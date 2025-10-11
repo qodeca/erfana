@@ -50,5 +50,9 @@ const content = await window.api.file.readFile('/path/to/file.md')
 | `file:writeFile` | file-handlers | Write file content |
 | `file:getStats` | file-handlers | Get file metadata |
 | `file:getProjectPath` | file-handlers | Get current project path |
+| `file:createFile` | file-handlers | Create new empty file |
+| `file:createFolder` | file-handlers | Create new folder |
+| `file:renameFile` | file-handlers | Rename file or folder |
+| `file:deleteFile` | file-handlers | Delete file or folder |
 
 See: [Architecture](./architecture.md) | [Security](./security.md)

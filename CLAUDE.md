@@ -43,13 +43,17 @@ src/
 │   └── index.d.ts         # window.api types
 └── renderer/src/
     ├── components/
-    │   ├── DockLayout/    # Panel system
-    │   ├── Toolbar/       # Top toolbar with toggle buttons
-    │   ├── Panels/        # Panel implementations
-    │   ├── Editor/        # Monaco + Preview
-    │   └── FileTree/      # File explorer
-    ├── hooks/             # React hooks
-    └── App.tsx            # Root component
+    │   ├── DockLayout/      # Panel system
+    │   ├── Toolbar/         # Top toolbar with toggle buttons
+    │   ├── Panels/          # Panel implementations
+    │   ├── Editor/          # Monaco + Preview + Context Menus
+    │   ├── FileTree/        # File explorer with context menu
+    │   ├── ContextMenu/     # Right-click menu (file tree)
+    │   ├── ConfirmDialog/   # Confirmation dialogs
+    │   └── Toast/           # Toast notifications
+    ├── contexts/            # React contexts (ToastContext)
+    ├── hooks/               # React hooks
+    └── App.tsx              # Root (wrapped with ToastProvider)
 ```
 
 📚 **Detailed architecture**: See [docs/architecture.md](docs/architecture.md)
@@ -89,9 +93,13 @@ Add panels by creating component, registering in `AppDockLayout.tsx`, and adding
 ## Markdown Editing
 
 Superior markdown capabilities with Monaco Editor + live preview:
-- **Editor**: Monaco with word wrap, standard text editing shortcuts
-- **Preview**: GitHub-styled with GFM support, syntax highlighting
+- **Multi-File Tabs**: Each file gets unique panel with independent state
+- **Formatting Toolbar**: 10 markdown buttons (bold, italic, code, links, images, headings, lists)
+- **Document Statistics**: Real-time word count, character count, lines, reading time
+- **Auto-Save**: Debounced auto-save (2s after last edit) with visual indicator
+- **Claude Integration**: Right-click context menu in preview for AI-powered text operations
 - **View Modes**: Editor only, split view (default), preview only
+- **Preview**: GitHub-styled with GFM support, syntax highlighting
 
 📚 **Markdown features**: See [docs/markdown-editing.md](docs/markdown-editing.md)
 
@@ -127,7 +135,7 @@ Superior markdown capabilities with Monaco Editor + live preview:
 
 - **node-pty**: Build fails on Python 3.13 - terminal panel deferred
 - **Dockview CSS**: Use `dockview/dist/styles/dockview.css` path
-- **Monaco CDN**: Loads workers from CDN (offline mode future enhancement)
+- **Monaco CSP**: ✅ RESOLVED - Monaco now uses local bundling instead of CDN
 
 📚 **All known issues**: See [docs/known-issues.md](docs/known-issues.md)
 
