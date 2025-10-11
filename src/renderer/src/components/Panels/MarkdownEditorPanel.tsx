@@ -197,6 +197,96 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
 
         <div className="editor-controls">
           <button
+            className="save-btn"
+            onClick={() => handleSave(false)}
+            disabled={!currentFile?.modified}
+            title="Save (Cmd/Ctrl+S)"
+          >
+            <SaveIcon size={16} strokeWidth={2} />
+            <span>Save</span>
+          </button>
+        </div>
+      </div>
+
+      {currentFile && (
+        <div className="markdown-toolbar">
+          {(viewMode === 'editor' || viewMode === 'split') && (
+            <>
+              <button
+                className="toolbar-btn"
+                onClick={() => editorRef.current?.formatBold()}
+                title="Bold (Cmd/Ctrl+B)"
+              >
+                <Bold size={16} strokeWidth={2} />
+              </button>
+              <button
+                className="toolbar-btn"
+                onClick={() => editorRef.current?.formatItalic()}
+                title="Italic (Cmd/Ctrl+I)"
+              >
+                <Italic size={16} strokeWidth={2} />
+              </button>
+              <button
+                className="toolbar-btn"
+                onClick={() => editorRef.current?.formatStrikethrough()}
+                title="Strikethrough"
+              >
+                <Strikethrough size={16} strokeWidth={2} />
+              </button>
+
+              <div className="toolbar-separator" />
+
+              <button
+                className="toolbar-btn"
+                onClick={() => editorRef.current?.formatCode()}
+                title="Inline Code"
+              >
+                <Code size={16} strokeWidth={2} />
+              </button>
+              <button
+                className="toolbar-btn"
+                onClick={() => editorRef.current?.insertLink()}
+                title="Insert Link (Cmd/Ctrl+K)"
+              >
+                <Link size={16} strokeWidth={2} />
+              </button>
+              <button
+                className="toolbar-btn"
+                onClick={() => editorRef.current?.insertImage()}
+                title="Insert Image"
+              >
+                <Image size={16} strokeWidth={2} />
+              </button>
+
+              <div className="toolbar-separator" />
+
+              <button
+                className="toolbar-btn"
+                onClick={() => editorRef.current?.insertHeading(1)}
+                title="Heading 1"
+              >
+                <Heading1 size={16} strokeWidth={2} />
+              </button>
+              <button
+                className="toolbar-btn"
+                onClick={() => editorRef.current?.insertList(false)}
+                title="Bullet List"
+              >
+                <List size={16} strokeWidth={2} />
+              </button>
+              <button
+                className="toolbar-btn"
+                onClick={() => editorRef.current?.insertList(true)}
+                title="Numbered List"
+              >
+                <ListOrdered size={16} strokeWidth={2} />
+              </button>
+            </>
+          )}
+
+          <div className="toolbar-spacer" />
+
+          <button
             className={`view-mode-btn ${viewMode === 'editor' ? 'active' : ''}`}
             onClick={() => setViewMode('editor')}
             title="Editor Only"
@@ -216,92 +306,6 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
             title="Preview Only"
           >
             <Eye size={16} strokeWidth={2} />
-          </button>
-
-          <div className="toolbar-separator" />
-
-          <button
-            className="save-btn"
-            onClick={() => handleSave(false)}
-            disabled={!currentFile?.modified}
-            title="Save (Cmd/Ctrl+S)"
-          >
-            <SaveIcon size={16} strokeWidth={2} />
-            <span>Save</span>
-          </button>
-        </div>
-      </div>
-
-      {currentFile && (viewMode === 'editor' || viewMode === 'split') && (
-        <div className="markdown-toolbar">
-          <button
-            className="toolbar-btn"
-            onClick={() => editorRef.current?.formatBold()}
-            title="Bold (Cmd/Ctrl+B)"
-          >
-            <Bold size={16} strokeWidth={2} />
-          </button>
-          <button
-            className="toolbar-btn"
-            onClick={() => editorRef.current?.formatItalic()}
-            title="Italic (Cmd/Ctrl+I)"
-          >
-            <Italic size={16} strokeWidth={2} />
-          </button>
-          <button
-            className="toolbar-btn"
-            onClick={() => editorRef.current?.formatStrikethrough()}
-            title="Strikethrough"
-          >
-            <Strikethrough size={16} strokeWidth={2} />
-          </button>
-
-          <div className="toolbar-separator" />
-
-          <button
-            className="toolbar-btn"
-            onClick={() => editorRef.current?.formatCode()}
-            title="Inline Code"
-          >
-            <Code size={16} strokeWidth={2} />
-          </button>
-          <button
-            className="toolbar-btn"
-            onClick={() => editorRef.current?.insertLink()}
-            title="Insert Link (Cmd/Ctrl+K)"
-          >
-            <Link size={16} strokeWidth={2} />
-          </button>
-          <button
-            className="toolbar-btn"
-            onClick={() => editorRef.current?.insertImage()}
-            title="Insert Image"
-          >
-            <Image size={16} strokeWidth={2} />
-          </button>
-
-          <div className="toolbar-separator" />
-
-          <button
-            className="toolbar-btn"
-            onClick={() => editorRef.current?.insertHeading(1)}
-            title="Heading 1"
-          >
-            <Heading1 size={16} strokeWidth={2} />
-          </button>
-          <button
-            className="toolbar-btn"
-            onClick={() => editorRef.current?.insertList(false)}
-            title="Bullet List"
-          >
-            <List size={16} strokeWidth={2} />
-          </button>
-          <button
-            className="toolbar-btn"
-            onClick={() => editorRef.current?.insertList(true)}
-            title="Numbered List"
-          >
-            <ListOrdered size={16} strokeWidth={2} />
           </button>
         </div>
       )}
