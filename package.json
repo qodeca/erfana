@@ -33,6 +33,7 @@
     "dockview": "^4.9.0",
     "electron-store": "^11.0.2",
     "gray-matter": "^4.0.3",
+    "lucide-react": "^0.545.0",
     "monaco-editor": "^0.54.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
