@@ -14,15 +14,15 @@ import { Toolbar } from '../Toolbar/Toolbar'
 // File Explorer Panel - wraps FileTree
 const FileExplorerPanel = (props: IDockviewPanelProps) => {
   const handleFileSelect = (filePath: string) => {
-    // Get the DockView API from props
-    const api = props.api
+    // Get the main DockView API through the group accessor
+    const mainApi = props.containerApi
 
     // Find or create editor panel
-    let editorPanel = api.getPanel('editor')
+    let editorPanel = mainApi.getPanel('editor')
 
     if (!editorPanel) {
       // Create editor panel if it doesn't exist
-      editorPanel = api.addPanel({
+      editorPanel = mainApi.addPanel({
         id: 'editor',
         component: 'editor',
         title: 'Editor'

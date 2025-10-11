@@ -12,6 +12,10 @@ declare global {
         writeFile: (filePath: string, content: string) => Promise<boolean>
         getStats: (filePath: string) => Promise<FileStats>
         getProjectPath: () => Promise<string | null>
+        createFile: (dirPath: string, fileName: string) => Promise<string>
+        createFolder: (dirPath: string, folderName: string) => Promise<string>
+        deleteFile: (filePath: string) => Promise<boolean>
+        deleteFolder: (folderPath: string) => Promise<boolean>
       }
     }
   }

@@ -1,4 +1,4 @@
-import { readdir, readFile, writeFile, stat } from 'fs/promises'
+import { readdir, readFile, writeFile, stat, rm, mkdir } from 'fs/promises'
 import { join, extname, basename } from 'path'
 
 export interface FileNode {
@@ -78,6 +78,95 @@ export class FileService {
   isMarkdownFile(filePath: string): boolean {
     const ext = extname(filePath).toLowerCase()
     return ext === '.md' || ext === '.markdown'
+  }
+
+  async createFile(dirPath: string, fileName: string): Promise<string> {
+    // Ensure .md extension
+    if (!fileName.endsWith('.md') && !fileName.endsWith('.markdown')) {
+      fileName = `${fileName}.md`
+    }
+
+    const filePath = join(dirPath, fileName)
+
+    // Check if file already exists
+    try {
+      await stat(filePath)
+      throw new Error(`File "${fileName}" already exists`)
+    } catch (error: any) {
+      // File doesn't exist - good, we can create it
+      if (error.code !== 'ENOENT') {
+        throw error
+      }
+    }
+
+    // Create file with default content
+    const defaultContent = `# ${basename(fileName, extname(fileName))}\n\n`
+    await writeFile(filePath, defaultContent, 'utf-8')
+
+    return filePath
+  }
+
+  async createFolder(dirPath: string, folderName: string): Promise<string> {
+    // Sanitize folder name - remove path separators
+    folderName = folderName.replace(/[/\\]/g, '')
+
+    if (!folderName) {
+      throw new Error('Folder name cannot be empty')
+    }
+
+    const folderPath = join(dirPath, folderName)
+
+    // Check if folder already exists
+    try {
+      await stat(folderPath)
+      throw new Error(`Folder "${folderName}" already exists`)
+    } catch (error: any) {
+      // Folder doesn't exist - good, we can create it
+      if (error.code !== 'ENOENT') {
+        throw error
+      }
+    }
+
+    // Create folder
+    await mkdir(folderPath)
+
+    return folderPath
+  }
+
+  async deleteFile(filePath: string): Promise<void> {
+    // Verify it's a file, not a directory
+    const stats = await stat(filePath)
+    if (stats.isDirectory()) {
+      throw new Error('Cannot delete a directory using deleteFile. Use deleteFolder instead.')
+    }
+
+    // Prevent deleting files outside project
+    if (this.projectPath && !filePath.startsWith(this.projectPath)) {
+      throw new Error('Cannot delete files outside the project directory')
+    }
+
+    await rm(filePath)
+  }
+
+  async deleteFolder(folderPath: string): Promise<void> {
+    // Verify it's a directory
+    const stats = await stat(folderPath)
+    if (!stats.isDirectory()) {
+      throw new Error('Path is not a directory')
+    }
+
+    // Prevent deleting project root
+    if (this.projectPath && folderPath === this.projectPath) {
+      throw new Error('Cannot delete the project root directory')
+    }
+
+    // Prevent deleting folders outside project
+    if (this.projectPath && !folderPath.startsWith(this.projectPath)) {
+      throw new Error('Cannot delete folders outside the project directory')
+    }
+
+    // Delete folder recursively
+    await rm(folderPath, { recursive: true, force: true })
   }
 }
 

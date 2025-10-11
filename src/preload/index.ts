@@ -28,7 +28,15 @@ const api = {
       ipcRenderer.invoke('file:writeFile', filePath, content),
     getStats: (filePath: string): Promise<FileStats> =>
       ipcRenderer.invoke('file:getStats', filePath),
-    getProjectPath: (): Promise<string | null> => ipcRenderer.invoke('file:getProjectPath')
+    getProjectPath: (): Promise<string | null> => ipcRenderer.invoke('file:getProjectPath'),
+    createFile: (dirPath: string, fileName: string): Promise<string> =>
+      ipcRenderer.invoke('file:createFile', dirPath, fileName),
+    createFolder: (dirPath: string, folderName: string): Promise<string> =>
+      ipcRenderer.invoke('file:createFolder', dirPath, folderName),
+    deleteFile: (filePath: string): Promise<boolean> =>
+      ipcRenderer.invoke('file:deleteFile', filePath),
+    deleteFolder: (folderPath: string): Promise<boolean> =>
+      ipcRenderer.invoke('file:deleteFolder', folderPath)
   }
 }
 
