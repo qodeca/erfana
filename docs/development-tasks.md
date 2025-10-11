@@ -124,6 +124,119 @@ Protection is automatic - click interception and auto-restore work immediately.
 
 See: [UI Components](./ui-components.md#panel-protection)
 
+## Testing with Circuit Electron MCP
+
+Circuit Electron MCP allows Claude Code to visually inspect and test Erfana UI.
+
+### Quick Test After Code Changes
+
+```bash
+# 1. Build first
+npm run build
+
+# 2. Use Circuit Electron MCP
+```
+
+```typescript
+// Launch and screenshot
+const s = mcp__circuit-electron__app_launch({
+  app: "/Users/marcinobel/Projects/erfana/out/main/index.js",
+  compressScreenshots: true
+})
+
+mcp__circuit-electron__screenshot({ sessionId: s.sessionId })
+mcp__circuit-electron__close({ sessionId: s.sessionId })
+```
+
+### Testing New Feature
+
+```typescript
+// 1. Launch app
+const s = mcp__circuit-electron__app_launch({ app: "..." })
+
+// 2. Navigate to feature
+mcp__circuit-electron__click_by_text({ sessionId: s.sessionId, text: "Feature Name" })
+mcp__circuit-electron__wait_for_selector({ sessionId: s.sessionId, selector: ".feature-element" })
+
+// 3. Screenshot
+mcp__circuit-electron__screenshot({ sessionId: s.sessionId })
+
+// 4. Verify
+const works = mcp__circuit-electron__evaluate({
+  sessionId: s.sessionId,
+  expression: "document.querySelector('.expected-result') !== null"
+})
+
+// 5. Close
+mcp__circuit-electron__close({ sessionId: s.sessionId })
+```
+
+### Testing Keyboard Shortcut
+
+```typescript
+const s = mcp__circuit-electron__app_launch({ app: "..." })
+
+// Press shortcut (e.g., Cmd+B)
+mcp__circuit-electron__keyboard_press({
+  sessionId: s.sessionId,
+  key: "b",
+  modifiers: ["Meta"]
+})
+
+// Verify result
+mcp__circuit-electron__screenshot({ sessionId: s.sessionId })
+const hidden = mcp__circuit-electron__evaluate({
+  sessionId: s.sessionId,
+  expression: "!document.querySelector('[title=\"Explorer\"]')?.parentElement.offsetParent"
+})
+
+mcp__circuit-electron__close({ sessionId: s.sessionId })
+```
+
+### Verifying UI Changes
+
+```typescript
+// Before changes - baseline screenshot
+const s = mcp__circuit-electron__app_launch({ app: "..." })
+mcp__circuit-electron__screenshot({ sessionId: s.sessionId })
+
+// Make code changes, rebuild, relaunch
+const s2 = mcp__circuit-electron__app_launch({ app: "..." })
+mcp__circuit-electron__screenshot({ sessionId: s2.sessionId })
+
+// Compare visually or programmatically
+const newState = mcp__circuit-electron__evaluate({
+  sessionId: s2.sessionId,
+  expression: "/* check new behavior */"
+})
+```
+
+### Common Test Selectors
+
+| Element | Selector |
+|---------|----------|
+| Main layout | `.app-dock-layout` |
+| File tree | `.file-tree` |
+| Monaco editor | `.monaco-editor` |
+| Preview pane | `.preview-pane` |
+| Save button | `button.save-btn` |
+| Modified indicator | `.modified-indicator` |
+| Explorer panel | `[title="Explorer"]` |
+| Terminal panel | `[title="Terminal"]` |
+
+### Available MCP Tools
+
+- `app_launch` - Start Erfana
+- `screenshot` - Capture compressed screenshot
+- `click`, `click_by_text`, `click_by_role` - UI interaction
+- `keyboard_type`, `keyboard_press` - Input simulation
+- `evaluate` - Run JavaScript in app
+- `wait_for_selector` - Wait for element
+- `snapshot` - Get accessibility tree
+- `close` - End session
+
+See: [Testing Index](./testing/README.md) | [Circuit Electron Guide](./testing/circuit-electron-guide.md) | [Quick Start](./testing/quickstart.md) | [UI Scenarios](./testing/ui-scenarios.md) | [Interaction Scenarios](./testing/interaction-scenarios.md)
+
 ## Debugging
 
 - **Main Process**: Terminal output (`console.log`)
