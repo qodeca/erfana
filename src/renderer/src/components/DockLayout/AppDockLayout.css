@@ -1,0 +1,48 @@
+.app-dock-layout {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.dockview-theme-dark {
+  --dv-activegroup-visiblepanel-tab-background-color: #2d2d30;
+  --dv-activegroup-hiddenpanel-tab-background-color: #2d2d30;
+  --dv-inactivegroup-visiblepanel-tab-background-color: #252526;
+  --dv-inactivegroup-hiddenpanel-tab-background-color: #252526;
+  --dv-tabs-and-actions-container-background-color: #252526;
+  --dv-tabs-and-actions-container-color: #cccccc;
+  --dv-separator-border: #3c3c3c;
+  --dv-paneview-header-border-color: #3c3c3c;
+  --dv-group-view-background-color: #1e1e1e;
+  --dv-activegroup-visiblepanel-tab-color: #ffffff;
+  --dv-activegroup-hiddenpanel-tab-color: #cccccc;
+  --dv-inactivegroup-visiblepanel-tab-color: #cccccc;
+  --dv-inactivegroup-hiddenpanel-tab-color: #858585;
+}
+
+.panel-content {
+  padding: 20px;
+  color: #cccccc;
+  height: 100%;
+  overflow: auto;
+  background-color: #1e1e1e;
+}
+
+.panel-content h3 {
+  margin-top: 0;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.panel-content p {
+  color: #858585;
+  font-size: 14px;
+}
+
+.panel-content .hint {
+  font-size: 12px;
+  color: #6a6a6a;
+  font-style: italic;
+}

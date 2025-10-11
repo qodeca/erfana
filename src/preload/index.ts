@@ -1,0 +1,50 @@
+import { contextBridge, ipcRenderer } from 'electron'
+import { electronAPI } from '@electron-toolkit/preload'
+
+export interface FileNode {
+  name: string
+  path: string
+  type: 'file' | 'directory'
+  children?: FileNode[]
+  extension?: string
+}
+
+export interface FileStats {
+  size: number
+  modified: Date
+  created: Date
+}
+
+// Custom APIs for renderer
+const api = {
+  // File operations
+  file: {
+    openProject: (): Promise<string | null> => ipcRenderer.invoke('file:openProject'),
+    readDirectory: (dirPath: string): Promise<FileNode[]> =>
+      ipcRenderer.invoke('file:readDirectory', dirPath),
+    readFile: (filePath: string): Promise<string> =>
+      ipcRenderer.invoke('file:readFile', filePath),
+    writeFile: (filePath: string, content: string): Promise<boolean> =>
+      ipcRenderer.invoke('file:writeFile', filePath, content),
+    getStats: (filePath: string): Promise<FileStats> =>
+      ipcRenderer.invoke('file:getStats', filePath),
+    getProjectPath: (): Promise<string | null> => ipcRenderer.invoke('file:getProjectPath')
+  }
+}
+
+// Use `contextBridge` APIs to expose Electron APIs to
+// renderer only if context isolation is enabled, otherwise
+// just add to the DOM global.
+if (process.contextIsolated) {
+  try {
+    contextBridge.exposeInMainWorld('electron', electronAPI)
+    contextBridge.exposeInMainWorld('api', api)
+  } catch (error) {
+    console.error(error)
+  }
+} else {
+  // @ts-ignore (define in dts)
+  window.electron = electronAPI
+  // @ts-ignore (define in dts)
+  window.api = api
+}

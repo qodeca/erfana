@@ -1,0 +1,127 @@
+import { useRef, useEffect } from 'react'
+import Editor, { OnMount } from '@monaco-editor/react'
+import * as monaco from 'monaco-editor'
+import './MonacoMarkdownEditor.css'
+
+interface MonacoMarkdownEditorProps {
+  value: string
+  onChange: (value: string) => void
+  filePath?: string
+  onSelectionChange?: (selection: string) => void
+}
+
+export function MonacoMarkdownEditor({
+  value,
+  onChange,
+  filePath,
+  onSelectionChange
+}: MonacoMarkdownEditorProps) {
+  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
+
+  const handleEditorDidMount: OnMount = (editor, monaco) => {
+    editorRef.current = editor
+
+    // Configure markdown-specific options
+    editor.updateOptions({
+      wordWrap: 'on',
+      wrappingIndent: 'same',
+      lineNumbers: 'on',
+      minimap: { enabled: true },
+      fontSize: 14,
+      lineHeight: 24,
+      padding: { top: 16, bottom: 16 },
+      scrollBeyondLastLine: false,
+      renderWhitespace: 'selection',
+      rulers: [80, 120],
+      bracketPairColorization: { enabled: true }
+    })
+
+    // Handle selection changes
+    editor.onDidChangeCursorSelection((e) => {
+      const selection = editor.getModel()?.getValueInRange(e.selection)
+      if (selection && onSelectionChange) {
+        onSelectionChange(selection)
+      }
+    })
+
+    // Add markdown-specific keybindings
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB, () => {
+      wrapSelection('**')
+    })
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyI, () => {
+      wrapSelection('*')
+    })
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, () => {
+      insertLink()
+    })
+  }
+
+  const wrapSelection = (wrapper: string) => {
+    const editor = editorRef.current
+    if (!editor) return
+
+    const selection = editor.getSelection()
+    if (!selection) return
+
+    const model = editor.getModel()
+    if (!model) return
+
+    const selectedText = model.getValueInRange(selection)
+    const wrappedText = `${wrapper}${selectedText}${wrapper}`
+
+    editor.executeEdits('', [
+      {
+        range: selection,
+        text: wrappedText
+      }
+    ])
+
+    // Update selection to be inside the wrapper
+    editor.setSelection({
+      startLineNumber: selection.startLineNumber,
+      startColumn: selection.startColumn + wrapper.length,
+      endLineNumber: selection.endLineNumber,
+      endColumn: selection.endColumn + wrapper.length
+    })
+  }
+
+  const insertLink = () => {
+    const editor = editorRef.current
+    if (!editor) return
+
+    const selection = editor.getSelection()
+    if (!selection) return
+
+    const model = editor.getModel()
+    if (!model) return
+
+    const selectedText = model.getValueInRange(selection)
+    const linkText = selectedText || 'link text'
+    const markdown = `[${linkText}](url)`
+
+    editor.executeEdits('', [
+      {
+        range: selection,
+        text: markdown
+      }
+    ])
+  }
+
+  return (
+    <div className="monaco-markdown-editor">
+      <Editor
+        height="100%"
+        language="markdown"
+        theme="vs-dark"
+        value={value}
+        onChange={(value) => onChange(value || '')}
+        onMount={handleEditorDidMount}
+        options={{
+          automaticLayout: true
+        }}
+      />
+    </div>
+  )
+}
