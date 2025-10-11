@@ -116,6 +116,35 @@
   flex-shrink: 0;
 }
 
+.toolbar-spacer {
+  flex: 1;
+  min-width: 12px;
+}
+
+.markdown-toolbar .view-mode-btn {
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  background-color: transparent;
+  border: 1px solid transparent;
+  color: #cccccc;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.2s;
+}
+
+.markdown-toolbar .view-mode-btn:hover {
+  background-color: #2a2d2e;
+  border-color: #3c3c3c;
+  color: #ffffff;
+}
+
+.markdown-toolbar .view-mode-btn.active {
+  background-color: #0e639c;
+  border-color: #0e639c;
+  color: #ffffff;
+}
+
 .toolbar-btn {
   display: flex;
   align-items: center;
