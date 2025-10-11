@@ -5,7 +5,9 @@ export function registerFileHandlers(): void {
   // Open project folder
   ipcMain.handle('file:openProject', async () => {
     const result = await dialog.showOpenDialog({
-      properties: ['openDirectory']
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Select Project Folder',
+      buttonLabel: 'Open Project'
     })
 
     if (result.canceled || result.filePaths.length === 0) {

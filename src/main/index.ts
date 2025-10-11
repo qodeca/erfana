@@ -11,6 +11,7 @@ function createWindow(): void {
     height: 900,
     show: false,
     autoHideMenuBar: true,
+    title: 'Erfana',
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -42,6 +43,9 @@ function createWindow(): void {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
+  // Set application name (shows in macOS menu bar)
+  app.setName('Erfana')
+
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.erfana')
 

@@ -60,4 +60,56 @@ self.MonacoEnvironment = {
 
 **Action**: Ignore warnings; electron-toolkit will update
 
-See: [Architecture](./architecture.md)
+---
+
+## Panel Close Button CSS Selectors
+
+**Issue**: CSS uses `:has()` selector for hiding close buttons on protected panels
+
+**Browser Support**: Chrome 105+, Firefox 121+, Safari 15.4+
+
+**Impact**: If browser doesn't support `:has()`, close buttons won't be hidden by CSS
+
+**Mitigation**: JavaScript capture-phase event listener provides fallback protection
+
+**Status**: Acceptable - Electron uses recent Chromium which supports `:has()`
+
+See: [UI Components](./ui-components.md#panel-protection)
+
+---
+
+## localStorage Clear on Startup
+
+**Issue**: `loadPersistedState()` clears localStorage on every app start
+
+**Location**: `src/renderer/src/components/DockLayout/AppDockLayout.tsx` line 89
+
+**Reason**: Temporary workaround during development to force fresh state
+
+**Impact**: Panel sizes and visibility reset to defaults every time
+
+**Action**: Remove `localStorage.removeItem('erfana-sidebar-state')` after development stabilizes
+
+---
+
+## Panel Protection Implementation
+
+**Issue**: Multiple attempts to hide close buttons failed
+
+**Root Cause**: Used wrong CSS class selectors (`.tab-label` instead of `.dv-default-tab-content`)
+
+**Current Solution**:
+- Capture-phase event listener intercepts clicks on `.dv-default-tab-action`
+- Fallback auto-restore if panel somehow removed
+
+**Technical Debt**:
+- Multiple setTimeout calls for button hiding (can be optimized)
+- CSS selectors using `textContent` attribute may have compatibility issues
+
+**Status**: Working solution, but could be more elegant
+
+See: [UI Components](./ui-components.md#panel-protection)
+
+---
+
+See: [Architecture](./architecture.md) | [UI Components](./ui-components.md)

@@ -25,3 +25,6 @@ dist-ssr
 
 # Electron
 out
+
+# Temporary files
+temp/

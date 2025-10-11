@@ -32,6 +32,7 @@ src/
     └── src/
         ├── components/
         │   ├── DockLayout/      # Panel system
+        │   ├── Toolbar/         # Top toolbar with toggle buttons
         │   ├── Panels/          # Panel implementations
         │   ├── Editor/          # Monaco + Preview
         │   └── FileTree/        # File explorer
@@ -46,4 +47,4 @@ src/
 - **Component Registry**: Dockview uses string-based component lookup
 - **Multi-model Editor**: Single Monaco instance, swap models per file
 
-See: [IPC Patterns](./ipc-patterns.md) | [Security](./security.md)
+See: [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md) | [Security](./security.md)
