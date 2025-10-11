@@ -4,283 +4,134 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Erfana** is an Electron desktop IDE specifically designed for managing consulting and research projects with Claude Code integration. It provides a multi-panel workspace with markdown editing, git integration, and direct Claude AI assistance.
+**Erfana** is an Electron desktop IDE for managing consulting and research projects with Claude Code integration. Multi-panel workspace with superior markdown editing, git integration, and direct Claude AI assistance.
 
-## Development Commands
+## Quick Start
 
-### Running the App
 ```bash
-npm run dev          # Start development server with hot reload
-npm start            # Start app in production mode
-```
-
-### Building
-```bash
+npm run dev          # Start development with hot reload
 npm run build        # Build for production
-npm run build:mac    # Build macOS app
-npm run build:win    # Build Windows app
-npm run build:linux  # Build Linux app
-```
-
-### Code Quality
-```bash
 npm run lint         # Run ESLint
-npm run format       # Format code with Prettier
-npm run typecheck    # Type-check all TypeScript files
+npm run typecheck    # Type-check TypeScript
 ```
 
-## Architecture
+## Architecture Quick Reference
 
-### Three-Process Model
-Erfana follows Electron's standard architecture:
+Erfana follows Electron's three-process model:
 
-1. **Main Process** (`src/main/`): Node.js environment
-   - Window lifecycle management
-   - File system operations
-   - Native OS integration
-   - IPC request handlers
+1. **Main Process** (`src/main/`): Node.js environment - window lifecycle, file operations, IPC handlers
+2. **Preload Script** (`src/preload/`): Secure bridge using `contextBridge` for type-safe IPC
+3. **Renderer Process** (`src/renderer/`): React UI with Dockview panels, no Node.js access
 
-2. **Preload Script** (`src/preload/`): Secure bridge
-   - Exposes safe APIs via `contextBridge`
-   - Type-safe IPC channels
-   - NO direct Node.js access in renderer
+**Key Technologies:**
+- electron-vite (build tool)
+- Dockview (VS Code-like panels)
+- Monaco Editor (markdown editing)
+- react-markdown + remark-gfm (preview)
+- @anthropic-ai/claude-agent-sdk (Claude AI)
+- simple-git (git operations)
 
-3. **Renderer Process** (`src/renderer/`): React UI
-   - All UI components
-   - Dockview panel system
-   - No Node.js integration (security)
-
-### Key Technologies
-
-- **electron-vite**: Build tool optimized for Electron + Vite
-- **Dockview**: Panel docking system (VS Code-like)
-- **Monaco Editor**: Code editor (VS Code's engine)
-- **@xterm/xterm**: Terminal emulator
-- **@anthropic-ai/claude-agent-sdk**: Claude AI integration
-- **simple-git**: Git operations
-- **electron-store**: Persistent settings
-
-## Project Structure
-
+**Project Structure:**
 ```
 src/
 ├── main/
-│   ├── index.ts              # Main process entry point
-│   ├── services/             # Business logic classes (OOP)
-│   │   ├── ClaudeService.ts  # Claude Agent SDK wrapper
-│   │   ├── GitService.ts     # Git operations
-│   │   ├── ProjectService.ts # Project/workspace management
-│   │   └── FileWatchService.ts # File watching with chokidar
-│   └── ipc/                  # IPC handlers organized by domain
-│       ├── claude-handlers.ts
-│       ├── file-handlers.ts
-│       └── git-handlers.ts
-│
+│   ├── index.ts           # Entry point
+│   ├── services/          # Business logic (OOP)
+│   └── ipc/               # IPC handlers by domain
 ├── preload/
-│   ├── index.ts              # contextBridge setup
-│   └── index.d.ts            # Type definitions for window.api
-│
-└── renderer/
-    ├── index.html
-    └── src/
-        ├── components/
-        │   ├── DockLayout/       # Dockview setup
-        │   ├── Panels/           # Panel implementations
-        │   ├── Editor/           # Monaco Editor wrapper
-        │   ├── Terminal/         # xterm.js wrapper
-        │   ├── FileTree/         # Project file explorer
-        │   └── Git/              # Git UI components
-        ├── hooks/                # React hooks
-        ├── stores/               # Zustand state stores
-        ├── types/                # TypeScript type definitions
-        ├── App.tsx               # Root component
-        └── main.tsx              # React entry point
+│   ├── index.ts           # contextBridge API
+│   └── index.d.ts         # window.api types
+└── renderer/src/
+    ├── components/        # React components
+    ├── hooks/             # React hooks
+    └── App.tsx            # Root component
 ```
 
-## Important Patterns
+📚 **Detailed architecture**: See [docs/architecture.md](docs/architecture.md)
+
+## Essential Patterns
 
 ### IPC Communication
 
-**Secure Pattern (ALWAYS use this):**
+**Standard secure pattern:**
+1. Define in `src/preload/index.ts` with contextBridge
+2. Handle in `src/main/ipc/*-handlers.ts` with validation
+3. Call from renderer via `window.api.*`
 
-1. Define IPC channel in preload:
-```typescript
-// src/preload/index.ts
-const api = {
-  openProject: (path: string) => ipcRenderer.invoke('project:open', path)
-}
-contextBridge.exposeInMainWorld('api', api)
-```
-
-2. Handle in main process:
-```typescript
-// src/main/ipc/file-handlers.ts
-ipcMain.handle('project:open', async (_event, path: string) => {
-  // Validate input!
-  if (!isValidPath(path)) throw new Error('Invalid path')
-  return await projectService.open(path)
-})
-```
-
-3. Call from renderer:
-```typescript
-// src/renderer/src/components/...
-const result = await window.api.openProject('/path/to/project')
-```
+📚 **Full IPC patterns**: See [docs/ipc-patterns.md](docs/ipc-patterns.md)
 
 ### Service Classes (OOP)
 
-Services encapsulate business logic:
+Business logic lives in service classes (`src/main/services/`):
+- `FileService.ts` - File operations
+- `GitService.ts` - Git operations (future)
+- `ClaudeService.ts` - Claude SDK wrapper (future)
 
 ```typescript
-// src/main/services/GitService.ts
-export class GitService {
-  private git: SimpleGit
-
-  constructor(private projectPath: string) {
-    this.git = simpleGit(projectPath)
-  }
-
-  async getStatus(): Promise<StatusResult> {
-    return await this.git.status()
-  }
-
-  async commit(message: string): Promise<void> {
-    await this.git.commit(message)
-  }
+export class MyService {
+  constructor(private config: Config) {}
+  async doWork(): Promise<Result> { /* ... */ }
 }
+export const myService = new MyService(config)
 ```
 
 ### Dockview Panels
 
-Add new panels by:
+Add panels by creating component, registering in `AppDockLayout.tsx`, and adding to layout.
 
-1. Create component:
-```typescript
-// src/renderer/src/components/Panels/MyPanel.tsx
-export const MyPanel = (props: IDockviewPanelProps) => {
-  return <div>Content</div>
-}
-```
+📚 **Panel setup guide**: See [docs/development-tasks.md](docs/development-tasks.md#adding-dockview-panel)
 
-2. Register in DockLayout:
-```typescript
-// src/renderer/src/components/DockLayout/AppDockLayout.tsx
-const components = {
-  myPanel: MyPanel,
-  // ... other panels
-}
-```
+## Markdown Editing
 
-3. Add panel programmatically:
-```typescript
-event.api.addPanel({
-  id: 'myPanel',
-  component: 'myPanel',
-  title: 'My Panel'
-})
-```
+Superior markdown capabilities with Monaco Editor + live preview:
+- **Editor**: Monaco with word wrap, keyboard shortcuts (Cmd+B/I/K)
+- **Preview**: GitHub-styled with GFM support, syntax highlighting
+- **View Modes**: Editor only, split view (default), preview only
 
-## Known Issues & Workarounds
+📚 **Markdown features**: See [docs/markdown-editing.md](docs/markdown-editing.md)
 
-### node-pty Build Issue
-- **Problem**: node-pty fails to build on Python 3.13 (missing `distutils`)
-- **Workaround**: Terminal feature is deferred. Use Claude Agent SDK directly for now.
-- **Solution**: Switch to Python 3.12 or wait for node-pty update
+## Security
 
-### Monaco Editor in Electron
-- **Loading**: Monaco loads from CDN by default. For offline use, configure local loading:
-```typescript
-import * as monaco from 'monaco-editor'
-import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
+**Critical security rules:**
+- Context isolation ALWAYS enabled (`contextIsolation: true`)
+- Node integration ALWAYS disabled (`nodeIntegration: false`)
+- Validate ALL inputs in main process IPC handlers
+- Use contextBridge for all renderer ↔ main communication
 
-self.MonacoEnvironment = {
-  getWorker: () => new editorWorker()
-}
-```
+📚 **Security guidelines**: See [docs/security.md](docs/security.md)
 
-### Dockview Styling
-- Import CSS: `import 'dockview/dist/styles.css'`
-- Use dark theme class: `dockview-theme-dark`
-- Custom CSS variables for colors (see `AppDockLayout.css`)
+## Known Issues
 
-## Security Considerations
+- **node-pty**: Build fails on Python 3.13 - terminal panel deferred
+- **Dockview CSS**: Use `dockview/dist/styles/dockview.css` path
+- **Monaco CDN**: Loads workers from CDN (offline mode future enhancement)
 
-### Context Isolation
-- **ALWAYS ENABLED**: `contextIsolation: true` in BrowserWindow
-- Never disable for convenience
-- Use contextBridge for all IPC
+📚 **All known issues**: See [docs/known-issues.md](docs/known-issues.md)
 
-### IPC Validation
-- **Validate all inputs** in main process handlers
-- Check file paths, sanitize strings
-- Never trust renderer input
+## Common Tasks
 
-### CSP Headers
-```html
-<meta http-equiv="Content-Security-Policy"
-      content="default-src 'self';
-               script-src 'self';
-               style-src 'self' 'unsafe-inline';
-               font-src 'self' data:" />
-```
+### Adding New IPC Channel
+1. Define in `src/preload/index.ts` with types
+2. Create handler in `src/main/ipc/*-handlers.ts` with validation
+3. Register in `src/main/index.ts`
+4. Call from renderer via `window.api.*`
 
-### No Node Integration
-- `nodeIntegration: false` in renderer
-- Use preload script for Node.js features
-
-## Testing Strategy
-
-### Unit Tests
-- Service classes in `src/main/services/`
-- React components with React Testing Library
-- IPC handlers (mock ipcMain/ipcRenderer)
-
-### Integration Tests
-- Full IPC flow (main ↔ renderer)
-- File operations end-to-end
-- Git operations
-
-### Manual Testing
-```bash
-npm run dev
-# Test:
-# 1. Open project folder
-# 2. Navigate file tree
-# 3. Open markdown file
-# 4. Run Claude prompt
-# 5. Check git status
-```
-
-## Common Development Tasks
-
-### Adding a New IPC Channel
-1. Add to preload API with types
-2. Create handler in main process
-3. Call from renderer component
-4. Test with dev tools
-
-### Adding a New Panel
-1. Create panel component
-2. Register in DockLayout
-3. Add panel in layout setup
-4. Style with CSS
-
-### Integrating a New Library
-1. `npm install library-name`
-2. If main process: Import in service
-3. If renderer: Import in component
-4. Update types if needed
+### Adding New Panel
+1. Create `src/renderer/src/components/Panels/MyPanel.tsx`
+2. Register in `AppDockLayout.tsx` components object
+3. Add panel via `event.api.addPanel()` in layout
 
 ### Debugging
-- **Main Process**: `console.log()` appears in terminal
-- **Renderer**: Use Chrome DevTools (F12)
-- **IPC**: Log both sides to trace communication
-- **Electron DevTools**: Automatically opens in dev mode
+- **Main Process**: Terminal output (`console.log`)
+- **Renderer**: Chrome DevTools (F12)
+- **IPC**: Log both sides to trace calls
 
-## Claude Code Integration
+📚 **Detailed development tasks**: See [docs/development-tasks.md](docs/development-tasks.md)
 
-### Using Claude Agent SDK
+## Claude Code Integration (Future)
+
+Planned integration using Claude Agent SDK:
+
 ```typescript
 import { query } from '@anthropic-ai/claude-agent-sdk'
 
@@ -289,66 +140,38 @@ for await (const message of query(prompt, {
   permissionMode: 'acceptEdits',
   workingDirectory: projectPath
 })) {
-  // Stream messages to renderer via IPC
   mainWindow.webContents.send('claude:message', message)
 }
 ```
 
-### Terminal Integration (Future)
-When node-pty is working:
-```typescript
-// Spawn Claude Code CLI
-const pty = spawn('claude', ['-p', prompt], {
-  name: 'xterm-color',
-  cols: 80,
-  rows: 30
-})
-
-// Stream to xterm.js in renderer
-pty.on('data', (data) => {
-  terminal.write(data)
-})
-```
-
-## Performance Tips
-
-- **Monaco**: Use single editor instance, switch models for files
-- **Dockview**: Lazy-load panel content when possible
-- **File Watching**: Debounce file change events
-- **Git**: Cache status, only refresh on user action
-- **IPC**: Batch updates instead of individual messages
-
-## Build & Release
-
-### Development Build
-```bash
-npm run build        # Creates out/ directory
-```
-
-### Production Build
-```bash
-npm run build:mac    # Creates release/0.1.0/
-```
-
-### Auto-Update (Future)
-- Configure `publish` in electron-builder.yml
-- Set up release server
-- Sign apps (macOS requires signing)
+**Roadmap:**
+- [ ] ClaudeService implementation
+- [ ] Text selection → prompt flow
+- [ ] Streaming response UI
+- [ ] Terminal integration (when node-pty fixed)
 
 ## Contributing
 
 When adding features:
-1. Follow existing patterns (Service classes, IPC, etc.)
-2. Add TypeScript types
-3. Validate IPC inputs
-4. Update this CLAUDE.md if architecture changes
+1. Follow existing patterns (Service classes, secure IPC, OOP)
+2. Add TypeScript types for everything
+3. Validate all IPC inputs in main process
+4. Update relevant docs/ files
 5. Test with `npm run dev`
+
+## Documentation
+
+- [Architecture](docs/architecture.md) - Three-process model, tech stack, design decisions
+- [IPC Patterns](docs/ipc-patterns.md) - Secure communication patterns, current channels
+- [Markdown Editing](docs/markdown-editing.md) - Editor features, shortcuts, preview
+- [Security](docs/security.md) - Security guidelines, CSP, validation patterns
+- [Known Issues](docs/known-issues.md) - Current issues and workarounds
+- [Development Tasks](docs/development-tasks.md) - Common development patterns
 
 ## Useful Resources
 
 - [Electron Docs](https://www.electronjs.org/docs/latest/)
-- [electron-vite Docs](https://electron-vite.org/)
-- [Dockview Docs](https://dockview.dev/)
+- [electron-vite](https://electron-vite.org/)
+- [Dockview](https://dockview.dev/)
 - [Monaco Editor API](https://microsoft.github.io/monaco-editor/api/index.html)
 - [Claude Agent SDK](https://github.com/anthropics/claude-code)
-- [xterm.js Docs](https://xtermjs.org/)
