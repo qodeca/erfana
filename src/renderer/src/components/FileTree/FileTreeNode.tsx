@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, File, FileText, Folder } from 'lucide-react'
+import { ChevronRight, ChevronDown, File, FileText } from 'lucide-react'
 import type { FileNode } from '../../../../preload/index'
 import './FileTree.css'
 

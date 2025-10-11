@@ -61,10 +61,6 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
     onFileSelect(filePath)
   }
 
-  const handleFolderSelect = (folderPath: string) => {
-    setSelectedFolder(folderPath)
-  }
-
   const handleNewFile = () => {
     setIsCreatingFile(true)
     setNewFileName('')
