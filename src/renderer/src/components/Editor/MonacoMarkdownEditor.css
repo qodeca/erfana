@@ -1,0 +1,36 @@
+.monaco-markdown-editor {
+  width: 100%;
+  height: 100%;
+  background-color: #1e1e1e;
+}
+
+/* Override Monaco editor styles for better markdown experience */
+.monaco-markdown-editor .monaco-editor {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+}
+
+.monaco-markdown-editor .monaco-editor .view-line {
+  line-height: 1.6;
+}
+
+/* Markdown-specific styling hints */
+.monaco-markdown-editor .mtk1 {
+  /* Regular text */
+  color: #d4d4d4;
+}
+
+.monaco-markdown-editor .mtk4 {
+  /* Headings */
+  color: #569cd6;
+  font-weight: 600;
+}
+
+.monaco-markdown-editor .mtk8 {
+  /* Links */
+  color: #4ec9b0;
+}
+
+.monaco-markdown-editor .mtk12 {
+  /* Code */
+  color: #ce9178;
+}

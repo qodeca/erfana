@@ -1,0 +1,150 @@
+.markdown-editor-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #1e1e1e;
+}
+
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background-color: #252526;
+  border-bottom: 1px solid #3c3c3c;
+  height: 48px;
+  flex-shrink: 0;
+}
+
+.editor-file-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #cccccc;
+}
+
+.modified-indicator {
+  color: #4ec9b0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.editor-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.view-mode-btn {
+  padding: 6px 12px;
+  background-color: transparent;
+  border: 1px solid #3c3c3c;
+  color: #cccccc;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.view-mode-btn:hover {
+  background-color: #2a2d2e;
+  border-color: #4ec9b0;
+}
+
+.view-mode-btn.active {
+  background-color: #0e639c;
+  border-color: #0e639c;
+  color: #ffffff;
+}
+
+.toolbar-separator {
+  width: 1px;
+  height: 24px;
+  background-color: #3c3c3c;
+  margin: 0 8px;
+}
+
+.save-btn {
+  padding: 6px 12px;
+  background-color: #0e639c;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.save-btn:hover:not(:disabled) {
+  background-color: #1177bb;
+}
+
+.save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.editor-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.editor-content.view-mode-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.editor-content.view-mode-editor .preview-pane,
+.editor-content.view-mode-preview .editor-pane {
+  display: none;
+}
+
+.editor-pane {
+  height: 100%;
+  overflow: hidden;
+  border-right: 1px solid #3c3c3c;
+}
+
+.preview-pane {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.editor-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #858585;
+  gap: 8px;
+}
+
+.editor-empty p {
+  margin: 0;
+}
+
+.editor-empty .hint {
+  font-size: 12px;
+  color: #6a6a6a;
+}
+
+.selection-info {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  padding: 4px 8px;
+  background-color: #2d2d30;
+  border: 1px solid #3c3c3c;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #858585;
+  pointer-events: none;
+}

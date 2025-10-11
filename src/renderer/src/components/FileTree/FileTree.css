@@ -1,0 +1,131 @@
+.file-tree {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #252526;
+  color: #cccccc;
+  font-size: 13px;
+}
+
+.file-tree-header {
+  padding: 8px;
+  border-bottom: 1px solid #3c3c3c;
+}
+
+.open-project-btn {
+  width: 100%;
+  padding: 6px 12px;
+  background-color: #0e639c;
+  color: #ffffff;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.open-project-btn:hover:not(:disabled) {
+  background-color: #1177bb;
+}
+
+.open-project-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.file-tree-path {
+  padding: 8px;
+  font-size: 11px;
+  color: #858585;
+  border-bottom: 1px solid #3c3c3c;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.file-tree-error {
+  padding: 8px;
+  background-color: #5a1d1d;
+  color: #f48771;
+  font-size: 12px;
+  margin: 8px;
+  border-radius: 2px;
+}
+
+.file-tree-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.file-tree-empty {
+  padding: 20px;
+  text-align: center;
+  color: #858585;
+  font-size: 12px;
+}
+
+.file-tree-node {
+  user-select: none;
+}
+
+.file-tree-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-tree-item:hover {
+  background-color: #2a2d2e;
+}
+
+.file-tree-item.file {
+  cursor: pointer;
+}
+
+.file-tree-item.directory {
+  font-weight: 500;
+}
+
+.file-icon {
+  margin-right: 6px;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-name.markdown {
+  color: #4ec9b0;
+  font-weight: 500;
+}
+
+.file-tree-children {
+  /* Children are indented via paddingLeft in FileTreeNode */
+}
+
+/* Scrollbar styling */
+.file-tree-content::-webkit-scrollbar {
+  width: 10px;
+}
+
+.file-tree-content::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.file-tree-content::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 5px;
+}
+
+.file-tree-content::-webkit-scrollbar-thumb:hover {
+  background: #4e4e4e;
+}
