@@ -6,9 +6,17 @@ interface FileTreeNodeProps {
   node: FileNode
   level: number
   onFileClick: (filePath: string) => void
+  onContextMenu?: (e: React.MouseEvent, node: FileNode, elementRect: DOMRect) => void
+  selectedFolder?: string | null
 }
 
-export function FileTreeNode({ node, level, onFileClick }: FileTreeNodeProps) {
+export function FileTreeNode({
+  node,
+  level,
+  onFileClick,
+  onContextMenu,
+  selectedFolder
+}: FileTreeNodeProps) {
   const [isExpanded, setIsExpanded] = useState(level === 0)
 
   const handleClick = () => {
@@ -19,7 +27,17 @@ export function FileTreeNode({ node, level, onFileClick }: FileTreeNodeProps) {
     }
   }
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (onContextMenu) {
+      const element = e.currentTarget as HTMLElement
+      const elementRect = element.getBoundingClientRect()
+      onContextMenu(e, node, elementRect)
+    }
+  }
+
   const isMarkdown = node.extension === '.md' || node.extension === '.markdown'
+  const isSelected = node.type === 'directory' && node.path === selectedFolder
   const icon = node.type === 'directory'
     ? (isExpanded ? '📂' : '📁')
     : isMarkdown
@@ -29,9 +47,10 @@ export function FileTreeNode({ node, level, onFileClick }: FileTreeNodeProps) {
   return (
     <div className="file-tree-node">
       <div
-        className={`file-tree-item ${node.type}`}
+        className={`file-tree-item ${node.type} ${isSelected ? 'selected' : ''}`}
         style={{ paddingLeft: `${level * 16 + 8}px` }}
         onClick={handleClick}
+        onContextMenu={handleContextMenu}
       >
         <span className="file-icon">{icon}</span>
         <span className={`file-name ${isMarkdown ? 'markdown' : ''}`}>
@@ -46,6 +65,8 @@ export function FileTreeNode({ node, level, onFileClick }: FileTreeNodeProps) {
               node={child}
               level={level + 1}
               onFileClick={onFileClick}
+              onContextMenu={onContextMenu}
+              selectedFolder={selectedFolder}
             />
           ))}
         </div>

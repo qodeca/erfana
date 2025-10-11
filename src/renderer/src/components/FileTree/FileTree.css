@@ -10,10 +10,12 @@
 .file-tree-header {
   padding: 8px;
   border-bottom: 1px solid #3c3c3c;
+  display: flex;
+  gap: 8px;
 }
 
 .open-project-btn {
-  width: 100%;
+  flex: 1;
   padding: 6px 12px;
   background-color: #0e639c;
   color: #ffffff;
@@ -30,6 +32,50 @@
 }
 
 .open-project-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.new-file-btn {
+  padding: 6px 12px;
+  background-color: #2d7d2d;
+  color: #ffffff;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.new-file-btn:hover:not(:disabled) {
+  background-color: #3a9b3a;
+}
+
+.new-file-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.new-folder-btn {
+  padding: 6px 12px;
+  background-color: #0e639c;
+  color: #ffffff;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.new-folder-btn:hover:not(:disabled) {
+  background-color: #1177bb;
+}
+
+.new-folder-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -91,6 +137,11 @@
   font-weight: 500;
 }
 
+.file-tree-item.selected {
+  background-color: #094771;
+  border-left: 2px solid #0e639c;
+}
+
 .file-icon {
   margin-right: 6px;
   font-size: 14px;
@@ -128,4 +179,136 @@
 
 .file-tree-content::-webkit-scrollbar-thumb:hover {
   background: #4e4e4e;
+}
+
+/* New File Dialog */
+.new-file-dialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.new-file-content {
+  background-color: #252526;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  padding: 20px;
+  min-width: 300px;
+  max-width: 90%;
+}
+
+.new-file-content h4 {
+  margin: 0 0 12px 0;
+  color: #cccccc;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.target-folder {
+  margin: 0 0 12px 0;
+  color: #858585;
+  font-size: 11px;
+  font-style: italic;
+  padding: 4px 8px;
+  background-color: #1e1e1e;
+  border-radius: 2px;
+}
+
+.new-file-input {
+  width: 100%;
+  padding: 8px;
+  background-color: #3c3c3c;
+  border: 1px solid #6c6c6c;
+  border-radius: 2px;
+  color: #cccccc;
+  font-size: 13px;
+  font-family: inherit;
+  margin-bottom: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.new-file-input:focus {
+  outline: none;
+  border-color: #0e639c;
+  box-shadow: 0 0 0 1px #0e639c;
+}
+
+.new-file-input.error {
+  border-color: #f48771;
+  background-color: #5a1d1d;
+}
+
+.new-file-input.error:focus {
+  border-color: #f48771;
+  box-shadow: 0 0 0 1px #f48771;
+}
+
+.new-file-input::placeholder {
+  color: #858585;
+}
+
+.new-file-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px;
+  margin-bottom: 12px;
+  background-color: rgba(244, 135, 113, 0.1);
+  border-left: 2px solid #f48771;
+  border-radius: 2px;
+  font-size: 12px;
+  color: #f48771;
+  line-height: 1.4;
+}
+
+.error-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.error-message {
+  flex: 1;
+}
+
+.new-file-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.new-file-actions button {
+  padding: 6px 16px;
+  background-color: #0e639c;
+  color: #ffffff;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.new-file-actions button:hover:not(:disabled) {
+  background-color: #1177bb;
+}
+
+.new-file-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.new-file-actions button:last-child {
+  background-color: #3c3c3c;
+}
+
+.new-file-actions button:last-child:hover {
+  background-color: #505050;
 }
