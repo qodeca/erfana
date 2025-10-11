@@ -53,6 +53,15 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   const editorRef = useRef<MonacoEditorHandle>(null)
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Debug logging
+  console.log('MarkdownEditorPanel render:', {
+    hasCurrentFile: !!currentFile,
+    filePath: currentFile?.path,
+    contentLength: currentFile?.content?.length,
+    contentPreview: currentFile?.content?.substring(0, 50),
+    viewMode
+  })
+
   // Calculate document statistics
   const documentStats = useMemo(() => {
     if (!currentFile) return null
@@ -126,8 +135,14 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   }, [currentFile?.content, currentFile?.modified])
 
   const loadFile = async (filePath: string) => {
+    console.log('Loading file:', filePath)
     try {
       const content = await window.api.file.readFile(filePath)
+      console.log('File loaded successfully:', {
+        filePath,
+        contentLength: content.length,
+        contentPreview: content.substring(0, 100)
+      })
       setCurrentFile({
         path: filePath,
         content,
@@ -296,6 +311,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
           {(viewMode === 'editor' || viewMode === 'split') && (
             <div className="editor-pane">
               <MonacoMarkdownEditor
+                key={currentFile.path}
                 ref={editorRef}
                 value={currentFile.content}
                 onChange={handleContentChange}
