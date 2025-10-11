@@ -11,26 +11,54 @@ import { FileTree } from '../FileTree/FileTree'
 import { MarkdownEditorPanel } from '../Panels/MarkdownEditorPanel'
 import { Toolbar } from '../Toolbar/Toolbar'
 
+// Utility function to sanitize file path for panel ID
+const sanitizeFilePath = (filePath: string): string => {
+  // Convert /Users/name/docs/notes.md → users-name-docs-notes-md
+  return filePath
+    .replace(/^\//, '')
+    .replace(/[^a-zA-Z0-9]/g, '-')
+    .toLowerCase()
+}
+
 // File Explorer Panel - wraps FileTree
 const FileExplorerPanel = (props: IDockviewPanelProps) => {
   const handleFileSelect = (filePath: string) => {
     // Get the main DockView API through the group accessor
     const mainApi = props.containerApi
 
-    // Find or create editor panel
-    let editorPanel = mainApi.getPanel('editor')
+    // Extract file name from path
+    const fileName = filePath.split('/').pop() || 'Editor'
+
+    // Create unique panel ID for this file
+    const panelId = `editor-${sanitizeFilePath(filePath)}`
+
+    // Check if panel for this file already exists
+    let editorPanel = mainApi.getPanel(panelId)
 
     if (!editorPanel) {
-      // Create editor panel if it doesn't exist
+      // Find the center group (where editor panels should go)
+      const centerPlaceholder = mainApi.getPanel('_center-placeholder')
+
+      // Create new editor panel for this file
       editorPanel = mainApi.addPanel({
-        id: 'editor',
+        id: panelId,
         component: 'editor',
-        title: 'Editor'
+        title: fileName,
+        params: { filePath },
+        position: centerPlaceholder
+          ? { referenceGroup: centerPlaceholder.group }
+          : undefined
       })
+
+      // Close placeholder if this is the first real editor panel
+      const editorPanels = mainApi.panels.filter(p => p.id.startsWith('editor-'))
+      if (editorPanels.length === 1 && centerPlaceholder) {
+        centerPlaceholder.api.close()
+      }
     }
 
-    // Update editor panel with new file path
-    editorPanel.api.updateParameters({ filePath })
+    // Focus the panel (switch to this tab)
+    editorPanel.api.setActive()
   }
 
   return <FileTree onFileSelect={handleFileSelect} />
@@ -151,10 +179,11 @@ export function AppDockLayout() {
       minimumWidth: MIN_SIZES.leftSidebar
     })
 
-    const editorPanel = event.api.addPanel({
-      id: 'editor',
+    // Create a placeholder center group for editor panels
+    const centerPlaceholder = event.api.addPanel({
+      id: '_center-placeholder',
       component: 'editor',
-      title: 'Editor',
+      title: 'Welcome',
       position: { referencePanel: leftPanel, direction: 'right' }
     })
 
@@ -162,7 +191,7 @@ export function AppDockLayout() {
       id: 'terminal',
       component: 'terminal',
       title: 'Terminal',
-      position: { referencePanel: editorPanel, direction: 'below' },
+      position: { referencePanel: centerPlaceholder, direction: 'below' },
       initialHeight: sidebarStates.bottomPanel.height,
       minimumHeight: MIN_SIZES.bottomPanel
     })
@@ -171,7 +200,7 @@ export function AppDockLayout() {
       id: 'git',
       component: 'git',
       title: 'Git',
-      position: { referencePanel: editorPanel, direction: 'right' },
+      position: { referencePanel: centerPlaceholder, direction: 'right' },
       initialWidth: sidebarStates.rightSidebar.width,
       minimumWidth: MIN_SIZES.rightSidebar
     })
