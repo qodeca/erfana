@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
-import { FileEdit, Columns2, Eye, Save as SaveIcon } from 'lucide-react'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { FileEdit, Columns2, Eye, Save as SaveIcon, Bold, Italic, Code, Link, Image, Heading1, List, ListOrdered, Strikethrough } from 'lucide-react'
 import { IDockviewPanelProps } from 'dockview'
-import { MonacoMarkdownEditor } from '../Editor/MonacoMarkdownEditor'
+import { MonacoMarkdownEditor, MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
 import { MarkdownPreview } from '../Editor/MarkdownPreview'
+import { ConfirmDialog } from '../ConfirmDialog/ConfirmDialog'
 import './MarkdownEditorPanel.css'
 
 interface EditorFile {
@@ -11,77 +12,172 @@ interface EditorFile {
   modified: boolean
 }
 
+interface DocumentStats {
+  words: number
+  characters: number
+  charactersNoSpaces: number
+  lines: number
+  readingTimeMinutes: number
+}
+
+// Calculate document statistics
+const calculateStats = (content: string): DocumentStats => {
+  const lines = content.split('\n').length
+  const characters = content.length
+  const charactersNoSpaces = content.replace(/\s/g, '').length
+
+  // Count words (split by whitespace and filter empty strings)
+  const words = content
+    .trim()
+    .split(/\s+/)
+    .filter(word => word.length > 0).length
+
+  // Estimate reading time (average 200 words per minute)
+  const readingTimeMinutes = Math.ceil(words / 200)
+
+  return {
+    words,
+    characters,
+    charactersNoSpaces,
+    lines,
+    readingTimeMinutes
+  }
+}
+
 export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: string }>) {
-  const [files, setFiles] = useState<Map<string, EditorFile>>(new Map())
-  const [currentFilePath, setCurrentFilePath] = useState<string | null>(null)
+  const [currentFile, setCurrentFile] = useState<EditorFile | null>(null)
   const [viewMode, setViewMode] = useState<'split' | 'editor' | 'preview'>('split')
   const [selectedText, setSelectedText] = useState<string>('')
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false)
+  const [isAutoSaving, setIsAutoSaving] = useState(false)
+  const editorRef = useRef<MonacoEditorHandle>(null)
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Calculate document statistics
+  const documentStats = useMemo(() => {
+    if (!currentFile) return null
+    return calculateStats(currentFile.content)
+  }, [currentFile?.content])
 
   // Load file when panel receives a file path
   useEffect(() => {
     const filePath = props.params?.filePath
-    if (filePath && !files.has(filePath)) {
+    if (filePath) {
       loadFile(filePath)
     }
   }, [props.params?.filePath])
 
+  // Update tab title when modified state changes
+  useEffect(() => {
+    if (!currentFile) return
+    const fileName = currentFile.path.split('/').pop() || 'Editor'
+    const title = currentFile.modified ? `● ${fileName}` : fileName
+    props.api.setTitle(title)
+  }, [currentFile?.modified, currentFile?.path])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
+      const modKey = isMac ? e.metaKey : e.ctrlKey
+
+      // Cmd/Ctrl+S - Save
+      if (modKey && e.key === 's' && !e.shiftKey && !e.altKey) {
+        e.preventDefault()
+        handleSave(false) // Manual save
+      }
+
+      // Cmd/Ctrl+W - Close tab
+      if (modKey && e.key === 'w' && !e.shiftKey && !e.altKey) {
+        e.preventDefault()
+        if (currentFile?.modified) {
+          // Show confirmation dialog if unsaved changes
+          setShowCloseConfirm(true)
+        } else {
+          props.api.close()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [currentFile])
+
+  // Auto-save: debounced save 2 seconds after last edit
+  useEffect(() => {
+    // Clear existing timer
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current)
+    }
+
+    // Only auto-save if file is modified
+    if (currentFile?.modified) {
+      autoSaveTimerRef.current = setTimeout(() => {
+        handleSave(true) // Auto-save
+      }, 2000)
+    }
+
+    // Cleanup timer on unmount
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current)
+      }
+    }
+  }, [currentFile?.content, currentFile?.modified])
+
   const loadFile = async (filePath: string) => {
     try {
       const content = await window.api.file.readFile(filePath)
-      const newFile: EditorFile = {
+      setCurrentFile({
         path: filePath,
         content,
         modified: false
-      }
-      setFiles(new Map(files.set(filePath, newFile)))
-      setCurrentFilePath(filePath)
+      })
     } catch (error) {
       console.error('Error loading file:', error)
     }
   }
 
   const handleContentChange = (newContent: string) => {
-    if (!currentFilePath) return
-
-    const currentFile = files.get(currentFilePath)
     if (!currentFile) return
 
-    const updatedFile: EditorFile = {
+    setCurrentFile({
       ...currentFile,
       content: newContent,
       modified: true
-    }
-
-    setFiles(new Map(files.set(currentFilePath, updatedFile)))
+    })
   }
 
-  const handleSave = async () => {
-    if (!currentFilePath) return
-
-    const currentFile = files.get(currentFilePath)
+  const handleSave = async (isAutoSave: boolean = false) => {
     if (!currentFile) return
 
     try {
-      await window.api.file.writeFile(currentFilePath, currentFile.content)
-      const updatedFile: EditorFile = {
+      if (isAutoSave) {
+        setIsAutoSaving(true)
+      }
+
+      await window.api.file.writeFile(currentFile.path, currentFile.content)
+      setCurrentFile({
         ...currentFile,
         modified: false
+      })
+
+      if (isAutoSave) {
+        // Show auto-save indicator briefly
+        setTimeout(() => setIsAutoSaving(false), 1000)
       }
-      setFiles(new Map(files.set(currentFilePath, updatedFile)))
     } catch (error) {
       console.error('Error saving file:', error)
+      setIsAutoSaving(false)
     }
   }
-
-  const currentFile = currentFilePath ? files.get(currentFilePath) : null
-  const fileName = currentFilePath ? currentFilePath.split('/').pop() : 'No file open'
 
   return (
     <div className="markdown-editor-panel">
       <div className="editor-toolbar">
         <div className="editor-file-info">
-          <span className="file-name">{fileName}</span>
           {currentFile?.modified && <span className="modified-indicator">●</span>}
+          {isAutoSaving && <span className="auto-save-indicator">Auto-saving...</span>}
         </div>
 
         <div className="editor-controls">
@@ -121,11 +217,86 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
         </div>
       </div>
 
+      {currentFile && (viewMode === 'editor' || viewMode === 'split') && (
+        <div className="markdown-toolbar">
+          <button
+            className="toolbar-btn"
+            onClick={() => editorRef.current?.formatBold()}
+            title="Bold (Cmd/Ctrl+B)"
+          >
+            <Bold size={16} strokeWidth={2} />
+          </button>
+          <button
+            className="toolbar-btn"
+            onClick={() => editorRef.current?.formatItalic()}
+            title="Italic (Cmd/Ctrl+I)"
+          >
+            <Italic size={16} strokeWidth={2} />
+          </button>
+          <button
+            className="toolbar-btn"
+            onClick={() => editorRef.current?.formatStrikethrough()}
+            title="Strikethrough"
+          >
+            <Strikethrough size={16} strokeWidth={2} />
+          </button>
+
+          <div className="toolbar-separator" />
+
+          <button
+            className="toolbar-btn"
+            onClick={() => editorRef.current?.formatCode()}
+            title="Inline Code"
+          >
+            <Code size={16} strokeWidth={2} />
+          </button>
+          <button
+            className="toolbar-btn"
+            onClick={() => editorRef.current?.insertLink()}
+            title="Insert Link (Cmd/Ctrl+K)"
+          >
+            <Link size={16} strokeWidth={2} />
+          </button>
+          <button
+            className="toolbar-btn"
+            onClick={() => editorRef.current?.insertImage()}
+            title="Insert Image"
+          >
+            <Image size={16} strokeWidth={2} />
+          </button>
+
+          <div className="toolbar-separator" />
+
+          <button
+            className="toolbar-btn"
+            onClick={() => editorRef.current?.insertHeading(1)}
+            title="Heading 1"
+          >
+            <Heading1 size={16} strokeWidth={2} />
+          </button>
+          <button
+            className="toolbar-btn"
+            onClick={() => editorRef.current?.insertList(false)}
+            title="Bullet List"
+          >
+            <List size={16} strokeWidth={2} />
+          </button>
+          <button
+            className="toolbar-btn"
+            onClick={() => editorRef.current?.insertList(true)}
+            title="Numbered List"
+          >
+            <ListOrdered size={16} strokeWidth={2} />
+          </button>
+        </div>
+      )}
+
       {currentFile ? (
         <div className={`editor-content view-mode-${viewMode}`}>
           {(viewMode === 'editor' || viewMode === 'split') && (
             <div className="editor-pane">
               <MonacoMarkdownEditor
+                ref={editorRef}
                 value={currentFile.content}
                 onChange={handleContentChange}
                 filePath={currentFile.path}
@@ -135,7 +306,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
           )}
           {(viewMode === 'preview' || viewMode === 'split') && (
             <div className="preview-pane">
-              <MarkdownPreview content={currentFile.content} />
+              <MarkdownPreview content={currentFile.content} filePath={currentFile.path} />
             </div>
           )}
         </div>
@@ -146,10 +317,58 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
         </div>
       )}
 
-      {selectedText && (
-        <div className="selection-info">
-          {selectedText.length} characters selected
+      {documentStats && (
+        <div className="document-stats">
+          <div className="stats-group">
+            <span className="stat-item">
+              <span className="stat-label">Words:</span>
+              <span className="stat-value">{documentStats.words.toLocaleString()}</span>
+            </span>
+            <span className="stat-separator">•</span>
+            <span className="stat-item">
+              <span className="stat-label">Characters:</span>
+              <span className="stat-value">{documentStats.characters.toLocaleString()}</span>
+            </span>
+            <span className="stat-separator">•</span>
+            <span className="stat-item">
+              <span className="stat-label">Lines:</span>
+              <span className="stat-value">{documentStats.lines.toLocaleString()}</span>
+            </span>
+            <span className="stat-separator">•</span>
+            <span className="stat-item">
+              <span className="stat-label">Reading time:</span>
+              <span className="stat-value">
+                {documentStats.readingTimeMinutes} min
+              </span>
+            </span>
+          </div>
+          {selectedText && (
+            <div className="stats-group selection-stats">
+              <span className="stat-separator">|</span>
+              <span className="stat-item">
+                <span className="stat-label">Selected:</span>
+                <span className="stat-value">{selectedText.length} chars</span>
+              </span>
+            </div>
+          )}
         </div>
+      )}
+
+      {showCloseConfirm && currentFile && (
+        <ConfirmDialog
+          title="Unsaved Changes"
+          message={`File "${currentFile.path.split('/').pop()}" has unsaved changes. Close anyway?`}
+          confirmLabel="Close Without Saving"
+          cancelLabel="Cancel"
+          danger={true}
+          onConfirm={() => {
+            setShowCloseConfirm(false)
+            props.api.close()
+          }}
+          onCancel={() => {
+            setShowCloseConfirm(false)
+          }}
+        />
       )}
     </div>
   )

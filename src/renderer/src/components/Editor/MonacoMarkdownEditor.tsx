@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useImperativeHandle, forwardRef } from 'react'
 import Editor, { OnMount } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
 import './MonacoMarkdownEditor.css'
@@ -10,13 +10,21 @@ interface MonacoMarkdownEditorProps {
   onSelectionChange?: (selection: string) => void
 }
 
-export function MonacoMarkdownEditor({
-  value,
-  onChange,
-  filePath,
-  onSelectionChange
-}: MonacoMarkdownEditorProps) {
-  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
+export interface MonacoEditorHandle {
+  formatBold: () => void
+  formatItalic: () => void
+  formatStrikethrough: () => void
+  formatCode: () => void
+  formatCodeBlock: () => void
+  insertLink: () => void
+  insertImage: () => void
+  insertHeading: (level: number) => void
+  insertList: (ordered: boolean) => void
+}
+
+export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdownEditorProps>(
+  ({ value, onChange, filePath, onSelectionChange }, ref) => {
+    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor
@@ -109,6 +117,113 @@ export function MonacoMarkdownEditor({
     ])
   }
 
+  const formatBold = () => wrapSelection('**')
+  const formatItalic = () => wrapSelection('*')
+  const formatStrikethrough = () => wrapSelection('~~')
+  const formatCode = () => wrapSelection('`')
+
+  const formatCodeBlock = () => {
+    const editor = editorRef.current
+    if (!editor) return
+
+    const selection = editor.getSelection()
+    if (!selection) return
+
+    const model = editor.getModel()
+    if (!model) return
+
+    const selectedText = model.getValueInRange(selection)
+    const markdown = `\n\`\`\`\n${selectedText}\n\`\`\`\n`
+
+    editor.executeEdits('', [
+      {
+        range: selection,
+        text: markdown
+      }
+    ])
+  }
+
+  const insertImage = () => {
+    const editor = editorRef.current
+    if (!editor) return
+
+    const selection = editor.getSelection()
+    if (!selection) return
+
+    const model = editor.getModel()
+    if (!model) return
+
+    const selectedText = model.getValueInRange(selection)
+    const altText = selectedText || 'image'
+    const markdown = `![${altText}](url)`
+
+    editor.executeEdits('', [
+      {
+        range: selection,
+        text: markdown
+      }
+    ])
+  }
+
+  const insertHeading = (level: number) => {
+    const editor = editorRef.current
+    if (!editor) return
+
+    const selection = editor.getSelection()
+    if (!selection) return
+
+    const model = editor.getModel()
+    if (!model) return
+
+    const selectedText = model.getValueInRange(selection)
+    const headingText = selectedText || 'Heading'
+    const markdown = `${'#'.repeat(level)} ${headingText}`
+
+    editor.executeEdits('', [
+      {
+        range: selection,
+        text: markdown
+      }
+    ])
+  }
+
+  const insertList = (ordered: boolean) => {
+    const editor = editorRef.current
+    if (!editor) return
+
+    const selection = editor.getSelection()
+    if (!selection) return
+
+    const model = editor.getModel()
+    if (!model) return
+
+    const selectedText = model.getValueInRange(selection)
+    const lines = selectedText ? selectedText.split('\n') : ['List item']
+    const markdown = lines
+      .map((line, i) => (ordered ? `${i + 1}. ${line}` : `- ${line}`))
+      .join('\n')
+
+    editor.executeEdits('', [
+      {
+        range: selection,
+        text: markdown
+      }
+    ])
+  }
+
+  // Expose methods via ref
+  useImperativeHandle(ref, () => ({
+    formatBold,
+    formatItalic,
+    formatStrikethrough,
+    formatCode,
+    formatCodeBlock,
+    insertLink,
+    insertImage,
+    insertHeading,
+    insertList
+  }))
+
   return (
     <div className="monaco-markdown-editor">
       <Editor
@@ -124,4 +239,4 @@ export function MonacoMarkdownEditor({
       />
     </div>
   )
-}
+})

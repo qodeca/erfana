@@ -20,18 +20,28 @@
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.file-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: #cccccc;
+  min-width: 24px; /* Reserve space for modified indicator */
 }
 
 .modified-indicator {
   color: #4ec9b0;
   font-size: 18px;
   line-height: 1;
+}
+
+.auto-save-indicator {
+  color: #4ec9b0;
+  font-size: 11px;
+  animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .editor-controls {
@@ -96,6 +106,40 @@
   cursor: not-allowed;
 }
 
+.markdown-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 12px;
+  background-color: #1e1e1e;
+  border-bottom: 1px solid #3c3c3c;
+  flex-shrink: 0;
+}
+
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  background-color: transparent;
+  border: none;
+  border-radius: 3px;
+  color: #cccccc;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.toolbar-btn:hover {
+  background-color: #2a2d2e;
+  color: #ffffff;
+}
+
+.toolbar-btn:active {
+  background-color: #094771;
+}
+
 .editor-content {
   flex: 1;
   display: flex;
@@ -142,15 +186,49 @@
   color: #6a6a6a;
 }
 
-.selection-info {
-  position: absolute;
-  bottom: 16px;
-  right: 16px;
-  padding: 4px 8px;
-  background-color: #2d2d30;
-  border: 1px solid #3c3c3c;
-  border-radius: 3px;
+.document-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  background-color: #1e1e1e;
+  border-top: 1px solid #3c3c3c;
   font-size: 11px;
   color: #858585;
-  pointer-events: none;
+  flex-shrink: 0;
+  height: 26px;
+}
+
+.stats-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-label {
+  color: #858585;
+}
+
+.stat-value {
+  color: #cccccc;
+  font-weight: 500;
+}
+
+.stat-separator {
+  color: #3c3c3c;
+  font-size: 10px;
+}
+
+.selection-stats {
+  margin-left: auto;
+}
+
+.selection-stats .stat-value {
+  color: #4ec9b0;
 }

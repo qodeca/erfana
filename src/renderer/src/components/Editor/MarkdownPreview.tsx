@@ -1,16 +1,65 @@
+import { useState, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { PreviewContextMenu } from '../ContextMenu/PreviewContextMenu'
 import './MarkdownPreview.css'
 
 interface MarkdownPreviewProps {
   content: string
+  filePath?: string
   className?: string
 }
 
-export function MarkdownPreview({ content, className = '' }: MarkdownPreviewProps) {
+export function MarkdownPreview({ content, filePath, className = '' }: MarkdownPreviewProps) {
+  const [selection, setSelection] = useState<{
+    text: string
+    rect: DOMRect
+  } | null>(null)
+  const [contextMenu, setContextMenu] = useState<{
+    x: number
+    y: number
+    elementRect: DOMRect
+  } | null>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
+
+  const handleMouseUp = () => {
+    const sel = window.getSelection()
+    if (sel && sel.toString().trim().length > 0 && previewRef.current) {
+      const range = sel.getRangeAt(0)
+      const rect = range.getBoundingClientRect()
+      setSelection({
+        text: sel.toString(),
+        rect
+      })
+    } else {
+      setSelection(null)
+    }
+  }
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    // Only show custom context menu if text is selected and filePath is available
+    if (selection && selection.text && filePath) {
+      e.preventDefault()
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        elementRect: selection.rect
+      })
+    }
+  }
+
+  const handleCloseContextMenu = () => {
+    setContextMenu(null)
+  }
+
   return (
     <div className={`markdown-preview ${className}`}>
-      <div className="markdown-preview-content">
+      <div
+        ref={previewRef}
+        className="markdown-preview-content"
+        onMouseUp={handleMouseUp}
+        onContextMenu={handleContextMenu}
+      >
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
@@ -79,6 +128,18 @@ export function MarkdownPreview({ content, className = '' }: MarkdownPreviewProp
           {content}
         </ReactMarkdown>
       </div>
+
+      {contextMenu && selection && filePath && (
+        <PreviewContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          elementRect={contextMenu.elementRect}
+          selectedText={selection.text}
+          filePath={filePath}
+          fullDocument={content}
+          onClose={handleCloseContextMenu}
+        />
+      )}
     </div>
   )
 }
