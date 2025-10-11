@@ -7,86 +7,48 @@
   font-size: 13px;
 }
 
-.file-tree-header {
-  padding: 8px;
-  border-bottom: 1px solid #3c3c3c;
-  display: flex;
-  gap: 8px;
-}
-
-.open-project-btn {
-  flex: 1;
-  padding: 6px 12px;
-  background-color: #0e639c;
-  color: #ffffff;
-  border: none;
-  border-radius: 2px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  transition: background-color 0.2s;
-}
-
-.open-project-btn:hover:not(:disabled) {
-  background-color: #1177bb;
-}
-
-.open-project-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.new-file-btn {
-  padding: 6px 12px;
-  background-color: #2d7d2d;
-  color: #ffffff;
-  border: none;
-  border-radius: 2px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  transition: background-color 0.2s;
-  white-space: nowrap;
-}
-
-.new-file-btn:hover:not(:disabled) {
-  background-color: #3a9b3a;
-}
-
-.new-file-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.new-folder-btn {
-  padding: 6px 12px;
-  background-color: #0e639c;
-  color: #ffffff;
-  border: none;
-  border-radius: 2px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  transition: background-color 0.2s;
-  white-space: nowrap;
-}
-
-.new-folder-btn:hover:not(:disabled) {
-  background-color: #1177bb;
-}
-
-.new-folder-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 .file-tree-path {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 8px;
   font-size: 11px;
   color: #858585;
   border-bottom: 1px solid #3c3c3c;
   font-weight: 600;
   text-transform: uppercase;
+}
+
+.project-name {
+  flex: 1;
+}
+
+.file-tree-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background-color: transparent;
+  border: 1px solid #3c3c3c;
+  border-radius: 2px;
+  color: #cccccc;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background-color: #2a2d2e;
+  border-color: #0e639c;
+}
+
+.icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .file-tree-error {
@@ -102,6 +64,7 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  padding: 10px;
 }
 
 .file-tree-empty {
@@ -144,8 +107,18 @@
 
 .file-icon {
   margin-right: 6px;
-  font-size: 14px;
   flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #cccccc;
+}
+
+.file-icon svg {
+  width: 16px;
+  height: 16px;
 }
 
 .file-name {

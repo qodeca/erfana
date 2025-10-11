@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ChevronRight, ChevronDown, File, FileText, Folder } from 'lucide-react'
 import type { FileNode } from '../../../../preload/index'
 import './FileTree.css'
 
@@ -38,11 +39,20 @@ export function FileTreeNode({
 
   const isMarkdown = node.extension === '.md' || node.extension === '.markdown'
   const isSelected = node.type === 'directory' && node.path === selectedFolder
-  const icon = node.type === 'directory'
-    ? (isExpanded ? '📂' : '📁')
-    : isMarkdown
-    ? '📝'
-    : '📄'
+
+  const renderIcon = () => {
+    if (node.type === 'directory') {
+      return isExpanded ? (
+        <ChevronDown size={16} strokeWidth={2} />
+      ) : (
+        <ChevronRight size={16} strokeWidth={2} />
+      )
+    } else if (isMarkdown) {
+      return <FileText size={16} strokeWidth={2} />
+    } else {
+      return <File size={16} strokeWidth={2} />
+    }
+  }
 
   return (
     <div className="file-tree-node">
@@ -52,7 +62,7 @@ export function FileTreeNode({
         onClick={handleClick}
         onContextMenu={handleContextMenu}
       >
-        <span className="file-icon">{icon}</span>
+        <span className="file-icon">{renderIcon()}</span>
         <span className={`file-name ${isMarkdown ? 'markdown' : ''}`}>
           {node.name}
         </span>

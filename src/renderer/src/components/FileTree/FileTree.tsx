@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { FilePlus, FolderPlus, FolderOpen, Replace, Trash, AlertTriangle } from 'lucide-react'
 import type { FileNode } from '../../../../preload/index'
 import { FileTreeNode } from './FileTreeNode'
 import { ContextMenu, ContextMenuItem } from '../ContextMenu/ContextMenu'
@@ -302,18 +303,18 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
       return [
         {
           label: 'New File...',
-          icon: '📝',
+          icon: <FilePlus size={14} strokeWidth={2} />,
           action: () => handleNewFileInFolder(node.path)
         },
         {
           label: 'New Folder...',
-          icon: '📁',
+          icon: <FolderPlus size={14} strokeWidth={2} />,
           action: () => handleNewFolderInFolder(node.path)
         },
         { separator: true } as ContextMenuItem,
         {
           label: 'Delete Folder',
-          icon: '🗑️',
+          icon: <Trash size={14} strokeWidth={2} />,
           danger: true,
           action: () => handleDeleteFolder(node.path, node.name)
         }
@@ -322,7 +323,7 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
       return [
         {
           label: 'Delete File',
-          icon: '🗑️',
+          icon: <Trash size={14} strokeWidth={2} />,
           danger: true,
           action: () => handleDeleteFile(node.path, node.name)
         }
@@ -332,47 +333,51 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
 
   return (
     <div className="file-tree">
-      <div className="file-tree-header">
-        <button
-          className="open-project-btn"
-          onClick={handleOpenProject}
-          disabled={loading}
-        >
-          {loading ? 'Opening...' : projectPath ? 'Change Project' : 'Open Project'}
-        </button>
-        {projectPath && (
-          <>
-            <button
-              className="new-file-btn"
-              onClick={handleNewFile}
-              disabled={loading || isCreatingFile || isCreatingFolder}
-              title="Create new markdown file"
-            >
-              + New File
-            </button>
-            <button
-              className="new-folder-btn"
-              onClick={handleNewFolder}
-              disabled={loading || isCreatingFile || isCreatingFolder}
-              title="Create new folder"
-            >
-              + New Folder
-            </button>
-          </>
-        )}
-      </div>
-
       {error && (
         <div className="file-tree-error">
           {error}
         </div>
       )}
 
-      {projectPath && (
-        <div className="file-tree-path">
-          {projectPath.split('/').pop()}
+      <div className="file-tree-path">
+        <span className="project-name">
+          {projectPath ? projectPath.split('/').pop() : 'No project open'}
+        </span>
+        <div className="file-tree-actions">
+          <button
+            className="icon-btn"
+            onClick={handleOpenProject}
+            disabled={loading}
+            title={projectPath ? 'Change project' : 'Open project'}
+          >
+            {projectPath ? (
+              <Replace size={14} strokeWidth={2} />
+            ) : (
+              <FolderOpen size={14} strokeWidth={2} />
+            )}
+          </button>
+          {projectPath && (
+            <>
+              <button
+                className="icon-btn"
+                onClick={handleNewFile}
+                disabled={loading || isCreatingFile || isCreatingFolder}
+                title="Create new markdown file"
+              >
+                <FilePlus size={14} strokeWidth={2} />
+              </button>
+              <button
+                className="icon-btn"
+                onClick={handleNewFolder}
+                disabled={loading || isCreatingFile || isCreatingFolder}
+                title="Create new folder"
+              >
+                <FolderPlus size={14} strokeWidth={2} />
+              </button>
+            </>
+          )}
         </div>
-      )}
+      </div>
 
       {isCreatingFile && (
         <div className="new-file-dialog">
@@ -394,7 +399,9 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
             />
             {createFileError && (
               <div className="new-file-error">
-                <span className="error-icon">⚠️</span>
+                <span className="error-icon">
+                  <AlertTriangle size={14} strokeWidth={2} />
+                </span>
                 <span className="error-message">{createFileError}</span>
               </div>
             )}
@@ -428,7 +435,9 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
             />
             {createFolderError && (
               <div className="new-file-error">
-                <span className="error-icon">⚠️</span>
+                <span className="error-icon">
+                  <AlertTriangle size={14} strokeWidth={2} />
+                </span>
                 <span className="error-message">{createFolderError}</span>
               </div>
             )}

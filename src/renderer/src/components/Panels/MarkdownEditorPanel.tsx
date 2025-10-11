@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { FileEdit, Columns2, Eye, Save as SaveIcon } from 'lucide-react'
 import { IDockviewPanelProps } from 'dockview'
 import { MonacoMarkdownEditor } from '../Editor/MonacoMarkdownEditor'
 import { MarkdownPreview } from '../Editor/MarkdownPreview'
@@ -89,21 +90,21 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
             onClick={() => setViewMode('editor')}
             title="Editor Only"
           >
-            📝
+            <FileEdit size={16} strokeWidth={2} />
           </button>
           <button
             className={`view-mode-btn ${viewMode === 'split' ? 'active' : ''}`}
             onClick={() => setViewMode('split')}
             title="Split View"
           >
-            ⚡
+            <Columns2 size={16} strokeWidth={2} />
           </button>
           <button
             className={`view-mode-btn ${viewMode === 'preview' ? 'active' : ''}`}
             onClick={() => setViewMode('preview')}
             title="Preview Only"
           >
-            👁️
+            <Eye size={16} strokeWidth={2} />
           </button>
 
           <div className="toolbar-separator" />
@@ -114,7 +115,8 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
             disabled={!currentFile?.modified}
             title="Save (Cmd/Ctrl+S)"
           >
-            💾 Save
+            <SaveIcon size={16} strokeWidth={2} />
+            <span>Save</span>
           </button>
         </div>
       </div>
