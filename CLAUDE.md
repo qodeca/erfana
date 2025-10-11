@@ -159,6 +159,56 @@ Superior markdown capabilities with Monaco Editor + live preview:
 
 📚 **Detailed development tasks**: See [docs/development-tasks.md](docs/development-tasks.md)
 
+## Testing & Visual Verification
+
+Claude Code can visually inspect and test Erfana using **Circuit Electron MCP** (already configured):
+
+**Quick Test:**
+```typescript
+// 1. Build first
+npm run build
+
+// 2. Launch and screenshot
+const session = mcp__circuit-electron__app_launch({
+  app: "/Users/marcinobel/Projects/erfana/out/main/index.js",
+  compressScreenshots: true
+})
+
+mcp__circuit-electron__screenshot({ sessionId: session.sessionId })
+mcp__circuit-electron__close({ sessionId: session.sessionId })
+```
+
+**Capabilities:**
+- ✅ Launch Erfana and capture screenshots
+- ✅ Interact with UI (click, type, keyboard shortcuts)
+- ✅ Verify functionality with visual and programmatic checks
+- ✅ Test after code changes without manual inspection
+- ✅ Run pre-defined test scenarios
+- ✅ AI-optimized screenshot compression
+
+**Available Tools:**
+- `app_launch` - Start the application
+- `screenshot` - Capture compressed screenshots
+- `click`, `click_by_text`, `click_by_role` - UI interaction
+- `keyboard_type`, `keyboard_press` - Text input and shortcuts
+- `evaluate` - Execute JavaScript in app context
+- `wait_for_selector` - Wait for elements
+- `snapshot` - Get accessibility tree
+- `close` - End testing session
+
+**Testing Workflow:**
+1. Make code changes
+2. Build: `npm run build`
+3. Launch via Circuit Electron MCP
+4. Take screenshots and verify visually
+5. Test interactions and functionality
+6. Report results
+
+📚 **Testing index**: See [docs/testing/README.md](docs/testing/README.md) - Complete testing guide
+📚 **Quick start**: See [docs/testing/quickstart.md](docs/testing/quickstart.md)
+📚 **Reference**: See [docs/testing/circuit-electron-guide.md](docs/testing/circuit-electron-guide.md)
+📚 **Test scenarios**: See [docs/testing/ui-scenarios.md](docs/testing/ui-scenarios.md) and [interaction-scenarios.md](docs/testing/interaction-scenarios.md)
+
 ## Claude Code Integration (Future)
 
 Planned integration using Claude Agent SDK:
@@ -199,6 +249,12 @@ When adding features:
 - [Security](docs/security.md) - Security guidelines, CSP, validation patterns
 - [Known Issues](docs/known-issues.md) - Current issues and workarounds
 - [Development Tasks](docs/development-tasks.md) - Common development patterns
+- **Testing:**
+  - [Testing Index](docs/testing/README.md) - Complete testing documentation hub
+  - [Quick Start](docs/testing/quickstart.md) - Fast testing setup
+  - [Circuit Electron Guide](docs/testing/circuit-electron-guide.md) - Complete MCP reference
+  - [UI Scenarios](docs/testing/ui-scenarios.md) - UI verification tests (Scenarios 1-5)
+  - [Interaction Scenarios](docs/testing/interaction-scenarios.md) - User interaction tests (Scenarios 6-10)
 
 ## Useful Resources
 
