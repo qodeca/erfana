@@ -35,20 +35,33 @@ import 'dockview/dist/styles/dockview.css'  // ✅ Correct
 
 ## Monaco Editor CDN Loading
 
-**Issue**: Monaco loads workers from CDN by default
+**Status**: ✅ RESOLVED (commit 121fbb6)
 
-**Impact**: Offline mode doesn't work
+**Component**: MonacoMarkdownEditor
+**File**: `src/renderer/src/components/Editor/MonacoMarkdownEditor.tsx:6-8`
 
-**Workaround** (if needed):
+### Issue (Historical)
+
+Monaco Editor was loading web workers from CDN (`cdn.jsdelivr.net`) which caused Content Security Policy violations in Electron, resulting in the editor showing "Loading..." indefinitely and never rendering.
+
+### Solution
+
+Configured Monaco loader to use local bundling instead of CDN:
+
 ```typescript
-import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
+import { loader } from '@monaco-editor/react'
+import * as monaco from 'monaco-editor'
 
-self.MonacoEnvironment = {
-  getWorker: () => new editorWorker()
-}
+// Configure Monaco to use local files instead of CDN
+// This prevents CSP violations in Electron
+loader.config({ monaco })
 ```
 
-**Status**: Current implementation works online; offline mode is future enhancement
+This prevents CSP violations by bundling Monaco workers from `node_modules` instead of fetching from external CDN.
+
+**Impact**: Editor now loads properly without CSP violations. Offline mode works correctly.
+
+**Commit**: 121fbb6 (Fix Monaco Editor CSP violation and initialization issues)
 
 ---
 
