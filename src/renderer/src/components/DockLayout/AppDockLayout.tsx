@@ -65,7 +65,7 @@ const FileExplorerPanel = (props: IDockviewPanelProps) => {
 }
 
 // Terminal Panel (placeholder)
-const TerminalPanel = (props: IDockviewPanelProps) => {
+const TerminalPanel = (_props: IDockviewPanelProps) => {
   return (
     <div className="panel-content">
       <h3>Claude Terminal</h3>
@@ -78,7 +78,7 @@ const TerminalPanel = (props: IDockviewPanelProps) => {
 }
 
 // Git Panel (placeholder)
-const GitPanel = (props: IDockviewPanelProps) => {
+const GitPanel = (_props: IDockviewPanelProps) => {
   return (
     <div className="panel-content">
       <h3>Git Status</h3>
@@ -249,6 +249,7 @@ export function AppDockLayout() {
           }
         }
       }
+      return undefined
     }
 
     // Add listener in capture phase to intercept before dockview's handler
@@ -256,22 +257,22 @@ export function AppDockLayout() {
 
     // Fallback: If a panel somehow gets removed, restore it immediately
     const disposeCloseListeners = event.api.onDidRemovePanel((e) => {
-      if (protectedPanels.includes(e.panel.id)) {
-        console.warn(`⚠️ System panel ${e.panel.id} was removed - restoring immediately...`)
+      if (protectedPanels.includes(e.id)) {
+        console.warn(`⚠️ System panel ${e.id} was removed - restoring immediately...`)
 
         // Re-add the panel in the next tick
         setTimeout(() => {
-          if (!event.api.getPanel(e.panel.id)) {
+          if (!event.api.getPanel(e.id)) {
             const panelMap = {
               fileExplorer: { component: 'fileExplorer', title: 'Explorer', width: sidebarStates.leftSidebar.width },
               terminal: { component: 'terminal', title: 'Terminal', height: sidebarStates.bottomPanel.height },
               git: { component: 'git', title: 'Git', width: sidebarStates.rightSidebar.width }
             }
 
-            const config = panelMap[e.panel.id]
+            const config = panelMap[e.id]
             if (config) {
               const restoredPanel = event.api.addPanel({
-                id: e.panel.id,
+                id: e.id,
                 component: config.component,
                 title: config.title
               })
@@ -354,9 +355,9 @@ export function AppDockLayout() {
     } else {
       // Set size BEFORE showing to prevent flicker
       const savedSize = sidebarId === 'bottomPanel'
-        ? Math.max(currentState.height || DEFAULT_SIZES.bottomPanel, MIN_SIZES.bottomPanel)
+        ? Math.max((currentState as any).height || DEFAULT_SIZES.bottomPanel, MIN_SIZES.bottomPanel)
         : Math.max(
-            currentState.width || DEFAULT_SIZES[sidebarId as keyof typeof DEFAULT_SIZES],
+            (currentState as any).width || DEFAULT_SIZES[sidebarId as keyof typeof DEFAULT_SIZES],
             MIN_SIZES[sidebarId as keyof typeof MIN_SIZES]
           )
 

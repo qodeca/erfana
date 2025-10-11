@@ -222,7 +222,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
 
           <button
             className="save-btn"
-            onClick={handleSave}
+            onClick={() => handleSave(false)}
             disabled={!currentFile?.modified}
             title="Save (Cmd/Ctrl+S)"
           >

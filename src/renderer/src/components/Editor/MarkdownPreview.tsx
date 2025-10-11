@@ -64,9 +64,10 @@ export function MarkdownPreview({ content, filePath, className = '' }: MarkdownP
           remarkPlugins={[remarkGfm]}
           components={{
             // Custom code block styling
-            code({ node, inline, className, children, ...props }) {
+            code({ node, className, children, ...props }) {
               const match = /language-(\w+)/.exec(className || '')
-              return !inline ? (
+              const isInline = !match && !className?.includes('language-')
+              return !isInline ? (
                 <pre className={`code-block ${className || ''}`}>
                   <code className={match ? `language-${match[1]}` : ''} {...props}>
                     {children}
@@ -114,6 +115,7 @@ export function MarkdownPreview({ content, filePath, className = '' }: MarkdownP
               const handleClick = (e: React.MouseEvent) => {
                 if (href?.startsWith('http')) {
                   e.preventDefault()
+                  // @ts-ignore - shell is available but not typed in ElectronAPI
                   window.electron.shell.openExternal(href)
                 }
               }
