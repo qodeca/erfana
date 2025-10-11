@@ -1,6 +1,13 @@
 .app-dock-layout {
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app-dock-content {
+  flex: 1;
   overflow: hidden;
 }
 
@@ -45,4 +52,26 @@
   font-size: 12px;
   color: #6a6a6a;
   font-style: italic;
+}
+
+/* Hide close buttons for system panels (Explorer, Terminal, Git) */
+/* Uses correct dockview class names: .dv-default-tab-content (title), .dv-default-tab-action (close button) */
+
+/* Hide close button for tabs with Explorer, Terminal, or Git title */
+.dv-default-tab:has(.dv-default-tab-content:is([textContent="Explorer"], [textContent="Terminal"], [textContent="Git"])) .dv-default-tab-action {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Alternative: Target by checking text content (browser support may vary) */
+.dv-default-tab .dv-default-tab-content:is([textContent~="Explorer"], [textContent~="Terminal"], [textContent~="Git"]) ~ .dv-default-tab-action {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Fallback: Hide using sibling selector if :has() not supported */
+.dv-default-tab-content:first-child ~ .dv-default-tab-action {
+  /* Will be overridden by JavaScript for protected panels */
 }

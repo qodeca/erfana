@@ -11,12 +11,16 @@
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl+B` | Bold selection |
-| `Cmd/Ctrl+I` | Italic selection |
-| `Cmd/Ctrl+K` | Insert link |
-| `Cmd/Ctrl+S` | Save file |
+**Monaco Built-in Shortcuts** (work when editor is focused):
+- Standard text editing (Cmd/Ctrl+C/V/X/Z, etc.)
+- Find/Replace (Cmd/Ctrl+F, Cmd/Ctrl+H)
+- Multi-cursor (Alt+Click, Cmd/Ctrl+Alt+↑/↓)
+- Save file (Cmd/Ctrl+S)
+
+**⚠️ Global App Shortcuts**:
+Application-level shortcuts like Cmd/Ctrl+B (toggle sidebar) override Monaco shortcuts. When these keys are pressed, they trigger app actions instead of editor actions.
+
+See: [UI Components](./ui-components.md) for global keyboard shortcuts
 
 ## View Modes
 
@@ -56,4 +60,4 @@
 - `MarkdownPreview.tsx` - Preview component
 - `MarkdownEditorPanel.tsx` - Combined panel with view modes
 
-See: [Architecture](./architecture.md)
+See: [UI Components](./ui-components.md) | [Architecture](./architecture.md)

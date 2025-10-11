@@ -72,6 +72,58 @@
 
 2. Use in IPC handler or main process
 
+## Working with Panel State
+
+### Reading Panel State
+
+```typescript
+// Get current state from localStorage
+const state = localStorage.getItem('erfana-sidebar-state')
+const parsed = JSON.parse(state)
+
+console.log(parsed.leftSidebar.visible)  // boolean
+console.log(parsed.leftSidebar.width)    // number (px)
+```
+
+### Updating Panel State
+
+```typescript
+// Update state programmatically
+const updateSidebarState = (sidebarId: string, updates: any) => {
+  setSidebarStates((prev) => {
+    const newState = {
+      ...prev,
+      [sidebarId]: { ...prev[sidebarId], ...updates }
+    }
+    localStorage.setItem('erfana-sidebar-state', JSON.stringify(newState))
+    return newState
+  })
+}
+```
+
+### Resetting Panel State
+
+```typescript
+// Clear state to force defaults on next load
+localStorage.removeItem('erfana-sidebar-state')
+```
+
+### Adding New Protected Panel
+
+1. Add panel ID to `protectedPanels` array:
+   ```typescript
+   const protectedPanels = ['fileExplorer', 'terminal', 'git', 'myNewPanel']
+   ```
+
+2. Add panel title to `protectedTitles` array:
+   ```typescript
+   const protectedTitles = ['Explorer', 'Terminal', 'Git', 'My New Panel']
+   ```
+
+Protection is automatic - click interception and auto-restore work immediately.
+
+See: [UI Components](./ui-components.md#panel-protection)
+
 ## Debugging
 
 - **Main Process**: Terminal output (`console.log`)
@@ -87,4 +139,4 @@
    - Renderer: Standard React import
 3. Add types if needed: `npm install -D @types/package-name`
 
-See: [Architecture](./architecture.md) | [IPC Patterns](./ipc-patterns.md)
+See: [Architecture](./architecture.md) | [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md)

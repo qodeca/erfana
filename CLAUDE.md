@@ -42,7 +42,12 @@ src/
 │   ├── index.ts           # contextBridge API
 │   └── index.d.ts         # window.api types
 └── renderer/src/
-    ├── components/        # React components
+    ├── components/
+    │   ├── DockLayout/    # Panel system
+    │   ├── Toolbar/       # Top toolbar with toggle buttons
+    │   ├── Panels/        # Panel implementations
+    │   ├── Editor/        # Monaco + Preview
+    │   └── FileTree/      # File explorer
     ├── hooks/             # React hooks
     └── App.tsx            # Root component
 ```
@@ -84,11 +89,29 @@ Add panels by creating component, registering in `AppDockLayout.tsx`, and adding
 ## Markdown Editing
 
 Superior markdown capabilities with Monaco Editor + live preview:
-- **Editor**: Monaco with word wrap, keyboard shortcuts (Cmd+B/I/K)
+- **Editor**: Monaco with word wrap, standard text editing shortcuts
 - **Preview**: GitHub-styled with GFM support, syntax highlighting
 - **View Modes**: Editor only, split view (default), preview only
 
 📚 **Markdown features**: See [docs/markdown-editing.md](docs/markdown-editing.md)
+
+## UI & Keyboard Shortcuts
+
+**Toolbar**: VS Code-style toolbar at top with icon-only toggle buttons for Explorer, Terminal, Git panels.
+
+**Global Keyboard Shortcuts** (work anywhere in app):
+- `Cmd/Ctrl+B` - Toggle left sidebar (Explorer)
+- `Cmd/Ctrl+J` - Toggle bottom panel (Terminal)
+- `Cmd/Ctrl+Alt+B` - Toggle right sidebar (Git)
+
+**Panel Behavior**:
+- Toggle hides/shows entire sidebar areas (not individual tabs)
+- Preserves panel dimensions when toggling
+- State persisted to localStorage
+
+**⚠️ Note**: Global shortcuts override editor shortcuts. When Cmd/Ctrl+B is pressed, it toggles the sidebar rather than triggering Monaco's bold action.
+
+📚 **UI components & panel system**: See [docs/ui-components.md](docs/ui-components.md)
 
 ## Security
 
@@ -163,6 +186,7 @@ When adding features:
 
 - [Architecture](docs/architecture.md) - Three-process model, tech stack, design decisions
 - [IPC Patterns](docs/ipc-patterns.md) - Secure communication patterns, current channels
+- [UI Components](docs/ui-components.md) - Toolbar, panel toggle, keyboard shortcuts, panel protection
 - [Markdown Editing](docs/markdown-editing.md) - Editor features, shortcuts, preview
 - [Security](docs/security.md) - Security guidelines, CSP, validation patterns
 - [Known Issues](docs/known-issues.md) - Current issues and workarounds
