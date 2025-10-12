@@ -339,3 +339,4 @@ When adding features:
 - [Dockview](https://dockview.dev/)
 - [Monaco Editor API](https://microsoft.github.io/monaco-editor/api/index.html)
 - [Claude Agent SDK](https://github.com/anthropics/claude-code)
+- ALWAYS save screenshots made with cicruit-electron MCP server to the /temp/ folder located in the root folder of the project. If /temp/ doesn't exist create it
