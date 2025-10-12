@@ -62,6 +62,11 @@
   line-height: 1.4;
 }
 
+/* First element - remove top margin to match padding */
+.markdown-preview-content > *:first-child {
+  margin-top: 0 !important;
+}
+
 /* Paragraphs - compact spacing */
 .markdown-preview p {
   margin: 1.2em 0 0 0;
