@@ -81,6 +81,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   const scrollMapRef = useRef<ScrollMapEntry[]>([])
   const isSyncingRef = useRef(false)
   const [isEditorReady, setIsEditorReady] = useState(false)
+  const [isScrollMapReady, setIsScrollMapReady] = useState(false)
 
   // Debug logging
   console.log('MarkdownEditorPanel render:', {
@@ -224,6 +225,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
         const map = buildScrollMap()
         scrollMapRef.current = map
         console.log(`📍 Scroll map built: ${map.length} entries`)
+        setIsScrollMapReady(true)
       })
     })
   }, [currentFile?.content, viewMode, isEditorReady])
@@ -296,7 +298,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
       previewElement.removeEventListener('scroll', handlePreviewScroll)
       console.log('🔄 Scroll synchronization disabled')
     }
-  }, [viewMode, currentFile, isEditorReady, scrollMapRef.current.length])
+  }, [viewMode, currentFile, isEditorReady, isScrollMapReady])
 
   const handleEditorMount = (_editor: monaco.editor.IStandaloneCodeEditor) => {
     console.log('✅ Editor mounted and ready')
@@ -306,6 +308,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   const loadFile = async (filePath: string) => {
     console.log('Loading file:', filePath)
     setIsEditorReady(false) // Reset editor ready state when loading new file
+    setIsScrollMapReady(false) // Reset scroll map ready state when loading new file
     try {
       const content = await window.api.file.readFile(filePath)
       console.log('File loaded successfully:', {
