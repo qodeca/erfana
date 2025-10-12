@@ -27,6 +27,18 @@
   --dv-inactivegroup-hiddenpanel-tab-color: #858585;
 }
 
+/* Set tab height to 41px to match sidebar panels */
+.dockview-theme-dark .dv-tabs-and-actions-container {
+  height: 41px;
+  min-height: 41px;
+  max-height: 41px;
+}
+
+.dockview-theme-dark .dv-default-tab {
+  height: 41px;
+  box-sizing: border-box;
+}
+
 .panel-content {
   width: 100%;
   height: 100%;
@@ -108,13 +120,42 @@
   font-size: 14px;
 }
 
-/* Welcome tab icon styling */
+/* Remove Dockview's default padding from welcome tab container */
+.dockview-theme-dark .dv-default-tab:has(.welcome-tab) {
+  padding: 0 !important;
+  width: 41px !important;
+  min-width: 41px !important;
+  max-width: 41px !important;
+}
+
+/* Welcome tab icon styling - 41px square */
 .welcome-tab {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 8px;
+  width: 41px;
+  height: 41px;
+  min-width: 41px;
+  min-height: 41px;
+  max-width: 41px;
+  max-height: 41px;
   color: #cccccc;
+  user-select: none;
+  cursor: pointer;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+/* Center the icon precisely */
+.welcome-tab svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Disable dragging for welcome tab */
+.welcome-tab * {
+  pointer-events: none;
 }
 
 /* Hide close button for locked welcome tab */
@@ -122,4 +163,65 @@
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
+}
+
+/* Sidebar panel styling (Git & Terminal) - matches Explorer panel */
+.sidebar-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #252526;
+  color: #cccccc;
+  font-size: 13px;
+}
+
+.sidebar-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px;
+  height: 41px;
+  box-sizing: border-box;
+  font-size: 11px;
+  color: #858585;
+  border-bottom: 1px solid #3c3c3c;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.sidebar-panel-title {
+  flex: 1;
+}
+
+.sidebar-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px;
+}
+
+.sidebar-panel-content p {
+  color: #858585;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* Scrollbar styling for sidebar panels */
+.sidebar-panel-content::-webkit-scrollbar {
+  width: 10px;
+}
+
+.sidebar-panel-content::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.sidebar-panel-content::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 5px;
+}
+
+.sidebar-panel-content::-webkit-scrollbar-thumb:hover {
+  background: #4e4e4e;
 }
