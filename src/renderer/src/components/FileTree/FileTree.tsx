@@ -33,7 +33,6 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
-    elementRect: DOMRect
     node: FileNode
   } | null>(null)
 
@@ -339,11 +338,10 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
   }
 
   // Context menu handlers
-  const handleContextMenu = (e: React.MouseEvent, node: FileNode, elementRect: DOMRect) => {
+  const handleContextMenu = (e: React.MouseEvent, node: FileNode) => {
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
-      elementRect,
       node
     })
   }
@@ -758,7 +756,6 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
         <ContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
-          elementRect={contextMenu.elementRect}
           items={getContextMenuItems(contextMenu.node)}
           onClose={handleCloseContextMenu}
         />

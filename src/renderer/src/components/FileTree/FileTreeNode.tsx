@@ -6,7 +6,7 @@ interface FileTreeNodeProps {
   node: FileNode
   level: number
   onFileClick: (filePath: string) => void
-  onContextMenu?: (e: React.MouseEvent, node: FileNode, elementRect: DOMRect) => void
+  onContextMenu?: (e: React.MouseEvent, node: FileNode) => void
   selectedFolder?: string | null
   expandedFolders: Set<string>
   onToggleFolder: (folderPath: string) => void
@@ -35,9 +35,7 @@ export function FileTreeNode({
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
     if (onContextMenu) {
-      const element = e.currentTarget as HTMLElement
-      const elementRect = element.getBoundingClientRect()
-      onContextMenu(e, node, elementRect)
+      onContextMenu(e, node)
     }
   }
 
