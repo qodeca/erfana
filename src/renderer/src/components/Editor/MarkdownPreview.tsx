@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { PreviewContextMenu } from '../ContextMenu/PreviewContextMenu'
+import { MermaidDiagram } from './MermaidDiagram'
 import './MarkdownPreview.css'
 
 interface MarkdownPreviewProps {
@@ -63,10 +64,18 @@ export function MarkdownPreview({ content, filePath, className = '' }: MarkdownP
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
-            // Custom code block styling
+            // Custom code block styling with Mermaid diagram support
             code({ node, className, children, ...props }) {
               const match = /language-(\w+)/.exec(className || '')
               const isInline = !match && !className?.includes('language-')
+
+              // Check if this is a mermaid code block
+              if (match && match[1] === 'mermaid') {
+                const code = String(children).replace(/\n$/, '')
+                return <MermaidDiagram code={code} />
+              }
+
+              // Regular code blocks (non-inline, non-mermaid)
               return !isInline ? (
                 <pre className={`code-block ${className || ''}`}>
                   <code className={match ? `language-${match[1]}` : ''} {...props}>
