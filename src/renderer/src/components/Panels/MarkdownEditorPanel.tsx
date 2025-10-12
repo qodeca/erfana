@@ -49,7 +49,7 @@ const calculateStats = (content: string): DocumentStats => {
 
 export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: string }>) {
   const [currentFile, setCurrentFile] = useState<EditorFile | null>(null)
-  const [viewMode, setViewMode] = useState<'split' | 'editor' | 'preview'>('split')
+  const [viewMode, setViewMode] = useState<'split' | 'editor' | 'preview'>('preview')
   const [selectedText, setSelectedText] = useState<string>('')
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
   const [isAutoSaving, setIsAutoSaving] = useState(false)
