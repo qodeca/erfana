@@ -44,7 +44,8 @@ const content = await window.api.file.readFile('/path/to/file.md')
 
 | Channel | Handler | Purpose |
 |---------|---------|---------|
-| `file:openProject` | file-handlers | Open folder dialog |
+| `file:openProject` | file-handlers | Open folder dialog, save to settings |
+| `file:getLastProjectPath` | file-handlers | Get last opened project path |
 | `file:readDirectory` | file-handlers | Read directory tree |
 | `file:readFile` | file-handlers | Read file content |
 | `file:writeFile` | file-handlers | Write file content |
@@ -52,7 +53,8 @@ const content = await window.api.file.readFile('/path/to/file.md')
 | `file:getProjectPath` | file-handlers | Get current project path |
 | `file:createFile` | file-handlers | Create new empty file |
 | `file:createFolder` | file-handlers | Create new folder |
-| `file:renameFile` | file-handlers | Rename file or folder |
-| `file:deleteFile` | file-handlers | Delete file or folder |
+| `file:rename` | file-handlers | Rename file or folder |
+| `file:deleteFile` | file-handlers | Delete file |
+| `file:deleteFolder` | file-handlers | Delete folder recursively |
 
 See: [Architecture](./architecture.md) | [Security](./security.md)

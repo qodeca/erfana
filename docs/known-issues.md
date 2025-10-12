@@ -65,6 +65,51 @@ This prevents CSP violations by bundling Monaco workers from `node_modules` inst
 
 ---
 
+## electron-store ES Module Import
+
+**Issue**: electron-store v11+ is an ES Module and cannot be imported with `require()` in CommonJS
+
+**Error**:
+```
+ERR_REQUIRE_ESM: require() of ES Module not supported
+```
+
+**Solution**: Use dynamic `import()` instead:
+```typescript
+export class SettingsService {
+  private store: any
+  private storePromise: Promise<any>
+
+  constructor() {
+    this.storePromise = import('electron-store').then((module) => {
+      const ElectronStore = module.default
+      this.store = new ElectronStore<Settings>({
+        name: 'erfana-settings'
+      })
+      return this.store
+    })
+  }
+
+  private async ensureStore(): Promise<any> {
+    if (!this.store) await this.storePromise
+    return this.store
+  }
+
+  async getLastProjectPath(): Promise<string | null> {
+    const store = await this.ensureStore()
+    return store.get('lastProjectPath') || null
+  }
+}
+```
+
+**Pattern**: All SettingsService methods must be async to handle dynamic import.
+
+**Files**:
+- `src/main/services/SettingsService.ts`
+- `src/main/ipc/file-handlers.ts` (must await settingsService calls)
+
+---
+
 ## ESLint Peer Dependency Warnings
 
 **Issue**: ESLint 9 vs ESLint 8 peer dependencies

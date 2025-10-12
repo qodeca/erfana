@@ -4,10 +4,11 @@
 
 - Language: `markdown`
 - Word wrap: `on`
-- Line height: `24`
-- Font size: `14`
-- Minimap: `enabled`
-- Rulers: `[80, 120]`
+- Line height: `20px` (compact)
+- Font size: `13px` (compact)
+- Padding: `8px` top/bottom (compact)
+- Minimap: `disabled`
+- Rulers: `[]` (none)
 
 ## Keyboard Shortcuts
 
@@ -157,13 +158,28 @@ Right-click context menu in markdown preview pane for AI-powered text operations
 - Blockquotes with accent border
 - Auto-linked headings (for future TOC)
 
-### Styling
+### Typography & Styling
 
-- GitHub-inspired dark theme
-- Responsive images
-- External links open in default browser
+**Medium.com-Inspired Design**:
+- Font family: Charter, Georgia, Cambria serif stack
+- Body text: 18px, line-height 1.5, letter-spacing -0.003em
+- Max width: 680px (optimal reading column)
+- Padding: 32px all sides (top padding optimized to match left/right)
+- Compact spacing for efficient information density
+
+**Dark Theme**:
+- Background: `#1e1e1e`
+- Text: `#d4d4d4`
+- Headings: `#ffffff` with tight letter-spacing
 - Code blocks: `#2d2d30` background
 - Inline code: `#ce9178` color
+- Links: `#4fc3f7` with hover underline
+- Blockquotes: Italic serif, `#b8b8b8`, 3px left border
+
+**Responsive**:
+- Images scale to container
+- External links open in default browser
+- Hover effects on tables
 
 ## Additional Features
 

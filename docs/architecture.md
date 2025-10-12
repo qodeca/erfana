@@ -20,11 +20,12 @@
 ```
 src/
 ├── main/
-│   ├── index.ts              # Main process entry
-│   ├── services/             # Business logic (OOP)
-│   │   └── FileService.ts    # Currently implemented
+│   ├── index.ts                 # Main process entry
+│   ├── services/                # Business logic (OOP)
+│   │   ├── FileService.ts       # File operations + rename
+│   │   └── SettingsService.ts   # Persistent settings (electron-store)
 │   └── ipc/
-│       └── file-handlers.ts  # IPC handlers
+│       └── file-handlers.ts     # IPC handlers
 ├── preload/
 │   ├── index.ts              # contextBridge setup
 │   └── index.d.ts            # TypeScript definitions
@@ -48,9 +49,12 @@ src/
 ## Key Design Decisions
 
 - **OOP Services**: Business logic in service classes
+  - FileService: File operations (read, write, create, rename, delete)
+  - SettingsService: Persistent storage with electron-store (dynamic ES Module import)
 - **Secure IPC**: All main↔renderer communication via contextBridge
 - **Component Registry**: Dockview uses string-based component lookup
 - **Multi-model Editor**: Single Monaco instance, swap models per file
+- **Project Persistence**: Auto-loads last opened project on startup
 
 ## Toast Notification System
 

@@ -16,12 +16,54 @@ VS Code-inspired toolbar at top of application window.
 - Height: 40px
 - Background: `#2d2d30` (VS Code dark theme)
 - Button size: 28x28px square
-- SVG icons matching VS Code style
+- Icons: Lucide React (`PanelLeft`, `PanelBottom`, `PanelRight`)
 - Tooltips show keyboard shortcuts
 
 ### Files
 - `Toolbar.tsx` - React component (57 lines)
 - `Toolbar.css` - Styles matching VS Code aesthetics
+
+## Context Menu (File Explorer)
+
+**Location**: `src/renderer/src/components/FileTree/FileTree.tsx`, `src/renderer/src/components/ContextMenu/ContextMenu.tsx`
+
+Right-click context menu for files and folders in the file explorer.
+
+### Menu Items
+
+**For Files**:
+- Rename
+- --- (separator)
+- Delete
+
+**For Folders**:
+- New File
+- New Folder
+- Rename
+- --- (separator)
+- Delete
+
+### Features
+- Icons from Lucide React (`FilePlus`, `FolderPlus`, `Edit`, `Trash`)
+- Separator isolates destructive actions (Delete)
+- Danger styling for Delete action (red text on hover)
+- Rename dialog with validation and error handling
+- Delete confirmation dialogs
+
+### Rename Functionality
+- Pre-fills current name
+- Validates for empty names and duplicates
+- Sanitizes input (removes path separators)
+- Prevents renaming project root
+- Shows inline error messages
+- Supports Enter to confirm, Escape to cancel
+
+**IPC Channel**: `file:rename`
+
+### Files
+- `FileTree.tsx` - Context menu logic and handlers
+- `ContextMenu.tsx` - Reusable context menu component
+- `ContextMenu.css` - VS Code-style dark theme
 
 ## Global Keyboard Shortcuts
 
