@@ -20,6 +20,8 @@ const api = {
   // File operations
   file: {
     openProject: (): Promise<string | null> => ipcRenderer.invoke('file:openProject'),
+    getLastProjectPath: (): Promise<string | null> =>
+      ipcRenderer.invoke('file:getLastProjectPath'),
     readDirectory: (dirPath: string): Promise<FileNode[]> =>
       ipcRenderer.invoke('file:readDirectory', dirPath),
     readFile: (filePath: string): Promise<string> =>
@@ -36,7 +38,9 @@ const api = {
     deleteFile: (filePath: string): Promise<boolean> =>
       ipcRenderer.invoke('file:deleteFile', filePath),
     deleteFolder: (folderPath: string): Promise<boolean> =>
-      ipcRenderer.invoke('file:deleteFolder', folderPath)
+      ipcRenderer.invoke('file:deleteFolder', folderPath),
+    rename: (oldPath: string, newName: string): Promise<string> =>
+      ipcRenderer.invoke('file:rename', oldPath, newName)
   }
 }
 

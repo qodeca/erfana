@@ -1,5 +1,7 @@
 import { ipcMain, dialog } from 'electron'
 import { fileService } from '../services/FileService'
+import { settingsService } from '../services/SettingsService'
+import { stat } from 'fs/promises'
 
 export function registerFileHandlers(): void {
   // Open project folder
@@ -16,7 +18,30 @@ export function registerFileHandlers(): void {
 
     const projectPath = result.filePaths[0]
     fileService.setProjectPath(projectPath)
+    settingsService.setLastProjectPath(projectPath)
     return projectPath
+  })
+
+  // Get last opened project path if it still exists
+  ipcMain.handle('file:getLastProjectPath', async () => {
+    const lastPath = settingsService.getLastProjectPath()
+    if (!lastPath) {
+      return null
+    }
+
+    // Verify the folder still exists
+    try {
+      const stats = await stat(lastPath)
+      if (stats.isDirectory()) {
+        fileService.setProjectPath(lastPath)
+        return lastPath
+      }
+    } catch (error) {
+      // Folder doesn't exist anymore, clear from settings
+      settingsService.clearLastProjectPath()
+    }
+
+    return null
   })
 
   // Read directory structure
@@ -148,6 +173,31 @@ export function registerFileHandlers(): void {
       return true
     } catch (error) {
       console.error('Error deleting folder:', error)
+      throw error
+    }
+  })
+
+  // Rename file or folder
+  ipcMain.handle('file:rename', async (_event, oldPath: string, newName: string) => {
+    try {
+      // Validate inputs
+      if (!oldPath || typeof oldPath !== 'string') {
+        throw new Error('Invalid path')
+      }
+      if (!newName || typeof newName !== 'string') {
+        throw new Error('Invalid name')
+      }
+
+      // Sanitize new name to prevent path traversal
+      const sanitizedName = newName.replace(/[/\\]/g, '')
+      if (!sanitizedName) {
+        throw new Error('Invalid name')
+      }
+
+      const newPath = await fileService.rename(oldPath, sanitizedName)
+      return newPath
+    } catch (error) {
+      console.error('Error renaming:', error)
       throw error
     }
   })

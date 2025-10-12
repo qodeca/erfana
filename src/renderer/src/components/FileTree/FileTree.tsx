@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { FilePlus, FolderPlus, FolderOpen, Replace, Trash, AlertTriangle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { FilePlus, FolderPlus, FolderOpen, Replace, Trash, AlertTriangle, Edit } from 'lucide-react'
 import type { FileNode } from '../../../../preload/index'
 import { FileTreeNode } from './FileTreeNode'
 import { ContextMenu, ContextMenuItem } from '../ContextMenu/ContextMenu'
@@ -22,6 +22,10 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
   const [isCreatingFolder, setIsCreatingFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const [createFolderError, setCreateFolderError] = useState<string | null>(null)
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [renamingPath, setRenamingPath] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [renameError, setRenameError] = useState<string | null>(null)
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -37,6 +41,29 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
     message: string
     onConfirm: () => void
   } | null>(null)
+
+  // Load last project on mount
+  useEffect(() => {
+    const loadLastProject = async () => {
+      try {
+        setLoading(true)
+        const lastPath = await window.api.file.getLastProjectPath()
+
+        if (lastPath) {
+          setProjectPath(lastPath)
+          const fileTree = await window.api.file.readDirectory(lastPath)
+          setFiles(fileTree)
+        }
+      } catch (err) {
+        console.error('Error loading last project:', err)
+        // Don't show error to user, just fail silently
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadLastProject()
+  }, [])
 
   const handleOpenProject = async () => {
     try {
@@ -294,6 +321,74 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
     setContextMenu(null)
   }
 
+  const handleRename = (path: string, currentName: string) => {
+    setRenamingPath(path)
+    setRenameValue(currentName)
+    setRenameError(null)
+    setIsRenaming(true)
+    setContextMenu(null)
+  }
+
+  const handleCancelRename = () => {
+    setIsRenaming(false)
+    setRenamingPath(null)
+    setRenameValue('')
+    setRenameError(null)
+  }
+
+  const handleRenameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setRenameValue(e.target.value)
+    if (renameError) {
+      setRenameError(null)
+    }
+  }
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleConfirmRename()
+    } else if (e.key === 'Escape') {
+      handleCancelRename()
+    }
+  }
+
+  const handleConfirmRename = async () => {
+    if (!renameValue.trim()) {
+      setRenameError('Please enter a name')
+      return
+    }
+
+    if (!renamingPath) return
+
+    try {
+      setLoading(true)
+      setRenameError(null)
+
+      await window.api.file.rename(renamingPath, renameValue)
+
+      // Refresh file tree
+      await refreshFileTree()
+
+      // Reset state
+      setIsRenaming(false)
+      setRenamingPath(null)
+      setRenameValue('')
+    } catch (err) {
+      // Clean up error message for better UX
+      let errorMessage = 'Failed to rename'
+      if (err instanceof Error) {
+        errorMessage = err.message.replace(/^Error invoking remote method.*?Error:\s*/i, '')
+
+        if (errorMessage.includes('already exists')) {
+          errorMessage = 'An item with this name already exists'
+        }
+      }
+      setRenameError(errorMessage)
+      console.error('Error renaming:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const getContextMenuItems = (node: FileNode): ContextMenuItem[] => {
     if (node.type === 'directory') {
       return [
@@ -309,6 +404,11 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
         },
         { separator: true } as ContextMenuItem,
         {
+          label: 'Rename...',
+          icon: <Edit size={14} strokeWidth={2} />,
+          action: () => handleRename(node.path, node.name)
+        },
+        {
           label: 'Delete Folder',
           icon: <Trash size={14} strokeWidth={2} />,
           danger: true,
@@ -317,6 +417,11 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
       ]
     } else {
       return [
+        {
+          label: 'Rename...',
+          icon: <Edit size={14} strokeWidth={2} />,
+          action: () => handleRename(node.path, node.name)
+        },
         {
           label: 'Delete File',
           icon: <Trash size={14} strokeWidth={2} />,
@@ -442,6 +547,37 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
                 Create
               </button>
               <button onClick={handleCancelNewFolder}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isRenaming && (
+        <div className="new-file-dialog">
+          <div className="new-file-content">
+            <h4>Rename</h4>
+            <input
+              type="text"
+              className={`new-file-input ${renameError ? 'error' : ''}`}
+              placeholder="Enter new name"
+              value={renameValue}
+              onChange={handleRenameChange}
+              onKeyDown={handleRenameKeyDown}
+              autoFocus
+            />
+            {renameError && (
+              <div className="new-file-error">
+                <span className="error-icon">
+                  <AlertTriangle size={14} strokeWidth={2} />
+                </span>
+                <span className="error-message">{renameError}</span>
+              </div>
+            )}
+            <div className="new-file-actions">
+              <button onClick={handleConfirmRename} disabled={!renameValue.trim()}>
+                Rename
+              </button>
+              <button onClick={handleCancelRename}>Cancel</button>
             </div>
           </div>
         </div>
