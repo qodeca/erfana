@@ -121,6 +121,15 @@
   min-width: 12px;
 }
 
+.markdown-toolbar .modified-indicator,
+.markdown-toolbar .auto-save-indicator {
+  margin-right: 12px;
+}
+
+.markdown-toolbar .modified-indicator {
+  font-size: 16px;
+}
+
 .markdown-toolbar .view-mode-btn {
   width: 32px;
   height: 28px;
