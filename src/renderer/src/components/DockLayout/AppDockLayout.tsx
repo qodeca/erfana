@@ -56,6 +56,8 @@ const FileExplorerSplitPanel = (props: ISplitviewPanelProps) => {
     }
 
     editorPanel.api.setActive()
+    // Focus the group to ensure the active tab indicator shows immediately
+    editorPanel.group.focus()
   }
 
   return <FileTree onFileSelect={handleFileSelect} />
@@ -73,16 +75,29 @@ const EditorAreaSplitPanel = (props: ISplitviewPanelProps) => {
       id: '_center-placeholder',
       component: 'welcome',
       title: '',
-      tabComponent: 'welcomeTab',
-      floating: {
-        disabled: true
-      }
+      tabComponent: 'welcomeTab'
     })
 
     // Disable dragging for welcome tab
     if (welcomePanel) {
       welcomePanel.group.locked = true
     }
+
+    // Listen for active panel changes and focus the panel content
+    event.api.onDidActivePanelChange((panel) => {
+      if (panel) {
+        // Focus the group to show the active indicator
+        panel.group.focus()
+
+        // Use setTimeout to ensure the DOM is ready and focus the content
+        setTimeout(() => {
+          const panelElement = panel.group.element.querySelector('.panel-content, .markdown-editor-panel')
+          if (panelElement instanceof HTMLElement) {
+            panelElement.focus()
+          }
+        }, 0)
+      }
+    })
 
     // Pass the API to parent via params callback
     if (props.params?.setDockviewApi) {

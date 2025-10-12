@@ -199,7 +199,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   }
 
   return (
-    <div className="markdown-editor-panel">
+    <div className="markdown-editor-panel" tabIndex={0}>
       {currentFile && (
         <div className="markdown-toolbar">
           {(viewMode === 'editor' || viewMode === 'split') && (

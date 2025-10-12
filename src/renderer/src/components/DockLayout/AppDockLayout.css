@@ -37,6 +37,62 @@
 .dockview-theme-dark .dv-default-tab {
   height: 41px;
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+/* Remove padding from tab wrappers */
+.dockview-theme-dark .dv-tab.dv-inactive-tab,
+.dockview-theme-dark .dv-tab.dv-active-tab {
+  padding: 0;
+}
+
+/* Hover effect for inactive tabs - lighter background */
+.dockview-theme-dark .dv-inactive-tab:hover .dv-default-tab {
+  background-color: #3a3d41 !important;
+}
+
+/* Hover effect for active tabs - slightly lighter than default */
+.dockview-theme-dark .dv-active-tab:hover .dv-default-tab {
+  background-color: #2d2d30 !important;
+  opacity: 0.9;
+}
+
+/* Active tab indicator - bottom border like activity bar and VS Code */
+.dockview-theme-dark .dv-tab.dv-active-tab {
+  position: relative;
+  overflow: visible;
+}
+
+/* Active tab border indicator at the bottom - always visible regardless of focus */
+.dockview-theme-dark .dv-tab.dv-active-tab::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #007acc !important;
+  z-index: 100;
+  pointer-events: none;
+  display: block !important;
+}
+
+/* Ensure active indicator shows in both active and inactive groups */
+.dockview-theme-dark .groupview .dv-tab.dv-active-tab::after,
+.dockview-theme-dark .dv-group-view .dv-tab.dv-active-tab::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #007acc !important;
+  z-index: 100;
+  pointer-events: none;
+  display: block !important;
 }
 
 .panel-content {
@@ -47,6 +103,9 @@
   color: #cccccc;
   background-color: #1e1e1e;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  outline: none; /* Remove focus outline */
 }
 
 .panel-content h3 {
@@ -95,6 +154,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: 1;
+  width: 100%;
   height: 100%;
 }
 
@@ -126,6 +187,11 @@
   width: 41px !important;
   min-width: 41px !important;
   max-width: 41px !important;
+}
+
+/* Remove padding from dv-tab wrapper */
+.dockview-theme-dark .dv-tab:has(.welcome-tab) {
+  padding: 0 !important;
 }
 
 /* Welcome tab icon styling - 41px square */
