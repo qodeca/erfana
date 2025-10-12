@@ -23,6 +23,12 @@ interface DocumentStats {
   readingTimeMinutes: number
 }
 
+interface ScrollMapEntry {
+  line: number
+  editorOffset: number
+  previewOffset: number
+}
+
 // Calculate document statistics
 const calculateStats = (content: string): DocumentStats => {
   const lines = content.split('\n').length
@@ -65,9 +71,14 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   const [isReloading, setIsReloading] = useState(false)
 
   const editorRef = useRef<MonacoEditorHandle>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
   const isSavingRef = useRef(false) // Track save operations to prevent race conditions
   const { showToast } = useToast()
+
+  // Scroll synchronization state
+  const scrollMapRef = useRef<ScrollMapEntry[]>([])
+  const isSyncingRef = useRef(false)
 
   // Debug logging
   console.log('MarkdownEditorPanel render:', {
@@ -199,6 +210,78 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
       }
     }
   }, [currentFile?.content, currentFile?.modified])
+
+  // Build scroll map when content changes or view mode changes to split
+  useEffect(() => {
+    if (viewMode !== 'split' || !currentFile) return
+
+    // Debounce scroll map building after content changes
+    const timeoutId = setTimeout(() => {
+      const map = buildScrollMap()
+      scrollMapRef.current = map
+      console.log(`📍 Scroll map built: ${map.length} entries`)
+    }, 500)
+
+    return () => clearTimeout(timeoutId)
+  }, [currentFile?.content, viewMode])
+
+  // Set up scroll synchronization listeners
+  useEffect(() => {
+    if (viewMode !== 'split' || !editorRef.current || !previewRef.current) return
+
+    /**
+     * Handle editor scroll events → sync to preview
+     * Defined inside useEffect to avoid stale closures
+     */
+    const handleEditorScroll = () => {
+      if (isSyncingRef.current || !previewRef.current) return
+
+      console.log('🔄 Editor scrolled, syncing to preview...')
+      const scrollTop = editorRef.current?.getScrollTop() || 0
+      const targetOffset = interpolateScrollPosition(scrollTop, scrollMapRef.current, 'editor')
+
+      isSyncingRef.current = true
+      previewRef.current.scrollTop = targetOffset
+
+      setTimeout(() => {
+        isSyncingRef.current = false
+      }, 50)
+    }
+
+    /**
+     * Handle preview scroll events → sync to editor
+     * Defined inside useEffect to avoid stale closures
+     */
+    const handlePreviewScroll = () => {
+      if (isSyncingRef.current || !previewRef.current) return
+
+      console.log('🔄 Preview scrolled, syncing to editor...')
+      const scrollTop = previewRef.current.scrollTop
+      const targetOffset = interpolateScrollPosition(scrollTop, scrollMapRef.current, 'preview')
+
+      isSyncingRef.current = true
+      editorRef.current?.setScrollTop(targetOffset)
+
+      setTimeout(() => {
+        isSyncingRef.current = false
+      }, 50)
+    }
+
+    // Editor scroll listener
+    const editorDisposable = editorRef.current.onDidScrollChange(handleEditorScroll)
+
+    // Preview scroll listener
+    const previewElement = previewRef.current
+    previewElement.addEventListener('scroll', handlePreviewScroll)
+
+    console.log('🔄 Scroll synchronization enabled')
+
+    return () => {
+      editorDisposable.dispose()
+      previewElement.removeEventListener('scroll', handlePreviewScroll)
+      console.log('🔄 Scroll synchronization disabled')
+    }
+  }, [viewMode, currentFile])
 
   const loadFile = async (filePath: string) => {
     console.log('Loading file:', filePath)
@@ -363,6 +446,74 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     localStorage.setItem('markdown-editor-divider-position', newPosition.toString())
   }
 
+  /**
+   * Build scroll map: line → pixel positions
+   * Maps editor line numbers to preview element positions
+   */
+  const buildScrollMap = (): ScrollMapEntry[] => {
+    if (!editorRef.current || !previewRef.current) return []
+
+    const map: ScrollMapEntry[] = []
+    const elements = previewRef.current.querySelectorAll('[data-line]')
+
+    elements.forEach((el) => {
+      const lineAttr = el.getAttribute('data-line')
+      if (!lineAttr) return
+
+      const line = parseInt(lineAttr, 10)
+      if (isNaN(line)) return
+
+      const previewOffset = (el as HTMLElement).offsetTop
+      const editorOffset = editorRef.current!.getTopForLineNumber(line)
+
+      map.push({ line, editorOffset, previewOffset })
+    })
+
+    return map.sort((a, b) => a.line - b.line)
+  }
+
+  /**
+   * Interpolate scroll position between known mapping points
+   * Uses linear interpolation for smooth scrolling
+   */
+  const interpolateScrollPosition = (
+    scrollTop: number,
+    map: ScrollMapEntry[],
+    sourceType: 'editor' | 'preview'
+  ): number => {
+    if (map.length === 0) return scrollTop
+    if (map.length === 1)
+      return map[0][sourceType === 'editor' ? 'previewOffset' : 'editorOffset']
+
+    const sourceKey = sourceType === 'editor' ? 'editorOffset' : 'previewOffset'
+    const targetKey = sourceType === 'editor' ? 'previewOffset' : 'editorOffset'
+
+    // Binary search for closest entries
+    let left = 0,
+      right = map.length - 1
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2)
+      if (map[mid][sourceKey] < scrollTop) left = mid + 1
+      else right = mid
+    }
+
+    // Handle edge cases
+    if (left === 0) return map[0][targetKey]
+    if (left >= map.length) return map[map.length - 1][targetKey]
+
+    // Linear interpolation between two points
+    const before = map[left - 1]
+    const after = map[left]
+
+    const sourceRange = after[sourceKey] - before[sourceKey]
+    if (sourceRange === 0) return before[targetKey]
+
+    const ratio = (scrollTop - before[sourceKey]) / sourceRange
+    const targetRange = after[targetKey] - before[targetKey]
+
+    return before[targetKey] + ratio * targetRange
+  }
+
   return (
     <div className="markdown-editor-panel" tabIndex={0}>
       {currentFile && (
@@ -515,7 +666,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
               className="preview-pane"
               style={viewMode === 'split' ? { width: `${100 - dividerPosition}%` } : undefined}
             >
-              <MarkdownPreview content={currentFile.content} filePath={currentFile.path} />
+              <MarkdownPreview ref={previewRef} content={currentFile.content} filePath={currentFile.path} />
             </div>
           )}
         </div>
