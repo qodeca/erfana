@@ -15,6 +15,8 @@ Dual vertical activity bars on left and right edges (VS Code-style).
 
 ### Right Activity Bar
 
+- **AI Assistant icon**: Toggle AI Assistant panel (top position)
+  - Keyboard: None (toggle via icon only)
 - **Git icon**: Toggle Git panel
   - Keyboard: `Ctrl+Shift+G`
 - **Terminal icon**: Toggle Terminal panel
@@ -47,6 +49,52 @@ Manages:
 - **Active indicator**: 2px blue vertical bar on active item
 - **Hover effect**: Icon color changes to white
 - **Size**: 48x48px click target per item
+
+## AI Assistant Panel
+
+**Location**: `src/renderer/src/components/Panels/AiAssistantPanel.tsx`, `ClaudeCode/ClaudeCodeChat.tsx`
+
+Right sidebar panel for Claude Code integration via persistent CLI session.
+
+### Features
+
+- **Installation Check**: Detects Claude CLI presence, shows install guide if missing
+- **Authentication**: OAuth token setup with visual flow
+- **Persistent Session**: Long-running Claude CLI process maintains conversation context
+- **Session State Indicators**: Visual dots (ready=green, starting=yellow, error=red)
+- **Chat Interface**: Message history with user/assistant/tool_use messages
+- **Stop Generation**: Stop button during active generation (Escape key)
+- **Auto-restart**: Exponential backoff recovery (max 3 attempts) on crashes
+
+### Session Lifecycle
+
+1. User authenticates via OAuth token
+2. Session starts automatically when authenticated
+3. Claude CLI spawns in project directory context
+4. Process runs until project closes
+5. Messages sent via stdin (JSONL), received via stdout (JSONL)
+
+### UI States
+
+- **Loading**: Checking Claude CLI status
+- **Not Installed**: Installation guide with Homebrew command
+- **Not Authenticated**: OAuth token input form
+- **Starting**: Spinner with "Starting Claude session..."
+- **Ready**: Chat interface with green indicator
+- **Error**: Error message with restart button
+
+### Components
+
+- `AiAssistantPanel.tsx` - Session management, auth flows, state indicators
+- `ClaudeCodeChat.tsx` - Chat interface, message display, input handling
+- `TerminalMessage.tsx` - Individual message rendering (user/assistant/tool_use)
+
+### Implementation
+
+**Service**: `src/main/services/ClaudeCliService.ts` (persistent session architecture)
+**IPC**: `src/main/ipc/claude-code-handlers.ts` (session lifecycle)
+
+See: [IPC Patterns](./ipc-patterns.md) | [Architecture](./architecture.md)
 
 ## Context Menu (File Explorer)
 
