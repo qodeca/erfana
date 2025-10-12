@@ -402,12 +402,12 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
           icon: <FolderPlus size={14} strokeWidth={2} />,
           action: () => handleNewFolderInFolder(node.path)
         },
-        { separator: true } as ContextMenuItem,
         {
           label: 'Rename',
           icon: <Edit size={14} strokeWidth={2} />,
           action: () => handleRename(node.path, node.name)
         },
+        { separator: true } as ContextMenuItem,
         {
           label: 'Delete',
           icon: <Trash size={14} strokeWidth={2} />,
@@ -422,6 +422,7 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
           icon: <Edit size={14} strokeWidth={2} />,
           action: () => handleRename(node.path, node.name)
         },
+        { separator: true } as ContextMenuItem,
         {
           label: 'Delete',
           icon: <Trash size={14} strokeWidth={2} />,
