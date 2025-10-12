@@ -397,7 +397,7 @@ Displays multi-dimensional performance or comparison data.
 ```mermaid
 radar-beta
     title Developer Skills Assessment
-    axis "TypeScript", "React", "Node.js", "Design", "Testing", "DevOps"
+    axis TypeScript, React, NodeJS, Design, Testing, DevOps
     curve Developer1{85, 90, 75, 60, 70, 55}
     curve Developer2{70, 80, 90, 50, 85, 75}
     curve Developer3{95, 85, 80, 70, 65, 60}
