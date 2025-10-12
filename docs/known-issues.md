@@ -1,6 +1,55 @@
 # Known Issues & Workarounds
 
-## node-pty Build Failure
+## Resolved Issues
+
+### ✅ Panel Resizing (RESOLVED in v0.1.0, Commit 4ff94cb)
+
+**Previous Issue**: Panels showed resize cursor but didn't actually resize. Users could see the resize handle but dragging it had no effect.
+
+**Root Cause**: Was using DockviewReact for basic 3-column layout (not its intended purpose). All panels had `flexGrow: 0`, breaking flex layout and preventing proper space distribution.
+
+**Solution**: Refactored to hybrid SplitviewReact (outer layout) + DockviewReact (editor tabs only). Now matches VS Code architecture pattern.
+
+**Status**: ✅ All panels now resize correctly with working drag handles.
+
+See: [Architecture - Hybrid Layout Architecture](./architecture.md#hybrid-layout-architecture)
+
+---
+
+### ✅ Monaco Editor CDN Loading (RESOLVED, Commit 121fbb6)
+
+**Previous Issue**: Monaco Editor was loading web workers from CDN (`cdn.jsdelivr.net`) which caused Content Security Policy violations in Electron, resulting in the editor showing "Loading..." indefinitely and never rendering.
+
+**Solution**: Configured Monaco loader to use local bundling instead of CDN:
+
+```typescript
+import { loader } from '@monaco-editor/react'
+import * as monaco from 'monaco-editor'
+
+// Configure Monaco to use local files instead of CDN
+// This prevents CSP violations in Electron
+loader.config({ monaco })
+```
+
+**Status**: ✅ Editor now loads properly without CSP violations. Offline mode works correctly.
+
+---
+
+### ✅ Panel Protection (RESOLVED in v0.1.0, Commit 4ff94cb)
+
+**Previous Issue**: Multiple attempts to hide close buttons on protected panels (Explorer, Git, Terminal) failed. Used wrong CSS class selectors and required multiple setTimeout calls.
+
+**Solution**: New SplitviewReact architecture renders sidebar panels differently. Panel protection is now handled through the splitview API's visibility control rather than hiding close buttons.
+
+**Status**: ✅ Panel visibility managed through Zustand store and SplitviewApi.
+
+See: [UI Components - Panel Toggle System](./ui-components.md#panel-toggle-system)
+
+---
+
+## Active Issues
+
+### node-pty Build Failure
 
 **Issue**: Fails to build on Python 3.13 (missing `distutils`)
 
@@ -30,38 +79,6 @@ ModuleNotFoundError: No module named 'distutils'
 ```typescript
 import 'dockview/dist/styles/dockview.css'  // ✅ Correct
 ```
-
----
-
-## Monaco Editor CDN Loading
-
-**Status**: ✅ RESOLVED (commit 121fbb6)
-
-**Component**: MonacoMarkdownEditor
-**File**: `src/renderer/src/components/Editor/MonacoMarkdownEditor.tsx:6-8`
-
-### Issue (Historical)
-
-Monaco Editor was loading web workers from CDN (`cdn.jsdelivr.net`) which caused Content Security Policy violations in Electron, resulting in the editor showing "Loading..." indefinitely and never rendering.
-
-### Solution
-
-Configured Monaco loader to use local bundling instead of CDN:
-
-```typescript
-import { loader } from '@monaco-editor/react'
-import * as monaco from 'monaco-editor'
-
-// Configure Monaco to use local files instead of CDN
-// This prevents CSP violations in Electron
-loader.config({ monaco })
-```
-
-This prevents CSP violations by bundling Monaco workers from `node_modules` instead of fetching from external CDN.
-
-**Impact**: Editor now loads properly without CSP violations. Offline mode works correctly.
-
-**Commit**: 121fbb6 (Fix Monaco Editor CSP violation and initialization issues)
 
 ---
 
@@ -122,51 +139,13 @@ export class SettingsService {
 
 ## Panel Close Button CSS Selectors
 
-**Issue**: CSS uses `:has()` selector for hiding close buttons on protected panels
+**Status**: No longer applicable after v0.1.0 architectural refactoring
 
-**Browser Support**: Chrome 105+, Firefox 121+, Safari 15.4+
+**Previous Issue**: CSS used `:has()` selector for hiding close buttons on protected panels
 
-**Impact**: If browser doesn't support `:has()`, close buttons won't be hidden by CSS
+**Current State**: New SplitviewReact architecture handles panel visibility through API rather than hiding close buttons. This issue is resolved by the architectural change.
 
-**Mitigation**: JavaScript capture-phase event listener provides fallback protection
-
-**Status**: Acceptable - Electron uses recent Chromium which supports `:has()`
-
-See: [UI Components](./ui-components.md#panel-protection)
-
----
-
-## localStorage Clear on Startup
-
-**Issue**: `loadPersistedState()` clears localStorage on every app start
-
-**Location**: `src/renderer/src/components/DockLayout/AppDockLayout.tsx` line 89
-
-**Reason**: Temporary workaround during development to force fresh state
-
-**Impact**: Panel sizes and visibility reset to defaults every time
-
-**Action**: Remove `localStorage.removeItem('erfana-sidebar-state')` after development stabilizes
-
----
-
-## Panel Protection Implementation
-
-**Issue**: Multiple attempts to hide close buttons failed
-
-**Root Cause**: Used wrong CSS class selectors (`.tab-label` instead of `.dv-default-tab-content`)
-
-**Current Solution**:
-- Capture-phase event listener intercepts clicks on `.dv-default-tab-action`
-- Fallback auto-restore if panel somehow removed
-
-**Technical Debt**:
-- Multiple setTimeout calls for button hiding (can be optimized)
-- CSS selectors using `textContent` attribute may have compatibility issues
-
-**Status**: Working solution, but could be more elegant
-
-See: [UI Components](./ui-components.md#panel-protection)
+**Browser Support Note**: Electron uses recent Chromium which supports `:has()` if needed elsewhere
 
 ---
 
