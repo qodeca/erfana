@@ -214,6 +214,11 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
         content,
         modified: false
       })
+
+      // Set view mode based on file type
+      const extension = filePath.toLowerCase().split('.').pop()
+      const isMarkdown = extension === 'md' || extension === 'markdown'
+      setViewMode(isMarkdown ? 'preview' : 'editor')
     } catch (error) {
       console.error('Error loading file:', error)
     }
