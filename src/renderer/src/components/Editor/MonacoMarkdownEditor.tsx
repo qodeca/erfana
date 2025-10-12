@@ -12,6 +12,7 @@ interface MonacoMarkdownEditorProps {
   onChange: (value: string) => void
   filePath?: string
   onSelectionChange?: (selection: string) => void
+  onEditorMount?: (editor: monaco.editor.IStandaloneCodeEditor) => void
 }
 
 export interface MonacoEditorHandle {
@@ -26,15 +27,17 @@ export interface MonacoEditorHandle {
   insertHeading: (level: number) => void
   insertList: (ordered: boolean) => void
 
+  // Direct editor access for advanced operations
+  getEditor: () => monaco.editor.IStandaloneCodeEditor | null
+
   // Scroll synchronization methods
   getScrollTop: () => number
   setScrollTop: (offset: number) => void
   getTopForLineNumber: (line: number) => number
-  onDidScrollChange: (callback: () => void) => monaco.IDisposable
 }
 
 export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdownEditorProps>(
-  ({ value, onChange, filePath, onSelectionChange }, ref) => {
+  ({ value, onChange, filePath, onSelectionChange, onEditorMount }, ref) => {
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
 
     // Debug logging
@@ -83,6 +86,11 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, () => {
         insertLink()
       })
+
+      // Notify parent component that editor is mounted and ready
+      if (onEditorMount) {
+        onEditorMount(editor)
+      }
     }
 
     const wrapSelection = (wrapper: string) => {
@@ -249,13 +257,8 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
       return editor.getTopForLineNumber(line)
     }
 
-    const onDidScrollChange = (callback: () => void): monaco.IDisposable => {
-      const editor = editorRef.current
-      if (!editor) {
-        // Return a no-op disposable if editor not ready
-        return { dispose: () => {} }
-      }
-      return editor.onDidScrollChange(callback)
+    const getEditor = (): monaco.editor.IStandaloneCodeEditor | null => {
+      return editorRef.current
     }
 
     // Expose methods via ref
@@ -271,11 +274,13 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
       insertHeading,
       insertList,
 
+      // Direct editor access
+      getEditor,
+
       // Scroll synchronization methods
       getScrollTop,
       setScrollTop,
-      getTopForLineNumber,
-      onDidScrollChange
+      getTopForLineNumber
     }))
 
     return (
