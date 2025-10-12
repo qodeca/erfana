@@ -175,9 +175,11 @@
   overflow: hidden;
 }
 
-.editor-content.view-mode-split {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+/* All view modes use flex layout */
+.editor-content.view-mode-split,
+.editor-content.view-mode-editor,
+.editor-content.view-mode-preview {
+  display: flex;
 }
 
 .editor-content.view-mode-editor .preview-pane,
@@ -185,10 +187,23 @@
   display: none;
 }
 
+/* Ensure editor and preview panes fill available space in single-pane modes */
+.editor-content.view-mode-editor .editor-pane,
+.editor-content.view-mode-preview .preview-pane {
+  flex: 1;
+  width: 100%;
+}
+
+/* In split mode, widths are controlled by inline styles */
+.editor-content.view-mode-split .editor-pane,
+.editor-content.view-mode-split .preview-pane {
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
 .editor-pane {
   height: 100%;
   overflow: hidden;
-  border-right: 1px solid #3c3c3c;
 }
 
 .preview-pane {
