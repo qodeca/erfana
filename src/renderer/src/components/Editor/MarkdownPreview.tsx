@@ -12,15 +12,14 @@ interface MarkdownPreviewProps {
 }
 
 /**
- * Helper function to extract line number from sourcePos
- * @param sourcePos - Format: "1:0-3:5" (startLine:startCol-endLine:endCol)
+ * Helper function to extract line number from node position
+ * In react-markdown v9+, position data comes from node.position instead of sourcePos
+ * @param node - The AST node with position information
  * @returns Line number or undefined
  */
-function extractLineNumber(sourcePos?: string): number | undefined {
-  if (!sourcePos) return undefined
-  // Extract start line from sourcePos format
-  const match = sourcePos.match(/^(\d+):/)
-  return match ? parseInt(match[1], 10) : undefined
+function extractLineNumber(node?: any): number | undefined {
+  if (!node?.position?.start?.line) return undefined
+  return node.position.start.line
 }
 
 /**
@@ -31,7 +30,7 @@ function withLineNumber<T extends keyof JSX.IntrinsicElements>(
   tag: T
 ): React.ComponentType<any> {
   return ({ node, ...props }: any) => {
-    const line = extractLineNumber(props['data-sourcepos'])
+    const line = extractLineNumber(node)
     const Component = tag as any
     return <Component data-line={line} {...props} />
   }
@@ -89,7 +88,6 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
           onContextMenu={handleContextMenu}
         >
           <ReactMarkdown
-            {...({ rawSourcePos: true } as any)}
             remarkPlugins={[remarkGfm]}
             components={{
               // Inject data-line on all block elements for scroll synchronization
@@ -102,7 +100,7 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
               code({ node, className, children, ...props }) {
                 const match = /language-(\w+)/.exec(className || '')
                 const isInline = !match && !className?.includes('language-')
-                const line = extractLineNumber(props['data-sourcepos'])
+                const line = extractLineNumber(node)
 
                 // Check if this is a mermaid code block
                 if (match && match[1] === 'mermaid') {
@@ -124,8 +122,8 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
                 )
               },
               // Custom table styling
-              table({ node, children, ...props }) {
-                const line = extractLineNumber(props['data-sourcepos'])
+              table({ node, children }) {
+                const line = extractLineNumber(node)
                 return (
                   <div className="table-wrapper" data-line={line}>
                     <table>{children}</table>
@@ -140,20 +138,20 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
                 return <input type={type} {...props} />
               },
               // Add IDs to headings for potential TOC and data-line for scroll sync
-              h1({ node, children, ...props }) {
-                const line = extractLineNumber(props['data-sourcepos'])
+              h1({ node, children }) {
+                const line = extractLineNumber(node)
                 const text = String(children)
                 const id = text.toLowerCase().replace(/\s+/g, '-')
                 return <h1 data-line={line} id={id}>{children}</h1>
               },
-              h2({ node, children, ...props }) {
-                const line = extractLineNumber(props['data-sourcepos'])
+              h2({ node, children }) {
+                const line = extractLineNumber(node)
                 const text = String(children)
                 const id = text.toLowerCase().replace(/\s+/g, '-')
                 return <h2 data-line={line} id={id}>{children}</h2>
               },
-              h3({ node, children, ...props }) {
-                const line = extractLineNumber(props['data-sourcepos'])
+              h3({ node, children }) {
+                const line = extractLineNumber(node)
                 const text = String(children)
                 const id = text.toLowerCase().replace(/\s+/g, '-')
                 return <h3 data-line={line} id={id}>{children}</h3>
