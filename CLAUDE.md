@@ -31,7 +31,7 @@ Erfana follows Electron's three-process model:
 - react-markdown + remark-gfm (preview)
 - Zustand (activity bar state management)
 - chokidar (file system watching)
-- @anthropic-ai/claude-agent-sdk (Claude AI)
+- Claude CLI binary (Claude AI via MAX subscription)
 - simple-git (git operations)
 
 **Project Structure:**
@@ -80,8 +80,8 @@ Business logic lives in service classes (`src/main/services/`):
 - `FileWatcherService.ts` - File content auto-refresh (300ms debounce)
 - `DirectoryWatcherService.ts` - Directory tree auto-refresh (1000ms debounce)
 - `SettingsService.ts` - Persistent storage with electron-store (async, dynamic ES Module import)
+- `ClaudeCliService.ts` - Persistent Claude CLI session (long-running process, JSONL stdin/stdout)
 - `GitService.ts` - Git operations (future)
-- `ClaudeService.ts` - Claude SDK wrapper (future)
 
 ```typescript
 export class MyService {
@@ -155,7 +155,7 @@ Automatic detection and refresh for external file system changes:
 
 **Activity Bars**: Dual vertical activity bars (VS Code-style) on left and right edges with Lucide icon toggle buttons.
 - **Left Activity Bar**: Explorer toggle
-- **Right Activity Bar**: Git and Terminal toggles (separate panels, mutually exclusive)
+- **Right Activity Bar**: AI Assistant toggle (top position), Git and Terminal toggles (separate panels, mutually exclusive)
 
 **File Explorer Context Menu**: Right-click files/folders for New File, New Folder, Rename, Delete actions with validation.
 
@@ -284,27 +284,46 @@ mcp__circuit-electron__close({ sessionId: session.sessionId })
 📚 **Reference**: See [docs/testing/circuit-electron-guide.md](docs/testing/circuit-electron-guide.md)
 📚 **Test scenarios**: See [docs/testing/ui-scenarios.md](docs/testing/ui-scenarios.md) and [interaction-scenarios.md](docs/testing/interaction-scenarios.md)
 
-## Claude Code Integration (Future)
+## Claude Code Integration
 
-Planned integration using Claude Agent SDK:
+**Status**: ✅ IMPLEMENTED - Persistent session architecture
 
-```typescript
-import { query } from '@anthropic-ai/claude-agent-sdk'
+Erfana integrates Claude Code via persistent CLI session for AI-powered assistance within the IDE.
 
-for await (const message of query(prompt, {
-  tools: ['Edit', 'Read'],
-  permissionMode: 'acceptEdits',
-  workingDirectory: projectPath
-})) {
-  mainWindow.webContents.send('claude:message', message)
-}
+### Architecture
+
+- **ClaudeCliService** (`src/main/services/ClaudeCliService.ts`): Spawns and manages long-running Claude CLI process
+- **Persistent Session**: Process runs from project open to project close, maintains conversation context
+- **JSONL Communication**: Bidirectional stdin/stdout streaming with `--input-format stream-json` and `--output-format stream-json`
+- **Auto-Restart**: Exponential backoff recovery (max 3 attempts) on process crashes
+- **Session States**: 'stopped' | 'starting' | 'ready' | 'error'
+
+### UI
+
+- **AI Assistant Panel**: Right sidebar, accessible via activity bar icon
+- **Installation Check**: Detects Claude CLI, shows Homebrew install command if missing
+- **Authentication**: OAuth token setup flow with visual feedback
+- **Session Indicators**: Color-coded dots (green=ready, yellow=starting, red=error)
+- **Chat Interface**: Message history (user/assistant/tool_use), stop generation button
+
+### Implementation
+
+**Files**:
+- Service: `src/main/services/ClaudeCliService.ts` (~527 lines)
+- IPC: `src/main/ipc/claude-code-handlers.ts` (~180 lines)
+- UI: `src/renderer/src/components/Panels/AiAssistantPanel.tsx`
+- Chat: `src/renderer/src/components/ClaudeCode/ClaudeCodeChat.tsx`
+
+**Flags Used**:
+```bash
+claude -p \
+  --input-format stream-json \
+  --output-format stream-json \
+  --verbose \
+  --replay-user-messages
 ```
 
-**Roadmap:**
-- [ ] ClaudeService implementation
-- [ ] Text selection → prompt flow
-- [ ] Streaming response UI
-- [ ] Terminal integration (when node-pty fixed)
+📚 **Detailed docs**: [IPC Patterns - Claude Code](docs/ipc-patterns.md) | [UI Components - AI Assistant](docs/ui-components.md#ai-assistant-panel) | [Architecture](docs/architecture.md)
 
 ## Contributing
 

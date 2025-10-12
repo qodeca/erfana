@@ -45,6 +45,51 @@ declare global {
           callback: (data: { dirPath: string; error: string }) => void
         ) => () => void
       }
+      claudeCode: {
+        // Session lifecycle
+        startSession: (projectPath: string) => Promise<{ success: boolean; error?: string }>
+        stopSession: () => Promise<{ success: boolean; error?: string }>
+        getSessionState: () => Promise<{
+          success: boolean
+          state?: 'stopped' | 'starting' | 'ready' | 'error'
+          error?: string
+        }>
+        // Send message
+        sendMessage: (prompt: string, context: any, sessionId: string) => void
+        stop: () => void
+        // CLI installation and authentication
+        isInstalled: () => Promise<boolean>
+        checkAuth: () => Promise<{
+          isAuthenticated: boolean
+          username?: string
+          error?: string
+        }>
+        setToken: (token: string) => Promise<{ success: boolean; error?: string }>
+        // Event listeners - Messages
+        onMessage: (
+          callback: (data: {
+            sessionId: string
+            message: {
+              id: string
+              type: 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'system' | 'error'
+              content: string
+              metadata?: any
+              timestamp: Date
+            }
+          }) => void
+        ) => () => void
+        onComplete: (callback: (data: { sessionId: string }) => void) => () => void
+        onError: (callback: (data: { sessionId: string; error: string }) => void) => () => void
+        // Event listeners - Session lifecycle
+        onSessionStarted: (callback: (data: { projectPath: string }) => void) => () => void
+        onSessionStopped: (callback: () => void) => () => void
+        onSessionRestarting: (
+          callback: (data: { attempt: number; maxAttempts: number }) => void
+        ) => () => void
+        onSessionError: (
+          callback: (error: { message: string; recoverable: boolean }) => void
+        ) => () => void
+      }
     }
   }
 }
