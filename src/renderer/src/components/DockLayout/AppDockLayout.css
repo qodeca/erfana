@@ -2,7 +2,7 @@
   width: 100%;
   height: 100%;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   overflow: hidden;
 }
 
@@ -74,4 +74,50 @@
 /* Fallback: Hide using sibling selector if :has() not supported */
 .dv-default-tab-content:first-child ~ .dv-default-tab-action {
   /* Will be overridden by JavaScript for protected panels */
+}
+
+/* Welcome panel styles */
+.welcome-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.welcome-content {
+  text-align: center;
+  color: #858585;
+}
+
+.welcome-icon {
+  color: #858585;
+  margin-bottom: 20px;
+}
+
+.welcome-content h2 {
+  color: #cccccc;
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.welcome-content p {
+  color: #858585;
+  font-size: 14px;
+}
+
+/* Welcome tab icon styling */
+.welcome-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  color: #cccccc;
+}
+
+/* Hide close button for locked welcome tab */
+.dv-default-tab.dv-tab-locked .dv-default-tab-action {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
