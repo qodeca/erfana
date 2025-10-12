@@ -393,23 +393,23 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
     if (node.type === 'directory') {
       return [
         {
-          label: 'New File...',
+          label: 'New File',
           icon: <FilePlus size={14} strokeWidth={2} />,
           action: () => handleNewFileInFolder(node.path)
         },
         {
-          label: 'New Folder...',
+          label: 'New Folder',
           icon: <FolderPlus size={14} strokeWidth={2} />,
           action: () => handleNewFolderInFolder(node.path)
         },
         { separator: true } as ContextMenuItem,
         {
-          label: 'Rename...',
+          label: 'Rename',
           icon: <Edit size={14} strokeWidth={2} />,
           action: () => handleRename(node.path, node.name)
         },
         {
-          label: 'Delete Folder',
+          label: 'Delete',
           icon: <Trash size={14} strokeWidth={2} />,
           danger: true,
           action: () => handleDeleteFolder(node.path, node.name)
@@ -418,12 +418,12 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
     } else {
       return [
         {
-          label: 'Rename...',
+          label: 'Rename',
           icon: <Edit size={14} strokeWidth={2} />,
           action: () => handleRename(node.path, node.name)
         },
         {
-          label: 'Delete File',
+          label: 'Delete',
           icon: <Trash size={14} strokeWidth={2} />,
           danger: true,
           action: () => handleDeleteFile(node.path, node.name)
