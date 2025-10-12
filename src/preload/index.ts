@@ -74,6 +74,44 @@ const api = {
       ipcRenderer.on('file-watch:error', listener)
       return () => ipcRenderer.removeListener('file-watch:error', listener)
     }
+  },
+
+  // Directory watching operations
+  directoryWatch: {
+    start: (dirPath: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('directory-watch:start', dirPath),
+    stop: (dirPath: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('directory-watch:stop', dirPath),
+    stopAll: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('directory-watch:stop-all'),
+    pause: (dirPath: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('directory-watch:pause', dirPath),
+    resume: (dirPath: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('directory-watch:resume', dirPath),
+    getStats: (): Promise<{ success: boolean; stats?: any; error?: string }> =>
+      ipcRenderer.invoke('directory-watch:get-stats'),
+
+    // Event listeners
+    onDirectoryChanged: (
+      callback: (data: { dirPath: string; eventCount: number; summary: any }) => void
+    ) => {
+      const listener = (
+        _event: any,
+        data: { dirPath: string; eventCount: number; summary: any }
+      ) => callback(data)
+      ipcRenderer.on('directory-watch:changed', listener)
+      return () => ipcRenderer.removeListener('directory-watch:changed', listener)
+    },
+    onProjectDeleted: (callback: (data: { dirPath: string }) => void) => {
+      const listener = (_event: any, data: { dirPath: string }) => callback(data)
+      ipcRenderer.on('directory-watch:project-deleted', listener)
+      return () => ipcRenderer.removeListener('directory-watch:project-deleted', listener)
+    },
+    onDirectoryError: (callback: (data: { dirPath: string; error: string }) => void) => {
+      const listener = (_event: any, data: { dirPath: string; error: string }) => callback(data)
+      ipcRenderer.on('directory-watch:error', listener)
+      return () => ipcRenderer.removeListener('directory-watch:error', listener)
+    }
   }
 }
 

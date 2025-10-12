@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { FilePlus, FolderPlus, FolderOpen, Replace, Trash, AlertTriangle, Edit } from 'lucide-react'
 import type { FileNode } from '../../../../preload/index'
 import { FileTreeNode } from './FileTreeNode'
@@ -16,6 +16,8 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const isInternalOperation = useRef(false)
   const [isCreatingFile, setIsCreatingFile] = useState(false)
   const [newFileName, setNewFileName] = useState('')
   const [createFileError, setCreateFileError] = useState<string | null>(null)
@@ -64,6 +66,46 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
 
     loadLastProject()
   }, [])
+
+  // Directory watching for auto-refresh
+  useEffect(() => {
+    if (!projectPath) return
+
+    // Start watching the project directory
+    window.api.directoryWatch.start(projectPath).catch((err) => {
+      console.error('Failed to start directory watch:', err)
+    })
+
+    // Listen for directory changes
+    const unsubscribeChanged = window.api.directoryWatch.onDirectoryChanged((data) => {
+      // Only refresh if not during our own internal operations
+      if (!isInternalOperation.current) {
+        console.log(`📁 Directory changed, refreshing file tree... (${data.eventCount} events)`)
+        refreshFileTree()
+      }
+    })
+
+    // Listen for project deletion
+    const unsubscribeDeleted = window.api.directoryWatch.onProjectDeleted(() => {
+      setError('Project folder no longer exists')
+      setProjectPath(null)
+      setFiles([])
+      setExpandedFolders(new Set())
+    })
+
+    // Listen for errors
+    const unsubscribeError = window.api.directoryWatch.onDirectoryError((data) => {
+      console.error('Directory watch error:', data.error)
+    })
+
+    // Cleanup on unmount or when project changes
+    return () => {
+      window.api.directoryWatch.stop(projectPath)
+      unsubscribeChanged()
+      unsubscribeDeleted()
+      unsubscribeError()
+    }
+  }, [projectPath])
 
   const handleOpenProject = async () => {
     try {
@@ -133,9 +175,22 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
     try {
       const fileTree = await window.api.file.readDirectory(projectPath)
       setFiles(fileTree)
+      // Expanded folders are preserved automatically via state
     } catch (err) {
       console.error('Error refreshing file tree:', err)
     }
+  }
+
+  const handleToggleFolder = (folderPath: string) => {
+    setExpandedFolders((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(folderPath)) {
+        newSet.delete(folderPath)
+      } else {
+        newSet.add(folderPath)
+      }
+      return newSet
+    })
   }
 
   const handleCreateFile = async () => {
@@ -155,10 +210,22 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
         return
       }
 
+      // Mark as internal operation and pause directory watcher
+      isInternalOperation.current = true
+      if (projectPath) {
+        await window.api.directoryWatch.pause(projectPath)
+      }
+
       const createdFilePath = await window.api.file.createFile(targetPath, newFileName)
 
       // Refresh file tree
       await refreshFileTree()
+
+      // Resume directory watcher
+      if (projectPath) {
+        await window.api.directoryWatch.resume(projectPath)
+      }
+      isInternalOperation.current = false
 
       // Open the newly created file
       onFileSelect(createdFilePath)
@@ -181,6 +248,12 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
       }
       setCreateFileError(errorMessage)
       console.error('Error creating file:', err)
+
+      // Make sure to resume watcher even on error
+      if (projectPath) {
+        await window.api.directoryWatch.resume(projectPath)
+      }
+      isInternalOperation.current = false
     } finally {
       setLoading(false)
     }
@@ -203,10 +276,22 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
         return
       }
 
+      // Mark as internal operation and pause directory watcher
+      isInternalOperation.current = true
+      if (projectPath) {
+        await window.api.directoryWatch.pause(projectPath)
+      }
+
       await window.api.file.createFolder(targetPath, newFolderName)
 
       // Refresh file tree
       await refreshFileTree()
+
+      // Resume directory watcher
+      if (projectPath) {
+        await window.api.directoryWatch.resume(projectPath)
+      }
+      isInternalOperation.current = false
 
       // Reset state
       setIsCreatingFolder(false)
@@ -226,6 +311,12 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
       }
       setCreateFolderError(errorMessage)
       console.error('Error creating folder:', err)
+
+      // Make sure to resume watcher even on error
+      if (projectPath) {
+        await window.api.directoryWatch.resume(projectPath)
+      }
+      isInternalOperation.current = false
     } finally {
       setLoading(false)
     }
@@ -285,12 +376,32 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
         try {
           setLoading(true)
           setError(null)
+
+          // Mark as internal operation and pause directory watcher
+          isInternalOperation.current = true
+          if (projectPath) {
+            await window.api.directoryWatch.pause(projectPath)
+          }
+
           await window.api.file.deleteFile(filePath)
           await refreshFileTree()
+
+          // Resume directory watcher
+          if (projectPath) {
+            await window.api.directoryWatch.resume(projectPath)
+          }
+          isInternalOperation.current = false
+
           setConfirmDialog(null)
         } catch (err) {
           setError(err instanceof Error ? err.message : 'Failed to delete file')
           console.error('Error deleting file:', err)
+
+          // Make sure to resume watcher even on error
+          if (projectPath) {
+            await window.api.directoryWatch.resume(projectPath)
+          }
+          isInternalOperation.current = false
         } finally {
           setLoading(false)
         }
@@ -307,12 +418,32 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
         try {
           setLoading(true)
           setError(null)
+
+          // Mark as internal operation and pause directory watcher
+          isInternalOperation.current = true
+          if (projectPath) {
+            await window.api.directoryWatch.pause(projectPath)
+          }
+
           await window.api.file.deleteFolder(folderPath)
           await refreshFileTree()
+
+          // Resume directory watcher
+          if (projectPath) {
+            await window.api.directoryWatch.resume(projectPath)
+          }
+          isInternalOperation.current = false
+
           setConfirmDialog(null)
         } catch (err) {
           setError(err instanceof Error ? err.message : 'Failed to delete folder')
           console.error('Error deleting folder:', err)
+
+          // Make sure to resume watcher even on error
+          if (projectPath) {
+            await window.api.directoryWatch.resume(projectPath)
+          }
+          isInternalOperation.current = false
         } finally {
           setLoading(false)
         }
@@ -363,10 +494,22 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
       setLoading(true)
       setRenameError(null)
 
+      // Mark as internal operation and pause directory watcher
+      isInternalOperation.current = true
+      if (projectPath) {
+        await window.api.directoryWatch.pause(projectPath)
+      }
+
       await window.api.file.rename(renamingPath, renameValue)
 
       // Refresh file tree
       await refreshFileTree()
+
+      // Resume directory watcher
+      if (projectPath) {
+        await window.api.directoryWatch.resume(projectPath)
+      }
+      isInternalOperation.current = false
 
       // Reset state
       setIsRenaming(false)
@@ -384,6 +527,12 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
       }
       setRenameError(errorMessage)
       console.error('Error renaming:', err)
+
+      // Make sure to resume watcher even on error
+      if (projectPath) {
+        await window.api.directoryWatch.resume(projectPath)
+      }
+      isInternalOperation.current = false
     } finally {
       setLoading(false)
     }
@@ -594,6 +743,8 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
               onFileClick={handleFileClick}
               onContextMenu={handleContextMenu}
               selectedFolder={selectedFolder}
+              expandedFolders={expandedFolders}
+              onToggleFolder={handleToggleFolder}
             />
           ))
         ) : (

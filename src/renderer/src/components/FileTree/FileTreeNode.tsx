@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { ChevronRight, ChevronDown, File, FileText } from 'lucide-react'
 import type { FileNode } from '../../../../preload/index'
 import './FileTree.css'
@@ -9,6 +8,8 @@ interface FileTreeNodeProps {
   onFileClick: (filePath: string) => void
   onContextMenu?: (e: React.MouseEvent, node: FileNode, elementRect: DOMRect) => void
   selectedFolder?: string | null
+  expandedFolders: Set<string>
+  onToggleFolder: (folderPath: string) => void
 }
 
 export function FileTreeNode({
@@ -16,13 +17,16 @@ export function FileTreeNode({
   level,
   onFileClick,
   onContextMenu,
-  selectedFolder
+  selectedFolder,
+  expandedFolders,
+  onToggleFolder
 }: FileTreeNodeProps) {
-  const [isExpanded, setIsExpanded] = useState(level === 0)
+  // Controlled component - check if this folder is expanded
+  const isExpanded = expandedFolders.has(node.path) || level === 0
 
   const handleClick = () => {
     if (node.type === 'directory') {
-      setIsExpanded(!isExpanded)
+      onToggleFolder(node.path)
     } else {
       onFileClick(node.path)
     }
@@ -77,6 +81,8 @@ export function FileTreeNode({
               onFileClick={onFileClick}
               onContextMenu={onContextMenu}
               selectedFolder={selectedFolder}
+              expandedFolders={expandedFolders}
+              onToggleFolder={onToggleFolder}
             />
           ))}
         </div>
