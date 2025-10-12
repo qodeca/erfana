@@ -35,8 +35,8 @@ SplitviewReact (outer horizontal 3-column split)
   │   └─ Wraps FileTree component
   ├─ Center: EditorAreaSplitPanel (400px min, flex-fills remaining)
   │   └─ Contains DockviewReact for tabbed editors
-  └─ Right: RightSidebarSplitPanel (170-600px, resizable)
-      └─ Custom Git/Terminal tab switcher
+  └─ Right: GitSplitPanel + TerminalSplitPanel (170-600px each, mutually exclusive)
+      └─ Separate panels, only one visible at a time
 ```
 
 **SplitviewReact** (outer layer):
@@ -54,7 +54,8 @@ SplitviewReact (outer horizontal 3-column split)
 **Key Components**:
 - `FileExplorerSplitPanel` - Splitview panel wrapping FileTree
 - `EditorAreaSplitPanel` - Splitview panel containing nested DockviewReact
-- `RightSidebarSplitPanel` - Splitview panel with Git/Terminal tab UI
+- `GitSplitPanel` - Splitview panel for Git integration
+- `TerminalSplitPanel` - Splitview panel for terminal (mutually exclusive with Git)
 
 **Panel Communication**: DockviewApi passed via params to FileExplorerSplitPanel for opening files as tabs.
 

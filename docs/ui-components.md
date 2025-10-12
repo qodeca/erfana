@@ -126,7 +126,7 @@ Matches VS Code panel toggle behavior:
 **Splitview Panels**:
 - Left sidebar: `FileExplorerSplitPanel`
 - Center editor: `EditorAreaSplitPanel` (always visible)
-- Right sidebar: `RightSidebarSplitPanel`
+- Right sidebar: `GitSplitPanel` and `TerminalSplitPanel` (mutually exclusive)
 
 **Toggle Mechanism**:
 ```typescript
@@ -190,6 +190,199 @@ leftPanel.api.onDidSizeChange(() => {
 4. FileTree calls `dockviewApi.addPanel()` to open file tab
 
 **Code**: `AppDockLayout.tsx` lines 208-222
+
+## Tab Styling & Interactions
+
+**Location**: `src/renderer/src/components/DockLayout/AppDockLayout.css`, `AppDockLayout.tsx`
+
+Center editor tabs use VS Code-style hover effects and active indicators.
+
+### Hover Effects
+
+**Inactive tabs**:
+```css
+.dockview-theme-dark .dv-inactive-tab:hover .dv-default-tab {
+  background-color: #3a3d41 !important;
+}
+```
+- Lighter background on hover
+- Color: `#3a3d41` (VS Code hover color)
+- Applied to `.dv-default-tab` inside `.dv-inactive-tab`
+
+**Active tabs**:
+```css
+.dockview-theme-dark .dv-active-tab:hover .dv-default-tab {
+  background-color: #2d2d30 !important;
+  opacity: 0.9;
+}
+```
+- Subtle opacity change on hover
+- Maintains active appearance
+
+### Active Tab Indicator
+
+Blue bottom border matching VS Code and activity bars:
+
+```css
+.dockview-theme-dark .dv-tab.dv-active-tab::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #007acc !important;
+  z-index: 100;
+}
+```
+
+**Design**:
+- 2px height
+- Color: `#007acc` (matches activity bar indicator)
+- Pseudo-element `::after` for layering
+- Always visible (z-index: 100)
+
+### Tab Layout
+
+**Vertical centering**:
+```css
+.dockview-theme-dark .dv-default-tab {
+  height: 41px;
+  display: flex;
+  align-items: center;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+```
+
+**Padding removal from wrappers**:
+```css
+.dockview-theme-dark .dv-tab.dv-inactive-tab,
+.dockview-theme-dark .dv-tab.dv-active-tab {
+  padding: 0;
+}
+```
+
+### Focus Management
+
+**Auto-focus on tab change** ensures the blue active indicator shows immediately:
+
+```typescript
+// Listen for active panel changes
+event.api.onDidActivePanelChange((panel) => {
+  if (panel) {
+    // Focus the group
+    panel.group.focus()
+
+    // Focus panel content
+    setTimeout(() => {
+      const panelElement = panel.group.element.querySelector(
+        '.panel-content, .markdown-editor-panel'
+      )
+      if (panelElement instanceof HTMLElement) {
+        panelElement.focus()
+      }
+    }, 0)
+  }
+})
+```
+
+**Focusable panels**:
+- `WelcomePanel`: Add `tabIndex={0}` to `.panel-content`
+- `MarkdownEditorPanel`: Add `tabIndex={0}` to `.markdown-editor-panel`
+- Remove focus outlines: `outline: none` in CSS
+
+**Implementation**: `AppDockLayout.tsx` lines 86-100
+
+## Welcome Tab & Panel
+
+**Location**: `src/renderer/src/components/Panels/WelcomePanel.tsx`, `WelcomeTab.tsx`
+
+Home icon tab and welcome screen in center editor.
+
+### Welcome Tab (Tab Handle)
+
+**Specifications**:
+- Dimensions: 41px × 41px (perfect square)
+- Icon: `Home` from Lucide React (16px, strokeWidth 2)
+- Non-draggable: `draggable={false}` + drag event handlers
+- Locked: `welcomePanel.group.locked = true`
+
+**CSS Override** (removes Dockview padding):
+```css
+.dockview-theme-dark .dv-default-tab:has(.welcome-tab) {
+  padding: 0 !important;
+  width: 41px !important;
+  min-width: 41px !important;
+  max-width: 41px !important;
+}
+
+.dockview-theme-dark .dv-tab:has(.welcome-tab) {
+  padding: 0 !important;
+}
+```
+
+**Tab content styling**:
+```css
+.welcome-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 41px;
+  height: 41px;
+  color: #cccccc;
+  cursor: pointer;
+}
+```
+
+**Prevent dragging**:
+```typescript
+const handleDragStart = (e: React.DragEvent) => {
+  e.preventDefault()
+  e.stopPropagation()
+}
+
+<div
+  className="welcome-tab"
+  draggable={false}
+  onDragStart={handleDragStart}
+  onDrag={handleDragStart}
+>
+  <Home size={16} strokeWidth={2} />
+</div>
+```
+
+### Welcome Panel (Content Area)
+
+**Layout structure** (fills entire center area):
+```tsx
+<div className="panel-content" tabIndex={0}>
+  <div className="welcome-panel">
+    <div className="welcome-content">
+      {/* Icon, title, description */}
+    </div>
+  </div>
+</div>
+```
+
+**CSS for full-width**:
+```css
+.panel-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.welcome-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+}
+```
+
+**Key pattern**: Nested flex containers where inner div has `flex: 1` to expand.
 
 ## Development Patterns
 

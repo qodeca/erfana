@@ -119,9 +119,15 @@ Superior markdown capabilities with Monaco Editor + live preview:
 
 **Activity Bars**: Dual vertical activity bars (VS Code-style) on left and right edges with Lucide icon toggle buttons.
 - **Left Activity Bar**: Explorer toggle
-- **Right Activity Bar**: Git and Terminal toggles
+- **Right Activity Bar**: Git and Terminal toggles (separate panels, mutually exclusive)
 
 **File Explorer Context Menu**: Right-click files/folders for New File, New Folder, Rename, Delete actions with validation.
+
+**Editor Tab Styling**:
+- Hover effects on tabs (lighter background)
+- Blue bottom border on active tab (2px #007acc)
+- Auto-focus ensures active indicator shows immediately
+- 12px horizontal padding, 41px height
 
 **Global Keyboard Shortcuts** (work anywhere in app):
 - `Cmd/Ctrl+B` - Toggle left sidebar (Explorer)
@@ -129,7 +135,8 @@ Superior markdown capabilities with Monaco Editor + live preview:
 - `Ctrl+Shift+G` - Toggle right panel (Git)
 
 **Panel Behavior**:
-- Toggles hide/show entire splitview panels (not individual tabs)
+- Right sidebar: Git and Terminal are separate splitview panels (mutually exclusive)
+- Toggles hide/show entire panels (not individual tabs)
 - Preserves panel dimensions when toggling (working resize handles)
 - State persisted via Zustand store (sidebar widths, active panels)
 
