@@ -161,21 +161,35 @@ Right-click context menu in markdown preview pane for AI-powered text operations
 
 ### Mermaid Diagrams
 
-Erfana supports Mermaid diagrams for creating flowcharts, sequence diagrams, state machines, Gantt charts, and more.
+Erfana supports **ALL 23 Mermaid diagram types** for comprehensive visualization needs (Mermaid v11.12.0).
 
-#### Supported Diagram Types
+#### Supported Diagram Types (Complete List)
 
-- **Flowcharts** (`graph TD`, `graph LR`) - Decision trees, process flows
-- **Sequence Diagrams** (`sequenceDiagram`) - Message flows between participants
-- **Class Diagrams** (`classDiagram`) - Object-oriented structures
-- **State Diagrams** (`stateDiagram-v2`) - State machines and transitions
-- **Gantt Charts** (`gantt`) - Project timelines and schedules
-- **ER Diagrams** (`erDiagram`) - Entity-relationship models
-- **Git Graphs** (`gitGraph`) - Branch and commit visualizations
-- **Pie Charts** (`pie`) - Data distribution
-- **Journey Diagrams** (`journey`) - User journey mapping
-- **Timeline Diagrams** (`timeline`) - Event timelines
-- And 10+ more diagram types
+1. **Flowcharts** (`flowchart`) - Process flows, decision trees
+2. **Sequence Diagrams** (`sequenceDiagram`) - Actor interactions over time
+3. **Class Diagrams** (`classDiagram`) - OOP structures and relationships
+4. **State Diagrams** (`stateDiagram-v2`) - State machines and transitions
+5. **Entity Relationship Diagrams** (`erDiagram`) - Database models
+6. **User Journey** (`journey`) - User experience flows
+7. **Gantt Charts** (`gantt`) - Project timelines and schedules
+8. **Pie Charts** (`pie`) - Proportional data visualization
+9. **Quadrant Charts** (`quadrantChart`) - 4-quadrant analysis
+10. **Requirement Diagrams** (`requirementDiagram`) - System requirements
+11. **Git Graphs** (`gitGraph`) - Branch and commit history
+12. **C4 Diagrams** (`C4Context`) - Software architecture contexts
+13. **Mindmaps** (`mindmap`) - Hierarchical concepts and brainstorming
+14. **Timelines** (`timeline`) - Chronological events
+15. **ZenUML** (`zenuml`) - Simplified UML sequences
+16. **Sankey Diagrams** (`sankey-beta`) - Flow and energy transfers
+17. **XY Charts** (`xychart-beta`) - Data point plotting
+18. **Block Diagrams** (`block-beta`) - System components
+19. **Packet Diagrams** (`packet-beta`) - Network packet structures
+20. **Kanban Boards** (`kanban`) - Task workflow management
+21. **Architecture Diagrams** (`architecture-beta`) - System designs
+22. **Radar Charts** (`radar-beta`) - Multi-dimensional data comparison
+23. **Treemaps** (`treemap-beta`) - Hierarchical rectangles
+
+See `test-mermaid.md` for examples of all 23 diagram types.
 
 #### Usage
 
