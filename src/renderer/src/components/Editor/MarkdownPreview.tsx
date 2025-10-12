@@ -89,7 +89,7 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
           onContextMenu={handleContextMenu}
         >
           <ReactMarkdown
-            {...({ sourcePos: true } as any)}
+            {...({ rawSourcePos: true } as any)}
             remarkPlugins={[remarkGfm]}
             components={{
               // Inject data-line on all block elements for scroll synchronization

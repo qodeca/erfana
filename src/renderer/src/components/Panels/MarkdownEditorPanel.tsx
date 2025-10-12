@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { FileEdit, Columns2, Eye, Bold, Italic, Code, Link, Image, Heading1, List, ListOrdered, Strikethrough } from 'lucide-react'
 import { IDockviewPanelProps } from 'dockview'
+import * as monaco from 'monaco-editor'
 import { MonacoMarkdownEditor, MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
 import { MarkdownPreview } from '../Editor/MarkdownPreview'
 import { ResizableDivider } from '../Editor/ResizableDivider'
@@ -79,6 +80,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   // Scroll synchronization state
   const scrollMapRef = useRef<ScrollMapEntry[]>([])
   const isSyncingRef = useRef(false)
+  const [isEditorReady, setIsEditorReady] = useState(false)
 
   // Debug logging
   console.log('MarkdownEditorPanel render:', {
@@ -213,21 +215,34 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
 
   // Build scroll map when content changes or view mode changes to split
   useEffect(() => {
-    if (viewMode !== 'split' || !currentFile) return
+    if (viewMode !== 'split' || !currentFile || !isEditorReady) return
 
-    // Debounce scroll map building after content changes
-    const timeoutId = setTimeout(() => {
-      const map = buildScrollMap()
-      scrollMapRef.current = map
-      console.log(`📍 Scroll map built: ${map.length} entries`)
-    }, 500)
-
-    return () => clearTimeout(timeoutId)
-  }, [currentFile?.content, viewMode])
+    // Wait for preview to render, then build map
+    // Double RAF ensures layout is complete before building map
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const map = buildScrollMap()
+        scrollMapRef.current = map
+        console.log(`📍 Scroll map built: ${map.length} entries`)
+      })
+    })
+  }, [currentFile?.content, viewMode, isEditorReady])
 
   // Set up scroll synchronization listeners
   useEffect(() => {
-    if (viewMode !== 'split' || !editorRef.current || !previewRef.current) return
+    // Wait for editor to be ready, scroll map to be built, and split view mode
+    if (viewMode !== 'split' || !isEditorReady || !previewRef.current) return
+    if (scrollMapRef.current.length === 0) {
+      console.log('⏸️  Waiting for scroll map to be built...')
+      return
+    }
+
+    // Get direct editor access
+    const editor = editorRef.current?.getEditor()
+    if (!editor) {
+      console.log('⏸️  Editor not available yet...')
+      return
+    }
 
     /**
      * Handle editor scroll events → sync to preview
@@ -237,7 +252,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
       if (isSyncingRef.current || !previewRef.current) return
 
       console.log('🔄 Editor scrolled, syncing to preview...')
-      const scrollTop = editorRef.current?.getScrollTop() || 0
+      const scrollTop = editor.getScrollTop()
       const targetOffset = interpolateScrollPosition(scrollTop, scrollMapRef.current, 'editor')
 
       isSyncingRef.current = true
@@ -260,31 +275,37 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
       const targetOffset = interpolateScrollPosition(scrollTop, scrollMapRef.current, 'preview')
 
       isSyncingRef.current = true
-      editorRef.current?.setScrollTop(targetOffset)
+      editor.setScrollTop(targetOffset)
 
       setTimeout(() => {
         isSyncingRef.current = false
       }, 50)
     }
 
-    // Editor scroll listener
-    const editorDisposable = editorRef.current.onDidScrollChange(handleEditorScroll)
+    // Editor scroll listener - attach directly to Monaco editor instance
+    const editorDisposable = editor.onDidScrollChange(handleEditorScroll)
 
     // Preview scroll listener
     const previewElement = previewRef.current
     previewElement.addEventListener('scroll', handlePreviewScroll)
 
-    console.log('🔄 Scroll synchronization enabled')
+    console.log('✅ Scroll synchronization enabled with', scrollMapRef.current.length, 'map entries')
 
     return () => {
       editorDisposable.dispose()
       previewElement.removeEventListener('scroll', handlePreviewScroll)
       console.log('🔄 Scroll synchronization disabled')
     }
-  }, [viewMode, currentFile])
+  }, [viewMode, currentFile, isEditorReady, scrollMapRef.current.length])
+
+  const handleEditorMount = (_editor: monaco.editor.IStandaloneCodeEditor) => {
+    console.log('✅ Editor mounted and ready')
+    setIsEditorReady(true)
+  }
 
   const loadFile = async (filePath: string) => {
     console.log('Loading file:', filePath)
+    setIsEditorReady(false) // Reset editor ready state when loading new file
     try {
       const content = await window.api.file.readFile(filePath)
       console.log('File loaded successfully:', {
@@ -649,12 +670,12 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
               style={viewMode === 'split' ? { width: `${dividerPosition}%` } : undefined}
             >
               <MonacoMarkdownEditor
-                key={currentFile.path}
                 ref={editorRef}
                 value={currentFile.content}
                 onChange={handleContentChange}
                 filePath={currentFile.path}
                 onSelectionChange={setSelectedText}
+                onEditorMount={handleEditorMount}
               />
             </div>
           )}
