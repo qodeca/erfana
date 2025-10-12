@@ -72,6 +72,46 @@
 
 2. Use in IPC handler or main process
 
+## Using SettingsService
+
+SettingsService provides persistent storage using electron-store.
+
+**Pattern**: All methods are async due to dynamic ES Module import.
+
+```typescript
+// In IPC handler
+import { settingsService } from '../services/SettingsService'
+
+ipcMain.handle('file:openProject', async () => {
+  const projectPath = result.filePaths[0]
+
+  // Save to settings (async)
+  await settingsService.setLastProjectPath(projectPath)
+
+  return projectPath
+})
+
+ipcMain.handle('file:getLastProjectPath', async () => {
+  // Retrieve from settings (async)
+  const lastPath = await settingsService.getLastProjectPath()
+
+  if (lastPath) {
+    // Verify folder still exists
+    const stats = await stat(lastPath)
+    if (stats.isDirectory()) {
+      return lastPath
+    } else {
+      // Clean up invalid path
+      await settingsService.clearLastProjectPath()
+    }
+  }
+
+  return null
+})
+```
+
+**Why Dynamic Import**: electron-store v11+ is an ES Module. See [Known Issues](./known-issues.md#electron-store-es-module-import).
+
 ## Working with Panel State
 
 ### Reading Panel State

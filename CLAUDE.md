@@ -72,7 +72,8 @@ src/
 ### Service Classes (OOP)
 
 Business logic lives in service classes (`src/main/services/`):
-- `FileService.ts` - File operations
+- `FileService.ts` - File operations (read, write, create, delete, rename)
+- `SettingsService.ts` - Persistent storage with electron-store (async, dynamic ES Module import)
 - `GitService.ts` - Git operations (future)
 - `ClaudeService.ts` - Claude SDK wrapper (future)
 
@@ -84,6 +85,8 @@ export class MyService {
 export const myService = new MyService(config)
 ```
 
+**Note**: SettingsService uses dynamic `import()` for electron-store. See [Known Issues](docs/known-issues.md#electron-store-es-module-import).
+
 ### Dockview Panels
 
 Add panels by creating component, registering in `AppDockLayout.tsx`, and adding to layout.
@@ -93,19 +96,22 @@ Add panels by creating component, registering in `AppDockLayout.tsx`, and adding
 ## Markdown Editing
 
 Superior markdown capabilities with Monaco Editor + live preview:
+- **Compact Editor**: 13px font, 20px line-height, 8px padding, no minimap or rulers
 - **Multi-File Tabs**: Each file gets unique panel with independent state
 - **Formatting Toolbar**: 10 markdown buttons (bold, italic, code, links, images, headings, lists)
 - **Document Statistics**: Real-time word count, character count, lines, reading time
 - **Auto-Save**: Debounced auto-save (2s after last edit) with visual indicator
 - **Claude Integration**: Right-click context menu in preview for AI-powered text operations
 - **View Modes**: Editor only, split view (default), preview only
-- **Preview**: GitHub-styled with GFM support, syntax highlighting
+- **Medium.com Preview**: Charter serif font, 18px, compact spacing, 680px max width, professional typography
 
 📚 **Markdown features**: See [docs/markdown-editing.md](docs/markdown-editing.md)
 
 ## UI & Keyboard Shortcuts
 
-**Toolbar**: VS Code-style toolbar at top with icon-only toggle buttons for Explorer, Terminal, Git panels.
+**Toolbar**: VS Code-style toolbar at top with Lucide icon toggle buttons for Explorer, Terminal, Git panels.
+
+**File Explorer Context Menu**: Right-click files/folders for New File, New Folder, Rename, Delete actions with validation.
 
 **Global Keyboard Shortcuts** (work anywhere in app):
 - `Cmd/Ctrl+B` - Toggle left sidebar (Explorer)
@@ -116,6 +122,8 @@ Superior markdown capabilities with Monaco Editor + live preview:
 - Toggle hides/shows entire sidebar areas (not individual tabs)
 - Preserves panel dimensions when toggling
 - State persisted to localStorage
+
+**Project Persistence**: Auto-loads last opened project on startup.
 
 **⚠️ Note**: Global shortcuts override editor shortcuts. When Cmd/Ctrl+B is pressed, it toggles the sidebar rather than triggering Monaco's bold action.
 
@@ -135,6 +143,7 @@ Superior markdown capabilities with Monaco Editor + live preview:
 
 - **node-pty**: Build fails on Python 3.13 - terminal panel deferred
 - **Dockview CSS**: Use `dockview/dist/styles/dockview.css` path
+- **electron-store**: ES Module requiring dynamic `import()` - all SettingsService methods are async
 - **Monaco CSP**: ✅ RESOLVED - Monaco now uses local bundling instead of CDN
 
 📚 **All known issues**: See [docs/known-issues.md](docs/known-issues.md)
