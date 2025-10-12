@@ -46,10 +46,10 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
         wordWrap: 'on',
         wrappingIndent: 'same',
         lineNumbers: 'on',
-        minimap: { enabled: true },
-        fontSize: 14,
-        lineHeight: 24,
-        padding: { top: 16, bottom: 16 },
+        minimap: { enabled: false }, // Disabled per user request
+        fontSize: 13, // Reduced from 14 for more compact view
+        lineHeight: 20, // Reduced from 24 for tighter line spacing
+        padding: { top: 8, bottom: 8 }, // Reduced from 16 for less padding
         scrollBeyondLastLine: false,
         renderWhitespace: 'selection',
         rulers: [80, 120],
