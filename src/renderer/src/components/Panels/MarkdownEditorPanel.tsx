@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { FileEdit, Columns2, Eye, Save as SaveIcon, Bold, Italic, Code, Link, Image, Heading1, List, ListOrdered, Strikethrough } from 'lucide-react'
+import { FileEdit, Columns2, Eye, Bold, Italic, Code, Link, Image, Heading1, List, ListOrdered, Strikethrough } from 'lucide-react'
 import { IDockviewPanelProps } from 'dockview'
 import { MonacoMarkdownEditor, MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
 import { MarkdownPreview } from '../Editor/MarkdownPreview'
@@ -203,19 +203,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
       <div className="editor-toolbar">
         <div className="editor-file-info">
           {currentFile?.modified && <span className="modified-indicator">●</span>}
-        </div>
-
-        <div className="editor-controls">
           {isAutoSaving && <span className="auto-save-indicator">Auto-saving...</span>}
-          <button
-            className="save-btn"
-            onClick={() => handleSave(false)}
-            disabled={!currentFile?.modified}
-            title="Save (Cmd/Ctrl+S)"
-          >
-            <SaveIcon size={16} strokeWidth={2} />
-            <span>Save</span>
-          </button>
         </div>
       </div>
 

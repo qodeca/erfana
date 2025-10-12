@@ -52,7 +52,7 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
         padding: { top: 8, bottom: 8 }, // Reduced from 16 for less padding
         scrollBeyondLastLine: false,
         renderWhitespace: 'selection',
-        rulers: [80, 120],
+        rulers: [], // Removed vertical ruler lines
         bracketPairColorization: { enabled: true }
       })
 
