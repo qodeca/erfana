@@ -18,29 +18,30 @@ Complete guide to Erfana's tool approval system for Claude Code integration.
 
 ## Security Model
 
-### Safe Defaults (Always Approved)
+### Pre-Approved Tools (No Approval Needed)
 
-These tools are read-only and safe to execute without approval:
+These tools are pre-approved by default for seamless workflow:
 
-- **Read** - Read file contents
-- **Glob** - Find files by pattern (e.g., `"**/*.ts"`)
-- **Grep** - Search file contents with regex
+- **Read** - Read file contents (safe, read-only)
+- **Write** - Create or overwrite files (common operation)
+- **Edit** - Modify existing files with search/replace (common operation)
+- **Glob** - Find files by pattern (safe, read-only)
+- **Grep** - Search file contents with regex (safe, read-only)
+- **Bash** - Execute shell commands (essential for development)
+- **WebSearch** - Search the web (read-only, network access)
 
-**Rationale**: Read-only operations cannot harm the project, enable basic functionality.
+**Rationale**: These tools cover 95% of common Claude Code operations. Pre-approving them provides seamless UX while maintaining security through persistent session architecture and user visibility of all tool executions.
 
-### Dangerous Tools (Require Approval)
+### Tools Requiring Approval
 
-These tools can modify files or execute commands:
+These tools require explicit user approval on first use:
 
-- **Write** - Create or overwrite files
-- **Edit** - Modify existing files with search/replace
-- **Bash** - Execute shell commands
-- **Task** - Launch background agent tasks
-- **WebSearch** - Search the web
-- **WebFetch** - Fetch web content
-- **Others** - Any tool not in safe defaults list
+- **Task** - Launch background agent tasks (complex, autonomous operations)
+- **WebFetch** - Fetch web content (network access, potential security risk)
+- **SlashCommand** - Execute custom slash commands (user-defined, unpredictable)
+- **Others** - Any tool not in pre-approved list
 
-**Rationale**: These operations are potentially destructive and require explicit user consent.
+**Rationale**: These operations are less common, more complex, or have higher security implications requiring explicit user consent.
 
 ## Approval Flow
 
@@ -163,7 +164,8 @@ User → Dialog → Approve → Session Restarts → **Auto re-sends** → Execu
 
 ```typescript
 async getApprovedTools(): Promise<string[]>
-// Returns approved tools list, defaults to ['Read', 'Glob', 'Grep']
+// Returns approved tools list, defaults to pre-approved tools:
+// ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch']
 
 async setApprovedTools(tools: string[]): Promise<void>
 // Replaces entire approved tools list
@@ -175,7 +177,7 @@ async removeApprovedTool(toolName: string): Promise<void>
 // Removes single tool from list
 
 async resetApprovedTools(): Promise<void>
-// Resets to safe defaults
+// Resets to pre-approved defaults
 ```
 
 ### Storage Location
@@ -185,10 +187,12 @@ async resetApprovedTools(): Promise<void>
 **Data Structure**:
 ```json
 {
-  "approvedTools": ["Read", "Glob", "Grep", "Write", "Edit"],
+  "approvedTools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "WebSearch", "Task"],
   "lastProjectPath": "/Users/user/Projects/my-project"
 }
 ```
+
+**Note**: Pre-approved tools (Read, Write, Edit, Glob, Grep, Bash, WebSearch) are always included via merge logic in `ClaudeCliService.ts:148-153`, even if not in config file.
 
 ### Persistence Behavior
 
@@ -248,9 +252,14 @@ private getToolDescription(toolName: string): string {
 }
 ```
 
-**2. Decide if Safe by Default** (`SettingsService.ts:48-51`):
+**2. Decide if Pre-Approved by Default** (`SettingsService.ts:47`, `ClaudeCliService.ts:85`):
 
-Only add to safe defaults if read-only, no network, no command execution, no data leakage.
+Add to pre-approved list if:
+- Common operation (>80% of Claude Code sessions need it)
+- Transparent to user (all executions logged in chat)
+- Recoverable via git (file modifications can be reverted)
+
+Current pre-approved tools reflect balance between UX and security.
 
 ### Testing Approval Flow
 
@@ -278,7 +287,8 @@ rm ~/.config/erfana/config.json
 **5. Verify Persistence**:
 ```bash
 cat ~/.config/erfana/config.json
-# Should show: {"approvedTools": ["Read", "Glob", "Grep", "Edit"], ...}
+# Should show: {"approvedTools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "WebSearch", "Task"], ...}
+# Note: "Task" only appears if it was the tool approved in step 4
 ```
 
 **6. Verify Survives Restart**:
@@ -365,20 +375,25 @@ cat ~/.config/erfana/config.json
 
 **Location**: `src/renderer/src/components/Dialogs/ToolApprovalDialog.tsx`
 
-Modal dialog displaying:
-- Tool name (monospace, blue)
-- Tool description (human-readable)
-- Collapsible parameters section (JSON)
-- "Remember this choice" checkbox
-- Approve/Deny buttons
+Modal dialog for approving or denying Claude Code tool execution.
+
+**Features**:
+- Tool name display (monospace font, blue color)
+- Tool description explaining what the tool does
+- Collapsible parameters section (JSON pretty-print)
+- "Remember this choice" checkbox for persistent approval
+- Approve/Deny action buttons with icons
+- VS Code dark theme styling
+- Overlay prevents interaction with app during approval
+- Animations: fadeIn (overlay), slideUp (dialog)
 
 **Props**:
 ```typescript
 interface ToolApprovalRequest {
-  toolName: string
-  toolId: string
-  input: any
-  description: string
+  toolName: string      // e.g., "Edit", "Write", "Bash", "Task"
+  toolId: string        // UUID from Claude CLI
+  input: any            // Tool parameters as JSON object
+  description: string   // Human-readable tool description
 }
 
 interface ToolApprovalDialogProps {
@@ -388,7 +403,38 @@ interface ToolApprovalDialogProps {
 }
 ```
 
-**Design**: VS Code dark theme (#2d2d30, #007acc), 500px width, centered, fadeIn/slideUp animations.
+**Design**:
+- **Dimensions**: 500px width, max-height 80vh, centered
+- **Colors**: VS Code dark (#2d2d30 background, #007acc buttons)
+- **Icons**: AlertTriangle (warning), Check (approve), X (deny) from Lucide React
+- **Animations**: fadeIn 0.2s (overlay), slideUp 0.3s (dialog)
+- **Parameters**: Collapsible with toggle button, JSON formatted with 2-space indent
+
+**Usage Pattern**:
+```typescript
+const [pendingApproval, setPendingApproval] = useState<ToolApprovalRequest | null>(null)
+
+// Listen for approval requests
+useEffect(() => {
+  const unsubscribe = window.api.claudeCode.onToolApprovalNeeded((request) => {
+    setPendingApproval(request)
+  })
+  return unsubscribe
+}, [])
+
+// Render dialog conditionally
+{pendingApproval && (
+  <ToolApprovalDialog
+    request={pendingApproval}
+    onApprove={handleToolApprove}
+    onDeny={handleToolDeny}
+  />
+)}
+```
+
+**Files**:
+- `ToolApprovalDialog.tsx` (115 lines) - Component logic
+- `ToolApprovalDialog.css` (240 lines) - VS Code-themed styling
 
 ### ClaudeCodeChat.tsx
 

@@ -5,7 +5,7 @@
  * Handles message display, input, streaming, and session management.
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Send, Square } from 'lucide-react'
 import { TerminalMessage } from './TerminalMessage'
 import { ToolApprovalDialog, ToolApprovalRequest } from '../Dialogs/ToolApprovalDialog'
@@ -27,24 +27,77 @@ export function ClaudeCodeChat() {
   const [_currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [pendingApproval, setPendingApproval] = useState<ToolApprovalRequest | null>(null)
   const [lastUserPrompt, setLastUserPrompt] = useState('')
+  const [isWaitingForResponse, setIsWaitingForResponse] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const lastMessageTimeRef = useRef<number>(Date.now())
+  const activityCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Watch for pending messages from AI Assistant store
   const pendingMessage = useAiAssistantStore((state) => state.pendingMessage)
+  const shouldSendImmediately = useAiAssistantStore((state) => state.shouldSendImmediately)
   const clearPendingMessage = useAiAssistantStore((state) => state.clearPendingMessage)
 
-  // Auto-scroll to bottom when new messages arrive
+  // Helper: Update last message timestamp (called whenever any message arrives)
+  const updateLastMessageTime = useCallback(() => {
+    lastMessageTimeRef.current = Date.now()
+  }, [])
+
+  // Helper: Start activity monitoring interval
+  const startActivityMonitoring = useCallback(() => {
+    // Clear any existing interval
+    if (activityCheckIntervalRef.current) {
+      clearInterval(activityCheckIntervalRef.current)
+    }
+
+    // Update timestamp when starting
+    lastMessageTimeRef.current = Date.now()
+
+    // Check every 500ms if we should show the indicator
+    activityCheckIntervalRef.current = setInterval(() => {
+      const timeSinceLastMessage = Date.now() - lastMessageTimeRef.current
+
+      // Show indicator if more than 1 second has passed since last message
+      if (timeSinceLastMessage > 1000) {
+        setIsWaitingForResponse(true)
+      } else {
+        setIsWaitingForResponse(false)
+      }
+    }, 500)
+  }, [])
+
+  // Helper: Stop activity monitoring and hide indicator
+  const stopActivityMonitoring = useCallback(() => {
+    if (activityCheckIntervalRef.current) {
+      clearInterval(activityCheckIntervalRef.current)
+      activityCheckIntervalRef.current = null
+    }
+    setIsWaitingForResponse(false)
+  }, [])
+
+  // Auto-scroll to bottom when new messages arrive or typing indicator changes
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, isWaitingForResponse])
+
+  // Cleanup activity monitoring on unmount
+  useEffect(() => {
+    return () => {
+      if (activityCheckIntervalRef.current) {
+        clearInterval(activityCheckIntervalRef.current)
+      }
+    }
+  }, [])
 
   // Listen for incoming messages (persistent session)
   useEffect(() => {
     const unsubscribe = window.api.claudeCode.onMessage((data) => {
       // In persistent session mode, accept all messages
       console.log('📨 Received message:', data.message.type, data.message.content.substring(0, 50))
+
+      // Update last message time for any message (keeps indicator responsive)
+      updateLastMessageTime()
 
       // Filter out system init messages
       if (data.message.type === 'system' && data.message.content.includes('Session started')) {
@@ -56,6 +109,7 @@ export function ClaudeCodeChat() {
         console.log('✅ Message stream completed')
         setIsRunning(false)
         setCurrentSessionId(null)
+        stopActivityMonitoring()
         textareaRef.current?.focus()
         return
       }
@@ -64,7 +118,7 @@ export function ClaudeCodeChat() {
     })
 
     return unsubscribe
-  }, [])
+  }, [stopActivityMonitoring, updateLastMessageTime])
 
   // Listen for completion (legacy - kept for compatibility)
   useEffect(() => {
@@ -72,13 +126,14 @@ export function ClaudeCodeChat() {
       console.log('✅ Session completed:', data.sessionId)
       setIsRunning(false)
       setCurrentSessionId(null)
+      stopActivityMonitoring()
 
       // Focus input after completion
       textareaRef.current?.focus()
     })
 
     return unsubscribe
-  }, [])
+  }, [stopActivityMonitoring])
 
   // Listen for errors
   useEffect(() => {
@@ -98,13 +153,14 @@ export function ClaudeCodeChat() {
 
       setIsRunning(false)
       setCurrentSessionId(null)
+      stopActivityMonitoring()
 
       // Focus input after error
       textareaRef.current?.focus()
     })
 
     return unsubscribe
-  }, [])
+  }, [stopActivityMonitoring])
 
   // Listen for tool approval requests
   useEffect(() => {
@@ -140,37 +196,57 @@ export function ClaudeCodeChat() {
         const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
         setCurrentSessionId(sessionId)
         setIsRunning(true)
+        startActivityMonitoring()
 
         window.api.claudeCode.sendMessage(lastUserPrompt, {}, sessionId)
       }
     })
 
     return unsubscribe
-  }, [lastUserPrompt])
+  }, [lastUserPrompt, startActivityMonitoring])
 
   // Listen for pending messages from context menu (or other sources)
   useEffect(() => {
     if (pendingMessage) {
       console.log('📥 Received pending message from store:', pendingMessage.substring(0, 50))
 
-      // Populate input field with pending message
-      setInput(pendingMessage)
+      if (shouldSendImmediately && !isRunning) {
+        // Send directly without populating input field
+        console.log('🚀 Sending message immediately')
 
-      // Clear pending message from store
-      clearPendingMessage()
+        // Store last prompt for auto-retry after tool approval
+        setLastUserPrompt(pendingMessage)
 
-      // Auto-resize textarea
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto'
-          textareaRef.current.style.height =
-            Math.min(textareaRef.current.scrollHeight, 200) + 'px'
-        }
-        // Focus textarea so user can review and send
-        textareaRef.current?.focus()
-      }, 100)
+        const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        setCurrentSessionId(sessionId)
+        setIsRunning(true)
+        startActivityMonitoring()
+
+        // Clear pending message from store
+        clearPendingMessage()
+
+        // Send to Claude Code via IPC
+        window.api.claudeCode.sendMessage(pendingMessage, {}, sessionId)
+      } else {
+        // Populate input field with pending message for review
+        setInput(pendingMessage)
+
+        // Clear pending message from store
+        clearPendingMessage()
+
+        // Auto-resize textarea
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto'
+            textareaRef.current.style.height =
+              Math.min(textareaRef.current.scrollHeight, 200) + 'px'
+          }
+          // Focus textarea so user can review and send
+          textareaRef.current?.focus()
+        }, 100)
+      }
     }
-  }, [pendingMessage, clearPendingMessage])
+  }, [pendingMessage, shouldSendImmediately, isRunning, clearPendingMessage, startActivityMonitoring])
 
   /**
    * Send message to Claude Code
@@ -193,6 +269,7 @@ export function ClaudeCodeChat() {
 
     setInput('')
     setIsRunning(true)
+    startActivityMonitoring()
 
     // Send to Claude Code via IPC
     console.log('🚀 Sending message to Claude Code:', sessionId)
@@ -207,6 +284,7 @@ export function ClaudeCodeChat() {
     window.api.claudeCode.stop()
     setIsRunning(false)
     setCurrentSessionId(null)
+    stopActivityMonitoring()
 
     // Focus input
     textareaRef.current?.focus()
@@ -308,6 +386,20 @@ export function ClaudeCodeChat() {
         {messages.map((message) => (
           <TerminalMessage key={message.id} message={message} />
         ))}
+
+        {/* Typing indicator */}
+        {isWaitingForResponse && (
+          <div className="typing-indicator">
+            <div className="typing-indicator-content">
+              <div className="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <span className="typing-text">Claude is thinking...</span>
+            </div>
+          </div>
+        )}
 
         {/* Auto-scroll anchor */}
         <div ref={messagesEndRef} />

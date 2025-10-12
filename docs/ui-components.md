@@ -16,7 +16,7 @@ Dual vertical activity bars on left and right edges (VS Code-style).
 ### Right Activity Bar
 
 - **AI Assistant icon**: Toggle AI Assistant panel (top position)
-  - Keyboard: None (toggle via icon only)
+  - Keyboard: `Cmd/Ctrl+Shift+A`
 - **Git icon**: Toggle Git panel
   - Keyboard: `Ctrl+Shift+G`
 - **Terminal icon**: Toggle Terminal panel
@@ -100,73 +100,16 @@ See: [IPC Patterns](./ipc-patterns.md) | [Architecture](./architecture.md) | [Cl
 
 **Location**: `src/renderer/src/components/Dialogs/ToolApprovalDialog.tsx`
 
-Modal dialog for approving or denying Claude Code tool execution.
+Modal dialog for approving or denying Claude Code tool execution. Appears when Claude attempts to use a tool requiring user approval (Task, WebFetch, SlashCommand, etc.).
 
-### Features
-
-- Tool name display (monospace font, blue color)
-- Tool description explaining what the tool does
-- Collapsible parameters section (JSON pretty-print)
+**Quick Reference**:
+- VS Code dark theme with 500px centered modal
+- Tool name, description, collapsible parameters (JSON)
 - "Remember this choice" checkbox for persistent approval
-- Approve/Deny action buttons with icons
-- VS Code dark theme styling
-- Overlay prevents interaction with app during approval
+- Approve/Deny buttons with icons
 - Animations: fadeIn (overlay), slideUp (dialog)
 
-### Props
-
-```typescript
-interface ToolApprovalRequest {
-  toolName: string      // e.g., "Edit", "Write", "Bash"
-  toolId: string        // UUID from Claude CLI
-  input: any            // Tool parameters as JSON object
-  description: string   // Human-readable tool description
-}
-
-interface ToolApprovalDialogProps {
-  request: ToolApprovalRequest
-  onApprove: (remember: boolean) => void
-  onDeny: () => void
-}
-```
-
-### Design
-
-- **Dimensions**: 500px width, max-height 80vh, centered
-- **Colors**: VS Code dark (#2d2d30 background, #007acc buttons)
-- **Icons**: AlertTriangle (warning), Check (approve), X (deny) from Lucide React
-- **Animations**: fadeIn 0.2s (overlay), slideUp 0.3s (dialog)
-- **Parameters**: Collapsible with toggle button, JSON formatted with 2-space indent
-
-### Usage Pattern
-
-```typescript
-const [pendingApproval, setPendingApproval] = useState<ToolApprovalRequest | null>(null)
-
-// Listen for approval requests
-useEffect(() => {
-  const unsubscribe = window.api.claudeCode.onToolApprovalNeeded((request) => {
-    setPendingApproval(request)
-  })
-  return unsubscribe
-}, [])
-
-// Render dialog conditionally
-{pendingApproval && (
-  <ToolApprovalDialog
-    request={pendingApproval}
-    onApprove={handleToolApprove}
-    onDeny={handleToolDeny}
-  />
-)}
-```
-
-### Files
-
-- `ToolApprovalDialog.tsx` (115 lines) - Component logic
-- `ToolApprovalDialog.css` (240 lines) - VS Code-themed styling
-
-See: [Tool Approval System](./claude-code/tool-approval.md) | [IPC Patterns](./ipc-patterns.md)
+See: [Tool Approval System](./claude-code/tool-approval.md) for complete documentation including security model, approval flow, auto-retry, persistence, and component details.
 
 ## Context Menu (File Explorer)
 
@@ -222,6 +165,7 @@ These work **anywhere in the application**:
 | `Cmd/Ctrl+B` | Toggle left sidebar | Explorer |
 | `Cmd/Ctrl+J` | Toggle right panel | Terminal |
 | `Ctrl+Shift+G` | Toggle right panel | Git |
+| `Cmd/Ctrl+Shift+A` | Toggle right panel | AI Assistant |
 
 **Platform Detection**: Uses `metaKey` on macOS, `ctrlKey` on Windows/Linux
 

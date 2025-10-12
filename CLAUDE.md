@@ -169,6 +169,7 @@ Automatic detection and refresh for external file system changes:
 - `Cmd/Ctrl+B` - Toggle left sidebar (Explorer)
 - `Cmd/Ctrl+J` - Toggle right panel (Terminal)
 - `Ctrl+Shift+G` - Toggle right panel (Git)
+- `Cmd/Ctrl+Shift+A` - Toggle right panel (AI Assistant)
 
 **Panel Behavior**:
 - Right sidebar: Git and Terminal are separate splitview panels (mutually exclusive)
@@ -308,15 +309,15 @@ Erfana integrates Claude Code via persistent CLI session with security-first too
 
 ### Tool Approval System
 
-Security-first approach requiring user approval for potentially dangerous tools:
+Security-first approach with pre-approved common tools and user approval for complex operations:
 
-- **Safe Defaults**: Read, Glob, Grep (always approved, read-only operations)
-- **Dangerous Tools**: Write, Edit, Bash (require user approval via modal dialog)
+- **Pre-Approved Tools**: Read, Write, Edit, Glob, Grep, Bash, WebSearch (cover 95% of operations, transparent execution)
+- **Tools Requiring Approval**: Task, WebFetch, SlashCommand (complex, higher security implications)
 - **Modal Dialog**: ToolApprovalDialog shows tool name, description, parameters, "Remember this choice" option
 - **Auto-Retry**: After approval, system automatically re-sends user prompt with updated permissions
 - **Persistence**: Approved tools saved via electron-store, survive app restarts
 - **Session Restart**: Uses `--resume` flag to preserve conversation context when adding tools
-- **Settings**: Manage approved tools via SettingsService (get, set, add, remove, reset)
+- **Merge Logic**: Pre-approved tools always included (ClaudeCliService.ts:148-153), even if not in settings
 
 **Key Architecture Decision**: `--allowedTools` flag is immutable at runtime, requiring session restart to add new tools.
 
@@ -338,7 +339,7 @@ claude -p \
   --output-format stream-json \
   --verbose \
   --replay-user-messages \
-  --allowedTools Read Glob Grep Write Edit  # Updated via tool approval
+  --allowedTools Read Write Edit Glob Grep Bash WebSearch  # Pre-approved, plus any user-approved
   --resume <sessionId>  # Used when restarting with new tools
 ```
 

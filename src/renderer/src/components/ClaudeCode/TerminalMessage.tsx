@@ -26,6 +26,65 @@ interface TerminalMessageProps {
 }
 
 /**
+ * Format tool usage display with parameters
+ * Examples: "Read (.../project/file.md)", "Glob (*.ts)", "Write (.../file.txt)"
+ */
+const formatToolDisplay = (toolName: string, metadata?: any): string => {
+  if (!metadata?.input) {
+    return toolName
+  }
+
+  const input = metadata.input
+
+  // Read tool - show file path
+  if (toolName === 'Read' && input.file_path) {
+    const pathParts = input.file_path.split('/')
+    const shortPath = pathParts.length > 3
+      ? `.../${pathParts.slice(-3).join('/')}`
+      : input.file_path
+    return `${toolName} (${shortPath})`
+  }
+
+  // Write tool - show file path
+  if (toolName === 'Write' && input.file_path) {
+    const pathParts = input.file_path.split('/')
+    const shortPath = pathParts.length > 3
+      ? `.../${pathParts.slice(-3).join('/')}`
+      : input.file_path
+    return `${toolName} (${shortPath})`
+  }
+
+  // Edit tool - show file path
+  if (toolName === 'Edit' && input.file_path) {
+    const pathParts = input.file_path.split('/')
+    const shortPath = pathParts.length > 3
+      ? `.../${pathParts.slice(-3).join('/')}`
+      : input.file_path
+    return `${toolName} (${shortPath})`
+  }
+
+  // Glob tool - show pattern
+  if (toolName === 'Glob' && input.pattern) {
+    return `${toolName} (${input.pattern})`
+  }
+
+  // Grep tool - show pattern
+  if (toolName === 'Grep' && input.pattern) {
+    return `${toolName} (${input.pattern})`
+  }
+
+  // Bash tool - show command (truncated)
+  if (toolName === 'Bash' && input.command) {
+    const cmd = input.command.length > 50
+      ? input.command.substring(0, 47) + '...'
+      : input.command
+    return `${toolName} (${cmd})`
+  }
+
+  return toolName
+}
+
+/**
  * Terminal Message Component
  * Uses React.memo for performance optimization
  */
@@ -35,8 +94,7 @@ export const TerminalMessage = React.memo(({ message }: TerminalMessageProps) =>
       return (
         <div className="terminal-message terminal-message-user">
           <div className="message-prefix">
-            <User size={14} />
-            <span className="prefix-text">You</span>
+            <User size={16} />
           </div>
           <div className="message-content">{message.content}</div>
         </div>
@@ -46,8 +104,7 @@ export const TerminalMessage = React.memo(({ message }: TerminalMessageProps) =>
       return (
         <div className="terminal-message terminal-message-assistant">
           <div className="message-prefix">
-            <Bot size={14} />
-            <span className="prefix-text">Claude</span>
+            <Bot size={16} />
           </div>
           <div className="message-content">
             <ReactMarkdown
@@ -89,12 +146,10 @@ export const TerminalMessage = React.memo(({ message }: TerminalMessageProps) =>
       return (
         <div className="terminal-message terminal-message-tool">
           <div className="message-prefix">
-            <Terminal size={14} />
-            <span className="prefix-text">Tool</span>
+            <Terminal size={16} />
           </div>
           <div className="message-content tool-indicator">
-            <span className="tool-icon">⏺</span>
-            {message.content}
+            {formatToolDisplay(message.content, message.metadata)}
             {message.metadata?.input && (
               <details className="tool-details">
                 <summary>View parameters</summary>
@@ -111,8 +166,7 @@ export const TerminalMessage = React.memo(({ message }: TerminalMessageProps) =>
       return (
         <div className="terminal-message terminal-message-tool-result">
           <div className="message-prefix">
-            <CheckCircle size={14} />
-            <span className="prefix-text">Result</span>
+            <CheckCircle size={16} />
           </div>
           <div className="message-content">{message.content}</div>
         </div>
@@ -122,8 +176,7 @@ export const TerminalMessage = React.memo(({ message }: TerminalMessageProps) =>
       return (
         <div className="terminal-message terminal-message-error">
           <div className="message-prefix">
-            <AlertCircle size={14} />
-            <span className="prefix-text">Error</span>
+            <AlertCircle size={16} />
           </div>
           <div className="message-content">{message.content}</div>
         </div>
@@ -133,7 +186,7 @@ export const TerminalMessage = React.memo(({ message }: TerminalMessageProps) =>
       return (
         <div className="terminal-message terminal-message-system">
           <div className="message-prefix">
-            <Info size={14} />
+            <Info size={16} />
           </div>
           <div className="message-content">{message.content}</div>
         </div>

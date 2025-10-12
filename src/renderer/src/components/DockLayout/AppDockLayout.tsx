@@ -340,6 +340,22 @@ export function AppDockLayout() {
     }
   }
 
+  // Watch for programmatic panel changes (e.g., from context menu)
+  useEffect(() => {
+    if (!splitviewApiRef.current) return
+
+    const gitPanel = splitviewApiRef.current.getPanel('git-panel')
+    const terminalPanel = splitviewApiRef.current.getPanel('terminal-panel')
+    const claudePanel = splitviewApiRef.current.getPanel('claude-panel')
+
+    if (!gitPanel || !terminalPanel || !claudePanel) return
+
+    // Update visibility based on rightActivePanel
+    gitPanel.api.setVisible(rightActivePanel === 'git')
+    terminalPanel.api.setVisible(rightActivePanel === 'terminal')
+    claudePanel.api.setVisible(rightActivePanel === 'claude')
+  }, [rightActivePanel])
+
   // Keyboard shortcuts (matching VS Code)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
