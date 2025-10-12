@@ -1,16 +1,6 @@
-import { PanelLeft, PanelBottom, PanelRight } from 'lucide-react'
 import './Toolbar.css'
 
-interface ToolbarProps {
-  onTogglePanel: (panelId: string) => void
-  panelStates: {
-    fileExplorer: boolean
-    terminal: boolean
-    git: boolean
-  }
-}
-
-export function Toolbar({ onTogglePanel, panelStates }: ToolbarProps) {
+export function Toolbar() {
   return (
     <div className="toolbar">
       <div className="toolbar-section toolbar-left">
@@ -22,29 +12,7 @@ export function Toolbar({ onTogglePanel, panelStates }: ToolbarProps) {
       </div>
 
       <div className="toolbar-section toolbar-right">
-        <button
-          className={`toolbar-icon-button ${panelStates.fileExplorer ? 'active' : ''}`}
-          onClick={() => onTogglePanel('fileExplorer')}
-          title="Toggle Primary Sidebar (⌘B)"
-        >
-          <PanelLeft size={16} strokeWidth={2} />
-        </button>
-
-        <button
-          className={`toolbar-icon-button ${panelStates.terminal ? 'active' : ''}`}
-          onClick={() => onTogglePanel('terminal')}
-          title="Toggle Panel (⌘J)"
-        >
-          <PanelBottom size={16} strokeWidth={2} />
-        </button>
-
-        <button
-          className={`toolbar-icon-button ${panelStates.git ? 'active' : ''}`}
-          onClick={() => onTogglePanel('git')}
-          title="Toggle Secondary Sidebar"
-        >
-          <PanelRight size={16} strokeWidth={2} />
-        </button>
+        {/* Future: additional controls */}
       </div>
     </div>
   )

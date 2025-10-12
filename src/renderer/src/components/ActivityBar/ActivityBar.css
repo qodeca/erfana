@@ -1,0 +1,111 @@
+/* Activity Bar Container */
+.activity-bar {
+  width: 48px;
+  background: #333333;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.activity-bar-left {
+  border-right: 1px solid #1e1e1e;
+}
+
+.activity-bar-right {
+  border-left: 1px solid #1e1e1e;
+}
+
+/* Activity Bar Items Container */
+.activity-bar-items {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* Individual Activity Bar Item */
+.activity-bar-item {
+  width: 100%;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  color: #858585;
+  transition: color 0.1s ease;
+  outline: none;
+}
+
+.activity-bar-item:hover {
+  color: #ffffff;
+}
+
+.activity-bar-item:focus-visible {
+  outline: 1px solid #007acc;
+  outline-offset: -1px;
+}
+
+.activity-bar-item.active {
+  color: #ffffff;
+}
+
+/* Active indicator (left bar on left side, right bar on right side) */
+.activity-bar-item-left.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #007acc;
+}
+
+.activity-bar-item-right.active::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #007acc;
+}
+
+/* Icon Container */
+.activity-bar-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Badge Styles */
+.activity-bar-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: #007acc;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 600;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* Badge for left activity bar */
+.activity-bar-left .activity-bar-badge {
+  right: 6px;
+}
+
+/* Badge for right activity bar */
+.activity-bar-right .activity-bar-badge {
+  left: 6px;
+  right: auto;
+}

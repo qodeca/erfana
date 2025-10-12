@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useEffect } from 'react'
 import {
   DockviewReact,
   DockviewReadyEvent,
@@ -9,7 +9,11 @@ import 'dockview/dist/styles/dockview.css'
 import './AppDockLayout.css'
 import { FileTree } from '../FileTree/FileTree'
 import { MarkdownEditorPanel } from '../Panels/MarkdownEditorPanel'
-import { Toolbar } from '../Toolbar/Toolbar'
+import { WelcomePanel } from '../Panels/WelcomePanel'
+import { WelcomeTab } from '../Panels/WelcomeTab'
+import { ActivityBar } from '../ActivityBar/ActivityBar'
+import { useActivityBarStore } from '../../stores/useActivityBarStore'
+import { getPanelById } from '../ActivityBar/activityBarConfig'
 
 // Utility function to sanitize file path for panel ID
 const sanitizeFilePath = (filePath: string): string => {
@@ -91,6 +95,7 @@ const GitPanel = (_props: IDockviewPanelProps) => {
 const components = {
   fileExplorer: FileExplorerPanel,
   editor: MarkdownEditorPanel,
+  welcome: WelcomePanel,
   terminal: TerminalPanel,
   git: GitPanel
 }
@@ -98,74 +103,21 @@ const components = {
 // Size constraints matching VS Code
 const MIN_SIZES = {
   leftSidebar: 170,   // VS Code's minimum sidebar width
-  bottomPanel: 100,   // Reasonable minimum for terminal
   rightSidebar: 170
-}
-
-const DEFAULT_SIZES = {
-  leftSidebar: 300,    // Left Explorer panel
-  bottomPanel: 250,    // Bottom Terminal panel
-  rightSidebar: 250    // Right Git panel (reduced to give more space to editor)
 }
 
 export function AppDockLayout() {
   const apiRef = useRef<DockviewApi | null>(null)
 
-  // Load persisted state from localStorage
-  const loadPersistedState = () => {
-    // TEMPORARY: Clear old state to force new default sizes
-    localStorage.removeItem('erfana-sidebar-state')
-
-    try {
-      const saved = localStorage.getItem('erfana-sidebar-state')
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        // Validate and apply minimum sizes
-        return {
-          leftSidebar: {
-            visible: parsed.leftSidebar?.visible ?? true,
-            width: Math.max(parsed.leftSidebar?.width || DEFAULT_SIZES.leftSidebar, MIN_SIZES.leftSidebar)
-          },
-          bottomPanel: {
-            visible: parsed.bottomPanel?.visible ?? true,
-            height: Math.max(parsed.bottomPanel?.height || DEFAULT_SIZES.bottomPanel, MIN_SIZES.bottomPanel)
-          },
-          rightSidebar: {
-            visible: parsed.rightSidebar?.visible ?? true,
-            width: Math.max(parsed.rightSidebar?.width || DEFAULT_SIZES.rightSidebar, MIN_SIZES.rightSidebar)
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load sidebar state:', e)
-    }
-    return {
-      leftSidebar: { visible: true, width: DEFAULT_SIZES.leftSidebar },
-      bottomPanel: { visible: true, height: DEFAULT_SIZES.bottomPanel },
-      rightSidebar: { visible: true, width: DEFAULT_SIZES.rightSidebar }
-    }
-  }
-
-  const [sidebarStates, setSidebarStates] = useState(loadPersistedState)
-
-  // Persist state to localStorage whenever it changes
-  const updateSidebarState = (sidebarId: string, updates: any) => {
-    setSidebarStates((prev) => {
-      const newState = {
-        ...prev,
-        [sidebarId]: { ...prev[sidebarId], ...updates }
-      }
-      localStorage.setItem('erfana-sidebar-state', JSON.stringify(newState))
-      return newState
-    })
-  }
-
-  // Dynamically get group by panel ID
-  const getGroupByPanelId = (panelId: string) => {
-    if (!apiRef.current) return null
-    const panel = apiRef.current.getPanel(panelId)
-    return panel ? panel.group : null
-  }
+  // Use Zustand store for activity bar state
+  const {
+    leftActivePanel,
+    rightActivePanel,
+    leftWidth,
+    rightWidth,
+    togglePanel,
+    setSidebarWidth
+  } = useActivityBarStore()
 
   const onReady = (event: DockviewReadyEvent) => {
     apiRef.current = event.api
@@ -175,25 +127,18 @@ export function AppDockLayout() {
       id: 'fileExplorer',
       component: 'fileExplorer',
       title: 'Explorer',
-      initialWidth: sidebarStates.leftSidebar.width,
+      initialWidth: leftWidth,
       minimumWidth: MIN_SIZES.leftSidebar
     })
 
-    // Create a placeholder center group for editor panels
+    // Create a welcome home panel in the center
     const centerPlaceholder = event.api.addPanel({
       id: '_center-placeholder',
-      component: 'editor',
-      title: 'Welcome',
-      position: { referencePanel: leftPanel, direction: 'right' }
-    })
-
-    const terminalPanel = event.api.addPanel({
-      id: 'terminal',
-      component: 'terminal',
-      title: 'Terminal',
-      position: { referencePanel: centerPlaceholder, direction: 'below' },
-      initialHeight: sidebarStates.bottomPanel.height,
-      minimumHeight: MIN_SIZES.bottomPanel
+      component: 'welcome',
+      title: '', // Title will be rendered by custom tab
+      tabComponent: 'welcomeTab',
+      position: { referencePanel: leftPanel, direction: 'right' },
+      floating: false
     })
 
     const gitPanel = event.api.addPanel({
@@ -201,29 +146,44 @@ export function AppDockLayout() {
       component: 'git',
       title: 'Git',
       position: { referencePanel: centerPlaceholder, direction: 'right' },
-      initialWidth: sidebarStates.rightSidebar.width,
+      initialWidth: rightWidth,
       minimumWidth: MIN_SIZES.rightSidebar
     })
 
-    // Restore sizes and visibility from persisted state (fallback)
-    leftPanel.api.setSize({ width: sidebarStates.leftSidebar.width })
-    if (!sidebarStates.leftSidebar.visible) {
+    const terminalPanel = event.api.addPanel({
+      id: 'terminal',
+      component: 'terminal',
+      title: 'Terminal',
+      position: { referencePanel: gitPanel, direction: 'below' },
+      initialHeight: 300,
+      minimumHeight: 100
+    })
+
+    // Restore sizes and visibility from persisted state
+    leftPanel.api.setSize({ width: leftWidth })
+    if (leftActivePanel === null) {
       leftPanel.group.api.setVisible(false)
     }
 
-    terminalPanel.api.setSize({ height: sidebarStates.bottomPanel.height })
-    if (!sidebarStates.bottomPanel.visible) {
+    gitPanel.api.setSize({ width: rightWidth })
+    terminalPanel.api.setSize({ width: rightWidth })
+
+    if (rightActivePanel === null) {
+      gitPanel.group.api.setVisible(false)
+      terminalPanel.group.api.setVisible(false)
+    } else if (rightActivePanel === 'terminal') {
+      // Show terminal, hide git
+      gitPanel.group.api.setVisible(false)
+      terminalPanel.group.api.setVisible(true)
+    } else if (rightActivePanel === 'git') {
+      // Show git, hide terminal
+      gitPanel.group.api.setVisible(true)
       terminalPanel.group.api.setVisible(false)
     }
 
-    gitPanel.api.setSize({ width: sidebarStates.rightSidebar.width })
-    if (!sidebarStates.rightSidebar.visible) {
-      gitPanel.group.api.setVisible(false)
-    }
-
     // Prevent closing of system panels by intercepting close button clicks
-    const protectedPanels = ['fileExplorer', 'terminal', 'git']
-    const protectedTitles = ['Explorer', 'Terminal', 'Git']
+    const protectedPanels = ['fileExplorer', 'terminal', 'git', '_center-placeholder']
+    const protectedTitles = ['Explorer', 'Terminal', 'Git', ''] // Empty string for welcome tab
 
     // Intercept ALL click events on close buttons using capture phase
     const handleClick = (e: MouseEvent) => {
@@ -264,9 +224,9 @@ export function AppDockLayout() {
         setTimeout(() => {
           if (!event.api.getPanel(e.id)) {
             const panelMap = {
-              fileExplorer: { component: 'fileExplorer', title: 'Explorer', width: sidebarStates.leftSidebar.width },
-              terminal: { component: 'terminal', title: 'Terminal', height: sidebarStates.bottomPanel.height },
-              git: { component: 'git', title: 'Git', width: sidebarStates.rightSidebar.width }
+              fileExplorer: { component: 'fileExplorer', title: 'Explorer', width: leftWidth },
+              terminal: { component: 'terminal', title: 'Terminal', height: 300 },
+              git: { component: 'git', title: 'Git', width: rightWidth }
             }
 
             const config = panelMap[e.id]
@@ -292,103 +252,64 @@ export function AppDockLayout() {
     // Listen to resize events to keep state in sync
     const disposeLeft = leftPanel.api.onDidDimensionsChange(() => {
       const width = Math.max(leftPanel.api.width, MIN_SIZES.leftSidebar)
-      updateSidebarState('leftSidebar', { width })
-    })
-
-    const disposeBottom = terminalPanel.api.onDidDimensionsChange(() => {
-      const height = Math.max(terminalPanel.api.height, MIN_SIZES.bottomPanel)
-      updateSidebarState('bottomPanel', { height })
+      setSidebarWidth(width, 'left')
     })
 
     const disposeRight = gitPanel.api.onDidDimensionsChange(() => {
       const width = Math.max(gitPanel.api.width, MIN_SIZES.rightSidebar)
-      updateSidebarState('rightSidebar', { width })
+      setSidebarWidth(width, 'right')
     })
 
     // Store disposables for cleanup
     return () => {
       disposeCloseListeners.dispose()
       disposeLeft.dispose()
-      disposeBottom.dispose()
       disposeRight.dispose()
     }
   }
 
-  const handleToggleSidebar = (sidebarId: string) => {
+  // Handle activity bar panel clicks
+  const handleActivityBarClick = (panelId: string, side: 'left' | 'right') => {
     if (!apiRef.current) {
       console.warn('DockView API not ready')
       return
     }
 
-    // Map sidebar IDs to panel IDs
-    const panelIdMap = {
-      leftSidebar: 'fileExplorer',
-      bottomPanel: 'terminal',
-      rightSidebar: 'git'
-    }
+    const panelConfig = getPanelById(panelId)
+    if (!panelConfig) return
 
-    const panelId = panelIdMap[sidebarId as keyof typeof panelIdMap]
-    const group = getGroupByPanelId(panelId)
+    const dockviewPanel = apiRef.current.getPanel(panelConfig.dockviewPanelId)
+    if (!dockviewPanel) return
 
-    if (!group) {
-      console.error(`Group for panel ${panelId} not found`)
-      return
-    }
+    const currentActive = side === 'left' ? leftActivePanel : rightActivePanel
+    const shouldShow = currentActive !== panelId
 
-    const currentState = sidebarStates[sidebarId as keyof typeof sidebarStates]
-    const isVisible = currentState.visible
+    // For right sidebar: handle switching between git and terminal
+    if (side === 'right') {
+      const gitPanel = apiRef.current.getPanel('git')
+      const terminalPanel = apiRef.current.getPanel('terminal')
 
-    if (isVisible) {
-      // Save current size before hiding
-      const currentSize = sidebarId === 'bottomPanel'
-        ? Math.max(group.api.height, MIN_SIZES.bottomPanel)
-        : Math.max(group.api.width, MIN_SIZES[sidebarId as keyof typeof MIN_SIZES])
-
-      if (sidebarId === 'leftSidebar' || sidebarId === 'rightSidebar') {
-        updateSidebarState(sidebarId, { visible: false, width: currentSize })
+      if (shouldShow) {
+        // Show the clicked panel, hide the other
+        if (panelId === 'git') {
+          gitPanel?.group.api.setVisible(true)
+          terminalPanel?.group.api.setVisible(false)
+        } else if (panelId === 'terminal') {
+          gitPanel?.group.api.setVisible(false)
+          terminalPanel?.group.api.setVisible(true)
+        }
       } else {
-        updateSidebarState(sidebarId, { visible: false, height: currentSize })
+        // Hide both panels
+        gitPanel?.group.api.setVisible(false)
+        terminalPanel?.group.api.setVisible(false)
       }
-
-      // Hide the sidebar
-      group.api.setVisible(false)
     } else {
-      // Set size BEFORE showing to prevent flicker
-      const savedSize = sidebarId === 'bottomPanel'
-        ? Math.max((currentState as any).height || DEFAULT_SIZES.bottomPanel, MIN_SIZES.bottomPanel)
-        : Math.max(
-            (currentState as any).width || DEFAULT_SIZES[sidebarId as keyof typeof DEFAULT_SIZES],
-            MIN_SIZES[sidebarId as keyof typeof MIN_SIZES]
-          )
-
-      if (sidebarId === 'leftSidebar' || sidebarId === 'rightSidebar') {
-        group.api.setSize({ width: savedSize })
-      } else {
-        group.api.setSize({ height: savedSize })
-      }
-
-      // Show the sidebar after size is set
-      group.api.setVisible(true)
-      updateSidebarState(sidebarId, { visible: true })
+      // For left sidebar: simple toggle
+      dockviewPanel.group.api.setVisible(shouldShow)
     }
-  }
 
-  // Map panel IDs to sidebar IDs
-  const handleTogglePanel = (panelId: string) => {
-    if (panelId === 'fileExplorer') {
-      handleToggleSidebar('leftSidebar')
-    } else if (panelId === 'terminal') {
-      handleToggleSidebar('bottomPanel')
-    } else if (panelId === 'git') {
-      handleToggleSidebar('rightSidebar')
-    }
-  }
-
-  // Map sidebar states to panel states for toolbar
-  const panelStates = {
-    fileExplorer: sidebarStates.leftSidebar.visible,
-    terminal: sidebarStates.bottomPanel.visible,
-    git: sidebarStates.rightSidebar.visible
+    // Update store
+    togglePanel(panelId, side)
   }
 
   // Keyboard shortcuts (matching VS Code)
@@ -397,39 +318,49 @@ export function AppDockLayout() {
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
       const modKey = isMac ? e.metaKey : e.ctrlKey
 
-      // Cmd/Ctrl + B - Toggle left sidebar (Primary Sidebar)
+      // Cmd/Ctrl + B - Toggle Explorer
       if (modKey && e.key === 'b' && !e.shiftKey && !e.altKey) {
         e.preventDefault()
-        handleToggleSidebar('leftSidebar')
+        handleActivityBarClick('explorer', 'left')
       }
 
-      // Cmd/Ctrl + J - Toggle bottom panel
+      // Cmd/Ctrl + J - Toggle Terminal
       if (modKey && e.key === 'j' && !e.shiftKey && !e.altKey) {
         e.preventDefault()
-        handleToggleSidebar('bottomPanel')
+        handleActivityBarClick('terminal', 'right')
       }
 
-      // Cmd/Ctrl + Alt + B - Toggle right sidebar (Secondary Sidebar)
-      if (modKey && e.altKey && e.key === 'b' && !e.shiftKey) {
+      // Ctrl + Shift + G - Toggle Git
+      if (e.ctrlKey && e.shiftKey && e.key === 'g' && !e.altKey) {
         e.preventDefault()
-        handleToggleSidebar('rightSidebar')
+        handleActivityBarClick('git', 'right')
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [sidebarStates]) // Depend on sidebarStates to have access to current state
+  }, [leftActivePanel, rightActivePanel]) // Depend on active panels to have access to current state
 
   return (
     <div className="app-dock-layout">
-      <Toolbar onTogglePanel={handleTogglePanel} panelStates={panelStates} />
+      <ActivityBar
+        side="left"
+        activePanel={leftActivePanel}
+        onPanelClick={(panelId) => handleActivityBarClick(panelId, 'left')}
+      />
       <div className="app-dock-content">
         <DockviewReact
           components={components}
+          tabComponents={{ welcomeTab: WelcomeTab }}
           onReady={onReady}
           className="dockview-theme-dark"
         />
       </div>
+      <ActivityBar
+        side="right"
+        activePanel={rightActivePanel}
+        onPanelClick={(panelId) => handleActivityBarClick(panelId, 'right')}
+      />
     </div>
   )
 }
