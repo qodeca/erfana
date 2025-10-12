@@ -113,7 +113,8 @@ Superior markdown capabilities with Monaco Editor + live preview:
 - **Document Statistics**: Real-time word count, character count, lines, reading time
 - **Auto-Save**: Debounced auto-save (2s after last edit) with visual indicator
 - **Claude Integration**: Right-click context menu in preview for AI-powered text operations
-- **View Modes**: Editor only, split view (default), preview only
+- **View Modes**: Editor only, split view with bidirectional scroll sync, preview only
+- **Scroll Synchronization**: Editor ↔ preview scrolling in split view (line-to-pixel mapping, 50ms debounce)
 - **Mermaid Diagrams**: 22 diagram types (flowcharts, sequence, class, state, Gantt, ER, timelines, and more)
 - **Medium.com Preview**: Charter serif font, 18px, compact spacing, 680px max width, professional typography
 
@@ -202,6 +203,7 @@ Automatic detection and refresh for external file system changes:
 **Resolved Issues:**
 - **Panel Resizing**: ✅ RESOLVED - Hybrid SplitviewReact + DockviewReact architecture fixed resize functionality
 - **Monaco CSP**: ✅ RESOLVED - Monaco now uses local bundling instead of CDN
+- **Scroll Synchronization**: ✅ RESOLVED - Fixed react-markdown v10 API compatibility + React ref re-render issues
 
 📚 **All known issues**: See [docs/known-issues.md](docs/known-issues.md)
 

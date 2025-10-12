@@ -26,8 +26,30 @@ See: [UI Components](./ui-components.md) for global keyboard shortcuts
 ## View Modes
 
 1. **Editor Only** (📝): Focus on writing
-2. **Split View** (⚡): Source + preview side-by-side (default)
+2. **Split View** (⚡): Source + preview side-by-side with synchronized scrolling
 3. **Preview Only** (👁️): Presentation mode
+
+### Scroll Synchronization
+
+In **Split View**, the editor and preview panes are bidirectionally synchronized - scrolling one automatically scrolls the other to the corresponding position.
+
+**Features:**
+- **Editor → Preview**: Scrolling in Monaco editor updates preview position
+- **Preview → Editor**: Scrolling in preview updates editor position
+- **Line Mapping**: Uses `data-line` attributes for precise positioning
+- **Smooth Interpolation**: Linear interpolation between known points
+- **Debouncing**: 50ms delay prevents scroll loops
+
+**Technical Implementation:**
+- Scroll map builds on view mode change (296 entries for CLAUDE.md)
+- Maps editor line numbers to preview element positions
+- Uses react-markdown's `node.position` API for AST line data
+- Attaches scroll listeners when scroll map is ready
+
+**Files:**
+- `MarkdownEditorPanel.tsx:217-301` - Scroll map + listeners
+- `MarkdownPreview.tsx:20-37` - Line number extraction
+- `MonacoMarkdownEditor.tsx` - Exposes scroll API
 
 ## Multi-File Tab System
 
