@@ -1,5 +1,5 @@
 import { readdir, readFile, writeFile, stat, rm, mkdir } from 'fs/promises'
-import { join, extname, basename } from 'path'
+import { join, extname } from 'path'
 
 export interface FileNode {
   name: string
@@ -99,9 +99,8 @@ export class FileService {
       }
     }
 
-    // Create file with default content
-    const defaultContent = `# ${basename(fileName, extname(fileName))}\n\n`
-    await writeFile(filePath, defaultContent, 'utf-8')
+    // Create empty file
+    await writeFile(filePath, '', 'utf-8')
 
     return filePath
   }

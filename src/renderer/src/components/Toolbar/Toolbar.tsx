@@ -1,3 +1,4 @@
+import { PanelLeft, PanelBottom, PanelRight } from 'lucide-react'
 import './Toolbar.css'
 
 interface ToolbarProps {
@@ -26,9 +27,7 @@ export function Toolbar({ onTogglePanel, panelStates }: ToolbarProps) {
           onClick={() => onTogglePanel('fileExplorer')}
           title="Toggle Primary Sidebar (⌘B)"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path fillRule="evenodd" clipRule="evenodd" d="M1.5 1h11l.5.5v13l-.5.5h-11l-.5-.5v-13l.5-.5zM2 14h4V2H2v12zm5 0h6V2H7v12z"/>
-          </svg>
+          <PanelLeft size={16} strokeWidth={2} />
         </button>
 
         <button
@@ -36,9 +35,7 @@ export function Toolbar({ onTogglePanel, panelStates }: ToolbarProps) {
           onClick={() => onTogglePanel('terminal')}
           title="Toggle Panel (⌘J)"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path fillRule="evenodd" clipRule="evenodd" d="M1.5 1h13l.5.5v10l-.5.5h-13l-.5-.5v-10l.5-.5zm.5 10h12V2H2v9zm0 2v1h12v-1H2z"/>
-          </svg>
+          <PanelBottom size={16} strokeWidth={2} />
         </button>
 
         <button
@@ -46,9 +43,7 @@ export function Toolbar({ onTogglePanel, panelStates }: ToolbarProps) {
           onClick={() => onTogglePanel('git')}
           title="Toggle Secondary Sidebar"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path fillRule="evenodd" clipRule="evenodd" d="M14.5 1h-11l-.5.5v13l.5.5h11l.5-.5v-13l-.5-.5zM14 14H10V2h4v12zM9 14H3V2h6v12z"/>
-          </svg>
+          <PanelRight size={16} strokeWidth={2} />
         </button>
       </div>
     </div>
