@@ -57,13 +57,24 @@ export const activityBarPanels: ActivityBarPanel[] = [
 
   // Right sidebar panels
   {
+    id: 'claude',
+    icon: Bot,
+    label: 'Claude AI',
+    tooltip: 'Claude AI Assistant (⌘⇧A)',
+    side: 'right',
+    dockviewPanelId: 'claude',
+    order: 1,
+    keyboardShortcut: 'mod+shift+a',
+    enabled: true
+  },
+  {
     id: 'git',
     icon: GitBranch,
     label: 'Source Control',
     tooltip: 'Source Control (⌃⇧G)',
     side: 'right',
     dockviewPanelId: 'git',
-    order: 1,
+    order: 2,
     keyboardShortcut: 'ctrl+shift+g',
     enabled: true,
     badge: getGitChangesCount
@@ -75,21 +86,10 @@ export const activityBarPanels: ActivityBarPanel[] = [
     tooltip: 'Terminal (⌘J)',
     side: 'right',
     dockviewPanelId: 'terminal',
-    order: 2,
+    order: 3,
     keyboardShortcut: 'mod+j',
     enabled: true,
     badge: getTerminalActiveIndicator
-  },
-  {
-    id: 'claude',
-    icon: Bot,
-    label: 'Claude AI',
-    tooltip: 'Claude AI Assistant (⌘⇧A)',
-    side: 'right',
-    dockviewPanelId: 'claude',
-    order: 3,
-    keyboardShortcut: 'mod+shift+a',
-    enabled: true
   }
 ]
 
