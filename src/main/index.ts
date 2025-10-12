@@ -4,7 +4,9 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerFileHandlers } from './ipc/file-handlers'
 import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
+import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
 import { fileWatcherService } from './services/FileWatcherService'
+import { directoryWatcherService } from './services/DirectoryWatcherService'
 
 function createWindow(): void {
   // Create the browser window.
@@ -61,6 +63,7 @@ app.whenReady().then(() => {
   // Register IPC handlers
   registerFileHandlers()
   registerFileWatcherHandlers()
+  registerDirectoryWatcherHandlers()
 
   createWindow()
 
@@ -80,10 +83,11 @@ app.on('window-all-closed', () => {
   }
 })
 
-// Cleanup file watchers before app quits
+// Cleanup file watchers and directory watchers before app quits
 app.on('before-quit', async () => {
-  console.log('🛑 App quitting, cleaning up file watchers...')
+  console.log('🛑 App quitting, cleaning up watchers...')
   await fileWatcherService.dispose()
+  await directoryWatcherService.dispose()
 })
 
 // In this file you can include the rest of your app's specific main process

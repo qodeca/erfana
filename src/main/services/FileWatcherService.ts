@@ -15,9 +15,26 @@ export class FileWatcherService {
   private readonly DEBOUNCE_DELAY = 300 // ms
   private readonly MAX_WATCHED_FILES = 100
   private projectPath: string | null = null
+  private isDisposing: boolean = false // Flag to prevent operations during cleanup
 
   setProjectPath(path: string): void {
     this.projectPath = path
+  }
+
+  /**
+   * Safe logging that handles EPIPE errors during app shutdown
+   */
+  private safeLog(message: string): void {
+    if (this.isDisposing) return // Don't log during disposal
+    try {
+      console.log(message)
+    } catch (error) {
+      // Suppress EPIPE errors during shutdown
+      if (error instanceof Error && !error.message.includes('EPIPE')) {
+        // Only re-throw non-EPIPE errors
+        throw error
+      }
+    }
   }
 
   /**
@@ -47,11 +64,11 @@ export class FileWatcherService {
     if (this.watchedFiles.has(filePath)) {
       const watched = this.watchedFiles.get(filePath)!
       watched.webContentsIds.add(webContentsId)
-      console.log(`👁️  Added webContents ${webContentsId} to watch: ${filePath}`)
+      this.safeLog(`👁️  Added webContents ${webContentsId} to watch: ${filePath}`)
       return
     }
 
-    console.log(`👁️  Starting watch for: ${filePath}`)
+    this.safeLog(`👁️  Starting watch for: ${filePath}`)
 
     // Create new watcher
     const watcher = chokidar.watch(filePath, {
@@ -86,8 +103,15 @@ export class FileWatcherService {
 
     // Handle errors
     watcher.on('error', (error: unknown) => {
+      if (this.isDisposing) return // Ignore errors during disposal
       const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error(`File watcher error for ${filePath}:`, error)
+
+      try {
+        console.error(`File watcher error for ${filePath}:`, error)
+      } catch {
+        // Suppress EPIPE errors
+      }
+
       this.notifyWebContents(filePath, 'file-watch:error', {
         filePath,
         error: errorMessage
@@ -109,11 +133,11 @@ export class FileWatcherService {
     const webContentsId = webContents.id
     watched.webContentsIds.delete(webContentsId)
 
-    console.log(`👁️  Removed webContents ${webContentsId} from watch: ${filePath}`)
+    this.safeLog(`👁️  Removed webContents ${webContentsId} from watch: ${filePath}`)
 
     // If no more webContents watching this file, stop watching entirely
     if (watched.webContentsIds.size === 0) {
-      console.log(`👁️  Stopping watch for: ${filePath}`)
+      this.safeLog(`👁️  Stopping watch for: ${filePath}`)
       if (watched.debounceTimer) {
         clearTimeout(watched.debounceTimer)
       }
@@ -141,7 +165,7 @@ export class FileWatcherService {
       await this.unwatchFile(filePath, webContents)
     }
 
-    console.log(`👁️  Cleaned up watches for webContents ${webContentsId}`)
+    this.safeLog(`👁️  Cleaned up watches for webContents ${webContentsId}`)
   }
 
   /**
@@ -151,7 +175,7 @@ export class FileWatcherService {
     const watched = this.watchedFiles.get(filePath)
     if (watched) {
       watched.isPaused = true
-      console.log(`⏸️  Paused watch for: ${filePath}`)
+      this.safeLog(`⏸️  Paused watch for: ${filePath}`)
     }
   }
 
@@ -162,7 +186,7 @@ export class FileWatcherService {
     const watched = this.watchedFiles.get(filePath)
     if (watched) {
       watched.isPaused = false
-      console.log(`▶️  Resumed watch for: ${filePath}`)
+      this.safeLog(`▶️  Resumed watch for: ${filePath}`)
     }
   }
 
@@ -170,12 +194,13 @@ export class FileWatcherService {
    * Handle file change events with debouncing
    */
   private handleFileChange(filePath: string): void {
+    if (this.isDisposing) return // Ignore events during disposal
     const watched = this.watchedFiles.get(filePath)
     if (!watched) return
 
     // Ignore if paused (during our own save)
     if (watched.isPaused) {
-      console.log(`⏸️  Ignoring change (paused): ${filePath}`)
+      this.safeLog(`⏸️  Ignoring change (paused): ${filePath}`)
       return
     }
 
@@ -186,7 +211,8 @@ export class FileWatcherService {
 
     // Debounce: wait for file changes to settle
     watched.debounceTimer = setTimeout(() => {
-      console.log(`📝 File changed externally: ${filePath}`)
+      if (this.isDisposing) return // Check again after timeout
+      this.safeLog(`📝 File changed externally: ${filePath}`)
       this.notifyWebContents(filePath, 'file-watch:changed', { filePath })
       watched.debounceTimer = null
     }, this.DEBOUNCE_DELAY)
@@ -196,10 +222,11 @@ export class FileWatcherService {
    * Handle file deletion
    */
   private handleFileDeleted(filePath: string): void {
+    if (this.isDisposing) return // Ignore events during disposal
     const watched = this.watchedFiles.get(filePath)
     if (!watched) return
 
-    console.log(`🗑️  File deleted externally: ${filePath}`)
+    this.safeLog(`🗑️  File deleted externally: ${filePath}`)
     this.notifyWebContents(filePath, 'file-watch:deleted', { filePath })
 
     // Cleanup the watch
@@ -214,6 +241,7 @@ export class FileWatcherService {
    * Notify all webContents watching this file
    */
   private notifyWebContents(filePath: string, channel: string, data: any): void {
+    if (this.isDisposing) return // Don't notify during disposal
     const watched = this.watchedFiles.get(filePath)
     if (!watched) return
 
@@ -222,7 +250,14 @@ export class FileWatcherService {
     for (const webContentsId of watched.webContentsIds) {
       const window = windows.find(w => w.webContents.id === webContentsId)
       if (window && !window.isDestroyed()) {
-        window.webContents.send(channel, data)
+        try {
+          window.webContents.send(channel, data)
+        } catch (error) {
+          // Suppress errors during shutdown (EPIPE, destroyed webContents, etc.)
+          if (error instanceof Error && !error.message.includes('destroyed')) {
+            this.safeLog(`⚠️  Error sending to webContents: ${error.message}`)
+          }
+        }
       }
     }
   }
@@ -244,12 +279,18 @@ export class FileWatcherService {
    * Cleanup all watchers (on app shutdown)
    */
   async dispose(): Promise<void> {
-    console.log('👁️  Disposing all file watchers...')
+    this.isDisposing = true // Set flag FIRST to stop all event processing
+    this.safeLog('👁️  Disposing all file watchers...')
+
     for (const [, watched] of this.watchedFiles.entries()) {
       if (watched.debounceTimer) {
         clearTimeout(watched.debounceTimer)
       }
-      await watched.watcher.close()
+      try {
+        await watched.watcher.close()
+      } catch (error) {
+        // Suppress errors during cleanup
+      }
     }
     this.watchedFiles.clear()
   }

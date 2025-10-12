@@ -30,6 +30,21 @@ declare global {
         onFileDeleted: (callback: (data: { filePath: string }) => void) => () => void
         onFileError: (callback: (data: { filePath: string; error: string }) => void) => () => void
       }
+      directoryWatch: {
+        start: (dirPath: string) => Promise<{ success: boolean; error?: string }>
+        stop: (dirPath: string) => Promise<{ success: boolean; error?: string }>
+        stopAll: () => Promise<{ success: boolean; error?: string }>
+        pause: (dirPath: string) => Promise<{ success: boolean; error?: string }>
+        resume: (dirPath: string) => Promise<{ success: boolean; error?: string }>
+        getStats: () => Promise<{ success: boolean; stats?: any; error?: string }>
+        onDirectoryChanged: (
+          callback: (data: { dirPath: string; eventCount: number; summary: any }) => void
+        ) => () => void
+        onProjectDeleted: (callback: (data: { dirPath: string }) => void) => () => void
+        onDirectoryError: (
+          callback: (data: { dirPath: string; error: string }) => void
+        ) => () => void
+      }
     }
   }
 }
