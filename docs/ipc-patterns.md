@@ -56,5 +56,17 @@ const content = await window.api.file.readFile('/path/to/file.md')
 | `file:rename` | file-handlers | Rename file or folder |
 | `file:deleteFile` | file-handlers | Delete file |
 | `file:deleteFolder` | file-handlers | Delete folder recursively |
+| `file-watch:start` | file-watcher-handlers | Start watching file for changes |
+| `file-watch:stop` | file-watcher-handlers | Stop watching file |
+| `file-watch:pause` | file-watcher-handlers | Pause watching (during save) |
+| `file-watch:resume` | file-watcher-handlers | Resume watching after save |
+| `file-watch:changed` | file-watcher-handlers | Event: File changed externally |
+| `file-watch:deleted` | file-watcher-handlers | Event: File deleted externally |
+| `directory-watch:start` | directory-watcher-handlers | Start watching directory tree |
+| `directory-watch:stop` | directory-watcher-handlers | Stop watching directory |
+| `directory-watch:pause` | directory-watcher-handlers | Pause watching (during CRUD) |
+| `directory-watch:resume` | directory-watcher-handlers | Resume watching after CRUD |
+| `directory-watch:changed` | directory-watcher-handlers | Event: Directory changed externally |
+| `directory-watch:project-deleted` | directory-watcher-handlers | Event: Project folder deleted |
 
-See: [Architecture](./architecture.md) | [Security](./security.md)
+See: [Architecture](./architecture.md) | [Security](./security.md) | [File Watching](./file-watching.md)

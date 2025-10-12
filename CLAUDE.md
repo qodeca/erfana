@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Erfana** is an Electron desktop IDE for managing consulting and research projects with Claude Code integration. Multi-panel workspace with superior markdown editing, git integration, and direct Claude AI assistance.
+**Erfana** is an Electron desktop IDE for managing consulting and research projects with Claude Code integration. Multi-panel workspace with superior markdown editing, auto-refresh for external changes, git integration, and direct Claude AI assistance.
 
 ## Quick Start
 
@@ -30,6 +30,7 @@ Erfana follows Electron's three-process model:
 - Monaco Editor (markdown editing)
 - react-markdown + remark-gfm (preview)
 - Zustand (activity bar state management)
+- chokidar (file system watching)
 - @anthropic-ai/claude-agent-sdk (Claude AI)
 - simple-git (git operations)
 
@@ -76,6 +77,8 @@ src/
 
 Business logic lives in service classes (`src/main/services/`):
 - `FileService.ts` - File operations (read, write, create, delete, rename)
+- `FileWatcherService.ts` - File content auto-refresh (300ms debounce)
+- `DirectoryWatcherService.ts` - Directory tree auto-refresh (1000ms debounce)
 - `SettingsService.ts` - Persistent storage with electron-store (async, dynamic ES Module import)
 - `GitService.ts` - Git operations (future)
 - `ClaudeService.ts` - Claude SDK wrapper (future)
@@ -115,6 +118,37 @@ Superior markdown capabilities with Monaco Editor + live preview:
 - **Medium.com Preview**: Charter serif font, 18px, compact spacing, 680px max width, professional typography
 
 📚 **Markdown features**: See [docs/markdown-editing.md](docs/markdown-editing.md)
+
+## Auto-Refresh
+
+Automatic detection and refresh for external file system changes:
+
+**File Content Watching** (FileWatcherService):
+- Auto-reload files modified externally (if no unsaved changes)
+- Conflict resolution UI when file has local modifications
+- File deletion warning banner
+- Debouncing (300ms) for rapid changes
+- Pause/resume during save to prevent race conditions
+- Toolbar indicator: "Reloaded from disk"
+
+**Directory Tree Watching** (DirectoryWatcherService):
+- Recursive watching of project folder
+- Detects file/folder creation and deletion
+- Preserves expanded folder state during refresh
+- Intelligent debouncing (1000ms bulk, 300ms single)
+- Ignored patterns: `.git`, `node_modules`, build outputs
+- Pause/resume during internal CRUD operations
+- Silent background operation (no notifications)
+
+**Use Cases**:
+- Git operations (checkout, pull, merge) → Auto-refresh
+- NPM operations (install, update) → Auto-refresh
+- External editor changes → Auto-reload or conflict detection
+- File system operations → Tree updates immediately
+
+**Security**: Project root validation, resource limits, proper cleanup
+
+📚 **Full documentation**: See [docs/file-watching.md](docs/file-watching.md)
 
 ## UI & Keyboard Shortcuts
 
@@ -163,6 +197,7 @@ Superior markdown capabilities with Monaco Editor + live preview:
 - **node-pty**: Build fails on Python 3.13 - terminal panel deferred
 - **Dockview CSS**: Use `dockview/dist/styles/dockview.css` path
 - **electron-store**: ES Module requiring dynamic `import()` - all SettingsService methods are async
+- **Network file systems**: May require `usePolling: true` for file watching (future config option)
 
 **Resolved Issues:**
 - **Panel Resizing**: ✅ RESOLVED - Hybrid SplitviewReact + DockviewReact architecture fixed resize functionality
@@ -282,6 +317,7 @@ When adding features:
 
 - [Architecture](docs/architecture.md) - Three-process model, hybrid layout architecture, tech stack, design decisions
 - [IPC Patterns](docs/ipc-patterns.md) - Secure communication patterns, current channels
+- [File Watching](docs/file-watching.md) - Auto-refresh systems, patterns, testing
 - [UI Components](docs/ui-components.md) - Activity bars, panel toggle system, keyboard shortcuts, panel communication
 - [Markdown Editing](docs/markdown-editing.md) - Editor features, shortcuts, preview
 - [Security](docs/security.md) - Security guidelines, CSP, validation patterns
