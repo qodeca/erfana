@@ -22,7 +22,7 @@ export function FileTreeNode({
   onToggleFolder
 }: FileTreeNodeProps) {
   // Controlled component - check if this folder is expanded
-  const isExpanded = expandedFolders.has(node.path) || level === 0
+  const isExpanded = expandedFolders.has(node.path)
 
   const handleClick = () => {
     if (node.type === 'directory') {
