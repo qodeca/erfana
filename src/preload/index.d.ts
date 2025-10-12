@@ -19,6 +19,17 @@ declare global {
         deleteFolder: (folderPath: string) => Promise<boolean>
         rename: (oldPath: string, newName: string) => Promise<string>
       }
+      fileWatch: {
+        start: (filePath: string) => Promise<{ success: boolean; error?: string }>
+        stop: (filePath: string) => Promise<{ success: boolean; error?: string }>
+        stopAll: () => Promise<{ success: boolean; error?: string }>
+        pause: (filePath: string) => Promise<{ success: boolean; error?: string }>
+        resume: (filePath: string) => Promise<{ success: boolean; error?: string }>
+        getStats: () => Promise<{ success: boolean; stats?: any; error?: string }>
+        onFileChanged: (callback: (data: { filePath: string }) => void) => () => void
+        onFileDeleted: (callback: (data: { filePath: string }) => void) => () => void
+        onFileError: (callback: (data: { filePath: string; error: string }) => void) => () => void
+      }
     }
   }
 }

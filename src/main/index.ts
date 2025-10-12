@@ -3,6 +3,8 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerFileHandlers } from './ipc/file-handlers'
+import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
+import { fileWatcherService } from './services/FileWatcherService'
 
 function createWindow(): void {
   // Create the browser window.
@@ -58,6 +60,7 @@ app.whenReady().then(() => {
 
   // Register IPC handlers
   registerFileHandlers()
+  registerFileWatcherHandlers()
 
   createWindow()
 
@@ -75,6 +78,12 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+// Cleanup file watchers before app quits
+app.on('before-quit', async () => {
+  console.log('🛑 App quitting, cleaning up file watchers...')
+  await fileWatcherService.dispose()
 })
 
 // In this file you can include the rest of your app's specific main process

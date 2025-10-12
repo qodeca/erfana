@@ -41,6 +41,39 @@ const api = {
       ipcRenderer.invoke('file:deleteFolder', folderPath),
     rename: (oldPath: string, newName: string): Promise<string> =>
       ipcRenderer.invoke('file:rename', oldPath, newName)
+  },
+
+  // File watching operations
+  fileWatch: {
+    start: (filePath: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('file-watch:start', filePath),
+    stop: (filePath: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('file-watch:stop', filePath),
+    stopAll: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('file-watch:stopAll'),
+    pause: (filePath: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('file-watch:pause', filePath),
+    resume: (filePath: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('file-watch:resume', filePath),
+    getStats: (): Promise<{ success: boolean; stats?: any; error?: string }> =>
+      ipcRenderer.invoke('file-watch:stats'),
+
+    // Event listeners
+    onFileChanged: (callback: (data: { filePath: string }) => void) => {
+      const listener = (_event: any, data: { filePath: string }) => callback(data)
+      ipcRenderer.on('file-watch:changed', listener)
+      return () => ipcRenderer.removeListener('file-watch:changed', listener)
+    },
+    onFileDeleted: (callback: (data: { filePath: string }) => void) => {
+      const listener = (_event: any, data: { filePath: string }) => callback(data)
+      ipcRenderer.on('file-watch:deleted', listener)
+      return () => ipcRenderer.removeListener('file-watch:deleted', listener)
+    },
+    onFileError: (callback: (data: { filePath: string; error: string }) => void) => {
+      const listener = (_event: any, data: { filePath: string; error: string }) => callback(data)
+      ipcRenderer.on('file-watch:error', listener)
+      return () => ipcRenderer.removeListener('file-watch:error', listener)
+    }
   }
 }
 
