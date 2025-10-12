@@ -9,6 +9,7 @@
 import { spawn, ChildProcess } from 'child_process'
 import { EventEmitter } from 'events'
 import { homedir } from 'os'
+import { settingsService } from './SettingsService'
 
 /**
  * Message context for Claude queries
@@ -80,15 +81,15 @@ export class ClaudeCliService extends EventEmitter {
   private restartAttempts = 0
   private maxRestartAttempts = 3
   private restartTimeout: NodeJS.Timeout | null = null
-  private oauthToken: string | null = null
   private authCheckBypass = false
+  private approvedTools: Set<string> = new Set(['Read', 'Glob', 'Grep']) // Safe defaults
+  private sessionId: string | null = null
 
   /**
    * Set OAuth token for Claude CLI
    * This bypasses authentication check and trusts the system auth
    */
-  setOAuthToken(token: string): void {
-    this.oauthToken = token
+  setOAuthToken(_token: string): void {
     this.authCheckBypass = true
   }
 
@@ -144,32 +145,47 @@ export class ClaudeCliService extends EventEmitter {
     this.buffer = ''
     this.restartAttempts = 0
 
+    // Load approved tools from settings
+    const approvedToolsList = await settingsService.getApprovedTools()
+    this.approvedTools = new Set(approvedToolsList)
+
+    // Generate session ID for resume support
+    this.sessionId = this.generateSessionId()
+
     console.log(`🚀 Starting persistent Claude CLI session for: ${projectPath}`)
+    console.log(`🔧 Approved tools: ${Array.from(this.approvedTools).join(', ')}`)
 
     try {
+      // Build args with approved tools
+      const args = [
+        '-p', // Print mode (non-interactive, but can accept stdin)
+        '--input-format',
+        'stream-json',
+        '--output-format',
+        'stream-json',
+        '--verbose', // Required for stream-json output format
+        '--replay-user-messages', // Echo user messages back for acknowledgment
+        '--session-id',
+        this.sessionId // Use specific session ID for resume support
+      ]
+
+      // Add --allowedTools with approved tools
+      // This is required for Claude CLI to actually execute the tools
+      if (this.approvedTools.size > 0) {
+        args.push('--allowedTools', ...Array.from(this.approvedTools))
+      }
+
       // Start Claude CLI in persistent mode with stream-json I/O
-      this.claudeProcess = spawn(
-        'claude',
-        [
-          '-p', // Print mode (non-interactive, but can accept stdin)
-          '--input-format',
-          'stream-json',
-          '--output-format',
-          'stream-json',
-          '--verbose', // Required for stream-json output format
-          '--replay-user-messages' // Echo user messages back for acknowledgment
-        ],
-        {
-          cwd: projectPath, // Run in project directory context
-          shell: true, // Use shell for proper environment
-          stdio: ['pipe', 'pipe', 'pipe'],
-          env: {
-            ...process.env,
-            HOME: process.env.HOME || homedir(),
-            ANTHROPIC_API_KEY: undefined // Ensure subscription usage
-          }
+      this.claudeProcess = spawn('claude', args, {
+        cwd: projectPath, // Run in project directory context
+        shell: true, // Use shell for proper environment
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          HOME: process.env.HOME || homedir(),
+          ANTHROPIC_API_KEY: undefined // Ensure subscription usage
         }
-      )
+      })
 
       if (!this.claudeProcess.stdout || !this.claudeProcess.stderr || !this.claudeProcess.stdin) {
         throw new Error('Failed to initialize Claude CLI stdio streams')
@@ -275,6 +291,116 @@ export class ClaudeCliService extends EventEmitter {
         message: `Error sending message: ${error.message}`,
         recoverable: true
       })
+    }
+  }
+
+  /**
+   * Approve tool and restart session with new permissions
+   */
+  async approveTool(toolName: string, remember: boolean = false): Promise<void> {
+    console.log(`✅ Approving tool: ${toolName} (remember: ${remember})`)
+
+    // Add to approved tools
+    this.approvedTools.add(toolName)
+
+    // Save to settings if remember is true
+    if (remember) {
+      await settingsService.addApprovedTool(toolName)
+    }
+
+    // Restart session with new tool permissions
+    await this.restartWithNewPermissions()
+  }
+
+  /**
+   * Deny tool use and restart session
+   */
+  async denyTool(toolName: string): Promise<void> {
+    console.log(`❌ Denying tool: ${toolName}`)
+
+    // Don't add to approved tools
+    // Restart session so Claude can try a different approach
+    await this.restartWithNewPermissions()
+  }
+
+  /**
+   * Restart session with updated tool permissions
+   */
+  private async restartWithNewPermissions(): Promise<void> {
+    if (!this.projectPath || !this.sessionId) {
+      console.error('❌ Cannot restart: missing project path or session ID')
+      return
+    }
+
+    console.log('🔄 Restarting session with updated permissions...')
+
+    const previousSessionId = this.sessionId
+    const projectPath = this.projectPath
+
+    // Kill current process
+    if (this.claudeProcess) {
+      this.claudeProcess.removeAllListeners()
+      this.claudeProcess.kill('SIGTERM')
+      this.claudeProcess = null
+    }
+
+    this.sessionState = 'starting'
+    this.buffer = ''
+
+    try {
+      // Restart with --resume and updated --allowedTools
+      const args = [
+        '-p',
+        '--input-format',
+        'stream-json',
+        '--output-format',
+        'stream-json',
+        '--verbose',
+        '--replay-user-messages',
+        '--resume',
+        previousSessionId
+      ]
+
+      // Add updated allowed tools
+      if (this.approvedTools.size > 0) {
+        args.push('--allowedTools', ...Array.from(this.approvedTools))
+      }
+
+      console.log(`🔧 Resuming with tools: ${Array.from(this.approvedTools).join(', ')}`)
+
+      this.claudeProcess = spawn('claude', args, {
+        cwd: projectPath,
+        shell: true,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: {
+          ...process.env,
+          HOME: process.env.HOME || homedir(),
+          ANTHROPIC_API_KEY: undefined
+        }
+      })
+
+      if (!this.claudeProcess.stdout || !this.claudeProcess.stderr || !this.claudeProcess.stdin) {
+        throw new Error('Failed to initialize stdio')
+      }
+
+      // Setup handlers
+      this.claudeProcess.stdout.on('data', (data: Buffer) => this.handleStdout(data))
+      this.claudeProcess.stderr.on('data', (data: Buffer) => {
+        console.error('❌ Claude CLI stderr:', data.toString())
+      })
+      this.claudeProcess.on('close', (code) => this.handleProcessExit(code))
+      this.claudeProcess.on('error', (error) => {
+        console.error('❌ Process error:', error)
+        this.sessionState = 'error'
+      })
+
+      this.sessionState = 'ready'
+      this.emit('session-resumed', { projectPath, approvedTools: Array.from(this.approvedTools) })
+      console.log('✅ Session resumed with new permissions')
+    } catch (error: any) {
+      console.error('❌ Failed to restart:', error)
+      this.sessionState = 'error'
+      throw error
     }
   }
 
@@ -496,13 +622,41 @@ export class ClaudeCliService extends EventEmitter {
         }
 
         // Tool use
-        if (block.type === 'tool_use') {
+        if (block.type === 'tool_use' && block.name) {
+          const toolName = block.name
+
+          // Check if tool is approved
+          if (!this.approvedTools.has(toolName)) {
+            // Tool needs approval
+            console.log(`⚠️ Tool ${toolName} requires approval`)
+
+            // Send a system message to UI
+            this.emit('message', {
+              id: this.generateId(),
+              type: 'system',
+              content: `⚠️ ${toolName} tool requires approval - please review and approve to use this tool`,
+              timestamp: new Date()
+            })
+
+            // Emit approval request (shows dialog)
+            this.emit('tool-approval-needed', {
+              toolName: toolName,
+              toolId: block.id,
+              input: block.input,
+              description: this.getToolDescription(toolName)
+            })
+
+            // Suppress the tool_use message - don't show it to user
+            return null
+          }
+
+          // Tool is approved, show normally
           return {
             id: this.generateId(),
             type: 'tool_use',
-            content: `⏺ ${block.name}`,
+            content: `⏺ ${toolName}`,
             metadata: {
-              name: block.name,
+              name: toolName,
               input: block.input,
               tool_use_id: block.id
             },
@@ -520,6 +674,37 @@ export class ClaudeCliService extends EventEmitter {
    */
   private generateId(): string {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  }
+
+  /**
+   * Generate UUID-compatible session ID for --session-id flag
+   */
+  private generateSessionId(): string {
+    // Generate a simple UUID v4 format
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0
+      const v = c === 'x' ? r : (r & 0x3) | 0x8
+      return v.toString(16)
+    })
+  }
+
+  /**
+   * Get human-readable description for tool
+   */
+  private getToolDescription(toolName: string): string {
+    const descriptions: Record<string, string> = {
+      Write: 'Create or overwrite files',
+      Edit: 'Modify existing files',
+      Read: 'Read file contents',
+      Bash: 'Execute shell commands',
+      Glob: 'Search for files by pattern',
+      Grep: 'Search file contents',
+      Task: 'Delegate to specialized agent',
+      WebSearch: 'Search the web',
+      WebFetch: 'Fetch web content',
+      SlashCommand: 'Execute custom slash command'
+    }
+    return descriptions[toolName] || `Use ${toolName} tool`
   }
 }
 

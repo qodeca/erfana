@@ -114,6 +114,26 @@ const api = {
     }
   },
 
+  // Settings operations
+  settings: {
+    getApprovedTools: (): Promise<{ success: boolean; tools?: string[]; error?: string }> =>
+      ipcRenderer.invoke('settings:getApprovedTools'),
+    setApprovedTools: (
+      tools: string[]
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('settings:setApprovedTools', tools),
+    addApprovedTool: (
+      toolName: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('settings:addApprovedTool', toolName),
+    removeApprovedTool: (
+      toolName: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('settings:removeApprovedTool', toolName),
+    resetApprovedTools: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('settings:resetApprovedTools')
+  },
+
   // Claude Code operations - Persistent Session Architecture
   claudeCode: {
     // Session lifecycle
@@ -150,6 +170,16 @@ const api = {
 
     setToken: (token: string): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('claudeCode:setToken', token),
+
+    // Tool approval
+    approveTool: (
+      toolName: string,
+      remember: boolean
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('claudeCode:approveTool', toolName, remember),
+
+    denyTool: (toolName: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('claudeCode:denyTool', toolName),
 
     // Event listeners - Messages
     onMessage: (callback: (data: { sessionId: string; message: any }) => void) => {
@@ -197,6 +227,34 @@ const api = {
         callback(error)
       ipcRenderer.on('claudeCode:sessionError', listener)
       return () => ipcRenderer.removeListener('claudeCode:sessionError', listener)
+    },
+
+    // Event listeners - Tool approval
+    onToolApprovalNeeded: (
+      callback: (request: {
+        toolName: string
+        toolId: string
+        input: any
+        description: string
+      }) => void
+    ) => {
+      const listener = (
+        _event: any,
+        request: { toolName: string; toolId: string; input: any; description: string }
+      ) => callback(request)
+      ipcRenderer.on('claudeCode:toolApprovalNeeded', listener)
+      return () => ipcRenderer.removeListener('claudeCode:toolApprovalNeeded', listener)
+    },
+
+    onSessionResumed: (
+      callback: (data: { projectPath: string; approvedTools: string[] }) => void
+    ) => {
+      const listener = (
+        _event: any,
+        data: { projectPath: string; approvedTools: string[] }
+      ) => callback(data)
+      ipcRenderer.on('claudeCode:sessionResumed', listener)
+      return () => ipcRenderer.removeListener('claudeCode:sessionResumed', listener)
     }
   }
 }

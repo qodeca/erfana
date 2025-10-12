@@ -80,9 +80,18 @@ const content = await window.api.file.readFile('/path/to/file.md')
 | `claudeCode:sessionStopped` | claude-code-handlers | Event: Session stopped |
 | `claudeCode:sessionRestarting` | claude-code-handlers | Event: Session restarting |
 | `claudeCode:sessionError` | claude-code-handlers | Event: Session error |
+| `claudeCode:approveTool` | claude-code-handlers | Approve tool use and restart session |
+| `claudeCode:denyTool` | claude-code-handlers | Deny tool use and restart session |
 | `claudeCode:message` | claude-code-handlers | Event: Message from Claude CLI |
 | `claudeCode:complete` | claude-code-handlers | Event: Generation complete |
 | `claudeCode:error` | claude-code-handlers | Event: Error occurred |
+| `claudeCode:toolApprovalNeeded` | claude-code-handlers | Event: Tool approval request |
+| `claudeCode:sessionResumed` | claude-code-handlers | Event: Session resumed with new tools |
+| `settings:getApprovedTools` | settings-handlers | Get approved tools list |
+| `settings:setApprovedTools` | settings-handlers | Set approved tools list |
+| `settings:addApprovedTool` | settings-handlers | Add single tool to approved list |
+| `settings:removeApprovedTool` | settings-handlers | Remove single tool from approved list |
+| `settings:resetApprovedTools` | settings-handlers | Reset to safe defaults |
 
 ## Event-Based IPC Pattern
 
@@ -110,4 +119,4 @@ claudeCliService.on('message', (message) => {
 
 **Key Pattern**: Get window dynamically (timing-safe), use EventEmitter for service events.
 
-See: [Architecture](./architecture.md) | [Security](./security.md) | [File Watching](./file-watching.md)
+See: [Architecture](./architecture.md) | [Security](./security.md) | [File Watching](./file-watching.md) | [Claude Code Integration](./claude-code/README.md)

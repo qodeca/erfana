@@ -94,7 +94,79 @@ Right sidebar panel for Claude Code integration via persistent CLI session.
 **Service**: `src/main/services/ClaudeCliService.ts` (persistent session architecture)
 **IPC**: `src/main/ipc/claude-code-handlers.ts` (session lifecycle)
 
-See: [IPC Patterns](./ipc-patterns.md) | [Architecture](./architecture.md)
+See: [IPC Patterns](./ipc-patterns.md) | [Architecture](./architecture.md) | [Claude Code Integration](./claude-code/README.md)
+
+## Tool Approval Dialog
+
+**Location**: `src/renderer/src/components/Dialogs/ToolApprovalDialog.tsx`
+
+Modal dialog for approving or denying Claude Code tool execution.
+
+### Features
+
+- Tool name display (monospace font, blue color)
+- Tool description explaining what the tool does
+- Collapsible parameters section (JSON pretty-print)
+- "Remember this choice" checkbox for persistent approval
+- Approve/Deny action buttons with icons
+- VS Code dark theme styling
+- Overlay prevents interaction with app during approval
+- Animations: fadeIn (overlay), slideUp (dialog)
+
+### Props
+
+```typescript
+interface ToolApprovalRequest {
+  toolName: string      // e.g., "Edit", "Write", "Bash"
+  toolId: string        // UUID from Claude CLI
+  input: any            // Tool parameters as JSON object
+  description: string   // Human-readable tool description
+}
+
+interface ToolApprovalDialogProps {
+  request: ToolApprovalRequest
+  onApprove: (remember: boolean) => void
+  onDeny: () => void
+}
+```
+
+### Design
+
+- **Dimensions**: 500px width, max-height 80vh, centered
+- **Colors**: VS Code dark (#2d2d30 background, #007acc buttons)
+- **Icons**: AlertTriangle (warning), Check (approve), X (deny) from Lucide React
+- **Animations**: fadeIn 0.2s (overlay), slideUp 0.3s (dialog)
+- **Parameters**: Collapsible with toggle button, JSON formatted with 2-space indent
+
+### Usage Pattern
+
+```typescript
+const [pendingApproval, setPendingApproval] = useState<ToolApprovalRequest | null>(null)
+
+// Listen for approval requests
+useEffect(() => {
+  const unsubscribe = window.api.claudeCode.onToolApprovalNeeded((request) => {
+    setPendingApproval(request)
+  })
+  return unsubscribe
+}, [])
+
+// Render dialog conditionally
+{pendingApproval && (
+  <ToolApprovalDialog
+    request={pendingApproval}
+    onApprove={handleToolApprove}
+    onDeny={handleToolDeny}
+  />
+)}
+```
+
+### Files
+
+- `ToolApprovalDialog.tsx` (115 lines) - Component logic
+- `ToolApprovalDialog.css` (240 lines) - VS Code-themed styling
+
+See: [Tool Approval System](./claude-code/tool-approval.md) | [IPC Patterns](./ipc-patterns.md)
 
 ## Context Menu (File Explorer)
 

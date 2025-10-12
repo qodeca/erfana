@@ -129,6 +129,34 @@ export function registerClaudeCodeHandlers() {
     }
   })
 
+  /**
+   * Approve tool use and restart session with updated permissions
+   */
+  ipcMain.handle('claudeCode:approveTool', async (_event, toolName: string, remember: boolean) => {
+    try {
+      console.log(`✅ Approving tool: ${toolName} (remember: ${remember})`)
+      await claudeCliService.approveTool(toolName, remember)
+      return { success: true }
+    } catch (error: any) {
+      console.error('❌ Error approving tool:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
+  /**
+   * Deny tool use and restart session
+   */
+  ipcMain.handle('claudeCode:denyTool', async (_event, toolName: string) => {
+    try {
+      console.log(`❌ Denying tool: ${toolName}`)
+      await claudeCliService.denyTool(toolName)
+      return { success: true }
+    } catch (error: any) {
+      console.error('❌ Error denying tool:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
   // Forward ClaudeCliService events to renderer
   // Get window dynamically to avoid timing issues
 
@@ -173,6 +201,22 @@ export function registerClaudeCodeHandlers() {
     if (windows.length > 0 && !windows[0].isDestroyed()) {
       console.error('❌ Session error, notifying renderer:', error)
       windows[0].webContents.send('claudeCode:sessionError', error)
+    }
+  })
+
+  claudeCliService.on('tool-approval-needed', (request) => {
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length > 0 && !windows[0].isDestroyed()) {
+      console.log(`⚠️ Tool approval needed: ${request.toolName}`)
+      windows[0].webContents.send('claudeCode:toolApprovalNeeded', request)
+    }
+  })
+
+  claudeCliService.on('session-resumed', (data) => {
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length > 0 && !windows[0].isDestroyed()) {
+      console.log('✅ Session resumed with new tools, notifying renderer')
+      windows[0].webContents.send('claudeCode:sessionResumed', data)
     }
   })
 
