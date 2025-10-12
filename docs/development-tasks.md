@@ -319,6 +319,119 @@ const newState = mcp__circuit-electron__evaluate({
 
 See: [Testing Index](./testing/README.md) | [Circuit Electron Guide](./testing/circuit-electron-guide.md) | [Quick Start](./testing/quickstart.md) | [UI Scenarios](./testing/ui-scenarios.md) | [Interaction Scenarios](./testing/interaction-scenarios.md)
 
+## Testing Auto-Refresh Functionality
+
+### File Content Auto-Refresh
+
+Test that files automatically reload when modified externally:
+
+```bash
+# 1. Open a markdown file in Erfana
+# 2. Modify it externally (e.g., with VS Code or echo)
+echo "# External Change" >> /path/to/project/test.md
+
+# Expected: File reloads automatically in Erfana
+# Toolbar shows: "Reloaded from disk" (1 second)
+```
+
+Test conflict detection:
+
+```bash
+# 1. Open file in Erfana
+# 2. Make unsaved changes in Erfana
+# 3. Modify file externally
+echo "# Conflict" >> /path/to/project/test.md
+
+# Expected: Orange conflict bar appears
+# Options: "Reload from Disk", "Keep My Version", "Dismiss"
+```
+
+Test file deletion:
+
+```bash
+# 1. Open file in Erfana
+# 2. Delete file externally
+rm /path/to/project/test.md
+
+# Expected: Red warning banner appears
+# Message: "This file has been deleted externally"
+```
+
+### Directory Tree Auto-Refresh
+
+Test file creation:
+
+```bash
+# 1. Erfana project is open
+# 2. Create file externally
+echo "# New File" > /path/to/project/new-file.md
+
+# Expected: File appears in tree automatically (within 1 second)
+```
+
+Test folder operations:
+
+```bash
+# 1. Expand some folders in Erfana file tree
+# 2. Create folder externally
+mkdir /path/to/project/new-folder
+
+# Expected: Folder appears, expanded folders remain expanded
+```
+
+Test bulk operations (git):
+
+```bash
+# 1. Erfana project is open
+# 2. Git checkout different branch
+git checkout feature-branch
+
+# Expected: Tree refreshes once after all changes settle (~1 second)
+# Expanded folders remain expanded
+```
+
+Test internal CRUD operations:
+
+```typescript
+// 1. Create file via Erfana UI
+// 2. Check console logs
+// Expected logs:
+// "⏸️  Paused directory watch"
+// "▶️  Resumed directory watch"
+// No "📁 Directory changed" message (watcher was paused)
+```
+
+### Testing Pause/Resume Pattern
+
+Verify no double-refresh during internal operations:
+
+```typescript
+// Add debug logging to FileTree.tsx
+const handleCreateFile = async () => {
+  console.log('1. Starting create file')
+  isInternalOperation.current = true
+  await window.api.directoryWatch.pause(projectPath)
+
+  console.log('2. Creating file')
+  await window.api.file.createFile(targetPath, fileName)
+
+  console.log('3. Refreshing tree')
+  await refreshFileTree()
+
+  console.log('4. Resuming watch')
+  await window.api.directoryWatch.resume(projectPath)
+  isInternalOperation.current = false
+}
+
+// Expected console output (no duplicate refresh):
+// 1. Starting create file
+// 2. Creating file
+// 3. Refreshing tree
+// 4. Resuming watch
+```
+
+See: [File Watching](./file-watching.md) | [Testing Index](./testing/README.md)
+
 ## Debugging
 
 - **Main Process**: Terminal output (`console.log`)

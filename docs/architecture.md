@@ -69,9 +69,13 @@ src/
 │   ├── index.ts                 # Main process entry
 │   ├── services/                # Business logic (OOP)
 │   │   ├── FileService.ts       # File operations + rename
+│   │   ├── FileWatcherService.ts    # File content auto-refresh
+│   │   ├── DirectoryWatcherService.ts  # Directory tree auto-refresh
 │   │   └── SettingsService.ts   # Persistent settings (electron-store)
 │   └── ipc/
-│       └── file-handlers.ts     # IPC handlers
+│       ├── file-handlers.ts     # IPC handlers
+│       ├── file-watcher-handlers.ts  # File watching IPC
+│       └── directory-watcher-handlers.ts  # Directory watching IPC
 ├── preload/
 │   ├── index.ts              # contextBridge setup
 │   └── index.d.ts            # TypeScript definitions
@@ -98,7 +102,10 @@ src/
 - **Hybrid Layout System**: SplitviewReact (outer) + DockviewReact (center) matches VS Code pattern
 - **OOP Services**: Business logic in service classes
   - FileService: File operations (read, write, create, rename, delete)
+  - FileWatcherService: Auto-reload files on external changes (300ms debounce)
+  - DirectoryWatcherService: Auto-refresh file tree (1000ms debounce, ignored patterns)
   - SettingsService: Persistent storage with electron-store (dynamic ES Module import)
+- **Auto-Refresh**: Chokidar-based watching with pause/resume race prevention
 - **Secure IPC**: All main↔renderer communication via contextBridge
 - **State Management**: Zustand for activity bar state (sidebar widths, active panels)
 - **Component Registry**: Splitview and Dockview use string-based component lookup
