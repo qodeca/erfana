@@ -200,13 +200,6 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
 
   return (
     <div className="markdown-editor-panel">
-      <div className="editor-toolbar">
-        <div className="editor-file-info">
-          {currentFile?.modified && <span className="modified-indicator">●</span>}
-          {isAutoSaving && <span className="auto-save-indicator">Auto-saving...</span>}
-        </div>
-      </div>
-
       {currentFile && (
         <div className="markdown-toolbar">
           {(viewMode === 'editor' || viewMode === 'split') && (
@@ -284,6 +277,9 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
           )}
 
           <div className="toolbar-spacer" />
+
+          {currentFile?.modified && <span className="modified-indicator">●</span>}
+          {isAutoSaving && <span className="auto-save-indicator">Auto-saving...</span>}
 
           <button
             className={`view-mode-btn ${viewMode === 'editor' ? 'active' : ''}`}
