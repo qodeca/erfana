@@ -43,8 +43,8 @@ export class SettingsService {
   // Approved Tools Management
   async getApprovedTools(): Promise<string[]> {
     const store = await this.ensureStore()
-    // Default to safe read-only tools
-    return store.get('approvedTools') || ['Read', 'Glob', 'Grep']
+    // Default to pre-approved tools
+    return store.get('approvedTools') || ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch']
   }
 
   async setApprovedTools(tools: string[]): Promise<void> {
@@ -70,7 +70,7 @@ export class SettingsService {
 
   async resetApprovedTools(): Promise<void> {
     const store = await this.ensureStore()
-    store.set('approvedTools', ['Read', 'Glob', 'Grep'])
+    store.set('approvedTools', ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch'])
   }
 }
 

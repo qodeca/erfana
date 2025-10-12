@@ -1,7 +1,6 @@
 import { useState, ReactNode } from 'react'
 import { Maximize2, Minimize2, RefreshCw, Sparkles, MessageSquare, Copy } from 'lucide-react'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
-import { useToast } from '../Toast/ToastContext'
 import { useAiAssistantStore } from '../../stores/useAiAssistantStore'
 import { useActivityBarStore } from '../../stores/useActivityBarStore'
 import './PreviewContextMenu.css'
@@ -21,14 +20,16 @@ interface ClaudeAction {
   label: string
   icon: ReactNode
   buildPrompt: (text: string, file: string, doc: string) => string
+  sendDirectly?: boolean // If true, send directly to Claude Code without review
 }
 
 const CLAUDE_ACTIONS: ClaudeAction[] = [
   {
     label: 'Ask Claude to Elaborate',
     icon: <Maximize2 size={14} strokeWidth={2} />,
-    buildPrompt: (text, file, doc) =>
-      `In ${file}, I selected this text:\n\n---\n${text}\n---\n\nPlease elaborate on this text with more detail, examples, and context. The full document for reference:\n\n${doc}`
+    buildPrompt: (text) =>
+      `I selected this text:\n\n---\n${text}\n---\n\nPlease elaborate on this text with more detail, examples, and context. Review the file and the entire project if you need more context.`,
+    sendDirectly: true // Send directly without review
   },
   {
     label: 'Ask Claude to Rewrite',
@@ -62,7 +63,6 @@ export function PreviewContextMenu({
 }: PreviewContextMenuProps) {
   const [showCustomPrompt, setShowCustomPrompt] = useState(false)
   const [customPrompt, setCustomPrompt] = useState('')
-  const { showToast } = useToast()
   const setPendingMessage = useAiAssistantStore((state) => state.setPendingMessage)
   const setActivePanel = useActivityBarStore((state) => state.setActivePanel)
 
@@ -78,18 +78,11 @@ export function PreviewContextMenu({
       prompt = `${fileRef}\n\n${prompt}`
     }
 
-    // Set pending message in AI Assistant store
-    setPendingMessage(prompt)
-
     // Open AI Assistant panel
-    setActivePanel('ai-assistant', 'right')
+    setActivePanel('claude', 'right')
 
-    // Show success toast
-    showToast({
-      title: 'Prompt Sent',
-      message: 'Opening AI Assistant panel with your prompt.',
-      type: 'success'
-    })
+    // Set pending message with send flag
+    setPendingMessage(prompt, action.sendDirectly || false)
 
     onClose()
   }
@@ -111,13 +104,7 @@ export function PreviewContextMenu({
       setPendingMessage(prompt)
 
       // Open AI Assistant panel
-      setActivePanel('ai-assistant', 'right')
-
-      showToast({
-        title: 'Custom Prompt Sent',
-        message: 'Opening AI Assistant panel with your custom prompt.',
-        type: 'success'
-      })
+      setActivePanel('claude', 'right')
 
       onClose()
     }
@@ -125,13 +112,6 @@ export function PreviewContextMenu({
 
   const handleCopySelection = async () => {
     await navigator.clipboard.writeText(selectedText)
-
-    showToast({
-      title: 'Copied',
-      message: 'Selected text copied to clipboard.',
-      type: 'info'
-    })
-
     onClose()
   }
 
@@ -174,7 +154,7 @@ export function PreviewContextMenu({
           />
           <div className="custom-prompt-actions">
             <button onClick={handleCustomPrompt} disabled={!customPrompt.trim()}>
-              Copy Prompt
+              Send to Claude
             </button>
             <button onClick={() => setShowCustomPrompt(false)}>Cancel</button>
           </div>

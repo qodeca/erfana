@@ -82,7 +82,7 @@ export class ClaudeCliService extends EventEmitter {
   private maxRestartAttempts = 3
   private restartTimeout: NodeJS.Timeout | null = null
   private authCheckBypass = false
-  private approvedTools: Set<string> = new Set(['Read', 'Glob', 'Grep']) // Safe defaults
+  private approvedTools: Set<string> = new Set(['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch']) // Pre-approved tools
   private sessionId: string | null = null
 
   /**
@@ -145,9 +145,12 @@ export class ClaudeCliService extends EventEmitter {
     this.buffer = ''
     this.restartAttempts = 0
 
-    // Load approved tools from settings
+    // Load approved tools from settings and merge with defaults
     const approvedToolsList = await settingsService.getApprovedTools()
-    this.approvedTools = new Set(approvedToolsList)
+    const defaultTools = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch']
+
+    // Merge: always include defaults, plus any additional tools from settings
+    this.approvedTools = new Set([...defaultTools, ...approvedToolsList])
 
     // Generate session ID for resume support
     this.sessionId = this.generateSessionId()

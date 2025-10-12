@@ -140,34 +140,57 @@ Automatic file saving with debounced writes to prevent excessive disk I/O.
 
 ## Claude Code Integration
 
-Right-click context menu in markdown preview pane for AI-powered text operations.
+Right-click context menu in markdown preview for AI-powered text operations with automatic AI Assistant panel integration.
 
 ### Available Actions
 
-1. **Elaborate** - Expand on selected text with more detail
-2. **Rewrite** - Rephrase selected text in different style
-3. **Simplify** - Make selected text clearer and simpler
-4. **Improve** - General improvement suggestions
+1. **Ask Claude to Elaborate** - Expands selected text with detail (sends directly to AI)
+2. **Rewrite** - Rephrases selected text in different style (populates input for review)
+3. **Simplify** - Makes selected text clearer and simpler (populates input for review)
+4. **Improve** - General improvement suggestions (populates input for review)
+5. **Custom** - Write your own custom prompt (populates input for review)
 
-### Usage
+### Behavior
 
-1. Select text in the markdown preview pane
-2. Right-click to open context menu
-3. Choose desired action
-4. Prompt is copied to clipboard with toast notification
-5. Paste prompt into Claude Code Terminal for AI assistance
+**Direct Send ("Elaborate")**:
+- Sends prompt immediately to AI Assistant panel
+- Auto-opens AI Assistant panel if hidden
+- Suggests Claude review file/project for context
+- No user review needed (streamlined UX)
+
+**Populate for Review (Other Actions)**:
+- Fills AI Assistant input field with generated prompt
+- User can review, edit, or send manually
+- More control for complex operations
+
+### File References
+
+Selected text includes precise line number references:
+- Single line: `@/path/to/file.md:42`
+- Multi-line: `@/path/to/file.md:42-58`
+- Claude Code automatically loads context from these references
 
 ### Technical Implementation
 
-- **Component**: `PreviewContextMenu.tsx`
-- **Toast Notifications**: ToastContext provides global notification system
-- **Clipboard**: Uses `navigator.clipboard.writeText()`
-- **Selection Tracking**: `MarkdownPreview.tsx` tracks text selection
+**Cross-Component Communication**:
+- Uses Zustand store (`useAiAssistantStore`) for message passing
+- `setPendingMessage(prompt, sendImmediately)` sends to AI panel
+- `setActivePanel('claude', 'right')` opens AI Assistant
+
+**Line Number Extraction**:
+- `getLineNumbersFromSelection()` reads `data-line` attributes from DOM
+- Preview elements tagged via react-markdown `node.position` API
+- Handles inline selections, multi-element ranges, edge cases
+
+**React Portal**:
+- Context menu rendered at document level for correct positioning
+- Escapes containing blocks to avoid overflow issues
+- Portal root: `#context-menu-root` in index.html
 
 **Files**:
-- `src/renderer/src/components/Editor/PreviewContextMenu.tsx`
-- `src/renderer/src/components/Editor/PreviewContextMenu.css`
-- `src/renderer/src/contexts/ToastContext.tsx`
+- `PreviewContextMenu.tsx` (context menu actions, line number extraction)
+- `MarkdownPreview.tsx` (selection tracking, line number injection)
+- `useAiAssistantStore.ts` (Zustand store for messaging)
 
 ## Preview Features
 

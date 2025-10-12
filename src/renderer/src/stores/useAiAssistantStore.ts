@@ -2,7 +2,8 @@ import { create } from 'zustand'
 
 interface AiAssistantStore {
   pendingMessage: string | null
-  setPendingMessage: (message: string) => void
+  shouldSendImmediately: boolean
+  setPendingMessage: (message: string, sendImmediately?: boolean) => void
   clearPendingMessage: () => void
 }
 
@@ -12,12 +13,13 @@ interface AiAssistantStore {
  */
 export const useAiAssistantStore = create<AiAssistantStore>((set) => ({
   pendingMessage: null,
+  shouldSendImmediately: false,
 
-  setPendingMessage: (message: string) => {
-    set({ pendingMessage: message })
+  setPendingMessage: (message: string, sendImmediately = false) => {
+    set({ pendingMessage: message, shouldSendImmediately: sendImmediately })
   },
 
   clearPendingMessage: () => {
-    set({ pendingMessage: null })
+    set({ pendingMessage: null, shouldSendImmediately: false })
   }
 }))
