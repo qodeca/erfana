@@ -111,6 +111,7 @@ Superior markdown capabilities with Monaco Editor + live preview:
 - **Auto-Save**: Debounced auto-save (2s after last edit) with visual indicator
 - **Claude Integration**: Right-click context menu in preview for AI-powered text operations
 - **View Modes**: Editor only, split view (default), preview only
+- **Mermaid Diagrams**: Flowcharts, sequence diagrams, class diagrams, state machines, Gantt charts, and 15+ more diagram types
 - **Medium.com Preview**: Charter serif font, 18px, compact spacing, 680px max width, professional typography
 
 📚 **Markdown features**: See [docs/markdown-editing.md](docs/markdown-editing.md)

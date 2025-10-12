@@ -157,6 +157,75 @@ Right-click context menu in markdown preview pane for AI-powered text operations
 - Task lists with checkboxes
 - Blockquotes with accent border
 - Auto-linked headings (for future TOC)
+- **Mermaid diagrams** (flowcharts, sequence diagrams, class diagrams, and more)
+
+### Mermaid Diagrams
+
+Erfana supports Mermaid diagrams for creating flowcharts, sequence diagrams, state machines, Gantt charts, and more.
+
+#### Supported Diagram Types
+
+- **Flowcharts** (`graph TD`, `graph LR`) - Decision trees, process flows
+- **Sequence Diagrams** (`sequenceDiagram`) - Message flows between participants
+- **Class Diagrams** (`classDiagram`) - Object-oriented structures
+- **State Diagrams** (`stateDiagram-v2`) - State machines and transitions
+- **Gantt Charts** (`gantt`) - Project timelines and schedules
+- **ER Diagrams** (`erDiagram`) - Entity-relationship models
+- **Git Graphs** (`gitGraph`) - Branch and commit visualizations
+- **Pie Charts** (`pie`) - Data distribution
+- **Journey Diagrams** (`journey`) - User journey mapping
+- **Timeline Diagrams** (`timeline`) - Event timelines
+- And 10+ more diagram types
+
+#### Usage
+
+Use standard markdown code blocks with `mermaid` language identifier:
+
+````markdown
+```mermaid
+graph TD
+    A[Start] --> B{Decision}
+    B -->|Yes| C[Action]
+    B -->|No| D[End]
+```
+````
+
+#### Visual Design
+
+Diagrams automatically use Erfana's dark theme:
+- **Background**: `#2d2d30` (matches code blocks)
+- **Accent Color**: `#4fc3f7` (cyan/blue)
+- **Text**: `#d4d4d4` (light gray)
+- **Borders**: `#555`, `#3c3c3c` (subtle contrast)
+- **Layout**: Centered, responsive, horizontally scrollable
+
+#### Error Handling
+
+Invalid diagram syntax displays a user-friendly error message with:
+- **Red error box** with clear error description
+- **Link to Mermaid documentation** for syntax help
+- **No crashes** - gracefully handles syntax errors
+
+#### Example Diagrams
+
+**Flowchart**:
+```mermaid
+graph LR
+    A[Erfana] --> B[Open File]
+    B --> C[Edit Markdown]
+    C --> D[Preview]
+```
+
+**Sequence Diagram**:
+```mermaid
+sequenceDiagram
+    User->>Erfana: Open markdown
+    Erfana->>FileSystem: Read file
+    FileSystem-->>Erfana: Content
+    Erfana-->>User: Display preview
+```
+
+**Implementation**: `MermaidDiagram.tsx`, `MarkdownPreview.tsx:73-76`
 
 ### Typography & Styling
 
