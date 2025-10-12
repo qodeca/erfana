@@ -213,43 +213,7 @@ useEffect(() => {
 
 ### Expanded State Preservation Pattern
 
-How the file tree maintains expanded folder state during refreshes.
-
-```typescript
-// FileTree.tsx - Controlled folder expansion
-const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
-
-const handleToggleFolder = (folderPath: string) => {
-  setExpandedFolders((prev) => {
-    const newSet = new Set(prev)
-    if (newSet.has(folderPath)) {
-      newSet.delete(folderPath)
-    } else {
-      newSet.add(folderPath)
-    }
-    return newSet
-  })
-}
-
-const refreshFileTree = async () => {
-  if (!projectPath) return
-  const fileTree = await window.api.file.readDirectory(projectPath)
-  setFiles(fileTree)
-  // expandedFolders Set is preserved automatically
-}
-
-// Pass to child components
-<FileTreeNode
-  expandedFolders={expandedFolders}
-  onToggleFolder={handleToggleFolder}
-/>
-```
-
-**Why This Works**:
-- `expandedFolders` is a React state Set
-- Refreshing `files` doesn't affect `expandedFolders`
-- Child components check Set for expansion state
-- User's folder expansion choices persist across refreshes
+File tree uses `Set<string>` to track expanded folders. Refreshing file list preserves expansion state since they're separate React state variables.
 
 ---
 
@@ -397,16 +361,7 @@ rm -rf /path/to/project
 
 ### Event Batching
 
-Directory watcher accumulates events during debounce period:
-
-```javascript
-// Example: Git checkout creates 50 files
-// Events queued: 50 × 'add'
-// Debounce: 1000ms (detected bulk operation)
-// Result: Single refresh with summary
-
-console.log(`📁 Directory changed: /project (50 events: {"add":50})`)
-```
+Directory watcher accumulates events during debounce period. Example: Git checkout with 50 file additions triggers single refresh after 1000ms.
 
 ### Resource Limits
 
