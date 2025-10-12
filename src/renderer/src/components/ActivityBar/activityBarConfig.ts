@@ -84,11 +84,12 @@ export const activityBarPanels: ActivityBarPanel[] = [
     id: 'claude',
     icon: Bot,
     label: 'Claude AI',
-    tooltip: 'Claude AI Assistant',
+    tooltip: 'Claude AI Assistant (⌘⇧A)',
     side: 'right',
     dockviewPanelId: 'claude',
     order: 3,
-    enabled: false // Coming soon
+    keyboardShortcut: 'mod+shift+a',
+    enabled: true
   }
 ]
 
