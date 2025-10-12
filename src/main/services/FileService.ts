@@ -167,6 +167,47 @@ export class FileService {
     // Delete folder recursively
     await rm(folderPath, { recursive: true, force: true })
   }
+
+  async rename(oldPath: string, newName: string): Promise<string> {
+    // Sanitize new name - remove path separators
+    newName = newName.replace(/[/\\]/g, '')
+
+    if (!newName) {
+      throw new Error('Name cannot be empty')
+    }
+
+    // Get the directory and construct new path
+    const { dirname } = await import('path')
+    const parentDir = dirname(oldPath)
+    const newPath = join(parentDir, newName)
+
+    // Check if already exists
+    try {
+      await stat(newPath)
+      throw new Error(`"${newName}" already exists`)
+    } catch (error: any) {
+      // File/folder doesn't exist - good, we can rename
+      if (error.code !== 'ENOENT') {
+        throw error
+      }
+    }
+
+    // Prevent renaming files/folders outside project
+    if (this.projectPath && !oldPath.startsWith(this.projectPath)) {
+      throw new Error('Cannot rename items outside the project directory')
+    }
+
+    // Prevent renaming project root
+    if (this.projectPath && oldPath === this.projectPath) {
+      throw new Error('Cannot rename the project root directory')
+    }
+
+    // Perform the rename
+    const { rename } = await import('fs/promises')
+    await rename(oldPath, newPath)
+
+    return newPath
+  }
 }
 
 // Singleton instance

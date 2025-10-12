@@ -7,6 +7,7 @@ declare global {
     api: {
       file: {
         openProject: () => Promise<string | null>
+        getLastProjectPath: () => Promise<string | null>
         readDirectory: (dirPath: string) => Promise<FileNode[]>
         readFile: (filePath: string) => Promise<string>
         writeFile: (filePath: string, content: string) => Promise<boolean>
@@ -16,6 +17,7 @@ declare global {
         createFolder: (dirPath: string, folderName: string) => Promise<string>
         deleteFile: (filePath: string) => Promise<boolean>
         deleteFolder: (folderPath: string) => Promise<boolean>
+        rename: (oldPath: string, newName: string) => Promise<string>
       }
     }
   }
