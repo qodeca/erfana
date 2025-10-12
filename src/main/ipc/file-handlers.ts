@@ -18,13 +18,13 @@ export function registerFileHandlers(): void {
 
     const projectPath = result.filePaths[0]
     fileService.setProjectPath(projectPath)
-    settingsService.setLastProjectPath(projectPath)
+    await settingsService.setLastProjectPath(projectPath)
     return projectPath
   })
 
   // Get last opened project path if it still exists
   ipcMain.handle('file:getLastProjectPath', async () => {
-    const lastPath = settingsService.getLastProjectPath()
+    const lastPath = await settingsService.getLastProjectPath()
     if (!lastPath) {
       return null
     }
@@ -38,7 +38,7 @@ export function registerFileHandlers(): void {
       }
     } catch (error) {
       // Folder doesn't exist anymore, clear from settings
-      settingsService.clearLastProjectPath()
+      await settingsService.clearLastProjectPath()
     }
 
     return null
