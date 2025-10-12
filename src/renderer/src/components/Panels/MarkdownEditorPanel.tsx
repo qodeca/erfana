@@ -5,6 +5,8 @@ import { MonacoMarkdownEditor, MonacoEditorHandle } from '../Editor/MonacoMarkdo
 import { MarkdownPreview } from '../Editor/MarkdownPreview'
 import { ResizableDivider } from '../Editor/ResizableDivider'
 import { ConfirmDialog } from '../ConfirmDialog/ConfirmDialog'
+import { FileConflictNotification } from '../FileConflictNotification/FileConflictNotification'
+import { useToast } from '../Toast/ToastContext'
 import './MarkdownEditorPanel.css'
 
 interface EditorFile {
@@ -56,8 +58,16 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     const saved = localStorage.getItem('markdown-editor-divider-position')
     return saved ? parseFloat(saved) : 50
   })
+
+  // File watching state
+  const [externalChangeDetected, setExternalChangeDetected] = useState(false)
+  const [isFileDeleted, setIsFileDeleted] = useState(false)
+  const [isReloading, setIsReloading] = useState(false)
+
   const editorRef = useRef<MonacoEditorHandle>(null)
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const isSavingRef = useRef(false) // Track save operations to prevent race conditions
+  const { showToast } = useToast()
 
   // Debug logging
   console.log('MarkdownEditorPanel render:', {
@@ -86,9 +96,59 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   useEffect(() => {
     if (!currentFile) return
     const fileName = currentFile.path.split('/').pop() || 'Editor'
-    const title = currentFile.modified ? `● ${fileName}` : fileName
+    let title = currentFile.modified ? `● ${fileName}` : fileName
+    if (isFileDeleted) {
+      title = `${fileName} (deleted)`
+    }
     props.api.setTitle(title)
-  }, [currentFile?.modified, currentFile?.path])
+  }, [currentFile?.modified, currentFile?.path, isFileDeleted])
+
+  // Start watching file for external changes
+  useEffect(() => {
+    if (!currentFile?.path) return
+
+    console.log('👁️  Starting watch for:', currentFile.path)
+
+    // Start watching
+    window.api.fileWatch.start(currentFile.path).then((result) => {
+      if (!result.success) {
+        console.error('Failed to start watching file:', result.error)
+      }
+    })
+
+    // Set up event listeners
+    const unsubscribeChanged = window.api.fileWatch.onFileChanged((data) => {
+      if (data.filePath === currentFile.path) {
+        handleExternalChange()
+      }
+    })
+
+    const unsubscribeDeleted = window.api.fileWatch.onFileDeleted((data) => {
+      if (data.filePath === currentFile.path) {
+        handleFileDeleted()
+      }
+    })
+
+    const unsubscribeError = window.api.fileWatch.onFileError((data) => {
+      if (data.filePath === currentFile.path) {
+        console.error('File watch error:', data.error)
+        showToast({
+          title: 'File Watch Error',
+          message: data.error,
+          type: 'error'
+        })
+      }
+    })
+
+    // Cleanup on unmount or file change
+    return () => {
+      console.log('👁️  Stopping watch for:', currentFile.path)
+      window.api.fileWatch.stop(currentFile.path)
+      unsubscribeChanged()
+      unsubscribeDeleted()
+      unsubscribeError()
+    }
+  }, [currentFile?.path])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -172,10 +232,16 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   const handleSave = async (isAutoSave: boolean = false) => {
     if (!currentFile) return
 
+    // Set saving flag to prevent race conditions with file watcher
+    isSavingRef.current = true
+
     try {
       if (isAutoSave) {
         setIsAutoSaving(true)
       }
+
+      // Pause file watching during save to prevent race condition
+      await window.api.fileWatch.pause(currentFile.path)
 
       await window.api.file.writeFile(currentFile.path, currentFile.content)
       setCurrentFile({
@@ -183,14 +249,108 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
         modified: false
       })
 
+      // Clear any external change detection since we just saved
+      setExternalChangeDetected(false)
+      setIsFileDeleted(false)
+
       if (isAutoSave) {
         // Show auto-save indicator briefly
         setTimeout(() => setIsAutoSaving(false), 1000)
       }
     } catch (error) {
       console.error('Error saving file:', error)
+      showToast({
+        title: 'Save Error',
+        message: 'Failed to save file',
+        type: 'error'
+      })
       setIsAutoSaving(false)
+    } finally {
+      // Resume file watching after save completes
+      await window.api.fileWatch.resume(currentFile.path)
+      isSavingRef.current = false
     }
+  }
+
+  /**
+   * Handle external file changes
+   */
+  const handleExternalChange = async () => {
+    console.log('📝 External change detected for:', currentFile?.path)
+
+    // Ignore if we're currently saving (race condition prevention)
+    if (isSavingRef.current) {
+      console.log('⏸️  Ignoring external change (save in progress)')
+      return
+    }
+
+    // Check if file has unsaved changes
+    if (!currentFile?.modified) {
+      // Safe to auto-reload
+      console.log('✅ No local changes, auto-reloading...')
+      await reloadFromDisk()
+    } else {
+      // Has unsaved changes - show conflict notification
+      console.log('⚠️  Local changes detected, showing conflict notification')
+      setExternalChangeDetected(true)
+    }
+  }
+
+  /**
+   * Reload file from disk
+   */
+  const reloadFromDisk = async () => {
+    if (!currentFile) return
+
+    setIsReloading(true)
+    try {
+      const content = await window.api.file.readFile(currentFile.path)
+      setCurrentFile({
+        ...currentFile,
+        content,
+        modified: false
+      })
+      setExternalChangeDetected(false)
+      console.log('✅ File reloaded successfully')
+
+      // Show reload indicator briefly (like auto-save)
+      setTimeout(() => setIsReloading(false), 1000)
+    } catch (error) {
+      console.error('Error reloading file:', error)
+      setIsReloading(false)
+      showToast({
+        title: 'Reload Error',
+        message: 'Failed to reload file',
+        type: 'error'
+      })
+    }
+  }
+
+  /**
+   * Handle file deletion
+   */
+  const handleFileDeleted = () => {
+    console.log('🗑️  File deleted externally:', currentFile?.path)
+    setIsFileDeleted(true)
+    setExternalChangeDetected(false) // Clear conflict notification if shown
+    showToast({
+      title: 'File Deleted',
+      message: 'File was deleted on disk',
+      type: 'warning'
+    })
+  }
+
+  /**
+   * Handle conflict resolution: Keep local version
+   */
+  const handleKeepLocal = () => {
+    console.log('✅ User chose to keep local version')
+    setExternalChangeDetected(false)
+    showToast({
+      title: 'Local Version Kept',
+      message: 'Keeping your local version',
+      type: 'info'
+    })
   }
 
   const handleDividerResize = (newPosition: number) => {
@@ -201,7 +361,8 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   return (
     <div className="markdown-editor-panel" tabIndex={0}>
       {currentFile && (
-        <div className="markdown-toolbar">
+        <>
+          <div className="markdown-toolbar">
           {(viewMode === 'editor' || viewMode === 'split') && (
             <>
               <button
@@ -279,7 +440,8 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
           <div className="toolbar-spacer" />
 
           {currentFile?.modified && <span className="modified-indicator">●</span>}
-          {isAutoSaving && <span className="auto-save-indicator">Auto-saving...</span>}
+          {isAutoSaving && <span className="file-status-indicator">Auto-saving...</span>}
+          {isReloading && <span className="file-status-indicator">Reloaded from disk</span>}
 
           <button
             className={`view-mode-btn ${viewMode === 'editor' ? 'active' : ''}`}
@@ -303,6 +465,24 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
             <Eye size={16} strokeWidth={2} />
           </button>
         </div>
+
+        {/* File conflict notification */}
+        {externalChangeDetected && currentFile && (
+          <FileConflictNotification
+            fileName={currentFile.path.split('/').pop() || 'File'}
+            onReload={reloadFromDisk}
+            onKeepLocal={handleKeepLocal}
+            onDismiss={() => setExternalChangeDetected(false)}
+          />
+        )}
+
+        {/* File deleted warning */}
+        {isFileDeleted && (
+          <div className="file-deleted-warning">
+            <span>⚠️ This file was deleted on disk. Save to restore it.</span>
+          </div>
+        )}
+      </>
       )}
 
       {currentFile ? (
