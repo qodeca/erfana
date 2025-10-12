@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect } from 'react'
 import {
   DockviewReact,
   DockviewReadyEvent,
@@ -69,12 +69,20 @@ const EditorAreaSplitPanel = (props: ISplitviewPanelProps) => {
     console.log('📝 Editor DockView ready')
 
     // Create the welcome/home panel
-    event.api.addPanel({
+    const welcomePanel = event.api.addPanel({
       id: '_center-placeholder',
       component: 'welcome',
       title: '',
-      tabComponent: 'welcomeTab'
+      tabComponent: 'welcomeTab',
+      floating: {
+        disabled: true
+      }
     })
+
+    // Disable dragging for welcome tab
+    if (welcomePanel) {
+      welcomePanel.group.locked = true
+    }
 
     // Pass the API to parent via params callback
     if (props.params?.setDockviewApi) {
@@ -101,64 +109,32 @@ const EditorAreaSplitPanel = (props: ISplitviewPanelProps) => {
 }
 
 // ============================================================================
-// RIGHT SIDEBAR PANEL - Git/Terminal tabs
+// RIGHT SIDEBAR PANELS - Separate Git and Terminal panels
 // ============================================================================
-const RightSidebarSplitPanel = (props: ISplitviewPanelProps) => {
-  const [activeTab, setActiveTab] = useState<'git' | 'terminal'>('git')
-
-  // Sync with parent if provided via params
-  useEffect(() => {
-    if (props.params?.activePanel) {
-      setActiveTab(props.params.activePanel)
-    }
-  }, [props.params?.activePanel])
-
+const GitSplitPanel = (_props: ISplitviewPanelProps) => {
   return (
-    <div className="panel-content" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Tab bar */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #3c3c3c' }}>
-        <button
-          onClick={() => setActiveTab('git')}
-          style={{
-            flex: 1,
-            padding: '8px',
-            background: activeTab === 'git' ? '#2d2d30' : '#252526',
-            color: activeTab === 'git' ? '#ffffff' : '#cccccc',
-            border: 'none',
-            cursor: 'pointer'
-          }}
-        >
-          Git
-        </button>
-        <button
-          onClick={() => setActiveTab('terminal')}
-          style={{
-            flex: 1,
-            padding: '8px',
-            background: activeTab === 'terminal' ? '#2d2d30' : '#252526',
-            color: activeTab === 'terminal' ? '#ffffff' : '#cccccc',
-            border: 'none',
-            cursor: 'pointer'
-          }}
-        >
-          Terminal
-        </button>
+    <div className="sidebar-panel">
+      <div className="sidebar-panel-header">
+        <span className="sidebar-panel-title">Source Control</span>
       </div>
+      <div className="sidebar-panel-content">
+        <p>Git integration coming soon</p>
+      </div>
+    </div>
+  )
+}
 
-      {/* Tab content */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        {activeTab === 'git' ? (
-          <div className="panel-content">
-            <h3>Git Status</h3>
-            <p>Git integration coming soon</p>
-          </div>
-        ) : (
-          <div className="panel-content">
-            <h3>Claude Terminal</h3>
-            <p>Terminal integration coming soon</p>
-            <p className="hint">Note: node-pty requires Python 3.12 or earlier</p>
-          </div>
-        )}
+const TerminalSplitPanel = (_props: ISplitviewPanelProps) => {
+  return (
+    <div className="sidebar-panel">
+      <div className="sidebar-panel-header">
+        <span className="sidebar-panel-title">Terminal</span>
+      </div>
+      <div className="sidebar-panel-content">
+        <p>Terminal integration coming soon</p>
+        <p className="hint" style={{ marginTop: '8px', fontSize: '11px', color: '#858585' }}>
+          Note: node-pty requires Python 3.12 or earlier
+        </p>
       </div>
     </div>
   )
@@ -221,27 +197,42 @@ export function AppDockLayout() {
       }
     })
 
-    // RIGHT PANEL - Git/Terminal
-    const rightPanel = event.api.addPanel({
-      id: 'right-sidebar',
-      component: 'rightSidebar',
+    // RIGHT PANELS - Git and Terminal (separate panels)
+    const gitPanel = event.api.addPanel({
+      id: 'git-panel',
+      component: 'gitPanel',
       minimumSize: MIN_SIZES.rightSidebar,
-      maximumSize: 600,
-      params: {
-        activePanel: rightActivePanel
-      }
+      maximumSize: 600
+    })
+
+    const terminalPanel = event.api.addPanel({
+      id: 'terminal-panel',
+      component: 'terminalPanel',
+      minimumSize: MIN_SIZES.rightSidebar,
+      maximumSize: 600
     })
 
     // Set initial sizes
     leftPanel.api.setSize({ size: leftWidth })
-    rightPanel.api.setSize({ size: rightWidth })
+    gitPanel.api.setSize({ size: rightWidth })
+    terminalPanel.api.setSize({ size: rightWidth })
 
-    // Set initial visibility
+    // Set initial visibility based on rightActivePanel
     if (leftActivePanel === null) {
       leftPanel.api.setVisible(false)
     }
-    if (rightActivePanel === null) {
-      rightPanel.api.setVisible(false)
+
+    // Only show the active right panel, hide the other
+    if (rightActivePanel === 'git') {
+      gitPanel.api.setVisible(true)
+      terminalPanel.api.setVisible(false)
+    } else if (rightActivePanel === 'terminal') {
+      gitPanel.api.setVisible(false)
+      terminalPanel.api.setVisible(true)
+    } else {
+      // Both hidden
+      gitPanel.api.setVisible(false)
+      terminalPanel.api.setVisible(false)
     }
 
     // Listen to resize events
@@ -251,16 +242,23 @@ export function AppDockLayout() {
       setSidebarWidth(newWidth, 'left')
     })
 
-    const disposeRight = rightPanel.api.onDidSizeChange(() => {
-      const newWidth = rightPanel.api.width
-      console.log(`📏 Right sidebar resized: ${newWidth}px`)
+    const disposeGit = gitPanel.api.onDidSizeChange(() => {
+      const newWidth = gitPanel.api.width
+      console.log(`📏 Git panel resized: ${newWidth}px`)
+      setSidebarWidth(newWidth, 'right')
+    })
+
+    const disposeTerminal = terminalPanel.api.onDidSizeChange(() => {
+      const newWidth = terminalPanel.api.width
+      console.log(`📏 Terminal panel resized: ${newWidth}px`)
       setSidebarWidth(newWidth, 'right')
     })
 
     // Cleanup
     return () => {
       disposeLeft.dispose()
-      disposeRight.dispose()
+      disposeGit.dispose()
+      disposeTerminal.dispose()
     }
   }
 
@@ -274,20 +272,43 @@ export function AppDockLayout() {
     const panelConfig = getPanelById(panelId)
     if (!panelConfig) return
 
-    // Map panel IDs to splitview panel IDs
-    const splitviewPanelId = side === 'left' ? 'left-sidebar' : 'right-sidebar'
-    const panel = splitviewApiRef.current.getPanel(splitviewPanelId)
+    if (side === 'left') {
+      // Left sidebar: simple toggle
+      const panel = splitviewApiRef.current.getPanel('left-sidebar')
+      if (!panel) return
 
-    if (!panel) return
+      const shouldShow = leftActivePanel !== panelId
+      panel.api.setVisible(shouldShow)
+      togglePanel(panelId, side)
+    } else {
+      // Right sidebar: mutually exclusive panels
+      const gitPanel = splitviewApiRef.current.getPanel('git-panel')
+      const terminalPanel = splitviewApiRef.current.getPanel('terminal-panel')
 
-    const currentActive = side === 'left' ? leftActivePanel : rightActivePanel
-    const shouldShow = currentActive !== panelId
+      if (!gitPanel || !terminalPanel) return
 
-    // Toggle visibility
-    panel.api.setVisible(shouldShow)
+      const currentActive = rightActivePanel
 
-    // Update store
-    togglePanel(panelId, side)
+      if (currentActive === panelId) {
+        // Clicking active panel - hide it
+        if (panelId === 'git') {
+          gitPanel.api.setVisible(false)
+        } else if (panelId === 'terminal') {
+          terminalPanel.api.setVisible(false)
+        }
+        togglePanel(panelId, side) // This will set to null
+      } else {
+        // Switching to different panel or showing first panel
+        if (panelId === 'git') {
+          gitPanel.api.setVisible(true)
+          terminalPanel.api.setVisible(false)
+        } else if (panelId === 'terminal') {
+          terminalPanel.api.setVisible(true)
+          gitPanel.api.setVisible(false)
+        }
+        togglePanel(panelId, side) // This will set to the new panelId
+      }
+    }
   }
 
   // Keyboard shortcuts (matching VS Code)
@@ -323,7 +344,8 @@ export function AppDockLayout() {
   const splitviewComponents = {
     fileExplorer: FileExplorerSplitPanel,
     editorArea: EditorAreaSplitPanel,
-    rightSidebar: RightSidebarSplitPanel
+    gitPanel: GitSplitPanel,
+    terminalPanel: TerminalSplitPanel
   }
 
   return (
