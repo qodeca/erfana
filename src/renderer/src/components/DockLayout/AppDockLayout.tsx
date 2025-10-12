@@ -15,6 +15,7 @@ import { FileTree } from '../FileTree/FileTree'
 import { MarkdownEditorPanel } from '../Panels/MarkdownEditorPanel'
 import { WelcomePanel } from '../Panels/WelcomePanel'
 import { WelcomeTab } from '../Panels/WelcomeTab'
+import { AiAssistantPanel } from '../Panels/AiAssistantPanel'
 import { ActivityBar } from '../ActivityBar/ActivityBar'
 import { useActivityBarStore } from '../../stores/useActivityBarStore'
 import { getPanelById } from '../ActivityBar/activityBarConfig'
@@ -124,7 +125,7 @@ const EditorAreaSplitPanel = (props: ISplitviewPanelProps) => {
 }
 
 // ============================================================================
-// RIGHT SIDEBAR PANELS - Separate Git and Terminal panels
+// RIGHT SIDEBAR PANELS - Separate Git, Terminal, and AI Assistant panels
 // ============================================================================
 const GitSplitPanel = (_props: ISplitviewPanelProps) => {
   return (
@@ -212,7 +213,7 @@ export function AppDockLayout() {
       }
     })
 
-    // RIGHT PANELS - Git and Terminal (separate panels)
+    // RIGHT PANELS - Git, Terminal, and AI Assistant (mutually exclusive)
     const gitPanel = event.api.addPanel({
       id: 'git-panel',
       component: 'gitPanel',
@@ -227,28 +228,28 @@ export function AppDockLayout() {
       maximumSize: 600
     })
 
+    const claudePanel = event.api.addPanel({
+      id: 'claude-panel',
+      component: 'claudePanel',
+      minimumSize: MIN_SIZES.rightSidebar,
+      maximumSize: 600
+    })
+
     // Set initial sizes
     leftPanel.api.setSize({ size: leftWidth })
     gitPanel.api.setSize({ size: rightWidth })
     terminalPanel.api.setSize({ size: rightWidth })
+    claudePanel.api.setSize({ size: rightWidth })
 
     // Set initial visibility based on rightActivePanel
     if (leftActivePanel === null) {
       leftPanel.api.setVisible(false)
     }
 
-    // Only show the active right panel, hide the other
-    if (rightActivePanel === 'git') {
-      gitPanel.api.setVisible(true)
-      terminalPanel.api.setVisible(false)
-    } else if (rightActivePanel === 'terminal') {
-      gitPanel.api.setVisible(false)
-      terminalPanel.api.setVisible(true)
-    } else {
-      // Both hidden
-      gitPanel.api.setVisible(false)
-      terminalPanel.api.setVisible(false)
-    }
+    // Only show the active right panel, hide the others
+    gitPanel.api.setVisible(rightActivePanel === 'git')
+    terminalPanel.api.setVisible(rightActivePanel === 'terminal')
+    claudePanel.api.setVisible(rightActivePanel === 'claude')
 
     // Listen to resize events
     const disposeLeft = leftPanel.api.onDidSizeChange(() => {
@@ -269,11 +270,18 @@ export function AppDockLayout() {
       setSidebarWidth(newWidth, 'right')
     })
 
+    const disposeClaude = claudePanel.api.onDidSizeChange(() => {
+      const newWidth = claudePanel.api.width
+      console.log(`📏 AI Assistant panel resized: ${newWidth}px`)
+      setSidebarWidth(newWidth, 'right')
+    })
+
     // Cleanup
     return () => {
       disposeLeft.dispose()
       disposeGit.dispose()
       disposeTerminal.dispose()
+      disposeClaude.dispose()
     }
   }
 
@@ -296,31 +304,37 @@ export function AppDockLayout() {
       panel.api.setVisible(shouldShow)
       togglePanel(panelId, side)
     } else {
-      // Right sidebar: mutually exclusive panels
+      // Right sidebar: mutually exclusive panels (git, terminal, claude)
       const gitPanel = splitviewApiRef.current.getPanel('git-panel')
       const terminalPanel = splitviewApiRef.current.getPanel('terminal-panel')
+      const claudePanel = splitviewApiRef.current.getPanel('claude-panel')
 
-      if (!gitPanel || !terminalPanel) return
+      if (!gitPanel || !terminalPanel || !claudePanel) return
 
       const currentActive = rightActivePanel
 
       if (currentActive === panelId) {
         // Clicking active panel - hide it
-        if (panelId === 'git') {
-          gitPanel.api.setVisible(false)
-        } else if (panelId === 'terminal') {
-          terminalPanel.api.setVisible(false)
-        }
+        gitPanel.api.setVisible(false)
+        terminalPanel.api.setVisible(false)
+        claudePanel.api.setVisible(false)
         togglePanel(panelId, side) // This will set to null
       } else {
         // Switching to different panel or showing first panel
+        // Hide all panels first
+        gitPanel.api.setVisible(false)
+        terminalPanel.api.setVisible(false)
+        claudePanel.api.setVisible(false)
+
+        // Show the selected panel
         if (panelId === 'git') {
           gitPanel.api.setVisible(true)
-          terminalPanel.api.setVisible(false)
         } else if (panelId === 'terminal') {
           terminalPanel.api.setVisible(true)
-          gitPanel.api.setVisible(false)
+        } else if (panelId === 'claude') {
+          claudePanel.api.setVisible(true)
         }
+
         togglePanel(panelId, side) // This will set to the new panelId
       }
     }
@@ -349,6 +363,12 @@ export function AppDockLayout() {
         e.preventDefault()
         handleActivityBarClick('git', 'right')
       }
+
+      // Cmd/Ctrl + Shift + A - Toggle AI Assistant
+      if (modKey && e.shiftKey && e.key === 'a' && !e.altKey) {
+        e.preventDefault()
+        handleActivityBarClick('claude', 'right')
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -360,7 +380,8 @@ export function AppDockLayout() {
     fileExplorer: FileExplorerSplitPanel,
     editorArea: EditorAreaSplitPanel,
     gitPanel: GitSplitPanel,
-    terminalPanel: TerminalSplitPanel
+    terminalPanel: TerminalSplitPanel,
+    claudePanel: AiAssistantPanel
   }
 
   return (
