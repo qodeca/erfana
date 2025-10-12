@@ -2,15 +2,18 @@ import { useState, ReactNode } from 'react'
 import { Maximize2, Minimize2, RefreshCw, Sparkles, MessageSquare, Copy } from 'lucide-react'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
 import { useToast } from '../Toast/ToastContext'
+import { useAiAssistantStore } from '../../stores/useAiAssistantStore'
+import { useActivityBarStore } from '../../stores/useActivityBarStore'
 import './PreviewContextMenu.css'
 
 interface PreviewContextMenuProps {
   x: number
   y: number
-  elementRect: DOMRect
   selectedText: string
   filePath: string
   fullDocument: string
+  startLine?: number
+  endLine?: number
   onClose: () => void
 }
 
@@ -50,26 +53,41 @@ const CLAUDE_ACTIONS: ClaudeAction[] = [
 export function PreviewContextMenu({
   x,
   y,
-  elementRect,
   selectedText,
   filePath,
   fullDocument,
+  startLine,
+  endLine,
   onClose
 }: PreviewContextMenuProps) {
   const [showCustomPrompt, setShowCustomPrompt] = useState(false)
   const [customPrompt, setCustomPrompt] = useState('')
   const { showToast } = useToast()
+  const setPendingMessage = useAiAssistantStore((state) => state.setPendingMessage)
+  const setActivePanel = useActivityBarStore((state) => state.setActivePanel)
 
   const handleAction = async (action: ClaudeAction) => {
-    const prompt = action.buildPrompt(selectedText, filePath, fullDocument)
+    let prompt = action.buildPrompt(selectedText, filePath, fullDocument)
 
-    // Copy to clipboard
-    await navigator.clipboard.writeText(prompt)
+    // Add file reference with line numbers if available
+    if (startLine !== undefined && endLine !== undefined) {
+      const fileRef =
+        startLine === endLine
+          ? `@${filePath}:${startLine}`
+          : `@${filePath}:${startLine}-${endLine}`
+      prompt = `${fileRef}\n\n${prompt}`
+    }
+
+    // Set pending message in AI Assistant store
+    setPendingMessage(prompt)
+
+    // Open AI Assistant panel
+    setActivePanel('ai-assistant', 'right')
 
     // Show success toast
     showToast({
-      title: 'Prompt Ready',
-      message: 'Prompt copied to clipboard. Paste in Terminal tab for Claude Code.',
+      title: 'Prompt Sent',
+      message: 'Opening AI Assistant panel with your prompt.',
       type: 'success'
     })
 
@@ -78,13 +96,26 @@ export function PreviewContextMenu({
 
   const handleCustomPrompt = async () => {
     if (customPrompt.trim()) {
-      const prompt = `In ${filePath}, I selected this text:\n\n---\n${selectedText}\n---\n\n${customPrompt}`
+      let prompt = `In ${filePath}, I selected this text:\n\n---\n${selectedText}\n---\n\n${customPrompt}`
 
-      await navigator.clipboard.writeText(prompt)
+      // Add file reference with line numbers if available
+      if (startLine !== undefined && endLine !== undefined) {
+        const fileRef =
+          startLine === endLine
+            ? `@${filePath}:${startLine}`
+            : `@${filePath}:${startLine}-${endLine}`
+        prompt = `${fileRef}\n\n${prompt}`
+      }
+
+      // Set pending message in AI Assistant store
+      setPendingMessage(prompt)
+
+      // Open AI Assistant panel
+      setActivePanel('ai-assistant', 'right')
 
       showToast({
-        title: 'Custom Prompt Ready',
-        message: 'Prompt copied to clipboard. Paste in Terminal tab for Claude Code.',
+        title: 'Custom Prompt Sent',
+        message: 'Opening AI Assistant panel with your custom prompt.',
         type: 'success'
       })
 
@@ -174,5 +205,5 @@ export function PreviewContextMenu({
     }
   ]
 
-  return <ContextMenu x={x} y={y} elementRect={elementRect} items={items} onClose={onClose} />
+  return <ContextMenu x={x} y={y} items={items} onClose={onClose} />
 }

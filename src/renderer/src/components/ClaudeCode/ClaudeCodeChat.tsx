@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Send, Square } from 'lucide-react'
 import { TerminalMessage } from './TerminalMessage'
 import { ToolApprovalDialog, ToolApprovalRequest } from '../Dialogs/ToolApprovalDialog'
+import { useAiAssistantStore } from '../../stores/useAiAssistantStore'
 import './ClaudeCodeChat.css'
 
 interface ClaudeMessage {
@@ -29,6 +30,10 @@ export function ClaudeCodeChat() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Watch for pending messages from AI Assistant store
+  const pendingMessage = useAiAssistantStore((state) => state.pendingMessage)
+  const clearPendingMessage = useAiAssistantStore((state) => state.clearPendingMessage)
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -142,6 +147,30 @@ export function ClaudeCodeChat() {
 
     return unsubscribe
   }, [lastUserPrompt])
+
+  // Listen for pending messages from context menu (or other sources)
+  useEffect(() => {
+    if (pendingMessage) {
+      console.log('📥 Received pending message from store:', pendingMessage.substring(0, 50))
+
+      // Populate input field with pending message
+      setInput(pendingMessage)
+
+      // Clear pending message from store
+      clearPendingMessage()
+
+      // Auto-resize textarea
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto'
+          textareaRef.current.style.height =
+            Math.min(textareaRef.current.scrollHeight, 200) + 'px'
+        }
+        // Focus textarea so user can review and send
+        textareaRef.current?.focus()
+      }, 100)
+    }
+  }, [pendingMessage, clearPendingMessage])
 
   /**
    * Send message to Claude Code
