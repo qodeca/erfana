@@ -15,6 +15,7 @@ interface MonacoMarkdownEditorProps {
 }
 
 export interface MonacoEditorHandle {
+  // Formatting methods
   formatBold: () => void
   formatItalic: () => void
   formatStrikethrough: () => void
@@ -24,6 +25,12 @@ export interface MonacoEditorHandle {
   insertImage: () => void
   insertHeading: (level: number) => void
   insertList: (ordered: boolean) => void
+
+  // Scroll synchronization methods
+  getScrollTop: () => number
+  setScrollTop: (offset: number) => void
+  getTopForLineNumber: (line: number) => number
+  onDidScrollChange: (callback: () => void) => monaco.IDisposable
 }
 
 export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdownEditorProps>(
@@ -223,8 +230,37 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
       ])
     }
 
+    // Scroll synchronization methods
+    const getScrollTop = (): number => {
+      const editor = editorRef.current
+      if (!editor) return 0
+      return editor.getScrollTop()
+    }
+
+    const setScrollTop = (offset: number): void => {
+      const editor = editorRef.current
+      if (!editor) return
+      editor.setScrollTop(offset)
+    }
+
+    const getTopForLineNumber = (line: number): number => {
+      const editor = editorRef.current
+      if (!editor) return 0
+      return editor.getTopForLineNumber(line)
+    }
+
+    const onDidScrollChange = (callback: () => void): monaco.IDisposable => {
+      const editor = editorRef.current
+      if (!editor) {
+        // Return a no-op disposable if editor not ready
+        return { dispose: () => {} }
+      }
+      return editor.onDidScrollChange(callback)
+    }
+
     // Expose methods via ref
     useImperativeHandle(ref, () => ({
+      // Formatting methods
       formatBold,
       formatItalic,
       formatStrikethrough,
@@ -233,7 +269,13 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
       insertLink,
       insertImage,
       insertHeading,
-      insertList
+      insertList,
+
+      // Scroll synchronization methods
+      getScrollTop,
+      setScrollTop,
+      getTopForLineNumber,
+      onDidScrollChange
     }))
 
     return (
