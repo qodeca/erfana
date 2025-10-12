@@ -90,6 +90,7 @@ src/
         │   ├── Editor/          # Monaco + Preview + Context Menus
         │   ├── FileTree/        # File explorer with context menu
         │   ├── ClaudeCode/      # Claude Code integration components
+        │   ├── Dialogs/         # Modal dialogs (ToolApprovalDialog)
         │   ├── ContextMenu/     # Right-click context menu
         │   ├── ConfirmDialog/   # Confirmation dialog component
         │   └── Toast/           # Toast notification components
@@ -108,7 +109,7 @@ src/
   - FileWatcherService: Auto-reload files on external changes (300ms debounce)
   - DirectoryWatcherService: Auto-refresh file tree (1000ms debounce, ignored patterns)
   - SettingsService: Persistent storage with electron-store (dynamic ES Module import)
-  - ClaudeCliService: Persistent Claude CLI session (long-running process, JSONL stdin/stdout)
+  - ClaudeCliService: Persistent Claude CLI session (long-running process, JSONL stdin/stdout, tool approval system, auto-retry)
 - **Auto-Refresh**: Chokidar-based watching with pause/resume race prevention
 - **Secure IPC**: All main↔renderer communication via contextBridge
 - **State Management**: Zustand for activity bar state (sidebar widths, active panels)
@@ -149,4 +150,4 @@ Global notification system implemented using React Context:
 
 **Used for**: Clipboard operations, file operations, save confirmations
 
-See: [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md) | [Security](./security.md)
+See: [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md) | [Security](./security.md) | [Claude Code Integration](./claude-code/README.md)

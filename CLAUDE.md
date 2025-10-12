@@ -286,9 +286,9 @@ mcp__circuit-electron__close({ sessionId: session.sessionId })
 
 ## Claude Code Integration
 
-**Status**: ✅ IMPLEMENTED - Persistent session architecture
+**Status**: ✅ FULLY IMPLEMENTED - Persistent session architecture with tool approval system
 
-Erfana integrates Claude Code via persistent CLI session for AI-powered assistance within the IDE.
+Erfana integrates Claude Code via persistent CLI session with security-first tool approval for AI-powered assistance within the IDE.
 
 ### Architecture
 
@@ -306,24 +306,43 @@ Erfana integrates Claude Code via persistent CLI session for AI-powered assistan
 - **Session Indicators**: Color-coded dots (green=ready, yellow=starting, red=error)
 - **Chat Interface**: Message history (user/assistant/tool_use), stop generation button
 
+### Tool Approval System
+
+Security-first approach requiring user approval for potentially dangerous tools:
+
+- **Safe Defaults**: Read, Glob, Grep (always approved, read-only operations)
+- **Dangerous Tools**: Write, Edit, Bash (require user approval via modal dialog)
+- **Modal Dialog**: ToolApprovalDialog shows tool name, description, parameters, "Remember this choice" option
+- **Auto-Retry**: After approval, system automatically re-sends user prompt with updated permissions
+- **Persistence**: Approved tools saved via electron-store, survive app restarts
+- **Session Restart**: Uses `--resume` flag to preserve conversation context when adding tools
+- **Settings**: Manage approved tools via SettingsService (get, set, add, remove, reset)
+
+**Key Architecture Decision**: `--allowedTools` flag is immutable at runtime, requiring session restart to add new tools.
+
 ### Implementation
 
 **Files**:
 - Service: `src/main/services/ClaudeCliService.ts` (~527 lines)
 - IPC: `src/main/ipc/claude-code-handlers.ts` (~180 lines)
+- Settings: `src/main/ipc/settings-handlers.ts` (tool approval persistence)
 - UI: `src/renderer/src/components/Panels/AiAssistantPanel.tsx`
 - Chat: `src/renderer/src/components/ClaudeCode/ClaudeCodeChat.tsx`
+- Dialog: `src/renderer/src/components/Dialogs/ToolApprovalDialog.tsx`
 
 **Flags Used**:
 ```bash
 claude -p \
+  --session-id <uuid> \
   --input-format stream-json \
   --output-format stream-json \
   --verbose \
-  --replay-user-messages
+  --replay-user-messages \
+  --allowedTools Read Glob Grep Write Edit  # Updated via tool approval
+  --resume <sessionId>  # Used when restarting with new tools
 ```
 
-📚 **Detailed docs**: [IPC Patterns - Claude Code](docs/ipc-patterns.md) | [UI Components - AI Assistant](docs/ui-components.md#ai-assistant-panel) | [Architecture](docs/architecture.md)
+📚 **Detailed docs**: [Claude Code Integration Index](docs/claude-code/README.md) | [Tool Approval System](docs/claude-code/tool-approval.md) | [IPC Patterns](docs/ipc-patterns.md) | [UI Components](docs/ui-components.md#ai-assistant-panel)
 
 ## Contributing
 
@@ -344,6 +363,9 @@ When adding features:
 - [Security](docs/security.md) - Security guidelines, CSP, validation patterns
 - [Known Issues](docs/known-issues.md) - Current issues, resolved issues, workarounds
 - [Development Tasks](docs/development-tasks.md) - Common development patterns, adding panels
+- **Claude Code Integration:**
+  - [Integration Index](docs/claude-code/README.md) - Quick reference and navigation
+  - [Tool Approval System](docs/claude-code/tool-approval.md) - Security model, approval flow, auto-retry
 - **Testing:**
   - [Testing Index](docs/testing/README.md) - Complete testing documentation hub
   - [Quick Start](docs/testing/quickstart.md) - Fast testing setup

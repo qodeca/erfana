@@ -6,6 +6,7 @@ import { registerFileHandlers } from './ipc/file-handlers'
 import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
 import { registerClaudeCodeHandlers } from './ipc/claude-code-handlers'
+import { registerSettingsHandlers } from './ipc/settings-handlers'
 import { fileWatcherService } from './services/FileWatcherService'
 import { directoryWatcherService } from './services/DirectoryWatcherService'
 
@@ -68,6 +69,7 @@ app.whenReady().then(() => {
   registerFileWatcherHandlers()
   registerDirectoryWatcherHandlers()
   registerClaudeCodeHandlers()
+  registerSettingsHandlers()
 
   // Create main window
   createWindow()

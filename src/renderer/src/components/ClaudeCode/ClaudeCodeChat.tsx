@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Send, Square } from 'lucide-react'
 import { TerminalMessage } from './TerminalMessage'
+import { ToolApprovalDialog, ToolApprovalRequest } from '../Dialogs/ToolApprovalDialog'
 import './ClaudeCodeChat.css'
 
 interface ClaudeMessage {
@@ -22,7 +23,9 @@ export function ClaudeCodeChat() {
   const [messages, setMessages] = useState<ClaudeMessage[]>([])
   const [input, setInput] = useState('')
   const [isRunning, setIsRunning] = useState(false)
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+  const [_currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+  const [pendingApproval, setPendingApproval] = useState<ToolApprovalRequest | null>(null)
+  const [lastUserPrompt, setLastUserPrompt] = useState('')
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -98,6 +101,48 @@ export function ClaudeCodeChat() {
     return unsubscribe
   }, [])
 
+  // Listen for tool approval requests
+  useEffect(() => {
+    const unsubscribe = window.api.claudeCode.onToolApprovalNeeded((request) => {
+      console.log('⚠️ Tool approval needed:', request.toolName)
+      setPendingApproval(request)
+    })
+
+    return unsubscribe
+  }, [])
+
+  // Listen for session resumed (after approval)
+  useEffect(() => {
+    const unsubscribe = window.api.claudeCode.onSessionResumed((data) => {
+      console.log('✅ Session resumed with tools:', data.approvedTools)
+
+      // Auto-retry last user prompt after approval
+      if (lastUserPrompt) {
+        console.log('🔄 Auto-retrying last prompt after approval:', lastUserPrompt)
+
+        // Add system message to show we're retrying
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            type: 'system',
+            content: `🔄 Retrying with approved tools: ${data.approvedTools.join(', ')}`,
+            timestamp: new Date()
+          }
+        ])
+
+        // Send the last prompt again
+        const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        setCurrentSessionId(sessionId)
+        setIsRunning(true)
+
+        window.api.claudeCode.sendMessage(lastUserPrompt, {}, sessionId)
+      }
+    })
+
+    return unsubscribe
+  }, [lastUserPrompt])
+
   /**
    * Send message to Claude Code
    */
@@ -107,6 +152,9 @@ export function ClaudeCodeChat() {
     if (!trimmedInput || isRunning) {
       return
     }
+
+    // Store last prompt for auto-retry after tool approval
+    setLastUserPrompt(trimmedInput)
 
     const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     setCurrentSessionId(sessionId)
@@ -176,6 +224,38 @@ export function ClaudeCodeChat() {
     const textarea = e.target
     textarea.style.height = 'auto'
     textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px'
+  }
+
+  /**
+   * Handle tool approval
+   */
+  const handleToolApprove = async (remember: boolean) => {
+    if (!pendingApproval) return
+
+    console.log(`✅ Approving tool: ${pendingApproval.toolName} (remember: ${remember})`)
+
+    try {
+      await window.api.claudeCode.approveTool(pendingApproval.toolName, remember)
+      setPendingApproval(null) // Close dialog
+    } catch (error) {
+      console.error('Failed to approve tool:', error)
+    }
+  }
+
+  /**
+   * Handle tool denial
+   */
+  const handleToolDeny = async () => {
+    if (!pendingApproval) return
+
+    console.log(`❌ Denying tool: ${pendingApproval.toolName}`)
+
+    try {
+      await window.api.claudeCode.denyTool(pendingApproval.toolName)
+      setPendingApproval(null) // Close dialog
+    } catch (error) {
+      console.error('Failed to deny tool:', error)
+    }
   }
 
   return (
@@ -253,6 +333,15 @@ export function ClaudeCodeChat() {
           </button>
         </div>
       </div>
+
+      {/* Tool Approval Dialog */}
+      {pendingApproval && (
+        <ToolApprovalDialog
+          request={pendingApproval}
+          onApprove={handleToolApprove}
+          onDeny={handleToolDeny}
+        />
+      )}
     </div>
   )
 }

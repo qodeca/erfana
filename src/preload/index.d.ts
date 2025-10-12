@@ -65,6 +65,12 @@ declare global {
           error?: string
         }>
         setToken: (token: string) => Promise<{ success: boolean; error?: string }>
+        // Tool approval
+        approveTool: (
+          toolName: string,
+          remember: boolean
+        ) => Promise<{ success: boolean; error?: string }>
+        denyTool: (toolName: string) => Promise<{ success: boolean; error?: string }>
         // Event listeners - Messages
         onMessage: (
           callback: (data: {
@@ -89,6 +95,31 @@ declare global {
         onSessionError: (
           callback: (error: { message: string; recoverable: boolean }) => void
         ) => () => void
+        // Event listeners - Tool approval
+        onToolApprovalNeeded: (
+          callback: (request: {
+            toolName: string
+            toolId: string
+            input: any
+            description: string
+          }) => void
+        ) => () => void
+        onSessionResumed: (
+          callback: (data: { projectPath: string; approvedTools: string[] }) => void
+        ) => () => void
+      }
+      settings: {
+        getApprovedTools: () => Promise<{ success: boolean; tools?: string[]; error?: string }>
+        setApprovedTools: (
+          tools: string[]
+        ) => Promise<{ success: boolean; error?: string }>
+        addApprovedTool: (
+          toolName: string
+        ) => Promise<{ success: boolean; error?: string }>
+        removeApprovedTool: (
+          toolName: string
+        ) => Promise<{ success: boolean; error?: string }>
+        resetApprovedTools: () => Promise<{ success: boolean; error?: string }>
       }
     }
   }
