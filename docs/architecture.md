@@ -103,6 +103,7 @@ src/
 - **State Management**: Zustand for activity bar state (sidebar widths, active panels)
 - **Component Registry**: Splitview and Dockview use string-based component lookup
 - **Multi-model Editor**: Single Monaco instance, swap models per file
+- **Mermaid Integration**: Client-side diagram rendering (22 types) with dark theme
 - **Project Persistence**: Auto-loads last opened project on startup
 
 ## Activity Bar System
