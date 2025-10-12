@@ -1,6 +1,6 @@
 # Comprehensive Mermaid Diagram Test File
 
-This file tests **ALL 23 diagram types** available in Mermaid.js (as of v11.12.0).
+This file tests **22 diagram types** supported by the base Mermaid.js package (v11.12.0).
 
 ---
 
@@ -280,22 +280,7 @@ timeline
 
 ---
 
-## 15. ZenUML (Sequence Diagram Alternative)
-
-Represents UML sequence diagrams with simplified syntax.
-
-```mermaid
-zenuml
-    title User Authentication Flow
-    User -> Auth: Enter credentials
-    Auth -> Database: Verify password
-    Database --> Auth: Valid
-    Auth --> User: Login successful
-```
-
----
-
-## 16. Sankey Diagram
+## 15. Sankey Diagram
 
 Visualizes flow and energy transfers.
 
@@ -314,7 +299,7 @@ sankey-beta
 
 ---
 
-## 17. XY Chart
+## 16. XY Chart
 
 Plots data points on X and Y axes.
 
@@ -329,7 +314,7 @@ xychart-beta
 
 ---
 
-## 18. Block Diagram
+## 17. Block Diagram
 
 Shows system components and their connections.
 
@@ -348,7 +333,7 @@ block-beta
 
 ---
 
-## 19. Packet Diagram
+## 18. Packet Diagram
 
 Illustrates network packet structures.
 
@@ -364,7 +349,7 @@ packet-beta
 
 ---
 
-## 20. Kanban Board
+## 19. Kanban Board
 
 Represents workflow management and task progression.
 
@@ -385,7 +370,7 @@ kanban
 
 ---
 
-## 21. Architecture Diagram
+## 20. Architecture Diagram
 
 Depicts system architectural designs.
 
@@ -405,7 +390,7 @@ architecture-beta
 
 ---
 
-## 22. Radar Chart (Spider Chart)
+## 21. Radar Chart (Spider Chart)
 
 Displays multi-dimensional performance or comparison data.
 
@@ -420,7 +405,7 @@ radar-beta
 
 ---
 
-## 23. Treemap
+## 22. Treemap
 
 Shows hierarchical data as nested rectangles.
 
@@ -455,7 +440,7 @@ graph TD
 
 ## End of Test
 
-✅ **If all 23 diagrams above (except the last error test) render correctly, Mermaid integration is fully operational!**
+✅ **If all 22 diagrams above (except the last error test) render correctly, Mermaid integration is fully operational!**
 
 ### Supported Diagram Types Summary
 
@@ -473,15 +458,16 @@ graph TD
 12. ✓ C4 Diagram - Architecture contexts
 13. ✓ Mindmap - Hierarchical concepts
 14. ✓ Timeline - Chronological events
-15. ✓ ZenUML - Simplified sequences
-16. ✓ Sankey - Flow visualization
-17. ✓ XY Chart - Data plotting
-18. ✓ Block Diagram - System components
-19. ✓ Packet Diagram - Network packets
-20. ✓ Kanban - Task boards
-21. ✓ Architecture - System design
-22. ✓ Radar Chart - Multi-dimensional data
-23. ✓ Treemap - Hierarchical rectangles
+15. ✓ Sankey - Flow visualization
+16. ✓ XY Chart - Data plotting
+17. ✓ Block Diagram - System components
+18. ✓ Packet Diagram - Network packets
+19. ✓ Kanban - Task boards
+20. ✓ Architecture - System design
+21. ✓ Radar Chart - Multi-dimensional data
+22. ✓ Treemap - Hierarchical rectangles
+
+**Note**: ZenUML is not included as it requires an external plugin (`@mermaid-js/mermaid-zenuml`) not included in the base Mermaid package.
 
 **Mermaid.js Version**: 11.12.0
 **Last Updated**: 2024-10-12
