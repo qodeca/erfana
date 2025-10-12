@@ -3,6 +3,7 @@ import { FileEdit, Columns2, Eye, Save as SaveIcon, Bold, Italic, Code, Link, Im
 import { IDockviewPanelProps } from 'dockview'
 import { MonacoMarkdownEditor, MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
 import { MarkdownPreview } from '../Editor/MarkdownPreview'
+import { ResizableDivider } from '../Editor/ResizableDivider'
 import { ConfirmDialog } from '../ConfirmDialog/ConfirmDialog'
 import './MarkdownEditorPanel.css'
 
@@ -50,6 +51,11 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   const [selectedText, setSelectedText] = useState<string>('')
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
   const [isAutoSaving, setIsAutoSaving] = useState(false)
+  const [dividerPosition, setDividerPosition] = useState<number>(() => {
+    // Load from localStorage, default to 50%
+    const saved = localStorage.getItem('markdown-editor-divider-position')
+    return saved ? parseFloat(saved) : 50
+  })
   const editorRef = useRef<MonacoEditorHandle>(null)
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -187,15 +193,20 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     }
   }
 
+  const handleDividerResize = (newPosition: number) => {
+    setDividerPosition(newPosition)
+    localStorage.setItem('markdown-editor-divider-position', newPosition.toString())
+  }
+
   return (
     <div className="markdown-editor-panel">
       <div className="editor-toolbar">
         <div className="editor-file-info">
           {currentFile?.modified && <span className="modified-indicator">●</span>}
-          {isAutoSaving && <span className="auto-save-indicator">Auto-saving...</span>}
         </div>
 
         <div className="editor-controls">
+          {isAutoSaving && <span className="auto-save-indicator">Auto-saving...</span>}
           <button
             className="save-btn"
             onClick={() => handleSave(false)}
@@ -313,7 +324,10 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
       {currentFile ? (
         <div className={`editor-content view-mode-${viewMode}`}>
           {(viewMode === 'editor' || viewMode === 'split') && (
-            <div className="editor-pane">
+            <div
+              className="editor-pane"
+              style={viewMode === 'split' ? { width: `${dividerPosition}%` } : undefined}
+            >
               <MonacoMarkdownEditor
                 key={currentFile.path}
                 ref={editorRef}
@@ -324,8 +338,14 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
               />
             </div>
           )}
+          {viewMode === 'split' && (
+            <ResizableDivider onResize={handleDividerResize} />
+          )}
           {(viewMode === 'preview' || viewMode === 'split') && (
-            <div className="preview-pane">
+            <div
+              className="preview-pane"
+              style={viewMode === 'split' ? { width: `${100 - dividerPosition}%` } : undefined}
+            >
               <MarkdownPreview content={currentFile.content} filePath={currentFile.path} />
             </div>
           )}
