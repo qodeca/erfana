@@ -161,7 +161,7 @@ Right-click context menu in markdown preview pane for AI-powered text operations
 
 ### Mermaid Diagrams
 
-Erfana supports **ALL 23 Mermaid diagram types** for comprehensive visualization needs (Mermaid v11.12.0).
+Erfana supports **22 Mermaid diagram types** from the base Mermaid.js package (v11.12.0) for comprehensive visualization needs.
 
 #### Supported Diagram Types (Complete List)
 
@@ -179,17 +179,18 @@ Erfana supports **ALL 23 Mermaid diagram types** for comprehensive visualization
 12. **C4 Diagrams** (`C4Context`) - Software architecture contexts
 13. **Mindmaps** (`mindmap`) - Hierarchical concepts and brainstorming
 14. **Timelines** (`timeline`) - Chronological events
-15. **ZenUML** (`zenuml`) - Simplified UML sequences
-16. **Sankey Diagrams** (`sankey-beta`) - Flow and energy transfers
-17. **XY Charts** (`xychart-beta`) - Data point plotting
-18. **Block Diagrams** (`block-beta`) - System components
-19. **Packet Diagrams** (`packet-beta`) - Network packet structures
-20. **Kanban Boards** (`kanban`) - Task workflow management
-21. **Architecture Diagrams** (`architecture-beta`) - System designs
-22. **Radar Charts** (`radar-beta`) - Multi-dimensional data comparison
-23. **Treemaps** (`treemap-beta`) - Hierarchical rectangles
+15. **Sankey Diagrams** (`sankey-beta`) - Flow and energy transfers
+16. **XY Charts** (`xychart-beta`) - Data point plotting
+17. **Block Diagrams** (`block-beta`) - System components
+18. **Packet Diagrams** (`packet-beta`) - Network packet structures
+19. **Kanban Boards** (`kanban`) - Task workflow management
+20. **Architecture Diagrams** (`architecture-beta`) - System designs
+21. **Radar Charts** (`radar-beta`) - Multi-dimensional data comparison
+22. **Treemaps** (`treemap-beta`) - Hierarchical rectangles
 
-See `test-mermaid.md` for examples of all 23 diagram types.
+**Note**: ZenUML is not included as it requires an external plugin (`@mermaid-js/mermaid-zenuml`).
+
+See `test-mermaid.md` for examples of all 22 diagram types.
 
 #### Usage
 
