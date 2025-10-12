@@ -35,25 +35,67 @@
    await window.api.myFeature.doSomething('value')
    ```
 
-## Adding Dockview Panel
+## Adding Panels
 
-1. Create `src/renderer/src/components/Panels/MyPanel.tsx`
+### Adding Splitview Panel (Sidebar)
 
-2. Register in `AppDockLayout.tsx`:
+For fixed sidebars (Explorer, Git, Terminal) that don't need tabbing:
+
+1. Create splitview panel component:
    ```typescript
-   const components = {
-     myPanel: MyPanel
+   const MySidebarPanel = (props: ISplitviewPanelProps) => {
+     return <div className="panel-content">My Sidebar Content</div>
    }
    ```
 
-3. Add to layout:
+2. Register in `splitviewComponents` in `AppDockLayout.tsx`:
+   ```typescript
+   const splitviewComponents = {
+     mySidebar: MySidebarPanel
+   }
+   ```
+
+3. Add to splitview layout in `onSplitviewReady`:
    ```typescript
    event.api.addPanel({
-     id: 'myPanel',
-     component: 'myPanel',
-     title: 'My Panel'
+     id: 'my-sidebar',
+     component: 'mySidebar',
+     minimumSize: 170,
+     maximumSize: 600
    })
    ```
+
+### Adding Dockview Panel (Editor Tab)
+
+For editor tabs that should appear in the center area:
+
+1. Create panel component:
+   ```typescript
+   const MyEditorPanel = (props: IDockviewPanelProps) => {
+     return <div>My Editor Content</div>
+   }
+   ```
+
+2. Register in `editorComponents` inside `EditorAreaSplitPanel`:
+   ```typescript
+   const editorComponents = {
+     myEditor: MyEditorPanel
+   }
+   ```
+
+3. Open programmatically via DockviewApi:
+   ```typescript
+   dockviewApi.addPanel({
+     id: 'my-editor-1',
+     component: 'myEditor',
+     title: 'My File',
+     params: { filePath: '/path/to/file' }
+   })
+   ```
+
+**Note**: The center `EditorAreaSplitPanel` contains the DockviewReact instance. File opening happens via `dockviewApi` passed through params.
+
+See: [Architecture](./architecture.md#hybrid-layout-architecture) | [UI Components](./ui-components.md#panel-communication-pattern)
 
 ## Adding Service Class
 

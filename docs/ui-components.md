@@ -1,27 +1,52 @@
 # UI Components & Behavior
 
-## Toolbar
+## Activity Bars
 
-**Location**: `src/renderer/src/components/Toolbar/`
+**Location**: `src/renderer/src/components/ActivityBar/`
 
-VS Code-inspired toolbar at top of application window.
+Dual vertical activity bars on left and right edges (VS Code-style).
 
-### Features
-- Application title ("Erfana") on left
-- Icon-only toggle buttons on right (Explorer, Terminal, Git panels)
-- Active state indicators (highlighted when panel visible)
-- Hover effects with semi-transparent background
+### Left Activity Bar
+
+- **Explorer icon**: Toggle file tree sidebar
+- **Keyboard**: `Cmd/Ctrl+B`
+- **Width**: 48px fixed
+- **Position**: Left edge of window
+
+### Right Activity Bar
+
+- **Git icon**: Toggle Git panel
+  - Keyboard: `Ctrl+Shift+G`
+- **Terminal icon**: Toggle Terminal panel
+  - Keyboard: `Cmd/Ctrl+J`
+- **Width**: 48px fixed
+- **Position**: Right edge of window
+
+### Components
+
+- `ActivityBar.tsx` - Main container, renders items vertically
+- `ActivityBarItem.tsx` - Individual clickable item with icon
+- `ActivityBarBadge.tsx` - Badge system for notifications (e.g., file count)
+- `activityBarConfig.ts` - Configuration mapping (panel IDs, icons, shortcuts)
+
+### State Management
+
+**Zustand Store**: `src/renderer/src/stores/useActivityBarStore.ts`
+
+Manages:
+- Active panel per side (left/right)
+- Sidebar widths (persisted)
+- Toggle logic
+
+**Persisted via**: Zustand persist middleware (localStorage)
 
 ### Design
-- Height: 40px
-- Background: `#2d2d30` (VS Code dark theme)
-- Button size: 28x28px square
-- Icons: Lucide React (`PanelLeft`, `PanelBottom`, `PanelRight`)
-- Tooltips show keyboard shortcuts
 
-### Files
-- `Toolbar.tsx` - React component (57 lines)
-- `Toolbar.css` - Styles matching VS Code aesthetics
+- **Background**: `#333333`
+- **Icons**: Lucide React (`Folder`, `GitBranch`, `Terminal`)
+- **Active indicator**: 2px blue vertical bar on active item
+- **Hover effect**: Icon color changes to white
+- **Size**: 48x48px click target per item
 
 ## Context Menu (File Explorer)
 
@@ -44,6 +69,7 @@ Right-click context menu for files and folders in the file explorer.
 - Delete
 
 ### Features
+
 - Icons from Lucide React (`FilePlus`, `FolderPlus`, `Edit`, `Trash`)
 - Separator isolates destructive actions (Delete)
 - Danger styling for Delete action (red text on hover)
@@ -51,6 +77,7 @@ Right-click context menu for files and folders in the file explorer.
 - Delete confirmation dialogs
 
 ### Rename Functionality
+
 - Pre-fills current name
 - Validates for empty names and duplicates
 - Sanitizes input (removes path separators)
@@ -61,6 +88,7 @@ Right-click context menu for files and folders in the file explorer.
 **IPC Channel**: `file:rename`
 
 ### Files
+
 - `FileTree.tsx` - Context menu logic and handlers
 - `ContextMenu.tsx` - Reusable context menu component
 - `ContextMenu.css` - VS Code-style dark theme
@@ -72,14 +100,14 @@ These work **anywhere in the application**:
 | Shortcut | Action | Panel |
 |----------|--------|-------|
 | `Cmd/Ctrl+B` | Toggle left sidebar | Explorer |
-| `Cmd/Ctrl+J` | Toggle bottom panel | Terminal |
-| `Cmd/Ctrl+Alt+B` | Toggle right sidebar | Git |
+| `Cmd/Ctrl+J` | Toggle right panel | Terminal |
+| `Ctrl+Shift+G` | Toggle right panel | Git |
 
 **Platform Detection**: Uses `metaKey` on macOS, `ctrlKey` on Windows/Linux
 
-**Implementation**: `AppDockLayout.tsx` lines 312-338
+**Implementation**: `AppDockLayout.tsx` useEffect hook with keydown listener
 
-**⚠️ NOTE**: These override any Monaco Editor shortcuts with same keys. Monaco's built-in shortcuts (Cmd+B for bold) only work when editor is focused AND these global shortcuts are not active.
+**⚠️ NOTE**: These override Monaco Editor shortcuts with same keys. Monaco's built-in shortcuts only work when editor is focused.
 
 See: [Markdown Editing](./markdown-editing.md) for editor-specific shortcuts
 
@@ -88,165 +116,128 @@ See: [Markdown Editing](./markdown-editing.md) for editor-specific shortcuts
 ### Behavior
 
 Matches VS Code panel toggle behavior:
-- **Toggles entire sidebar area**, not individual tabs
+- **Toggles entire splitview panel**, not individual tabs
 - **Preserves panel dimensions** when hiding/showing
-- **Persists state** across app restarts via localStorage
-- **Works after drag/drop** panel reorganization
+- **Persists state** across app restarts via Zustand
+- **Resize handles work correctly** with SplitviewReact
 
-### State Schema (localStorage)
+### Implementation (New Architecture)
 
-Key: `erfana-sidebar-state`
+**Splitview Panels**:
+- Left sidebar: `FileExplorerSplitPanel`
+- Center editor: `EditorAreaSplitPanel` (always visible)
+- Right sidebar: `RightSidebarSplitPanel`
 
-```json
+**Toggle Mechanism**:
+```typescript
+const panel = splitviewApiRef.current.getPanel(splitviewPanelId)
+panel.api.setVisible(shouldShow)
+```
+
+**State Storage**: `useActivityBarStore` (Zustand with persist)
+```typescript
 {
-  "leftSidebar": {
-    "visible": true,
-    "width": 300
-  },
-  "bottomPanel": {
-    "visible": true,
-    "height": 250
-  },
-  "rightSidebar": {
-    "visible": true,
-    "width": 250
-  }
+  leftActivePanel: 'explorer' | null,
+  rightActivePanel: 'git' | 'terminal' | null,
+  leftWidth: number,
+  rightWidth: number
 }
 ```
 
 ### Size Constraints
 
-**Minimum sizes** (enforced by `Math.max()` validation):
+**Minimum sizes**:
 - Left sidebar: 170px
-- Bottom panel: 100px
 - Right sidebar: 170px
+- Center editor: 400px
+
+**Maximum sizes**:
+- Left sidebar: 600px
+- Right sidebar: 600px
+- Center editor: unlimited (flex-fills)
 
 **Default sizes** (first launch):
 - Left sidebar: 300px
-- Bottom panel: 250px
 - Right sidebar: 250px
 
-### Implementation Details
+### Resize Behavior
 
-**File**: `src/renderer/src/components/DockLayout/AppDockLayout.tsx`
+**SplitviewReact provides**:
+- Working resize handles between panels ✅
+- Proper flex-grow for center panel ✅
+- Min/max constraint enforcement ✅
+- Resize event listeners via `onDidSizeChange` ✅
 
-**Key patterns**:
+**Implementation**: `AppDockLayout.tsx` lines 248-258
 
-1. **Dynamic panel lookup** (lines 133-137):
-   ```typescript
-   const getGroupByPanelId = (panelId: string) => {
-     const panel = apiRef.current.getPanel(panelId)
-     return panel ? panel.group : null
-   }
-   ```
-   Prevents stale references when panels move between groups.
-
-2. **Toggle with size preservation** (lines 234-291):
-   - Save current size before hiding
-   - Set size BEFORE showing (prevents flicker)
-   - Update localStorage on every change
-
-3. **Resize listeners** (lines 270-278):
-   ```typescript
-   panel.api.onDidDimensionsChange(() => {
-     const width = Math.max(panel.api.width, MIN_SIZES.leftSidebar)
-     updateSidebarState('leftSidebar', { width })
-   })
-   ```
-   Keeps localStorage in sync with manual resizing.
-
-## Panel Protection
-
-**Goal**: Prevent closing Explorer, Terminal, Git tabs (system panels).
-
-### Why Needed
-
-System panels should always be present. Users can hide them with toggle buttons, but not close them entirely.
-
-### Implementation Layers
-
-**Layer 1: Click Interception** (lines 195-226)
-- Document-wide click listener in **capture phase**
-- Intercepts clicks on `.dv-default-tab-action` (close button container)
-- Checks tab title via `.dv-default-tab-content` element
-- Calls `preventDefault()` to block close event
-
-**Layer 2: Fallback Restore** (lines 229-260)
-- Listens to `onDidRemovePanel` event
-- If protected panel removed, immediately re-adds it
-- Restores with correct size from localStorage state
-
-### Dockview DOM Structure
-
-Understanding dockview's actual DOM is critical for CSS selectors:
-
-```html
-<div class="dv-default-tab">
-  <div class="dv-default-tab-content">Explorer</div>  <!-- Title text -->
-  <div class="dv-default-tab-action">                <!-- Close button -->
-    <svg><!-- close icon --></svg>
-  </div>
-</div>
+```typescript
+leftPanel.api.onDidSizeChange(() => {
+  const newWidth = leftPanel.api.width
+  setSidebarWidth(newWidth, 'left')
+})
 ```
 
-**Common mistake**: Using wrong selectors like `.tab-label` or `.tab-actions-container` (these don't exist in dockview).
+## Panel Communication Pattern
 
-### Close Button Event Flow
+**Problem**: FileTree needs to open files in center DockviewReact.
 
-1. User clicks X button
-2. Click bubbles up (default browser behavior)
-3. **Our capture-phase listener catches it FIRST** (before dockview)
-4. We call `preventDefault()` if tab is protected
-5. Dockview's handler checks `ev.defaultPrevented`
-6. If true, dockview's handler returns early (doesn't close)
+**Solution**: Pass DockviewApi through splitview panel params.
 
-**Source**: `node_modules/dockview-core/dist/esm/dockview/components/tab/defaultTab.js` lines 26-34
+**Flow**:
+1. `EditorAreaSplitPanel` creates DockviewReact, gets `dockviewApi`
+2. Calls `setDockviewApi` callback in params → updates ref in parent
+3. Parent passes `dockviewApi` to `FileExplorerSplitPanel` via params
+4. FileTree calls `dockviewApi.addPanel()` to open file tab
+
+**Code**: `AppDockLayout.tsx` lines 208-222
 
 ## Development Patterns
 
-### Adding New Protected Panel
+### Adding New Activity Bar Item
 
-1. Add panel ID to `protectedPanels` array (line 196)
-2. Add panel title to `protectedTitles` array (line 197)
-3. That's it - protection is automatic
+1. Update `activityBarConfig.ts`:
+   ```typescript
+   export const LEFT_PANELS = [
+     { id: 'explorer', icon: Folder, label: 'Explorer', shortcut: 'Cmd+B' },
+     { id: 'myPanel', icon: MyIcon, label: 'My Panel', shortcut: 'Cmd+M' }
+   ]
+   ```
 
-### Debugging Panel State
+2. Add panel ID mapping in `AppDockLayout.tsx`
+
+3. Create corresponding splitview panel component
+
+### Toggling Panel Programmatically
 
 ```typescript
-// Check current state
-console.log(localStorage.getItem('erfana-sidebar-state'))
+// Via Zustand store
+const { togglePanel } = useActivityBarStore()
+togglePanel('explorer', 'left')
 
-// Clear state (force defaults on next load)
-localStorage.removeItem('erfana-sidebar-state')
+// Via SplitviewApi directly
+const panel = splitviewApiRef.current.getPanel('left-sidebar')
+panel.api.setVisible(false)
 ```
 
-### Testing Panel Toggle
+### Reading Current State
 
-1. Toggle panel with keyboard shortcut or toolbar button
-2. Resize panel manually
-3. Toggle again - should restore exact size
-4. Restart app - should restore visibility and size
+```typescript
+const { leftActivePanel, rightActivePanel, leftWidth, rightWidth }
+  = useActivityBarStore()
+
+console.log('Explorer visible:', leftActivePanel === 'explorer')
+console.log('Explorer width:', leftWidth)
+```
 
 ## Known Issues
 
-**CSS :has() Selector Browser Compatibility**
+**None** - Panel resizing now works correctly with SplitviewReact architecture.
 
-Current CSS uses `:has()` for hiding close buttons:
-```css
-.dv-default-tab:has(.dv-default-tab-content)
-```
-
-**Support**: Chrome 105+, Firefox 121+, Safari 15.4+
-
-**Impact**: If browser doesn't support :has(), close buttons won't be hidden by CSS (but JavaScript capture-phase listener still prevents closing).
-
-**Status**: Acceptable - Electron uses recent Chromium (supports :has()).
-
-See: [Known Issues](./known-issues.md)
+Previous issue (DockviewReact panels not resizing) resolved in v0.1.0.
 
 ## Related Documentation
 
-- [Architecture](./architecture.md) - Dockview panel system overview
+- [Architecture](./architecture.md) - Hybrid SplitviewReact + DockviewReact architecture
 - [Markdown Editing](./markdown-editing.md) - Editor-specific shortcuts
-- [Development Tasks](./development-tasks.md) - Working with panels
-- [Known Issues](./known-issues.md) - Browser compatibility notes
+- [Development Tasks](./development-tasks.md) - Adding panels and components
+- [Known Issues](./known-issues.md) - Current issues and workarounds

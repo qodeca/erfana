@@ -12,8 +12,53 @@
    - NO direct Node.js access in renderer
 
 3. **Renderer Process** (`src/renderer/`): React UI
-   - Dockview panel system
+   - Hybrid SplitviewReact + DockviewReact layout system
    - No Node.js integration (security)
+
+## Hybrid Layout Architecture
+
+Erfana uses a **hybrid architecture** matching VS Code's actual implementation pattern.
+
+### Why Hybrid Architecture?
+
+**Problem Solved**: DockviewReact is designed for tabbed docking panels (like editor tabs), NOT basic layout splits. Using it for a 3-column layout caused panels to have `flexGrow: 0`, breaking resize functionality.
+
+**Solution**: Use the right tool for each job:
+- **SplitviewReact**: Outer 3-column layout with working resize handles
+- **DockviewReact**: Center area only, for editor file tabs
+
+### Architecture Layers
+
+```
+SplitviewReact (outer horizontal 3-column split)
+  ├─ Left: FileExplorerSplitPanel (170-600px, resizable)
+  │   └─ Wraps FileTree component
+  ├─ Center: EditorAreaSplitPanel (400px min, flex-fills remaining)
+  │   └─ Contains DockviewReact for tabbed editors
+  └─ Right: RightSidebarSplitPanel (170-600px, resizable)
+      └─ Custom Git/Terminal tab switcher
+```
+
+**SplitviewReact** (outer layer):
+- 3-column horizontal split with resizable dividers ✅
+- Proper flex-grow behavior (center auto-fills space) ✅
+- Built-in resize handles that actually work ✅
+- Min/max constraints enforced ✅
+
+**DockviewReact** (center panel only):
+- Tabbed docking for editor files
+- Tab drag-and-drop reordering
+- Multi-file editing with independent states
+- Each opened file = new tab in DockviewReact
+
+**Key Components**:
+- `FileExplorerSplitPanel` - Splitview panel wrapping FileTree
+- `EditorAreaSplitPanel` - Splitview panel containing nested DockviewReact
+- `RightSidebarSplitPanel` - Splitview panel with Git/Terminal tab UI
+
+**Panel Communication**: DockviewApi passed via params to FileExplorerSplitPanel for opening files as tabs.
+
+Reference: [Dockview Documentation](https://dockview.dev/)
 
 ## Directory Structure
 
@@ -32,15 +77,16 @@ src/
 └── renderer/
     └── src/
         ├── components/
-        │   ├── DockLayout/      # Panel system
-        │   ├── Toolbar/         # Top toolbar with toggle buttons
-        │   ├── Panels/          # Panel implementations
+        │   ├── DockLayout/      # Hybrid SplitviewReact + DockviewReact
+        │   ├── ActivityBar/     # Vertical activity bars (left/right)
+        │   ├── Panels/          # Panel implementations + WelcomePanel
         │   ├── Editor/          # Monaco + Preview + Context Menus
         │   ├── FileTree/        # File explorer with context menu
-        │   ├── ContextMenu/     # Right-click context menu (file tree)
+        │   ├── ContextMenu/     # Right-click context menu
         │   ├── ConfirmDialog/   # Confirmation dialog component
         │   └── Toast/           # Toast notification components
         ├── contexts/            # React contexts (ToastContext)
+        ├── stores/              # Zustand stores (useActivityBarStore)
         ├── hooks/               # React hooks
         ├── App.tsx              # Root (wrapped with ToastProvider)
         └── main.tsx
@@ -48,13 +94,35 @@ src/
 
 ## Key Design Decisions
 
+- **Hybrid Layout System**: SplitviewReact (outer) + DockviewReact (center) matches VS Code pattern
 - **OOP Services**: Business logic in service classes
   - FileService: File operations (read, write, create, rename, delete)
   - SettingsService: Persistent storage with electron-store (dynamic ES Module import)
 - **Secure IPC**: All main↔renderer communication via contextBridge
-- **Component Registry**: Dockview uses string-based component lookup
+- **State Management**: Zustand for activity bar state (sidebar widths, active panels)
+- **Component Registry**: Splitview and Dockview use string-based component lookup
 - **Multi-model Editor**: Single Monaco instance, swap models per file
 - **Project Persistence**: Auto-loads last opened project on startup
+
+## Activity Bar System
+
+Dual vertical activity bars (VS Code-style):
+
+**Left Activity Bar**:
+- Explorer toggle
+- Keyboard: `Cmd/Ctrl+B`
+
+**Right Activity Bar**:
+- Git toggle (`Ctrl+Shift+G`)
+- Terminal toggle (`Cmd/Ctrl+J`)
+
+**Components**:
+- `ActivityBar.tsx` - Container component
+- `ActivityBarItem.tsx` - Individual clickable item
+- `ActivityBarBadge.tsx` - Badge system for notifications
+- `activityBarConfig.ts` - Panel configuration
+
+**State**: Managed by `useActivityBarStore` (Zustand), persists sidebar widths and active panels.
 
 ## Toast Notification System
 

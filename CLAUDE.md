@@ -21,13 +21,15 @@ Erfana follows Electron's three-process model:
 
 1. **Main Process** (`src/main/`): Node.js environment - window lifecycle, file operations, IPC handlers
 2. **Preload Script** (`src/preload/`): Secure bridge using `contextBridge` for type-safe IPC
-3. **Renderer Process** (`src/renderer/`): React UI with Dockview panels, no Node.js access
+3. **Renderer Process** (`src/renderer/`): React UI with hybrid SplitviewReact + DockviewReact layout, no Node.js access
 
 **Key Technologies:**
 - electron-vite (build tool)
-- Dockview (VS Code-like panels)
+- Splitview (outer 3-column layout with working resize)
+- Dockview (center editor tabs)
 - Monaco Editor (markdown editing)
 - react-markdown + remark-gfm (preview)
+- Zustand (activity bar state management)
 - @anthropic-ai/claude-agent-sdk (Claude AI)
 - simple-git (git operations)
 
@@ -43,15 +45,16 @@ src/
 │   └── index.d.ts         # window.api types
 └── renderer/src/
     ├── components/
-    │   ├── DockLayout/      # Panel system
-    │   ├── Toolbar/         # Top toolbar with toggle buttons
-    │   ├── Panels/          # Panel implementations
+    │   ├── DockLayout/      # Hybrid SplitviewReact + DockviewReact system
+    │   ├── ActivityBar/     # Vertical activity bars (left/right)
+    │   ├── Panels/          # Panel implementations + WelcomePanel
     │   ├── Editor/          # Monaco + Preview + Context Menus
     │   ├── FileTree/        # File explorer with context menu
     │   ├── ContextMenu/     # Right-click menu (file tree)
     │   ├── ConfirmDialog/   # Confirmation dialogs
     │   └── Toast/           # Toast notifications
     ├── contexts/            # React contexts (ToastContext)
+    ├── stores/              # Zustand stores (useActivityBarStore)
     ├── hooks/               # React hooks
     └── App.tsx              # Root (wrapped with ToastProvider)
 ```
@@ -87,11 +90,16 @@ export const myService = new MyService(config)
 
 **Note**: SettingsService uses dynamic `import()` for electron-store. See [Known Issues](docs/known-issues.md#electron-store-es-module-import).
 
-### Dockview Panels
+### Layout System & Panels
 
-Add panels by creating component, registering in `AppDockLayout.tsx`, and adding to layout.
+Erfana uses a **hybrid architecture**:
+- **SplitviewReact** (outer layer): 3-column layout with resizable sidebars
+- **DockviewReact** (center only): Tabbed editor area for file editing
 
-📚 **Panel setup guide**: See [docs/development-tasks.md](docs/development-tasks.md#adding-dockview-panel)
+**Adding Splitview Panel** (sidebar): Create component, register in `splitviewComponents`, add via SplitviewApi
+**Adding Dockview Panel** (editor tab): Create component, register in `editorComponents`, add via DockviewApi
+
+📚 **Panel setup guide**: See [docs/development-tasks.md](docs/development-tasks.md#adding-panels)
 
 ## Markdown Editing
 
@@ -109,19 +117,21 @@ Superior markdown capabilities with Monaco Editor + live preview:
 
 ## UI & Keyboard Shortcuts
 
-**Toolbar**: VS Code-style toolbar at top with Lucide icon toggle buttons for Explorer, Terminal, Git panels.
+**Activity Bars**: Dual vertical activity bars (VS Code-style) on left and right edges with Lucide icon toggle buttons.
+- **Left Activity Bar**: Explorer toggle
+- **Right Activity Bar**: Git and Terminal toggles
 
 **File Explorer Context Menu**: Right-click files/folders for New File, New Folder, Rename, Delete actions with validation.
 
 **Global Keyboard Shortcuts** (work anywhere in app):
 - `Cmd/Ctrl+B` - Toggle left sidebar (Explorer)
-- `Cmd/Ctrl+J` - Toggle bottom panel (Terminal)
-- `Cmd/Ctrl+Alt+B` - Toggle right sidebar (Git)
+- `Cmd/Ctrl+J` - Toggle right panel (Terminal)
+- `Ctrl+Shift+G` - Toggle right panel (Git)
 
 **Panel Behavior**:
-- Toggle hides/shows entire sidebar areas (not individual tabs)
-- Preserves panel dimensions when toggling
-- State persisted to localStorage
+- Toggles hide/show entire splitview panels (not individual tabs)
+- Preserves panel dimensions when toggling (working resize handles)
+- State persisted via Zustand store (sidebar widths, active panels)
 
 **Project Persistence**: Auto-loads last opened project on startup.
 
@@ -141,9 +151,13 @@ Superior markdown capabilities with Monaco Editor + live preview:
 
 ## Known Issues
 
+**Active Issues:**
 - **node-pty**: Build fails on Python 3.13 - terminal panel deferred
 - **Dockview CSS**: Use `dockview/dist/styles/dockview.css` path
 - **electron-store**: ES Module requiring dynamic `import()` - all SettingsService methods are async
+
+**Resolved Issues:**
+- **Panel Resizing**: ✅ RESOLVED - Hybrid SplitviewReact + DockviewReact architecture fixed resize functionality
 - **Monaco CSP**: ✅ RESOLVED - Monaco now uses local bundling instead of CDN
 
 📚 **All known issues**: See [docs/known-issues.md](docs/known-issues.md)
@@ -157,9 +171,16 @@ Superior markdown capabilities with Monaco Editor + live preview:
 4. Call from renderer via `window.api.*`
 
 ### Adding New Panel
-1. Create `src/renderer/src/components/Panels/MyPanel.tsx`
-2. Register in `AppDockLayout.tsx` components object
-3. Add panel via `event.api.addPanel()` in layout
+
+**Splitview Panel** (for sidebars):
+1. Create panel component with `ISplitviewPanelProps`
+2. Register in `splitviewComponents` in `AppDockLayout.tsx`
+3. Add via `splitviewApi.addPanel()` with size constraints
+
+**Dockview Panel** (for editor tabs):
+1. Create panel component with `IDockviewPanelProps`
+2. Register in `editorComponents` inside `EditorAreaSplitPanel`
+3. Open via `dockviewApi.addPanel()` with file params
 
 ### Debugging
 - **Main Process**: Terminal output (`console.log`)
@@ -251,13 +272,13 @@ When adding features:
 
 ## Documentation
 
-- [Architecture](docs/architecture.md) - Three-process model, tech stack, design decisions
+- [Architecture](docs/architecture.md) - Three-process model, hybrid layout architecture, tech stack, design decisions
 - [IPC Patterns](docs/ipc-patterns.md) - Secure communication patterns, current channels
-- [UI Components](docs/ui-components.md) - Toolbar, panel toggle, keyboard shortcuts, panel protection
+- [UI Components](docs/ui-components.md) - Activity bars, panel toggle system, keyboard shortcuts, panel communication
 - [Markdown Editing](docs/markdown-editing.md) - Editor features, shortcuts, preview
 - [Security](docs/security.md) - Security guidelines, CSP, validation patterns
-- [Known Issues](docs/known-issues.md) - Current issues and workarounds
-- [Development Tasks](docs/development-tasks.md) - Common development patterns
+- [Known Issues](docs/known-issues.md) - Current issues, resolved issues, workarounds
+- [Development Tasks](docs/development-tasks.md) - Common development patterns, adding panels
 - **Testing:**
   - [Testing Index](docs/testing/README.md) - Complete testing documentation hub
   - [Quick Start](docs/testing/quickstart.md) - Fast testing setup
