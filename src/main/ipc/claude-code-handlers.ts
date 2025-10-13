@@ -14,10 +14,10 @@ export function registerClaudeCodeHandlers() {
   /**
    * Start persistent Claude CLI session
    */
-  ipcMain.handle('claudeCode:startSession', async (_event, projectPath: string) => {
+  ipcMain.handle('claudeCode:startSession', async (_event, projectPath: string, planningMode?: boolean) => {
     try {
-      console.log(`🚀 Starting Claude session for project: ${projectPath}`)
-      await claudeCliService.startSession(projectPath)
+      console.log(`🚀 Starting Claude session for project: ${projectPath}${planningMode ? ' (planning mode)' : ''}`)
+      await claudeCliService.startSession(projectPath, planningMode || false)
       return { success: true }
     } catch (error: any) {
       console.error('❌ Failed to start session:', error)
@@ -168,6 +168,21 @@ export function registerClaudeCodeHandlers() {
         sessionId: 'persistent-session',
         message
       })
+    }
+  })
+
+  // Forward streaming message updates (--include-partial-messages)
+  claudeCliService.on('message-update', (message) => {
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length > 0 && !windows[0].isDestroyed()) {
+      windows[0].webContents.send('claudeCode:messageUpdate', { message })
+    }
+  })
+
+  claudeCliService.on('message-complete', (message) => {
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length > 0 && !windows[0].isDestroyed()) {
+      windows[0].webContents.send('claudeCode:messageComplete', { message })
     }
   })
 

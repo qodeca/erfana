@@ -12,20 +12,30 @@ Complete documentation for Erfana's Claude Code integration with persistent sess
 - Persistent Claude CLI sessions (long-running process)
 - Tool approval dialog for security
 - Auto-retry after approval (seamless UX)
-- Safe defaults (Read, Glob, Grep)
+- Pre-approved tools (10 total): Read, Write, Edit, Glob, Grep, Bash, WebSearch, Search, TodoWrite, Task
+- Planning mode for safe exploration (read-only tools)
+- Control Panel showing all 17 tools with approval status
 - Persistent permissions via electron-store
 
 ## Documentation Structure
 
 ### Core Documentation
 
-**[Tool Approval System](./tool-approval.md)** (Main Guide)
+**[Tool Approval System](./tool-approval.md)**
 - Security model and approval flow
-- Safe defaults vs dangerous tools
+- Pre-approved tools vs tools requiring approval
+- Planning mode tool restrictions
 - Auto-retry feature
 - Persistent storage
 - Development patterns
 - Testing and debugging
+
+**[UI Features](./ui-features.md)**
+- AI Assistant Panel (Copilot)
+- Control Panel with tool approval status
+- Planning Mode toggle
+- Tool Approval Dialog
+- Session indicators and UI states
 
 ### Related Documentation
 
@@ -40,23 +50,21 @@ Complete documentation for Erfana's Claude Code integration with persistent sess
 - Settings channels
 - Event-based communication
 
-**[UI Components](../ui-components.md)**
-- AiAssistantPanel (session management)
-- ClaudeCodeChat (chat interface)
-- ToolApprovalDialog (approval modal)
-- TerminalMessage (message rendering)
+**[UI Features](./ui-features.md)** (see above)
 
 ## Quick Start
 
 ### User Flow
 
-1. Open AI Assistant panel (right sidebar)
+1. Open AI Assistant panel (right sidebar, labeled "Copilot")
 2. Authenticate with OAuth token
 3. Session starts automatically
-4. Send message to Claude Code
-5. If unapproved tool needed → dialog appears
-6. Approve tool (optional: remember choice)
-7. System auto-retries prompt with new permissions
+4. Optional: Enable planning mode for read-only exploration
+5. Send message to Claude Code
+6. If unapproved tool needed → dialog appears
+7. Approve tool (optional: remember choice)
+8. System auto-retries prompt with new permissions
+9. View tool usage in Control Panel
 
 ### Developer Flow
 
@@ -166,11 +174,11 @@ spawn('claude', ['--resume', uuid, '--allowedTools', ...updatedApproved])
 ```typescript
 // Via settings service
 const tools = await settingsService.getApprovedTools()
-console.log(tools)  // ['Read', 'Glob', 'Grep', 'Write', 'Edit']
+console.log(tools)  // ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch', 'Search', 'TodoWrite', 'Task']
 
 // Via IPC
 const result = await window.api.settings.getApprovedTools()
-console.log(result.tools)
+console.log(result.tools)  // Same as above (10 pre-approved tools)
 ```
 
 ### Reset to Safe Defaults
@@ -214,8 +222,8 @@ cat ~/.claude/logs/claude-cli-<date>.log
 ## Related Documentation
 
 - **[Tool Approval System](./tool-approval.md)** - Complete guide to tool approval
+- **[UI Features](./ui-features.md)** - Copilot panel, Control Panel, Planning Mode, Tool Approval Dialog
 - **[Architecture](../architecture.md)** - Three-process model, services
 - **[IPC Patterns](../ipc-patterns.md)** - All IPC channels
-- **[UI Components](../ui-components.md)** - Panel and dialog components
 - **[Security](../security.md)** - Security principles
 - **[Development Tasks](../development-tasks.md)** - Common patterns

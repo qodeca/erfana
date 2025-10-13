@@ -14,7 +14,7 @@
 .custom-prompt-dialog {
   background-color: #252526;
   border: 1px solid #3c3c3c;
-  border-radius: 4px;
+  border-radius: 0;
   padding: 16px;
   min-width: 400px;
   max-width: 600px;
@@ -37,7 +37,7 @@
   padding: 8px;
   background-color: #1e1e1e;
   border-left: 3px solid #4ec9b0;
-  border-radius: 2px;
+  border-radius: 0;
   font-size: 12px;
   color: #858585;
   font-style: italic;
@@ -48,7 +48,7 @@
   padding: 8px;
   background-color: #3c3c3c;
   border: 1px solid #6c6c6c;
-  border-radius: 2px;
+  border-radius: 0;
   color: #cccccc;
   font-size: 13px;
   font-family: inherit;
@@ -79,7 +79,7 @@
   background-color: #0e639c;
   color: #ffffff;
   border: none;
-  border-radius: 2px;
+  border-radius: 0;
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;

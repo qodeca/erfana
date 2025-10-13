@@ -60,7 +60,7 @@
   border: 1px solid #3c3c3c;
   color: #cccccc;
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: 0;
   font-size: 14px;
   transition: all 0.2s;
 }
@@ -92,7 +92,7 @@
   border: none;
   color: #ffffff;
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: 0;
   font-size: 13px;
   font-weight: 500;
   transition: background-color 0.2s;
@@ -139,7 +139,7 @@
   border: 1px solid transparent;
   color: #cccccc;
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: 0;
   transition: all 0.2s;
 }
 
@@ -164,7 +164,7 @@
   padding: 0;
   background-color: transparent;
   border: none;
-  border-radius: 3px;
+  border-radius: 0;
   color: #cccccc;
   cursor: pointer;
   transition: all 0.2s;
@@ -294,7 +294,7 @@
   padding: 10px 14px;
   background: rgba(255, 75, 75, 0.15);
   border: 1px solid rgba(255, 75, 75, 0.3);
-  border-radius: 4px;
+  border-radius: 0;
   margin: 0 0 8px 0;
   animation: slideDown 0.2s ease-out;
 }
