@@ -177,11 +177,11 @@ export function AiAssistantPanel(_props: ISplitviewPanelProps) {
   return (
     <div className="ai-assistant-panel sidebar-panel">
       <div className="sidebar-panel-header">
-        <Bot size={16} className="panel-header-icon" />
-        <span className="sidebar-panel-title">Claude Code</span>
         {sessionState === 'ready' && <span className="session-indicator ready">●</span>}
         {sessionState === 'starting' && <span className="session-indicator starting">●</span>}
         {sessionState === 'error' && <span className="session-indicator error">●</span>}
+        <Bot size={16} className="panel-header-icon" />
+        <span className="sidebar-panel-title">Copilot</span>
       </div>
       <div className="sidebar-panel-content">
         {isChecking ? (

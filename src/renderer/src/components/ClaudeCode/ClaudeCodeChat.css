@@ -99,59 +99,26 @@
 /* Input container */
 .chat-input-container {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 12px;
+  padding: 8px;
   background: #252525;
-}
-
-/* Chat actions */
-.chat-actions {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 8px;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.action-button {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #858585;
-  padding: 4px 12px;
-  border-radius: 0;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.action-button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.15);
-  color: #a0a0a0;
-}
-
-.action-button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-/* Input area */
-.chat-input {
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-}
-
+/* Textarea - full width */
 .chat-input-textarea {
-  flex: 1;
+  width: 100%;
   background: #1e1e1e;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0;
-  padding: 10px 12px;
+  padding: 8px 10px;
   color: #cccccc;
   font-family: inherit;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.4;
   resize: none;
-  min-height: 60px;
+  min-height: 44px;
   max-height: 200px;
   transition: border-color 0.15s ease;
 }
@@ -170,52 +137,115 @@
   color: #858585;
 }
 
-/* Send/Stop button */
-.send-button {
-  background: #4fc1ff;
-  border: none;
-  color: #1e1e1e;
-  padding: 10px 20px;
+/* Toolbar - horizontal bar with icon buttons */
+.chat-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+/* Toolbar buttons */
+.toolbar-button {
+  background: #000000;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  padding: 4px 10px;
   border-radius: 0;
-  font-size: 13px;
-  font-weight: 500;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 60px;
+  justify-content: center;
+  gap: 4px;
   transition: all 0.15s ease;
-  flex-shrink: 0;
+  font-size: 12px;
+  font-family: inherit;
+  min-height: 26px;
 }
 
-.send-button:hover:not(:disabled) {
-  background: #5fd1ff;
-  transform: translateY(-1px);
+.toolbar-button:hover:not(:disabled) {
+  background: #1a1a1a;
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
-.send-button:active:not(:disabled) {
-  transform: translateY(0);
+.toolbar-button:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
-.send-button:disabled {
+.toolbar-button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-/* Stop button variant */
-.stop-button {
-  background: #f48771;
+/* Clear button - text only, minimal */
+.toolbar-button.clear-button {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.15);
+  padding: 4px 10px;
 }
 
-.stop-button:hover:not(:disabled) {
-  background: #ff9781;
+.toolbar-button.clear-button:hover:not(:disabled) {
+  background: #1a1a1a;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Planning mode toggle button */
+.toolbar-button.planning-button {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.15);
+  padding: 4px 8px;
+}
+
+.toolbar-button.planning-button:hover:not(:disabled) {
+  background: #1a1a1a;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.toolbar-button.planning-button.active {
+  background: #4fc1ff;
+  border-color: #4fc1ff;
+  color: #000000;
+}
+
+.toolbar-button.planning-button.active:hover:not(:disabled) {
+  background: #5fd1ff;
+  border-color: #5fd1ff;
+}
+
+/* Send button - black with white icon */
+.toolbar-button.send-button {
+  background: #000000;
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  padding: 4px 10px;
+}
+
+.toolbar-button.send-button:hover:not(:disabled) {
+  background: #1a1a1a;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* Stop button variant - black with white icon */
+.toolbar-button.stop-button {
+  background: #000000;
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.toolbar-button.stop-button:hover:not(:disabled) {
+  background: #1a1a1a;
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 /* Typing indicator */
 .typing-indicator {
-  padding: 12px 16px;
+  padding: 12px 0px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   animation: fadeIn 0.3s ease;
 }
 
@@ -233,12 +263,13 @@
 .typing-indicator-content {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 0;
-  border-left: 3px solid #4fc1ff;
+  border-left: 3px solid #dcdcaa;
+  align-self: flex-start;
 }
 
 .typing-dots {
@@ -251,7 +282,7 @@
 .typing-dots span {
   width: 6px;
   height: 6px;
-  background: #4fc1ff;
+  background: #dcdcaa;
   border-radius: 0;
   animation: typing 1.4s infinite ease-in-out;
   opacity: 0.3;
@@ -329,7 +360,7 @@
 .metrics-title {
   font-size: 12px;
   font-weight: 600;
-  color: #4fc1ff;
+  color: #cccccc;
   letter-spacing: 0.5px;
 }
 
@@ -408,6 +439,59 @@
 
 .metric-highlight .metric-value {
   color: #4fc1ff;
+}
+
+/* Tools Section */
+.tools-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tools-section-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: #858585;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.tools-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tool-chip {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 0;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.tool-approved {
+  background: rgba(79, 193, 255, 0.15);
+  border: 1px solid rgba(79, 193, 255, 0.3);
+  color: #4fc1ff;
+}
+
+.tool-approved:hover {
+  background: rgba(79, 193, 255, 0.25);
+  border-color: rgba(79, 193, 255, 0.4);
+}
+
+.tool-not-approved {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #858585;
+}
+
+.tool-not-approved:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 /* Responsive metrics grid */

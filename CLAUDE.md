@@ -301,18 +301,20 @@ Erfana integrates Claude Code via persistent CLI session with security-first too
 
 ### UI
 
-- **AI Assistant Panel**: Right sidebar, accessible via activity bar icon
+- **AI Assistant Panel**: Right sidebar, accessible via activity bar icon (labeled "Copilot")
 - **Installation Check**: Detects Claude CLI, shows Homebrew install command if missing
 - **Authentication**: OAuth token setup flow with visual feedback
 - **Session Indicators**: Color-coded dots (green=ready, yellow=starting, red=error)
 - **Chat Interface**: Message history (user/assistant/tool_use), stop generation button
+- **Control Panel**: Collapsible panel showing session stats (messages, tools used, duration) and all 17 Claude Code tools with color-coded approval status
+- **Planning Mode Toggle**: Switch between full access and read-only mode (restricts to safe exploration tools)
 
 ### Tool Approval System
 
 Security-first approach with pre-approved common tools and user approval for complex operations:
 
-- **Pre-Approved Tools**: Read, Write, Edit, Glob, Grep, Bash, WebSearch (cover 95% of operations, transparent execution)
-- **Tools Requiring Approval**: Task, WebFetch, SlashCommand (complex, higher security implications)
+- **Pre-Approved Tools** (10 total): Read, Write, Edit, Glob, Grep, Bash, WebSearch, Search, TodoWrite, Task (cover 95%+ of operations, transparent execution)
+- **Tools Requiring Approval**: MultiEdit, WebFetch, SlashCommand, TodoRead, NotebookRead, NotebookEdit, ExitPlanMode (complex operations, higher security implications)
 - **Modal Dialog**: ToolApprovalDialog shows tool name, description, parameters, "Remember this choice" option
 - **Auto-Retry**: After approval, system automatically re-sends user prompt with updated permissions
 - **Persistence**: Approved tools saved via electron-store, survive app restarts
@@ -320,6 +322,22 @@ Security-first approach with pre-approved common tools and user approval for com
 - **Merge Logic**: Pre-approved tools always included (ClaudeCliService.ts:148-153), even if not in settings
 
 **Key Architecture Decision**: `--allowedTools` flag is immutable at runtime, requiring session restart to add new tools.
+
+### Planning Mode
+
+**Native Claude CLI feature** for safe exploration and planning without file modifications:
+
+- **Activation**: Toggle button in chat interface, uses `--permission-mode plan` flag
+- **Tool Restrictions**: Only read-only tools available (Read, Grep, Task, WebSearch, Search, TodoWrite)
+- **Blocked Tools**: Write, Edit, Bash, and all other modification tools
+- **Use Cases**: Code exploration, architecture planning, research, cost estimation before implementation
+- **Session Restart**: Toggling mode restarts Claude CLI session with updated permissions
+- **Visual Indicator**: System message in chat confirms mode change
+- **Control Panel**: Shows restricted tool set when planning mode is active
+
+**Planning Mode Tool Set** (6 tools): Read, Grep, Task, WebSearch, Search, TodoWrite
+
+See: [Claude Code UI Features](docs/claude-code/ui-features.md#planning-mode-toggle) for UI documentation
 
 ### Implementation
 
@@ -339,11 +357,12 @@ claude -p \
   --output-format stream-json \
   --verbose \
   --replay-user-messages \
-  --allowedTools Read Write Edit Glob Grep Bash WebSearch  # Pre-approved, plus any user-approved
+  --allowedTools Read Write Edit Glob Grep Bash WebSearch Search TodoWrite Task  # 10 pre-approved + user-approved
   --resume <sessionId>  # Used when restarting with new tools
+  --permission-mode plan  # Optional: Enable planning mode (read-only tools only)
 ```
 
-📚 **Detailed docs**: [Claude Code Integration Index](docs/claude-code/README.md) | [Tool Approval System](docs/claude-code/tool-approval.md) | [IPC Patterns](docs/ipc-patterns.md) | [UI Components](docs/ui-components.md#ai-assistant-panel)
+📚 **Detailed docs**: [Claude Code Integration Index](docs/claude-code/README.md) | [Tool Approval System](docs/claude-code/tool-approval.md) | [UI Features](docs/claude-code/ui-features.md) | [IPC Patterns](docs/ipc-patterns.md)
 
 ## Contributing
 
@@ -367,6 +386,7 @@ When adding features:
 - **Claude Code Integration:**
   - [Integration Index](docs/claude-code/README.md) - Quick reference and navigation
   - [Tool Approval System](docs/claude-code/tool-approval.md) - Security model, approval flow, auto-retry
+  - [UI Features](docs/claude-code/ui-features.md) - Copilot panel, Control Panel, Planning Mode, Tool Approval Dialog
 - **Testing:**
   - [Testing Index](docs/testing/README.md) - Complete testing documentation hub
   - [Quick Start](docs/testing/quickstart.md) - Fast testing setup

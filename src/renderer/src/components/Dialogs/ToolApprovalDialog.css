@@ -25,7 +25,7 @@
 
 .tool-approval-dialog {
   background: #2d2d30;
-  border-radius: 8px;
+  border-radius: 0;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   width: 500px;
   max-width: 90vw;
@@ -134,7 +134,7 @@
   cursor: pointer;
   padding: 6px 8px;
   text-align: left;
-  border-radius: 4px;
+  border-radius: 0;
   transition: all 0.2s;
   display: flex;
   align-items: center;
@@ -149,7 +149,7 @@
 .tool-params-content {
   background: #1e1e1e;
   border: 1px solid #3e3e42;
-  border-radius: 4px;
+  border-radius: 0;
   padding: 12px;
   margin: 0;
   font-size: 12px;
@@ -162,7 +162,7 @@
 /* Options */
 .tool-approval-options {
   background: #252526;
-  border-radius: 6px;
+  border-radius: 0;
   padding: 16px;
 }
 
@@ -205,7 +205,7 @@
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  border-radius: 4px;
+  border-radius: 0;
   border: none;
   font-size: 14px;
   font-weight: 500;

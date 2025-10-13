@@ -50,66 +50,27 @@ Manages:
 - **Hover effect**: Icon color changes to white
 - **Size**: 48x48px click target per item
 
-## AI Assistant Panel
+## AI Assistant Panel & Claude Code UI
 
-**Location**: `src/renderer/src/components/Panels/AiAssistantPanel.tsx`, `ClaudeCode/ClaudeCodeChat.tsx`
-
-Right sidebar panel for Claude Code integration via persistent CLI session.
-
-### Features
-
-- **Installation Check**: Detects Claude CLI presence, shows install guide if missing
-- **Authentication**: OAuth token setup with visual flow
-- **Persistent Session**: Long-running Claude CLI process maintains conversation context
-- **Session State Indicators**: Visual dots (ready=green, starting=yellow, error=red)
-- **Chat Interface**: Message history with user/assistant/tool_use messages
-- **Stop Generation**: Stop button during active generation (Escape key)
-- **Auto-restart**: Exponential backoff recovery (max 3 attempts) on crashes
-
-### Session Lifecycle
-
-1. User authenticates via OAuth token
-2. Session starts automatically when authenticated
-3. Claude CLI spawns in project directory context
-4. Process runs until project closes
-5. Messages sent via stdin (JSONL), received via stdout (JSONL)
-
-### UI States
-
-- **Loading**: Checking Claude CLI status
-- **Not Installed**: Installation guide with Homebrew command
-- **Not Authenticated**: OAuth token input form
-- **Starting**: Spinner with "Starting Claude session..."
-- **Ready**: Chat interface with green indicator
-- **Error**: Error message with restart button
-
-### Components
-
-- `AiAssistantPanel.tsx` - Session management, auth flows, state indicators
-- `ClaudeCodeChat.tsx` - Chat interface, message display, input handling
-- `TerminalMessage.tsx` - Individual message rendering (user/assistant/tool_use)
-
-### Implementation
-
-**Service**: `src/main/services/ClaudeCliService.ts` (persistent session architecture)
-**IPC**: `src/main/ipc/claude-code-handlers.ts` (session lifecycle)
-
-See: [IPC Patterns](./ipc-patterns.md) | [Architecture](./architecture.md) | [Claude Code Integration](./claude-code/README.md)
-
-## Tool Approval Dialog
-
-**Location**: `src/renderer/src/components/Dialogs/ToolApprovalDialog.tsx`
-
-Modal dialog for approving or denying Claude Code tool execution. Appears when Claude attempts to use a tool requiring user approval (Task, WebFetch, SlashCommand, etc.).
+**See**: [Claude Code UI Features](./claude-code/ui-features.md) for complete documentation.
 
 **Quick Reference**:
-- VS Code dark theme with 500px centered modal
-- Tool name, description, collapsible parameters (JSON)
-- "Remember this choice" checkbox for persistent approval
-- Approve/Deny buttons with icons
-- Animations: fadeIn (overlay), slideUp (dialog)
+- **Panel Label**: "Copilot" with status indicator dot (left of icon)
+- **Location**: Right sidebar, top position in activity bar
+- **Keyboard**: `Cmd/Ctrl+Shift+A`
+- **Status Indicators**: Color-coded dot (🟢 green=ready, 🟡 yellow=starting, 🔴 red=error)
+- **Features**: Installation check, OAuth authentication, persistent CLI session, chat interface, planning mode toggle, control panel
+- **Components**:
+  - `AiAssistantPanel.tsx` - Session management and state indicators
+  - `ClaudeCodeChat.tsx` - Chat interface with Control Panel
+  - `TerminalMessage.tsx` - Message rendering
+  - `ToolApprovalDialog.tsx` - Tool approval modal
 
-See: [Tool Approval System](./claude-code/tool-approval.md) for complete documentation including security model, approval flow, auto-retry, persistence, and component details.
+**Control Panel**: Shows session stats (messages, tools used, duration) and all 17 Claude Code tools with color-coded approval status (blue=approved, gray=not approved).
+
+**Planning Mode**: Toggle between full access and read-only mode (restricts to Read, Grep, Task, WebSearch, Search, TodoWrite).
+
+For complete documentation including session lifecycle, UI states, tool approval system, and planning mode, see [Claude Code UI Features](./claude-code/ui-features.md).
 
 ## Context Menu (File Explorer)
 

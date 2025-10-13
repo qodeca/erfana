@@ -218,21 +218,21 @@ export function AppDockLayout() {
       id: 'git-panel',
       component: 'gitPanel',
       minimumSize: MIN_SIZES.rightSidebar,
-      maximumSize: 600
+      maximumSize: 1200
     })
 
     const terminalPanel = event.api.addPanel({
       id: 'terminal-panel',
       component: 'terminalPanel',
       minimumSize: MIN_SIZES.rightSidebar,
-      maximumSize: 600
+      maximumSize: 1200
     })
 
     const claudePanel = event.api.addPanel({
       id: 'claude-panel',
       component: 'claudePanel',
       minimumSize: MIN_SIZES.rightSidebar,
-      maximumSize: 600
+      maximumSize: 1200
     })
 
     // Set initial sizes

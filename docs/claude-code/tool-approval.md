@@ -20,7 +20,7 @@ Complete guide to Erfana's tool approval system for Claude Code integration.
 
 ### Pre-Approved Tools (No Approval Needed)
 
-These tools are pre-approved by default for seamless workflow:
+These tools are pre-approved by default for seamless workflow (10 total):
 
 - **Read** - Read file contents (safe, read-only)
 - **Write** - Create or overwrite files (common operation)
@@ -29,19 +29,47 @@ These tools are pre-approved by default for seamless workflow:
 - **Grep** - Search file contents with regex (safe, read-only)
 - **Bash** - Execute shell commands (essential for development)
 - **WebSearch** - Search the web (read-only, network access)
+- **Search** - General search capability (safe, read-only)
+- **TodoWrite** - Task management and tracking (safe, planning aid)
+- **Task** - Launch agent tasks for complex operations (common, autonomous work)
 
-**Rationale**: These tools cover 95% of common Claude Code operations. Pre-approving them provides seamless UX while maintaining security through persistent session architecture and user visibility of all tool executions.
+**Rationale**: These 10 tools cover 95%+ of common Claude Code operations. Pre-approving them provides seamless UX while maintaining security through persistent session architecture and user visibility of all tool executions.
 
 ### Tools Requiring Approval
 
-These tools require explicit user approval on first use:
+These tools require explicit user approval on first use (7 total):
 
-- **Task** - Launch background agent tasks (complex, autonomous operations)
+- **MultiEdit** - Batch edit multiple files (complex, wide-reaching modifications)
 - **WebFetch** - Fetch web content (network access, potential security risk)
 - **SlashCommand** - Execute custom slash commands (user-defined, unpredictable)
-- **Others** - Any tool not in pre-approved list
+- **TodoRead** - Read Claude's todo list (access to AI planning data)
+- **NotebookRead** - Read Jupyter notebooks (file access)
+- **NotebookEdit** - Edit Jupyter notebooks (file modifications)
+- **ExitPlanMode** - Exit planning mode (permission escalation)
 
-**Rationale**: These operations are less common, more complex, or have higher security implications requiring explicit user consent.
+**Rationale**: These operations are less common, more complex, or have higher security implications requiring explicit user consent. Total tools: 10 pre-approved + 7 requiring approval = 17 Claude Code tools.
+
+### Planning Mode
+
+**Native Claude CLI feature** that restricts Claude to read-only tools for safe exploration and planning:
+
+**Activation**: Toggle button in chat interface, uses `--permission-mode plan` flag
+
+**Tool Restrictions in Planning Mode** (6 tools):
+- Read, Grep, Task, WebSearch, Search, TodoWrite
+
+**Blocked in Planning Mode**:
+- All write operations: Write, Edit, MultiEdit, NotebookEdit
+- Command execution: Bash
+- Other tools requiring approval: WebFetch, SlashCommand, TodoRead, NotebookRead, ExitPlanMode
+
+**Use Cases**: Code exploration, architecture planning, research, cost estimation, learning existing codebases
+
+**Implementation**: ClaudeCliService.ts:85-95 defines tool set, session restart with `--permission-mode plan`, Control Panel shows restricted tools, system message confirms mode change
+
+**Visual Indicators**: Toggle button (blue when active), system message, Control Panel displays only 6 tools
+
+See: [UI Features - Planning Mode Toggle](./ui-features.md#planning-mode-toggle) for complete UI documentation
 
 ## Approval Flow
 
@@ -165,7 +193,7 @@ User → Dialog → Approve → Session Restarts → **Auto re-sends** → Execu
 ```typescript
 async getApprovedTools(): Promise<string[]>
 // Returns approved tools list, defaults to pre-approved tools:
-// ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch']
+// ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch', 'Search', 'TodoWrite', 'Task']
 
 async setApprovedTools(tools: string[]): Promise<void>
 // Replaces entire approved tools list
@@ -187,12 +215,12 @@ async resetApprovedTools(): Promise<void>
 **Data Structure**:
 ```json
 {
-  "approvedTools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "WebSearch", "Task"],
+  "approvedTools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "WebSearch", "Search", "TodoWrite", "Task"],
   "lastProjectPath": "/Users/user/Projects/my-project"
 }
 ```
 
-**Note**: Pre-approved tools (Read, Write, Edit, Glob, Grep, Bash, WebSearch) are always included via merge logic in `ClaudeCliService.ts:148-153`, even if not in config file.
+**Note**: The 10 pre-approved tools (Read, Write, Edit, Glob, Grep, Bash, WebSearch, Search, TodoWrite, Task) are always included via merge logic in `ClaudeCliService.ts:148-153`, even if not in config file. User-approved tools (e.g., MultiEdit, WebFetch) are added to this list when approved with "Remember this choice".
 
 ### Persistence Behavior
 
@@ -287,8 +315,8 @@ rm ~/.config/erfana/config.json
 **5. Verify Persistence**:
 ```bash
 cat ~/.config/erfana/config.json
-# Should show: {"approvedTools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "WebSearch", "Task"], ...}
-# Note: "Task" only appears if it was the tool approved in step 4
+# Should show: {"approvedTools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "WebSearch", "Search", "TodoWrite", "Task", "<YourApprovedTool>"], ...}
+# Note: The 10 pre-approved tools always appear, plus any additional user-approved tools
 ```
 
 **6. Verify Survives Restart**:
@@ -456,7 +484,7 @@ const [lastUserPrompt, setLastUserPrompt] = useState('')
 ## Related Documentation
 
 - **[Claude Code Integration Index](./README.md)** - Overview and quick reference
+- **[UI Features](./ui-features.md)** - Copilot panel, Control Panel, Planning Mode, ToolApprovalDialog
 - **[Architecture](../architecture.md)** - ClaudeCliService, persistent sessions
 - **[IPC Patterns](../ipc-patterns.md)** - Tool approval and settings channels
-- **[UI Components](../ui-components.md)** - ToolApprovalDialog component
 - **[Security](../security.md)** - Security principles and validation

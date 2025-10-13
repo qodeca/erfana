@@ -84,6 +84,29 @@ declare global {
             }
           }) => void
         ) => () => void
+        // Streaming message updates (--include-partial-messages)
+        onMessageUpdate: (
+          callback: (data: {
+            message: {
+              id: string
+              type: 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'system' | 'error'
+              content: string
+              metadata?: any
+              timestamp: Date
+            }
+          }) => void
+        ) => () => void
+        onMessageComplete: (
+          callback: (data: {
+            message: {
+              id: string
+              type: 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'system' | 'error'
+              content: string
+              metadata?: any
+              timestamp: Date
+            }
+          }) => void
+        ) => () => void
         onComplete: (callback: (data: { sessionId: string }) => void) => () => void
         onError: (callback: (data: { sessionId: string; error: string }) => void) => () => void
         // Event listeners - Session lifecycle

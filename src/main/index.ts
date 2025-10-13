@@ -18,6 +18,7 @@ function createWindow(): BrowserWindow {
     show: false,
     autoHideMenuBar: true,
     title: 'Erfana',
+    roundedCorners: false,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

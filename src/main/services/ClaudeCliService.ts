@@ -67,9 +67,10 @@ interface ModelUsage {
 
 /**
  * JSONL Event types from Claude CLI (output format)
+ * Includes streaming event types from --include-partial-messages
  */
 interface ClaudeCliEvent {
-  type: 'system' | 'user' | 'assistant' | 'result'
+  type: 'system' | 'user' | 'assistant' | 'result' | 'message_start' | 'message_stop' | 'message_delta' | 'content_block_start' | 'content_block_delta' | 'content_block_stop'
   subtype?: string
   message?: {
     role?: string
@@ -107,6 +108,21 @@ interface ClaudeCliEvent {
   permission_denials?: any[]
   uuid?: string
   stats?: any
+  // Streaming event fields (--include-partial-messages)
+  index?: number // Content block index
+  content_block?: {
+    type: string
+    text?: string
+    id?: string
+    name?: string
+    input?: any
+  }
+  delta?: {
+    type: string
+    text?: string // Token delta for streaming
+    stop_reason?: string
+    usage?: TokenUsage
+  }
 }
 
 /**
@@ -128,6 +144,19 @@ interface ClaudeInputMessage {
  */
 type SessionState = 'stopped' | 'starting' | 'ready' | 'error'
 
+/**
+ * Streaming message state for accumulating deltas
+ */
+interface StreamingMessage {
+  id: string
+  type: 'assistant'
+  content: string // Accumulated text
+  metadata: any
+  timestamp: Date
+  contentBlocks: Map<number, string> // Block index -> accumulated content
+  isStreaming: boolean
+}
+
 export class ClaudeCliService extends EventEmitter {
   private claudeProcess: ChildProcess | null = null
   private sessionState: SessionState = 'stopped'
@@ -137,8 +166,24 @@ export class ClaudeCliService extends EventEmitter {
   private maxRestartAttempts = 3
   private restartTimeout: NodeJS.Timeout | null = null
   private authCheckBypass = false
-  private approvedTools: Set<string> = new Set(['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch']) // Pre-approved tools
+  private approvedTools: Set<string> = new Set(['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch', 'Search', 'TodoWrite', 'Task']) // Pre-approved tools
   private sessionId: string | null = null
+  private isPlanningMode: boolean = false // Planning mode state
+
+  // Streaming state management
+  private streamingMessages: Map<string, StreamingMessage> = new Map() // message_id -> streaming message
+  private currentMessageId: string | null = null
+
+  // Tool execution timing
+  private toolExecutionStart: Map<string, number> = new Map() // tool_use_id -> start timestamp
+
+  // Cumulative token tracking for the session
+  private cumulativeTokens = {
+    input_tokens: 0,
+    output_tokens: 0,
+    cache_read_input_tokens: 0,
+    cache_creation_input_tokens: 0
+  }
 
   /**
    * Set OAuth token for Claude CLI
@@ -188,8 +233,10 @@ export class ClaudeCliService extends EventEmitter {
   /**
    * Start persistent Claude CLI session
    * Called when project opens
+   * @param projectPath - Path to the project directory
+   * @param planningMode - If true, restricts tools to read-only (Read, Grep, Task, WebSearch)
    */
-  async startSession(projectPath: string): Promise<void> {
+  async startSession(projectPath: string, planningMode: boolean = false): Promise<void> {
     if (this.claudeProcess) {
       console.log('⚠️ Session already running, stopping first...')
       this.stopSession()
@@ -197,15 +244,35 @@ export class ClaudeCliService extends EventEmitter {
 
     this.sessionState = 'starting'
     this.projectPath = projectPath
+    this.isPlanningMode = planningMode
     this.buffer = ''
     this.restartAttempts = 0
 
-    // Load approved tools from settings and merge with defaults
-    const approvedToolsList = await settingsService.getApprovedTools()
-    const defaultTools = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch']
+    // Reset cumulative token tracking
+    this.cumulativeTokens = {
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0
+    }
 
-    // Merge: always include defaults, plus any additional tools from settings
-    this.approvedTools = new Set([...defaultTools, ...approvedToolsList])
+    // Determine tool set based on planning mode
+    let toolsToUse: Set<string>
+
+    if (planningMode) {
+      // Planning mode: read-only tools only
+      toolsToUse = new Set(['Read', 'Grep', 'Task', 'WebSearch', 'Search', 'TodoWrite'])
+      console.log('📋 Planning mode enabled: using read-only tools')
+    } else {
+      // Normal mode: load approved tools from settings and merge with defaults
+      const approvedToolsList = await settingsService.getApprovedTools()
+      const defaultTools = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch', 'Search', 'TodoWrite', 'Task']
+
+      // Merge: always include defaults, plus any additional tools from settings
+      toolsToUse = new Set([...defaultTools, ...approvedToolsList])
+    }
+
+    this.approvedTools = toolsToUse
 
     // Generate session ID for resume support
     this.sessionId = this.generateSessionId()
@@ -223,9 +290,15 @@ export class ClaudeCliService extends EventEmitter {
         'stream-json',
         '--verbose', // Required for stream-json output format
         '--replay-user-messages', // Echo user messages back for acknowledgment
+        '--include-partial-messages', // Enable real-time token streaming
         '--session-id',
         this.sessionId // Use specific session ID for resume support
       ]
+
+      // Add planning mode flag if enabled
+      if (planningMode) {
+        args.push('--permission-mode', 'plan')
+      }
 
       // Add --allowedTools with approved tools
       // This is required for Claude CLI to actually execute the tools
@@ -383,6 +456,7 @@ export class ClaudeCliService extends EventEmitter {
 
   /**
    * Restart session with updated tool permissions
+   * Preserves planning mode state
    */
   private async restartWithNewPermissions(): Promise<void> {
     if (!this.projectPath || !this.sessionId) {
@@ -394,6 +468,7 @@ export class ClaudeCliService extends EventEmitter {
 
     const previousSessionId = this.sessionId
     const projectPath = this.projectPath
+    const planningMode = this.isPlanningMode
 
     // Kill current process
     if (this.claudeProcess) {
@@ -415,9 +490,15 @@ export class ClaudeCliService extends EventEmitter {
         'stream-json',
         '--verbose',
         '--replay-user-messages',
+        '--include-partial-messages', // Enable streaming
         '--resume',
         previousSessionId
       ]
+
+      // Add planning mode flag if enabled
+      if (planningMode) {
+        args.push('--permission-mode', 'plan')
+      }
 
       // Add updated allowed tools
       if (this.approvedTools.size > 0) {
@@ -425,6 +506,9 @@ export class ClaudeCliService extends EventEmitter {
       }
 
       console.log(`🔧 Resuming with tools: ${Array.from(this.approvedTools).join(', ')}`)
+      if (planningMode) {
+        console.log('📋 Planning mode: enabled')
+      }
 
       this.claudeProcess = spawn('claude', args, {
         cwd: projectPath,
@@ -623,17 +707,151 @@ export class ClaudeCliService extends EventEmitter {
 
   /**
    * Convert Claude CLI event to our unified format
+   * Handles both traditional events and streaming events
    */
   private convertEvent(event: ClaudeCliEvent): ClaudeMessage | null {
-    // System init event
-    if (event.type === 'system' && event.subtype === 'init') {
-      return {
-        id: this.generateId(),
-        type: 'system',
-        content: `Session started: ${event.session_id}`,
-        metadata: event,
-        timestamp: new Date()
+    // === STREAMING EVENTS (--include-partial-messages) ===
+
+    // Message start - Initialize streaming message
+    if (event.type === 'message_start' && event.message) {
+      const messageId = event.message.id || this.generateId()
+      this.currentMessageId = messageId
+
+      const streamingMessage: StreamingMessage = {
+        id: messageId,
+        type: 'assistant',
+        content: '',
+        metadata: {
+          model: event.message.model,
+          message_id: messageId,
+          usage: event.message.usage,
+          isStreaming: true
+        },
+        timestamp: new Date(),
+        contentBlocks: new Map(),
+        isStreaming: true
       }
+
+      this.streamingMessages.set(messageId, streamingMessage)
+
+      // Emit create event for new streaming message
+      return {
+        id: messageId,
+        type: 'assistant',
+        content: '',
+        metadata: {
+          ...streamingMessage.metadata,
+          isStreaming: true
+        },
+        timestamp: streamingMessage.timestamp
+      }
+    }
+
+    // Content block start - Initialize content block in streaming message
+    if (event.type === 'content_block_start' && this.currentMessageId) {
+      const streamingMessage = this.streamingMessages.get(this.currentMessageId)
+      if (streamingMessage && event.index !== undefined) {
+        streamingMessage.contentBlocks.set(event.index, '')
+      }
+      // Don't emit, this is internal state
+      return null
+    }
+
+    // Content block delta - Accumulate streaming text
+    if (event.type === 'content_block_delta' && this.currentMessageId && event.delta?.text) {
+      const streamingMessage = this.streamingMessages.get(this.currentMessageId)
+      if (streamingMessage && event.index !== undefined) {
+        // Append delta to content block
+        const blockContent = streamingMessage.contentBlocks.get(event.index) || ''
+        streamingMessage.contentBlocks.set(event.index, blockContent + event.delta.text)
+
+        // Rebuild full content from all blocks
+        streamingMessage.content = Array.from(streamingMessage.contentBlocks.values()).join('')
+
+        // Emit update event with accumulated content
+        this.emit('message-update', {
+          id: streamingMessage.id,
+          type: 'assistant',
+          content: streamingMessage.content,
+          metadata: {
+            ...streamingMessage.metadata,
+            isStreaming: true
+          },
+          timestamp: streamingMessage.timestamp
+        })
+      }
+      return null // Don't return new message, we emit update event
+    }
+
+    // Content block stop - Finalize content block
+    if (event.type === 'content_block_stop' && this.currentMessageId) {
+      // Just marks block as complete, no action needed
+      return null
+    }
+
+    // Message delta - Update metadata (usage, stop_reason)
+    if (event.type === 'message_delta' && this.currentMessageId && event.delta) {
+      const streamingMessage = this.streamingMessages.get(this.currentMessageId)
+      if (streamingMessage) {
+        // Update usage metadata if present
+        if (event.delta.usage) {
+          streamingMessage.metadata.usage = event.delta.usage
+        }
+        if (event.delta.stop_reason) {
+          streamingMessage.metadata.stop_reason = event.delta.stop_reason
+        }
+
+        // Emit metadata update
+        this.emit('message-update', {
+          id: streamingMessage.id,
+          type: 'assistant',
+          content: streamingMessage.content,
+          metadata: {
+            ...streamingMessage.metadata,
+            isStreaming: true
+          },
+          timestamp: streamingMessage.timestamp
+        })
+      }
+      return null
+    }
+
+    // Message stop - Finalize streaming message
+    if (event.type === 'message_stop' && this.currentMessageId) {
+      const streamingMessage = this.streamingMessages.get(this.currentMessageId)
+      if (streamingMessage) {
+        // Accumulate tokens from this message
+        this.accumulateTokens(streamingMessage.metadata.usage)
+
+        // Mark as complete
+        streamingMessage.isStreaming = false
+        streamingMessage.metadata.isStreaming = false
+
+        // Emit final update with cumulative tokens
+        this.emit('message-complete', {
+          id: streamingMessage.id,
+          type: 'assistant',
+          content: streamingMessage.content,
+          metadata: {
+            ...streamingMessage.metadata,
+            isStreaming: false,
+            cumulativeUsage: { ...this.cumulativeTokens } // Include running total
+          },
+          timestamp: streamingMessage.timestamp
+        })
+
+        // Clean up
+        this.streamingMessages.delete(this.currentMessageId)
+        this.currentMessageId = null
+      }
+      return null
+    }
+
+    // === TRADITIONAL EVENTS (non-streaming) ===
+
+    // System init event - suppress entirely (not needed in UI)
+    if (event.type === 'system' && event.subtype === 'init') {
+      return null
     }
 
     // Result event - Include rich metadata (cost, timing, tokens)
@@ -681,6 +899,9 @@ export class ClaudeCliService extends EventEmitter {
       for (const block of event.message.content) {
         // Text content - Preserve usage metadata
         if (block.type === 'text' && block.text) {
+          // Accumulate tokens
+          this.accumulateTokens(event.message.usage)
+
           return {
             id: this.generateId(),
             type: 'assistant',
@@ -691,6 +912,7 @@ export class ClaudeCliService extends EventEmitter {
               message_id: event.message.id,
               stop_reason: event.message.stop_reason,
               usage: event.message.usage,
+              cumulativeUsage: { ...this.cumulativeTokens }, // Include running total
               session_id: event.session_id
             },
             timestamp: new Date()
@@ -727,6 +949,11 @@ export class ClaudeCliService extends EventEmitter {
           }
 
           // Tool is approved, show normally
+          const startTime = Date.now()
+          if (block.id) {
+            this.toolExecutionStart.set(block.id, startTime)
+          }
+
           return {
             id: this.generateId(),
             type: 'tool_use',
@@ -734,21 +961,34 @@ export class ClaudeCliService extends EventEmitter {
             metadata: {
               name: toolName,
               input: block.input,
-              tool_use_id: block.id
+              tool_use_id: block.id,
+              startTime: startTime
             },
             timestamp: new Date()
           }
         }
 
-        // Tool result - Capture tool execution output
+        // Tool result - Capture tool execution output with timing
         if (block.type === 'tool_result') {
+          // Calculate execution duration
+          const startTime = block.tool_use_id ? this.toolExecutionStart.get(block.tool_use_id) : undefined
+          const endTime = Date.now()
+          const duration = startTime ? endTime - startTime : undefined
+
+          // Clean up timing map
+          if (startTime && block.tool_use_id) {
+            this.toolExecutionStart.delete(block.tool_use_id)
+          }
+
           return {
             id: this.generateId(),
             type: 'tool_result',
             content: block.content || '[No output]',
             metadata: {
               tool_use_id: block.tool_use_id,
-              is_error: block.is_error
+              is_error: block.is_error,
+              duration_ms: duration,
+              endTime: endTime
             },
             timestamp: new Date()
           }
@@ -757,6 +997,18 @@ export class ClaudeCliService extends EventEmitter {
     }
 
     return null
+  }
+
+  /**
+   * Accumulate token usage for session tracking
+   */
+  private accumulateTokens(usage: TokenUsage | undefined): void {
+    if (!usage) return
+
+    this.cumulativeTokens.input_tokens += usage.input_tokens || 0
+    this.cumulativeTokens.output_tokens += usage.output_tokens || 0
+    this.cumulativeTokens.cache_read_input_tokens += usage.cache_read_input_tokens || 0
+    this.cumulativeTokens.cache_creation_input_tokens += usage.cache_creation_input_tokens || 0
   }
 
   /**

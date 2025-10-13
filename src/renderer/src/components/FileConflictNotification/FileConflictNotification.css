@@ -4,7 +4,7 @@
   justify-content: space-between;
   background: rgba(255, 165, 0, 0.12);
   border: 1px solid rgba(255, 165, 0, 0.3);
-  border-radius: 4px;
+  border-radius: 0;
   padding: 10px 14px;
   margin: 0 0 8px 0;
   gap: 16px;
@@ -73,7 +73,7 @@
   gap: 6px;
   padding: 6px 12px;
   border: none;
-  border-radius: 3px;
+  border-radius: 0;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;

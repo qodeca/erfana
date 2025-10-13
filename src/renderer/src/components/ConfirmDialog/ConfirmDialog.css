@@ -15,7 +15,7 @@
 .confirm-dialog {
   background-color: #252526;
   border: 1px solid #454545;
-  border-radius: 6px;
+  border-radius: 0;
   padding: 24px;
   min-width: 400px;
   max-width: 90%;
@@ -47,7 +47,7 @@
   background-color: #3c3c3c;
   color: #ffffff;
   border: none;
-  border-radius: 3px;
+  border-radius: 0;
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;

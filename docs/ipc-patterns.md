@@ -68,7 +68,7 @@ const content = await window.api.file.readFile('/path/to/file.md')
 | `directory-watch:resume` | directory-watcher-handlers | Resume watching after CRUD |
 | `directory-watch:changed` | directory-watcher-handlers | Event: Directory changed externally |
 | `directory-watch:project-deleted` | directory-watcher-handlers | Event: Project folder deleted |
-| `claudeCode:startSession` | claude-code-handlers | Start persistent Claude CLI session |
+| `claudeCode:startSession` | claude-code-handlers | Start persistent Claude CLI session (accepts planningMode: boolean) |
 | `claudeCode:stopSession` | claude-code-handlers | Stop persistent session |
 | `claudeCode:sendMessage` | claude-code-handlers | Send message to running session |
 | `claudeCode:stop` | claude-code-handlers | Stop generation (limited in persistent mode) |

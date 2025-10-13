@@ -46,7 +46,7 @@
   padding: 0;
   background: transparent;
   border: none;
-  border-radius: 3px;
+  border-radius: 0;
   color: #cccccc;
   cursor: pointer;
   transition: all 0.1s ease;

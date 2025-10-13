@@ -137,8 +137,8 @@ const api = {
   // Claude Code operations - Persistent Session Architecture
   claudeCode: {
     // Session lifecycle
-    startSession: (projectPath: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('claudeCode:startSession', projectPath),
+    startSession: (projectPath: string, planningMode?: boolean): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('claudeCode:startSession', projectPath, planningMode),
 
     stopSession: (): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('claudeCode:stopSession'),
@@ -186,6 +186,19 @@ const api = {
       const listener = (_event: any, data: { sessionId: string; message: any }) => callback(data)
       ipcRenderer.on('claudeCode:message', listener)
       return () => ipcRenderer.removeListener('claudeCode:message', listener)
+    },
+
+    // Streaming message updates (--include-partial-messages)
+    onMessageUpdate: (callback: (data: { message: any }) => void) => {
+      const listener = (_event: any, data: { message: any }) => callback(data)
+      ipcRenderer.on('claudeCode:messageUpdate', listener)
+      return () => ipcRenderer.removeListener('claudeCode:messageUpdate', listener)
+    },
+
+    onMessageComplete: (callback: (data: { message: any }) => void) => {
+      const listener = (_event: any, data: { message: any }) => callback(data)
+      ipcRenderer.on('claudeCode:messageComplete', listener)
+      return () => ipcRenderer.removeListener('claudeCode:messageComplete', listener)
     },
 
     onComplete: (callback: (data: { sessionId: string }) => void) => {
