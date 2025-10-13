@@ -253,3 +253,189 @@
 .message-content input[type='checkbox'] {
   margin-right: 6px;
 }
+
+/* =========================================
+   Rich Metadata Displays
+   ========================================= */
+
+/* Message metadata container */
+.message-metadata {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+/* Metadata badges */
+.metadata-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #a0a0a0;
+}
+
+/* Token usage badge */
+.token-badge {
+  color: #4fc1ff;
+  border-color: rgba(79, 193, 255, 0.2);
+  background: rgba(79, 193, 255, 0.1);
+}
+
+/* Cache hit badge */
+.cache-badge {
+  color: #4ec9b0;
+  border-color: rgba(78, 201, 176, 0.2);
+  background: rgba(78, 201, 176, 0.1);
+}
+
+/* Cost badge */
+.cost-badge {
+  color: #dcdcaa;
+  border-color: rgba(220, 220, 170, 0.2);
+  background: rgba(220, 220, 170, 0.1);
+}
+
+/* Tool result output */
+.tool-result-output {
+  margin: 0;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #a0a0a0;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.tool-result-error {
+  color: #f48771;
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+/* Result event (completion summary) */
+.terminal-message-result {
+  border-left: 3px solid #4ec9b0;
+  padding-left: 12px;
+  background: rgba(78, 201, 176, 0.05);
+}
+
+.result-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.result-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4ec9b0;
+}
+
+/* Result details */
+.result-details {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.result-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.result-stat + .result-stat {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stat-label {
+  color: #858585;
+  font-weight: 500;
+}
+
+.stat-value {
+  color: #cccccc;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
+}
+
+.cache-stat .stat-value {
+  color: #4ec9b0;
+}
+
+/* Model usage breakdown */
+.model-usage-details {
+  margin-top: 12px;
+  font-size: 11px;
+}
+
+.model-usage-details summary {
+  cursor: pointer;
+  user-select: none;
+  padding: 6px 0;
+  color: #858585;
+  font-weight: 500;
+}
+
+.model-usage-details summary:hover {
+  color: #a0a0a0;
+}
+
+.model-usage-details[open] summary {
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.model-usage-list {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.model-usage-item {
+  padding: 6px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.model-usage-item + .model-usage-item {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.model-name {
+  font-weight: 600;
+  color: #dcdcaa;
+  text-transform: capitalize;
+  font-size: 11px;
+}
+
+.model-stats {
+  display: flex;
+  gap: 12px;
+  color: #a0a0a0;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
+  font-size: 10px;
+}
+
+.model-cost {
+  color: #dcdcaa;
+  font-weight: 600;
+}
