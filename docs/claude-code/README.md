@@ -1,0 +1,221 @@
+# Claude Code Integration - Documentation Index
+
+Complete documentation for Erfana's Claude Code integration with persistent session architecture and tool approval system.
+
+## Quick Reference
+
+**Status**: ✅ Fully implemented
+
+**Location**: Right sidebar AI Assistant panel
+
+**Key Features**:
+- Persistent Claude CLI sessions (long-running process)
+- Tool approval dialog for security
+- Auto-retry after approval (seamless UX)
+- Safe defaults (Read, Glob, Grep)
+- Persistent permissions via electron-store
+
+## Documentation Structure
+
+### Core Documentation
+
+**[Tool Approval System](./tool-approval.md)** (Main Guide)
+- Security model and approval flow
+- Safe defaults vs dangerous tools
+- Auto-retry feature
+- Persistent storage
+- Development patterns
+- Testing and debugging
+
+### Related Documentation
+
+**[Architecture](../architecture.md)**
+- ClaudeCliService overview
+- Persistent session architecture
+- Service classes and OOP patterns
+
+**[IPC Patterns](../ipc-patterns.md)**
+- Session management channels
+- Tool approval channels
+- Settings channels
+- Event-based communication
+
+**[UI Components](../ui-components.md)**
+- AiAssistantPanel (session management)
+- ClaudeCodeChat (chat interface)
+- ToolApprovalDialog (approval modal)
+- TerminalMessage (message rendering)
+
+## Quick Start
+
+### User Flow
+
+1. Open AI Assistant panel (right sidebar)
+2. Authenticate with OAuth token
+3. Session starts automatically
+4. Send message to Claude Code
+5. If unapproved tool needed → dialog appears
+6. Approve tool (optional: remember choice)
+7. System auto-retries prompt with new permissions
+
+### Developer Flow
+
+**Add New Tool Type**:
+```typescript
+// ClaudeCliService.ts
+private getToolDescription(toolName: string): string {
+  const descriptions: Record<string, string> = {
+    // ... existing tools ...
+    MyNewTool: 'Description of what it does'
+  }
+  return descriptions[toolName] || `Execute ${toolName} tool`
+}
+```
+
+**Test Approval Flow**:
+```bash
+# Reset to defaults
+rm ~/.config/erfana/config.json
+
+# Send message requiring unapproved tool
+"Edit the file README.md"  # Requires Edit tool
+
+# Verify dialog shows, approve, check persistence
+cat ~/.config/erfana/config.json
+```
+
+## Architecture Summary
+
+### Persistent Session Architecture
+
+**Why Persistent?**
+- Context preservation (conversation history)
+- Performance (no spawn overhead per message)
+- Session resumption via --resume flag
+
+**Lifecycle**:
+1. Project opens → session starts
+2. User authenticated → session ready
+3. Messages exchanged via JSONL stdin/stdout
+4. Tool approval → session restarts with --resume + updated --allowedTools
+5. Project closes → session stops
+
+### Critical Design Decision
+
+**--allowedTools is immutable**: Claude CLI reads tool permissions at spawn and cannot change mid-session.
+
+**Consequence**: Must restart session to add tools, use --resume to preserve context.
+
+**Code Pattern**:
+```typescript
+// Initial start
+spawn('claude', ['--session-id', uuid, '--allowedTools', ...approved])
+
+// After approval: Must restart
+spawn('claude', ['--resume', uuid, '--allowedTools', ...updatedApproved])
+```
+
+## Key Components
+
+### Main Process
+
+**ClaudeCliService.ts** (`src/main/services/ClaudeCliService.ts`)
+- Manages persistent CLI sessions
+- Detects unapproved tools in message stream
+- Handles session restart with --resume
+- EventEmitter for lifecycle events
+
+**SettingsService.ts** (`src/main/services/SettingsService.ts`)
+- Persists approved tools via electron-store
+- Methods: get, set, add, remove, reset
+
+### IPC Handlers
+
+**claude-code-handlers.ts** (`src/main/ipc/claude-code-handlers.ts`)
+- Session management: start, stop, sendMessage
+- Tool approval: approveTool, denyTool
+- Events: sessionStarted, sessionResumed, toolApprovalNeeded
+
+**settings-handlers.ts** (`src/main/ipc/settings-handlers.ts`)
+- Settings management: getApprovedTools, setApprovedTools, etc.
+
+### Renderer Components
+
+**AiAssistantPanel.tsx** (`src/renderer/src/components/Panels/AiAssistantPanel.tsx`)
+- Right sidebar panel
+- Installation check and auth flow
+- Session state indicators
+- Hosts ClaudeCodeChat
+
+**ClaudeCodeChat.tsx** (`src/renderer/src/components/ClaudeCode/ClaudeCodeChat.tsx`)
+- Chat interface with message history
+- Tracks lastUserPrompt for auto-retry
+- Listens for tool approval requests
+- Auto-retries after session resumed
+
+**ToolApprovalDialog.tsx** (`src/renderer/src/components/Dialogs/ToolApprovalDialog.tsx`)
+- Modal dialog for tool approval
+- Shows tool name, description, parameters
+- "Remember this choice" checkbox
+- Approve/Deny actions
+
+## Common Tasks
+
+### Check Approved Tools
+
+```typescript
+// Via settings service
+const tools = await settingsService.getApprovedTools()
+console.log(tools)  // ['Read', 'Glob', 'Grep', 'Write', 'Edit']
+
+// Via IPC
+const result = await window.api.settings.getApprovedTools()
+console.log(result.tools)
+```
+
+### Reset to Safe Defaults
+
+```bash
+rm ~/.config/erfana/config.json
+# Or programmatically:
+await settingsService.resetApprovedTools()
+```
+
+### Debug Session Issues
+
+**Main process output** (terminal):
+```
+🚀 Starting persistent Claude CLI session
+🔧 Approved tools: Read, Glob, Grep, Write
+📨 Message: user Hello
+⚠️ Tool Edit requires approval
+🔄 Restarting session with updated permissions
+```
+
+**Renderer output** (DevTools):
+```
+📨 Received message: user Hello...
+⚠️ Tool approval needed: Edit
+✅ Session resumed with tools: ['Read', 'Glob', 'Grep', 'Write', 'Edit']
+```
+
+**Claude CLI logs**:
+```bash
+ls ~/.claude/logs/
+cat ~/.claude/logs/claude-cli-<date>.log
+```
+
+## Known Issues
+
+- **Session restart timing**: Brief delay after approval (intentional, allows initialization)
+- **Stop generation**: Not supported in persistent mode (would require full restart)
+- **Network file systems**: Claude CLI may have issues with NFS/SMB projects (use local only)
+
+## Related Documentation
+
+- **[Tool Approval System](./tool-approval.md)** - Complete guide to tool approval
+- **[Architecture](../architecture.md)** - Three-process model, services
+- **[IPC Patterns](../ipc-patterns.md)** - All IPC channels
+- **[UI Components](../ui-components.md)** - Panel and dialog components
+- **[Security](../security.md)** - Security principles
+- **[Development Tasks](../development-tasks.md)** - Common patterns

@@ -31,7 +31,7 @@ Erfana follows Electron's three-process model:
 - react-markdown + remark-gfm (preview)
 - Zustand (activity bar state management)
 - chokidar (file system watching)
-- @anthropic-ai/claude-agent-sdk (Claude AI)
+- Claude CLI binary (Claude AI via MAX subscription)
 - simple-git (git operations)
 
 **Project Structure:**
@@ -80,8 +80,8 @@ Business logic lives in service classes (`src/main/services/`):
 - `FileWatcherService.ts` - File content auto-refresh (300ms debounce)
 - `DirectoryWatcherService.ts` - Directory tree auto-refresh (1000ms debounce)
 - `SettingsService.ts` - Persistent storage with electron-store (async, dynamic ES Module import)
+- `ClaudeCliService.ts` - Persistent Claude CLI session (long-running process, JSONL stdin/stdout)
 - `GitService.ts` - Git operations (future)
-- `ClaudeService.ts` - Claude SDK wrapper (future)
 
 ```typescript
 export class MyService {
@@ -155,7 +155,7 @@ Automatic detection and refresh for external file system changes:
 
 **Activity Bars**: Dual vertical activity bars (VS Code-style) on left and right edges with Lucide icon toggle buttons.
 - **Left Activity Bar**: Explorer toggle
-- **Right Activity Bar**: Git and Terminal toggles (separate panels, mutually exclusive)
+- **Right Activity Bar**: AI Assistant toggle (top position), Git and Terminal toggles (separate panels, mutually exclusive)
 
 **File Explorer Context Menu**: Right-click files/folders for New File, New Folder, Rename, Delete actions with validation.
 
@@ -169,6 +169,7 @@ Automatic detection and refresh for external file system changes:
 - `Cmd/Ctrl+B` - Toggle left sidebar (Explorer)
 - `Cmd/Ctrl+J` - Toggle right panel (Terminal)
 - `Ctrl+Shift+G` - Toggle right panel (Git)
+- `Cmd/Ctrl+Shift+A` - Toggle right panel (AI Assistant)
 
 **Panel Behavior**:
 - Right sidebar: Git and Terminal are separate splitview panels (mutually exclusive)
@@ -284,27 +285,65 @@ mcp__circuit-electron__close({ sessionId: session.sessionId })
 📚 **Reference**: See [docs/testing/circuit-electron-guide.md](docs/testing/circuit-electron-guide.md)
 📚 **Test scenarios**: See [docs/testing/ui-scenarios.md](docs/testing/ui-scenarios.md) and [interaction-scenarios.md](docs/testing/interaction-scenarios.md)
 
-## Claude Code Integration (Future)
+## Claude Code Integration
 
-Planned integration using Claude Agent SDK:
+**Status**: ✅ FULLY IMPLEMENTED - Persistent session architecture with tool approval system
 
-```typescript
-import { query } from '@anthropic-ai/claude-agent-sdk'
+Erfana integrates Claude Code via persistent CLI session with security-first tool approval for AI-powered assistance within the IDE.
 
-for await (const message of query(prompt, {
-  tools: ['Edit', 'Read'],
-  permissionMode: 'acceptEdits',
-  workingDirectory: projectPath
-})) {
-  mainWindow.webContents.send('claude:message', message)
-}
+### Architecture
+
+- **ClaudeCliService** (`src/main/services/ClaudeCliService.ts`): Spawns and manages long-running Claude CLI process
+- **Persistent Session**: Process runs from project open to project close, maintains conversation context
+- **JSONL Communication**: Bidirectional stdin/stdout streaming with `--input-format stream-json` and `--output-format stream-json`
+- **Auto-Restart**: Exponential backoff recovery (max 3 attempts) on process crashes
+- **Session States**: 'stopped' | 'starting' | 'ready' | 'error'
+
+### UI
+
+- **AI Assistant Panel**: Right sidebar, accessible via activity bar icon
+- **Installation Check**: Detects Claude CLI, shows Homebrew install command if missing
+- **Authentication**: OAuth token setup flow with visual feedback
+- **Session Indicators**: Color-coded dots (green=ready, yellow=starting, red=error)
+- **Chat Interface**: Message history (user/assistant/tool_use), stop generation button
+
+### Tool Approval System
+
+Security-first approach with pre-approved common tools and user approval for complex operations:
+
+- **Pre-Approved Tools**: Read, Write, Edit, Glob, Grep, Bash, WebSearch (cover 95% of operations, transparent execution)
+- **Tools Requiring Approval**: Task, WebFetch, SlashCommand (complex, higher security implications)
+- **Modal Dialog**: ToolApprovalDialog shows tool name, description, parameters, "Remember this choice" option
+- **Auto-Retry**: After approval, system automatically re-sends user prompt with updated permissions
+- **Persistence**: Approved tools saved via electron-store, survive app restarts
+- **Session Restart**: Uses `--resume` flag to preserve conversation context when adding tools
+- **Merge Logic**: Pre-approved tools always included (ClaudeCliService.ts:148-153), even if not in settings
+
+**Key Architecture Decision**: `--allowedTools` flag is immutable at runtime, requiring session restart to add new tools.
+
+### Implementation
+
+**Files**:
+- Service: `src/main/services/ClaudeCliService.ts` (~527 lines)
+- IPC: `src/main/ipc/claude-code-handlers.ts` (~180 lines)
+- Settings: `src/main/ipc/settings-handlers.ts` (tool approval persistence)
+- UI: `src/renderer/src/components/Panels/AiAssistantPanel.tsx`
+- Chat: `src/renderer/src/components/ClaudeCode/ClaudeCodeChat.tsx`
+- Dialog: `src/renderer/src/components/Dialogs/ToolApprovalDialog.tsx`
+
+**Flags Used**:
+```bash
+claude -p \
+  --session-id <uuid> \
+  --input-format stream-json \
+  --output-format stream-json \
+  --verbose \
+  --replay-user-messages \
+  --allowedTools Read Write Edit Glob Grep Bash WebSearch  # Pre-approved, plus any user-approved
+  --resume <sessionId>  # Used when restarting with new tools
 ```
 
-**Roadmap:**
-- [ ] ClaudeService implementation
-- [ ] Text selection → prompt flow
-- [ ] Streaming response UI
-- [ ] Terminal integration (when node-pty fixed)
+📚 **Detailed docs**: [Claude Code Integration Index](docs/claude-code/README.md) | [Tool Approval System](docs/claude-code/tool-approval.md) | [IPC Patterns](docs/ipc-patterns.md) | [UI Components](docs/ui-components.md#ai-assistant-panel)
 
 ## Contributing
 
@@ -325,6 +364,9 @@ When adding features:
 - [Security](docs/security.md) - Security guidelines, CSP, validation patterns
 - [Known Issues](docs/known-issues.md) - Current issues, resolved issues, workarounds
 - [Development Tasks](docs/development-tasks.md) - Common development patterns, adding panels
+- **Claude Code Integration:**
+  - [Integration Index](docs/claude-code/README.md) - Quick reference and navigation
+  - [Tool Approval System](docs/claude-code/tool-approval.md) - Security model, approval flow, auto-retry
 - **Testing:**
   - [Testing Index](docs/testing/README.md) - Complete testing documentation hub
   - [Quick Start](docs/testing/quickstart.md) - Fast testing setup
@@ -339,3 +381,4 @@ When adding features:
 - [Dockview](https://dockview.dev/)
 - [Monaco Editor API](https://microsoft.github.io/monaco-editor/api/index.html)
 - [Claude Agent SDK](https://github.com/anthropics/claude-code)
+- ALWAYS save screenshots made with cicruit-electron MCP server to the /temp/ folder located in the root folder of the project. If /temp/ doesn't exist create it

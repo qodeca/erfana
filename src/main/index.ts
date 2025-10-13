@@ -5,10 +5,12 @@ import icon from '../../resources/icon.png?asset'
 import { registerFileHandlers } from './ipc/file-handlers'
 import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
+import { registerClaudeCodeHandlers } from './ipc/claude-code-handlers'
+import { registerSettingsHandlers } from './ipc/settings-handlers'
 import { fileWatcherService } from './services/FileWatcherService'
 import { directoryWatcherService } from './services/DirectoryWatcherService'
 
-function createWindow(): void {
+function createWindow(): BrowserWindow {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 1400,
@@ -41,6 +43,8 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  return mainWindow
 }
 
 // This method will be called when Electron has finished
@@ -64,7 +68,10 @@ app.whenReady().then(() => {
   registerFileHandlers()
   registerFileWatcherHandlers()
   registerDirectoryWatcherHandlers()
+  registerClaudeCodeHandlers()
+  registerSettingsHandlers()
 
+  // Create main window
   createWindow()
 
   app.on('activate', function () {

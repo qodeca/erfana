@@ -112,6 +112,150 @@ const api = {
       ipcRenderer.on('directory-watch:error', listener)
       return () => ipcRenderer.removeListener('directory-watch:error', listener)
     }
+  },
+
+  // Settings operations
+  settings: {
+    getApprovedTools: (): Promise<{ success: boolean; tools?: string[]; error?: string }> =>
+      ipcRenderer.invoke('settings:getApprovedTools'),
+    setApprovedTools: (
+      tools: string[]
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('settings:setApprovedTools', tools),
+    addApprovedTool: (
+      toolName: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('settings:addApprovedTool', toolName),
+    removeApprovedTool: (
+      toolName: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('settings:removeApprovedTool', toolName),
+    resetApprovedTools: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('settings:resetApprovedTools')
+  },
+
+  // Claude Code operations - Persistent Session Architecture
+  claudeCode: {
+    // Session lifecycle
+    startSession: (projectPath: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('claudeCode:startSession', projectPath),
+
+    stopSession: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('claudeCode:stopSession'),
+
+    getSessionState: (): Promise<{
+      success: boolean
+      state?: 'stopped' | 'starting' | 'ready' | 'error'
+      error?: string
+    }> => ipcRenderer.invoke('claudeCode:getSessionState'),
+
+    // Send message (event-based for streaming)
+    sendMessage: (prompt: string, context: any, sessionId: string): void => {
+      ipcRenderer.send('claudeCode:sendMessage', { prompt, context, sessionId })
+    },
+
+    // Stop generation (not supported in persistent mode)
+    stop: (): void => {
+      ipcRenderer.send('claudeCode:stop')
+    },
+
+    // CLI installation and authentication
+    isInstalled: (): Promise<boolean> => ipcRenderer.invoke('claudeCode:isInstalled'),
+
+    checkAuth: (): Promise<{
+      isAuthenticated: boolean
+      username?: string
+      error?: string
+    }> => ipcRenderer.invoke('claudeCode:checkAuth'),
+
+    setToken: (token: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('claudeCode:setToken', token),
+
+    // Tool approval
+    approveTool: (
+      toolName: string,
+      remember: boolean
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('claudeCode:approveTool', toolName, remember),
+
+    denyTool: (toolName: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('claudeCode:denyTool', toolName),
+
+    // Event listeners - Messages
+    onMessage: (callback: (data: { sessionId: string; message: any }) => void) => {
+      const listener = (_event: any, data: { sessionId: string; message: any }) => callback(data)
+      ipcRenderer.on('claudeCode:message', listener)
+      return () => ipcRenderer.removeListener('claudeCode:message', listener)
+    },
+
+    onComplete: (callback: (data: { sessionId: string }) => void) => {
+      const listener = (_event: any, data: { sessionId: string }) => callback(data)
+      ipcRenderer.on('claudeCode:complete', listener)
+      return () => ipcRenderer.removeListener('claudeCode:complete', listener)
+    },
+
+    onError: (callback: (data: { sessionId: string; error: string }) => void) => {
+      const listener = (_event: any, data: { sessionId: string; error: string }) => callback(data)
+      ipcRenderer.on('claudeCode:error', listener)
+      return () => ipcRenderer.removeListener('claudeCode:error', listener)
+    },
+
+    // Event listeners - Session lifecycle
+    onSessionStarted: (callback: (data: { projectPath: string }) => void) => {
+      const listener = (_event: any, data: { projectPath: string }) => callback(data)
+      ipcRenderer.on('claudeCode:sessionStarted', listener)
+      return () => ipcRenderer.removeListener('claudeCode:sessionStarted', listener)
+    },
+
+    onSessionStopped: (callback: () => void) => {
+      const listener = () => callback()
+      ipcRenderer.on('claudeCode:sessionStopped', listener)
+      return () => ipcRenderer.removeListener('claudeCode:sessionStopped', listener)
+    },
+
+    onSessionRestarting: (
+      callback: (data: { attempt: number; maxAttempts: number }) => void
+    ) => {
+      const listener = (_event: any, data: { attempt: number; maxAttempts: number }) =>
+        callback(data)
+      ipcRenderer.on('claudeCode:sessionRestarting', listener)
+      return () => ipcRenderer.removeListener('claudeCode:sessionRestarting', listener)
+    },
+
+    onSessionError: (callback: (error: { message: string; recoverable: boolean }) => void) => {
+      const listener = (_event: any, error: { message: string; recoverable: boolean }) =>
+        callback(error)
+      ipcRenderer.on('claudeCode:sessionError', listener)
+      return () => ipcRenderer.removeListener('claudeCode:sessionError', listener)
+    },
+
+    // Event listeners - Tool approval
+    onToolApprovalNeeded: (
+      callback: (request: {
+        toolName: string
+        toolId: string
+        input: any
+        description: string
+      }) => void
+    ) => {
+      const listener = (
+        _event: any,
+        request: { toolName: string; toolId: string; input: any; description: string }
+      ) => callback(request)
+      ipcRenderer.on('claudeCode:toolApprovalNeeded', listener)
+      return () => ipcRenderer.removeListener('claudeCode:toolApprovalNeeded', listener)
+    },
+
+    onSessionResumed: (
+      callback: (data: { projectPath: string; approvedTools: string[] }) => void
+    ) => {
+      const listener = (
+        _event: any,
+        data: { projectPath: string; approvedTools: string[] }
+      ) => callback(data)
+      ipcRenderer.on('claudeCode:sessionResumed', listener)
+      return () => ipcRenderer.removeListener('claudeCode:sessionResumed', listener)
+    }
   }
 }
 

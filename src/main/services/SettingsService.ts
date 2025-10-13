@@ -1,5 +1,6 @@
 interface Settings {
   lastProjectPath?: string
+  approvedTools?: string[]
 }
 
 export class SettingsService {
@@ -37,6 +38,39 @@ export class SettingsService {
   async clearLastProjectPath(): Promise<void> {
     const store = await this.ensureStore()
     store.delete('lastProjectPath')
+  }
+
+  // Approved Tools Management
+  async getApprovedTools(): Promise<string[]> {
+    const store = await this.ensureStore()
+    // Default to pre-approved tools
+    return store.get('approvedTools') || ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch']
+  }
+
+  async setApprovedTools(tools: string[]): Promise<void> {
+    const store = await this.ensureStore()
+    store.set('approvedTools', tools)
+  }
+
+  async addApprovedTool(toolName: string): Promise<void> {
+    const store = await this.ensureStore()
+    const tools = await this.getApprovedTools()
+    if (!tools.includes(toolName)) {
+      tools.push(toolName)
+      store.set('approvedTools', tools)
+    }
+  }
+
+  async removeApprovedTool(toolName: string): Promise<void> {
+    const store = await this.ensureStore()
+    const tools = await this.getApprovedTools()
+    const filtered = tools.filter((t) => t !== toolName)
+    store.set('approvedTools', filtered)
+  }
+
+  async resetApprovedTools(): Promise<void> {
+    const store = await this.ensureStore()
+    store.set('approvedTools', ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch'])
   }
 }
 
