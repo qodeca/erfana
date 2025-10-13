@@ -138,6 +138,19 @@ export const TerminalMessage = React.memo(({ message }: TerminalMessageProps) =>
             >
               {message.content}
             </ReactMarkdown>
+            {/* Token usage badge */}
+            {message.metadata?.usage && (
+              <div className="message-metadata">
+                <span className="metadata-badge token-badge">
+                  {message.metadata.usage.input_tokens || 0} in / {message.metadata.usage.output_tokens || 0} out
+                </span>
+                {message.metadata.usage.cache_read_input_tokens > 0 && (
+                  <span className="metadata-badge cache-badge" title="Cache hit">
+                    ⚡ {message.metadata.usage.cache_read_input_tokens} cached
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )
@@ -168,7 +181,12 @@ export const TerminalMessage = React.memo(({ message }: TerminalMessageProps) =>
           <div className="message-prefix">
             <CheckCircle size={16} />
           </div>
-          <div className="message-content">{message.content}</div>
+          <div className="message-content">
+            {message.metadata?.is_error && (
+              <div className="tool-result-error">⚠️ Tool Error</div>
+            )}
+            <pre className="tool-result-output">{message.content}</pre>
+          </div>
         </div>
       )
 
@@ -183,6 +201,76 @@ export const TerminalMessage = React.memo(({ message }: TerminalMessageProps) =>
       )
 
     case 'system':
+      // Check if this is a result event with rich metadata
+      if (message.content === '✓ Complete' && message.metadata) {
+        const { total_cost_usd, duration_ms, usage, modelUsage } = message.metadata
+
+        return (
+          <div className="terminal-message terminal-message-system terminal-message-result">
+            <div className="message-prefix">
+              <CheckCircle size={16} />
+            </div>
+            <div className="message-content">
+              <div className="result-summary">
+                <span className="result-title">✓ Complete</span>
+                {duration_ms && (
+                  <span className="metadata-badge">
+                    ⏱️ {(duration_ms / 1000).toFixed(2)}s
+                  </span>
+                )}
+                {total_cost_usd !== undefined && (
+                  <span className="metadata-badge cost-badge">
+                    💰 ${total_cost_usd.toFixed(4)}
+                  </span>
+                )}
+              </div>
+
+              {/* Token usage summary */}
+              {usage && (
+                <div className="result-details">
+                  <div className="result-stat">
+                    <span className="stat-label">Tokens:</span>
+                    <span className="stat-value">
+                      {usage.input_tokens || 0} in / {usage.output_tokens || 0} out
+                    </span>
+                  </div>
+                  {usage.cache_read_input_tokens > 0 && (
+                    <div className="result-stat cache-stat">
+                      <span className="stat-label">Cache:</span>
+                      <span className="stat-value">
+                        ⚡ {usage.cache_read_input_tokens} tokens ({
+                          ((usage.cache_read_input_tokens /
+                            ((usage.cache_read_input_tokens || 0) + (usage.input_tokens || 0))) * 100).toFixed(0)
+                        }% hit rate)
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Model usage breakdown (expandable) */}
+              {modelUsage && Object.keys(modelUsage).length > 0 && (
+                <details className="model-usage-details">
+                  <summary>Model breakdown</summary>
+                  <div className="model-usage-list">
+                    {Object.entries(modelUsage).map(([model, stats]: [string, any]) => (
+                      <div key={model} className="model-usage-item">
+                        <div className="model-name">{model.split('-').pop()}</div>
+                        <div className="model-stats">
+                          <span>{stats.inputTokens} in / {stats.outputTokens} out</span>
+                          <span className="model-cost">${stats.costUSD.toFixed(4)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+          </div>
+        )
+      }
+
+      // Regular system message
       return (
         <div className="terminal-message terminal-message-system">
           <div className="message-prefix">

@@ -33,6 +33,39 @@ export interface ClaudeMessage {
 }
 
 /**
+ * Token usage statistics
+ */
+interface TokenUsage {
+  input_tokens?: number
+  output_tokens?: number
+  cache_creation_input_tokens?: number
+  cache_read_input_tokens?: number
+  cache_creation?: {
+    ephemeral_5m_input_tokens?: number
+    ephemeral_1h_input_tokens?: number
+  }
+  service_tier?: string
+  server_tool_use?: {
+    web_search_requests?: number
+  }
+}
+
+/**
+ * Model-specific usage breakdown
+ */
+interface ModelUsage {
+  [modelName: string]: {
+    inputTokens: number
+    outputTokens: number
+    cacheReadInputTokens: number
+    cacheCreationInputTokens: number
+    webSearchRequests: number
+    costUSD: number
+    contextWindow: number
+  }
+}
+
+/**
  * JSONL Event types from Claude CLI (output format)
  */
 interface ClaudeCliEvent {
@@ -40,6 +73,11 @@ interface ClaudeCliEvent {
   subtype?: string
   message?: {
     role?: string
+    model?: string
+    id?: string
+    stop_reason?: string | null
+    stop_sequence?: string | null
+    usage?: TokenUsage
     content?: Array<{
       type: string
       text?: string
@@ -47,10 +85,27 @@ interface ClaudeCliEvent {
       name?: string
       input?: any
       tool_use_id?: string
+      content?: string // For tool_result
+      is_error?: boolean
     }>
   }
   session_id?: string
-  tools?: any[]
+  tools?: string[]
+  mcp_servers?: Array<{ name: string; status: string }>
+  model?: string
+  permissionMode?: string
+  cwd?: string
+  // Result event fields
+  is_error?: boolean
+  duration_ms?: number
+  duration_api_ms?: number
+  num_turns?: number
+  result?: string
+  total_cost_usd?: number
+  usage?: TokenUsage
+  modelUsage?: ModelUsage
+  permission_denials?: any[]
+  uuid?: string
   stats?: any
 }
 
@@ -581,13 +636,24 @@ export class ClaudeCliService extends EventEmitter {
       }
     }
 
-    // Result event
+    // Result event - Include rich metadata (cost, timing, tokens)
     if (event.type === 'result') {
       return {
         id: this.generateId(),
         type: 'system',
         content: '✓ Complete',
-        metadata: event.stats,
+        metadata: {
+          // Preserve all rich metadata
+          duration_ms: event.duration_ms,
+          duration_api_ms: event.duration_api_ms,
+          num_turns: event.num_turns,
+          total_cost_usd: event.total_cost_usd,
+          usage: event.usage,
+          modelUsage: event.modelUsage,
+          is_error: event.is_error,
+          permission_denials: event.permission_denials,
+          stats: event.stats
+        },
         timestamp: new Date()
       }
     }
@@ -613,13 +679,20 @@ export class ClaudeCliService extends EventEmitter {
     // Assistant message
     if (event.type === 'assistant' && event.message?.content) {
       for (const block of event.message.content) {
-        // Text content
+        // Text content - Preserve usage metadata
         if (block.type === 'text' && block.text) {
           return {
             id: this.generateId(),
             type: 'assistant',
             content: block.text,
-            metadata: event,
+            metadata: {
+              // Preserve token usage and model info
+              model: event.message.model,
+              message_id: event.message.id,
+              stop_reason: event.message.stop_reason,
+              usage: event.message.usage,
+              session_id: event.session_id
+            },
             timestamp: new Date()
           }
         }
@@ -662,6 +735,20 @@ export class ClaudeCliService extends EventEmitter {
               name: toolName,
               input: block.input,
               tool_use_id: block.id
+            },
+            timestamp: new Date()
+          }
+        }
+
+        // Tool result - Capture tool execution output
+        if (block.type === 'tool_result') {
+          return {
+            id: this.generateId(),
+            type: 'tool_result',
+            content: block.content || '[No output]',
+            metadata: {
+              tool_use_id: block.tool_use_id,
+              is_error: block.is_error
             },
             timestamp: new Date()
           }
