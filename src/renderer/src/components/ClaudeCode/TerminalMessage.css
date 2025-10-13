@@ -5,7 +5,7 @@
 
 /* Base terminal message */
 .terminal-message {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   font-size: 13px;
   line-height: 1.5;
   padding: 6px 8px;
@@ -33,7 +33,13 @@
   min-width: 0;
 }
 
-/* User messages */
+/* User messages - blue background */
+.terminal-message-user {
+  border-left: 3px solid #4fc1ff;
+  background: rgba(79, 193, 255, 0.05);
+  padding-left: 12px;
+}
+
 .terminal-message-user .message-prefix {
   color: #4fc1ff;
 }
@@ -42,7 +48,13 @@
   color: #cccccc;
 }
 
-/* Assistant messages */
+/* Assistant messages - green background */
+.terminal-message-assistant {
+  border-left: 3px solid #4ec9b0;
+  background: rgba(78, 201, 176, 0.05);
+  padding-left: 12px;
+}
+
 .terminal-message-assistant .message-prefix {
   color: #4ec9b0;
 }
@@ -86,12 +98,53 @@
   margin-top: 6px;
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.03);
-  border-radius: 4px;
+  border-radius: 0;
   border: 1px solid rgba(255, 255, 255, 0.05);
   overflow-x: auto;
   font-size: 11px;
   line-height: 1.5;
   color: #a0a0a0;
+}
+
+/* Inline tool details - chevron at end of line */
+.tool-details-inline {
+  display: block;
+  font-size: 13px;
+  color: inherit;
+  width: 100%;
+}
+
+.tool-summary-inline {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  list-style: none;
+  gap: 8px;
+}
+
+.tool-summary-inline::-webkit-details-marker {
+  display: none;
+}
+
+.tool-summary-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.tool-summary-chevron {
+  flex-shrink: 0;
+  color: #858585;
+}
+
+.tool-details-inline[open] .tool-summary-chevron {
+  transform: rotate(90deg);
+}
+
+.tool-details-inline .tool-params {
+  display: block;
+  margin-top: 8px;
 }
 
 /* Tool result messages */
@@ -187,7 +240,7 @@
 .message-content :not(pre) > code {
   background: rgba(255, 255, 255, 0.08);
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: 0;
   color: #4fc1ff;
   font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
   font-size: 12px;
@@ -197,7 +250,7 @@
 .message-content pre {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
+  border-radius: 0;
   padding: 12px;
   overflow-x: auto;
   margin: 8px 0;
@@ -272,7 +325,7 @@
   align-items: center;
   gap: 4px;
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: 0;
   font-size: 11px;
   font-weight: 500;
   background: rgba(255, 255, 255, 0.08);
@@ -306,7 +359,7 @@
   margin: 0;
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.03);
-  border-radius: 4px;
+  border-radius: 0;
   border: 1px solid rgba(255, 255, 255, 0.05);
   font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
   font-size: 11px;
@@ -350,7 +403,7 @@
   margin-top: 12px;
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.03);
-  border-radius: 4px;
+  border-radius: 0;
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -385,19 +438,37 @@
   font-size: 11px;
 }
 
-.model-usage-details summary {
+.model-breakdown-summary {
   cursor: pointer;
   user-select: none;
   padding: 6px 0;
   color: #858585;
   font-weight: 500;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
 }
 
-.model-usage-details summary:hover {
+.model-breakdown-summary::-webkit-details-marker {
+  display: none;
+}
+
+.model-breakdown-summary:hover {
   color: #a0a0a0;
 }
 
-.model-usage-details[open] summary {
+.model-breakdown-chevron {
+  flex-shrink: 0;
+  color: #858585;
+}
+
+.model-usage-details[open] .model-breakdown-chevron {
+  transform: rotate(90deg);
+}
+
+.model-usage-details[open] .model-breakdown-summary {
   margin-bottom: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -405,7 +476,7 @@
 .model-usage-list {
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.03);
-  border-radius: 4px;
+  border-radius: 0;
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -438,4 +509,256 @@
 .model-cost {
   color: #dcdcaa;
   font-weight: 600;
+}
+
+/* =========================================
+   Streaming Message Animations
+   ========================================= */
+
+/* Streaming message subtle pulse */
+.terminal-message-assistant.streaming {
+  animation: message-pulse 2s ease-in-out infinite;
+}
+
+@keyframes message-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+/* Streaming indicator badge */
+.streaming-indicator {
+  margin-bottom: 8px;
+}
+
+.streaming-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(79, 193, 255, 0.1);
+  border: 1px solid rgba(79, 193, 255, 0.2);
+  color: #4fc1ff;
+  animation: badge-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* Typing cursor animation */
+.typing-cursor {
+  display: inline-block;
+  color: #4fc1ff;
+  font-size: 14px;
+  line-height: 1;
+  margin-left: 2px;
+  animation: cursor-blink 1s step-end infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* =========================================
+   Tool Execution Enhancements (Phase 2)
+   ========================================= */
+
+/* Tool messages - plain styling (no background) */
+.terminal-message-tool .message-content {
+  font-weight: 500;
+}
+
+/* Tool display elements */
+.tool-path {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
+  font-size: 11px;
+  color: #858585;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 0;
+  font-weight: 400;
+}
+
+.tool-pattern {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
+  font-size: 11px;
+  color: #858585;
+  font-weight: 400;
+}
+
+.tool-command {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
+  font-size: 11px;
+  color: #858585;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 0;
+  font-weight: 400;
+}
+
+/* Tool result summary container */
+.tool-result-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* Tool result badges */
+.tool-result-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 0;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid;
+}
+
+.tool-success-badge {
+  background: rgba(78, 201, 176, 0.15);
+  color: #4ec9b0;
+  border-color: rgba(78, 201, 176, 0.3);
+}
+
+.tool-error-badge {
+  background: rgba(244, 135, 113, 0.15);
+  color: #f48771;
+  border-color: rgba(244, 135, 113, 0.3);
+}
+
+/* Tool execution duration */
+.tool-duration {
+  font-size: 11px;
+  color: #858585;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
+}
+
+/* Tool output collapsible details */
+.tool-output-details {
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.tool-output-summary {
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0;
+  color: #858585;
+  font-weight: 500;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+}
+
+.tool-output-summary::-webkit-details-marker {
+  display: none;
+}
+
+.tool-output-summary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #a0a0a0;
+}
+
+.tool-output-chevron {
+  flex-shrink: 0;
+  color: #858585;
+}
+
+.tool-output-details[open] .tool-output-chevron {
+  transform: rotate(90deg);
+}
+
+.tool-output-details[open] .tool-output-summary {
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* =========================================
+   System Event Enhancements (Phase 3)
+   ========================================= */
+
+/* System event containers */
+.system-event-session {
+  background: rgba(78, 201, 176, 0.05);
+  border-left: 3px solid #4ec9b0;
+  padding-left: 12px;
+}
+
+.system-event-warning {
+  background: rgba(220, 220, 170, 0.05);
+  border-left: 3px solid #dcdcaa;
+  padding-left: 12px;
+}
+
+.system-event-error {
+  background: rgba(244, 135, 113, 0.05);
+  border-left: 3px solid #f48771;
+  padding-left: 12px;
+}
+
+/* System event badges */
+.system-event-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid;
+  margin-right: 8px;
+}
+
+.session-started-badge {
+  background: rgba(78, 201, 176, 0.15);
+  color: #4ec9b0;
+  border-color: rgba(78, 201, 176, 0.3);
+}
+
+.session-stopped-badge {
+  background: rgba(136, 136, 136, 0.15);
+  color: #858585;
+  border-color: rgba(136, 136, 136, 0.3);
+}
+
+.session-restart-badge {
+  background: rgba(220, 220, 170, 0.15);
+  color: #dcdcaa;
+  border-color: rgba(220, 220, 170, 0.3);
+}
+
+.session-error-badge {
+  background: rgba(244, 135, 113, 0.15);
+  color: #f48771;
+  border-color: rgba(244, 135, 113, 0.3);
+}
+
+/* System event details */
+.system-event-detail {
+  display: inline-block;
+  font-size: 11px;
+  color: #a0a0a0;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
+  margin-left: 4px;
 }
