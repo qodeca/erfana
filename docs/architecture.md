@@ -71,11 +71,13 @@ src/
 │   │   ├── FileService.ts       # File operations + rename
 │   │   ├── FileWatcherService.ts    # File content auto-refresh
 │   │   ├── DirectoryWatcherService.ts  # Directory tree auto-refresh
-│   │   └── SettingsService.ts   # Persistent settings (electron-store)
+│   │   ├── SettingsService.ts   # Persistent settings (electron-store)
+│   │   └── ClaudeCliService.ts  # Persistent Claude CLI session
 │   └── ipc/
 │       ├── file-handlers.ts     # IPC handlers
 │       ├── file-watcher-handlers.ts  # File watching IPC
-│       └── directory-watcher-handlers.ts  # Directory watching IPC
+│       ├── directory-watcher-handlers.ts  # Directory watching IPC
+│       └── claude-code-handlers.ts  # Claude Code integration IPC
 ├── preload/
 │   ├── index.ts              # contextBridge setup
 │   └── index.d.ts            # TypeScript definitions
@@ -87,6 +89,8 @@ src/
         │   ├── Panels/          # Panel implementations + WelcomePanel
         │   ├── Editor/          # Monaco + Preview + Context Menus
         │   ├── FileTree/        # File explorer with context menu
+        │   ├── ClaudeCode/      # Claude Code integration components
+        │   ├── Dialogs/         # Modal dialogs (ToolApprovalDialog)
         │   ├── ContextMenu/     # Right-click context menu
         │   ├── ConfirmDialog/   # Confirmation dialog component
         │   └── Toast/           # Toast notification components
@@ -105,6 +109,7 @@ src/
   - FileWatcherService: Auto-reload files on external changes (300ms debounce)
   - DirectoryWatcherService: Auto-refresh file tree (1000ms debounce, ignored patterns)
   - SettingsService: Persistent storage with electron-store (dynamic ES Module import)
+  - ClaudeCliService: Persistent Claude CLI session (long-running process, JSONL stdin/stdout, tool approval system, auto-retry)
 - **Auto-Refresh**: Chokidar-based watching with pause/resume race prevention
 - **Secure IPC**: All main↔renderer communication via contextBridge
 - **State Management**: Zustand for activity bar state (sidebar widths, active panels)
@@ -122,6 +127,7 @@ Dual vertical activity bars (VS Code-style):
 - Keyboard: `Cmd/Ctrl+B`
 
 **Right Activity Bar**:
+- AI Assistant toggle (top position)
 - Git toggle (`Ctrl+Shift+G`)
 - Terminal toggle (`Cmd/Ctrl+J`)
 
@@ -144,4 +150,4 @@ Global notification system implemented using React Context:
 
 **Used for**: Clipboard operations, file operations, save confirmations
 
-See: [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md) | [Security](./security.md)
+See: [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md) | [Security](./security.md) | [Claude Code Integration](./claude-code/README.md)

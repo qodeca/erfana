@@ -68,5 +68,55 @@ const content = await window.api.file.readFile('/path/to/file.md')
 | `directory-watch:resume` | directory-watcher-handlers | Resume watching after CRUD |
 | `directory-watch:changed` | directory-watcher-handlers | Event: Directory changed externally |
 | `directory-watch:project-deleted` | directory-watcher-handlers | Event: Project folder deleted |
+| `claudeCode:startSession` | claude-code-handlers | Start persistent Claude CLI session |
+| `claudeCode:stopSession` | claude-code-handlers | Stop persistent session |
+| `claudeCode:sendMessage` | claude-code-handlers | Send message to running session |
+| `claudeCode:stop` | claude-code-handlers | Stop generation (limited in persistent mode) |
+| `claudeCode:isInstalled` | claude-code-handlers | Check if Claude CLI is installed |
+| `claudeCode:checkAuth` | claude-code-handlers | Check authentication status |
+| `claudeCode:setToken` | claude-code-handlers | Set OAuth token |
+| `claudeCode:getSessionState` | claude-code-handlers | Get current session state |
+| `claudeCode:sessionStarted` | claude-code-handlers | Event: Session started |
+| `claudeCode:sessionStopped` | claude-code-handlers | Event: Session stopped |
+| `claudeCode:sessionRestarting` | claude-code-handlers | Event: Session restarting |
+| `claudeCode:sessionError` | claude-code-handlers | Event: Session error |
+| `claudeCode:approveTool` | claude-code-handlers | Approve tool use and restart session |
+| `claudeCode:denyTool` | claude-code-handlers | Deny tool use and restart session |
+| `claudeCode:message` | claude-code-handlers | Event: Message from Claude CLI |
+| `claudeCode:complete` | claude-code-handlers | Event: Generation complete |
+| `claudeCode:error` | claude-code-handlers | Event: Error occurred |
+| `claudeCode:toolApprovalNeeded` | claude-code-handlers | Event: Tool approval request |
+| `claudeCode:sessionResumed` | claude-code-handlers | Event: Session resumed with new tools |
+| `settings:getApprovedTools` | settings-handlers | Get approved tools list |
+| `settings:setApprovedTools` | settings-handlers | Set approved tools list |
+| `settings:addApprovedTool` | settings-handlers | Add single tool to approved list |
+| `settings:removeApprovedTool` | settings-handlers | Remove single tool from approved list |
+| `settings:resetApprovedTools` | settings-handlers | Reset to safe defaults |
 
-See: [Architecture](./architecture.md) | [Security](./security.md) | [File Watching](./file-watching.md)
+## Event-Based IPC Pattern
+
+For streaming/event-based communication (Claude Code integration):
+
+**1. Register event listener** in renderer:
+```typescript
+useEffect(() => {
+  const unsubscribe = window.api.claudeCode.onMessage((data) => {
+    setMessages((prev) => [...prev, data.message])
+  })
+  return unsubscribe
+}, [])
+```
+
+**2. Emit events** from main process:
+```typescript
+claudeCliService.on('message', (message) => {
+  const windows = BrowserWindow.getAllWindows()
+  if (windows.length > 0) {
+    windows[0].webContents.send('claudeCode:message', { message })
+  }
+})
+```
+
+**Key Pattern**: Get window dynamically (timing-safe), use EventEmitter for service events.
+
+See: [Architecture](./architecture.md) | [Security](./security.md) | [File Watching](./file-watching.md) | [Claude Code Integration](./claude-code/README.md)

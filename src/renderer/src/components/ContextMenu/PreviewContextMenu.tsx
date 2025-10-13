@@ -1,16 +1,18 @@
 import { useState, ReactNode } from 'react'
 import { Maximize2, Minimize2, RefreshCw, Sparkles, MessageSquare, Copy } from 'lucide-react'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
-import { useToast } from '../Toast/ToastContext'
+import { useAiAssistantStore } from '../../stores/useAiAssistantStore'
+import { useActivityBarStore } from '../../stores/useActivityBarStore'
 import './PreviewContextMenu.css'
 
 interface PreviewContextMenuProps {
   x: number
   y: number
-  elementRect: DOMRect
   selectedText: string
   filePath: string
   fullDocument: string
+  startLine?: number
+  endLine?: number
   onClose: () => void
 }
 
@@ -18,14 +20,16 @@ interface ClaudeAction {
   label: string
   icon: ReactNode
   buildPrompt: (text: string, file: string, doc: string) => string
+  sendDirectly?: boolean // If true, send directly to Claude Code without review
 }
 
 const CLAUDE_ACTIONS: ClaudeAction[] = [
   {
     label: 'Ask Claude to Elaborate',
     icon: <Maximize2 size={14} strokeWidth={2} />,
-    buildPrompt: (text, file, doc) =>
-      `In ${file}, I selected this text:\n\n---\n${text}\n---\n\nPlease elaborate on this text with more detail, examples, and context. The full document for reference:\n\n${doc}`
+    buildPrompt: (text) =>
+      `I selected this text:\n\n---\n${text}\n---\n\nPlease elaborate on this text with more detail, examples, and context. Review the file and the entire project if you need more context.`,
+    sendDirectly: true // Send directly without review
   },
   {
     label: 'Ask Claude to Rewrite',
@@ -50,43 +54,57 @@ const CLAUDE_ACTIONS: ClaudeAction[] = [
 export function PreviewContextMenu({
   x,
   y,
-  elementRect,
   selectedText,
   filePath,
   fullDocument,
+  startLine,
+  endLine,
   onClose
 }: PreviewContextMenuProps) {
   const [showCustomPrompt, setShowCustomPrompt] = useState(false)
   const [customPrompt, setCustomPrompt] = useState('')
-  const { showToast } = useToast()
+  const setPendingMessage = useAiAssistantStore((state) => state.setPendingMessage)
+  const setActivePanel = useActivityBarStore((state) => state.setActivePanel)
 
   const handleAction = async (action: ClaudeAction) => {
-    const prompt = action.buildPrompt(selectedText, filePath, fullDocument)
+    let prompt = action.buildPrompt(selectedText, filePath, fullDocument)
 
-    // Copy to clipboard
-    await navigator.clipboard.writeText(prompt)
+    // Add file reference with line numbers if available
+    if (startLine !== undefined && endLine !== undefined) {
+      const fileRef =
+        startLine === endLine
+          ? `@${filePath}:${startLine}`
+          : `@${filePath}:${startLine}-${endLine}`
+      prompt = `${fileRef}\n\n${prompt}`
+    }
 
-    // Show success toast
-    showToast({
-      title: 'Prompt Ready',
-      message: 'Prompt copied to clipboard. Paste in Terminal tab for Claude Code.',
-      type: 'success'
-    })
+    // Open AI Assistant panel
+    setActivePanel('claude', 'right')
+
+    // Set pending message with send flag
+    setPendingMessage(prompt, action.sendDirectly || false)
 
     onClose()
   }
 
   const handleCustomPrompt = async () => {
     if (customPrompt.trim()) {
-      const prompt = `In ${filePath}, I selected this text:\n\n---\n${selectedText}\n---\n\n${customPrompt}`
+      let prompt = `In ${filePath}, I selected this text:\n\n---\n${selectedText}\n---\n\n${customPrompt}`
 
-      await navigator.clipboard.writeText(prompt)
+      // Add file reference with line numbers if available
+      if (startLine !== undefined && endLine !== undefined) {
+        const fileRef =
+          startLine === endLine
+            ? `@${filePath}:${startLine}`
+            : `@${filePath}:${startLine}-${endLine}`
+        prompt = `${fileRef}\n\n${prompt}`
+      }
 
-      showToast({
-        title: 'Custom Prompt Ready',
-        message: 'Prompt copied to clipboard. Paste in Terminal tab for Claude Code.',
-        type: 'success'
-      })
+      // Set pending message in AI Assistant store
+      setPendingMessage(prompt)
+
+      // Open AI Assistant panel
+      setActivePanel('claude', 'right')
 
       onClose()
     }
@@ -94,13 +112,6 @@ export function PreviewContextMenu({
 
   const handleCopySelection = async () => {
     await navigator.clipboard.writeText(selectedText)
-
-    showToast({
-      title: 'Copied',
-      message: 'Selected text copied to clipboard.',
-      type: 'info'
-    })
-
     onClose()
   }
 
@@ -143,7 +154,7 @@ export function PreviewContextMenu({
           />
           <div className="custom-prompt-actions">
             <button onClick={handleCustomPrompt} disabled={!customPrompt.trim()}>
-              Copy Prompt
+              Send to Claude
             </button>
             <button onClick={() => setShowCustomPrompt(false)}>Cancel</button>
           </div>
@@ -174,5 +185,5 @@ export function PreviewContextMenu({
     }
   ]
 
-  return <ContextMenu x={x} y={y} elementRect={elementRect} items={items} onClose={onClose} />
+  return <ContextMenu x={x} y={y} items={items} onClose={onClose} />
 }

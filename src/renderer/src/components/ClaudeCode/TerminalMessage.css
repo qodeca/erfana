@@ -1,0 +1,441 @@
+/**
+ * Terminal Message Styles
+ * Claude Code terminal aesthetic
+ */
+
+/* Base terminal message */
+.terminal-message {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 6px 8px;
+  margin: 2px 0;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+/* Message prefix (icon only) */
+.message-prefix {
+  display: flex;
+  align-items: center;
+  color: #858585;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+/* Message content */
+.message-content {
+  flex: 1;
+  color: #cccccc;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+
+/* User messages */
+.terminal-message-user .message-prefix {
+  color: #4fc1ff;
+}
+
+.terminal-message-user .message-content {
+  color: #cccccc;
+}
+
+/* Assistant messages */
+.terminal-message-assistant .message-prefix {
+  color: #4ec9b0;
+}
+
+.terminal-message-assistant .message-content {
+  color: #cccccc;
+}
+
+/* Tool use messages */
+.terminal-message-tool .message-prefix {
+  color: #dcdcaa;
+}
+
+.tool-indicator {
+  color: #dcdcaa;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tool-details {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #858585;
+  width: 100%;
+}
+
+.tool-details summary {
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 0;
+}
+
+.tool-details summary:hover {
+  color: #a0a0a0;
+}
+
+.tool-params {
+  margin-top: 6px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow-x: auto;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #a0a0a0;
+}
+
+/* Tool result messages */
+.terminal-message-tool-result .message-prefix {
+  color: #4ec9b0;
+}
+
+.terminal-message-tool-result .message-content {
+  color: #858585;
+  font-style: italic;
+}
+
+/* Error messages */
+.terminal-message-error .message-prefix {
+  color: #f48771;
+}
+
+.terminal-message-error .message-content {
+  color: #f48771;
+}
+
+/* System messages */
+.terminal-message-system {
+  color: #858585;
+  font-style: italic;
+  font-size: 12px;
+}
+
+.terminal-message-system .message-content {
+  color: #858585;
+}
+
+/* Markdown content in assistant messages */
+.message-content p {
+  margin: 8px 0;
+}
+
+.message-content p:first-child {
+  margin-top: 0;
+}
+
+.message-content p:last-child {
+  margin-bottom: 0;
+}
+
+.message-content ul,
+.message-content ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.message-content li {
+  margin: 4px 0;
+}
+
+.message-content blockquote {
+  margin: 8px 0;
+  padding-left: 12px;
+  border-left: 3px solid #4ec9b0;
+  color: #a0a0a0;
+}
+
+.message-content h1,
+.message-content h2,
+.message-content h3,
+.message-content h4,
+.message-content h5,
+.message-content h6 {
+  margin: 16px 0 8px 0;
+  color: #cccccc;
+  font-weight: 600;
+}
+
+.message-content h1 {
+  font-size: 18px;
+}
+
+.message-content h2 {
+  font-size: 16px;
+}
+
+.message-content h3 {
+  font-size: 15px;
+}
+
+.message-content h4,
+.message-content h5,
+.message-content h6 {
+  font-size: 14px;
+}
+
+/* Inline code */
+.message-content :not(pre) > code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: #4fc1ff;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
+  font-size: 12px;
+}
+
+/* Code blocks */
+.message-content pre {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.message-content pre code {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Links */
+.message-content a {
+  color: #4fc1ff;
+  text-decoration: none;
+}
+
+.message-content a:hover {
+  text-decoration: underline;
+}
+
+/* Tables */
+.message-content table {
+  border-collapse: collapse;
+  margin: 12px 0;
+  width: 100%;
+}
+
+.message-content th,
+.message-content td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.message-content th {
+  background: rgba(255, 255, 255, 0.05);
+  font-weight: 600;
+}
+
+.message-content tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Horizontal rule */
+.message-content hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 16px 0;
+}
+
+/* Task lists */
+.message-content input[type='checkbox'] {
+  margin-right: 6px;
+}
+
+/* =========================================
+   Rich Metadata Displays
+   ========================================= */
+
+/* Message metadata container */
+.message-metadata {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+/* Metadata badges */
+.metadata-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #a0a0a0;
+}
+
+/* Token usage badge */
+.token-badge {
+  color: #4fc1ff;
+  border-color: rgba(79, 193, 255, 0.2);
+  background: rgba(79, 193, 255, 0.1);
+}
+
+/* Cache hit badge */
+.cache-badge {
+  color: #4ec9b0;
+  border-color: rgba(78, 201, 176, 0.2);
+  background: rgba(78, 201, 176, 0.1);
+}
+
+/* Cost badge */
+.cost-badge {
+  color: #dcdcaa;
+  border-color: rgba(220, 220, 170, 0.2);
+  background: rgba(220, 220, 170, 0.1);
+}
+
+/* Tool result output */
+.tool-result-output {
+  margin: 0;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #a0a0a0;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.tool-result-error {
+  color: #f48771;
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+/* Result event (completion summary) */
+.terminal-message-result {
+  border-left: 3px solid #4ec9b0;
+  padding-left: 12px;
+  background: rgba(78, 201, 176, 0.05);
+}
+
+.result-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.result-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4ec9b0;
+}
+
+/* Result details */
+.result-details {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.result-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.result-stat + .result-stat {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stat-label {
+  color: #858585;
+  font-weight: 500;
+}
+
+.stat-value {
+  color: #cccccc;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
+}
+
+.cache-stat .stat-value {
+  color: #4ec9b0;
+}
+
+/* Model usage breakdown */
+.model-usage-details {
+  margin-top: 12px;
+  font-size: 11px;
+}
+
+.model-usage-details summary {
+  cursor: pointer;
+  user-select: none;
+  padding: 6px 0;
+  color: #858585;
+  font-weight: 500;
+}
+
+.model-usage-details summary:hover {
+  color: #a0a0a0;
+}
+
+.model-usage-details[open] summary {
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.model-usage-list {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.model-usage-item {
+  padding: 6px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.model-usage-item + .model-usage-item {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.model-name {
+  font-weight: 600;
+  color: #dcdcaa;
+  text-transform: capitalize;
+  font-size: 11px;
+}
+
+.model-stats {
+  display: flex;
+  gap: 12px;
+  color: #a0a0a0;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Courier New', monospace;
+  font-size: 10px;
+}
+
+.model-cost {
+  color: #dcdcaa;
+  font-weight: 600;
+}

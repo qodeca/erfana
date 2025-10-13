@@ -1,4 +1,5 @@
 import { useEffect, useRef, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import './ContextMenu.css'
 
 export interface ContextMenuItem {
@@ -12,13 +13,13 @@ export interface ContextMenuItem {
 interface ContextMenuProps {
   x: number
   y: number
-  elementRect: DOMRect
   items: ContextMenuItem[]
   onClose: () => void
 }
 
-export function ContextMenu({ x, y, elementRect, items, onClose }: ContextMenuProps) {
+export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
+  const portalRoot = document.getElementById('portal-root')
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -54,30 +55,29 @@ export function ContextMenu({ x, y, elementRect, items, onClose }: ContextMenuPr
       const viewportWidth = window.innerWidth
       const viewportHeight = window.innerHeight
 
-      // Position menu like VS Code: overlay the element
-      // Menu top aligns with element top, left edge at element left
-      // Offset by 34px right and 24px up for better visual alignment
-      let finalX = elementRect.left + 34
-      let finalY = elementRect.top - 24
+      // Position menu near the cursor (use clientX/Y directly)
+      // Small offset to avoid cursor covering the menu
+      let finalX = x + 8
+      let finalY = y + 8
 
       // Check right edge - if menu would overflow, align to right edge of viewport
       if (finalX + menuRect.width > viewportWidth) {
-        finalX = viewportWidth - menuRect.width - 2
+        finalX = viewportWidth - menuRect.width - 8
       }
 
       // Check bottom edge - if menu would overflow, position at bottom of viewport
       if (finalY + menuRect.height > viewportHeight) {
-        finalY = viewportHeight - menuRect.height - 2
+        finalY = viewportHeight - menuRect.height - 8
       }
 
       // Ensure menu stays within left edge
-      if (finalX < 2) {
-        finalX = 2
+      if (finalX < 8) {
+        finalX = 8
       }
 
       // Ensure menu stays within top edge
-      if (finalY < 2) {
-        finalY = 2
+      if (finalY < 8) {
+        finalY = 8
       }
 
       // Apply calculated position and make visible
@@ -85,7 +85,7 @@ export function ContextMenu({ x, y, elementRect, items, onClose }: ContextMenuPr
       menu.style.top = `${finalY}px`
       menu.style.opacity = '1'
     }
-  }, [x, y, elementRect])
+  }, [x, y])
 
   const handleItemClick = (item: ContextMenuItem) => {
     if (!item.separator) {
@@ -94,7 +94,9 @@ export function ContextMenu({ x, y, elementRect, items, onClose }: ContextMenuPr
     }
   }
 
-  return (
+  if (!portalRoot) return null
+
+  const menu = (
     <div
       ref={menuRef}
       className="context-menu"
@@ -121,4 +123,6 @@ export function ContextMenu({ x, y, elementRect, items, onClose }: ContextMenuPr
       )}
     </div>
   )
+
+  return createPortal(menu, portalRoot)
 }
