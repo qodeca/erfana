@@ -271,7 +271,7 @@ Opinionated approach optimized for consultant workflow with all tools pre-author
 - **Configuration UI**: Settings modal (gear icon in Copilot header, Cmd/Ctrl+,) provides per-tool authorization control
 - **Global Toggle**: "Enable all tools by default" checkbox for quick configuration
 - **Persistence**: Tool settings saved via electron-store, survive app restarts
-- **Session Restart**: Tool changes trigger session restart with `--resume` flag to preserve conversation context
+- **Session Restart**: Tool changes trigger session restart with `--continue` flag to preserve conversation context
 - **Modal Dialog**: ToolApprovalDialog appears only if user manually restricts a tool and Claude attempts to use it
 
 **Key Architecture Decision**: `--allowedTools` flag is immutable at runtime, requiring session restart to add new tools.
@@ -323,9 +323,8 @@ See: [Claude Code UI Features](docs/claude-code/ui-features.md#planning-mode-tog
 
 **Flags Used**:
 ```bash
-claude -p \
+claude -p /path/to/project \
   --continue \
-  --session-id <uuid> \
   --input-format stream-json \
   --output-format stream-json \
   --verbose \
@@ -334,7 +333,7 @@ claude -p \
   --permission-mode plan  # Optional: Enable planning mode (restricts to 9 safe tools)
 ```
 
-📚 **Detailed docs**: [Claude Code Integration Index](docs/claude-code/README.md) | [Tool Approval System](docs/claude-code/tool-approval.md) | [Conversation Preservation](docs/claude-code/conversation-preservation.md) | [UI Features](docs/claude-code/ui-features.md) | [IPC Patterns](docs/ipc-patterns.md)
+📚 **Detailed docs**: [Claude Code Integration Index](docs/claude-code/README.md) | [Tool Approval Core](docs/claude-code/tool-approval-core.md) | [Tool Approval Advanced](docs/claude-code/tool-approval-advanced.md) | [Conversation Preservation](docs/claude-code/conversation-preservation.md) | [UI Features](docs/claude-code/ui-features.md) | [IPC Patterns](docs/ipc-patterns.md)
 
 ## Agent Delegation
 
@@ -361,7 +360,7 @@ claude -p \
 - [Known Issues](docs/known-issues.md) - Current and resolved issues
 - [Development Tasks](docs/development-tasks.md) - Common patterns
 - [Agent Delegation](docs/agent-delegation.md) - Specialized agent usage guide
-- **Claude Code**: [Index](docs/claude-code/README.md) | [Tool Approval](docs/claude-code/tool-approval.md) | [Conversation Preservation](docs/claude-code/conversation-preservation.md) | [UI Features](docs/claude-code/ui-features.md)
+- **Claude Code**: [Index](docs/claude-code/README.md) | [Tool Approval Core](docs/claude-code/tool-approval-core.md) | [Tool Approval Advanced](docs/claude-code/tool-approval-advanced.md) | [Conversation Preservation](docs/claude-code/conversation-preservation.md) | [UI Features](docs/claude-code/ui-features.md)
 - **Testing**: [Index](docs/testing/README.md) | [Quick Start](docs/testing/quickstart.md) | [MCP Guide](docs/testing/circuit-electron-guide.md) | [Scenarios](docs/testing/ui-scenarios.md)
 
 ## Useful Resources

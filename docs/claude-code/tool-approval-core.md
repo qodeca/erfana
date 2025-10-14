@@ -1,4 +1,4 @@
-# Tool Approval System
+# Tool Approval System - Core Guide
 
 Complete guide to Erfana's tool approval system for Claude Code integration.
 
@@ -14,7 +14,7 @@ Complete guide to Erfana's tool approval system for Claude Code integration.
 - Global toggle: "Enable all tools by default"
 - Planning mode: Restricts to 9 safe tools for exploration
 - Persistent storage via electron-store
-- Session restart with --resume when changing tools
+- Session restart with --continue when changing tools
 - ToolApprovalDialog shown only if user manually restricts a tool
 
 ## Tool Authorization
@@ -85,17 +85,131 @@ Users can manually restrict specific tools via Settings modal (Cmd/Ctrl+,) if se
 
 See: [UI Features - Planning Mode Toggle](./ui-features.md#planning-mode-toggle) for complete UI documentation
 
+## Settings Modal (ToolSettingsDialog)
+
+### Overview
+
+**Location**: `src/renderer/src/components/Dialogs/ToolSettingsDialog.tsx`
+
+Modal dialog for configuring Claude Code tool authorization. Accessed via gear icon in Copilot panel header or Cmd/Ctrl+, keyboard shortcut.
+
+**Features**:
+- Blocking modal overlay (prevents background interaction)
+- Global toggle: "Enable all tools by default" (checked by default)
+- Per-tool checkboxes organized into 5 categories
+- Selective mode: Uncheck global toggle to customize individual tools
+- Reset to defaults button with inline confirmation
+- Save & restart session (triggers Claude CLI session restart)
+- Cancel with unsaved changes confirmation
+- ESC key and overlay click to close
+- Loading state while fetching current settings
+- Error display in footer if save fails
+
+**Categories** (17 tools total):
+1. **File Operations** (7): Read, Write, Edit, MultiEdit, Glob, Grep, LS
+2. **System Operations** (1): Bash
+3. **AI & Web** (3): WebSearch, WebFetch, Task
+4. **Workflow & Tasks** (4): TodoRead, TodoWrite, SlashCommand, ExitPlanMode
+5. **Jupyter Notebooks** (2): NotebookRead, NotebookEdit
+
+### Usage
+
+**Opening Modal**:
+- Click gear icon in Copilot header
+- OR press Cmd/Ctrl+, when Copilot is active
+
+**Default State**:
+- "Enable all tools by default" checkbox: ✓ Checked
+- All 17 individual checkboxes: ✓ Checked and disabled (grayed out)
+- Counter: "17 of 17 selected"
+
+**Selective Mode**:
+1. Uncheck "Enable all tools by default"
+2. Individual checkboxes become active
+3. Customize specific tools
+4. Counter updates (e.g., "15 of 17 selected")
+5. Unsaved changes indicator appears
+
+**Saving Changes**:
+1. Click "Save" button
+2. Session restarts with updated tool configuration
+3. Modal closes automatically
+4. Conversation history preserved via --continue
+5. Control Panel updates to show new tool list
+
+**Canceling**:
+- Click "Cancel" button
+- Press ESC key
+- Click overlay background
+- Confirmation if unsaved changes exist
+
+**Reset to Defaults**:
+1. Click "Reset to Defaults" button
+2. Inline confirmation appears
+3. Click "Yes" to confirm
+4. All 17 tools re-enabled
+5. "Enable all tools by default" re-checked
+
+### Props
+
+```typescript
+interface ToolSettingsDialogProps {
+  onClose: () => void
+  onSave: (approvedTools: string[]) => Promise<void>
+}
+```
+
+### Design
+
+- **Dimensions**: 600px width, max-height 85vh, centered
+- **Colors**: VS Code dark (#2d2d30 background, #007acc accent)
+- **Icons**: Settings (gear), AlertCircle (error) from Lucide React
+- **Animations**: fadeIn 0.2s (overlay), slideUp 0.3s (dialog)
+- **Scrolling**: Internal scroll for tool list, fixed header/footer
+
+### Usage Pattern
+
+```typescript
+const [showSettings, setShowSettings] = useState(false)
+
+const handleSaveSettings = async (approvedTools: string[]) => {
+  await window.api.settings.setApprovedTools(approvedTools)
+  await window.api.claudeCode.stopSession()
+  const projectPath = await window.api.file.getProjectPath()
+  if (projectPath) {
+    await window.api.claudeCode.startSession(projectPath, false)
+  }
+}
+
+// In header
+<span className="settings-button" onClick={() => setShowSettings(true)}>
+  <Settings size={16} />
+</span>
+
+// In render
+{showSettings && (
+  <ToolSettingsDialog
+    onClose={() => setShowSettings(false)}
+    onSave={handleSaveSettings}
+  />
+)}
+```
+
+**Files**:
+- `ToolSettingsDialog.tsx` (~270 lines) - Component logic
+- `ToolSettingsDialog.css` (~300 lines) - Modal styling
+
 ## Approval Flow
 
 ### Complete User Flow
 
 1. **User sends message**: "Change the poem in asd.md"
-2. **Claude plans**: Decides to use Edit tool (not approved)
+2. **Claude plans**: Decides to use Edit tool (not approved if user restricted it)
 3. **System detects**: Tool_use block with unapproved tool name
 4. **Dialog shows**: ToolApprovalDialog appears with tool details
 5. **User reviews**: Tool name, description, parameters
 6. **User approves**: Clicks "Approve" with "Remember this choice" checked
-7. **Session restarts**: Process killed, respawned with --resume + updated --allowedTools
+7. **Session restarts**: Process killed, respawned with --continue + updated --allowedTools
 8. **System notifies**: Shows "🔄 Retrying with approved tools: Read, Glob, Grep, Write, Edit"
 9. **Auto-retry**: System automatically re-sends "Change the poem in asd.md"
 10. **Claude executes**: Uses Edit tool successfully with updated permissions
@@ -130,7 +244,7 @@ async approveTool(toolName: string, remember: boolean): Promise<void> {
 }
 ```
 
-**5. Restart Session with --resume** (`ClaudeCliService.ts:329-405`)
+**5. Restart Session with --continue** (`ClaudeCliService.ts:329-405`)
 
 ```typescript
 private async restartWithNewPermissions(): Promise<void> {
@@ -138,9 +252,12 @@ private async restartWithNewPermissions(): Promise<void> {
   this.claudeProcess.kill('SIGTERM')
 
   const args = [
-    '-p', '--input-format', 'stream-json', '--output-format', 'stream-json',
-    '--verbose', '--replay-user-messages',
-    '--resume', previousSessionId,  // Preserve context
+    '-p', this.projectPath,
+    '--continue',  // Preserve conversation
+    '--input-format', 'stream-json',
+    '--output-format', 'stream-json',
+    '--verbose',
+    '--replay-user-messages',
     '--allowedTools', ...Array.from(this.approvedTools)  // Updated list
   ]
 
@@ -162,166 +279,35 @@ Listens for `onSessionResumed` event, if `lastUserPrompt` exists:
 Erfana automatically preserves conversation history when you make configuration changes,
 eliminating the frustration of losing context mid-workflow.
 
-### When --resume is Used
+### When --continue is Used
 
 **Settings Changes**:
 - User modifies tools in Copilot Configuration (Cmd/Ctrl+,)
 - Clicks "Save"
-- Session restarts with `--resume` flag
+- Session restarts with `--continue` flag
 - Conversation history preserved
 - New tool configuration active
 
 **Planning Mode Toggles**:
 - User toggles between planning mode (read-only) and implementation mode (full access)
-- Session restarts with `--resume` flag
+- Session restarts with `--continue` flag
 - Conversation history preserved
 - Tool set updated (9 safe tools ↔ all approved tools)
 
 **Tool Approvals**:
 - User approves tool via approval dialog
-- Session restarts with `--resume` flag
+- Session restarts with `--continue` flag
 - Conversation history preserved
 - Newly approved tool active
 - Last prompt automatically re-sent
 
-### Session ID Lifecycle
-
-Session ID determines when conversation context is preserved:
-
-```
-Initial Project Open:
-  └─> Fresh session ID → New conversation
-
-Settings Change:
-  └─> Reuse session ID + --resume → Conversation preserved
-
-Planning Mode Toggle:
-  └─> Reuse session ID + --resume → Conversation preserved
-
-Tool Approval:
-  └─> Reuse session ID + --resume → Conversation preserved
-
-Manual Restart:
-  └─> Fresh session ID → New conversation
-
-Crash Recovery:
-  └─> Attempt --resume → Fallback to fresh if failed
-```
-
-### Resume Failure Handling
-
-If `--resume` fails (session not found, corrupted, etc.), Erfana automatically:
-1. Detects failure from Claude CLI stderr (13 error patterns)
-2. Generates fresh session ID
-3. Restarts without `--resume`
-4. Shows system message: "⚠️ Previous conversation unavailable. Starting fresh session."
-5. Continues with fresh session
-
-**Common Causes**:
-- Session file deleted from `~/.claude/projects/`
-- Session expired (>30 days old)
-- Claude CLI version mismatch
-- File system corruption
-- Network interruption during server-side session fetch
-
-**Error Patterns Detected** (13 total):
-```
-'session not found'
-'resume failed'
-'invalid session'
-'session expired'
-'failed to resume'
-'could not resume'
-'unable to resume'
-'session file not found'
-'session file corrupted'
-'session file is corrupted'
-'failed to load session'
-'error loading session'
-'session data invalid'
-```
-
-### Session Statistics
-
-Track conversation metrics across configuration changes:
-- **Message count**: Total user + assistant messages (preserved via --resume)
-- **Tool executions**: Total tool invocations (preserved via --resume)
-- **Session age**: Time since session creation (preserved via --resume)
-
-**Access via IPC**:
-```typescript
-const stats = await window.api.claudeCode.getSessionStats()
-// Returns: {
-//   messageCount: 15,
-//   toolExecutions: 7,
-//   createdAt: Date
-// }
-```
-
-**When Stats Reset**:
-- App launch or project open
-- Manual "Restart Session" button
-- Resume failure (automatic fallback)
-
-**When Stats Preserved**:
-- Tool authorization changes (settings save, approval dialog)
-- Planning mode toggles (exploration ↔ implementation)
-
 ### Technical Implementation
 
-**ClaudeCliService.ts** - Session ID lifecycle management:
+**Directory-Based Sessions**: Claude CLI stores conversation history in `~/.claude/projects/` organized by project directory path.
 
-```typescript
-/**
- * Session start reason - determines session ID lifecycle and --resume usage
- */
-type SessionStartReason =
-  | 'initial'         // App launch - fresh session ID
-  | 'manual_restart'  // User explicit restart - fresh session ID
-  | 'settings'        // Tool config change - reuse session ID + --resume
-  | 'planning'        // Planning mode toggle - reuse session ID + --resume
-  | 'recovery'        // Crash recovery - attempt --resume, fallback if needed
+**Automatic Resume**: `--continue` flag finds and loads the latest conversation for the current directory without manual session ID management.
 
-async startSession(
-  projectPath: string,
-  planningMode: boolean = false,
-  reason: SessionStartReason = 'initial'
-): Promise<void> {
-  // Session ID lifecycle logic
-  const previousSessionId = this.sessionId
-  const shouldUseResume = (reason === 'settings' || reason === 'planning') && previousSessionId
-
-  if (reason === 'initial' || reason === 'manual_restart' || reason === 'recovery') {
-    this.sessionId = this.generateSessionId()  // Fresh conversation
-  } else {
-    // Reuse session ID for --resume
-  }
-
-  // Build args with --resume if applicable
-  const args = ['--session-id', this.sessionId!]
-  if (shouldUseResume) {
-    args.push('--resume', previousSessionId!)  // Preserve conversation
-  }
-}
-```
-
-**Resume Timeout**: 10-second timeout prevents hanging. Falls back to fresh session if --resume hangs.
-
-**Structured Logging**: All resume attempts logged with session metadata for debugging:
-```typescript
-private logResumeAttempt(sessionId: string, reason: SessionStartReason): void {
-  console.log('📝 RESUME ATTEMPT', JSON.stringify({
-    sessionId,
-    reason,
-    projectPath: this.projectPath,
-    planningMode: this.isPlanningMode,
-    messageCount: this.sessionStats.messageCount,
-    toolExecutions: this.sessionStats.toolExecutions,
-    sessionAge: /* calculated in seconds */,
-    timestamp: new Date().toISOString()
-  }, null, 2))
-}
-```
+**Session Statistics**: Track conversation metrics (message count, tool executions, session age) across configuration changes. Stats reset on each session restart but conversation history is preserved.
 
 See: [Conversation Preservation Guide](./conversation-preservation.md) for complete documentation
 
@@ -440,242 +426,20 @@ spawn('claude', ['--allowedTools', 'Read', 'Glob', 'Grep'])
 this.approvedTools.add('Edit')
 this.claudeProcess.kill()
 spawn('claude', [
-  '--resume', previousSessionId,  // Preserve context
+  '--continue',  // Preserve conversation
   '--allowedTools', ...this.approvedTools  // Updated list
 ])
 ```
 
 **Consequence**: To add new tool, must restart session.
 
-**Why --resume Works**:
-- Claude CLI stores session state server-side
-- `--resume <sessionId>` loads previous conversation history
+**Why --continue Works**:
+- Claude CLI stores session state client-side in `~/.claude/projects/`
+- `--continue` loads previous conversation history from disk
 - New `--allowedTools` list applied to resumed session
 - Result: Conversation continues with new permissions
 
-## Development Patterns
-
-### Adding New Tool Type
-
-**1. Add Tool Description** (`ClaudeCliService.ts:719-741`):
-
-```typescript
-private getToolDescription(toolName: string): string {
-  const descriptions: Record<string, string> = {
-    Read: 'Read file contents',
-    Edit: 'Modify existing file with search/replace',
-    MyNewTool: 'Clear description of what MyNewTool does'
-  }
-  return descriptions[toolName] || `Execute ${toolName} tool`
-}
-```
-
-**2. Add to ToolSettingsDialog Categories** (`ToolSettingsDialog.tsx:20-60`):
-
-Add tool to appropriate category:
-```typescript
-const TOOL_CATEGORIES: ToolCategory[] = [
-  {
-    name: 'File Operations',
-    tools: [
-      { id: 'MyNewTool', name: 'MyNewTool', description: 'Clear description' }
-    ]
-  }
-]
-```
-
-All tools are enabled by default. Users configure via Settings modal (Cmd/Ctrl+,).
-
-### Testing Settings Modal
-
-**1. Open Settings Modal**:
-- Click gear icon in Copilot header
-- OR press Cmd/Ctrl+, when Copilot is active
-
-**2. Verify Default State**:
-- "Enable all tools by default" checked ✓
-- All 17 individual checkboxes checked and disabled (grayed out)
-- Counter shows "17 of 17 selected"
-
-**3. Test Selective Mode**:
-- Uncheck "Enable all tools by default"
-- Individual checkboxes become active
-- Uncheck specific tool (e.g., WebFetch)
-- Counter updates (e.g., "16 of 17 selected")
-- Verify unsaved changes indicator appears
-
-**4. Test Save & Restart**:
-- Click "Save" button
-- Verify session restarts (console: "🔄 Restarting session")
-- Verify modal closes
-- Control Panel shows updated tool list
-
-**5. Verify Persistence**:
-```bash
-cat ~/.config/erfana/config.json
-# Should show: {"approvedTools": ["Read", "Write", ...", "NotebookEdit", "ExitPlanMode"], ...}
-# Missing tools: Tools unchecked in settings
-```
-
-**6. Test Approval Dialog (when tool restricted)**:
-- Send message requiring restricted tool
-- ToolApprovalDialog appears
-- Approve with "Remember this choice"
-- Tool gets added back to approved list
-
-**7. Test Reset to Defaults**:
-- Click "Reset to Defaults"
-- Inline confirmation appears
-- Click "Yes"
-- All 17 tools re-checked
-- "Enable all tools" re-checked
-
-### Debugging Common Issues
-
-**Dialog doesn't show**:
-- Check tool not already in approved list
-- Check `convertEvent()` detecting tool_use blocks
-- Check `tool-approval-needed` event emitted
-- Check `onToolApprovalNeeded` listener registered
-
-**Tool blocked even after approval**:
-- Check `approvedTools` Set contains tool name
-- Check `--allowedTools` in spawn args includes tool
-- Check session restarted (logs: "🔄 Restarting session")
-- Check no typos in tool name (case-sensitive)
-
-**Context lost after restart**:
-- Check `--resume <sessionId>` flag in restart args
-- Check `sessionId` not regenerated (reuse previous UUID)
-- Check Claude CLI version supports --resume
-- Check network connectivity (session state stored server-side)
-
-**Auto-retry doesn't work**:
-- Check `lastUserPrompt` stored in state
-- Check `onSessionResumed` listener registered
-- Check system message shows
-- Check `sendMessage` called with `lastUserPrompt`
-
-**Persistence doesn't work**:
-- Check `remember` parameter true in `approveTool()` call
-- Check `addApprovedTool()` called
-- Check `config.json` file exists and writable
-- Check electron-store initialized (async import)
-
-## IPC Channels
-
-### Tool Approval
-
-**claudeCode:approveTool(toolName, remember)**
-- Approves tool, restarts session with updated permissions
-- Returns: `{success, error?}`
-- Handler: `claude-code-handlers.ts:135`
-
-**claudeCode:denyTool(toolName)**
-- Denies tool, restarts session (no permission added)
-- Returns: `{success, error?}`
-- Handler: `claude-code-handlers.ts:149`
-
-**claudeCode:toolApprovalNeeded** (Event)
-- Emitted when unapproved tool detected
-- Payload: `{toolName, toolId, input, description}`
-
-**claudeCode:sessionResumed** (Event)
-- Emitted after session restarted with new tools
-- Payload: `{projectPath, approvedTools[]}`
-
-### Settings
-
-**settings:getApprovedTools()**
-- Returns: `{success, tools?, error?}`
-- Handler: `settings-handlers.ts:6`
-
-**settings:addApprovedTool(toolName)**
-- Returns: `{success, error?}`
-- Handler: `settings-handlers.ts:24`
-
-**settings:removeApprovedTool(toolName)**
-- Returns: `{success, error?}`
-- Handler: `settings-handlers.ts:33`
-
-**settings:resetApprovedTools()**
-- Returns: `{success, error?}`
-- Handler: `settings-handlers.ts:42`
-
 ## Components
-
-### ToolSettingsDialog.tsx
-
-**Location**: `src/renderer/src/components/Dialogs/ToolSettingsDialog.tsx`
-
-Modal dialog for configuring Claude Code tool authorization. Accessed via gear icon in Copilot panel header or Cmd/Ctrl+, keyboard shortcut.
-
-**Features**:
-- Blocking modal overlay (prevents background interaction)
-- Global toggle: "Enable all tools by default" (checked by default)
-- Per-tool checkboxes organized into 5 categories
-- Selective mode: Uncheck global toggle to customize individual tools
-- Reset to defaults button with inline confirmation
-- Save & restart session (triggers Claude CLI session restart)
-- Cancel with unsaved changes confirmation
-- ESC key and overlay click to close
-- Loading state while fetching current settings
-- Error display in footer if save fails
-
-**Categories** (17 tools total):
-1. **File Operations** (7): Read, Write, Edit, MultiEdit, Glob, Grep, LS
-2. **System Operations** (1): Bash
-3. **AI & Web** (3): WebSearch, WebFetch, Task
-4. **Workflow & Tasks** (4): TodoRead, TodoWrite, SlashCommand, ExitPlanMode
-5. **Jupyter Notebooks** (2): NotebookRead, NotebookEdit
-
-**Props**:
-```typescript
-interface ToolSettingsDialogProps {
-  onClose: () => void
-  onSave: (approvedTools: string[]) => Promise<void>
-}
-```
-
-**Design**:
-- **Dimensions**: 600px width, max-height 85vh, centered
-- **Colors**: VS Code dark (#2d2d30 background, #007acc accent)
-- **Icons**: Settings (gear), AlertCircle (error) from Lucide React
-- **Animations**: fadeIn 0.2s (overlay), slideUp 0.3s (dialog)
-- **Scrolling**: Internal scroll for tool list, fixed header/footer
-
-**Usage Pattern**:
-```typescript
-const [showSettings, setShowSettings] = useState(false)
-
-const handleSaveSettings = async (approvedTools: string[]) => {
-  await window.api.settings.setApprovedTools(approvedTools)
-  await window.api.claudeCode.stopSession()
-  const projectPath = await window.api.file.getProjectPath()
-  if (projectPath) {
-    await window.api.claudeCode.startSession(projectPath, false)
-  }
-}
-
-// In header
-<span className="settings-button" onClick={() => setShowSettings(true)}>
-  <Settings size={16} />
-</span>
-
-// In render
-{showSettings && (
-  <ToolSettingsDialog
-    onClose={() => setShowSettings(false)}
-    onSave={handleSaveSettings}
-  />
-)}
-```
-
-**Keyboard Shortcut**: Cmd/Ctrl+, opens settings when Copilot panel is active
-
-**Files**:
-- `ToolSettingsDialog.tsx` (~270 lines) - Component logic
-- `ToolSettingsDialog.css` (~300 lines) - Modal styling
 
 ### ToolApprovalDialog.tsx
 
@@ -744,7 +508,7 @@ useEffect(() => {
 
 ### CopilotChat.tsx
 
-**Location**: `src/renderer/src/components/ClaudeCode/CopilotChat.tsx`
+**Location**: `src/renderer/src/components/Copilot/CopilotChat.tsx`
 
 Chat interface with:
 - Message history display
@@ -762,7 +526,8 @@ const [lastUserPrompt, setLastUserPrompt] = useState('')
 ## Related Documentation
 
 - **[Claude Code Integration Index](./README.md)** - Overview and quick reference
-- **[UI Features](./ui-features.md)** - Copilot panel, Control Panel, Planning Mode, ToolApprovalDialog
+- **[Tool Approval Advanced Guide](./tool-approval-advanced.md)** - IPC details, testing, troubleshooting
+- **[Conversation Preservation](./conversation-preservation.md)** - Session preservation guide
+- **[UI Features](./ui-features.md)** - Copilot panel, Control Panel, Planning Mode
 - **[Architecture](../architecture.md)** - ClaudeCliService, persistent sessions
 - **[IPC Patterns](../ipc-patterns.md)** - Tool approval and settings channels
-- **[Security](../security.md)** - Security principles and validation

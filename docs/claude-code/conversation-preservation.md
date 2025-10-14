@@ -6,39 +6,39 @@ Complete guide to Erfana's conversation preservation system for seamless Claude 
 
 **Problem**: Traditional session restarts lose conversation context, forcing users to repeat context or abandon ongoing discussions when changing tool permissions or toggling modes.
 
-**Solution**: Erfana intelligently preserves conversation history across configuration changes using Claude CLI's `--resume` flag, maintaining context while updating permissions.
+**Solution**: Erfana preserves conversation history across configuration changes using Claude CLI's `--continue` flag, maintaining context while updating permissions.
 
-**Key Innovation**: Session ID lifecycle management determines when to preserve context (reuse session ID + `--resume`) vs. start fresh (generate new session ID).
+**Key Innovation**: Directory-based session management - one project directory = one conversation thread, automatically resumed without session ID tracking.
 
 ## How It Works
 
-### Session ID Lifecycle
+### Directory-Based Sessions
 
-The session ID determines conversation continuity:
+Claude CLI stores conversation history in `~/.claude/projects/` organized by project directory path:
 
-**Fresh Session ID** (new conversation):
-- App launch or project open
-- Manual "Restart Session" button
-- Resume failure (automatic fallback)
+```bash
+~/.claude/projects/
+└── Users_marcinobel_Projects_erfana/
+    ├── conversation.jsonl      # Message history
+    ├── context.json            # Session metadata
+    └── tools.json              # Tool execution log
+```
 
-**Reused Session ID** (preserved conversation):
-- Tool authorization changes (settings save)
-- Tool approval dialog
-- Planning mode toggles
+**Key Concept**: Session identity tied to project directory, not UUID-based session IDs.
 
-### --resume Flag
+### --continue Flag
 
-Claude CLI's `--resume` flag loads conversation history from server-side session storage:
+Claude CLI's `--continue` flag automatically resumes the latest conversation in the current directory:
 
 ```bash
 # Initial session
-claude --session-id abc123 --allowedTools Read Write
+claude -p /path/to/project --allowedTools Read Write
 
 # Later: Add Edit tool with conversation preservation
-claude --session-id abc123 --resume abc123 --allowedTools Read Write Edit
+claude -p /path/to/project --continue --allowedTools Read Write Edit
 ```
 
-**Server-Side Storage**: Session state stored in `~/.claude/projects/` directory with conversation history, context, and metadata.
+**Automatic Resume**: `--continue` finds and loads the latest conversation for the current directory without manual session ID management.
 
 ## When Conversation is Preserved
 
@@ -48,7 +48,7 @@ claude --session-id abc123 --resume abc123 --allowedTools Read Write Edit
 1. Open Copilot Configuration modal (Cmd/Ctrl+,)
 2. Modify tool authorizations (enable/disable specific tools)
 3. Click "Save"
-4. Session restarts with `--resume` flag
+4. Session restarts with `--continue` flag
 5. Conversation history preserved
 6. New tool configuration active
 
@@ -60,24 +60,21 @@ const handleSaveSettings = async (approvedTools: string[]) => {
   await window.api.claudeCode.stopSession()
   const projectPath = await window.api.file.getProjectPath()
   if (projectPath) {
-    // startSession called without reason parameter
-    // Internally uses 'settings' reason to trigger --resume
+    // startSession uses --continue internally
     await window.api.claudeCode.startSession(projectPath, false)
   }
 }
 ```
 
-**Session Start Reason**: `'settings'` - triggers session ID reuse + `--resume`
-
 ### Planning Mode Toggles
 
 **User Flow**:
 1. User toggles planning mode button in chat interface
-2. Session restarts with `--resume` flag
+2. Session restarts with `--continue` flag
 3. Conversation history preserved
 4. Tool set updated:
    - Planning mode ON: 9 safe tools (Read, LS, Glob, Grep, Task, WebSearch, TodoRead, TodoWrite, NotebookRead)
-   - Planning mode OFF: All approved tools
+   - Planning mode OFF: All approved tools (17 by default)
 
 **Technical**:
 ```typescript
@@ -85,15 +82,10 @@ const handleSaveSettings = async (approvedTools: string[]) => {
 const handlePlanningModeToggle = async () => {
   const newPlanningMode = !isPlanningMode
   setIsPlanningMode(newPlanningMode)
-
   await window.api.claudeCode.stopSession()
-  // startSession with planning mode flag
-  // Internally uses 'planning' reason to trigger --resume
   await window.api.claudeCode.startSession(projectPath, newPlanningMode)
 }
 ```
-
-**Session Start Reason**: `'planning'` - triggers session ID reuse + `--resume`
 
 ### Tool Approvals
 
@@ -101,7 +93,7 @@ const handlePlanningModeToggle = async () => {
 1. Claude requests unapproved tool (e.g., MultiEdit, WebFetch)
 2. ToolApprovalDialog appears
 3. User approves tool (optionally with "Remember this choice")
-4. Session restarts with `--resume` flag
+4. Session restarts with `--continue` flag
 5. Conversation history preserved
 6. Newly approved tool active
 7. Last user prompt automatically re-sent (auto-retry)
@@ -112,18 +104,12 @@ const handlePlanningModeToggle = async () => {
 async approveTool(toolName: string): Promise<void> {
   this.approvedTools.add(toolName)
   await settingsService.addApprovedTool(toolName)
-
-  // Restart with new permissions
-  await this.restartWithNewPermissions()  // Uses 'settings' reason internally
+  await this.restartWithNewPermissions()
 }
 
 private async restartWithNewPermissions(): Promise<void> {
   console.log('🔄 Restarting session with updated tool permissions...')
-  console.log('📊 Using reason: settings (conversation will be preserved)')
-
-  // Use startSession with 'settings' reason to preserve conversation
-  await this.startSession(this.projectPath!, this.isPlanningMode, 'settings')
-
+  await this.startSession(this.projectPath!, this.isPlanningMode)
   this.emit('session-resumed', {
     projectPath: this.projectPath,
     approvedTools: Array.from(this.approvedTools)
@@ -131,119 +117,51 @@ private async restartWithNewPermissions(): Promise<void> {
 }
 ```
 
-**Session Start Reason**: `'settings'` - triggers session ID reuse + `--resume`
-
 ## When Conversation Resets
 
-### App Launch or Project Open
+### Clear Button
 
-**Behavior**: Fresh session ID generated, new conversation started.
+**Behavior**: Deletes session files from `~/.claude/projects/`, forcing fresh conversation start.
 
-**Reason**: No previous session context available.
+**User Flow**:
+1. Click "Clear" button in Copilot panel
+2. Confirmation dialog appears
+3. User confirms
+4. Session files deleted from disk
+5. Session restarts without `--continue`
+6. Fresh conversation begins
 
-**Session Start Reason**: `'initial'`
-
-### Manual Restart
-
-**Behavior**: User clicks "Restart Session" button, fresh session ID generated.
-
-**Reason**: User explicitly requests fresh start (troubleshooting, clear context, etc.).
-
-**Session Start Reason**: `'manual_restart'`
-
-### Resume Failure
-
-**Behavior**: `--resume` fails, automatically falls back to fresh session ID.
-
-**Reason**: Session not found, expired, or corrupted on server-side.
-
-**Session Start Reason**: `'recovery'` (attempts resume first, then falls back)
-
-## Resume Failure Handling
-
-### Automatic Fallback
-
-Erfana detects resume failures and gracefully falls back to fresh session:
-
-**Detection**: 13 error patterns from Claude CLI stderr:
-
-```typescript
-const resumeFailurePatterns = [
-  'session not found',
-  'resume failed',
-  'invalid session',
-  'session expired',
-  'failed to resume',
-  'could not resume',
-  'unable to resume',
-  'session file not found',
-  'session file corrupted',
-  'session file is corrupted',
-  'failed to load session',
-  'error loading session',
-  'session data invalid'
-]
-```
-
-**Fallback Process**:
-1. Claude CLI process spawns with `--resume` flag
-2. stderr output monitored for failure patterns
-3. If match detected:
-   - Kill current failed process
-   - Generate fresh session ID
-   - Restart without `--resume`
-   - Emit `'session-resume-failed'` event
-   - Show system message in chat
-
-**User Experience**: Seamless transition with informative message:
-```
-⚠️ Previous conversation history unavailable. Starting fresh session.
-```
-
-### Resume Timeout
-
-**Protection**: 10-second timeout prevents hanging on server-side issues.
-
-**Implementation**:
+**Technical**:
 ```typescript
 // ClaudeCliService.ts
-let resumeTimeout: NodeJS.Timeout | null = null
-if (shouldUseResume) {
-  resumeTimeout = setTimeout(() => {
-    if (this.sessionState === 'starting') {
-      console.error('❌ Resume operation timed out (10s)')
-      this.handleResumeFailed(previousSessionId!)
-    }
-  }, 10000)
+async clearSession(): Promise<void> {
+  const sessionDir = this.getSessionDirectory()
+  if (await fs.pathExists(sessionDir)) {
+    await fs.remove(sessionDir)
+    console.log('🗑️ Session files deleted:', sessionDir)
+  }
+  await this.restartSession()
+}
+
+private getSessionDirectory(): string {
+  const encoded = this.projectPath!.replace(/[\/\\:]/g, '_')
+  return path.join(os.homedir(), '.claude', 'projects', encoded)
 }
 ```
 
-**Behavior**: If session doesn't become ready within 10 seconds, automatic fallback to fresh session.
+**Result**: Next session starts fresh without conversation history.
 
-### Common Causes
+### App Launch or Project Open
 
-**Session File Deleted**:
-- User manually deleted `~/.claude/projects/<session-id>` directory
-- Cleanup script removed old sessions
-- File system full during session write
+**Behavior**: Session uses `--continue` automatically if previous conversation exists, otherwise starts fresh.
 
-**Session Expired**:
-- >30 days since last use (Claude CLI policy)
-- Server-side retention policy
+**Reason**: Directory-based approach enables seamless context restoration across app restarts.
 
-**Claude CLI Version Mismatch**:
-- Session created with v1.x, resumed with v2.x
-- Incompatible session format changes
+### Manual Restart
 
-**File System Corruption**:
-- Disk errors during session write
-- Power loss during session save
-- File system permissions changed
+**Behavior**: User clicks "Restart Session" button, session restarts with `--continue`.
 
-**Network Interruption**:
-- Server-side session fetch failed
-- Timeout during session retrieval
-- API endpoint unavailable
+**Reason**: Troubleshooting or connection issues, context preserved unless user explicitly clears.
 
 ## Session Statistics Tracking
 
@@ -251,22 +169,18 @@ if (shouldUseResume) {
 
 **Message Count**: Total user + assistant messages in conversation
 **Tool Executions**: Total tool invocations (Read, Write, Edit, etc.)
-**Session Age**: Time since session creation (in seconds)
+**Session Age**: Time since current session started (not total conversation age)
 
 ### When Stats Reset
 
-**Fresh Session ID** scenarios:
-- App launch or project open
-- Manual "Restart Session" button
-- Resume failure (automatic fallback)
+**Session restart**: Stats reset on each session restart (tool changes, planning mode toggles)
+**Not conversation**: Conversation history preserved via `--continue`, but runtime stats are per-session
 
 **Implementation**:
 ```typescript
 // ClaudeCliService.ts
-if (reason === 'initial' || reason === 'manual_restart' || reason === 'recovery') {
-  this.sessionId = this.generateSessionId()
-
-  // Reset stats for fresh sessions
+async startSession(projectPath: string, planningMode: boolean = false): Promise<void> {
+  // Stats reset on every session start
   this.sessionStats = {
     messageCount: 0,
     toolExecutions: 0,
@@ -274,14 +188,6 @@ if (reason === 'initial' || reason === 'manual_restart' || reason === 'recovery'
   }
 }
 ```
-
-### When Stats Preserved
-
-**Reused Session ID** scenarios:
-- Tool authorization changes (settings save, approval dialog)
-- Planning mode toggles (exploration ↔ implementation)
-
-**Behavior**: Stats continue incrementing across session restarts.
 
 ### Accessing Stats
 
@@ -297,91 +203,54 @@ console.log(`Session age: ${Math.floor((Date.now() - stats.createdAt.getTime()) 
 ```
 
 **UI Display**: Control Panel shows real-time stats:
-- **Messages**: "15" (user + assistant count)
-- **Tools Used**: "7" (total tool executions)
-- **Duration**: "12m" (session runtime)
+- **Messages**: "15" (user + assistant count in current session)
+- **Tools Used**: "7" (total tool executions in current session)
+- **Duration**: "12m" (current session runtime)
 
 ## Technical Implementation
 
-### Session Start Reasons
-
-**Type Definition**:
-```typescript
-/**
- * Session start reason - determines session ID lifecycle and --resume usage
- *
- * - 'initial': App launch or first project open - generates fresh session ID
- * - 'manual_restart': User explicit restart - generates fresh session ID
- * - 'settings': Tool approval change - reuses session ID with --resume
- * - 'planning': Planning mode toggle - reuses session ID with --resume
- * - 'recovery': Crash recovery - attempts --resume, falls back to fresh if needed
- */
-type SessionStartReason =
-  | 'initial'         // App launch
-  | 'manual_restart'  // User explicit restart
-  | 'settings'        // Tool config change
-  | 'planning'        // Planning mode toggle
-  | 'recovery'        // Crash recovery or resume failure
-```
-
-### Session ID Lifecycle Logic
+### Directory-Based Session Management
 
 **ClaudeCliService.ts** - Core logic:
 
 ```typescript
 async startSession(
   projectPath: string,
-  planningMode: boolean = false,
-  reason: SessionStartReason = 'initial'
+  planningMode: boolean = false
 ): Promise<void> {
-  // Session ID lifecycle: Generate fresh ID for initial/manual/recovery, reuse for settings/planning
-  const previousSessionId = this.sessionId
-  const shouldUseResume = (reason === 'settings' || reason === 'planning') && previousSessionId
+  this.projectPath = projectPath
+  this.isPlanningMode = planningMode
 
-  if (reason === 'initial' || reason === 'manual_restart' || reason === 'recovery') {
-    this.sessionId = this.generateSessionId()
-    console.log('🆕 Fresh session ID generated:', this.sessionId)
-    console.log(`📊 Reason: ${reason} - Starting new conversation`)
+  // Build args with --continue for automatic resume
+  const args = [
+    '-p', projectPath,
+    '--continue',  // Automatic conversation resume
+    '--input-format', 'stream-json',
+    '--output-format', 'stream-json',
+    '--verbose',
+    '--replay-user-messages',
+    '--allowedTools', ...Array.from(this.approvedTools)
+  ]
 
-    // Reset stats for fresh sessions
-    this.sessionStats = {
-      messageCount: 0,
-      toolExecutions: 0,
-      createdAt: new Date()
-    }
-  } else {
-    console.log('🔄 Reusing session ID for conversation preservation:', this.sessionId)
-    console.log(`📊 Reason: ${reason} - Preserving conversation context`)
+  if (planningMode) {
+    args.push('--permission-mode', 'plan')
   }
 
-  // Build args
-  const args = ['--session-id', this.sessionId!]
-
-  // Add --resume flag for settings/planning mode changes
-  if (shouldUseResume) {
-    this.logResumeAttempt(previousSessionId!, reason)
-    args.push('--resume', previousSessionId!)
-    console.log('✅ Added --resume flag for conversation preservation')
-  }
+  this.claudeProcess = spawn('claude', args, { cwd: projectPath })
 }
 ```
 
 ### Structured Logging
 
-**Resume Attempt Logging**: All resume attempts logged with full session context for debugging.
+**Session Start Logging**: All session starts logged with configuration context.
 
 ```typescript
-private logResumeAttempt(sessionId: string, reason: SessionStartReason): void {
-  console.log('📝 RESUME ATTEMPT', JSON.stringify({
-    sessionId,
-    reason,
+private logSessionStart(reason: string): void {
+  console.log('📝 SESSION START', JSON.stringify({
     projectPath: this.projectPath,
     planningMode: this.isPlanningMode,
-    messageCount: this.sessionStats.messageCount,
-    toolExecutions: this.sessionStats.toolExecutions,
-    sessionAge: this.sessionStats.createdAt
-      ? Math.floor((Date.now() - this.sessionStats.createdAt.getTime()) / 1000)
-      : 0,
+    approvedTools: Array.from(this.approvedTools).length,
+    reason,
     timestamp: new Date().toISOString()
   }, null, 2))
 }
@@ -389,207 +258,137 @@ private logResumeAttempt(sessionId: string, reason: SessionStartReason): void {
 
 **Example Log Output**:
 ```json
-📝 RESUME ATTEMPT {
-  "sessionId": "abc123-def456-ghi789",
-  "reason": "settings",
+📝 SESSION START {
   "projectPath": "/Users/user/Projects/my-app",
   "planningMode": false,
-  "messageCount": 15,
-  "toolExecutions": 7,
-  "sessionAge": 720,
+  "approvedTools": 17,
+  "reason": "settings_change",
   "timestamp": "2025-10-14T12:34:56.789Z"
-}
-```
-
-### Error Detection
-
-**stderr Monitoring**: Claude CLI stderr continuously monitored for resume failure patterns.
-
-```typescript
-this.claudeProcess.stderr.on('data', (data: Buffer) => {
-  const errorText = data.toString()
-  console.error('❌ Claude CLI stderr:', errorText)
-
-  // Detect resume-specific failures
-  if (this.isResumeFailure(errorText)) {
-    console.error('❌ Resume failed, falling back to fresh session')
-    this.handleResumeFailed(previousSessionId || this.sessionId!)
-    return
-  }
-})
-```
-
-**Resume Failure Detection**:
-```typescript
-private isResumeFailure(errorText: string): boolean {
-  const lowerErrorText = errorText.toLowerCase()
-  return resumeFailurePatterns.some(pattern => lowerErrorText.includes(pattern))
-}
-```
-
-### Fallback Process
-
-**handleResumeFailed()** - Graceful fallback to fresh session:
-
-```typescript
-private async handleResumeFailed(oldSessionId: string): Promise<void> {
-  console.error('🔄 Resume failed, initiating fallback to fresh session')
-  console.error(`📝 Failed session ID: ${oldSessionId}`)
-
-  // Kill current failed attempt
-  if (this.claudeProcess) {
-    this.claudeProcess.removeAllListeners()
-    this.claudeProcess.kill('SIGKILL')
-    this.claudeProcess = null
-  }
-
-  // Generate fresh session ID
-  this.sessionId = this.generateSessionId()
-  console.log(`🆕 Generated fresh session ID: ${this.sessionId}`)
-
-  // Restart with 'recovery' reason (will not use --resume)
-  await this.startSession(this.projectPath!, this.isPlanningMode, 'recovery')
-
-  // Emit event to notify UI
-  this.emit('session-resume-failed', {
-    oldSessionId,
-    newSessionId: this.sessionId,
-    message: '⚠️ Previous conversation history unavailable. Starting fresh session.'
-  })
 }
 ```
 
 ## Troubleshooting
 
-### Resume Not Working
+### Conversation Not Preserved
 
 **Symptoms**: Settings changes or planning mode toggles restart session but lose conversation context.
 
 **Diagnosis**:
-1. Check console logs for "🔄 Reusing session ID for conversation preservation"
-2. Verify `--resume` flag in spawn args
-3. Check stderr for resume failure patterns
-4. Verify session ID is not regenerated
+1. Check console logs for `--continue` flag in spawn args
+2. Verify session directory exists: `ls ~/.claude/projects/`
+3. Check session files: `ls ~/.claude/projects/<encoded_path>/`
+4. Verify Claude CLI version supports `--continue`
 
 **Common Issues**:
-- Session start reason incorrect (should be 'settings' or 'planning')
-- Previous session ID is null (no session to resume)
-- Session expired or deleted from `~/.claude/projects/`
+- Session directory deleted (user cleanup or disk full)
+- Claude CLI version too old (update via `brew upgrade claude`)
+- File system permissions prevent reading session files
 
 **Fix**:
-```typescript
-// Ensure correct reason passed to startSession
-await this.startSession(projectPath, planningMode, 'settings')  // ✅
-await this.startSession(projectPath, planningMode, 'initial')   // ❌ Will not resume
+```bash
+# Check Claude CLI version
+claude --version
+
+# Update if needed
+brew upgrade claude
+
+# Verify session files exist
+ls -la ~/.claude/projects/
+```
+
+### Clear Button Not Working
+
+**Symptoms**: Clear button clicked but conversation continues from previous session.
+
+**Diagnosis**:
+1. Check session directory still exists after clear
+2. Verify `fs.remove()` completed successfully
+3. Check file system permissions for deletion
+
+**Fix**:
+```bash
+# Manual clear if button fails
+rm -rf ~/.claude/projects/<encoded_project_path>
+
+# Or clear all sessions
+rm -rf ~/.claude/projects/*
 ```
 
 ### Stats Not Resetting
 
-**Symptoms**: Message count and tool executions persist after app restart.
+**Symptoms**: Message count and tool executions persist after session restart.
 
-**Diagnosis**: Check session start reason. Stats only reset for 'initial', 'manual_restart', and 'recovery'.
+**Expected Behavior**: Stats reset on every session restart, not conversation reset.
 
-**Expected Behavior**:
-- App launch → 'initial' reason → stats reset
-- Tool approval → 'settings' reason → stats preserved
-
-### Resume Timeout
-
-**Symptoms**: Session hangs for 10 seconds, then falls back to fresh session.
-
-**Diagnosis**: Network or server-side issues preventing session retrieval.
-
-**Mitigation**:
-- Check internet connectivity
-- Verify Claude API endpoint reachable
-- Review `~/.claude/logs/` for server errors
-- Try manual restart (fresh session)
-
-### Session File Corruption
-
-**Symptoms**: Resume consistently fails with "session file corrupted" error.
-
-**Diagnosis**:
-```bash
-ls -la ~/.claude/projects/
-# Check if session directory exists and has valid files
-```
-
-**Fix**:
-```bash
-# Remove corrupted session (forces fresh session)
-rm -rf ~/.claude/projects/<session-id>
-
-# Or reset all sessions
-rm -rf ~/.claude/projects/*
-```
+**Note**: Stats track current session runtime, not total conversation history. This is by design.
 
 ## Performance Considerations
 
 ### Token Costs
 
-**Resume Impact**: `--resume` loads conversation history from server, replaying context without retransmitting messages.
+**Continue Impact**: `--continue` loads conversation history from disk, replaying context efficiently.
 
 **Cost Comparison**:
-- Without resume: Full context re-sent on every restart (e.g., 10,000 input tokens)
-- With resume: Server-side replay (minimal additional cost)
+- Without continue: Full context re-sent on every restart (e.g., 10,000 input tokens)
+- With continue: Client-side replay from disk (minimal API cost)
 
-**Recommendation**: Resume significantly reduces token costs for long conversations.
+**Recommendation**: Continue significantly reduces token costs for long conversations.
 
-### Memory Usage
+### Disk Usage
 
-**Session State**: Server-side session storage has size limits (typically MB per session).
+**Session Storage**: Each project has dedicated directory in `~/.claude/projects/`.
 
-**Long Conversations**: Very long conversations (>1000 messages) may approach limits.
+**Long Conversations**: Very long conversations (>1000 messages) may consume significant disk space (typically <10MB).
 
-**Best Practice**: Periodically start fresh session for major task transitions.
+**Best Practice**: Use Clear button periodically for major task transitions to reclaim disk space.
 
-### Network Latency
+### Session Load Time
 
-**Resume Latency**: Initial session startup with `--resume` fetches history from server (typically <500ms).
+**Continue Latency**: Initial session startup with `--continue` loads history from disk (typically <200ms).
 
-**Fallback Latency**: If resume fails, fallback adds 10-second timeout delay.
+**Network**: No network latency since session stored client-side, not server-side.
 
-**Optimization**: Resume timeout could be tuned (currently 10s conservative).
+**Optimization**: Fast local disk I/O ensures minimal startup delay.
 
-## Future Enhancements
+## Architecture Benefits
 
-### Selective Resume
+### Simplified Session Management
 
-**Idea**: Allow user to choose whether to resume or start fresh on configuration changes.
+**No UUID Tracking**: Directory-based approach eliminates session ID lifecycle complexity.
 
-**UI**: Checkbox in settings modal: "Preserve conversation when changing tools"
+**Automatic Resume**: Claude CLI handles session discovery automatically.
 
-**Benefit**: Power users can control context vs. fresh start tradeoff.
+**Crash Recovery**: Session files persist on disk, survive app crashes.
 
-### Session History UI
+### Clear Button for Fresh Start
 
-**Idea**: Show list of previous sessions with timestamps, allow manual resume.
+**User Control**: Explicit action to clear conversation, not accidental.
 
-**UI**: "Session History" section in Copilot panel
+**Disk Cleanup**: Removes session files, reclaims space.
 
-**Benefit**: Recover abandoned conversations, switch between projects.
+**Debugging**: Clean slate for testing or troubleshooting.
 
-### Resume Retry
+## Migration from --resume
 
-**Idea**: If resume fails, show dialog offering retry vs. fresh start.
+**Previous Approach**: Used `--session-id` + `--resume` with UUID-based session tracking.
 
-**UI**: "Resume failed. Retry or start fresh?"
+**Current Approach**: Uses `--continue` with directory-based session discovery.
 
-**Benefit**: User control on transient network issues.
+**Benefits**:
+- Simpler architecture (-178 lines of code)
+- No session ID lifecycle management
+- Automatic session discovery
+- Better crash recovery (session files persist)
+- Explicit clear action via Clear button
 
-### Session Export/Import
-
-**Idea**: Export session state to file, import on different machine.
-
-**UI**: "Export Conversation" button, "Import Conversation" file picker
-
-**Benefit**: Share conversation context, backup important discussions.
+**Code Reduction**:
+- Removed: `generateSessionId()`, session ID reuse logic, resume failure patterns, timeout handling
+- Simplified: Session start logic, conversation preservation, error handling
 
 ## Related Documentation
 
 - **[Claude Code Integration Index](./README.md)** - Overview and quick reference
-- **[Tool Approval System](./tool-approval.md)** - Complete tool approval documentation
+- **[Tool Approval System](./tool-approval-core.md)** - Complete tool approval documentation
 - **[UI Features](./ui-features.md)** - Copilot panel, Control Panel, Planning Mode
 - **[Architecture](../architecture.md)** - ClaudeCliService, persistent sessions
 - **[IPC Patterns](../ipc-patterns.md)** - Session management channels
