@@ -175,6 +175,12 @@ const api = {
       error?: string
     }> => ipcRenderer.invoke('claudeCode:getMessageCount'),
 
+    /**
+     * Clear session history - deletes conversation files from disk
+     */
+    clearSessionHistory: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('claudeCode:clearSessionHistory'),
+
     // Send message (event-based for streaming)
     sendMessage: (prompt: string, context: any, sessionId: string): void => {
       ipcRenderer.send('claudeCode:sendMessage', { prompt, context, sessionId })

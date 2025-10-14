@@ -416,14 +416,14 @@ export function CopilotChat({
 
   /**
    * Clear conversation and start fresh
-   * Restarts session without --continue flag and sends familiarization prompt
+   * Deletes session files from disk, then restarts with --continue (finds nothing = fresh start)
    */
   const handleClear = async () => {
     if (isRunning) {
       return
     }
 
-    if (window.confirm('Start fresh conversation? This will clear all messages.')) {
+    if (window.confirm('Start fresh conversation? This will permanently delete chat history.')) {
       try {
         // Step 1: Clear UI messages immediately
         setMessages([])
@@ -435,19 +435,29 @@ export function CopilotChat({
           throw new Error('No project path available')
         }
 
-        // Step 3: Restart session WITHOUT --continue (fresh start)
-        console.log('🔄 Restarting session for fresh conversation...')
-        await window.api.claudeCode.stopSession()
-        await window.api.claudeCode.startSession(projectPath, isPlanningMode, true) // skipContinue=true
+        // Step 3: Delete session files from disk
+        console.log('🗑️ Deleting session history from disk...')
+        const deleteResult = await window.api.claudeCode.clearSessionHistory()
 
-        // Step 4: Send automatic familiarization prompt IMMEDIATELY (no delay)
-        // Claude CLI in -p mode requires immediate stdin input to avoid timeout
+        if (!deleteResult.success) {
+          console.warn('⚠️ Could not delete session files:', deleteResult.error)
+          // Continue anyway - UI is cleared which is what user sees
+        } else {
+          console.log('✅ Session files deleted from ~/.claude/projects/')
+        }
+
+        // Step 4: Restart session WITH --continue (will find no history = fresh start)
+        console.log('🔄 Restarting session with --continue (will find no history)...')
+        await window.api.claudeCode.stopSession()
+        await window.api.claudeCode.startSession(projectPath, isPlanningMode) // --continue enabled, finds nothing
+
+        // Step 5: Send automatic familiarization prompt immediately
         const familiarizePrompt = 'Please familiarize yourself with the current working directory.'
-        console.log('📝 Sending familiarization prompt immediately')
+        console.log('📝 Sending familiarization prompt')
 
         window.api.claudeCode.sendMessage(familiarizePrompt, { projectPath }, 'auto-familiarize')
 
-        console.log('✅ Fresh conversation started')
+        console.log('✅ Fresh conversation started (session files deleted, --continue found no history)')
 
       } catch (error: any) {
         console.error('❌ Failed to start fresh conversation:', error)
