@@ -72,12 +72,14 @@ src/
 │   │   ├── FileWatcherService.ts    # File content auto-refresh
 │   │   ├── DirectoryWatcherService.ts  # Directory tree auto-refresh
 │   │   ├── SettingsService.ts   # Persistent settings (electron-store)
-│   │   └── ClaudeCliService.ts  # Persistent Claude CLI session
+│   │   ├── ClaudeCliService.ts  # Persistent Claude CLI session
+│   │   └── TerminalService.ts   # PTY management with node-pty
 │   └── ipc/
 │       ├── file-handlers.ts     # IPC handlers
 │       ├── file-watcher-handlers.ts  # File watching IPC
 │       ├── directory-watcher-handlers.ts  # Directory watching IPC
-│       └── claude-code-handlers.ts  # Claude Code integration IPC
+│       ├── claude-code-handlers.ts  # Claude Code integration IPC
+│       └── terminal-handlers.ts # Terminal emulator IPC
 ├── preload/
 │   ├── index.ts              # contextBridge setup
 │   └── index.d.ts            # TypeScript definitions
@@ -112,6 +114,7 @@ src/
   - DirectoryWatcherService: Auto-refresh file tree (1000ms debounce, ignored patterns)
   - SettingsService: Persistent storage with electron-store (dynamic ES Module import)
   - ClaudeCliService: Persistent Claude CLI session (long-running process, JSONL stdin/stdout, tool approval system, auto-retry)
+  - TerminalService: Terminal emulator with xterm.js + node-pty (PTY lifecycle, WebGL rendering, auto-resize, traditional zsh prompt)
 - **Auto-Refresh**: Chokidar-based watching with pause/resume race prevention
 - **Secure IPC**: All main↔renderer communication via contextBridge
 - **State Management**: Zustand for activity bar state (sidebar widths, active panels)

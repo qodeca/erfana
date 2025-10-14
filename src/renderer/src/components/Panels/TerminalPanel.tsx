@@ -11,6 +11,8 @@ import { Terminal as TerminalIcon, X } from 'lucide-react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
+import { WebglAddon } from '@xterm/addon-webgl'
+import { useTerminalStore } from '../../stores/useTerminalStore'
 import '@xterm/xterm/css/xterm.css'
 import './TerminalPanel.css'
 
@@ -22,6 +24,15 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const terminalRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
+  const terminalIdRef = useRef<string | null>(null)
+
+  // Terminal store for cross-component communication
+  const setActiveTerminalId = useTerminalStore((state) => state.setActiveTerminalId)
+
+  // Keep ref in sync with state for cleanup
+  useEffect(() => {
+    terminalIdRef.current = terminalId
+  }, [terminalId])
 
   // Check terminal availability on mount
   useEffect(() => {
@@ -34,16 +45,17 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       initializeTerminal()
     }
 
-    // Cleanup on unmount
+    // Cleanup on unmount only
     return () => {
-      if (terminalId) {
-        window.api.terminal.kill(terminalId)
+      if (terminalIdRef.current) {
+        window.api.terminal.kill(terminalIdRef.current)
+        setActiveTerminalId(null)
       }
       if (xtermRef.current) {
         xtermRef.current.dispose()
       }
     }
-  }, [isAvailable])
+  }, [isAvailable, setActiveTerminalId])
 
   // Handle terminal data
   useEffect(() => {
@@ -57,14 +69,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
     const unsubscribeExit = window.api.terminal.onExit((data) => {
       if (data.terminalId === terminalId) {
-        console.log(`🏁 Terminal exited with code ${data.exitCode}`)
+        console.log(`Terminal exited with code ${data.exitCode}`)
         // Optionally restart or show exit message
       }
     })
 
     const unsubscribeError = window.api.terminal.onError((data) => {
       if (data.terminalId === terminalId) {
-        console.error('❌ Terminal error:', data.error)
+        console.error('Terminal error:', data.error)
         setError(data.error)
       }
     })
@@ -76,9 +88,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }, [terminalId])
 
-  // Handle resize
+  // Handle resize (panel drag, window resize, show/hide)
   useEffect(() => {
-    if (!fitAddonRef.current || !terminalId) return
+    if (!fitAddonRef.current || !terminalId || !terminalRef.current) return
 
     const handleResize = () => {
       try {
@@ -97,10 +109,16 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     // Fit on mount
     setTimeout(handleResize, 100)
 
-    // Fit on window resize
-    window.addEventListener('resize', handleResize)
+    // Use ResizeObserver to detect container size changes
+    // This handles panel drag, window resize, and show/hide
+    const resizeObserver = new ResizeObserver(() => {
+      // Debounce slightly to avoid excessive resize calls
+      setTimeout(handleResize, 10)
+    })
 
-    return () => window.removeEventListener('resize', handleResize)
+    resizeObserver.observe(terminalRef.current)
+
+    return () => resizeObserver.disconnect()
   }, [terminalId])
 
   const checkAvailability = async () => {
@@ -117,17 +135,30 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const initializeTerminal = async () => {
     if (!terminalRef.current) return
 
+    // Check if container is visible before initializing xterm
+    // xterm.js cannot render properly if opened on hidden element (display:none or 0 dimensions)
+    const rect = terminalRef.current.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) {
+      console.warn('Terminal container not visible, waiting for visibility...')
+      // Retry after container becomes visible
+      setTimeout(initializeTerminal, 100)
+      return
+    }
+
     try {
       // Create xterm.js instance
       const xterm = new Terminal({
         cursorBlink: true,
-        fontSize: 13,
+        fontSize: 12,
         fontFamily: "'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace",
+        fontWeight: 'normal',
+        fontWeightBold: 'bold',
+        allowTransparency: false,
         theme: {
-          background: '#1e1e1e',
-          foreground: '#d4d4d4',
+          background: '#000000',
+          foreground: '#ffffff',
           cursor: '#4fc1ff',
-          cursorAccent: '#1e1e1e',
+          cursorAccent: '#000000',
           selectionBackground: '#264f78',
           black: '#000000',
           red: '#cd3131',
@@ -150,22 +181,37 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         allowProposedApi: true
       })
 
-      // Add addons
+      // Add addons (load fit and weblinks BEFORE open)
       const fitAddon = new FitAddon()
       const webLinksAddon = new WebLinksAddon()
 
       xterm.loadAddon(fitAddon)
       xterm.loadAddon(webLinksAddon)
 
-      // Open terminal
-      xterm.open(terminalRef.current)
+      // Open terminal in DOM
+      xterm.open(terminalRef.current!)
+
+      // Load WebGL renderer AFTER open (fixes canvas rendering issues in Electron)
+      try {
+        const webglAddon = new WebglAddon()
+        webglAddon.onContextLoss(() => {
+          console.warn('WebGL context lost, disposing addon')
+          webglAddon.dispose()
+        })
+        xterm.loadAddon(webglAddon)
+      } catch (error) {
+        console.warn('WebGL renderer failed, falling back to canvas:', error)
+        // Continue with canvas renderer if WebGL fails
+      }
 
       // Store refs
       xtermRef.current = xterm
       fitAddonRef.current = fitAddon
 
       // Fit terminal to container
-      setTimeout(() => fitAddon.fit(), 50)
+      setTimeout(() => {
+        fitAddon.fit()
+      }, 50)
 
       // Get project path for initial CWD
       const projectPath = await window.api.file.getProjectPath()
@@ -182,7 +228,10 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }
 
       setTerminalId(result.terminalId)
-      console.log(`✅ Terminal created: ${result.terminalId}`)
+      setActiveTerminalId(result.terminalId) // Register in store
+
+      // Clear screen and show clean prompt
+      xterm.write('\x1b[2J\x1b[H')
 
       // Handle user input
       xterm.onData((data) => {
@@ -196,9 +245,29 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }
 
-  const handleClearTerminal = () => {
+  const handleRestartTerminal = async () => {
+    // Kill current terminal session
+    if (terminalIdRef.current) {
+      await window.api.terminal.kill(terminalIdRef.current)
+      setActiveTerminalId(null)
+    }
+
+    // Dispose xterm instance
     if (xtermRef.current) {
-      xtermRef.current.clear()
+      xtermRef.current.dispose()
+      xtermRef.current = null
+    }
+
+    // Reset state
+    setTerminalId(null)
+    setError(null)
+
+    // Wait a moment for cleanup
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    // Create new terminal
+    if (terminalRef.current && isAvailable) {
+      await initializeTerminal()
     }
   }
 
@@ -210,8 +279,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         {terminalId && (
           <button
             className="terminal-clear-button"
-            onClick={handleClearTerminal}
-            title="Clear Terminal"
+            onClick={handleRestartTerminal}
+            title="Restart Terminal"
           >
             <X size={14} />
           </button>

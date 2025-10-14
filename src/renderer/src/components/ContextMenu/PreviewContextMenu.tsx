@@ -1,8 +1,10 @@
 import { useState, ReactNode } from 'react'
-import { Maximize2, Minimize2, RefreshCw, Sparkles, MessageSquare, Copy } from 'lucide-react'
+import { Maximize2, Minimize2, RefreshCw, Sparkles, MessageSquare, Copy, Terminal } from 'lucide-react'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
 import { useCopilotStore } from '../../stores/useCopilotStore'
 import { useActivityBarStore } from '../../stores/useActivityBarStore'
+import { useTerminalStore } from '../../stores/useTerminalStore'
+import { useToast } from '../Toast/ToastContext'
 import './PreviewContextMenu.css'
 
 interface PreviewContextMenuProps {
@@ -65,6 +67,8 @@ export function PreviewContextMenu({
   const [customPrompt, setCustomPrompt] = useState('')
   const setPendingMessage = useCopilotStore((state) => state.setPendingMessage)
   const setActivePanel = useActivityBarStore((state) => state.setActivePanel)
+  const sendToTerminal = useTerminalStore((state) => state.sendToTerminal)
+  const { showToast } = useToast()
 
   const handleAction = async (action: CopilotAction) => {
     let prompt = action.buildPrompt(selectedText, filePath, fullDocument)
@@ -112,6 +116,35 @@ export function PreviewContextMenu({
 
   const handleCopySelection = async () => {
     await navigator.clipboard.writeText(selectedText)
+    onClose()
+  }
+
+  const handleSendToTerminal = async () => {
+    // Open terminal panel if not visible
+    setActivePanel('terminal', 'right')
+
+    // Wait briefly for terminal to initialize if it was just opened
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    // Send text to terminal
+    const success = await sendToTerminal(selectedText)
+
+    if (success) {
+      showToast({
+        title: 'Terminal',
+        message: 'Command sent to terminal',
+        type: 'success',
+        duration: 2000
+      })
+    } else {
+      showToast({
+        title: 'Terminal',
+        message: 'Terminal not available. Please wait for terminal to initialize.',
+        type: 'error',
+        duration: 3000
+      })
+    }
+
     onClose()
   }
 
@@ -176,6 +209,12 @@ export function PreviewContextMenu({
       label: 'Custom Prompt...',
       icon: <MessageSquare size={14} strokeWidth={2} />,
       action: () => setShowCustomPrompt(true)
+    },
+    { separator: true } as ContextMenuItem,
+    {
+      label: 'Send Selection to Terminal',
+      icon: <Terminal size={14} strokeWidth={2} />,
+      action: handleSendToTerminal
     },
     { separator: true } as ContextMenuItem,
     {

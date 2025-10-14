@@ -71,8 +71,18 @@ export class TerminalService extends EventEmitter {
     console.log(`🔵 Size: ${cols}x${rows}`)
 
     try {
+      // Determine shell arguments
+      // For zsh: use --no-rcs to skip all RC files and get clean prompt
+      // For bash: use --norc --noprofile to skip configuration
+      const shellArgs: string[] = []
+      if (shell.includes('zsh')) {
+        shellArgs.push('--no-rcs')
+      } else if (shell.includes('bash')) {
+        shellArgs.push('--norc', '--noprofile')
+      }
+
       // Spawn PTY process
-      const ptyProcess = pty.spawn(shell, [], {
+      const ptyProcess = pty.spawn(shell, shellArgs, {
         name: 'xterm-256color',
         cols,
         rows,
@@ -81,7 +91,13 @@ export class TerminalService extends EventEmitter {
           ...process.env,
           ...config.env,
           TERM: 'xterm-256color',
-          COLORTERM: 'truecolor'
+          COLORTERM: 'truecolor',
+          // Set traditional prompt: username directory $
+          // %n = username, %~ = current directory (~ for home)
+          PROMPT: '%n %~ $ ',
+          PS1: '%n %~ $ ',
+          // Disable macOS session restoration (prevents "Restored session" message)
+          SHELL_SESSIONS_DISABLE: '1'
         }
       })
 

@@ -157,6 +157,51 @@ Project panel displays hierarchical file tree with filtering, visual indicators,
 
 See: [Project Panel](./project-panel.md#visual-indicators) for complete details
 
+## Terminal Panel
+
+**Location**: Right sidebar, accessible via activity bar
+
+Integrated terminal emulator with native shell access using xterm.js and node-pty.
+
+**Quick Access**:
+- **Activity Bar**: Terminal icon in right sidebar (bottom position)
+- **Keyboard**: `Cmd/Ctrl+J`
+- **Restart Button**: X in panel header kills and restarts terminal session
+
+**Key Features**:
+- Native PTY process (zsh on macOS, bash on Linux)
+- WebGL-accelerated rendering with canvas fallback
+- Auto-resize on panel drag
+- Bold font support
+- High contrast theme (white on pure black)
+- Traditional prompt format: `username directory $`
+- "Send Selection to Terminal" from markdown preview context menu
+
+**Theme**:
+- Font size: 12px
+- Font family: SF Mono, Monaco, Inconsolata, Courier New
+- Background: #000000 (pure black)
+- Foreground: #ffffff (bright white)
+- Cursor: #4fc1ff (cyan)
+
+**Technologies**:
+- xterm.js v5.5.0 - Terminal emulator
+- node-pty v1.0.0 - PTY backend
+- WebglAddon - Hardware-accelerated rendering
+- FitAddon - Auto-resize terminal to container
+- WebLinksAddon - Clickable URLs
+
+**Architecture**:
+- `TerminalService.ts` - PTY management (main process)
+- `terminal-handlers.ts` - IPC handlers
+- `TerminalPanel.tsx` - React component with xterm.js
+- `useTerminalStore.ts` - Zustand state management
+
+**Context Menu Integration**:
+Right-click selected text in markdown preview → "Send Selection to Terminal" opens terminal panel and sends text as command input.
+
+📚 **Complete documentation**: [Terminal](./terminal.md)
+
 ## Context Menu
 
 **Location**: `src/renderer/src/components/ContextMenu/ContextMenu.tsx`
