@@ -146,7 +146,7 @@ Click element containing specific text.
 ```typescript
 mcp__circuit-electron__click_by_text({
   sessionId: "erfana-session-id",
-  text: "Explorer",
+  text: "Project",
   exact: true
 })
 ```
@@ -306,7 +306,7 @@ mcp__circuit-electron__close({
 **Priority order:**
 1. **ARIA roles** - Most reliable (`role=button[name='Save']`)
 2. **Text content** - Good for buttons/links (`text=Save`)
-3. **CSS selectors** - When unique (`.save-btn`, `#file-explorer`)
+3. **CSS selectors** - When unique (`.save-btn`, `#project`)
 4. **Data attributes** - If available (`[data-testid='save-button']`)
 
 ### 3. Session Management
@@ -347,9 +347,9 @@ mcp__circuit-electron__screenshot({
 })
 
 // 4. Verify panels exist
-const hasExplorer = mcp__circuit-electron__evaluate({
+const hasProject = mcp__circuit-electron__evaluate({
   sessionId: session.sessionId,
-  expression: "document.querySelector('[title=\"Explorer\"]') !== null"
+  expression: "document.querySelector('[title=\"Project\"]') !== null"
 })
 
 // 5. Close
@@ -403,7 +403,7 @@ mcp__circuit-electron__screenshot({ sessionId: session.sessionId })
 // Verify sidebar hidden
 const sidebarVisible = mcp__circuit-electron__evaluate({
   sessionId: session.sessionId,
-  expression: "document.querySelector('#fileExplorer')?.parentElement.style.display !== 'none'"
+  expression: "document.querySelector('#project')?.parentElement.style.display !== 'none'"
 })
 ```
 
@@ -436,13 +436,13 @@ const sidebarVisible = mcp__circuit-electron__evaluate({
 For testing Erfana's keyboard shortcuts:
 
 ```typescript
-// Cmd/Ctrl+B - Toggle left sidebar
+// Cmd/Ctrl+B - Toggle Project panel
 keyboard_press({ key: "b", modifiers: ["Meta"] })
 
-// Cmd/Ctrl+J - Toggle bottom panel
+// Cmd/Ctrl+J - Toggle Terminal panel
 keyboard_press({ key: "j", modifiers: ["Meta"] })
 
-// Cmd/Ctrl+Alt+B - Toggle right sidebar
+// Cmd/Ctrl+Alt+B - Toggle Git panel
 keyboard_press({ key: "b", modifiers: ["Meta", "Alt"] })
 
 // Cmd/Ctrl+S - Save file

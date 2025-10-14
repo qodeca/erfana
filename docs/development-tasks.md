@@ -39,7 +39,7 @@
 
 ### Adding Splitview Panel (Sidebar)
 
-For fixed sidebars (Explorer, Git, Terminal) that don't need tabbing:
+For fixed sidebars (Project, Git, Terminal) that don't need tabbing:
 
 1. Create splitview panel component:
    ```typescript
@@ -194,12 +194,12 @@ localStorage.removeItem('erfana-sidebar-state')
 
 1. Add panel ID to `protectedPanels` array:
    ```typescript
-   const protectedPanels = ['fileExplorer', 'terminal', 'git', 'myNewPanel']
+   const protectedPanels = ['project', 'terminal', 'git', 'myNewPanel']
    ```
 
 2. Add panel title to `protectedTitles` array:
    ```typescript
-   const protectedTitles = ['Explorer', 'Terminal', 'Git', 'My New Panel']
+   const protectedTitles = ['Project', 'Terminal', 'Git', 'My New Panel']
    ```
 
 Protection is automatic - click interception and auto-restore work immediately.
@@ -269,7 +269,7 @@ mcp__circuit-electron__keyboard_press({
 mcp__circuit-electron__screenshot({ sessionId: s.sessionId })
 const hidden = mcp__circuit-electron__evaluate({
   sessionId: s.sessionId,
-  expression: "!document.querySelector('[title=\"Explorer\"]')?.parentElement.offsetParent"
+  expression: "!document.querySelector('[title=\"Project\"]')?.parentElement.offsetParent"
 })
 
 mcp__circuit-electron__close({ sessionId: s.sessionId })
@@ -298,12 +298,12 @@ const newState = mcp__circuit-electron__evaluate({
 | Element | Selector |
 |---------|----------|
 | Main layout | `.app-dock-layout` |
-| File tree | `.file-tree` |
+| Project tree | `.project-tree` |
 | Monaco editor | `.monaco-editor` |
 | Preview pane | `.preview-pane` |
 | Save button | `button.save-btn` |
 | Modified indicator | `.modified-indicator` |
-| Explorer panel | `[title="Explorer"]` |
+| Project panel | `[title="Project"]` |
 | Terminal panel | `[title="Terminal"]` |
 
 ### Available MCP Tools
@@ -406,7 +406,7 @@ Test internal CRUD operations:
 Verify no double-refresh during internal operations:
 
 ```typescript
-// Add debug logging to FileTree.tsx
+// Add debug logging to ProjectTree.tsx
 const handleCreateFile = async () => {
   console.log('1. Starting create file')
   isInternalOperation.current = true

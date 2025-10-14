@@ -9,7 +9,7 @@ Erfana is an Electron desktop application that provides an integrated developmen
 - 🎨 **Multi-Panel IDE Layout**: Drag-and-drop, resizable panels powered by Dockview
 - 📝 **Markdown Editor**: Monaco Editor with live preview and split view support
 - 🤖 **Claude Code Integration**: Direct integration with Claude Agent SDK for AI-powered editing
-- 📁 **Project Management**: File tree explorer with markdown file focus
+- 📁 **Project Management**: Project tree explorer with markdown file focus
 - 🔄 **Git Integration**: Visual git status, diff viewer, and commit management
 - 💻 **Integrated Terminal**: xterm.js terminal for running Claude Code CLI commands
 - ⚡ **Text Selection Prompts**: Select text and prompt Claude to edit in place
@@ -68,7 +68,7 @@ erfana/
 │       │   │   ├── Panels/          # Panel components
 │       │   │   ├── Editor/          # Monaco editor
 │       │   │   ├── Terminal/        # xterm.js
-│       │   │   ├── FileTree/        # File explorer
+│       │   │   ├── ProjectTree/     # Project explorer
 │       │   │   └── Git/             # Git integration
 │       │   ├── hooks/               # React hooks
 │       │   ├── stores/              # State management

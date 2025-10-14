@@ -50,7 +50,7 @@ mcp__circuit-electron__screenshot({
 const verification = mcp__circuit-electron__evaluate({
   sessionId: session.sessionId,
   expression: `({
-    hasExplorer: document.querySelector('[title="Explorer"]') !== null,
+    hasProject: document.querySelector('[title="Project"]') !== null,
     hasTerminal: document.querySelector('[title="Terminal"]') !== null,
     hasGit: document.querySelector('[title="Git"]') !== null,
     hasToolbar: document.querySelector('.toolbar') !== null,
@@ -69,14 +69,14 @@ mcp__circuit-electron__close({ sessionId: session.sessionId })
 
 **Expected Results:**
 - Application window opens
-- Explorer panel visible on left
+- Project panel visible on left
 - Terminal panel visible at bottom
 - Git panel visible on right
 - Toolbar visible at top
 - No error dialogs or blank screens
 
 **Verification:**
-- `verification.hasExplorer === true`
+- `verification.hasProject === true`
 - `verification.hasTerminal === true`
 - `verification.hasGit === true`
 - `verification.hasToolbar === true`
@@ -97,10 +97,10 @@ const session = mcp__circuit-electron__app_launch({
   compressScreenshots: true
 })
 
-// 2. Wait for file tree to load
+// 2. Wait for project tree to load
 mcp__circuit-electron__wait_for_selector({
   sessionId: session.sessionId,
-  selector: ".file-tree",
+  selector: ".project-tree",
   timeout: 5000
 })
 
@@ -142,7 +142,7 @@ mcp__circuit-electron__close({ sessionId: session.sessionId })
 ```
 
 **Expected Results:**
-- File tree displays project files
+- Project tree displays project files
 - Clicking README.md opens editor panel
 - Monaco editor loads with content
 - Preview pane displays rendered markdown
