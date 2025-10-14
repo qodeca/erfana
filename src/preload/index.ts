@@ -131,7 +131,11 @@ const api = {
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('settings:removeApprovedTool', toolName),
     resetApprovedTools: (): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('settings:resetApprovedTools')
+      ipcRenderer.invoke('settings:resetApprovedTools'),
+    getProjectFilterMode: (): Promise<{ success: boolean; mode?: string; error?: string }> =>
+      ipcRenderer.invoke('settings:getProjectFilterMode'),
+    setProjectFilterMode: (mode: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('settings:setProjectFilterMode', mode)
   },
 
   // Claude Code operations - Persistent Session Architecture

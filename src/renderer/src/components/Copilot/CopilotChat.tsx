@@ -3,10 +3,11 @@
  *
  * Main chat interface for Copilot.
  * Backend: Communicates with Claude CLI via window.api.claudeCode
+ * Now with Control Panel toggle via props from parent
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Send, Square, ChevronLeft, ChevronDown, ListChecks } from 'lucide-react'
+import { Send, Square, ListChecks } from 'lucide-react'
 import { TerminalMessage } from './TerminalMessage'
 import { ToolApprovalDialog, ToolApprovalRequest } from '../Dialogs/ToolApprovalDialog'
 import { useCopilotStore } from '../../stores/useCopilotStore'
@@ -26,6 +27,11 @@ interface SessionMetrics {
   sessionStartTime: Date | null
 }
 
+interface CopilotChatProps {
+  showControlPanel: boolean
+  onToggleControlPanel: () => void
+}
+
 // All available Claude Code tools (from official documentation)
 const ALL_TOOLS = [
   'Read', 'Write', 'Edit', 'MultiEdit', 'Glob', 'Grep', 'Bash', 'LS',
@@ -35,7 +41,7 @@ const ALL_TOOLS = [
   'ExitPlanMode'
 ]
 
-export function CopilotChat() {
+export function CopilotChat({ showControlPanel }: CopilotChatProps) {
   const [messages, setMessages] = useState<ClaudeMessage[]>([])
   const [input, setInput] = useState('')
   const [isRunning, setIsRunning] = useState(false)
@@ -48,7 +54,6 @@ export function CopilotChat() {
     messagesCount: 0,
     sessionStartTime: null
   })
-  const [showControlPanel, setShowControlPanel] = useState(false)
   const [isPlanningMode, setIsPlanningMode] = useState(false)
   const [approvedTools, setApprovedTools] = useState<string[]>([])
 
@@ -537,16 +542,6 @@ export function CopilotChat() {
     <div className="copilot-chat">
       {/* Control Panel */}
       <div className="metrics-dashboard">
-        <div className="metrics-header" onClick={() => setShowControlPanel(!showControlPanel)}>
-          <span className="metrics-title">Control Panel</span>
-          <span className="metrics-toggle">
-            {showControlPanel ? (
-              <ChevronDown size={16} strokeWidth={2} />
-            ) : (
-              <ChevronLeft size={16} strokeWidth={2} />
-            )}
-          </span>
-        </div>
         {showControlPanel && (
           <div className="metrics-content">
             {/* Session Stats - always show Messages and Tools Used */}

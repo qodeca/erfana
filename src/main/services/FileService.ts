@@ -25,8 +25,8 @@ export class FileService {
     const nodes: FileNode[] = []
 
     for (const entry of entries) {
-      // Skip hidden files and node_modules
-      if (entry.name.startsWith('.') || entry.name === 'node_modules') {
+      // Skip node_modules for performance (can contain thousands of files)
+      if (entry.name === 'node_modules') {
         continue
       }
 

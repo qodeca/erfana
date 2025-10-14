@@ -50,13 +50,15 @@ src/
     │   ├── ActivityBar/     # Vertical activity bars (left/right)
     │   ├── Panels/          # Panel implementations + WelcomePanel
     │   ├── Editor/          # Monaco + Preview + Context Menus
-    │   ├── ProjectTree/     # Project panel with context menu
+    │   ├── ProjectTree/     # Project tree with filtering
     │   ├── ContextMenu/     # Right-click menu (project tree)
     │   ├── ConfirmDialog/   # Confirmation dialogs
     │   └── Toast/           # Toast notifications
     ├── contexts/            # React contexts (ToastContext)
     ├── stores/              # Zustand stores (useActivityBarStore)
     ├── hooks/               # React hooks
+    ├── types/               # Shared TypeScript types (filters.ts)
+    ├── utils/               # Shared utilities (fileUtils.ts)
     └── App.tsx              # Root (wrapped with ToastProvider)
 ```
 
@@ -137,7 +139,13 @@ Automatic file system change detection via chokidar:
 - **Left Activity Bar**: Project toggle
 - **Right Activity Bar**: Copilot toggle (top position), Git and Terminal toggles (separate panels, mutually exclusive)
 
-**Project Panel Context Menu**: Right-click files/folders for New File, New Folder, Rename, Delete actions with validation.
+**Control Panels**: Collapsible panels with chevron toggle (Copilot: session stats + tool approval; Project: file filtering)
+
+**Project Panel**:
+- **Control Panel**: File filtering (All Files | Markdown Only) with persistence
+- **Visual Indicators**: Sensitive files (amber + warning icon), hidden files (70% opacity, italic)
+- **Context Menu**: Right-click for New File, New Folder, Rename, Delete with validation
+- **Recursive Filtering**: Markdown mode shows only .md files + folders containing them
 
 **Editor Tab Styling**:
 - Hover effects on tabs (lighter background)

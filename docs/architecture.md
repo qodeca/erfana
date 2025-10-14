@@ -97,6 +97,8 @@ src/
         ├── contexts/            # React contexts (ToastContext)
         ├── stores/              # Zustand stores (useActivityBarStore)
         ├── hooks/               # React hooks
+        ├── types/               # Shared TypeScript types (filters.ts)
+        ├── utils/               # Shared utilities (fileUtils.ts)
         ├── App.tsx              # Root (wrapped with ToastProvider)
         └── main.tsx
 ```
@@ -117,6 +119,7 @@ src/
 - **Multi-model Editor**: Single Monaco instance, swap models per file
 - **Mermaid Integration**: Client-side diagram rendering (22 types) with dark theme
 - **Project Persistence**: Auto-loads last opened project on startup
+- **Shared Utilities**: `types/` for shared TypeScript types (FilterMode), `utils/` for shared functions (sanitizeFilePath, isMarkdownFile)
 
 ## Activity Bar System
 

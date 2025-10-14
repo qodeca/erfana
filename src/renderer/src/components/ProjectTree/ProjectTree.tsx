@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
-import { FilePlus, FolderPlus, FolderOpen, Replace, Trash, AlertTriangle, Edit } from 'lucide-react'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { FilePlus, FolderPlus, FolderOpen, Replace, Trash, AlertTriangle, Edit, FileText, Files } from 'lucide-react'
 import type { FileNode } from '../../../../preload/index'
+import type { FilterMode } from '../../types/filters'
 import { ProjectTreeNode } from './ProjectTreeNode'
 import { ContextMenu, ContextMenuItem } from '../ContextMenu/ContextMenu'
 import { ConfirmDialog } from '../ConfirmDialog/ConfirmDialog'
@@ -8,9 +9,12 @@ import './ProjectTree.css'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
+  showControlPanel: boolean
+  filterMode: FilterMode
+  onFilterModeChange: (mode: FilterMode) => void
 }
 
-export function ProjectTree({ onFileSelect }: ProjectTreeProps) {
+export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilterModeChange }: ProjectTreeProps) {
   const [projectPath, setProjectPath] = useState<string | null>(null)
   const [files, setFiles] = useState<FileNode[]>([])
   const [loading, setLoading] = useState(false)
@@ -179,6 +183,53 @@ export function ProjectTree({ onFileSelect }: ProjectTreeProps) {
       console.error('Error refreshing project tree:', err)
     }
   }
+
+  /**
+   * Check if a file is a markdown file
+   */
+  const isMarkdownFile = (fileName: string): boolean => {
+    const lower = fileName.toLowerCase()
+    return lower.endsWith('.md') || lower.endsWith('.markdown')
+  }
+
+  /**
+   * Recursively filter file tree to show only markdown files and folders containing them
+   */
+  const filterMarkdownFiles = (nodes: FileNode[]): FileNode[] => {
+    return nodes
+      .map(node => {
+        if (node.type === 'file') {
+          // Keep only markdown files
+          return isMarkdownFile(node.name) ? node : null
+        } else {
+          // For directories, recursively filter children
+          if (node.children && node.children.length > 0) {
+            const filteredChildren = filterMarkdownFiles(node.children)
+
+            // Keep directory only if it has markdown children
+            if (filteredChildren.length > 0) {
+              return {
+                ...node,
+                children: filteredChildren
+              }
+            }
+          }
+          return null
+        }
+      })
+      .filter((node): node is FileNode => node !== null)
+  }
+
+  /**
+   * Apply filtering based on current filter mode
+   */
+  const filteredFiles = useMemo(() => {
+    if (filterMode === 'all') {
+      return files
+    } else {
+      return filterMarkdownFiles(files)
+    }
+  }, [files, filterMode])
 
   const handleToggleFolder = (folderPath: string) => {
     setExpandedFolders((prev) => {
@@ -731,9 +782,38 @@ export function ProjectTree({ onFileSelect }: ProjectTreeProps) {
         </div>
       )}
 
+      {/* Control Panel */}
+      {showControlPanel && (
+        <div className="project-control-panel">
+          <div className="control-panel-content">
+            <div className="control-panel-section">
+              <div className="control-panel-label">File Filter</div>
+              <div className="filter-options">
+                <button
+                  className={`filter-option ${filterMode === 'all' ? 'active' : ''}`}
+                  onClick={() => onFilterModeChange('all')}
+                  title="Show all files and folders"
+                >
+                  <Files size={14} />
+                  <span>All Files</span>
+                </button>
+                <button
+                  className={`filter-option ${filterMode === 'markdown' ? 'active' : ''}`}
+                  onClick={() => onFilterModeChange('markdown')}
+                  title="Show only markdown files and their folders"
+                >
+                  <FileText size={14} />
+                  <span>Markdown Only</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="project-tree-content">
-        {files.length > 0 ? (
-          files.map((node) => (
+        {filteredFiles.length > 0 ? (
+          filteredFiles.map((node) => (
             <ProjectTreeNode
               key={node.path}
               node={node}
@@ -747,7 +827,7 @@ export function ProjectTree({ onFileSelect }: ProjectTreeProps) {
           ))
         ) : (
           <div className="project-tree-empty">
-            {projectPath ? 'No files found' : 'Open a project to get started'}
+            {projectPath ? (filterMode === 'markdown' ? 'No markdown files found' : 'No files found') : 'Open a project to get started'}
           </div>
         )}
       </div>
