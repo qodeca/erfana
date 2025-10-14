@@ -1,16 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
 import { FilePlus, FolderPlus, FolderOpen, Replace, Trash, AlertTriangle, Edit } from 'lucide-react'
 import type { FileNode } from '../../../../preload/index'
-import { FileTreeNode } from './FileTreeNode'
+import { ProjectTreeNode } from './ProjectTreeNode'
 import { ContextMenu, ContextMenuItem } from '../ContextMenu/ContextMenu'
 import { ConfirmDialog } from '../ConfirmDialog/ConfirmDialog'
-import './FileTree.css'
+import './ProjectTree.css'
 
-interface FileTreeProps {
+interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
 }
 
-export function FileTree({ onFileSelect }: FileTreeProps) {
+export function ProjectTree({ onFileSelect }: ProjectTreeProps) {
   const [projectPath, setProjectPath] = useState<string | null>(null)
   const [files, setFiles] = useState<FileNode[]>([])
   const [loading, setLoading] = useState(false)
@@ -79,8 +79,8 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
     const unsubscribeChanged = window.api.directoryWatch.onDirectoryChanged((data) => {
       // Only refresh if not during our own internal operations
       if (!isInternalOperation.current) {
-        console.log(`📁 Directory changed, refreshing file tree... (${data.eventCount} events)`)
-        refreshFileTree()
+        console.log(`📁 Directory changed, refreshing project tree... (${data.eventCount} events)`)
+        refreshProjectTree()
       }
     })
 
@@ -169,14 +169,14 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
     }
   }
 
-  const refreshFileTree = async () => {
+  const refreshProjectTree = async () => {
     if (!projectPath) return
     try {
       const fileTree = await window.api.file.readDirectory(projectPath)
       setFiles(fileTree)
       // Expanded folders are preserved automatically via state
     } catch (err) {
-      console.error('Error refreshing file tree:', err)
+      console.error('Error refreshing project tree:', err)
     }
   }
 
@@ -217,8 +217,8 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
 
       const createdFilePath = await window.api.file.createFile(targetPath, newFileName)
 
-      // Refresh file tree
-      await refreshFileTree()
+      // Refresh project tree
+      await refreshProjectTree()
 
       // Resume directory watcher
       if (projectPath) {
@@ -283,8 +283,8 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
 
       await window.api.file.createFolder(targetPath, newFolderName)
 
-      // Refresh file tree
-      await refreshFileTree()
+      // Refresh project tree
+      await refreshProjectTree()
 
       // Resume directory watcher
       if (projectPath) {
@@ -382,7 +382,7 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
           }
 
           await window.api.file.deleteFile(filePath)
-          await refreshFileTree()
+          await refreshProjectTree()
 
           // Resume directory watcher
           if (projectPath) {
@@ -424,7 +424,7 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
           }
 
           await window.api.file.deleteFolder(folderPath)
-          await refreshFileTree()
+          await refreshProjectTree()
 
           // Resume directory watcher
           if (projectPath) {
@@ -500,8 +500,8 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
 
       await window.api.file.rename(renamingPath, renameValue)
 
-      // Refresh file tree
-      await refreshFileTree()
+      // Refresh project tree
+      await refreshProjectTree()
 
       // Resume directory watcher
       if (projectPath) {
@@ -581,18 +581,18 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
   }
 
   return (
-    <div className="file-tree">
+    <div className="project-tree">
       {error && (
-        <div className="file-tree-error">
+        <div className="project-tree-error">
           {error}
         </div>
       )}
 
-      <div className="file-tree-path">
+      <div className="project-tree-path">
         <span className="project-name">
           {projectPath ? projectPath.split('/').pop() : 'No project open'}
         </span>
-        <div className="file-tree-actions">
+        <div className="project-tree-actions">
           <button
             className="icon-btn"
             onClick={handleOpenProject}
@@ -731,10 +731,10 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
         </div>
       )}
 
-      <div className="file-tree-content">
+      <div className="project-tree-content">
         {files.length > 0 ? (
           files.map((node) => (
-            <FileTreeNode
+            <ProjectTreeNode
               key={node.path}
               node={node}
               level={0}
@@ -746,7 +746,7 @@ export function FileTree({ onFileSelect }: FileTreeProps) {
             />
           ))
         ) : (
-          <div className="file-tree-empty">
+          <div className="project-tree-empty">
             {projectPath ? 'No files found' : 'Open a project to get started'}
           </div>
         )}

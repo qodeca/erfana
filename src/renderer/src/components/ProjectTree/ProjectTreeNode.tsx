@@ -1,8 +1,8 @@
 import { ChevronRight, ChevronDown, File, FileText } from 'lucide-react'
 import type { FileNode } from '../../../../preload/index'
-import './FileTree.css'
+import './ProjectTree.css'
 
-interface FileTreeNodeProps {
+interface ProjectTreeNodeProps {
   node: FileNode
   level: number
   onFileClick: (filePath: string) => void
@@ -12,7 +12,7 @@ interface FileTreeNodeProps {
   onToggleFolder: (folderPath: string) => void
 }
 
-export function FileTreeNode({
+export function ProjectTreeNode({
   node,
   level,
   onFileClick,
@@ -20,7 +20,7 @@ export function FileTreeNode({
   selectedFolder,
   expandedFolders,
   onToggleFolder
-}: FileTreeNodeProps) {
+}: ProjectTreeNodeProps) {
   // Controlled component - check if this folder is expanded
   const isExpanded = expandedFolders.has(node.path)
 
@@ -57,9 +57,9 @@ export function FileTreeNode({
   }
 
   return (
-    <div className="file-tree-node">
+    <div className="project-tree-node">
       <div
-        className={`file-tree-item ${node.type} ${isSelected ? 'selected' : ''}`}
+        className={`project-tree-item ${node.type} ${isSelected ? 'selected' : ''}`}
         style={{ paddingLeft: `${level * 16 + 8}px` }}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
@@ -70,9 +70,9 @@ export function FileTreeNode({
         </span>
       </div>
       {node.type === 'directory' && isExpanded && node.children && (
-        <div className="file-tree-children">
+        <div className="project-tree-children">
           {node.children.map((child) => (
-            <FileTreeNode
+            <ProjectTreeNode
               key={child.path}
               node={child}
               level={level + 1}

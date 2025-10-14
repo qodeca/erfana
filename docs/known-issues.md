@@ -37,7 +37,7 @@ loader.config({ monaco })
 
 ### ✅ Panel Protection (RESOLVED in v0.1.0, Commit 4ff94cb)
 
-**Previous Issue**: Multiple attempts to hide close buttons on protected panels (Explorer, Git, Terminal) failed. Used wrong CSS class selectors and required multiple setTimeout calls.
+**Previous Issue**: Multiple attempts to hide close buttons on protected panels (Project, Git, Terminal) failed. Used wrong CSS class selectors and required multiple setTimeout calls.
 
 **Solution**: New SplitviewReact architecture renders sidebar panels differently. Panel protection is now handled through the splitview API's visibility control rather than hiding close buttons.
 

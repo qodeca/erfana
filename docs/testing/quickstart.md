@@ -116,10 +116,10 @@ mcp__circuit-electron__close({ sessionId: s.sessionId })
 | Element | Selector |
 |---------|----------|
 | Main layout | `.app-dock-layout` |
-| Explorer panel | `[title="Explorer"]` |
+| Project panel | `[title="Project"]` |
 | Terminal panel | `[title="Terminal"]` |
 | Git panel | `[title="Git"]` |
-| File tree | `.file-tree` |
+| Project tree | `.project-tree` |
 | Monaco editor | `.monaco-editor` |
 | Preview pane | `.preview-pane` |
 | Toolbar | `.toolbar` |
@@ -131,7 +131,7 @@ mcp__circuit-electron__close({ sessionId: s.sessionId })
 
 | Shortcut | Action | Code |
 |----------|--------|------|
-| Cmd/Ctrl+B | Toggle Explorer | `keyboard_press({ key: "b", modifiers: ["Meta"] })` |
+| Cmd/Ctrl+B | Toggle Project | `keyboard_press({ key: "b", modifiers: ["Meta"] })` |
 | Cmd/Ctrl+J | Toggle Terminal | `keyboard_press({ key: "j", modifiers: ["Meta"] })` |
 | Cmd/Ctrl+Alt+B | Toggle Git | `keyboard_press({ key: "b", modifiers: ["Meta", "Alt"] })` |
 | Cmd/Ctrl+S | Save file | `keyboard_press({ key: "s", modifiers: ["Meta"] })` |
@@ -152,7 +152,7 @@ const state = mcp__circuit-electron__evaluate({
   sessionId: s.sessionId,
   expression: `({
     panels: {
-      explorer: document.querySelector('[title="Explorer"]') !== null,
+      project: document.querySelector('[title="Project"]') !== null,
       terminal: document.querySelector('[title="Terminal"]') !== null,
       git: document.querySelector('[title="Git"]') !== null
     },

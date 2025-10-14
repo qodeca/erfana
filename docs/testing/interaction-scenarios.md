@@ -42,7 +42,7 @@ mcp__circuit-electron__screenshot({ sessionId: session.sessionId })
 
 const leftSidebarHidden = mcp__circuit-electron__evaluate({
   sessionId: session.sessionId,
-  expression: `!document.querySelector('[title="Explorer"]')?.parentElement.offsetParent`
+  expression: `!document.querySelector('[title="Project"]')?.parentElement.offsetParent`
 })
 
 // 3. Press Cmd+B again to restore
@@ -100,7 +100,7 @@ mcp__circuit-electron__close({ sessionId: session.sessionId })
 ```
 
 **Expected Results:**
-- Cmd+B toggles Explorer panel visibility
+- Cmd+B toggles Project panel visibility
 - Cmd+J toggles Terminal panel visibility
 - Cmd+Alt+B toggles Git panel visibility
 - Cmd+S saves file and clears modified indicator
@@ -116,19 +116,19 @@ mcp__circuit-electron__close({ sessionId: session.sessionId })
 
 ## Scenario 7: File Context Menu Operations
 
-**Goal:** Test right-click context menu in file tree.
+**Goal:** Test right-click context menu in project tree.
 
 **Steps:**
 
 ```typescript
 // 1. Launch app
 const session = mcp__circuit-electron__app_launch({ ... })
-mcp__circuit-electron__wait_for_selector({ sessionId: session.sessionId, selector: ".file-tree" })
+mcp__circuit-electron__wait_for_selector({ sessionId: session.sessionId, selector: ".project-tree" })
 
 // 2. Right-click on a folder
 mcp__circuit-electron__click({
   sessionId: session.sessionId,
-  selector: ".file-tree-node[data-type='directory']",
+  selector: ".project-tree-node[data-type='directory']",
   button: "right"  // Right-click
 })
 
@@ -312,7 +312,7 @@ mcp__circuit-electron__close({ sessionId: session.sessionId })
 
 ## Scenario 10: Panel Protection (Cannot Close System Panels)
 
-**Goal:** Verify that system panels (Explorer, Terminal, Git) cannot be closed via close button.
+**Goal:** Verify that system panels (Project, Terminal, Git) cannot be closed via close button.
 
 **Steps:**
 
@@ -321,14 +321,14 @@ mcp__circuit-electron__close({ sessionId: session.sessionId })
 const session = mcp__circuit-electron__app_launch({ ... })
 mcp__circuit-electron__wait_for_selector({ sessionId: session.sessionId, selector: ".app-dock-layout" })
 
-// 2. Try to find and click Explorer close button
-const explorerCloseAttempt = mcp__circuit-electron__evaluate({
+// 2. Try to find and click Project close button
+const projectCloseAttempt = mcp__circuit-electron__evaluate({
   sessionId: session.sessionId,
   expression: `(() => {
-    const explorerTab = Array.from(document.querySelectorAll('.dv-default-tab')).find(
-      tab => tab.querySelector('.dv-default-tab-content')?.textContent === 'Explorer'
+    const projectTab = Array.from(document.querySelectorAll('.dv-default-tab')).find(
+      tab => tab.querySelector('.dv-default-tab-content')?.textContent === 'Project'
     )
-    const closeButton = explorerTab?.querySelector('.dv-default-tab-action')
+    const closeButton = projectTab?.querySelector('.dv-default-tab-action')
     if (closeButton) {
       closeButton.click()
       return { clicked: true, stillExists: true }
@@ -337,11 +337,11 @@ const explorerCloseAttempt = mcp__circuit-electron__evaluate({
   })()`
 })
 
-// 3. Verify Explorer still exists
+// 3. Verify Project still exists
 await new Promise(resolve => setTimeout(resolve, 500))
-const explorerExists = mcp__circuit-electron__evaluate({
+const projectPanelExists = mcp__circuit-electron__evaluate({
   sessionId: session.sessionId,
-  expression: `document.querySelector('[title="Explorer"]') !== null`
+  expression: `document.querySelector('[title="Project"]') !== null`
 })
 mcp__circuit-electron__screenshot({ sessionId: session.sessionId })
 
@@ -365,7 +365,7 @@ mcp__circuit-electron__close({ sessionId: session.sessionId })
 - User-created tabs can still be closed
 
 **Verification:**
-- `explorerExists === true` after close attempt
+- `projectPanelExists === true` after close attempt
 - `terminalExists === true`
 - `gitExists === true`
 
