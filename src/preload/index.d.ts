@@ -54,6 +54,21 @@ declare global {
           state?: 'stopped' | 'starting' | 'ready' | 'error'
           error?: string
         }>
+        // Session statistics
+        getSessionStats: () => Promise<{
+          success: boolean
+          stats?: {
+            messageCount: number
+            toolExecutions: number
+            createdAt: Date
+          }
+          error?: string
+        }>
+        getMessageCount: () => Promise<{
+          success: boolean
+          count?: number
+          error?: string
+        }>
         // Send message
         sendMessage: (prompt: string, context: any, sessionId: string) => void
         stop: () => void
@@ -128,6 +143,13 @@ declare global {
         ) => () => void
         onSessionResumed: (
           callback: (data: { projectPath: string; approvedTools: string[] }) => void
+        ) => () => void
+        onSessionResumeFailed: (
+          callback: (data: {
+            oldSessionId: string
+            newSessionId: string
+            message: string
+          }) => void
         ) => () => void
       }
       settings: {

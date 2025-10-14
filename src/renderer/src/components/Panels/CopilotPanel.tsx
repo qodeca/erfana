@@ -223,8 +223,11 @@ export function CopilotPanel(_props: ISplitviewPanelProps) {
   const handleRestartSession = async () => {
     console.log('🔄 Manual session restart requested')
     try {
+      // Explicitly stop session first - user wants a fresh start (no --resume)
       await window.api.claudeCode.stopSession()
       setSessionState('stopped')
+
+      // Start fresh session (IPC will detect 'stopped' state → use 'initial' reason)
       await startSession()
     } catch (err: any) {
       console.error('Failed to restart session:', err)
@@ -255,35 +258,33 @@ export function CopilotPanel(_props: ISplitviewPanelProps) {
       setApprovedTools(newApprovedTools)
       console.log('✅ Step 2 complete: React state updated')
 
-      // Step 3: Stop current session (now waits for real exit)
-      console.log('💾 Step 3: Stopping current session...')
-      const stopResult = await window.api.claudeCode.stopSession()
-      if (!stopResult.success) {
-        throw new Error(stopResult.error || 'Failed to stop session')
-      }
-      setSessionState('stopped')
-      console.log('✅ Step 3 complete: Session stopped and process exited')
-
-      // Step 4: Get project path
-      console.log('💾 Step 4: Getting project path...')
+      // Step 3: Get project path
+      console.log('💾 Step 3: Getting project path...')
       const projectPath = await window.api.file.getProjectPath()
       if (!projectPath) {
         throw new Error('No project path available')
       }
-      console.log('✅ Step 4 complete: Project path:', projectPath)
+      console.log('✅ Step 3 complete: Project path:', projectPath)
 
-      // Step 5: Start new session with updated tools
-      console.log('💾 Step 5: Starting new session with updated tools...')
+      // Step 4: Restart session with updated tools
+      // IMPORTANT: Do NOT call stopSession() first!
+      // Let startSession() detect running session and use --resume to preserve conversation
+      // IPC handler will see 'ready'/'starting' state → detect as 'settings' → use --resume
+      console.log('💾 Step 4: Restarting session with updated tools (preserving conversation)...')
       console.log('💾 Tools that will be loaded:', newApprovedTools)
+
+      // Mark as starting for UI feedback
+      setSessionState('starting')
+
       const restartResult = await window.api.claudeCode.startSession(projectPath, false)
 
       if (!restartResult.success) {
         throw new Error(restartResult.error || 'Failed to restart session')
       }
-      console.log('✅ Step 5 complete: New session starting')
+      console.log('✅ Step 4 complete: Session restarting with --resume')
       console.log('✅ SETTINGS SAVE: Complete! Session will emit "started" event when ready.')
 
-      // Step 6: Session state will be updated to 'ready' via event listener (line 81-86)
+      // Step 5: Session state will be updated to 'ready' via event listener (line 81-86)
       // This happens asynchronously when the session-started event fires
     } catch (error: any) {
       console.error('❌ SETTINGS SAVE FAILED:', error)

@@ -153,6 +153,28 @@ const api = {
       error?: string
     }> => ipcRenderer.invoke('claudeCode:getSessionState'),
 
+    /**
+     * Get session statistics including message count, tool executions, and session age
+     */
+    getSessionStats: (): Promise<{
+      success: boolean
+      stats?: {
+        messageCount: number
+        toolExecutions: number
+        createdAt: Date
+      }
+      error?: string
+    }> => ipcRenderer.invoke('claudeCode:getSessionStats'),
+
+    /**
+     * Get current message count (convenience method)
+     */
+    getMessageCount: (): Promise<{
+      success: boolean
+      count?: number
+      error?: string
+    }> => ipcRenderer.invoke('claudeCode:getMessageCount'),
+
     // Send message (event-based for streaming)
     sendMessage: (prompt: string, context: any, sessionId: string): void => {
       ipcRenderer.send('claudeCode:sendMessage', { prompt, context, sessionId })
@@ -271,6 +293,21 @@ const api = {
       ) => callback(data)
       ipcRenderer.on('claudeCode:sessionResumed', listener)
       return () => ipcRenderer.removeListener('claudeCode:sessionResumed', listener)
+    },
+
+    onSessionResumeFailed: (
+      callback: (data: {
+        oldSessionId: string
+        newSessionId: string
+        message: string
+      }) => void
+    ) => {
+      const listener = (
+        _event: any,
+        data: { oldSessionId: string; newSessionId: string; message: string }
+      ) => callback(data)
+      ipcRenderer.on('claudeCode:sessionResumeFailed', listener)
+      return () => ipcRenderer.removeListener('claudeCode:sessionResumeFailed', listener)
     }
   }
 }

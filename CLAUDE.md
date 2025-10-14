@@ -292,6 +292,29 @@ Opinionated approach optimized for consultant workflow with all tools pre-author
 
 See: [Claude Code UI Features](docs/claude-code/ui-features.md#planning-mode-toggle) for UI documentation
 
+### Conversation Preservation
+
+**Behavior**: Erfana preserves conversation context across configuration changes for seamless workflow.
+
+**When Conversation is Preserved (--resume)**:
+- Tool authorization changes (settings save, approval dialog)
+- Planning mode toggles (exploration ↔ implementation)
+- Crash recovery (automatic with fallback)
+
+**When Conversation Resets (fresh start)**:
+- App launch or project open
+- Manual "Restart Session" button
+- Resume failure (automatic fallback)
+
+**Benefits**:
+- Never lose context when approving new tools
+- Seamless transition between planning and implementation
+- Maintains discussion during tool configuration adjustments
+
+**Technical**: Uses Claude CLI's --resume flag with session ID reuse. Session state stored server-side (~/.claude/projects/).
+
+📚 **Full documentation**: See [Conversation Preservation](docs/claude-code/conversation-preservation.md)
+
 ### Implementation
 
 **Files**:
@@ -315,7 +338,7 @@ claude -p \
   --permission-mode plan  # Optional: Enable planning mode (restricts to 9 safe tools)
 ```
 
-📚 **Detailed docs**: [Claude Code Integration Index](docs/claude-code/README.md) | [Tool Approval System](docs/claude-code/tool-approval.md) | [UI Features](docs/claude-code/ui-features.md) | [IPC Patterns](docs/ipc-patterns.md)
+📚 **Detailed docs**: [Claude Code Integration Index](docs/claude-code/README.md) | [Tool Approval System](docs/claude-code/tool-approval.md) | [Conversation Preservation](docs/claude-code/conversation-preservation.md) | [UI Features](docs/claude-code/ui-features.md) | [IPC Patterns](docs/ipc-patterns.md)
 
 ## Agent Delegation
 
@@ -342,7 +365,7 @@ claude -p \
 - [Known Issues](docs/known-issues.md) - Current and resolved issues
 - [Development Tasks](docs/development-tasks.md) - Common patterns
 - [Agent Delegation](docs/agent-delegation.md) - Specialized agent usage guide
-- **Claude Code**: [Index](docs/claude-code/README.md) | [Tool Approval](docs/claude-code/tool-approval.md) | [UI Features](docs/claude-code/ui-features.md)
+- **Claude Code**: [Index](docs/claude-code/README.md) | [Tool Approval](docs/claude-code/tool-approval.md) | [Conversation Preservation](docs/claude-code/conversation-preservation.md) | [UI Features](docs/claude-code/ui-features.md)
 - **Testing**: [Index](docs/testing/README.md) | [Quick Start](docs/testing/quickstart.md) | [MCP Guide](docs/testing/circuit-electron-guide.md) | [Scenarios](docs/testing/ui-scenarios.md)
 
 ## Useful Resources

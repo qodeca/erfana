@@ -194,6 +194,22 @@ interface ClaudeInputMessage {
 type SessionState = 'stopped' | 'starting' | 'ready' | 'error'
 
 /**
+ * Session start reason - determines session ID lifecycle and --resume usage
+ *
+ * - 'initial': App launch or first project open - generates fresh session ID
+ * - 'manual_restart': User explicit restart - generates fresh session ID
+ * - 'settings': Tool approval change - reuses session ID with --resume
+ * - 'planning': Planning mode toggle - reuses session ID with --resume
+ * - 'recovery': Crash recovery - attempts --resume, falls back to fresh if needed
+ */
+type SessionStartReason =
+  | 'initial'         // App launch
+  | 'manual_restart'  // User explicit restart
+  | 'settings'        // Tool config change
+  | 'planning'        // Planning mode toggle
+  | 'recovery'        // Crash recovery or resume failure
+
+/**
  * Streaming message state for accumulating deltas
  */
 interface StreamingMessage {
@@ -204,6 +220,15 @@ interface StreamingMessage {
   timestamp: Date
   contentBlocks: Map<number, string> // Block index -> accumulated content
   isStreaming: boolean
+}
+
+/**
+ * Session statistics for tracking conversation metrics
+ */
+interface SessionStats {
+  messageCount: number      // Total user + assistant messages
+  toolExecutions: number    // Total tool executions
+  createdAt: Date          // Session creation timestamp
 }
 
 export class ClaudeCliService extends EventEmitter {
@@ -233,6 +258,13 @@ export class ClaudeCliService extends EventEmitter {
     output_tokens: 0,
     cache_read_input_tokens: 0,
     cache_creation_input_tokens: 0
+  }
+
+  // Session statistics tracking
+  private sessionStats: SessionStats = {
+    messageCount: 0,
+    toolExecutions: 0,
+    createdAt: new Date()
   }
 
   /**
@@ -282,14 +314,25 @@ export class ClaudeCliService extends EventEmitter {
 
   /**
    * Start persistent Claude CLI session
-   * Called when project opens
+   * Called when project opens or during session restarts
+   *
    * @param projectPath - Path to the project directory
    * @param planningMode - If true, restricts tools to read-only (Read, LS, Grep, Task, WebSearch, TodoWrite)
+   * @param reason - Reason for session start (determines session ID lifecycle and --resume usage)
+   *
+   * Session ID Lifecycle:
+   * - 'initial' / 'manual_restart' / 'recovery': Generate fresh session ID
+   * - 'settings' / 'planning': Reuse session ID and add --resume flag
    */
-  async startSession(projectPath: string, planningMode: boolean = false): Promise<void> {
+  async startSession(
+    projectPath: string,
+    planningMode: boolean = false,
+    reason: SessionStartReason = 'initial'
+  ): Promise<void> {
     console.log('🔵 SESSION START: Begin startSession()')
     console.log('🔵 Project path:', projectPath)
     console.log('🔵 Planning mode:', planningMode)
+    console.log('🔵 Start reason:', reason)
 
     if (this.claudeProcess) {
       console.log('⚠️ Session already running, stopping first...')
@@ -302,12 +345,32 @@ export class ClaudeCliService extends EventEmitter {
     this.buffer = ''
     this.restartAttempts = 0
 
-    // Reset cumulative token tracking
-    this.cumulativeTokens = {
-      input_tokens: 0,
-      output_tokens: 0,
-      cache_read_input_tokens: 0,
-      cache_creation_input_tokens: 0
+    // Session ID lifecycle: Generate fresh ID for initial/manual/recovery, reuse for settings/planning
+    const previousSessionId = this.sessionId
+    const shouldUseResume = (reason === 'settings' || reason === 'planning') && previousSessionId
+
+    if (reason === 'initial' || reason === 'manual_restart' || reason === 'recovery') {
+      this.sessionId = this.generateSessionId()
+      console.log('🆕 Fresh session ID generated:', this.sessionId)
+      console.log(`📊 Reason: ${reason} - Starting new conversation`)
+
+      // Reset stats for fresh sessions
+      this.sessionStats = {
+        messageCount: 0,
+        toolExecutions: 0,
+        createdAt: new Date()
+      }
+
+      // Reset cumulative token tracking
+      this.cumulativeTokens = {
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_read_input_tokens: 0,
+        cache_creation_input_tokens: 0
+      }
+    } else {
+      console.log('🔄 Reusing session ID for conversation preservation:', this.sessionId)
+      console.log(`📊 Reason: ${reason} - Preserving conversation context`)
     }
 
     // Determine tool set based on planning mode
@@ -327,14 +390,11 @@ export class ClaudeCliService extends EventEmitter {
 
     this.approvedTools = toolsToUse
 
-    // Generate session ID for resume support
-    this.sessionId = this.generateSessionId()
-
     console.log(`🚀 Starting persistent Claude CLI session for: ${projectPath}`)
     console.log(`🔧 Approved tools (${this.approvedTools.size} total): ${Array.from(this.approvedTools).join(', ')}`)
 
     try {
-      // Build args with approved tools
+      // Build args with session ID and standard flags
       const args = [
         '-p', // Print mode (non-interactive, but can accept stdin)
         '--input-format',
@@ -345,8 +405,16 @@ export class ClaudeCliService extends EventEmitter {
         '--replay-user-messages', // Echo user messages back for acknowledgment
         '--include-partial-messages', // Enable real-time token streaming
         '--session-id',
-        this.sessionId // Use specific session ID for resume support
+        this.sessionId! // Use specific session ID for resume support
       ]
+
+      // Add --resume flag for settings/planning mode changes to preserve conversation
+      if (shouldUseResume) {
+        this.logResumeAttempt(previousSessionId!, reason)
+        args.push('--resume', previousSessionId!)
+        console.log('✅ Added --resume flag for conversation preservation')
+        console.log(`📝 Resuming conversation from session: ${previousSessionId}`)
+      }
 
       // Add planning mode flag if enabled
       if (planningMode) {
@@ -365,6 +433,17 @@ export class ClaudeCliService extends EventEmitter {
       }
 
       console.log('🔵 Final command args:', args.join(' '))
+
+      // Resume timeout: If --resume hangs, fall back to fresh session
+      let resumeTimeout: NodeJS.Timeout | null = null
+      if (shouldUseResume) {
+        resumeTimeout = setTimeout(() => {
+          if (this.sessionState === 'starting') {
+            console.error('❌ Resume operation timed out (10s)')
+            this.handleResumeFailed(previousSessionId!)
+          }
+        }, 10000) // 10 second timeout
+      }
 
       // Start Claude CLI in persistent mode with stream-json I/O
       this.claudeProcess = spawn('claude', args, {
@@ -387,10 +466,21 @@ export class ClaudeCliService extends EventEmitter {
         this.handleStdout(data)
       })
 
-      // Handle stderr
+      // Handle stderr with resume failure detection
       this.claudeProcess.stderr.on('data', (data: Buffer) => {
         const errorText = data.toString()
         console.error('❌ Claude CLI stderr:', errorText)
+
+        // Detect resume-specific failures
+        if (this.isResumeFailure(errorText)) {
+          console.error('❌ Resume failed, falling back to fresh session')
+          if (resumeTimeout) {
+            clearTimeout(resumeTimeout)
+            resumeTimeout = null
+          }
+          this.handleResumeFailed(previousSessionId || this.sessionId!)
+          return
+        }
 
         // Check for authentication errors
         if (errorText.includes('not logged in') || errorText.includes('authenticate')) {
@@ -405,12 +495,20 @@ export class ClaudeCliService extends EventEmitter {
       // Handle process exit
       this.claudeProcess.on('close', (code) => {
         console.log(`🏁 Claude CLI process exited with code: ${code}`)
+        if (resumeTimeout) {
+          clearTimeout(resumeTimeout)
+          resumeTimeout = null
+        }
         this.handleProcessExit(code)
       })
 
       // Handle process errors
       this.claudeProcess.on('error', (error) => {
         console.error('❌ Claude CLI process error:', error)
+        if (resumeTimeout) {
+          clearTimeout(resumeTimeout)
+          resumeTimeout = null
+        }
         this.sessionState = 'error'
         this.emit('error', {
           message: error.message,
@@ -419,6 +517,10 @@ export class ClaudeCliService extends EventEmitter {
       })
 
       this.sessionState = 'ready'
+      if (resumeTimeout) {
+        clearTimeout(resumeTimeout)
+        resumeTimeout = null
+      }
       console.log('🔵 Emitting session-started event with projectPath:', projectPath)
       this.emit('session-started', { projectPath })
       console.log('✅ Claude CLI session ready')
@@ -518,90 +620,25 @@ export class ClaudeCliService extends EventEmitter {
 
   /**
    * Restart session with updated tool permissions
-   * Preserves planning mode state
+   * Uses 'settings' reason to preserve conversation via --resume
    */
   private async restartWithNewPermissions(): Promise<void> {
-    if (!this.projectPath || !this.sessionId) {
-      console.error('❌ Cannot restart: missing project path or session ID')
+    if (!this.projectPath) {
+      console.error('❌ Cannot restart: missing project path')
       return
     }
 
-    console.log('🔄 Restarting session with updated permissions...')
+    console.log('🔄 Restarting session with updated tool permissions...')
+    console.log('📊 Using reason: settings (conversation will be preserved)')
 
-    const previousSessionId = this.sessionId
     const projectPath = this.projectPath
     const planningMode = this.isPlanningMode
 
-    // Stop current session and wait for exit
-    await this.stopSession()
+    // Use startSession with 'settings' reason to preserve conversation
+    await this.startSession(projectPath, planningMode, 'settings')
 
-    this.sessionState = 'starting'
-    this.buffer = ''
-
-    try {
-      // Restart with --resume and updated --allowedTools
-      const args = [
-        '-p',
-        '--input-format',
-        'stream-json',
-        '--output-format',
-        'stream-json',
-        '--verbose',
-        '--replay-user-messages',
-        '--include-partial-messages', // Enable streaming
-        '--resume',
-        previousSessionId
-      ]
-
-      // Add planning mode flag if enabled
-      if (planningMode) {
-        args.push('--permission-mode', 'plan')
-      }
-
-      // Add updated allowed tools
-      if (this.approvedTools.size > 0) {
-        args.push('--allowedTools', ...Array.from(this.approvedTools))
-      }
-
-      console.log(`🔧 Resuming with tools: ${Array.from(this.approvedTools).join(', ')}`)
-      if (planningMode) {
-        console.log('📋 Planning mode: enabled')
-      }
-
-      this.claudeProcess = spawn('claude', args, {
-        cwd: projectPath,
-        shell: true,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: {
-          ...process.env,
-          HOME: process.env.HOME || homedir(),
-          ANTHROPIC_API_KEY: undefined
-        }
-      })
-
-      if (!this.claudeProcess.stdout || !this.claudeProcess.stderr || !this.claudeProcess.stdin) {
-        throw new Error('Failed to initialize stdio')
-      }
-
-      // Setup handlers
-      this.claudeProcess.stdout.on('data', (data: Buffer) => this.handleStdout(data))
-      this.claudeProcess.stderr.on('data', (data: Buffer) => {
-        console.error('❌ Claude CLI stderr:', data.toString())
-      })
-      this.claudeProcess.on('close', (code) => this.handleProcessExit(code))
-      this.claudeProcess.on('error', (error) => {
-        console.error('❌ Process error:', error)
-        this.sessionState = 'error'
-      })
-
-      this.sessionState = 'ready'
-      this.emit('session-resumed', { projectPath, approvedTools: Array.from(this.approvedTools) })
-      console.log('✅ Session resumed with new permissions')
-    } catch (error: any) {
-      console.error('❌ Failed to restart:', error)
-      this.sessionState = 'error'
-      throw error
-    }
+    this.emit('session-resumed', { projectPath, approvedTools: Array.from(this.approvedTools) })
+    console.log('✅ Session resumed with new permissions and preserved conversation')
   }
 
   /**
@@ -663,7 +700,8 @@ export class ClaudeCliService extends EventEmitter {
   }
 
   /**
-   * Restart session (for error recovery)
+   * Restart session after crash (for error recovery)
+   * Uses 'recovery' reason to attempt conversation preservation with --resume
    */
   private async restartSession(): Promise<void> {
     if (!this.projectPath) {
@@ -684,7 +722,8 @@ export class ClaudeCliService extends EventEmitter {
     this.restartAttempts++
     const delay = Math.pow(2, this.restartAttempts) * 1000 // Exponential backoff
 
-    console.log(`🔄 Restarting session in ${delay}ms (attempt ${this.restartAttempts}/${this.maxRestartAttempts})`)
+    console.log(`🔄 Crash recovery: Restarting session in ${delay}ms (attempt ${this.restartAttempts}/${this.maxRestartAttempts})`)
+    console.log('📊 Using reason: recovery (will attempt conversation preservation)')
 
     this.emit('session-restarting', {
       attempt: this.restartAttempts,
@@ -693,8 +732,10 @@ export class ClaudeCliService extends EventEmitter {
 
     this.restartTimeout = setTimeout(async () => {
       try {
-        await this.startSession(this.projectPath!)
-        console.log('✅ Session restarted successfully')
+        // Use 'recovery' reason to attempt --resume
+        // If --resume fails, recovery reason will generate fresh session ID on next attempt
+        await this.startSession(this.projectPath!, this.isPlanningMode, 'recovery')
+        console.log('✅ Session restarted successfully after crash')
         this.restartAttempts = 0 // Reset on success
       } catch (error) {
         console.error('❌ Restart failed:', error)
@@ -708,6 +749,20 @@ export class ClaudeCliService extends EventEmitter {
    */
   getSessionState(): SessionState {
     return this.sessionState
+  }
+
+  /**
+   * Get session statistics
+   */
+  getSessionStats(): SessionStats {
+    return { ...this.sessionStats }
+  }
+
+  /**
+   * Get message count (convenience method)
+   */
+  getMessageCount(): number {
+    return this.sessionStats.messageCount
   }
 
   /**
@@ -900,6 +955,10 @@ export class ClaudeCliService extends EventEmitter {
         // Accumulate tokens from this message
         this.accumulateTokens(streamingMessage.metadata.usage)
 
+        // Track assistant message (streaming mode)
+        this.sessionStats.messageCount++
+        console.log(`📊 Message count (streaming): ${this.sessionStats.messageCount}`)
+
         // Mark as complete
         streamingMessage.isStreaming = false
         streamingMessage.metadata.isStreaming = false
@@ -961,6 +1020,10 @@ export class ClaudeCliService extends EventEmitter {
         .join('\n')
 
       if (content) {
+        // Track message count
+        this.sessionStats.messageCount++
+        console.log(`📊 Message count: ${this.sessionStats.messageCount}`)
+
         return {
           id: this.generateId(),
           type: 'user',
@@ -978,6 +1041,10 @@ export class ClaudeCliService extends EventEmitter {
         if (block.type === 'text' && block.text) {
           // Accumulate tokens
           this.accumulateTokens(event.message.usage)
+
+          // Track message count
+          this.sessionStats.messageCount++
+          console.log(`📊 Message count: ${this.sessionStats.messageCount}`)
 
           return {
             id: this.generateId(),
@@ -1030,6 +1097,10 @@ export class ClaudeCliService extends EventEmitter {
           if (block.id) {
             this.toolExecutionStart.set(block.id, startTime)
           }
+
+          // Track tool execution
+          this.sessionStats.toolExecutions++
+          console.log(`📊 Tool executions: ${this.sessionStats.toolExecutions}`)
 
           return {
             id: this.generateId(),
@@ -1131,6 +1202,97 @@ export class ClaudeCliService extends EventEmitter {
       ExitPlanMode: 'Exit planning phase'
     }
     return descriptions[toolName] || `Use ${toolName} tool`
+  }
+
+  /**
+   * Detect if error message indicates a resume failure
+   * Checks for common --resume failure patterns from Claude CLI stderr
+   */
+  private isResumeFailure(errorText: string): boolean {
+    const resumeFailurePatterns = [
+      'session not found',
+      'resume failed',
+      'invalid session',
+      'session expired',
+      'failed to resume',
+      'could not resume',
+      'unable to resume',
+      'session file not found',
+      'session file corrupted',
+      'session file is corrupted',
+      'failed to load session',
+      'error loading session',
+      'session data invalid'
+    ]
+
+    const lowerErrorText = errorText.toLowerCase()
+    return resumeFailurePatterns.some(pattern => lowerErrorText.includes(pattern))
+  }
+
+  /**
+   * Handle resume failure by falling back to fresh session
+   * Automatically generates new session ID and restarts without --resume
+   */
+  private async handleResumeFailed(oldSessionId: string): Promise<void> {
+    console.error('🔄 Resume failed, initiating fallback to fresh session')
+    console.error(`📝 Failed session ID: ${oldSessionId}`)
+
+    if (!this.projectPath) {
+      console.error('❌ Cannot fallback: no project path')
+      return
+    }
+
+    // Kill current failed attempt
+    if (this.claudeProcess) {
+      console.log('🛑 Killing failed Claude CLI process')
+      this.claudeProcess.removeAllListeners()
+      this.claudeProcess.kill('SIGKILL')
+      this.claudeProcess = null
+    }
+
+    // Generate fresh session ID
+    this.sessionId = this.generateSessionId()
+    console.log(`🆕 Generated fresh session ID: ${this.sessionId} (replacing: ${oldSessionId})`)
+
+    // Restart with 'recovery' reason (will not use --resume)
+    try {
+      console.log('🔄 Starting fresh session after resume failure...')
+      await this.startSession(this.projectPath, this.isPlanningMode, 'recovery')
+      console.log('✅ Fresh session started successfully after resume failure')
+
+      // Emit event to notify UI
+      this.emit('session-resume-failed', {
+        oldSessionId,
+        newSessionId: this.sessionId,
+        message: '⚠️ Previous conversation history unavailable. Starting fresh session.'
+      })
+    } catch (error: any) {
+      console.error('❌ Fallback session start also failed:', error)
+      this.sessionState = 'error'
+      this.emit('error', {
+        message: `Failed to start session after resume failure: ${error.message}`,
+        recoverable: true
+      })
+    }
+  }
+
+  /**
+   * Log structured resume attempt information
+   * Helps diagnose resume failures and track session lifecycle
+   */
+  private logResumeAttempt(sessionId: string, reason: SessionStartReason): void {
+    console.log('📝 RESUME ATTEMPT', JSON.stringify({
+      sessionId,
+      reason,
+      projectPath: this.projectPath,
+      planningMode: this.isPlanningMode,
+      messageCount: this.sessionStats.messageCount,
+      toolExecutions: this.sessionStats.toolExecutions,
+      sessionAge: this.sessionStats.createdAt
+        ? Math.floor((Date.now() - this.sessionStats.createdAt.getTime()) / 1000)
+        : 0,
+      timestamp: new Date().toISOString()
+    }, null, 2))
   }
 }
 

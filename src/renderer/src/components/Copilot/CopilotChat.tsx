@@ -311,6 +311,24 @@ export function CopilotChat({
     return unsubscribe
   }, [lastUserPrompt, startActivityMonitoring, onApprovedToolsChange])
 
+  // Listen for resume failures
+  useEffect(() => {
+    const unsubscribe = window.api.claudeCode.onSessionResumeFailed((data) => {
+      console.warn('⚠️ Resume failed:', data)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          type: 'system',
+          content: data.message,
+          timestamp: new Date()
+        }
+      ])
+    })
+
+    return unsubscribe
+  }, [])
+
   // Listen for pending messages from context menu (or other sources)
   useEffect(() => {
     if (pendingMessage) {
@@ -412,6 +430,7 @@ export function CopilotChat({
 
   /**
    * Toggle planning mode and restart session
+   * IMPORTANT: Does NOT call stopSession() first to preserve conversation history via --resume
    */
   const handlePlanningModeToggle = async () => {
     if (isRunning) {
@@ -444,10 +463,9 @@ export function CopilotChat({
     console.log(`🔄 Restarting session with planning mode: ${newPlanningMode}`)
 
     try {
-      // Stop current session
-      await window.api.claudeCode.stopSession()
-
-      // Start new session with planning mode
+      // IMPORTANT: Let startSession() detect running session and use --resume
+      // IPC handler will see 'ready' state → detect as 'planning' → use --resume to preserve conversation
+      // Do NOT call stopSession() first!
       await window.api.claudeCode.startSession(projectPath, newPlanningMode)
     } catch (error) {
       console.error('Failed to restart session:', error)
