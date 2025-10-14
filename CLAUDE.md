@@ -379,7 +379,7 @@ claude -p \
 - Before merging branches or pushing to production
 - When user explicitly requests code review
 
-**Delegation Pattern**: `/task code-reviewer "Review [component/file] for [security/quality/performance]"`
+**Invocation**: "Use the code-reviewer subagent to review [component/file] for [security/quality/performance]"
 
 #### 2. typescript-pro
 **MUST BE USED**:
@@ -388,7 +388,7 @@ claude -p \
 - Creating API contracts or component props
 - Type errors or runtime type issues detected
 
-**Delegation Pattern**: `/task typescript-pro "Ensure type safety for [module/component]"`
+**Invocation**: "Use the typescript-pro subagent to ensure type safety for [module/component]"
 
 #### 3. test-automator
 **MUST BE USED**:
@@ -397,7 +397,7 @@ claude -p \
 - When test coverage drops below 80%
 - Before deployments if tests missing
 
-**Delegation Pattern**: `/task test-automator "Create tests for [feature/component]"`
+**Invocation**: "Use the test-automator subagent to create tests for [feature/component]"
 
 #### 4. documentation-engineer
 **MUST BE USED**:
@@ -406,7 +406,7 @@ claude -p \
 - When documentation is outdated or missing
 - User explicitly requests documentation updates
 
-**Delegation Pattern**: `/task documentation-engineer "Document [API/feature/component]"`
+**Invocation**: "Use the documentation-engineer subagent to document [API/feature/component]"
 
 #### 5. qa-expert
 **MUST BE USED**:
@@ -415,7 +415,7 @@ claude -p \
 - After receiving bug reports or customer complaints
 - Requirements change requiring quality assessment
 
-**Delegation Pattern**: `/task qa-expert "Validate quality for [feature/release]"`
+**Invocation**: "Use the qa-expert subagent to validate quality for [feature/release]"
 
 #### 6. error-detective
 **MUST BE USED**:
@@ -424,7 +424,7 @@ claude -p \
 - After incidents, outages, or system behavior changes
 - User reports unexpected behavior
 
-**Delegation Pattern**: `/task error-detective "Analyze [error/failure/incident]"`
+**Invocation**: "Use the error-detective subagent to analyze [error/failure/incident]"
 
 ### Proactive Agent Delegation (USE WHEN APPLICABLE)
 
@@ -435,7 +435,7 @@ claude -p \
 - Evaluating technical decisions
 - After creating architectural diagrams or design documents
 
-**Delegation Pattern**: `/task architect-reviewer "Review [architecture/design] for [feature/system]"`
+**Invocation**: "Use the architect-reviewer subagent to review [architecture/design] for [feature/system]"
 
 #### 8. refactoring-specialist
 **USE PROACTIVELY**:
@@ -444,7 +444,7 @@ claude -p \
 - During code reviews identifying technical debt
 - User requests code quality improvements
 
-**Delegation Pattern**: `/task refactoring-specialist "Refactor [component/module] to reduce [complexity/duplication]"`
+**Invocation**: "Use the refactoring-specialist subagent to refactor [component/module] to reduce [complexity/duplication]"
 
 #### 9. business-analyst
 **USE PROACTIVELY**:
@@ -453,7 +453,7 @@ claude -p \
 - Gathering stakeholder needs
 - Before technical implementation planning
 
-**Delegation Pattern**: `/task business-analyst "Analyze requirements for [feature/initiative]"`
+**Invocation**: "Use the business-analyst subagent to analyze requirements for [feature/initiative]"
 
 #### 10. cli-developer
 **USE PROACTIVELY**:
@@ -461,20 +461,24 @@ claude -p \
 - Developing CLI tools or terminal interfaces
 - Improving developer workflows or utilities
 
-**Delegation Pattern**: `/task cli-developer "Build [tool/script] for [workflow/automation]"`
+**Invocation**: "Use the cli-developer subagent to build [tool/script] for [workflow/automation]"
 
 ### Agent Invocation Syntax
 
-**Via Task Tool**:
-```typescript
-// Direct delegation
-/task <agent-name> "<task description>"
-
-// Examples
-/task code-reviewer "Review authentication module for security vulnerabilities"
-/task typescript-pro "Add strict type definitions to API client"
-/task test-automator "Generate comprehensive test suite for user service"
+**Natural Language (Primary Method)**:
 ```
+"Use the <agent-name> subagent to <task description>"
+
+Examples:
+"Use the code-reviewer subagent to review the authentication module for security vulnerabilities"
+"Use the typescript-pro subagent to add strict type definitions to the API client"
+"Use the test-automator subagent to generate comprehensive test suite for user service"
+```
+
+**Automatic Delegation** (Rare - requires explicit trigger words in agent description):
+- Agents with "MUST BE USED" or "use PROACTIVELY" in descriptions may trigger automatically
+- Research indicates Claude "almost never delegates automatically" without explicit invocation
+- To ensure execution, use explicit natural language invocation
 
 ### Delegation Decision Framework
 
@@ -493,8 +497,8 @@ claude -p \
 - Developer tooling? → cli-developer (PROACTIVE)
 
 **Step 3: Invoke Agent**
-- Use `/task <agent> "<specific task description>"`
-- Agent operates in isolated context with focused expertise
+- Say: "Use the [agent-name] subagent to [specific task description]"
+- Agent executes via Task tool in isolated context with focused expertise
 - Results returned to main conversation
 
 ### Critical Rules
