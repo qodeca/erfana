@@ -1,11 +1,11 @@
-.ai-assistant-panel {
+.copilot-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
   background: var(--background-color, #1e1e1e);
 }
 
-.ai-welcome {
+.copilot-welcome {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -16,7 +16,7 @@
   height: 100%;
 }
 
-.ai-welcome-icon {
+.copilot-welcome-icon {
   color: #007acc;
   opacity: 0.9;
   animation: pulse 3s ease-in-out infinite;
@@ -33,21 +33,21 @@
   }
 }
 
-.ai-welcome h3 {
+.copilot-welcome h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
   color: #cccccc;
 }
 
-.ai-welcome p {
+.copilot-welcome p {
   margin: 0;
   font-size: 13px;
   color: #858585;
   line-height: 1.5;
 }
 
-.ai-features {
+.copilot-features {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -56,7 +56,7 @@
   margin-top: 8px;
 }
 
-.ai-feature-item {
+.copilot-feature-item {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -68,24 +68,24 @@
   transition: all 0.2s ease;
 }
 
-.ai-feature-item:hover {
+.copilot-feature-item:hover {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-.ai-feature-item strong {
+.copilot-feature-item strong {
   font-size: 13px;
   color: #cccccc;
   font-weight: 500;
 }
 
-.ai-feature-item span {
+.copilot-feature-item span {
   font-size: 11px;
   color: #858585;
   line-height: 1.4;
 }
 
-.ai-status {
+.copilot-status {
   display: flex;
   justify-content: center;
   margin-top: 12px;
@@ -175,7 +175,7 @@
 }
 
 /* Loading state */
-.ai-loading {
+.copilot-loading {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -185,7 +185,7 @@
   padding: 32px;
 }
 
-.ai-loading p {
+.copilot-loading p {
   font-size: 13px;
   color: #858585;
   margin: 0;
@@ -216,35 +216,25 @@
   overflow-y: auto;
 }
 
-/* API Key Setup (Legacy - can be removed later) */
-.api-key-setup {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 32px 24px;
-  height: 100%;
-  overflow-y: auto;
-}
-
-.setup-icon {
-  color: #dcdcaa;
-  opacity: 0.9;
-  margin-bottom: 16px;
-}
-
-.api-key-setup h3 {
+.claude-setup h3 {
   margin: 0 0 8px 0;
   font-size: 18px;
   font-weight: 600;
   color: #cccccc;
 }
 
-.api-key-setup > p {
+.claude-setup > p {
   margin: 0 0 24px 0;
   font-size: 13px;
   color: #858585;
   text-align: center;
   line-height: 1.5;
+}
+
+.setup-icon {
+  color: #dcdcaa;
+  opacity: 0.9;
+  margin-bottom: 16px;
 }
 
 .setup-form {

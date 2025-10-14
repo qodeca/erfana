@@ -15,7 +15,7 @@ Dual vertical activity bars on left and right edges (VS Code-style).
 
 ### Right Activity Bar
 
-- **AI Assistant icon**: Toggle AI Assistant panel (top position)
+- **Copilot icon**: Toggle Copilot panel (top position)
   - Keyboard: `Cmd/Ctrl+Shift+A`
 - **Git icon**: Toggle Git panel
   - Keyboard: `Ctrl+Shift+G`
@@ -50,7 +50,7 @@ Manages:
 - **Hover effect**: Icon color changes to white
 - **Size**: 48x48px click target per item
 
-## AI Assistant Panel & Claude Code UI
+## Copilot Panel & Claude Code UI
 
 **See**: [Claude Code UI Features](./claude-code/ui-features.md) for complete documentation.
 
@@ -61,8 +61,8 @@ Manages:
 - **Status Indicators**: Color-coded dot (🟢 green=ready, 🟡 yellow=starting, 🔴 red=error)
 - **Features**: Installation check, OAuth authentication, persistent CLI session, chat interface, planning mode toggle, control panel
 - **Components**:
-  - `AiAssistantPanel.tsx` - Session management and state indicators
-  - `ClaudeCodeChat.tsx` - Chat interface with Control Panel
+  - `CopilotPanel.tsx` - Session management and state indicators
+  - `CopilotChat.tsx` - Chat interface with Control Panel
   - `TerminalMessage.tsx` - Message rendering
   - `ToolApprovalDialog.tsx` - Tool approval modal
 
@@ -126,7 +126,7 @@ These work **anywhere in the application**:
 | `Cmd/Ctrl+B` | Toggle left sidebar | Project |
 | `Cmd/Ctrl+J` | Toggle right panel | Terminal |
 | `Ctrl+Shift+G` | Toggle right panel | Git |
-| `Cmd/Ctrl+Shift+A` | Toggle right panel | AI Assistant |
+| `Cmd/Ctrl+Shift+A` | Toggle right panel | Copilot |
 
 **Platform Detection**: Uses `metaKey` on macOS, `ctrlKey` on Windows/Linux
 

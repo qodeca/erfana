@@ -96,11 +96,11 @@ Checks if tool is in `approvedTools` Set, if not:
 - Returns `null` to suppress tool_use from UI
 - System message shown to user
 
-**2. Show Dialog** (`ClaudeCodeChat.tsx:104-111`)
+**2. Show Dialog** (`CopilotChat.tsx:104-111`)
 
 Listens for `onToolApprovalNeeded` event, sets `pendingApproval` state to show ToolApprovalDialog.
 
-**3. Approve Tool** (`ClaudeCodeChat.tsx:206-217`)
+**3. Approve Tool** (`CopilotChat.tsx:206-217`)
 
 User approves → calls `window.api.claudeCode.approveTool(toolName, remember)` → closes dialog.
 
@@ -135,7 +135,7 @@ private async restartWithNewPermissions(): Promise<void> {
 }
 ```
 
-**6. Auto-Retry** (`ClaudeCodeChat.tsx:119-140`)
+**6. Auto-Retry** (`CopilotChat.tsx:119-140`)
 
 Listens for `onSessionResumed` event, if `lastUserPrompt` exists:
 - Shows system message with approved tools list
@@ -150,7 +150,7 @@ Listens for `onSessionResumed` event, if `lastUserPrompt` exists:
 
 ### Implementation
 
-**Store Prompt** (`ClaudeCodeChat.tsx:134-135`):
+**Store Prompt** (`CopilotChat.tsx:134-135`):
 ```typescript
 const handleSend = () => {
   setLastUserPrompt(trimmedInput)  // Store for auto-retry
@@ -158,7 +158,7 @@ const handleSend = () => {
 }
 ```
 
-**Auto-Retry on Resume** (`ClaudeCodeChat.tsx:119-140`):
+**Auto-Retry on Resume** (`CopilotChat.tsx:119-140`):
 ```typescript
 useEffect(() => {
   const unsubscribe = window.api.claudeCode.onSessionResumed((data) => {
@@ -464,9 +464,9 @@ useEffect(() => {
 - `ToolApprovalDialog.tsx` (115 lines) - Component logic
 - `ToolApprovalDialog.css` (240 lines) - VS Code-themed styling
 
-### ClaudeCodeChat.tsx
+### CopilotChat.tsx
 
-**Location**: `src/renderer/src/components/ClaudeCode/ClaudeCodeChat.tsx`
+**Location**: `src/renderer/src/components/ClaudeCode/CopilotChat.tsx`
 
 Chat interface with:
 - Message history display
