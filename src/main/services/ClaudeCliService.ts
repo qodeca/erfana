@@ -356,6 +356,7 @@ export class ClaudeCliService extends EventEmitter {
 
     try {
       // Build args with --continue flag for automatic conversation preservation
+      // NOTE: --session-id CANNOT be used with --continue (Claude CLI restriction)
       const args = [
         '-p', // Print mode (non-interactive, but can accept stdin)
         '--continue', // Automatically continue latest conversation in this directory
@@ -365,9 +366,7 @@ export class ClaudeCliService extends EventEmitter {
         'stream-json',
         '--verbose', // Required for stream-json output format
         '--replay-user-messages', // Echo user messages back for acknowledgment
-        '--include-partial-messages', // Enable real-time token streaming
-        '--session-id',
-        this.sessionId! // Unique ID for this session instance
+        '--include-partial-messages' // Enable real-time token streaming
       ]
 
       console.log('✅ Using --continue flag for conversation preservation')
