@@ -155,7 +155,7 @@ Automatic detection and refresh for external file system changes:
 
 **Activity Bars**: Dual vertical activity bars (VS Code-style) on left and right edges with Lucide icon toggle buttons.
 - **Left Activity Bar**: Explorer toggle
-- **Right Activity Bar**: AI Assistant toggle (top position), Git and Terminal toggles (separate panels, mutually exclusive)
+- **Right Activity Bar**: Copilot toggle (top position), Git and Terminal toggles (separate panels, mutually exclusive)
 
 **File Explorer Context Menu**: Right-click files/folders for New File, New Folder, Rename, Delete actions with validation.
 
@@ -169,7 +169,7 @@ Automatic detection and refresh for external file system changes:
 - `Cmd/Ctrl+B` - Toggle left sidebar (Explorer)
 - `Cmd/Ctrl+J` - Toggle right panel (Terminal)
 - `Ctrl+Shift+G` - Toggle right panel (Git)
-- `Cmd/Ctrl+Shift+A` - Toggle right panel (AI Assistant)
+- `Cmd/Ctrl+Shift+A` - Toggle right panel (Copilot)
 
 **Panel Behavior**:
 - Right sidebar: Git and Terminal are separate splitview panels (mutually exclusive)
@@ -239,51 +239,15 @@ Automatic detection and refresh for external file system changes:
 
 Claude Code can visually inspect and test Erfana using **Circuit Electron MCP** (already configured):
 
-**Quick Test:**
-```typescript
-// 1. Build first
-npm run build
+**Quick Test**: Build app (`npm run build`), launch with `mcp__circuit-electron__app_launch`, take screenshots, verify UI
 
-// 2. Launch and screenshot
-const session = mcp__circuit-electron__app_launch({
-  app: "/Users/marcinobel/Projects/erfana/out/main/index.js",
-  compressScreenshots: true
-})
+**Capabilities**: Launch app, capture screenshots, UI interaction (click, type, shortcuts), JavaScript evaluation, element waiting
 
-mcp__circuit-electron__screenshot({ sessionId: session.sessionId })
-mcp__circuit-electron__close({ sessionId: session.sessionId })
-```
+**Tools**: `app_launch`, `screenshot`, `click`, `type`, `keyboard_press`, `evaluate`, `wait_for_selector`, `close`
 
-**Capabilities:**
-- ✅ Launch Erfana and capture screenshots
-- ✅ Interact with UI (click, type, keyboard shortcuts)
-- ✅ Verify functionality with visual and programmatic checks
-- ✅ Test after code changes without manual inspection
-- ✅ Run pre-defined test scenarios
-- ✅ AI-optimized screenshot compression
+**IMPORTANT**: ALWAYS save screenshots to `/temp/` folder (create if needed)
 
-**Available Tools:**
-- `app_launch` - Start the application
-- `screenshot` - Capture compressed screenshots
-- `click`, `click_by_text`, `click_by_role` - UI interaction
-- `keyboard_type`, `keyboard_press` - Text input and shortcuts
-- `evaluate` - Execute JavaScript in app context
-- `wait_for_selector` - Wait for elements
-- `snapshot` - Get accessibility tree
-- `close` - End testing session
-
-**Testing Workflow:**
-1. Make code changes
-2. Build: `npm run build`
-3. Launch via Circuit Electron MCP
-4. Take screenshots and verify visually
-5. Test interactions and functionality
-6. Report results
-
-📚 **Testing index**: See [docs/testing/README.md](docs/testing/README.md) - Complete testing guide
-📚 **Quick start**: See [docs/testing/quickstart.md](docs/testing/quickstart.md)
-📚 **Reference**: See [docs/testing/circuit-electron-guide.md](docs/testing/circuit-electron-guide.md)
-📚 **Test scenarios**: See [docs/testing/ui-scenarios.md](docs/testing/ui-scenarios.md) and [interaction-scenarios.md](docs/testing/interaction-scenarios.md)
+📚 **Complete guide**: [docs/testing/README.md](docs/testing/README.md) | [Quick Start](docs/testing/quickstart.md) | [Circuit Electron Guide](docs/testing/circuit-electron-guide.md) | [Test Scenarios](docs/testing/ui-scenarios.md)
 
 ## Claude Code Integration
 
@@ -301,7 +265,7 @@ Erfana integrates Claude Code via persistent CLI session with security-first too
 
 ### UI
 
-- **AI Assistant Panel**: Right sidebar, accessible via activity bar icon (labeled "Copilot")
+- **Copilot Panel**: Right sidebar, accessible via activity bar icon (labeled "Copilot")
 - **Installation Check**: Detects Claude CLI, shows Homebrew install command if missing
 - **Authentication**: OAuth token setup flow with visual feedback
 - **Session Indicators**: Color-coded dots (green=ready, yellow=starting, red=error)
@@ -345,8 +309,8 @@ See: [Claude Code UI Features](docs/claude-code/ui-features.md#planning-mode-tog
 - Service: `src/main/services/ClaudeCliService.ts` (~527 lines)
 - IPC: `src/main/ipc/claude-code-handlers.ts` (~180 lines)
 - Settings: `src/main/ipc/settings-handlers.ts` (tool approval persistence)
-- UI: `src/renderer/src/components/Panels/AiAssistantPanel.tsx`
-- Chat: `src/renderer/src/components/ClaudeCode/ClaudeCodeChat.tsx`
+- UI: `src/renderer/src/components/Panels/CopilotPanel.tsx`
+- Chat: `src/renderer/src/components/Copilot/CopilotChat.tsx`
 - Dialog: `src/renderer/src/components/Dialogs/ToolApprovalDialog.tsx`
 
 **Flags Used**:
@@ -368,157 +332,42 @@ claude -p \
 
 **Location**: `.claude/agents/` - 10 specialized subagents with independent context windows
 
-### Mandatory Agent Delegation (MUST USE)
+### When to Delegate
 
-**ALWAYS delegate to these agents under specified conditions:**
+**Mandatory Agents** (MUST USE):
+- **code-reviewer**: After ANY code changes, before commits/PRs
+- **typescript-pro**: When modifying ANY TypeScript file
+- **test-automator**: After new features, before deployment
+- **documentation-engineer**: After API/feature changes
+- **qa-expert**: Before ANY release or deployment
+- **error-detective**: When ANY error occurs
 
-#### 1. code-reviewer
-**MUST BE USED**:
-- After implementing ANY code changes (features, fixes, refactors)
-- Before git commits or pull requests
-- Before merging branches or pushing to production
-- When user explicitly requests code review
+**Proactive Agents** (USE WHEN APPLICABLE):
+- **architect-reviewer**: Architecture/design decisions
+- **refactoring-specialist**: Code complexity/smells
+- **business-analyst**: Requirements/ROI analysis
+- **cli-developer**: Automation/build tools
 
-**Invocation**: "Use the code-reviewer subagent to review [component/file] for [security/quality/performance]"
+### Invocation Syntax
 
-#### 2. typescript-pro
-**MUST BE USED**:
-- When modifying ANY TypeScript file (.ts, .tsx)
-- Defining data structures, interfaces, types
-- Creating API contracts or component props
-- Type errors or runtime type issues detected
-
-**Invocation**: "Use the typescript-pro subagent to ensure type safety for [module/component]"
-
-#### 3. test-automator
-**MUST BE USED**:
-- After implementing new features
-- After bug fixes requiring test coverage
-- When test coverage drops below 80%
-- Before deployments if tests missing
-
-**Invocation**: "Use the test-automator subagent to create tests for [feature/component]"
-
-#### 4. documentation-engineer
-**MUST BE USED**:
-- After creating or modifying APIs/endpoints
-- After adding new features or components
-- When documentation is outdated or missing
-- User explicitly requests documentation updates
-
-**Invocation**: "Use the documentation-engineer subagent to document [API/feature/component]"
-
-#### 5. qa-expert
-**MUST BE USED**:
-- Before ANY feature release or deployment
-- When quality gates need validation
-- After receiving bug reports or customer complaints
-- Requirements change requiring quality assessment
-
-**Invocation**: "Use the qa-expert subagent to validate quality for [feature/release]"
-
-#### 6. error-detective
-**MUST BE USED**:
-- When ANY error, exception, or failure occurs
-- Error rates increase or patterns emerge
-- After incidents, outages, or system behavior changes
-- User reports unexpected behavior
-
-**Invocation**: "Use the error-detective subagent to analyze [error/failure/incident]"
-
-### Proactive Agent Delegation (USE WHEN APPLICABLE)
-
-#### 7. architect-reviewer
-**USE PROACTIVELY**:
-- Designing new features or system components
-- Modifying system architecture or technology stack
-- Evaluating technical decisions
-- After creating architectural diagrams or design documents
-
-**Invocation**: "Use the architect-reviewer subagent to review [architecture/design] for [feature/system]"
-
-#### 8. refactoring-specialist
-**USE PROACTIVELY**:
-- Code complexity exceeds thresholds (cyclomatic > 10)
-- Code smells detected (long methods, duplication)
-- During code reviews identifying technical debt
-- User requests code quality improvements
-
-**Invocation**: "Use the refactoring-specialist subagent to refactor [component/module] to reduce [complexity/duplication]"
-
-#### 9. business-analyst
-**USE PROACTIVELY**:
-- Defining new features or requirements
-- Analyzing business impact or ROI
-- Gathering stakeholder needs
-- Before technical implementation planning
-
-**Invocation**: "Use the business-analyst subagent to analyze requirements for [feature/initiative]"
-
-#### 10. cli-developer
-**USE PROACTIVELY**:
-- Creating automation scripts or build tools
-- Developing CLI tools or terminal interfaces
-- Improving developer workflows or utilities
-
-**Invocation**: "Use the cli-developer subagent to build [tool/script] for [workflow/automation]"
-
-### Agent Invocation Syntax
-
-**Natural Language (Primary Method)**:
-```
-"Use the <agent-name> subagent to <task description>"
+Use natural language: **"Use the [agent-name] subagent to [task description]"**
 
 Examples:
-"Use the code-reviewer subagent to review the authentication module for security vulnerabilities"
-"Use the typescript-pro subagent to add strict type definitions to the API client"
-"Use the test-automator subagent to generate comprehensive test suite for user service"
-```
+- "Use the code-reviewer subagent to review authentication module for security vulnerabilities"
+- "Use the typescript-pro subagent to add strict type definitions to API client"
+- "Use the test-automator subagent to create tests for user service"
 
-**Automatic Delegation** (Rare - requires explicit trigger words in agent description):
-- Agents with "MUST BE USED" or "use PROACTIVELY" in descriptions may trigger automatically
-- Research indicates Claude "almost never delegates automatically" without explicit invocation
-- To ensure execution, use explicit natural language invocation
+### Quick Decision Tree
 
-### Delegation Decision Framework
+**Code changed?** → code-reviewer (MANDATORY)
+**TypeScript modified?** → typescript-pro (MANDATORY)
+**New feature?** → test-automator + documentation-engineer (MANDATORY)
+**Deployment?** → qa-expert (MANDATORY)
+**Error?** → error-detective (MANDATORY)
+**Architecture decision?** → architect-reviewer (PROACTIVE)
+**Code quality issue?** → refactoring-specialist (PROACTIVE)
 
-**Step 1: Pattern Match Task**
-- Code changes? → code-reviewer (MANDATORY)
-- TypeScript files? → typescript-pro (MANDATORY)
-- New feature? → test-automator (MANDATORY)
-- API changes? → documentation-engineer (MANDATORY)
-- Before deploy? → qa-expert (MANDATORY)
-- Error occurred? → error-detective (MANDATORY)
-
-**Step 2: Assess Context**
-- Architecture decision? → architect-reviewer (PROACTIVE)
-- Code quality issue? → refactoring-specialist (PROACTIVE)
-- Business requirements? → business-analyst (PROACTIVE)
-- Developer tooling? → cli-developer (PROACTIVE)
-
-**Step 3: Invoke Agent**
-- Say: "Use the [agent-name] subagent to [specific task description]"
-- Agent executes via Task tool in isolated context with focused expertise
-- Results returned to main conversation
-
-### Critical Rules
-
-1. **NEVER skip mandatory agents** - They prevent production issues
-2. **Delegate early** - Before problems compound
-3. **Be specific** - Clear task descriptions improve agent output
-4. **Trust specialization** - Agents have deep domain expertise
-5. **Use isolated contexts** - Prevents context pollution in main thread
-
-📚 **Agent Definitions**: All agents defined in `.claude/agents/*.md` with YAML frontmatter specifying capabilities and tools
-
-## Contributing
-
-When adding features:
-1. Follow existing patterns (Service classes, secure IPC, OOP)
-2. Add TypeScript types for everything
-3. Validate all IPC inputs in main process
-4. Update relevant docs/ files
-5. Test with `npm run dev`
+📚 **Agent Definitions**: See `.claude/agents/*.md` for detailed capabilities and tools
 
 ## Documentation
 
@@ -543,9 +392,4 @@ When adding features:
 
 ## Useful Resources
 
-- [Electron Docs](https://www.electronjs.org/docs/latest/)
-- [electron-vite](https://electron-vite.org/)
-- [Dockview](https://dockview.dev/)
-- [Monaco Editor API](https://microsoft.github.io/monaco-editor/api/index.html)
-- [Claude Agent SDK](https://github.com/anthropics/claude-code)
-- ALWAYS save screenshots made with cicruit-electron MCP server to the /temp/ folder located in the root folder of the project. If /temp/ doesn't exist create it
+[Electron Docs](https://www.electronjs.org/docs/latest/) | [electron-vite](https://electron-vite.org/) | [Dockview](https://dockview.dev/) | [Monaco Editor API](https://microsoft.github.io/monaco-editor/api/index.html)

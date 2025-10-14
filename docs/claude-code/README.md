@@ -6,7 +6,7 @@ Complete documentation for Erfana's Claude Code integration with persistent sess
 
 **Status**: ✅ Fully implemented
 
-**Location**: Right sidebar AI Assistant panel
+**Location**: Right sidebar Copilot panel
 
 **Key Features**:
 - Persistent Claude CLI sessions (long-running process)
@@ -31,7 +31,7 @@ Complete documentation for Erfana's Claude Code integration with persistent sess
 - Testing and debugging
 
 **[UI Features](./ui-features.md)**
-- AI Assistant Panel (Copilot)
+- Copilot Panel
 - Control Panel with tool approval status
 - Planning Mode toggle
 - Tool Approval Dialog
@@ -56,7 +56,7 @@ Complete documentation for Erfana's Claude Code integration with persistent sess
 
 ### User Flow
 
-1. Open AI Assistant panel (right sidebar, labeled "Copilot")
+1. Open Copilot panel (right sidebar, labeled "Copilot")
 2. Authenticate with OAuth token
 3. Session starts automatically
 4. Optional: Enable planning mode for read-only exploration
@@ -149,13 +149,13 @@ spawn('claude', ['--resume', uuid, '--allowedTools', ...updatedApproved])
 
 ### Renderer Components
 
-**AiAssistantPanel.tsx** (`src/renderer/src/components/Panels/AiAssistantPanel.tsx`)
+**CopilotPanel.tsx** (`src/renderer/src/components/Panels/CopilotPanel.tsx`)
 - Right sidebar panel
 - Installation check and auth flow
 - Session state indicators
-- Hosts ClaudeCodeChat
+- Hosts CopilotChat
 
-**ClaudeCodeChat.tsx** (`src/renderer/src/components/ClaudeCode/ClaudeCodeChat.tsx`)
+**CopilotChat.tsx** (`src/renderer/src/components/Copilot/CopilotChat.tsx`)
 - Chat interface with message history
 - Tracks lastUserPrompt for auto-retry
 - Listens for tool approval requests

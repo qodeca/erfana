@@ -1,12 +1,21 @@
+/**
+ * CopilotPanel Component
+ *
+ * Generic AI assistant interface powered by Claude CLI.
+ * Designed to support multiple AI providers in the future.
+ *
+ * Current implementation: ClaudeCliService for Claude Code integration
+ */
+
 import { useState, useEffect } from 'react'
 import { ISplitviewPanelProps } from 'dockview'
 import { Bot, LogIn, Download, RefreshCw } from 'lucide-react'
-import { ClaudeCodeChat } from '../ClaudeCode/ClaudeCodeChat'
-import './AiAssistantPanel.css'
+import { CopilotChat } from '../Copilot/CopilotChat'
+import './CopilotPanel.css'
 
 type SessionState = 'stopped' | 'starting' | 'ready' | 'error'
 
-export function AiAssistantPanel(_props: ISplitviewPanelProps) {
+export function CopilotPanel(_props: ISplitviewPanelProps) {
   const [isInstalled, setIsInstalled] = useState<boolean | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
@@ -175,7 +184,7 @@ export function AiAssistantPanel(_props: ISplitviewPanelProps) {
   }
 
   return (
-    <div className="ai-assistant-panel sidebar-panel">
+    <div className="copilot-panel sidebar-panel">
       <div className="sidebar-panel-header">
         {sessionState === 'ready' && <span className="session-indicator ready">●</span>}
         {sessionState === 'starting' && <span className="session-indicator starting">●</span>}
@@ -186,7 +195,7 @@ export function AiAssistantPanel(_props: ISplitviewPanelProps) {
       <div className="sidebar-panel-content">
         {isChecking ? (
           // Loading state
-          <div className="ai-loading">
+          <div className="copilot-loading">
             <div className="loading-spinner"></div>
             <p>Checking Claude CLI status...</p>
           </div>
@@ -294,14 +303,14 @@ export function AiAssistantPanel(_props: ISplitviewPanelProps) {
           </div>
         ) : sessionState === 'starting' ? (
           // Starting session
-          <div className="ai-loading">
+          <div className="copilot-loading">
             <div className="loading-spinner"></div>
             {restartAttempt ? (
               <p>
                 Reconnecting to Claude... (attempt {restartAttempt.current}/{restartAttempt.max})
               </p>
             ) : (
-              <p>Starting Claude session...</p>
+              <p>Starting Copilot...</p>
             )}
           </div>
         ) : sessionState === 'error' ? (
@@ -319,7 +328,7 @@ export function AiAssistantPanel(_props: ISplitviewPanelProps) {
           </div>
         ) : (
           // Session ready - Show chat interface
-          <ClaudeCodeChat />
+          <CopilotChat />
         )}
       </div>
     </div>
