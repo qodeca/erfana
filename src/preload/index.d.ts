@@ -169,6 +169,34 @@ declare global {
         getProjectFilterMode: () => Promise<{ success: boolean; mode?: string; error?: string }>
         setProjectFilterMode: (mode: string) => Promise<{ success: boolean; error?: string }>
       }
+      terminal: {
+        isAvailable: () => Promise<{ success: boolean; available: boolean }>
+        create: (config?: {
+          shell?: string
+          cwd?: string
+          env?: Record<string, string>
+          cols?: number
+          rows?: number
+        }) => Promise<{ success: boolean; terminalId?: string; error?: string }>
+        write: (terminalId: string, data: string) => void
+        resize: (terminalId: string, cols: number, rows: number) => void
+        kill: (terminalId: string) => Promise<{ success: boolean; error?: string }>
+        getInfo: (terminalId: string) => Promise<{
+          success: boolean
+          info?: { id: string; cwd: string; title: string }
+          error?: string
+        }>
+        list: () => Promise<{
+          success: boolean
+          terminals?: Array<{ id: string; title: string }>
+          error?: string
+        }>
+        onData: (callback: (data: { terminalId: string; data: string }) => void) => () => void
+        onExit: (
+          callback: (data: { terminalId: string; exitCode: number; signal?: number }) => void
+        ) => () => void
+        onError: (callback: (data: { terminalId: string; error: string }) => void) => () => void
+      }
     }
   }
 }
