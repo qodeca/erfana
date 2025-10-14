@@ -28,8 +28,8 @@ These tools are pre-approved by default for seamless workflow (10 total):
 - **Glob** - Find files by pattern (safe, read-only)
 - **Grep** - Search file contents with regex (safe, read-only)
 - **Bash** - Execute shell commands (essential for development)
+- **LS** - List directory contents (safe, read-only)
 - **WebSearch** - Search the web (read-only, network access)
-- **Search** - General search capability (safe, read-only)
 - **TodoWrite** - Task management and tracking (safe, planning aid)
 - **Task** - Launch agent tasks for complex operations (common, autonomous work)
 
@@ -56,7 +56,7 @@ These tools require explicit user approval on first use (7 total):
 **Activation**: Toggle button in chat interface, uses `--permission-mode plan` flag
 
 **Tool Restrictions in Planning Mode** (6 tools):
-- Read, Grep, Task, WebSearch, Search, TodoWrite
+- Read, LS, Grep, Task, WebSearch, TodoWrite
 
 **Blocked in Planning Mode**:
 - All write operations: Write, Edit, MultiEdit, NotebookEdit
@@ -193,7 +193,7 @@ User → Dialog → Approve → Session Restarts → **Auto re-sends** → Execu
 ```typescript
 async getApprovedTools(): Promise<string[]>
 // Returns approved tools list, defaults to pre-approved tools:
-// ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch', 'Search', 'TodoWrite', 'Task']
+// ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'LS', 'WebSearch', 'TodoWrite', 'Task']
 
 async setApprovedTools(tools: string[]): Promise<void>
 // Replaces entire approved tools list
@@ -215,12 +215,12 @@ async resetApprovedTools(): Promise<void>
 **Data Structure**:
 ```json
 {
-  "approvedTools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "WebSearch", "Search", "TodoWrite", "Task"],
+  "approvedTools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "LS", "WebSearch", "TodoWrite", "Task"],
   "lastProjectPath": "/Users/user/Projects/my-project"
 }
 ```
 
-**Note**: The 10 pre-approved tools (Read, Write, Edit, Glob, Grep, Bash, WebSearch, Search, TodoWrite, Task) are always included via merge logic in `ClaudeCliService.ts:148-153`, even if not in config file. User-approved tools (e.g., MultiEdit, WebFetch) are added to this list when approved with "Remember this choice".
+**Note**: The 10 pre-approved tools (Read, Write, Edit, Glob, Grep, Bash, LS, WebSearch, TodoWrite, Task) are always included via merge logic in `ClaudeCliService.ts:148-153`, even if not in config file. User-approved tools (e.g., MultiEdit, WebFetch) are added to this list when approved with "Remember this choice".
 
 ### Persistence Behavior
 
@@ -315,7 +315,7 @@ rm ~/.config/erfana/config.json
 **5. Verify Persistence**:
 ```bash
 cat ~/.config/erfana/config.json
-# Should show: {"approvedTools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "WebSearch", "Search", "TodoWrite", "Task", "<YourApprovedTool>"], ...}
+# Should show: {"approvedTools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "LS", "WebSearch", "TodoWrite", "Task", "<YourApprovedTool>"], ...}
 # Note: The 10 pre-approved tools always appear, plus any additional user-approved tools
 ```
 

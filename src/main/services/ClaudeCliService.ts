@@ -166,7 +166,7 @@ export class ClaudeCliService extends EventEmitter {
   private maxRestartAttempts = 3
   private restartTimeout: NodeJS.Timeout | null = null
   private authCheckBypass = false
-  private approvedTools: Set<string> = new Set(['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch', 'Search', 'TodoWrite', 'Task']) // Pre-approved tools
+  private approvedTools: Set<string> = new Set(['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'LS', 'WebSearch', 'TodoWrite', 'Task']) // Pre-approved tools
   private sessionId: string | null = null
   private isPlanningMode: boolean = false // Planning mode state
 
@@ -234,7 +234,7 @@ export class ClaudeCliService extends EventEmitter {
    * Start persistent Claude CLI session
    * Called when project opens
    * @param projectPath - Path to the project directory
-   * @param planningMode - If true, restricts tools to read-only (Read, Grep, Task, WebSearch)
+   * @param planningMode - If true, restricts tools to read-only (Read, LS, Grep, Task, WebSearch, TodoWrite)
    */
   async startSession(projectPath: string, planningMode: boolean = false): Promise<void> {
     if (this.claudeProcess) {
@@ -261,12 +261,12 @@ export class ClaudeCliService extends EventEmitter {
 
     if (planningMode) {
       // Planning mode: read-only tools only
-      toolsToUse = new Set(['Read', 'Grep', 'Task', 'WebSearch', 'Search', 'TodoWrite'])
+      toolsToUse = new Set(['Read', 'LS', 'Grep', 'Task', 'WebSearch', 'TodoWrite'])
       console.log('📋 Planning mode enabled: using read-only tools')
     } else {
       // Normal mode: load approved tools from settings and merge with defaults
       const approvedToolsList = await settingsService.getApprovedTools()
-      const defaultTools = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch', 'Search', 'TodoWrite', 'Task']
+      const defaultTools = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'LS', 'WebSearch', 'TodoWrite', 'Task']
 
       // Merge: always include defaults, plus any additional tools from settings
       toolsToUse = new Set([...defaultTools, ...approvedToolsList])
@@ -1037,14 +1037,21 @@ export class ClaudeCliService extends EventEmitter {
     const descriptions: Record<string, string> = {
       Write: 'Create or overwrite files',
       Edit: 'Modify existing files',
+      MultiEdit: 'Make multiple edits to a single file',
       Read: 'Read file contents',
       Bash: 'Execute shell commands',
+      LS: 'List directory contents',
       Glob: 'Search for files by pattern',
       Grep: 'Search file contents',
       Task: 'Delegate to specialized agent',
       WebSearch: 'Search the web',
       WebFetch: 'Fetch web content',
-      SlashCommand: 'Execute custom slash command'
+      SlashCommand: 'Execute custom slash command',
+      TodoRead: 'Read current to-do list',
+      TodoWrite: 'Create and manage task list',
+      NotebookRead: 'Read Jupyter notebook files',
+      NotebookEdit: 'Edit Jupyter notebook cells',
+      ExitPlanMode: 'Exit planning phase'
     }
     return descriptions[toolName] || `Use ${toolName} tool`
   }

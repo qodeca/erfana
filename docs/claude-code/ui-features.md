@@ -153,19 +153,19 @@ Collapsible panel at the top of the chat interface showing session statistics an
 **All 17 Claude Code Tools**:
 
 **File Operations**: Read, Write, Edit, MultiEdit, NotebookRead, NotebookEdit
-**Search & Navigation**: Glob, Grep, Search
+**Search & Navigation**: Glob, Grep, LS
 **Command Execution**: Bash
 **Web & Planning**: WebSearch, WebFetch, SlashCommand
 **Task Management**: TodoRead, TodoWrite, Task
 **Special**: ExitPlanMode
 
 **Pre-Approved Tools** (shown in blue by default):
-Read, Write, Edit, Glob, Grep, Bash, WebSearch, Search, TodoWrite, Task
+Read, Write, Edit, Glob, Grep, Bash, LS, WebSearch, TodoWrite, Task
 
 **Requires Approval** (shown in gray until user approves):
 MultiEdit, WebFetch, SlashCommand, TodoRead, NotebookRead, NotebookEdit, ExitPlanMode
 
-**Note**: In planning mode, only read-only tools (Read, Grep, Task, WebSearch, Search, TodoWrite) are available regardless of approval status.
+**Note**: In planning mode, only read-only tools (Read, LS, Grep, Task, WebSearch, TodoWrite) are available regardless of approval status.
 
 ### User Interaction
 
@@ -198,7 +198,7 @@ Toggle button that switches Claude CLI between full access mode and read-only pl
 ### Tool Restrictions in Planning Mode
 
 When planning mode is enabled:
-- **Allowed**: Read, Grep, Task, WebSearch, Search, TodoWrite
+- **Allowed**: Read, LS, Grep, Task, WebSearch, TodoWrite
 - **Blocked**: Write, Edit, Bash, and all other modification tools
 - **Purpose**: Safe exploration, analysis, and planning without file modifications
 

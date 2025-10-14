@@ -12,7 +12,7 @@ Complete documentation for Erfana's Claude Code integration with persistent sess
 - Persistent Claude CLI sessions (long-running process)
 - Tool approval dialog for security
 - Auto-retry after approval (seamless UX)
-- Pre-approved tools (10 total): Read, Write, Edit, Glob, Grep, Bash, WebSearch, Search, TodoWrite, Task
+- Pre-approved tools (10 total): Read, Write, Edit, Glob, Grep, Bash, LS, WebSearch, TodoWrite, Task
 - Planning mode for safe exploration (read-only tools)
 - Control Panel showing all 17 tools with approval status
 - Persistent permissions via electron-store
@@ -174,7 +174,7 @@ spawn('claude', ['--resume', uuid, '--allowedTools', ...updatedApproved])
 ```typescript
 // Via settings service
 const tools = await settingsService.getApprovedTools()
-console.log(tools)  // ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch', 'Search', 'TodoWrite', 'Task']
+console.log(tools)  // ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'LS', 'WebSearch', 'TodoWrite', 'Task']
 
 // Via IPC
 const result = await window.api.settings.getApprovedTools()

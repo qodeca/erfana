@@ -28,8 +28,8 @@ interface SessionMetrics {
 
 // All available Claude Code tools (from official documentation)
 const ALL_TOOLS = [
-  'Read', 'Write', 'Edit', 'MultiEdit', 'Glob', 'Grep', 'Bash',
-  'WebSearch', 'Search', 'WebFetch', 'SlashCommand',
+  'Read', 'Write', 'Edit', 'MultiEdit', 'Glob', 'Grep', 'Bash', 'LS',
+  'WebSearch', 'WebFetch', 'SlashCommand',
   'TodoRead', 'TodoWrite', 'Task',
   'NotebookRead', 'NotebookEdit',
   'ExitPlanMode'
@@ -130,7 +130,7 @@ export function ClaudeCodeChat() {
         const result = await window.api.settings.getApprovedTools()
         if (result.success && result.tools) {
           // Merge default tools with user-approved tools
-          const defaultTools = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch', 'Search', 'TodoWrite', 'Task']
+          const defaultTools = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'LS', 'WebSearch', 'TodoWrite', 'Task']
           const allApproved = Array.from(new Set([...defaultTools, ...result.tools]))
           setApprovedTools(allApproved)
         }
@@ -444,7 +444,7 @@ export function ClaudeCodeChat() {
         id: Date.now().toString(),
         type: 'system',
         content: newPlanningMode
-          ? '📋 Planning mode enabled: Claude will use read-only tools (Read, Grep, Task, WebSearch)'
+          ? '📋 Planning mode enabled: Claude will use read-only tools (Read, LS, Grep, Task, WebSearch, TodoWrite)'
           : '🔧 Planning mode disabled: Claude has full access to approved tools',
         timestamp: new Date()
       }
