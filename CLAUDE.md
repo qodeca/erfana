@@ -158,6 +158,7 @@ Automatic file system change detection via chokidar:
 - `Cmd/Ctrl+J` - Toggle right panel (Terminal)
 - `Ctrl+Shift+G` - Toggle right panel (Git)
 - `Cmd/Ctrl+Shift+A` - Toggle right panel (Copilot)
+- `Cmd/Ctrl+,` - Open Claude Code settings (when Copilot active)
 
 **Panel Behavior**:
 - Right sidebar: Git and Terminal are separate splitview panels (mutually exclusive)
@@ -255,18 +256,23 @@ Erfana integrates Claude Code via persistent CLI session with security-first too
 - **Chat Interface**: Message history (user/assistant/tool_use), stop generation button
 - **Control Panel**: Collapsible panel showing session stats (messages, tools used, duration) and all 17 Claude Code tools with color-coded approval status
 - **Planning Mode Toggle**: Switch between full access and read-only mode (restricts to safe exploration tools)
+- **Settings Modal**: Gear icon in header opens blocking modal dialog for tool authorization configuration (Cmd/Ctrl+,)
 
 ### Tool Approval System
 
-Security-first approach with pre-approved common tools and user approval for complex operations:
+Opinionated approach optimized for consultant workflow with all tools pre-authorized by default:
 
-- **Pre-Approved Tools** (10 total): Read, Write, Edit, Glob, Grep, Bash, LS, WebSearch, TodoWrite, Task (cover 95%+ of operations, transparent execution)
-- **Tools Requiring Approval**: MultiEdit, WebFetch, SlashCommand, TodoRead, NotebookRead, NotebookEdit, ExitPlanMode (complex operations, higher security implications)
-- **Modal Dialog**: ToolApprovalDialog shows tool name, description, parameters, "Remember this choice" option
-- **Auto-Retry**: After approval, system automatically re-sends user prompt with updated permissions
-- **Persistence**: Approved tools saved via electron-store, survive app restarts
-- **Session Restart**: Uses `--resume` flag to preserve conversation context when adding tools
-- **Merge Logic**: Pre-approved tools always included (ClaudeCliService.ts:148-153), even if not in settings
+- **Pre-Approved Tools** (17 total): All Claude Code tools enabled by default
+  - **File Operations**: Read, Write, Edit, MultiEdit, Glob, Grep, LS
+  - **System**: Bash
+  - **AI & Web**: WebSearch, WebFetch, Task
+  - **Workflow**: TodoRead, TodoWrite, SlashCommand, ExitPlanMode
+  - **Notebooks**: NotebookRead, NotebookEdit
+- **Configuration UI**: Settings modal (gear icon in Copilot header, Cmd/Ctrl+,) provides per-tool authorization control
+- **Global Toggle**: "Enable all tools by default" checkbox for quick configuration
+- **Persistence**: Tool settings saved via electron-store, survive app restarts
+- **Session Restart**: Tool changes trigger session restart with `--resume` flag to preserve conversation context
+- **Modal Dialog**: ToolApprovalDialog appears only if user manually restricts a tool and Claude attempts to use it
 
 **Key Architecture Decision**: `--allowedTools` flag is immutable at runtime, requiring session restart to add new tools.
 
@@ -275,26 +281,26 @@ Security-first approach with pre-approved common tools and user approval for com
 **Native Claude CLI feature** for safe exploration and planning without file modifications:
 
 - **Activation**: Toggle button in chat interface, uses `--permission-mode plan` flag
-- **Tool Restrictions**: Only read-only tools available (Read, LS, Grep, Task, WebSearch, TodoWrite)
-- **Blocked Tools**: Write, Edit, Bash, and all other modification tools
+- **Tool Restrictions**: Only read-only and safe tools available (9 tools)
+- **Blocked Tools**: Write, Edit, MultiEdit, Bash, WebFetch, SlashCommand, NotebookEdit, ExitPlanMode
 - **Use Cases**: Code exploration, architecture planning, research, cost estimation before implementation
 - **Session Restart**: Toggling mode restarts Claude CLI session with updated permissions
 - **Visual Indicator**: System message in chat confirms mode change
 - **Control Panel**: Shows restricted tool set when planning mode is active
 
-**Planning Mode Tool Set** (6 tools): Read, LS, Grep, Task, WebSearch, TodoWrite
+**Planning Mode Tool Set** (9 safe tools): Read, LS, Glob, Grep, Task, WebSearch, TodoRead, TodoWrite, NotebookRead
 
 See: [Claude Code UI Features](docs/claude-code/ui-features.md#planning-mode-toggle) for UI documentation
 
 ### Implementation
 
 **Files**:
-- Service: `src/main/services/ClaudeCliService.ts` (~527 lines)
-- IPC: `src/main/ipc/claude-code-handlers.ts` (~180 lines)
-- Settings: `src/main/ipc/settings-handlers.ts` (tool approval persistence)
+- Service: `src/main/services/ClaudeCliService.ts` (~1060 lines)
+- IPC: `src/main/ipc/claude-code-handlers.ts` (~240 lines)
+- Settings: `src/main/ipc/settings-handlers.ts` (tool settings persistence)
 - UI: `src/renderer/src/components/Panels/CopilotPanel.tsx`
 - Chat: `src/renderer/src/components/Copilot/CopilotChat.tsx`
-- Dialog: `src/renderer/src/components/Dialogs/ToolApprovalDialog.tsx`
+- Dialogs: `src/renderer/src/components/Dialogs/ToolApprovalDialog.tsx`, `ToolSettingsDialog.tsx`
 
 **Flags Used**:
 ```bash
@@ -304,9 +310,9 @@ claude -p \
   --output-format stream-json \
   --verbose \
   --replay-user-messages \
-  --allowedTools Read Write Edit Glob Grep Bash LS WebSearch TodoWrite Task  # 10 pre-approved + user-approved
+  --allowedTools Read Write Edit MultiEdit Glob Grep Bash LS WebSearch WebFetch SlashCommand TodoRead TodoWrite Task NotebookRead NotebookEdit ExitPlanMode  # All 17 tools by default
   --resume <sessionId>  # Used when restarting with new tools
-  --permission-mode plan  # Optional: Enable planning mode (read-only tools only)
+  --permission-mode plan  # Optional: Enable planning mode (restricts to 9 safe tools)
 ```
 
 📚 **Detailed docs**: [Claude Code Integration Index](docs/claude-code/README.md) | [Tool Approval System](docs/claude-code/tool-approval.md) | [UI Features](docs/claude-code/ui-features.md) | [IPC Patterns](docs/ipc-patterns.md)

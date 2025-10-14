@@ -7,10 +7,11 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Send, Square, ListChecks } from 'lucide-react'
+import { Send, Square, ListChecks, Settings } from 'lucide-react'
 import { TerminalMessage } from './TerminalMessage'
 import { ToolApprovalDialog, ToolApprovalRequest } from '../Dialogs/ToolApprovalDialog'
 import { useCopilotStore } from '../../stores/useCopilotStore'
+import { ALL_CLAUDE_TOOLS } from '../../constants/claude-tools'
 import './CopilotChat.css'
 
 interface ClaudeMessage {
@@ -30,18 +31,20 @@ interface SessionMetrics {
 interface CopilotChatProps {
   showControlPanel: boolean
   onToggleControlPanel: () => void
+  onOpenSettings?: () => void
+  approvedTools: string[]
+  onApprovedToolsChange: (tools: string[]) => void
 }
 
-// All available Claude Code tools (from official documentation)
-const ALL_TOOLS = [
-  'Read', 'Write', 'Edit', 'MultiEdit', 'Glob', 'Grep', 'Bash', 'LS',
-  'WebSearch', 'WebFetch', 'SlashCommand',
-  'TodoRead', 'TodoWrite', 'Task',
-  'NotebookRead', 'NotebookEdit',
-  'ExitPlanMode'
-]
+// Import all Claude Code tools from shared constants
+const ALL_TOOLS = ALL_CLAUDE_TOOLS
 
-export function CopilotChat({ showControlPanel }: CopilotChatProps) {
+export function CopilotChat({
+  showControlPanel,
+  onOpenSettings,
+  approvedTools,
+  onApprovedToolsChange
+}: CopilotChatProps) {
   const [messages, setMessages] = useState<ClaudeMessage[]>([])
   const [input, setInput] = useState('')
   const [isRunning, setIsRunning] = useState(false)
@@ -55,7 +58,6 @@ export function CopilotChat({ showControlPanel }: CopilotChatProps) {
     sessionStartTime: null
   })
   const [isPlanningMode, setIsPlanningMode] = useState(false)
-  const [approvedTools, setApprovedTools] = useState<string[]>([])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -126,25 +128,6 @@ export function CopilotChat({ showControlPanel }: CopilotChatProps) {
 
       return updated
     })
-  }, [])
-
-  // Fetch approved tools on mount
-  useEffect(() => {
-    const fetchApprovedTools = async () => {
-      try {
-        const result = await window.api.settings.getApprovedTools()
-        if (result.success && result.tools) {
-          // Merge default tools with user-approved tools
-          const defaultTools = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'LS', 'WebSearch', 'TodoWrite', 'Task']
-          const allApproved = Array.from(new Set([...defaultTools, ...result.tools]))
-          setApprovedTools(allApproved)
-        }
-      } catch (error) {
-        console.error('Failed to fetch approved tools:', error)
-      }
-    }
-
-    fetchApprovedTools()
   }, [])
 
   // Auto-scroll to bottom when new messages arrive or typing indicator changes
@@ -294,8 +277,11 @@ export function CopilotChat({ showControlPanel }: CopilotChatProps) {
 
   // Listen for session resumed (after approval)
   useEffect(() => {
-    const unsubscribe = window.api.claudeCode.onSessionResumed((data) => {
+    const unsubscribe = window.api.claudeCode.onSessionResumed(async (data) => {
       console.log('✅ Session resumed with tools:', data.approvedTools)
+
+      // Update parent state with exact tools from session (no merge needed)
+      onApprovedToolsChange(data.approvedTools)
 
       // Auto-retry last user prompt after approval
       if (lastUserPrompt) {
@@ -323,7 +309,7 @@ export function CopilotChat({ showControlPanel }: CopilotChatProps) {
     })
 
     return unsubscribe
-  }, [lastUserPrompt, startActivityMonitoring])
+  }, [lastUserPrompt, startActivityMonitoring, onApprovedToolsChange])
 
   // Listen for pending messages from context menu (or other sources)
   useEffect(() => {
@@ -449,7 +435,7 @@ export function CopilotChat({ showControlPanel }: CopilotChatProps) {
         id: Date.now().toString(),
         type: 'system',
         content: newPlanningMode
-          ? '📋 Planning mode enabled: Claude will use read-only tools (Read, LS, Grep, Task, WebSearch, TodoWrite)'
+          ? '📋 Planning mode enabled: Claude will use 9 safe tools (Read, LS, Glob, Grep, Task, WebSearch, TodoRead, TodoWrite, NotebookRead)'
           : '🔧 Planning mode disabled: Claude has full access to approved tools',
         timestamp: new Date()
       }
@@ -566,7 +552,16 @@ export function CopilotChat({ showControlPanel }: CopilotChatProps) {
 
             {/* Tools Section */}
             <div className="tools-section">
-              <div className="tools-section-header">Available Tools ({ALL_TOOLS.length})</div>
+              <div className="tools-section-header">
+                <span>Available Tools ({ALL_TOOLS.length})</span>
+                <span
+                  className="tools-settings-button"
+                  onClick={onOpenSettings}
+                  title="Configure Tools (⌘,)"
+                >
+                  <Settings size={14} />
+                </span>
+              </div>
               <div className="tools-list">
                 {ALL_TOOLS.map((tool) => (
                   <span

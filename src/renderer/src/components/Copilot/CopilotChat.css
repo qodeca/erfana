@@ -422,12 +422,28 @@
 }
 
 .tools-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 11px;
   font-weight: 600;
   color: #858585;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 8px;
+}
+
+.tools-settings-button {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  color: #858585;
+  transition: color 0.15s ease;
+  padding: 2px;
+}
+
+.tools-settings-button:hover {
+  color: #cccccc;
 }
 
 .tools-list {

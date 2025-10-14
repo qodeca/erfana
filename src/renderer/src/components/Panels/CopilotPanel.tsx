@@ -7,10 +7,11 @@
  * Current implementation: ClaudeCliService for Claude Code integration
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ISplitviewPanelProps } from 'dockview'
 import { Bot, LogIn, Download, RefreshCw, ChevronDown, ChevronLeft } from 'lucide-react'
 import { CopilotChat } from '../Copilot/CopilotChat'
+import { CopilotSettingsDialog } from '../Dialogs/CopilotSettingsDialog'
 import './CopilotPanel.css'
 
 type SessionState = 'stopped' | 'starting' | 'ready' | 'error'
@@ -33,10 +34,32 @@ export function CopilotPanel(_props: ISplitviewPanelProps) {
   // Control Panel state
   const [showControlPanel, setShowControlPanel] = useState(false)
 
+  // Settings modal state
+  const [showSettings, setShowSettings] = useState(false)
+
+  // Approved tools state - lifted up from CopilotChat
+  const [approvedTools, setApprovedTools] = useState<string[]>([])
+
   // Check Claude CLI status on mount
   useEffect(() => {
     checkClaudeStatus()
   }, [])
+
+  // Listen for global settings keyboard shortcut (Cmd/Ctrl+,)
+  // FIXED: Removed sessionState from dependency array to prevent listener accumulation
+  useEffect(() => {
+    const handleOpenSettings = () => {
+      // Check current session state at execution time
+      window.api.claudeCode.getSessionState().then((result) => {
+        if (result.success && result.state === 'ready') {
+          setShowSettings(true)
+        }
+      })
+    }
+
+    window.addEventListener('open-claude-settings', handleOpenSettings)
+    return () => window.removeEventListener('open-claude-settings', handleOpenSettings)
+  }, []) // Empty dependency array - listener never recreates
 
   // Start session when authenticated
   useEffect(() => {
@@ -92,6 +115,25 @@ export function CopilotPanel(_props: ISplitviewPanelProps) {
       unsubscribeError()
     }
   }, [])
+
+  // Fetch approved tools on mount and when session starts
+  const fetchApprovedTools = useCallback(async () => {
+    try {
+      const result = await window.api.settings.getApprovedTools()
+      if (result.success && result.tools) {
+        // Use exact tools from settings (defaults handled by SettingsService)
+        setApprovedTools(result.tools)
+        console.log('✅ Approved tools fetched:', result.tools)
+      }
+    } catch (error) {
+      console.error('Failed to fetch approved tools:', error)
+    }
+  }, [])
+
+  // Fetch approved tools on mount
+  useEffect(() => {
+    fetchApprovedTools()
+  }, [fetchApprovedTools])
 
   const checkClaudeStatus = async () => {
     setIsChecking(true)
@@ -178,7 +220,6 @@ export function CopilotPanel(_props: ISplitviewPanelProps) {
     try {
       await window.api.claudeCode.stopSession()
       setSessionState('stopped')
-      await new Promise((resolve) => setTimeout(resolve, 500))
       await startSession()
     } catch (err: any) {
       console.error('Failed to restart session:', err)
@@ -186,14 +227,60 @@ export function CopilotPanel(_props: ISplitviewPanelProps) {
     }
   }
 
+  const handleSaveSettings = async (newApprovedTools: string[]) => {
+    // Store previous state for rollback
+    const previousTools = approvedTools
+
+    try {
+      // FIXED: Check IPC result before updating state
+      const saveResult = await window.api.settings.setApprovedTools(newApprovedTools)
+
+      if (!saveResult.success) {
+        throw new Error(saveResult.error || 'Failed to save settings')
+      }
+
+      // Optimistic UI update - update state IMMEDIATELY with exact selections
+      setApprovedTools(newApprovedTools)
+      console.log('✅ Approved tools updated optimistically:', newApprovedTools)
+
+      // Restart session with new tools
+      await window.api.claudeCode.stopSession()
+      setSessionState('stopped')
+
+      const projectPath = await window.api.file.getProjectPath()
+      if (!projectPath) {
+        throw new Error('No project path available')
+      }
+
+      // FIXED: Check session restart result and rollback on failure
+      const restartResult = await window.api.claudeCode.startSession(projectPath, false)
+
+      if (!restartResult.success) {
+        throw new Error(restartResult.error || 'Failed to restart session')
+      }
+    } catch (error: any) {
+      console.error('Failed to save settings and restart session:', error)
+
+      // FIXED: Rollback state on failure
+      setApprovedTools(previousTools)
+      console.log('⚠️ Rolled back to previous tools:', previousTools)
+
+      // FIXED: Show error to user
+      setSessionError(`Settings update failed: ${error.message}`)
+      setSessionState('error')
+
+      throw error
+    }
+  }
+
   return (
     <div className="copilot-panel sidebar-panel">
       <div className="sidebar-panel-header">
+        <Bot size={16} className="panel-header-icon" />
+        <span className="sidebar-panel-title">Copilot</span>
         {sessionState === 'ready' && <span className="session-indicator ready">●</span>}
         {sessionState === 'starting' && <span className="session-indicator starting">●</span>}
         {sessionState === 'error' && <span className="session-indicator error">●</span>}
-        <Bot size={16} className="panel-header-icon" />
-        <span className="sidebar-panel-title">Copilot</span>
         {sessionState === 'ready' && (
           <span
             className="control-panel-chevron"
@@ -347,9 +434,20 @@ export function CopilotPanel(_props: ISplitviewPanelProps) {
           <CopilotChat
             showControlPanel={showControlPanel}
             onToggleControlPanel={() => setShowControlPanel(!showControlPanel)}
+            onOpenSettings={() => setShowSettings(true)}
+            approvedTools={approvedTools}
+            onApprovedToolsChange={setApprovedTools}
           />
         )}
       </div>
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <CopilotSettingsDialog
+          onClose={() => setShowSettings(false)}
+          onSave={handleSaveSettings}
+        />
+      )}
     </div>
   )
 }
