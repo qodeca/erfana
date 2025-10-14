@@ -287,9 +287,13 @@ export class ClaudeCliService extends EventEmitter {
    * @param planningMode - If true, restricts tools to read-only (Read, LS, Grep, Task, WebSearch, TodoWrite)
    */
   async startSession(projectPath: string, planningMode: boolean = false): Promise<void> {
+    console.log('🔵 SESSION START: Begin startSession()')
+    console.log('🔵 Project path:', projectPath)
+    console.log('🔵 Planning mode:', planningMode)
+
     if (this.claudeProcess) {
       console.log('⚠️ Session already running, stopping first...')
-      this.stopSession()
+      await this.stopSession()
     }
 
     this.sessionState = 'starting'
@@ -315,7 +319,9 @@ export class ClaudeCliService extends EventEmitter {
       console.log('📋 Planning mode enabled: using 9 safe tools')
     } else {
       // Normal mode: load approved tools from settings (exact user selection)
+      console.log('🔵 Loading approved tools from settings...')
       const approvedToolsList = await settingsService.getApprovedTools()
+      console.log('🔵 Tools loaded from settings:', approvedToolsList)
       toolsToUse = new Set(approvedToolsList)
     }
 
@@ -325,7 +331,7 @@ export class ClaudeCliService extends EventEmitter {
     this.sessionId = this.generateSessionId()
 
     console.log(`🚀 Starting persistent Claude CLI session for: ${projectPath}`)
-    console.log(`🔧 Approved tools: ${Array.from(this.approvedTools).join(', ')}`)
+    console.log(`🔧 Approved tools (${this.approvedTools.size} total): ${Array.from(this.approvedTools).join(', ')}`)
 
     try {
       // Build args with approved tools
@@ -345,13 +351,20 @@ export class ClaudeCliService extends EventEmitter {
       // Add planning mode flag if enabled
       if (planningMode) {
         args.push('--permission-mode', 'plan')
+        console.log('🔵 Added planning mode flag')
       }
 
       // Add --allowedTools with approved tools
       // This is required for Claude CLI to actually execute the tools
       if (this.approvedTools.size > 0) {
-        args.push('--allowedTools', ...Array.from(this.approvedTools))
+        const toolsArray = Array.from(this.approvedTools)
+        args.push('--allowedTools', ...toolsArray)
+        console.log('🔵 Added --allowedTools flag with:', toolsArray)
+      } else {
+        console.warn('⚠️ No approved tools to add!')
       }
+
+      console.log('🔵 Final command args:', args.join(' '))
 
       // Start Claude CLI in persistent mode with stream-json I/O
       this.claudeProcess = spawn('claude', args, {
@@ -406,8 +419,10 @@ export class ClaudeCliService extends EventEmitter {
       })
 
       this.sessionState = 'ready'
+      console.log('🔵 Emitting session-started event with projectPath:', projectPath)
       this.emit('session-started', { projectPath })
       console.log('✅ Claude CLI session ready')
+      console.log('✅ SESSION START: Complete!')
     } catch (error: any) {
       console.error('❌ Failed to start Claude CLI session:', error)
       this.sessionState = 'error'
@@ -517,12 +532,8 @@ export class ClaudeCliService extends EventEmitter {
     const projectPath = this.projectPath
     const planningMode = this.isPlanningMode
 
-    // Kill current process
-    if (this.claudeProcess) {
-      this.claudeProcess.removeAllListeners()
-      this.claudeProcess.kill('SIGTERM')
-      this.claudeProcess = null
-    }
+    // Stop current session and wait for exit
+    await this.stopSession()
 
     this.sessionState = 'starting'
     this.buffer = ''
@@ -594,10 +605,11 @@ export class ClaudeCliService extends EventEmitter {
   }
 
   /**
-   * Stop current session
+   * Stop current session (async)
    * Called when project closes or app quits
+   * Returns promise that resolves when process actually exits
    */
-  stopSession(): void {
+  async stopSession(): Promise<void> {
     console.log('🛑 Stopping Claude CLI session...')
 
     if (this.restartTimeout) {
@@ -605,31 +617,49 @@ export class ClaudeCliService extends EventEmitter {
       this.restartTimeout = null
     }
 
-    if (this.claudeProcess) {
-      // Remove listeners to prevent restart on manual stop
-      this.claudeProcess.removeAllListeners()
+    if (!this.claudeProcess) {
+      // Already stopped
+      this.sessionState = 'stopped'
+      this.projectPath = null
+      this.buffer = ''
+      this.restartAttempts = 0
+      return
+    }
 
-      // Kill the process
-      this.claudeProcess.kill('SIGTERM')
+    return new Promise<void>((resolve) => {
+      const process = this.claudeProcess!
 
-      // Force kill if not dead after 2s
-      setTimeout(() => {
+      // Remove all existing listeners to prevent interference
+      process.removeAllListeners()
+
+      // Set up one-time exit listener
+      process.once('exit', (code) => {
+        console.log(`✅ Claude CLI process exited with code: ${code}`)
+        this.claudeProcess = null
+        this.sessionState = 'stopped'
+        this.projectPath = null
+        this.buffer = ''
+        this.restartAttempts = 0
+        this.emit('session-stopped')
+        console.log('✅ Claude CLI session stopped')
+        resolve()
+      })
+
+      // Set up timeout for force kill
+      const forceKillTimeout = setTimeout(() => {
         if (this.claudeProcess && !this.claudeProcess.killed) {
-          console.log('⚠️ Force killing Claude CLI process')
+          console.log('⚠️ Force killing Claude CLI process (2s timeout)')
           this.claudeProcess.kill('SIGKILL')
         }
       }, 2000)
 
-      this.claudeProcess = null
-    }
+      // Clean up timeout when process exits
+      process.once('exit', () => clearTimeout(forceKillTimeout))
 
-    this.sessionState = 'stopped'
-    this.projectPath = null
-    this.buffer = ''
-    this.restartAttempts = 0
-
-    this.emit('session-stopped')
-    console.log('✅ Claude CLI session stopped')
+      // Send SIGTERM to gracefully shutdown
+      console.log('📤 Sending SIGTERM to Claude CLI process')
+      process.kill('SIGTERM')
+    })
   }
 
   /**
