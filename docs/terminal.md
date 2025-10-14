@@ -1,0 +1,316 @@
+# Terminal Panel
+
+Integrated terminal emulator with xterm.js and node-pty for native shell access within Erfana.
+
+## Overview
+
+**Status**: ✅ FULLY IMPLEMENTED
+
+The Terminal Panel provides a full-featured terminal emulator using:
+- **xterm.js v5.5.0** - Modern terminal emulator for web
+- **node-pty v1.0.0** - Native pseudo-terminal (PTY) backend
+- **WebGL rendering** - Hardware-accelerated rendering for performance
+
+## Quick Access
+
+- **Activity Bar**: Terminal icon in right sidebar (bottom)
+- **Keyboard**: `Cmd/Ctrl+J` - Toggle terminal panel
+- **Restart**: X button in panel header - Kill and restart terminal session
+
+## Features
+
+### Core Capabilities
+
+- **Native Shell**: Spawns real PTY process (zsh on macOS, bash on Linux)
+- **Auto-Resize**: Terminal automatically resizes when panel is dragged
+- **WebGL Rendering**: Hardware acceleration with canvas fallback
+- **Bold Font Support**: Renders bold text with proper font weight
+- **Clean Prompt**: Traditional format without RC file artifacts
+- **Context Integration**: "Send Selection to Terminal" from markdown preview
+
+### Terminal Configuration
+
+```typescript
+// xterm.js settings
+fontSize: 12
+fontFamily: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace
+fontWeight: 'normal'
+fontWeightBold: 'bold'
+
+// Theme - High contrast
+background: '#000000'  // Pure black
+foreground: '#ffffff'  // Bright white
+cursor: '#4fc1ff'      // Cyan
+```
+
+### Shell Configuration
+
+**Prompt Format**: `%n %~ $` (username directory $)
+
+**Example**: `marcinmobel ~/Projects/erfana $`
+
+**Environment Variables**:
+- `PS1='%n %~ $ '` - Traditional zsh prompt
+- `PROMPT='%n %~ $ '` - Zsh synonym for PS1
+- `SHELL_SESSIONS_DISABLE='1'` - Disables macOS "Restored session" messages
+- `TERM='xterm-256color'` - 256-color support
+- `COLORTERM='truecolor'` - True color support
+
+**Shell Arguments**:
+- **zsh**: `--no-rcs` - Skip all RC files for clean prompt
+- **bash**: `--norc --noprofile` - Skip configuration files
+
+## Architecture
+
+### Service Layer
+
+**File**: `src/main/services/TerminalService.ts` (~260 lines)
+
+```typescript
+class TerminalService extends EventEmitter {
+  private terminals: Map<string, TerminalInstance>
+
+  // Lifecycle
+  createTerminal(config: TerminalConfig): string | null
+  killTerminal(terminalId: string): boolean
+  dispose(): Promise<void>
+
+  // Operations
+  write(terminalId: string, data: string): boolean
+  resize(terminalId: string, cols: number, rows: number): boolean
+
+  // Info
+  getTerminalInfo(terminalId: string): {...} | null
+  listTerminals(): Array<{id: string; title: string}>
+}
+
+export const terminalService = new TerminalService()
+```
+
+**Pattern**: OOP service with singleton instance (follows FileService, ClaudeCliService pattern)
+
+### IPC Handlers
+
+**File**: `src/main/ipc/terminal-handlers.ts` (~120 lines)
+
+**Exposed via contextBridge**:
+```typescript
+window.api.terminal = {
+  isAvailable: () => Promise<{available: boolean}>
+  create: (config) => Promise<{success, terminalId?, error?}>
+  write: (terminalId, data) => void
+  resize: (terminalId, cols, rows) => void
+  kill: (terminalId) => void
+
+  // Events
+  onData: (callback) => unsubscribe
+  onExit: (callback) => unsubscribe
+  onError: (callback) => unsubscribe
+}
+```
+
+### UI Component
+
+**File**: `src/renderer/src/components/Panels/TerminalPanel.tsx` (~250 lines)
+
+**Key Features**:
+- Visibility check before xterm initialization (prevents rendering issues)
+- WebGL addon loaded AFTER `xterm.open()` (order matters)
+- ResizeObserver for panel drag handling
+- useRef pattern to avoid useEffect cleanup issues
+- Clean screen on mount (`\x1b[2J\x1b[H`)
+
+**Critical Implementation Detail**:
+```typescript
+// IMPORTANT: Use ref to avoid cleanup issues
+const terminalIdRef = useRef<string | null>(null)
+
+useEffect(() => {
+  terminalIdRef.current = terminalId
+}, [terminalId])
+
+// Cleanup uses ref, not state
+useEffect(() => {
+  return () => {
+    if (terminalIdRef.current) {
+      window.api.terminal.kill(terminalIdRef.current)
+    }
+  }
+}, [isAvailable]) // terminalId NOT in dependencies
+```
+
+**Why**: Including `terminalId` in dependencies causes cleanup to run when terminal ID changes, disposing xterm before it can render.
+
+### State Management
+
+**File**: `src/renderer/src/stores/useTerminalStore.ts`
+
+```typescript
+interface TerminalStore {
+  activeTerminalId: string | null
+  setActiveTerminalId: (id: string | null) => void
+  sendToTerminal: (text: string) => Promise<boolean>
+}
+```
+
+**Purpose**: Cross-component communication (PreviewContextMenu → Terminal Panel)
+
+## Addons
+
+### FitAddon
+**Purpose**: Automatically fits terminal dimensions to container size
+**Usage**: Called on resize, mount, show/hide
+
+```typescript
+fitAddon.fit()  // Recalculate dimensions
+```
+
+### WebLinksAddon
+**Purpose**: Makes URLs in terminal clickable
+**Auto-enabled**: Loaded automatically on terminal creation
+
+### WebglAddon
+**Purpose**: Hardware-accelerated rendering
+**Loading Order**: MUST load AFTER `xterm.open()` or rendering fails
+
+```typescript
+xterm.open(container)
+
+// Load WebGL renderer AFTER open
+try {
+  const webglAddon = new WebglAddon()
+  webglAddon.onContextLoss(() => {
+    webglAddon.dispose()
+  })
+  xterm.loadAddon(webglAddon)
+} catch (error) {
+  console.warn('WebGL failed, falling back to canvas:', error)
+}
+```
+
+## Integration Points
+
+### Activity Bar Toggle
+**File**: `src/renderer/src/components/DockLayout/AppDockLayout.tsx`
+
+- Terminal icon in right activity bar (bottom position)
+- Toggles terminal splitview panel visibility
+- Mutually exclusive with Git panel
+
+### Context Menu Integration
+**File**: `src/renderer/src/components/ContextMenu/PreviewContextMenu.tsx`
+
+**"Send Selection to Terminal"** menu item:
+1. Opens terminal panel (if closed)
+2. Waits 100ms for initialization
+3. Calls `sendToTerminal(selectedText)`
+4. Shows success/error toast
+
+### Keyboard Shortcuts
+**Global**: `Cmd/Ctrl+J` - Toggle terminal panel (works anywhere in app)
+
+## Known Issues
+
+### node-pty Build Failure (Python 3.13)
+
+**Status**: Terminal feature deferred until resolved
+
+**Issue**: node-pty fails to build with Python 3.13 due to native module compilation
+
+**Current State**: Terminal panel implemented but may not work if node-pty build failed
+
+**Workaround**: Use Python 3.12 or earlier for development
+
+```bash
+# Check if node-pty is available
+await window.api.terminal.isAvailable()
+// Returns: {available: boolean}
+```
+
+**References**:
+- [node-pty GitHub Issues](https://github.com/microsoft/node-pty/issues)
+- [Electron Rebuild Docs](https://www.electronjs.org/docs/latest/tutorial/using-native-node-modules)
+
+### WebGL Context Loss
+
+**Symptom**: Terminal rendering stops after GPU driver issues
+
+**Solution**: Auto-handled with context loss listener
+```typescript
+webglAddon.onContextLoss(() => {
+  webglAddon.dispose()
+  // Falls back to canvas renderer
+})
+```
+
+### Terminal Appears Empty/Black
+
+**Causes**:
+1. xterm.js opened on hidden element (display:none)
+2. Canvas renderer failure in Electron
+3. useEffect cleanup disposing xterm too early
+
+**Solutions**:
+1. ✅ Visibility check before initialization
+2. ✅ WebGL renderer as primary (canvas fallback)
+3. ✅ useRef pattern to avoid cleanup issues
+
+## Troubleshooting
+
+### Terminal Not Available
+
+**Check**:
+```typescript
+const result = await window.api.terminal.isAvailable()
+if (!result.available) {
+  // node-pty not available
+  // Check build logs for native module errors
+}
+```
+
+### Terminal Not Resizing
+
+**Verify**:
+- ResizeObserver is attached to terminalRef.current
+- fitAddon.fit() is being called
+- window.api.terminal.resize() is called with new dimensions
+
+**Debug**:
+```typescript
+console.log('Terminal dimensions:', xterm.cols, xterm.rows)
+console.log('Container dimensions:', container.getBoundingClientRect())
+```
+
+### Prompt Shows Artifacts
+
+**Problem**: zsh RC files loading despite --no-rcs flag
+
+**Check**: `SHELL_SESSIONS_DISABLE='1'` environment variable
+
+**Verify**:
+```bash
+echo $SHELL_SESSIONS_DISABLE  # Should output: 1
+```
+
+### Bold Text Not Rendering
+
+**Verify**:
+```typescript
+fontWeight: 'normal'
+fontWeightBold: 'bold'  // Must be explicitly set
+```
+
+## References
+
+- [xterm.js Documentation](https://xtermjs.org/docs/)
+- [xterm.js API Reference](https://github.com/xtermjs/xterm.js/blob/master/typings/xterm.d.ts)
+- [node-pty GitHub](https://github.com/microsoft/node-pty)
+- [Terminal Emulator Basics](https://en.wikipedia.org/wiki/Terminal_emulator)
+- [ANSI Escape Codes](https://en.wikipedia.org/wiki/ANSI_escape_code)
+
+## Related Documentation
+
+- [UI Components](./ui-components.md) - Terminal panel UI integration
+- [Architecture](./architecture.md) - TerminalService in service layer
+- [IPC Patterns](./ipc-patterns.md) - Terminal IPC communication patterns
+- [Known Issues](./known-issues.md) - node-pty build issues

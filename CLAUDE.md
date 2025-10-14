@@ -31,6 +31,7 @@ Erfana follows Electron's three-process model:
 - react-markdown + remark-gfm (preview)
 - Zustand (activity bar state management)
 - chokidar (file system watching)
+- xterm.js + node-pty (terminal emulator)
 - Claude CLI binary (Claude AI via MAX subscription)
 - simple-git (git operations)
 
@@ -83,6 +84,7 @@ Business logic lives in service classes (`src/main/services/`):
 - `DirectoryWatcherService.ts` - Directory tree auto-refresh (1000ms debounce)
 - `SettingsService.ts` - Persistent storage with electron-store (async, dynamic ES Module import)
 - `ClaudeCliService.ts` - Persistent Claude CLI session (long-running process, JSONL stdin/stdout)
+- `TerminalService.ts` - Terminal emulator (xterm.js + node-pty, PTY lifecycle, WebGL rendering)
 - `GitService.ts` - Git operations (future)
 
 ```typescript
@@ -185,7 +187,7 @@ Automatic file system change detection via chokidar:
 ## Known Issues
 
 **Active Issues:**
-- **node-pty**: Build fails on Python 3.13 - terminal panel deferred
+- **node-pty**: Build fails on Python 3.13 - use Python 3.12 or earlier for terminal functionality
 - **Dockview CSS**: Use `dockview/dist/styles/dockview.css` path
 - **electron-store**: ES Module requiring dynamic `import()` - all SettingsService methods are async
 - **Network file systems**: May require `usePolling: true` for file watching (future config option)
@@ -355,6 +357,7 @@ claude -p /path/to/project \
 - [IPC Patterns](docs/ipc-patterns.md) - Secure communication patterns
 - [File Watching](docs/file-watching.md) - Auto-refresh systems
 - [UI Components](docs/ui-components.md) - Activity bars, keyboard shortcuts
+- [Terminal](docs/terminal.md) - Terminal emulator with xterm.js + node-pty
 - [Markdown Editing](docs/markdown-editing.md) - Editor features, preview
 - [Security](docs/security.md) - Security guidelines, CSP
 - [Known Issues](docs/known-issues.md) - Current and resolved issues
