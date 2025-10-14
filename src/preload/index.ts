@@ -315,6 +315,70 @@ const api = {
       ipcRenderer.on('claudeCode:sessionResumeFailed', listener)
       return () => ipcRenderer.removeListener('claudeCode:sessionResumeFailed', listener)
     }
+  },
+
+  // Terminal operations
+  terminal: {
+    // Check availability
+    isAvailable: (): Promise<{ success: boolean; available: boolean }> =>
+      ipcRenderer.invoke('terminal:isAvailable'),
+
+    // Create terminal
+    create: (config?: {
+      shell?: string
+      cwd?: string
+      env?: Record<string, string>
+      cols?: number
+      rows?: number
+    }): Promise<{ success: boolean; terminalId?: string; error?: string }> =>
+      ipcRenderer.invoke('terminal:create', config),
+
+    // Write to terminal
+    write: (terminalId: string, data: string): void => {
+      ipcRenderer.send('terminal:write', { terminalId, data })
+    },
+
+    // Resize terminal
+    resize: (terminalId: string, cols: number, rows: number): void => {
+      ipcRenderer.send('terminal:resize', { terminalId, cols, rows })
+    },
+
+    // Kill terminal
+    kill: (terminalId: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('terminal:kill', terminalId),
+
+    // Get terminal info
+    getInfo: (terminalId: string): Promise<{
+      success: boolean
+      info?: { id: string; cwd: string; title: string }
+      error?: string
+    }> => ipcRenderer.invoke('terminal:getInfo', terminalId),
+
+    // List terminals
+    list: (): Promise<{
+      success: boolean
+      terminals?: Array<{ id: string; title: string }>
+      error?: string
+    }> => ipcRenderer.invoke('terminal:list'),
+
+    // Event listeners
+    onData: (callback: (data: { terminalId: string; data: string }) => void) => {
+      const listener = (_event: any, data: { terminalId: string; data: string }) => callback(data)
+      ipcRenderer.on('terminal:data', listener)
+      return () => ipcRenderer.removeListener('terminal:data', listener)
+    },
+
+    onExit: (callback: (data: { terminalId: string; exitCode: number; signal?: number }) => void) => {
+      const listener = (_event: any, data: { terminalId: string; exitCode: number; signal?: number }) => callback(data)
+      ipcRenderer.on('terminal:exit', listener)
+      return () => ipcRenderer.removeListener('terminal:exit', listener)
+    },
+
+    onError: (callback: (data: { terminalId: string; error: string }) => void) => {
+      const listener = (_event: any, data: { terminalId: string; error: string }) => callback(data)
+      ipcRenderer.on('terminal:error', listener)
+      return () => ipcRenderer.removeListener('terminal:error', listener)
+    }
   }
 }
 

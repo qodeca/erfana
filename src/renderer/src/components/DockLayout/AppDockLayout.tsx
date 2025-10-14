@@ -16,6 +16,7 @@ import { MarkdownEditorPanel } from '../Panels/MarkdownEditorPanel'
 import { WelcomePanel } from '../Panels/WelcomePanel'
 import { WelcomeTab } from '../Panels/WelcomeTab'
 import { CopilotPanel } from '../Panels/CopilotPanel'
+import { TerminalPanel } from '../Panels/TerminalPanel'
 import { ActivityBar } from '../ActivityBar/ActivityBar'
 import { useActivityBarStore } from '../../stores/useActivityBarStore'
 import { getPanelById } from '../ActivityBar/activityBarConfig'
@@ -101,21 +102,6 @@ const GitSplitPanel = (_props: ISplitviewPanelProps) => {
   )
 }
 
-const TerminalSplitPanel = (_props: ISplitviewPanelProps) => {
-  return (
-    <div className="sidebar-panel">
-      <div className="sidebar-panel-header">
-        <span className="sidebar-panel-title">Terminal</span>
-      </div>
-      <div className="sidebar-panel-content">
-        <p>Terminal integration coming soon</p>
-        <p className="hint" style={{ marginTop: '8px', fontSize: '11px', color: '#858585' }}>
-          Note: node-pty requires Python 3.12 or earlier
-        </p>
-      </div>
-    </div>
-  )
-}
 
 // Size constraints matching VS Code
 const MIN_SIZES = {
@@ -365,7 +351,7 @@ export function AppDockLayout() {
     project: ProjectPanel,
     editorArea: EditorAreaSplitPanel,
     gitPanel: GitSplitPanel,
-    terminalPanel: TerminalSplitPanel,
+    terminalPanel: TerminalPanel,
     claudePanel: CopilotPanel
   }
 

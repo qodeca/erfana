@@ -7,8 +7,10 @@ import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
 import { registerClaudeCodeHandlers } from './ipc/claude-code-handlers'
 import { registerSettingsHandlers } from './ipc/settings-handlers'
+import { registerTerminalHandlers } from './ipc/terminal-handlers'
 import { fileWatcherService } from './services/FileWatcherService'
 import { directoryWatcherService } from './services/DirectoryWatcherService'
+import { terminalService } from './services/TerminalService'
 
 function createWindow(): BrowserWindow {
   // Create the browser window.
@@ -71,6 +73,7 @@ app.whenReady().then(() => {
   registerDirectoryWatcherHandlers()
   registerClaudeCodeHandlers()
   registerSettingsHandlers()
+  registerTerminalHandlers()
 
   // Create main window
   createWindow()
@@ -91,11 +94,12 @@ app.on('window-all-closed', () => {
   }
 })
 
-// Cleanup file watchers and directory watchers before app quits
+// Cleanup file watchers, directory watchers, and terminals before app quits
 app.on('before-quit', async () => {
-  console.log('🛑 App quitting, cleaning up watchers...')
+  console.log('🛑 App quitting, cleaning up services...')
   await fileWatcherService.dispose()
   await directoryWatcherService.dispose()
+  await terminalService.dispose()
 })
 
 // In this file you can include the rest of your app's specific main process

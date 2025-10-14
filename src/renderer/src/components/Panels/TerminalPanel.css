@@ -1,0 +1,147 @@
+.terminal-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--background-color, #1e1e1e);
+}
+
+/* Header styling - matches Project and Copilot panels */
+.terminal-panel .sidebar-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 41px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: #252525;
+  flex-shrink: 0;
+}
+
+.terminal-panel .sidebar-panel-title {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #cccccc;
+}
+
+.terminal-panel .panel-header-icon {
+  opacity: 0.8;
+  color: #cccccc;
+}
+
+.terminal-panel .sidebar-panel-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Clear button in header */
+.terminal-clear-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 0;
+  color: #858585;
+  transition: all 0.15s ease;
+}
+
+.terminal-clear-button:hover {
+  color: #cccccc;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.terminal-clear-button:active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Terminal container */
+.terminal-container {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  padding: 8px;
+  background: #1e1e1e;
+  overflow: hidden;
+}
+
+/* Ensure xterm terminal fills the container */
+.terminal-container .xterm {
+  height: 100% !important;
+  padding: 0;
+}
+
+.terminal-container .xterm-viewport {
+  background: #1e1e1e !important;
+  overflow-y: scroll !important;
+}
+
+.terminal-container .xterm-screen {
+  background: #1e1e1e !important;
+}
+
+/* Status messages (checking, error) */
+.terminal-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 32px 24px;
+  text-align: center;
+  gap: 16px;
+}
+
+.terminal-status h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #cccccc;
+}
+
+.terminal-status p {
+  margin: 0;
+  font-size: 13px;
+  color: #858585;
+  line-height: 1.5;
+}
+
+.terminal-error-icon {
+  font-size: 48px;
+  opacity: 0.8;
+}
+
+.error-details {
+  background: rgba(244, 135, 113, 0.1);
+  border: 1px solid rgba(244, 135, 113, 0.3);
+  color: #f48771;
+  padding: 8px 12px;
+  border-radius: 0;
+  font-size: 12px;
+  margin-top: 8px !important;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace;
+}
+
+/* Custom scrollbar for terminal (matches VS Code) */
+.terminal-container .xterm-viewport::-webkit-scrollbar {
+  width: 10px;
+}
+
+.terminal-container .xterm-viewport::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.terminal-container .xterm-viewport::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 0;
+}
+
+.terminal-container .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: #4e4e4e;
+}
