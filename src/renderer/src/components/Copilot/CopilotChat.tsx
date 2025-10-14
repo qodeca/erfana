@@ -440,12 +440,10 @@ export function CopilotChat({
         await window.api.claudeCode.stopSession()
         await window.api.claudeCode.startSession(projectPath, isPlanningMode, true) // skipContinue=true
 
-        // Step 4: Wait for session to be ready
-        await new Promise(resolve => setTimeout(resolve, 1000))
-
-        // Step 5: Send automatic familiarization prompt
+        // Step 4: Send automatic familiarization prompt IMMEDIATELY (no delay)
+        // Claude CLI in -p mode requires immediate stdin input to avoid timeout
         const familiarizePrompt = 'Please familiarize yourself with the current working directory.'
-        console.log('📝 Sending familiarization prompt')
+        console.log('📝 Sending familiarization prompt immediately')
 
         window.api.claudeCode.sendMessage(familiarizePrompt, { projectPath }, 'auto-familiarize')
 
