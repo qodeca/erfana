@@ -302,10 +302,12 @@ export class ClaudeCliService extends EventEmitter {
    *
    * @param projectPath - Path to the project directory
    * @param planningMode - If true, restricts tools to read-only (Read, LS, Grep, Task, WebSearch, TodoWrite)
+   * @param skipContinue - If true, starts fresh conversation without --continue flag
    */
   async startSession(
     projectPath: string,
-    planningMode: boolean = false
+    planningMode: boolean = false,
+    skipContinue: boolean = false
   ): Promise<void> {
     console.log('🔵 SESSION START: Begin startSession()')
     console.log('🔵 Project path:', projectPath)
@@ -355,11 +357,11 @@ export class ClaudeCliService extends EventEmitter {
     console.log(`🔧 Approved tools (${this.approvedTools.size} total): ${Array.from(this.approvedTools).join(', ')}`)
 
     try {
-      // Build args with --continue flag for automatic conversation preservation
+      // Build args - conditionally add --continue based on skipContinue parameter
       // NOTE: --session-id CANNOT be used with --continue (Claude CLI restriction)
       const args = [
         '-p', // Print mode (non-interactive, but can accept stdin)
-        '--continue', // Automatically continue latest conversation in this directory
+        ...(skipContinue ? [] : ['--continue']), // Conditionally add --continue
         '--input-format',
         'stream-json',
         '--output-format',
@@ -369,8 +371,12 @@ export class ClaudeCliService extends EventEmitter {
         '--include-partial-messages' // Enable real-time token streaming
       ]
 
-      console.log('✅ Using --continue flag for conversation preservation')
-      console.log('📝 Will automatically continue latest conversation in directory')
+      if (skipContinue) {
+        console.log('🆕 Starting fresh conversation (--continue skipped)')
+      } else {
+        console.log('✅ Using --continue flag for conversation preservation')
+        console.log('📝 Will automatically continue latest conversation in directory')
+      }
 
       // Add planning mode flag if enabled
       if (planningMode) {

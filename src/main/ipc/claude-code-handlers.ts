@@ -14,11 +14,12 @@ export function registerClaudeCodeHandlers() {
   /**
    * Start persistent Claude CLI session
    * Uses --continue flag to automatically preserve conversation per directory
+   * @param skipContinue - If true, starts fresh conversation without --continue
    */
-  ipcMain.handle('claudeCode:startSession', async (_event, projectPath: string, planningMode?: boolean) => {
+  ipcMain.handle('claudeCode:startSession', async (_event, projectPath: string, planningMode?: boolean, skipContinue?: boolean) => {
     try {
-      console.log(`🚀 Starting Claude session for project: ${projectPath}${planningMode ? ' (planning mode)' : ''}`)
-      await claudeCliService.startSession(projectPath, planningMode || false)
+      console.log(`🚀 Starting Claude session for project: ${projectPath}${planningMode ? ' (planning mode)' : ''}${skipContinue ? ' (fresh start)' : ''}`)
+      await claudeCliService.startSession(projectPath, planningMode || false, skipContinue || false)
       return { success: true }
     } catch (error: any) {
       console.error('❌ Failed to start session:', error)
