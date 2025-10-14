@@ -1,6 +1,7 @@
 interface Settings {
   lastProjectPath?: string
   approvedTools?: string[]
+  projectFilterMode?: string
 }
 
 export class SettingsService {
@@ -71,6 +72,18 @@ export class SettingsService {
   async resetApprovedTools(): Promise<void> {
     const store = await this.ensureStore()
     store.set('approvedTools', ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch'])
+  }
+
+  // Project Filter Mode Management
+  async getProjectFilterMode(): Promise<string> {
+    const store = await this.ensureStore()
+    // Default to 'all' mode
+    return store.get('projectFilterMode') || 'all'
+  }
+
+  async setProjectFilterMode(mode: string): Promise<void> {
+    const store = await this.ensureStore()
+    store.set('projectFilterMode', mode)
   }
 }
 

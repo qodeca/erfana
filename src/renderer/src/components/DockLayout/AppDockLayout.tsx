@@ -11,7 +11,7 @@ import {
 } from 'dockview'
 import 'dockview/dist/styles/dockview.css'
 import './AppDockLayout.css'
-import { ProjectTree } from '../ProjectTree/ProjectTree'
+import { ProjectPanel } from '../Panels/ProjectPanel'
 import { MarkdownEditorPanel } from '../Panels/MarkdownEditorPanel'
 import { WelcomePanel } from '../Panels/WelcomePanel'
 import { WelcomeTab } from '../Panels/WelcomeTab'
@@ -20,49 +20,10 @@ import { ActivityBar } from '../ActivityBar/ActivityBar'
 import { useActivityBarStore } from '../../stores/useActivityBarStore'
 import { getPanelById } from '../ActivityBar/activityBarConfig'
 
-// Utility function to sanitize file path for panel ID
-const sanitizeFilePath = (filePath: string): string => {
-  // Convert /Users/name/docs/notes.md → users-name-docs-notes-md
-  return filePath
-    .replace(/^\//, '')
-    .replace(/[^a-zA-Z0-9]/g, '-')
-    .toLowerCase()
-}
-
 // ============================================================================
 // LEFT SIDEBAR PANEL - Project Panel
 // ============================================================================
-const ProjectPanelWrapper = (props: ISplitviewPanelProps) => {
-  const handleFileSelect = (filePath: string) => {
-    // Get DockviewApi from params (passed by parent)
-    const dockviewApi = props.params?.dockviewApi as DockviewApi | undefined
-
-    if (!dockviewApi) {
-      console.warn('DockView API not ready')
-      return
-    }
-
-    const fileName = filePath.split('/').pop() || 'Editor'
-    const panelId = `editor-${sanitizeFilePath(filePath)}`
-
-    let editorPanel = dockviewApi.getPanel(panelId)
-
-    if (!editorPanel) {
-      editorPanel = dockviewApi.addPanel({
-        id: panelId,
-        component: 'editor',
-        title: fileName,
-        params: { filePath }
-      })
-    }
-
-    editorPanel.api.setActive()
-    // Focus the group to ensure the active tab indicator shows immediately
-    editorPanel.group.focus()
-  }
-
-  return <ProjectTree onFileSelect={handleFileSelect} />
-}
+// ProjectPanel now handles its own file selection logic internally
 
 // ============================================================================
 // CENTER PANEL - DockviewReact for editor tabs
@@ -393,7 +354,7 @@ export function AppDockLayout() {
 
   // Splitview components registry
   const splitviewComponents = {
-    project: ProjectPanelWrapper,
+    project: ProjectPanel,
     editorArea: EditorAreaSplitPanel,
     gitPanel: GitSplitPanel,
     terminalPanel: TerminalSplitPanel,

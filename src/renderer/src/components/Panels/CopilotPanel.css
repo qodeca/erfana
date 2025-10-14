@@ -414,3 +414,17 @@
   font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace;
   font-size: 11px;
 }
+
+/* Control Panel Chevron in Header */
+.control-panel-chevron {
+  margin-left: 8px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  color: #858585;
+  transition: color 0.15s ease;
+}
+
+.control-panel-chevron:hover {
+  color: #cccccc;
+}

@@ -143,6 +143,8 @@ declare global {
           toolName: string
         ) => Promise<{ success: boolean; error?: string }>
         resetApprovedTools: () => Promise<{ success: boolean; error?: string }>
+        getProjectFilterMode: () => Promise<{ success: boolean; mode?: string; error?: string }>
+        setProjectFilterMode: (mode: string) => Promise<{ success: boolean; error?: string }>
       }
     }
   }

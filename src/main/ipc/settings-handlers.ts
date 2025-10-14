@@ -67,5 +67,27 @@ export function registerSettingsHandlers(): void {
     }
   })
 
+  // Get project filter mode
+  ipcMain.handle('settings:getProjectFilterMode', async () => {
+    try {
+      const mode = await settingsService.getProjectFilterMode()
+      return { success: true, mode }
+    } catch (error: any) {
+      console.error('❌ Error getting project filter mode:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
+  // Set project filter mode
+  ipcMain.handle('settings:setProjectFilterMode', async (_event, mode: string) => {
+    try {
+      await settingsService.setProjectFilterMode(mode)
+      return { success: true }
+    } catch (error: any) {
+      console.error('❌ Error setting project filter mode:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
   console.log('✅ Settings IPC handlers registered')
 }

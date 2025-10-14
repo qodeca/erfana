@@ -41,29 +41,45 @@
 
 For fixed sidebars (Project, Git, Terminal) that don't need tabbing:
 
-1. Create splitview panel component:
+**Wrapper Pattern** (recommended for panels with headers/controls):
+
+1. Create wrapper component with header + controls:
    ```typescript
-   const MySidebarPanel = (props: ISplitviewPanelProps) => {
-     return <div className="panel-content">My Sidebar Content</div>
+   const MyPanel = (props: ISplitviewPanelProps) => {
+     const [showControl, setShowControl] = useState(true)
+
+     return (
+       <div className="my-panel">
+         <div className="panel-header">
+           <MyIcon />
+           <span>Panel Label</span>
+           <ChevronDown onClick={() => setShowControl(!showControl)} />
+         </div>
+         {showControl && <div className="control-panel">{/* Controls */}</div>}
+         <MyContentComponent {...props} />
+       </div>
+     )
    }
    ```
 
 2. Register in `splitviewComponents` in `AppDockLayout.tsx`:
    ```typescript
    const splitviewComponents = {
-     mySidebar: MySidebarPanel
+     myPanel: MyPanel
    }
    ```
 
 3. Add to splitview layout in `onSplitviewReady`:
    ```typescript
    event.api.addPanel({
-     id: 'my-sidebar',
-     component: 'mySidebar',
+     id: 'my-panel',
+     component: 'myPanel',
      minimumSize: 170,
      maximumSize: 600
    })
    ```
+
+**Example**: See `ProjectPanel.tsx` (wrapper) + `ProjectTree.tsx` (content)
 
 ### Adding Dockview Panel (Editor Tab)
 

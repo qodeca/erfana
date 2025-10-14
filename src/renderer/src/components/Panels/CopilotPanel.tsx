@@ -9,7 +9,7 @@
 
 import { useState, useEffect } from 'react'
 import { ISplitviewPanelProps } from 'dockview'
-import { Bot, LogIn, Download, RefreshCw } from 'lucide-react'
+import { Bot, LogIn, Download, RefreshCw, ChevronDown, ChevronLeft } from 'lucide-react'
 import { CopilotChat } from '../Copilot/CopilotChat'
 import './CopilotPanel.css'
 
@@ -29,6 +29,9 @@ export function CopilotPanel(_props: ISplitviewPanelProps) {
   const [restartAttempt, setRestartAttempt] = useState<{ current: number; max: number } | null>(
     null
   )
+
+  // Control Panel state
+  const [showControlPanel, setShowControlPanel] = useState(false)
 
   // Check Claude CLI status on mount
   useEffect(() => {
@@ -191,6 +194,19 @@ export function CopilotPanel(_props: ISplitviewPanelProps) {
         {sessionState === 'error' && <span className="session-indicator error">●</span>}
         <Bot size={16} className="panel-header-icon" />
         <span className="sidebar-panel-title">Copilot</span>
+        {sessionState === 'ready' && (
+          <span
+            className="control-panel-chevron"
+            onClick={() => setShowControlPanel(!showControlPanel)}
+            title={showControlPanel ? 'Hide Control Panel' : 'Show Control Panel'}
+          >
+            {showControlPanel ? (
+              <ChevronDown size={16} strokeWidth={2} />
+            ) : (
+              <ChevronLeft size={16} strokeWidth={2} />
+            )}
+          </span>
+        )}
       </div>
       <div className="sidebar-panel-content">
         {isChecking ? (
@@ -328,7 +344,10 @@ export function CopilotPanel(_props: ISplitviewPanelProps) {
           </div>
         ) : (
           // Session ready - Show chat interface
-          <CopilotChat />
+          <CopilotChat
+            showControlPanel={showControlPanel}
+            onToggleControlPanel={() => setShowControlPanel(!showControlPanel)}
+          />
         )}
       </div>
     </div>

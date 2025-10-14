@@ -92,6 +92,8 @@ const content = await window.api.file.readFile('/path/to/file.md')
 | `settings:addApprovedTool` | settings-handlers | Add single tool to approved list |
 | `settings:removeApprovedTool` | settings-handlers | Remove single tool from approved list |
 | `settings:resetApprovedTools` | settings-handlers | Reset to safe defaults |
+| `settings:getProjectFilterMode` | settings-handlers | Get project filter mode (all/markdown) |
+| `settings:setProjectFilterMode` | settings-handlers | Set project filter mode (all/markdown) |
 
 ## Event-Based IPC Pattern
 

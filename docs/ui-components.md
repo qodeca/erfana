@@ -72,50 +72,100 @@ Manages:
 
 For complete documentation including session lifecycle, UI states, tool approval system, and planning mode, see [Claude Code UI Features](./claude-code/ui-features.md).
 
-## Context Menu (Project Tree)
+## Control Panels
 
-**Location**: `src/renderer/src/components/ProjectTree/ProjectTree.tsx`, `src/renderer/src/components/ContextMenu/ContextMenu.tsx`
+Collapsible panels within main panels using chevron toggle pattern (matches VS Code behavior).
 
-Right-click context menu for files and folders in the project tree.
+### Pattern
 
-### Menu Items
+**Header with chevron toggle**:
+- Panel label + ChevronDown/ChevronLeft icon (8px spacing)
+- Click chevron to show/hide control panel
+- Smooth 150ms rotation transition
 
-**For Files**:
-- Rename
-- --- (separator)
-- Delete
+**Implementation**:
+```typescript
+const [showControlPanel, setShowControlPanel] = useState(true)
 
-**For Folders**:
-- New File
-- New Folder
-- Rename
-- --- (separator)
-- Delete
+<div className="panel-header">
+  <PanelIcon />
+  <span>Panel Label</span>
+  <ChevronDown
+    className={`chevron-toggle ${showControlPanel ? '' : 'collapsed'}`}
+    onClick={() => setShowControlPanel(!showControlPanel)}
+  />
+</div>
 
-### Features
+{showControlPanel && (
+  <div className="control-panel">
+    {/* Controls */}
+  </div>
+)}
+```
 
-- Icons from Lucide React (`FilePlus`, `FolderPlus`, `Edit`, `Trash`)
-- Separator isolates destructive actions (Delete)
-- Danger styling for Delete action (red text on hover)
-- Rename dialog with validation and error handling
-- Delete confirmation dialogs
+**CSS**:
+```css
+.chevron-toggle {
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
 
-### Rename Functionality
+.chevron-toggle.collapsed {
+  transform: rotate(-90deg);
+}
+```
 
-- Pre-fills current name
-- Validates for empty names and duplicates
-- Sanitizes input (removes path separators)
-- Prevents renaming project root
-- Shows inline error messages
-- Supports Enter to confirm, Escape to cancel
+### Examples
 
-**IPC Channel**: `file:rename`
+**CopilotPanel**: Session stats, tool approval status, planning mode toggle
+**ProjectPanel**: File filtering (All Files | Markdown Only)
 
-### Files
+See: [Claude Code UI Features](./claude-code/ui-features.md) | [Project Panel](./project-panel.md#control-panel)
 
-- `ProjectTree.tsx` - Context menu logic and handlers
-- `ContextMenu.tsx` - Reusable context menu component
-- `ContextMenu.css` - VS Code-style dark theme
+## Project Panel
+
+**Location**: Left sidebar, accessible via activity bar
+
+Project panel displays hierarchical file tree with filtering, visual indicators, and context menu operations.
+
+**Features**:
+- Control panel with file filtering (All Files | Markdown Only)
+- Recursive markdown filtering (shows only .md files + containing folders)
+- Sensitive file detection (credentials, keys, environment files)
+- Hidden file styling (dotfiles with reduced opacity)
+- Context menu (New File, New Folder, Rename, Delete)
+- Directory watching with auto-refresh
+
+**Architecture**: Wrapper component (header + controls) + ProjectTree component (tree logic)
+
+📚 **Complete documentation**: [Project Panel](./project-panel.md)
+
+### File Visual Indicators
+
+**Sensitive Files** (amber color + warning icon):
+- Environment: `.env*`, `.npmrc`, `*.pem`, `*.key`
+- Cloud: `.aws/`, `.azure/`, `.gcloud/`
+- SSH: `.ssh/`, `id_rsa*`, `known_hosts`
+- Secrets: `credentials*`, `secrets*`, `*.keystore`
+- Config: `config.json`, `settings.json`
+
+**Hidden Files** (70% opacity + italic):
+- Files/folders starting with `.` (dot)
+- Examples: `.git/`, `.gitignore`, `.DS_Store`
+
+**Styling Priority**: Sensitive files override opacity reduction (always 100% visible)
+
+See: [Project Panel](./project-panel.md#visual-indicators) for complete details
+
+## Context Menu
+
+**Location**: `src/renderer/src/components/ContextMenu/ContextMenu.tsx`
+
+Reusable context menu component used by Project Panel for file/folder operations.
+
+**Features**: Rename, Delete, New File, New Folder with validation and confirmation dialogs
+
+📚 **Complete documentation**: [Project Panel](./project-panel.md#context-menu-operations)
 
 ## Global Keyboard Shortcuts
 
@@ -323,91 +373,16 @@ event.api.onDidActivePanelChange((panel) => {
 
 **Location**: `src/renderer/src/components/Panels/WelcomePanel.tsx`, `WelcomeTab.tsx`
 
-Home icon tab and welcome screen in center editor.
+Home icon tab (41px square) and welcome screen in center editor.
 
-### Welcome Tab (Tab Handle)
+**Tab Features**:
+- Non-draggable, locked
+- Home icon (16px)
+- CSS override removes Dockview padding
 
-**Specifications**:
-- Dimensions: 41px × 41px (perfect square)
-- Icon: `Home` from Lucide React (16px, strokeWidth 2)
-- Non-draggable: `draggable={false}` + drag event handlers
-- Locked: `welcomePanel.group.locked = true`
-
-**CSS Override** (removes Dockview padding):
-```css
-.dockview-theme-dark .dv-default-tab:has(.welcome-tab) {
-  padding: 0 !important;
-  width: 41px !important;
-  min-width: 41px !important;
-  max-width: 41px !important;
-}
-
-.dockview-theme-dark .dv-tab:has(.welcome-tab) {
-  padding: 0 !important;
-}
-```
-
-**Tab content styling**:
-```css
-.welcome-tab {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 41px;
-  height: 41px;
-  color: #cccccc;
-  cursor: pointer;
-}
-```
-
-**Prevent dragging**:
-```typescript
-const handleDragStart = (e: React.DragEvent) => {
-  e.preventDefault()
-  e.stopPropagation()
-}
-
-<div
-  className="welcome-tab"
-  draggable={false}
-  onDragStart={handleDragStart}
-  onDrag={handleDragStart}
->
-  <Home size={16} strokeWidth={2} />
-</div>
-```
-
-### Welcome Panel (Content Area)
-
-**Layout structure** (fills entire center area):
-```tsx
-<div className="panel-content" tabIndex={0}>
-  <div className="welcome-panel">
-    <div className="welcome-content">
-      {/* Icon, title, description */}
-    </div>
-  </div>
-</div>
-```
-
-**CSS for full-width**:
-```css
-.panel-content {
-  display: flex;
-  flex-direction: column;
-}
-
-.welcome-panel {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  width: 100%;
-  height: 100%;
-}
-```
-
-**Key pattern**: Nested flex containers where inner div has `flex: 1` to expand.
+**Panel Layout**:
+- Nested flex containers with `flex: 1` to fill center area
+- Centered content with icon, title, description
 
 ## Development Patterns
 
