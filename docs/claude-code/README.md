@@ -21,23 +21,32 @@ Complete documentation for Erfana's Claude Code integration with persistent sess
 
 ### Core Documentation
 
-**[Tool Approval System](./tool-approval.md)**
-- Security model and approval flow
-- Pre-approved tools vs tools requiring approval
-- Planning mode tool restrictions
+**[Tool Approval System - Core Guide](./tool-approval-core.md)**
+- Overview and philosophy (all 17 tools enabled by default)
+- Tool authorization and categories
+- Settings modal (ToolSettingsDialog) usage
+- Approval flow and technical implementation
+- Conversation preservation with --continue
 - Auto-retry feature
 - Persistent storage
-- Development patterns
-- Testing and debugging
+- Critical architecture decisions
+
+**[Tool Approval System - Advanced Guide](./tool-approval-advanced.md)**
+- IPC channels and handlers
+- Development patterns (adding new tools)
+- Testing procedures (settings modal, approval flow, planning mode)
+- Debugging common issues
+- Advanced troubleshooting
+- Performance optimization
 
 **[Conversation Preservation](./conversation-preservation.md)**
-- Session ID lifecycle management
+- Directory-based session management
 - When conversation is preserved vs reset
-- Resume failure handling and automatic fallback
+- Clear button functionality
 - Session statistics tracking
 - Technical implementation details
 - Troubleshooting guide
-- Performance considerations
+- Migration from --resume to --continue
 
 **[UI Features](./ui-features.md)**
 - Copilot Panel
@@ -108,28 +117,28 @@ cat ~/.config/erfana/config.json
 **Why Persistent?**
 - Context preservation (conversation history)
 - Performance (no spawn overhead per message)
-- Session resumption via --resume flag
+- Session resumption via --continue flag
 
 **Lifecycle**:
 1. Project opens → session starts
 2. User authenticated → session ready
 3. Messages exchanged via JSONL stdin/stdout
-4. Tool approval → session restarts with --resume + updated --allowedTools
+4. Tool approval → session restarts with --continue + updated --allowedTools
 5. Project closes → session stops
 
 ### Critical Design Decision
 
 **--allowedTools is immutable**: Claude CLI reads tool permissions at spawn and cannot change mid-session.
 
-**Consequence**: Must restart session to add tools, use --resume to preserve context.
+**Consequence**: Must restart session to add tools, use --continue to preserve context.
 
 **Code Pattern**:
 ```typescript
 // Initial start
-spawn('claude', ['--session-id', uuid, '--allowedTools', ...approved])
+spawn('claude', ['-p', projectPath, '--allowedTools', ...approved])
 
 // After approval: Must restart
-spawn('claude', ['--resume', uuid, '--allowedTools', ...updatedApproved])
+spawn('claude', ['-p', projectPath, '--continue', '--allowedTools', ...updatedApproved])
 ```
 
 ## Key Components
@@ -139,7 +148,7 @@ spawn('claude', ['--resume', uuid, '--allowedTools', ...updatedApproved])
 **ClaudeCliService.ts** (`src/main/services/ClaudeCliService.ts`)
 - Manages persistent CLI sessions
 - Detects unapproved tools in message stream
-- Handles session restart with --resume
+- Handles session restart with --continue
 - EventEmitter for lifecycle events
 
 **SettingsService.ts** (`src/main/services/SettingsService.ts`)
@@ -230,8 +239,9 @@ cat ~/.claude/logs/claude-cli-<date>.log
 
 ## Related Documentation
 
-- **[Tool Approval System](./tool-approval.md)** - Complete guide to tool approval
-- **[Conversation Preservation](./conversation-preservation.md)** - Session preservation and resume handling
+- **[Tool Approval Core](./tool-approval-core.md)** - Core guide to tool approval system
+- **[Tool Approval Advanced](./tool-approval-advanced.md)** - Advanced topics, IPC, testing, troubleshooting
+- **[Conversation Preservation](./conversation-preservation.md)** - Directory-based session preservation with --continue
 - **[UI Features](./ui-features.md)** - Copilot panel, Control Panel, Planning Mode, Tool Approval Dialog
 - **[Architecture](../architecture.md)** - Three-process model, services
 - **[IPC Patterns](../ipc-patterns.md)** - All IPC channels
