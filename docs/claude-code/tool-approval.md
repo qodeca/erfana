@@ -4,70 +4,84 @@ Complete guide to Erfana's tool approval system for Claude Code integration.
 
 ## Overview
 
-**Problem**: Claude Code has access to dangerous tools (Write, Edit, Bash) that can modify files or execute commands without user knowledge.
+**Philosophy**: Opinionated IDE for consultants with full trust in Claude AI capabilities. All 17 Claude Code tools enabled by default for seamless, friction-free workflow.
 
-**Solution**: User approval required before first execution of non-safe tools via modal dialog.
+**Configuration**: Settings modal (Cmd/Ctrl+,) provides per-tool authorization control for users who need custom restrictions.
 
 **Key Features**:
-- Modal approval dialog with tool details
-- Safe defaults (Read, Glob, Grep always approved)
-- "Remember this choice" for persistent permissions
-- Auto-retry after approval (seamless UX)
-- Session restart with --resume to update permissions
+- All 17 tools pre-authorized by default
+- Settings modal for flexible per-tool configuration
+- Global toggle: "Enable all tools by default"
+- Planning mode: Restricts to 9 safe tools for exploration
 - Persistent storage via electron-store
+- Session restart with --resume when changing tools
+- ToolApprovalDialog shown only if user manually restricts a tool
 
-## Security Model
+## Tool Authorization
 
-### Pre-Approved Tools (No Approval Needed)
+### Pre-Authorized Tools (All 17 by Default)
 
-These tools are pre-approved by default for seamless workflow (10 total):
+All Claude Code tools are enabled by default for seamless consultant workflow:
 
-- **Read** - Read file contents (safe, read-only)
-- **Write** - Create or overwrite files (common operation)
-- **Edit** - Modify existing files with search/replace (common operation)
-- **Glob** - Find files by pattern (safe, read-only)
-- **Grep** - Search file contents with regex (safe, read-only)
-- **Bash** - Execute shell commands (essential for development)
-- **LS** - List directory contents (safe, read-only)
-- **WebSearch** - Search the web (read-only, network access)
-- **TodoWrite** - Task management and tracking (safe, planning aid)
-- **Task** - Launch agent tasks for complex operations (common, autonomous work)
+**File Operations (7 tools)**:
+- **Read** - Read file contents
+- **Write** - Create or overwrite files
+- **Edit** - Modify existing files
+- **MultiEdit** - Batch file modifications
+- **Glob** - Search files by pattern
+- **Grep** - Search file contents
+- **LS** - List directory contents
 
-**Rationale**: These 10 tools cover 95%+ of common Claude Code operations. Pre-approving them provides seamless UX while maintaining security through persistent session architecture and user visibility of all tool executions.
+**System Operations (1 tool)**:
+- **Bash** - Execute shell commands
+
+**AI & Web (3 tools)**:
+- **WebSearch** - Search the web
+- **WebFetch** - Fetch web content
+- **Task** - Delegate to specialized agent
+
+**Workflow & Tasks (4 tools)**:
+- **TodoRead** - Read to-do list
+- **TodoWrite** - Manage task list
+- **SlashCommand** - Execute custom commands
+- **ExitPlanMode** - Exit planning phase
+
+**Jupyter Notebooks (2 tools)**:
+- **NotebookRead** - Read .ipynb files
+- **NotebookEdit** - Edit notebook cells
+
+**Rationale**: Erfana is designed for consultants who trust Claude AI as a coding partner. Pre-authorizing all tools eliminates approval friction while maintaining visibility through chat history and git version control.
 
 ### Tools Requiring Approval
 
-These tools require explicit user approval on first use (7 total):
+**None by default**. All 17 tools are pre-authorized.
 
-- **MultiEdit** - Batch edit multiple files (complex, wide-reaching modifications)
-- **WebFetch** - Fetch web content (network access, potential security risk)
-- **SlashCommand** - Execute custom slash commands (user-defined, unpredictable)
-- **TodoRead** - Read Claude's todo list (access to AI planning data)
-- **NotebookRead** - Read Jupyter notebooks (file access)
-- **NotebookEdit** - Edit Jupyter notebooks (file modifications)
-- **ExitPlanMode** - Exit planning mode (permission escalation)
-
-**Rationale**: These operations are less common, more complex, or have higher security implications requiring explicit user consent. Total tools: 10 pre-approved + 7 requiring approval = 17 Claude Code tools.
+Users can manually restrict specific tools via Settings modal (Cmd/Ctrl+,) if security policies require it. ToolApprovalDialog will appear if Claude attempts to use a manually-restricted tool.
 
 ### Planning Mode
 
-**Native Claude CLI feature** that restricts Claude to read-only tools for safe exploration and planning:
+**Native Claude CLI feature** that restricts Claude to read-only and safe tools for exploration without modifications:
 
 **Activation**: Toggle button in chat interface, uses `--permission-mode plan` flag
 
-**Tool Restrictions in Planning Mode** (6 tools):
-- Read, LS, Grep, Task, WebSearch, TodoWrite
+**Tool Restrictions in Planning Mode** (9 safe tools):
+- **File Operations**: Read, LS, Glob, Grep
+- **AI Operations**: Task, WebSearch
+- **Task Management**: TodoRead, TodoWrite
+- **Notebooks**: NotebookRead
 
 **Blocked in Planning Mode**:
-- All write operations: Write, Edit, MultiEdit, NotebookEdit
-- Command execution: Bash
-- Other tools requiring approval: WebFetch, SlashCommand, TodoRead, NotebookRead, ExitPlanMode
+- **Write operations**: Write, Edit, MultiEdit, NotebookEdit
+- **Command execution**: Bash
+- **Network fetch**: WebFetch
+- **Custom commands**: SlashCommand
+- **Mode control**: ExitPlanMode
 
 **Use Cases**: Code exploration, architecture planning, research, cost estimation, learning existing codebases
 
-**Implementation**: ClaudeCliService.ts:85-95 defines tool set, session restart with `--permission-mode plan`, Control Panel shows restricted tools, system message confirms mode change
+**Implementation**: ClaudeCliService.ts:270-277 defines tool set, session restart with `--permission-mode plan`, Control Panel shows restricted tools, system message confirms mode change
 
-**Visual Indicators**: Toggle button (blue when active), system message, Control Panel displays only 6 tools
+**Visual Indicators**: Toggle button (blue when active), system message, Control Panel displays only 9 safe tools
 
 See: [UI Features - Planning Mode Toggle](./ui-features.md#planning-mode-toggle) for complete UI documentation
 
@@ -192,11 +206,13 @@ User → Dialog → Approve → Session Restarts → **Auto re-sends** → Execu
 
 ```typescript
 async getApprovedTools(): Promise<string[]>
-// Returns approved tools list, defaults to pre-approved tools:
-// ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'LS', 'WebSearch', 'TodoWrite', 'Task']
+// Returns approved tools list, defaults to all 17 tools:
+// ['Read', 'Write', 'Edit', 'MultiEdit', 'Glob', 'Grep', 'Bash', 'LS',
+//  'WebSearch', 'WebFetch', 'SlashCommand', 'TodoRead', 'TodoWrite', 'Task',
+//  'NotebookRead', 'NotebookEdit', 'ExitPlanMode']
 
 async setApprovedTools(tools: string[]): Promise<void>
-// Replaces entire approved tools list
+// Replaces entire approved tools list (used by Settings modal)
 
 async addApprovedTool(toolName: string): Promise<void>
 // Adds single tool to list (idempotent)
@@ -205,22 +221,27 @@ async removeApprovedTool(toolName: string): Promise<void>
 // Removes single tool from list
 
 async resetApprovedTools(): Promise<void>
-// Resets to pre-approved defaults
+// Resets to all 17 tools
 ```
 
 ### Storage Location
 
 **Path**: `~/.config/erfana/config.json` (electron-store default on macOS)
 
-**Data Structure**:
+**Data Structure** (default):
 ```json
 {
-  "approvedTools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "LS", "WebSearch", "TodoWrite", "Task"],
+  "approvedTools": [
+    "Read", "Write", "Edit", "MultiEdit", "Glob", "Grep", "Bash", "LS",
+    "WebSearch", "WebFetch", "SlashCommand",
+    "TodoRead", "TodoWrite", "Task",
+    "NotebookRead", "NotebookEdit", "ExitPlanMode"
+  ],
   "lastProjectPath": "/Users/user/Projects/my-project"
 }
 ```
 
-**Note**: The 10 pre-approved tools (Read, Write, Edit, Glob, Grep, Bash, LS, WebSearch, TodoWrite, Task) are always included via merge logic in `ClaudeCliService.ts:148-153`, even if not in config file. User-approved tools (e.g., MultiEdit, WebFetch) are added to this list when approved with "Remember this choice".
+**Note**: All 17 tools are included by default via merge logic in `ClaudeCliService.ts:281-287`. Users can customize via Settings modal (Cmd/Ctrl+,).
 
 ### Persistence Behavior
 
@@ -280,50 +301,65 @@ private getToolDescription(toolName: string): string {
 }
 ```
 
-**2. Decide if Pre-Approved by Default** (`SettingsService.ts:47`, `ClaudeCliService.ts:85`):
+**2. Add to ToolSettingsDialog Categories** (`ToolSettingsDialog.tsx:20-60`):
 
-Add to pre-approved list if:
-- Common operation (>80% of Claude Code sessions need it)
-- Transparent to user (all executions logged in chat)
-- Recoverable via git (file modifications can be reverted)
-
-Current pre-approved tools reflect balance between UX and security.
-
-### Testing Approval Flow
-
-**1. Reset to Safe Defaults**:
-```bash
-rm ~/.config/erfana/config.json
+Add tool to appropriate category:
+```typescript
+const TOOL_CATEGORIES: ToolCategory[] = [
+  {
+    name: 'File Operations',
+    tools: [
+      { id: 'MyNewTool', name: 'MyNewTool', description: 'Clear description' }
+    ]
+  }
+]
 ```
 
-**2. Send Message Requiring Unapproved Tool**:
-- "Edit the file README.md" → Requires Edit
-- "Run npm install" → Requires Bash
-- "Create a new file test.js" → Requires Write
+All tools are enabled by default. Users configure via Settings modal (Cmd/Ctrl+,).
 
-**3. Verify Dialog Appears**:
-- Tool name correct
-- Description helpful
-- Parameters visible (collapsible)
+### Testing Settings Modal
 
-**4. Approve with "Remember this choice"**:
-- Click Approve
+**1. Open Settings Modal**:
+- Click gear icon in Copilot header
+- OR press Cmd/Ctrl+, when Copilot is active
+
+**2. Verify Default State**:
+- "Enable all tools by default" checked ✓
+- All 17 individual checkboxes checked and disabled (grayed out)
+- Counter shows "17 of 17 selected"
+
+**3. Test Selective Mode**:
+- Uncheck "Enable all tools by default"
+- Individual checkboxes become active
+- Uncheck specific tool (e.g., WebFetch)
+- Counter updates (e.g., "16 of 17 selected")
+- Verify unsaved changes indicator appears
+
+**4. Test Save & Restart**:
+- Click "Save" button
 - Verify session restarts (console: "🔄 Restarting session")
-- Verify auto-retry (console: "🔄 Retrying with approved tools")
-- Verify tool executes successfully
+- Verify modal closes
+- Control Panel shows updated tool list
 
 **5. Verify Persistence**:
 ```bash
 cat ~/.config/erfana/config.json
-# Should show: {"approvedTools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash", "LS", "WebSearch", "TodoWrite", "Task", "<YourApprovedTool>"], ...}
-# Note: The 10 pre-approved tools always appear, plus any additional user-approved tools
+# Should show: {"approvedTools": ["Read", "Write", ...", "NotebookEdit", "ExitPlanMode"], ...}
+# Missing tools: Tools unchecked in settings
 ```
 
-**6. Verify Survives Restart**:
-- Close Erfana
-- Reopen Erfana
-- Send same message
-- Should NOT show approval dialog
+**6. Test Approval Dialog (when tool restricted)**:
+- Send message requiring restricted tool
+- ToolApprovalDialog appears
+- Approve with "Remember this choice"
+- Tool gets added back to approved list
+
+**7. Test Reset to Defaults**:
+- Click "Reset to Defaults"
+- Inline confirmation appears
+- Click "Yes"
+- All 17 tools re-checked
+- "Enable all tools" re-checked
 
 ### Debugging Common Issues
 
@@ -398,6 +434,79 @@ cat ~/.config/erfana/config.json
 - Handler: `settings-handlers.ts:42`
 
 ## Components
+
+### ToolSettingsDialog.tsx
+
+**Location**: `src/renderer/src/components/Dialogs/ToolSettingsDialog.tsx`
+
+Modal dialog for configuring Claude Code tool authorization. Accessed via gear icon in Copilot panel header or Cmd/Ctrl+, keyboard shortcut.
+
+**Features**:
+- Blocking modal overlay (prevents background interaction)
+- Global toggle: "Enable all tools by default" (checked by default)
+- Per-tool checkboxes organized into 5 categories
+- Selective mode: Uncheck global toggle to customize individual tools
+- Reset to defaults button with inline confirmation
+- Save & restart session (triggers Claude CLI session restart)
+- Cancel with unsaved changes confirmation
+- ESC key and overlay click to close
+- Loading state while fetching current settings
+- Error display in footer if save fails
+
+**Categories** (17 tools total):
+1. **File Operations** (7): Read, Write, Edit, MultiEdit, Glob, Grep, LS
+2. **System Operations** (1): Bash
+3. **AI & Web** (3): WebSearch, WebFetch, Task
+4. **Workflow & Tasks** (4): TodoRead, TodoWrite, SlashCommand, ExitPlanMode
+5. **Jupyter Notebooks** (2): NotebookRead, NotebookEdit
+
+**Props**:
+```typescript
+interface ToolSettingsDialogProps {
+  onClose: () => void
+  onSave: (approvedTools: string[]) => Promise<void>
+}
+```
+
+**Design**:
+- **Dimensions**: 600px width, max-height 85vh, centered
+- **Colors**: VS Code dark (#2d2d30 background, #007acc accent)
+- **Icons**: Settings (gear), AlertCircle (error) from Lucide React
+- **Animations**: fadeIn 0.2s (overlay), slideUp 0.3s (dialog)
+- **Scrolling**: Internal scroll for tool list, fixed header/footer
+
+**Usage Pattern**:
+```typescript
+const [showSettings, setShowSettings] = useState(false)
+
+const handleSaveSettings = async (approvedTools: string[]) => {
+  await window.api.settings.setApprovedTools(approvedTools)
+  await window.api.claudeCode.stopSession()
+  const projectPath = await window.api.file.getProjectPath()
+  if (projectPath) {
+    await window.api.claudeCode.startSession(projectPath, false)
+  }
+}
+
+// In header
+<span className="settings-button" onClick={() => setShowSettings(true)}>
+  <Settings size={16} />
+</span>
+
+// In render
+{showSettings && (
+  <ToolSettingsDialog
+    onClose={() => setShowSettings(false)}
+    onSave={handleSaveSettings}
+  />
+)}
+```
+
+**Keyboard Shortcut**: Cmd/Ctrl+, opens settings when Copilot panel is active
+
+**Files**:
+- `ToolSettingsDialog.tsx` (~270 lines) - Component logic
+- `ToolSettingsDialog.css` (~300 lines) - Modal styling
 
 ### ToolApprovalDialog.tsx
 

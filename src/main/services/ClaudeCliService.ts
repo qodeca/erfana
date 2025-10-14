@@ -12,6 +12,55 @@ import { homedir } from 'os'
 import { settingsService } from './SettingsService'
 
 /**
+ * All available Claude Code tools (17 total)
+ * Shared with renderer constants - must be kept in sync
+ */
+const ALL_CLAUDE_TOOLS = [
+  // File Operations (7)
+  'Read',
+  'Write',
+  'Edit',
+  'MultiEdit',
+  'Glob',
+  'Grep',
+  'LS',
+
+  // System Operations (1)
+  'Bash',
+
+  // AI & Web (3)
+  'WebSearch',
+  'WebFetch',
+  'Task',
+
+  // Workflow & Tasks (4)
+  'TodoRead',
+  'TodoWrite',
+  'SlashCommand',
+  'ExitPlanMode',
+
+  // Jupyter Notebooks (2)
+  'NotebookRead',
+  'NotebookEdit'
+] as const
+
+/**
+ * Planning mode safe tools (9 total)
+ * Read-only and safe tools allowed in planning mode.
+ */
+const PLANNING_MODE_TOOLS = [
+  'Read',
+  'LS',
+  'Glob',
+  'Grep',
+  'Task',
+  'WebSearch',
+  'TodoRead',
+  'TodoWrite',
+  'NotebookRead'
+] as const
+
+/**
  * Message context for Claude queries
  */
 export interface ClaudeMessageContext {
@@ -166,7 +215,8 @@ export class ClaudeCliService extends EventEmitter {
   private maxRestartAttempts = 3
   private restartTimeout: NodeJS.Timeout | null = null
   private authCheckBypass = false
-  private approvedTools: Set<string> = new Set(['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'LS', 'WebSearch', 'TodoWrite', 'Task']) // Pre-approved tools
+  // Pre-approved tools: all 17 Claude Code tools by default
+  private approvedTools: Set<string> = new Set(ALL_CLAUDE_TOOLS)
   private sessionId: string | null = null
   private isPlanningMode: boolean = false // Planning mode state
 
@@ -260,16 +310,13 @@ export class ClaudeCliService extends EventEmitter {
     let toolsToUse: Set<string>
 
     if (planningMode) {
-      // Planning mode: read-only tools only
-      toolsToUse = new Set(['Read', 'LS', 'Grep', 'Task', 'WebSearch', 'TodoWrite'])
-      console.log('📋 Planning mode enabled: using read-only tools')
+      // Planning mode: read-only and safe tools (9 tools)
+      toolsToUse = new Set(PLANNING_MODE_TOOLS)
+      console.log('📋 Planning mode enabled: using 9 safe tools')
     } else {
-      // Normal mode: load approved tools from settings and merge with defaults
+      // Normal mode: load approved tools from settings (exact user selection)
       const approvedToolsList = await settingsService.getApprovedTools()
-      const defaultTools = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'LS', 'WebSearch', 'TodoWrite', 'Task']
-
-      // Merge: always include defaults, plus any additional tools from settings
-      toolsToUse = new Set([...defaultTools, ...approvedToolsList])
+      toolsToUse = new Set(approvedToolsList)
     }
 
     this.approvedTools = toolsToUse

@@ -346,6 +346,14 @@ export function AppDockLayout() {
         e.preventDefault()
         handleActivityBarClick('claude', 'right')
       }
+
+      // Cmd/Ctrl + , - Open Settings (when Copilot is active)
+      if (modKey && e.key === ',' && !e.shiftKey && !e.altKey) {
+        if (rightActivePanel === 'claude') {
+          e.preventDefault()
+          window.dispatchEvent(new CustomEvent('open-claude-settings'))
+        }
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)

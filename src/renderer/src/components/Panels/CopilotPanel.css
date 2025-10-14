@@ -5,6 +5,39 @@
   background: var(--background-color, #1e1e1e);
 }
 
+/* Header styling - matches Project panel */
+.copilot-panel .sidebar-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 41px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: #252525;
+  flex-shrink: 0;
+}
+
+.copilot-panel .sidebar-panel-title {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #cccccc;
+}
+
+.copilot-panel .panel-header-icon {
+  opacity: 0.8;
+  color: #cccccc;
+}
+
+.copilot-panel .sidebar-panel-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 .copilot-welcome {
   display: flex;
   flex-direction: column;
@@ -132,13 +165,9 @@
   }
 }
 
-.panel-header-icon {
-  opacity: 0.8;
-}
-
 /* Session indicators */
 .session-indicator {
-  margin-right: 8px;
+  margin-left: 8px;
   font-size: 10px;
 }
 
