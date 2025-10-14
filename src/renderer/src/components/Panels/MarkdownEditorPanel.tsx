@@ -7,7 +7,6 @@ import { MarkdownPreview } from '../Editor/MarkdownPreview'
 import { ResizableDivider } from '../Editor/ResizableDivider'
 import { ConfirmDialog } from '../ConfirmDialog/ConfirmDialog'
 import { FileConflictNotification } from '../FileConflictNotification/FileConflictNotification'
-import { useToast } from '../Toast/ToastContext'
 import './MarkdownEditorPanel.css'
 
 interface EditorFile {
@@ -75,7 +74,6 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   const previewRef = useRef<HTMLDivElement>(null)
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
   const isSavingRef = useRef(false) // Track save operations to prevent race conditions
-  const { showToast } = useToast()
 
   // Scroll synchronization state
   const scrollMapRef = useRef<ScrollMapEntry[]>([])
@@ -146,11 +144,6 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     const unsubscribeError = window.api.fileWatch.onFileError((data) => {
       if (data.filePath === currentFile.path) {
         console.error('File watch error:', data.error)
-        showToast({
-          title: 'File Watch Error',
-          message: data.error,
-          type: 'error'
-        })
       }
     })
 
@@ -371,11 +364,6 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
       }
     } catch (error) {
       console.error('Error saving file:', error)
-      showToast({
-        title: 'Save Error',
-        message: 'Failed to save file',
-        type: 'error'
-      })
       setIsAutoSaving(false)
     } finally {
       // Resume file watching after save completes
@@ -430,11 +418,6 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     } catch (error) {
       console.error('Error reloading file:', error)
       setIsReloading(false)
-      showToast({
-        title: 'Reload Error',
-        message: 'Failed to reload file',
-        type: 'error'
-      })
     }
   }
 
@@ -445,11 +428,6 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     console.log('🗑️  File deleted externally:', currentFile?.path)
     setIsFileDeleted(true)
     setExternalChangeDetected(false) // Clear conflict notification if shown
-    showToast({
-      title: 'File Deleted',
-      message: 'File was deleted on disk',
-      type: 'warning'
-    })
   }
 
   /**
@@ -458,11 +436,6 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   const handleKeepLocal = () => {
     console.log('✅ User chose to keep local version')
     setExternalChangeDetected(false)
-    showToast({
-      title: 'Local Version Kept',
-      message: 'Keeping your local version',
-      type: 'info'
-    })
   }
 
   const handleDividerResize = (newPosition: number) => {

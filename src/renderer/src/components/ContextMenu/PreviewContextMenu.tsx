@@ -4,7 +4,6 @@ import { ContextMenu, ContextMenuItem } from './ContextMenu'
 import { useCopilotStore } from '../../stores/useCopilotStore'
 import { useActivityBarStore } from '../../stores/useActivityBarStore'
 import { useTerminalStore } from '../../stores/useTerminalStore'
-import { useToast } from '../Toast/ToastContext'
 import './PreviewContextMenu.css'
 
 interface PreviewContextMenuProps {
@@ -68,7 +67,6 @@ export function PreviewContextMenu({
   const setPendingMessage = useCopilotStore((state) => state.setPendingMessage)
   const setActivePanel = useActivityBarStore((state) => state.setActivePanel)
   const sendToTerminal = useTerminalStore((state) => state.sendToTerminal)
-  const { showToast } = useToast()
 
   const handleAction = async (action: CopilotAction) => {
     let prompt = action.buildPrompt(selectedText, filePath, fullDocument)
@@ -127,23 +125,7 @@ export function PreviewContextMenu({
     await new Promise((resolve) => setTimeout(resolve, 100))
 
     // Send text to terminal
-    const success = await sendToTerminal(selectedText)
-
-    if (success) {
-      showToast({
-        title: 'Terminal',
-        message: 'Command sent to terminal',
-        type: 'success',
-        duration: 2000
-      })
-    } else {
-      showToast({
-        title: 'Terminal',
-        message: 'Terminal not available. Please wait for terminal to initialize.',
-        type: 'error',
-        duration: 3000
-      })
-    }
+    await sendToTerminal(selectedText)
 
     onClose()
   }
