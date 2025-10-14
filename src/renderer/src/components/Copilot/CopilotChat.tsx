@@ -1,16 +1,16 @@
 /**
- * ClaudeCodeChat Component
+ * CopilotChat Component
  *
- * Main chat interface for Claude Code integration.
- * Handles message display, input, streaming, and session management.
+ * Main chat interface for Copilot.
+ * Backend: Communicates with Claude CLI via window.api.claudeCode
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Send, Square, ChevronLeft, ChevronDown, ListChecks } from 'lucide-react'
 import { TerminalMessage } from './TerminalMessage'
 import { ToolApprovalDialog, ToolApprovalRequest } from '../Dialogs/ToolApprovalDialog'
-import { useAiAssistantStore } from '../../stores/useAiAssistantStore'
-import './ClaudeCodeChat.css'
+import { useCopilotStore } from '../../stores/useCopilotStore'
+import './CopilotChat.css'
 
 interface ClaudeMessage {
   id: string
@@ -35,7 +35,7 @@ const ALL_TOOLS = [
   'ExitPlanMode'
 ]
 
-export function ClaudeCodeChat() {
+export function CopilotChat() {
   const [messages, setMessages] = useState<ClaudeMessage[]>([])
   const [input, setInput] = useState('')
   const [isRunning, setIsRunning] = useState(false)
@@ -57,10 +57,10 @@ export function ClaudeCodeChat() {
   const lastMessageTimeRef = useRef<number>(Date.now())
   const activityCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Watch for pending messages from AI Assistant store
-  const pendingMessage = useAiAssistantStore((state) => state.pendingMessage)
-  const shouldSendImmediately = useAiAssistantStore((state) => state.shouldSendImmediately)
-  const clearPendingMessage = useAiAssistantStore((state) => state.clearPendingMessage)
+  // Watch for pending messages from Copilot store
+  const pendingMessage = useCopilotStore((state) => state.pendingMessage)
+  const shouldSendImmediately = useCopilotStore((state) => state.shouldSendImmediately)
+  const clearPendingMessage = useCopilotStore((state) => state.clearPendingMessage)
 
   // Helper: Update last message timestamp (called whenever any message arrives)
   const updateLastMessageTime = useCallback(() => {
@@ -364,7 +364,7 @@ export function ClaudeCodeChat() {
   }, [pendingMessage, shouldSendImmediately, isRunning, clearPendingMessage, startActivityMonitoring])
 
   /**
-   * Send message to Claude Code
+   * Send message to Claude Code backend
    */
   const handleSend = () => {
     const trimmedInput = input.trim()
@@ -534,7 +534,7 @@ export function ClaudeCodeChat() {
   }
 
   return (
-    <div className="claude-code-chat">
+    <div className="copilot-chat">
       {/* Control Panel */}
       <div className="metrics-dashboard">
         <div className="metrics-header" onClick={() => setShowControlPanel(!showControlPanel)}>
@@ -593,8 +593,8 @@ export function ClaudeCodeChat() {
           <div className="chat-empty-state">
             <div className="empty-state-content">
               <div className="empty-state-icon">⚡</div>
-              <h3>Claude Code</h3>
-              <p>Ask Claude Code anything about your project.</p>
+              <h3>Copilot</h3>
+              <p>Ask Copilot anything about your project.</p>
               <div className="empty-state-tips">
                 <div className="tip">💡 Press <kbd>⌘</kbd>+<kbd>↵</kbd> to send</div>
                 <div className="tip">💡 Press <kbd>Esc</kbd> to stop</div>
@@ -616,7 +616,7 @@ export function ClaudeCodeChat() {
                 <span></span>
                 <span></span>
               </div>
-              <span className="typing-text">Claude is thinking...</span>
+              <span className="typing-text">Copilot is thinking...</span>
             </div>
           </div>
         )}
@@ -634,7 +634,7 @@ export function ClaudeCodeChat() {
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           placeholder={
-            isRunning ? 'Claude Code is thinking...' : 'Message Claude Code... (⌘↵ to send)'
+            isRunning ? 'Copilot is thinking...' : 'Message Copilot... (⌘↵ to send)'
           }
           disabled={isRunning}
           rows={3}
