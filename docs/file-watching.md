@@ -117,8 +117,8 @@ ignored: [
 
 - **Service**: `src/main/services/DirectoryWatcherService.ts` (323 lines)
 - **IPC Handlers**: `src/main/ipc/directory-watcher-handlers.ts` (103 lines)
-- **Integration**: `src/renderer/src/components/FileTree/FileTree.tsx`
-- **Component**: `src/renderer/src/components/FileTree/FileTreeNode.tsx` (controlled pattern)
+- **Integration**: `src/renderer/src/components/ProjectTree/ProjectTree.tsx`
+- **Component**: `src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx` (controlled pattern)
 
 ### Expanded State Preservation
 
@@ -133,7 +133,7 @@ The file tree maintains a `Set<string>` of expanded folder paths. When the tree 
 Used to prevent double-refresh when internal operations trigger external file system events.
 
 ```typescript
-// FileTree.tsx - Internal CRUD operation
+// ProjectTree.tsx - Internal CRUD operation
 const handleCreateFile = async () => {
   try {
     // Mark as internal operation
@@ -304,12 +304,12 @@ git checkout feature-branch
 # Expected:
 # - Tree refreshes once after all changes settle (~1 second)
 # - Expanded folders remain expanded
-# - Console log: "📁 Directory changed, refreshing file tree... (X events)"
+# - Console log: "📁 Directory changed, refreshing project tree... (X events)"
 ```
 
 **Test 8: Internal CRUD (no double refresh)**
 ```typescript
-// 1. Enable debug logging in FileTree.tsx
+// 1. Enable debug logging in ProjectTree.tsx
 // 2. Create file via Erfana's "New File" button
 // 3. Check console logs
 
@@ -442,7 +442,7 @@ ipcMain.handle('file-watch:start', async (event, filePath: string) => {
 - Shows conflict bar when needed
 - Implements pause/resume during save
 
-### FileTree (Directory Watching)
+### ProjectTree (Directory Watching)
 
 - Starts directory watcher when project is loaded
 - Stops watcher when project is closed

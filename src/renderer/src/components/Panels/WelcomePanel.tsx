@@ -8,7 +8,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
         <div className="welcome-content">
           <Home size={64} strokeWidth={1.5} className="welcome-icon" />
           <h2>Welcome to Erfana</h2>
-          <p>Open a markdown file from the Explorer to start editing</p>
+          <p>Open a markdown file from the Project panel to start editing</p>
         </div>
       </div>
     </div>
