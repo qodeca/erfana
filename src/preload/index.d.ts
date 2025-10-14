@@ -65,10 +65,9 @@ declare global {
           error?: string
         }>
         setToken: (token: string) => Promise<{ success: boolean; error?: string }>
-        // Tool approval
+        // Tool approval (always persists to settings)
         approveTool: (
-          toolName: string,
-          remember: boolean
+          toolName: string
         ) => Promise<{ success: boolean; error?: string }>
         denyTool: (toolName: string) => Promise<{ success: boolean; error?: string }>
         // Event listeners - Messages

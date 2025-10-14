@@ -131,11 +131,12 @@ export function registerClaudeCodeHandlers() {
 
   /**
    * Approve tool use and restart session with updated permissions
+   * All approvals are automatically persisted to settings
    */
-  ipcMain.handle('claudeCode:approveTool', async (_event, toolName: string, remember: boolean) => {
+  ipcMain.handle('claudeCode:approveTool', async (_event, toolName: string) => {
     try {
-      console.log(`✅ Approving tool: ${toolName} (remember: ${remember})`)
-      await claudeCliService.approveTool(toolName, remember)
+      console.log(`✅ Approving tool: ${toolName}`)
+      await claudeCliService.approveTool(toolName)
       return { success: true }
     } catch (error: any) {
       console.error('❌ Error approving tool:', error)
@@ -188,10 +189,16 @@ export function registerClaudeCodeHandlers() {
 
   // Forward session events
   claudeCliService.on('session-started', (data) => {
+    console.log('🔵 IPC HANDLER: Received session-started event from service')
+    console.log('🔵 Event data:', data)
     const windows = BrowserWindow.getAllWindows()
+    console.log('🔵 Number of windows:', windows.length)
     if (windows.length > 0 && !windows[0].isDestroyed()) {
-      console.log('✅ Session started, notifying renderer')
+      console.log('✅ Session started, notifying renderer via IPC')
       windows[0].webContents.send('claudeCode:sessionStarted', data)
+      console.log('🔵 IPC message sent: claudeCode:sessionStarted')
+    } else {
+      console.error('❌ No valid windows to send session-started event!')
     }
   })
 

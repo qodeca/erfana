@@ -66,11 +66,12 @@ const TOOL_CATEGORIES: ToolCategory[] = [
 const CRITICAL_TOOLS = ['Read', 'LS', 'Grep']
 
 interface CopilotSettingsDialogProps {
+  initialTools: string[]
   onClose: () => void
   onSave: (approvedTools: string[]) => Promise<void>
 }
 
-export function CopilotSettingsDialog({ onClose, onSave }: CopilotSettingsDialogProps) {
+export function CopilotSettingsDialog({ initialTools, onClose, onSave }: CopilotSettingsDialogProps) {
   const [enableAll, setEnableAll] = useState(true)
   const [selectedTools, setSelectedTools] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
@@ -80,32 +81,31 @@ export function CopilotSettingsDialog({ onClose, onSave }: CopilotSettingsDialog
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [warningMessage, setWarningMessage] = useState<string | null>(null)
 
-  // Load current settings on mount
+  // Initialize from props on mount
   useEffect(() => {
-    loadSettings()
+    const toolsSet = new Set(initialTools)
+    setSelectedTools(toolsSet)
+
+    // Check if all 17 tools are enabled
+    const allTools = TOOL_CATEGORIES.flatMap((cat) => cat.tools.map((t) => t.id))
+    const allEnabled = allTools.every((tool) => toolsSet.has(tool))
+    setEnableAll(allEnabled)
+
+    setIsLoading(false)
   }, [])
 
-  const loadSettings = async () => {
-    try {
-      setIsLoading(true)
-      const result = await window.api.settings.getApprovedTools()
+  // Watch for external tool changes (e.g., approval via dialog while settings is open)
+  useEffect(() => {
+    const toolsSet = new Set(initialTools)
+    setSelectedTools(toolsSet)
 
-      if (result.success && result.tools) {
-        const toolsSet = new Set(result.tools)
-        setSelectedTools(toolsSet)
+    // Update "Enable all" state
+    const allTools = TOOL_CATEGORIES.flatMap((cat) => cat.tools.map((t) => t.id))
+    const allEnabled = allTools.every((tool) => toolsSet.has(tool))
+    setEnableAll(allEnabled)
 
-        // Check if all 17 tools are enabled
-        const allTools = TOOL_CATEGORIES.flatMap((cat) => cat.tools.map((t) => t.id))
-        const allEnabled = allTools.every((tool) => toolsSet.has(tool))
-        setEnableAll(allEnabled)
-      }
-    } catch (error) {
-      console.error('Failed to load settings:', error)
-      setErrorMessage('Failed to load current settings')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    console.log('🔄 Settings dialog updated with new tools from parent:', initialTools)
+  }, [initialTools])
 
   // Validate selected tools and show warnings
   const validateSelection = (tools: Set<string>): { isValid: boolean; warning: string | null } => {

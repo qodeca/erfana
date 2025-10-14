@@ -489,17 +489,17 @@ export class ClaudeCliService extends EventEmitter {
 
   /**
    * Approve tool and restart session with new permissions
+   * Always persists to settings for unified state management
    */
-  async approveTool(toolName: string, remember: boolean = false): Promise<void> {
-    console.log(`✅ Approving tool: ${toolName} (remember: ${remember})`)
+  async approveTool(toolName: string): Promise<void> {
+    console.log(`✅ Approving tool: ${toolName}`)
 
-    // Add to approved tools
+    // Add to approved tools runtime Set
     this.approvedTools.add(toolName)
 
-    // Save to settings if remember is true
-    if (remember) {
-      await settingsService.addApprovedTool(toolName)
-    }
+    // Always save to settings for seamless integration
+    await settingsService.addApprovedTool(toolName)
+    console.log(`💾 Tool ${toolName} saved to settings`)
 
     // Restart session with new tool permissions
     await this.restartWithNewPermissions()

@@ -494,14 +494,15 @@ export function CopilotChat({
 
   /**
    * Handle tool approval
+   * All approvals are automatically persisted to settings
    */
-  const handleToolApprove = async (remember: boolean) => {
+  const handleToolApprove = async () => {
     if (!pendingApproval) return
 
-    console.log(`✅ Approving tool: ${pendingApproval.toolName} (remember: ${remember})`)
+    console.log(`✅ Approving tool: ${pendingApproval.toolName}`)
 
     try {
-      await window.api.claudeCode.approveTool(pendingApproval.toolName, remember)
+      await window.api.claudeCode.approveTool(pendingApproval.toolName)
       setPendingApproval(null) // Close dialog
     } catch (error) {
       console.error('Failed to approve tool:', error)

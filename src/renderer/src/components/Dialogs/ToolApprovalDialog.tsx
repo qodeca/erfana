@@ -2,7 +2,7 @@
  * ToolApprovalDialog Component
  *
  * Modal dialog shown when Copilot wants to use a tool that hasn't been approved.
- * Allows users to approve or deny the tool use, with option to remember the choice.
+ * All approvals are automatically persisted to settings for seamless integration.
  */
 
 import { useState } from 'react'
@@ -18,16 +18,15 @@ export interface ToolApprovalRequest {
 
 interface ToolApprovalDialogProps {
   request: ToolApprovalRequest
-  onApprove: (remember: boolean) => void
+  onApprove: () => void
   onDeny: () => void
 }
 
 export function ToolApprovalDialog({ request, onApprove, onDeny }: ToolApprovalDialogProps) {
-  const [remember, setRemember] = useState(false)
   const [showParams, setShowParams] = useState(false)
 
   const handleApprove = () => {
-    onApprove(remember)
+    onApprove()
   }
 
   const handleDeny = () => {
@@ -75,20 +74,10 @@ export function ToolApprovalDialog({ request, onApprove, onDeny }: ToolApprovalD
             )}
           </div>
 
-          {/* Remember Choice */}
+          {/* Info message */}
           <div className="tool-approval-options">
-            <label className="remember-checkbox">
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-              />
-              <span>Remember this choice for future sessions</span>
-            </label>
-            <p className="remember-hint">
-              {remember
-                ? `${request.toolName} will be automatically approved in the future`
-                : 'You will be asked again next time'}
+            <p className="approval-info">
+              Approving this tool will save it to your Copilot Configuration and update the Control Panel.
             </p>
           </div>
         </div>
