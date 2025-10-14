@@ -364,6 +364,107 @@ claude -p \
 
 📚 **Detailed docs**: [Claude Code Integration Index](docs/claude-code/README.md) | [Tool Approval System](docs/claude-code/tool-approval.md) | [UI Features](docs/claude-code/ui-features.md) | [IPC Patterns](docs/ipc-patterns.md)
 
+## Specialized Agents (Subagents)
+
+**Location**: `.claude/agents/` (10 specialized agents for autonomous task delegation)
+
+Erfana includes 10 specialized subagents that Claude Code automatically delegates to for specific tasks. Each agent operates in its own context window with focused expertise, reducing context pollution and enabling reliable, repeatable workflows.
+
+### How Automatic Delegation Works
+
+Claude Code automatically selects and invokes the appropriate agent based on:
+- The task description in your request
+- The agent's `description` field (with trigger keywords like "MUST BE USED", "use PROACTIVELY")
+- Current context and conversation
+- Available tools and permissions
+
+**You don't need to manually invoke agents** - Claude will automatically delegate when the task matches an agent's expertise.
+
+### Available Agents
+
+| Agent | Purpose | Auto-Invoked When | Explicit Invocation |
+|-------|---------|-------------------|---------------------|
+| **architect-reviewer** | Architecture review, system design validation, technology stack evaluation | Designing new features, modifying system architecture, evaluating technical decisions, after creating architectural diagrams | `/task architect-reviewer <task>` |
+| **business-analyst** | Requirements gathering, stakeholder analysis, process documentation, ROI analysis | Defining features, analyzing business impact, evaluating ROI, identifying business needs | `/task business-analyst <task>` |
+| **cli-developer** | CLI development, terminal interfaces, developer utilities | Creating automation scripts, build tools, developer workflows, tool requirements defined | `/task cli-developer <task>` |
+| **code-reviewer** | Code quality, security vulnerabilities, optimization, best practices review | **After any code changes**, git commits, pull requests, before merging, pushing to production | `/task code-reviewer <task>` |
+| **documentation-engineer** | Technical docs, API documentation, automated generation, developer content | **Creating or updating documentation**, API modifications, feature additions, new endpoints/components implemented | `/task documentation-engineer <task>` |
+| **error-detective** | Error pattern analysis, distributed tracing, debugging, cascading failure prediction | **Any error/exception/failure occurs**, error rates increase, patterns emerge, incidents/outages, customer complaints | `/task error-detective <task>` |
+| **qa-expert** | Quality assurance, test strategy, defect management, quality gates validation | **Before feature release or deployment**, requirements change, new features added, bug reports, customer complaints | `/task qa-expert <task>` |
+| **refactoring-specialist** | Code refactoring, complexity reduction, technical debt elimination | **Code complexity exceeds thresholds**, code smells detected, during code reviews, duplication/long methods identified | `/task refactoring-specialist <task>` |
+| **test-automator** | Test automation framework, CI/CD integration, test coverage, automated testing | **Writing or modifying any code**, after feature implementation, bug fix, refactor, maintaining >80% coverage | `/task test-automator <task>` |
+| **typescript-pro** | TypeScript development, type safety, full-stack types, advanced type system | **Every TypeScript file and type definition**, defining data structures, API contracts, component props, preventing runtime errors | `/task typescript-pro <task>` |
+
+### Proactive Agent Usage
+
+**Most Critical Agents** (use PROACTIVELY):
+- **code-reviewer**: After any code changes, commits, PRs
+- **test-automator**: After any feature implementation or bug fix
+- **typescript-pro**: For every TypeScript file modification
+- **documentation-engineer**: After API changes or new features
+- **qa-expert**: Before any deployment or release
+- **error-detective**: When any error or failure occurs
+
+### Agent Integration Patterns
+
+**Development Workflow with Agents:**
+```
+1. Implement Feature → typescript-pro ensures type safety
+2. Write Tests → test-automator validates coverage
+3. Review Code → code-reviewer checks quality & security
+4. Refactor if Needed → refactoring-specialist optimizes structure
+5. Update Docs → documentation-engineer maintains docs
+6. QA Validation → qa-expert validates quality gates
+7. Monitor Errors → error-detective tracks production issues
+```
+
+**Architecture & Planning:**
+```
+1. Business Requirements → business-analyst gathers requirements
+2. System Design → architect-reviewer validates architecture
+3. Tool Development → cli-developer builds developer utilities
+```
+
+### Explicit Agent Invocation
+
+While agents work automatically, you can explicitly invoke them:
+
+```bash
+# Explicit invocation via Task tool
+/task code-reviewer "Review the authentication module for security issues"
+/task architect-reviewer "Evaluate the microservices architecture design"
+/task test-automator "Create comprehensive test suite for user service"
+```
+
+### Agent Configuration
+
+All agents are defined in `.claude/agents/*.md` with:
+- **YAML Frontmatter**: name, description, model, tools, color
+- **System Prompt**: Specialized instructions and expertise
+- **Communication Protocol**: Context queries and workflows
+- **Tool Suite**: MCP tools available to the agent
+- **Integration Patterns**: How the agent collaborates with others
+
+**Example**: `.claude/agents/code-reviewer.md`
+```yaml
+---
+name: code-reviewer
+description: Expert code review specialist. Use PROACTIVELY after any code changes...
+model: inherit
+color: blue
+---
+```
+
+### Best Practices
+
+1. **Trust Automatic Delegation**: Let Claude Code automatically select the right agent for the task
+2. **Use Proactive Agents**: Code-reviewer, test-automator, typescript-pro should run on every relevant change
+3. **Explicit Invocation**: Use `/task <agent> <description>` when you specifically want an agent's expertise
+4. **Agent Specialization**: Each agent has focused expertise - let them handle their domain
+5. **Context Isolation**: Agents operate in separate contexts, enabling deep focus without pollution
+
+📚 **Agent definitions**: See [.claude/agents/](/.claude/agents/) folder for complete agent specifications
+
 ## Contributing
 
 When adding features:
