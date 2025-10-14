@@ -294,24 +294,20 @@ See: [Claude Code UI Features](docs/claude-code/ui-features.md#planning-mode-tog
 
 ### Conversation Preservation
 
-**Behavior**: Erfana preserves conversation context across configuration changes for seamless workflow.
+**Behavior**: Erfana automatically preserves conversation history across all configuration changes using Claude CLI's --continue flag.
 
-**When Conversation is Preserved (--resume)**:
-- Tool authorization changes (settings save, approval dialog)
-- Planning mode toggles (exploration ↔ implementation)
-- Crash recovery (automatic with fallback)
-
-**When Conversation Resets (fresh start)**:
-- App launch or project open
-- Manual "Restart Session" button
-- Resume failure (automatic fallback)
+**How It Works**:
+- Uses `--continue` flag (directory-based, finds latest conversation automatically)
+- One project directory = One conversation thread
+- Session history stored client-side in `~/.claude/projects/`
+- Tool changes, planning mode toggles, approvals all preserve context
 
 **Benefits**:
-- Never lose context when approving new tools
-- Seamless transition between planning and implementation
-- Maintains discussion during tool configuration adjustments
+- ✅ Never lose context when changing tools or toggling planning mode
+- ✅ Seamless workflow - configuration changes don't interrupt discussions
+- ✅ Simple & reliable - no complex session ID management
 
-**Technical**: Uses Claude CLI's --resume flag with session ID reuse. Session state stored server-side (~/.claude/projects/).
+**Technical**: Uses `claude --continue` flag which automatically resumes the latest conversation in the current directory.
 
 📚 **Full documentation**: See [Conversation Preservation](docs/claude-code/conversation-preservation.md)
 
@@ -328,13 +324,13 @@ See: [Claude Code UI Features](docs/claude-code/ui-features.md#planning-mode-tog
 **Flags Used**:
 ```bash
 claude -p \
+  --continue \
   --session-id <uuid> \
   --input-format stream-json \
   --output-format stream-json \
   --verbose \
   --replay-user-messages \
   --allowedTools Read Write Edit MultiEdit Glob Grep Bash LS WebSearch WebFetch SlashCommand TodoRead TodoWrite Task NotebookRead NotebookEdit ExitPlanMode  # All 17 tools by default
-  --resume <sessionId>  # Used when restarting with new tools
   --permission-mode plan  # Optional: Enable planning mode (restricts to 9 safe tools)
 ```
 

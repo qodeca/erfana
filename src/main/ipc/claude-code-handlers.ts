@@ -13,18 +13,12 @@ export function registerClaudeCodeHandlers() {
 
   /**
    * Start persistent Claude CLI session
+   * Uses --continue flag to automatically preserve conversation per directory
    */
   ipcMain.handle('claudeCode:startSession', async (_event, projectPath: string, planningMode?: boolean) => {
     try {
       console.log(`🚀 Starting Claude session for project: ${projectPath}${planningMode ? ' (planning mode)' : ''}`)
-
-      // Determine session start reason based on current state
-      // If session is already active, this is a planning mode toggle, otherwise it's initial start
-      const currentState = claudeCliService.getSessionState()
-      const reason = (currentState === 'ready' || currentState === 'starting') ? 'planning' : 'initial'
-
-      console.log(`📊 Session start reason: ${reason}`)
-      await claudeCliService.startSession(projectPath, planningMode || false, reason)
+      await claudeCliService.startSession(projectPath, planningMode || false)
       return { success: true }
     } catch (error: any) {
       console.error('❌ Failed to start session:', error)
