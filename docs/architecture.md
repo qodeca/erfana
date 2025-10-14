@@ -127,7 +127,7 @@ Dual vertical activity bars (VS Code-style):
 - Keyboard: `Cmd/Ctrl+B`
 
 **Right Activity Bar**:
-- AI Assistant toggle (top position)
+- Copilot toggle (top position)
 - Git toggle (`Ctrl+Shift+G`)
 - Terminal toggle (`Cmd/Ctrl+J`)
 

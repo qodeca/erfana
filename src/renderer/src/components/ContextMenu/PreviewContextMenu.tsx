@@ -1,7 +1,7 @@
 import { useState, ReactNode } from 'react'
 import { Maximize2, Minimize2, RefreshCw, Sparkles, MessageSquare, Copy } from 'lucide-react'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
-import { useAiAssistantStore } from '../../stores/useAiAssistantStore'
+import { useCopilotStore } from '../../stores/useCopilotStore'
 import { useActivityBarStore } from '../../stores/useActivityBarStore'
 import './PreviewContextMenu.css'
 
@@ -16,35 +16,35 @@ interface PreviewContextMenuProps {
   onClose: () => void
 }
 
-interface ClaudeAction {
+interface CopilotAction {
   label: string
   icon: ReactNode
   buildPrompt: (text: string, file: string, doc: string) => string
-  sendDirectly?: boolean // If true, send directly to Claude Code without review
+  sendDirectly?: boolean // If true, send directly without review
 }
 
-const CLAUDE_ACTIONS: ClaudeAction[] = [
+const COPILOT_ACTIONS: CopilotAction[] = [
   {
-    label: 'Ask Claude to Elaborate',
+    label: 'Ask Copilot to Elaborate',
     icon: <Maximize2 size={14} strokeWidth={2} />,
     buildPrompt: (text) =>
       `I selected this text:\n\n---\n${text}\n---\n\nPlease elaborate on this text with more detail, examples, and context. Review the file and the entire project if you need more context.`,
     sendDirectly: true // Send directly without review
   },
   {
-    label: 'Ask Claude to Rewrite',
+    label: 'Ask Copilot to Rewrite',
     icon: <RefreshCw size={14} strokeWidth={2} />,
     buildPrompt: (text, file) =>
       `In ${file}, I selected this text:\n\n---\n${text}\n---\n\nPlease rewrite this text to improve clarity, flow, and readability.`
   },
   {
-    label: 'Ask Claude to Simplify',
+    label: 'Ask Copilot to Simplify',
     icon: <Minimize2 size={14} strokeWidth={2} />,
     buildPrompt: (text, file) =>
       `In ${file}, I selected this text:\n\n---\n${text}\n---\n\nPlease simplify this text for easier understanding while maintaining the key points.`
   },
   {
-    label: 'Ask Claude to Improve',
+    label: 'Ask Copilot to Improve',
     icon: <Sparkles size={14} strokeWidth={2} />,
     buildPrompt: (text, file) =>
       `In ${file}, I selected this text:\n\n---\n${text}\n---\n\nPlease improve this text (grammar, style, clarity, and coherence).`
@@ -63,10 +63,10 @@ export function PreviewContextMenu({
 }: PreviewContextMenuProps) {
   const [showCustomPrompt, setShowCustomPrompt] = useState(false)
   const [customPrompt, setCustomPrompt] = useState('')
-  const setPendingMessage = useAiAssistantStore((state) => state.setPendingMessage)
+  const setPendingMessage = useCopilotStore((state) => state.setPendingMessage)
   const setActivePanel = useActivityBarStore((state) => state.setActivePanel)
 
-  const handleAction = async (action: ClaudeAction) => {
+  const handleAction = async (action: CopilotAction) => {
     let prompt = action.buildPrompt(selectedText, filePath, fullDocument)
 
     // Add file reference with line numbers if available
@@ -78,7 +78,7 @@ export function PreviewContextMenu({
       prompt = `${fileRef}\n\n${prompt}`
     }
 
-    // Open AI Assistant panel
+    // Open Copilot panel
     setActivePanel('claude', 'right')
 
     // Set pending message with send flag
@@ -100,10 +100,10 @@ export function PreviewContextMenu({
         prompt = `${fileRef}\n\n${prompt}`
       }
 
-      // Set pending message in AI Assistant store
+      // Set pending message in Copilot store
       setPendingMessage(prompt)
 
-      // Open AI Assistant panel
+      // Open Copilot panel
       setActivePanel('claude', 'right')
 
       onClose()
@@ -137,7 +137,7 @@ export function PreviewContextMenu({
         <div className="custom-prompt-dialog" style={{ position: 'fixed', left: x, top: y }}>
           <div className="custom-prompt-header">
             <MessageSquare size={16} strokeWidth={2} />
-            <span>Custom Prompt for Claude</span>
+            <span>Custom Prompt for Copilot</span>
           </div>
           <div className="custom-prompt-selected">
             Selected: "{selectedText.substring(0, 100)}
@@ -148,13 +148,13 @@ export function PreviewContextMenu({
             value={customPrompt}
             onChange={(e) => setCustomPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Enter your question or request for Claude..."
+            placeholder="Enter your question or request for Copilot..."
             autoFocus
             rows={4}
           />
           <div className="custom-prompt-actions">
             <button onClick={handleCustomPrompt} disabled={!customPrompt.trim()}>
-              Send to Claude
+              Send to Copilot
             </button>
             <button onClick={() => setShowCustomPrompt(false)}>Cancel</button>
           </div>
@@ -166,7 +166,7 @@ export function PreviewContextMenu({
 
   // Build context menu items
   const items: ContextMenuItem[] = [
-    ...CLAUDE_ACTIONS.map((action) => ({
+    ...COPILOT_ACTIONS.map((action) => ({
       label: action.label,
       icon: action.icon,
       action: () => handleAction(action)
