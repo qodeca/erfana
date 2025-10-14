@@ -114,90 +114,25 @@ Modal dialog for configuring Claude Code tool authorization. Accessed via gear i
 
 ### Usage
 
-**Opening Modal**:
-- Click gear icon in Copilot header
-- OR press Cmd/Ctrl+, when Copilot is active
+**Open**: Gear icon or `Cmd/Ctrl+,` when Copilot active
 
-**Default State**:
-- "Enable all tools by default" checkbox: ✓ Checked
-- All 17 individual checkboxes: ✓ Checked and disabled (grayed out)
-- Counter: "17 of 17 selected"
+**Default State**: All 17 tools enabled, global toggle checked, counter shows "17 of 17"
 
-**Selective Mode**:
-1. Uncheck "Enable all tools by default"
-2. Individual checkboxes become active
-3. Customize specific tools
-4. Counter updates (e.g., "15 of 17 selected")
-5. Unsaved changes indicator appears
+**Selective Mode**: Uncheck global toggle → customize individual tools → counter updates → unsaved changes indicator
 
-**Saving Changes**:
-1. Click "Save" button
-2. Session restarts with updated tool configuration
-3. Modal closes automatically
-4. Conversation history preserved via --continue
-5. Control Panel updates to show new tool list
+**Save**: Click Save → session restarts with --continue → modal closes → Control Panel updates
 
-**Canceling**:
-- Click "Cancel" button
-- Press ESC key
-- Click overlay background
-- Confirmation if unsaved changes exist
+**Cancel**: Cancel button, ESC key, or overlay click → confirmation if unsaved changes
 
-**Reset to Defaults**:
-1. Click "Reset to Defaults" button
-2. Inline confirmation appears
-3. Click "Yes" to confirm
-4. All 17 tools re-enabled
-5. "Enable all tools by default" re-checked
+**Reset**: Click Reset → inline confirmation → all tools re-enabled
 
-### Props
+### Design & Implementation
 
-```typescript
-interface ToolSettingsDialogProps {
-  onClose: () => void
-  onSave: (approvedTools: string[]) => Promise<void>
-}
-```
+**Dimensions**: 600px width, max-height 85vh, centered
 
-### Design
+**Styling**: VS Code dark theme, fadeIn/slideUp animations, internal scroll
 
-- **Dimensions**: 600px width, max-height 85vh, centered
-- **Colors**: VS Code dark (#2d2d30 background, #007acc accent)
-- **Icons**: Settings (gear), AlertCircle (error) from Lucide React
-- **Animations**: fadeIn 0.2s (overlay), slideUp 0.3s (dialog)
-- **Scrolling**: Internal scroll for tool list, fixed header/footer
-
-### Usage Pattern
-
-```typescript
-const [showSettings, setShowSettings] = useState(false)
-
-const handleSaveSettings = async (approvedTools: string[]) => {
-  await window.api.settings.setApprovedTools(approvedTools)
-  await window.api.claudeCode.stopSession()
-  const projectPath = await window.api.file.getProjectPath()
-  if (projectPath) {
-    await window.api.claudeCode.startSession(projectPath, false)
-  }
-}
-
-// In header
-<span className="settings-button" onClick={() => setShowSettings(true)}>
-  <Settings size={16} />
-</span>
-
-// In render
-{showSettings && (
-  <ToolSettingsDialog
-    onClose={() => setShowSettings(false)}
-    onSave={handleSaveSettings}
-  />
-)}
-```
-
-**Files**:
-- `ToolSettingsDialog.tsx` (~270 lines) - Component logic
-- `ToolSettingsDialog.css` (~300 lines) - Modal styling
+**Files**: `ToolSettingsDialog.tsx` (~270 lines), `ToolSettingsDialog.css` (~300 lines)
 
 ## Approval Flow
 
@@ -217,61 +152,17 @@ const handleSaveSettings = async (approvedTools: string[]) => {
 
 ### Technical Flow
 
-**1. Tool Detection** (`ClaudeCliService.ts:654-683`)
+**1. Tool Detection**: `ClaudeCliService.ts` checks tool in `approvedTools` Set → emits `tool-approval-needed` event if not approved
 
-Checks if tool is in `approvedTools` Set, if not:
-- Emits `'tool-approval-needed'` event with tool details
-- Returns `null` to suppress tool_use from UI
-- System message shown to user
+**2. Show Dialog**: `CopilotChat.tsx` listens for event → sets `pendingApproval` state → ToolApprovalDialog appears
 
-**2. Show Dialog** (`CopilotChat.tsx:104-111`)
+**3. Approve**: User clicks Approve → calls `approveTool(toolName, remember)` → closes dialog
 
-Listens for `onToolApprovalNeeded` event, sets `pendingApproval` state to show ToolApprovalDialog.
+**4. Restart**: `approveTool()` adds tool to Set → persists if remember=true → calls `restartWithNewPermissions()`
 
-**3. Approve Tool** (`CopilotChat.tsx:206-217`)
+**5. Session Resume**: Process killed → respawned with `--continue` + updated `--allowedTools` → emits `session-resumed` event
 
-User approves → calls `window.api.claudeCode.approveTool(toolName, remember)` → closes dialog.
-
-**4. Add to Approved List & Restart** (`ClaudeCliService.ts:300-313`)
-
-```typescript
-async approveTool(toolName: string, remember: boolean): Promise<void> {
-  this.approvedTools.add(toolName)
-  if (remember) {
-    await settingsService.addApprovedTool(toolName)
-  }
-  await this.restartWithNewPermissions()
-}
-```
-
-**5. Restart Session with --continue** (`ClaudeCliService.ts:329-405`)
-
-```typescript
-private async restartWithNewPermissions(): Promise<void> {
-  const previousSessionId = this.sessionId
-  this.claudeProcess.kill('SIGTERM')
-
-  const args = [
-    '-p', this.projectPath,
-    '--continue',  // Preserve conversation
-    '--input-format', 'stream-json',
-    '--output-format', 'stream-json',
-    '--verbose',
-    '--replay-user-messages',
-    '--allowedTools', ...Array.from(this.approvedTools)  // Updated list
-  ]
-
-  this.claudeProcess = spawn('claude', args, { cwd: this.projectPath })
-  this.emit('session-resumed', { projectPath, approvedTools: Array.from(this.approvedTools) })
-}
-```
-
-**6. Auto-Retry** (`CopilotChat.tsx:119-140`)
-
-Listens for `onSessionResumed` event, if `lastUserPrompt` exists:
-- Shows system message with approved tools list
-- Automatically re-sends last user prompt
-- No manual intervention needed
+**6. Auto-Retry**: Listens for `session-resumed` → shows system message → auto-sends `lastUserPrompt` if exists
 
 ## Conversation Preservation
 
@@ -319,39 +210,11 @@ See: [Conversation Preservation Guide](./conversation-preservation.md) for compl
 
 ### Implementation
 
-**Store Prompt** (`CopilotChat.tsx:134-135`):
-```typescript
-const handleSend = () => {
-  setLastUserPrompt(trimmedInput)  // Store for auto-retry
-  window.api.claudeCode.sendMessage(trimmedInput, {}, sessionId)
-}
-```
+**Store Prompt**: `handleSend()` stores `trimmedInput` in `lastUserPrompt` state before sending
 
-**Auto-Retry on Resume** (`CopilotChat.tsx:119-140`):
-```typescript
-useEffect(() => {
-  const unsubscribe = window.api.claudeCode.onSessionResumed((data) => {
-    if (lastUserPrompt) {
-      setMessages(prev => [...prev, {
-        type: 'system',
-        content: `🔄 Retrying with approved tools: ${data.approvedTools.join(', ')}`
-      }])
-      window.api.claudeCode.sendMessage(lastUserPrompt, {}, newSessionId)
-    }
-  })
-  return unsubscribe
-}, [lastUserPrompt])
-```
+**Auto-Retry**: `onSessionResumed` listener checks `lastUserPrompt` → shows system message → re-sends if exists
 
-### UX Comparison
-
-**Before Auto-Retry**:
-User → Dialog → Approve → Session Restarts → User types "proceed" → Executes
-
-**With Auto-Retry**:
-User → Dialog → Approve → Session Restarts → **Auto re-sends** → Executes
-
-**Benefit**: Seamless UX, user doesn't need to know about session restart.
+**UX Benefit**: User → Dialog → Approve → Auto re-sends (seamless, no manual "proceed" needed)
 
 ## Persistent Storage
 
@@ -414,30 +277,11 @@ async resetApprovedTools(): Promise<void>
 
 ### --allowedTools is Immutable
 
-**Key Fact**: Claude CLI reads `--allowedTools` at process spawn and **cannot change permissions mid-session**.
+**Key Fact**: Claude CLI reads `--allowedTools` at spawn, cannot change mid-session.
 
-**Why This Matters**:
-```typescript
-// ❌ This does NOT work
-spawn('claude', ['--allowedTools', 'Read', 'Glob', 'Grep'])
-// Later: Cannot dynamically add 'Edit' to running process
+**Consequence**: Adding tool requires full restart (kill → spawn with `--continue` + updated `--allowedTools`)
 
-// ✅ This works
-this.approvedTools.add('Edit')
-this.claudeProcess.kill()
-spawn('claude', [
-  '--continue',  // Preserve conversation
-  '--allowedTools', ...this.approvedTools  // Updated list
-])
-```
-
-**Consequence**: To add new tool, must restart session.
-
-**Why --continue Works**:
-- Claude CLI stores session state client-side in `~/.claude/projects/`
-- `--continue` loads previous conversation history from disk
-- New `--allowedTools` list applied to resumed session
-- Result: Conversation continues with new permissions
+**Why --continue Works**: Session stored in `~/.claude/projects/` → loads history → applies new permissions → conversation continues
 
 ## Components
 
@@ -445,83 +289,17 @@ spawn('claude', [
 
 **Location**: `src/renderer/src/components/Dialogs/ToolApprovalDialog.tsx`
 
-Modal dialog for approving or denying Claude Code tool execution.
+Modal for approving/denying tool execution with tool name, description, collapsible parameters (JSON), "Remember" checkbox, Approve/Deny buttons.
 
-**Features**:
-- Tool name display (monospace font, blue color)
-- Tool description explaining what the tool does
-- Collapsible parameters section (JSON pretty-print)
-- "Remember this choice" checkbox for persistent approval
-- Approve/Deny action buttons with icons
-- VS Code dark theme styling
-- Overlay prevents interaction with app during approval
-- Animations: fadeIn (overlay), slideUp (dialog)
+**Design**: 500px width, VS Code dark theme, fadeIn/slideUp animations
 
-**Props**:
-```typescript
-interface ToolApprovalRequest {
-  toolName: string      // e.g., "Edit", "Write", "Bash", "Task"
-  toolId: string        // UUID from Claude CLI
-  input: any            // Tool parameters as JSON object
-  description: string   // Human-readable tool description
-}
-
-interface ToolApprovalDialogProps {
-  request: ToolApprovalRequest
-  onApprove: (remember: boolean) => void
-  onDeny: () => void
-}
-```
-
-**Design**:
-- **Dimensions**: 500px width, max-height 80vh, centered
-- **Colors**: VS Code dark (#2d2d30 background, #007acc buttons)
-- **Icons**: AlertTriangle (warning), Check (approve), X (deny) from Lucide React
-- **Animations**: fadeIn 0.2s (overlay), slideUp 0.3s (dialog)
-- **Parameters**: Collapsible with toggle button, JSON formatted with 2-space indent
-
-**Usage Pattern**:
-```typescript
-const [pendingApproval, setPendingApproval] = useState<ToolApprovalRequest | null>(null)
-
-// Listen for approval requests
-useEffect(() => {
-  const unsubscribe = window.api.claudeCode.onToolApprovalNeeded((request) => {
-    setPendingApproval(request)
-  })
-  return unsubscribe
-}, [])
-
-// Render dialog conditionally
-{pendingApproval && (
-  <ToolApprovalDialog
-    request={pendingApproval}
-    onApprove={handleToolApprove}
-    onDeny={handleToolDeny}
-  />
-)}
-```
-
-**Files**:
-- `ToolApprovalDialog.tsx` (115 lines) - Component logic
-- `ToolApprovalDialog.css` (240 lines) - VS Code-themed styling
+**Files**: `ToolApprovalDialog.tsx` (115 lines), `ToolApprovalDialog.css` (240 lines)
 
 ### CopilotChat.tsx
 
 **Location**: `src/renderer/src/components/Copilot/CopilotChat.tsx`
 
-Chat interface with:
-- Message history display
-- `lastUserPrompt` tracking for auto-retry
-- `onToolApprovalNeeded` listener → shows dialog
-- `onSessionResumed` listener → auto-retries prompt
-- ToolApprovalDialog integration
-
-**Key State**:
-```typescript
-const [pendingApproval, setPendingApproval] = useState<ToolApprovalRequest | null>(null)
-const [lastUserPrompt, setLastUserPrompt] = useState('')
-```
+Chat interface with message history, `lastUserPrompt` tracking, `onToolApprovalNeeded`/`onSessionResumed` listeners, ToolApprovalDialog integration.
 
 ## Related Documentation
 
