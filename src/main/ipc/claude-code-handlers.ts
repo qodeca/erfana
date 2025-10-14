@@ -17,7 +17,14 @@ export function registerClaudeCodeHandlers() {
   ipcMain.handle('claudeCode:startSession', async (_event, projectPath: string, planningMode?: boolean) => {
     try {
       console.log(`🚀 Starting Claude session for project: ${projectPath}${planningMode ? ' (planning mode)' : ''}`)
-      await claudeCliService.startSession(projectPath, planningMode || false)
+
+      // Determine session start reason based on current state
+      // If session is already active, this is a planning mode toggle, otherwise it's initial start
+      const currentState = claudeCliService.getSessionState()
+      const reason = (currentState === 'ready' || currentState === 'starting') ? 'planning' : 'initial'
+
+      console.log(`📊 Session start reason: ${reason}`)
+      await claudeCliService.startSession(projectPath, planningMode || false, reason)
       return { success: true }
     } catch (error: any) {
       console.error('❌ Failed to start session:', error)
@@ -125,6 +132,36 @@ export function registerClaudeCodeHandlers() {
       return { success: true, state }
     } catch (error: any) {
       console.error('❌ Error getting session state:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
+  /**
+   * Get session statistics
+   * Returns message count, tool executions, and session creation timestamp
+   */
+  ipcMain.handle('claudeCode:getSessionStats', async () => {
+    try {
+      const stats = claudeCliService.getSessionStats()
+      console.log('📊 Session stats:', stats)
+      return { success: true, stats }
+    } catch (error: any) {
+      console.error('❌ Error getting session stats:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
+  /**
+   * Get message count (convenience method)
+   * Returns only the current message count from session statistics
+   */
+  ipcMain.handle('claudeCode:getMessageCount', async () => {
+    try {
+      const count = claudeCliService.getMessageCount()
+      console.log(`📊 Message count: ${count}`)
+      return { success: true, count }
+    } catch (error: any) {
+      console.error('❌ Error getting message count:', error)
       return { success: false, error: error.message }
     }
   })
@@ -239,6 +276,14 @@ export function registerClaudeCodeHandlers() {
     if (windows.length > 0 && !windows[0].isDestroyed()) {
       console.log('✅ Session resumed with new tools, notifying renderer')
       windows[0].webContents.send('claudeCode:sessionResumed', data)
+    }
+  })
+
+  claudeCliService.on('session-resume-failed', (data) => {
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length > 0 && !windows[0].isDestroyed()) {
+      console.log('⚠️ Resume failed, notifying renderer')
+      windows[0].webContents.send('claudeCode:sessionResumeFailed', data)
     }
   })
 

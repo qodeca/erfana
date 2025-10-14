@@ -156,6 +156,175 @@ Listens for `onSessionResumed` event, if `lastUserPrompt` exists:
 - Automatically re-sends last user prompt
 - No manual intervention needed
 
+## Conversation Preservation
+
+### Overview
+Erfana automatically preserves conversation history when you make configuration changes,
+eliminating the frustration of losing context mid-workflow.
+
+### When --resume is Used
+
+**Settings Changes**:
+- User modifies tools in Copilot Configuration (Cmd/Ctrl+,)
+- Clicks "Save"
+- Session restarts with `--resume` flag
+- Conversation history preserved
+- New tool configuration active
+
+**Planning Mode Toggles**:
+- User toggles between planning mode (read-only) and implementation mode (full access)
+- Session restarts with `--resume` flag
+- Conversation history preserved
+- Tool set updated (9 safe tools ↔ all approved tools)
+
+**Tool Approvals**:
+- User approves tool via approval dialog
+- Session restarts with `--resume` flag
+- Conversation history preserved
+- Newly approved tool active
+- Last prompt automatically re-sent
+
+### Session ID Lifecycle
+
+Session ID determines when conversation context is preserved:
+
+```
+Initial Project Open:
+  └─> Fresh session ID → New conversation
+
+Settings Change:
+  └─> Reuse session ID + --resume → Conversation preserved
+
+Planning Mode Toggle:
+  └─> Reuse session ID + --resume → Conversation preserved
+
+Tool Approval:
+  └─> Reuse session ID + --resume → Conversation preserved
+
+Manual Restart:
+  └─> Fresh session ID → New conversation
+
+Crash Recovery:
+  └─> Attempt --resume → Fallback to fresh if failed
+```
+
+### Resume Failure Handling
+
+If `--resume` fails (session not found, corrupted, etc.), Erfana automatically:
+1. Detects failure from Claude CLI stderr (13 error patterns)
+2. Generates fresh session ID
+3. Restarts without `--resume`
+4. Shows system message: "⚠️ Previous conversation unavailable. Starting fresh session."
+5. Continues with fresh session
+
+**Common Causes**:
+- Session file deleted from `~/.claude/projects/`
+- Session expired (>30 days old)
+- Claude CLI version mismatch
+- File system corruption
+- Network interruption during server-side session fetch
+
+**Error Patterns Detected** (13 total):
+```
+'session not found'
+'resume failed'
+'invalid session'
+'session expired'
+'failed to resume'
+'could not resume'
+'unable to resume'
+'session file not found'
+'session file corrupted'
+'session file is corrupted'
+'failed to load session'
+'error loading session'
+'session data invalid'
+```
+
+### Session Statistics
+
+Track conversation metrics across configuration changes:
+- **Message count**: Total user + assistant messages (preserved via --resume)
+- **Tool executions**: Total tool invocations (preserved via --resume)
+- **Session age**: Time since session creation (preserved via --resume)
+
+**Access via IPC**:
+```typescript
+const stats = await window.api.claudeCode.getSessionStats()
+// Returns: {
+//   messageCount: 15,
+//   toolExecutions: 7,
+//   createdAt: Date
+// }
+```
+
+**When Stats Reset**:
+- App launch or project open
+- Manual "Restart Session" button
+- Resume failure (automatic fallback)
+
+**When Stats Preserved**:
+- Tool authorization changes (settings save, approval dialog)
+- Planning mode toggles (exploration ↔ implementation)
+
+### Technical Implementation
+
+**ClaudeCliService.ts** - Session ID lifecycle management:
+
+```typescript
+/**
+ * Session start reason - determines session ID lifecycle and --resume usage
+ */
+type SessionStartReason =
+  | 'initial'         // App launch - fresh session ID
+  | 'manual_restart'  // User explicit restart - fresh session ID
+  | 'settings'        // Tool config change - reuse session ID + --resume
+  | 'planning'        // Planning mode toggle - reuse session ID + --resume
+  | 'recovery'        // Crash recovery - attempt --resume, fallback if needed
+
+async startSession(
+  projectPath: string,
+  planningMode: boolean = false,
+  reason: SessionStartReason = 'initial'
+): Promise<void> {
+  // Session ID lifecycle logic
+  const previousSessionId = this.sessionId
+  const shouldUseResume = (reason === 'settings' || reason === 'planning') && previousSessionId
+
+  if (reason === 'initial' || reason === 'manual_restart' || reason === 'recovery') {
+    this.sessionId = this.generateSessionId()  // Fresh conversation
+  } else {
+    // Reuse session ID for --resume
+  }
+
+  // Build args with --resume if applicable
+  const args = ['--session-id', this.sessionId!]
+  if (shouldUseResume) {
+    args.push('--resume', previousSessionId!)  // Preserve conversation
+  }
+}
+```
+
+**Resume Timeout**: 10-second timeout prevents hanging. Falls back to fresh session if --resume hangs.
+
+**Structured Logging**: All resume attempts logged with session metadata for debugging:
+```typescript
+private logResumeAttempt(sessionId: string, reason: SessionStartReason): void {
+  console.log('📝 RESUME ATTEMPT', JSON.stringify({
+    sessionId,
+    reason,
+    projectPath: this.projectPath,
+    planningMode: this.isPlanningMode,
+    messageCount: this.sessionStats.messageCount,
+    toolExecutions: this.sessionStats.toolExecutions,
+    sessionAge: /* calculated in seconds */,
+    timestamp: new Date().toISOString()
+  }, null, 2))
+}
+```
+
+See: [Conversation Preservation Guide](./conversation-preservation.md) for complete documentation
+
 ## Auto-Retry Feature
 
 **Problem**: After approval and session restart, user had to manually re-send prompt.

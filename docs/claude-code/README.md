@@ -30,6 +30,15 @@ Complete documentation for Erfana's Claude Code integration with persistent sess
 - Development patterns
 - Testing and debugging
 
+**[Conversation Preservation](./conversation-preservation.md)**
+- Session ID lifecycle management
+- When conversation is preserved vs reset
+- Resume failure handling and automatic fallback
+- Session statistics tracking
+- Technical implementation details
+- Troubleshooting guide
+- Performance considerations
+
 **[UI Features](./ui-features.md)**
 - Copilot Panel
 - Control Panel with tool approval status
@@ -222,6 +231,7 @@ cat ~/.claude/logs/claude-cli-<date>.log
 ## Related Documentation
 
 - **[Tool Approval System](./tool-approval.md)** - Complete guide to tool approval
+- **[Conversation Preservation](./conversation-preservation.md)** - Session preservation and resume handling
 - **[UI Features](./ui-features.md)** - Copilot panel, Control Panel, Planning Mode, Tool Approval Dialog
 - **[Architecture](../architecture.md)** - Three-process model, services
 - **[IPC Patterns](../ipc-patterns.md)** - All IPC channels

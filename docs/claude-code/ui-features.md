@@ -327,11 +327,12 @@ useEffect(() => {
 )}
 ```
 
-See: [Tool Approval System](./tool-approval.md) for complete documentation including security model, auto-retry, persistence, and debugging.
+See: [Tool Approval System](./tool-approval.md) for complete documentation including security model, auto-retry, persistence, and debugging. Also see: [Conversation Preservation](./conversation-preservation.md) for details on how conversation context is maintained across tool approvals.
 
 ## Related Documentation
 
 - **[Tool Approval System](./tool-approval.md)** - Complete approval system documentation
+- **[Conversation Preservation](./conversation-preservation.md)** - Session preservation and resume handling
 - **[Claude Code Integration Index](./README.md)** - Overview and quick reference
 - **[IPC Patterns](../ipc-patterns.md)** - Session management and tool approval channels
 - **[UI Components](../ui-components.md)** - Activity bars, keyboard shortcuts, panel system
