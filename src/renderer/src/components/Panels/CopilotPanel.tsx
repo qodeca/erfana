@@ -472,6 +472,7 @@ export function CopilotPanel(_props: ISplitviewPanelProps) {
       {/* Settings Modal */}
       {showSettings && (
         <CopilotSettingsDialog
+          initialTools={approvedTools}
           onClose={() => setShowSettings(false)}
           onSave={handleSaveSettings}
         />

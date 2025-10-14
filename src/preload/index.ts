@@ -175,12 +175,11 @@ const api = {
     setToken: (token: string): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('claudeCode:setToken', token),
 
-    // Tool approval
+    // Tool approval (always persists to settings)
     approveTool: (
-      toolName: string,
-      remember: boolean
+      toolName: string
     ): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('claudeCode:approveTool', toolName, remember),
+      ipcRenderer.invoke('claudeCode:approveTool', toolName),
 
     denyTool: (toolName: string): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('claudeCode:denyTool', toolName),
