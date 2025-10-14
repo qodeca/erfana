@@ -11,7 +11,7 @@ import {
 } from 'dockview'
 import 'dockview/dist/styles/dockview.css'
 import './AppDockLayout.css'
-import { FileTree } from '../FileTree/FileTree'
+import { ProjectTree } from '../ProjectTree/ProjectTree'
 import { MarkdownEditorPanel } from '../Panels/MarkdownEditorPanel'
 import { WelcomePanel } from '../Panels/WelcomePanel'
 import { WelcomeTab } from '../Panels/WelcomeTab'
@@ -30,9 +30,9 @@ const sanitizeFilePath = (filePath: string): string => {
 }
 
 // ============================================================================
-// LEFT SIDEBAR PANEL - File Explorer
+// LEFT SIDEBAR PANEL - Project Panel
 // ============================================================================
-const FileExplorerSplitPanel = (props: ISplitviewPanelProps) => {
+const ProjectPanelWrapper = (props: ISplitviewPanelProps) => {
   const handleFileSelect = (filePath: string) => {
     // Get DockviewApi from params (passed by parent)
     const dockviewApi = props.params?.dockviewApi as DockviewApi | undefined
@@ -61,7 +61,7 @@ const FileExplorerSplitPanel = (props: ISplitviewPanelProps) => {
     editorPanel.group.focus()
   }
 
-  return <FileTree onFileSelect={handleFileSelect} />
+  return <ProjectTree onFileSelect={handleFileSelect} />
 }
 
 // ============================================================================
@@ -185,10 +185,10 @@ export function AppDockLayout() {
 
     console.log('🔧 Initializing SplitviewReact with 3-column layout')
 
-    // LEFT PANEL - File Explorer
+    // LEFT PANEL - Project Panel
     const leftPanel = event.api.addPanel({
       id: 'left-sidebar',
-      component: 'fileExplorer',
+      component: 'project',
       minimumSize: MIN_SIZES.leftSidebar,
       maximumSize: 600,
       params: {
@@ -254,7 +254,7 @@ export function AppDockLayout() {
     // Listen to resize events
     const disposeLeft = leftPanel.api.onDidSizeChange(() => {
       const newWidth = leftPanel.api.width
-      console.log(`📏 Explorer resized: ${newWidth}px`)
+      console.log(`📏 Project panel resized: ${newWidth}px`)
       setSidebarWidth(newWidth, 'left')
     })
 
@@ -362,10 +362,10 @@ export function AppDockLayout() {
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
       const modKey = isMac ? e.metaKey : e.ctrlKey
 
-      // Cmd/Ctrl + B - Toggle Explorer
+      // Cmd/Ctrl + B - Toggle Project
       if (modKey && e.key === 'b' && !e.shiftKey && !e.altKey) {
         e.preventDefault()
-        handleActivityBarClick('explorer', 'left')
+        handleActivityBarClick('project', 'left')
       }
 
       // Cmd/Ctrl + J - Toggle Terminal
@@ -393,7 +393,7 @@ export function AppDockLayout() {
 
   // Splitview components registry
   const splitviewComponents = {
-    fileExplorer: FileExplorerSplitPanel,
+    project: ProjectPanelWrapper,
     editorArea: EditorAreaSplitPanel,
     gitPanel: GitSplitPanel,
     terminalPanel: TerminalSplitPanel,

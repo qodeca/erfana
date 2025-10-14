@@ -8,7 +8,7 @@ Dual vertical activity bars on left and right edges (VS Code-style).
 
 ### Left Activity Bar
 
-- **Explorer icon**: Toggle file tree sidebar
+- **Project icon**: Toggle project tree sidebar
 - **Keyboard**: `Cmd/Ctrl+B`
 - **Width**: 48px fixed
 - **Position**: Left edge of window
@@ -72,11 +72,11 @@ Manages:
 
 For complete documentation including session lifecycle, UI states, tool approval system, and planning mode, see [Claude Code UI Features](./claude-code/ui-features.md).
 
-## Context Menu (File Explorer)
+## Context Menu (Project Tree)
 
-**Location**: `src/renderer/src/components/FileTree/FileTree.tsx`, `src/renderer/src/components/ContextMenu/ContextMenu.tsx`
+**Location**: `src/renderer/src/components/ProjectTree/ProjectTree.tsx`, `src/renderer/src/components/ContextMenu/ContextMenu.tsx`
 
-Right-click context menu for files and folders in the file explorer.
+Right-click context menu for files and folders in the project tree.
 
 ### Menu Items
 
@@ -113,7 +113,7 @@ Right-click context menu for files and folders in the file explorer.
 
 ### Files
 
-- `FileTree.tsx` - Context menu logic and handlers
+- `ProjectTree.tsx` - Context menu logic and handlers
 - `ContextMenu.tsx` - Reusable context menu component
 - `ContextMenu.css` - VS Code-style dark theme
 
@@ -123,7 +123,7 @@ These work **anywhere in the application**:
 
 | Shortcut | Action | Panel |
 |----------|--------|-------|
-| `Cmd/Ctrl+B` | Toggle left sidebar | Explorer |
+| `Cmd/Ctrl+B` | Toggle left sidebar | Project |
 | `Cmd/Ctrl+J` | Toggle right panel | Terminal |
 | `Ctrl+Shift+G` | Toggle right panel | Git |
 | `Cmd/Ctrl+Shift+A` | Toggle right panel | AI Assistant |
@@ -149,7 +149,7 @@ Matches VS Code panel toggle behavior:
 ### Implementation (New Architecture)
 
 **Splitview Panels**:
-- Left sidebar: `FileExplorerSplitPanel`
+- Left sidebar: `ProjectPanelWrapper`
 - Center editor: `EditorAreaSplitPanel` (always visible)
 - Right sidebar: `GitSplitPanel` and `TerminalSplitPanel` (mutually exclusive)
 
@@ -162,7 +162,7 @@ panel.api.setVisible(shouldShow)
 **State Storage**: `useActivityBarStore` (Zustand with persist)
 ```typescript
 {
-  leftActivePanel: 'explorer' | null,
+  leftActivePanel: 'project' | null,
   rightActivePanel: 'git' | 'terminal' | null,
   leftWidth: number,
   rightWidth: number
@@ -204,15 +204,15 @@ leftPanel.api.onDidSizeChange(() => {
 
 ## Panel Communication Pattern
 
-**Problem**: FileTree needs to open files in center DockviewReact.
+**Problem**: ProjectTree needs to open files in center DockviewReact.
 
 **Solution**: Pass DockviewApi through splitview panel params.
 
 **Flow**:
 1. `EditorAreaSplitPanel` creates DockviewReact, gets `dockviewApi`
 2. Calls `setDockviewApi` callback in params → updates ref in parent
-3. Parent passes `dockviewApi` to `FileExplorerSplitPanel` via params
-4. FileTree calls `dockviewApi.addPanel()` to open file tab
+3. Parent passes `dockviewApi` to `ProjectPanelWrapper` via params
+4. ProjectTree calls `dockviewApi.addPanel()` to open file tab
 
 **Code**: `AppDockLayout.tsx` lines 208-222
 
@@ -416,7 +416,7 @@ const handleDragStart = (e: React.DragEvent) => {
 1. Update `activityBarConfig.ts`:
    ```typescript
    export const LEFT_PANELS = [
-     { id: 'explorer', icon: Folder, label: 'Explorer', shortcut: 'Cmd+B' },
+     { id: 'project', icon: Folder, label: 'Project', shortcut: 'Cmd+B' },
      { id: 'myPanel', icon: MyIcon, label: 'My Panel', shortcut: 'Cmd+M' }
    ]
    ```
@@ -430,7 +430,7 @@ const handleDragStart = (e: React.DragEvent) => {
 ```typescript
 // Via Zustand store
 const { togglePanel } = useActivityBarStore()
-togglePanel('explorer', 'left')
+togglePanel('project', 'left')
 
 // Via SplitviewApi directly
 const panel = splitviewApiRef.current.getPanel('left-sidebar')
@@ -443,8 +443,8 @@ panel.api.setVisible(false)
 const { leftActivePanel, rightActivePanel, leftWidth, rightWidth }
   = useActivityBarStore()
 
-console.log('Explorer visible:', leftActivePanel === 'explorer')
-console.log('Explorer width:', leftWidth)
+console.log('Project panel visible:', leftActivePanel === 'project')
+console.log('Project panel width:', leftWidth)
 ```
 
 ## Known Issues

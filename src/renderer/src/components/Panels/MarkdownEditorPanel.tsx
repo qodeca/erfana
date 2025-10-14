@@ -697,7 +697,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
       ) : (
         <div className="editor-empty">
           <p>No file open</p>
-          <p className="hint">Select a markdown file from the file explorer to start editing</p>
+          <p className="hint">Select a markdown file from the project panel to start editing</p>
         </div>
       )}
 

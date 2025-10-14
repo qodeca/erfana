@@ -31,8 +31,8 @@ Erfana uses a **hybrid architecture** matching VS Code's actual implementation p
 
 ```
 SplitviewReact (outer horizontal 3-column split)
-  ├─ Left: FileExplorerSplitPanel (170-600px, resizable)
-  │   └─ Wraps FileTree component
+  ├─ Left: ProjectPanelWrapper (170-600px, resizable)
+  │   └─ Wraps ProjectTree component
   ├─ Center: EditorAreaSplitPanel (400px min, flex-fills remaining)
   │   └─ Contains DockviewReact for tabbed editors
   └─ Right: GitSplitPanel + TerminalSplitPanel (170-600px each, mutually exclusive)
@@ -52,12 +52,12 @@ SplitviewReact (outer horizontal 3-column split)
 - Each opened file = new tab in DockviewReact
 
 **Key Components**:
-- `FileExplorerSplitPanel` - Splitview panel wrapping FileTree
+- `ProjectPanelWrapper` - Splitview panel wrapping ProjectTree
 - `EditorAreaSplitPanel` - Splitview panel containing nested DockviewReact
 - `GitSplitPanel` - Splitview panel for Git integration
 - `TerminalSplitPanel` - Splitview panel for terminal (mutually exclusive with Git)
 
-**Panel Communication**: DockviewApi passed via params to FileExplorerSplitPanel for opening files as tabs.
+**Panel Communication**: DockviewApi passed via params to ProjectPanelWrapper for opening files as tabs.
 
 Reference: [Dockview Documentation](https://dockview.dev/)
 
@@ -88,7 +88,7 @@ src/
         │   ├── ActivityBar/     # Vertical activity bars (left/right)
         │   ├── Panels/          # Panel implementations + WelcomePanel
         │   ├── Editor/          # Monaco + Preview + Context Menus
-        │   ├── FileTree/        # File explorer with context menu
+        │   ├── ProjectTree/     # Project tree with context menu
         │   ├── ClaudeCode/      # Claude Code integration components
         │   ├── Dialogs/         # Modal dialogs (ToolApprovalDialog)
         │   ├── ContextMenu/     # Right-click context menu
@@ -123,7 +123,7 @@ src/
 Dual vertical activity bars (VS Code-style):
 
 **Left Activity Bar**:
-- Explorer toggle
+- Project panel toggle
 - Keyboard: `Cmd/Ctrl+B`
 
 **Right Activity Bar**:

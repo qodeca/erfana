@@ -1,4 +1,4 @@
-.file-tree {
+.project-tree {
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -9,7 +9,7 @@
   font-size: 13px;
 }
 
-.file-tree-path {
+.project-tree-path {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -27,7 +27,7 @@
   flex: 1;
 }
 
-.file-tree-actions {
+.project-tree-actions {
   display: flex;
   gap: 4px;
 }
@@ -55,7 +55,7 @@
   cursor: not-allowed;
 }
 
-.file-tree-error {
+.project-tree-error {
   padding: 8px;
   background-color: #5a1d1d;
   color: #f48771;
@@ -64,25 +64,25 @@
   border-radius: 0;
 }
 
-.file-tree-content {
+.project-tree-content {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 10px;
 }
 
-.file-tree-empty {
+.project-tree-empty {
   padding: 20px;
   text-align: center;
   color: #858585;
   font-size: 12px;
 }
 
-.file-tree-node {
+.project-tree-node {
   user-select: none;
 }
 
-.file-tree-item {
+.project-tree-item {
   display: flex;
   align-items: center;
   padding: 4px 8px;
@@ -92,19 +92,19 @@
   text-overflow: ellipsis;
 }
 
-.file-tree-item:hover {
+.project-tree-item:hover {
   background-color: #2a2d2e;
 }
 
-.file-tree-item.file {
+.project-tree-item.file {
   cursor: pointer;
 }
 
-.file-tree-item.directory {
+.project-tree-item.directory {
   font-weight: 500;
 }
 
-.file-tree-item.selected {
+.project-tree-item.selected {
   background-color: #094771;
   border-left: 2px solid #0e639c;
 }
@@ -136,25 +136,25 @@
   font-weight: 500;
 }
 
-.file-tree-children {
-  /* Children are indented via paddingLeft in FileTreeNode */
+.project-tree-children {
+  /* Children are indented via paddingLeft in ProjectTreeNode */
 }
 
 /* Scrollbar styling */
-.file-tree-content::-webkit-scrollbar {
+.project-tree-content::-webkit-scrollbar {
   width: 10px;
 }
 
-.file-tree-content::-webkit-scrollbar-track {
+.project-tree-content::-webkit-scrollbar-track {
   background: #1e1e1e;
 }
 
-.file-tree-content::-webkit-scrollbar-thumb {
+.project-tree-content::-webkit-scrollbar-thumb {
   background: #424242;
   border-radius: 0;
 }
 
-.file-tree-content::-webkit-scrollbar-thumb:hover {
+.project-tree-content::-webkit-scrollbar-thumb:hover {
   background: #4e4e4e;
 }
 

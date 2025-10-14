@@ -20,8 +20,8 @@ interface ActivityBarState {
 export const useActivityBarStore = create<ActivityBarState>()(
   persist(
     (set, get) => ({
-      // Default state: Explorer open on left, nothing on right
-      leftActivePanel: 'explorer',
+      // Default state: Project panel open on left, nothing on right
+      leftActivePanel: 'project',
       rightActivePanel: null,
       leftWidth: 300,
       rightWidth: 300,

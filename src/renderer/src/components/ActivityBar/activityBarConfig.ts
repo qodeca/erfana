@@ -32,12 +32,12 @@ const getTerminalActiveIndicator = (): string | null => {
 export const activityBarPanels: ActivityBarPanel[] = [
   // Left sidebar panels
   {
-    id: 'explorer',
+    id: 'project',
     icon: Files,
-    label: 'Explorer',
-    tooltip: 'Explorer (⌘B)',
+    label: 'Project',
+    tooltip: 'Project (⌘B)',
     side: 'left',
-    dockviewPanelId: 'fileExplorer',
+    dockviewPanelId: 'project',
     order: 1,
     keyboardShortcut: 'mod+b',
     enabled: true,

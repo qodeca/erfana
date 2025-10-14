@@ -50,8 +50,8 @@ src/
     │   ├── ActivityBar/     # Vertical activity bars (left/right)
     │   ├── Panels/          # Panel implementations + WelcomePanel
     │   ├── Editor/          # Monaco + Preview + Context Menus
-    │   ├── FileTree/        # File explorer with context menu
-    │   ├── ContextMenu/     # Right-click menu (file tree)
+    │   ├── ProjectTree/     # Project panel with context menu
+    │   ├── ContextMenu/     # Right-click menu (project tree)
     │   ├── ConfirmDialog/   # Confirmation dialogs
     │   └── Toast/           # Toast notifications
     ├── contexts/            # React contexts (ToastContext)
@@ -154,10 +154,10 @@ Automatic detection and refresh for external file system changes:
 ## UI & Keyboard Shortcuts
 
 **Activity Bars**: Dual vertical activity bars (VS Code-style) on left and right edges with Lucide icon toggle buttons.
-- **Left Activity Bar**: Explorer toggle
+- **Left Activity Bar**: Project toggle
 - **Right Activity Bar**: AI Assistant toggle (top position), Git and Terminal toggles (separate panels, mutually exclusive)
 
-**File Explorer Context Menu**: Right-click files/folders for New File, New Folder, Rename, Delete actions with validation.
+**Project Panel Context Menu**: Right-click files/folders for New File, New Folder, Rename, Delete actions with validation.
 
 **Editor Tab Styling**:
 - Hover effects on tabs (lighter background)
@@ -166,7 +166,7 @@ Automatic detection and refresh for external file system changes:
 - 12px horizontal padding, 41px height
 
 **Global Keyboard Shortcuts** (work anywhere in app):
-- `Cmd/Ctrl+B` - Toggle left sidebar (Explorer)
+- `Cmd/Ctrl+B` - Toggle left sidebar (Project)
 - `Cmd/Ctrl+J` - Toggle right panel (Terminal)
 - `Ctrl+Shift+G` - Toggle right panel (Git)
 - `Cmd/Ctrl+Shift+A` - Toggle right panel (AI Assistant)

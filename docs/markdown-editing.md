@@ -64,8 +64,8 @@ Erfana supports editing multiple markdown files simultaneously with unique panel
 
 ### Opening Files
 
-- Single-click in File Explorer: Preview file
-- Double-click in File Explorer: Open in dedicated editor panel
+- Single-click in Project Panel: Preview file
+- Double-click in Project Panel: Open in dedicated editor panel
 - Multiple files can be open simultaneously
 
 **Implementation**: `MarkdownEditorPanel.tsx:314`

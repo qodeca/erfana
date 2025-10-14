@@ -127,18 +127,18 @@
   font-style: italic;
 }
 
-/* Hide close buttons for system panels (Explorer, Terminal, Git) */
+/* Hide close buttons for system panels (Project, Terminal, Git) */
 /* Uses correct dockview class names: .dv-default-tab-content (title), .dv-default-tab-action (close button) */
 
-/* Hide close button for tabs with Explorer, Terminal, or Git title */
-.dv-default-tab:has(.dv-default-tab-content:is([textContent="Explorer"], [textContent="Terminal"], [textContent="Git"])) .dv-default-tab-action {
+/* Hide close button for tabs with Project, Terminal, or Git title */
+.dv-default-tab:has(.dv-default-tab-content:is([textContent="Project"], [textContent="Terminal"], [textContent="Git"])) .dv-default-tab-action {
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
 }
 
 /* Alternative: Target by checking text content (browser support may vary) */
-.dv-default-tab .dv-default-tab-content:is([textContent~="Explorer"], [textContent~="Terminal"], [textContent~="Git"]) ~ .dv-default-tab-action {
+.dv-default-tab .dv-default-tab-content:is([textContent~="Project"], [textContent~="Terminal"], [textContent~="Git"]) ~ .dv-default-tab-action {
   display: none !important;
   visibility: hidden !important;
   pointer-events: none !important;
@@ -231,7 +231,7 @@
   pointer-events: none !important;
 }
 
-/* Sidebar panel styling (Git & Terminal) - matches Explorer panel */
+/* Sidebar panel styling (Git & Terminal) - matches Project panel */
 .sidebar-panel {
   display: flex;
   flex-direction: column;
