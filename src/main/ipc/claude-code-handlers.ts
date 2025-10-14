@@ -162,6 +162,21 @@ export function registerClaudeCodeHandlers() {
   })
 
   /**
+   * Clear session history for current project
+   * Deletes conversation files from ~/.claude/projects/
+   */
+  ipcMain.handle('claudeCode:clearSessionHistory', async () => {
+    try {
+      console.log('🗑️ Clearing session history...')
+      await claudeCliService.clearSessionHistory()
+      return { success: true }
+    } catch (error: any) {
+      console.error('❌ Error clearing session history:', error)
+      return { success: false, error: error.message }
+    }
+  })
+
+  /**
    * Approve tool use and restart session with updated permissions
    * All approvals are automatically persisted to settings
    */

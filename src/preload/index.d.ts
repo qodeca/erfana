@@ -69,6 +69,8 @@ declare global {
           count?: number
           error?: string
         }>
+        // Clear session history
+        clearSessionHistory: () => Promise<{ success: boolean; error?: string }>
         // Send message
         sendMessage: (prompt: string, context: any, sessionId: string) => void
         stop: () => void

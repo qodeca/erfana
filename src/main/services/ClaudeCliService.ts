@@ -9,6 +9,8 @@
 import { spawn, ChildProcess } from 'child_process'
 import { EventEmitter } from 'events'
 import { homedir } from 'os'
+import { promises as fs } from 'fs'
+import * as path from 'path'
 import { settingsService } from './SettingsService'
 
 /**
@@ -690,6 +692,69 @@ export class ClaudeCliService extends EventEmitter {
    */
   getMessageCount(): number {
     return this.sessionStats.messageCount
+  }
+
+  /**
+   * Clear session history for current project
+   * Deletes all JSONL files from ~/.claude/projects/[encoded-path]/
+   * This makes --continue find no history (fresh start)
+   */
+  async clearSessionHistory(): Promise<void> {
+    if (!this.projectPath) {
+      throw new Error('No project path available')
+    }
+
+    // Encode path using Claude CLI's convention: /Users/name/project → -Users-name-project
+    const encodedPath = this.projectPath
+      .split('/')
+      .filter(part => part.length > 0)
+      .join('-')
+
+    // Security: Validate encoded path
+    if (encodedPath.includes('..') || encodedPath.includes('~')) {
+      throw new Error('Invalid project path detected')
+    }
+
+    const sessionDir = path.join(homedir(), '.claude', 'projects', encodedPath)
+
+    console.log(`🗑️ Clearing session history for: ${this.projectPath}`)
+    console.log(`🗑️ Encoded path: ${encodedPath}`)
+    console.log(`🗑️ Session directory: ${sessionDir}`)
+
+    try {
+      // Check if directory exists
+      await fs.access(sessionDir)
+
+      // Read directory contents
+      const files = await fs.readdir(sessionDir)
+      const jsonlFiles = files.filter(f => f.endsWith('.jsonl'))
+
+      if (jsonlFiles.length === 0) {
+        console.log('ℹ️ No session files to delete')
+        return
+      }
+
+      console.log(`🗑️ Deleting ${jsonlFiles.length} session file(s)...`)
+
+      // Delete each .jsonl file
+      for (const file of jsonlFiles) {
+        const filePath = path.join(sessionDir, file)
+        await fs.unlink(filePath)
+        console.log(`✅ Deleted: ${file}`)
+      }
+
+      console.log('✅ Session history cleared successfully')
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        // Directory doesn't exist - no sessions to clear
+        console.log('ℹ️ No session directory found (project never used with Claude)')
+        return
+      }
+
+      // Log error but don't fail - best effort
+      console.error('⚠️ Failed to clear session history:', error.message)
+      throw new Error(`Could not delete session files: ${error.message}`)
+    }
   }
 
   /**
