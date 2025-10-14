@@ -122,34 +122,14 @@ Superior markdown capabilities with Monaco Editor + live preview:
 
 ## Auto-Refresh
 
-Automatic detection and refresh for external file system changes:
+Automatic file system change detection via chokidar:
 
-**File Content Watching** (FileWatcherService):
-- Auto-reload files modified externally (if no unsaved changes)
-- Conflict resolution UI when file has local modifications
-- File deletion warning banner
-- Debouncing (300ms) for rapid changes
-- Pause/resume during save to prevent race conditions
-- Toolbar indicator: "Reloaded from disk"
+**File Watching**: Auto-reload on external changes (conflict UI if unsaved edits), 300ms debounce, pause during save
+**Directory Watching**: Auto-refresh project tree (preserves expanded folders), 1000ms debounce, pause during CRUD ops
 
-**Directory Tree Watching** (DirectoryWatcherService):
-- Recursive watching of project folder
-- Detects file/folder creation and deletion
-- Preserves expanded folder state during refresh
-- Intelligent debouncing (1000ms bulk, 300ms single)
-- Ignored patterns: `.git`, `node_modules`, build outputs
-- Pause/resume during internal CRUD operations
-- Silent background operation (no notifications)
+**Use cases**: Git ops, NPM installs, external edits → Auto-refresh
 
-**Use Cases**:
-- Git operations (checkout, pull, merge) → Auto-refresh
-- NPM operations (install, update) → Auto-refresh
-- External editor changes → Auto-reload or conflict detection
-- File system operations → Tree updates immediately
-
-**Security**: Project root validation, resource limits, proper cleanup
-
-📚 **Full documentation**: See [docs/file-watching.md](docs/file-watching.md)
+📚 **Full documentation**: [docs/file-watching.md](docs/file-watching.md)
 
 ## UI & Keyboard Shortcuts
 
@@ -237,17 +217,12 @@ Automatic detection and refresh for external file system changes:
 
 ## Testing & Visual Verification
 
-Claude Code can visually inspect and test Erfana using **Circuit Electron MCP** (already configured):
+Use **Circuit Electron MCP** to visually test Erfana:
+1. Build: `npm run build`
+2. Launch app, take screenshots, interact with UI
+3. **IMPORTANT**: Save screenshots to `/temp/` folder
 
-**Quick Test**: Build app (`npm run build`), launch with `mcp__circuit-electron__app_launch`, take screenshots, verify UI
-
-**Capabilities**: Launch app, capture screenshots, UI interaction (click, type, shortcuts), JavaScript evaluation, element waiting
-
-**Tools**: `app_launch`, `screenshot`, `click`, `type`, `keyboard_press`, `evaluate`, `wait_for_selector`, `close`
-
-**IMPORTANT**: ALWAYS save screenshots to `/temp/` folder (create if needed)
-
-📚 **Complete guide**: [docs/testing/README.md](docs/testing/README.md) | [Quick Start](docs/testing/quickstart.md) | [Circuit Electron Guide](docs/testing/circuit-electron-guide.md) | [Test Scenarios](docs/testing/ui-scenarios.md)
+📚 **Complete guide**: [docs/testing/README.md](docs/testing/README.md) | [Quick Start](docs/testing/quickstart.md) | [MCP Tools](docs/testing/circuit-electron-guide.md) | [Scenarios](docs/testing/ui-scenarios.md)
 
 ## Claude Code Integration
 
@@ -328,67 +303,33 @@ claude -p \
 
 📚 **Detailed docs**: [Claude Code Integration Index](docs/claude-code/README.md) | [Tool Approval System](docs/claude-code/tool-approval.md) | [UI Features](docs/claude-code/ui-features.md) | [IPC Patterns](docs/ipc-patterns.md)
 
-## Agent Delegation Rules
+## Agent Delegation
 
-**Location**: `.claude/agents/` - 10 specialized subagents with independent context windows
+**Location**: `.claude/agents/` - 10 specialized subagents
 
-### When to Delegate
+**Mandatory**: code-reviewer (code changes), typescript-pro (TS files), test-automator (features), documentation-engineer (APIs), qa-expert (releases), error-detective (errors)
 
-**Mandatory Agents** (MUST USE):
-- **code-reviewer**: After ANY code changes, before commits/PRs
-- **typescript-pro**: When modifying ANY TypeScript file
-- **test-automator**: After new features, before deployment
-- **documentation-engineer**: After API/feature changes
-- **qa-expert**: Before ANY release or deployment
-- **error-detective**: When ANY error occurs
+**Proactive**: architect-reviewer (design), refactoring-specialist (quality), business-analyst (requirements), cli-developer (tools)
 
-**Proactive Agents** (USE WHEN APPLICABLE):
-- **architect-reviewer**: Architecture/design decisions
-- **refactoring-specialist**: Code complexity/smells
-- **business-analyst**: Requirements/ROI analysis
-- **cli-developer**: Automation/build tools
+**Syntax**: "Use the [agent-name] subagent to [task description]"
 
-### Invocation Syntax
+**Example**: "Use the code-reviewer subagent to review authentication module for security"
 
-Use natural language: **"Use the [agent-name] subagent to [task description]"**
-
-Examples:
-- "Use the code-reviewer subagent to review authentication module for security vulnerabilities"
-- "Use the typescript-pro subagent to add strict type definitions to API client"
-- "Use the test-automator subagent to create tests for user service"
-
-### Quick Decision Tree
-
-**Code changed?** → code-reviewer (MANDATORY)
-**TypeScript modified?** → typescript-pro (MANDATORY)
-**New feature?** → test-automator + documentation-engineer (MANDATORY)
-**Deployment?** → qa-expert (MANDATORY)
-**Error?** → error-detective (MANDATORY)
-**Architecture decision?** → architect-reviewer (PROACTIVE)
-**Code quality issue?** → refactoring-specialist (PROACTIVE)
-
-📚 **Agent Definitions**: See `.claude/agents/*.md` for detailed capabilities and tools
+📚 **Complete guide**: [docs/agent-delegation.md](docs/agent-delegation.md) - Detailed descriptions, decision framework, examples
 
 ## Documentation
 
-- [Architecture](docs/architecture.md) - Three-process model, hybrid layout architecture, tech stack, design decisions
-- [IPC Patterns](docs/ipc-patterns.md) - Secure communication patterns, current channels
-- [File Watching](docs/file-watching.md) - Auto-refresh systems, patterns, testing
-- [UI Components](docs/ui-components.md) - Activity bars, panel toggle system, keyboard shortcuts, panel communication
-- [Markdown Editing](docs/markdown-editing.md) - Editor features, shortcuts, preview
-- [Security](docs/security.md) - Security guidelines, CSP, validation patterns
-- [Known Issues](docs/known-issues.md) - Current issues, resolved issues, workarounds
-- [Development Tasks](docs/development-tasks.md) - Common development patterns, adding panels
-- **Claude Code Integration:**
-  - [Integration Index](docs/claude-code/README.md) - Quick reference and navigation
-  - [Tool Approval System](docs/claude-code/tool-approval.md) - Security model, approval flow, auto-retry
-  - [UI Features](docs/claude-code/ui-features.md) - Copilot panel, Control Panel, Planning Mode, Tool Approval Dialog
-- **Testing:**
-  - [Testing Index](docs/testing/README.md) - Complete testing documentation hub
-  - [Quick Start](docs/testing/quickstart.md) - Fast testing setup
-  - [Circuit Electron Guide](docs/testing/circuit-electron-guide.md) - Complete MCP reference
-  - [UI Scenarios](docs/testing/ui-scenarios.md) - UI verification tests (Scenarios 1-5)
-  - [Interaction Scenarios](docs/testing/interaction-scenarios.md) - User interaction tests (Scenarios 6-10)
+- [Architecture](docs/architecture.md) - Three-process model, hybrid layout, tech stack
+- [IPC Patterns](docs/ipc-patterns.md) - Secure communication patterns
+- [File Watching](docs/file-watching.md) - Auto-refresh systems
+- [UI Components](docs/ui-components.md) - Activity bars, keyboard shortcuts
+- [Markdown Editing](docs/markdown-editing.md) - Editor features, preview
+- [Security](docs/security.md) - Security guidelines, CSP
+- [Known Issues](docs/known-issues.md) - Current and resolved issues
+- [Development Tasks](docs/development-tasks.md) - Common patterns
+- [Agent Delegation](docs/agent-delegation.md) - Specialized agent usage guide
+- **Claude Code**: [Index](docs/claude-code/README.md) | [Tool Approval](docs/claude-code/tool-approval.md) | [UI Features](docs/claude-code/ui-features.md)
+- **Testing**: [Index](docs/testing/README.md) | [Quick Start](docs/testing/quickstart.md) | [MCP Guide](docs/testing/circuit-electron-guide.md) | [Scenarios](docs/testing/ui-scenarios.md)
 
 ## Useful Resources
 
