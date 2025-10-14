@@ -415,15 +415,52 @@ export function CopilotChat({
   }
 
   /**
-   * Clear conversation
+   * Clear conversation and start fresh
+   * Restarts session without --continue flag and sends familiarization prompt
    */
-  const handleClear = () => {
+  const handleClear = async () => {
     if (isRunning) {
       return
     }
 
-    if (window.confirm('Clear all messages?')) {
-      setMessages([])
+    if (window.confirm('Start fresh conversation? This will clear all messages.')) {
+      try {
+        // Step 1: Clear UI messages immediately
+        setMessages([])
+        console.log('🗑️ UI messages cleared')
+
+        // Step 2: Get project path
+        const projectPath = await window.api.file.getProjectPath()
+        if (!projectPath) {
+          throw new Error('No project path available')
+        }
+
+        // Step 3: Restart session WITHOUT --continue (fresh start)
+        console.log('🔄 Restarting session for fresh conversation...')
+        await window.api.claudeCode.stopSession()
+        await window.api.claudeCode.startSession(projectPath, isPlanningMode, true) // skipContinue=true
+
+        // Step 4: Wait for session to be ready
+        await new Promise(resolve => setTimeout(resolve, 1000))
+
+        // Step 5: Send automatic familiarization prompt
+        const familiarizePrompt = 'Please familiarize yourself with the current working directory.'
+        console.log('📝 Sending familiarization prompt')
+
+        window.api.claudeCode.sendMessage(familiarizePrompt, { projectPath }, 'auto-familiarize')
+
+        console.log('✅ Fresh conversation started')
+
+      } catch (error: any) {
+        console.error('❌ Failed to start fresh conversation:', error)
+        setMessages([{
+          id: Date.now().toString(),
+          type: 'error',
+          content: `Failed to start fresh conversation: ${error.message}`,
+          timestamp: new Date()
+        }])
+      }
+
       textareaRef.current?.focus()
     }
   }

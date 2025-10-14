@@ -141,8 +141,8 @@ const api = {
   // Claude Code operations - Persistent Session Architecture
   claudeCode: {
     // Session lifecycle
-    startSession: (projectPath: string, planningMode?: boolean): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('claudeCode:startSession', projectPath, planningMode),
+    startSession: (projectPath: string, planningMode?: boolean, skipContinue?: boolean): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('claudeCode:startSession', projectPath, planningMode, skipContinue),
 
     stopSession: (): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('claudeCode:stopSession'),

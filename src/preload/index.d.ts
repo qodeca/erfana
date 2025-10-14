@@ -47,7 +47,7 @@ declare global {
       }
       claudeCode: {
         // Session lifecycle
-        startSession: (projectPath: string, planningMode?: boolean) => Promise<{ success: boolean; error?: string }>
+        startSession: (projectPath: string, planningMode?: boolean, skipContinue?: boolean) => Promise<{ success: boolean; error?: string }>
         stopSession: () => Promise<{ success: boolean; error?: string }>
         getSessionState: () => Promise<{
           success: boolean
