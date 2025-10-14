@@ -313,7 +313,7 @@ Erfana integrates Claude Code via persistent CLI session with security-first too
 
 Security-first approach with pre-approved common tools and user approval for complex operations:
 
-- **Pre-Approved Tools** (10 total): Read, Write, Edit, Glob, Grep, Bash, WebSearch, Search, TodoWrite, Task (cover 95%+ of operations, transparent execution)
+- **Pre-Approved Tools** (10 total): Read, Write, Edit, Glob, Grep, Bash, LS, WebSearch, TodoWrite, Task (cover 95%+ of operations, transparent execution)
 - **Tools Requiring Approval**: MultiEdit, WebFetch, SlashCommand, TodoRead, NotebookRead, NotebookEdit, ExitPlanMode (complex operations, higher security implications)
 - **Modal Dialog**: ToolApprovalDialog shows tool name, description, parameters, "Remember this choice" option
 - **Auto-Retry**: After approval, system automatically re-sends user prompt with updated permissions
@@ -328,14 +328,14 @@ Security-first approach with pre-approved common tools and user approval for com
 **Native Claude CLI feature** for safe exploration and planning without file modifications:
 
 - **Activation**: Toggle button in chat interface, uses `--permission-mode plan` flag
-- **Tool Restrictions**: Only read-only tools available (Read, Grep, Task, WebSearch, Search, TodoWrite)
+- **Tool Restrictions**: Only read-only tools available (Read, LS, Grep, Task, WebSearch, TodoWrite)
 - **Blocked Tools**: Write, Edit, Bash, and all other modification tools
 - **Use Cases**: Code exploration, architecture planning, research, cost estimation before implementation
 - **Session Restart**: Toggling mode restarts Claude CLI session with updated permissions
 - **Visual Indicator**: System message in chat confirms mode change
 - **Control Panel**: Shows restricted tool set when planning mode is active
 
-**Planning Mode Tool Set** (6 tools): Read, Grep, Task, WebSearch, Search, TodoWrite
+**Planning Mode Tool Set** (6 tools): Read, LS, Grep, Task, WebSearch, TodoWrite
 
 See: [Claude Code UI Features](docs/claude-code/ui-features.md#planning-mode-toggle) for UI documentation
 
@@ -357,7 +357,7 @@ claude -p \
   --output-format stream-json \
   --verbose \
   --replay-user-messages \
-  --allowedTools Read Write Edit Glob Grep Bash WebSearch Search TodoWrite Task  # 10 pre-approved + user-approved
+  --allowedTools Read Write Edit Glob Grep Bash LS WebSearch TodoWrite Task  # 10 pre-approved + user-approved
   --resume <sessionId>  # Used when restarting with new tools
   --permission-mode plan  # Optional: Enable planning mode (read-only tools only)
 ```

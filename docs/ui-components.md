@@ -68,7 +68,7 @@ Manages:
 
 **Control Panel**: Shows session stats (messages, tools used, duration) and all 17 Claude Code tools with color-coded approval status (blue=approved, gray=not approved).
 
-**Planning Mode**: Toggle between full access and read-only mode (restricts to Read, Grep, Task, WebSearch, Search, TodoWrite).
+**Planning Mode**: Toggle between full access and read-only mode (restricts to Read, LS, Grep, Task, WebSearch, TodoWrite).
 
 For complete documentation including session lifecycle, UI states, tool approval system, and planning mode, see [Claude Code UI Features](./claude-code/ui-features.md).
 
