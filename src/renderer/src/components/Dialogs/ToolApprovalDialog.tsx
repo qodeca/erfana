@@ -1,7 +1,7 @@
 /**
  * ToolApprovalDialog Component
  *
- * Modal dialog shown when Claude wants to use a tool that hasn't been approved.
+ * Modal dialog shown when Copilot wants to use a tool that hasn't been approved.
  * Allows users to approve or deny the tool use, with option to remember the choice.
  */
 

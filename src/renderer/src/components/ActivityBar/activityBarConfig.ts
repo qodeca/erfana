@@ -59,8 +59,8 @@ export const activityBarPanels: ActivityBarPanel[] = [
   {
     id: 'claude',
     icon: Bot,
-    label: 'Claude AI',
-    tooltip: 'Claude AI Assistant (⌘⇧A)',
+    label: 'Copilot',
+    tooltip: 'Copilot (⌘⇧A)',
     side: 'right',
     dockviewPanelId: 'claude',
     order: 1,

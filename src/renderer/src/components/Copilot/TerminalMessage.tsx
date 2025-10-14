@@ -1,7 +1,7 @@
 /**
  * TerminalMessage Component
  *
- * Displays messages with Claude Code terminal aesthetic.
+ * Displays messages with Copilot terminal aesthetic.
  * Supports different message types: user, assistant, tool_use, tool_result, system, error.
  */
 

@@ -1,10 +1,10 @@
 # Claude Code UI Features
 
-Complete UI documentation for Erfana's AI Assistant Panel (Copilot) and related Claude Code interface components.
+Complete UI documentation for Erfana's Copilot panel and related Claude Code interface components.
 
-## AI Assistant Panel (Copilot)
+## Copilot Panel
 
-**Location**: `src/renderer/src/components/Panels/AiAssistantPanel.tsx`, `ClaudeCode/ClaudeCodeChat.tsx`
+**Location**: `src/renderer/src/components/Panels/CopilotPanel.tsx`, `Copilot/CopilotChat.tsx`
 
 Right sidebar panel for Claude Code integration via persistent CLI session. The panel header shows "Copilot" with a status indicator dot on the left.
 
@@ -77,13 +77,13 @@ Right sidebar panel for Claude Code integration via persistent CLI session. The 
 
 ### Components
 
-**AiAssistantPanel.tsx** (330 lines):
+**CopilotPanel.tsx** (330 lines):
 - Session lifecycle management
 - Installation and authentication flows
 - State indicators and UI state switching
-- Hosts ClaudeCodeChat component when ready
+- Hosts CopilotChat component when ready
 
-**ClaudeCodeChat.tsx** (689 lines):
+**CopilotChat.tsx** (689 lines):
 - Chat interface with message history display
 - Input textarea with auto-resize
 - Planning mode toggle button
@@ -110,7 +110,7 @@ See: [IPC Patterns](../ipc-patterns.md) | [Architecture](../architecture.md) | [
 
 ## Control Panel
 
-**Location**: Within `ClaudeCodeChat.tsx`
+**Location**: Within `CopilotChat.tsx`
 
 Collapsible panel at the top of the chat interface showing session statistics and tool approval status.
 
@@ -181,7 +181,7 @@ MultiEdit, WebFetch, SlashCommand, TodoRead, NotebookRead, NotebookEdit, ExitPla
 
 ## Planning Mode Toggle
 
-**Location**: Message input toolbar in `ClaudeCodeChat.tsx`
+**Location**: Message input toolbar in `CopilotChat.tsx`
 
 Toggle button that switches Claude CLI between full access mode and read-only planning mode.
 
@@ -210,7 +210,7 @@ When toggling planning mode, system message appears in chat:
 
 ### Implementation
 
-**Toggle Handler** (`ClaudeCodeChat.tsx:425-473`):
+**Toggle Handler** (`CopilotChat.tsx:425-473`):
 ```typescript
 const handlePlanningModeToggle = async () => {
   const newPlanningMode = !isPlanningMode
@@ -307,7 +307,7 @@ interface ToolApprovalDialogProps {
 - `ToolApprovalDialog.tsx` (110 lines) - Component logic
 - `ToolApprovalDialog.css` (239 lines) - VS Code-themed styling
 
-**Usage Pattern** (`ClaudeCodeChat.tsx`):
+**Usage Pattern** (`CopilotChat.tsx`):
 ```typescript
 const [pendingApproval, setPendingApproval] = useState<ToolApprovalRequest | null>(null)
 
