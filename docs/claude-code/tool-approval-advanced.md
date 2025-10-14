@@ -50,443 +50,103 @@ Advanced topics: IPC channels, development patterns, testing, and troubleshootin
 
 ### Adding New Tool Type
 
-**1. Add Tool Description** (`ClaudeCliService.ts:719-741`):
+**1. Add Tool Description**: Update `ClaudeCliService.ts:getToolDescription()` with new tool name and description.
 
-```typescript
-private getToolDescription(toolName: string): string {
-  const descriptions: Record<string, string> = {
-    Read: 'Read file contents',
-    Edit: 'Modify existing file with search/replace',
-    MyNewTool: 'Clear description of what MyNewTool does'
-  }
-  return descriptions[toolName] || `Execute ${toolName} tool`
-}
-```
-
-**2. Add to ToolSettingsDialog Categories** (`ToolSettingsDialog.tsx:20-60`):
-
-Add tool to appropriate category:
-```typescript
-const TOOL_CATEGORIES: ToolCategory[] = [
-  {
-    name: 'File Operations',
-    tools: [
-      { id: 'MyNewTool', name: 'MyNewTool', description: 'Clear description' }
-    ]
-  }
-]
-```
+**2. Add to ToolSettingsDialog Categories**: Update `ToolSettingsDialog.tsx:20-60` TOOL_CATEGORIES array with new tool entry.
 
 All tools are enabled by default. Users configure via Settings modal (Cmd/Ctrl+,).
 
 ### Testing Settings Modal
 
-**1. Open Settings Modal**:
-- Click gear icon in Copilot header
-- OR press Cmd/Ctrl+, when Copilot is active
+**Open**: Gear icon in Copilot header OR `Cmd/Ctrl+,`
 
-**2. Verify Default State**:
-- "Enable all tools by default" checked ✓
-- All 17 individual checkboxes checked and disabled (grayed out)
-- Counter shows "17 of 17 selected"
+**Default State**: All 17 tools enabled, global toggle checked
 
-**3. Test Selective Mode**:
-- Uncheck "Enable all tools by default"
-- Individual checkboxes become active
-- Uncheck specific tool (e.g., WebFetch)
-- Counter updates (e.g., "16 of 17 selected")
-- Verify unsaved changes indicator appears
+**Selective Mode Test**: Uncheck global toggle → customize individual tools → verify counter updates
 
-**4. Test Save & Restart**:
-- Click "Save" button
-- Verify session restarts (console: "🔄 Restarting session")
-- Verify modal closes
-- Control Panel shows updated tool list
+**Save & Restart**: Verify session restarts, modal closes, Control Panel updates
 
-**5. Verify Persistence**:
-```bash
-cat ~/.config/erfana/config.json
-# Should show: {"approvedTools": ["Read", "Write", ...", "NotebookEdit", "ExitPlanMode"], ...}
-# Missing tools: Tools unchecked in settings
-```
+**Persistence**: Check `~/.config/erfana/config.json` for approved tools list
 
-**6. Test Approval Dialog (when tool restricted)**:
-- Send message requiring restricted tool
-- ToolApprovalDialog appears
-- Approve with "Remember this choice"
-- Tool gets added back to approved list
+**Approval Dialog**: Send message requiring restricted tool → dialog appears → approve → tool added back
 
-**7. Test Reset to Defaults**:
-- Click "Reset to Defaults"
-- Inline confirmation appears
-- Click "Yes"
-- All 17 tools re-checked
-- "Enable all tools" re-checked
+**Reset**: Click "Reset to Defaults" → confirm → all tools re-enabled
 
 ### Testing Tool Approval Flow
 
-**Setup**: Restrict a tool via Settings modal
+**Setup**: Restrict tool via Settings modal (e.g., uncheck Edit)
 
-**1. Restrict Edit Tool**:
-```typescript
-// Via Settings modal
-// 1. Open modal (Cmd/Ctrl+,)
-// 2. Uncheck "Enable all tools by default"
-// 3. Uncheck "Edit" tool
-// 4. Click "Save"
-// 5. Verify config.json updated
-```
+**Trigger**: Send message requiring restricted tool
 
-**2. Trigger Approval Dialog**:
-```typescript
-// Send message requiring Edit tool
-"Change the poem in asd.md"
+**Approval Test**: Click "Approve" with "Remember" → dialog closes → session restarts with --continue → last prompt auto-retried → tool executes → config.json updated
 
-// Expected:
-// 1. ToolApprovalDialog appears
-// 2. Shows "Edit" tool with description
-// 3. Shows file_path parameter
-```
+**Denial Test**: Click "Deny" → dialog closes → session restarts without tool → no auto-retry
 
-**3. Test Approval**:
-```typescript
-// Click "Approve" with "Remember this choice" checked
-
-// Expected:
-// 1. Dialog closes
-// 2. System message: "🔄 Retrying with approved tools: ..."
-// 3. Session restarts with --continue
-// 4. Last prompt auto-retried
-// 5. Edit tool executes successfully
-// 6. config.json updated with Edit tool
-```
-
-**4. Test Denial**:
-```typescript
-// Click "Deny"
-
-// Expected:
-// 1. Dialog closes
-// 2. System message: "Tool Edit was denied"
-// 3. Session restarts without Edit tool
-// 4. No auto-retry
-```
-
-**5. Verify Persistence**:
-```bash
-cat ~/.config/erfana/config.json
-# Should include "Edit" if approved with "Remember this choice"
-```
+**Verify Persistence**: Check `~/.config/erfana/config.json` for approved tool
 
 ### Testing Planning Mode
 
-**1. Enable Planning Mode**:
-```typescript
-// Click planning mode toggle button in chat interface
+**Enable**: Click toggle → button turns blue → system message → session restarts with `--permission-mode plan` → Control Panel shows 9 safe tools
 
-// Expected:
-// 1. Button turns blue (active state)
-// 2. System message: "Planning mode enabled. Using read-only tools."
-// 3. Session restarts with --permission-mode plan
-// 4. Control Panel shows only 9 safe tools
-```
+**Test Read-Only**: Send "Read README.md" → executes successfully, no dialog
 
-**2. Test Read-Only Tools**:
-```typescript
-// Send message requiring safe tool
-"Read the contents of README.md"
+**Test Blocked**: Send "Edit README.md" → Claude responds with error, no dialog
 
-// Expected:
-// 1. Read tool executes successfully
-// 2. No approval dialog
-```
-
-**3. Test Blocked Tools**:
-```typescript
-// Send message requiring write tool
-"Edit the file README.md"
-
-// Expected:
-// 1. Claude responds with error
-// 2. "Edit tool not available in planning mode"
-// 3. No approval dialog (tool not in allowed list)
-```
-
-**4. Disable Planning Mode**:
-```typescript
-// Click planning mode toggle button again
-
-// Expected:
-// 1. Button returns to normal state
-// 2. System message: "Planning mode disabled. All approved tools available."
-// 3. Session restarts with full tool set
-// 4. Control Panel shows all 17 tools (or approved subset)
-```
+**Disable**: Click toggle again → normal state → system message → session restarts with full tool set → Control Panel shows all approved tools
 
 ### Testing Auto-Retry
 
-**Setup**: Restrict a tool, then trigger approval
+**Setup**: Restrict tool, trigger approval
 
-**1. Track Prompt**:
-```typescript
-// CopilotChat.tsx should store lastUserPrompt
-const handleSend = () => {
-  setLastUserPrompt(trimmedInput)  // This must be called
-  window.api.claudeCode.sendMessage(trimmedInput, {}, sessionId)
-}
-```
+**Verify**: Send "Edit file" → approve → check console for "🔄 Auto-retrying last prompt" → verify Edit executes
 
-**2. Trigger Approval**:
-```typescript
-// Send: "Edit the file asd.md"
-// ToolApprovalDialog appears
-// Click "Approve"
-```
-
-**3. Verify Auto-Retry**:
-```typescript
-// Expected sequence:
-// 1. Dialog closes
-// 2. Session restarts with --continue
-// 3. onSessionResumed event fires
-// 4. System message shows approved tools
-// 5. lastUserPrompt automatically re-sent
-// 6. Edit tool executes
-// 7. File modified
-
-// Check console logs:
-// "🔄 Auto-retrying last prompt: Edit the file asd.md"
-```
-
-**4. Test Without Last Prompt**:
-```typescript
-// Open new session
-// Approve tool via Settings modal (not via message)
-
-// Expected:
-// 1. Session restarts with --continue
-// 2. No auto-retry (no lastUserPrompt)
-// 3. Only system message about tool approval
-```
+**Without Prompt**: Approve via Settings (no message) → session restarts → no auto-retry, only system message
 
 ## Debugging Common Issues
 
 ### Dialog Doesn't Show
 
-**Symptoms**: Tool blocked but no approval dialog appears.
+**Diagnose**: Tool already approved? Event listener registered? IPC channel name correct? Preload API exposed?
 
-**Diagnosis**:
-1. Check tool not already in approved list
-2. Check `convertEvent()` detecting tool_use blocks
-3. Check `tool-approval-needed` event emitted
-4. Check `onToolApprovalNeeded` listener registered
+**Debug**: Add console.logs in `ClaudeCliService.convertEvent()` and `CopilotChat.onToolApprovalNeeded` listener
 
-**Debug Steps**:
-```typescript
-// ClaudeCliService.ts
-private convertEvent(event: ClaudeEvent): any {
-  if (event.type === 'tool_use') {
-    const toolName = event.name
-    if (!this.approvedTools.has(toolName)) {
-      console.log('❌ Tool not approved:', toolName)  // Should log
-      this.emit('tool-approval-needed', { ... })      // Should emit
-    }
-  }
-}
-
-// CopilotChat.tsx
-useEffect(() => {
-  const unsubscribe = window.api.claudeCode.onToolApprovalNeeded((request) => {
-    console.log('📨 Approval request received:', request)  // Should log
-    setPendingApproval(request)
-  })
-  return unsubscribe
-}, [])
-```
-
-**Common Causes**:
-- Tool already approved (check config.json)
-- Event listener not registered (check useEffect)
-- Event name mismatch (check IPC channel name)
-- Preload API not exposed (check contextBridge)
+**Check**: config.json for tool list, useEffect listener, contextBridge setup
 
 ### Tool Blocked Even After Approval
 
-**Symptoms**: User approves tool but it's still blocked on next use.
+**Diagnose**: Tool in approvedTools Set? In --allowedTools spawn args? Session restarted? Tool name case-sensitive match?
 
-**Diagnosis**:
-1. Check `approvedTools` Set contains tool name
-2. Check `--allowedTools` in spawn args includes tool
-3. Check session restarted (logs: "🔄 Restarting session")
-4. Check no typos in tool name (case-sensitive)
+**Debug**: Log `this.approvedTools` after add, spawn args before exec, stored tools in config.json
 
-**Debug Steps**:
-```typescript
-// ClaudeCliService.ts
-async approveTool(toolName: string, remember: boolean): Promise<void> {
-  this.approvedTools.add(toolName)
-  console.log('✅ Tool approved:', toolName)
-  console.log('📊 Approved tools:', Array.from(this.approvedTools))  // Verify included
-
-  if (remember) {
-    await settingsService.addApprovedTool(toolName)
-    const stored = await settingsService.getApprovedTools()
-    console.log('💾 Stored tools:', stored)  // Verify persisted
-  }
-
-  await this.restartWithNewPermissions()
-}
-
-private async startSession(...) {
-  const args = [
-    '--allowedTools', ...Array.from(this.approvedTools)
-  ]
-  console.log('🚀 Spawn args:', args)  // Verify tool in args
-}
-```
-
-**Common Causes**:
-- Tool name case mismatch (Edit vs edit)
-- Session not restarted after approval
-- Approved tools not passed to spawn args
-- electron-store persistence failed
+**Common Causes**: Case mismatch, session not restarted, persistence failed
 
 ### Context Lost After Restart
 
-**Symptoms**: Session restarts but conversation history lost.
+**Diagnose**: `--continue` flag in spawn args? Session dir `~/.claude/projects/` exists? Claude CLI version supports --continue? File permissions OK?
 
-**Diagnosis**:
-1. Check `--continue` flag in spawn args
-2. Check session directory exists: `~/.claude/projects/`
-3. Check Claude CLI version supports --continue
-4. Check file system permissions
+**Debug**: Log spawn args, check session directory with `ls -la ~/.claude/projects/`
 
-**Debug Steps**:
-```typescript
-// ClaudeCliService.ts
-private async startSession(...) {
-  const args = [
-    '-p', this.projectPath,
-    '--continue',  // Must be present
-    // ...
-  ]
-  console.log('🚀 Session start args:', args)
+**Verify**: Directory should contain `conversation.jsonl`, `context.json`, `tools.json`
 
-  // Check session directory
-  const sessionDir = path.join(os.homedir(), '.claude', 'projects',
-    this.projectPath!.replace(/[\/\\:]/g, '_'))
-  console.log('📁 Session directory:', sessionDir)
-  console.log('📁 Exists:', fs.existsSync(sessionDir))
-}
-```
-
-**Manual Check**:
-```bash
-# Check Claude CLI version
-claude --version
-
-# Check session directory
-ls -la ~/.claude/projects/
-
-# Check session files
-ls -la ~/.claude/projects/<encoded_project_path>/
-# Should show: conversation.jsonl, context.json, tools.json
-```
-
-**Common Causes**:
-- `--continue` flag missing from args
-- Session directory deleted (user cleanup or disk full)
-- Claude CLI version too old (update via brew)
-- File system permissions prevent reading
+**Common Causes**: Missing --continue flag, directory deleted, old Claude CLI version, permission issues
 
 ### Auto-Retry Doesn't Work
 
-**Symptoms**: After approval, user must manually re-send prompt.
+**Diagnose**: `lastUserPrompt` stored? `onSessionResumed` listener registered? System message shows?
 
-**Diagnosis**:
-1. Check `lastUserPrompt` stored in state
-2. Check `onSessionResumed` listener registered
-3. Check system message shows
-4. Check `sendMessage` called with `lastUserPrompt`
+**Debug**: Log in handleSend (storing prompt) and onSessionResumed (retrying)
 
-**Debug Steps**:
-```typescript
-// CopilotChat.tsx
-const handleSend = () => {
-  console.log('📨 Storing last prompt:', trimmedInput)
-  setLastUserPrompt(trimmedInput)  // Must be called
-}
-
-useEffect(() => {
-  const unsubscribe = window.api.claudeCode.onSessionResumed((data) => {
-    console.log('🔄 Session resumed:', data)
-    console.log('📝 Last prompt:', lastUserPrompt)
-
-    if (lastUserPrompt) {
-      console.log('🔁 Auto-retrying:', lastUserPrompt)
-      window.api.claudeCode.sendMessage(lastUserPrompt, {}, newSessionId)
-    } else {
-      console.log('⚠️ No last prompt to retry')
-    }
-  })
-  return unsubscribe
-}, [lastUserPrompt])
-```
-
-**Common Causes**:
-- `lastUserPrompt` not stored before approval
-- `onSessionResumed` listener not registered
-- `sendMessage` not called after resume
-- React state update timing issue
+**Common Causes**: Prompt not stored, listener not registered, sendMessage not called, React state timing
 
 ### Persistence Doesn't Work
 
-**Symptoms**: Approved tools lost on app restart.
+**Diagnose**: "Remember this choice" checked? electron-store initialized? config.json exists and writable?
 
-**Diagnosis**:
-1. Check `remember` parameter true in `approveTool()` call
-2. Check `addApprovedTool()` called
-3. Check `config.json` file exists and writable
-4. Check electron-store initialized (async import)
+**Debug**: Log remember parameter, verify addApprovedTool called, check config.json content
 
-**Debug Steps**:
-```typescript
-// ClaudeCliService.ts
-async approveTool(toolName: string, remember: boolean): Promise<void> {
-  console.log('💾 Remember:', remember)  // Should be true
+**Verify**: `cat ~/.config/erfana/config.json` should show approvedTools array
 
-  if (remember) {
-    await settingsService.addApprovedTool(toolName)
-    console.log('✅ Tool persisted')
-
-    // Verify immediately
-    const tools = await settingsService.getApprovedTools()
-    console.log('📊 All stored tools:', tools)
-  }
-}
-```
-
-**Manual Check**:
-```bash
-# Check config file exists
-cat ~/.config/erfana/config.json
-
-# Should show:
-# {
-#   "approvedTools": ["Read", "Write", "Edit", ...],
-#   "lastProjectPath": "..."
-# }
-
-# Check file permissions
-ls -la ~/.config/erfana/config.json
-# Should be writable by current user
-```
-
-**Common Causes**:
-- "Remember this choice" not checked in dialog
-- electron-store not initialized (async import issue)
-- Config file permissions (not writable)
-- Disk full (write failed)
+**Common Causes**: Checkbox not checked, electron-store async import issue, file permissions, disk full
 
 ## Advanced Troubleshooting
 
@@ -526,44 +186,13 @@ ls -la ~/.config/erfana/config.json
 
 ## Performance Optimization
 
-### Session Restart Optimization
+**Session Restart**: Full process restart (kill + spawn) on tool approval takes 200-500ms.
 
-**Current**: Full process restart (kill + spawn) on tool approval.
+**Future Improvements**: Batch approvals (500ms debounce), parallel config loading
 
-**Optimization Opportunities**:
-- Batch tool approvals (approve multiple tools before restart)
-- Debounce rapid approvals (500ms delay)
-- Parallel initialization (load config during spawn)
+**Memory**: Sessions stored in `~/.claude/projects/`. Long conversations (>1000 messages) may accumulate.
 
-**Implementation**:
-```typescript
-// Future: Batch approvals
-private pendingApprovals: Set<string> = new Set()
-private approvalTimer: NodeJS.Timeout | null = null
-
-async approveTool(toolName: string): Promise<void> {
-  this.pendingApprovals.add(toolName)
-
-  if (this.approvalTimer) clearTimeout(this.approvalTimer)
-
-  this.approvalTimer = setTimeout(() => {
-    this.approvedTools = new Set([...this.approvedTools, ...this.pendingApprovals])
-    this.pendingApprovals.clear()
-    this.restartWithNewPermissions()
-  }, 500)
-}
-```
-
-### Memory Management
-
-**Session Storage**: Each project stores conversation history in `~/.claude/projects/`.
-
-**Long Conversations**: Monitor disk usage for projects with >1000 messages.
-
-**Cleanup Strategy**:
-- Clear button removes session files
-- Manual cleanup: `rm -rf ~/.claude/projects/*`
-- Future: Automatic cleanup of old sessions (>30 days)
+**Cleanup**: Clear button removes session files, or manual `rm -rf ~/.claude/projects/*`
 
 ## Related Documentation
 

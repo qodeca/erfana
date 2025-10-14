@@ -43,6 +43,37 @@ foreground: '#ffffff'  // Bright white
 cursor: '#4fc1ff'      // Cyan
 ```
 
+### Scrollbar Styling
+
+**Visibility**: Custom WebKit scrollbar styled for clear visibility against black background.
+
+```css
+/* Container padding */
+.terminal-container { padding: 0; }
+.xterm { padding: 8px; }
+
+/* Scrollbar (16px wide, dark gray with lighter thumb) */
+.xterm-viewport::-webkit-scrollbar {
+  width: 16px;
+}
+
+.xterm-viewport::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: #555555;        // Dark gray
+  border-radius: 0;
+  border: 3px solid #1e1e1e;  // Matches track
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: #707070;        // Lighter on hover
+}
+```
+
+**Design Decision**: Darker scrollbar (#555555) provides subtlety while maintaining visibility. Border matches track for clean appearance.
+
 ### Shell Configuration
 
 **Prompt Format**: `%n %~ $` (username directory $)

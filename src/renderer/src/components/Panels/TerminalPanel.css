@@ -66,7 +66,7 @@
   flex: 1;
   width: 100%;
   height: 100%;
-  padding: 8px;
+  padding: 0;
   background: #000000;
   overflow: hidden;
   position: relative;
@@ -81,7 +81,7 @@
 /* Ensure xterm terminal fills the container */
 .terminal-container .xterm {
   height: 100% !important;
-  padding: 0;
+  padding: 8px;
 }
 
 .terminal-container .xterm-viewport {
@@ -163,20 +163,21 @@
   border: none !important;
 }
 
-/* Custom scrollbar for terminal (matches VS Code) */
+/* Custom scrollbar for terminal (highly visible) */
 .terminal-container .xterm-viewport::-webkit-scrollbar {
-  width: 10px;
+  width: 16px;
 }
 
 .terminal-container .xterm-viewport::-webkit-scrollbar-track {
-  background: #000000;
+  background: #1e1e1e;
 }
 
 .terminal-container .xterm-viewport::-webkit-scrollbar-thumb {
-  background: #424242;
+  background: #555555;
   border-radius: 0;
+  border: 3px solid #1e1e1e;
 }
 
 .terminal-container .xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background: #4e4e4e;
+  background: #707070;
 }
