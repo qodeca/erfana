@@ -53,14 +53,12 @@ src/
     │   ├── Editor/          # Monaco + Preview + Context Menus
     │   ├── ProjectTree/     # Project tree with filtering
     │   ├── ContextMenu/     # Right-click menu (project tree)
-    │   ├── ConfirmDialog/   # Confirmation dialogs
-    │   └── Toast/           # Toast notifications
-    ├── contexts/            # React contexts (ToastContext)
+    │   └── ConfirmDialog/   # Confirmation dialogs
     ├── stores/              # Zustand stores (useActivityBarStore)
     ├── hooks/               # React hooks
     ├── types/               # Shared TypeScript types (filters.ts)
     ├── utils/               # Shared utilities (fileUtils.ts)
-    └── App.tsx              # Root (wrapped with ToastProvider)
+    └── App.tsx              # Root component
 ```
 
 📚 **Detailed architecture**: See [docs/architecture.md](docs/architecture.md)

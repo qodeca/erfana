@@ -145,15 +145,4 @@ Dual vertical activity bars (VS Code-style):
 
 **State**: Managed by `useActivityBarStore` (Zustand), persists sidebar widths and active panels.
 
-## Toast Notification System
-
-Global notification system implemented using React Context:
-
-- **ToastContext.tsx**: Context provider with `showToast()` method
-- **ToastNotification.tsx**: Visual toast component
-- **Toast.css**: Styling for toast notifications
-- **Integration**: App.tsx wrapped with `<ToastProvider>`
-
-**Used for**: Clipboard operations, file operations, save confirmations
-
 See: [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md) | [Security](./security.md) | [Claude Code Integration](./claude-code/README.md)
