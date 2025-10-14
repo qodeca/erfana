@@ -140,7 +140,7 @@ Automatic file saving with debounced writes to prevent excessive disk I/O.
 
 ## Claude Code Integration
 
-Right-click context menu in markdown preview for AI-powered text operations with automatic AI Assistant panel integration.
+Right-click context menu in markdown preview for AI-powered text operations with automatic Copilot panel integration.
 
 ### Available Actions
 
@@ -153,13 +153,13 @@ Right-click context menu in markdown preview for AI-powered text operations with
 ### Behavior
 
 **Direct Send ("Elaborate")**:
-- Sends prompt immediately to AI Assistant panel
-- Auto-opens AI Assistant panel if hidden
+- Sends prompt immediately to Copilot panel
+- Auto-opens Copilot panel if hidden
 - Suggests Claude review file/project for context
 - No user review needed (streamlined UX)
 
 **Populate for Review (Other Actions)**:
-- Fills AI Assistant input field with generated prompt
+- Fills Copilot input field with generated prompt
 - User can review, edit, or send manually
 - More control for complex operations
 
@@ -173,9 +173,9 @@ Selected text includes precise line number references:
 ### Technical Implementation
 
 **Cross-Component Communication**:
-- Uses Zustand store (`useAiAssistantStore`) for message passing
-- `setPendingMessage(prompt, sendImmediately)` sends to AI panel
-- `setActivePanel('claude', 'right')` opens AI Assistant
+- Uses Zustand store (`useCopilotStore`) for message passing
+- `setPendingMessage(prompt, sendImmediately)` sends to Copilot panel
+- `setActivePanel('claude', 'right')` opens Copilot
 
 **Line Number Extraction**:
 - `getLineNumbersFromSelection()` reads `data-line` attributes from DOM
@@ -190,7 +190,7 @@ Selected text includes precise line number references:
 **Files**:
 - `PreviewContextMenu.tsx` (context menu actions, line number extraction)
 - `MarkdownPreview.tsx` (selection tracking, line number injection)
-- `useAiAssistantStore.ts` (Zustand store for messaging)
+- `useCopilotStore.ts` (Zustand store for messaging)
 
 ## Preview Features
 

@@ -15,7 +15,7 @@ import { ProjectTree } from '../ProjectTree/ProjectTree'
 import { MarkdownEditorPanel } from '../Panels/MarkdownEditorPanel'
 import { WelcomePanel } from '../Panels/WelcomePanel'
 import { WelcomeTab } from '../Panels/WelcomeTab'
-import { AiAssistantPanel } from '../Panels/AiAssistantPanel'
+import { CopilotPanel } from '../Panels/CopilotPanel'
 import { ActivityBar } from '../ActivityBar/ActivityBar'
 import { useActivityBarStore } from '../../stores/useActivityBarStore'
 import { getPanelById } from '../ActivityBar/activityBarConfig'
@@ -125,7 +125,7 @@ const EditorAreaSplitPanel = (props: ISplitviewPanelProps) => {
 }
 
 // ============================================================================
-// RIGHT SIDEBAR PANELS - Separate Git, Terminal, and AI Assistant panels
+// RIGHT SIDEBAR PANELS - Separate Git, Terminal, and Copilot panels
 // ============================================================================
 const GitSplitPanel = (_props: ISplitviewPanelProps) => {
   return (
@@ -213,7 +213,7 @@ export function AppDockLayout() {
       }
     })
 
-    // RIGHT PANELS - Git, Terminal, and AI Assistant (mutually exclusive)
+    // RIGHT PANELS - Git, Terminal, and Copilot (mutually exclusive)
     const gitPanel = event.api.addPanel({
       id: 'git-panel',
       component: 'gitPanel',
@@ -272,7 +272,7 @@ export function AppDockLayout() {
 
     const disposeClaude = claudePanel.api.onDidSizeChange(() => {
       const newWidth = claudePanel.api.width
-      console.log(`📏 AI Assistant panel resized: ${newWidth}px`)
+      console.log(`📏 Copilot panel resized: ${newWidth}px`)
       setSidebarWidth(newWidth, 'right')
     })
 
@@ -380,7 +380,7 @@ export function AppDockLayout() {
         handleActivityBarClick('git', 'right')
       }
 
-      // Cmd/Ctrl + Shift + A - Toggle AI Assistant
+      // Cmd/Ctrl + Shift + A - Toggle Copilot
       if (modKey && e.shiftKey && e.key === 'a' && !e.altKey) {
         e.preventDefault()
         handleActivityBarClick('claude', 'right')
@@ -397,7 +397,7 @@ export function AppDockLayout() {
     editorArea: EditorAreaSplitPanel,
     gitPanel: GitSplitPanel,
     terminalPanel: TerminalSplitPanel,
-    claudePanel: AiAssistantPanel
+    claudePanel: CopilotPanel
   }
 
   return (

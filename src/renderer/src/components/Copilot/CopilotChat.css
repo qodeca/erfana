@@ -1,9 +1,9 @@
 /**
- * Claude Code Chat Styles
+ * Copilot Chat Styles
  * Main chat interface styling
  */
 
-.claude-code-chat {
+.copilot-chat {
   display: flex;
   flex-direction: column;
   height: 100%;

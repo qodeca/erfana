@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-interface AiAssistantStore {
+interface CopilotStore {
   pendingMessage: string | null
   shouldSendImmediately: boolean
   setPendingMessage: (message: string, sendImmediately?: boolean) => void
@@ -8,10 +8,12 @@ interface AiAssistantStore {
 }
 
 /**
- * Store for programmatic AI Assistant message sending
- * Enables cross-component communication (e.g., context menu → chat panel)
+ * Store for programmatic Copilot message sending
+ * Enables cross-component communication (e.g., context menu → copilot panel)
+ *
+ * Note: Currently routes to Claude Code backend via window.api.claudeCode
  */
-export const useAiAssistantStore = create<AiAssistantStore>((set) => ({
+export const useCopilotStore = create<CopilotStore>((set) => ({
   pendingMessage: null,
   shouldSendImmediately: false,
 

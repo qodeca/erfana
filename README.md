@@ -100,13 +100,13 @@ erfana/
 
 ## Key Workflows
 
-### 1. Edit Selection with Claude
+### 1. Edit Selection with Copilot
 1. Open a markdown file
 2. Select text
-3. Press Cmd/Ctrl+K or click "Ask Claude"
+3. Right-click and choose "Ask Copilot..." action
 4. Enter prompt (e.g., "make this more concise")
-5. Claude streams changes in real-time
-6. Review diff and accept/reject
+5. Copilot streams changes in real-time
+6. Review and iterate
 
 ### 2. Terminal-Driven Development
 1. Use integrated terminal
