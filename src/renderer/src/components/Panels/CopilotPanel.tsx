@@ -78,11 +78,16 @@ export function CopilotPanel(_props: ISplitviewPanelProps) {
 
   // Listen to session events
   useEffect(() => {
+    console.log('🔵 EVENT LISTENERS: Registering session event listeners')
+
     const unsubscribeStarted = window.api.claudeCode.onSessionStarted((data) => {
+      console.log('🔵 EVENT: Received session-started event')
+      console.log('🔵 Event data:', data)
       console.log('✅ Session started:', data.projectPath)
       setSessionState('ready')
       setSessionError(null)
       setRestartAttempt(null)
+      console.log('🔵 Session state updated to: ready')
     })
 
     const unsubscribeStopped = window.api.claudeCode.onSessionStopped(() => {
@@ -228,44 +233,67 @@ export function CopilotPanel(_props: ISplitviewPanelProps) {
   }
 
   const handleSaveSettings = async (newApprovedTools: string[]) => {
+    console.log('💾 SETTINGS SAVE: Starting save and restart flow')
+    console.log('💾 Previous tools:', approvedTools)
+    console.log('💾 New tools:', newApprovedTools)
+
     // Store previous state for rollback
     const previousTools = approvedTools
 
     try {
-      // FIXED: Check IPC result before updating state
+      // Step 1: Save to settings
+      console.log('💾 Step 1: Saving tools to settings...')
       const saveResult = await window.api.settings.setApprovedTools(newApprovedTools)
 
       if (!saveResult.success) {
         throw new Error(saveResult.error || 'Failed to save settings')
       }
+      console.log('✅ Step 1 complete: Settings saved')
 
-      // Optimistic UI update - update state IMMEDIATELY with exact selections
+      // Step 2: Update React state optimistically
+      console.log('💾 Step 2: Updating React state...')
       setApprovedTools(newApprovedTools)
-      console.log('✅ Approved tools updated optimistically:', newApprovedTools)
+      console.log('✅ Step 2 complete: React state updated')
 
-      // Restart session with new tools
-      await window.api.claudeCode.stopSession()
+      // Step 3: Stop current session (now waits for real exit)
+      console.log('💾 Step 3: Stopping current session...')
+      const stopResult = await window.api.claudeCode.stopSession()
+      if (!stopResult.success) {
+        throw new Error(stopResult.error || 'Failed to stop session')
+      }
       setSessionState('stopped')
+      console.log('✅ Step 3 complete: Session stopped and process exited')
 
+      // Step 4: Get project path
+      console.log('💾 Step 4: Getting project path...')
       const projectPath = await window.api.file.getProjectPath()
       if (!projectPath) {
         throw new Error('No project path available')
       }
+      console.log('✅ Step 4 complete: Project path:', projectPath)
 
-      // FIXED: Check session restart result and rollback on failure
+      // Step 5: Start new session with updated tools
+      console.log('💾 Step 5: Starting new session with updated tools...')
+      console.log('💾 Tools that will be loaded:', newApprovedTools)
       const restartResult = await window.api.claudeCode.startSession(projectPath, false)
 
       if (!restartResult.success) {
         throw new Error(restartResult.error || 'Failed to restart session')
       }
-    } catch (error: any) {
-      console.error('Failed to save settings and restart session:', error)
+      console.log('✅ Step 5 complete: New session starting')
+      console.log('✅ SETTINGS SAVE: Complete! Session will emit "started" event when ready.')
 
-      // FIXED: Rollback state on failure
+      // Step 6: Session state will be updated to 'ready' via event listener (line 81-86)
+      // This happens asynchronously when the session-started event fires
+    } catch (error: any) {
+      console.error('❌ SETTINGS SAVE FAILED:', error)
+      console.error('❌ Error details:', error.message)
+
+      // Rollback state on failure
       setApprovedTools(previousTools)
       console.log('⚠️ Rolled back to previous tools:', previousTools)
 
-      // FIXED: Show error to user
+      // Show error to user
       setSessionError(`Settings update failed: ${error.message}`)
       setSessionState('error')
 
