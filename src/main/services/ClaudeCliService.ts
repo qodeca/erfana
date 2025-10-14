@@ -704,10 +704,12 @@ export class ClaudeCliService extends EventEmitter {
       throw new Error('No project path available')
     }
 
-    // Encode path using Claude CLI's convention: /Users/name/project → -Users-name-project
-    const encodedPath = this.projectPath
+    // Encode path using Claude CLI's convention: /Users/name/my project → -Users-name-my-project
+    // Rules: 1) Split by /, 2) Replace spaces with -, 3) Join with -, 4) Add leading -
+    const encodedPath = '-' + this.projectPath
       .split('/')
       .filter(part => part.length > 0)
+      .map(part => part.replace(/\s+/g, '-'))  // Replace spaces with hyphens
       .join('-')
 
     // Security: Validate encoded path
