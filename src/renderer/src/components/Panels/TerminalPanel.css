@@ -38,29 +38,6 @@
   flex-direction: column;
 }
 
-/* Clear button in header */
-.terminal-clear-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 0;
-  color: #858585;
-  transition: all 0.15s ease;
-}
-
-.terminal-clear-button:hover {
-  color: #cccccc;
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.terminal-clear-button:active {
-  background: rgba(255, 255, 255, 0.08);
-}
-
 /* Terminal container */
 .terminal-container {
   flex: 1;

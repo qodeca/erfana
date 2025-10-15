@@ -33,21 +33,27 @@
 }
 
 .icon-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
-  background-color: transparent;
-  border: 1px solid #3c3c3c;
-  border-radius: 0;
-  color: #cccccc;
+  background: none;
+  border: none;
   cursor: pointer;
-  transition: all 0.2s;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 0;
+  color: #858585;
+  transition: all 0.15s ease;
 }
 
 .icon-btn:hover:not(:disabled) {
-  background-color: #2a2d2e;
-  border-color: #0e639c;
+  color: #cccccc;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.icon-btn:active:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .icon-btn:disabled {
