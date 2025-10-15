@@ -4,6 +4,26 @@ This file tests **22 diagram types** supported by the base Mermaid.js package (v
 
 ---
 
+## 0. User Journey (Erfana Workflow)
+
+Maps the daily workflow of using Erfana for project management.
+
+```mermaid
+journey
+    title Erfana Daily Workflow
+    section Morning
+        Open Erfana: 5: Consultant
+        Review project files: 4: Consultant
+    section Afternoon
+        Edit markdown docs: 5: Consultant
+        Generate Mermaid diagrams: 4: Consultant
+    section Evening
+        Commit changes: 3: Consultant
+        Close Erfana: 5: Consultant
+```
+
+---
+
 ## 1. Flowchart
 
 Visualizes process flows and decision trees with standardized shapes and directional arrows. Flowcharts excel at representing sequential logic, conditional branching, loops, and parallel processes. They're ideal for documenting algorithms, business workflows, troubleshooting procedures, and system architectures. The diagram supports multiple node shapes (rectangles for processes, diamonds for decisions, circles for start/end points), various arrow styles for different flow types, and subgraphs for organizing complex processes into logical groupings. Flowcharts are the most versatile Mermaid diagram type, suitable for both technical and non-technical audiences.
