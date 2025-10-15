@@ -501,8 +501,20 @@ export class ClaudeCliService extends EventEmitter {
     console.log(`📤 Sending message to Claude CLI (${fullPrompt.length} chars)`)
 
     try {
+      // Check if stdin is writable before attempting write
+      if (!this.claudeProcess.stdin || this.claudeProcess.stdin.destroyed) {
+        throw new Error('Claude CLI stdin stream is not available or has been destroyed')
+      }
+
       this.claudeProcess.stdin.write(jsonLine, (error) => {
         if (error) {
+          // Suppress EPIPE errors during normal shutdown
+          const errWithCode = error as NodeJS.ErrnoException
+          if (errWithCode.code === 'EPIPE') {
+            console.log('ℹ️ Claude CLI stdin closed (process likely shutting down)')
+            return
+          }
+
           console.error('❌ Failed to write to stdin:', error)
           this.emit('error', {
             message: `Failed to send message: ${error.message}`,
@@ -511,6 +523,12 @@ export class ClaudeCliService extends EventEmitter {
         }
       })
     } catch (error: any) {
+      // Suppress EPIPE errors during normal shutdown
+      if (error.code === 'EPIPE') {
+        console.log('ℹ️ Claude CLI stdin closed (process likely shutting down)')
+        return
+      }
+
       console.error('❌ Error writing to stdin:', error)
       this.emit('error', {
         message: `Error sending message: ${error.message}`,

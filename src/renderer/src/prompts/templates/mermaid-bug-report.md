@@ -4,6 +4,7 @@ subArea: mermaid-error
 name: Mermaid Bug Report
 icon: bug
 targetPanel: terminal
+autoExecute: true
 ---
 {{#if fileRef}}{{fileRef}}
 

@@ -23,6 +23,9 @@ export const PromptFrontmatterSchema = z.object({
   /** Whether to send immediately without user review */
   sendDirectly: z.boolean().optional().default(false),
 
+  /** Whether to automatically execute (send Enter) after pasting to terminal */
+  autoExecute: z.boolean().optional().default(false),
+
   /** Order for sorting in menus (lower numbers appear first) */
   order: z.number().int().min(0).optional().default(0),
 

@@ -17,12 +17,7 @@ const parsedTemplates = parseTemplates([
   { raw: mermaidBugReportTemplate, filename: 'mermaid-bug-report.md' }
 ])
 
-console.log('📝 Parsed templates:', parsedTemplates.length)
-parsedTemplates.forEach((t) => {
-  console.log(
-    `  - ${t.id}: ${t.frontmatter.name} (area: ${t.frontmatter.area}, subArea: ${t.frontmatter.subArea})`
-  )
-})
+console.log('📝 Loaded prompt templates:', parsedTemplates.length)
 
 /**
  * Registry of all available prompt templates
@@ -37,6 +32,7 @@ export const PROMPT_REGISTRY: Record<string, PromptConfig> = parsedTemplates.red
       icon: parsed.frontmatter.icon,
       targetPanel: parsed.frontmatter.targetPanel || 'claude',
       sendDirectly: parsed.frontmatter.sendDirectly || false,
+      autoExecute: parsed.frontmatter.autoExecute || false,
       template: parsed.content, // Content without frontmatter
       // Add additional metadata from frontmatter
       area: parsed.frontmatter.area,

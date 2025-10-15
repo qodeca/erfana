@@ -88,6 +88,52 @@ See: [Markdown Editing - Code Block Rendering](./markdown-editing.md#code-block-
 
 ---
 
+### ✅ EPIPE Errors During Shutdown (RESOLVED in v0.4.0)
+
+**Previous Issue**: Application crashed with "write EPIPE" errors during cleanup, especially when closing the app with active Claude CLI sessions or terminal instances.
+
+**Root Cause**: Console.log and stream write operations continued after stdout/stderr were closed during the shutdown sequence. This happened in three scenarios:
+1. Process cleanup during `app.on('before-quit')`
+2. Child process (Claude CLI, Terminal PTY) unexpected termination
+3. Renderer process closing while main process continued logging
+
+**Stack Trace Pattern**:
+```
+Error: write EPIPE
+at afterWriteDispatched (node:internal/stream_base_commons:161:15)
+at console.log (node:internal/console/constructor:378:26)
+at /Users/.../erfana/out/main/index.js:2379:13
+```
+
+**Solution**: Implemented comprehensive EPIPE error handling:
+
+1. **Global Console Safety** (`src/main/utils/safe-console.ts`):
+   - Wraps all console methods with try-catch
+   - Silently suppresses EPIPE errors during shutdown
+   - Installed early in main process initialization
+
+2. **ClaudeCliService Protection**:
+   - Pre-write validation of stdin availability
+   - EPIPE suppression in write callback
+   - Graceful degradation with informative logging
+
+3. **TerminalService Protection**:
+   - EPIPE suppression in PTY write operations
+   - ESRCH (process not found) handling in kill operations
+   - Safe cleanup in dispose method
+
+**Status**: ✅ Application now shuts down cleanly without crashes. EPIPE errors are suppressed and logged informatively.
+
+**Files Modified**:
+- `src/main/utils/safe-console.ts` (new)
+- `src/main/index.ts` (installSafeConsole)
+- `src/main/services/ClaudeCliService.ts` (sendMessage)
+- `src/main/services/TerminalService.ts` (write, killTerminal, dispose)
+
+See: [EPIPE Error Handling Documentation](./epipe-error-handling.md)
+
+---
+
 ## Active Issues
 
 ### node-pty Build Failure

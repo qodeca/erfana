@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import { Info } from 'lucide-react'
 import './ModifyDialog.css'
 
 interface ModifyDialogProps {
@@ -18,8 +20,6 @@ export function ModifyDialog({
   onSubmit,
   onCancel
 }: ModifyDialogProps) {
-  console.log('🎨 ModifyDialog render, isOpen:', isOpen, 'selectedText length:', selectedText?.length)
-
   const [userInput, setUserInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -60,21 +60,16 @@ export function ModifyDialog({
     }
   }
 
-  if (!isOpen) {
-    console.log('⚠️ ModifyDialog returning null because isOpen is false')
-    return null
-  }
+  if (!isOpen) return null
 
-  console.log('✅ ModifyDialog rendering dialog UI')
-
-  // Truncate selected text for preview
-  const truncatedText = selectedText.length > 100
-    ? `${selectedText.substring(0, 100)}...`
+  // Truncate selected text for preview (showing source markdown)
+  const truncatedText = selectedText.length > 500
+    ? `${selectedText.substring(0, 500)}...`
     : selectedText
 
-  const isValid = userInput.trim().length >= 3 && userInput.trim().length <= 300
+  const isValid = userInput.trim().length >= 3 && userInput.trim().length <= 2000
 
-  return (
+  const dialogContent = (
     <div className="modify-dialog-overlay" onClick={handleBackdropClick}>
       <div className="modify-dialog">
         <div className="modify-dialog-header">
@@ -86,22 +81,36 @@ export function ModifyDialog({
           <div className="modify-dialog-selected-content">"{truncatedText}"</div>
         </div>
 
-        <textarea
-          ref={textareaRef}
-          className="modify-dialog-input"
-          value={userInput}
-          onChange={(e) => setUserInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={inputPlaceholder}
-          rows={4}
-          maxLength={300}
-        />
-
-        <div className="modify-dialog-char-count">
-          {userInput.length}/300 characters
+        <div className="modify-dialog-input-section">
+          <label className="modify-dialog-input-label">Your instructions:</label>
+          <textarea
+            ref={textareaRef}
+            className="modify-dialog-input"
+            value={userInput}
+            onChange={(e) => setUserInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={inputPlaceholder}
+            rows={6}
+            maxLength={2000}
+          />
+          <div className="modify-dialog-char-count">
+            {userInput.length}/2000 characters
+          </div>
         </div>
 
         <div className="modify-dialog-actions">
+          <div className="modify-dialog-info-wrapper">
+            <div className="modify-dialog-info-icon">
+              <Info size={16} strokeWidth={2} />
+            </div>
+            <div className="modify-dialog-tooltip">
+              <div className="modify-dialog-tooltip-content">
+                <kbd>Cmd/Ctrl+Enter</kbd> to submit
+                <br />
+                <kbd>Esc</kbd> to cancel
+              </div>
+            </div>
+          </div>
           <button
             className="modify-dialog-btn modify-dialog-btn-cancel"
             onClick={onCancel}
@@ -113,14 +122,13 @@ export function ModifyDialog({
             onClick={handleSubmit}
             disabled={!isValid}
           >
-            Modify
+            Apply Modification
           </button>
-        </div>
-
-        <div className="modify-dialog-hint">
-          Press <kbd>Cmd/Ctrl+Enter</kbd> to submit • <kbd>Esc</kbd> to cancel
         </div>
       </div>
     </div>
   )
+
+  // Render dialog at document root level for proper z-index stacking
+  return createPortal(dialogContent, document.body)
 }

@@ -8,12 +8,16 @@
 import { useActivityBarStore } from '../stores/useActivityBarStore'
 import { useCopilotStore } from '../stores/useCopilotStore'
 import { useTerminalStore } from '../stores/useTerminalStore'
+import { PROMPT_REGISTRY } from '../prompts/registry'
+import { promptRenderer } from '../prompts/renderer'
+import type { PromptVariables } from '../prompts/types'
 
 interface SendToPanelOptions {
   panel: 'terminal' | 'claude'
   location: 'left' | 'right'
   content: string
   sendImmediately?: boolean
+  autoExecute?: boolean
 }
 
 /**
@@ -48,7 +52,8 @@ export async function openPanelAndSendContent({
   panel,
   location,
   content,
-  sendImmediately = false
+  sendImmediately = false,
+  autoExecute = false
 }: SendToPanelOptions): Promise<boolean> {
   // Get store actions
   const { setActivePanel } = useActivityBarStore.getState()
@@ -63,7 +68,7 @@ export async function openPanelAndSendContent({
   // Send content based on panel type
   if (panel === 'terminal') {
     const { sendToTerminal } = useTerminalStore.getState()
-    return await sendToTerminal(content)
+    return await sendToTerminal(content, autoExecute)
   } else if (panel === 'claude') {
     const { setPendingMessage } = useCopilotStore.getState()
     setPendingMessage(content, sendImmediately)
@@ -71,4 +76,47 @@ export async function openPanelAndSendContent({
   }
 
   return false
+}
+
+/**
+ * Execute a prompt template with variables
+ * Centralized function for executing prompts from any trigger (context menu, button, keyboard shortcut)
+ *
+ * @param promptId - The prompt template ID from PROMPT_REGISTRY
+ * @param variables - Variables to pass to the template renderer
+ * @returns Promise<boolean> - Success status
+ *
+ * @example
+ * // Execute a prompt from a button click
+ * await executePromptTemplate('mermaid-bug-report', {
+ *   mermaidError: 'Parse error',
+ *   mermaidCode: 'graph TD...',
+ *   filePath: '/path/to/file.md'
+ * })
+ */
+export async function executePromptTemplate(
+  promptId: string,
+  variables: PromptVariables
+): Promise<boolean> {
+  // Get prompt configuration from registry
+  const config = PROMPT_REGISTRY[promptId]
+  if (!config) {
+    console.error(`❌ Prompt template not found: ${promptId}`)
+    return false
+  }
+
+  // Render template with variables
+  const renderedPrompt = promptRenderer.render(config.template, variables)
+
+  // Determine target panel (default to claude for backwards compatibility)
+  const targetPanel = config.targetPanel || 'claude'
+
+  // Execute prompt by sending to target panel
+  return await openPanelAndSendContent({
+    panel: targetPanel,
+    location: 'right',
+    content: renderedPrompt,
+    sendImmediately: config.sendDirectly || false,
+    autoExecute: config.autoExecute || false
+  })
 }
