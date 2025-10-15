@@ -1,9 +1,7 @@
 import { useState, ReactNode } from 'react'
 import { Maximize2, Minimize2, RefreshCw, Sparkles, MessageSquare, Copy, Terminal } from 'lucide-react'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
-import { useCopilotStore } from '../../stores/useCopilotStore'
-import { useActivityBarStore } from '../../stores/useActivityBarStore'
-import { useTerminalStore } from '../../stores/useTerminalStore'
+import { openPanelAndSendContent } from '../../utils/panelUtils'
 import './PreviewContextMenu.css'
 
 interface PreviewContextMenuProps {
@@ -22,6 +20,7 @@ interface CopilotAction {
   icon: ReactNode
   buildPrompt: (text: string, file: string, doc: string) => string
   sendDirectly?: boolean // If true, send directly without review
+  targetPanel?: 'claude' | 'terminal' // Which panel to send to (default: claude)
 }
 
 const COPILOT_ACTIONS: CopilotAction[] = [
@@ -30,7 +29,8 @@ const COPILOT_ACTIONS: CopilotAction[] = [
     icon: <Maximize2 size={14} strokeWidth={2} />,
     buildPrompt: (text) =>
       `I selected this text:\n\n---\n${text}\n---\n\nPlease elaborate on this text with more detail, examples, and context. Review the file and the entire project if you need more context.`,
-    sendDirectly: true // Send directly without review
+    sendDirectly: true, // Send directly without review
+    targetPanel: 'terminal' // Send to terminal instead of Copilot
   },
   {
     label: 'Ask Copilot to Rewrite',
@@ -52,6 +52,31 @@ const COPILOT_ACTIONS: CopilotAction[] = [
   }
 ]
 
+/**
+ * Read specific lines from source markdown file
+ * Returns the original markdown source (not rendered text from preview)
+ * @param filePath - Path to the source file
+ * @param startLine - Starting line number (1-indexed)
+ * @param endLine - Ending line number (1-indexed, inclusive)
+ * @returns Original source text or null if read fails
+ */
+async function readSourceLines(
+  filePath: string,
+  startLine: number,
+  endLine: number
+): Promise<string | null> {
+  try {
+    const content = await window.api.file.readFile(filePath)
+    const lines = content.split('\n')
+    // Line numbers are 1-indexed in markdown AST, but arrays are 0-indexed
+    const selectedLines = lines.slice(startLine - 1, endLine)
+    return selectedLines.join('\n')
+  } catch (error) {
+    console.error('Failed to read source lines from file:', error)
+    return null
+  }
+}
+
 export function PreviewContextMenu({
   x,
   y,
@@ -64,12 +89,22 @@ export function PreviewContextMenu({
 }: PreviewContextMenuProps) {
   const [showCustomPrompt, setShowCustomPrompt] = useState(false)
   const [customPrompt, setCustomPrompt] = useState('')
-  const setPendingMessage = useCopilotStore((state) => state.setPendingMessage)
-  const setActivePanel = useActivityBarStore((state) => state.setActivePanel)
-  const sendToTerminal = useTerminalStore((state) => state.sendToTerminal)
 
   const handleAction = async (action: CopilotAction) => {
-    let prompt = action.buildPrompt(selectedText, filePath, fullDocument)
+    // Try to read source lines from file, fall back to selectedText if unavailable
+    let textToUse = selectedText
+    if (startLine !== undefined && endLine !== undefined) {
+      const sourceText = await readSourceLines(filePath, startLine, endLine)
+      if (sourceText !== null) {
+        textToUse = sourceText
+      }
+    }
+
+    // Build prompt with source text (or fallback to rendered text)
+    let prompt = action.buildPrompt(textToUse, filePath, fullDocument)
+
+    // Determine target panel (default to claude for backwards compatibility)
+    const targetPanel = action.targetPanel || 'claude'
 
     // Add file reference with line numbers if available
     if (startLine !== undefined && endLine !== undefined) {
@@ -77,21 +112,42 @@ export function PreviewContextMenu({
         startLine === endLine
           ? `@${filePath}:${startLine}`
           : `@${filePath}:${startLine}-${endLine}`
-      prompt = `${fileRef}\n\n${prompt}`
+
+      if (targetPanel === 'claude') {
+        // Claude format: @file:line for direct file navigation
+        prompt = `${fileRef}\n\n${prompt}`
+      } else if (targetPanel === 'terminal') {
+        // Terminal format: @file:line (for Claude parsing) + human-readable context
+        const lineRef =
+          startLine === endLine ? `line ${startLine}` : `lines ${startLine}-${endLine}`
+        prompt = `${fileRef}\n\nIn ${filePath} (${lineRef}):\n\n${prompt}`
+      }
     }
 
-    // Open Copilot panel
-    setActivePanel('claude', 'right')
-
-    // Set pending message with send flag
-    setPendingMessage(prompt, action.sendDirectly || false)
+    // Open panel and send content with initialization wait
+    await openPanelAndSendContent({
+      panel: targetPanel,
+      location: 'right',
+      content: prompt,
+      sendImmediately: action.sendDirectly || false
+    })
 
     onClose()
   }
 
   const handleCustomPrompt = async () => {
     if (customPrompt.trim()) {
-      let prompt = `In ${filePath}, I selected this text:\n\n---\n${selectedText}\n---\n\n${customPrompt}`
+      // Try to read source lines from file, fall back to selectedText if unavailable
+      let textToUse = selectedText
+      if (startLine !== undefined && endLine !== undefined) {
+        const sourceText = await readSourceLines(filePath, startLine, endLine)
+        if (sourceText !== null) {
+          textToUse = sourceText
+        }
+      }
+
+      // Build prompt with source text (or fallback to rendered text)
+      let prompt = `In ${filePath}, I selected this text:\n\n---\n${textToUse}\n---\n\n${customPrompt}`
 
       // Add file reference with line numbers if available
       if (startLine !== undefined && endLine !== undefined) {
@@ -102,11 +158,13 @@ export function PreviewContextMenu({
         prompt = `${fileRef}\n\n${prompt}`
       }
 
-      // Set pending message in Copilot store
-      setPendingMessage(prompt)
-
-      // Open Copilot panel
-      setActivePanel('claude', 'right')
+      // Open Copilot panel and send content with initialization wait
+      await openPanelAndSendContent({
+        panel: 'claude',
+        location: 'right',
+        content: prompt,
+        sendImmediately: false // Custom prompts should be reviewed
+      })
 
       onClose()
     }
@@ -118,14 +176,21 @@ export function PreviewContextMenu({
   }
 
   const handleSendToTerminal = async () => {
-    // Open terminal panel if not visible
-    setActivePanel('terminal', 'right')
+    // Try to read source lines from file, fall back to selectedText if unavailable
+    let textToUse = selectedText
+    if (startLine !== undefined && endLine !== undefined) {
+      const sourceText = await readSourceLines(filePath, startLine, endLine)
+      if (sourceText !== null) {
+        textToUse = sourceText
+      }
+    }
 
-    // Wait briefly for terminal to initialize if it was just opened
-    await new Promise((resolve) => setTimeout(resolve, 100))
-
-    // Send text to terminal
-    await sendToTerminal(selectedText)
+    // Open terminal panel and send content with initialization wait
+    await openPanelAndSendContent({
+      panel: 'terminal',
+      location: 'right',
+      content: textToUse
+    })
 
     onClose()
   }
