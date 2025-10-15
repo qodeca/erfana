@@ -288,6 +288,97 @@ Available variables:
 
 See: [Prompt Templates](./prompt-templates.md) for detailed documentation
 
+## Executing Prompt Templates Programmatically
+
+Use the centralized `executePromptTemplate()` function to trigger prompts from UI buttons, keyboard shortcuts, or event handlers.
+
+### Basic Usage
+
+```typescript
+import { executePromptTemplate } from '../utils/panelUtils'
+import type { PromptVariables } from '../prompts/types'
+
+// Prepare template variables
+const variables: PromptVariables = {
+  selectedText: 'User selected text',
+  filePath: '/path/to/file.md',
+  startLine: 10,
+  endLine: 20,
+  lineRange: 'lines 10-20',
+  fileRef: '@/path/to/file.md:10-20',
+  userInput: 'Optional user input from dialog'
+}
+
+// Execute template by ID
+const success = await executePromptTemplate('elaborate', variables)
+```
+
+### Example: Button Click Handler
+
+```typescript
+const handleElaborateClick = async () => {
+  const variables: PromptVariables = {
+    selectedText: getCurrentSelection(),
+    filePath: currentFile.path,
+    startLine: selectionStart,
+    endLine: selectionEnd,
+    lineRange: formatLineRange(selectionStart, selectionEnd),
+    fileRef: `@${currentFile.path}:${selectionStart}-${selectionEnd}`
+  }
+
+  await executePromptTemplate('elaborate', variables)
+  // Prompt automatically sent to target panel (Claude or Terminal)
+  // autoExecute, sendDirectly handled automatically
+}
+```
+
+### With User Input Collection
+
+For templates with `requiresInput: true` (like "modify"):
+
+```typescript
+const handleModifyClick = async () => {
+  // Show input dialog first
+  const userInput = await showModifyDialog(selectedText)
+
+  if (!userInput) return // User cancelled
+
+  const variables: PromptVariables = {
+    selectedText: getCurrentSelection(),
+    filePath: currentFile.path,
+    userInput,  // Pass user input to template
+    // ... other variables
+  }
+
+  await executePromptTemplate('modify', variables)
+}
+```
+
+### Benefits of Centralized Execution
+
+- **Single Source of Truth**: All prompts use same execution logic
+- **Automatic Handling**: `targetPanel`, `sendDirectly`, `autoExecute` handled automatically
+- **Consistent Behavior**: Works same way from context menus, buttons, shortcuts
+- **Easy Maintenance**: Update execution logic in one place
+
+### Available Templates
+
+Get template IDs dynamically:
+
+```typescript
+import { getAllPromptIds, getPromptsForArea } from '../prompts/registry'
+
+// All templates
+const allIds = getAllPromptIds()  // ['elaborate', 'modify', 'mermaid-bug-report']
+
+// Templates for specific area
+const contextMenuPrompts = getPromptsForArea('markdown-preview', 'context-menu')
+```
+
+**Implementation**: `panelUtils.ts:executePromptTemplate()` (lines 50-85)
+
+See: [Prompt Templates](./prompt-templates.md#centralized-prompt-execution)
+
 ## Testing with Circuit Electron MCP
 
 Circuit Electron MCP allows visual inspection and testing of Erfana UI.
@@ -307,118 +398,17 @@ npm run build
 
 See: [Testing Index](./testing/README.md) | [Circuit Electron Guide](./testing/circuit-electron-guide.md) | [Quick Start](./testing/quickstart.md) | [UI Scenarios](./testing/ui-scenarios.md)
 
-## Testing Auto-Refresh Functionality
+## Testing Auto-Refresh
 
-### File Content Auto-Refresh
+File and directory watching with chokidar provides automatic refresh on external changes.
 
-Test that files automatically reload when modified externally:
+**Test Scenarios:**
+- File content reload (300ms debounce) - modify file externally, expect auto-reload
+- Conflict detection - unsaved changes + external modification shows conflict UI
+- Directory tree refresh (1000ms debounce) - external file/folder creation appears automatically
+- Pause/resume pattern - internal CRUD operations don't trigger duplicate refreshes
 
-```bash
-# 1. Open a markdown file in Erfana
-# 2. Modify it externally (e.g., with VS Code or echo)
-echo "# External Change" >> /path/to/project/test.md
-
-# Expected: File reloads automatically in Erfana
-# Toolbar shows: "Reloaded from disk" (1 second)
-```
-
-Test conflict detection:
-
-```bash
-# 1. Open file in Erfana
-# 2. Make unsaved changes in Erfana
-# 3. Modify file externally
-echo "# Conflict" >> /path/to/project/test.md
-
-# Expected: Orange conflict bar appears
-# Options: "Reload from Disk", "Keep My Version", "Dismiss"
-```
-
-Test file deletion:
-
-```bash
-# 1. Open file in Erfana
-# 2. Delete file externally
-rm /path/to/project/test.md
-
-# Expected: Red warning banner appears
-# Message: "This file has been deleted externally"
-```
-
-### Directory Tree Auto-Refresh
-
-Test file creation:
-
-```bash
-# 1. Erfana project is open
-# 2. Create file externally
-echo "# New File" > /path/to/project/new-file.md
-
-# Expected: File appears in tree automatically (within 1 second)
-```
-
-Test folder operations:
-
-```bash
-# 1. Expand some folders in Erfana file tree
-# 2. Create folder externally
-mkdir /path/to/project/new-folder
-
-# Expected: Folder appears, expanded folders remain expanded
-```
-
-Test bulk operations (git):
-
-```bash
-# 1. Erfana project is open
-# 2. Git checkout different branch
-git checkout feature-branch
-
-# Expected: Tree refreshes once after all changes settle (~1 second)
-# Expanded folders remain expanded
-```
-
-Test internal CRUD operations:
-
-```typescript
-// 1. Create file via Erfana UI
-// 2. Check console logs
-// Expected logs:
-// "⏸️  Paused directory watch"
-// "▶️  Resumed directory watch"
-// No "📁 Directory changed" message (watcher was paused)
-```
-
-### Testing Pause/Resume Pattern
-
-Verify no double-refresh during internal operations:
-
-```typescript
-// Add debug logging to ProjectTree.tsx
-const handleCreateFile = async () => {
-  console.log('1. Starting create file')
-  isInternalOperation.current = true
-  await window.api.directoryWatch.pause(projectPath)
-
-  console.log('2. Creating file')
-  await window.api.file.createFile(targetPath, fileName)
-
-  console.log('3. Refreshing tree')
-  await refreshFileTree()
-
-  console.log('4. Resuming watch')
-  await window.api.directoryWatch.resume(projectPath)
-  isInternalOperation.current = false
-}
-
-// Expected console output (no duplicate refresh):
-// 1. Starting create file
-// 2. Creating file
-// 3. Refreshing tree
-// 4. Resuming watch
-```
-
-See: [File Watching](./file-watching.md) | [Testing Index](./testing/README.md)
+See: [File Watching](./file-watching.md) for detailed testing instructions
 
 ## Debugging
 
