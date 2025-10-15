@@ -1,7 +1,8 @@
-import { useState, useRef, forwardRef } from 'react'
+import { useState, useRef, forwardRef, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { PreviewContextMenu } from '../ContextMenu/PreviewContextMenu'
+import { ModifyDialog } from '../Dialogs/ModifyDialog'
 import { MermaidDiagram } from './MermaidDiagram'
 import './MarkdownPreview.css'
 
@@ -285,8 +286,38 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
       x: number
       y: number
     } | null>(null)
+    const [modifyDialog, setModifyDialog] = useState<{
+      isOpen: boolean
+      selectedText: string
+      filePath: string
+      fullDocument: string
+      startLine?: number
+      endLine?: number
+      inputLabel?: string
+      inputPlaceholder?: string
+      onSubmit: (userInput: string) => void
+      onCancel: () => void
+    } | null>(null)
     const localRef = useRef<HTMLDivElement>(null)
     const previewRef = (ref as React.RefObject<HTMLDivElement>) || localRef
+
+    // Memoize markdown components to prevent unnecessary re-renders
+    // Only recreate when filePath changes (needed for MermaidDiagram bug reporting)
+    const markdownComponents = useMemo(
+      () => createMarkdownComponents(filePath),
+      [filePath]
+    )
+
+    // Memoize ReactMarkdown rendering to prevent re-renders when selection state changes
+    // Only re-render when content or components actually change
+    const renderedMarkdown = useMemo(
+      () => (
+        <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
+          {content}
+        </ReactMarkdown>
+      ),
+      [content, markdownComponents]
+    )
 
     const handleMouseUp = (e: React.MouseEvent) => {
       // Only capture selection on left-click (button 0)
@@ -357,9 +388,7 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
           onMouseUp={handleMouseUp}
           onContextMenu={handleContextMenu}
         >
-          <ReactMarkdown remarkPlugins={remarkPlugins} components={createMarkdownComponents(filePath)}>
-            {content}
-          </ReactMarkdown>
+          {renderedMarkdown}
         </div>
 
         {contextMenu && selection && filePath && (
@@ -372,6 +401,18 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
             startLine={selection.startLine}
             endLine={selection.endLine}
             onClose={handleCloseContextMenu}
+            onOpenModifyDialog={setModifyDialog}
+          />
+        )}
+
+        {modifyDialog && (
+          <ModifyDialog
+            isOpen={modifyDialog.isOpen}
+            selectedText={modifyDialog.selectedText}
+            inputLabel={modifyDialog.inputLabel}
+            inputPlaceholder={modifyDialog.inputPlaceholder}
+            onSubmit={modifyDialog.onSubmit}
+            onCancel={modifyDialog.onCancel}
           />
         )}
       </div>

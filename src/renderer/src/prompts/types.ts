@@ -32,6 +32,9 @@ export interface PromptVariables {
 
   /** Mermaid diagram code that failed to render (for error reporting) */
   mermaidCode?: string
+
+  /** User-provided input for prompts that require custom instructions */
+  userInput?: string
 }
 
 /**
@@ -73,4 +76,13 @@ export interface PromptConfig {
 
   /** Optional keyboard shortcut (e.g., "Cmd+Shift+E") */
   shortcut?: string
+
+  /** Whether this prompt requires user input before rendering */
+  requiresInput?: boolean
+
+  /** Label for the input field when requiresInput is true */
+  inputLabel?: string
+
+  /** Placeholder text for the input field */
+  inputPlaceholder?: string
 }

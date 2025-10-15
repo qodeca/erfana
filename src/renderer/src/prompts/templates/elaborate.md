@@ -7,12 +7,15 @@ targetPanel: terminal
 ---
 {{#if fileRef}}{{fileRef}}
 
-In {{filePath}} ({{formatLineRange startLine endLine}}):
+From {{filePath}} ({{formatLineRange startLine endLine}}):
 
-{{/if}}I selected this text:
-
+{{/if}}Selected text:
 ---
 {{selectedText}}
 ---
 
-Please elaborate on this text with more detail, examples, and context. Review the file and the entire project if you need more context.
+Elaborate on this text in 2-3 focused paragraphs (200-300 words max).
+
+Cover relevant aspects such as: background/context, supporting details, examples if helpful, connections to related concepts, or practical implications.
+
+Adapt your elaboration to the content type. Be clear and concise. Reference surrounding context in {{basename filePath}} only if the selection is unclear.

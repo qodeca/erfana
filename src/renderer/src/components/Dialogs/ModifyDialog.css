@@ -1,0 +1,151 @@
+/* ModifyDialog - Modal dialog for collecting modification instructions */
+
+.modify-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+
+.modify-dialog {
+  background-color: #252526;
+  border: 1px solid #3c3c3c;
+  border-radius: 0;
+  padding: 20px;
+  min-width: 480px;
+  max-width: 640px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Header */
+.modify-dialog-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #cccccc;
+}
+
+/* Selected text preview */
+.modify-dialog-selected {
+  background-color: #1e1e1e;
+  border-left: 3px solid #4ec9b0;
+  padding: 10px 12px;
+  border-radius: 0;
+}
+
+.modify-dialog-selected-label {
+  font-size: 11px;
+  color: #858585;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.modify-dialog-selected-content {
+  font-size: 13px;
+  color: #b8b8b8;
+  font-style: italic;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+/* Input textarea */
+.modify-dialog-input {
+  width: 100%;
+  padding: 10px 12px;
+  background-color: #3c3c3c;
+  border: 1px solid #6c6c6c;
+  border-radius: 0;
+  color: #cccccc;
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.modify-dialog-input:focus {
+  outline: none;
+  border-color: #0e639c;
+  box-shadow: 0 0 0 1px #0e639c;
+}
+
+.modify-dialog-input::placeholder {
+  color: #858585;
+}
+
+/* Character count */
+.modify-dialog-char-count {
+  font-size: 11px;
+  color: #6c6c6c;
+  text-align: right;
+}
+
+/* Action buttons */
+.modify-dialog-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.modify-dialog-btn {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color 0.2s, opacity 0.2s;
+}
+
+.modify-dialog-btn-cancel {
+  background-color: #3c3c3c;
+  color: #cccccc;
+}
+
+.modify-dialog-btn-cancel:hover {
+  background-color: #505050;
+}
+
+.modify-dialog-btn-submit {
+  background-color: #0e639c;
+  color: #ffffff;
+}
+
+.modify-dialog-btn-submit:hover:not(:disabled) {
+  background-color: #1177bb;
+}
+
+.modify-dialog-btn-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Keyboard hint */
+.modify-dialog-hint {
+  font-size: 11px;
+  color: #6c6c6c;
+  text-align: center;
+}
+
+.modify-dialog-hint kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  background-color: #3c3c3c;
+  border: 1px solid #555555;
+  border-radius: 0;
+  font-size: 10px;
+  font-family: 'SF Mono', Monaco, monospace;
+  color: #b8b8b8;
+}
