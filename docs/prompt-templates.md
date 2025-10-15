@@ -12,9 +12,8 @@ The template system consists of 6 core modules:
 src/renderer/src/prompts/
 ├── templates/           # Template markdown files
 │   ├── elaborate.md
-│   ├── improve.md
-│   ├── rewrite.md
-│   └── simplify.md
+│   ├── modify.md
+│   └── mermaid-bug-report.md
 ├── parser.ts           # YAML frontmatter parser
 ├── renderer.ts         # CSP-safe template renderer
 ├── schema.ts           # Zod validation
@@ -65,8 +64,12 @@ Please elaborate on this text with more detail, examples, and context.
 | `icon` | string | ✅ | Lucide icon name (e.g., "maximize2") |
 | `targetPanel` | string | ❌ | Target panel: "claude" or "terminal" (default: "claude") |
 | `sendDirectly` | boolean | ❌ | Send immediately without user review (default: false) |
+| `autoExecute` | boolean | ❌ | Auto-press Enter after pasting to terminal (default: false) |
+| `requiresInput` | boolean | ❌ | Show input dialog before execution (default: false) |
+| `inputLabel` | string | ❌ | Label for input dialog (if requiresInput: true) |
+| `inputPlaceholder` | string | ❌ | Placeholder for input dialog (if requiresInput: true) |
 
-**Validation:** Schema enforced by `schema.ts` (lines 1-62)
+**Validation:** Schema enforced by `schema.ts`
 
 ### Template Body Syntax
 
@@ -81,6 +84,7 @@ Templates support Handlebars-style syntax:
 {{endLine}}          # Selection end line (number)
 {{lineRange}}        # Formatted range: "line 42" or "lines 42-58"
 {{fileRef}}          # File reference: "@/path/file.md:42-58"
+{{userInput}}        # User input from dialog (if requiresInput: true)
 ```
 
 **Conditionals:**
@@ -312,10 +316,89 @@ const handleAction = async (promptId: string) => {
 ### `targetPanel: "terminal"`
 - Opens Terminal panel (right sidebar)
 - Pastes prompt as terminal input
-- User can edit before running command
+- User can edit before running command (unless `autoExecute: true`)
 - Useful for shell commands or scripts
 
 **Default:** If `targetPanel` omitted, defaults to `"claude"`
+
+### Auto-Execute Feature
+
+When `autoExecute: true` is set for terminal prompts:
+```yaml
+---
+targetPanel: terminal
+autoExecute: true
+---
+```
+
+**Behavior:**
+1. Opens terminal panel
+2. Pastes prompt text
+3. Waits 100ms for text to render
+4. Sends `\r` (carriage return) to simulate Enter key press
+5. Command executes automatically
+
+**Use Case:** Perfect for Claude Code in terminal - pastes prompt and executes immediately
+
+**Implementation:** `useTerminalStore.ts:25-59`
+
+## Centralized Prompt Execution
+
+All prompts execute through `executePromptTemplate()` in `panelUtils.ts`:
+
+```typescript
+export async function executePromptTemplate(
+  promptId: string,
+  variables: PromptVariables
+): Promise<boolean> {
+  // 1. Get config from registry
+  const config = PROMPT_REGISTRY[promptId]
+
+  // 2. Render template with variables
+  const renderedPrompt = promptRenderer.render(config.template, variables)
+
+  // 3. Open panel and send content
+  return await openPanelAndSendContent({
+    panel: config.targetPanel || 'claude',
+    location: 'right',
+    content: renderedPrompt,
+    sendImmediately: config.sendDirectly || false,
+    autoExecute: config.autoExecute || false
+  })
+}
+```
+
+**Benefits:**
+- Single source of truth - all prompts use same execution logic
+- Consistent behavior across triggers (context menu, buttons, shortcuts)
+- Automatically handles autoExecute, targetPanel, sendDirectly
+
+**Used by:** PreviewContextMenu, MermaidDiagram, future features
+
+## User Input Collection (Modify Dialog)
+
+Templates with `requiresInput: true` show input dialog before execution:
+
+```yaml
+---
+name: Modify
+requiresInput: true
+inputLabel: How should this be modified?
+inputPlaceholder: e.g., make more concise, add examples...
+---
+```
+
+**Dialog Features:**
+- React Portal overlay (entire UI, not just preview)
+- Source markdown preview (500 char truncation)
+- Multiline content with scrolling (max-height: 200px)
+- Custom scrollbar styling (dark theme)
+- 2000 character limit
+- Keyboard shortcuts: Cmd/Ctrl+Enter (submit), Esc (cancel)
+
+**Variable:** User input available as `{{userInput}}` in template
+
+**Implementation:** `ModifyDialog.tsx` (React Portal), `PreviewContextMenu.tsx` (dialog handling)
 
 ## Line Range Tracking
 
@@ -390,60 +473,13 @@ function getLineNumbersFromSelection(selection, containerRef) {
 
 ### Template Files
 
-- `templates/elaborate.md` - Expand with detail
-- `templates/improve.md` - Grammar/style/clarity
-- `templates/rewrite.md` - Rephrase differently
-- `templates/simplify.md` - Make clearer/simpler
-- `templates/mermaid-bug-report.md` - Report Mermaid diagram errors to Terminal
+- `templates/elaborate.md` - Expand with detail (autoExecute: true, terminal)
+- `templates/modify.md` - Custom modification (requiresInput: true, autoExecute: true, terminal)
+- `templates/mermaid-bug-report.md` - Report Mermaid diagram errors (autoExecute: true, terminal)
 
-## Architectural Decisions
+## Known Limitations
 
-### Template ID System (Current Limitation)
-
-**Current Implementation:**
-Templates are identified by slugified display names:
-```typescript
-// parser.ts
-const id = slugify(result.data.name)  // "Mermaid Bug Report" → "mermaid-bug-report"
-```
-
-**Problem:**
-- Fragile coupling between display name and programmatic identifier
-- Changing template name breaks all code references
-- Requires mental mapping between `name` and derived ID
-
-**Example Issue:**
-```yaml
-# Template frontmatter
----
-name: Report Mermaid Error  # Slugifies to "report-mermaid-error"
----
-```
-```typescript
-// Code reference
-const config = PROMPT_REGISTRY['mermaid-bug-report']  // WRONG ID!
-// Returns undefined because actual ID is "report-mermaid-error"
-```
-
-**Recommended Solution:**
-Add explicit `id` field to frontmatter:
-```yaml
----
-id: mermaid-bug-report    # Explicit, stable identifier
-name: Mermaid Bug Report  # Display name (can change freely)
----
-```
-
-**Implementation Steps:**
-1. Add `id` field to `PromptFrontmatterSchema` (schema.ts)
-2. Update parser to use explicit ID instead of slugify
-3. Add uniqueness validation in registry
-4. Migrate all existing templates (elaborate, improve, rewrite, simplify, mermaid-bug-report)
-5. Remove slugify function
-
-**Status:** Architecture review complete, implementation pending.
-
-**See:** [Known Issues - Template ID System](./known-issues.md#template-id-system)
+**Template ID System:** IDs are generated by slugifying display names (`"Mermaid Bug Report"` → `"mermaid-bug-report"`). Changing template names breaks code references. Consider adding explicit `id` field for stability. See [Known Issues](./known-issues.md#template-id-system)
 
 ## Dependencies
 

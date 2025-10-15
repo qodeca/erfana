@@ -145,12 +145,41 @@ Right-click context menu in markdown preview for AI-powered text operations with
 
 ### Available Actions
 
-1. **Elaborate** - Expands selected text with detail (sends to Terminal)
-2. **Improve** - Grammar, style, clarity improvements (sends to Terminal)
-3. **Simplify** - Makes text clearer and simpler (sends to Terminal)
-4. **Rewrite** - Rephrases in different style (sends to Terminal)
-5. **Custom** - Write your own custom prompt (sends to Copilot for review)
-6. **Send to Terminal** - Paste selection directly to terminal input
+1. **Elaborate** - Expands selected text with detail, examples, and context (sends to Terminal with auto-execute)
+2. **Modify** - Custom modification with user input (interactive dialog, sends to Terminal with auto-execute)
+3. **Send to Terminal** - Paste selection directly to terminal input (for custom workflows)
+
+### Modify Action & Input Dialog
+
+The **Modify** action provides a flexible way to transform selected text by collecting user instructions through an interactive dialog.
+
+**Dialog Features:**
+- **React Portal Overlay**: Renders at document.body level (entire UI, not just preview) for proper z-index layering
+- **Source Preview**: Displays original markdown source (not rendered HTML) with 500 character truncation
+- **Multiline Input**: Textarea with scrolling support (max-height: 200px)
+- **Character Limit**: 2000 characters for modification instructions
+- **Custom Scrollbar**: Dark theme scrollbar styling for consistency
+- **Sharp Design**: No rounded corners (matches Erfana's design language)
+- **Keyboard Shortcuts**:
+  - `Cmd/Ctrl+Enter` - Submit modification prompt
+  - `Esc` - Cancel and close dialog
+- **Visual Tooltip**: Info icon (ⓘ) displays keyboard shortcuts on hover
+
+**User Workflow:**
+1. Right-click selected text in preview → **Modify**
+2. Dialog appears showing truncated source (500 chars max)
+3. Enter modification instructions (e.g., "make more concise", "add examples")
+4. Press `Cmd/Ctrl+Enter` or click Submit
+5. Prompt automatically sent to Terminal and executed with Claude Code
+
+**Template Integration:**
+- Uses `requiresInput: true` in template frontmatter
+- User input available as `{{userInput}}` variable in template
+- Combines with `autoExecute: true` for seamless Claude Code workflow
+
+**Implementation**: `ModifyDialog.tsx` (React Portal component), `PreviewContextMenu.tsx` (dialog handling)
+
+See: [Prompt Templates](./prompt-templates.md) for `requiresInput` configuration
 
 ### Prompt Template System
 
@@ -168,6 +197,7 @@ Context menu actions are powered by dynamic prompt templates:
 - `{{startLine}}`, `{{endLine}}` - Selection line range
 - `{{fileRef}}` - File reference: `@/path/file.md:10-20`
 - `{{lineRange}}` - Formatted: "line 10" or "lines 10-20"
+- `{{userInput}}` - User input from dialog (if `requiresInput: true`)
 
 **See:** [Prompt Templates](./prompt-templates.md) for creating custom templates
 

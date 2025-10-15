@@ -14,6 +14,8 @@ This document covers supporting services. For the primary ClaudeCliService API, 
 
 Manages terminal emulator instances with xterm.js + node-pty.
 
+**EPIPE Error Handling:** Uses `safe-console` utility to prevent EPIPE crashes during terminal cleanup. See [EPIPE Error Handling](./epipe-error-handling.md) for details.
+
 ### Public Methods
 
 #### `createTerminal(id: string, cwd: string, cols: number, rows: number): Promise<void>`

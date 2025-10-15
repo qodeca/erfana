@@ -81,9 +81,11 @@ Business logic lives in service classes (`src/main/services/`):
 - `FileWatcherService.ts` - File content auto-refresh (300ms debounce)
 - `DirectoryWatcherService.ts` - Directory tree auto-refresh (1000ms debounce)
 - `SettingsService.ts` - Persistent storage with electron-store (async, dynamic ES Module import)
-- `ClaudeCliService.ts` - Persistent Claude CLI session (long-running process, JSONL stdin/stdout)
-- `TerminalService.ts` - Terminal emulator (xterm.js + node-pty, PTY lifecycle, WebGL rendering)
+- `ClaudeCliService.ts` - Persistent Claude CLI session (long-running process, JSONL stdin/stdout, EPIPE-safe logging)
+- `TerminalService.ts` - Terminal emulator (xterm.js + node-pty, PTY lifecycle, WebGL rendering, EPIPE-safe logging)
 - `GitService.ts` - Git operations (future)
+
+**EPIPE Error Handling**: TerminalService and ClaudeCliService use `safe-console` utility to prevent crashes from broken pipe errors during cleanup. See [docs/epipe-error-handling.md](docs/epipe-error-handling.md)
 
 ```typescript
 export class MyService {
@@ -116,6 +118,9 @@ Superior markdown capabilities with Monaco Editor + live preview:
 - **Auto-Save**: Debounced auto-save (2s after last edit) with visual indicator
 - **Claude Integration**: Right-click context menu in preview for AI-powered text operations
   - **Prompt Templates**: Dynamic templates with CSP-safe rendering (YAML frontmatter + Handlebars-style syntax)
+  - **Auto-Execute**: Terminal prompts automatically press Enter after pasting (seamless Claude Code workflow)
+  - **Modify Dialog**: Interactive input collection with React Portal overlay (2000 char limit, keyboard shortcuts)
+  - **Centralized Execution**: Single `executePromptTemplate()` function for consistent behavior across triggers
   - **Line Range Tracking**: Accurate source mapping with data-line-start/end attributes for multi-line elements
   - **Source Reading**: Reads original markdown source (not rendered HTML) for precise text extraction
 - **View Modes**: Editor only, split view with bidirectional scroll sync, preview only
