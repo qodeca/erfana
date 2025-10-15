@@ -238,105 +238,32 @@ Use **Circuit Electron MCP** to visually test Erfana:
 
 ## Claude Code Integration
 
-**Status**: ✅ FULLY IMPLEMENTED - Persistent session architecture with tool approval system
+**Status**: ✅ FULLY IMPLEMENTED - Persistent session with tool approval and conversation preservation
 
-Erfana integrates Claude Code via persistent CLI session with security-first tool approval for AI-powered assistance within the IDE.
+**Quick Facts**:
+- **Requirement**: Claude CLI via MAX subscription (`brew install claude`)
+- **Architecture**: Persistent JSONL session (process runs from project open to close)
+- **Location**: Right sidebar Copilot panel (Cmd/Ctrl+Shift+A)
+- **Tool Policy**: All 17 Claude Code tools enabled by default (opinionated for consultants)
+- **Conversation Preservation**: `--continue` flag preserves history across tool approvals and planning mode toggles
 
-### Architecture
+**Key Features**:
+- **Tool Approval System**: Settings modal (Cmd/Ctrl+,) for per-tool configuration
+- **Planning Mode**: Toggle for safe exploration (restricts to 9 read-only tools)
+- **Control Panel**: Session stats (messages, tools used, duration) + color-coded tool status
+- **Auto-Retry**: Seamless tool approval flow with session restart + conversation preservation
 
-- **ClaudeCliService** (`src/main/services/ClaudeCliService.ts`): Spawns and manages long-running Claude CLI process
-- **Persistent Session**: Process runs from project open to project close, maintains conversation context
-- **JSONL Communication**: Bidirectional stdin/stdout streaming with `--input-format stream-json` and `--output-format stream-json`
-- **Auto-Restart**: Exponential backoff recovery (max 3 attempts) on process crashes
-- **Session States**: 'stopped' | 'starting' | 'ready' | 'error'
+**Enabled Tools** (17 total):
+- File: Read, Write, Edit, MultiEdit, Glob, Grep, LS
+- System: Bash
+- AI/Web: WebSearch, WebFetch, Task
+- Workflow: TodoRead, TodoWrite, SlashCommand, ExitPlanMode
+- Notebooks: NotebookRead, NotebookEdit
 
-### UI
+**Planning Mode Tools** (9 safe tools):
+Read, LS, Glob, Grep, Task, WebSearch, TodoRead, TodoWrite, NotebookRead
 
-- **Copilot Panel**: Right sidebar, accessible via activity bar icon (labeled "Copilot")
-- **Installation Check**: Detects Claude CLI, shows Homebrew install command if missing
-- **Authentication**: OAuth token setup flow with visual feedback
-- **Session Indicators**: Color-coded dots (green=ready, yellow=starting, red=error)
-- **Chat Interface**: Message history (user/assistant/tool_use), stop generation button
-- **Control Panel**: Collapsible panel showing session stats (messages, tools used, duration) and all 17 Claude Code tools with color-coded approval status
-- **Planning Mode Toggle**: Switch between full access and read-only mode (restricts to safe exploration tools)
-- **Settings Modal**: Gear icon in header opens blocking modal dialog for tool authorization configuration (Cmd/Ctrl+,)
-
-### Tool Approval System
-
-Opinionated approach optimized for consultant workflow with all tools pre-authorized by default:
-
-- **Pre-Approved Tools** (17 total): All Claude Code tools enabled by default
-  - **File Operations**: Read, Write, Edit, MultiEdit, Glob, Grep, LS
-  - **System**: Bash
-  - **AI & Web**: WebSearch, WebFetch, Task
-  - **Workflow**: TodoRead, TodoWrite, SlashCommand, ExitPlanMode
-  - **Notebooks**: NotebookRead, NotebookEdit
-- **Configuration UI**: Settings modal (gear icon in Copilot header, Cmd/Ctrl+,) provides per-tool authorization control
-- **Global Toggle**: "Enable all tools by default" checkbox for quick configuration
-- **Persistence**: Tool settings saved via electron-store, survive app restarts
-- **Session Restart**: Tool changes trigger session restart with `--continue` flag to preserve conversation context
-- **Modal Dialog**: ToolApprovalDialog appears only if user manually restricts a tool and Claude attempts to use it
-
-**Key Architecture Decision**: `--allowedTools` flag is immutable at runtime, requiring session restart to add new tools.
-
-### Planning Mode
-
-**Native Claude CLI feature** for safe exploration and planning without file modifications:
-
-- **Activation**: Toggle button in chat interface, uses `--permission-mode plan` flag
-- **Tool Restrictions**: Only read-only and safe tools available (9 tools)
-- **Blocked Tools**: Write, Edit, MultiEdit, Bash, WebFetch, SlashCommand, NotebookEdit, ExitPlanMode
-- **Use Cases**: Code exploration, architecture planning, research, cost estimation before implementation
-- **Session Restart**: Toggling mode restarts Claude CLI session with updated permissions
-- **Visual Indicator**: System message in chat confirms mode change
-- **Control Panel**: Shows restricted tool set when planning mode is active
-
-**Planning Mode Tool Set** (9 safe tools): Read, LS, Glob, Grep, Task, WebSearch, TodoRead, TodoWrite, NotebookRead
-
-See: [Claude Code UI Features](docs/claude-code/ui-features.md#planning-mode-toggle) for UI documentation
-
-### Conversation Preservation
-
-**Behavior**: Erfana automatically preserves conversation history across all configuration changes using Claude CLI's --continue flag.
-
-**How It Works**:
-- Uses `--continue` flag (directory-based, finds latest conversation automatically)
-- One project directory = One conversation thread
-- Session history stored client-side in `~/.claude/projects/`
-- Tool changes, planning mode toggles, approvals all preserve context
-
-**Benefits**:
-- ✅ Never lose context when changing tools or toggling planning mode
-- ✅ Seamless workflow - configuration changes don't interrupt discussions
-- ✅ Simple & reliable - no complex session ID management
-
-**Technical**: Uses `claude --continue` flag which automatically resumes the latest conversation in the current directory.
-
-📚 **Full documentation**: See [Conversation Preservation](docs/claude-code/conversation-preservation.md)
-
-### Implementation
-
-**Files**:
-- Service: `src/main/services/ClaudeCliService.ts` (~1060 lines)
-- IPC: `src/main/ipc/claude-code-handlers.ts` (~240 lines)
-- Settings: `src/main/ipc/settings-handlers.ts` (tool settings persistence)
-- UI: `src/renderer/src/components/Panels/CopilotPanel.tsx`
-- Chat: `src/renderer/src/components/Copilot/CopilotChat.tsx`
-- Dialogs: `src/renderer/src/components/Dialogs/ToolApprovalDialog.tsx`, `ToolSettingsDialog.tsx`
-
-**Flags Used**:
-```bash
-claude -p /path/to/project \
-  --continue \
-  --input-format stream-json \
-  --output-format stream-json \
-  --verbose \
-  --replay-user-messages \
-  --allowedTools Read Write Edit MultiEdit Glob Grep Bash LS WebSearch WebFetch SlashCommand TodoRead TodoWrite Task NotebookRead NotebookEdit ExitPlanMode  # All 17 tools by default
-  --permission-mode plan  # Optional: Enable planning mode (restricts to 9 safe tools)
-```
-
-📚 **Detailed docs**: [Claude Code Integration Index](docs/claude-code/README.md) | [Tool Approval Core](docs/claude-code/tool-approval-core.md) | [Tool Approval Advanced](docs/claude-code/tool-approval-advanced.md) | [Conversation Preservation](docs/claude-code/conversation-preservation.md) | [UI Features](docs/claude-code/ui-features.md) | [IPC Patterns](docs/ipc-patterns.md)
+📚 **Complete documentation**: [Claude Code Index](docs/claude-code/README.md) | [Tool Approval](docs/claude-code/tool-approval-core.md) | [Conversation Preservation](docs/claude-code/conversation-preservation.md) | [UI Features](docs/claude-code/ui-features.md) | [API Reference](docs/api-reference.md#claudecliservice)
 
 ## Agent Delegation
 
@@ -354,18 +281,44 @@ claude -p /path/to/project \
 
 ## Documentation
 
+### Core Documentation
+
 - [Architecture](docs/architecture.md) - Three-process model, hybrid layout, tech stack
 - [IPC Patterns](docs/ipc-patterns.md) - Secure communication patterns
+- [API Reference](docs/api-reference.md) - Service class APIs (ClaudeCliService, TerminalService, etc.)
+- [Keyboard Shortcuts](docs/keyboard-shortcuts.md) - Complete shortcut reference
+- [Troubleshooting](docs/troubleshooting.md) - Common issues and solutions
+
+### Features & Integration
+
 - [File Watching](docs/file-watching.md) - Auto-refresh systems
-- [UI Components](docs/ui-components.md) - Activity bars, keyboard shortcuts
+- [UI Components](docs/ui-components.md) - Activity bars, panels, keyboard shortcuts
 - [Terminal](docs/terminal.md) - Terminal emulator with xterm.js + node-pty
-- [Markdown Editing](docs/markdown-editing.md) - Editor features, preview
+- [Markdown Editing](docs/markdown-editing.md) - Editor features, preview, Mermaid diagrams
+- [Prompt Templates](docs/prompt-templates.md) - AI prompt template system
+- [Project Panel](docs/project-panel.md) - File tree, filtering, context menu
+
+### Development & Quality
+
 - [Security](docs/security.md) - Security guidelines, CSP
 - [Known Issues](docs/known-issues.md) - Current and resolved issues
 - [Development Tasks](docs/development-tasks.md) - Common patterns
 - [Agent Delegation](docs/agent-delegation.md) - Specialized agent usage guide
-- **Claude Code**: [Index](docs/claude-code/README.md) | [Tool Approval Core](docs/claude-code/tool-approval-core.md) | [Tool Approval Advanced](docs/claude-code/tool-approval-advanced.md) | [Conversation Preservation](docs/claude-code/conversation-preservation.md) | [UI Features](docs/claude-code/ui-features.md)
-- **Testing**: [Index](docs/testing/README.md) | [Quick Start](docs/testing/quickstart.md) | [MCP Guide](docs/testing/circuit-electron-guide.md) | [Scenarios](docs/testing/ui-scenarios.md)
+
+### Claude Code Integration
+
+- [Index](docs/claude-code/README.md) - Overview and quick reference
+- [Tool Approval Core](docs/claude-code/tool-approval-core.md) - Tool approval system fundamentals
+- [Tool Approval Advanced](docs/claude-code/tool-approval-advanced.md) - IPC, testing, debugging
+- [Conversation Preservation](docs/claude-code/conversation-preservation.md) - Session management with --continue
+- [UI Features](docs/claude-code/ui-features.md) - Copilot panel, control panel, dialogs
+
+### Testing
+
+- [Index](docs/testing/README.md) - Testing documentation overview
+- [Quick Start](docs/testing/quickstart.md) - Fast testing patterns
+- [Circuit Electron Guide](docs/testing/circuit-electron-guide.md) - MCP tool reference
+- [UI Scenarios](docs/testing/ui-scenarios.md) | [Interaction Scenarios](docs/testing/interaction-scenarios.md) - Test scenarios
 
 ## Useful Resources
 
