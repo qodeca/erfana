@@ -115,12 +115,15 @@ Superior markdown capabilities with Monaco Editor + live preview:
 - **Document Statistics**: Real-time word count, character count, lines, reading time
 - **Auto-Save**: Debounced auto-save (2s after last edit) with visual indicator
 - **Claude Integration**: Right-click context menu in preview for AI-powered text operations
+  - **Prompt Templates**: Dynamic templates with CSP-safe rendering (YAML frontmatter + Handlebars-style syntax)
+  - **Line Range Tracking**: Accurate source mapping with data-line-start/end attributes for multi-line elements
+  - **Source Reading**: Reads original markdown source (not rendered HTML) for precise text extraction
 - **View Modes**: Editor only, split view with bidirectional scroll sync, preview only
 - **Scroll Synchronization**: Editor ↔ preview scrolling in split view (line-to-pixel mapping, 50ms debounce)
 - **Mermaid Diagrams**: 22 diagram types (flowcharts, sequence, class, state, Gantt, ER, timelines, and more)
 - **Medium.com Preview**: Charter serif font, 18px, compact spacing, 680px max width, professional typography
 
-📚 **Markdown features**: See [docs/markdown-editing.md](docs/markdown-editing.md)
+📚 **Markdown features**: See [docs/markdown-editing.md](docs/markdown-editing.md) | [docs/prompt-templates.md](docs/prompt-templates.md)
 
 ## Auto-Refresh
 

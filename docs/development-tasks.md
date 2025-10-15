@@ -222,118 +222,90 @@ Protection is automatic - click interception and auto-restore work immediately.
 
 See: [UI Components](./ui-components.md#panel-protection)
 
+## Creating Prompt Templates
+
+Add new AI-powered prompts for markdown preview context menu.
+
+### 1. Create Template File
+
+Create `src/renderer/src/prompts/templates/your-template.md`:
+
+```markdown
+---
+area: markdown-preview
+subArea: context-menu
+name: Summarize
+icon: list
+targetPanel: terminal
+sendDirectly: false
+---
+{{#if fileRef}}{{fileRef}}
+
+{{/if}}Summarize this text in 2-3 sentences:
+
+---
+{{selectedText}}
+---
+```
+
+### 2. Validate Schema
+
+Template automatically validates against Zod schema:
+- `area` (required): Context area (e.g., "markdown-preview")
+- `subArea` (required): Specific location (e.g., "context-menu")
+- `name` (required): Display name in UI
+- `icon` (required): Lucide icon name (e.g., "list", "sparkles", "maximize2")
+- `targetPanel` (optional): "claude" or "terminal" (default: "claude")
+- `sendDirectly` (optional): Send immediately without review (default: false)
+
+### 3. Use Template Variables
+
+Available variables:
+- `{{selectedText}}` - Selected text from markdown source
+- `{{filePath}}` - File path
+- `{{startLine}}`, `{{endLine}}` - Line numbers
+- `{{fileRef}}` - File reference: `@/path/file.md:10-20`
+- `{{lineRange}}` - Formatted: "line 10" or "lines 10-20"
+
+### 4. Use Conditionals & Helpers
+
+```handlebars
+{{#if fileRef}}
+  Content shown only if fileRef exists
+{{/if}}
+
+{{formatLineRange startLine endLine}}  # "line 42" or "lines 42-58"
+{{basename filePath}}                   # Filename only
+{{truncate selectedText 100}}           # First 100 chars
+```
+
+### 5. Test Template
+
+1. HMR will auto-reload template in dev mode
+2. Right-click markdown selection in preview
+3. Verify new template appears in context menu
+4. Test prompt rendering with various selections
+
+See: [Prompt Templates](./prompt-templates.md) for detailed documentation
+
 ## Testing with Circuit Electron MCP
 
-Circuit Electron MCP allows Claude Code to visually inspect and test Erfana UI.
-
-### Quick Test After Code Changes
+Circuit Electron MCP allows visual inspection and testing of Erfana UI.
 
 ```bash
-# 1. Build first
+# Build first
 npm run build
-
-# 2. Use Circuit Electron MCP
 ```
 
-```typescript
-// Launch and screenshot
-const s = mcp__circuit-electron__app_launch({
-  app: "/Users/marcinobel/Projects/erfana/out/main/index.js",
-  compressScreenshots: true
-})
+**Workflow:**
+1. Launch app: `app_launch({ app: "/path/to/erfana/out/main/index.js" })`
+2. Interact: `click_by_text()`, `keyboard_press()`, `wait_for_selector()`
+3. Verify: `screenshot()`, `evaluate()`
+4. Close: `close({ sessionId })`
 
-mcp__circuit-electron__screenshot({ sessionId: s.sessionId })
-mcp__circuit-electron__close({ sessionId: s.sessionId })
-```
+**Common Selectors:** `.app-dock-layout`, `.project-tree`, `.monaco-editor`, `.preview-pane`, `[title="Project"]`, `[title="Terminal"]`
 
-### Testing New Feature
-
-```typescript
-// 1. Launch app
-const s = mcp__circuit-electron__app_launch({ app: "..." })
-
-// 2. Navigate to feature
-mcp__circuit-electron__click_by_text({ sessionId: s.sessionId, text: "Feature Name" })
-mcp__circuit-electron__wait_for_selector({ sessionId: s.sessionId, selector: ".feature-element" })
-
-// 3. Screenshot
-mcp__circuit-electron__screenshot({ sessionId: s.sessionId })
-
-// 4. Verify
-const works = mcp__circuit-electron__evaluate({
-  sessionId: s.sessionId,
-  expression: "document.querySelector('.expected-result') !== null"
-})
-
-// 5. Close
-mcp__circuit-electron__close({ sessionId: s.sessionId })
-```
-
-### Testing Keyboard Shortcut
-
-```typescript
-const s = mcp__circuit-electron__app_launch({ app: "..." })
-
-// Press shortcut (e.g., Cmd+B)
-mcp__circuit-electron__keyboard_press({
-  sessionId: s.sessionId,
-  key: "b",
-  modifiers: ["Meta"]
-})
-
-// Verify result
-mcp__circuit-electron__screenshot({ sessionId: s.sessionId })
-const hidden = mcp__circuit-electron__evaluate({
-  sessionId: s.sessionId,
-  expression: "!document.querySelector('[title=\"Project\"]')?.parentElement.offsetParent"
-})
-
-mcp__circuit-electron__close({ sessionId: s.sessionId })
-```
-
-### Verifying UI Changes
-
-```typescript
-// Before changes - baseline screenshot
-const s = mcp__circuit-electron__app_launch({ app: "..." })
-mcp__circuit-electron__screenshot({ sessionId: s.sessionId })
-
-// Make code changes, rebuild, relaunch
-const s2 = mcp__circuit-electron__app_launch({ app: "..." })
-mcp__circuit-electron__screenshot({ sessionId: s2.sessionId })
-
-// Compare visually or programmatically
-const newState = mcp__circuit-electron__evaluate({
-  sessionId: s2.sessionId,
-  expression: "/* check new behavior */"
-})
-```
-
-### Common Test Selectors
-
-| Element | Selector |
-|---------|----------|
-| Main layout | `.app-dock-layout` |
-| Project tree | `.project-tree` |
-| Monaco editor | `.monaco-editor` |
-| Preview pane | `.preview-pane` |
-| Save button | `button.save-btn` |
-| Modified indicator | `.modified-indicator` |
-| Project panel | `[title="Project"]` |
-| Terminal panel | `[title="Terminal"]` |
-
-### Available MCP Tools
-
-- `app_launch` - Start Erfana
-- `screenshot` - Capture compressed screenshot
-- `click`, `click_by_text`, `click_by_role` - UI interaction
-- `keyboard_type`, `keyboard_press` - Input simulation
-- `evaluate` - Run JavaScript in app
-- `wait_for_selector` - Wait for element
-- `snapshot` - Get accessibility tree
-- `close` - End session
-
-See: [Testing Index](./testing/README.md) | [Circuit Electron Guide](./testing/circuit-electron-guide.md) | [Quick Start](./testing/quickstart.md) | [UI Scenarios](./testing/ui-scenarios.md) | [Interaction Scenarios](./testing/interaction-scenarios.md)
+See: [Testing Index](./testing/README.md) | [Circuit Electron Guide](./testing/circuit-electron-guide.md) | [Quick Start](./testing/quickstart.md) | [UI Scenarios](./testing/ui-scenarios.md)
 
 ## Testing Auto-Refresh Functionality
 

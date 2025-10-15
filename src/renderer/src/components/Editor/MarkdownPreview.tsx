@@ -70,7 +70,8 @@ const markdownComponents = {
   // Custom code block styling with Mermaid diagram support
   code({ node, className, children, ...props }: any) {
     const match = /language-(\w+)/.exec(className || '')
-    const isInline = !match && !className?.includes('language-')
+    // Detect inline vs block code: inline has no className and no newlines
+    const isInline = !className && typeof children === 'string' && !children.includes('\n')
     const range = extractLineRange(node)
 
     // Check if this is a mermaid code block
