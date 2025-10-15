@@ -4,9 +4,7 @@ import { parseTemplates } from './parser'
 // Import markdown templates as raw strings using Vite's ?raw suffix
 // These are bundled at build time, no runtime file I/O required
 import elaborateTemplate from './templates/elaborate.md?raw'
-import rewriteTemplate from './templates/rewrite.md?raw'
-import simplifyTemplate from './templates/simplify.md?raw'
-import improveTemplate from './templates/improve.md?raw'
+import modifyTemplate from './templates/modify.md?raw'
 import mermaidBugReportTemplate from './templates/mermaid-bug-report.md?raw'
 
 /**
@@ -15,9 +13,7 @@ import mermaidBugReportTemplate from './templates/mermaid-bug-report.md?raw'
  */
 const parsedTemplates = parseTemplates([
   { raw: elaborateTemplate, filename: 'elaborate.md' },
-  { raw: rewriteTemplate, filename: 'rewrite.md' },
-  { raw: simplifyTemplate, filename: 'simplify.md' },
-  { raw: improveTemplate, filename: 'improve.md' },
+  { raw: modifyTemplate, filename: 'modify.md' },
   { raw: mermaidBugReportTemplate, filename: 'mermaid-bug-report.md' }
 ])
 
@@ -48,7 +44,10 @@ export const PROMPT_REGISTRY: Record<string, PromptConfig> = parsedTemplates.red
       order: parsed.frontmatter.order || 0,
       enabled: parsed.frontmatter.enabled !== false,
       description: parsed.frontmatter.description,
-      shortcut: parsed.frontmatter.shortcut
+      shortcut: parsed.frontmatter.shortcut,
+      requiresInput: parsed.frontmatter.requiresInput || false,
+      inputLabel: parsed.frontmatter.inputLabel,
+      inputPlaceholder: parsed.frontmatter.inputPlaceholder
     }
     return acc
   },

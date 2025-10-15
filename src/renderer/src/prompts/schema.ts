@@ -33,7 +33,16 @@ export const PromptFrontmatterSchema = z.object({
   description: z.string().optional(),
 
   /** Optional keyboard shortcut (e.g., "Cmd+Shift+E") */
-  shortcut: z.string().optional()
+  shortcut: z.string().optional(),
+
+  /** Whether this prompt requires user input before rendering */
+  requiresInput: z.boolean().optional().default(false),
+
+  /** Label for the input field when requiresInput is true */
+  inputLabel: z.string().optional(),
+
+  /** Placeholder text for the input field */
+  inputPlaceholder: z.string().optional()
 })
 
 /**
