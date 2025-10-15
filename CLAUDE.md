@@ -121,7 +121,7 @@ Superior markdown capabilities with Monaco Editor + live preview:
 - **View Modes**: Editor only, split view with bidirectional scroll sync, preview only
 - **Scroll Synchronization**: Editor ↔ preview scrolling in split view (line-to-pixel mapping, 50ms debounce)
 - **Mermaid Diagrams**: 22 diagram types (flowcharts, sequence, class, state, Gantt, ER, timelines, and more)
-- **Medium.com Preview**: Charter serif font, 18px, compact spacing, 680px max width, professional typography
+- **Professional Compact Preview**: Charter serif font, 15px, compact spacing, 860px max width, GitHub-inspired typography
 
 📚 **Markdown features**: See [docs/markdown-editing.md](docs/markdown-editing.md) | [docs/prompt-templates.md](docs/prompt-templates.md)
 

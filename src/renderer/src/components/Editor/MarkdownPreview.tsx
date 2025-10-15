@@ -56,11 +56,12 @@ function withLineRange<T extends keyof JSX.IntrinsicElements>(
 const remarkPlugins = [remarkGfm]
 
 /**
- * Stable markdown components configuration
- * Defined at module level to maintain referential equality across renders
- * This prevents unnecessary ReactMarkdown re-renders that would destroy text selection
+ * Markdown components configuration factory
+ * Returns components with filePath context for Mermaid error reporting
+ * Called with filePath to enable bug report functionality
  */
-const markdownComponents = {
+function createMarkdownComponents(filePath?: string) {
+  return {
   // Inject line range on all block elements for scroll synchronization
   p: withLineRange('p'),
   ul: withLineRange('ul'),
@@ -84,7 +85,12 @@ const markdownComponents = {
           data-line-end={range?.end}
           data-line={range?.start}
         >
-          <MermaidDiagram code={code} />
+          <MermaidDiagram
+            code={code}
+            filePath={filePath}
+            startLine={range?.start}
+            endLine={range?.end}
+          />
         </div>
       )
     }
@@ -192,6 +198,7 @@ const markdownComponents = {
   // Add line range tracking to images and horizontal rules
   img: withLineRange('img'),
   hr: withLineRange('hr')
+  }
 }
 
 /**
@@ -350,7 +357,7 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
           onMouseUp={handleMouseUp}
           onContextMenu={handleContextMenu}
         >
-          <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
+          <ReactMarkdown remarkPlugins={remarkPlugins} components={createMarkdownComponents(filePath)}>
             {content}
           </ReactMarkdown>
         </div>

@@ -319,8 +319,21 @@ Diagrams automatically use Erfana's dark theme:
 
 Invalid diagram syntax displays a user-friendly error message with:
 - **Red error box** with clear error description
+- **Bug report button** (🐛) in upper right corner - sends formatted error report to Terminal panel
 - **Link to Mermaid documentation** for syntax help
 - **No crashes** - gracefully handles syntax errors
+
+**Bug Report Feature**:
+- Appears only when diagram error occurs and file path is known
+- Button matches panel toolbar styling (28px height, hover effects)
+- Clicking generates formatted report with:
+  - File reference with line range (`@/path/file.md:42-58`)
+  - Full error message
+  - Complete diagram code
+- Report sent to Terminal panel for easy sharing with Claude Code
+- Uses `mermaid-bug-report` template from prompt template system
+
+**Implementation**: `MermaidDiagram.tsx:22-69` (bug report handler)
 
 #### Example Diagrams
 
@@ -345,12 +358,12 @@ sequenceDiagram
 
 ### Typography & Styling
 
-**Medium.com-Inspired Design**:
+**Professional Compact Design** (GitHub-inspired):
 - Font family: Charter, Georgia, Cambria serif stack
-- Body text: 18px, line-height 1.5, letter-spacing -0.003em
-- Max width: 680px (optimal reading column)
-- Padding: 32px all sides (top padding optimized to match left/right)
-- Compact spacing for efficient information density
+- Body text: 15px, line-height 1.5, letter-spacing -0.003em
+- Max width: 860px (optimal reading column, centered)
+- Padding: 24px top, 32px sides, 20px bottom
+- Compact spacing for efficient information density with professional aesthetic
 
 **Dark Theme**:
 - Background: `#1e1e1e`

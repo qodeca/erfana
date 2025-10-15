@@ -26,6 +26,12 @@ export interface PromptVariables {
 
   /** Path to the project directory */
   projectPath?: string
+
+  /** Mermaid diagram error message (for error reporting) */
+  mermaidError?: string
+
+  /** Mermaid diagram code that failed to render (for error reporting) */
+  mermaidCode?: string
 }
 
 /**
