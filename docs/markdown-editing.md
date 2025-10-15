@@ -36,7 +36,7 @@ In **Split View**, the editor and preview panes are bidirectionally synchronized
 **Features:**
 - **Editor → Preview**: Scrolling in Monaco editor updates preview position
 - **Preview → Editor**: Scrolling in preview updates editor position
-- **Line Mapping**: Uses `data-line` attributes for precise positioning
+- **Line Mapping**: Uses `data-line-start`, `data-line-end`, `data-line` attributes for precise positioning
 - **Smooth Interpolation**: Linear interpolation between known points
 - **Debouncing**: 50ms delay prevents scroll loops
 
@@ -44,11 +44,12 @@ In **Split View**, the editor and preview panes are bidirectionally synchronized
 - Scroll map builds on view mode change (296 entries for CLAUDE.md)
 - Maps editor line numbers to preview element positions
 - Uses react-markdown's `node.position` API for AST line data
+- Enhanced line range tracking for multi-line elements
 - Attaches scroll listeners when scroll map is ready
 
 **Files:**
 - `MarkdownEditorPanel.tsx:217-301` - Scroll map + listeners
-- `MarkdownPreview.tsx:20-37` - Line number extraction
+- `MarkdownPreview.tsx:21-28` - Line range extraction (extractLineRange)
 - `MonacoMarkdownEditor.tsx` - Exposes scroll API
 
 ## Multi-File Tab System
@@ -144,43 +145,80 @@ Right-click context menu in markdown preview for AI-powered text operations with
 
 ### Available Actions
 
-1. **Ask Claude to Elaborate** - Expands selected text with detail (sends directly to AI)
-2. **Rewrite** - Rephrases selected text in different style (populates input for review)
-3. **Simplify** - Makes selected text clearer and simpler (populates input for review)
-4. **Improve** - General improvement suggestions (populates input for review)
-5. **Custom** - Write your own custom prompt (populates input for review)
+1. **Elaborate** - Expands selected text with detail (sends to Terminal)
+2. **Improve** - Grammar, style, clarity improvements (sends to Terminal)
+3. **Simplify** - Makes text clearer and simpler (sends to Terminal)
+4. **Rewrite** - Rephrases in different style (sends to Terminal)
+5. **Custom** - Write your own custom prompt (sends to Copilot for review)
+6. **Send to Terminal** - Paste selection directly to terminal input
 
-### Behavior
+### Prompt Template System
 
-**Direct Send ("Elaborate")**:
-- Sends prompt immediately to Copilot panel
-- Auto-opens Copilot panel if hidden
-- Suggests Claude review file/project for context
-- No user review needed (streamlined UX)
+Context menu actions are powered by dynamic prompt templates:
 
-**Populate for Review (Other Actions)**:
-- Fills Copilot input field with generated prompt
-- User can review, edit, or send manually
-- More control for complex operations
+**Template Files:** `src/renderer/src/prompts/templates/*.md`
+- YAML frontmatter configuration (area, name, icon, target panel)
+- Handlebars-style template body with variables
+- CSP-compliant rendering (no eval, no Function constructor)
+- Hot-reloadable in development
 
-### File References
+**Template Variables:**
+- `{{selectedText}}` - Selected markdown text (from original source)
+- `{{filePath}}` - Current file path
+- `{{startLine}}`, `{{endLine}}` - Selection line range
+- `{{fileRef}}` - File reference: `@/path/file.md:10-20`
+- `{{lineRange}}` - Formatted: "line 10" or "lines 10-20"
+
+**See:** [Prompt Templates](./prompt-templates.md) for creating custom templates
+
+### File References & Source Reading
 
 Selected text includes precise line number references:
 - Single line: `@/path/to/file.md:42`
 - Multi-line: `@/path/to/file.md:42-58`
 - Claude Code automatically loads context from these references
 
+**Source Line Reading:**
+- `readSourceLines()` reads original markdown source (not rendered HTML)
+- Ensures accurate text extraction for multi-element selections
+- Line numbers from enhanced line range tracking system
+
+### Line Range Tracking
+
+All preview elements have precise line range attributes:
+
+```html
+<pre data-line-start="42" data-line-end="58" data-line="42">
+  <!-- Code block spanning lines 42-58 -->
+</pre>
+```
+
+**Attributes:**
+- `data-line-start` - Start line (inclusive)
+- `data-line-end` - End line (inclusive)
+- `data-line` - Start line (legacy compatibility)
+
+**Selection Algorithm:**
+- Walks DOM from selection start/end points
+- Finds nearest elements with line range attributes
+- Handles multi-line elements (tables, code blocks, diagrams)
+- No race conditions (reads fresh DOM on right-click)
+
+**Files:** `MarkdownPreview.tsx:21-28` (extractLineRange), `MarkdownPreview.tsx:143-207` (getLineNumbersFromSelection)
+
 ### Technical Implementation
+
+**Prompt Template System**:
+- CSP-safe renderer (src/renderer/src/prompts/renderer.ts)
+- YAML parser with js-yaml (src/renderer/src/prompts/parser.ts)
+- Zod schema validation (src/renderer/src/prompts/schema.ts)
+- Dynamic template registry (src/renderer/src/prompts/registry.ts)
+- Helper functions (src/renderer/src/prompts/helpers.ts)
 
 **Cross-Component Communication**:
 - Uses Zustand store (`useCopilotStore`) for message passing
-- `setPendingMessage(prompt, sendImmediately)` sends to Copilot panel
-- `setActivePanel('claude', 'right')` opens Copilot
-
-**Line Number Extraction**:
-- `getLineNumbersFromSelection()` reads `data-line` attributes from DOM
-- Preview elements tagged via react-markdown `node.position` API
-- Handles inline selections, multi-element ranges, edge cases
+- `openPanelAndSendContent()` utility (src/renderer/src/utils/panelUtils.ts)
+- Targets Copilot or Terminal panel based on template configuration
 
 **React Portal**:
 - Context menu rendered at document level for correct positioning
@@ -188,9 +226,9 @@ Selected text includes precise line number references:
 - Portal root: `#context-menu-root` in index.html
 
 **Files**:
-- `PreviewContextMenu.tsx` (context menu actions, line number extraction)
-- `MarkdownPreview.tsx` (selection tracking, line number injection)
-- `useCopilotStore.ts` (Zustand store for messaging)
+- `PreviewContextMenu.tsx` - Context menu, template rendering, source reading
+- `MarkdownPreview.tsx` - Selection tracking, line range injection
+- `panelUtils.ts` - Panel opening utilities
 
 ## Preview Features
 
@@ -203,6 +241,24 @@ Selected text includes precise line number references:
 - Blockquotes with accent border
 - Auto-linked headings (for future TOC)
 - **Mermaid diagrams** (flowcharts, sequence diagrams, class diagrams, and more)
+
+### Code Block Rendering
+
+**Inline vs Block Detection:**
+- **Inline code**: Single backtick `` `code` `` - no className, no newlines
+- **Block code**: Triple backticks with/without language - contains newlines
+
+**Detection Logic** (`MarkdownPreview.tsx:74`):
+```typescript
+const isInline = !className && typeof children === 'string' && !children.includes('\n')
+```
+
+**Rendering:**
+- Plain code blocks (``` without language) render as unified `<pre>` blocks
+- Code blocks with language (```javascript) get syntax highlighting
+- Inline code renders as `<code className="inline-code">`
+
+**Bug Fix** (commit 4ccd42f): Previously, plain code blocks without language identifiers were incorrectly treated as inline code, rendering line-by-line instead of as unified blocks.
 
 ### Mermaid Diagrams
 

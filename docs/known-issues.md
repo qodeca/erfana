@@ -64,6 +64,30 @@ See: [Markdown Editing - Scroll Synchronization](./markdown-editing.md#scroll-sy
 
 ---
 
+### ✅ Plain Code Block Rendering (RESOLVED in v0.3.0, Commit 4ccd42f)
+
+**Previous Issue**: Code blocks without language identifiers (``` without language) were rendering line-by-line instead of as unified blocks, creating visual gaps between each line.
+
+**Root Cause**: Inline code detection logic was incorrect:
+```typescript
+// WRONG: Treated all code blocks without language as inline
+const isInline = !match && !className?.includes('language-')
+```
+
+This caused plain code blocks to be treated as inline code, rendering each line separately instead of as a single `<pre>` block.
+
+**Solution**: Improved detection to check for newlines:
+```typescript
+// CORRECT: Only treats single-line code without className as inline
+const isInline = !className && typeof children === 'string' && !children.includes('\n')
+```
+
+**Status**: ✅ Plain code blocks now render as unified blocks. Block code (with newlines) renders as `<pre>`, inline code (no newlines) renders as `<code>`.
+
+See: [Markdown Editing - Code Block Rendering](./markdown-editing.md#code-block-rendering)
+
+---
+
 ## Active Issues
 
 ### node-pty Build Failure

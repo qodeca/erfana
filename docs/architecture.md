@@ -94,14 +94,20 @@ src/
         │   ├── ClaudeCode/      # Claude Code integration components
         │   ├── Dialogs/         # Modal dialogs (ToolApprovalDialog)
         │   ├── ContextMenu/     # Right-click context menu
-        │   ├── ConfirmDialog/   # Confirmation dialog component
-        │   └── Toast/           # Toast notification components
-        ├── contexts/            # React contexts (ToastContext)
+        │   └── ConfirmDialog/   # Confirmation dialog component
+        ├── prompts/             # Prompt template system
+        │   ├── templates/       # Markdown templates with YAML frontmatter
+        │   ├── parser.ts        # CSP-safe YAML parser
+        │   ├── renderer.ts      # Template renderer (Handlebars-style)
+        │   ├── schema.ts        # Zod validation
+        │   ├── registry.ts      # Dynamic template loading
+        │   ├── helpers.ts       # Template helper functions
+        │   └── types.ts         # TypeScript interfaces
         ├── stores/              # Zustand stores (useActivityBarStore)
         ├── hooks/               # React hooks
         ├── types/               # Shared TypeScript types (filters.ts)
-        ├── utils/               # Shared utilities (fileUtils.ts)
-        ├── App.tsx              # Root (wrapped with ToastProvider)
+        ├── utils/               # Shared utilities (fileUtils.ts, panelUtils.ts)
+        ├── App.tsx              # Root component
         └── main.tsx
 ```
 
@@ -121,8 +127,10 @@ src/
 - **Component Registry**: Splitview and Dockview use string-based component lookup
 - **Multi-model Editor**: Single Monaco instance, swap models per file
 - **Mermaid Integration**: Client-side diagram rendering (22 types) with dark theme
+- **Prompt Template System**: CSP-compliant markdown templates with Handlebars-style syntax for context menu AI prompts (see [Prompt Templates](./prompt-templates.md))
+- **Line Range Tracking**: Enhanced markdown preview with `data-line-start/end` attributes for accurate source mapping
 - **Project Persistence**: Auto-loads last opened project on startup
-- **Shared Utilities**: `types/` for shared TypeScript types (FilterMode), `utils/` for shared functions (sanitizeFilePath, isMarkdownFile)
+- **Shared Utilities**: `types/` for shared TypeScript types (FilterMode), `utils/` for shared functions (sanitizeFilePath, isMarkdownFile, panelUtils)
 
 ## Activity Bar System
 
