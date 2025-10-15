@@ -12,27 +12,40 @@ interface MarkdownPreviewProps {
 }
 
 /**
- * Helper function to extract line number from node position
- * In react-markdown v9+, position data comes from node.position instead of sourcePos
+ * Helper function to extract line range from node position
+ * In react-markdown v9+, position data comes from node.position
+ * Extracts both start and end lines for accurate multi-line element tracking
  * @param node - The AST node with position information
- * @returns Line number or undefined
+ * @returns Line range object or undefined
  */
-function extractLineNumber(node?: any): number | undefined {
+function extractLineRange(node?: any): { start: number; end: number } | undefined {
   if (!node?.position?.start?.line) return undefined
-  return node.position.start.line
+
+  const startLine = node.position.start.line
+  const endLine = node.position.end?.line ?? startLine
+
+  return { start: startLine, end: endLine }
 }
 
 /**
- * Higher-order component to inject data-line attribute
- * Used for synchronized scrolling between editor and preview
+ * Higher-order component to inject line range attributes
+ * Used for synchronized scrolling and accurate source mapping
+ * Adds both data-line-start and data-line-end for multi-line elements
  */
-function withLineNumber<T extends keyof JSX.IntrinsicElements>(
+function withLineRange<T extends keyof JSX.IntrinsicElements>(
   tag: T
 ): React.ComponentType<any> {
   return ({ node, ...props }: any) => {
-    const line = extractLineNumber(node)
+    const range = extractLineRange(node)
     const Component = tag as any
-    return <Component data-line={line} {...props} />
+    return (
+      <Component
+        data-line-start={range?.start}
+        data-line-end={range?.end}
+        data-line={range?.start} // Legacy attribute for backwards compatibility
+        {...props}
+      />
+    )
   }
 }
 
@@ -48,27 +61,41 @@ const remarkPlugins = [remarkGfm]
  * This prevents unnecessary ReactMarkdown re-renders that would destroy text selection
  */
 const markdownComponents = {
-  // Inject data-line on all block elements for scroll synchronization
-  p: withLineNumber('p'),
-  ul: withLineNumber('ul'),
-  ol: withLineNumber('ol'),
-  li: withLineNumber('li'),
-  blockquote: withLineNumber('blockquote'),
+  // Inject line range on all block elements for scroll synchronization
+  p: withLineRange('p'),
+  ul: withLineRange('ul'),
+  ol: withLineRange('ol'),
+  li: withLineRange('li'),
+  blockquote: withLineRange('blockquote'),
   // Custom code block styling with Mermaid diagram support
   code({ node, className, children, ...props }: any) {
     const match = /language-(\w+)/.exec(className || '')
     const isInline = !match && !className?.includes('language-')
-    const line = extractLineNumber(node)
+    const range = extractLineRange(node)
 
     // Check if this is a mermaid code block
     if (match && match[1] === 'mermaid') {
       const code = String(children).replace(/\n$/, '')
-      return <MermaidDiagram code={code} />
+      return (
+        <div
+          className="mermaid-wrapper"
+          data-line-start={range?.start}
+          data-line-end={range?.end}
+          data-line={range?.start}
+        >
+          <MermaidDiagram code={code} />
+        </div>
+      )
     }
 
     // Regular code blocks (non-inline, non-mermaid)
     return !isInline ? (
-      <pre className={`code-block ${className || ''}`} data-line={line}>
+      <pre
+        className={`code-block ${className || ''}`}
+        data-line-start={range?.start}
+        data-line-end={range?.end}
+        data-line={range?.start}
+      >
         <code className={match ? `language-${match[1]}` : ''} {...props}>
           {children}
         </code>
@@ -79,15 +106,24 @@ const markdownComponents = {
       </code>
     )
   },
-  // Custom table styling
+  // Custom table styling with line range tracking
   table({ node, children }: any) {
-    const line = extractLineNumber(node)
+    const range = extractLineRange(node)
     return (
-      <div className="table-wrapper" data-line={line}>
+      <div
+        className="table-wrapper"
+        data-line-start={range?.start}
+        data-line-end={range?.end}
+        data-line={range?.start}
+      >
         <table>{children}</table>
       </div>
     )
   },
+  // Add line range to table rows and cells for accurate selection mapping
+  tr: withLineRange('tr'),
+  th: withLineRange('th'),
+  td: withLineRange('td'),
   // Custom checkbox styling
   input({ type, checked, ...props }: any) {
     if (type === 'checkbox') {
@@ -95,42 +131,43 @@ const markdownComponents = {
     }
     return <input type={type} {...props} />
   },
-  // Add IDs to headings for potential TOC and data-line for scroll sync
+  // Add IDs to headings for potential TOC and line range tracking for scroll sync
   h1({ node, children }: any) {
-    const line = extractLineNumber(node)
+    const range = extractLineRange(node)
     const text = String(children)
     const id = text.toLowerCase().replace(/\s+/g, '-')
     return (
-      <h1 data-line={line} id={id}>
+      <h1 data-line-start={range?.start} data-line-end={range?.end} data-line={range?.start} id={id}>
         {children}
       </h1>
     )
   },
   h2({ node, children }: any) {
-    const line = extractLineNumber(node)
+    const range = extractLineRange(node)
     const text = String(children)
     const id = text.toLowerCase().replace(/\s+/g, '-')
     return (
-      <h2 data-line={line} id={id}>
+      <h2 data-line-start={range?.start} data-line-end={range?.end} data-line={range?.start} id={id}>
         {children}
       </h2>
     )
   },
   h3({ node, children }: any) {
-    const line = extractLineNumber(node)
+    const range = extractLineRange(node)
     const text = String(children)
     const id = text.toLowerCase().replace(/\s+/g, '-')
     return (
-      <h3 data-line={line} id={id}>
+      <h3 data-line-start={range?.start} data-line-end={range?.end} data-line={range?.start} id={id}>
         {children}
       </h3>
     )
   },
-  h4: withLineNumber('h4'),
-  h5: withLineNumber('h5'),
-  h6: withLineNumber('h6'),
-  // Links open in external browser
-  a({ href, children, ...props }: any) {
+  h4: withLineRange('h4'),
+  h5: withLineRange('h5'),
+  h6: withLineRange('h6'),
+  // Links open in external browser with line range tracking
+  a({ node, href, children, ...props }: any) {
+    const range = extractLineRange(node)
     const handleClick = (e: React.MouseEvent) => {
       if (href?.startsWith('http')) {
         e.preventDefault()
@@ -139,17 +176,28 @@ const markdownComponents = {
       }
     }
     return (
-      <a href={href} onClick={handleClick} {...props}>
+      <a
+        href={href}
+        onClick={handleClick}
+        data-line-start={range?.start}
+        data-line-end={range?.end}
+        data-line={range?.start}
+        {...props}
+      >
         {children}
       </a>
     )
-  }
+  },
+  // Add line range tracking to images and horizontal rules
+  img: withLineRange('img'),
+  hr: withLineRange('hr')
 }
 
 /**
  * Extract source line numbers from DOM selection
- * Finds all elements with data-line attributes within the selection range
- * and returns the min/max line numbers to create a source file range
+ * Walks up from the selection start and end points to find the closest
+ * elements with data-line-start/data-line-end attributes
+ * Supports accurate multi-line element tracking
  */
 function getLineNumbersFromSelection(
   selection: Selection,
@@ -160,49 +208,61 @@ function getLineNumbersFromSelection(
   const range = selection.getRangeAt(0)
   const container = containerRef.current
 
-  // Find all elements with data-line within the selection
-  const elementsWithLine = container.querySelectorAll('[data-line]')
-  const lineNumbers: number[] = []
-
-  elementsWithLine.forEach((element) => {
-    // Check if element is within selection range
-    if (selection.containsNode(element, true)) {
-      const lineStr = element.getAttribute('data-line')
-      if (lineStr) {
-        const lineNum = parseInt(lineStr, 10)
-        if (!isNaN(lineNum)) {
-          lineNumbers.push(lineNum)
-        }
-      }
-    }
-  })
-
-  // If no line numbers found, try to find parent element with data-line
-  if (lineNumbers.length === 0) {
-    let node: Node | null = range.commonAncestorContainer
-
-    // Walk up the DOM tree to find an element with data-line
+  /**
+   * Walk up the DOM tree from a node to find the nearest element with line range
+   * Returns { start, end } for elements with range tracking, or null if not found
+   */
+  function findNearestLineRange(node: Node | null): { start: number; end: number } | null {
     while (node && node !== container) {
       if (node instanceof Element) {
+        // Prefer data-line-start/end for accurate range tracking
+        const startStr = node.getAttribute('data-line-start')
+        const endStr = node.getAttribute('data-line-end')
+
+        if (startStr) {
+          const start = parseInt(startStr, 10)
+          const end = endStr ? parseInt(endStr, 10) : start
+
+          if (!isNaN(start)) {
+            return { start, end: isNaN(end) ? start : end }
+          }
+        }
+
+        // Fallback to legacy data-line attribute
         const lineStr = node.getAttribute('data-line')
         if (lineStr) {
-          const lineNum = parseInt(lineStr, 10)
-          if (!isNaN(lineNum)) {
-            return { startLine: lineNum, endLine: lineNum }
+          const line = parseInt(lineStr, 10)
+          if (!isNaN(line)) {
+            return { start: line, end: line }
           }
         }
       }
       node = node.parentNode
     }
-
     return null
   }
 
-  // Return min and max line numbers
-  const startLine = Math.min(...lineNumbers)
-  const endLine = Math.max(...lineNumbers)
+  // Find line range at selection start (use start line of containing element)
+  const startRange = findNearestLineRange(range.startContainer)
 
-  return { startLine, endLine }
+  // Find line range at selection end (use end line of containing element)
+  const endRange = findNearestLineRange(range.endContainer)
+
+  // If we found line ranges, return the span
+  if (startRange && endRange) {
+    return {
+      startLine: Math.min(startRange.start, endRange.start),
+      endLine: Math.max(startRange.end, endRange.end)
+    }
+  }
+
+  // Fallback: try the common ancestor
+  const fallbackRange = findNearestLineRange(range.commonAncestorContainer)
+  if (fallbackRange) {
+    return { startLine: fallbackRange.start, endLine: fallbackRange.end }
+  }
+
+  return null
 }
 
 export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
@@ -227,6 +287,12 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
 
       const sel = window.getSelection()
       if (sel && sel.toString().trim().length > 0 && previewRef.current) {
+        // Validate selection has ranges before accessing them
+        if (sel.rangeCount === 0) {
+          setSelection(null)
+          return
+        }
+
         const range = sel.getRangeAt(0)
         const rect = range.getBoundingClientRect()
 
@@ -247,9 +313,24 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
     const handleContextMenu = (e: React.MouseEvent) => {
       e.preventDefault() // Always prevent default context menu
 
-      // Only show custom context menu if text is selected and filePath is available
-      if (selection && selection.text && filePath) {
-        // Use viewport coordinates (clientX/Y) for fixed positioning
+      // Read selection directly from DOM to avoid race condition with stale state
+      const sel = window.getSelection()
+      if (sel && sel.toString().trim().length > 0 && filePath && previewRef.current) {
+        // Validate selection has ranges
+        if (sel.rangeCount === 0) return
+
+        // Extract line numbers from current selection
+        const lineNumbers = getLineNumbersFromSelection(sel, previewRef)
+
+        // Update selection state with fresh data
+        setSelection({
+          text: sel.toString(),
+          rect: sel.getRangeAt(0).getBoundingClientRect(),
+          startLine: lineNumbers?.startLine,
+          endLine: lineNumbers?.endLine
+        })
+
+        // Show context menu at cursor position
         setContextMenu({
           x: e.clientX,
           y: e.clientY
