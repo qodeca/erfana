@@ -6,24 +6,25 @@ Erfana is an Electron desktop application that provides an integrated developmen
 
 ## Features
 
-- 🎨 **Multi-Panel IDE Layout**: Drag-and-drop, resizable panels powered by Dockview
-- 📝 **Markdown Editor**: Monaco Editor with live preview and split view support
-- 🤖 **Claude Code Integration**: Direct integration with Claude Agent SDK for AI-powered editing
-- 📁 **Project Management**: Project tree explorer with markdown file focus
-- 🔄 **Git Integration**: Visual git status, diff viewer, and commit management
-- 💻 **Integrated Terminal**: xterm.js terminal for running Claude Code CLI commands
-- ⚡ **Text Selection Prompts**: Select text and prompt Claude to edit in place
+- 🎨 **Multi-Panel IDE Layout**: Hybrid SplitviewReact + DockviewReact with resizable panels
+- 📝 **Superior Markdown Editing**: Monaco Editor with live preview, scroll sync, Mermaid diagrams, and formatting toolbar
+- 🤖 **Claude Code Integration**: Persistent Claude CLI session with tool approval system and planning mode
+- 📁 **Smart Project Management**: Project tree with markdown filtering, visual indicators, and context menu operations
+- 🔄 **Auto-Refresh**: Automatic file and directory tree updates on external changes
+- 💻 **Integrated Terminal**: Full-featured xterm.js terminal with WebGL rendering and traditional zsh prompt
+- ⚡ **AI-Powered Text Operations**: Right-click context menu with prompt templates for text elaboration, improvement, and more
 
 ## Tech Stack
 
 - **Electron** + **electron-vite**: Modern Electron development
 - **React** + **TypeScript**: UI framework with full type safety
-- **Dockview**: VS Code-like docking panel system
+- **SplitviewReact** + **DockviewReact**: Hybrid layout system matching VS Code architecture
 - **Monaco Editor**: VS Code's editor engine for code editing
-- **xterm.js**: Terminal emulator for Claude Code CLI
-- **Claude Agent SDK**: Official TypeScript SDK for Claude integration
+- **xterm.js** + **node-pty**: Full-featured terminal emulator with PTY support
+- **Claude CLI**: Native Claude Code binary via MAX subscription (requires `brew install claude`)
 - **simple-git**: Git operations
 - **electron-store**: Settings persistence
+- **Mermaid.js**: Diagram rendering (22 diagram types)
 
 ## Development
 
@@ -82,45 +83,59 @@ erfana/
 
 ### Main Process
 - Window management
-- File system operations
+- File system operations (with auto-refresh via chokidar)
 - Git integration via simple-git
-- Claude Agent SDK wrapper
-- IPC handlers
+- Claude CLI session management (persistent process with JSONL I/O)
+- Terminal PTY management (xterm.js + node-pty)
+- IPC handlers (97 channels across 6 domains)
 
 ### Preload
 - Secure contextBridge API
 - Type-safe IPC channels
 
 ### Renderer
-- React-based UI
-- Dockview panel system
-- Monaco Editor for markdown
-- xterm.js terminal
+- React-based UI with hybrid SplitviewReact + DockviewReact layout
+- Dual activity bars (left/right) for panel management
+- Monaco Editor with formatting toolbar and document statistics
+- Markdown preview with scroll sync and Mermaid diagram support
+- xterm.js terminal with WebGL rendering
+- Prompt template system (CSP-safe, YAML frontmatter + Handlebars-style syntax)
 - State management with Zustand
 
 ## Key Workflows
 
-### 1. Edit Selection with Copilot
-1. Open a markdown file
-2. Select text
-3. Right-click and choose "Ask Copilot..." action
-4. Enter prompt (e.g., "make this more concise")
-5. Copilot streams changes in real-time
-6. Review and iterate
+### 1. AI-Powered Text Operations
+1. Open a markdown file in split view (editor + preview)
+2. Select text in the preview pane
+3. Right-click and choose prompt template (Elaborate, Improve, Simplify, Rewrite, or Custom)
+4. Prompt is sent to Copilot or Terminal panel based on template configuration
+5. Review AI response and iterate
+6. File references include precise line numbers for context
 
-### 2. Terminal-Driven Development
-1. Use integrated terminal
-2. Run `claude -p "your prompt"`
-3. Watch streaming responses
-4. Changes appear in editor
-5. Git shows modifications
+### 2. Claude Code Integration
+1. Open Copilot panel from right activity bar
+2. Claude CLI session starts automatically (requires `brew install claude` and MAX subscription)
+3. Chat with Claude about your project with full context
+4. All 17 Claude Code tools enabled by default
+5. Toggle Planning Mode for safe exploration (read-only tools only)
+6. Tool approval system for security-sensitive operations
+7. Conversation history preserved across session restarts
 
-### 3. Project Management
-1. Open project folder
-2. Browse file tree
-3. Open multiple files in tabs
-4. Split editor for source/preview
-5. Git integration for version control
+### 3. Markdown Editing
+1. Open markdown files in Monaco editor
+2. Use formatting toolbar for quick markdown syntax
+3. Switch view modes: Editor only, Split view (with scroll sync), or Preview only
+4. Preview renders Mermaid diagrams (22 types supported)
+5. Auto-save after 2 seconds of inactivity
+6. Document statistics displayed in bottom bar
+
+### 4. Project Management
+1. Open project folder (auto-loads last project on startup)
+2. Browse file tree with markdown filtering
+3. Visual indicators for sensitive files and hidden files
+4. Context menu for New File, New Folder, Rename, Delete
+5. Auto-refresh on external changes (git operations, npm installs, etc.)
+6. Multiple files open in tabs with independent state
 
 ## Security
 
