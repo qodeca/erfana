@@ -2,6 +2,9 @@ import { useState, ReactNode } from 'react'
 import { Maximize2, Minimize2, RefreshCw, Sparkles, MessageSquare, Copy, Terminal } from 'lucide-react'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
 import { openPanelAndSendContent } from '../../utils/panelUtils'
+import { PROMPT_REGISTRY, getPromptsForArea } from '../../prompts/registry'
+import { promptRenderer } from '../../prompts/renderer'
+import type { PromptVariables } from '../../prompts/types'
 import './PreviewContextMenu.css'
 
 interface PreviewContextMenuProps {
@@ -15,42 +18,27 @@ interface PreviewContextMenuProps {
   onClose: () => void
 }
 
-interface CopilotAction {
-  label: string
-  icon: ReactNode
-  buildPrompt: (text: string, file: string, doc: string) => string
-  sendDirectly?: boolean // If true, send directly without review
-  targetPanel?: 'claude' | 'terminal' // Which panel to send to (default: claude)
-}
+/**
+ * Map icon name strings to Lucide React components
+ * @param iconName - The icon identifier from prompt config
+ * @returns React component for the icon
+ */
+function getIconComponent(iconName: string): ReactNode {
+  const iconProps = { size: 14, strokeWidth: 2 }
 
-const COPILOT_ACTIONS: CopilotAction[] = [
-  {
-    label: 'Ask Copilot to Elaborate',
-    icon: <Maximize2 size={14} strokeWidth={2} />,
-    buildPrompt: (text) =>
-      `I selected this text:\n\n---\n${text}\n---\n\nPlease elaborate on this text with more detail, examples, and context. Review the file and the entire project if you need more context.`,
-    sendDirectly: true, // Send directly without review
-    targetPanel: 'terminal' // Send to terminal instead of Copilot
-  },
-  {
-    label: 'Ask Copilot to Rewrite',
-    icon: <RefreshCw size={14} strokeWidth={2} />,
-    buildPrompt: (text, file) =>
-      `In ${file}, I selected this text:\n\n---\n${text}\n---\n\nPlease rewrite this text to improve clarity, flow, and readability.`
-  },
-  {
-    label: 'Ask Copilot to Simplify',
-    icon: <Minimize2 size={14} strokeWidth={2} />,
-    buildPrompt: (text, file) =>
-      `In ${file}, I selected this text:\n\n---\n${text}\n---\n\nPlease simplify this text for easier understanding while maintaining the key points.`
-  },
-  {
-    label: 'Ask Copilot to Improve',
-    icon: <Sparkles size={14} strokeWidth={2} />,
-    buildPrompt: (text, file) =>
-      `In ${file}, I selected this text:\n\n---\n${text}\n---\n\nPlease improve this text (grammar, style, clarity, and coherence).`
+  switch (iconName) {
+    case 'maximize2':
+      return <Maximize2 {...iconProps} />
+    case 'minimize2':
+      return <Minimize2 {...iconProps} />
+    case 'refresh':
+      return <RefreshCw {...iconProps} />
+    case 'sparkles':
+      return <Sparkles {...iconProps} />
+    default:
+      return <Sparkles {...iconProps} />
   }
-]
+}
 
 /**
  * Read specific lines from source markdown file
@@ -90,7 +78,14 @@ export function PreviewContextMenu({
   const [showCustomPrompt, setShowCustomPrompt] = useState(false)
   const [customPrompt, setCustomPrompt] = useState('')
 
-  const handleAction = async (action: CopilotAction) => {
+  const handleAction = async (promptId: string) => {
+    // Get prompt configuration
+    const config = PROMPT_REGISTRY[promptId]
+    if (!config) {
+      console.error(`Prompt not found: ${promptId}`)
+      return
+    }
+
     // Try to read source lines from file, fall back to selectedText if unavailable
     let textToUse = selectedText
     if (startLine !== undefined && endLine !== undefined) {
@@ -100,36 +95,49 @@ export function PreviewContextMenu({
       }
     }
 
-    // Build prompt with source text (or fallback to rendered text)
-    let prompt = action.buildPrompt(textToUse, filePath, fullDocument)
+    // Prepare variables for template rendering
+    const lineRange =
+      startLine !== undefined && endLine !== undefined
+        ? startLine === endLine
+          ? `line ${startLine}`
+          : `lines ${startLine}-${endLine}`
+        : undefined
 
-    // Determine target panel (default to claude for backwards compatibility)
-    const targetPanel = action.targetPanel || 'claude'
-
-    // Add file reference with line numbers if available
-    if (startLine !== undefined && endLine !== undefined) {
-      const fileRef =
-        startLine === endLine
+    const fileRef =
+      startLine !== undefined && endLine !== undefined
+        ? startLine === endLine
           ? `@${filePath}:${startLine}`
           : `@${filePath}:${startLine}-${endLine}`
+        : undefined
 
-      if (targetPanel === 'claude') {
-        // Claude format: @file:line for direct file navigation
-        prompt = `${fileRef}\n\n${prompt}`
-      } else if (targetPanel === 'terminal') {
-        // Terminal format: @file:line (for Claude parsing) + human-readable context
-        const lineRef =
-          startLine === endLine ? `line ${startLine}` : `lines ${startLine}-${endLine}`
-        prompt = `${fileRef}\n\nIn ${filePath} (${lineRef}):\n\n${prompt}`
-      }
+    const variables: PromptVariables = {
+      selectedText: textToUse,
+      filePath,
+      fullDocument,
+      startLine,
+      endLine,
+      lineRange,
+      fileRef
     }
+
+    console.log('🔧 Template rendering debug:')
+    console.log('  Template:', config.template)
+    console.log('  Variables:', variables)
+
+    // Render template with variables
+    const prompt = promptRenderer.render(config.template, variables)
+
+    console.log('  Rendered prompt:', prompt)
+
+    // Determine target panel (default to claude for backwards compatibility)
+    const targetPanel = config.targetPanel || 'claude'
 
     // Open panel and send content with initialization wait
     await openPanelAndSendContent({
       panel: targetPanel,
       location: 'right',
       content: prompt,
-      sendImmediately: action.sendDirectly || false
+      sendImmediately: config.sendDirectly || false
     })
 
     onClose()
@@ -244,12 +252,13 @@ export function PreviewContextMenu({
     )
   }
 
-  // Build context menu items
+  // Build context menu items from prompt registry
+  // Filter to only show prompts for markdown-preview context-menu area
   const items: ContextMenuItem[] = [
-    ...COPILOT_ACTIONS.map((action) => ({
-      label: action.label,
-      icon: action.icon,
-      action: () => handleAction(action)
+    ...getPromptsForArea('markdown-preview', 'context-menu').map((prompt) => ({
+      label: prompt.label,
+      icon: getIconComponent(prompt.icon),
+      action: () => handleAction(prompt.id)
     })),
     { separator: true } as ContextMenuItem,
     {
