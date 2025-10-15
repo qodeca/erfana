@@ -11,6 +11,11 @@ import { registerTerminalHandlers } from './ipc/terminal-handlers'
 import { fileWatcherService } from './services/FileWatcherService'
 import { directoryWatcherService } from './services/DirectoryWatcherService'
 import { terminalService } from './services/TerminalService'
+import { installSafeConsole } from './utils/safe-console'
+
+// Install safe console logging to prevent EPIPE crashes
+// Must be called before any other code that uses console.log
+installSafeConsole()
 
 function createWindow(): BrowserWindow {
   // Create the browser window.

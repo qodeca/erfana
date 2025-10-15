@@ -7,7 +7,7 @@ interface TerminalStore {
   // Actions
   setActiveTerminalId: (id: string | null) => void
   getActiveTerminalId: () => string | null
-  sendToTerminal: (text: string) => Promise<boolean>
+  sendToTerminal: (text: string, autoExecute?: boolean) => Promise<boolean>
 }
 
 export const useTerminalStore = create<TerminalStore>((set, get) => ({
@@ -22,7 +22,7 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     return get().activeTerminalId
   },
 
-  sendToTerminal: async (text: string): Promise<boolean> => {
+  sendToTerminal: async (text: string, autoExecute = false): Promise<boolean> => {
     const terminalId = get().activeTerminalId
 
     if (!terminalId) {
@@ -41,6 +41,16 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
       // Send text to terminal
       window.api.terminal.write(terminalId, text)
       console.log(`✅ Sent ${text.length} characters to terminal ${terminalId}`)
+
+      // If autoExecute is enabled, simulate pressing Enter
+      if (autoExecute) {
+        // Small delay to ensure text is written before Enter
+        await new Promise(resolve => setTimeout(resolve, 100))
+        // Send carriage return - this is the standard Enter key for terminals
+        window.api.terminal.write(terminalId, '\r')
+        console.log('⏎ Auto-executed command in terminal')
+      }
+
       return true
     } catch (error) {
       console.error('❌ Failed to send text to terminal:', error)

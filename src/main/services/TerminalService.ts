@@ -147,6 +147,15 @@ export class TerminalService extends EventEmitter {
       terminal.ptyProcess.write(data)
       return true
     } catch (error: any) {
+      // Suppress EPIPE errors - terminal may have closed
+      if (error.code === 'EPIPE') {
+        console.log(`ℹ️ Terminal ${terminalId} PTY closed (terminal likely exited)`)
+        // Clean up the closed terminal
+        this.terminals.delete(terminalId)
+        this.emit('exit', { terminalId, exitCode: 0 })
+        return false
+      }
+
       console.error(`❌ Failed to write to terminal ${terminalId}:`, error)
       this.emit('error', { terminalId, error: error.message })
       return false
@@ -192,6 +201,13 @@ export class TerminalService extends EventEmitter {
       console.log(`🛑 Terminal ${terminalId} killed`)
       return true
     } catch (error: any) {
+      // Suppress EPIPE and ESRCH errors - process may already be dead
+      if (error.code === 'EPIPE' || error.code === 'ESRCH') {
+        console.log(`ℹ️ Terminal ${terminalId} process already terminated`)
+        this.terminals.delete(terminalId)
+        return true
+      }
+
       console.error(`❌ Failed to kill terminal ${terminalId}:`, error)
       this.emit('error', { terminalId, error: error.message })
       return false
@@ -235,8 +251,13 @@ export class TerminalService extends EventEmitter {
       try {
         terminal.ptyProcess.kill()
         console.log(`✅ Terminal ${terminalId} cleaned up`)
-      } catch (error) {
-        console.error(`❌ Failed to cleanup terminal ${terminalId}:`, error)
+      } catch (error: any) {
+        // Suppress EPIPE and ESRCH errors during cleanup
+        if (error?.code === 'EPIPE' || error?.code === 'ESRCH') {
+          console.log(`ℹ️ Terminal ${terminalId} already terminated`)
+        } else {
+          console.error(`❌ Failed to cleanup terminal ${terminalId}:`, error)
+        }
       }
     }
 

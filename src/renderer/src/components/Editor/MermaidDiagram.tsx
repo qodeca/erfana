@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import mermaid from 'mermaid'
 import { Bug } from 'lucide-react'
-import { PROMPT_REGISTRY } from '../../prompts/registry'
-import { promptRenderer } from '../../prompts/renderer'
-import { openPanelAndSendContent } from '../../utils/panelUtils'
+import { executePromptTemplate } from '../../utils/panelUtils'
 
 interface MermaidDiagramProps {
   code: string
@@ -24,13 +22,6 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
     if (!error || !filePath) return
 
     try {
-      // Get the mermaid bug report template
-      const config = PROMPT_REGISTRY['mermaid-bug-report']
-      if (!config) {
-        console.error('mermaid-bug-report template not found in registry')
-        return
-      }
-
       // Construct file reference
       const fileRef = startLine && endLine
         ? `@${filePath}:${startLine}-${endLine}`
@@ -43,8 +34,8 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
           : `lines ${startLine}-${endLine}`
         : undefined
 
-      // Render template with variables
-      const renderedPrompt = promptRenderer.render(config.template, {
+      // Execute prompt template using centralized function
+      await executePromptTemplate('mermaid-bug-report', {
         selectedText: '',
         filePath,
         fullDocument: '',
@@ -54,14 +45,6 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
         fileRef,
         mermaidError: error,
         mermaidCode: code
-      })
-
-      // Send to terminal panel
-      await openPanelAndSendContent({
-        panel: 'terminal',
-        location: 'right',
-        content: renderedPrompt,
-        sendImmediately: true
       })
     } catch (err) {
       console.error('Failed to send bug report:', err)

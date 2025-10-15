@@ -1,9 +1,8 @@
 import { ReactNode } from 'react'
 import { Maximize2, Minimize2, RefreshCw, Sparkles, Copy, Edit3 } from 'lucide-react'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
-import { openPanelAndSendContent } from '../../utils/panelUtils'
+import { executePromptTemplate } from '../../utils/panelUtils'
 import { PROMPT_REGISTRY, getPromptsForArea } from '../../prompts/registry'
-import { promptRenderer } from '../../prompts/renderer'
 import type { PromptVariables, PromptConfig } from '../../prompts/types'
 
 interface PreviewContextMenuProps {
@@ -89,27 +88,25 @@ export function PreviewContextMenu({
   onClose,
   onOpenModifyDialog
 }: PreviewContextMenuProps) {
-  // Debug: Log registry contents
-  console.log('📚 PROMPT_REGISTRY keys:', Object.keys(PROMPT_REGISTRY))
-  console.log('📚 Full PROMPT_REGISTRY:', PROMPT_REGISTRY)
-
   const handleAction = async (promptId: string) => {
-    console.log('🎯 handleAction called with promptId:', promptId)
-
     // Get prompt configuration
     const config = PROMPT_REGISTRY[promptId]
-    console.log('📋 Config from registry:', config)
 
     if (!config) {
       console.error(`Prompt not found: ${promptId}`)
       return
     }
 
-    console.log('🔍 Checking requiresInput:', config.requiresInput)
-
     // Check if prompt requires user input
     if (config.requiresInput) {
-      console.log('💬 Opening modify dialog via callback...')
+      // Read source text from file (not rendered preview text)
+      let sourceText = selectedText
+      if (startLine !== undefined && endLine !== undefined) {
+        const readSource = await readSourceLines(filePath, startLine, endLine)
+        if (readSource !== null) {
+          sourceText = readSource
+        }
+      }
 
       // Create submit and cancel handlers
       const handleSubmit = async (userInput: string) => {
@@ -124,7 +121,7 @@ export function PreviewContextMenu({
       // Open dialog via callback and close context menu
       onOpenModifyDialog({
         isOpen: true,
-        selectedText,
+        selectedText: sourceText, // Use source markdown, not preview text
         filePath,
         fullDocument,
         startLine,
@@ -139,7 +136,6 @@ export function PreviewContextMenu({
       return
     }
 
-    console.log('⚡ Executing prompt immediately (no input required)')
     // Execute immediately for non-input prompts
     await executePrompt(config, undefined)
   }
@@ -180,25 +176,8 @@ export function PreviewContextMenu({
       userInput // Add user input if provided
     }
 
-    console.log('🔧 Template rendering debug:')
-    console.log('  Template:', config.template)
-    console.log('  Variables:', variables)
-
-    // Render template with variables
-    const prompt = promptRenderer.render(config.template, variables)
-
-    console.log('  Rendered prompt:', prompt)
-
-    // Determine target panel (default to claude for backwards compatibility)
-    const targetPanel = config.targetPanel || 'claude'
-
-    // Open panel and send content with initialization wait
-    await openPanelAndSendContent({
-      panel: targetPanel,
-      location: 'right',
-      content: prompt,
-      sendImmediately: config.sendDirectly || false
-    })
+    // Execute prompt template using centralized function
+    await executePromptTemplate(config.id, variables)
 
     onClose()
   }

@@ -56,6 +56,9 @@ export interface PromptConfig {
   /** Whether to send immediately without user review */
   sendDirectly?: boolean
 
+  /** Whether to automatically execute (send Enter) after pasting to terminal */
+  autoExecute?: boolean
+
   /** The Handlebars template string */
   template: string
 

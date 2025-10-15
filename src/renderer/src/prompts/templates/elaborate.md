@@ -4,6 +4,7 @@ subArea: context-menu
 name: Elaborate
 icon: maximize2
 targetPanel: terminal
+autoExecute: true
 ---
 {{#if fileRef}}{{fileRef}}
 
