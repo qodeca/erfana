@@ -446,14 +446,25 @@
 
 /* Control Panel Chevron in Header */
 .control-panel-chevron {
-  margin-left: 8px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
   cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 0;
   color: #858585;
-  transition: color 0.15s ease;
+  transition: all 0.15s ease;
 }
 
 .control-panel-chevron:hover {
   color: #cccccc;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.control-panel-chevron:active {
+  background: rgba(255, 255, 255, 0.08);
 }

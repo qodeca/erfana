@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { ISplitviewPanelProps } from 'dockview'
-import { Terminal as TerminalIcon, X } from 'lucide-react'
+import { Terminal as TerminalIcon, RotateCw } from 'lucide-react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
@@ -278,11 +278,11 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         <span className="sidebar-panel-title">Terminal</span>
         {terminalId && (
           <button
-            className="terminal-clear-button"
+            className="icon-btn"
             onClick={handleRestartTerminal}
             title="Restart Terminal"
           >
-            <X size={14} />
+            <RotateCw size={14} />
           </button>
         )}
       </div>
