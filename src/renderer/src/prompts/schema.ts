@@ -9,7 +9,7 @@ export const PromptFrontmatterSchema = z.object({
   area: z.enum(['markdown-preview', 'code-editor', 'global']),
 
   /** Optional sub-area for more specific placement */
-  subArea: z.enum(['context-menu', 'toolbar', 'command-palette']).optional(),
+  subArea: z.enum(['context-menu', 'toolbar', 'command-palette', 'mermaid-error']).optional(),
 
   /** Display name shown in the UI */
   name: z.string().min(1, 'Name is required'),

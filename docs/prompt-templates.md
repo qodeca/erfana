@@ -394,6 +394,56 @@ function getLineNumbersFromSelection(selection, containerRef) {
 - `templates/improve.md` - Grammar/style/clarity
 - `templates/rewrite.md` - Rephrase differently
 - `templates/simplify.md` - Make clearer/simpler
+- `templates/mermaid-bug-report.md` - Report Mermaid diagram errors to Terminal
+
+## Architectural Decisions
+
+### Template ID System (Current Limitation)
+
+**Current Implementation:**
+Templates are identified by slugified display names:
+```typescript
+// parser.ts
+const id = slugify(result.data.name)  // "Mermaid Bug Report" → "mermaid-bug-report"
+```
+
+**Problem:**
+- Fragile coupling between display name and programmatic identifier
+- Changing template name breaks all code references
+- Requires mental mapping between `name` and derived ID
+
+**Example Issue:**
+```yaml
+# Template frontmatter
+---
+name: Report Mermaid Error  # Slugifies to "report-mermaid-error"
+---
+```
+```typescript
+// Code reference
+const config = PROMPT_REGISTRY['mermaid-bug-report']  // WRONG ID!
+// Returns undefined because actual ID is "report-mermaid-error"
+```
+
+**Recommended Solution:**
+Add explicit `id` field to frontmatter:
+```yaml
+---
+id: mermaid-bug-report    # Explicit, stable identifier
+name: Mermaid Bug Report  # Display name (can change freely)
+---
+```
+
+**Implementation Steps:**
+1. Add `id` field to `PromptFrontmatterSchema` (schema.ts)
+2. Update parser to use explicit ID instead of slugify
+3. Add uniqueness validation in registry
+4. Migrate all existing templates (elaborate, improve, rewrite, simplify, mermaid-bug-report)
+5. Remove slugify function
+
+**Status:** Architecture review complete, implementation pending.
+
+**See:** [Known Issues - Template ID System](./known-issues.md#template-id-system)
 
 ## Dependencies
 

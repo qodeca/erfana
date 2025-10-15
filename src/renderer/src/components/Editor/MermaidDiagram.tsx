@@ -1,16 +1,72 @@
 import { useEffect, useRef, useState } from 'react'
 import mermaid from 'mermaid'
+import { Bug } from 'lucide-react'
+import { PROMPT_REGISTRY } from '../../prompts/registry'
+import { promptRenderer } from '../../prompts/renderer'
+import { openPanelAndSendContent } from '../../utils/panelUtils'
 
 interface MermaidDiagramProps {
   code: string
   className?: string
+  filePath?: string
+  startLine?: number
+  endLine?: number
 }
 
-export function MermaidDiagram({ code, className = '' }: MermaidDiagramProps) {
+export function MermaidDiagram({ code, className = '', filePath, startLine, endLine }: MermaidDiagramProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [initialized, setInitialized] = useState(false)
+
+  // Handle bug report button click
+  const handleBugReport = async () => {
+    if (!error || !filePath) return
+
+    try {
+      // Get the mermaid bug report template
+      const config = PROMPT_REGISTRY['mermaid-bug-report']
+      if (!config) {
+        console.error('mermaid-bug-report template not found in registry')
+        return
+      }
+
+      // Construct file reference
+      const fileRef = startLine && endLine
+        ? `@${filePath}:${startLine}-${endLine}`
+        : `@${filePath}`
+
+      // Format line range string
+      const lineRange = startLine && endLine
+        ? startLine === endLine
+          ? `line ${startLine}`
+          : `lines ${startLine}-${endLine}`
+        : undefined
+
+      // Render template with variables
+      const renderedPrompt = promptRenderer.render(config.template, {
+        selectedText: '',
+        filePath,
+        fullDocument: '',
+        startLine,
+        endLine,
+        lineRange,
+        fileRef,
+        mermaidError: error,
+        mermaidCode: code
+      })
+
+      // Send to terminal panel
+      await openPanelAndSendContent({
+        panel: 'terminal',
+        location: 'right',
+        content: renderedPrompt,
+        sendImmediately: true
+      })
+    } catch (err) {
+      console.error('Failed to send bug report:', err)
+    }
+  }
 
   // Initialize mermaid once on component mount
   useEffect(() => {
@@ -147,7 +203,18 @@ export function MermaidDiagram({ code, className = '' }: MermaidDiagramProps) {
     <div className={`mermaid-container ${className}`}>
       {error && (
         <div className="mermaid-error">
-          <strong>Mermaid Diagram Error:</strong>
+          <div className="mermaid-error-header">
+            <strong>Mermaid Diagram Error:</strong>
+            {filePath && (
+              <button
+                className="mermaid-bug-btn"
+                onClick={handleBugReport}
+                title="Report this error to Claude Code"
+              >
+                <Bug size={16} strokeWidth={2} />
+              </button>
+            )}
+          </div>
           <pre>{error}</pre>
           <div className="mermaid-error-hint">
             Check your diagram syntax. See{' '}

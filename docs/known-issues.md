@@ -112,6 +112,57 @@ ModuleNotFoundError: No module named 'distutils'
 
 ---
 
+### Template ID System
+
+**Issue**: Template IDs derived from slugified display names is fragile.
+
+**Current Implementation**:
+```typescript
+// parser.ts
+const id = slugify(result.data.name)  // Derives ID from name
+```
+
+**Problem**:
+- Changing template name breaks all code references
+- `name: "Mermaid Bug Report"` → `id: "mermaid-bug-report"`
+- Code must look up by derived ID: `PROMPT_REGISTRY['mermaid-bug-report']`
+- Fragile coupling between display name and programmatic identifier
+
+**Example Issue:**
+```yaml
+# Template frontmatter
+---
+name: Report Mermaid Error  # Slugifies to "report-mermaid-error"
+---
+```
+```typescript
+// Code reference
+const config = PROMPT_REGISTRY['mermaid-bug-report']  // WRONG ID!
+// Returns undefined because actual ID is "report-mermaid-error"
+```
+
+**Recommended Solution**:
+Add explicit `id` field to frontmatter:
+```yaml
+---
+id: mermaid-bug-report    # Explicit, stable identifier
+name: Mermaid Bug Report  # Display name (can change freely)
+---
+```
+
+**Implementation Steps**:
+1. Add `id` field to `PromptFrontmatterSchema` (schema.ts)
+2. Update parser to use explicit ID instead of slugify
+3. Add uniqueness validation in registry
+4. Migrate all existing templates (elaborate, improve, rewrite, simplify, mermaid-bug-report)
+5. Remove slugify function
+
+**Status**: Architecture review complete, implementation pending.
+
+**See**: [Prompt Templates - Architectural Decisions](./prompt-templates.md#architectural-decisions)
+
+---
+
 ## Dockview CSS Import Path
 
 **Issue**: Vite cannot resolve `dockview/dist/styles.css`

@@ -7,6 +7,7 @@ import elaborateTemplate from './templates/elaborate.md?raw'
 import rewriteTemplate from './templates/rewrite.md?raw'
 import simplifyTemplate from './templates/simplify.md?raw'
 import improveTemplate from './templates/improve.md?raw'
+import mermaidBugReportTemplate from './templates/mermaid-bug-report.md?raw'
 
 /**
  * Parse all template files with frontmatter
@@ -16,7 +17,8 @@ const parsedTemplates = parseTemplates([
   { raw: elaborateTemplate, filename: 'elaborate.md' },
   { raw: rewriteTemplate, filename: 'rewrite.md' },
   { raw: simplifyTemplate, filename: 'simplify.md' },
-  { raw: improveTemplate, filename: 'improve.md' }
+  { raw: improveTemplate, filename: 'improve.md' },
+  { raw: mermaidBugReportTemplate, filename: 'mermaid-bug-report.md' }
 ])
 
 console.log('📝 Parsed templates:', parsedTemplates.length)
