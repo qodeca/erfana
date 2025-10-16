@@ -170,10 +170,26 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     }
   }, [currentFile?.path])
 
-  // Reset scroll map ready when view mode or split state changes
+  // Reset scroll map ready and notify Monaco of layout change when split state changes
   useEffect(() => {
     if (!isAnySplitMode) {
       setIsScrollMapReady(false)
+      return
+    }
+
+    // CRITICAL: When switching between split modes or entering split mode,
+    // the editor container size changes. Monaco Editor must be told about this
+    // by calling layout(), otherwise it returns stale measurements which breaks scroll sync.
+    //
+    // Example: Switching from vertical (editor 50% width) to horizontal (editor 50% height)
+    // Monaco still thinks it has the old dimensions until we call layout()
+    const editor = editorRef.current?.getEditor()
+    if (editor) {
+      // Use requestAnimationFrame to let the DOM settle first
+      requestAnimationFrame(() => {
+        console.log('📐 Notifying Monaco Editor of layout change')
+        editor.layout()
+      })
     }
   }, [isAnySplitMode])
 
