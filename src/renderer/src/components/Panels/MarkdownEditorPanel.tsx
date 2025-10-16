@@ -88,7 +88,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   const isSyncingRef = useRef(false)
   const [isEditorReady, setIsEditorReady] = useState(false)
   const [isDynamicContentReady, setIsDynamicContentReady] = useState(false)
-  const [isScrollMapReady, setIsScrollMapReady] = useState(false)
+  const [isScrollMapReady, setIsScrollMapReady] = useState(false) // Signals when scroll map is built and ready for listeners
 
   // Unified helper: detect any split mode (vertical or horizontal)
   // Used consistently across all scroll sync effects to avoid code duplication
@@ -173,7 +173,9 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   // Reset scroll map ready and notify Monaco of layout change when split state changes
   useEffect(() => {
     if (!isAnySplitMode) {
-      setIsScrollMapReady(false)
+      setIsDynamicContentReady(false)
+      setIsScrollMapReady(false) // Reset scroll map ready when exiting split mode
+      console.log('🔄 Split mode exited, reset scroll map ready state')
       return
     }
 
@@ -310,9 +312,10 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   // Build scroll map when content changes or view mode changes to split
   // IMPROVED: Now waits for dynamic content (images, Mermaid) to load first
   // UNIFIED: Works for both vertical and horizontal split modes
+  // CRITICAL: Sets isScrollMapReady state to signal listener effect to re-attach
   useEffect(() => {
     if (!isAnySplitMode || !currentFile || !isEditorReady || !isDynamicContentReady) {
-      setIsScrollMapReady(false)
+      setIsScrollMapReady(false) // Reset when leaving split mode or conditions not met
       return
     }
 
@@ -322,8 +325,9 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
       requestAnimationFrame(() => {
         const map = buildScrollMap()
         scrollMapRef.current = map
-        console.log(`📍 Scroll map built: ${map.length} entries (after dynamic content ready)`)
-        setIsScrollMapReady(true)
+        const hasValidMap = map.length > 0
+        setIsScrollMapReady(hasValidMap) // Signal listeners that map is ready
+        console.log(`📍 Scroll map built: ${map.length} entries (${hasValidMap ? '✅ ready' : '⚠️ empty'})`)
       })
     })
   }, [currentFile?.content, viewMode, isEditorReady, isDynamicContentReady])
@@ -340,7 +344,9 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
         if (isEditorReady) {
           const map = buildScrollMap()
           scrollMapRef.current = map
-          console.log(`📍 Scroll map rebuilt: ${map.length} entries (layout change)`)
+          const hasValidMap = map.length > 0
+          setIsScrollMapReady(hasValidMap) // Keep listeners alive when map is rebuilt
+          console.log(`📍 Scroll map rebuilt: ${map.length} entries (layout change, ${hasValidMap ? '✅ ready' : '⚠️ empty'})`)
         }
       }, 100)
     }
@@ -372,12 +378,20 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
 
   // Set up scroll synchronization listeners
   // UNIFIED: Works for both vertical and horizontal split modes
-  // Depends on isScrollMapReady to ensure listeners attach AFTER scroll map is built
+  // CRITICAL FIX: Depend on isScrollMapReady state to ensure listeners attach AFTER scroll map is built
+  // This fixes the race condition where listeners would attach before scroll map is ready
   useEffect(() => {
-    // Wait for editor to be ready, scroll map to be built, and split view mode
-    if (!isAnySplitMode || !isEditorReady || !previewRef.current || !isScrollMapReady) return
+    // Wait for all conditions to be met
+    if (!isAnySplitMode || !isEditorReady || !previewRef.current || !isScrollMapReady) {
+      if (isAnySplitMode && !isScrollMapReady) {
+        console.log('⏸️  Scroll map not ready yet, waiting for listeners to attach...')
+      }
+      return
+    }
+
+    // Verify scroll map has data
     if (scrollMapRef.current.length === 0) {
-      console.log('⏸️  Waiting for scroll map to be built...')
+      console.log('⚠️  Scroll map exists but is empty, listeners not attaching')
       return
     }
 
@@ -395,7 +409,6 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     const handleEditorScroll = () => {
       if (isSyncingRef.current || !previewRef.current) return
 
-      console.log('🔄 Editor scrolled, syncing to preview...')
       const scrollTop = editor.getScrollTop()
       const targetOffset = interpolateScrollPosition(scrollTop, scrollMapRef.current, 'editor')
 
@@ -414,7 +427,6 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     const handlePreviewScroll = () => {
       if (isSyncingRef.current || !previewRef.current) return
 
-      console.log('🔄 Preview scrolled, syncing to editor...')
       const scrollTop = previewRef.current.scrollTop
       const targetOffset = interpolateScrollPosition(scrollTop, scrollMapRef.current, 'preview')
 
@@ -433,7 +445,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     const previewElement = previewRef.current
     previewElement.addEventListener('scroll', handlePreviewScroll)
 
-    console.log('✅ Scroll synchronization enabled with', scrollMapRef.current.length, 'map entries')
+    console.log('🔗 Scroll synchronization enabled with', scrollMapRef.current.length, 'map entries')
 
     return () => {
       editorDisposable.dispose()
@@ -450,8 +462,8 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   const loadFile = async (filePath: string) => {
     console.log('Loading file:', filePath)
     setIsEditorReady(false) // Reset editor ready state when loading new file
-    setIsScrollMapReady(false) // Reset scroll map ready state when loading new file
     setIsDynamicContentReady(false) // Reset dynamic content ready state when loading new file
+    setIsScrollMapReady(false) // Reset scroll map ready when loading new file
     try {
       const content = await window.api.file.readFile(filePath)
       console.log('File loaded successfully:', {
