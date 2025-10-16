@@ -185,6 +185,11 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     //
     // Example: Switching from vertical (editor 50% width) to horizontal (editor 50% height)
     // Monaco still thinks it has the old dimensions until we call layout()
+
+    // When switching between split modes (vertical ↔ horizontal), reset isDynamicContentReady
+    // to trigger the scroll map to rebuild with new measurements after DOM settles
+    setIsDynamicContentReady(false)
+
     const editor = editorRef.current?.getEditor()
     if (editor) {
       // Use requestAnimationFrame to let the DOM settle first
@@ -193,7 +198,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
         editor.layout()
       })
     }
-  }, [isAnySplitMode])
+  }, [isAnySplitMode, viewMode])
 
   // Wait for dynamic content (images, Mermaid diagrams) to load before building scroll map
   useEffect(() => {
