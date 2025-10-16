@@ -15,8 +15,6 @@ Dual vertical activity bars on left and right edges (VS Code-style).
 
 ### Right Activity Bar
 
-- **Copilot icon**: Toggle Copilot panel (top position)
-  - Keyboard: `Cmd/Ctrl+Shift+A`
 - **Terminal icon**: Toggle Terminal panel
   - Keyboard: `Cmd/Ctrl+J`
 - **Width**: 48px fixed
@@ -48,27 +46,9 @@ Manages:
 - **Hover effect**: Icon color changes to white
 - **Size**: 48x48px click target per item
 
-## Copilot Panel & Claude Code UI
+## Copilot Panel
 
-**See**: [Claude Code UI Features](./claude-code/ui-features.md) for complete documentation.
-
-**Quick Reference**:
-- **Panel Label**: "Copilot" with status indicator dot (left of icon)
-- **Location**: Right sidebar, top position in activity bar
-- **Keyboard**: `Cmd/Ctrl+Shift+A`
-- **Status Indicators**: Color-coded dot (🟢 green=ready, 🟡 yellow=starting, 🔴 red=error)
-- **Features**: Installation check, OAuth authentication, persistent CLI session, chat interface, planning mode toggle, control panel
-- **Components**:
-  - `CopilotPanel.tsx` - Session management and state indicators
-  - `CopilotChat.tsx` - Chat interface with Control Panel
-  - `TerminalMessage.tsx` - Message rendering
-  - `ToolApprovalDialog.tsx` - Tool approval modal
-
-**Control Panel**: Shows session stats (messages, tools used, duration) and all 17 Claude Code tools with color-coded approval status (blue=approved, gray=not approved).
-
-**Planning Mode**: Toggle between full access and read-only mode (restricts to Read, LS, Grep, Task, WebSearch, TodoWrite).
-
-For complete documentation including session lifecycle, UI states, tool approval system, and planning mode, see [Claude Code UI Features](./claude-code/ui-features.md).
+Removed.
 
 ## Control Panels
 
@@ -115,10 +95,9 @@ const [showControlPanel, setShowControlPanel] = useState(true)
 
 ### Examples
 
-**CopilotPanel**: Session stats, tool approval status, planning mode toggle
 **ProjectPanel**: File filtering (All Files | Markdown Only)
 
-See: [Claude Code UI Features](./claude-code/ui-features.md) | [Project Panel](./project-panel.md#control-panel)
+See: [Project Panel](./project-panel.md#control-panel)
 
 ## Project Panel
 
@@ -218,7 +197,6 @@ These work **anywhere in the application**:
 |----------|--------|-------|
 | `Cmd/Ctrl+B` | Toggle left sidebar | Project |
 | `Cmd/Ctrl+J` | Toggle right panel | Terminal |
-| `Cmd/Ctrl+Shift+A` | Toggle right panel | Copilot |
 
 **Platform Detection**: Uses `metaKey` on macOS, `ctrlKey` on Windows/Linux
 
@@ -243,7 +221,7 @@ Matches VS Code panel toggle behavior:
 **Splitview Panels**:
 - Left sidebar: `ProjectPanelWrapper`
 - Center editor: `EditorAreaSplitPanel` (always visible)
-- Right sidebar: `TerminalSplitPanel` and `CopilotSplitPanel` (mutually exclusive)
+- Right sidebar: `TerminalSplitPanel`
 
 **Toggle Mechanism**:
 ```typescript
@@ -255,7 +233,7 @@ panel.api.setVisible(shouldShow)
 ```typescript
 {
   leftActivePanel: 'project' | null,
-  rightActivePanel: 'terminal' | 'claude' | null,
+  rightActivePanel: 'terminal' | null,
   leftWidth: number,
   rightWidth: number
 }

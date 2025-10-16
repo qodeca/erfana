@@ -5,7 +5,6 @@ import icon from '../../resources/icon.png?asset'
 import { registerFileHandlers } from './ipc/file-handlers'
 import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
-import { registerClaudeCodeHandlers } from './ipc/claude-code-handlers'
 import { registerSettingsHandlers } from './ipc/settings-handlers'
 import { registerTerminalHandlers } from './ipc/terminal-handlers'
 import { fileWatcherService } from './services/FileWatcherService'
@@ -76,7 +75,6 @@ app.whenReady().then(() => {
   registerFileHandlers()
   registerFileWatcherHandlers()
   registerDirectoryWatcherHandlers()
-  registerClaudeCodeHandlers()
   registerSettingsHandlers()
   registerTerminalHandlers()
 

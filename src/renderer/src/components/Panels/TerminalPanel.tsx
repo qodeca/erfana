@@ -2,7 +2,7 @@
  * TerminalPanel Component
  *
  * Terminal emulator panel using xterm.js + node-pty.
- * Follows the panel style established by ProjectPanel and CopilotPanel.
+ * Follows the panel style established by ProjectPanel.
  */
 
 import { useState, useEffect, useRef } from 'react'

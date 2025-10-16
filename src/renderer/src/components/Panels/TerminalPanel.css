@@ -5,7 +5,7 @@
   background: var(--background-color, #000000);
 }
 
-/* Header styling - matches Project and Copilot panels */
+/* Header styling - matches Project panel */
 .terminal-panel .sidebar-panel-header {
   display: flex;
   align-items: center;

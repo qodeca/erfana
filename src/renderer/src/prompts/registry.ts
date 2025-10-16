@@ -32,7 +32,7 @@ export const PROMPT_REGISTRY: Record<string, PromptConfig> = parsedTemplates.red
       id: parsed.id,
       label: parsed.frontmatter.name,
       icon: parsed.frontmatter.icon,
-      targetPanel: parsed.frontmatter.targetPanel || 'claude',
+      targetPanel: parsed.frontmatter.targetPanel || 'terminal',
       sendDirectly: parsed.frontmatter.sendDirectly || false,
       autoExecute: parsed.frontmatter.autoExecute || false,
       template: parsed.content, // Content without frontmatter

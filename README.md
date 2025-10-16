@@ -1,18 +1,15 @@
 # Erfana
 
-**Claude-Powered Project IDE for Consulting and Research Work**
-
-Erfana is an Electron desktop application that provides an integrated development environment specifically designed for managing consulting and research projects with Claude Code integration.
+An Electron-based project workspace focused on markdown editing, a project tree, and an integrated terminal.
 
 ## Features
 
 - 🎨 **Multi-Panel IDE Layout**: Hybrid SplitviewReact + DockviewReact with resizable panels
 - 📝 **Superior Markdown Editing**: Monaco Editor with live preview, scroll sync, Mermaid diagrams, and formatting toolbar
-- 🤖 **Claude Code Integration**: Persistent Claude CLI session with tool approval system and planning mode
 - 📁 **Smart Project Management**: Project tree with markdown filtering, visual indicators, and context menu operations
 - 🔄 **Auto-Refresh**: Automatic file and directory tree updates on external changes
 - 💻 **Integrated Terminal**: Full-featured xterm.js terminal with WebGL rendering and traditional zsh prompt
-- ⚡ **AI-Powered Text Operations**: Right-click context menu with prompt templates for text elaboration, improvement, and more
+ - ⚡ **AI-Powered Text Operations**: Right-click context menu with prompt templates for text elaboration, improvement, and more (send to Terminal)
 
 ## Tech Stack
 
@@ -21,7 +18,6 @@ Erfana is an Electron desktop application that provides an integrated developmen
 - **SplitviewReact** + **DockviewReact**: Hybrid layout system matching VS Code architecture
 - **Monaco Editor**: VS Code's editor engine for code editing
 - **xterm.js** + **node-pty**: Full-featured terminal emulator with PTY support
-- **Claude CLI**: Native Claude Code binary via MAX subscription (requires `brew install claude`)
 - **electron-store**: Settings persistence
 - **Mermaid.js**: Diagram rendering (22 diagram types)
 
@@ -31,7 +27,6 @@ Erfana is an Electron desktop application that provides an integrated developmen
 
 - Node.js 18+ (with npm or pnpm)
 - Git
-- Claude Code CLI (for AI features)
 
 ### Setup
 
@@ -58,7 +53,7 @@ erfana/
 ├── src/
 │   ├── main/              # Electron main process
 │   │   ├── index.ts       # App entry point
-│   │   └── services/      # Business logic (Git, Claude, etc.)
+│   │   └── services/      # Business logic (Terminal, File, Settings)
 │   ├── preload/           # Secure IPC bridge
 │   │   └── index.ts       # contextBridge API
 │   └── renderer/          # React UI
@@ -85,7 +80,7 @@ erfana/
 - File system operations (with auto-refresh via chokidar)
 - Claude CLI session management (persistent process with JSONL I/O)
 - Terminal PTY management (xterm.js + node-pty)
-- IPC handlers (97 channels across 6 domains)
+- IPC handlers (reduced after feature cleanup)
 
 ### Preload
 - Secure contextBridge API
@@ -106,15 +101,12 @@ erfana/
 1. Open a markdown file in split view (editor + preview)
 2. Select text in the preview pane
 3. Right-click and choose prompt template (Elaborate, Improve, Simplify, Rewrite, or Custom)
-4. Prompt is sent to Copilot or Terminal panel based on template configuration
+4. Prompt is sent to the Terminal panel based on template configuration
 5. Review AI response and iterate
 6. File references include precise line numbers for context
 
-### 2. Claude Code Integration
-1. Open Copilot panel from right activity bar
-2. Claude CLI session starts automatically (requires `brew install claude` and MAX subscription)
-3. Chat with Claude about your project with full context
-4. All 17 Claude Code tools enabled by default
+### 2. Terminal Usage
+Open the Terminal panel from the right activity bar to run shell commands in the project context.
 5. Toggle Planning Mode for safe exploration (read-only tools only)
 6. Tool approval system for security-sensitive operations
 7. Conversation history preserved across session restarts

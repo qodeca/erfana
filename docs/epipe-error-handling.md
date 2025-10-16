@@ -11,7 +11,7 @@
 EPIPE errors occur when code attempts to write to stdout/stderr after the stream has been closed or disconnected. This typically happens in three scenarios:
 
 1. **Process Cleanup**: During `app.on('before-quit')` when services are disposed
-2. **Child Process Exit**: When Claude CLI or Terminal PTY processes exit unexpectedly
+2. **Child Process Exit**: When Terminal PTY processes exit unexpectedly
 3. **Stream Disconnection**: When renderer process closes but main process continues logging
 
 ### Original Error Stack Trace
@@ -61,34 +61,11 @@ import { installSafeConsole } from './utils/safe-console'
 installSafeConsole()
 ```
 
-### 2. ClaudeCliService Stream Protection
+### 2. PTY Stream Protection
 
-**Location**: `src/main/services/ClaudeCliService.ts` - `sendMessage()` method
+**Location**: `src/main/services/TerminalService.ts`
 
-**Enhancements**:
-1. **Pre-write validation**: Check if stdin is available and not destroyed
-2. **EPIPE suppression**: Catch and log EPIPE errors without emitting failures
-3. **Graceful degradation**: Inform user of shutdown state instead of crashing
-
-**Code Pattern**:
-```typescript
-// Check stream availability
-if (!this.claudeProcess.stdin || this.claudeProcess.stdin.destroyed) {
-  throw new Error('Claude CLI stdin stream is not available or has been destroyed')
-}
-
-// Write with EPIPE handling
-this.claudeProcess.stdin.write(jsonLine, (error) => {
-  if (error) {
-    const errWithCode = error as NodeJS.ErrnoException
-    if (errWithCode.code === 'EPIPE') {
-      console.log('ℹ️ Claude CLI stdin closed (process likely shutting down)')
-      return
-    }
-    // Handle other errors normally
-  }
-})
-```
+Protects against EPIPE when writing to a terminal PTY that has closed.
 
 ### 3. TerminalService PTY Protection
 
@@ -141,15 +118,15 @@ try {
 ### Manual Testing
 
 1. **Normal Shutdown**:
-   - Open project with Claude CLI session
+   - Open project with terminal session
    - Quit application (Cmd+Q / Ctrl+Q)
    - **Expected**: Clean exit, no EPIPE errors in console
 
-2. **Claude CLI Termination**:
-   - Start Claude session
-   - Manually kill Claude CLI process externally
-   - Attempt to send message
-   - **Expected**: Graceful failure message, no crash
+2. **Terminal PTY Termination**:
+   - Start terminal session
+   - Manually kill terminal process externally
+   - Attempt to write to terminal
+   - **Expected**: Graceful failure, no crash
 
 3. **Terminal PTY Closure**:
    - Create terminal instance
@@ -163,9 +140,9 @@ try {
 
 ### Automated Testing
 
-**Future**: Add integration tests using Circuit Electron MCP
+**Future**: Add integration tests
 - Launch app
-- Create terminal and Claude session
+- Create terminal session
 - Force-close processes
 - Verify no crashes in logs
 

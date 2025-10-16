@@ -82,7 +82,7 @@ export function parseTemplate(raw: string, filename: string): ParsedTemplate {
  * @returns Lowercase, hyphenated string
  *
  * @example
- * slugify("Ask Copilot to Elaborate") // "ask-copilot-to-elaborate"
+ * slugify("Ask to Elaborate") // "ask-to-elaborate"
  */
 export function slugify(str: string): string {
   return str

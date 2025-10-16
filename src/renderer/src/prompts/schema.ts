@@ -17,8 +17,8 @@ export const PromptFrontmatterSchema = z.object({
   /** Icon identifier (maps to Lucide icon component) */
   icon: z.string().min(1, 'Icon is required'),
 
-  /** Which panel to send the rendered prompt to */
-  targetPanel: z.enum(['claude', 'terminal']).optional(),
+  /** Which panel to send the rendered prompt to (Copilot removed; always terminal) */
+  targetPanel: z.literal('terminal').optional(),
 
   /** Whether to send immediately without user review */
   sendDirectly: z.boolean().optional().default(false),

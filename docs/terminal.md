@@ -119,7 +119,7 @@ class TerminalService extends EventEmitter {
 export const terminalService = new TerminalService()
 ```
 
-**Pattern**: OOP service with singleton instance (follows FileService, ClaudeCliService pattern)
+**Pattern**: OOP service with singleton instance (follows FileService pattern)
 
 ### IPC Handlers
 
@@ -227,7 +227,6 @@ try {
 
 - Terminal icon in right activity bar (bottom position)
 - Toggles terminal splitview panel visibility
- - Mutually exclusive with Copilot panel
 
 ### Context Menu Integration
 **File**: `src/renderer/src/components/ContextMenu/PreviewContextMenu.tsx`
@@ -313,7 +312,7 @@ console.log('Terminal dimensions:', xterm.cols, xterm.rows)
 console.log('Container dimensions:', container.getBoundingClientRect())
 ```
 
-### Commands Not Found (e.g., `claude` not found)
+### Commands Not Found
 
 **Problem**: Commands installed via Homebrew or in shell RC files aren't accessible
 
@@ -321,14 +320,13 @@ console.log('Container dimensions:', container.getBoundingClientRect())
 
 **Verify**:
 ```bash
-which claude      # Should find Claude CLI
 which npm         # Should find npm
 echo $PATH        # Should include /opt/homebrew/bin and other Homebrew paths
 ```
 
 **If still not found**:
-1. Close ERFANA and app
-2. Verify command works in native terminal: `which claude`
+1. Close ERFANA
+2. Verify command works in native terminal (e.g., `which npm`)
 3. Restart ERFANA - terminal should inherit environment
 
 ### Bold Text Not Rendering
