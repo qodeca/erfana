@@ -289,6 +289,47 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     })
   }, [currentFile?.content, viewMode, isEditorReady, isDynamicContentReady])
 
+  // Watch for layout changes (e.g., <details> expand/collapse) and rebuild scroll map if needed
+  useEffect(() => {
+    if (viewMode !== 'split' || !previewRef.current) return
+
+    const handleDetailsToggle = () => {
+      console.log('📐 Layout change detected (<details> toggled or content changed)')
+      // Debounced rebuild on layout change
+      setTimeout(() => {
+        if (isEditorReady) {
+          const map = buildScrollMap()
+          scrollMapRef.current = map
+          console.log(`📍 Scroll map rebuilt: ${map.length} entries (layout change)`)
+        }
+      }, 100)
+    }
+
+    // Detect <details> toggle events
+    const detailsElements = previewRef.current.querySelectorAll('details')
+    detailsElements.forEach((details) => {
+      details.addEventListener('toggle', handleDetailsToggle)
+    })
+
+    // Also use MutationObserver to detect other dynamic layout changes
+    const observer = new MutationObserver(() => {
+      handleDetailsToggle()
+    })
+
+    observer.observe(previewRef.current, {
+      attributes: true,
+      attributeFilter: ['open'], // Watch for open attribute changes on details
+      subtree: true,
+    })
+
+    return () => {
+      detailsElements.forEach((details) => {
+        details.removeEventListener('toggle', handleDetailsToggle)
+      })
+      observer.disconnect()
+    }
+  }, [viewMode, isEditorReady])
+
   // Set up scroll synchronization listeners
   useEffect(() => {
     // Wait for editor to be ready, scroll map to be built, and split view mode
