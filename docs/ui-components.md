@@ -204,7 +204,7 @@ These work **anywhere in the application**:
 
 **⚠️ NOTE**: These override Monaco Editor shortcuts with same keys. Monaco's built-in shortcuts only work when editor is focused.
 
-See: [Markdown Editing](./markdown-editing.md) for editor-specific shortcuts
+See: [Editor Documentation](./editor/README.md) for editor-specific features
 
 ## Panel Toggle System
 
@@ -451,6 +451,6 @@ Previous issue (DockviewReact panels not resizing) resolved in v0.1.0.
 ## Related Documentation
 
 - [Architecture](./architecture.md) - Hybrid SplitviewReact + DockviewReact architecture
-- [Markdown Editing](./markdown-editing.md) - Editor-specific shortcuts
+- [Editor Documentation](./editor/README.md) - Editor features and shortcuts
 - [Development Tasks](./development-tasks.md) - Adding panels and components
 - [Known Issues](./known-issues.md) - Current issues and workarounds
