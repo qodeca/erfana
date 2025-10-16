@@ -425,6 +425,12 @@ The following HTML elements are safely allowed:
 - Element-specific: `href`, `src`, `alt`, `colspan`, `rowspan`, `type`, etc.
 - Custom data attributes: `data-*` attributes
 
+**Image Handling:**
+- `<img src>` attributes must use HTTPS URLs (HTTP images blocked by CSP)
+- Supports external CDNs: Unsplash, Picsum, etc.
+- Image attributes preserved: `src`, `alt`, `title`, `width`, `height`
+- Example: `<img alt="Image" src="https://example.com/image.jpg" width="300" />`
+
 #### Blocked Elements (Security)
 
 The following dangerous elements are **always blocked**:

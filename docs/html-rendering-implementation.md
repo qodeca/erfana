@@ -53,8 +53,16 @@ Custom React components for line tracking:
 - Interactive: `details`, `summary`
 - Semantic: `mark`, `time`, `address`
 - Figures: `figure`, `figcaption`
+- Images: `img` (with explicit attribute handling)
 
-All wrapped with `withLineRange()` for scroll sync and selection tracking.
+Most wrapped with `withLineRange()` for scroll sync and selection tracking.
+
+**Special Handling - img Element:**
+- Custom component handler (not `withLineRange()`)
+- Explicitly preserves: `src`, `alt`, `title`, `width`, `height`
+- Ensures attributes survive sanitization
+- Maintains line tracking for scroll sync
+- See implementation: `MarkdownPreview.tsx:256-271`
 
 ---
 
@@ -126,10 +134,22 @@ Current CSP in `src/renderer/index.html`:
       content="default-src 'self';
                script-src 'self';
                style-src 'self' 'unsafe-inline';
-               font-src 'self' data:" />
+               font-src 'self' data:;
+               img-src 'self' https:;" />
 ```
 
-✅ **Compatible** with current sanitization schema
+**Policy Directives**:
+- `default-src 'self'` - All content from app origin
+- `script-src 'self'` - Scripts from app only (XSS protected)
+- `style-src 'self' 'unsafe-inline'` - Inline styles for dockview, CSS from app
+- `font-src 'self' data:` - Fonts from app or data URIs
+- `img-src 'self' https:;` - Images from app or HTTPS (enables CDNs, blocks HTTP)
+
+✅ **Compatible** with HTML rendering sanitization
+- HTML sanitization removes dangerous elements/attributes
+- `img-src 'self' https:;` enables external image loading from CDNs
+- HTTP images blocked by CSP (security layer)
+- No `data:` URI images (security layer)
 - Default schema doesn't inject scripts
 - Style attributes are limited/sanitized
 - No inline event handlers
@@ -329,11 +349,25 @@ Hidden content
 
 **Test Case**: `<img src="url" alt="text">`
 
-**Expected**: Image renders
+**Expected**: Image renders correctly from HTTPS sources
 
-**Behavior**: ✅ Works - img element allowed with src/alt
+**Behavior**: ✅ Works - img element allowed with src/alt/title/width/height
 
-**Protocols**: Only http/https allowed (javascript: blocked)
+**Protocols**: HTTPS allowed (HTTP blocked by CSP, javascript: blocked by sanitizer)
+
+**Attributes**: Custom img component explicitly preserves `src`, `alt`, `title`, `width`, `height`
+
+**CSP Layer**: `img-src 'self' https:;` allows external HTTPS images (CDNs, Unsplash, etc.)
+
+**Sanitization Layer**: Event handlers and dangerous attributes removed
+
+**Example**:
+```html
+<figure>
+  <img alt="Example" src="https://fastly.picsum.photos/id/652/200/300.jpg" width="200" />
+  <figcaption>Image with caption</figcaption>
+</figure>
+```
 
 ---
 
@@ -548,11 +582,14 @@ Next paragraph
 - [x] Dependencies installed (rehype-raw, rehype-sanitize, hast-util-sanitize)
 - [x] MarkdownPreview.tsx updated with plugins
 - [x] HTML components added with line tracking
+- [x] Custom img component handler with explicit attributes
+- [x] CSP updated to allow `img-src 'self' https:;`
 - [x] Sanitization schema configured (defaultSchema)
 - [x] TypeScript compilation passing
 - [x] Build successful
-- [x] Documentation updated (markdown-editing.md)
+- [x] Documentation updated (markdown-editing.md, security.md, html-rendering-implementation.md)
 - [x] Test document created (test-html-rendering.md)
+- [x] External image rendering tested and working
 
 **For Future:**
 - [ ] Automated security testing
