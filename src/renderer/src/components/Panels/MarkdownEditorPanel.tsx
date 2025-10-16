@@ -187,6 +187,35 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     }
   }, [isAnySplitMode, viewMode])
 
+  // Resize observers: rebuild mapping when preview/editor containers resize
+  useEffect(() => {
+    if (!isAnySplitMode) return
+    const previewEl = previewRef.current
+    const editorEl = editorRef.current?.getEditor()?.getDomNode() || null
+    if (!previewEl || !editorEl) return
+
+    let debounceTimer: any = null
+    const debouncedRebuild = () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => {
+        rebuildScrollMap()
+      }, 150)
+    }
+
+    const ro = new ResizeObserver(() => debouncedRebuild())
+    ro.observe(previewEl)
+    ro.observe(editorEl)
+
+    const onWindowResize = () => debouncedRebuild()
+    window.addEventListener('resize', onWindowResize)
+
+    return () => {
+      window.removeEventListener('resize', onWindowResize)
+      ro.disconnect()
+      if (debounceTimer) clearTimeout(debounceTimer)
+    }
+  }, [isAnySplitMode, currentFile?.path, isEditorReady])
+
   // Rebuild scroll map when content or view changes (imperative, no state coordination)
   const rebuildScrollMap = useCallback(() => {
     console.log('🔨 rebuildScrollMap called, checking conditions...', {
@@ -232,18 +261,104 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
       return
     }
 
-    console.log('⏰ Scheduling scroll map rebuild in 500ms...')
-    // Wait for dynamic content (images, Mermaid)
-    const timeoutId = setTimeout(() => {
-      console.log('🔔 Timeout fired, calling rebuildScrollMap()')
+    // Helper: wait for images to load and mermaid to signal
+    const waitForPreviewReady = async (): Promise<void> => {
+      if (!previewRef.current) return
+      const root = previewRef.current
+
+      // Track pending image loads
+      const imgs = Array.from(root.querySelectorAll('img'))
+      const loadingPromises = imgs
+        .filter((img) => !(img as HTMLImageElement).complete)
+        .map(
+          (img) =>
+            new Promise<void>((resolve) => {
+              img.addEventListener('load', () => resolve(), { once: true })
+              img.addEventListener('error', () => resolve(), { once: true })
+            })
+        )
+
+      // Track a single mermaid event cycle (if any diagrams exist)
+      const hasMermaid = root.querySelector('.mermaid-wrapper') !== null
+      const mermaidPromise = hasMermaid
+        ? new Promise<void>((resolve) => {
+            const handler = () => {
+              root.removeEventListener('mermaid:rendered', handler as any)
+              resolve()
+            }
+            root.addEventListener('mermaid:rendered', handler as any, { once: true })
+            // Fallback after 800ms in case nothing fires
+            setTimeout(() => {
+              root.removeEventListener('mermaid:rendered', handler as any)
+              resolve()
+            }, 800)
+          })
+        : Promise.resolve()
+
+      // Fallback timeout so we don't wait forever
+      const fallback = new Promise<void>((resolve) => setTimeout(resolve, 600))
+
+      await Promise.race([
+        Promise.all([Promise.all(loadingPromises), mermaidPromise]).then(() => undefined),
+        fallback
+      ])
+    }
+
+    let cancelled = false
+
+    ;(async () => {
+      console.log('⏳ Waiting for preview content readiness...')
+      await waitForPreviewReady()
+      if (cancelled) return
+      console.log('🔔 Content ready. Rebuilding scroll map...')
       rebuildScrollMap()
-    }, 500) // Give content time to render
+    })()
 
     return () => {
-      console.log('🧹 Cleanup: clearing timeout')
-      clearTimeout(timeoutId)
+      cancelled = true
     }
   }, [currentFile?.content, viewMode, isEditorReady, rebuildScrollMap])
+
+  // Listen for subsequent Mermaid render events to keep mapping accurate
+  useEffect(() => {
+    if (!isAnySplitMode || !previewRef.current) return
+    const root = previewRef.current
+    let timer: any = null
+    const handler = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => rebuildScrollMap(), 120)
+    }
+    root.addEventListener('mermaid:rendered', handler as any)
+    return () => {
+      root.removeEventListener('mermaid:rendered', handler as any)
+      if (timer) clearTimeout(timer)
+    }
+  }, [isAnySplitMode, currentFile?.path, rebuildScrollMap])
+
+  // Attach image load listeners after content changes to handle lazy-loading
+  useEffect(() => {
+    if (!isAnySplitMode || !previewRef.current) return
+    const root = previewRef.current
+    const imgs = Array.from(root.querySelectorAll('img'))
+    let timer: any = null
+    const handler = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => rebuildScrollMap(), 120)
+    }
+    imgs.forEach((img) => {
+      if (!(img as HTMLImageElement).complete) {
+        img.addEventListener('load', handler, { once: true })
+        img.addEventListener('error', handler, { once: true })
+      }
+    })
+    return () => {
+      if (timer) clearTimeout(timer)
+      imgs.forEach((img) => {
+        img.removeEventListener('load', handler)
+        img.removeEventListener('error', handler)
+      })
+    }
+  }, [isAnySplitMode, currentFile?.content, rebuildScrollMap])
 
   // STABLE handlers using useCallback - prevents stale closures
   const handleEditorScroll = useCallback(() => {
@@ -563,6 +678,13 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     localStorage.setItem('markdown-editor-divider-position-horizontal', newPosition.toString())
   }
 
+  const handleDividerResizeEnd = () => {
+    // Rebuild map after layout settles post divider drag
+    if (isAnySplitMode) {
+      requestAnimationFrame(() => rebuildScrollMap())
+    }
+  }
+
   /**
    * Build scroll map: line → pixel positions
    * Maps editor line numbers to preview element positions
@@ -585,38 +707,66 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
       return []
     }
 
-    const map: ScrollMapEntry[] = []
-    const elements = previewRef.current.querySelectorAll('[data-line]')
-    console.log(`🔍 Found ${elements.length} elements with data-line attribute`)
+    const container = previewRef.current
+    const containerRect = container.getBoundingClientRect()
+    const containerScrollTop = container.scrollTop
 
-    // Get container bounds for accurate position calculation
-    const containerRect = previewRef.current.getBoundingClientRect()
-    const containerScrollTop = previewRef.current.scrollTop
-    console.log('📏 Container info:', {
-      containerTop: containerRect.top,
-      containerHeight: containerRect.height,
-      containerScrollTop
-    })
+    // Collect candidates using start/end ranges
+    const nodeList = container.querySelectorAll('[data-line-start]')
+    console.log(`🔍 Found ${nodeList.length} elements with data-line-start attribute`)
 
-    elements.forEach((el) => {
-      const lineAttr = el.getAttribute('data-line')
-      if (!lineAttr) return
+    // Use a map of line -> { previewOffset: number }
+    // We'll emit a single mapping per line to keep source keys monotonic
+    const lineToPreviewOffset = new Map<number, number>()
 
-      const line = parseInt(lineAttr, 10)
-      if (isNaN(line)) return
+    nodeList.forEach((el) => {
+      const startAttr = el.getAttribute('data-line-start')
+      const endAttr = el.getAttribute('data-line-end')
+      if (!startAttr) return
 
-      // Use getBoundingClientRect for accurate positioning relative to viewport
-      // Then adjust for scroll position to get absolute position in the scrollable area
+      const startLine = parseInt(startAttr, 10)
+      const endLine = endAttr ? parseInt(endAttr, 10) : startLine
+      if (isNaN(startLine)) return
+
       const rect = (el as HTMLElement).getBoundingClientRect()
-      const previewOffset = rect.top - containerRect.top + containerScrollTop
-      const editorOffset = editor.getTopForLineNumber(line)
+      const topOffset = rect.top - containerRect.top + containerScrollTop
+      const bottomOffset = rect.bottom - containerRect.top + containerScrollTop
 
-      map.push({ line, editorOffset, previewOffset })
+      // For the start line of a block, prefer the smallest (top-most) offset
+      const existingStart = lineToPreviewOffset.get(startLine)
+      if (existingStart == null || topOffset < existingStart) {
+        lineToPreviewOffset.set(startLine, topOffset)
+      }
+
+      // If the block spans multiple lines, add an entry for the end line using the bottom
+      if (!isNaN(endLine) && endLine !== startLine) {
+        const existingEnd = lineToPreviewOffset.get(endLine)
+        // For the end line, prefer the largest (bottom-most) offset
+        if (existingEnd == null || bottomOffset > existingEnd) {
+          lineToPreviewOffset.set(endLine, bottomOffset)
+        }
+      }
     })
 
-    const sorted = map.sort((a, b) => a.line - b.line)
-    console.log(`✅ buildScrollMap completed: ${sorted.length} entries`)
-    return sorted
+    // Build scroll map entries from the deduplicated lines
+    const map: ScrollMapEntry[] = []
+    for (const [line, previewOffset] of lineToPreviewOffset.entries()) {
+      const editorOffset = editor.getTopForLineNumber(line)
+      map.push({ line, editorOffset, previewOffset })
+    }
+
+    // Sort by line number to ensure source monotonicity
+    map.sort((a, b) => a.line - b.line)
+
+    // Enforce monotonic non-decreasing preview offsets to avoid jitter
+    for (let i = 1; i < map.length; i++) {
+      if (map[i].previewOffset < map[i - 1].previewOffset) {
+        map[i].previewOffset = map[i - 1].previewOffset + 0.1 // epsilon
+      }
+    }
+
+    console.log(`✅ buildScrollMap completed: ${map.length} entries`)
+    return map
   }
 
   /**
@@ -647,35 +797,27 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
 
     // Handle edge cases
     if (left === 0) {
-      // Before first entry: use same proportion from start
-      const firstEntry = map[0]
-      const secondEntry = map[1] || map[0]
-      if (map.length === 1) return firstEntry[targetKey]
-
-      const sourceGap = secondEntry[sourceKey] - firstEntry[sourceKey]
-      const targetGap = secondEntry[targetKey] - firstEntry[targetKey]
-      const ratio = sourceGap > 0 ? scrollTop / sourceGap : 0
-      return ratio * targetGap
+      // Before first entry: extrapolate using line through first two points (y = m x + b)
+      const p1 = map[0]
+      const p2 = map[1]
+      const dx = p2[sourceKey] - p1[sourceKey]
+      if (dx === 0) return p1[targetKey]
+      const dy = p2[targetKey] - p1[targetKey]
+      const m = dy / dx
+      const b = p1[targetKey] - m * p1[sourceKey]
+      return m * scrollTop + b
     }
 
     if (left >= map.length) {
-      // CRITICAL FIX: Handle end-of-document scrolling
-      // When scrolling beyond last entry, calculate proportional distance beyond last point
-      const lastEntry = map[map.length - 1]
-      const secondLastEntry = map[map.length - 2]
-
-      const sourceGap = lastEntry[sourceKey] - secondLastEntry[sourceKey]
-      const targetGap = lastEntry[targetKey] - secondLastEntry[targetKey]
-
-      // Distance beyond last mapped point
-      const beyondLastDistance = scrollTop - lastEntry[sourceKey]
-
-      // Apply same proportion to target
-      // If we're 10% beyond the last entry in the source, go 10% beyond in the target
-      const ratio = sourceGap > 0 ? beyondLastDistance / sourceGap : 1
-      const extraDistance = ratio * targetGap
-
-      return lastEntry[targetKey] + extraDistance
+      // After last entry: extrapolate using line through last two points (y = m x + b)
+      const p2 = map[map.length - 1]
+      const p1 = map[map.length - 2]
+      const dx = p2[sourceKey] - p1[sourceKey]
+      if (dx === 0) return p2[targetKey]
+      const dy = p2[targetKey] - p1[targetKey]
+      const m = dy / dx
+      const b = p1[targetKey] - m * p1[sourceKey]
+      return m * scrollTop + b
     }
 
     // Linear interpolation between two points
@@ -836,7 +978,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
               >
                 <MarkdownPreview key={`preview-${viewMode}`} ref={previewRef} content={currentFile.content} filePath={currentFile.path} />
               </div>
-              <ResizableDivider orientation="horizontal" onResize={handleDividerResizeHorizontal} />
+              <ResizableDivider orientation="horizontal" onResize={handleDividerResizeHorizontal} onResizeEnd={handleDividerResizeEnd} />
               <div
                 className="editor-pane"
                 style={{ height: `${100 - dividerPositionHorizontal}%` }}
@@ -874,7 +1016,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
                 </div>
               )}
               {viewMode === 'split' && (
-                <ResizableDivider orientation="vertical" onResize={handleDividerResize} />
+                <ResizableDivider orientation="vertical" onResize={handleDividerResize} onResizeEnd={handleDividerResizeEnd} />
               )}
               {(viewMode === 'preview' || viewMode === 'split') && (
                 <div

@@ -166,6 +166,17 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
         }
 
         setIsLoading(false)
+
+        // Dispatch a custom event to inform preview that mermaid finished rendering
+        // Bubble so listeners on preview container can catch it
+        const target = containerRef.current
+        if (target) {
+          const event = new CustomEvent('mermaid:rendered', {
+            bubbles: true,
+            detail: { startLine, endLine, ok: true }
+          })
+          target.dispatchEvent(event)
+        }
       } catch (err) {
         console.error('❌ Mermaid rendering error:', err)
         const errorMessage = err instanceof Error ? err.message : 'Failed to render diagram'
@@ -176,6 +187,15 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
           .trim()
         setError(cleanMessage)
         setIsLoading(false)
+
+        // Notify listeners even on error so scroll map can stabilize
+        if (containerRef.current) {
+          const event = new CustomEvent('mermaid:rendered', {
+            bubbles: true,
+            detail: { startLine, endLine, ok: false }
+          })
+          containerRef.current.dispatchEvent(event)
+        }
       }
     }
 
