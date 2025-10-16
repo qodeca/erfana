@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { FileEdit, Columns2, Rows2, Eye, Bold, Italic, Code, Link, Image, Heading1, List, ListOrdered, Strikethrough } from 'lucide-react'
 import { IDockviewPanelProps } from 'dockview'
 import * as monaco from 'monaco-editor'
@@ -87,8 +87,6 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   const scrollMapRef = useRef<ScrollMapEntry[]>([])
   const isSyncingRef = useRef(false)
   const [isEditorReady, setIsEditorReady] = useState(false)
-  const [isDynamicContentReady, setIsDynamicContentReady] = useState(false)
-  const [isScrollMapReady, setIsScrollMapReady] = useState(false) // Signals when scroll map is built and ready for listeners
 
   // Unified helper: detect any split mode (vertical or horizontal)
   // Used consistently across all scroll sync effects to avoid code duplication
@@ -170,29 +168,18 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     }
   }, [currentFile?.path])
 
-  // Reset scroll map ready and notify Monaco of layout change when split state changes
+  // Reset editor state when view mode changes - force rebuild on next effect
   useEffect(() => {
-    if (!isAnySplitMode) {
-      setIsDynamicContentReady(false)
-      setIsScrollMapReady(false) // Reset scroll map ready when exiting split mode
-      console.log('🔄 Split mode exited, reset scroll map ready state')
-      return
-    }
+    setIsEditorReady(false) // Trigger rebuild cycle
+    console.log('🔄 Resetting editor state due to view mode change:', viewMode)
+  }, [viewMode])
 
-    // CRITICAL: When switching between split modes or entering split mode,
-    // the editor container size changes. Monaco Editor must be told about this
-    // by calling layout(), otherwise it returns stale measurements which breaks scroll sync.
-    //
-    // Example: Switching from vertical (editor 50% width) to horizontal (editor 50% height)
-    // Monaco still thinks it has the old dimensions until we call layout()
-
-    // When switching between split modes (vertical ↔ horizontal), reset isDynamicContentReady
-    // to trigger the scroll map to rebuild with new measurements after DOM settles
-    setIsDynamicContentReady(false)
+  // Notify Monaco of layout changes (no state coordination needed)
+  useEffect(() => {
+    if (!isAnySplitMode) return
 
     const editor = editorRef.current?.getEditor()
     if (editor) {
-      // Use requestAnimationFrame to let the DOM settle first
       requestAnimationFrame(() => {
         console.log('📐 Notifying Monaco Editor of layout change')
         editor.layout()
@@ -200,69 +187,120 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     }
   }, [isAnySplitMode, viewMode])
 
-  // Wait for dynamic content (images, Mermaid diagrams) to load before building scroll map
-  useEffect(() => {
-    if (!isAnySplitMode || !currentFile || !isEditorReady || !previewRef.current) {
-      setIsDynamicContentReady(false)
+  // Rebuild scroll map when content or view changes (imperative, no state coordination)
+  const rebuildScrollMap = useCallback(() => {
+    console.log('🔨 rebuildScrollMap called, checking conditions...', {
+      hasEditor: !!editorRef.current,
+      hasPreview: !!previewRef.current,
+      isAnySplitMode
+    })
+
+    if (!editorRef.current || !previewRef.current || !isAnySplitMode) {
+      console.log('⏭️  Skipping scroll map rebuild: preconditions not met')
       return
     }
 
-    const waitForDynamicContent = async () => {
-      console.log('⏳ Waiting for dynamic content (images, Mermaid) to load...')
-
-      try {
-        // Wait for all images to load
-        const images = previewRef.current?.querySelectorAll('img') || []
-        const imagePromises = Array.from(images).map((img: Element) => {
-          const htmlImg = img as HTMLImageElement
-          return new Promise<void>((resolve) => {
-            if (htmlImg.complete) {
-              // Image already loaded or failed
-              resolve()
-            } else {
-              // Wait for load or error
-              const onLoad = () => {
-                htmlImg.removeEventListener('load', onLoad)
-                htmlImg.removeEventListener('error', onError)
-                resolve()
-              }
-              const onError = () => {
-                htmlImg.removeEventListener('load', onLoad)
-                htmlImg.removeEventListener('error', onError)
-                resolve() // Resolve even on error to continue
-              }
-              htmlImg.addEventListener('load', onLoad)
-              htmlImg.addEventListener('error', onError)
-            }
-          })
-        })
-
-        if (imagePromises.length > 0) {
-          console.log(`📷 Waiting for ${imagePromises.length} images...`)
-          await Promise.all(imagePromises)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        try {
+          console.log('🏗️  Building scroll map...')
+          const map = buildScrollMap()
+          scrollMapRef.current = map
+          console.log(`📍 Scroll map rebuilt: ${map.length} entries`)
+          if (map.length > 0) {
+            console.log('✅ First few entries:', map.slice(0, 3))
+          }
+        } catch (error) {
+          console.error('Error rebuilding scroll map:', error)
+          scrollMapRef.current = []
         }
+      })
+    })
+  }, [isAnySplitMode])
 
-        // Wait for Mermaid diagrams to render
-        // Mermaid adds .mermaid-diagram class after rendering
-        const mermaidWrappers = previewRef.current?.querySelectorAll('.mermaid-wrapper') || []
-        if (mermaidWrappers.length > 0) {
-          console.log(`📊 Waiting for ${mermaidWrappers.length} Mermaid diagrams...`)
-          // Give Mermaid time to render (usually 100-300ms)
-          await new Promise((resolve) => setTimeout(resolve, 500))
-        }
+  // Trigger scroll map rebuild when content or file changes
+  useEffect(() => {
+    console.log('🔔 Rebuild trigger effect fired:', {
+      isAnySplitMode,
+      isEditorReady,
+      hasContent: !!currentFile?.content,
+      viewMode
+    })
 
-        console.log('✅ Dynamic content ready')
-        setIsDynamicContentReady(true)
-      } catch (error) {
-        console.error('Error waiting for dynamic content:', error)
-        // Still mark as ready to continue
-        setIsDynamicContentReady(true)
-      }
+    if (!isAnySplitMode || !isEditorReady) {
+      console.log('⏭️  Skipping rebuild trigger: preconditions not met')
+      return
     }
 
-    setIsDynamicContentReady(false)
-    waitForDynamicContent()
-  }, [currentFile?.content, viewMode, isEditorReady])
+    console.log('⏰ Scheduling scroll map rebuild in 500ms...')
+    // Wait for dynamic content (images, Mermaid)
+    const timeoutId = setTimeout(() => {
+      console.log('🔔 Timeout fired, calling rebuildScrollMap()')
+      rebuildScrollMap()
+    }, 500) // Give content time to render
+
+    return () => {
+      console.log('🧹 Cleanup: clearing timeout')
+      clearTimeout(timeoutId)
+    }
+  }, [currentFile?.content, viewMode, isEditorReady, rebuildScrollMap])
+
+  // STABLE handlers using useCallback - prevents stale closures
+  const handleEditorScroll = useCallback(() => {
+    if (isSyncingRef.current || !previewRef.current) return
+
+    try {
+      // Defensive: verify previewRef is still attached to DOM
+      if (!previewRef.current.offsetParent) return
+
+      const editor = editorRef.current?.getEditor()
+      if (!editor || scrollMapRef.current.length === 0) return
+
+      const scrollTop = editor.getScrollTop()
+      const targetOffset = interpolateScrollPosition(scrollTop, scrollMapRef.current, 'editor')
+
+      isSyncingRef.current = true
+      previewRef.current.scrollTop = targetOffset
+
+      // Use RAF instead of setTimeout (more reliable)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          isSyncingRef.current = false
+        })
+      })
+    } catch (error) {
+      console.error('Error in handleEditorScroll:', error)
+      isSyncingRef.current = false
+    }
+  }, [])
+
+  const handlePreviewScroll = useCallback(() => {
+    if (isSyncingRef.current || !previewRef.current) return
+
+    try {
+      // Defensive: verify previewRef is still attached to DOM
+      if (!previewRef.current.offsetParent) return
+
+      const editor = editorRef.current?.getEditor()
+      if (!editor || scrollMapRef.current.length === 0) return
+
+      const scrollTop = previewRef.current.scrollTop
+      const targetOffset = interpolateScrollPosition(scrollTop, scrollMapRef.current, 'preview')
+
+      isSyncingRef.current = true
+      editor.setScrollTop(targetOffset)
+
+      // Use RAF instead of setTimeout (more reliable)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          isSyncingRef.current = false
+        })
+      })
+    } catch (error) {
+      console.error('Error in handlePreviewScroll:', error)
+      isSyncingRef.current = false
+    }
+  }, [])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -314,161 +352,71 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     }
   }, [currentFile?.content, currentFile?.modified])
 
-  // Build scroll map when content changes or view mode changes to split
-  // IMPROVED: Now waits for dynamic content (images, Mermaid) to load first
-  // UNIFIED: Works for both vertical and horizontal split modes
-  // CRITICAL: Sets isScrollMapReady state to signal listener effect to re-attach
+  // Attach scroll listeners - simplified approach without polling
   useEffect(() => {
-    if (!isAnySplitMode || !currentFile || !isEditorReady || !isDynamicContentReady) {
-      setIsScrollMapReady(false) // Reset when leaving split mode or conditions not met
-      return
-    }
-
-    // Wait for layout to settle after dynamic content loads
-    // Double RAF ensures all layout calculations are complete
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const map = buildScrollMap()
-        scrollMapRef.current = map
-        const hasValidMap = map.length > 0
-        setIsScrollMapReady(hasValidMap) // Signal listeners that map is ready
-        console.log(`📍 Scroll map built: ${map.length} entries (${hasValidMap ? '✅ ready' : '⚠️ empty'})`)
+    if (!isAnySplitMode || !isEditorReady || !previewRef.current) {
+      console.log('⏭️  Skipping listener attachment:', {
+        isAnySplitMode,
+        isEditorReady,
+        hasPreviewRef: !!previewRef.current
       })
-    })
-  }, [currentFile?.content, viewMode, isEditorReady, isDynamicContentReady])
-
-  // Watch for layout changes (e.g., <details> expand/collapse) and rebuild scroll map if needed
-  // UNIFIED: Works for both vertical and horizontal split modes
-  useEffect(() => {
-    if (!isAnySplitMode || !previewRef.current) return
-
-    const handleDetailsToggle = () => {
-      console.log('📐 Layout change detected (<details> toggled or content changed)')
-      // Debounced rebuild on layout change
-      setTimeout(() => {
-        if (isEditorReady) {
-          const map = buildScrollMap()
-          scrollMapRef.current = map
-          const hasValidMap = map.length > 0
-          setIsScrollMapReady(hasValidMap) // Keep listeners alive when map is rebuilt
-          console.log(`📍 Scroll map rebuilt: ${map.length} entries (layout change, ${hasValidMap ? '✅ ready' : '⚠️ empty'})`)
-        }
-      }, 100)
-    }
-
-    // Detect <details> toggle events
-    const detailsElements = previewRef.current.querySelectorAll('details')
-    detailsElements.forEach((details) => {
-      details.addEventListener('toggle', handleDetailsToggle)
-    })
-
-    // Also use MutationObserver to detect other dynamic layout changes
-    const observer = new MutationObserver(() => {
-      handleDetailsToggle()
-    })
-
-    observer.observe(previewRef.current, {
-      attributes: true,
-      attributeFilter: ['open'], // Watch for open attribute changes on details
-      subtree: true,
-    })
-
-    return () => {
-      detailsElements.forEach((details) => {
-        details.removeEventListener('toggle', handleDetailsToggle)
-      })
-      observer.disconnect()
-    }
-  }, [viewMode, isEditorReady])
-
-  // Set up scroll synchronization listeners
-  // UNIFIED: Works for both vertical and horizontal split modes
-  // CRITICAL FIX: Depend on isScrollMapReady state to ensure listeners attach AFTER scroll map is built
-  // This fixes the race condition where listeners would attach before scroll map is ready
-  useEffect(() => {
-    // Wait for all conditions to be met
-    if (!isAnySplitMode || !isEditorReady || !previewRef.current || !isScrollMapReady) {
-      if (isAnySplitMode && !isScrollMapReady) {
-        console.log('⏸️  Scroll map not ready yet, waiting for listeners to attach...')
-      }
       return
     }
 
-    // Verify scroll map has data
-    if (scrollMapRef.current.length === 0) {
-      console.log('⚠️  Scroll map exists but is empty, listeners not attaching')
-      return
-    }
-
-    // Get direct editor access
     const editor = editorRef.current?.getEditor()
     if (!editor) {
-      console.log('⏸️  Editor not available yet...')
+      console.log('⏭️  Skipping listener attachment: no editor')
       return
     }
 
-    /**
-     * Handle editor scroll events → sync to preview
-     * Defined inside useEffect to avoid stale closures
-     */
-    const handleEditorScroll = () => {
-      if (isSyncingRef.current || !previewRef.current) return
+    console.log('🔄 Attaching scroll listeners directly...')
 
-      const scrollTop = editor.getScrollTop()
-      const targetOffset = interpolateScrollPosition(scrollTop, scrollMapRef.current, 'editor')
+    // Attach listeners immediately - scroll map should be built by now
+    try {
+      const editorDisposable = editor.onDidScrollChange(handleEditorScroll)
+      const previewElement = previewRef.current!
+      previewElement.addEventListener('scroll', handlePreviewScroll)
 
-      isSyncingRef.current = true
-      previewRef.current.scrollTop = targetOffset
+      console.log('🔗 Scroll listeners attached successfully')
+      console.log('📊 Current scroll map size:', scrollMapRef.current.length)
 
-      setTimeout(() => {
-        isSyncingRef.current = false
-      }, 50)
+      return () => {
+        console.log('🧹 Removing scroll listeners')
+        editorDisposable.dispose()
+        previewElement.removeEventListener('scroll', handlePreviewScroll)
+      }
+    } catch (error) {
+      console.error('❌ Error attaching scroll listeners:', error)
+      return undefined
     }
-
-    /**
-     * Handle preview scroll events → sync to editor
-     * Defined inside useEffect to avoid stale closures
-     */
-    const handlePreviewScroll = () => {
-      if (isSyncingRef.current || !previewRef.current) return
-
-      const scrollTop = previewRef.current.scrollTop
-      const targetOffset = interpolateScrollPosition(scrollTop, scrollMapRef.current, 'preview')
-
-      isSyncingRef.current = true
-      editor.setScrollTop(targetOffset)
-
-      setTimeout(() => {
-        isSyncingRef.current = false
-      }, 50)
-    }
-
-    // Editor scroll listener - attach directly to Monaco editor instance
-    const editorDisposable = editor.onDidScrollChange(handleEditorScroll)
-
-    // Preview scroll listener
-    const previewElement = previewRef.current
-    previewElement.addEventListener('scroll', handlePreviewScroll)
-
-    console.log('🔗 Scroll synchronization enabled with', scrollMapRef.current.length, 'map entries')
-
-    return () => {
-      editorDisposable.dispose()
-      previewElement.removeEventListener('scroll', handlePreviewScroll)
-      console.log('🔄 Scroll synchronization disabled')
-    }
-  }, [viewMode, currentFile, isEditorReady, isScrollMapReady])
+  }, [viewMode, currentFile?.path, isEditorReady, handleEditorScroll, handlePreviewScroll])
 
   const handleEditorMount = (_editor: monaco.editor.IStandaloneCodeEditor) => {
-    console.log('✅ Editor mounted and ready')
+    console.log('✅ Editor mounted and ready, in mode:', viewMode)
+
+    // Immediately build scroll map if in split mode
+    if (viewMode === 'split' || viewMode === 'split-horizontal') {
+      console.log('🔨 Triggering immediate scroll map build after editor mount in', viewMode)
+      // Schedule it for next frame to ensure Monaco is fully ready
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          try {
+            const map = buildScrollMap()
+            scrollMapRef.current = map
+            console.log(`📍 Scroll map built immediately after mount: ${map.length} entries`)
+          } catch (error) {
+            console.error('Error building scroll map immediately after mount:', error)
+          }
+        })
+      })
+    }
+
     setIsEditorReady(true)
   }
 
   const loadFile = async (filePath: string) => {
     console.log('Loading file:', filePath)
     setIsEditorReady(false) // Reset editor ready state when loading new file
-    setIsDynamicContentReady(false) // Reset dynamic content ready state when loading new file
-    setIsScrollMapReady(false) // Reset scroll map ready when loading new file
     try {
       const content = await window.api.file.readFile(filePath)
       console.log('File loaded successfully:', {
@@ -624,14 +572,31 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
    * Previously used offsetTop which didn't account for container padding.
    */
   const buildScrollMap = (): ScrollMapEntry[] => {
-    if (!editorRef.current || !previewRef.current) return []
+    console.log('🗺️  buildScrollMap() called')
+
+    if (!editorRef.current || !previewRef.current) {
+      console.log('⏭️  Skipping buildScrollMap: missing refs')
+      return []
+    }
+
+    const editor = editorRef.current.getEditor()
+    if (!editor) {
+      console.log('⏭️  Skipping buildScrollMap: no editor')
+      return []
+    }
 
     const map: ScrollMapEntry[] = []
     const elements = previewRef.current.querySelectorAll('[data-line]')
+    console.log(`🔍 Found ${elements.length} elements with data-line attribute`)
 
     // Get container bounds for accurate position calculation
     const containerRect = previewRef.current.getBoundingClientRect()
     const containerScrollTop = previewRef.current.scrollTop
+    console.log('📏 Container info:', {
+      containerTop: containerRect.top,
+      containerHeight: containerRect.height,
+      containerScrollTop
+    })
 
     elements.forEach((el) => {
       const lineAttr = el.getAttribute('data-line')
@@ -644,12 +609,14 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
       // Then adjust for scroll position to get absolute position in the scrollable area
       const rect = (el as HTMLElement).getBoundingClientRect()
       const previewOffset = rect.top - containerRect.top + containerScrollTop
-      const editorOffset = editorRef.current!.getTopForLineNumber(line)
+      const editorOffset = editor.getTopForLineNumber(line)
 
       map.push({ line, editorOffset, previewOffset })
     })
 
-    return map.sort((a, b) => a.line - b.line)
+    const sorted = map.sort((a, b) => a.line - b.line)
+    console.log(`✅ buildScrollMap completed: ${sorted.length} entries`)
+    return sorted
   }
 
   /**
@@ -867,7 +834,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
                 className="preview-pane"
                 style={{ height: `${dividerPositionHorizontal}%` }}
               >
-                <MarkdownPreview ref={previewRef} content={currentFile.content} filePath={currentFile.path} />
+                <MarkdownPreview key={`preview-${viewMode}`} ref={previewRef} content={currentFile.content} filePath={currentFile.path} />
               </div>
               <ResizableDivider orientation="horizontal" onResize={handleDividerResizeHorizontal} />
               <div
@@ -875,6 +842,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
                 style={{ height: `${100 - dividerPositionHorizontal}%` }}
               >
                 <MonacoMarkdownEditor
+                  key={`editor-${viewMode}`}
                   ref={editorRef}
                   value={currentFile.content}
                   onChange={handleContentChange}
@@ -895,6 +863,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
                   style={viewMode === 'split' ? { width: `${dividerPosition}%` } : undefined}
                 >
                   <MonacoMarkdownEditor
+                    key={`editor-${viewMode}`}
                     ref={editorRef}
                     value={currentFile.content}
                     onChange={handleContentChange}
@@ -912,7 +881,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
                   className="preview-pane"
                   style={viewMode === 'split' ? { width: `${100 - dividerPosition}%` } : undefined}
                 >
-                  <MarkdownPreview ref={previewRef} content={currentFile.content} filePath={currentFile.path} />
+                  <MarkdownPreview key={`preview-${viewMode}`} ref={previewRef} content={currentFile.content} filePath={currentFile.path} />
                 </div>
               )}
             </>
