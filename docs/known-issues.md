@@ -66,7 +66,7 @@ See: [UI Components - Panel Toggle System](./ui-components.md#panel-toggle-syste
 
 **Status**: ✅ Editor ↔ Preview scrolling now fully synchronized, including during split mode transitions.
 
-See: [Markdown Editing - Scroll Synchronization](./markdown-editing.md#scroll-synchronization)
+See: [Scroll Synchronization](./editor/scroll-sync.md)
 
 ---
 
@@ -90,7 +90,7 @@ const isInline = !className && typeof children === 'string' && !children.include
 
 **Status**: ✅ Plain code blocks now render as unified blocks. Block code (with newlines) renders as `<pre>`, inline code (no newlines) renders as `<code>`.
 
-See: [Markdown Editing - Code Block Rendering](./markdown-editing.md#code-block-rendering)
+See: [Markdown Preview](./editor/markdown-preview.md)
 
 ---
 
@@ -152,8 +152,8 @@ ModuleNotFoundError: No module named 'distutils'
 ```
 
 **Workaround**:
-- Terminal panel is deferred
-- Use Claude Agent SDK directly for now
+- Terminal functionality may be limited
+- Use external terminal if needed
  
 
 **Solution**:
@@ -211,7 +211,7 @@ name: Mermaid Bug Report  # Display name (can change freely)
 
 **Status**: Architecture review complete, implementation pending.
 
-**See**: [Prompt Templates - Architectural Decisions](./prompt-templates.md#architectural-decisions)
+**See**: [Prompt Templates](./prompts/README.md)
 
 ---
 
