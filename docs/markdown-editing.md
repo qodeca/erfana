@@ -177,7 +177,7 @@ The **Modify** action provides a flexible way to transform selected text by coll
 - User input available as `{{userInput}}` variable in template
 - Combines with `autoExecute: true` for seamless Claude Code workflow
 
-**Implementation**: `ModifyDialog.tsx` (React Portal component), `PreviewContextMenu.tsx` (dialog handling)
+**Implementation**: `UserInputDialog.tsx` (React Portal component), `PreviewContextMenu.tsx` (dialog handling)
 
 See: [Prompt Templates](./prompt-templates.md) for `requiresInput` configuration
 

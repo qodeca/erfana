@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Info } from 'lucide-react'
-import './ModifyDialog.css'
+import './UserInputDialog.css'
 
-interface ModifyDialogProps {
+interface UserInputDialogProps {
   isOpen: boolean
   selectedText: string
   inputLabel?: string
@@ -12,14 +12,14 @@ interface ModifyDialogProps {
   onCancel: () => void
 }
 
-export function ModifyDialog({
+export function UserInputDialog({
   isOpen,
   selectedText,
-  inputLabel = 'How should this be modified?',
-  inputPlaceholder = 'e.g., make more concise, add examples, use simpler language...',
+  inputLabel = 'What would you like to do?',
+  inputPlaceholder = 'Enter your instructions or question here...',
   onSubmit,
   onCancel
-}: ModifyDialogProps) {
+}: UserInputDialogProps) {
   const [userInput, setUserInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -70,22 +70,22 @@ export function ModifyDialog({
   const isValid = userInput.trim().length >= 3 && userInput.trim().length <= 2000
 
   const dialogContent = (
-    <div className="modify-dialog-overlay" onClick={handleBackdropClick}>
-      <div className="modify-dialog">
-        <div className="modify-dialog-header">
+    <div className="user-input-dialog-overlay" onClick={handleBackdropClick}>
+      <div className="user-input-dialog">
+        <div className="user-input-dialog-header">
           <h3>{inputLabel}</h3>
         </div>
 
-        <div className="modify-dialog-selected">
-          <div className="modify-dialog-selected-label">Selected text:</div>
-          <div className="modify-dialog-selected-content">"{truncatedText}"</div>
+        <div className="user-input-dialog-selected">
+          <div className="user-input-dialog-selected-label">Selected text:</div>
+          <div className="user-input-dialog-selected-content">"{truncatedText}"</div>
         </div>
 
-        <div className="modify-dialog-input-section">
-          <label className="modify-dialog-input-label">Your instructions:</label>
+        <div className="user-input-dialog-input-section">
+          <label className="user-input-dialog-input-label">Your input:</label>
           <textarea
             ref={textareaRef}
-            className="modify-dialog-input"
+            className="user-input-dialog-input"
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -93,18 +93,18 @@ export function ModifyDialog({
             rows={6}
             maxLength={2000}
           />
-          <div className="modify-dialog-char-count">
+          <div className="user-input-dialog-char-count">
             {userInput.length}/2000 characters
           </div>
         </div>
 
-        <div className="modify-dialog-actions">
-          <div className="modify-dialog-info-wrapper">
-            <div className="modify-dialog-info-icon">
+        <div className="user-input-dialog-actions">
+          <div className="user-input-dialog-info-wrapper">
+            <div className="user-input-dialog-info-icon">
               <Info size={16} strokeWidth={2} />
             </div>
-            <div className="modify-dialog-tooltip">
-              <div className="modify-dialog-tooltip-content">
+            <div className="user-input-dialog-tooltip">
+              <div className="user-input-dialog-tooltip-content">
                 <kbd>Cmd/Ctrl+Enter</kbd> to submit
                 <br />
                 <kbd>Esc</kbd> to cancel
@@ -112,17 +112,17 @@ export function ModifyDialog({
             </div>
           </div>
           <button
-            className="modify-dialog-btn modify-dialog-btn-cancel"
+            className="user-input-dialog-btn user-input-dialog-btn-cancel"
             onClick={onCancel}
           >
             Cancel
           </button>
           <button
-            className="modify-dialog-btn modify-dialog-btn-submit"
+            className="user-input-dialog-btn user-input-dialog-btn-submit"
             onClick={handleSubmit}
             disabled={!isValid}
           >
-            Apply Modification
+            Submit
           </button>
         </div>
       </div>

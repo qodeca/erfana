@@ -1,6 +1,6 @@
-/* ModifyDialog - Modal dialog for collecting modification instructions */
+/* UserInputDialog - Modal dialog for collecting user input from prompt templates */
 
-.modify-dialog-overlay {
+.user-input-dialog-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -24,7 +24,7 @@
   }
 }
 
-.modify-dialog {
+.user-input-dialog {
   background-color: #1e1e1e;
   border: 1px solid #454545;
   border-radius: 0;
@@ -53,7 +53,7 @@
 }
 
 /* Header */
-.modify-dialog-header h3 {
+.user-input-dialog-header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
@@ -62,7 +62,7 @@
 }
 
 /* Selected text preview */
-.modify-dialog-selected {
+.user-input-dialog-selected {
   background-color: #2d2d30;
   border-left: 3px solid #4ec9b0;
   padding: 14px 16px;
@@ -75,24 +75,24 @@
 }
 
 /* Always show scrollbar */
-.modify-dialog-selected::-webkit-scrollbar {
+.user-input-dialog-selected::-webkit-scrollbar {
   width: 10px;
 }
 
-.modify-dialog-selected::-webkit-scrollbar-track {
+.user-input-dialog-selected::-webkit-scrollbar-track {
   background: #1e1e1e;
 }
 
-.modify-dialog-selected::-webkit-scrollbar-thumb {
+.user-input-dialog-selected::-webkit-scrollbar-thumb {
   background: #454545;
   border: 2px solid #2d2d30;
 }
 
-.modify-dialog-selected::-webkit-scrollbar-thumb:hover {
+.user-input-dialog-selected::-webkit-scrollbar-thumb:hover {
   background: #555555;
 }
 
-.modify-dialog-selected-label {
+.user-input-dialog-selected-label {
   font-size: 11px;
   color: #9d9d9d;
   text-transform: uppercase;
@@ -101,7 +101,7 @@
   flex-shrink: 0;
 }
 
-.modify-dialog-selected-content {
+.user-input-dialog-selected-content {
   font-size: 13px;
   color: #c8c8c8;
   font-style: italic;
@@ -113,13 +113,13 @@
 }
 
 /* Input section */
-.modify-dialog-input-section {
+.user-input-dialog-input-section {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.modify-dialog-input-label {
+.user-input-dialog-input-label {
   font-size: 13px;
   font-weight: 600;
   color: #d4d4d4;
@@ -127,7 +127,7 @@
 }
 
 /* Input textarea */
-.modify-dialog-input {
+.user-input-dialog-input {
   width: 100%;
   padding: 12px 14px;
   background-color: #2d2d30;
@@ -142,20 +142,20 @@
   transition: all 0.2s ease;
 }
 
-.modify-dialog-input:focus {
+.user-input-dialog-input:focus {
   outline: none;
   border-color: #007acc;
   background-color: #252526;
   box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.15);
 }
 
-.modify-dialog-input::placeholder {
+.user-input-dialog-input::placeholder {
   color: #6c6c6c;
   font-style: italic;
 }
 
 /* Character count */
-.modify-dialog-char-count {
+.user-input-dialog-char-count {
   font-size: 12px;
   color: #858585;
   text-align: right;
@@ -163,7 +163,7 @@
 }
 
 /* Action buttons */
-.modify-dialog-actions {
+.user-input-dialog-actions {
   display: flex;
   gap: 12px;
   align-items: center;
@@ -171,7 +171,7 @@
   padding-top: 4px;
 }
 
-.modify-dialog-btn {
+.user-input-dialog-btn {
   padding: 10px 24px;
   border: none;
   border-radius: 0;
@@ -182,48 +182,48 @@
   letter-spacing: 0.2px;
 }
 
-.modify-dialog-btn-cancel {
+.user-input-dialog-btn-cancel {
   background-color: transparent;
   color: #d4d4d4;
   border: 1px solid #454545;
 }
 
-.modify-dialog-btn-cancel:hover {
+.user-input-dialog-btn-cancel:hover {
   background-color: #3c3c3c;
   border-color: #555;
 }
 
-.modify-dialog-btn-submit {
+.user-input-dialog-btn-submit {
   background-color: #0e639c;
   color: #ffffff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-.modify-dialog-btn-submit:hover:not(:disabled) {
+.user-input-dialog-btn-submit:hover:not(:disabled) {
   background-color: #1177bb;
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
   transform: translateY(-1px);
 }
 
-.modify-dialog-btn-submit:active:not(:disabled) {
+.user-input-dialog-btn-submit:active:not(:disabled) {
   transform: translateY(0);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-.modify-dialog-btn-submit:disabled {
+.user-input-dialog-btn-submit:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   box-shadow: none;
 }
 
 /* Info icon and tooltip */
-.modify-dialog-info-wrapper {
+.user-input-dialog-info-wrapper {
   position: relative;
   display: inline-flex;
   align-items: center;
 }
 
-.modify-dialog-info-icon {
+.user-input-dialog-info-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -235,11 +235,11 @@
   transition: color 0.2s ease;
 }
 
-.modify-dialog-info-icon:hover {
+.user-input-dialog-info-icon:hover {
   color: #d4d4d4;
 }
 
-.modify-dialog-tooltip {
+.user-input-dialog-tooltip {
   position: absolute;
   bottom: calc(100% + 8px);
   left: 0;
@@ -256,18 +256,18 @@
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.modify-dialog-info-wrapper:hover .modify-dialog-tooltip {
+.user-input-dialog-info-wrapper:hover .user-input-dialog-tooltip {
   opacity: 1;
   transform: translateY(0);
 }
 
-.modify-dialog-tooltip-content {
+.user-input-dialog-tooltip-content {
   font-size: 12px;
   color: #d4d4d4;
   line-height: 1.5;
 }
 
-.modify-dialog-tooltip-content kbd {
+.user-input-dialog-tooltip-content kbd {
   display: inline-block;
   padding: 2px 6px;
   background-color: #1e1e1e;

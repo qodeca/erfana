@@ -58,16 +58,18 @@ Please elaborate on this text with more detail, examples, and context.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `area` | string | ✅ | Context area (e.g., "markdown-preview") |
-| `subArea` | string | ✅ | Specific location (e.g., "context-menu") |
+| `area` | enum | ✅ | Placement scope: `"markdown-preview"`, `"code-editor"`, or `"global"` |
+| `subArea` | enum | ❌ | Specific location: `"context-menu"`, `"toolbar"`, `"command-palette"`, or `"mermaid-error"` |
 | `name` | string | ✅ | Display name in UI |
 | `icon` | string | ✅ | Lucide icon name (e.g., "maximize2") |
-| `targetPanel` | string | ❌ | Target panel: "claude" or "terminal" (default: "claude") |
+| `targetPanel` | enum | ❌ | Target panel: `"claude"` or `"terminal"` (default: `"claude"`) |
 | `sendDirectly` | boolean | ❌ | Send immediately without user review (default: false) |
 | `autoExecute` | boolean | ❌ | Auto-press Enter after pasting to terminal (default: false) |
+| `order` | number | ❌ | Sort order in menus (default: 0) |
+| `enabled` | boolean | ❌ | Allow prompt to appear in UI (default: true) |
 | `requiresInput` | boolean | ❌ | Show input dialog before execution (default: false) |
-| `inputLabel` | string | ❌ | Label for input dialog (if requiresInput: true) |
-| `inputPlaceholder` | string | ❌ | Placeholder for input dialog (if requiresInput: true) |
+| `inputLabel` | string | ❌ | Label for input dialog (if `requiresInput` is true) |
+| `inputPlaceholder` | string | ❌ | Placeholder for input dialog (if `requiresInput` is true) |
 
 **Validation:** Schema enforced by `schema.ts`
 
@@ -201,17 +203,23 @@ targetPanel: terminal
 
 ### Step 2: Schema Validation
 
-Template will be automatically validated against Zod schema:
+Frontmatter is validated in `schema.ts` via a Zod schema that enforces enums and defaults:
 
 ```typescript
 // schema.ts
-export const PromptConfigSchema = z.object({
-  area: z.string().min(1),
-  subArea: z.string().min(1),
-  name: z.string().min(1),
-  icon: z.string().min(1),
+export const PromptFrontmatterSchema = z.object({
+  area: z.enum(['markdown-preview', 'code-editor', 'global']),
+  subArea: z.enum(['context-menu', 'toolbar', 'command-palette', 'mermaid-error']).optional(),
+  name: z.string().min(1, 'Name is required'),
+  icon: z.string().min(1, 'Icon is required'),
   targetPanel: z.enum(['claude', 'terminal']).optional(),
-  sendDirectly: z.boolean().optional()
+  sendDirectly: z.boolean().optional().default(false),
+  autoExecute: z.boolean().optional().default(false),
+  order: z.number().int().min(0).optional().default(0),
+  enabled: z.boolean().optional().default(true),
+  requiresInput: z.boolean().optional().default(false),
+  inputLabel: z.string().optional(),
+  inputPlaceholder: z.string().optional()
 })
 ```
 
@@ -219,15 +227,21 @@ Invalid templates throw parsing errors at load time.
 
 ### Step 3: Dynamic Loading
 
-Templates are loaded automatically via Vite:
+Templates are imported as raw strings and parsed at startup:
 
 ```typescript
 // registry.ts
-const templateModules = import.meta.glob('./templates/*.md', {
-  eager: true,
-  query: '?raw',
-  import: 'default'
-})
+import elaborateTemplate from './templates/elaborate.md?raw'
+import modifyTemplate from './templates/modify.md?raw'
+import askTemplate from './templates/ask.md?raw'
+import mermaidBugReportTemplate from './templates/mermaid-bug-report.md?raw'
+
+const parsedTemplates = parseTemplates([
+  { raw: elaborateTemplate, filename: 'elaborate.md' },
+  { raw: modifyTemplate, filename: 'modify.md' },
+  { raw: askTemplate, filename: 'ask.md' },
+  { raw: mermaidBugReportTemplate, filename: 'mermaid-bug-report.md' }
+])
 ```
 
 **Hot Reload:** Template changes trigger HMR in development.
@@ -250,12 +264,38 @@ Use Lucide icon names. Common options:
 
 ```typescript
 // registry.ts
-export const PROMPT_REGISTRY: Record<string, PromptConfig> = {}
+export const PROMPT_REGISTRY: Record<string, PromptConfig> = parsedTemplates.reduce(
+  (acc, parsed) => {
+    acc[parsed.id] = {
+      id: parsed.id,
+      label: parsed.frontmatter.name,
+      icon: parsed.frontmatter.icon,
+      targetPanel: parsed.frontmatter.targetPanel || 'claude',
+      sendDirectly: parsed.frontmatter.sendDirectly || false,
+      autoExecute: parsed.frontmatter.autoExecute || false,
+      template: parsed.content,
+      area: parsed.frontmatter.area,
+      subArea: parsed.frontmatter.subArea,
+      order: parsed.frontmatter.order || 0,
+      enabled: parsed.frontmatter.enabled !== false,
+      requiresInput: parsed.frontmatter.requiresInput || false,
+      inputLabel: parsed.frontmatter.inputLabel,
+      inputPlaceholder: parsed.frontmatter.inputPlaceholder
+    }
+    return acc
+  },
+  {} as Record<string, PromptConfig>
+)
 
-export function getPromptsForArea(area: string, subArea: string) {
-  return Object.values(PROMPT_REGISTRY).filter(
-    (p) => p.area === area && p.subArea === subArea
-  )
+export function getPromptsForArea(area: string, subArea?: string): PromptConfig[] {
+  const filtered = Object.values(PROMPT_REGISTRY).filter((prompt) => {
+    const areaMatch = prompt.area === area
+    const subAreaMatch = subArea ? prompt.subArea === subArea : true
+    const enabledMatch = prompt.enabled !== false
+    return areaMatch && subAreaMatch && enabledMatch
+  })
+
+  return filtered.sort((a, b) => (a.order || 0) - (b.order || 0))
 }
 ```
 
@@ -278,30 +318,76 @@ const items: ContextMenuItem[] = [
 // PreviewContextMenu.tsx:81-144
 const handleAction = async (promptId: string) => {
   const config = PROMPT_REGISTRY[promptId]
+  if (!config) return
 
-  // Read original source (not rendered HTML)
-  const sourceText = await readSourceLines(filePath, startLine, endLine)
+  if (config.requiresInput) {
+    let sourceText = selectedText
+    if (startLine !== undefined && endLine !== undefined) {
+      const readSource = await readSourceLines(filePath, startLine, endLine)
+      if (readSource !== null) {
+        sourceText = readSource
+      }
+    }
 
-  // Prepare variables
-  const variables: PromptVariables = {
-    selectedText: sourceText,
-    filePath,
-    startLine,
-    endLine,
-    lineRange: formatLineRange(startLine, endLine),
-    fileRef: `@${filePath}:${startLine}-${endLine}`
+    onOpenUserInputDialog({
+      isOpen: true,
+      selectedText: sourceText,
+      filePath,
+      fullDocument,
+      startLine,
+      endLine,
+      inputLabel: config.inputLabel,
+      inputPlaceholder: config.inputPlaceholder,
+      onSubmit: async (userInput) => {
+        await executePrompt(config, userInput)
+        onOpenUserInputDialog(null as any)
+      },
+      onCancel: () => onOpenUserInputDialog(null as any)
+    })
+
+    onClose()
+    return
   }
 
-  // Render template
-  const prompt = promptRenderer.render(config.template, variables)
+  await executePrompt(config)
+}
 
-  // Send to panel
-  await openPanelAndSendContent({
-    panel: config.targetPanel || 'claude',
-    location: 'right',
-    content: prompt,
-    sendImmediately: config.sendDirectly || false
-  })
+const executePrompt = async (config: PromptConfig, userInput?: string) => {
+  let textToUse = selectedText
+  if (startLine !== undefined && endLine !== undefined) {
+    const sourceText = await readSourceLines(filePath, startLine, endLine)
+    if (sourceText !== null) {
+      textToUse = sourceText
+    }
+  }
+
+  const lineRange =
+    startLine !== undefined && endLine !== undefined
+      ? startLine === endLine
+        ? `line ${startLine}`
+        : `lines ${startLine}-${endLine}`
+      : undefined
+
+  const fileRef =
+    startLine !== undefined && endLine !== undefined
+      ? startLine === endLine
+        ? `@${filePath}:${startLine}`
+        : `@${filePath}:${startLine}-${endLine}`
+      : undefined
+
+  const variables: PromptVariables = {
+    selectedText: textToUse,
+    filePath,
+    fullDocument,
+    startLine,
+    endLine,
+    lineRange,
+    fileRef,
+    userInput
+  }
+
+  await executePromptTemplate(config.id, variables)
+  onClose()
 }
 ```
 
@@ -398,7 +484,7 @@ inputPlaceholder: e.g., make more concise, add examples...
 
 **Variable:** User input available as `{{userInput}}` in template
 
-**Implementation:** `ModifyDialog.tsx` (React Portal), `PreviewContextMenu.tsx` (dialog handling)
+**Implementation:** `UserInputDialog.tsx` (React Portal), `PreviewContextMenu.tsx` (dialog handling)
 
 ## Line Range Tracking
 
@@ -458,10 +544,10 @@ function getLineNumbersFromSelection(selection, containerRef) {
 |------|-------|---------|
 | `parser.ts` | 117 | YAML frontmatter parsing with js-yaml |
 | `renderer.ts` | 95 | CSP-safe template rendering (3 phases) |
-| `schema.ts` | 62 | Zod validation for frontmatter |
-| `registry.ts` | 104 | Dynamic template loading + registry |
+| `schema.ts` | 68 | Zod validation for frontmatter |
+| `registry.ts` | 101 | Template loading + registry construction |
 | `helpers.ts` | 80 | Template helper functions |
-| `types.ts` | 70 | TypeScript interfaces |
+| `types.ts` | 85 | TypeScript interfaces |
 
 ### Integration Files
 

@@ -339,7 +339,7 @@ For templates with `requiresInput: true` (like "modify"):
 ```typescript
 const handleModifyClick = async () => {
   // Show input dialog first
-  const userInput = await showModifyDialog(selectedText)
+  const userInput = await showUserInputDialog(selectedText)
 
   if (!userInput) return // User cancelled
 
