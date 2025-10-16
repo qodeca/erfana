@@ -3,13 +3,15 @@ import './ResizableDivider.css'
 
 interface ResizableDividerProps {
   onResize: (percentage: number) => void
+  onResizeEnd?: (percentage: number) => void
   orientation?: 'vertical' | 'horizontal'
 }
 
-export function ResizableDivider({ onResize, orientation = 'vertical' }: ResizableDividerProps) {
+export function ResizableDivider({ onResize, onResizeEnd, orientation = 'vertical' }: ResizableDividerProps) {
   const [isDragging, setIsDragging] = useState(false)
   const dividerRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLElement | null>(null)
+  const lastPercentageRef = useRef<number>(50)
 
   useEffect(() => {
     // Find the parent container (.editor-content) to calculate relative position
@@ -48,6 +50,7 @@ export function ResizableDivider({ onResize, orientation = 'vertical' }: Resizab
       // Clamp between 20% and 80% for usability
       percentage = Math.max(20, Math.min(80, percentage))
 
+      lastPercentageRef.current = percentage
       onResize(percentage)
     }
 
@@ -55,6 +58,10 @@ export function ResizableDivider({ onResize, orientation = 'vertical' }: Resizab
       setIsDragging(false)
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
+      // Notify resize end with the last computed percentage
+      if (onResizeEnd) {
+        onResizeEnd(lastPercentageRef.current)
+      }
     }
 
     // Set cursor globally during drag based on orientation
