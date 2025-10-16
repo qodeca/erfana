@@ -37,20 +37,48 @@ In **Split View**, the editor and preview panes are bidirectionally synchronized
 - **Editor → Preview**: Scrolling in Monaco editor updates preview position
 - **Preview → Editor**: Scrolling in preview updates editor position
 - **Line Mapping**: Uses `data-line-start`, `data-line-end`, `data-line` attributes for precise positioning
+- **Accurate Position Calculation**: Uses `getBoundingClientRect()` for viewport-relative positioning (accounts for container padding)
+- **Dynamic Content Ready**: Waits for images and Mermaid diagrams to load before building scroll map
 - **Smooth Interpolation**: Linear interpolation between known points
 - **Debouncing**: 50ms delay prevents scroll loops
 
-**Technical Implementation:**
-- Scroll map builds on view mode change (296 entries for CLAUDE.md)
+**Technical Implementation - Improvements (v0.2+):**
+
+1. **Container Padding Fix**: Previously used `offsetTop` which didn't account for the 24px top padding of `.markdown-preview-content`. Now uses:
+   ```typescript
+   const rect = element.getBoundingClientRect()
+   const previewOffset = rect.top - containerRect.top + containerScrollTop
+   ```
+   This correctly accounts for all padding and margin offsets.
+
+2. **Dynamic Content Handling**: The scroll map now waits for all dynamic content to load before building:
+   - Waits for all `<img>` elements to load (using `img.onload`/`img.onerror`)
+   - Waits for Mermaid diagrams to render (`.mermaid-wrapper` elements)
+   - Rebuilds scroll map AFTER all content is ready (prevents permanent drift)
+
+3. **Improved Accuracy**: Scroll map is now built with 100% accurate element positions because:
+   - All images have finished loading (heights are final)
+   - All Mermaid diagrams have rendered (heights are final)
+   - All layout calculations are complete
+   - No pending async operations
+
+**Sync Accuracy:**
+- Scroll map builds on view mode change or content change
+- Updates when editor is ready AND dynamic content is ready
 - Maps editor line numbers to preview element positions
 - Uses react-markdown's `node.position` API for AST line data
 - Enhanced line range tracking for multi-line elements
 - Attaches scroll listeners when scroll map is ready
 
 **Files:**
-- `MarkdownEditorPanel.tsx:217-301` - Scroll map + listeners
-- `MarkdownPreview.tsx:21-28` - Line range extraction (extractLineRange)
+- `MarkdownEditorPanel.tsx:161-223` - Dynamic content detection
+- `MarkdownEditorPanel.tsx:454-481` - Improved scroll map building with getBoundingClientRect
+- `MarkdownEditorPanel.tsx:275-290` - Wait for dynamic content before building map
+- `MarkdownPreview.tsx:59-66` - Line range extraction (extractLineRange)
 - `MonacoMarkdownEditor.tsx` - Exposes scroll API
+
+**Test Document:**
+See `test-scroll-sync.md` for comprehensive scroll synchronization testing with various content types (plain text, code blocks, images, Mermaid diagrams, HTML elements, mixed content).
 
 ## Multi-File Tab System
 
