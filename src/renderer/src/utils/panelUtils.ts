@@ -45,7 +45,6 @@ export async function openPanelAndSendContent({
   panel,
   location,
   content,
-  sendImmediately = false,
   autoExecute = false
 }: SendToPanelOptions): Promise<boolean> {
   // Get store actions
