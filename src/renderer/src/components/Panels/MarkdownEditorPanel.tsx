@@ -90,6 +90,10 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   const [isScrollMapReady, setIsScrollMapReady] = useState(false)
   const [isDynamicContentReady, setIsDynamicContentReady] = useState(false)
 
+  // Unified helper: detect any split mode (vertical or horizontal)
+  // Used consistently across all scroll sync effects to avoid code duplication
+  const isAnySplitMode = viewMode === 'split' || viewMode === 'split-horizontal'
+
   // Debug logging
   console.log('MarkdownEditorPanel render:', {
     hasCurrentFile: !!currentFile,
@@ -168,7 +172,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
 
   // Wait for dynamic content (images, Mermaid diagrams) to load before building scroll map
   useEffect(() => {
-    if (viewMode !== 'split' || !currentFile || !isEditorReady || !previewRef.current) {
+    if (!isAnySplitMode || !currentFile || !isEditorReady || !previewRef.current) {
       setIsDynamicContentReady(false)
       return
     }
@@ -282,8 +286,9 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
 
   // Build scroll map when content changes or view mode changes to split
   // IMPROVED: Now waits for dynamic content (images, Mermaid) to load first
+  // UNIFIED: Works for both vertical and horizontal split modes
   useEffect(() => {
-    if (viewMode !== 'split' || !currentFile || !isEditorReady || !isDynamicContentReady) return
+    if (!isAnySplitMode || !currentFile || !isEditorReady || !isDynamicContentReady) return
 
     // Wait for layout to settle after dynamic content loads
     // Double RAF ensures all layout calculations are complete
@@ -298,8 +303,9 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   }, [currentFile?.content, viewMode, isEditorReady, isDynamicContentReady])
 
   // Watch for layout changes (e.g., <details> expand/collapse) and rebuild scroll map if needed
+  // UNIFIED: Works for both vertical and horizontal split modes
   useEffect(() => {
-    if (viewMode !== 'split' || !previewRef.current) return
+    if (!isAnySplitMode || !previewRef.current) return
 
     const handleDetailsToggle = () => {
       console.log('📐 Layout change detected (<details> toggled or content changed)')
@@ -339,9 +345,10 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   }, [viewMode, isEditorReady])
 
   // Set up scroll synchronization listeners
+  // UNIFIED: Works for both vertical and horizontal split modes
   useEffect(() => {
     // Wait for editor to be ready, scroll map to be built, and split view mode
-    if (viewMode !== 'split' || !isEditorReady || !previewRef.current) return
+    if (!isAnySplitMode || !isEditorReady || !previewRef.current) return
     if (scrollMapRef.current.length === 0) {
       console.log('⏸️  Waiting for scroll map to be built...')
       return
