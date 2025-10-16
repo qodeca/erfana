@@ -80,6 +80,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   const isSyncingRef = useRef(false)
   const [isEditorReady, setIsEditorReady] = useState(false)
   const [isScrollMapReady, setIsScrollMapReady] = useState(false)
+  const [isDynamicContentReady, setIsDynamicContentReady] = useState(false)
 
   // Debug logging
   console.log('MarkdownEditorPanel render:', {
@@ -157,6 +158,70 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     }
   }, [currentFile?.path])
 
+  // Wait for dynamic content (images, Mermaid diagrams) to load before building scroll map
+  useEffect(() => {
+    if (viewMode !== 'split' || !currentFile || !isEditorReady || !previewRef.current) {
+      setIsDynamicContentReady(false)
+      return
+    }
+
+    const waitForDynamicContent = async () => {
+      console.log('⏳ Waiting for dynamic content (images, Mermaid) to load...')
+
+      try {
+        // Wait for all images to load
+        const images = previewRef.current?.querySelectorAll('img') || []
+        const imagePromises = Array.from(images).map((img: Element) => {
+          const htmlImg = img as HTMLImageElement
+          return new Promise<void>((resolve) => {
+            if (htmlImg.complete) {
+              // Image already loaded or failed
+              resolve()
+            } else {
+              // Wait for load or error
+              const onLoad = () => {
+                htmlImg.removeEventListener('load', onLoad)
+                htmlImg.removeEventListener('error', onError)
+                resolve()
+              }
+              const onError = () => {
+                htmlImg.removeEventListener('load', onLoad)
+                htmlImg.removeEventListener('error', onError)
+                resolve() // Resolve even on error to continue
+              }
+              htmlImg.addEventListener('load', onLoad)
+              htmlImg.addEventListener('error', onError)
+            }
+          })
+        })
+
+        if (imagePromises.length > 0) {
+          console.log(`📷 Waiting for ${imagePromises.length} images...`)
+          await Promise.all(imagePromises)
+        }
+
+        // Wait for Mermaid diagrams to render
+        // Mermaid adds .mermaid-diagram class after rendering
+        const mermaidWrappers = previewRef.current?.querySelectorAll('.mermaid-wrapper') || []
+        if (mermaidWrappers.length > 0) {
+          console.log(`📊 Waiting for ${mermaidWrappers.length} Mermaid diagrams...`)
+          // Give Mermaid time to render (usually 100-300ms)
+          await new Promise((resolve) => setTimeout(resolve, 500))
+        }
+
+        console.log('✅ Dynamic content ready')
+        setIsDynamicContentReady(true)
+      } catch (error) {
+        console.error('Error waiting for dynamic content:', error)
+        // Still mark as ready to continue
+        setIsDynamicContentReady(true)
+      }
+    }
+
+    setIsDynamicContentReady(false)
+    waitForDynamicContent()
+  }, [currentFile?.content, viewMode, isEditorReady])
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -208,20 +273,21 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   }, [currentFile?.content, currentFile?.modified])
 
   // Build scroll map when content changes or view mode changes to split
+  // IMPROVED: Now waits for dynamic content (images, Mermaid) to load first
   useEffect(() => {
-    if (viewMode !== 'split' || !currentFile || !isEditorReady) return
+    if (viewMode !== 'split' || !currentFile || !isEditorReady || !isDynamicContentReady) return
 
-    // Wait for preview to render, then build map
-    // Double RAF ensures layout is complete before building map
+    // Wait for layout to settle after dynamic content loads
+    // Double RAF ensures all layout calculations are complete
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const map = buildScrollMap()
         scrollMapRef.current = map
-        console.log(`📍 Scroll map built: ${map.length} entries`)
+        console.log(`📍 Scroll map built: ${map.length} entries (after dynamic content ready)`)
         setIsScrollMapReady(true)
       })
     })
-  }, [currentFile?.content, viewMode, isEditorReady])
+  }, [currentFile?.content, viewMode, isEditorReady, isDynamicContentReady])
 
   // Set up scroll synchronization listeners
   useEffect(() => {
@@ -302,6 +368,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     console.log('Loading file:', filePath)
     setIsEditorReady(false) // Reset editor ready state when loading new file
     setIsScrollMapReady(false) // Reset scroll map ready state when loading new file
+    setIsDynamicContentReady(false) // Reset dynamic content ready state when loading new file
     try {
       const content = await window.api.file.readFile(filePath)
       console.log('File loaded successfully:', {
@@ -446,12 +513,20 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   /**
    * Build scroll map: line → pixel positions
    * Maps editor line numbers to preview element positions
+   *
+   * CRITICAL FIX: Uses getBoundingClientRect() for accurate positioning
+   * relative to the scrollable container, accounting for padding and margins.
+   * Previously used offsetTop which didn't account for container padding.
    */
   const buildScrollMap = (): ScrollMapEntry[] => {
     if (!editorRef.current || !previewRef.current) return []
 
     const map: ScrollMapEntry[] = []
     const elements = previewRef.current.querySelectorAll('[data-line]')
+
+    // Get container bounds for accurate position calculation
+    const containerRect = previewRef.current.getBoundingClientRect()
+    const containerScrollTop = previewRef.current.scrollTop
 
     elements.forEach((el) => {
       const lineAttr = el.getAttribute('data-line')
@@ -460,7 +535,10 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
       const line = parseInt(lineAttr, 10)
       if (isNaN(line)) return
 
-      const previewOffset = (el as HTMLElement).offsetTop
+      // Use getBoundingClientRect for accurate positioning relative to viewport
+      // Then adjust for scroll position to get absolute position in the scrollable area
+      const rect = (el as HTMLElement).getBoundingClientRect()
+      const previewOffset = rect.top - containerRect.top + containerScrollTop
       const editorOffset = editorRef.current!.getTopForLineNumber(line)
 
       map.push({ line, editorOffset, previewOffset })
