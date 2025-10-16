@@ -25,7 +25,7 @@ The Terminal Panel provides a full-featured terminal emulator using:
 - **Auto-Resize**: Terminal automatically resizes when panel is dragged
 - **WebGL Rendering**: Hardware acceleration with canvas fallback
 - **Bold Font Support**: Renders bold text with proper font weight
-- **Clean Prompt**: Traditional format without RC file artifacts
+- **Full Environment**: Login shell on macOS/Linux loads user's shell configuration and Homebrew paths
 - **Context Integration**: "Send Selection to Terminal" from markdown preview
 
 ### Terminal Configuration
@@ -87,9 +87,10 @@ cursor: '#4fc1ff'      // Cyan
 - `TERM='xterm-256color'` - 256-color support
 - `COLORTERM='truecolor'` - True color support
 
-**Shell Arguments**:
-- **zsh**: `--no-rcs` - Skip all RC files for clean prompt
-- **bash**: `--norc --noprofile` - Skip configuration files
+**Shell Arguments** (Platform-Specific):
+- **macOS/Linux**: `-l` (login shell) - Sources RC files (.zprofile, .bash_profile) to load environment, Homebrew paths, and user configuration
+- **Windows (PowerShell)**: `-NoProfile` - Loads full environment profile
+- **Windows (cmd.exe)**: No arguments - Uses default environment
 
 ## Architecture
 
@@ -312,16 +313,23 @@ console.log('Terminal dimensions:', xterm.cols, xterm.rows)
 console.log('Container dimensions:', container.getBoundingClientRect())
 ```
 
-### Prompt Shows Artifacts
+### Commands Not Found (e.g., `claude` not found)
 
-**Problem**: zsh RC files loading despite --no-rcs flag
+**Problem**: Commands installed via Homebrew or in shell RC files aren't accessible
 
-**Check**: `SHELL_SESSIONS_DISABLE='1'` environment variable
+**Solution**: This is now fixed! Terminal uses login shell (-l) which sources RC files, so Homebrew paths and custom aliases are available.
 
 **Verify**:
 ```bash
-echo $SHELL_SESSIONS_DISABLE  # Should output: 1
+which claude      # Should find Claude CLI
+which npm         # Should find npm
+echo $PATH        # Should include /opt/homebrew/bin and other Homebrew paths
 ```
+
+**If still not found**:
+1. Close ERFANA and app
+2. Verify command works in native terminal: `which claude`
+3. Restart ERFANA - terminal should inherit environment
 
 ### Bold Text Not Rendering
 
