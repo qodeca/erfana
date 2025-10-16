@@ -24,7 +24,7 @@ function createWindow(): BrowserWindow {
     height: 900,
     show: false,
     autoHideMenuBar: true,
-    title: 'Erfana',
+    title: 'ERFANA',
     roundedCorners: false,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
@@ -60,7 +60,7 @@ function createWindow(): BrowserWindow {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   // Set application name (shows in macOS menu bar)
-  app.setName('Erfana')
+  app.setName('ERFANA')
 
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.erfana')
