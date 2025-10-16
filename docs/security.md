@@ -20,10 +20,23 @@ webPreferences: {
       content="default-src 'self';
                script-src 'self';
                style-src 'self' 'unsafe-inline';
-               font-src 'self' data:" />
+               font-src 'self' data:;
+               img-src 'self' https:;" />
 ```
 
-**Note**: `'unsafe-inline'` needed for dockview dynamic styles
+**Policy Details**:
+- `default-src 'self'` - All content from app origin only
+- `script-src 'self'` - Scripts only from app (no inline, no external)
+- `style-src 'self' 'unsafe-inline'` - Inline styles needed for dockview dynamic styling
+- `font-src 'self' data:` - Fonts from app or data URIs
+- `img-src 'self' https:;` - Images from app or HTTPS (enables external image CDNs)
+
+**HTML Rendering Notes**:
+- With `img-src 'self' https:;`, HTML `<img>` tags can load from HTTPS sources (Unsplash, CDNs, etc.)
+- HTTP images are blocked by CSP (security)
+- `data:` URI images are blocked (no image data URIs in HTML)
+- Sanitization still applies (no malicious attributes)
+- See [HTML Rendering](./markdown-editing.md#html-rendering-in-markdown) for details
 
 ## IPC Security Checklist
 
