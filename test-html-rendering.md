@@ -79,7 +79,7 @@ You can use **markdown** inside details too!
 ### Figure and Caption
 
 <figure>
-<img alt="Example image" src="https://via.placeholder.com/300x200" />
+<img alt="Example image" src="https://fastly.picsum.photos/id/652/200/300.jpg?hmac=yJT5T1Ugojp0HlslsxDN_nNnIIk4lsFXcV_5rq9FCTw" />
 <figcaption>This is a figure caption describing the image above.</figcaption>
 </figure>
 

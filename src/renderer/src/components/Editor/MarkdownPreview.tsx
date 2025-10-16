@@ -251,8 +251,25 @@ function createMarkdownComponents(filePath?: string) {
       </a>
     )
   },
-  // Add line range tracking to images and horizontal rules
-  img: withLineRange('img'),
+  // Custom img component with explicit attribute handling
+  // Ensures src, alt, title, width, height are preserved with line tracking
+  img({ node, src, alt, title, width, height, ...props }: any) {
+    const range = extractLineRange(node)
+    return (
+      <img
+        src={src}
+        alt={alt}
+        title={title}
+        width={width}
+        height={height}
+        data-line-start={range?.start}
+        data-line-end={range?.end}
+        data-line={range?.start}
+        {...props}
+      />
+    )
+  },
+  // Horizontal rule with line tracking
   hr: withLineRange('hr'),
 
   // HTML Block Element Support with Line Tracking
