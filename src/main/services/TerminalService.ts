@@ -71,14 +71,21 @@ export class TerminalService extends EventEmitter {
     console.log(`🔵 Size: ${cols}x${rows}`)
 
     try {
-      // Determine shell arguments
-      // For zsh: use --no-rcs to skip all RC files and get clean prompt
-      // For bash: use --norc --noprofile to skip configuration
+      // Determine shell arguments based on platform
+      // Windows shells (PowerShell, cmd) don't support -l flag
+      // Unix shells (zsh, bash) use -l to source RC files and load full environment
       const shellArgs: string[] = []
-      if (shell.includes('zsh')) {
-        shellArgs.push('--no-rcs')
-      } else if (shell.includes('bash')) {
-        shellArgs.push('--norc', '--noprofile')
+
+      if (osPlatform() === 'win32') {
+        // Windows: PowerShell uses -NoProfile to load full environment
+        // cmd.exe has no equivalent, so no arguments needed
+        if (shell.includes('powershell')) {
+          shellArgs.push('-NoProfile')
+        }
+      } else {
+        // macOS/Linux: Use login shell (-l) to source RC files
+        // This ensures Homebrew paths and other shell configurations are available
+        shellArgs.push('-l')
       }
 
       // Spawn PTY process
