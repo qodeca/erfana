@@ -2,7 +2,7 @@ import { useState, useRef, forwardRef, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { PreviewContextMenu } from '../ContextMenu/PreviewContextMenu'
-import { ModifyDialog } from '../Dialogs/ModifyDialog'
+import { UserInputDialog } from '../Dialogs/UserInputDialog'
 import { MermaidDiagram } from './MermaidDiagram'
 import './MarkdownPreview.css'
 
@@ -286,7 +286,7 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
       x: number
       y: number
     } | null>(null)
-    const [modifyDialog, setModifyDialog] = useState<{
+    const [userInputDialog, setUserInputDialog] = useState<{
       isOpen: boolean
       selectedText: string
       filePath: string
@@ -401,18 +401,18 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
             startLine={selection.startLine}
             endLine={selection.endLine}
             onClose={handleCloseContextMenu}
-            onOpenModifyDialog={setModifyDialog}
+            onOpenUserInputDialog={setUserInputDialog}
           />
         )}
 
-        {modifyDialog && (
-          <ModifyDialog
-            isOpen={modifyDialog.isOpen}
-            selectedText={modifyDialog.selectedText}
-            inputLabel={modifyDialog.inputLabel}
-            inputPlaceholder={modifyDialog.inputPlaceholder}
-            onSubmit={modifyDialog.onSubmit}
-            onCancel={modifyDialog.onCancel}
+        {userInputDialog && (
+          <UserInputDialog
+            isOpen={userInputDialog.isOpen}
+            selectedText={userInputDialog.selectedText}
+            inputLabel={userInputDialog.inputLabel}
+            inputPlaceholder={userInputDialog.inputPlaceholder}
+            onSubmit={userInputDialog.onSubmit}
+            onCancel={userInputDialog.onCancel}
           />
         )}
       </div>

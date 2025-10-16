@@ -32,12 +32,6 @@ export const PromptFrontmatterSchema = z.object({
   /** Whether this prompt is enabled (can be toggled off) */
   enabled: z.boolean().optional().default(true),
 
-  /** Optional description/tooltip for this prompt */
-  description: z.string().optional(),
-
-  /** Optional keyboard shortcut (e.g., "Cmd+Shift+E") */
-  shortcut: z.string().optional(),
-
   /** Whether this prompt requires user input before rendering */
   requiresInput: z.boolean().optional().default(false),
 

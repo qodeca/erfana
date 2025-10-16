@@ -1,5 +1,5 @@
 import { ReactNode } from 'react'
-import { Maximize2, Minimize2, RefreshCw, Sparkles, Copy, Edit3 } from 'lucide-react'
+import { Maximize2, Minimize2, RefreshCw, Sparkles, Copy, Edit3, HelpCircle } from 'lucide-react'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
 import { executePromptTemplate } from '../../utils/panelUtils'
 import { PROMPT_REGISTRY, getPromptsForArea } from '../../prompts/registry'
@@ -14,7 +14,7 @@ interface PreviewContextMenuProps {
   startLine?: number
   endLine?: number
   onClose: () => void
-  onOpenModifyDialog: (dialog: {
+  onOpenUserInputDialog: (dialog: {
     isOpen: boolean
     selectedText: string
     filePath: string
@@ -47,6 +47,8 @@ function getIconComponent(iconName: string): ReactNode {
       return <Sparkles {...iconProps} />
     case 'edit-3':
       return <Edit3 {...iconProps} />
+    case 'help-circle':
+      return <HelpCircle {...iconProps} />
     default:
       return <Sparkles {...iconProps} />
   }
@@ -86,7 +88,7 @@ export function PreviewContextMenu({
   startLine,
   endLine,
   onClose,
-  onOpenModifyDialog
+  onOpenUserInputDialog
 }: PreviewContextMenuProps) {
   const handleAction = async (promptId: string) => {
     // Get prompt configuration
@@ -111,15 +113,15 @@ export function PreviewContextMenu({
       // Create submit and cancel handlers
       const handleSubmit = async (userInput: string) => {
         await executePrompt(config, userInput)
-        onOpenModifyDialog(null as any) // Close dialog
+        onOpenUserInputDialog(null as any) // Close dialog
       }
 
       const handleCancel = () => {
-        onOpenModifyDialog(null as any) // Close dialog
+        onOpenUserInputDialog(null as any) // Close dialog
       }
 
       // Open dialog via callback and close context menu
-      onOpenModifyDialog({
+      onOpenUserInputDialog({
         isOpen: true,
         selectedText: sourceText, // Use source markdown, not preview text
         filePath,

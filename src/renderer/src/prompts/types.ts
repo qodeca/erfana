@@ -74,12 +74,6 @@ export interface PromptConfig {
   /** Whether this prompt is enabled (can be toggled off) */
   enabled?: boolean
 
-  /** Optional description/tooltip for this prompt */
-  description?: string
-
-  /** Optional keyboard shortcut (e.g., "Cmd+Shift+E") */
-  shortcut?: string
-
   /** Whether this prompt requires user input before rendering */
   requiresInput?: boolean
 
