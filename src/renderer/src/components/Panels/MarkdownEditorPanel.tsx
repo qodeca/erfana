@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { FileEdit, Columns2, Eye, Bold, Italic, Code, Link, Image, Heading1, List, ListOrdered, Strikethrough } from 'lucide-react'
+import { FileEdit, Columns2, Rows2, Eye, Bold, Italic, Code, Link, Image, Heading1, List, ListOrdered, Strikethrough } from 'lucide-react'
 import { IDockviewPanelProps } from 'dockview'
 import * as monaco from 'monaco-editor'
 import { MonacoMarkdownEditor, MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
@@ -55,13 +55,21 @@ const calculateStats = (content: string): DocumentStats => {
 
 export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: string }>) {
   const [currentFile, setCurrentFile] = useState<EditorFile | null>(null)
-  const [viewMode, setViewMode] = useState<'split' | 'editor' | 'preview'>('preview')
+  const [viewMode, setViewMode] = useState<'split' | 'split-horizontal' | 'editor' | 'preview'>('preview')
   const [selectedText, setSelectedText] = useState<string>('')
   const [showCloseConfirm, setShowCloseConfirm] = useState(false)
   const [isAutoSaving, setIsAutoSaving] = useState(false)
+
+  // Vertical split divider position (side-by-side)
   const [dividerPosition, setDividerPosition] = useState<number>(() => {
     // Load from localStorage, default to 50%
     const saved = localStorage.getItem('markdown-editor-divider-position')
+    return saved ? parseFloat(saved) : 50
+  })
+
+  // Horizontal split divider position (preview top, editor bottom)
+  const [dividerPositionHorizontal, setDividerPositionHorizontal] = useState<number>(() => {
+    const saved = localStorage.getItem('markdown-editor-divider-position-horizontal')
     return saved ? parseFloat(saved) : 50
   })
 
@@ -551,6 +559,11 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     localStorage.setItem('markdown-editor-divider-position', newPosition.toString())
   }
 
+  const handleDividerResizeHorizontal = (newPosition: number) => {
+    setDividerPositionHorizontal(newPosition)
+    localStorage.setItem('markdown-editor-divider-position-horizontal', newPosition.toString())
+  }
+
   /**
    * Build scroll map: line → pixel positions
    * Maps editor line numbers to preview element positions
@@ -753,9 +766,16 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
             <FileEdit size={16} strokeWidth={2} />
           </button>
           <button
+            className={`view-mode-btn ${viewMode === 'split-horizontal' ? 'active' : ''}`}
+            onClick={() => setViewMode('split-horizontal')}
+            title="Split Horizontal (Preview Top)"
+          >
+            <Rows2 size={16} strokeWidth={2} />
+          </button>
+          <button
             className={`view-mode-btn ${viewMode === 'split' ? 'active' : ''}`}
             onClick={() => setViewMode('split')}
-            title="Split View"
+            title="Split Vertical (Side by Side)"
           >
             <Columns2 size={16} strokeWidth={2} />
           </button>
@@ -789,31 +809,62 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
 
       {currentFile ? (
         <div className={`editor-content view-mode-${viewMode}`}>
-          {(viewMode === 'editor' || viewMode === 'split') && (
-            <div
-              className="editor-pane"
-              style={viewMode === 'split' ? { width: `${dividerPosition}%` } : undefined}
-            >
-              <MonacoMarkdownEditor
-                ref={editorRef}
-                value={currentFile.content}
-                onChange={handleContentChange}
-                filePath={currentFile.path}
-                onSelectionChange={setSelectedText}
-                onEditorMount={handleEditorMount}
-              />
-            </div>
+          {/* HORIZONTAL SPLIT: Preview on top, Editor on bottom */}
+          {viewMode === 'split-horizontal' && (
+            <>
+              <div
+                className="preview-pane"
+                style={{ height: `${dividerPositionHorizontal}%` }}
+              >
+                <MarkdownPreview ref={previewRef} content={currentFile.content} filePath={currentFile.path} />
+              </div>
+              <ResizableDivider orientation="horizontal" onResize={handleDividerResizeHorizontal} />
+              <div
+                className="editor-pane"
+                style={{ height: `${100 - dividerPositionHorizontal}%` }}
+              >
+                <MonacoMarkdownEditor
+                  ref={editorRef}
+                  value={currentFile.content}
+                  onChange={handleContentChange}
+                  filePath={currentFile.path}
+                  onSelectionChange={setSelectedText}
+                  onEditorMount={handleEditorMount}
+                />
+              </div>
+            </>
           )}
-          {viewMode === 'split' && (
-            <ResizableDivider onResize={handleDividerResize} />
-          )}
-          {(viewMode === 'preview' || viewMode === 'split') && (
-            <div
-              className="preview-pane"
-              style={viewMode === 'split' ? { width: `${100 - dividerPosition}%` } : undefined}
-            >
-              <MarkdownPreview ref={previewRef} content={currentFile.content} filePath={currentFile.path} />
-            </div>
+
+          {/* VERTICAL SPLIT (side-by-side) and SINGLE PANES */}
+          {viewMode !== 'split-horizontal' && (
+            <>
+              {(viewMode === 'editor' || viewMode === 'split') && (
+                <div
+                  className="editor-pane"
+                  style={viewMode === 'split' ? { width: `${dividerPosition}%` } : undefined}
+                >
+                  <MonacoMarkdownEditor
+                    ref={editorRef}
+                    value={currentFile.content}
+                    onChange={handleContentChange}
+                    filePath={currentFile.path}
+                    onSelectionChange={setSelectedText}
+                    onEditorMount={handleEditorMount}
+                  />
+                </div>
+              )}
+              {viewMode === 'split' && (
+                <ResizableDivider orientation="vertical" onResize={handleDividerResize} />
+              )}
+              {(viewMode === 'preview' || viewMode === 'split') && (
+                <div
+                  className="preview-pane"
+                  style={viewMode === 'split' ? { width: `${100 - dividerPosition}%` } : undefined}
+                >
+                  <MarkdownPreview ref={previewRef} content={currentFile.content} filePath={currentFile.path} />
+                </div>
+              )}
+            </>
           )}
         </div>
       ) : (
