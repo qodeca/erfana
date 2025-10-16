@@ -372,7 +372,7 @@ export function CopilotPanel(_props: ISplitviewPanelProps) {
               </button>
 
               <p className="help-note">
-                After installation, restart Erfana and Claude CLI will be detected automatically.
+                After installation, restart ERFANA and Claude CLI will be detected automatically.
               </p>
             </div>
           </div>

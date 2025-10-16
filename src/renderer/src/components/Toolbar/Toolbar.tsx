@@ -4,7 +4,7 @@ export function Toolbar() {
   return (
     <div className="toolbar">
       <div className="toolbar-section toolbar-left">
-        <div className="toolbar-title">Erfana</div>
+        <div className="toolbar-title">ERFANA</div>
       </div>
 
       <div className="toolbar-section toolbar-center">
