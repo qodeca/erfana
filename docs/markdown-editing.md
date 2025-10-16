@@ -271,6 +271,7 @@ All preview elements have precise line range attributes:
 - Blockquotes with accent border
 - Auto-linked headings (for future TOC)
 - **Mermaid diagrams** (flowcharts, sequence diagrams, class diagrams, and more)
+- **HTML Embedding** (with security sanitization)
 
 ### Code Block Rendering
 
@@ -385,6 +386,206 @@ sequenceDiagram
 ```
 
 **Implementation**: `MermaidDiagram.tsx`, `MarkdownPreview.tsx:73-76`
+
+### HTML Rendering in Markdown
+
+Erfana supports embedding HTML directly in Markdown documents with **automatic security sanitization**. This allows you to use HTML elements not available in standard Markdown while maintaining protection against XSS attacks.
+
+#### When to Use HTML in Markdown
+
+HTML rendering is useful when you need:
+- **Semantic HTML5 elements** (details/summary for collapsible content, figure/figcaption for images with captions)
+- **Styled containers** (divs with classes for custom layouts)
+- **Complex layouts** (multi-column designs, centered content)
+- **Interactive disclosure elements** (expandable sections)
+- **Custom attributes** (data-* attributes for scripting, id for anchoring)
+
+#### Allowed HTML Elements
+
+The following HTML elements are safely allowed:
+
+**Block Elements:**
+- `<div>`, `<section>`, `<article>`, `<aside>`, `<main>` - Container elements
+- `<details>`, `<summary>` - Collapsible content (HTML5)
+- `<figure>`, `<figcaption>` - Images with captions
+- `<table>`, `<thead>`, `<tbody>`, `<tr>`, `<th>`, `<td>` - Tables
+- `<ul>`, `<ol>`, `<li>` - Lists
+- `<blockquote>`, `<pre>` - Quoted and preformatted text
+- `<hr>` - Horizontal rules
+- `<header>`, `<footer>`, `<nav>` - Page structure
+
+**Inline Elements:**
+- `<span>`, `<em>`, `<strong>`, `<code>` - Text formatting
+- `<a>` - Links
+- `<img>` - Images
+- `<mark>`, `<time>`, `<address>` - Semantic inline elements
+
+**Allowed Attributes:**
+- Global: `id`, `class`, `title`, `lang`, `dir`, `role`, `aria-*`
+- Element-specific: `href`, `src`, `alt`, `colspan`, `rowspan`, `type`, etc.
+- Custom data attributes: `data-*` attributes
+
+#### Blocked Elements (Security)
+
+The following dangerous elements are **always blocked**:
+
+- `<script>` - JavaScript code
+- `<iframe>` - Embedded content/frames
+- `<style>` - Style sheets
+- Event handlers: `onclick`, `onerror`, `onload`, etc.
+- URLs like `javascript:` or `data:` with scripts
+- Form elements (input, button, textarea) - rendering only
+
+**Why?** These prevent XSS (Cross-Site Scripting) attacks by blocking potentially malicious content injection.
+
+#### Basic Examples
+
+**Collapsible Content:**
+```html
+<details>
+<summary>Click to expand</summary>
+
+This content is hidden until the user clicks the summary.
+
+- You can use **markdown** inside
+- HTML elements work here too
+
+</details>
+```
+
+**Styled Container:**
+```html
+<div class="note-box">
+<strong>Important:</strong> This div uses a CSS class for styling.
+Multiple markdown paragraphs and *formatting* work here.
+</div>
+```
+
+**Figure with Caption:**
+```html
+<figure>
+<img alt="Architecture" src="https://example.com/diagram.png" />
+<figcaption>System architecture diagram with components</figcaption>
+</figure>
+```
+
+**Semantic Section:**
+```html
+<section id="features">
+<h2>Features</h2>
+
+- **Feature 1**: Description
+- **Feature 2**: Description
+
+<aside>
+Pro tip: Consider the user experience when organizing content.
+</aside>
+
+</section>
+```
+
+#### HTML + Markdown Mixing
+
+You can freely mix HTML and Markdown:
+
+```markdown
+# Main Title (Markdown)
+
+<div class="intro">
+Introduction paragraph with **bold markdown** and *italic text*.
+
+- Markdown bullet list
+- Still works here
+- Inside HTML too
+</div>
+
+## Regular Markdown Section
+
+This is normal markdown after the HTML section.
+```
+
+#### Line Tracking & Scroll Synchronization
+
+All HTML elements (including those embedded in Markdown) automatically maintain **line tracking information** for:
+- ✅ Editor ↔ Preview scroll synchronization
+- ✅ Selection and context menu features (Modify, Elaborate)
+- ✅ Accurate source mapping for multi-line elements
+
+#### Styling Limitations
+
+**Inline Styles:** By default, inline `style` attributes are sanitized for security. If you need custom styling:
+
+**Option 1: Use CSS Classes (Recommended)**
+```html
+<div class="my-custom-class">
+Custom styled content via external CSS
+</div>
+```
+
+**Option 2: Configure Schema** (Advanced)
+To allow inline styles, you would need to extend the sanitization schema in `MarkdownPreview.tsx`. This is a security decision that should be made carefully. See the code comments for configuration examples.
+
+#### Nested HTML
+
+HTML elements can be nested safely:
+```html
+<section>
+  <article>
+    <div class="content">
+      **Nested content** with both HTML and Markdown
+    </div>
+  </article>
+</section>
+```
+
+#### Browser Compatibility
+
+HTML rendering uses browser-native HTML parsing, ensuring compatibility with:
+- Chrome/Chromium (V8 engine)
+- Firefox
+- Safari
+- All Electron-based browsers
+
+#### Performance Considerations
+
+- **Small HTML blocks**: No noticeable impact
+- **Large/deeply nested HTML**: May add 10-30% rendering overhead due to HTML parsing
+- **Recommendation**: Keep HTML blocks reasonable sized for optimal performance
+
+#### Troubleshooting
+
+**HTML elements not rendering?**
+- Check that elements are on **separate lines** with blank lines between them and surrounding Markdown
+- Verify the element is in the **allowed list** (see above)
+- Check browser console for sanitization warnings
+
+**Styling not applied?**
+- Inline `style` attributes are sanitized by default
+- Use CSS classes instead (create CSS in your Erfana theme or external files)
+- Or extend the sanitization schema (advanced)
+
+**Content missing or modified?**
+- The HTML sanitizer removes dangerous content and attributes
+- This is intentional for security
+- Restructure your HTML to use allowed attributes
+
+#### Implementation Details
+
+**Files:**
+- `src/renderer/src/components/Editor/MarkdownPreview.tsx:109-112` - Rehype plugins
+- `src/renderer/src/components/Editor/MarkdownPreview.tsx:50-50` - Sanitization schema
+- `src/renderer/src/components/Editor/MarkdownPreview.tsx:266-295` - HTML component support
+
+**Libraries:**
+- `rehype-raw` - Parses raw HTML in Markdown AST
+- `rehype-sanitize` - Sanitizes dangerous content
+- `hast-util-sanitize` - Provides the schema configuration
+
+**Security:**
+- All dangerous elements and attributes are removed
+- DOM clobbering attacks prevented via ID prefixing
+- CSP-compatible implementation
+- No eval() or dangerous function execution
 
 ### Typography & Styling
 

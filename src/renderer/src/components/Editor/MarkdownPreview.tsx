@@ -1,6 +1,9 @@
 import { useState, useRef, forwardRef, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
+import rehypeSanitize from 'rehype-sanitize'
+import { defaultSchema } from 'hast-util-sanitize'
 import { PreviewContextMenu } from '../ContextMenu/PreviewContextMenu'
 import { UserInputDialog } from '../Dialogs/UserInputDialog'
 import { MermaidDiagram } from './MermaidDiagram'
@@ -11,6 +14,40 @@ interface MarkdownPreviewProps {
   filePath?: string
   className?: string
 }
+
+/**
+ * Sanitization Schema Configuration for HTML Rendering
+ *
+ * Uses GitHub's safe sanitization defaults with enhancements for common documentation use cases.
+ * The schema is a whitelist-based approach - only explicitly allowed elements and attributes are rendered.
+ *
+ * SECURITY: This configuration is designed to be safe by default. Dangerous content like:
+ * - Script tags and event handlers → BLOCKED
+ * - Iframes and embeds → BLOCKED
+ * - JavaScript URLs → BLOCKED
+ * - Inline styles with dangerous properties → BLOCKED (by default)
+ * - DOM clobbering via id/name attributes → PREFIXED with 'user-content-'
+ *
+ * CUSTOMIZATION: To extend this schema (e.g., allow inline styles or custom elements),
+ * create a new schema by merging with defaultSchema. Example:
+ *
+ * ```typescript
+ * import deepmerge from 'deepmerge'
+ *
+ * const customSchema = deepmerge(defaultSchema, {
+ *   attributes: {
+ *     '*': ['style'],  // Allow inline styles (RISKY - review CSS carefully)
+ *     div: ['data-custom']  // Allow custom data attributes
+ *   },
+ *   tagNames: [...defaultSchema.tagNames, 'button']  // Add button element
+ * })
+ *
+ * rehypeSanitize as [rehypeSanitize, customSchema]
+ * ```
+ *
+ * Reference: https://github.com/rehypejs/rehype-sanitize
+ */
+const sanitizationSchema = defaultSchema
 
 /**
  * Helper function to extract line range from node position
@@ -55,6 +92,24 @@ function withLineRange<T extends keyof JSX.IntrinsicElements>(
  * Defined at module level to maintain referential equality across renders
  */
 const remarkPlugins = [remarkGfm]
+
+/**
+ * Stable rehype plugins array for HTML rendering and sanitization
+ * Defined at module level to maintain referential equality across renders
+ *
+ * PLUGIN ORDER IS CRITICAL:
+ * 1. rehypeRaw: Parses raw HTML in markdown (with position preservation for line tracking)
+ * 2. rehypeSanitize: Filters dangerous content AFTER HTML is parsed (always last)
+ *
+ * WARNING: Never use rehypeRaw without rehypeSanitize, as it defeats XSS protections.
+ * The sanitizer removes: scripts, event handlers, javascript: URLs, iframes, style tags, etc.
+ *
+ * Reference: https://github.com/rehypejs/rehype-raw and https://github.com/rehypejs/rehype-sanitize
+ */
+const rehypePlugins: any[] = [
+  rehypeRaw,
+  [rehypeSanitize, sanitizationSchema]
+]
 
 /**
  * Markdown components configuration factory
@@ -198,7 +253,46 @@ function createMarkdownComponents(filePath?: string) {
   },
   // Add line range tracking to images and horizontal rules
   img: withLineRange('img'),
-  hr: withLineRange('hr')
+  hr: withLineRange('hr'),
+
+  // HTML Block Element Support with Line Tracking
+  // These components ensure HTML elements parsed by rehypeRaw also get line tracking
+  // for proper scroll synchronization and context menu selection
+
+  /**
+   * Generic HTML container wrapper for block-level elements
+   * Preserves line tracking and ensures proper semantic structure
+   */
+  div: withLineRange('div'),
+  section: withLineRange('section'),
+  article: withLineRange('article'),
+  aside: withLineRange('aside'),
+  main: withLineRange('main'),
+
+  /**
+   * Collapsible disclosure elements (HTML5)
+   * Allows users to hide/show content with native browser support
+   * Edge case: details elements can contain block-level content
+   */
+  details: withLineRange('details'),
+  summary: withLineRange('summary'),
+
+  /**
+   * Semantic text elements
+   * mark: highlighted/marked text
+   * time: dates and times
+   * address: contact information
+   */
+  mark: withLineRange('mark'),
+  time: withLineRange('time'),
+  address: withLineRange('address'),
+
+  /**
+   * Figure and caption for images with descriptions
+   * Common in documentation and technical content
+   */
+  figure: withLineRange('figure'),
+  figcaption: withLineRange('figcaption')
   }
 }
 
@@ -310,9 +404,19 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
 
     // Memoize ReactMarkdown rendering to prevent re-renders when selection state changes
     // Only re-render when content or components actually change
+    //
+    // PLUGINS:
+    // - remarkPlugins: Markdown syntax extensions (GFM for tables, checkboxes, etc.)
+    // - rehypePlugins: HTML processing:
+    //   - rehypeRaw: Parse embedded HTML in markdown (preserves source line info for scroll sync)
+    //   - rehypeSanitize: Sanitize dangerous HTML (scripts, event handlers, etc.)
     const renderedMarkdown = useMemo(
       () => (
-        <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
+        <ReactMarkdown
+          remarkPlugins={remarkPlugins}
+          rehypePlugins={rehypePlugins}
+          components={markdownComponents}
+        >
           {content}
         </ReactMarkdown>
       ),
