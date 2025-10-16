@@ -187,9 +187,15 @@
 
 /* All view modes use flex layout */
 .editor-content.view-mode-split,
+.editor-content.view-mode-split-horizontal,
 .editor-content.view-mode-editor,
 .editor-content.view-mode-preview {
   display: flex;
+}
+
+/* Horizontal split: stack vertically (preview on top, editor on bottom) */
+.editor-content.view-mode-split-horizontal {
+  flex-direction: column;
 }
 
 .editor-content.view-mode-editor .preview-pane,
@@ -204,11 +210,19 @@
   width: 100%;
 }
 
-/* In split mode, widths are controlled by inline styles */
+/* In vertical split mode, widths are controlled by inline styles */
 .editor-content.view-mode-split .editor-pane,
 .editor-content.view-mode-split .preview-pane {
   flex-shrink: 0;
   overflow: hidden;
+}
+
+/* In horizontal split mode, heights are controlled by inline styles */
+.editor-content.view-mode-split-horizontal .editor-pane,
+.editor-content.view-mode-split-horizontal .preview-pane {
+  flex-shrink: 0;
+  overflow: hidden;
+  width: 100%;
 }
 
 .editor-pane {
@@ -218,6 +232,11 @@
 
 .preview-pane {
   height: 100%;
+  overflow-y: auto;
+}
+
+/* In horizontal split mode, preview pane should have explicit height handling */
+.editor-content.view-mode-split-horizontal .preview-pane {
   overflow-y: auto;
 }
 

@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import './ResizableDivider.css'
 
 interface ResizableDividerProps {
-  onResize: (leftPercentage: number) => void
+  onResize: (percentage: number) => void
+  orientation?: 'vertical' | 'horizontal'
 }
 
-export function ResizableDivider({ onResize }: ResizableDividerProps) {
+export function ResizableDivider({ onResize, orientation = 'vertical' }: ResizableDividerProps) {
   const [isDragging, setIsDragging] = useState(false)
   const dividerRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLElement | null>(null)
@@ -25,13 +26,26 @@ export function ResizableDivider({ onResize }: ResizableDividerProps) {
 
       const container = containerRef.current
       const containerRect = container.getBoundingClientRect()
-      const containerWidth = containerRect.width
 
-      // Calculate mouse position relative to container
-      const mouseX = e.clientX - containerRect.left
+      let percentage: number
 
-      // Calculate percentage (clamped between 20% and 80% for usability)
-      let percentage = (mouseX / containerWidth) * 100
+      if (orientation === 'horizontal') {
+        // For horizontal divider: track vertical position
+        const containerHeight = containerRect.height
+        const mouseY = e.clientY - containerRect.top
+
+        // Calculate percentage (clamped between 20% and 80% for usability)
+        percentage = (mouseY / containerHeight) * 100
+      } else {
+        // For vertical divider: track horizontal position (original behavior)
+        const containerWidth = containerRect.width
+        const mouseX = e.clientX - containerRect.left
+
+        // Calculate percentage (clamped between 20% and 80% for usability)
+        percentage = (mouseX / containerWidth) * 100
+      }
+
+      // Clamp between 20% and 80% for usability
       percentage = Math.max(20, Math.min(80, percentage))
 
       onResize(percentage)
@@ -43,8 +57,9 @@ export function ResizableDivider({ onResize }: ResizableDividerProps) {
       document.body.style.userSelect = ''
     }
 
-    // Set cursor globally during drag
-    document.body.style.cursor = 'col-resize'
+    // Set cursor globally during drag based on orientation
+    const cursor = orientation === 'horizontal' ? 'row-resize' : 'col-resize'
+    document.body.style.cursor = cursor
     document.body.style.userSelect = 'none'
 
     document.addEventListener('mousemove', handleMouseMove)
@@ -56,7 +71,7 @@ export function ResizableDivider({ onResize }: ResizableDividerProps) {
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
     }
-  }, [isDragging, onResize])
+  }, [isDragging, onResize, orientation])
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -66,7 +81,7 @@ export function ResizableDivider({ onResize }: ResizableDividerProps) {
   return (
     <div
       ref={dividerRef}
-      className={`resizable-divider ${isDragging ? 'dragging' : ''}`}
+      className={`resizable-divider ${orientation} ${isDragging ? 'dragging' : ''}`}
       onMouseDown={handleMouseDown}
     >
       <div className="divider-handle" />
