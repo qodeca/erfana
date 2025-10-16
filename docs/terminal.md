@@ -227,7 +227,7 @@ try {
 
 - Terminal icon in right activity bar (bottom position)
 - Toggles terminal splitview panel visibility
-- Mutually exclusive with Git panel
+ - Mutually exclusive with Copilot panel
 
 ### Context Menu Integration
 **File**: `src/renderer/src/components/ContextMenu/PreviewContextMenu.tsx`

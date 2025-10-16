@@ -118,7 +118,6 @@ mcp__circuit-electron__close({ sessionId: s.sessionId })
 | Main layout | `.app-dock-layout` |
 | Project panel | `[title="Project"]` |
 | Terminal panel | `[title="Terminal"]` |
-| Git panel | `[title="Git"]` |
 | Project tree | `.project-tree` |
 | Monaco editor | `.monaco-editor` |
 | Preview pane | `.preview-pane` |

@@ -71,7 +71,7 @@ mcp__circuit-electron__close({ sessionId: session.sessionId })
 - Application window opens
 - Project panel visible on left
 - Terminal panel visible at bottom
-- Git panel visible on right
+— Right sidebar shows Terminal or Copilot panel as selected
 - Toolbar visible at top
 - No error dialogs or blank screens
 

@@ -158,7 +158,6 @@ Ensure using SplitviewReact (outer) + DockviewReact (center):
 - `Cmd/Ctrl+B` = Toggle left sidebar (NOT Monaco bold)
 - `Cmd/Ctrl+J` = Toggle terminal panel
 - `Cmd/Ctrl+Shift+A` = Toggle Copilot panel
-- `Ctrl+Shift+G` = Toggle Git panel
 
 **Workaround:**
 Use Monaco's command palette (F1) or formatting toolbar for editor commands.

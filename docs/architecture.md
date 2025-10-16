@@ -35,7 +35,7 @@ SplitviewReact (outer horizontal 3-column split)
   │   └─ Wraps ProjectTree component
   ├─ Center: EditorAreaSplitPanel (400px min, flex-fills remaining)
   │   └─ Contains DockviewReact for tabbed editors
-  └─ Right: GitSplitPanel + TerminalSplitPanel (170-600px each, mutually exclusive)
+  └─ Right: CopilotSplitPanel + TerminalSplitPanel (170-600px each, mutually exclusive)
       └─ Separate panels, only one visible at a time
 ```
 
@@ -54,8 +54,8 @@ SplitviewReact (outer horizontal 3-column split)
 **Key Components**:
 - `ProjectPanelWrapper` - Splitview panel wrapping ProjectTree
 - `EditorAreaSplitPanel` - Splitview panel containing nested DockviewReact
-- `GitSplitPanel` - Splitview panel for Git integration
 - `TerminalSplitPanel` - Splitview panel for terminal (mutually exclusive with Git)
+- `CopilotSplitPanel` - Splitview panel for Claude Code Copilot (mutually exclusive with Terminal)
 
 **Panel Communication**: DockviewApi passed via params to ProjectPanelWrapper for opening files as tabs.
 
@@ -142,7 +142,6 @@ Dual vertical activity bars (VS Code-style):
 
 **Right Activity Bar**:
 - Copilot toggle (top position)
-- Git toggle (`Ctrl+Shift+G`)
 - Terminal toggle (`Cmd/Ctrl+J`)
 
 **Components**:

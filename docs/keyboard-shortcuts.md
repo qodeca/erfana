@@ -11,7 +11,6 @@ These shortcuts work anywhere in the application and override editor shortcuts.
 | `Cmd/Ctrl+B` | Toggle Left Sidebar | Show/hide Project panel |
 | `Cmd/Ctrl+J` | Toggle Terminal Panel | Show/hide Terminal (right sidebar) |
 | `Cmd/Ctrl+Shift+A` | Toggle Copilot Panel | Show/hide Claude Code Copilot (right sidebar) |
-| `Ctrl+Shift+G` | Toggle Git Panel | Show/hide Git integration (right sidebar) |
 | `Cmd/Ctrl+,` | Open Settings | Open Claude Code tool settings (when Copilot active) |
 
 **Note:** Global shortcuts take precedence over Monaco editor shortcuts. For example, `Cmd/Ctrl+B` toggles the sidebar rather than applying bold formatting in the editor.
@@ -316,7 +315,6 @@ Planned for future releases:
 | Shortcut | Global Action | Monaco Action | Winner |
 |----------|---------------|---------------|--------|
 | `Cmd/Ctrl+B` | Toggle Sidebar | Bold text | Global |
-| `Ctrl+Shift+G` | Toggle Git Panel | Find Previous | Global |
 
 **Workaround for Bold:**
 - Use formatting toolbar button
