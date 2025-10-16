@@ -591,6 +591,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   /**
    * Interpolate scroll position between known mapping points
    * Uses linear interpolation for smooth scrolling
+   * CRITICAL: Handles end-of-document scrolling by calculating proportional offset
    */
   const interpolateScrollPosition = (
     scrollTop: number,
@@ -614,8 +615,37 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     }
 
     // Handle edge cases
-    if (left === 0) return map[0][targetKey]
-    if (left >= map.length) return map[map.length - 1][targetKey]
+    if (left === 0) {
+      // Before first entry: use same proportion from start
+      const firstEntry = map[0]
+      const secondEntry = map[1] || map[0]
+      if (map.length === 1) return firstEntry[targetKey]
+
+      const sourceGap = secondEntry[sourceKey] - firstEntry[sourceKey]
+      const targetGap = secondEntry[targetKey] - firstEntry[targetKey]
+      const ratio = sourceGap > 0 ? scrollTop / sourceGap : 0
+      return ratio * targetGap
+    }
+
+    if (left >= map.length) {
+      // CRITICAL FIX: Handle end-of-document scrolling
+      // When scrolling beyond last entry, calculate proportional distance beyond last point
+      const lastEntry = map[map.length - 1]
+      const secondLastEntry = map[map.length - 2]
+
+      const sourceGap = lastEntry[sourceKey] - secondLastEntry[sourceKey]
+      const targetGap = lastEntry[targetKey] - secondLastEntry[targetKey]
+
+      // Distance beyond last mapped point
+      const beyondLastDistance = scrollTop - lastEntry[sourceKey]
+
+      // Apply same proportion to target
+      // If we're 10% beyond the last entry in the source, go 10% beyond in the target
+      const ratio = sourceGap > 0 ? beyondLastDistance / sourceGap : 1
+      const extraDistance = ratio * targetGap
+
+      return lastEntry[targetKey] + extraDistance
+    }
 
     // Linear interpolation between two points
     const before = map[left - 1]
