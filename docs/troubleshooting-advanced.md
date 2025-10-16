@@ -4,7 +4,7 @@ Advanced troubleshooting for Terminal, Performance, UI/Layout, and Development i
 
 ## Overview
 
-This guide covers advanced troubleshooting topics. For basic troubleshooting (Installation, Claude Code, File System, Markdown), see [Troubleshooting Guide](./troubleshooting.md).
+This guide covers advanced troubleshooting topics. For basic troubleshooting (Installation, File System, Markdown), see [Troubleshooting Guide](./troubleshooting.md).
 
 ## Terminal
 
@@ -157,7 +157,7 @@ Ensure using SplitviewReact (outer) + DockviewReact (center):
 **Expected Behavior:**
 - `Cmd/Ctrl+B` = Toggle left sidebar (NOT Monaco bold)
 - `Cmd/Ctrl+J` = Toggle terminal panel
-- `Cmd/Ctrl+Shift+A` = Toggle Copilot panel
+ 
 
 **Workaround:**
 Use Monaco's command palette (F1) or formatting toolbar for editor commands.
@@ -258,11 +258,7 @@ Check terminal where `npm run dev` is running.
 **Renderer Logs:**
 Open DevTools in app (F12 or View → Toggle Developer Tools).
 
-**Claude CLI Logs:**
-```bash
-ls ~/.claude/logs/
-cat ~/.claude/logs/claude-cli-$(date +%Y-%m-%d).log
-```
+ 
 
 **File Watcher Logs:**
 ```bash
@@ -283,7 +279,7 @@ When reporting bugs, include:
 2. **Environment:** macOS version, Node version, Python version
 3. **Steps to reproduce:** Detailed steps
 4. **Expected vs actual behavior**
-5. **Logs:** Main process + renderer console + Claude CLI logs
+5. **Logs:** Main process + renderer console
 6. **Screenshots:** If UI-related
 
 **Submit to:** https://github.com/qodeca/erfana/issues
@@ -292,10 +288,10 @@ When reporting bugs, include:
 
 ## See Also
 
-- [Troubleshooting Guide](./troubleshooting.md) - Basic troubleshooting (Installation, Claude Code, File System, Markdown)
+- [Troubleshooting Guide](./troubleshooting.md) - Basic troubleshooting (Installation, File System, Markdown)
 - [Known Issues](./known-issues.md) - Complete list of known issues and workarounds
 - [Architecture](./architecture.md) - System design and component overview
 - [Development Tasks](./development-tasks.md) - Common development patterns
-- [API Reference](./api-reference.md) - Service class API documentation
+- [API Services](./api-services.md) - Service class documentation
 - [API Services](./api-services.md) - Supporting services documentation
-- [Claude Code Integration](./claude-code/README.md) - Claude CLI integration details
+ 

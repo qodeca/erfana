@@ -255,7 +255,7 @@ Template automatically validates against Zod schema:
 - `subArea` (required): Specific location (e.g., "context-menu")
 - `name` (required): Display name in UI
 - `icon` (required): Lucide icon name (e.g., "list", "sparkles", "maximize2")
-- `targetPanel` (optional): "claude" or "terminal" (default: "claude")
+- `targetPanel` (optional): "terminal" (default: "terminal")
 - `sendDirectly` (optional): Send immediately without review (default: false)
 
 ### 3. Use Template Variables
@@ -327,7 +327,7 @@ const handleElaborateClick = async () => {
   }
 
   await executePromptTemplate('elaborate', variables)
-  // Prompt automatically sent to target panel (Claude or Terminal)
+  // Prompt automatically sent to target panel (Terminal)
   // autoExecute, sendDirectly handled automatically
 }
 ```

@@ -4,7 +4,7 @@ Centralized troubleshooting reference for common Erfana issues and their solutio
 
 ## Overview
 
-This guide covers basic troubleshooting for installation, Claude Code integration, file system, and markdown editing. For advanced troubleshooting (Terminal, Performance, UI/Layout, Development), see [Advanced Troubleshooting](./troubleshooting-advanced.md).
+This guide covers basic troubleshooting for installation, file system, markdown editing, and terminal. For advanced troubleshooting (Terminal, Performance, UI/Layout, Development), see [Advanced Troubleshooting](./troubleshooting-advanced.md).
 
 ## Installation & Setup
 
@@ -81,89 +81,46 @@ const lastPath = settingsService.getLastProjectPath()
 
 ---
 
-## Claude Code Integration
+## Copilot Panel
 
-### Claude CLI Not Found
+Removed.
 
-**Symptom:** "Claude CLI not installed" message in Copilot panel
+Removed.
 
-**Cause:** Claude CLI binary not in PATH.
-
-**Solution:**
-```bash
-# Install Claude CLI
-brew install claude
-
-# Verify installation
-which claude
-# Should output: /opt/homebrew/bin/claude (or similar)
-```
-
-**Note:** Requires Anthropic MAX subscription for Claude Code access.
+ 
 
 ---
 
 ### Authentication Failed
 
-**Symptom:** "Not authenticated" error when starting session
+ 
 
 **Error:**
 ```
-Not authenticated. Please run: claude setup-token
+ 
 ```
 
-**Cause:** No OAuth token configured for Claude CLI.
-
-**Solution:**
-```bash
-# Set up authentication
-claude setup-token
-
-# Follow browser OAuth flow
-# Token saved to ~/.claude/
-```
-
-**Verification:**
-```bash
-ls ~/.claude/
-# Should show: auth.json, config.json, projects/
-```
+ 
 
 ---
 
 ### Session Won't Start
 
-**Symptom:** Session stuck in "starting" state, never becomes "ready"
+ 
 
 **Debug Steps:**
 1. Check main process console for errors
 2. Verify project path is valid directory
-3. Check Claude CLI logs:
-   ```bash
-   ls ~/.claude/logs/
-   cat ~/.claude/logs/claude-cli-$(date +%Y-%m-%d).log
-   ```
+ 
 
 **Common Causes:**
 - Invalid project path (must be absolute)
 - Project path doesn't exist
 - Insufficient permissions on project directory
-- Claude CLI process crashed (check stderr output)
+ 
 
 **Solution:**
-```typescript
-// Ensure absolute path
-const absolutePath = path.resolve(projectPath)
-
-// Verify directory exists
-const stats = await fs.stat(absolutePath)
-if (!stats.isDirectory()) {
-  throw new Error('Project path must be a directory')
-}
-
-// Start session
-await claudeCliService.startSession(absolutePath)
-```
+ 
 
 ---
 
@@ -203,33 +160,19 @@ private async restartWithNewPermissions(): Promise<void> {
 }
 ```
 
-**Files:** `src/main/services/ClaudeCliService.ts:555-572`
+ 
 
 ---
 
-### Planning Mode Doesn't Restrict Tools
+ 
 
-**Symptom:** Write/Edit tools still available in planning mode
+ 
 
-**Verification:**
-Check planning mode flag in console:
-```
-📋 Planning mode enabled: using 9 safe tools
-🔵 Added planning mode flag
-```
+ 
 
-**Expected Safe Tools** (9 total):
-Read, LS, Glob, Grep, Task, WebSearch, TodoRead, TodoWrite, NotebookRead
+ 
 
-**Solution:**
-Ensure planning mode toggle actually restarts session:
-```typescript
-// In CopilotPanel.tsx
-const handlePlanningModeToggle = async () => {
-  await window.api.claudeCode.stopSession()
-  await window.api.claudeCode.startSession(projectPath, !isPlanningMode)
-}
-```
+ 
 
 ---
 
@@ -425,4 +368,4 @@ flowchart, sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, journey, g
 - [Architecture](./architecture.md) - System design and component overview
 - [Development Tasks](./development-tasks.md) - Common development patterns
 - [API Reference](./api-reference.md) - Service class API documentation
-- [Claude Code Integration](./claude-code/README.md) - Claude CLI integration details
+ 

@@ -171,9 +171,9 @@ Automatic file saving with debounced writes to prevent excessive disk I/O.
 
 **Code**: `MarkdownEditorPanel.tsx:115-135` (auto-save effect)
 
-## Claude Code Integration
+## AI Integration
 
-Right-click context menu in markdown preview for AI-powered text operations with automatic Copilot panel integration.
+Right-click context menu in markdown preview for AI-powered text operations that can send results to the Terminal panel.
 
 ### Available Actions
 
@@ -202,12 +202,12 @@ The **Modify** action provides a flexible way to transform selected text by coll
 2. Dialog appears showing truncated source (500 chars max)
 3. Enter modification instructions (e.g., "make more concise", "add examples")
 4. Press `Cmd/Ctrl+Enter` or click Submit
-5. Prompt automatically sent to Terminal and executed with Claude Code
+5. Prompt automatically sent to the Terminal (optionally auto-executed)
 
 **Template Integration:**
 - Uses `requiresInput: true` in template frontmatter
 - User input available as `{{userInput}}` variable in template
-- Combines with `autoExecute: true` for seamless Claude Code workflow
+- Combines with `autoExecute: true` for seamless workflow
 
 **Implementation**: `UserInputDialog.tsx` (React Portal component), `PreviewContextMenu.tsx` (dialog handling)
 
@@ -238,7 +238,7 @@ Context menu actions are powered by dynamic prompt templates:
 Selected text includes precise line number references:
 - Single line: `@/path/to/file.md:42`
 - Multi-line: `@/path/to/file.md:42-58`
-- Claude Code automatically loads context from these references
+- Context loaded from these references where relevant
 
 **Source Line Reading:**
 - `readSourceLines()` reads original markdown source (not rendered HTML)
@@ -278,9 +278,8 @@ All preview elements have precise line range attributes:
 - Helper functions (src/renderer/src/prompts/helpers.ts)
 
 **Cross-Component Communication**:
-- Uses Zustand store (`useCopilotStore`) for message passing
 - `openPanelAndSendContent()` utility (src/renderer/src/utils/panelUtils.ts)
-- Targets Copilot or Terminal panel based on template configuration
+- Targets the Terminal panel based on template configuration
 
 **React Portal**:
 - Context menu rendered at document level for correct positioning
@@ -393,7 +392,7 @@ Invalid diagram syntax displays a user-friendly error message with:
   - File reference with line range (`@/path/file.md:42-58`)
   - Full error message
   - Complete diagram code
-- Report sent to Terminal panel for easy sharing with Claude Code
+- Report sent to Terminal panel for easy sharing
 - Uses `mermaid-bug-report` template from prompt template system
 
 **Implementation**: `MermaidDiagram.tsx:22-69` (bug report handler)
@@ -650,7 +649,7 @@ HTML rendering uses browser-native HTML parsing, ensuring compatibility with:
 
 ## Additional Features
 
-- Selection tracking for Claude integration (see Claude Code Integration above)
+- Selection tracking for AI integration
 - Real-time preview updates as you type
 - Responsive layout that adjusts to panel size
 

@@ -50,8 +50,8 @@ export interface PromptConfig {
   /** Icon identifier (maps to Lucide icon component) */
   icon: string
 
-  /** Which panel to send the rendered prompt to */
-  targetPanel?: 'claude' | 'terminal'
+  /** Which panel to send the rendered prompt to (Copilot removed; use terminal) */
+  targetPanel?: 'terminal'
 
   /** Whether to send immediately without user review */
   sendDirectly?: boolean

@@ -1,7 +1,7 @@
 {
   "name": "erfana",
   "version": "0.1.0",
-  "description": "IDE for Claude-powered consulting projects",
+  "description": "Project IDE with Markdown, Project Tree, and Terminal",
   "main": "./out/main/index.js",
   "author": "Marcin Obel",
   "license": "MIT",

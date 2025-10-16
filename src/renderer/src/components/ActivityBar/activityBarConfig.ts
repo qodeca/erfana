@@ -1,4 +1,4 @@
-import { LucideIcon, Files, Search, Terminal, Bot } from 'lucide-react'
+import { LucideIcon, Files, Search, Terminal } from 'lucide-react'
 
 export interface ActivityBarPanel {
   id: string
@@ -53,24 +53,13 @@ export const activityBarPanels: ActivityBarPanel[] = [
 
   // Right sidebar panels
   {
-    id: 'claude',
-    icon: Bot,
-    label: 'Copilot',
-    tooltip: 'Copilot (⌘⇧A)',
-    side: 'right',
-    dockviewPanelId: 'claude',
-    order: 1,
-    keyboardShortcut: 'mod+shift+a',
-    enabled: true
-  },
-  {
     id: 'terminal',
     icon: Terminal,
     label: 'Terminal',
     tooltip: 'Terminal (⌘J)',
     side: 'right',
     dockviewPanelId: 'terminal',
-    order: 3,
+    order: 1,
     keyboardShortcut: 'mod+j',
     enabled: true,
     badge: getTerminalActiveIndicator

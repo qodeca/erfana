@@ -6,14 +6,13 @@
  */
 
 import { useActivityBarStore } from '../stores/useActivityBarStore'
-import { useCopilotStore } from '../stores/useCopilotStore'
 import { useTerminalStore } from '../stores/useTerminalStore'
 import { PROMPT_REGISTRY } from '../prompts/registry'
 import { promptRenderer } from '../prompts/renderer'
 import type { PromptVariables } from '../prompts/types'
 
 interface SendToPanelOptions {
-  panel: 'terminal' | 'claude'
+  panel: 'terminal'
   location: 'left' | 'right'
   content: string
   sendImmediately?: boolean
@@ -40,13 +39,7 @@ interface SendToPanelOptions {
  * })
  *
  * @example
- * // Send message to Copilot with immediate send
- * await openPanelAndSendContent({
- *   panel: 'claude',
- *   location: 'right',
- *   content: 'Explain this code',
- *   sendImmediately: true
- * })
+ * // Copilot removed; prompts target terminal
  */
 export async function openPanelAndSendContent({
   panel,
@@ -69,10 +62,6 @@ export async function openPanelAndSendContent({
   if (panel === 'terminal') {
     const { sendToTerminal } = useTerminalStore.getState()
     return await sendToTerminal(content, autoExecute)
-  } else if (panel === 'claude') {
-    const { setPendingMessage } = useCopilotStore.getState()
-    setPendingMessage(content, sendImmediately)
-    return true
   }
 
   return false
@@ -108,8 +97,8 @@ export async function executePromptTemplate(
   // Render template with variables
   const renderedPrompt = promptRenderer.render(config.template, variables)
 
-  // Determine target panel (default to claude for backwards compatibility)
-  const targetPanel = config.targetPanel || 'claude'
+  // Determine target panel (Copilot removed; default to terminal)
+  const targetPanel: 'terminal' = 'terminal'
 
   // Execute prompt by sending to target panel
   return await openPanelAndSendContent({

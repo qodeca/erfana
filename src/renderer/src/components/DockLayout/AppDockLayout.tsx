@@ -15,7 +15,7 @@ import { ProjectPanel } from '../Panels/ProjectPanel'
 import { MarkdownEditorPanel } from '../Panels/MarkdownEditorPanel'
 import { WelcomePanel } from '../Panels/WelcomePanel'
 import { WelcomeTab } from '../Panels/WelcomeTab'
-import { CopilotPanel } from '../Panels/CopilotPanel'
+// Copilot panel removed
 import { TerminalPanel } from '../Panels/TerminalPanel'
 import { ActivityBar } from '../ActivityBar/ActivityBar'
 import { useActivityBarStore } from '../../stores/useActivityBarStore'
@@ -87,7 +87,7 @@ const EditorAreaSplitPanel = (props: ISplitviewPanelProps) => {
 }
 
 // ============================================================================
-// RIGHT SIDEBAR PANELS - Terminal and Copilot panels
+// RIGHT SIDEBAR PANEL - Terminal only
 // ============================================================================
 // Size constraints matching VS Code
 const MIN_SIZES = {
@@ -147,7 +147,7 @@ export function AppDockLayout() {
       }
     })
 
-    // RIGHT PANELS - Terminal and Copilot (mutually exclusive)
+    // RIGHT PANEL - Terminal
     const terminalPanel = event.api.addPanel({
       id: 'terminal-panel',
       component: 'terminalPanel',
@@ -155,26 +155,17 @@ export function AppDockLayout() {
       maximumSize: 1200
     })
 
-    const claudePanel = event.api.addPanel({
-      id: 'claude-panel',
-      component: 'claudePanel',
-      minimumSize: MIN_SIZES.rightSidebar,
-      maximumSize: 1200
-    })
-
     // Set initial sizes
     leftPanel.api.setSize({ size: leftWidth })
     terminalPanel.api.setSize({ size: rightWidth })
-    claudePanel.api.setSize({ size: rightWidth })
 
     // Set initial visibility based on rightActivePanel
     if (leftActivePanel === null) {
       leftPanel.api.setVisible(false)
     }
 
-    // Only show the active right panel, hide the other
+    // Only show the active right panel
     terminalPanel.api.setVisible(rightActivePanel === 'terminal')
-    claudePanel.api.setVisible(rightActivePanel === 'claude')
 
     // Listen to resize events
     const disposeLeft = leftPanel.api.onDidSizeChange(() => {
@@ -189,17 +180,12 @@ export function AppDockLayout() {
       setSidebarWidth(newWidth, 'right')
     })
 
-    const disposeClaude = claudePanel.api.onDidSizeChange(() => {
-      const newWidth = claudePanel.api.width
-      console.log(`📏 Copilot panel resized: ${newWidth}px`)
-      setSidebarWidth(newWidth, 'right')
-    })
+    // Copilot panel removed
 
     // Cleanup
     return () => {
       disposeLeft.dispose()
       disposeTerminal.dispose()
-      disposeClaude.dispose()
     }
   }
 
@@ -222,30 +208,19 @@ export function AppDockLayout() {
       panel.api.setVisible(shouldShow)
       togglePanel(panelId, side)
     } else {
-      // Right sidebar: mutually exclusive panels (terminal, claude)
+      // Right sidebar: only Terminal panel remains
       const terminalPanel = splitviewApiRef.current.getPanel('terminal-panel')
-      const claudePanel = splitviewApiRef.current.getPanel('claude-panel')
-
-      if (!terminalPanel || !claudePanel) return
+      if (!terminalPanel) return
 
       const currentActive = rightActivePanel
-
       if (currentActive === panelId) {
-        // Clicking active panel - hide it
         terminalPanel.api.setVisible(false)
-        claudePanel.api.setVisible(false)
-        togglePanel(panelId, side) // This will set to null
+        togglePanel(panelId, side)
       } else {
-        // Hide both, then show selected
         terminalPanel.api.setVisible(false)
-        claudePanel.api.setVisible(false)
-
         if (panelId === 'terminal') {
           terminalPanel.api.setVisible(true)
-        } else if (panelId === 'claude') {
-          claudePanel.api.setVisible(true)
         }
-
         togglePanel(panelId, side)
       }
     }
@@ -256,18 +231,14 @@ export function AppDockLayout() {
     if (!splitviewApiRef.current) return
 
     const terminalPanel = splitviewApiRef.current.getPanel('terminal-panel')
-    const claudePanel = splitviewApiRef.current.getPanel('claude-panel')
-
-    if (!terminalPanel || !claudePanel) return
-
+    if (!terminalPanel) return
     // Update visibility based on rightActivePanel
     terminalPanel.api.setVisible(rightActivePanel === 'terminal')
-    claudePanel.api.setVisible(rightActivePanel === 'claude')
   }, [rightActivePanel])
 
-  // Sanitize persisted state: remove legacy 'git' active panel if present
+  // Sanitize persisted state: remove legacy 'git'/'claude' active panel if present
   useEffect(() => {
-    if (rightActivePanel === 'git') {
+    if (rightActivePanel === 'git' || rightActivePanel === 'claude') {
       setActivePanel(null, 'right')
     }
     // run once on mount
@@ -292,19 +263,7 @@ export function AppDockLayout() {
         handleActivityBarClick('terminal', 'right')
       }
 
-      // Cmd/Ctrl + Shift + A - Toggle Copilot
-      if (modKey && e.shiftKey && e.key === 'a' && !e.altKey) {
-        e.preventDefault()
-        handleActivityBarClick('claude', 'right')
-      }
-
-      // Cmd/Ctrl + , - Open Settings (when Copilot is active)
-      if (modKey && e.key === ',' && !e.shiftKey && !e.altKey) {
-        if (rightActivePanel === 'claude') {
-          e.preventDefault()
-          window.dispatchEvent(new CustomEvent('open-claude-settings'))
-        }
-      }
+      // Copilot removed - no shortcuts
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -315,8 +274,7 @@ export function AppDockLayout() {
   const splitviewComponents = {
     project: ProjectPanel,
     editorArea: EditorAreaSplitPanel,
-    terminalPanel: TerminalPanel,
-    claudePanel: CopilotPanel
+    terminalPanel: TerminalPanel
   }
 
   return (

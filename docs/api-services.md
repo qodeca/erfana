@@ -6,7 +6,7 @@ Supporting service classes for terminal emulation, file operations, file watchin
 
 ## Overview
 
-This document covers supporting services. For the primary ClaudeCliService API, see [API Reference](./api-reference.md).
+This document covers supporting services.
 
 ## TerminalService
 
@@ -316,7 +316,7 @@ Clear last project path.
 ---
 
 #### `getApprovedTools(): Promise<string[]>`
-Get approved Claude Code tools.
+ 
 
 **Returns:** Array of tool names (defaults to all 17 tools).
 
@@ -419,15 +419,13 @@ const lastPath = await settingsService.getLastProjectPath()
 // Save last project
 await settingsService.setLastProjectPath('/path/to/project')
 
-// Tool management
-const approvedTools = await settingsService.getApprovedTools()
-await settingsService.addApprovedTool('Write')
-await settingsService.removeApprovedTool('Bash')
+// Project filter mode
+const mode = await settingsService.getProjectFilterMode()
+await settingsService.setProjectFilterMode('all')
 ```
 
 ## See Also
 
-- [API Reference](./api-reference.md) - Primary ClaudeCliService API
 - [Architecture](./architecture.md) - Service class overview
 - [IPC Patterns](./ipc-patterns.md) - IPC handler integration
 - [Terminal](./terminal.md) - Terminal panel implementation

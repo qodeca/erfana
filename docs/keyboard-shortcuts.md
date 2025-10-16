@@ -10,8 +10,7 @@ These shortcuts work anywhere in the application and override editor shortcuts.
 |----------|--------|-------------|
 | `Cmd/Ctrl+B` | Toggle Left Sidebar | Show/hide Project panel |
 | `Cmd/Ctrl+J` | Toggle Terminal Panel | Show/hide Terminal (right sidebar) |
-| `Cmd/Ctrl+Shift+A` | Toggle Copilot Panel | Show/hide Claude Code Copilot (right sidebar) |
-| `Cmd/Ctrl+,` | Open Settings | Open Claude Code tool settings (when Copilot active) |
+| `Cmd/Ctrl+,` | Open Settings | — |
 
 **Note:** Global shortcuts take precedence over Monaco editor shortcuts. For example, `Cmd/Ctrl+B` toggles the sidebar rather than applying bold formatting in the editor.
 
@@ -141,7 +140,7 @@ Right-click selected text in preview to access:
 - **Improve** - Enhance grammar/style/clarity (sends to Terminal)
 - **Simplify** - Make clearer and simpler (sends to Terminal)
 - **Rewrite** - Rephrase in different style (sends to Terminal)
-- **Custom** - Write custom prompt (sends to Copilot for review)
+ 
 - **Send to Terminal** - Paste selection to terminal input
 
 **See:** [Prompt Templates](./prompt-templates.md) for creating custom context menu actions
@@ -197,9 +196,7 @@ Standard terminal emulator shortcuts (when terminal is focused).
 
 ---
 
-## Copilot Panel Shortcuts
-
-When focused in the Copilot chat interface.
+ 
 
 | Shortcut | Action |
 |----------|--------|
@@ -336,7 +333,7 @@ Planned for future releases:
 | Command palette | `F1` |
 | Toggle sidebar | `Cmd/Ctrl+B` |
 | Toggle terminal | `Cmd/Ctrl+J` |
-| Toggle Copilot | `Cmd/Ctrl+Shift+A` |
+ 
 | Multi-cursor | `Alt+Click` |
 | Comment line | `Cmd/Ctrl+/` |
 | Undo/Redo | `Cmd/Ctrl+Z` / `Cmd/Ctrl+Shift+Z` |
