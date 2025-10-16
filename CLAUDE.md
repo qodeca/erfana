@@ -124,7 +124,7 @@ Superior markdown capabilities with Monaco Editor + live preview:
   - **Line Range Tracking**: Accurate source mapping with data-line-start/end attributes for multi-line elements
   - **Source Reading**: Reads original markdown source (not rendered HTML) for precise text extraction
 - **View Modes**: Editor only, split view with bidirectional scroll sync, preview only
-- **Scroll Synchronization**: Editor ↔ preview scrolling in split view (line-to-pixel mapping, 50ms debounce)
+- **Scroll Synchronization**: ✅ FULLY FUNCTIONAL - Bidirectional editor ↔ preview scrolling in all split modes (v0.3+: resolved race conditions when switching modes)
 - **Mermaid Diagrams**: 22 diagram types (flowcharts, sequence, class, state, Gantt, ER, timelines, and more)
 - **Professional Compact Preview**: Charter serif font, 15px, compact spacing, 860px max width, GitHub-inspired typography
 
@@ -201,7 +201,7 @@ Automatic file system change detection via chokidar:
 **Resolved Issues:**
 - **Panel Resizing**: ✅ RESOLVED - Hybrid SplitviewReact + DockviewReact architecture fixed resize functionality
 - **Monaco CSP**: ✅ RESOLVED - Monaco now uses local bundling instead of CDN
-- **Scroll Synchronization**: ✅ RESOLVED - Fixed react-markdown v10 API compatibility + React ref re-render issues
+- **Scroll Synchronization**: ✅ RESOLVED (v0.3.0, Commit 4cd79a8) - Fixed race conditions when switching split modes via component remounting and simplified listener attachment
 
 📚 **All known issues**: See [docs/known-issues.md](docs/known-issues.md)
 

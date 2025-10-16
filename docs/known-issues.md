@@ -47,18 +47,24 @@ See: [UI Components - Panel Toggle System](./ui-components.md#panel-toggle-syste
 
 ---
 
-### ✅ Scroll Synchronization (RESOLVED in v0.2.0, Commits 5f1b85f-df8f220)
+### ✅ Scroll Synchronization (RESOLVED in v0.3.0, Commit 4cd79a8)
 
-**Previous Issue**: Editor and preview panes in split view didn't synchronize scrolling.
+**Previous Issue**: Editor and preview panes in split view didn't synchronize scrolling, especially when switching between split modes.
 
-**Solution**: Implemented bidirectional scroll synchronization using:
+**Solution (v0.2)**: Implemented bidirectional scroll synchronization using:
 - Line-to-pixel mapping via `data-line` attributes
 - React-markdown's `node.position` API for AST line numbers
 - Linear interpolation for smooth scrolling between known points
 - 50ms debouncing to prevent scroll loops
 - Proper React ref handling to avoid re-render issues
 
-**Status**: ✅ Editor ↔ Preview scrolling now synchronized in split view.
+**Latest Fix (v0.3+, Commit 4cd79a8)**: Resolved race condition when switching split modes:
+- Force component remounting with React keys: `key={`editor-${viewMode}`}`
+- Immediate scroll map building in `handleEditorMount()` when in split mode
+- Simplified listener attachment (removed complex polling mechanism)
+- Added comprehensive debugging logging with emoji-prefixed console output
+
+**Status**: ✅ Editor ↔ Preview scrolling now fully synchronized, including during split mode transitions.
 
 See: [Markdown Editing - Scroll Synchronization](./markdown-editing.md#scroll-synchronization)
 

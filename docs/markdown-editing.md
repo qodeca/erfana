@@ -77,8 +77,12 @@ In **Split View**, the editor and preview panes are bidirectionally synchronized
 - `MarkdownPreview.tsx:59-66` - Line range extraction (extractLineRange)
 - `MonacoMarkdownEditor.tsx` - Exposes scroll API
 
-**Test Document:**
-See `test-scroll-sync.md` for comprehensive scroll synchronization testing with various content types (plain text, code blocks, images, Mermaid diagrams, HTML elements, mixed content).
+**Latest Fix (v0.3+, Commit 4cd79a8):**
+- Force component remounting with React keys (`key={`editor-${viewMode}`}`)
+- Immediate scroll map building in `handleEditorMount()` for split modes
+- Simplified listener attachment (removed polling mechanism)
+- Added comprehensive debugging logging
+- Resolves race conditions when switching between vertical and horizontal split modes
 
 ## Multi-File Tab System
 
