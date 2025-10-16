@@ -102,7 +102,7 @@ mcp__circuit-electron__close({ sessionId: session.sessionId })
 **Expected Results:**
 - Cmd+B toggles Project panel visibility
 - Cmd+J toggles Terminal panel visibility
-- Cmd+Alt+B toggles Git panel visibility
+— Cmd/Ctrl+J toggles Terminal panel visibility; Cmd/Ctrl+Shift+A toggles Copilot panel
 - Cmd+S saves file and clears modified indicator
 - Panel sizes are preserved when toggled
 

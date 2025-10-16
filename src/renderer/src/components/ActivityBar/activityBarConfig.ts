@@ -1,4 +1,4 @@
-import { LucideIcon, Files, Search, GitBranch, Terminal, Bot } from 'lucide-react'
+import { LucideIcon, Files, Search, Terminal, Bot } from 'lucide-react'
 
 export interface ActivityBarPanel {
   id: string
@@ -19,10 +19,6 @@ const getFileCount = (): number | null => {
   return null
 }
 
-const getGitChangesCount = (): number | null => {
-  // TODO: Hook into git service to count changes
-  return null
-}
 
 const getTerminalActiveIndicator = (): string | null => {
   // TODO: Show indicator when terminal has active session
@@ -66,18 +62,6 @@ export const activityBarPanels: ActivityBarPanel[] = [
     order: 1,
     keyboardShortcut: 'mod+shift+a',
     enabled: true
-  },
-  {
-    id: 'git',
-    icon: GitBranch,
-    label: 'Source Control',
-    tooltip: 'Source Control (⌃⇧G)',
-    side: 'right',
-    dockviewPanelId: 'git',
-    order: 2,
-    keyboardShortcut: 'ctrl+shift+g',
-    enabled: true,
-    badge: getGitChangesCount
   },
   {
     id: 'terminal',

@@ -87,22 +87,8 @@ const EditorAreaSplitPanel = (props: ISplitviewPanelProps) => {
 }
 
 // ============================================================================
-// RIGHT SIDEBAR PANELS - Separate Git, Terminal, and Copilot panels
+// RIGHT SIDEBAR PANELS - Terminal and Copilot panels
 // ============================================================================
-const GitSplitPanel = (_props: ISplitviewPanelProps) => {
-  return (
-    <div className="sidebar-panel">
-      <div className="sidebar-panel-header">
-        <span className="sidebar-panel-title">Source Control</span>
-      </div>
-      <div className="sidebar-panel-content">
-        <p>Git integration coming soon</p>
-      </div>
-    </div>
-  )
-}
-
-
 // Size constraints matching VS Code
 const MIN_SIZES = {
   leftSidebar: 170,
@@ -124,7 +110,8 @@ export function AppDockLayout() {
     leftWidth,
     rightWidth,
     togglePanel,
-    setSidebarWidth
+    setSidebarWidth,
+    setActivePanel
   } = useActivityBarStore()
 
   const onSplitviewReady = (event: SplitviewReadyEvent) => {
@@ -160,14 +147,7 @@ export function AppDockLayout() {
       }
     })
 
-    // RIGHT PANELS - Git, Terminal, and Copilot (mutually exclusive)
-    const gitPanel = event.api.addPanel({
-      id: 'git-panel',
-      component: 'gitPanel',
-      minimumSize: MIN_SIZES.rightSidebar,
-      maximumSize: 1200
-    })
-
+    // RIGHT PANELS - Terminal and Copilot (mutually exclusive)
     const terminalPanel = event.api.addPanel({
       id: 'terminal-panel',
       component: 'terminalPanel',
@@ -184,7 +164,6 @@ export function AppDockLayout() {
 
     // Set initial sizes
     leftPanel.api.setSize({ size: leftWidth })
-    gitPanel.api.setSize({ size: rightWidth })
     terminalPanel.api.setSize({ size: rightWidth })
     claudePanel.api.setSize({ size: rightWidth })
 
@@ -193,8 +172,7 @@ export function AppDockLayout() {
       leftPanel.api.setVisible(false)
     }
 
-    // Only show the active right panel, hide the others
-    gitPanel.api.setVisible(rightActivePanel === 'git')
+    // Only show the active right panel, hide the other
     terminalPanel.api.setVisible(rightActivePanel === 'terminal')
     claudePanel.api.setVisible(rightActivePanel === 'claude')
 
@@ -203,12 +181,6 @@ export function AppDockLayout() {
       const newWidth = leftPanel.api.width
       console.log(`📏 Project panel resized: ${newWidth}px`)
       setSidebarWidth(newWidth, 'left')
-    })
-
-    const disposeGit = gitPanel.api.onDidSizeChange(() => {
-      const newWidth = gitPanel.api.width
-      console.log(`📏 Git panel resized: ${newWidth}px`)
-      setSidebarWidth(newWidth, 'right')
     })
 
     const disposeTerminal = terminalPanel.api.onDidSizeChange(() => {
@@ -226,7 +198,6 @@ export function AppDockLayout() {
     // Cleanup
     return () => {
       disposeLeft.dispose()
-      disposeGit.dispose()
       disposeTerminal.dispose()
       disposeClaude.dispose()
     }
@@ -251,38 +222,31 @@ export function AppDockLayout() {
       panel.api.setVisible(shouldShow)
       togglePanel(panelId, side)
     } else {
-      // Right sidebar: mutually exclusive panels (git, terminal, claude)
-      const gitPanel = splitviewApiRef.current.getPanel('git-panel')
+      // Right sidebar: mutually exclusive panels (terminal, claude)
       const terminalPanel = splitviewApiRef.current.getPanel('terminal-panel')
       const claudePanel = splitviewApiRef.current.getPanel('claude-panel')
 
-      if (!gitPanel || !terminalPanel || !claudePanel) return
+      if (!terminalPanel || !claudePanel) return
 
       const currentActive = rightActivePanel
 
       if (currentActive === panelId) {
         // Clicking active panel - hide it
-        gitPanel.api.setVisible(false)
         terminalPanel.api.setVisible(false)
         claudePanel.api.setVisible(false)
         togglePanel(panelId, side) // This will set to null
       } else {
-        // Switching to different panel or showing first panel
-        // Hide all panels first
-        gitPanel.api.setVisible(false)
+        // Hide both, then show selected
         terminalPanel.api.setVisible(false)
         claudePanel.api.setVisible(false)
 
-        // Show the selected panel
-        if (panelId === 'git') {
-          gitPanel.api.setVisible(true)
-        } else if (panelId === 'terminal') {
+        if (panelId === 'terminal') {
           terminalPanel.api.setVisible(true)
         } else if (panelId === 'claude') {
           claudePanel.api.setVisible(true)
         }
 
-        togglePanel(panelId, side) // This will set to the new panelId
+        togglePanel(panelId, side)
       }
     }
   }
@@ -291,17 +255,24 @@ export function AppDockLayout() {
   useEffect(() => {
     if (!splitviewApiRef.current) return
 
-    const gitPanel = splitviewApiRef.current.getPanel('git-panel')
     const terminalPanel = splitviewApiRef.current.getPanel('terminal-panel')
     const claudePanel = splitviewApiRef.current.getPanel('claude-panel')
 
-    if (!gitPanel || !terminalPanel || !claudePanel) return
+    if (!terminalPanel || !claudePanel) return
 
     // Update visibility based on rightActivePanel
-    gitPanel.api.setVisible(rightActivePanel === 'git')
     terminalPanel.api.setVisible(rightActivePanel === 'terminal')
     claudePanel.api.setVisible(rightActivePanel === 'claude')
   }, [rightActivePanel])
+
+  // Sanitize persisted state: remove legacy 'git' active panel if present
+  useEffect(() => {
+    if (rightActivePanel === 'git') {
+      setActivePanel(null, 'right')
+    }
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Keyboard shortcuts (matching VS Code)
   useEffect(() => {
@@ -319,12 +290,6 @@ export function AppDockLayout() {
       if (modKey && e.key === 'j' && !e.shiftKey && !e.altKey) {
         e.preventDefault()
         handleActivityBarClick('terminal', 'right')
-      }
-
-      // Ctrl + Shift + G - Toggle Git
-      if (e.ctrlKey && e.shiftKey && e.key === 'g' && !e.altKey) {
-        e.preventDefault()
-        handleActivityBarClick('git', 'right')
       }
 
       // Cmd/Ctrl + Shift + A - Toggle Copilot
@@ -350,7 +315,6 @@ export function AppDockLayout() {
   const splitviewComponents = {
     project: ProjectPanel,
     editorArea: EditorAreaSplitPanel,
-    gitPanel: GitSplitPanel,
     terminalPanel: TerminalPanel,
     claudePanel: CopilotPanel
   }

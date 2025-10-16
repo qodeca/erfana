@@ -164,12 +164,11 @@ Automatic file system change detection via chokidar:
 **Global Keyboard Shortcuts** (work anywhere in app):
 - `Cmd/Ctrl+B` - Toggle left sidebar (Project)
 - `Cmd/Ctrl+J` - Toggle right panel (Terminal)
-- `Ctrl+Shift+G` - Toggle right panel (Git)
 - `Cmd/Ctrl+Shift+A` - Toggle right panel (Copilot)
 - `Cmd/Ctrl+,` - Open Claude Code settings (when Copilot active)
 
 **Panel Behavior**:
-- Right sidebar: Git and Terminal are separate splitview panels (mutually exclusive)
+- Right sidebar: Copilot and Terminal are separate splitview panels (mutually exclusive)
 - Toggles hide/show entire panels (not individual tabs)
 - Preserves panel dimensions when toggling (working resize handles)
 - State persisted via Zustand store (sidebar widths, active panels)

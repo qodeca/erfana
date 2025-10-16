@@ -17,8 +17,6 @@ Dual vertical activity bars on left and right edges (VS Code-style).
 
 - **Copilot icon**: Toggle Copilot panel (top position)
   - Keyboard: `Cmd/Ctrl+Shift+A`
-- **Git icon**: Toggle Git panel
-  - Keyboard: `Ctrl+Shift+G`
 - **Terminal icon**: Toggle Terminal panel
   - Keyboard: `Cmd/Ctrl+J`
 - **Width**: 48px fixed
@@ -45,7 +43,7 @@ Manages:
 ### Design
 
 - **Background**: `#333333`
-- **Icons**: Lucide React (`Folder`, `GitBranch`, `Terminal`)
+- **Icons**: Lucide React (`Folder`, `Terminal`, `Bot`)
 - **Active indicator**: 2px blue vertical bar on active item
 - **Hover effect**: Icon color changes to white
 - **Size**: 48x48px click target per item
@@ -220,7 +218,6 @@ These work **anywhere in the application**:
 |----------|--------|-------|
 | `Cmd/Ctrl+B` | Toggle left sidebar | Project |
 | `Cmd/Ctrl+J` | Toggle right panel | Terminal |
-| `Ctrl+Shift+G` | Toggle right panel | Git |
 | `Cmd/Ctrl+Shift+A` | Toggle right panel | Copilot |
 
 **Platform Detection**: Uses `metaKey` on macOS, `ctrlKey` on Windows/Linux
@@ -246,7 +243,7 @@ Matches VS Code panel toggle behavior:
 **Splitview Panels**:
 - Left sidebar: `ProjectPanelWrapper`
 - Center editor: `EditorAreaSplitPanel` (always visible)
-- Right sidebar: `GitSplitPanel` and `TerminalSplitPanel` (mutually exclusive)
+- Right sidebar: `TerminalSplitPanel` and `CopilotSplitPanel` (mutually exclusive)
 
 **Toggle Mechanism**:
 ```typescript
@@ -258,7 +255,7 @@ panel.api.setVisible(shouldShow)
 ```typescript
 {
   leftActivePanel: 'project' | null,
-  rightActivePanel: 'git' | 'terminal' | null,
+  rightActivePanel: 'terminal' | 'claude' | null,
   leftWidth: number,
   rightWidth: number
 }

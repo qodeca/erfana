@@ -22,7 +22,6 @@ Erfana is an Electron desktop application that provides an integrated developmen
 - **Monaco Editor**: VS Code's editor engine for code editing
 - **xterm.js** + **node-pty**: Full-featured terminal emulator with PTY support
 - **Claude CLI**: Native Claude Code binary via MAX subscription (requires `brew install claude`)
-- **simple-git**: Git operations
 - **electron-store**: Settings persistence
 - **Mermaid.js**: Diagram rendering (22 diagram types)
 
@@ -70,7 +69,7 @@ erfana/
 │       │   │   ├── Editor/          # Monaco editor
 │       │   │   ├── Terminal/        # xterm.js
 │       │   │   ├── ProjectTree/     # Project explorer
-│       │   │   └── Git/             # Git integration
+│       │   │   └── Toolbar/         # Editor toolbar
 │       │   ├── hooks/               # React hooks
 │       │   ├── stores/              # State management
 │       │   └── types/               # TypeScript types
@@ -84,7 +83,6 @@ erfana/
 ### Main Process
 - Window management
 - File system operations (with auto-refresh via chokidar)
-- Git integration via simple-git
 - Claude CLI session management (persistent process with JSONL I/O)
 - Terminal PTY management (xterm.js + node-pty)
 - IPC handlers (97 channels across 6 domains)

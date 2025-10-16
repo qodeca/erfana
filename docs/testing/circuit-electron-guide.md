@@ -442,7 +442,7 @@ keyboard_press({ key: "b", modifiers: ["Meta"] })
 // Cmd/Ctrl+J - Toggle Terminal panel
 keyboard_press({ key: "j", modifiers: ["Meta"] })
 
-// Cmd/Ctrl+Alt+B - Toggle Git panel
+
 keyboard_press({ key: "b", modifiers: ["Meta", "Alt"] })
 
 // Cmd/Ctrl+S - Save file
