@@ -1,4 +1,4 @@
-import { ChevronRight, ChevronDown, File, FileText, AlertTriangle } from 'lucide-react'
+import { ChevronRight, ChevronDown, File, FileText, AlertTriangle, Link as LinkIcon } from 'lucide-react'
 import type { FileNode } from '../../../../preload/index'
 import './ProjectTree.css'
 
@@ -94,6 +94,7 @@ export function ProjectTreeNode({
   const isSelected = node.type === 'directory' && node.path === selectedFolder
   const isSensitive = node.type === 'file' && isSensitiveFile(node.name)
   const isHidden = node.name.startsWith('.')
+  const isSymlink = (node as any).isSymlink === true
 
   const renderIcon = () => {
     if (node.type === 'directory') {
@@ -123,6 +124,7 @@ export function ProjectTreeNode({
           title={isSensitive ? 'Sensitive file - may contain credentials' : undefined}
         >
           {isSensitive && <AlertTriangle size={14} className="sensitive-icon" aria-label="Warning: sensitive file" />}
+          {isSymlink && <LinkIcon size={12} style={{ marginRight: 4, opacity: 0.8 }} aria-label="Symlink" />}
           {node.name}
         </span>
       </div>

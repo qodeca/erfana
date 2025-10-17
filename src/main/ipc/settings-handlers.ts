@@ -38,5 +38,29 @@ export function registerSettingsHandlers(): void {
     }
   })
 
+  // Get directory watcher depth
+  ipcMain.handle('settings:getDirectoryWatchDepth', async () => {
+    try {
+      const depth = await settingsService.getDirectoryWatchDepth()
+      return { success: true, depth }
+    } catch (error) {
+      console.error('❌ Error getting directory watch depth:', error)
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
+    }
+  })
+
+  // Set directory watcher depth
+  ipcMain.handle('settings:setDirectoryWatchDepth', async (_event, depth: number | null) => {
+    try {
+      await settingsService.setDirectoryWatchDepth(depth)
+      return { success: true }
+    } catch (error) {
+      console.error('❌ Error setting directory watch depth:', error)
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
+    }
+  })
+
   console.log('✅ Settings IPC handlers registered')
 }

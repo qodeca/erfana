@@ -133,7 +133,12 @@ const api = {
     getProjectFilterMode: (): Promise<{ success: boolean; mode?: string; error?: string }> =>
       ipcRenderer.invoke('settings:getProjectFilterMode'),
     setProjectFilterMode: (mode: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('settings:setProjectFilterMode', mode)
+      ipcRenderer.invoke('settings:setProjectFilterMode', mode),
+    // Directory watcher depth
+    getDirectoryWatchDepth: (): Promise<{ success: boolean; depth?: number; error?: string }> =>
+      ipcRenderer.invoke('settings:getDirectoryWatchDepth'),
+    setDirectoryWatchDepth: (depth: number | null): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('settings:setDirectoryWatchDepth', depth)
   },
 
   // Copilot/Claude Code removed

@@ -35,6 +35,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const [renameError, setRenameError] = useState<string | null>(null)
   const [isSwitchingProject, setIsSwitchingProject] = useState(false)
   const initialLoadCompleteRef = useRef(false)
+  const [watchDepth, setWatchDepth] = useState<number | null>(null)
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -72,6 +73,17 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
 
     loadLastProject()
+    // Load watcher depth setting
+    ;(async () => {
+      try {
+        const res = await window.api.settings.getDirectoryWatchDepth()
+        if (res.success) {
+          setWatchDepth(typeof res.depth === 'number' ? res.depth : null)
+        }
+      } catch (e) {
+        console.warn('Failed to load watcher depth:', e)
+      }
+    })()
   }, [])
 
   // Listen for project change events from other components
@@ -120,8 +132,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       console.error('Failed to start directory watch:', err)
     })
 
-    // Listen for directory changes
-    const unsubscribeChanged = window.api.directoryWatch.onDirectoryChanged((data) => {
+      // Listen for directory changes
+      const unsubscribeChanged = window.api.directoryWatch.onDirectoryChanged((data) => {
       // Only refresh if not during our own internal operations
       if (!isInternalOperation.current) {
         console.log(`📁 Directory changed, refreshing project tree... (${data.eventCount} events)`)
@@ -150,6 +162,24 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       unsubscribeError()
     }
   }, [projectPath])
+
+  const handleWatchDepthChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value
+    const depth = value === 'unlimited' ? null : parseInt(value, 10)
+    try {
+      await window.api.settings.setDirectoryWatchDepth(depth)
+      setWatchDepth(depth)
+      // Restart watcher to apply new depth
+      if (projectPath) {
+        await window.api.directoryWatch.stop(projectPath)
+        await window.api.directoryWatch.start(projectPath)
+      }
+      showGlobalToast({ type: 'info', title: 'Watcher Depth', message: depth === null ? 'Unlimited' : `Depth: ${depth}` })
+    } catch (err) {
+      console.error('Failed to set watcher depth:', err)
+      showGlobalToast({ type: 'error', title: 'Watcher Depth', message: 'Failed to update' })
+    }
+  }
 
   const switchTokenRef = useRef(0)
 
@@ -954,9 +984,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       {showControlPanel && (
         <div className="project-control-panel">
           <div className="control-panel-content">
-            <div className="control-panel-section">
-              <div className="control-panel-label">File Filter</div>
-              <div className="filter-options">
+          <div className="control-panel-section">
+            <div className="control-panel-label">File Filter</div>
+            <div className="filter-options">
                 <button
                   className={`filter-option ${filterMode === 'all' ? 'active' : ''}`}
                   onClick={() => onFilterModeChange('all')}
@@ -973,11 +1003,26 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
                   <FileText size={14} />
                   <span>Markdown Only</span>
                 </button>
-              </div>
             </div>
           </div>
+          <div className="control-panel-section">
+            <div className="control-panel-label">Watching</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <label htmlFor="watch-depth" style={{ fontSize: 12, color: '#bbb' }}>Depth</label>
+              <select id="watch-depth" value={watchDepth === null ? 'unlimited' : String(watchDepth)} onChange={handleWatchDepthChange} style={{ fontSize: 12 }}>
+                <option value="unlimited">Unlimited</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+            </div>
+            <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>Limit recursive watching for large projects.</div>
+          </div>
         </div>
-      )}
+      </div>
+    )}
 
       <div className="project-tree-content">
         {filteredFiles.length > 0 ? (
