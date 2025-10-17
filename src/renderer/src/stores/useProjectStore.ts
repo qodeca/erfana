@@ -4,20 +4,31 @@ import type { DockviewApi } from 'dockview'
 interface ProjectState {
   dockviewApi: DockviewApi | null
   editorPanelIds: Set<string>
+  dirtyPanelIds: Set<string>
   setDockviewApi: (api: DockviewApi | null) => void
   registerEditorPanel: (id: string) => void
+  setEditorDirty: (id: string, dirty: boolean) => void
+  hasDirtyEditors: () => boolean
   clearAllEditorTabs: () => void
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
   dockviewApi: null,
   editorPanelIds: new Set<string>(),
+  dirtyPanelIds: new Set<string>(),
   setDockviewApi: (api) => set({ dockviewApi: api }),
   registerEditorPanel: (id: string) => {
     const next = new Set(get().editorPanelIds)
     next.add(id)
     set({ editorPanelIds: next })
   },
+  setEditorDirty: (id: string, dirty: boolean) => {
+    const current = new Set(get().dirtyPanelIds)
+    if (dirty) current.add(id)
+    else current.delete(id)
+    set({ dirtyPanelIds: current })
+  },
+  hasDirtyEditors: () => get().dirtyPanelIds.size > 0,
   clearAllEditorTabs: () => {
     const api = get().dockviewApi
     if (!api) return
@@ -34,6 +45,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         // ignore failures; continue closing others
       }
     }
-    set({ editorPanelIds: new Set<string>() })
+    set({ editorPanelIds: new Set<string>(), dirtyPanelIds: new Set<string>() })
   }
 }))

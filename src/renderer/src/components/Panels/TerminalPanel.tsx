@@ -15,6 +15,7 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import '@xterm/xterm/css/xterm.css'
 import './TerminalPanel.css'
+import { isElementVisible } from '../../utils/domUtils'
 
 export function TerminalPanel(_props: ISplitviewPanelProps) {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null)
@@ -25,6 +26,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const xtermRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const terminalIdRef = useRef<string | null>(null)
+  const pendingInitRef = useRef<boolean>(false)
+  const visibilityObserverRef = useRef<ResizeObserver | null>(null)
 
   // Terminal store for cross-component communication
   const setActiveTerminalId = useTerminalStore((state) => state.setActiveTerminalId)
@@ -51,11 +54,31 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
     // Check if container is visible before initializing xterm
     // xterm.js cannot render properly if opened on hidden element (display:none or 0 dimensions)
-    const rect = terminalRef.current.getBoundingClientRect()
-    if (rect.width === 0 || rect.height === 0) {
+    if (!isElementVisible(terminalRef.current)) {
       console.warn('Terminal container not visible, waiting for visibility...')
-      // Retry after container becomes visible
-      setTimeout(initializeTerminal, 100)
+      pendingInitRef.current = true
+      // Set up a ResizeObserver to detect when the panel becomes visible
+      if (visibilityObserverRef.current) {
+        try { visibilityObserverRef.current.disconnect() } catch (e) {
+          console.warn('Failed to disconnect visibility observer:', e)
+        }
+      }
+      visibilityObserverRef.current = new ResizeObserver(() => {
+        if (terminalRef.current && pendingInitRef.current && isElementVisible(terminalRef.current)) {
+          // Now visible: stop observing and initialize
+          try { visibilityObserverRef.current?.disconnect() } catch (e) {
+            console.warn('Failed to disconnect visibility observer (callback):', e)
+          }
+          visibilityObserverRef.current = null
+          pendingInitRef.current = false
+          void initializeTerminal()
+        }
+      })
+      try {
+        visibilityObserverRef.current.observe(terminalRef.current)
+      } catch (e) {
+        console.warn('Failed to observe terminal visibility:', e)
+      }
       return
     }
 
@@ -180,6 +203,12 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       if (xtermRef.current) {
         xtermRef.current.dispose()
       }
+      if (visibilityObserverRef.current) {
+        try { visibilityObserverRef.current.disconnect() } catch (e) {
+          console.warn('Failed to disconnect visibility observer on cleanup:', e)
+        }
+        visibilityObserverRef.current = null
+      }
     }
   }, [isAvailable, setActiveTerminalId])
 
@@ -200,9 +229,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       setError(null)
       // Wait briefly then initialize new terminal in new CWD (if a project is open)
       if (data.newPath) {
-        setTimeout(() => {
-          void initializeTerminal()
-        }, 100)
+        // Try initialize; if hidden, visibility observer will defer until visible
+        void initializeTerminal()
       }
     })
     return () => unsubscribe()
@@ -215,6 +243,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     const unsubscribeData = window.api.terminal.onData((data) => {
       if (data.terminalId === terminalId && xtermRef.current) {
         xtermRef.current.write(data.data)
+        // Record recent activity
+        useTerminalStore.getState().setLastActivityNow()
       }
     })
 

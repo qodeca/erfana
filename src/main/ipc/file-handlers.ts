@@ -32,6 +32,19 @@ async function canonicalizePath(p: string): Promise<string> {
   return r
 }
 
+export function broadcastProjectChanged(payload: { oldPath: string | null; newPath: string | null }) {
+  const windows = BrowserWindow.getAllWindows()
+  for (const win of windows) {
+    if (win && !win.isDestroyed()) {
+      try {
+        win.webContents.send('project:changed', payload)
+      } catch {
+        // ignore send errors for destroyed windows
+      }
+    }
+  }
+}
+
 export function registerFileHandlers(): void {
   // Open project folder
   ipcMain.handle('file:openProject', async () => {
@@ -72,14 +85,11 @@ export function registerFileHandlers(): void {
     await settingsService.setLastProjectPath(newProjectPath)
 
     // Notify renderers
-    const win = BrowserWindow.getAllWindows()[0]
-    if (win && !win.isDestroyed()) {
-      const payload: ProjectChanged = {
-        oldPath: oldProjectPath,
-        newPath: newProjectPath
-      }
-      win.webContents.send('project:changed', payload)
+    const payload: ProjectChanged = {
+      oldPath: oldProjectPath,
+      newPath: newProjectPath
     }
+    broadcastProjectChanged(payload)
 
     return newProjectPath
   })
@@ -176,14 +186,11 @@ export function registerFileHandlers(): void {
     await settingsService.clearLastProjectPath()
 
     // Notify renderers of closed project
-    const win = BrowserWindow.getAllWindows()[0]
-    if (win && !win.isDestroyed()) {
-      const payload: ProjectChanged = {
-        oldPath: oldProjectPath,
-        newPath: null
-      }
-      win.webContents.send('project:changed', payload)
+    const payload: ProjectChanged = {
+      oldPath: oldProjectPath,
+      newPath: null
     }
+    broadcastProjectChanged(payload)
 
     return true
   })

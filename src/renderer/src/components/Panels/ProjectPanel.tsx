@@ -79,7 +79,7 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
         id: panelId,
         component: 'editor',
         title: fileName,
-        params: { filePath }
+        params: { filePath, panelId }
       })
       // Track opened editor panel id for later cleanup
       useProjectStore.getState().registerEditorPanel(panelId)
