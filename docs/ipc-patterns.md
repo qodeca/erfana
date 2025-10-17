@@ -90,3 +90,13 @@ To keep IPC payloads consistent across processes, shared zod schemas live at `sr
 Recommended:
 - Validate payloads in tests using these schemas (see contract tests under `src/preload/__tests__/`)
 - Import types from the shared module rather than re-declaring shapes
+
+## Multi-Window Notifications
+
+For app-wide events (e.g., `project:changed`), broadcast to all BrowserWindow instances:
+
+- Iterate `BrowserWindow.getAllWindows()`
+- Send to each non-destroyed window's `webContents`
+- Avoid assuming a single-window app
+
+This ensures secondary windows remain in sync when project context changes.

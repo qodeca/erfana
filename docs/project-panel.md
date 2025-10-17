@@ -91,6 +91,18 @@ Two mutually exclusive radio buttons:
 
 See: [IPC Patterns](./ipc-patterns.md) for filter persistence channels
 
+## Unsaved Changes Prompt
+
+When switching projects (Open Project or Close Project), the app safeguards against data loss:
+
+- Detects dirty editor tabs via a global store
+- Shows a confirmation dialog if any unsaved changes exist
+- Options:
+  - Discard: proceed with the operation; tabs are cleared
+  - Cancel: abort; current project and tabs remain untouched
+
+The prompt appears before opening the OS folder dialog to avoid half-switched states.
+
 ## File Filtering
 
 ### Filter Modes

@@ -22,12 +22,10 @@ See [Automated Testing Plan](./automated-testing-plan.md) for the phased rollout
 - Configure trace/screenshots on failure for debugging.
 
 ### Coverage
-- Generate coverage reports with Vitest (v8 provider):
-  - `npm run test:cov`
-- Reports:
-  - Text summary in console
-  - HTML and lcov saved under `coverage/<project>/`
-  - Initial thresholds are low (10%) to avoid blocking early adoption
+- Generate per-project coverage reports: `npm run test:cov`
+- Reports written under `coverage/<project>/` (lcov + HTML)
+- Build outputs (`out/`) are excluded from coverage to keep signal clean
+- Initial thresholds are low (10%) to avoid blocking early adoption
 
 ---
 

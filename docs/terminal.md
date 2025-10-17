@@ -218,6 +218,20 @@ try {
 } catch (error) {
   console.warn('WebGL failed, falling back to canvas:', error)
 }
+
+## Project Switching & Safety
+
+### Recent Activity Detection
+- Tracks terminal output to detect activity in the last N seconds
+- On project open/close, if recent activity is detected, a confirmation dialog appears
+- On confirm, the app sends Ctrl+C to the terminal and waits briefly before switching
+
+### Deferred Initialization
+- Terminal initialization is deferred when the panel is hidden to avoid xterm sizing issues
+- Uses a ResizeObserver + visibility check to initialize once visible
+
+### CWD Verification (Planned)
+- After spawn, send an explicit `cd "<projectRoot>"` and `pwd` to verify cwd on shells that override working directory
 ```
 
 ## Integration Points
