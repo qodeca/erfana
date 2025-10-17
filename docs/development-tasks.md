@@ -396,7 +396,7 @@ npm run build
 
 **Common Selectors:** `.app-dock-layout`, `.project-tree`, `.monaco-editor`, `.preview-pane`, `[title="Project"]`, `[title="Terminal"]`
 
-See: [Testing Index](./testing/README.md) | [Circuit Electron Guide](./testing/circuit-electron-guide.md) | [Quick Start](./testing/quickstart.md) | [UI Scenarios](./testing/ui-scenarios.md)
+See: [Testing Index](./testing/README.md) | [UI Scenarios](./testing/ui-scenarios.md) | [Interaction Scenarios](./testing/interaction-scenarios.md)
 
 ## Testing Auto-Refresh
 

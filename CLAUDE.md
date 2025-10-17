@@ -13,6 +13,12 @@ npm run build        # Production build
 npm run typecheck    # Type checking
 npm run lint         # Linting
 npm run build:mac    # macOS build
+
+# Tests
+npm run test         # Vitest workspace (one-shot)
+npm run test:renderer
+npm run test:main
+npm run test:preload
 ```
 
 ## Project Structure
@@ -40,6 +46,8 @@ See `docs/` folder for detailed documentation:
 - [Editor Features](docs/editor/README.md) - Monaco editor, preview, scroll sync
 - [Terminal](docs/terminal.md) - Terminal integration
 - [Prompt Templates](docs/prompts/README.md) - Template system
+- [Testing](docs/testing/README.md) - Automated and visual testing
+- [Automated Testing Plan](docs/testing/automated-testing-plan.md) - Phased rollout and setup
 - [Known Issues](docs/known-issues.md) - Current limitations
 
 ## Code Style & Conventions
@@ -62,11 +70,8 @@ See `docs/` folder for detailed documentation:
 - `docs/` - Documentation files
 
 ## Testing
-Manual testing required for:
-- File operations (create, rename, delete)
-- Terminal integration
-- Markdown preview and scroll sync
-- Context menu operations
+- Unit/Integration: Vitest workspace across renderer, main, preload (see docs/testing/README.md).
+- Visual/MCP Scenarios: See docs/testing/ui-scenarios.md and docs/testing/interaction-scenarios.md.
 
 ## Important Notes
 - node-pty may fail to build on Python 3.13 (use 3.12)

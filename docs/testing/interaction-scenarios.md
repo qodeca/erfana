@@ -395,6 +395,5 @@ Scenarios can be adapted for automated testing pipelines.
 ## See Also
 
 - [UI Test Scenarios](./ui-scenarios.md) - UI verification tests
-- [Circuit Electron Guide](./circuit-electron-guide.md) - Complete tool reference
-- [Quick Start](./quickstart.md) - Fast testing patterns
+- See [Testing README](./README.md) for automated tests and visual testing tips
 - [Testing Index](./README.md) - All testing documentation

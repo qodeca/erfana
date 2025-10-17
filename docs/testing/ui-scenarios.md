@@ -403,6 +403,5 @@ mcp__circuit-electron__close({ sessionId: session.sessionId })
 ## See Also
 
 - [Interaction Test Scenarios](./interaction-scenarios.md) - User interaction tests
-- [Circuit Electron Guide](./circuit-electron-guide.md) - Complete tool reference
-- [Quick Start](./quickstart.md) - Fast testing patterns
+- See [Testing README](./README.md) for automated tests and visual testing tips
 - [Testing Index](./README.md) - All testing documentation
