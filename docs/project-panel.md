@@ -91,6 +91,16 @@ Two mutually exclusive radio buttons:
 
 See: [IPC Patterns](./ipc-patterns.md) for filter persistence channels
 
+### Watching Controls
+
+Controls for the directory watcher:
+
+- Depth selector: Unlimited (default) or 1–5
+  - Persists via settings and restarts the watcher to apply
+  - Helps reduce load in very large projects
+- Symlink indicator: small chain icon on symlink entries in the tree
+- Docs: quick link to File Watching → Watcher Debugging
+
 ## Unsaved Changes Prompt
 
 When switching projects (Open Project or Close Project), the app safeguards against data loss:

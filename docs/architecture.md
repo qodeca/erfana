@@ -120,6 +120,7 @@ src/
   - TerminalService: Terminal emulator with xterm.js + node-pty (PTY lifecycle, WebGL rendering, auto-resize, traditional zsh prompt, cwd verification)
 - **Auto-Refresh**: Chokidar-based watching with pause/resume race prevention
   - Session token guards drop stale events during project switches
+  - Configurable depth cap (settings-driven) to limit recursion in large projects
 - **Secure IPC**: All main↔renderer communication via contextBridge
 - **State Management**: Zustand for activity bar state (sidebar widths, active panels)
 - **Component Registry**: Splitview and Dockview use string-based component lookup
