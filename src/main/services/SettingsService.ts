@@ -8,6 +8,7 @@
 interface Settings {
   lastProjectPath?: string
   projectFilterMode?: string
+  directoryWatchDepth?: number | null
 }
 
 // Copilot removed: no approved tools management
@@ -76,6 +77,21 @@ export class SettingsService {
   async setProjectFilterMode(mode: string): Promise<void> {
     const store = await this.ensureStore()
     store.set('projectFilterMode', mode)
+  }
+
+  // Directory watcher depth (performance tuning)
+  async getDirectoryWatchDepth(): Promise<number | undefined> {
+    const store = await this.ensureStore()
+    const v = store.get('directoryWatchDepth')
+    if (v === null || v === undefined) return undefined
+    if (typeof v === 'number' && v >= 0) return v
+    return undefined
+  }
+
+  async setDirectoryWatchDepth(depth: number | null): Promise<void> {
+    const store = await this.ensureStore()
+    // null clears to undefined behavior (chokidar unlimited)
+    store.set('directoryWatchDepth', depth === null ? null : Math.max(0, Math.floor(depth)))
   }
 }
 

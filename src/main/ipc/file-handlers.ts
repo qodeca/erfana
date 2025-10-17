@@ -72,26 +72,53 @@ export function registerFileHandlers(): void {
       }
     }
 
-    // Stop all existing watchers before switching
-    await fileWatcherService.stopAll()
-    await directoryWatcherService.stopAll()
+    try {
+      // Validate directory exists and is accessible before touching current state
+      const stats = await stat(newProjectPath)
+      if (!stats.isDirectory()) {
+        throw new Error('Selected path is not a directory')
+      }
 
-    // Update project path across services
-    fileService.setProjectPath(newProjectPath)
-    fileWatcherService.setProjectPath(newProjectPath)
-    directoryWatcherService.setProjectPath(newProjectPath)
+      // Stop all existing watchers before switching
+      try {
+        await fileWatcherService.stopAll()
+        await directoryWatcherService.stopAll()
+      } catch (e) {
+        // Non-fatal: proceed with switch, guards prevent stale events
+        console.warn('Stopping watchers failed (continuing):', e)
+      }
 
-    // Persist last project path
-    await settingsService.setLastProjectPath(newProjectPath)
+      // Update project path across services
+      fileService.setProjectPath(newProjectPath)
+      fileWatcherService.setProjectPath(newProjectPath)
+      directoryWatcherService.setProjectPath(newProjectPath)
 
-    // Notify renderers
-    const payload: ProjectChanged = {
-      oldPath: oldProjectPath,
-      newPath: newProjectPath
+      // Persist last project path
+      await settingsService.setLastProjectPath(newProjectPath)
+
+      // Notify renderers
+      const payload: ProjectChanged = {
+        oldPath: oldProjectPath,
+        newPath: newProjectPath
+      }
+      broadcastProjectChanged(payload)
+
+      return newProjectPath
+    } catch (error) {
+      // Roll back to previous project path in services on failure
+      try {
+        fileService.setProjectPath(oldProjectPath || '')
+        fileWatcherService.setProjectPath(oldProjectPath || '')
+        directoryWatcherService.setProjectPath(oldProjectPath || '')
+      } catch (e) {
+        // Best-effort rollback
+        console.warn('Rollback failed after openProject error:', e)
+      }
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('Open project failed:', message)
+      // Throw so renderer can show toast
+      throw new Error(message)
     }
-    broadcastProjectChanged(payload)
-
-    return newProjectPath
   })
 
   // Get last opened project path if it still exists

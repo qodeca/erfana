@@ -12,6 +12,13 @@ import type { IPty } from 'node-pty'
 // Dynamic import for node-pty (optional dependency)
 type NodePtyModule = typeof import('node-pty')
 let pty: NodePtyModule | null = null
+// Test override: allow injecting a mock pty module for unit tests
+try {
+  const injected = (globalThis as any).__ERFANA_TEST_PTY__
+  if (injected) {
+    pty = injected as NodePtyModule
+  }
+} catch {}
 // Kick off loading in background
 void import('node-pty')
   .then((mod) => {
