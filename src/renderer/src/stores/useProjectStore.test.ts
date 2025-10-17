@@ -25,3 +25,19 @@ describe('useProjectStore dirty editor tracking', () => {
   })
 })
 
+describe('useProjectStore fallback close', () => {
+  it('tries to close remaining panels via API fallback', () => {
+    const store = useProjectStore.getState()
+    const closed: string[] = []
+    // fake api with getPanels
+    const api: any = {
+      getPanel: (_id: string) => ({ api: { close: () => closed.push('a') } }),
+      getPanels: () => [{ id: 'a', api: { close: () => closed.push('a') } }, { id: '_center-placeholder' }],
+    }
+    store.setDockviewApi(api)
+    // register a known editor id to exercise primary loop as well
+    store.registerEditorPanel('a')
+    store.clearAllEditorTabs()
+    expect(closed).toContain('a')
+  })
+})

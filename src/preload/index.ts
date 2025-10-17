@@ -8,6 +8,7 @@ export interface FileNode {
   type: 'file' | 'directory'
   children?: FileNode[]
   extension?: string
+  isSymlink?: boolean
 }
 
 export interface FileStats {

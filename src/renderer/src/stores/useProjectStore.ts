@@ -45,6 +45,20 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         // ignore failures; continue closing others
       }
     }
+    // Fallback: attempt to close any remaining editor panels not tracked
+    try {
+      const anyApi = api as unknown as { getPanels?: () => any[]; removePanel?: (pid: string) => void }
+      const panels = typeof anyApi.getPanels === 'function' ? anyApi.getPanels() : []
+      for (const p of panels) {
+        // Prefer not to touch welcome placeholder
+        if (p?.id && p.id !== '_center-placeholder') {
+          if (p?.api?.close) p.api.close()
+          else if (typeof anyApi.removePanel === 'function') anyApi.removePanel(p.id)
+        }
+      }
+    } catch {
+      // ignore
+    }
     set({ editorPanelIds: new Set<string>(), dirtyPanelIds: new Set<string>() })
   }
 }))

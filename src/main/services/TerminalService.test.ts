@@ -4,7 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 let dataHandler: ((d: string) => void) | null = null
 const writes: string[] = []
 
-vi.mock('node-pty', () => ({
+// Provide injected mock via global hook and standard mocking
+;(globalThis as any).__ERFANA_TEST_PTY__ = {
   spawn: vi.fn((_shell: string, _args: string[], _opts: any) => {
     writes.length = 0
     dataHandler = null
@@ -20,9 +21,13 @@ vi.mock('node-pty', () => ({
       }
     }
   })
-}))
+} as any
 
-describe('TerminalService cwd verification', () => {
+vi.mock('node-pty', () => (globalThis as any).__ERFANA_TEST_PTY__)
+
+const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
+
+;(isRendererEnv ? describe.skip : describe)('TerminalService cwd verification', () => {
   beforeEach(() => {
     vi.resetModules()
   })

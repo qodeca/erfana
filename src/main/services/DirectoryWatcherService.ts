@@ -1,5 +1,6 @@
 import chokidar, { FSWatcher } from 'chokidar'
 import { BrowserWindow, WebContents } from 'electron'
+import { settingsService } from './SettingsService'
 
 interface WatchedDirectory {
   dirPath: string
@@ -87,6 +88,14 @@ export class DirectoryWatcherService {
 
     this.safeLog(`👁️  Starting directory watch for: ${dirPath}`)
 
+    // Read depth setting (undefined => watch all levels)
+    let depth: number | undefined
+    try {
+      depth = await settingsService.getDirectoryWatchDepth()
+    } catch {
+      depth = undefined
+    }
+
     // Create new watcher with performance optimizations
     const watcher = chokidar.watch(dirPath, {
       persistent: true,
@@ -112,7 +121,7 @@ export class DirectoryWatcherService {
       ],
       usePolling: false, // Use native fs events (faster)
       awaitWriteFinish: false, // Not needed for directory operations
-      depth: undefined, // Watch all levels (could be limited for performance if needed)
+      depth, // Optional cap for performance
       followSymlinks: false // Security: don't follow symlinks
     })
 

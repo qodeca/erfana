@@ -34,6 +34,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const [renameValue, setRenameValue] = useState('')
   const [renameError, setRenameError] = useState<string | null>(null)
   const [isSwitchingProject, setIsSwitchingProject] = useState(false)
+  const initialLoadCompleteRef = useRef(false)
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -60,6 +61,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
           setProjectPath(lastPath)
           const fileTree = await window.api.file.readDirectory(lastPath)
           setFiles(fileTree)
+          initialLoadCompleteRef.current = true
         }
       } catch (err) {
         console.error('Error loading last project:', err)
@@ -89,6 +91,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
           setLoading(true)
           const fileTree = await window.api.file.readDirectory(data.newPath)
           setFiles(fileTree)
+          initialLoadCompleteRef.current = true
         } catch (err) {
           console.error('Error loading new project tree:', err)
           setError(err instanceof Error ? err.message : 'Failed to load project')
@@ -110,6 +113,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   // Directory watching for auto-refresh
   useEffect(() => {
     if (!projectPath) return
+    if (!initialLoadCompleteRef.current) return
 
     // Start watching the project directory
     window.api.directoryWatch.start(projectPath).catch((err) => {

@@ -36,6 +36,10 @@ export class FileService {
         path: fullPath,
         type: entry.isDirectory() ? 'directory' : 'file'
       }
+      // Flag symlinks for UI indication/security awareness
+      if (entry.isSymbolicLink()) {
+        ;(node as any).isSymlink = true
+      }
 
       if (node.type === 'file') {
         node.extension = extname(entry.name)
