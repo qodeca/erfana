@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react'
+import { subscribeGlobalToasts } from './toastService'
 
 export interface Toast {
   id: string
@@ -48,6 +49,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id))
   }, [])
+
+  // Subscribe to global toast events so non-React modules can trigger toasts
+  useEffect(() => {
+    const unsubscribe = subscribeGlobalToasts((payload) => {
+      showToast(payload)
+    })
+    return () => unsubscribe()
+  }, [showToast])
 
   return (
     <ToastContext.Provider value={{ toasts, showToast, removeToast }}>

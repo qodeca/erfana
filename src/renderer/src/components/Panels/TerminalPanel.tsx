@@ -14,6 +14,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import '@xterm/xterm/css/xterm.css'
+import { showGlobalToast } from '../Toast/toastService'
 import './TerminalPanel.css'
 
 export function TerminalPanel(_props: ISplitviewPanelProps) {
@@ -185,7 +186,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
   // Restart terminal on project change
   useEffect(() => {
-    const unsubscribe = window.api.file.onProjectChanged(async () => {
+    const unsubscribe = window.api.file.onProjectChanged(async (data) => {
       // Kill current terminal session
       if (terminalIdRef.current) {
         await window.api.terminal.kill(terminalIdRef.current)
@@ -198,10 +199,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }
       setTerminalId(null)
       setError(null)
-      // Wait briefly then initialize new terminal in new CWD
-      setTimeout(() => {
-        void initializeTerminal()
-      }, 100)
+      // Wait briefly then initialize new terminal in new CWD (if a project is open)
+      if (data.newPath) {
+        setTimeout(() => {
+          void initializeTerminal().then(() => {
+            showGlobalToast({ type: 'info', title: 'Terminal Restarted', message: data.newPath! })
+          })
+        }, 100)
+      }
     })
     return () => unsubscribe()
   }, [setActiveTerminalId])

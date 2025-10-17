@@ -23,12 +23,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     if (!api) return
     const ids = Array.from(get().editorPanelIds)
     for (const id of ids) {
-      const panel = api.getPanel(id) as any
+      const panel = api.getPanel(id) as unknown as { api?: { close?: () => void } } | null
       try {
         if (panel?.api?.close) {
           panel.api.close()
-        } else if (typeof (api as any).removePanel === 'function') {
-          ;(api as any).removePanel(id)
+        } else if (typeof (api as unknown as { removePanel?: (pid: string) => void }).removePanel === 'function') {
+          ;(api as unknown as { removePanel: (pid: string) => void }).removePanel(id)
         }
       } catch {
         // ignore failures; continue closing others

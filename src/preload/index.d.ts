@@ -19,8 +19,9 @@ declare global {
         deleteFolder: (folderPath: string) => Promise<boolean>
         rename: (oldPath: string, newName: string) => Promise<string>
         onProjectChanged: (
-          callback: (data: { oldPath: string | null; newPath: string }) => void
+          callback: (data: { oldPath: string | null; newPath: string | null }) => void
         ) => () => void
+        closeProject: () => Promise<boolean>
       }
       fileWatch: {
         start: (filePath: string) => Promise<{ success: boolean; error?: string }>
