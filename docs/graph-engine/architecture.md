@@ -1,5 +1,12 @@
 # Graph Engine Architecture
 
+> ⚠️ **WORK IN PROGRESS - NOT READY FOR DEVELOPMENT**
+>
+> This documentation is currently under active development and review. The Graph Engine specification, architecture, and implementation details are subject to significant changes. **DO NOT start implementation work based on these documents.**
+>
+> **Status**: Draft specification being refined
+> **Expected Ready**: TBD pending architectural review and wireframe finalization
+
 **Last Updated:** October 2025
 **Status:** Design Specification
 
@@ -46,8 +53,16 @@ The Erfana Graph Engine is a **local-first, embedded knowledge graph** that comb
 │  ┌───────────────────┐  ┌──────────────────┐  ┌─────────────────┐ │
 │  │  Related Sidebar  │  │  Knowledge Panel │  │  Global Search  │ │
 │  │  - Top-k results  │  │  - Entities      │  │  - Filters      │ │
-│  │  - Citations      │  │  - Mentions      │  │  - Time slider  │ │
+│  │  - Citations      │  │  - Backlinks     │  │  - Time slider  │ │
+│  │  - Auto-update    │  │  - Mentions      │  │  - Replace grep │ │
 │  └───────────────────┘  └──────────────────┘  └─────────────────┘ │
+│                                                                      │
+│  ┌──────────────────┐  ┌────────────────────────────────────────┐ │
+│  │ Settings Panel   │  │  Status Indicator                      │ │
+│  │  - Hybrid weights│  │  - Indexing progress (%)               │ │
+│  │  - Re-index      │  │  - MCP server status (🟢/🔴)          │ │
+│  │  - Quantization  │  │  - Click for details                   │ │
+│  └──────────────────┘  └────────────────────────────────────────┘ │
 │                                                                      │
 │  useGraphSettingsStore (Zustand)                                    │
 │  - Hybrid weights (α, β, γ, δ)                                      │
@@ -61,11 +76,42 @@ The Erfana Graph Engine is a **local-first, embedded knowledge graph** that comb
 ┌──────────────────────────────▼───────────────────────────────────────┐
 │                      MAIN PROCESS (Node.js)                          │
 │                                                                       │
+│  ┌───────────────────────────────────────────────────────────────┐ │
+│  │                    ERFANA Services Integration                 │ │
+│  │                                                                 │ │
+│  │  ┌────────────────────┐         ┌────────────────────────┐   │ │
+│  │  │ FileWatcherService │ ───────▶│  GraphEngineService    │   │ │
+│  │  │ (Event Emitter)    │ Events  │  (Subscriber)          │   │ │
+│  │  │                    │         │                        │   │ │
+│  │  │ • file:saved       │         │ • Listens to events    │   │ │
+│  │  │ • file:created     │         │ • Queues indexing      │   │ │
+│  │  │ • file:deleted     │         │ • Debounces changes    │   │ │
+│  │  │ • project:changed  │         │ • Emits progress       │   │ │
+│  │  └────────────────────┘         └────────────────────────┘   │ │
+│  │                                                                 │ │
+│  │  ┌────────────────────┐         ┌────────────────────────┐   │ │
+│  │  │  MCPServerService  │ ◀───────│  GraphEngineService    │   │ │
+│  │  │  (stdio transport) │ Queries │  (Data Provider)       │   │ │
+│  │  │                    │         │                        │   │ │
+│  │  │ • erfana_graph_    │         │ • search()             │   │ │
+│  │  │   search           │         │ • getRelated()         │   │ │
+│  │  │ • erfana_graph_    │         │ • getEntities()        │   │ │
+│  │  │   related          │         │ • getBacklinks()       │   │ │
+│  │  │ • erfana_graph_    │         │ • getTimeline()        │   │ │
+│  │  │   entities/etc.    │         │                        │   │ │
+│  │  └────────────────────┘         └────────────────────────┘   │ │
+│  │           │                                   │                │ │
+│  │           │ Claude Code (Terminal)            │                │ │
+│  │           ▼                                   ▼                │ │
+│  └───────────────────────────────────────────────────────────────┘ │
+│                                                                       │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │               GraphEngineService                             │   │
+│  │               GraphEngineService (Core)                      │   │
 │  │  - Orchestrates all graph operations                         │   │
 │  │  - Manages debouncing and queueing                           │   │
 │  │  - Exposes IPC API surface                                   │   │
+│  │  - Subscribes to FileWatcherService events                   │   │
+│  │  - Provides data to MCPServerService                         │   │
 │  └───┬──────────────────┬──────────────────┬──────────────────┘   │
 │      │                  │                  │                        │
 │  ┌───▼──────┐   ┌───────▼────────┐   ┌────▼──────┐                │
@@ -86,12 +132,53 @@ The Erfana Graph Engine is a **local-first, embedded knowledge graph** that comb
 
 ### Component Responsibilities
 
+#### Integration with ERFANA Services
+
+The Graph Engine integrates seamlessly with existing ERFANA services through an event-driven architecture:
+
+**FileWatcherService → GraphEngineService**
+- GraphEngineService subscribes to FileWatcherService events on initialization
+- Events listened to:
+  - `file:saved` - Re-index modified file (incremental update)
+  - `file:created` - Index new file
+  - `file:deleted` - Remove from index
+  - `project:changed` - Trigger full project indexing
+
+**GraphEngineService → MCPServerService**
+- MCPServerService exposes GraphEngineService data via MCP protocol
+- Runs on stdio transport for Claude Code consumption
+- 5 MCP tools provided (search, related, entities, backlinks, timeline)
+- Rate limiting: 100/min for search, 50/min for entities, 20/min for timeline
+
+**Event Flow Example:**
+```typescript
+// On app startup
+const eventBus = new EventEmitter();
+const fileWatcherService = new FileWatcherService(eventBus);
+const graphEngineService = new GraphEngineService(eventBus);
+const mcpServerService = new MCPServerService(graphEngineService);
+
+// User opens project
+eventBus.emit('project:changed', { newPath: '/path/to/project' });
+// → GraphEngine discovers all .md files and queues indexing
+
+// User saves file
+eventBus.emit('file:saved', { path: '/path/to/file.md' });
+// → GraphEngine re-indexes only changed sections (via text_hash)
+
+// Claude Code queries from Terminal
+await mcpClient.callTool('erfana_graph_search', { query: 'architecture' });
+// → MCPServer calls graphEngine.search() → returns results
+```
+
 #### GraphEngineService (Orchestrator)
 - **Request Handling**: Processes IPC requests from renderer
+- **Event Subscription**: Listens to FileWatcherService events for auto-indexing
 - **Debouncing**: Coalesces rapid file saves (e.g., 300ms window)
 - **Queue Management**: Serializes indexing operations to prevent contention
 - **Error Handling**: Catches errors, logs, returns structured error responses
 - **State Coordination**: Tracks indexing progress, worker availability
+- **MCP Data Provider**: Exposes search/graph APIs to MCPServerService
 
 #### SQLite Database
 - **Schema Management**: DDL migrations, version tracking
@@ -114,6 +201,49 @@ The Erfana Graph Engine is a **local-first, embedded knowledge graph** that comb
 - **Centrality Metrics**: PageRank, betweenness, closeness
 - **Neighborhood Queries**: Find N-hop neighbors for an entity
 - **Lazy Loading**: Only load subgraphs when needed (not full graph)
+
+#### MCPServerService (Claude Code Integration)
+- **Protocol**: Model Context Protocol (MCP) over stdio transport
+- **Lifecycle**: Started on app launch, stopped on app quit
+- **Tools Exposed**:
+  - `erfana_graph_search` - Hybrid search (BM25 + vector)
+  - `erfana_graph_related` - Find related sections
+  - `erfana_graph_entities` - List entities with filters
+  - `erfana_graph_backlinks` - Get entity backlinks
+  - `erfana_graph_timeline` - Temporal queries
+- **Rate Limiting**: Token bucket algorithm per tool
+- **Security**: Read-only access, no file system writes
+
+#### UI Components (Renderer Process)
+
+**Related Sidebar**
+- **Purpose**: Research assistant showing top-10 related sections
+- **Trigger**: Auto-updates on file change or text selection
+- **Display**: Citation with score, file path, snippet
+- **Actions**: Click to open, copy citation, insert link
+
+**Global Search**
+- **Purpose**: Project-wide hybrid search (replaces/augments grep)
+- **Input**: Natural language query
+- **Filters**: Folder, file type, date range
+- **Display**: Results with BM25 score, cosine similarity, combined score
+- **Actions**: Click to navigate, "Why this result?" breakdown
+
+**Knowledge Panel** (M3+)
+- **Purpose**: Entity mentions and backlinks (Obsidian-like)
+- **Display**: Entities in current section, where else mentioned
+- **Actions**: Click entity to see backlinks, navigate to mentions
+
+**Settings Panel**
+- **Purpose**: Configure hybrid search weights and indexing
+- **Controls**: α/β/γ/δ sliders, re-index button, quantization toggle
+- **Display**: Current embedder model, corpus size, index status
+
+**Status Indicator**
+- **Purpose**: Show indexing progress and MCP server status
+- **Display**: Progress bar (e.g., "Indexing: 450/1000 files"), MCP status (🟢/🔴)
+- **Location**: Bottom-right status bar
+- **Actions**: Click to open indexing details
 
 ---
 
@@ -190,6 +320,72 @@ Renderer (untrusted) <--> Preload (bridge) <--> Main (trusted)
 
 ## Data Flow
 
+### Complete Event-Driven Architecture
+
+**Overview:** The Graph Engine integrates with ERFANA through an event-driven architecture where services communicate via an EventEmitter bus.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Event-Driven Flow                            │
+│                                                                   │
+│  User Action          Service Events         Graph Engine        │
+│  ────────────         ──────────────         ────────────        │
+│                                                                   │
+│  Open Project    ──▶  project:changed   ──▶  Discover .md files │
+│                       (EventEmitter)          Queue full index   │
+│                                               Emit: graph:       │
+│                                                 indexing:started │
+│                                                                   │
+│  Save File       ──▶  file:saved        ──▶  Re-index changed   │
+│                       (300ms debounce)        sections only      │
+│                                               Emit: graph:file:  │
+│                                                 indexed          │
+│                                                                   │
+│  Create File     ──▶  file:created      ──▶  Index new file     │
+│                                                                   │
+│  Delete File     ──▶  file:deleted      ──▶  Remove from index  │
+│                                                                   │
+│  Claude Code     ──▶  MCP Tool Call     ──▶  Query graph DB     │
+│  (Terminal)           (stdio)                 Return results     │
+│                                                                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Project Initialization Flow
+
+```
+1. User opens project (File → Open Project)
+   │
+   ▼
+2. EventEmitter emits 'project:changed'
+   │
+   ▼
+3. GraphEngineService receives event
+   │
+   ├─▶ 4a. Discover all .md files recursively
+   │       Exclude: node_modules/, .git/, dist/
+   │       Priority: Currently open files first
+   │
+   ├─▶ 4b. Create/migrate SQLite database
+   │       Path: {projectPath}/.erfana/graph.db
+   │       Schema version check
+   │
+   ├─▶ 4c. Queue indexing jobs (batches of 10 files)
+   │       Emit: graph:indexing:started { total: N }
+   │
+   └─▶ 4d. Process batches in parallel
+           For each batch:
+             - Parse markdown → sections
+             - Compute text_hash
+             - Check if changed (compare hash)
+             - If changed: embed + store
+             - Emit: graph:indexing:progress { current, total }
+
+           When done:
+             - Emit: graph:indexing:complete { indexed: N, skipped: M }
+             - Start MCP server (if Claude Code running)
+```
+
 ### Indexing Flow (File Save)
 
 ```
@@ -199,31 +395,39 @@ Renderer (untrusted) <--> Preload (bridge) <--> Main (trusted)
 2. FileWatcherService detects change (debounced 300ms)
    │
    ▼
-3. GraphEngineService.indexFile(path)
+3. FileWatcherService emits 'file:saved' event
    │
-   ├─▶ 4a. Parse markdown → sections (H1-H6)
-   │       Compute text_hash per section
+   ▼
+4. GraphEngineService.handleFileSaved(event)
    │
-   ├─▶ 4b. Diff against DB (select changed sections)
+   ├─▶ 5a. Parse markdown → sections (H1-H6)
+   │       Compute text_hash per section (SHA-256)
    │
-   ├─▶ 4c. Tokenize + chunk (256-384 tokens, 10-15% overlap)
+   ├─▶ 5b. Diff against DB (SELECT text_hash WHERE file_id = ?)
+   │       Compare hashes to find changed sections
+   │
+   ├─▶ 5c. Tokenize + chunk changed sections only
+   │       (256-384 tokens, 10-15% overlap)
    │       Store in sections table
    │
-   ├─▶ 4d. FTS5 sync via triggers (automatic)
+   ├─▶ 5d. FTS5 sync via triggers (automatic)
    │
-   ├─▶ 4e. Send chunks to EmbedderWorker
+   ├─▶ 5e. Send chunks to EmbedderWorker
    │       │
    │       ▼
    │       Worker: Batch embed (32-128 chunks)
    │       Worker: L2 normalize vectors
    │       Worker: Return embeddings
    │
-   ├─▶ 4f. Insert into embeddings table
-   │       Insert into vss_sections (vector index)
+   ├─▶ 5f. INSERT OR REPLACE into embeddings table
+   │       INSERT OR REPLACE into vss_sections (vector index)
    │
-   └─▶ 4g. [Optional M3+] Extract entities/mentions/edges
-           - LLM-based extraction OR
-           - Rule-based patterns (e.g., [[wikilinks]], #tags)
+   ├─▶ 5g. [Optional M3+] Extract entities/mentions/edges
+   │       - LLM-based extraction OR
+   │       - Rule-based patterns (e.g., [[wikilinks]], #tags)
+   │
+   └─▶ 5h. Emit 'graph:file:indexed' event
+           Renderer updates Related Sidebar (if visible)
 ```
 
 ### Search Flow (Hybrid Retrieval)
@@ -262,6 +466,55 @@ Renderer (untrusted) <--> Preload (bridge) <--> Main (trusted)
 6. Renderer displays results in UI
 ```
 
+### MCP Server Integration Flow (Claude Code)
+
+```
+1. Claude Code starts in Terminal panel
+   │
+   ▼
+2. ERFANA launches MCPServerService (stdio transport)
+   │
+   ▼
+3. MCPServerService registers 5 tools:
+   - erfana_graph_search
+   - erfana_graph_related
+   - erfana_graph_entities
+   - erfana_graph_backlinks
+   - erfana_graph_timeline
+   │
+   ▼
+4. Claude Code queries: "Show me docs about SQLite"
+   │
+   ▼
+5. MCP client calls erfana_graph_search({ query: "SQLite", k: 10 })
+   │
+   ▼
+6. MCPServerService.handleToolCall()
+   │
+   ├─▶ 7a. Check rate limit (100 queries/min for search)
+   │
+   ├─▶ 7b. Call graphEngineService.search({ q: "SQLite", k: 10 })
+   │       (This uses the same hybrid search as UI)
+   │
+   ├─▶ 7c. Format results as MCP response
+   │       {
+   │         results: [
+   │           { title, file, snippet, score, ... },
+   │           ...
+   │         ]
+   │       }
+   │
+   └─▶ 7d. Return to Claude Code via stdio
+           Claude uses results to inform response
+```
+
+**Security & Isolation:**
+- MCP server runs in main process (trusted zone)
+- Read-only access to graph database
+- No file system writes allowed
+- Rate limiting prevents abuse
+- Separate from renderer process (untrusted zone)
+
 ---
 
 ## Key Design Decisions
@@ -293,6 +546,23 @@ Renderer (untrusted) <--> Preload (bridge) <--> Main (trusted)
 ### 7. Single Embedder per Project
 **Why:** Mixing vector spaces causes poor results.
 **Migration:** Re-embed all on model switch (background job with progress).
+
+### 8. Event-Driven Integration with ERFANA
+**Why:** Loose coupling; GraphEngine doesn't need to know about FileWatcherService internals.
+**How:** GraphEngine subscribes to EventEmitter events (`file:saved`, `project:changed`, etc.).
+**Benefits:**
+- Easy to add new event sources (e.g., git commits, external file changes)
+- Graph engine can be disabled/enabled without code changes
+- Clean separation of concerns
+
+### 9. MCP Server for Claude Code Integration
+**Why:** Standardized protocol for AI assistant tooling; future-proof for other MCP clients.
+**How:** MCPServerService exposes GraphEngineService via stdio transport.
+**Benefits:**
+- Claude Code gets project knowledge automatically
+- Same search API used by both UI and MCP (consistency)
+- Rate limiting prevents resource exhaustion
+- Read-only access ensures safety
 
 ---
 
@@ -360,6 +630,9 @@ Renderer (untrusted) <--> Preload (bridge) <--> Main (trusted)
 
 ## Next Steps
 
+- **[User Guide](./user-guide.md)**: Learn what the graph engine does and how to use it
+- **[Data Ingestion](./data-ingestion.md)**: How files are discovered and indexed
+- **[MCP Server](./mcp-server.md)**: Claude Code integration details
 - **[Data Model](./data-model.md)**: Review SQLite schema details
 - **[Vector Search](./vector-search.md)**: Deep dive on sqlite-vec
 - **[Embedding Pipeline](./embedding-pipeline.md)**: ONNX integration details
@@ -370,3 +643,4 @@ Renderer (untrusted) <--> Preload (bridge) <--> Main (trusted)
 - [Main Overview](../graph-engine.md)
 - [Performance & Scalability](./performance.md)
 - [Production Readiness](./production-readiness.md)
+- [Implementation Guide](./implementation-guide.md)

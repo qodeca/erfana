@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 900" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 11px;">
+  <!-- Modal overlay -->
+  <rect x="0" y="0" width="900" height="900" fill="#000" opacity="0.5"/>
+
+  <!-- Container (dark theme modal) -->
+  <rect x="50" y="30" width="800" height="840" fill="#252526" stroke="#0066cc" stroke-width="2" rx="6"/>
+
+  <!-- Header -->
+  <rect x="50" y="30" width="800" height="40" fill="#2d2d30" stroke="#3e3e42" stroke-width="1" rx="6"/>
+  <text x="70" y="55" fill="#ccc" font-weight="bold" font-size="14">Graph Engine Settings</text>
+  <text x="820" y="55" fill="#888" font-size="16">×</text>
+
+  <!-- Section 1: Hybrid Search Weights -->
+  <rect x="70" y="90" width="760" height="185" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <text x="80" y="110" font-weight="bold" font-size="12" fill="#ccc">Hybrid Search Weights:</text>
+
+  <!-- BM25 slider -->
+  <text x="80" y="140" font-size="11" fill="#ccc">BM25 (keyword matching)</text>
+  <text x="80" y="160" font-size="11" fill="#569cd6">α:</text>
+  <rect x="110" y="150" width="300" height="6" fill="#444" stroke="#666" stroke-width="1" rx="3"/>
+  <rect x="230" y="145" width="12" height="16" fill="#0066cc" stroke="#0066cc" stroke-width="1" rx="3"/>
+  <text x="430" y="160" font-size="11" font-weight="bold" fill="#ccc">0.4</text>
+
+  <!-- Vector slider -->
+  <text x="80" y="190" font-size="11" fill="#ccc">Vector (semantic similarity)</text>
+  <text x="80" y="210" font-size="11" fill="#569cd6">β:</text>
+  <rect x="110" y="200" width="300" height="6" fill="#444" stroke="#666" stroke-width="1" rx="3"/>
+  <rect x="290" y="195" width="12" height="16" fill="#0066cc" stroke="#0066cc" stroke-width="1" rx="3"/>
+  <text x="430" y="210" font-size="11" font-weight="bold" fill="#ccc">0.6</text>
+
+  <!-- Graph boost slider -->
+  <text x="80" y="240" font-size="11" fill="#ccc">Graph Boost (centrality)</text>
+  <text x="80" y="260" font-size="11" fill="#569cd6">γ:</text>
+  <rect x="110" y="250" width="300" height="6" fill="#444" stroke="#666" stroke-width="1" rx="3"/>
+  <rect x="140" y="245" width="12" height="16" fill="#0066cc" stroke="#0066cc" stroke-width="1" rx="3"/>
+  <text x="430" y="260" font-size="11" font-weight="bold" fill="#ccc">0.1</text>
+
+  <!-- Reset button -->
+  <rect x="80" y="280" width="130" height="25" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="3"/>
+  <text x="100" y="297" font-size="10" fill="#ccc">[Reset to Defaults]</text>
+
+  <!-- Section 2: Indexing -->
+  <line x1="70" y1="305" x2="830" y2="305" stroke="#3e3e42" stroke-width="1"/>
+  <rect x="70" y="315" width="760" height="150" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <text x="80" y="335" font-weight="bold" font-size="12" fill="#ccc">Indexing:</text>
+
+  <!-- Status -->
+  <circle cx="85" cy="360" r="6" fill="#00ff00"/>
+  <text x="100" y="365" font-size="11" fill="#ccc">Ready (1,247 sections indexed)</text>
+  <text x="80" y="385" font-size="10" fill="#888">Last indexed: 2 minutes ago</text>
+
+  <!-- Re-index button -->
+  <rect x="80" y="400" width="140" height="25" fill="#5a1f1f" stroke="#8b0000" stroke-width="1" rx="3"/>
+  <text x="92" y="417" font-size="10" fill="#ff9999">[Re-index All Files]</text>
+  <text x="230" y="417" font-size="9" fill="#ff9999">⚠️ This may take 5-10 minutes</text>
+
+  <!-- Excluded folders -->
+  <text x="80" y="445" font-size="11" font-weight="bold" fill="#ccc">Excluded Folders:</text>
+  <rect x="80" y="450" width="110" height="20" fill="#2d2d30" stroke="#666" stroke-width="1" rx="2"/>
+  <text x="85" y="464" font-size="9" fill="#ccc">[node_modules/]</text>
+  <rect x="195" y="450" width="50" height="20" fill="#2d2d30" stroke="#666" stroke-width="1" rx="2"/>
+  <text x="200" y="464" font-size="9" fill="#ccc">[.git/]</text>
+  <rect x="250" y="450" width="90" height="20" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="255" y="464" font-size="9" fill="#ccc">[Add Folder...]</text>
+
+  <!-- Section 3: Embedding Model -->
+  <line x1="70" y1="485" x2="830" y2="485" stroke="#3e3e42" stroke-width="1"/>
+  <rect x="70" y="495" width="760" height="165" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <text x="80" y="515" font-weight="bold" font-size="12" fill="#ccc">Embedding Model:</text>
+
+  <!-- Model selector -->
+  <text x="80" y="540" font-size="11" fill="#ccc">Model:</text>
+  <rect x="130" y="525" width="190" height="25" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="138" y="542" font-size="10" fill="#ccc">all-MiniLM-L6-v2 ▼</text>
+  <text x="330" y="542" font-size="10" fill="#888">(384 dims, local)</text>
+  <text x="130" y="560" font-size="9" fill="#666">Options: all-MiniLM-L6-v2, bge-micro-v2, OpenAI (cloud)</text>
+
+  <!-- Quantization checkbox -->
+  <rect x="78" y="575" width="14" height="14" fill="#1e1e1e" stroke="#569cd6" stroke-width="1"/>
+  <text x="98" y="587" font-size="10" fill="#ccc">Enable binary quantization</text>
+  <text x="98" y="603" font-size="9" fill="#888">(reduces memory 75%, slight accuracy loss)</text>
+
+  <!-- Re-embed button -->
+  <rect x="80" y="615" width="110" height="25" fill="#5a1f1f" stroke="#8b0000" stroke-width="1" rx="3"/>
+  <text x="95" y="632" font-size="10" fill="#ff9999">[Re-embed All]</text>
+  <text x="200" y="632" font-size="9" fill="#ff9999">⚠️ Will clear existing embeddings (10-30 min)</text>
+
+  <!-- Section 4: Advanced -->
+  <line x1="70" y1="680" x2="830" y2="680" stroke="#3e3e42" stroke-width="1"/>
+  <rect x="70" y="690" width="760" height="120" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <text x="80" y="710" font-weight="bold" font-size="12" fill="#ccc">Advanced:</text>
+
+  <!-- Chunk size -->
+  <text x="80" y="735" font-size="11" fill="#ccc">Chunk size:</text>
+  <rect x="155" y="722" width="70" height="22" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="170" y="738" font-size="10" fill="#ccc">256 ▼</text>
+  <text x="230" y="735" font-size="11" fill="#ccc">tokens</text>
+
+  <!-- Overlap -->
+  <text x="330" y="735" font-size="11" fill="#ccc">Overlap:</text>
+  <rect x="395" y="722" width="60" height="22" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="410" y="738" font-size="10" fill="#ccc">10 ▼</text>
+  <text x="460" y="735" font-size="11" fill="#ccc">%</text>
+
+  <!-- Batch size -->
+  <text x="80" y="770" font-size="11" fill="#ccc">Batch size:</text>
+  <rect x="155" y="757" width="70" height="22" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="175" y="773" font-size="10" fill="#ccc">32 ▼</text>
+  <text x="230" y="770" font-size="11" fill="#ccc">chunks</text>
+
+  <!-- Diagnostics buttons -->
+  <rect x="80" y="785" width="130" height="20" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="95" y="799" font-size="9" fill="#ccc">[View Diagnostics]</text>
+  <rect x="220" y="785" width="100" height="20" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="235" y="799" font-size="9" fill="#ccc">[Export Logs]</text>
+
+  <!-- Bottom buttons -->
+  <line x1="70" y1="820" x2="830" y2="820" stroke="#3e3e42" stroke-width="1"/>
+  <rect x="70" y="825" width="760" height="35" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <rect x="680" y="833" width="70" height="24" fill="#0066cc" stroke="#0066cc" stroke-width="1" rx="3"/>
+  <text x="700" y="849" fill="white" font-weight="bold">[Apply]</text>
+  <rect x="760" y="833" width="60" height="24" fill="#2d2d30" stroke="#666" stroke-width="1" rx="3"/>
+  <text x="775" y="849" fill="#ccc" font-weight="bold">[Cancel]</text>
+
+  <text x="75" y="850" font-size="9" fill="#666">Esc to close</text>
+</svg>

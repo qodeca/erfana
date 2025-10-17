@@ -1,5 +1,12 @@
 # Implementation Guide
 
+> ⚠️ **WORK IN PROGRESS - NOT READY FOR DEVELOPMENT**
+>
+> This documentation is currently under active development and review. The Graph Engine specification, architecture, and implementation details are subject to significant changes. **DO NOT start implementation work based on these documents.**
+>
+> **Status**: Draft specification being refined
+> **Expected Ready**: TBD pending architectural review and wireframe finalization
+
 **Last Updated:** October 2025
 
 This document provides a step-by-step implementation roadmap for the Erfana Graph Engine, organized into 5 milestones (M1-M5).
@@ -46,9 +53,19 @@ Build features incrementally, shipping working functionality at each milestone:
 
 ## Milestone 1: Foundation (FTS5 + Keyword Search)
 
-**Goal:** Ship working keyword search with "Related Sidebar" UI.
+**Goal:** Ship working keyword search with complete UI components and MCP server for Claude Code.
 
-**Duration:** 2-3 weeks
+**Duration:** 3-4 weeks
+
+### Overview
+
+M1 delivers:
+- **Related Sidebar**: Auto-updating research assistant
+- **Global Search**: Project-wide keyword search (replaces grep)
+- **Settings Panel**: Configure indexing and search
+- **Status Indicator**: Show indexing progress
+- **MCP Server**: Expose graph engine to Claude Code (Terminal)
+- **Event-Driven Integration**: Subscribe to FileWatcherService events
 
 ### Tasks
 
@@ -100,8 +117,12 @@ Build features incrementally, shipping working functionality at each milestone:
 
 **Test:**
 ```typescript
-const text = TextPreprocessor.normalize('## Heading\n\nThis is **bold**.');
-assert.equal(text, 'Heading\n\nThis is bold.');
+const text = TextPreprocessor.normalize('## Heading
+
+This is **bold**.');
+assert.equal(text, 'Heading
+
+This is bold.');
 ```
 
 #### 1.3 File Indexing Pipeline
@@ -293,14 +314,324 @@ export function RelatedSidebar() {
 }
 ```
 
+#### 1.7 Global Search UI
+
+**File:** `src/renderer/src/components/Panels/GlobalSearch.tsx`
+
+**Implementation:**
+
+```tsx
+export function GlobalSearch() {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const handleSearch = async () => {
+    if (!query.trim()) return;
+
+    setLoading(true);
+    try {
+      const data = await window.api.graph.search({ q: query, k: 50 });
+      setResults(data.results);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="global-search">
+      <input
+        type="text"
+        placeholder="Search project (e.g., 'SQLite performance')..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+      />
+      <button onClick={handleSearch}>Search</button>
+
+      {loading && <div>Searching...</div>}
+      {results.map(r => (
+        <div key={r.section_id} className="result">
+          <div className="result-header">
+            <span className="path">{r.path}</span>
+            <span className="score">Score: {r.score.toFixed(2)}</span>
+          </div>
+          <h4>{r.heading}</h4>
+          <p>{r.text.slice(0, 200)}...</p>
+          <button onClick={() => openFile(r.path, r.section_id)}>
+            Open
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+**Features:**
+- Natural language queries (e.g., "how to optimize search")
+- Filters: folder, file type, date range (M2+)
+- "Why this result?" breakdown (M2+)
+
+#### 1.8 Settings Panel UI
+
+**File:** `src/renderer/src/components/GraphSettings/SettingsPanel.tsx`
+
+**Implementation:**
+
+```tsx
+export function GraphSettingsPanel() {
+  const [indexing, setIndexing] = useState(false);
+
+  const handleReindex = async () => {
+    setIndexing(true);
+    try {
+      await window.api.graph.reindexAll();
+    } finally {
+      setIndexing(false);
+    }
+  };
+
+  return (
+    <div className="graph-settings">
+      <h3>Graph Engine Settings</h3>
+
+      <section>
+        <h4>Indexing</h4>
+        <button onClick={handleReindex} disabled={indexing}>
+          {indexing ? 'Reindexing...' : 'Reindex All Files'}
+        </button>
+        <p className="help-text">
+          Re-scan and index all markdown files in the project.
+        </p>
+      </section>
+
+      {/* M2: Add hybrid weights sliders */}
+      {/* M3: Add entity extraction toggle */}
+    </div>
+  );
+}
+```
+
+#### 1.9 Status Indicator UI
+
+**File:** `src/renderer/src/components/StatusBar/GraphStatus.tsx`
+
+**Implementation:**
+
+```tsx
+export function GraphStatusIndicator() {
+  const [status, setStatus] = useState<IndexingStatus | null>(null);
+
+  useEffect(() => {
+    // Subscribe to indexing progress events
+    window.api.graph.onIndexingProgress((progress) => {
+      setStatus(progress);
+    });
+  }, []);
+
+  if (!status) return null;
+
+  return (
+    <div className="graph-status">
+      {status.indexing ? (
+        <>
+          <div className="spinner" />
+          <span>Indexing: {status.current}/{status.total}</span>
+        </>
+      ) : (
+        <>
+          <span className="status-dot green" />
+          <span>Graph Ready</span>
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+**Events to handle:**
+- `graph:indexing:started` → Show spinner
+- `graph:indexing:progress` → Update count
+- `graph:indexing:complete` → Show green dot
+
+#### 1.10 Event-Driven Integration
+
+**File:** `src/main/services/GraphEngineService.ts`
+
+**Implementation:**
+
+```typescript
+export class GraphEngineService {
+  constructor(
+    private db: GraphDatabaseService,
+    private indexingService: IndexingService,
+    private eventBus: EventEmitter
+  ) {
+    // Subscribe to FileWatcherService events
+    this.eventBus.on('file:saved', this.handleFileSaved.bind(this));
+    this.eventBus.on('file:created', this.handleFileCreated.bind(this));
+    this.eventBus.on('file:deleted', this.handleFileDeleted.bind(this));
+    this.eventBus.on('project:changed', this.handleProjectChanged.bind(this));
+  }
+
+  private async handleFileSaved(event: { path: string }): Promise<void> {
+    if (!this.isMarkdownFile(event.path)) return;
+
+    console.log(`[GraphEngine] Re-indexing: ${event.path}`);
+    await this.indexingService.indexFile(event.path);
+    this.eventBus.emit('graph:file:indexed', { path: event.path });
+  }
+
+  private async handleFileCreated(event: { path: string }): Promise<void> {
+    if (!this.isMarkdownFile(event.path)) return;
+
+    console.log(`[GraphEngine] Indexing new file: ${event.path}`);
+    await this.indexingService.indexFile(event.path);
+  }
+
+  private async handleFileDeleted(event: { path: string }): Promise<void> {
+    console.log(`[GraphEngine] Removing from index: ${event.path}`);
+    await this.db.deleteFileByPath(event.path);
+  }
+
+  private async handleProjectChanged(event: { newPath: string | null }): Promise<void> {
+    if (!event.newPath) return;
+
+    console.log(`[GraphEngine] Indexing project: ${event.newPath}`);
+    await this.discoverAndIndexAllFiles(event.newPath);
+  }
+
+  private async discoverAndIndexAllFiles(projectPath: string): Promise<void> {
+    // Discover all .md files
+    const files = await this.discoverMarkdownFiles(projectPath);
+
+    this.eventBus.emit('graph:indexing:started', { total: files.length });
+
+    // Index in batches
+    for (let i = 0; i < files.length; i += 10) {
+      const batch = files.slice(i, i + 10);
+      await Promise.all(batch.map(f => this.indexingService.indexFile(f)));
+
+      this.eventBus.emit('graph:indexing:progress', {
+        current: Math.min(i + 10, files.length),
+        total: files.length
+      });
+    }
+
+    this.eventBus.emit('graph:indexing:complete', {
+      indexed: files.length,
+      skipped: 0
+    });
+  }
+
+  private isMarkdownFile(path: string): boolean {
+    return path.endsWith('.md');
+  }
+}
+```
+
+#### 1.11 MCP Server Integration
+
+**File:** `src/main/services/MCPServerService.ts`
+
+**Implementation:**
+
+```typescript
+import { MCPServer } from '@modelcontextprotocol/sdk/server';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio';
+
+export class MCPServerService {
+  private server: MCPServer;
+
+  constructor(private graphEngine: GraphEngineService) {
+    this.server = new MCPServer({
+      name: 'erfana-graph-engine',
+      version: '1.0.0'
+    });
+
+    this.registerTools();
+  }
+
+  private registerTools(): void {
+    // Tool 1: Hybrid search
+    this.server.addTool({
+      name: 'erfana_graph_search',
+      description: 'Hybrid BM25 + vector search across project documentation',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Search query' },
+          k: { type: 'number', description: 'Number of results', default: 10 }
+        },
+        required: ['query']
+      }
+    }, async (params) => {
+      const results = await this.graphEngine.search({
+        q: params.query,
+        k: params.k || 10
+      });
+      return { results };
+    });
+
+    // Additional tools in M2+
+  }
+
+  async start(): Promise<void> {
+    const transport = new StdioServerTransport();
+    await this.server.connect(transport);
+    console.log('[MCP] Graph Engine MCP server started on stdio');
+  }
+
+  async stop(): Promise<void> {
+    await this.server.close();
+  }
+}
+```
+
+**Start MCP Server on app launch:**
+
+```typescript
+// In main process initialization
+const eventBus = new EventEmitter();
+const graphEngine = new GraphEngineService(db, indexingService, eventBus);
+const mcpServer = new MCPServerService(graphEngine);
+
+app.on('ready', async () => {
+  await mcpServer.start();
+});
+
+app.on('quit', async () => {
+  await mcpServer.stop();
+});
+```
+
 ### M1 Completion Checklist
 
+**Core Functionality:**
 - [ ] SQLite database initialized with schema
 - [ ] Text preprocessing pipeline working
 - [ ] File indexing pipeline working (on save)
 - [ ] BM25 search returns relevant results
-- [ ] Related Sidebar displays top-10 results
-- [ ] Manual test: Edit file → save → see updated results
+
+**UI Components:**
+- [ ] Related Sidebar displays top-10 results (auto-updates)
+- [ ] Global Search UI with project-wide search
+- [ ] Settings Panel with reindex button
+- [ ] Status Indicator shows indexing progress
+
+**Integration:**
+- [ ] Event-driven integration: GraphEngine subscribes to FileWatcherService events
+- [ ] `file:saved` → re-index file
+- [ ] `project:changed` → discover and index all .md files
+- [ ] MCP Server started on app launch
+- [ ] `erfana_graph_search` tool accessible from Claude Code
+
+**Manual Tests:**
+- [ ] Edit file → save → see Related Sidebar update
+- [ ] Global Search: query "SQLite" → see results
+- [ ] Open project → see status indicator show indexing progress
+- [ ] Claude Code in Terminal: use `erfana_graph_search` tool → get results
 
 ---
 
@@ -440,6 +771,54 @@ async vectorSearch(queryVector: Float32Array, k: number): Promise<VectorResult[]
 - Real-time preview (show top-10 with current weights)
 - Reset to defaults button
 
+#### 2.10 MCP Server Updates
+
+**Update:** `src/main/services/MCPServerService.ts`
+
+**Add new MCP tool:**
+
+```typescript
+// Tool 2: Find related sections
+this.server.addTool({
+  name: 'erfana_graph_related',
+  description: 'Find sections related to a specific section',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      sectionId: { type: 'number', description: 'Section ID' },
+      k: { type: 'number', description: 'Number of results', default: 10 }
+    },
+    required: ['sectionId']
+  }
+}, async (params) => {
+  const results = await this.graphEngine.getRelated({
+    sectionId: params.sectionId,
+    k: params.k || 10
+  });
+  return { results };
+});
+```
+
+**Status Indicator Update:**
+
+Add MCP server status to status indicator:
+
+```tsx
+<div className="mcp-status">
+  {mcpServerRunning ? (
+    <>
+      <span className="status-dot green" />
+      <span>MCP Server</span>
+    </>
+  ) : (
+    <>
+      <span className="status-dot red" />
+      <span>MCP Offline</span>
+    </>
+  )}
+</div>
+```
+
 ### M2 Completion Checklist
 
 - [ ] sqlite-vec loaded successfully
@@ -560,14 +939,74 @@ export class GraphService {
 - Click entity → show backlinks
 - "Impact analysis" button (shows dependents)
 
+#### 3.7 MCP Server Updates
+
+**Update:** `src/main/services/MCPServerService.ts`
+
+**Add 2 new MCP tools:**
+
+```typescript
+// Tool 3: List entities
+this.server.addTool({
+  name: 'erfana_graph_entities',
+  description: 'List entities (with optional filters)',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Filter by name' },
+      type: { type: 'string', description: 'Filter by type (e.g., technology, person)' },
+      limit: { type: 'number', description: 'Max results', default: 50 }
+    }
+  }
+}, async (params) => {
+  const results = await this.graphEngine.getEntities({
+    query: params.query,
+    type: params.type,
+    limit: params.limit || 50
+  });
+  return { results };
+});
+
+// Tool 4: Get backlinks
+this.server.addTool({
+  name: 'erfana_graph_backlinks',
+  description: 'Get backlinks for an entity',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      entityName: { type: 'string', description: 'Entity name (e.g., "SQLite")' },
+      limit: { type: 'number', description: 'Max results', default: 50 }
+    },
+    required: ['entityName']
+  }
+}, async (params) => {
+  const results = await this.graphEngine.getBacklinks({
+    entityName: params.entityName,
+    limit: params.limit || 50
+  });
+  return { results };
+});
+```
+
 ### M3 Completion Checklist
 
+**Core Functionality:**
 - [ ] Entity extraction working (wikilinks, tags, mentions)
 - [ ] Entities and mentions stored in DB
 - [ ] Backlinks API returns correct results
+
+**UI Components:**
 - [ ] Knowledge Panel shows entities
 - [ ] Click entity → backlinks populate
-- [ ] Manual test: Add `[[SQLite]]` → see backlinks
+
+**MCP Server:**
+- [ ] `erfana_graph_entities` tool accessible from Claude Code
+- [ ] `erfana_graph_backlinks` tool accessible from Claude Code
+
+**Manual Tests:**
+- [ ] Add `[[SQLite]]` → see backlinks in Knowledge Panel
+- [ ] Claude Code: `erfana_graph_entities({ type: 'technology' })` → get entities
+- [ ] Claude Code: `erfana_graph_backlinks({ entityName: 'SQLite' })` → get backlinks
 
 ---
 
@@ -636,12 +1075,58 @@ getEdgesAsOf(asOf: number): Edge[] {
 - Show change events (edges added/closed)
 - Re-run search with `asOf` filter
 
+#### 4.5 MCP Server Updates
+
+**Update:** `src/main/services/MCPServerService.ts`
+
+**Add final MCP tool:**
+
+```typescript
+// Tool 5: Timeline queries
+this.server.addTool({
+  name: 'erfana_graph_timeline',
+  description: 'Get temporal timeline for entity or file',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      entityId: { type: 'number', description: 'Entity ID (optional)' },
+      fileId: { type: 'number', description: 'File ID (optional)' },
+      asOf: { type: 'number', description: 'Unix timestamp for "as-of" query (optional)' }
+    }
+  }
+}, async (params) => {
+  const results = await this.graphEngine.getTimeline({
+    entityId: params.entityId,
+    fileId: params.fileId,
+    asOf: params.asOf
+  });
+  return { results };
+});
+```
+
+**All 5 MCP Tools Now Available:**
+1. `erfana_graph_search` - Hybrid search (M1)
+2. `erfana_graph_related` - Related sections (M2)
+3. `erfana_graph_entities` - List entities (M3)
+4. `erfana_graph_backlinks` - Entity backlinks (M3)
+5. `erfana_graph_timeline` - Temporal queries (M4)
+
 ### M4 Completion Checklist
 
+**Core Functionality:**
 - [ ] Edges have valid_from/valid_to/tx_time
 - [ ] As-of queries work
+
+**UI Components:**
 - [ ] Timeline slider functional
-- [ ] Manual test: Create edge → close edge → query past date → see old edge
+
+**MCP Server:**
+- [ ] `erfana_graph_timeline` tool accessible from Claude Code
+- [ ] All 5 MCP tools tested and working
+
+**Manual Tests:**
+- [ ] Create edge → close edge → query past date → see old edge
+- [ ] Claude Code: `erfana_graph_timeline({ entityId: 5, asOf: Date.parse('2024-03-01') })` → get timeline
 
 ---
 
@@ -663,9 +1148,11 @@ getEdgesAsOf(asOf: number): Edge[] {
 generateMermaidGraph(entityName: string, hops: number = 2): string {
   const neighbors = this.getNeighborhood(entityName, hops);
 
-  let mermaid = 'graph TD\n';
+  let mermaid = 'graph TD
+';
   for (const edge of neighbors) {
-    mermaid += `  ${edge.src}[${edge.srcName}] -->|${edge.type}| ${edge.dst}[${edge.dstName}]\n`;
+    mermaid += `  ${edge.src}[${edge.srcName}] -->|${edge.type}| ${edge.dst}[${edge.dstName}]
+`;
   }
 
   return mermaid;
@@ -679,7 +1166,9 @@ const insertGraph = () => {
   const mermaid = await window.api.graph.generateMermaid('SQLite', 2);
   monaco.editor.executeEdits('insert-graph', [{
     range: currentSelection,
-    text: `\`\`\`mermaid\n${mermaid}\n\`\`\``
+    text: `\`\`\`mermaid
+${mermaid}
+\`\`\``
   }]);
 };
 ```
@@ -749,6 +1238,7 @@ export class HealthCheckService {
 src/main/
 ├── services/
 │   ├── GraphDatabaseService.ts      # SQLite wrapper
+│   ├── GraphEngineService.ts        # Main orchestrator + event subscriber
 │   ├── IndexingService.ts           # File → sections pipeline
 │   ├── TextPreprocessor.ts          # Markdown → normalized text
 │   ├── SearchService.ts             # BM25 + vector + hybrid
@@ -757,7 +1247,8 @@ src/main/
 │   ├── EntityExtractor.ts           # Rule-based entity extraction
 │   ├── EntityService.ts             # Entity CRUD
 │   ├── EdgeService.ts               # Edge CRUD (temporal)
-│   └── GraphService.ts              # Backlinks, impact, as-of queries
+│   ├── GraphService.ts              # Backlinks, impact, as-of queries
+│   └── MCPServerService.ts          # MCP server for Claude Code (M1+)
 ├── workers/
 │   └── embedder.worker.ts           # ONNX embedding worker
 ├── db/
@@ -768,15 +1259,25 @@ src/main/
 src/renderer/src/
 ├── components/
 │   ├── Panels/
-│   │   ├── RelatedSidebar.tsx
-│   │   └── GraphPanel.tsx
+│   │   ├── RelatedSidebar.tsx       # Research assistant (M1)
+│   │   ├── GlobalSearch.tsx         # Project-wide search (M1)
+│   │   └── GraphPanel.tsx           # Entity backlinks (M3)
 │   ├── GraphSettings/
-│   │   └── WeightTuner.tsx
+│   │   ├── SettingsPanel.tsx        # Reindex button (M1)
+│   │   └── WeightTuner.tsx          # Hybrid weights (M2)
+│   ├── StatusBar/
+│   │   └── GraphStatus.tsx          # Indexing progress (M1)
 │   └── Timeline/
-│       └── TimelineSlider.tsx
+│       └── TimelineSlider.tsx       # Temporal queries (M4)
 └── stores/
     └── useGraphStore.ts             # Zustand store for settings
 ```
+
+**Key Integration Points:**
+- `GraphEngineService` subscribes to FileWatcherService events via EventEmitter
+- `MCPServerService` exposes GraphEngineService data to Claude Code (stdio transport)
+- All UI components call `window.api.graph.*` IPC methods
+- Status indicator listens to `graph:indexing:*` events for real-time updates
 
 ---
 
@@ -794,9 +1295,13 @@ src/renderer/src/
 ```typescript
 describe('TextPreprocessor', () => {
   it('should strip markdown syntax', () => {
-    const input = '## Heading\n\nThis is **bold**.';
+    const input = '## Heading
+
+This is **bold**.';
     const output = TextPreprocessor.normalize(input);
-    expect(output).toBe('Heading\n\nThis is bold.');
+    expect(output).toBe('Heading
+
+This is bold.');
   });
 });
 ```
@@ -862,6 +1367,9 @@ describe('Indexing Pipeline', () => {
 ---
 
 **Related:**
+- [User Guide](./user-guide.md) - Learn what the graph engine does and how to use it
+- [Data Ingestion](./data-ingestion.md) - How files are discovered and indexed
+- [MCP Server](./mcp-server.md) - Claude Code integration details
 - [Architecture](./architecture.md) - System design overview
 - [Data Model](./data-model.md) - Schema reference
 - [Packaging](./packaging.md) - Electron build configuration
