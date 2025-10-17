@@ -828,6 +828,15 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       <div className="project-tree-path">
         <span className="project-name">
           {projectPath ? projectPath.split('/').pop() : 'No project open'}
+          {projectPath && (
+            <span
+              className="watch-depth"
+              title={`Directory watcher depth${watchDepth === null ? ' (Unlimited)' : ''}`}
+            >
+              {' '}
+              · Depth: {watchDepth === null ? 'Unlimited' : watchDepth}
+            </span>
+          )}
         </span>
         <div className="project-tree-actions">
           <button
@@ -1006,7 +1015,19 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
             </div>
           </div>
           <div className="control-panel-section">
-            <div className="control-panel-label">Watching</div>
+            <div className="control-panel-label">
+              Watching
+              {' '}
+              <a
+                href="https://github.com/qodeca/erfana/blob/main/docs/file-watching.md#watcher-debugging"
+                target="_blank"
+                rel="noreferrer"
+                title="Open docs: File Watching and Watcher Debugging"
+                style={{ fontSize: 11, color: '#89b4fa', textDecoration: 'none', marginLeft: 6 }}
+              >
+                docs
+              </a>
+            </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <label htmlFor="watch-depth" style={{ fontSize: 12, color: '#bbb' }}>Depth</label>
               <select id="watch-depth" value={watchDepth === null ? 'unlimited' : String(watchDepth)} onChange={handleWatchDepthChange} style={{ fontSize: 12 }}>
