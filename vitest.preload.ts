@@ -11,6 +11,21 @@ export default defineConfig({
     setupFiles: ['tests/setup/setupTests.preload.ts'],
     reporters: 'default',
   },
+  coverage: {
+    provider: 'v8',
+    reporter: ['text', 'lcov', 'html'],
+    reportsDirectory: 'coverage/preload',
+    thresholds: { lines: 10, functions: 10, branches: 5, statements: 10 },
+    exclude: [
+      'node_modules/**',
+      'out/**',
+      'dist/**',
+      '**/*.test.*',
+      '**/__tests__/**',
+      'vitest.*.ts',
+      'electron.vite.config.ts'
+    ],
+  },
   resolve: {
     alias: {
       '@preload': path.resolve(__dirname, 'src/preload'),
@@ -18,4 +33,3 @@ export default defineConfig({
     },
   },
 })
-

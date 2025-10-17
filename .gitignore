@@ -29,3 +29,4 @@ release/
 
 # Temporary files
 temp/
+coverage/
