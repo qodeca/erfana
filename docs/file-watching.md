@@ -339,6 +339,49 @@ git checkout feature-branch
 # - Console log: "📁 Directory changed, refreshing project tree... (X events)"
 ```
 
+---
+
+## Watcher Debugging
+
+Quick, low-noise checks to verify watcher health and boundaries.
+
+### From Renderer DevTools Console
+
+Stats snapshots:
+
+```ts
+// Directory watcher stats (total watched dirs, pending events per dir)
+await window.api.directoryWatch.getStats()
+
+// File watcher stats (total watched files)
+await window.api.fileWatch.getStats()
+
+// Current project path boundary
+await window.api.file.getProjectPath()
+```
+
+Session reset (drops stale events):
+
+```ts
+// Stop all directory/file watchers for this window (safe; re-created on demand)
+await window.api.directoryWatch.stopAll()
+await window.api.fileWatch.stopAll()
+```
+
+Pause/resume around internal CRUD (if scripting flows):
+
+```ts
+await window.api.directoryWatch.pause(<projectPath>)
+// ... perform file ops via window.api.file.*
+await window.api.directoryWatch.resume(<projectPath>)
+```
+
+### Expected Behaviors
+
+- Bulk changes (e.g., git checkout) aggregate to a single `directory-watch:changed` after ~1s idle.
+- Deleting the project folder emits `directory-watch:project-deleted` and clears internal watchers.
+- After project switching, late events from previous sessions are dropped (guarded by session token).
+
 **Test 8: Internal CRUD (no double refresh)**
 ```typescript
 // 1. Enable debug logging in ProjectTree.tsx
