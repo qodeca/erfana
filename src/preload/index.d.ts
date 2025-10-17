@@ -53,6 +53,8 @@ declare global {
       settings: {
         getProjectFilterMode: () => Promise<{ success: boolean; mode?: string; error?: string }>
         setProjectFilterMode: (mode: string) => Promise<{ success: boolean; error?: string }>
+        getDirectoryWatchDepth: () => Promise<{ success: boolean; depth?: number; error?: string }>
+        setDirectoryWatchDepth: (depth: number | null) => Promise<{ success: boolean; error?: string }>
       }
       terminal: {
         isAvailable: () => Promise<{ success: boolean; available: boolean }>

@@ -14,11 +14,13 @@ type NodePtyModule = typeof import('node-pty')
 let pty: NodePtyModule | null = null
 // Test override: allow injecting a mock pty module for unit tests
 try {
-  const injected = (globalThis as any).__ERFANA_TEST_PTY__
+  const injected = (globalThis as unknown as { __ERFANA_TEST_PTY__?: NodePtyModule }).__ERFANA_TEST_PTY__
   if (injected) {
     pty = injected as NodePtyModule
   }
-} catch {}
+} catch {
+  // No test override available
+}
 // Kick off loading in background
 void import('node-pty')
   .then((mod) => {
@@ -177,44 +179,56 @@ export class TerminalService extends EventEmitter {
     if (platform === 'win32') {
       const isPwsh = shell.toLowerCase().includes('powershell')
       if (isPwsh) {
-        // PowerShell
-        cmd = `Set-Location -Path \"${target.replace(/`/g, '``').replace(/"/g, '\"')}\"\r\nWrite-Output (Get-Location).Path\r\nWrite-Output ${marker}\r\n`
+        // PowerShell: escape backticks and quotes using PowerShell conventions
+        const pwshPath = target.replace(/`/g, '``').replace(/"/g, '`"')
+        cmd = [
+          `Set-Location -Path "${pwshPath}"`,
+          'Write-Output (Get-Location).Path',
+          `Write-Output ${marker}`
+        ].join('\r\n')
       } else {
-        // cmd.exe
-        cmd = `cd /d \"${target.replace(/"/g, '"')}\"\r\ncd\r\necho ${marker}\r\n`
+        // cmd.exe: wrap in double quotes
+        cmd = [
+          `cd /d "${target}"`,
+          'cd',
+          `echo ${marker}`
+        ].join('\r\n')
       }
     } else {
       // POSIX shells
-      const escaped = target.replace(/"/g, '\\"')
-      cmd = `cd \"${escaped}\"\nprintf \"%s\\n\" \"$(pwd)\"\necho ${marker}\n`
+      cmd = [
+        `cd "${target}"`,
+        'printf "%s\\n" "$(pwd)"',
+        `echo ${marker}`
+      ].join('\n')
     }
 
     let buffer = ''
+    let done = false
     const onData = (data: string) => {
+      if (done) return
       buffer += data
       if (buffer.includes(marker)) {
+        done = true
         // try to parse last path before marker
         const lines = buffer.split(/\r?\n/).filter(Boolean)
         const idx = lines.findIndex((l) => l.includes(marker))
         if (idx > 0) {
           const detected = lines[idx - 1].trim()
           if (detected) {
-            // Update cached cwd
             const t = this.terminals.get(terminal.id)
             if (t) t.cwd = detected
           }
         }
-        // Remove listener once done
-        terminal.ptyProcess.off?.('data', onData as any)
       }
     }
 
-    // Add temporary listener in addition to the public forwarder
-    terminal.ptyProcess.on('data', onData as any)
+    // Add a secondary onData handler (node-pty supports multiple onData subscribers)
+    terminal.ptyProcess.onData(onData)
     // Issue commands
     try {
       terminal.ptyProcess.write(cmd)
-    } catch (e) {
+    } catch {
       // Ignore if write fails; verification is best-effort
     }
   }

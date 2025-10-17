@@ -7,6 +7,7 @@ export interface FileNode {
   type: 'file' | 'directory'
   children?: FileNode[]
   extension?: string
+  isSymlink?: boolean
 }
 
 export class FileService {
@@ -38,7 +39,7 @@ export class FileService {
       }
       // Flag symlinks for UI indication/security awareness
       if (entry.isSymbolicLink()) {
-        ;(node as any).isSymlink = true
+        node.isSymlink = true
       }
 
       if (node.type === 'file') {

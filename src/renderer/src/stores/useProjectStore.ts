@@ -47,7 +47,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
     // Fallback: attempt to close any remaining editor panels not tracked
     try {
-      const anyApi = api as unknown as { getPanels?: () => any[]; removePanel?: (pid: string) => void }
+      const anyApi = api as unknown as {
+        getPanels?: () => Array<{ id?: string; api?: { close?: () => void } }>
+        removePanel?: (pid: string) => void
+      }
       const panels = typeof anyApi.getPanels === 'function' ? anyApi.getPanels() : []
       for (const p of panels) {
         // Prefer not to touch welcome placeholder

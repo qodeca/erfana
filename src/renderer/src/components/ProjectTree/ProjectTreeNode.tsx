@@ -94,7 +94,7 @@ export function ProjectTreeNode({
   const isSelected = node.type === 'directory' && node.path === selectedFolder
   const isSensitive = node.type === 'file' && isSensitiveFile(node.name)
   const isHidden = node.name.startsWith('.')
-  const isSymlink = (node as any).isSymlink === true
+  const isSymlink = node.isSymlink === true
 
   const renderIcon = () => {
     if (node.type === 'directory') {
