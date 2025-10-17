@@ -67,7 +67,7 @@ See `docs/` for details (keep Claude’s context focused):
 - Fixed EPIPE errors during shutdown
 - Watchers: recoverable ENOENT (stopAll) + session token guards to drop stale events
 - Terminal: explicit cwd verification post-spawn (cd + pwd marker)
- - Watcher depth control in Project panel (Unlimited or 1–5)
+ - Watcher depth setting (config-only; not exposed in UI)
  - Symlink indicators in Project Tree (watchers do not follow symlinks)
 
 ## Working Areas

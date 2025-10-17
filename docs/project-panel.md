@@ -91,15 +91,10 @@ Two mutually exclusive radio buttons:
 
 See: [IPC Patterns](./ipc-patterns.md) for filter persistence channels
 
-### Watching Controls
+### Watching
 
-Controls for the directory watcher:
-
-- Depth selector: Unlimited (default) or 1–5
-  - Persists via settings and restarts the watcher to apply
-  - Helps reduce load in very large projects
-- Symlink indicator: small chain icon on symlink entries in the tree
-- Docs: quick link to File Watching → Watcher Debugging
+- Symlink indicator: small chain icon on symlink entries in the tree (watchers do not follow symlinks)
+- Depth: configuration exists via settings (`directoryWatchDepth`), not exposed in UI
 
 ## Unsaved Changes Prompt
 
