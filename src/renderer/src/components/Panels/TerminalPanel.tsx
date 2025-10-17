@@ -14,7 +14,6 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import '@xterm/xterm/css/xterm.css'
-import { showGlobalToast } from '../Toast/toastService'
 import './TerminalPanel.css'
 
 export function TerminalPanel(_props: ISplitviewPanelProps) {
@@ -202,9 +201,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // Wait briefly then initialize new terminal in new CWD (if a project is open)
       if (data.newPath) {
         setTimeout(() => {
-          void initializeTerminal().then(() => {
-            showGlobalToast({ type: 'info', title: 'Terminal Restarted', message: data.newPath! })
-          })
+          void initializeTerminal()
         }, 100)
       }
     })

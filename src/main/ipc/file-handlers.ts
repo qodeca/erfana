@@ -47,14 +47,14 @@ export function registerFileHandlers(): void {
     const newProjectPath = result.filePaths[0]
     const oldProjectPath = fileService.getProjectPath()
 
-    // If same path (canonical comparison), just return
+    // If same path (canonical comparison), just return null (no-op)
     if (oldProjectPath) {
       const [canonOld, canonNew] = await Promise.all([
         canonicalizePath(oldProjectPath),
         canonicalizePath(newProjectPath)
       ])
       if (canonOld === canonNew) {
-        return newProjectPath
+        return null
       }
     }
 
