@@ -222,9 +222,11 @@ try {
 ## Project Switching & Safety
 
 ### Recent Activity Detection
-- Tracks terminal output to detect activity in the last N seconds
-- On project open/close, if recent activity is detected, a confirmation dialog appears
-- On confirm, the app sends Ctrl+C to the terminal and waits briefly before switching
+- Tracks activity per-terminal on both output and user input
+- Ignores shell warm-up noise for ~500ms after spawn
+- Uses a default 20s window to consider an active session "busy"
+- On project open/close, if busy, a confirmation dialog appears
+- On confirm, the app sends Ctrl+C, waits briefly, and proceeds; clears activity if quiet
 
 ### Deferred Initialization
 - Terminal initialization is deferred when the panel is hidden to avoid xterm sizing issues
@@ -232,6 +234,16 @@ try {
 
 ### CWD Verification (Planned)
 - After spawn, send an explicit `cd "<projectRoot>"` and `pwd` to verify cwd on shells that override working directory
+
+## Unavailable Terminal (node-pty)
+
+When `node-pty` is unavailable (not built or failed to load):
+
+- Terminal panel shows a clear "Terminal Not Available" message
+- Actions:
+  - Recheck (debounced) — attempts a quick availability check
+  - Copy Fix Command — copies `npm rebuild node-pty --build-from-source`
+
 ```
 
 ## Integration Points

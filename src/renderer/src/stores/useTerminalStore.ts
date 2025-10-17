@@ -3,19 +3,25 @@ import { create } from 'zustand'
 interface TerminalStore {
   // Active terminal ID (null if no terminal is active)
   activeTerminalId: string | null
-  lastActivityAt: number | null
+  activityById: Map<string, number>
+  userInputById: Map<string, number>
 
   // Actions
   setActiveTerminalId: (id: string | null) => void
   getActiveTerminalId: () => string | null
-  setLastActivityNow: () => void
+  markActivity: (id: string) => void
+  clearActivity: (id: string) => void
   isRecentlyActive: (windowMs?: number) => boolean
+  isRecentlyActiveId: (id: string, windowMs?: number) => boolean
+  markUserInput: (id: string) => void
+  hasUserInteracted: () => boolean
   sendToTerminal: (text: string, autoExecute?: boolean) => Promise<boolean>
 }
 
 export const useTerminalStore = create<TerminalStore>((set, get) => ({
   activeTerminalId: null,
-  lastActivityAt: null,
+  activityById: new Map<string, number>(),
+  userInputById: new Map<string, number>(),
 
   setActiveTerminalId: (id) => {
     console.log(`📝 Terminal store: Setting active terminal ID to ${id}`)
@@ -26,14 +32,42 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     return get().activeTerminalId
   },
 
-  setLastActivityNow: () => {
-    set({ lastActivityAt: Date.now() })
+  markActivity: (id: string) => {
+    const map = new Map(get().activityById)
+    map.set(id, Date.now())
+    set({ activityById: map })
   },
 
-  isRecentlyActive: (windowMs = 10000) => {
-    const ts = get().lastActivityAt
+  clearActivity: (id: string) => {
+    const map = new Map(get().activityById)
+    map.delete(id)
+    set({ activityById: map })
+  },
+
+  isRecentlyActive: (windowMs = 3000) => {
+    const id = get().activeTerminalId
+    if (!id) return false
+    const ts = get().activityById.get(id)
     if (!ts) return false
     return Date.now() - ts <= windowMs
+  },
+
+  isRecentlyActiveId: (id: string, windowMs = 3000) => {
+    const ts = get().activityById.get(id)
+    if (!ts) return false
+    return Date.now() - ts <= windowMs
+  },
+
+  markUserInput: (id: string) => {
+    const map = new Map(get().userInputById)
+    map.set(id, Date.now())
+    set({ userInputById: map })
+  },
+
+  hasUserInteracted: () => {
+    const id = get().activeTerminalId
+    if (!id) return false
+    return get().userInputById.has(id)
   },
 
   sendToTerminal: async (text: string, autoExecute = false): Promise<boolean> => {

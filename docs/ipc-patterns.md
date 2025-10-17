@@ -100,3 +100,13 @@ For app-wide events (e.g., `project:changed`), broadcast to all BrowserWindow in
 - Avoid assuming a single-window app
 
 This ensures secondary windows remain in sync when project context changes.
+
+## Race Guards (Version Tokens)
+
+For long-running async operations during project switching (watcher shutdown, tree reload, terminal init), use a monotonic "switch token":
+
+- Increment the token at the start of a switch
+- Attach the token to async tasks
+- Before applying results, compare against the latest token; ignore stale work
+
+This pattern avoids stale updates from previous switches.
