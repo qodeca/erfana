@@ -5,7 +5,7 @@ import { fileWatcherService } from '../services/FileWatcherService'
 import { directoryWatcherService } from '../services/DirectoryWatcherService'
 import { stat, realpath } from 'fs/promises'
 import { normalize, sep, parse } from 'path'
-import type { ProjectChanged } from '@shared/ipc/schema'
+import type { ProjectChanged } from '../../shared/ipc/schema'
 
 async function canonicalizePath(p: string): Promise<string> {
   // Normalize separators

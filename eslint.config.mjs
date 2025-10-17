@@ -27,5 +27,20 @@ export default [
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off'
     }
+  },
+  // Test files: relax some strict TS rules
+  {
+    files: [
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      'tests/**/*.ts',
+      'tests/**/*.tsx',
+      'src/**/__tests__/**/*.ts',
+      'src/**/__tests__/**/*.tsx'
+    ],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/ban-ts-comment': 'off'
+    }
   }
 ]
