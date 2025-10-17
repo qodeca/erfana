@@ -71,6 +71,8 @@ const content = await window.api.file.readFile('/path/to/file.md')
  
 | `settings:getProjectFilterMode` | settings-handlers | Get project filter mode (all/markdown) |
 | `settings:setProjectFilterMode` | settings-handlers | Set project filter mode (all/markdown) |
+| `settings:getDirectoryWatchDepth` | settings-handlers | Get directory watcher depth (number or undefined) |
+| `settings:setDirectoryWatchDepth` | settings-handlers | Set directory watcher depth (number or null) |
 
 ## Event-Based IPC Pattern
 

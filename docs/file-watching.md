@@ -92,6 +92,18 @@ ignored: [
 ]
 ```
 
+### Watch Depth (Performance)
+
+The directory watcher supports an optional recursive depth cap to reduce load on very large projects.
+
+- Config key: `directoryWatchDepth` (SettingsService)
+- UI: Project panel → Control Panel → Watching → Depth (Unlimited, 1–5)
+- Behavior: Applies to chokidar `depth` option; changing it restarts the watcher for the current project
+
+Recommended:
+- Start with “Unlimited”
+- Use smaller depths when the tree is very large and deep
+
 ### Use Cases
 
 | Scenario | Behavior |
@@ -248,6 +260,12 @@ This ensures watcher boundary checks ("inside project root") are correct immedia
 File tree uses `Set<string>` to track expanded folders. Refreshing file list preserves expansion state since they're separate React state variables.
 
 ---
+
+## Symlinks
+
+- Watchers do not follow symlinks (security)
+- Symlinked entries are flagged in the Project Tree with a small chain icon and tooltip
+- Operations on symlink targets remain subject to project boundary checks
 
 ## Testing Scenarios
 
