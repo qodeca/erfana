@@ -147,6 +147,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
   }, [projectPath])
 
+  const switchTokenRef = useRef(0)
+
   const handleOpenProject = async () => {
     try {
       setIsSwitchingProject(true)
@@ -156,9 +158,12 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         .then(({ useProjectStore }) => useProjectStore.getState().hasDirtyEditors())
         .catch(() => false)
 
-      // Terminal recent activity check
+      // Terminal recent activity check (3s window)
       const terminalBusy = await import('../../stores/useTerminalStore')
-        .then(({ useTerminalStore }) => useTerminalStore.getState().isRecentlyActive(10000))
+        .then(({ useTerminalStore }) => {
+          const store = useTerminalStore.getState()
+          return store.hasUserInteracted() && store.isRecentlyActive(20000)
+        })
         .catch(() => false)
 
       if (hasDirty || terminalBusy) {
@@ -176,13 +181,18 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
               if (tid) {
                 // Send Ctrl+C signal
                 window.api.terminal.write(tid, '\u0003')
-                await new Promise((r) => setTimeout(r, 200))
+                await new Promise((r) => setTimeout(r, 300))
+                // If no new activity, mark idle
+                if (!useTerminalStore.getState().isRecentlyActiveId(tid, 300)) {
+                  useTerminalStore.getState().clearActivity(tid)
+                }
               }
             } catch (e) {
               console.warn('Failed to signal terminal before switching project:', e)
             }
+            const currentToken = ++switchTokenRef.current
             const path = await window.api.file.openProject()
-            if (path) {
+            if (path && currentToken === switchTokenRef.current) {
               setProjectPath(path)
               const fileTree = await window.api.file.readDirectory(path)
               setFiles(fileTree)
@@ -217,7 +227,10 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         .then(({ useProjectStore }) => useProjectStore.getState().hasDirtyEditors())
         .catch(() => false)
       const terminalBusy = await import('../../stores/useTerminalStore')
-        .then(({ useTerminalStore }) => useTerminalStore.getState().isRecentlyActive(10000))
+        .then(({ useTerminalStore }) => {
+          const store = useTerminalStore.getState()
+          return store.hasUserInteracted() && store.isRecentlyActive(20000)
+        })
         .catch(() => false)
       if (hasDirty || terminalBusy) {
         return setConfirmDialog({
@@ -232,13 +245,17 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
               const tid = useTerminalStore.getState().getActiveTerminalId()
               if (tid) {
                 window.api.terminal.write(tid, '\u0003')
-                await new Promise((r) => setTimeout(r, 200))
+                await new Promise((r) => setTimeout(r, 300))
+                if (!useTerminalStore.getState().isRecentlyActiveId(tid, 300)) {
+                  useTerminalStore.getState().clearActivity(tid)
+                }
               }
             } catch (e) {
               console.warn('Failed to signal terminal before closing project:', e)
             }
+            const currentToken = ++switchTokenRef.current
             const ok = await window.api.file.closeProject()
-            if (ok) {
+            if (ok && currentToken === switchTokenRef.current) {
               setProjectPath(null)
               setFiles([])
               setExpandedFolders(new Set())

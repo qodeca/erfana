@@ -11,8 +11,8 @@ import { Terminal as TerminalIcon, RotateCw } from 'lucide-react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
-import { WebglAddon } from '@xterm/addon-webgl'
 import { useTerminalStore } from '../../stores/useTerminalStore'
+import { showGlobalToast } from '../Toast/toastService'
 import '@xterm/xterm/css/xterm.css'
 import './TerminalPanel.css'
 import { isElementVisible } from '../../utils/domUtils'
@@ -21,6 +21,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null)
   const [terminalId, setTerminalId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [recheckCooldown, setRecheckCooldown] = useState(false)
 
   const terminalRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<Terminal | null>(null)
@@ -28,6 +29,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const terminalIdRef = useRef<string | null>(null)
   const pendingInitRef = useRef<boolean>(false)
   const visibilityObserverRef = useRef<ResizeObserver | null>(null)
+  const warmupUntilRef = useRef<number>(0)
 
   // Terminal store for cross-component communication
   const setActiveTerminalId = useTerminalStore((state) => state.setActiveTerminalId)
@@ -46,6 +48,27 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       setIsAvailable(false)
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
+    }
+  }
+
+  const handleRecheck = async () => {
+    if (recheckCooldown) return
+    setRecheckCooldown(true)
+    try {
+      await checkAvailability()
+    } finally {
+      setTimeout(() => setRecheckCooldown(false), 1000)
+    }
+  }
+
+  const handleCopyFix = async () => {
+    const cmd = 'npm rebuild node-pty --build-from-source'
+    try {
+      await navigator.clipboard.writeText(cmd)
+      showGlobalToast({ type: 'info', title: 'Copied', message: 'Fix command copied to clipboard.' })
+    } catch (e) {
+      console.warn('Clipboard write failed:', e)
+      showGlobalToast({ type: 'warning', title: 'Copy Failed', message: cmd })
     }
   }
 
@@ -130,6 +153,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
       // Load WebGL renderer AFTER open (fixes canvas rendering issues in Electron)
       try {
+        const { WebglAddon } = await import('@xterm/addon-webgl')
         const webglAddon = new WebglAddon()
         webglAddon.onContextLoss(() => {
           console.warn('WebGL context lost, disposing addon')
@@ -166,6 +190,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
       setTerminalId(result.terminalId)
       setActiveTerminalId(result.terminalId) // Register in store
+      warmupUntilRef.current = Date.now() + 500
 
       // Clear screen and show clean prompt
       xterm.write('\x1b[2J\x1b[H')
@@ -173,6 +198,10 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // Handle user input
       xterm.onData((data) => {
         if (result.terminalId) {
+          // Mark activity on user input to catch long-running commands with sparse output
+          const store = useTerminalStore.getState()
+          store.markActivity(result.terminalId)
+          store.markUserInput(result.terminalId)
           window.api.terminal.write(result.terminalId, data)
         }
       })
@@ -243,14 +272,17 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     const unsubscribeData = window.api.terminal.onData((data) => {
       if (data.terminalId === terminalId && xtermRef.current) {
         xtermRef.current.write(data.data)
-        // Record recent activity
-        useTerminalStore.getState().setLastActivityNow()
+        // Record recent activity (ignore warmup period noise)
+        if (Date.now() >= warmupUntilRef.current) {
+          useTerminalStore.getState().markActivity(terminalId)
+        }
       }
     })
 
     const unsubscribeExit = window.api.terminal.onExit((data) => {
       if (data.terminalId === terminalId) {
         console.log(`Terminal exited with code ${data.exitCode}`)
+        useTerminalStore.getState().clearActivity(terminalId)
         // Optionally restart or show exit message
       }
     })
@@ -360,6 +392,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
               successfully.
             </p>
             {error && <p className="error-details">{error}</p>}
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <button className="icon-btn" onClick={handleRecheck} disabled={recheckCooldown} aria-label="Recheck">
+                Recheck
+              </button>
+              <button className="icon-btn" onClick={handleCopyFix} aria-label="Copy Fix Command">
+                Copy Fix Command
+              </button>
+            </div>
           </div>
         ) : error ? (
           // Error occurred

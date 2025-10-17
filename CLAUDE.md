@@ -78,7 +78,11 @@ See `docs/` folder for detailed documentation:
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)
-- Terminal recent-activity detection; sends Ctrl+C before switching
+- Terminal activity heuristic:
+  - Per-terminal tracking, marks on input + output
+  - 500ms warm-up ignore
+  - 20s busy window
+  - Clears on exit and after Ctrl+C if quiet
 - Terminal initialization defers until panel is visible
 
 ## IPC Contracts

@@ -14,6 +14,13 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 See [Automated Testing Plan](./automated-testing-plan.md) for the phased rollout and setup details.
 
+#### Renderer tips
+- When testing TerminalPanel in jsdom, mock xterm and addons to avoid canvas errors:
+  - `vi.mock('@xterm/xterm', () => ({ Terminal: class { open(){} loadAddon(){} dispose(){} write(){} cols=80; rows=24 } }))`
+  - `vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit(){} } }))`
+  - `vi.mock('@xterm/addon-webgl', () => ({ WebglAddon: class { onContextLoss(){} dispose(){} } }))`
+- Prefer dynamic import of `@xterm/addon-webgl` in code to keep tests happy
+
 ---
 
 ### E2E/UI (Playwright Electron)
