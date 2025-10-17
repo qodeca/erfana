@@ -20,6 +20,7 @@ Based on the most recent work, created, deleted or updated files ultrathink abou
 14. Commit all of the changes and push to remote
 
 # Context:
+
 * @docs/ is a folder
 * ALL documentation is stored in @docs/ folder
 

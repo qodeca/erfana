@@ -76,6 +76,11 @@ See `docs/` folder for detailed documentation:
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`).
 - Visual/MCP Scenarios: See docs/testing/ui-scenarios.md and docs/testing/interaction-scenarios.md.
 
+## Project Switching Safeguards
+- Unsaved editor prompt on open/close (Discard/Cancel)
+- Terminal recent-activity detection; sends Ctrl+C before switching
+- Terminal initialization defers until panel is visible
+
 ## IPC Contracts
 - Shared schemas/types: `src/shared/ipc/schema.ts` (zod)
 - `project:changed` payload: `{ oldPath: string | null; newPath: string | null }`
