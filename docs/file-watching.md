@@ -97,8 +97,10 @@ ignored: [
 The directory watcher supports an optional recursive depth cap to reduce load on very large projects.
 
 - Config key: `directoryWatchDepth` (SettingsService)
-- UI: Project panel → Control Panel → Watching → Depth (Unlimited, 1–5)
-- Behavior: Applies to chokidar `depth` option; changing it restarts the watcher for the current project
+- No UI control at the moment. Configure via preload settings API, e.g. in DevTools:
+  - `await window.api.settings.setDirectoryWatchDepth(2)`
+  - `await window.api.settings.setDirectoryWatchDepth(null)` for Unlimited
+- Behavior: Applies to chokidar `depth` option; the watcher will use the new setting on the next start
 
 Recommended:
 - Start with “Unlimited”
