@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { ProjectChanged } from '@shared/ipc/schema'
 import { electronAPI } from '@electron-toolkit/preload'
 
 export interface FileNode {
@@ -43,10 +44,10 @@ const api = {
       ipcRenderer.invoke('file:rename', oldPath, newName),
 
     // Project change event listener
-    onProjectChanged: (callback: (data: { oldPath: string | null; newPath: string | null }) => void) => {
+    onProjectChanged: (callback: (data: ProjectChanged) => void) => {
       const listener = (
         _event: unknown,
-        data: { oldPath: string | null; newPath: string | null }
+        data: ProjectChanged
       ) =>
         callback(data)
       ipcRenderer.on('project:changed', listener)
