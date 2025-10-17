@@ -97,7 +97,7 @@ export async function executePromptTemplate(
   const renderedPrompt = promptRenderer.render(config.template, variables)
 
   // Determine target panel (Copilot removed; default to terminal)
-  const targetPanel: 'terminal' = 'terminal'
+  const targetPanel = 'terminal' as const
 
   // Execute prompt by sending to target panel
   return await openPanelAndSendContent({

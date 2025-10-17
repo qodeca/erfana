@@ -2,6 +2,8 @@ import { ipcMain, WebContents } from 'electron'
 import { fileWatcherService } from '../services/FileWatcherService'
 
 export function registerFileWatcherHandlers(): void {
+  const getErrorMessage = (error: unknown): string =>
+    error instanceof Error ? error.message : String(error)
   /**
    * Start watching a file
    */
@@ -16,9 +18,9 @@ export function registerFileWatcherHandlers(): void {
       await fileWatcherService.watchFile(filePath, webContents)
 
       return { success: true }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error starting file watch:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: getErrorMessage(error) }
     }
   })
 
@@ -36,9 +38,9 @@ export function registerFileWatcherHandlers(): void {
       await fileWatcherService.unwatchFile(filePath, webContents)
 
       return { success: true }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error stopping file watch:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: getErrorMessage(error) }
     }
   })
 
@@ -51,9 +53,9 @@ export function registerFileWatcherHandlers(): void {
       await fileWatcherService.unwatchAll(webContents)
 
       return { success: true }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error stopping all file watches:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: getErrorMessage(error) }
     }
   })
 
@@ -70,9 +72,9 @@ export function registerFileWatcherHandlers(): void {
       fileWatcherService.pauseWatch(filePath)
 
       return { success: true }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error pausing file watch:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: getErrorMessage(error) }
     }
   })
 
@@ -89,9 +91,9 @@ export function registerFileWatcherHandlers(): void {
       fileWatcherService.resumeWatch(filePath)
 
       return { success: true }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error resuming file watch:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: getErrorMessage(error) }
     }
   })
 
@@ -102,9 +104,9 @@ export function registerFileWatcherHandlers(): void {
     try {
       const stats = fileWatcherService.getStats()
       return { success: true, stats }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error getting watch stats:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: getErrorMessage(error) }
     }
   })
 

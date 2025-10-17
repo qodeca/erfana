@@ -25,7 +25,7 @@ interface PreviewContextMenuProps {
     inputPlaceholder?: string
     onSubmit: (userInput: string) => void
     onCancel: () => void
-  }) => void
+  } | null) => void
 }
 
 /**
@@ -113,11 +113,11 @@ export function PreviewContextMenu({
       // Create submit and cancel handlers
       const handleSubmit = async (userInput: string) => {
         await executePrompt(config, userInput)
-        onOpenUserInputDialog(null as any) // Close dialog
+        onOpenUserInputDialog(null) // Close dialog
       }
 
       const handleCancel = () => {
-        onOpenUserInputDialog(null as any) // Close dialog
+        onOpenUserInputDialog(null) // Close dialog
       }
 
       // Open dialog via callback and close context menu

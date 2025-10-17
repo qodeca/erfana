@@ -1,8 +1,10 @@
 import { useState, useRef, forwardRef, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
+import type { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize from 'rehype-sanitize'
+import type { PluggableList } from 'unified'
 import { defaultSchema } from 'hast-util-sanitize'
 import { PreviewContextMenu } from '../ContextMenu/PreviewContextMenu'
 import { UserInputDialog } from '../Dialogs/UserInputDialog'
@@ -56,11 +58,12 @@ const sanitizationSchema = defaultSchema
  * @param node - The AST node with position information
  * @returns Line range object or undefined
  */
-function extractLineRange(node?: any): { start: number; end: number } | undefined {
-  if (!node?.position?.start?.line) return undefined
+function extractLineRange(node?: unknown): { start: number; end: number } | undefined {
+  const n = node as { position?: { start?: { line?: number }; end?: { line?: number } } }
+  if (!n?.position?.start?.line) return undefined
 
-  const startLine = node.position.start.line
-  const endLine = node.position.end?.line ?? startLine
+  const startLine = n.position.start.line as number
+  const endLine = (n.position.end?.line as number | undefined) ?? startLine
 
   return { start: startLine, end: endLine }
 }
@@ -72,10 +75,10 @@ function extractLineRange(node?: any): { start: number; end: number } | undefine
  */
 function withLineRange<T extends keyof JSX.IntrinsicElements>(
   tag: T
-): React.ComponentType<any> {
-  return ({ node, ...props }: any) => {
+): React.ComponentType<{ node?: unknown } & Record<string, unknown>> {
+  const Comp: React.FC<{ node?: unknown } & Record<string, unknown>> = ({ node, ...props }) => {
     const range = extractLineRange(node)
-    const Component = tag as any
+    const Component = tag as unknown as React.ElementType
     return (
       <Component
         data-line-start={range?.start}
@@ -85,6 +88,8 @@ function withLineRange<T extends keyof JSX.IntrinsicElements>(
       />
     )
   }
+  Comp.displayName = `withLineRange(${String(tag)})`
+  return Comp as unknown as React.ComponentType<{ node?: unknown } & Record<string, unknown>>
 }
 
 /**
@@ -106,7 +111,7 @@ const remarkPlugins = [remarkGfm]
  *
  * Reference: https://github.com/rehypejs/rehype-raw and https://github.com/rehypejs/rehype-sanitize
  */
-const rehypePlugins: any[] = [
+const rehypePlugins: PluggableList = [
   rehypeRaw,
   [rehypeSanitize, sanitizationSchema]
 ]
@@ -116,7 +121,7 @@ const rehypePlugins: any[] = [
  * Returns components with filePath context for Mermaid error reporting
  * Called with filePath to enable bug report functionality
  */
-function createMarkdownComponents(filePath?: string) {
+function createMarkdownComponents(filePath?: string): Components {
   return {
   // Inject line range on all block elements for scroll synchronization
   p: withLineRange('p'),
@@ -125,7 +130,12 @@ function createMarkdownComponents(filePath?: string) {
   li: withLineRange('li'),
   blockquote: withLineRange('blockquote'),
   // Custom code block styling with Mermaid diagram support
-  code({ node, className, children, ...props }: any) {
+  code({
+    node,
+    className,
+    children,
+    ...props
+  }: { node?: unknown; className?: string; children?: React.ReactNode } & Record<string, unknown>) {
     const match = /language-(\w+)/.exec(className || '')
     // Detect inline vs block code: inline has no className and no newlines
     const isInline = !className && typeof children === 'string' && !children.includes('\n')
@@ -170,7 +180,7 @@ function createMarkdownComponents(filePath?: string) {
     )
   },
   // Custom table styling with line range tracking
-  table({ node, children }: any) {
+  table({ node, children }: { node?: unknown; children?: React.ReactNode }) {
     const range = extractLineRange(node)
     return (
       <div
@@ -188,14 +198,14 @@ function createMarkdownComponents(filePath?: string) {
   th: withLineRange('th'),
   td: withLineRange('td'),
   // Custom checkbox styling
-  input({ type, checked, ...props }: any) {
+  input({ type, checked, ...props }: { type?: string; checked?: boolean } & Record<string, unknown>) {
     if (type === 'checkbox') {
       return <input type="checkbox" checked={checked} readOnly {...props} />
     }
     return <input type={type} {...props} />
   },
   // Add IDs to headings for potential TOC and line range tracking for scroll sync
-  h1({ node, children }: any) {
+  h1({ node, children }: { node?: unknown; children?: React.ReactNode }) {
     const range = extractLineRange(node)
     const text = String(children)
     const id = text.toLowerCase().replace(/\s+/g, '-')
@@ -205,7 +215,7 @@ function createMarkdownComponents(filePath?: string) {
       </h1>
     )
   },
-  h2({ node, children }: any) {
+  h2({ node, children }: { node?: unknown; children?: React.ReactNode }) {
     const range = extractLineRange(node)
     const text = String(children)
     const id = text.toLowerCase().replace(/\s+/g, '-')
@@ -215,7 +225,7 @@ function createMarkdownComponents(filePath?: string) {
       </h2>
     )
   },
-  h3({ node, children }: any) {
+  h3({ node, children }: { node?: unknown; children?: React.ReactNode }) {
     const range = extractLineRange(node)
     const text = String(children)
     const id = text.toLowerCase().replace(/\s+/g, '-')
@@ -229,12 +239,12 @@ function createMarkdownComponents(filePath?: string) {
   h5: withLineRange('h5'),
   h6: withLineRange('h6'),
   // Links open in external browser with line range tracking
-  a({ node, href, children, ...props }: any) {
+  a({ node, href, children, ...props }: { node?: unknown; href?: string; children?: React.ReactNode } & Record<string, unknown>) {
     const range = extractLineRange(node)
     const handleClick = (e: React.MouseEvent) => {
       if (href?.startsWith('http')) {
         e.preventDefault()
-        // @ts-ignore - shell is available but not typed in ElectronAPI
+        // @ts-expect-error - shell is available but not typed in ElectronAPI
         window.electron.shell.openExternal(href)
       }
     }
@@ -253,7 +263,7 @@ function createMarkdownComponents(filePath?: string) {
   },
   // Custom img component with explicit attribute handling
   // Ensures src, alt, title, width, height are preserved with line tracking
-  img({ node, src, alt, title, width, height, ...props }: any) {
+  img({ node, src, alt, title, width, height, ...props }: { node?: unknown; src?: string; alt?: string; title?: string; width?: number | string; height?: number | string } & Record<string, unknown>) {
     const range = extractLineRange(node)
     return (
       <img
@@ -310,7 +320,7 @@ function createMarkdownComponents(filePath?: string) {
    */
   figure: withLineRange('figure'),
   figcaption: withLineRange('figcaption')
-  }
+  } as Components
 }
 
 /**

@@ -25,6 +25,23 @@ export class DirectoryWatcherService {
   setProjectPath(path: string): void {
     this.projectPath = path
   }
+  /**
+   * Stop all directory watchers (for project switching)
+   */
+  async stopAll(): Promise<void> {
+    this.safeLog('👁️  Stopping all directory watchers...')
+    for (const [, watched] of this.watchedDirectories.entries()) {
+      if (watched.debounceTimer) {
+        clearTimeout(watched.debounceTimer)
+      }
+      try {
+        await watched.watcher.close()
+      } catch {
+        // ignore
+      }
+    }
+    this.watchedDirectories.clear()
+  }
 
   /**
    * Safe logging that handles EPIPE errors during app shutdown
@@ -69,22 +86,22 @@ export class DirectoryWatcherService {
       ignoreInitial: true, // Don't fire events for existing files
       ignored: [
         // Hidden files and folders (except .md files which might be hidden)
-        /(^|[\/\\])\.[^\/\\]+$/,
+        /(^|[/\\])\.[^/\\]+$/,
         // Specific directories to ignore
-        /(^|[\/\\])node_modules($|[\/\\])/,
-        /(^|[\/\\])\.git($|[\/\\])/,
-        /(^|[\/\\])out($|[\/\\])/,
-        /(^|[\/\\])dist($|[\/\\])/,
-        /(^|[\/\\])build($|[\/\\])/,
-        /(^|[\/\\])\.next($|[\/\\])/,
-        /(^|[\/\\])\.cache($|[\/\\])/,
+        /(^|[/\\])node_modules($|[/\\])/,
+        /(^|[/\\])\.git($|[/\\])/,
+        /(^|[/\\])out($|[/\\])/,
+        /(^|[/\\])dist($|[/\\])/,
+        /(^|[/\\])build($|[/\\])/,
+        /(^|[/\\])\.next($|[/\\])/,
+        /(^|[/\\])\.cache($|[/\\])/,
         // macOS specific
         /\.DS_Store$/,
         // Editor specific
         /\.swp$/,
         /~$/,
-        /(^|[\/\\])\.vscode($|[\/\\])/,
-        /(^|[\/\\])\.idea($|[\/\\])/
+        /(^|[/\\])\.vscode($|[/\\])/,
+        /(^|[/\\])\.idea($|[/\\])/
       ],
       usePolling: false, // Use native fs events (faster)
       awaitWriteFinish: false, // Not needed for directory operations
@@ -291,7 +308,11 @@ export class DirectoryWatcherService {
   /**
    * Notify all webContents watching this directory
    */
-  private notifyWebContents(dirPath: string, channel: string, data: any): void {
+  private notifyWebContents(
+    dirPath: string,
+    channel: string,
+    data: Record<string, unknown>
+  ): void {
     if (this.isDisposing) return // Don't notify during disposal
     const watched = this.watchedDirectories.get(dirPath)
     if (!watched) return
@@ -303,12 +324,12 @@ export class DirectoryWatcherService {
       if (window && !window.isDestroyed()) {
         try {
           window.webContents.send(channel, data)
-        } catch (error) {
-          // Suppress errors during shutdown (EPIPE, destroyed webContents, etc.)
-          if (error instanceof Error && !error.message.includes('destroyed')) {
-            this.safeLog(`⚠️  Error sending to webContents: ${error.message}`)
-          }
+      } catch (error) {
+        // Suppress errors during shutdown (EPIPE, destroyed webContents, etc.)
+        if (error instanceof Error && !error.message.includes('destroyed')) {
+          this.safeLog(`⚠️  Error sending to webContents: ${error.message}`)
         }
+      }
       }
     }
   }
@@ -343,7 +364,7 @@ export class DirectoryWatcherService {
       }
       try {
         await watched.watcher.close()
-      } catch (error) {
+      } catch {
         // Suppress errors during cleanup
       }
     }

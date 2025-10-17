@@ -34,101 +34,15 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     terminalIdRef.current = terminalId
   }, [terminalId])
 
-  // Check terminal availability on mount
-  useEffect(() => {
-    checkAvailability()
-  }, [])
-
-  // Create terminal when available
-  useEffect(() => {
-    if (isAvailable && terminalRef.current && !xtermRef.current) {
-      initializeTerminal()
-    }
-
-    // Cleanup on unmount only
-    return () => {
-      if (terminalIdRef.current) {
-        window.api.terminal.kill(terminalIdRef.current)
-        setActiveTerminalId(null)
-      }
-      if (xtermRef.current) {
-        xtermRef.current.dispose()
-      }
-    }
-  }, [isAvailable, setActiveTerminalId])
-
-  // Handle terminal data
-  useEffect(() => {
-    if (!terminalId) return
-
-    const unsubscribeData = window.api.terminal.onData((data) => {
-      if (data.terminalId === terminalId && xtermRef.current) {
-        xtermRef.current.write(data.data)
-      }
-    })
-
-    const unsubscribeExit = window.api.terminal.onExit((data) => {
-      if (data.terminalId === terminalId) {
-        console.log(`Terminal exited with code ${data.exitCode}`)
-        // Optionally restart or show exit message
-      }
-    })
-
-    const unsubscribeError = window.api.terminal.onError((data) => {
-      if (data.terminalId === terminalId) {
-        console.error('Terminal error:', data.error)
-        setError(data.error)
-      }
-    })
-
-    return () => {
-      unsubscribeData()
-      unsubscribeExit()
-      unsubscribeError()
-    }
-  }, [terminalId])
-
-  // Handle resize (panel drag, window resize, show/hide)
-  useEffect(() => {
-    if (!fitAddonRef.current || !terminalId || !terminalRef.current) return
-
-    const handleResize = () => {
-      try {
-        fitAddonRef.current?.fit()
-
-        if (xtermRef.current) {
-          const cols = xtermRef.current.cols
-          const rows = xtermRef.current.rows
-          window.api.terminal.resize(terminalId, cols, rows)
-        }
-      } catch (error) {
-        console.error('Failed to resize terminal:', error)
-      }
-    }
-
-    // Fit on mount
-    setTimeout(handleResize, 100)
-
-    // Use ResizeObserver to detect container size changes
-    // This handles panel drag, window resize, and show/hide
-    const resizeObserver = new ResizeObserver(() => {
-      // Debounce slightly to avoid excessive resize calls
-      setTimeout(handleResize, 10)
-    })
-
-    resizeObserver.observe(terminalRef.current)
-
-    return () => resizeObserver.disconnect()
-  }, [terminalId])
-
-  const checkAvailability = async () => {
+  async function checkAvailability() {
     try {
       const result = await window.api.terminal.isAvailable()
       setIsAvailable(result.available)
-    } catch (err: any) {
+    } catch (err) {
       console.error('Failed to check terminal availability:', err)
       setIsAvailable(false)
-      setError(err.message)
+      const message = err instanceof Error ? err.message : String(err)
+      setError(message)
     }
   }
 
@@ -239,11 +153,123 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           window.api.terminal.write(result.terminalId, data)
         }
       })
-    } catch (err: any) {
+    } catch (err) {
       console.error('Failed to initialize terminal:', err)
-      setError(err.message)
+      const message = err instanceof Error ? err.message : String(err)
+      setError(message)
     }
   }
+
+  // Check terminal availability on mount
+  useEffect(() => {
+    checkAvailability()
+  }, [])
+
+  // Create terminal when available
+  useEffect(() => {
+    if (isAvailable && terminalRef.current && !xtermRef.current) {
+      initializeTerminal()
+    }
+
+    // Cleanup on unmount only
+    return () => {
+      if (terminalIdRef.current) {
+        window.api.terminal.kill(terminalIdRef.current)
+        setActiveTerminalId(null)
+      }
+      if (xtermRef.current) {
+        xtermRef.current.dispose()
+      }
+    }
+  }, [isAvailable, setActiveTerminalId])
+
+  // Restart terminal on project change
+  useEffect(() => {
+    const unsubscribe = window.api.file.onProjectChanged(async () => {
+      // Kill current terminal session
+      if (terminalIdRef.current) {
+        await window.api.terminal.kill(terminalIdRef.current)
+        setActiveTerminalId(null)
+      }
+      // Dispose xterm
+      if (xtermRef.current) {
+        xtermRef.current.dispose()
+        xtermRef.current = null
+      }
+      setTerminalId(null)
+      setError(null)
+      // Wait briefly then initialize new terminal in new CWD
+      setTimeout(() => {
+        void initializeTerminal()
+      }, 100)
+    })
+    return () => unsubscribe()
+  }, [setActiveTerminalId])
+
+  // Handle terminal data
+  useEffect(() => {
+    if (!terminalId) return
+
+    const unsubscribeData = window.api.terminal.onData((data) => {
+      if (data.terminalId === terminalId && xtermRef.current) {
+        xtermRef.current.write(data.data)
+      }
+    })
+
+    const unsubscribeExit = window.api.terminal.onExit((data) => {
+      if (data.terminalId === terminalId) {
+        console.log(`Terminal exited with code ${data.exitCode}`)
+        // Optionally restart or show exit message
+      }
+    })
+
+    const unsubscribeError = window.api.terminal.onError((data) => {
+      if (data.terminalId === terminalId) {
+        console.error('Terminal error:', data.error)
+        setError(data.error)
+      }
+    })
+
+    return () => {
+      unsubscribeData()
+      unsubscribeExit()
+      unsubscribeError()
+    }
+  }, [terminalId])
+
+  // Handle resize (panel drag, window resize, show/hide)
+  useEffect(() => {
+    if (!fitAddonRef.current || !terminalId || !terminalRef.current) return
+
+    const handleResize = () => {
+      try {
+        fitAddonRef.current?.fit()
+
+        if (xtermRef.current) {
+          const cols = xtermRef.current.cols
+          const rows = xtermRef.current.rows
+          window.api.terminal.resize(terminalId, cols, rows)
+        }
+      } catch (error) {
+        console.error('Failed to resize terminal:', error)
+      }
+    }
+
+    // Fit on mount
+    setTimeout(handleResize, 100)
+
+    // Use ResizeObserver to detect container size changes
+    // This handles panel drag, window resize, and show/hide
+    const resizeObserver = new ResizeObserver(() => {
+      // Debounce slightly to avoid excessive resize calls
+      setTimeout(handleResize, 10)
+    })
+
+    resizeObserver.observe(terminalRef.current)
+
+    return () => resizeObserver.disconnect()
+  }, [terminalId])
+
 
   const handleRestartTerminal = async () => {
     // Kill current terminal session

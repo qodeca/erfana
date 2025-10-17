@@ -18,6 +18,9 @@ declare global {
         deleteFile: (filePath: string) => Promise<boolean>
         deleteFolder: (folderPath: string) => Promise<boolean>
         rename: (oldPath: string, newName: string) => Promise<string>
+        onProjectChanged: (
+          callback: (data: { oldPath: string | null; newPath: string }) => void
+        ) => () => void
       }
       fileWatch: {
         start: (filePath: string) => Promise<{ success: boolean; error?: string }>
@@ -25,7 +28,7 @@ declare global {
         stopAll: () => Promise<{ success: boolean; error?: string }>
         pause: (filePath: string) => Promise<{ success: boolean; error?: string }>
         resume: (filePath: string) => Promise<{ success: boolean; error?: string }>
-        getStats: () => Promise<{ success: boolean; stats?: any; error?: string }>
+        getStats: () => Promise<{ success: boolean; stats?: unknown; error?: string }>
         onFileChanged: (callback: (data: { filePath: string }) => void) => () => void
         onFileDeleted: (callback: (data: { filePath: string }) => void) => () => void
         onFileError: (callback: (data: { filePath: string; error: string }) => void) => () => void
@@ -36,9 +39,9 @@ declare global {
         stopAll: () => Promise<{ success: boolean; error?: string }>
         pause: (dirPath: string) => Promise<{ success: boolean; error?: string }>
         resume: (dirPath: string) => Promise<{ success: boolean; error?: string }>
-        getStats: () => Promise<{ success: boolean; stats?: any; error?: string }>
+        getStats: () => Promise<{ success: boolean; stats?: unknown; error?: string }>
         onDirectoryChanged: (
-          callback: (data: { dirPath: string; eventCount: number; summary: any }) => void
+          callback: (data: { dirPath: string; eventCount: number; summary: Record<string, number> }) => void
         ) => () => void
         onProjectDeleted: (callback: (data: { dirPath: string }) => void) => () => void
         onDirectoryError: (

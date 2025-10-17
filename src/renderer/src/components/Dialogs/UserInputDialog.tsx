@@ -78,7 +78,7 @@ export function UserInputDialog({
 
         <div className="user-input-dialog-selected">
           <div className="user-input-dialog-selected-label">Selected text:</div>
-          <div className="user-input-dialog-selected-content">"{truncatedText}"</div>
+          <div className="user-input-dialog-selected-content">&quot;{truncatedText}&quot;</div>
         </div>
 
         <div className="user-input-dialog-input-section">

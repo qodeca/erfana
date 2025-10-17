@@ -194,10 +194,10 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     const editorEl = editorRef.current?.getEditor()?.getDomNode() || null
     if (!previewEl || !editorEl) return
 
-    let debounceTimer: any = null
+    let debounceTimer: number | null = null
     const debouncedRebuild = () => {
       if (debounceTimer) clearTimeout(debounceTimer)
-      debounceTimer = setTimeout(() => {
+      debounceTimer = window.setTimeout(() => {
         rebuildScrollMap()
       }, 150)
     }
@@ -283,13 +283,13 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
       const mermaidPromise = hasMermaid
         ? new Promise<void>((resolve) => {
             const handler = () => {
-              root.removeEventListener('mermaid:rendered', handler as any)
+              root.removeEventListener('mermaid:rendered', handler)
               resolve()
             }
-            root.addEventListener('mermaid:rendered', handler as any, { once: true })
+            root.addEventListener('mermaid:rendered', handler, { once: true })
             // Fallback after 800ms in case nothing fires
             setTimeout(() => {
-              root.removeEventListener('mermaid:rendered', handler as any)
+              root.removeEventListener('mermaid:rendered', handler)
               resolve()
             }, 800)
           })
@@ -323,14 +323,14 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   useEffect(() => {
     if (!isAnySplitMode || !previewRef.current) return
     const root = previewRef.current
-    let timer: any = null
+    let timer: number | null = null
     const handler = () => {
       if (timer) clearTimeout(timer)
-      timer = setTimeout(() => rebuildScrollMap(), 120)
+      timer = window.setTimeout(() => rebuildScrollMap(), 120)
     }
-    root.addEventListener('mermaid:rendered', handler as any)
+    root.addEventListener('mermaid:rendered', handler)
     return () => {
-      root.removeEventListener('mermaid:rendered', handler as any)
+      root.removeEventListener('mermaid:rendered', handler)
       if (timer) clearTimeout(timer)
     }
   }, [isAnySplitMode, currentFile?.path, rebuildScrollMap])
@@ -340,10 +340,10 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
     if (!isAnySplitMode || !previewRef.current) return
     const root = previewRef.current
     const imgs = Array.from(root.querySelectorAll('img'))
-    let timer: any = null
+    let timer: number | null = null
     const handler = () => {
       if (timer) clearTimeout(timer)
-      timer = setTimeout(() => rebuildScrollMap(), 120)
+      timer = window.setTimeout(() => rebuildScrollMap(), 120)
     }
     imgs.forEach((img) => {
       if (!(img as HTMLImageElement).complete) {

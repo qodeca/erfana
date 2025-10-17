@@ -19,9 +19,10 @@ export function registerSettingsHandlers(): void {
     try {
       const mode = await settingsService.getProjectFilterMode()
       return { success: true, mode }
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error getting project filter mode:', error)
-      return { success: false, error: error.message }
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
     }
   })
 
@@ -30,9 +31,10 @@ export function registerSettingsHandlers(): void {
     try {
       await settingsService.setProjectFilterMode(mode)
       return { success: true }
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Error setting project filter mode:', error)
-      return { success: false, error: error.message }
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
     }
   })
 

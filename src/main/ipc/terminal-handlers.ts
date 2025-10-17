@@ -7,6 +7,14 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import { terminalService } from '../services/TerminalService'
 
+type TerminalCreateConfig = {
+  shell?: string
+  cwd?: string
+  env?: Record<string, string>
+  cols?: number
+  rows?: number
+}
+
 export function registerTerminalHandlers() {
   console.log('📝 Registering Terminal IPC handlers...')
 
@@ -22,20 +30,21 @@ export function registerTerminalHandlers() {
   /**
    * Create a new terminal instance
    */
-  ipcMain.handle('terminal:create', async (_event, config?: any) => {
+  ipcMain.handle('terminal:create', async (_event, config?: TerminalCreateConfig) => {
     console.log('🚀 Creating terminal with config:', config)
 
     try {
-      const terminalId = terminalService.createTerminal(config)
+      const terminalId = await terminalService.createTerminal(config)
 
       if (!terminalId) {
         return { success: false, error: 'Failed to create terminal' }
       }
 
       return { success: true, terminalId }
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Failed to create terminal:', error)
-      return { success: false, error: error.message }
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
     }
   })
 
@@ -60,9 +69,10 @@ export function registerTerminalHandlers() {
     try {
       const success = terminalService.killTerminal(terminalId)
       return { success }
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Failed to kill terminal:', error)
-      return { success: false, error: error.message }
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
     }
   })
 
@@ -78,9 +88,10 @@ export function registerTerminalHandlers() {
       }
 
       return { success: true, info }
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Failed to get terminal info:', error)
-      return { success: false, error: error.message }
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
     }
   })
 
@@ -91,9 +102,10 @@ export function registerTerminalHandlers() {
     try {
       const terminals = terminalService.listTerminals()
       return { success: true, terminals }
-    } catch (error: any) {
+    } catch (error) {
       console.error('❌ Failed to list terminals:', error)
-      return { success: false, error: error.message }
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
     }
   })
 
