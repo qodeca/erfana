@@ -110,3 +110,7 @@ For long-running async operations during project switching (watcher shutdown, tr
 - Before applying results, compare against the latest token; ignore stale work
 
 This pattern avoids stale updates from previous switches.
+
+Applied in services:
+- File watcher: src/main/services/FileWatcherService.ts (`switchVersion` guards change/delete/notify)
+- Directory watcher: src/main/services/DirectoryWatcherService.ts (`switchVersion` guards queue/process/notify)

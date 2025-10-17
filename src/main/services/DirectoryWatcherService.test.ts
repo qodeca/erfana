@@ -32,7 +32,8 @@ describe('DirectoryWatcherService ENOENT handling', () => {
       webContentsIds: new Set([1]),
       isPaused: false,
       debounceTimer: null,
-      pendingEvents: []
+      pendingEvents: [],
+      version: svc.switchVersion
     })
 
     // Simulate ENOENT error
@@ -56,7 +57,8 @@ describe('DirectoryWatcherService ENOENT handling', () => {
       webContentsIds: new Set([1]),
       isPaused: false,
       debounceTimer: null,
-      pendingEvents: []
+      pendingEvents: [],
+      version: svc.switchVersion
     })
 
     svc.handleWatcherError('/proj', 'EACCES: permission denied')
@@ -64,3 +66,33 @@ describe('DirectoryWatcherService ENOENT handling', () => {
   })
 })
 
+describe('DirectoryWatcherService session token guards', () => {
+  beforeEach(() => {
+    sends.length = 0
+  })
+
+  it('drops notifications from previous sessions', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    // Seed watched directory with old version 0
+    const fakeWatcher = { close: vi.fn(async () => {}) }
+    svc.watchedDirectories.set('/proj', {
+      dirPath: '/proj',
+      watcher: fakeWatcher,
+      webContentsIds: new Set([1]),
+      isPaused: false,
+      debounceTimer: null,
+      pendingEvents: [],
+      version: 0
+    })
+
+    // Simulate project switch bumping session
+    svc.switchVersion = 1
+
+    // Attempt to notify via private API; should be ignored due to version mismatch
+    svc.notifyWebContents('/proj', 'directory-watch:changed', { dirPath: '/proj', eventCount: 1, summary: { add: 1 } })
+
+    expect(sends.length).toBe(0)
+  })
+})

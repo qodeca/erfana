@@ -117,8 +117,9 @@ src/
   - DirectoryWatcherService: Auto-refresh file tree (1000ms debounce, ignored patterns)
   - SettingsService: Persistent storage with electron-store (dynamic ES Module import)
   
-  - TerminalService: Terminal emulator with xterm.js + node-pty (PTY lifecycle, WebGL rendering, auto-resize, traditional zsh prompt)
+  - TerminalService: Terminal emulator with xterm.js + node-pty (PTY lifecycle, WebGL rendering, auto-resize, traditional zsh prompt, cwd verification)
 - **Auto-Refresh**: Chokidar-based watching with pause/resume race prevention
+  - Session token guards drop stale events during project switches
 - **Secure IPC**: All main↔renderer communication via contextBridge
 - **State Management**: Zustand for activity bar state (sidebar widths, active panels)
 - **Component Registry**: Splitview and Dockview use string-based component lookup

@@ -140,12 +140,75 @@ export class TerminalService extends EventEmitter {
       })
 
       console.log(`✅ Terminal ${terminalId} created`)
+      // Ensure shell actually starts in requested cwd; then confirm with marker
+      try {
+        await this.verifyAndSetCwd(terminal, shell)
+      } catch (e) {
+        console.warn('Failed to verify working directory:', e)
+      }
       return terminalId
     } catch (error) {
       console.error(`❌ Failed to create terminal:`, error)
       const message = error instanceof Error ? error.message : String(error)
       this.emit('error', { terminalId, error: message })
       return null
+    }
+  }
+
+  /**
+   * Ensure the PTY process is in the expected cwd by issuing a cd and
+   * then printing the directory with a unique marker. Updates the
+   * terminal instance cwd when detected.
+   */
+  private async verifyAndSetCwd(terminal: { id: string; ptyProcess: IPty; cwd: string }, shell: string) {
+    const marker = `__ERFANA_PWD_MARKER_${Date.now()}__`
+    const platform = osPlatform()
+    const target = terminal.cwd
+
+    // Compose platform-specific commands
+    let cmd = ''
+    if (platform === 'win32') {
+      const isPwsh = shell.toLowerCase().includes('powershell')
+      if (isPwsh) {
+        // PowerShell
+        cmd = `Set-Location -Path \"${target.replace(/`/g, '``').replace(/"/g, '\"')}\"\r\nWrite-Output (Get-Location).Path\r\nWrite-Output ${marker}\r\n`
+      } else {
+        // cmd.exe
+        cmd = `cd /d \"${target.replace(/"/g, '"')}\"\r\ncd\r\necho ${marker}\r\n`
+      }
+    } else {
+      // POSIX shells
+      const escaped = target.replace(/"/g, '\\"')
+      cmd = `cd \"${escaped}\"\nprintf \"%s\\n\" \"$(pwd)\"\necho ${marker}\n`
+    }
+
+    let buffer = ''
+    const onData = (data: string) => {
+      buffer += data
+      if (buffer.includes(marker)) {
+        // try to parse last path before marker
+        const lines = buffer.split(/\r?\n/).filter(Boolean)
+        const idx = lines.findIndex((l) => l.includes(marker))
+        if (idx > 0) {
+          const detected = lines[idx - 1].trim()
+          if (detected) {
+            // Update cached cwd
+            const t = this.terminals.get(terminal.id)
+            if (t) t.cwd = detected
+          }
+        }
+        // Remove listener once done
+        terminal.ptyProcess.off?.('data', onData as any)
+      }
+    }
+
+    // Add temporary listener in addition to the public forwarder
+    terminal.ptyProcess.on('data', onData as any)
+    // Issue commands
+    try {
+      terminal.ptyProcess.write(cmd)
+    } catch (e) {
+      // Ignore if write fails; verification is best-effort
     }
   }
 

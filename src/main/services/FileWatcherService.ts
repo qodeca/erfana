@@ -8,6 +8,7 @@ interface WatchedFile {
   webContentsIds: Set<number>
   isPaused: boolean
   debounceTimer: NodeJS.Timeout | null
+  version: number
 }
 
 export class FileWatcherService {
@@ -16,9 +17,13 @@ export class FileWatcherService {
   private readonly MAX_WATCHED_FILES = 100
   private projectPath: string | null = null
   private isDisposing: boolean = false // Flag to prevent operations during cleanup
+  // Session token to guard against late/stale events
+  private switchVersion = 0
 
   setProjectPath(path: string): void {
     this.projectPath = path
+    // Bump session on project changes to drop stale events
+    this.switchVersion++
   }
   /**
    * Stop all file watchers (for project switching)
@@ -36,6 +41,8 @@ export class FileWatcherService {
       }
     }
     this.watchedFiles.clear()
+    // Increment session to ignore late events from the previous watchers
+    this.switchVersion++
   }
 
   /**
@@ -105,7 +112,8 @@ export class FileWatcherService {
       watcher,
       webContentsIds: new Set([webContentsId]),
       isPaused: false,
-      debounceTimer: null
+      debounceTimer: null,
+      version: this.switchVersion
     }
 
     // Handle file change events
@@ -214,6 +222,10 @@ export class FileWatcherService {
     if (this.isDisposing) return // Ignore events during disposal
     const watched = this.watchedFiles.get(filePath)
     if (!watched) return
+    // Drop events generated for a previous session
+    if (watched.version !== this.switchVersion) {
+      return
+    }
 
     // Ignore if paused (during our own save)
     if (watched.isPaused) {
@@ -242,6 +254,10 @@ export class FileWatcherService {
     if (this.isDisposing) return // Ignore events during disposal
     const watched = this.watchedFiles.get(filePath)
     if (!watched) return
+    // Ignore late delete notices from previous sessions
+    if (watched.version !== this.switchVersion) {
+      return
+    }
 
     this.safeLog(`🗑️  File deleted externally: ${filePath}`)
     this.notifyWebContents(filePath, 'file-watch:deleted', { filePath })
@@ -265,6 +281,10 @@ export class FileWatcherService {
     if (this.isDisposing) return // Don't notify during disposal
     const watched = this.watchedFiles.get(filePath)
     if (!watched) return
+    // Ensure only current-session watchers can publish notifications
+    if (watched.version !== this.switchVersion) {
+      return
+    }
 
     const windows = BrowserWindow.getAllWindows()
 

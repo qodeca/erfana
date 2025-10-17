@@ -232,8 +232,18 @@ try {
 - Terminal initialization is deferred when the panel is hidden to avoid xterm sizing issues
 - Uses a ResizeObserver + visibility check to initialize once visible
 
-### CWD Verification (Planned)
-- After spawn, send an explicit `cd "<projectRoot>"` and `pwd` to verify cwd on shells that override working directory
+### CWD Verification
+- After spawn, TerminalService explicitly sets and verifies cwd to ensure shells that override startup directories are corrected
+- Implementation: sends platform-specific `cd` + prints `pwd` followed by a unique marker; updates cached cwd when detected
+
+Platform details:
+- macOS/Linux: `cd "<projectRoot>" && printf "%s\n" "$(pwd)" && echo <MARKER>`
+- Windows (PowerShell): `Set-Location -Path "<projectRoot>" ; Write-Output (Get-Location).Path ; Write-Output <MARKER>`
+- Windows (cmd.exe): `cd /d "<projectRoot>" & cd & echo <MARKER>`
+
+References:
+- Main: src/main/services/TerminalService.ts
+- Tests: src/main/services/TerminalService.test.ts
 
 ## Unavailable Terminal (node-pty)
 

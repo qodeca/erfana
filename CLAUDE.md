@@ -42,15 +42,15 @@ src/
 4. **Prompt Templates** - AI text operations via context menu
 
 ## Documentation
-See `docs/` folder for detailed documentation:
-- [Architecture](docs/architecture.md) - System design
-- [Editor Features](docs/editor/README.md) - Monaco editor, preview, scroll sync
-- [Terminal](docs/terminal.md) - Terminal integration
-- [Prompt Templates](docs/prompts/README.md) - Template system
-- [Testing](docs/testing/README.md) - Automated and visual testing
-- [Automated Testing Plan](docs/testing/automated-testing-plan.md) - Phased rollout and setup
- - [IPC Patterns](docs/ipc-patterns.md) - Includes shared schema notes
-- [Known Issues](docs/known-issues.md) - Current limitations
+See `docs/` for details (keep Claude’s context focused):
+- [Architecture](docs/architecture.md) — System design
+- [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
+- [Terminal](docs/terminal.md) — Integration + cwd verification
+- [File Watching](docs/file-watching.md) — Auto-refresh, recoverable ENOENT, session tokens
+- [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
+- [Testing](docs/testing/README.md) — Workspace + coverage
+- [Automated Plan](docs/testing/automated-testing-plan.md) — Phased rollout
+- [Known Issues](docs/known-issues.md) — Limitations and workarounds
 
 ## Code Style & Conventions
 - TypeScript strict mode enabled
@@ -61,10 +61,12 @@ See `docs/` folder for detailed documentation:
 - Lucide React for icons
 
 ## Recent Changes
-- Removed Copilot panel and Claude Code integration (simplified to Terminal only)
+- Removed Copilot panel and Claude Code integration (Terminal-only)
 - Removed Git panel feature (unfinished)
-- Improved scroll synchronization between editor and preview
+- Improved editor/preview scroll sync
 - Fixed EPIPE errors during shutdown
+- Watchers: recoverable ENOENT (stopAll) + session token guards to drop stale events
+- Terminal: explicit cwd verification post-spawn (cd + pwd marker)
 
 ## Working Areas
 - `src/renderer/src/components/` - UI components
@@ -84,6 +86,7 @@ See `docs/` folder for detailed documentation:
   - 20s busy window
   - Clears on exit and after Ctrl+C if quiet
 - Terminal initialization defers until panel is visible
+- Watchers increment session tokens on switch; stale events dropped
 
 ## IPC Contracts
 - Shared schemas/types: `src/shared/ipc/schema.ts` (zod)
