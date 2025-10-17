@@ -10,6 +10,21 @@ export default defineConfig({
     globals: true,
     reporters: 'default',
   },
+  coverage: {
+    provider: 'v8',
+    reporter: ['text', 'lcov', 'html'],
+    reportsDirectory: 'coverage/main',
+    thresholds: { lines: 10, functions: 10, branches: 5, statements: 10 },
+    exclude: [
+      'node_modules/**',
+      'out/**',
+      'dist/**',
+      '**/*.test.*',
+      '**/__tests__/**',
+      'vitest.*.ts',
+      'electron.vite.config.ts'
+    ],
+  },
   resolve: {
     alias: {
       '@main': path.resolve(__dirname, 'src/main'),
@@ -17,4 +32,3 @@ export default defineConfig({
     },
   },
 })
-

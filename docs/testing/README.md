@@ -21,6 +21,14 @@ See [Automated Testing Plan](./automated-testing-plan.md) for the phased rollout
 - Suggested: add smoke spec + critical flows (project open/change, file open/save).
 - Configure trace/screenshots on failure for debugging.
 
+### Coverage
+- Generate coverage reports with Vitest (v8 provider):
+  - `npm run test:cov`
+- Reports:
+  - Text summary in console
+  - HTML and lcov saved under `coverage/<project>/`
+  - Initial thresholds are low (10%) to avoid blocking early adoption
+
 ---
 
 ### Visual/MCP Test Scenarios

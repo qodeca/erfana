@@ -14,6 +14,22 @@ export default defineConfig({
     css: true,
     reporters: 'default',
   },
+  coverage: {
+    provider: 'v8',
+    reporter: ['text', 'lcov', 'html'],
+    reportsDirectory: 'coverage/renderer',
+    thresholds: { lines: 10, functions: 10, branches: 5, statements: 10 },
+    exclude: [
+      'node_modules/**',
+      'out/**',
+      'dist/**',
+      '**/*.test.*',
+      '**/__tests__/**',
+      'vitest.*.ts',
+      'electron.vite.config.ts',
+      'src/renderer/index.html'
+    ],
+  },
   resolve: {
     alias: {
       '@renderer': path.resolve(__dirname, 'src/renderer/src'),
@@ -21,4 +37,3 @@ export default defineConfig({
     },
   },
 })
-
