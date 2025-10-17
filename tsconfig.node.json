@@ -5,6 +5,11 @@
     "src/main/**/*",
     "src/preload/**/*"
   ],
+  "exclude": [
+    "src/main/**/*.test.*",
+    "src/preload/**/*.test.*",
+    "src/preload/**/__tests__/**"
+  ],
   "compilerOptions": {
     "composite": true,
     "types": ["electron-vite/node"]

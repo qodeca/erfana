@@ -77,3 +77,16 @@ const content = await window.api.file.readFile('/path/to/file.md')
 Use event-based IPC for watchers and terminal events (e.g., `terminal:data`, `directory-watch:changed`).
 
 See: [Architecture](./architecture.md) | [Security](./security.md) | [File Watching](./file-watching.md)
+
+## Shared Schemas (Type Safety)
+
+To keep IPC payloads consistent across processes, shared zod schemas live at `src/shared/ipc/schema.ts`.
+
+- `ProjectChangedSchema` — payload for `project:changed` events
+  - Shape: `{ oldPath: string | null; newPath: string | null }`
+  - Used in main when broadcasting, and in preload typings for `onProjectChanged`
+- Terminal event schemas — `TerminalDataSchema`, `TerminalExitSchema`, `TerminalErrorSchema`
+
+Recommended:
+- Validate payloads in tests using these schemas (see contract tests under `src/preload/__tests__/`)
+- Import types from the shared module rather than re-declaring shapes

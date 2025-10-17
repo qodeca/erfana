@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest'
 import type * as FsProm from 'fs/promises'
 import { FileService } from './FileService'
 
@@ -22,13 +22,11 @@ function makeStats(opts: { isDir: boolean }) {
 }
 
 describe('FileService', () => {
-  let fs: jest.Mocked<typeof import('fs/promises')>
+  let fs: any
   let svc: FileService
 
   beforeEach(async () => {
-    fs = (await import('fs/promises')) as unknown as jest.Mocked<
-      typeof import('fs/promises')
-    >
+    fs = (await import('fs/promises')) as any
     // Reset all mocks
     vi.resetAllMocks()
     svc = new FileService()
@@ -36,7 +34,7 @@ describe('FileService', () => {
 
   describe('deleteFile', () => {
     it('throws when target is a directory', async () => {
-      ;(fs.stat as unknown as jest.Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
+      ;(fs.stat as unknown as Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
       await expect(svc.deleteFile('/proj/dir'))
         .rejects.toThrow('Cannot delete a directory using deleteFile')
       expect(fs.rm).not.toHaveBeenCalled()
@@ -44,7 +42,7 @@ describe('FileService', () => {
 
     it('throws when file is outside project root', async () => {
       svc.setProjectPath('/proj')
-      ;(fs.stat as unknown as jest.Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
+      ;(fs.stat as unknown as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       await expect(svc.deleteFile('/other/file.md'))
         .rejects.toThrow('outside the project directory')
       expect(fs.rm).not.toHaveBeenCalled()
@@ -52,8 +50,8 @@ describe('FileService', () => {
 
     it('deletes file within project root', async () => {
       svc.setProjectPath('/proj')
-      ;(fs.stat as unknown as jest.Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
-      ;(fs.rm as unknown as jest.Mock).mockResolvedValueOnce(undefined)
+      ;(fs.stat as unknown as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
+      ;(fs.rm as unknown as Mock).mockResolvedValueOnce(undefined)
       await expect(svc.deleteFile('/proj/docs/readme.md')).resolves.toBeUndefined()
       expect(fs.rm).toHaveBeenCalledWith('/proj/docs/readme.md')
     })
@@ -61,29 +59,28 @@ describe('FileService', () => {
 
   describe('deleteFolder', () => {
     it('throws when not a directory', async () => {
-      ;(fs.stat as unknown as jest.Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
+      ;(fs.stat as unknown as Mock).mockResolvedValueOnce(makeStats({ isDir: false }))
       await expect(svc.deleteFolder('/proj/file.md')).rejects.toThrow('Path is not a directory')
     })
 
     it('prevents deleting project root', async () => {
       svc.setProjectPath('/proj')
-      ;(fs.stat as unknown as jest.Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
+      ;(fs.stat as unknown as Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
       await expect(svc.deleteFolder('/proj')).rejects.toThrow('Cannot delete the project root')
     })
 
     it('prevents deleting outside project', async () => {
       svc.setProjectPath('/proj')
-      ;(fs.stat as unknown as jest.Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
+      ;(fs.stat as unknown as Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
       await expect(svc.deleteFolder('/other/folder')).rejects.toThrow('outside the project directory')
     })
 
     it('deletes folder recursively within project', async () => {
       svc.setProjectPath('/proj')
-      ;(fs.stat as unknown as jest.Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
-      ;(fs.rm as unknown as jest.Mock).mockResolvedValueOnce(undefined)
+      ;(fs.stat as unknown as Mock).mockResolvedValueOnce(makeStats({ isDir: true }))
+      ;(fs.rm as unknown as Mock).mockResolvedValueOnce(undefined)
       await expect(svc.deleteFolder('/proj/tmp/cache')).resolves.toBeUndefined()
       expect(fs.rm).toHaveBeenCalledWith('/proj/tmp/cache', { recursive: true, force: true })
     })
   })
 })
-

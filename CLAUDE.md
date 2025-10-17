@@ -19,6 +19,7 @@ npm run test         # Vitest workspace (one-shot)
 npm run test:renderer
 npm run test:main
 npm run test:preload
+npm run test:cov     # Coverage (v8) per project
 ```
 
 ## Project Structure
@@ -48,6 +49,7 @@ See `docs/` folder for detailed documentation:
 - [Prompt Templates](docs/prompts/README.md) - Template system
 - [Testing](docs/testing/README.md) - Automated and visual testing
 - [Automated Testing Plan](docs/testing/automated-testing-plan.md) - Phased rollout and setup
+ - [IPC Patterns](docs/ipc-patterns.md) - Includes shared schema notes
 - [Known Issues](docs/known-issues.md) - Current limitations
 
 ## Code Style & Conventions
@@ -71,7 +73,12 @@ See `docs/` folder for detailed documentation:
 
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see docs/testing/README.md).
+- Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`).
 - Visual/MCP Scenarios: See docs/testing/ui-scenarios.md and docs/testing/interaction-scenarios.md.
+
+## IPC Contracts
+- Shared schemas/types: `src/shared/ipc/schema.ts` (zod)
+- `project:changed` payload: `{ oldPath: string | null; newPath: string | null }`
 
 ## Important Notes
 - node-pty may fail to build on Python 3.13 (use 3.12)

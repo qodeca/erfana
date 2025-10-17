@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { ProjectChanged } from '@shared/ipc/schema'
+import type { ProjectChanged } from '../shared/ipc/schema'
 import { electronAPI } from '@electron-toolkit/preload'
 
 export interface FileNode {

@@ -4,6 +4,10 @@
     "src/renderer/**/*",
     "src/preload/*.d.ts"
   ],
+  "exclude": [
+    "src/renderer/src/**/*.test.*",
+    "src/renderer/src/**/__tests__/**"
+  ],
   "compilerOptions": {
     "composite": true,
     "jsx": "react-jsx",
