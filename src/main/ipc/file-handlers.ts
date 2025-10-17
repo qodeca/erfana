@@ -3,7 +3,33 @@ import { fileService } from '../services/FileService'
 import { settingsService } from '../services/SettingsService'
 import { fileWatcherService } from '../services/FileWatcherService'
 import { directoryWatcherService } from '../services/DirectoryWatcherService'
-import { stat } from 'fs/promises'
+import { stat, realpath } from 'fs/promises'
+import { normalize, sep, parse } from 'path'
+
+async function canonicalizePath(p: string): Promise<string> {
+  // Normalize separators
+  let n = normalize(p)
+
+  // Preserve root; trim trailing separators only past root length
+  const root = parse(n).root
+  while (n.length > root.length && n.endsWith(sep)) {
+    n = n.slice(0, -1)
+  }
+
+  // Resolve symlinks if possible
+  let r = n
+  try {
+    r = await realpath(n)
+  } catch {
+    // ignore, fallback to normalized path
+  }
+
+  // Case fold only on Windows (case-insensitive by default)
+  if (process.platform === 'win32') {
+    r = r.toLowerCase()
+  }
+  return r
+}
 
 export function registerFileHandlers(): void {
   // Open project folder
@@ -21,9 +47,15 @@ export function registerFileHandlers(): void {
     const newProjectPath = result.filePaths[0]
     const oldProjectPath = fileService.getProjectPath()
 
-    // If same path, just return
-    if (oldProjectPath === newProjectPath) {
-      return newProjectPath
+    // If same path (canonical comparison), just return
+    if (oldProjectPath) {
+      const [canonOld, canonNew] = await Promise.all([
+        canonicalizePath(oldProjectPath),
+        canonicalizePath(newProjectPath)
+      ])
+      if (canonOld === canonNew) {
+        return newProjectPath
+      }
     }
 
     // Stop all existing watchers before switching
@@ -121,6 +153,36 @@ export function registerFileHandlers(): void {
   // Get current project path
   ipcMain.handle('file:getProjectPath', async () => {
     return fileService.getProjectPath()
+  })
+
+  // Close current project
+  ipcMain.handle('file:closeProject', async () => {
+    const oldProjectPath = fileService.getProjectPath()
+
+    if (!oldProjectPath) return true
+
+    // Stop all watchers
+    await fileWatcherService.stopAll()
+    await directoryWatcherService.stopAll()
+
+    // Clear project path in services
+    fileService.setProjectPath('')
+    fileWatcherService.setProjectPath('')
+    directoryWatcherService.setProjectPath('')
+
+    // Clear last project path from settings
+    await settingsService.clearLastProjectPath()
+
+    // Notify renderers of closed project
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('project:changed', {
+        oldPath: oldProjectPath,
+        newPath: null
+      })
+    }
+
+    return true
   })
 
   // Create new file

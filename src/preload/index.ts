@@ -43,12 +43,16 @@ const api = {
       ipcRenderer.invoke('file:rename', oldPath, newName),
 
     // Project change event listener
-    onProjectChanged: (callback: (data: { oldPath: string | null; newPath: string }) => void) => {
-      const listener = (_event: unknown, data: { oldPath: string | null; newPath: string }) =>
+    onProjectChanged: (callback: (data: { oldPath: string | null; newPath: string | null }) => void) => {
+      const listener = (
+        _event: unknown,
+        data: { oldPath: string | null; newPath: string | null }
+      ) =>
         callback(data)
       ipcRenderer.on('project:changed', listener)
       return () => ipcRenderer.removeListener('project:changed', listener)
-    }
+    },
+    closeProject: (): Promise<boolean> => ipcRenderer.invoke('file:closeProject')
   },
 
   // File watching operations
@@ -212,6 +216,6 @@ if (process.contextIsolated) {
     console.error(error)
   }
 } else {
-  ;(window as any).electron = electronAPI
-  ;(window as any).api = api
+  ;(window as unknown as { electron: typeof electronAPI }).electron = electronAPI
+  ;(window as unknown as { api: typeof api }).api = api
 }

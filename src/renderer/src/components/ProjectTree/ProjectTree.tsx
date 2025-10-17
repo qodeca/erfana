@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { FilePlus, FolderPlus, FolderOpen, Replace, Trash, AlertTriangle, Edit, FileText, Files } from 'lucide-react'
+import { FilePlus, FolderPlus, FolderOpen, Replace, Trash, AlertTriangle, Edit, FileText, Files, RotateCw, X as CloseIcon } from 'lucide-react'
 import type { FileNode } from '../../../../preload/index'
 import type { FilterMode } from '../../types/filters'
 import { ProjectTreeNode } from './ProjectTreeNode'
 import { ContextMenu, ContextMenuItem } from '../ContextMenu/ContextMenu'
 import { ConfirmDialog } from '../ConfirmDialog/ConfirmDialog'
 import './ProjectTree.css'
+import { showGlobalToast } from '../Toast/toastService'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -32,6 +33,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [renameError, setRenameError] = useState<string | null>(null)
+  const [isSwitchingProject, setIsSwitchingProject] = useState(false)
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -147,7 +149,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
   const handleOpenProject = async () => {
     try {
-      setLoading(true)
+      setIsSwitchingProject(true)
       setError(null)
       const path = await window.api.file.openProject()
 
@@ -155,12 +157,34 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         setProjectPath(path)
         const fileTree = await window.api.file.readDirectory(path)
         setFiles(fileTree)
+        showGlobalToast({ type: 'success', title: 'Project Opened', message: path })
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to open project')
       console.error('Error opening project:', err)
+      showGlobalToast({ type: 'error', title: 'Open Project Failed', message: String(err instanceof Error ? err.message : err) })
     } finally {
-      setLoading(false)
+      setIsSwitchingProject(false)
+    }
+  }
+
+  const handleCloseProject = async () => {
+    try {
+      setIsSwitchingProject(true)
+      setError(null)
+      const ok = await window.api.file.closeProject()
+      if (ok) {
+        setProjectPath(null)
+        setFiles([])
+        setExpandedFolders(new Set())
+        showGlobalToast({ type: 'info', title: 'Project Closed', message: 'Current project has been closed.' })
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to close project')
+      console.error('Error closing project:', err)
+      showGlobalToast({ type: 'error', title: 'Close Project Failed', message: String(err instanceof Error ? err.message : err) })
+    } finally {
+      setIsSwitchingProject(false)
     }
   }
 
@@ -682,15 +706,27 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
           <button
             className="icon-btn"
             onClick={handleOpenProject}
-            disabled={loading}
+            disabled={isSwitchingProject}
             title={projectPath ? 'Change project' : 'Open project'}
           >
-            {projectPath ? (
+            {isSwitchingProject ? (
+              <RotateCw size={14} strokeWidth={2} className="spin" />
+            ) : projectPath ? (
               <Replace size={14} strokeWidth={2} />
             ) : (
               <FolderOpen size={14} strokeWidth={2} />
             )}
           </button>
+          {projectPath && (
+            <button
+              className="icon-btn"
+              onClick={handleCloseProject}
+              disabled={isSwitchingProject}
+              title="Close project"
+            >
+              <CloseIcon size={14} strokeWidth={2} />
+            </button>
+          )}
           {projectPath && (
             <>
               <button
