@@ -7,21 +7,26 @@
 
 import { EventEmitter } from 'events'
 import { homedir, platform as osPlatform } from 'os'
+import type { IPty } from 'node-pty'
 
 // Dynamic import for node-pty (optional dependency)
-let pty: any = null
-try {
-  pty = require('node-pty')
-} catch (error) {
-  console.error('⚠️ node-pty not available:', error)
-}
+type NodePtyModule = typeof import('node-pty')
+let pty: NodePtyModule | null = null
+// Kick off loading in background
+void import('node-pty')
+  .then((mod) => {
+    pty = mod
+  })
+  .catch((error) => {
+    console.error('⚠️ node-pty not available:', error)
+  })
 
 /**
  * Terminal instance data
  */
 interface TerminalInstance {
   id: string
-  ptyProcess: any // IPty from node-pty
+  ptyProcess: IPty
   cwd: string
   title: string
 }
@@ -51,10 +56,14 @@ export class TerminalService extends EventEmitter {
   /**
    * Create a new terminal instance
    */
-  createTerminal(config: TerminalConfig = {}): string | null {
-    if (!this.isAvailable()) {
-      console.error('❌ Cannot create terminal: node-pty not available')
-      return null
+  async createTerminal(config: TerminalConfig = {}): Promise<string | null> {
+    if (!pty) {
+      try {
+        pty = await import('node-pty')
+      } catch (e) {
+        console.error('❌ Cannot create terminal: node-pty not available', e)
+        return null
+      }
     }
 
     const terminalId = `terminal-${++this.terminalCounter}`
@@ -132,9 +141,10 @@ export class TerminalService extends EventEmitter {
 
       console.log(`✅ Terminal ${terminalId} created`)
       return terminalId
-    } catch (error: any) {
+    } catch (error) {
       console.error(`❌ Failed to create terminal:`, error)
-      this.emit('error', { terminalId, error: error.message })
+      const message = error instanceof Error ? error.message : String(error)
+      this.emit('error', { terminalId, error: message })
       return null
     }
   }
@@ -153,9 +163,10 @@ export class TerminalService extends EventEmitter {
     try {
       terminal.ptyProcess.write(data)
       return true
-    } catch (error: any) {
+    } catch (error) {
       // Suppress EPIPE errors - terminal may have closed
-      if (error.code === 'EPIPE') {
+      const code = (error as { code?: unknown }).code
+      if (code === 'EPIPE') {
         console.log(`ℹ️ Terminal ${terminalId} PTY closed (terminal likely exited)`)
         // Clean up the closed terminal
         this.terminals.delete(terminalId)
@@ -164,7 +175,8 @@ export class TerminalService extends EventEmitter {
       }
 
       console.error(`❌ Failed to write to terminal ${terminalId}:`, error)
-      this.emit('error', { terminalId, error: error.message })
+      const message = error instanceof Error ? error.message : String(error)
+      this.emit('error', { terminalId, error: message })
       return false
     }
   }
@@ -184,9 +196,10 @@ export class TerminalService extends EventEmitter {
       terminal.ptyProcess.resize(cols, rows)
       console.log(`📏 Terminal ${terminalId} resized to ${cols}x${rows}`)
       return true
-    } catch (error: any) {
+    } catch (error) {
       console.error(`❌ Failed to resize terminal ${terminalId}:`, error)
-      this.emit('error', { terminalId, error: error.message })
+      const message = error instanceof Error ? error.message : String(error)
+      this.emit('error', { terminalId, error: message })
       return false
     }
   }
@@ -207,16 +220,18 @@ export class TerminalService extends EventEmitter {
       this.terminals.delete(terminalId)
       console.log(`🛑 Terminal ${terminalId} killed`)
       return true
-    } catch (error: any) {
+    } catch (error) {
       // Suppress EPIPE and ESRCH errors - process may already be dead
-      if (error.code === 'EPIPE' || error.code === 'ESRCH') {
+      const code = (error as { code?: unknown }).code
+      if (code === 'EPIPE' || code === 'ESRCH') {
         console.log(`ℹ️ Terminal ${terminalId} process already terminated`)
         this.terminals.delete(terminalId)
         return true
       }
 
       console.error(`❌ Failed to kill terminal ${terminalId}:`, error)
-      this.emit('error', { terminalId, error: error.message })
+      const message = error instanceof Error ? error.message : String(error)
+      this.emit('error', { terminalId, error: message })
       return false
     }
   }
@@ -258,9 +273,10 @@ export class TerminalService extends EventEmitter {
       try {
         terminal.ptyProcess.kill()
         console.log(`✅ Terminal ${terminalId} cleaned up`)
-      } catch (error: any) {
+      } catch (error) {
         // Suppress EPIPE and ESRCH errors during cleanup
-        if (error?.code === 'EPIPE' || error?.code === 'ESRCH') {
+        const code = (error as { code?: unknown }).code
+        if (code === 'EPIPE' || code === 'ESRCH') {
           console.log(`ℹ️ Terminal ${terminalId} already terminated`)
         } else {
           console.error(`❌ Failed to cleanup terminal ${terminalId}:`, error)

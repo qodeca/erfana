@@ -40,7 +40,15 @@ const api = {
     deleteFolder: (folderPath: string): Promise<boolean> =>
       ipcRenderer.invoke('file:deleteFolder', folderPath),
     rename: (oldPath: string, newName: string): Promise<string> =>
-      ipcRenderer.invoke('file:rename', oldPath, newName)
+      ipcRenderer.invoke('file:rename', oldPath, newName),
+
+    // Project change event listener
+    onProjectChanged: (callback: (data: { oldPath: string | null; newPath: string }) => void) => {
+      const listener = (_event: unknown, data: { oldPath: string | null; newPath: string }) =>
+        callback(data)
+      ipcRenderer.on('project:changed', listener)
+      return () => ipcRenderer.removeListener('project:changed', listener)
+    }
   },
 
   // File watching operations
@@ -55,22 +63,22 @@ const api = {
       ipcRenderer.invoke('file-watch:pause', filePath),
     resume: (filePath: string): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('file-watch:resume', filePath),
-    getStats: (): Promise<{ success: boolean; stats?: any; error?: string }> =>
+    getStats: (): Promise<{ success: boolean; stats?: unknown; error?: string }> =>
       ipcRenderer.invoke('file-watch:stats'),
 
     // Event listeners
     onFileChanged: (callback: (data: { filePath: string }) => void) => {
-      const listener = (_event: any, data: { filePath: string }) => callback(data)
+      const listener = (_event: unknown, data: { filePath: string }) => callback(data)
       ipcRenderer.on('file-watch:changed', listener)
       return () => ipcRenderer.removeListener('file-watch:changed', listener)
     },
     onFileDeleted: (callback: (data: { filePath: string }) => void) => {
-      const listener = (_event: any, data: { filePath: string }) => callback(data)
+      const listener = (_event: unknown, data: { filePath: string }) => callback(data)
       ipcRenderer.on('file-watch:deleted', listener)
       return () => ipcRenderer.removeListener('file-watch:deleted', listener)
     },
     onFileError: (callback: (data: { filePath: string; error: string }) => void) => {
-      const listener = (_event: any, data: { filePath: string; error: string }) => callback(data)
+      const listener = (_event: unknown, data: { filePath: string; error: string }) => callback(data)
       ipcRenderer.on('file-watch:error', listener)
       return () => ipcRenderer.removeListener('file-watch:error', listener)
     }
@@ -88,27 +96,27 @@ const api = {
       ipcRenderer.invoke('directory-watch:pause', dirPath),
     resume: (dirPath: string): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('directory-watch:resume', dirPath),
-    getStats: (): Promise<{ success: boolean; stats?: any; error?: string }> =>
+    getStats: (): Promise<{ success: boolean; stats?: unknown; error?: string }> =>
       ipcRenderer.invoke('directory-watch:get-stats'),
 
     // Event listeners
     onDirectoryChanged: (
-      callback: (data: { dirPath: string; eventCount: number; summary: any }) => void
+      callback: (data: { dirPath: string; eventCount: number; summary: Record<string, number> }) => void
     ) => {
       const listener = (
-        _event: any,
-        data: { dirPath: string; eventCount: number; summary: any }
+        _event: unknown,
+        data: { dirPath: string; eventCount: number; summary: Record<string, number> }
       ) => callback(data)
       ipcRenderer.on('directory-watch:changed', listener)
       return () => ipcRenderer.removeListener('directory-watch:changed', listener)
     },
     onProjectDeleted: (callback: (data: { dirPath: string }) => void) => {
-      const listener = (_event: any, data: { dirPath: string }) => callback(data)
+      const listener = (_event: unknown, data: { dirPath: string }) => callback(data)
       ipcRenderer.on('directory-watch:project-deleted', listener)
       return () => ipcRenderer.removeListener('directory-watch:project-deleted', listener)
     },
     onDirectoryError: (callback: (data: { dirPath: string; error: string }) => void) => {
-      const listener = (_event: any, data: { dirPath: string; error: string }) => callback(data)
+      const listener = (_event: unknown, data: { dirPath: string; error: string }) => callback(data)
       ipcRenderer.on('directory-watch:error', listener)
       return () => ipcRenderer.removeListener('directory-watch:error', listener)
     }
@@ -170,19 +178,23 @@ const api = {
 
     // Event listeners
     onData: (callback: (data: { terminalId: string; data: string }) => void) => {
-      const listener = (_event: any, data: { terminalId: string; data: string }) => callback(data)
+      const listener = (_event: unknown, data: { terminalId: string; data: string }) => callback(data)
       ipcRenderer.on('terminal:data', listener)
       return () => ipcRenderer.removeListener('terminal:data', listener)
     },
 
     onExit: (callback: (data: { terminalId: string; exitCode: number; signal?: number }) => void) => {
-      const listener = (_event: any, data: { terminalId: string; exitCode: number; signal?: number }) => callback(data)
+      const listener = (
+        _event: unknown,
+        data: { terminalId: string; exitCode: number; signal?: number }
+      ) => callback(data)
       ipcRenderer.on('terminal:exit', listener)
       return () => ipcRenderer.removeListener('terminal:exit', listener)
     },
 
     onError: (callback: (data: { terminalId: string; error: string }) => void) => {
-      const listener = (_event: any, data: { terminalId: string; error: string }) => callback(data)
+      const listener = (_event: unknown, data: { terminalId: string; error: string }) =>
+        callback(data)
       ipcRenderer.on('terminal:error', listener)
       return () => ipcRenderer.removeListener('terminal:error', listener)
     }
@@ -200,8 +212,6 @@ if (process.contextIsolated) {
     console.error(error)
   }
 } else {
-  // @ts-ignore (define in dts)
-  window.electron = electronAPI
-  // @ts-ignore (define in dts)
-  window.api = api
+  ;(window as any).electron = electronAPI
+  ;(window as any).api = api
 }

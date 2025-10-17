@@ -92,9 +92,10 @@ export class FileService {
     try {
       await stat(filePath)
       throw new Error(`File "${fileName}" already exists`)
-    } catch (error: any) {
+    } catch (error) {
       // File doesn't exist - good, we can create it
-      if (error.code !== 'ENOENT') {
+      const code = (error as { code?: unknown }).code
+      if (code !== 'ENOENT') {
         throw error
       }
     }
@@ -119,9 +120,10 @@ export class FileService {
     try {
       await stat(folderPath)
       throw new Error(`Folder "${folderName}" already exists`)
-    } catch (error: any) {
+    } catch (error) {
       // Folder doesn't exist - good, we can create it
-      if (error.code !== 'ENOENT') {
+      const code = (error as { code?: unknown }).code
+      if (code !== 'ENOENT') {
         throw error
       }
     }
@@ -185,9 +187,10 @@ export class FileService {
     try {
       await stat(newPath)
       throw new Error(`"${newName}" already exists`)
-    } catch (error: any) {
+    } catch (error) {
       // File/folder doesn't exist - good, we can rename
-      if (error.code !== 'ENOENT') {
+      const code = (error as { code?: unknown }).code
+      if (code !== 'ENOENT') {
         throw error
       }
     }

@@ -14,14 +14,15 @@ type ConsoleMethod = 'log' | 'error' | 'warn' | 'info' | 'debug'
 /**
  * Safe wrapper for console methods that handles EPIPE errors
  */
-function safeConsoleWrite(method: ConsoleMethod, ...args: any[]): void {
+function safeConsoleWrite(method: ConsoleMethod, ...args: unknown[]): void {
   try {
     // Attempt to write to console
     console[method](...args)
-  } catch (error: any) {
+  } catch (error) {
     // Silently suppress EPIPE errors (broken pipe)
     // These occur naturally during cleanup when stdout/stderr are closed
-    if (error?.code === 'EPIPE') {
+    const code = (error as { code?: unknown }).code
+    if (code === 'EPIPE') {
       // Do nothing - this is expected during shutdown
       return
     }
@@ -29,7 +30,8 @@ function safeConsoleWrite(method: ConsoleMethod, ...args: any[]): void {
     // For other errors, attempt to write to stderr if available
     // This is a last resort for unexpected console errors
     try {
-      process.stderr?.write(`[Console Error] ${error?.message || error}\n`)
+      const message = error instanceof Error ? error.message : String(error)
+      process.stderr?.write(`[Console Error] ${message}\n`)
     } catch {
       // If even stderr is unavailable, fail silently
     }
@@ -41,11 +43,11 @@ function safeConsoleWrite(method: ConsoleMethod, ...args: any[]): void {
  * Drop-in replacement for console.log, console.error, etc.
  */
 export const safeConsole = {
-  log: (...args: any[]) => safeConsoleWrite('log', ...args),
-  error: (...args: any[]) => safeConsoleWrite('error', ...args),
-  warn: (...args: any[]) => safeConsoleWrite('warn', ...args),
-  info: (...args: any[]) => safeConsoleWrite('info', ...args),
-  debug: (...args: any[]) => safeConsoleWrite('debug', ...args)
+  log: (...args: unknown[]) => safeConsoleWrite('log', ...args),
+  error: (...args: unknown[]) => safeConsoleWrite('error', ...args),
+  warn: (...args: unknown[]) => safeConsoleWrite('warn', ...args),
+  info: (...args: unknown[]) => safeConsoleWrite('info', ...args),
+  debug: (...args: unknown[]) => safeConsoleWrite('debug', ...args)
 }
 
 /**

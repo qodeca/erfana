@@ -19,6 +19,7 @@ import { WelcomeTab } from '../Panels/WelcomeTab'
 import { TerminalPanel } from '../Panels/TerminalPanel'
 import { ActivityBar } from '../ActivityBar/ActivityBar'
 import { useActivityBarStore } from '../../stores/useActivityBarStore'
+import { useProjectStore } from '../../stores/useProjectStore'
 import { getPanelById } from '../ActivityBar/activityBarConfig'
 
 // ============================================================================
@@ -138,6 +139,8 @@ export function AppDockLayout() {
       params: {
         setDockviewApi: (api: DockviewApi) => {
           dockviewApiRef.current = api
+          // Make available via store for cross-component operations
+          useProjectStore.getState().setDockviewApi(api)
           // Update left panel params with the dockview API
           const leftPanelRef = event.api.getPanel('left-sidebar')
           if (leftPanelRef) {
@@ -242,7 +245,15 @@ export function AppDockLayout() {
       setActivePanel(null, 'right')
     }
     // run once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Listen for project change events to clear editor tabs
+  useEffect(() => {
+    const unsubscribe = window.api.file.onProjectChanged(() => {
+      // Close all opened editor tabs
+      useProjectStore.getState().clearAllEditorTabs()
+    })
+    return () => unsubscribe()
   }, [])
 
   // Keyboard shortcuts (matching VS Code)

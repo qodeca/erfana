@@ -1,6 +1,8 @@
-import { ipcMain, dialog } from 'electron'
+import { ipcMain, dialog, BrowserWindow } from 'electron'
 import { fileService } from '../services/FileService'
 import { settingsService } from '../services/SettingsService'
+import { fileWatcherService } from '../services/FileWatcherService'
+import { directoryWatcherService } from '../services/DirectoryWatcherService'
 import { stat } from 'fs/promises'
 
 export function registerFileHandlers(): void {
@@ -16,10 +18,36 @@ export function registerFileHandlers(): void {
       return null
     }
 
-    const projectPath = result.filePaths[0]
-    fileService.setProjectPath(projectPath)
-    await settingsService.setLastProjectPath(projectPath)
-    return projectPath
+    const newProjectPath = result.filePaths[0]
+    const oldProjectPath = fileService.getProjectPath()
+
+    // If same path, just return
+    if (oldProjectPath === newProjectPath) {
+      return newProjectPath
+    }
+
+    // Stop all existing watchers before switching
+    await fileWatcherService.stopAll()
+    await directoryWatcherService.stopAll()
+
+    // Update project path across services
+    fileService.setProjectPath(newProjectPath)
+    fileWatcherService.setProjectPath(newProjectPath)
+    directoryWatcherService.setProjectPath(newProjectPath)
+
+    // Persist last project path
+    await settingsService.setLastProjectPath(newProjectPath)
+
+    // Notify renderers
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('project:changed', {
+        oldPath: oldProjectPath,
+        newPath: newProjectPath
+      })
+    }
+
+    return newProjectPath
   })
 
   // Get last opened project path if it still exists
@@ -36,7 +64,7 @@ export function registerFileHandlers(): void {
         fileService.setProjectPath(lastPath)
         return lastPath
       }
-    } catch (error) {
+    } catch {
       // Folder doesn't exist anymore, clear from settings
       await settingsService.clearLastProjectPath()
     }

@@ -12,6 +12,7 @@ import { ProjectTree } from '../ProjectTree/ProjectTree'
 import type { FilterMode } from '../../types/filters'
 import { sanitizeFilePath } from '../../utils/fileUtils'
 import './ProjectPanel.css'
+import { useProjectStore } from '../../stores/useProjectStore'
 
 /**
  * Runtime type guard for FilterMode
@@ -80,6 +81,8 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
         title: fileName,
         params: { filePath }
       })
+      // Track opened editor panel id for later cleanup
+      useProjectStore.getState().registerEditorPanel(panelId)
     }
 
     editorPanel.api.setActive()

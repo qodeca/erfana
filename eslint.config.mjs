@@ -1,14 +1,20 @@
 import pluginJs from '@eslint/js'
 import pluginReact from 'eslint-plugin-react'
 import * as tseslint from 'typescript-eslint'
-import prettier from '@electron-toolkit/eslint-config-prettier'
+// Use flat-config-friendly Prettier rules directly
+import eslintConfigPrettier from 'eslint-config-prettier'
 
 export default [
+  // Ignore build outputs and vendored folders
+  { ignores: ['node_modules/**', 'out/**', 'dist/**', 'release/**'] },
   { files: ['**/*.{js,mjs,cjs,ts,jsx,tsx}'] },
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
   pluginReact.configs.flat.recommended,
-  prettier,
+  // Disable formatting-related rules that conflict with Prettier
+  { rules: eslintConfigPrettier.rules },
+  // Configure React version detection for eslint-plugin-react
+  { settings: { react: { version: 'detect' } } },
   {
     rules: {
       '@typescript-eslint/explicit-function-return-type': 'off',
@@ -18,7 +24,8 @@ export default [
           argsIgnorePattern: '^_'
         }
       ],
-      'react/react-in-jsx-scope': 'off'
+      'react/react-in-jsx-scope': 'off',
+      'react/prop-types': 'off'
     }
   }
 ]

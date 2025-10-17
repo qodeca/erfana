@@ -20,6 +20,23 @@ export class FileWatcherService {
   setProjectPath(path: string): void {
     this.projectPath = path
   }
+  /**
+   * Stop all file watchers (for project switching)
+   */
+  async stopAll(): Promise<void> {
+    this.safeLog('👁️  Stopping all file watchers...')
+    for (const [, watched] of this.watchedFiles.entries()) {
+      if (watched.debounceTimer) {
+        clearTimeout(watched.debounceTimer)
+      }
+      try {
+        await watched.watcher.close()
+      } catch {
+        // ignore
+      }
+    }
+    this.watchedFiles.clear()
+  }
 
   /**
    * Safe logging that handles EPIPE errors during app shutdown
@@ -54,7 +71,7 @@ export class FileWatcherService {
     // Verify file exists
     try {
       await stat(filePath)
-    } catch (error) {
+    } catch {
       throw new Error(`File does not exist: ${filePath}`)
     }
 
@@ -240,7 +257,11 @@ export class FileWatcherService {
   /**
    * Notify all webContents watching this file
    */
-  private notifyWebContents(filePath: string, channel: string, data: any): void {
+  private notifyWebContents(
+    filePath: string,
+    channel: string,
+    data: Record<string, unknown>
+  ): void {
     if (this.isDisposing) return // Don't notify during disposal
     const watched = this.watchedFiles.get(filePath)
     if (!watched) return
@@ -252,12 +273,12 @@ export class FileWatcherService {
       if (window && !window.isDestroyed()) {
         try {
           window.webContents.send(channel, data)
-        } catch (error) {
-          // Suppress errors during shutdown (EPIPE, destroyed webContents, etc.)
-          if (error instanceof Error && !error.message.includes('destroyed')) {
-            this.safeLog(`⚠️  Error sending to webContents: ${error.message}`)
-          }
+      } catch (error) {
+        // Suppress errors during shutdown (EPIPE, destroyed webContents, etc.)
+        if (error instanceof Error && !error.message.includes('destroyed')) {
+          this.safeLog(`⚠️  Error sending to webContents: ${error.message}`)
         }
+      }
       }
     }
   }
@@ -288,7 +309,7 @@ export class FileWatcherService {
       }
       try {
         await watched.watcher.close()
-      } catch (error) {
+      } catch {
         // Suppress errors during cleanup
       }
     }

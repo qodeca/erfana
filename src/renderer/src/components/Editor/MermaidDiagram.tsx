@@ -225,7 +225,7 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
               href="https://mermaid.js.org/"
               onClick={(e) => {
                 e.preventDefault()
-                // @ts-ignore - shell is available via electron
+                // @ts-expect-error - shell is available via electron
                 window.electron.shell.openExternal('https://mermaid.js.org/')
               }}
             >

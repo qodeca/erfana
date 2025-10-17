@@ -70,6 +70,41 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     loadLastProject()
   }, [])
 
+  // Listen for project change events from other components
+  useEffect(() => {
+    const unsubscribe = window.api.file.onProjectChanged(async (data) => {
+      console.log('🌳 ProjectTree: Project changed event received:', data)
+
+      // Clear UI state for new project
+      setExpandedFolders(new Set())
+      setSelectedFolder(null)
+      setError(null)
+
+      // Update project path and load new tree
+      if (data.newPath) {
+        setProjectPath(data.newPath)
+        try {
+          setLoading(true)
+          const fileTree = await window.api.file.readDirectory(data.newPath)
+          setFiles(fileTree)
+        } catch (err) {
+          console.error('Error loading new project tree:', err)
+          setError(err instanceof Error ? err.message : 'Failed to load project')
+        } finally {
+          setLoading(false)
+        }
+      } else {
+        // Project was closed
+        setProjectPath(null)
+        setFiles([])
+      }
+    })
+
+    return () => {
+      unsubscribe()
+    }
+  }, [])
+
   // Directory watching for auto-refresh
   useEffect(() => {
     if (!projectPath) return
