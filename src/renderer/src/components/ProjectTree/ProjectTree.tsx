@@ -151,6 +151,47 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     try {
       setIsSwitchingProject(true)
       setError(null)
+      // Check for unsaved editors
+      const hasDirty = await import('../../stores/useProjectStore')
+        .then(({ useProjectStore }) => useProjectStore.getState().hasDirtyEditors())
+        .catch(() => false)
+
+      // Terminal recent activity check
+      const terminalBusy = await import('../../stores/useTerminalStore')
+        .then(({ useTerminalStore }) => useTerminalStore.getState().isRecentlyActive(10000))
+        .catch(() => false)
+
+      if (hasDirty || terminalBusy) {
+        return setConfirmDialog({
+          title: hasDirty ? 'Unsaved Changes' : 'Active Terminal Session',
+          message: hasDirty
+            ? 'You have unsaved changes. Discard and switch project?'
+            : 'Terminal shows recent activity. Stop it and switch project?',
+          onConfirm: async () => {
+            setConfirmDialog(null)
+            // Graceful signal to terminal if active
+            try {
+              const { useTerminalStore } = await import('../../stores/useTerminalStore')
+              const tid = useTerminalStore.getState().getActiveTerminalId()
+              if (tid) {
+                // Send Ctrl+C signal
+                window.api.terminal.write(tid, '\u0003')
+                await new Promise((r) => setTimeout(r, 200))
+              }
+            } catch (e) {
+              console.warn('Failed to signal terminal before switching project:', e)
+            }
+            const path = await window.api.file.openProject()
+            if (path) {
+              setProjectPath(path)
+              const fileTree = await window.api.file.readDirectory(path)
+              setFiles(fileTree)
+              showGlobalToast({ type: 'success', title: 'Project Opened', message: path })
+            }
+            setIsSwitchingProject(false)
+          }
+        })
+      }
       const path = await window.api.file.openProject()
 
       if (path) {
@@ -172,6 +213,41 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     try {
       setIsSwitchingProject(true)
       setError(null)
+      const hasDirty = await import('../../stores/useProjectStore')
+        .then(({ useProjectStore }) => useProjectStore.getState().hasDirtyEditors())
+        .catch(() => false)
+      const terminalBusy = await import('../../stores/useTerminalStore')
+        .then(({ useTerminalStore }) => useTerminalStore.getState().isRecentlyActive(10000))
+        .catch(() => false)
+      if (hasDirty || terminalBusy) {
+        return setConfirmDialog({
+          title: hasDirty ? 'Unsaved Changes' : 'Active Terminal Session',
+          message: hasDirty
+            ? 'You have unsaved changes. Discard and close project?'
+            : 'Terminal shows recent activity. Stop it and close project?',
+          onConfirm: async () => {
+            setConfirmDialog(null)
+            try {
+              const { useTerminalStore } = await import('../../stores/useTerminalStore')
+              const tid = useTerminalStore.getState().getActiveTerminalId()
+              if (tid) {
+                window.api.terminal.write(tid, '\u0003')
+                await new Promise((r) => setTimeout(r, 200))
+              }
+            } catch (e) {
+              console.warn('Failed to signal terminal before closing project:', e)
+            }
+            const ok = await window.api.file.closeProject()
+            if (ok) {
+              setProjectPath(null)
+              setFiles([])
+              setExpandedFolders(new Set())
+              showGlobalToast({ type: 'info', title: 'Project Closed', message: 'Current project has been closed.' })
+            }
+            setIsSwitchingProject(false)
+          }
+        })
+      }
       const ok = await window.api.file.closeProject()
       if (ok) {
         setProjectPath(null)

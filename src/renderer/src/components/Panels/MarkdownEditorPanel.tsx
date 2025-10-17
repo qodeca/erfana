@@ -53,7 +53,9 @@ const calculateStats = (content: string): DocumentStats => {
   }
 }
 
-export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: string }>) {
+export function MarkdownEditorPanel(
+  props: IDockviewPanelProps<{ filePath?: string; panelId?: string }>
+) {
   const [currentFile, setCurrentFile] = useState<EditorFile | null>(null)
   const [viewMode, setViewMode] = useState<'split' | 'split-horizontal' | 'editor' | 'preview'>('preview')
   const [selectedText, setSelectedText] = useState<string>('')
@@ -77,6 +79,7 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
   const [externalChangeDetected, setExternalChangeDetected] = useState(false)
   const [isFileDeleted, setIsFileDeleted] = useState(false)
   const [isReloading, setIsReloading] = useState(false)
+  const panelIdRef = useRef<string | undefined>(props.params?.panelId)
 
   const editorRef = useRef<MonacoEditorHandle>(null)
   const previewRef = useRef<HTMLDivElement>(null)
@@ -562,6 +565,12 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
       content: newContent,
       modified: true
     })
+    // Mark panel as dirty in global store (if panel id known)
+    if (panelIdRef.current) {
+      import('../../stores/useProjectStore').then(({ useProjectStore }) => {
+        useProjectStore.getState().setEditorDirty(panelIdRef.current!, true)
+      })
+    }
   }
 
   const handleSave = async (isAutoSave: boolean = false) => {
@@ -583,6 +592,11 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
         ...currentFile,
         modified: false
       })
+      if (panelIdRef.current) {
+        import('../../stores/useProjectStore').then(({ useProjectStore }) => {
+          useProjectStore.getState().setEditorDirty(panelIdRef.current!, false)
+        })
+      }
 
       // Clear any external change detection since we just saved
       setExternalChangeDetected(false)
@@ -601,6 +615,17 @@ export function MarkdownEditorPanel(props: IDockviewPanelProps<{ filePath?: stri
       isSavingRef.current = false
     }
   }
+
+  // Cleanup: ensure panel is not marked dirty on unmount
+  useEffect(() => {
+    return () => {
+      if (panelIdRef.current) {
+        import('../../stores/useProjectStore').then(({ useProjectStore }) => {
+          useProjectStore.getState().setEditorDirty(panelIdRef.current!, false)
+        })
+      }
+    }
+  }, [])
 
   /**
    * Handle external file changes

@@ -3,15 +3,19 @@ import { create } from 'zustand'
 interface TerminalStore {
   // Active terminal ID (null if no terminal is active)
   activeTerminalId: string | null
+  lastActivityAt: number | null
 
   // Actions
   setActiveTerminalId: (id: string | null) => void
   getActiveTerminalId: () => string | null
+  setLastActivityNow: () => void
+  isRecentlyActive: (windowMs?: number) => boolean
   sendToTerminal: (text: string, autoExecute?: boolean) => Promise<boolean>
 }
 
 export const useTerminalStore = create<TerminalStore>((set, get) => ({
   activeTerminalId: null,
+  lastActivityAt: null,
 
   setActiveTerminalId: (id) => {
     console.log(`📝 Terminal store: Setting active terminal ID to ${id}`)
@@ -20,6 +24,16 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
 
   getActiveTerminalId: () => {
     return get().activeTerminalId
+  },
+
+  setLastActivityNow: () => {
+    set({ lastActivityAt: Date.now() })
+  },
+
+  isRecentlyActive: (windowMs = 10000) => {
+    const ts = get().lastActivityAt
+    if (!ts) return false
+    return Date.now() - ts <= windowMs
   },
 
   sendToTerminal: async (text: string, autoExecute = false): Promise<boolean> => {

@@ -17,7 +17,7 @@
     "test:main": "vitest --run --config vitest.main.ts",
     "test:preload": "vitest --run --config vitest.preload.ts",
     "test:renderer": "vitest --run --config vitest.renderer.ts",
-    "test:cov": "vitest --run --workspace vitest.workspace.ts --coverage",
+    "test:cov": "rm -rf coverage && ([ -d out ] && mv out temp/.out_backup || true) && vitest --run --config vitest.main.ts --coverage && vitest --run --config vitest.preload.ts --coverage && vitest --run --config vitest.renderer.ts --coverage && ([ -d temp/.out_backup ] && mv temp/.out_backup out || true)",
     "start": "electron-vite preview",
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
