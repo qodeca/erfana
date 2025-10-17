@@ -1,0 +1,89 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+
+// Mock electron + toolkit before importing preload
+const listeners: Record<string, Array<(e: unknown, d: any) => void>> = {}
+
+vi.mock('electron', () => {
+  return {
+    contextBridge: {
+      exposeInMainWorld: vi.fn((key: string, value: unknown) => {
+        ;(globalThis as any).window[key] = value
+      })
+    },
+    ipcRenderer: {
+      on: vi.fn((channel: string, cb: (e: unknown, d: any) => void) => {
+        ;(listeners[channel] ||= []).push(cb)
+      }),
+      removeListener: vi.fn((channel: string, cb: (e: unknown, d: any) => void) => {
+        const arr = listeners[channel] || []
+        const idx = arr.indexOf(cb)
+        if (idx >= 0) arr.splice(idx, 1)
+      }),
+      invoke: vi.fn(async (_channel: string, ..._args: any[]) => null),
+      send: vi.fn(),
+      __emit: (channel: string, data: any) => {
+        for (const cb of listeners[channel] || []) cb({}, data)
+      }
+    }
+  }
+})
+
+vi.mock('@electron-toolkit/preload', () => {
+  // Minimal stub; not used directly in tests when contextIsolated=false
+  return { electronAPI: {} }
+})
+
+declare global {
+  interface Window {
+    api: typeof import('./index').default extends never ? any : any
+  }
+}
+
+beforeEach(async () => {
+  // Force non-contextIsolated branch to attach directly to window
+  ;(process as any).contextIsolated = false
+  // Clean module cache to re-run preload init
+  vi.resetModules()
+  delete (window as any).api
+  // Import the preload script
+  await import('./index')
+})
+
+describe('preload api exposure', () => {
+  it('exposes api on window with file and terminal namespaces', () => {
+    expect(window.api).toBeDefined()
+    expect(typeof window.api.file.openProject).toBe('function')
+    expect(typeof window.api.file.onProjectChanged).toBe('function')
+    expect(typeof window.api.terminal.create).toBe('function')
+  })
+
+  it('file.openProject invokes correct IPC channel', async () => {
+    const { ipcRenderer } = await import('electron')
+    await window.api.file.openProject()
+    expect((ipcRenderer.invoke as any)).toHaveBeenCalledWith('file:openProject')
+  })
+
+  it('onProjectChanged delivers payload with string | null', async () => {
+    const { ipcRenderer } = await import('electron')
+    const received: Array<{ oldPath: string | null; newPath: string | null }> = []
+    const unsubscribe = window.api.file.onProjectChanged((data) => {
+      // Type-level check: data.newPath accepts null
+      const n: string | null = data.newPath
+      received.push({ oldPath: data.oldPath, newPath: n })
+    })
+
+    ;(ipcRenderer as any).__emit('project:changed', { oldPath: '/a', newPath: null })
+    ;(ipcRenderer as any).__emit('project:changed', { oldPath: null, newPath: '/b' })
+
+    expect(received).toEqual([
+      { oldPath: '/a', newPath: null },
+      { oldPath: null, newPath: '/b' }
+    ])
+
+    // Unsubscribe blocks further events
+    unsubscribe()
+    ;(ipcRenderer as any).__emit('project:changed', { oldPath: '/x', newPath: '/y' })
+    expect(received.length).toBe(2)
+  })
+})
+

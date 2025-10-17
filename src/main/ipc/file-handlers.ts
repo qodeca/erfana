@@ -5,6 +5,7 @@ import { fileWatcherService } from '../services/FileWatcherService'
 import { directoryWatcherService } from '../services/DirectoryWatcherService'
 import { stat, realpath } from 'fs/promises'
 import { normalize, sep, parse } from 'path'
+import type { ProjectChanged } from '@shared/ipc/schema'
 
 async function canonicalizePath(p: string): Promise<string> {
   // Normalize separators
@@ -73,10 +74,11 @@ export function registerFileHandlers(): void {
     // Notify renderers
     const win = BrowserWindow.getAllWindows()[0]
     if (win && !win.isDestroyed()) {
-      win.webContents.send('project:changed', {
+      const payload: ProjectChanged = {
         oldPath: oldProjectPath,
         newPath: newProjectPath
-      })
+      }
+      win.webContents.send('project:changed', payload)
     }
 
     return newProjectPath
@@ -176,10 +178,11 @@ export function registerFileHandlers(): void {
     // Notify renderers of closed project
     const win = BrowserWindow.getAllWindows()[0]
     if (win && !win.isDestroyed()) {
-      win.webContents.send('project:changed', {
+      const payload: ProjectChanged = {
         oldPath: oldProjectPath,
         newPath: null
-      })
+      }
+      win.webContents.send('project:changed', payload)
     }
 
     return true
