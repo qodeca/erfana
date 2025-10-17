@@ -221,6 +221,18 @@ useEffect(() => {
 - Each listener returns an unsubscribe function
 - All listeners and watchers are cleaned up on unmount
 
+### Session Token Guards (Switch Tokens)
+
+To avoid stale updates during project switches, both watcher services maintain a monotonic session token (`switchVersion`). Any late events/timers from a previous session are ignored.
+
+Implementation:
+- File watcher: guards in change/delete/notify paths
+- Directory watcher: guards in queue/process/notify paths
+
+Effect:
+- Eliminates UI updates from old watchers after `stopAll()` and project change
+- Prevents flicker and tree corruption during rapid switches
+
 ### Auto‑Restore Watcher Boundaries
 
 On app launch, when restoring the last project:

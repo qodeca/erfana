@@ -8,6 +8,7 @@ interface WatchedDirectory {
   isPaused: boolean
   debounceTimer: NodeJS.Timeout | null
   pendingEvents: DirectoryChangeEvent[]
+  version: number
 }
 
 interface DirectoryChangeEvent {
@@ -21,9 +22,13 @@ export class DirectoryWatcherService {
   private readonly MIN_EVENTS_FOR_BULK = 5 // Threshold for bulk operation detection
   private projectPath: string | null = null
   private isDisposing: boolean = false // Flag to prevent operations during cleanup
+  // Session token to guard against late/stale events during project switches
+  private switchVersion = 0
 
   setProjectPath(path: string): void {
     this.projectPath = path
+    // Bump session on project changes to drop stale events
+    this.switchVersion++
   }
   /**
    * Stop all directory watchers (for project switching)
@@ -41,6 +46,8 @@ export class DirectoryWatcherService {
       }
     }
     this.watchedDirectories.clear()
+    // Increment session to ignore late events from the previous watchers
+    this.switchVersion++
   }
 
   /**
@@ -115,7 +122,8 @@ export class DirectoryWatcherService {
       webContentsIds: new Set([webContentsId]),
       isPaused: false,
       debounceTimer: null,
-      pendingEvents: []
+      pendingEvents: [],
+      version: this.switchVersion
     }
 
     // Handle file/folder additions
@@ -234,6 +242,10 @@ export class DirectoryWatcherService {
     if (this.isDisposing) return // Ignore events during disposal
     const watched = this.watchedDirectories.get(dirPath)
     if (!watched) return
+    // Drop events generated for a previous session
+    if (watched.version !== this.switchVersion) {
+      return
+    }
 
     // Ignore if paused (during our own operations)
     if (watched.isPaused) {
@@ -268,6 +280,10 @@ export class DirectoryWatcherService {
     if (this.isDisposing) return // Ignore events during disposal
     const watched = this.watchedDirectories.get(dirPath)
     if (!watched) return
+    // Guard against stale timers/events from old sessions
+    if (watched.version !== this.switchVersion) {
+      return
+    }
 
     const eventCount = watched.pendingEvents.length
     if (eventCount === 0) return
@@ -307,6 +323,10 @@ export class DirectoryWatcherService {
     if (this.isDisposing) return // Don't notify during disposal
     const watched = this.watchedDirectories.get(dirPath)
     if (!watched) return
+    // Ensure only current-session watchers can publish notifications
+    if (watched.version !== this.switchVersion) {
+      return
+    }
 
     const windows = BrowserWindow.getAllWindows()
 
