@@ -6,7 +6,7 @@ import eslintConfigPrettier from 'eslint-config-prettier'
 
 export default [
   // Ignore build outputs and vendored folders
-  { ignores: ['node_modules/**', 'out/**', 'dist/**', 'release/**'] },
+  { ignores: ['node_modules/**', 'out/**', 'dist/**', 'release/**', 'temp/**'] },
   { files: ['**/*.{js,mjs,cjs,ts,jsx,tsx}'] },
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,

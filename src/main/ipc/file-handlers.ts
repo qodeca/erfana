@@ -106,6 +106,17 @@ export function registerFileHandlers(): void {
       const stats = await stat(lastPath)
       if (stats.isDirectory()) {
         fileService.setProjectPath(lastPath)
+        // Keep watchers in sync with restored project path
+        try {
+          fileWatcherService.setProjectPath(lastPath)
+        } catch (e) {
+          console.warn('Failed to set FileWatcherService projectPath on restore:', e)
+        }
+        try {
+          directoryWatcherService.setProjectPath(lastPath)
+        } catch (e) {
+          console.warn('Failed to set DirectoryWatcherService projectPath on restore:', e)
+        }
         return lastPath
       }
     } catch {

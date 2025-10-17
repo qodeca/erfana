@@ -124,6 +124,16 @@ ignored: [
 
 The file tree maintains a `Set<string>` of expanded folder paths. When the tree refreshes due to external changes, this state is preserved, ensuring folders remain expanded.
 
+### Recoverable Project Deletion (ENOENT)
+
+If the watched project folder is deleted or becomes unavailable mid‑session (ENOENT/no such file):
+
+- Service broadcasts `directory-watch:project-deleted { dirPath }`
+- Internally calls `stopAll()` (not `dispose()`), clearing watchers while keeping the service reusable
+- User can select a new project without restarting the app
+
+This avoids a non‑recoverable state after disruptive filesystem events.
+
 ---
 
 ## Common Patterns
@@ -210,6 +220,16 @@ useEffect(() => {
 - Multiple event listeners can be attached
 - Each listener returns an unsubscribe function
 - All listeners and watchers are cleaned up on unmount
+
+### Auto‑Restore Watcher Boundaries
+
+On app launch, when restoring the last project:
+
+- `fileService.setProjectPath(lastPath)`
+- `fileWatcherService.setProjectPath(lastPath)`
+- `directoryWatcherService.setProjectPath(lastPath)`
+
+This ensures watcher boundary checks ("inside project root") are correct immediately after auto‑restore.
 
 ### Expanded State Preservation Pattern
 

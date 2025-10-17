@@ -147,16 +147,7 @@ export class DirectoryWatcherService {
         // Suppress EPIPE errors
       }
 
-      // If project root was deleted, notify and cleanup
-      if (errorMessage.includes('ENOENT') || errorMessage.includes('no such file')) {
-        this.notifyWebContents(dirPath, 'directory-watch:project-deleted', { dirPath })
-        this.dispose()
-      } else {
-        this.notifyWebContents(dirPath, 'directory-watch:error', {
-          dirPath,
-          error: errorMessage
-        })
-      }
+      this.handleWatcherError(dirPath, errorMessage)
     })
 
     // Handle watcher ready
@@ -369,6 +360,25 @@ export class DirectoryWatcherService {
       }
     }
     this.watchedDirectories.clear()
+  }
+
+  /**
+   * Centralized error handling for watcher errors to keep the service recoverable
+   */
+  private handleWatcherError(dirPath: string, errorMessage: string): void {
+    // If project root was deleted, notify and cleanup in a recoverable way
+    if (errorMessage.includes('ENOENT') || errorMessage.toLowerCase().includes('no such file')) {
+      this.notifyWebContents(dirPath, 'directory-watch:project-deleted', { dirPath })
+      // Use stopAll instead of dispose to keep service reusable without setting isDisposing
+      void this.stopAll()
+      return
+    }
+
+    // Generic error path
+    this.notifyWebContents(dirPath, 'directory-watch:error', {
+      dirPath,
+      error: errorMessage
+    })
   }
 }
 
