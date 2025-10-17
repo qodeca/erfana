@@ -1,33 +1,29 @@
 # Erfana Testing Documentation
 
-Complete guide for visually inspecting and testing Erfana using Circuit Electron MCP.
+Complete guide for testing Erfana. This covers both automated tests (Vitest/Playwright) and visual/manual testing using Circuit Electron MCP.
 
 ## 📚 Documentation Index
 
-### Quick Start
-**[quickstart.md](./quickstart.md)** - Get started in 1 minute
-- Fast testing patterns
-- Common commands cheat sheet
-- Copy-paste templates
-- Troubleshooting tips
+### Automated Tests (Unit/Integration)
+- Runner: Vitest workspace (`main`, `preload`, `renderer`)
+- Commands:
+  - `npm run test` — run all projects once
+  - `npm run test:renderer` — renderer tests
+  - `npm run test:main` — main process tests
+  - `npm run test:preload` — preload tests
 
-**Perfect for:** First-time testing or quick verification after code changes.
-
----
-
-### Complete Reference
-**[circuit-electron-guide.md](./circuit-electron-guide.md)** - Comprehensive MCP tool reference
-- All available Circuit Electron MCP tools
-- Parameters and return values
-- Best practices for element selection
-- Common workflows and examples
-- Integration with development process
-
-**Perfect for:** Understanding all testing capabilities and advanced usage.
+See [Automated Testing Plan](./automated-testing-plan.md) for the phased rollout and setup details.
 
 ---
 
-### Test Scenarios
+### E2E/UI (Playwright Electron)
+- Use `@playwright/test` to launch Electron and assert UI flows.
+- Suggested: add smoke spec + critical flows (project open/change, file open/save).
+- Configure trace/screenshots on failure for debugging.
+
+---
+
+### Visual/MCP Test Scenarios
 
 #### UI Verification Tests
 **[ui-scenarios.md](./ui-scenarios.md)** - Test scenarios 1-5
@@ -54,19 +50,19 @@ Complete guide for visually inspecting and testing Erfana using Circuit Electron
 ## 🚀 Recommended Workflows
 
 ### After Making Code Changes
-1. Build: `npm run build`
-2. Use [quickstart.md](./quickstart.md) for rapid verification
-3. Run relevant scenarios from [ui-scenarios.md](./ui-scenarios.md) or [interaction-scenarios.md](./interaction-scenarios.md)
+1. Unit tests: `npm run test:ci`
+2. Run relevant scenarios from [ui-scenarios.md](./ui-scenarios.md) or [interaction-scenarios.md](./interaction-scenarios.md)
+3. Optionally: build `npm run build` for full-package checks
 
 ### Comprehensive Testing
-1. Review [circuit-electron-guide.md](./circuit-electron-guide.md)
+1. Run unit/integration tests (Vitest)
 2. Run all scenarios in [ui-scenarios.md](./ui-scenarios.md)
 3. Run all scenarios in [interaction-scenarios.md](./interaction-scenarios.md)
 
 ### Learning Circuit Electron MCP
-1. Start with [quickstart.md](./quickstart.md)
-2. Study [circuit-electron-guide.md](./circuit-electron-guide.md)
-3. Practice with simple scenarios from [ui-scenarios.md](./ui-scenarios.md)
+1. Start with simple flows from [ui-scenarios.md](./ui-scenarios.md)
+2. Practice interaction flows from [interaction-scenarios.md](./interaction-scenarios.md)
+3. Use screenshots to debug visually
 
 ---
 
@@ -84,10 +80,13 @@ Circuit Electron MCP enables Claude Code to:
 
 ## 📋 Prerequisites
 
-Before testing:
-1. Build the application: `npm run build`
-2. Verify build output exists: `ls -la out/main/index.js`
-3. Circuit Electron MCP configured in `.mcp.json`
+For unit/integration:
+1. Install dev deps: `npm i -D vitest @testing-library/react @testing-library/user-event @testing-library/jest-dom jsdom`
+2. Run tests: `npm run test`
+
+For MCP visual testing:
+1. Build: `npm run build`
+2. Circuit Electron MCP configured in `.mcp.json`
 
 ---
 
@@ -99,18 +98,6 @@ Before testing:
 
 ---
 
-## 💡 Quick Example
-
-```typescript
-// Launch Erfana and take a screenshot
-const session = mcp__circuit-electron__app_launch({
-  app: "/Users/marcinobel/Projects/erfana",
-  mode: "development",
-  compressScreenshots: true
-})
-
-mcp__circuit-electron__screenshot({ sessionId: session.sessionId })
-mcp__circuit-electron__close({ sessionId: session.sessionId })
-```
-
-For more examples, see [quickstart.md](./quickstart.md).
+## 💡 Examples
+- Unit: see renderer tests under `src/renderer/src/**/*.test.tsx`
+- Visual/MCP: follow flows in [ui-scenarios.md](./ui-scenarios.md) and [interaction-scenarios.md](./interaction-scenarios.md)

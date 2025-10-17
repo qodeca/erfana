@@ -51,7 +51,7 @@ Project panel displays hierarchical file tree with filtering, visual indicators,
 
 ## Control Panel
 
-Collapsible panel with chevron toggle in header (matches CopilotPanel pattern).
+Collapsible panel with chevron toggle in header (common pattern across panels).
 
 ### Toggle Behavior
 

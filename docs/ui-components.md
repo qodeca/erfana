@@ -50,6 +50,15 @@ Manages:
 
 Removed.
 
+## Global Toasts
+
+Lightweight, centralized toast notifications displayed in the bottom-left corner.
+
+- Location: `src/renderer/src/components/Toast/`
+- API: global event bus via `showGlobalToast()`; React components subscribe through `ToastProvider`
+- Usage: Components dispatch global toasts; a single `ToastNotification` renders them
+- Position: bottom-left; types: info, success, warning, error
+
 ## Control Panels
 
 Collapsible panels within main panels using chevron toggle pattern (matches VS Code behavior).

@@ -227,3 +227,4 @@ npm run test:main   # main process tests
 npm run test:preload
 npm run test:renderer
 ```
+
