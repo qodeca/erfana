@@ -35,7 +35,6 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const [renameError, setRenameError] = useState<string | null>(null)
   const [isSwitchingProject, setIsSwitchingProject] = useState(false)
   const initialLoadCompleteRef = useRef(false)
-  const [watchDepth, setWatchDepth] = useState<number | null>(null)
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -73,17 +72,6 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
 
     loadLastProject()
-    // Load watcher depth setting
-    ;(async () => {
-      try {
-        const res = await window.api.settings.getDirectoryWatchDepth()
-        if (res.success) {
-          setWatchDepth(typeof res.depth === 'number' ? res.depth : null)
-        }
-      } catch (e) {
-        console.warn('Failed to load watcher depth:', e)
-      }
-    })()
   }, [])
 
   // Listen for project change events from other components
@@ -163,23 +151,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
   }, [projectPath])
 
-  const handleWatchDepthChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value
-    const depth = value === 'unlimited' ? null : parseInt(value, 10)
-    try {
-      await window.api.settings.setDirectoryWatchDepth(depth)
-      setWatchDepth(depth)
-      // Restart watcher to apply new depth
-      if (projectPath) {
-        await window.api.directoryWatch.stop(projectPath)
-        await window.api.directoryWatch.start(projectPath)
-      }
-      showGlobalToast({ type: 'info', title: 'Watcher Depth', message: depth === null ? 'Unlimited' : `Depth: ${depth}` })
-    } catch (err) {
-      console.error('Failed to set watcher depth:', err)
-      showGlobalToast({ type: 'error', title: 'Watcher Depth', message: 'Failed to update' })
-    }
-  }
+  // no watch depth control in UI
 
   const switchTokenRef = useRef(0)
 
@@ -826,18 +798,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       )}
 
       <div className="project-tree-path">
-        <span className="project-name">
-          {projectPath ? projectPath.split('/').pop() : 'No project open'}
-          {projectPath && (
-            <span
-              className="watch-depth"
-              title={`Directory watcher depth${watchDepth === null ? ' (Unlimited)' : ''}`}
-            >
-              {' '}
-              · Depth: {watchDepth === null ? 'Unlimited' : watchDepth}
-            </span>
-          )}
-        </span>
+        <span className="project-name">{projectPath ? projectPath.split('/').pop() : 'No project open'}</span>
         <div className="project-tree-actions">
           <button
             className="icon-btn"
@@ -1014,33 +975,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
                 </button>
             </div>
           </div>
-          <div className="control-panel-section">
-            <div className="control-panel-label">
-              Watching
-              {' '}
-              <a
-                href="https://github.com/qodeca/erfana/blob/main/docs/file-watching.md#watcher-debugging"
-                target="_blank"
-                rel="noreferrer"
-                title="Open docs: File Watching and Watcher Debugging"
-                style={{ fontSize: 11, color: '#89b4fa', textDecoration: 'none', marginLeft: 6 }}
-              >
-                docs
-              </a>
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <label htmlFor="watch-depth" style={{ fontSize: 12, color: '#bbb' }}>Depth</label>
-              <select id="watch-depth" value={watchDepth === null ? 'unlimited' : String(watchDepth)} onChange={handleWatchDepthChange} style={{ fontSize: 12 }}>
-                <option value="unlimited">Unlimited</option>
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-              </select>
-            </div>
-            <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>Limit recursive watching for large projects.</div>
-          </div>
+          {/* Watching controls removed from UI by request */}
         </div>
       </div>
     )}

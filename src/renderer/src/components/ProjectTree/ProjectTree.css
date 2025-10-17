@@ -27,11 +27,7 @@
   flex: 1;
 }
 
-.watch-depth {
-  margin-left: 8px;
-  color: #9aa0a6;
-  font-weight: 500;
-}
+/* .watch-depth removed */
 
 .project-tree-actions {
   display: flex;

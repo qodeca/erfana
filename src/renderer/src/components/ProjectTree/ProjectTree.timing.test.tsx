@@ -21,7 +21,7 @@ describe('ProjectTree watcher start timing', () => {
     const getLastProjectPath = vi.fn(async () => '/proj')
 
     ;(window as any).api = {
-      file: { getLastProjectPath, readDirectory, onProjectChanged: (cb: any) => { /* no-op; return unsub */ return () => {} } },
+      file: { getLastProjectPath, readDirectory, onProjectChanged: (_cb: any) => { /* no-op; return unsub */ return () => {} } },
       directoryWatch: {
         start,
         stop: vi.fn(async () => {}),
