@@ -1,5 +1,12 @@
 # Packaging & Deployment
 
+> ⚠️ **WORK IN PROGRESS - NOT READY FOR DEVELOPMENT**
+>
+> This documentation is currently under active development and review. The Graph Engine specification, architecture, and implementation details are subject to significant changes. **DO NOT start implementation work based on these documents.**
+>
+> **Status**: Draft specification being refined
+> **Expected Ready**: TBD pending architectural review and wireframe finalization
+
 **Last Updated:** October 2025
 
 This document covers packaging the Erfana Graph Engine for distribution, including native module configuration, electron-vite setup, and platform-specific builds.

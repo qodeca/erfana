@@ -1,5 +1,12 @@
 # Hybrid Search & Ranking
 
+> ⚠️ **WORK IN PROGRESS - NOT READY FOR DEVELOPMENT**
+>
+> This documentation is currently under active development and review. The Graph Engine specification, architecture, and implementation details are subject to significant changes. **DO NOT start implementation work based on these documents.**
+>
+> **Status**: Draft specification being refined
+> **Expected Ready**: TBD pending architectural review and wireframe finalization
+
 **Last Updated:** October 2025
 
 This document covers hybrid search architecture, combining BM25 keyword search (FTS5), vector similarity (sqlite-vec), and graph-aware boosts into a unified ranking system.

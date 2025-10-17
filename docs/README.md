@@ -18,6 +18,9 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 - [File Watching](./file-watching.md) - Auto-refresh and file monitoring
 - [Prompt Templates](./prompts/README.md) - AI-powered text operations
 - [Graph Engine](./graph-engine.md) - SQLite-based knowledge graph with hybrid search
+  - [User Guide](./graph-engine/user-guide.md) - **START HERE** - Value proposition and user workflows
+  - [Data Ingestion](./graph-engine/data-ingestion.md) - How files are discovered and indexed
+  - [MCP Server](./graph-engine/mcp-server.md) - Claude Code integration via MCP protocol
   - [Architecture](./graph-engine/architecture.md) - System design and technology stack
   - [Data Model](./graph-engine/data-model.md) - Complete SQLite schema and patterns
   - [Vector Search](./graph-engine/vector-search.md) - sqlite-vec deep dive

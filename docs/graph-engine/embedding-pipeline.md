@@ -1,5 +1,12 @@
 # Embedding Pipeline
 
+> ⚠️ **WORK IN PROGRESS - NOT READY FOR DEVELOPMENT**
+>
+> This documentation is currently under active development and review. The Graph Engine specification, architecture, and implementation details are subject to significant changes. **DO NOT start implementation work based on these documents.**
+>
+> **Status**: Draft specification being refined
+> **Expected Ready**: TBD pending architectural review and wireframe finalization
+
 **Last Updated:** October 2025
 
 This document covers the end-to-end embedding pipeline: from raw markdown text to normalized vectors stored in SQLite, including ONNX Runtime integration, worker thread patterns, and stability considerations.
@@ -29,11 +36,15 @@ This document covers the end-to-end embedding pipeline: from raw markdown text t
 └─────────────────────────────────────────────────────────────────────┘
 
 1. Raw Markdown
-   └─▶ "# Introduction\n\nThis is **bold** text with [link](url)."
+   └─▶ "# Introduction
+
+This is **bold** text with [link](url)."
 
 2. Text Preprocessing
    └─▶ Strip markdown syntax, preserve meaning
-   └─▶ "Introduction\n\nThis is bold text with link."
+   └─▶ "Introduction
+
+This is bold text with link."
 
 3. Tokenization
    └─▶ ["introduction", "this", "is", "bold", "text", "with", "link"]
@@ -83,7 +94,10 @@ export class TextPreprocessor {
     let text = markdown;
 
     // Remove YAML frontmatter
-    text = text.replace(/^---\n[\s\S]*?\n---\n/, '');
+    text = text.replace(/^---
+[\s\S]*?
+---
+/, '');
 
     // Remove code blocks (preserve inline code as text)
     text = text.replace(/```[\s\S]*?```/g, '');
@@ -115,8 +129,11 @@ export class TextPreprocessor {
     text = text.replace(/^\s*>\s+/gm, '');
 
     // Normalize whitespace
-    text = text.replace(/\n{3,}/g, '\n\n'); // Max 2 consecutive newlines
-    text = text.replace(/[ \t]+/g, ' '); // Collapse spaces
+    text = text.replace(/
+{3,}/g, '
+
+'); // Max 2 consecutive newlines
+    text = text.replace(/[ 	]+/g, ' '); // Collapse spaces
     text = text.trim();
 
     return text;

@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 450" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 11px;">
+  <!-- Title -->
+  <text x="10" y="20" font-weight="bold" font-size="14">Status Indicator (3 States)</text>
+
+  <!-- State 1: Ready -->
+  <text x="10" y="50" font-weight="bold" font-size="12">State 1: Ready</text>
+  <rect x="10" y="60" width="880" height="35" fill="#f0f0f0" stroke="black" stroke-width="2"/>
+  <circle cx="25" cy="77" r="6" fill="#00ff00"/>
+  <text x="40" y="82" font-size="11">Graph Ready  |  architecture.md  |  Line 42  |  UTF-8  |  Markdown</text>
+
+  <!-- State 2: Indexing -->
+  <text x="10" y="130" font-weight="bold" font-size="12">State 2: Indexing</text>
+  <rect x="10" y="140" width="880" height="35" fill="#f0f0f0" stroke="black" stroke-width="2"/>
+  <circle cx="25" cy="157" r="6" fill="#ffaa00"/>
+  <text x="40" y="162" font-size="11">Indexing: 450/1000 files (45%)  |  architecture.md  |  Line 42</text>
+  <text x="40" y="195" font-size="10" fill="#0066cc" font-style="italic">[Click to show indexing details]</text>
+
+  <!-- State 3: Error -->
+  <text x="10" y="230" font-weight="bold" font-size="12">State 3: Error</text>
+  <rect x="10" y="240" width="880" height="35" fill="#f0f0f0" stroke="black" stroke-width="2"/>
+  <circle cx="25" cy="257" r="6" fill="#ff0000"/>
+  <text x="40" y="262" font-size="11">Graph Error (Click for details)  |  architecture.md  |  Line 42</text>
+
+  <!-- Details Panel (shown on click during indexing) -->
+  <text x="10" y="310" font-weight="bold" font-size="12">Details Panel (on click during indexing):</text>
+
+  <rect x="10" y="320" width="350" height="280" fill="white" stroke="black" stroke-width="2"/>
+
+  <!-- Header -->
+  <rect x="10" y="320" width="350" height="30" fill="#f5f5f5" stroke="black" stroke-width="2"/>
+  <text x="20" y="340" font-weight="bold" font-size="12">Indexing Progress</text>
+  <text x="330" y="340" font-size="14">[×]</text>
+
+  <!-- Status section -->
+  <rect x="20" y="360" width="330" height="80" fill="#f9f9f9" stroke="#ddd" stroke-width="1"/>
+  <text x="25" y="378" font-size="11">Status: Indexing in progress</text>
+  <text x="25" y="398" font-size="11">Files: 450/1000 (45%)</text>
+  <text x="25" y="418" font-size="11">Sections: 2,847 indexed</text>
+  <text x="25" y="438" font-size="11">Time elapsed: 2m 34s</text>
+  <text x="25" y="458" font-size="11">ETA: ~3 minutes</text>
+
+  <!-- Current batch section -->
+  <line x1="20" y1="470" x2="350" y2="470" stroke="#ccc" stroke-width="1"/>
+  <text x="25" y="488" font-weight="bold" font-size="11">Current batch:</text>
+  <text x="25" y="508" font-size="10">✓ docs/architecture.md</text>
+  <text x="25" y="525" font-size="10">✓ docs/database.md</text>
+  <text x="25" y="542" font-size="10" fill="#0066cc">⏳ docs/performance.md</text>
+  <text x="25" y="559" font-size="10" fill="#999">⏳ docs/vector-search.md</text>
+  <text x="25" y="576" font-size="10" fill="#999">⏳ docs/hybrid-search.md</text>
+
+  <!-- Worker stats section -->
+  <line x1="20" y1="585" x2="350" y2="585" stroke="#ccc" stroke-width="1"/>
+  <text x="25" y="603" font-size="11">Worker threads: 4/4 active</text>
+  <text x="25" y="620" font-size="11">Queue: 550 files pending</text>
+
+  <!-- Action buttons -->
+  <line x1="20" y1="630" x2="350" y2="630" stroke="#ccc" stroke-width="1"/>
+  <rect x="60" y="645" width="60" height="25" fill="#e8e8e8" stroke="#999" stroke-width="1" rx="3"/>
+  <text x="75" y="662" font-size="10">[Pause]</text>
+  <rect x="130" y="645" width="60" height="25" fill="#ff9999" stroke="#cc0000" stroke-width="1" rx="3"/>
+  <text x="142" y="662" font-size="10">[Cancel]</text>
+</svg>

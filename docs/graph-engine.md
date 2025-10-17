@@ -1,5 +1,12 @@
 # Erfana Graph Engine (SQLite-Based)
 
+> ⚠️ **WORK IN PROGRESS - NOT READY FOR DEVELOPMENT**
+>
+> This documentation is currently under active development and review. The Graph Engine specification, architecture, and implementation details are subject to significant changes. **DO NOT start implementation work based on these documents.**
+>
+> **Status**: Draft specification being refined
+> **Expected Ready**: TBD pending architectural review and wireframe finalization
+
 **Status:** Specification (October 2025)
 **Research Validated:** ✅ Extensively validated against 2025 production practices
 
@@ -7,58 +14,139 @@ This document provides an overview of the Erfana Graph Engine—a local-first, e
 
 ---
 
+## Why Use the Graph Engine?
+
+The Erfana Graph Engine solves common documentation challenges:
+
+### 🔍 **Better Search Than Grep**
+- **Problem**: Grep only finds exact keyword matches, missing semantically similar content
+- **Solution**: Hybrid search combines keyword matching (BM25) with semantic similarity (vectors)
+- **Result**: Find "optimize database performance" even when you search for "make queries faster"
+
+### 🧠 **Research Assistant While You Write**
+- **Problem**: Forgetting what you've written elsewhere, duplicating content
+- **Solution**: Related Sidebar auto-shows top-10 similar sections as you edit
+- **Result**: Discover related content without manual searching, avoid duplication
+
+### 🔗 **Obsidian-Like Navigation**
+- **Problem**: Hard to track where concepts are mentioned across your project
+- **Solution**: Knowledge Panel shows entity mentions and backlinks (e.g., "Where else did I mention SQLite?")
+- **Result**: Navigate your knowledge graph like Obsidian, understand impact of changes
+
+### ⏰ **Time-Travel for Documentation**
+- **Problem**: Can't remember what the architecture looked like 3 months ago
+- **Solution**: Temporal queries track how entities and relationships changed over time
+- **Result**: Audit trail for decisions, detect contradictions (e.g., "still using sqlite-vss?" vs "migrated to sqlite-vec")
+
+### 🤖 **Claude Code Integration**
+- **Problem**: Claude Code doesn't understand your project structure and documentation
+- **Solution**: MCP server exposes graph engine to Claude Code (running in Terminal)
+- **Result**: Claude Code queries your docs automatically, gives better suggestions
+
+---
+
+## Quick Start
+
+### For Users (Want to use the graph engine)
+1. **Read**: [User Guide](./graph-engine/user-guide.md) - Learn workflows and features
+2. **Wait for M1**: Graph engine will auto-index `.md` files on project open
+3. **Try Features**:
+   - Edit file → See Related Sidebar update
+   - Global Search → Query "SQLite performance"
+   - Settings → Adjust hybrid weights (α, β)
+   - Terminal → Use Claude Code with `erfana_graph_search` tool
+
+### For Developers (Want to implement the graph engine)
+1. **Read**: [Architecture](./graph-engine/architecture.md) - Understand system design
+2. **Read**: [Data Ingestion](./graph-engine/data-ingestion.md) - Learn how files are indexed
+3. **Follow**: [Implementation Guide](./graph-engine/implementation-guide.md) - Step-by-step M1-M5 milestones
+4. **Test**: [Production Readiness](./graph-engine/production-readiness.md) - Pre-deployment checklist
+
+### For Claude Code (Want to understand integration)
+1. **Read**: [MCP Server](./graph-engine/mcp-server.md) - Complete integration guide
+2. **Tools Available**:
+   - `erfana_graph_search` - Hybrid search across docs
+   - `erfana_graph_related` - Find related sections
+   - `erfana_graph_entities` - List entities with filters
+   - `erfana_graph_backlinks` - Get entity backlinks
+   - `erfana_graph_timeline` - Temporal queries
+
+---
+
 ## Quick Navigation
+
+### Getting Started (NEW)
+
+1. **[User Guide](./graph-engine/user-guide.md)** 👤 FOR USERS
+   - What the graph engine does and why it's valuable
+   - User workflows with examples
+   - UI components (Related Sidebar, Global Search, Knowledge Panel)
+   - Claude Code integration from user perspective
+
+2. **[Data Ingestion](./graph-engine/data-ingestion.md)** 📥 HOW FILES ARE INDEXED
+   - Project initialization flow (auto-index on open)
+   - Event-driven architecture (FileWatcherService integration)
+   - Incremental updates and content deduplication
+   - Progress reporting and error handling
+
+3. **[MCP Server](./graph-engine/mcp-server.md)** 🤖 CLAUDE CODE INTEGRATION
+   - MCP architecture and protocol
+   - 5 MCP tools exposed to Claude Code
+   - Server implementation and client usage
+   - Security and rate limiting
 
 ### Core Documentation
 
-1. **[Architecture](./graph-engine/architecture.md)** ⭐ START HERE
+4. **[Architecture](./graph-engine/architecture.md)** ⭐ START HERE
    - System design and component interactions
+   - ERFANA services integration (event-driven)
+   - MCP layer and Claude Code flow
    - Technology stack justification (October 2025)
-   - Key architectural decisions
 
-2. **[Data Model & Schema](./graph-engine/data-model.md)**
+5. **[Data Model & Schema](./graph-engine/data-model.md)**
    - Complete SQLite DDL with annotations
    - Temporal graph patterns (`valid_from`, `valid_to`, `tx_time`)
    - Entity-relationship design
 
-3. **[Vector Search (sqlite-vec)](./graph-engine/vector-search.md)** 🔄 UPDATED
+6. **[Vector Search (sqlite-vec)](./graph-engine/vector-search.md)** 🔄 UPDATED
    - Why sqlite-vec over sqlite-vss (deprecation status)
    - Performance characteristics and scale limits
    - Binary quantization strategy
 
-4. **[Embedding Pipeline](./graph-engine/embedding-pipeline.md)**
+7. **[Embedding Pipeline](./graph-engine/embedding-pipeline.md)**
    - ONNX Runtime integration with Electron
    - Worker thread strategy and stability concerns
    - Chunking and tokenization best practices
 
-5. **[Hybrid Search & Ranking](./graph-engine/hybrid-search.md)**
+8. **[Hybrid Search & Ranking](./graph-engine/hybrid-search.md)**
    - BM25 + vector similarity fusion
    - Configurable weight tuning
    - Graph-aware boosts
 
-6. **[Graph Capabilities](./graph-engine/graph-capabilities.md)**
+9. **[Graph Capabilities](./graph-engine/graph-capabilities.md)**
    - Entity extraction and linking
    - Temporal queries and change timelines
    - Graphology integration patterns
 
 ### Implementation & Operations
 
-7. **[Implementation Guide](./graph-engine/implementation-guide.md)** 📝 PRACTICAL
-   - Step-by-step milestones (M1-M5)
-   - Code structure and IPC patterns
-   - Testing strategies
+10. **[Implementation Guide](./graph-engine/implementation-guide.md)** 📝 PRACTICAL
+    - Step-by-step milestones (M1-M5)
+    - M1 includes: UI components + event-driven integration + MCP server
+    - Code structure and IPC patterns
+    - Testing strategies
 
-8. **[Performance & Scalability](./graph-engine/performance.md)** 📊 BENCHMARKS
-   - Real-world performance targets
-   - Scale limits (100K optimal, 500K+ with quantization)
-   - Optimization techniques
+11. **[Performance & Scalability](./graph-engine/performance.md)** 📊 BENCHMARKS
+    - Real-world performance targets
+    - Scale limits (100K optimal, 500K+ with quantization)
+    - Optimization techniques
 
-9. **[Packaging & Deployment](./graph-engine/packaging.md)** 🔧 ELECTRON
-   - Native module configuration (better-sqlite3, onnxruntime-node)
-   - Electron-vite setup
-   - Platform-specific builds
+12. **[Packaging & Deployment](./graph-engine/packaging.md)** 🔧 ELECTRON
+    - Native module configuration (better-sqlite3, onnxruntime-node)
+    - Electron-vite setup
+    - Platform-specific builds
 
-10. **[Production Readiness](./graph-engine/production-readiness.md)** ✅ CHECKLIST
+13. **[Production Readiness](./graph-engine/production-readiness.md)** ✅ CHECKLIST
     - Pre-deployment validation
     - Known limitations and workarounds
     - Monitoring and observability

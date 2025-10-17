@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 800" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 11px;">
+  <!-- Modal overlay -->
+  <rect x="0" y="0" width="900" height="800" fill="#000" opacity="0.5"/>
+
+  <!-- Container (dark theme modal) -->
+  <rect x="50" y="50" width="800" height="700" fill="#252526" stroke="#0066cc" stroke-width="2" rx="6"/>
+
+  <!-- Header -->
+  <rect x="50" y="50" width="800" height="40" fill="#2d2d30" stroke="#3e3e42" stroke-width="1" rx="6"/>
+  <text x="70" y="75" fill="#ccc" font-weight="bold" font-size="14">Global Search</text>
+  <text x="820" y="75" fill="#888" font-size="16">×</text>
+
+  <!-- Search bar -->
+  <rect x="70" y="110" width="700" height="35" fill="#1e1e1e" stroke="#569cd6" stroke-width="1" rx="3"/>
+  <text x="85" y="133" fill="#ccc">🔍 optimize database queries</text>
+  <rect x="780" y="110" width="50" height="35" fill="#0066cc" stroke="#0066cc" stroke-width="1" rx="3"/>
+  <text x="788" y="133" fill="white" font-weight="bold">Search</text>
+
+  <!-- Filters bar -->
+  <rect x="70" y="155" width="760" height="30" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <text x="75" y="173" font-size="10" fill="#888">Filters:</text>
+  <rect x="130" y="160" width="110" height="20" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="138" y="174" font-size="10" fill="#ccc">All Folders ▼</text>
+  <rect x="250" y="160" width="60" height="20" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="258" y="174" font-size="10" fill="#ccc">.md ▼</text>
+  <rect x="320" y="160" width="90" height="20" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="328" y="174" font-size="10" fill="#ccc">Any Date ▼</text>
+  <text x="570" y="173" font-size="10" fill="#888">Sort:</text>
+  <rect x="610" y="160" width="100" height="20" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="618" y="174" font-size="10" fill="#ccc">Relevance ▼</text>
+
+  <!-- Results count -->
+  <rect x="70" y="195" width="760" height="25" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <text x="75" y="211" font-weight="bold" fill="#ccc">Found 8 results</text>
+
+  <!-- Result 1 -->
+  <rect x="70" y="230" width="760" height="135" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <text x="75" y="248" font-weight="bold" font-size="12" fill="#ccc">📄 docs/performance.md</text>
+  <text x="740" y="248" font-size="11" fill="#4ec9b0">Score: 0.94</text>
+  <text x="75" y="268" font-size="12" fill="#569cd6" font-weight="bold">## SQLite Query Optimization</text>
+
+  <!-- Snippet box -->
+  <rect x="80" y="278" width="740" height="40" fill="#2d2d30" stroke="#444" stroke-width="1"/>
+  <text x="85" y="295" font-size="10" fill="#999">To optimize database queries, we use prepared statements,</text>
+  <text x="85" y="310" font-size="10" fill="#999">indexes, and WAL mode for concurrent access...</text>
+
+  <!-- Action buttons -->
+  <rect x="75" y="328" width="50" height="18" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="82" y="341" font-size="9" fill="#ccc">[Open]</text>
+  <rect x="130" y="328" width="50" height="18" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="137" y="341" font-size="9" fill="#ccc">[Copy]</text>
+
+  <!-- Why this result dropdown -->
+  <rect x="190" y="328" width="130" height="18" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="197" y="341" font-size="9" fill="#4ec9b0">[Why this result? ▼]</text>
+
+  <!-- Result 2 -->
+  <rect x="70" y="375" width="760" height="100" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <text x="75" y="393" font-weight="bold" font-size="12" fill="#ccc">📄 docs/database.md</text>
+  <text x="740" y="393" font-size="11" fill="#4ec9b0">Score: 0.89</text>
+  <text x="75" y="413" font-size="12" fill="#569cd6" font-weight="bold">## Database Performance Tips</text>
+
+  <!-- Snippet box -->
+  <rect x="80" y="423" width="740" height="30" fill="#2d2d30" stroke="#444" stroke-width="1"/>
+  <text x="85" y="440" font-size="10" fill="#999">When working with SQLite, consider indexing frequently queried columns...</text>
+
+  <!-- Action buttons -->
+  <rect x="75" y="460" width="50" height="16" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="82" y="472" font-size="9" fill="#ccc">[Open]</text>
+
+  <!-- Result 3 -->
+  <rect x="70" y="485" width="760" height="60" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <text x="75" y="503" font-weight="bold" font-size="12" fill="#ccc">📄 docs/fts5-guide.md</text>
+  <text x="740" y="503" font-size="11" fill="#4ec9b0">Score: 0.85</text>
+  <text x="75" y="523" font-size="12" fill="#569cd6">## FTS5 Best Practices</text>
+
+  <!-- More results indicator -->
+  <text x="75" y="570" font-size="11" fill="#666">... (5 more results)</text>
+
+  <!-- Advanced settings -->
+  <line x1="70" y1="590" x2="830" y2="590" stroke="#3e3e42" stroke-width="1"/>
+  <rect x="70" y="595" width="760" height="145" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <text x="80" y="615" font-size="10" font-weight="bold" fill="#ccc">[Advanced Settings]</text>
+
+  <text x="200" y="645" font-size="10" fill="#ccc">α (BM25): 0.4</text>
+  <rect x="300" y="633" width="200" height="4" fill="#444" stroke="#666" stroke-width="1" rx="2"/>
+  <rect x="370" y="630" width="12" height="10" fill="#0066cc" stroke="#0066cc" stroke-width="1" rx="2"/>
+
+  <text x="200" y="680" font-size="10" fill="#ccc">β (Vector): 0.6</text>
+  <rect x="300" y="668" width="200" height="4" fill="#444" stroke="#666" stroke-width="1" rx="2"/>
+  <rect x="410" y="665" width="12" height="10" fill="#0066cc" stroke="#0066cc" stroke-width="1" rx="2"/>
+
+  <rect x="550" y="645" width="70" height="22" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="568" y="660" font-size="10" fill="#ccc">[Reset]</text>
+
+  <text x="80" y="720" font-size="9" fill="#888">Esc to close</text>
+</svg>

@@ -1,5 +1,12 @@
 # Graph Capabilities
 
+> ⚠️ **WORK IN PROGRESS - NOT READY FOR DEVELOPMENT**
+>
+> This documentation is currently under active development and review. The Graph Engine specification, architecture, and implementation details are subject to significant changes. **DO NOT start implementation work based on these documents.**
+>
+> **Status**: Draft specification being refined
+> **Expected Ready**: TBD pending architectural review and wireframe finalization
+
 **Last Updated:** October 2025
 
 This document covers the graph layer of the Erfana Graph Engine: entity extraction, temporal relationships, graph traversal, and knowledge graph features.
@@ -109,7 +116,7 @@ export class RuleBasedExtractor {
     // Technical terms (from predefined list)
     const technicalTerms = ['SQLite', 'React', 'Electron', 'FTS5', 'ONNX'];
     for (const term of technicalTerms) {
-      const regex = new RegExp(`\\b${term}\\b`, 'gi');
+      const regex = new RegExp(`\b${term}\b`, 'gi');
       while ((match = regex.exec(text)) !== null) {
         entities.push({
           name: term,
