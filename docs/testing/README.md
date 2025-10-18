@@ -21,6 +21,20 @@ See [Automated Testing Plan](./automated-testing-plan.md) for the phased rollout
   - `vi.mock('@xterm/addon-webgl', () => ({ WebglAddon: class { onContextLoss(){} dispose(){} } }))`
 - Prefer dynamic import of `@xterm/addon-webgl` in code to keep tests happy
 
+#### Notable Test Suites
+
+**TerminalService** (`src/main/services/TerminalService.test.ts`)
+- **18 comprehensive tests** covering terminal bootstrap pattern (v0.3.0)
+- **Coverage**: 46% statements, 50% branch, 40% functions
+- **Test Categories**:
+  - Bootstrap script generation (3 tests)
+  - Marker detection & clear handshake (4 tests)
+  - Three-flag gating system (4 tests)
+  - Environment filtering (3 tests)
+  - Terminal operations (4 tests)
+- Tests validate non-interactive terminal initialization, eliminating visible artifacts
+- See [Terminal Documentation](../terminal.md) for implementation details
+
 ---
 
 ### E2E/UI (Playwright Electron)

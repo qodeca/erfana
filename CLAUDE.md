@@ -2,6 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
+- **Version**: 0.3.0
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -42,14 +43,14 @@ src/
 4. **Prompt Templates** - AI text operations via context menu
 
 ## Documentation
-See `docs/` for details (keep Claude’s context focused):
-- [Architecture](docs/architecture.md) — System design
+See `docs/` for details (keep Claude's context focused):
+- [Architecture](docs/architecture.md) — System design patterns
+- [Architectural Review](docs/architectural-review.md) — Code quality assessment, security, testing gaps
+- [Terminal](docs/terminal.md) — Bootstrap pattern, integration, clean initialization
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
-- [Terminal](docs/terminal.md) — Integration + cwd verification
 - [File Watching](docs/file-watching.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace + coverage
-- [Automated Plan](docs/testing/automated-testing-plan.md) — Phased rollout
+- [Testing](docs/testing/README.md) — Workspace, coverage (46% TerminalService)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 
 ## Code Style & Conventions
@@ -60,15 +61,18 @@ See `docs/` for details (keep Claude’s context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes
-- Removed Copilot panel and Claude Code integration (Terminal-only)
-- Removed Git panel feature (unfinished)
+## Recent Changes (v0.3.0)
+- **Terminal Bootstrap Pattern**: Eliminated initialization artifacts using non-interactive `-c` script + exec
+  - Zero visible commands (cd, pwd, echo marker)
+  - Three-flag gating system (hasReceivedMarker, initializationComplete, isClearing)
+  - Bypass channel for deterministic clear handshake
+  - Environment variable filtering (excludes dev vars)
+  - 18 comprehensive tests, 46% coverage
+- Symlink indicators in Project Tree (watchers do not follow symlinks)
+- Watcher depth setting (config-only; not exposed in UI)
 - Improved editor/preview scroll sync
 - Fixed EPIPE errors during shutdown
-- Watchers: recoverable ENOENT (stopAll) + session token guards to drop stale events
-- Terminal: explicit cwd verification post-spawn (cd + pwd marker)
- - Watcher depth setting (config-only; not exposed in UI)
- - Symlink indicators in Project Tree (watchers do not follow symlinks)
+- Watchers: recoverable ENOENT (stopAll) + session token guards
 
 ## Working Areas
 - `src/renderer/src/components/` - UI components

@@ -46,88 +46,76 @@ The Erfana Graph Engine is a **local-first, embedded knowledge graph** that comb
 
 ## Component Architecture
 
-```
-┌────────────────────────────────────────────────────────────────────┐
-│                      RENDERER PROCESS (React)                       │
-│                                                                      │
-│  ┌───────────────────┐  ┌──────────────────┐  ┌─────────────────┐ │
-│  │  Related Sidebar  │  │  Knowledge Panel │  │  Global Search  │ │
-│  │  - Top-k results  │  │  - Entities      │  │  - Filters      │ │
-│  │  - Citations      │  │  - Backlinks     │  │  - Time slider  │ │
-│  │  - Auto-update    │  │  - Mentions      │  │  - Replace grep │ │
-│  └───────────────────┘  └──────────────────┘  └─────────────────┘ │
-│                                                                      │
-│  ┌──────────────────┐  ┌────────────────────────────────────────┐ │
-│  │ Settings Panel   │  │  Status Indicator                      │ │
-│  │  - Hybrid weights│  │  - Indexing progress (%)               │ │
-│  │  - Re-index      │  │  - MCP server status (🟢/🔴)          │ │
-│  │  - Quantization  │  │  - Click for details                   │ │
-│  └──────────────────┘  └────────────────────────────────────────┘ │
-│                                                                      │
-│  useGraphSettingsStore (Zustand)                                    │
-│  - Hybrid weights (α, β, γ, δ)                                      │
-│  - Chunk size, overlap                                              │
-│  - Active embedder ID                                               │
-└──────────────────────────────┬───────────────────────────────────────┘
-                               │
-                               │ IPC (contextBridge)
-                               │ window.api.graph.*
-                               │
-┌──────────────────────────────▼───────────────────────────────────────┐
-│                      MAIN PROCESS (Node.js)                          │
-│                                                                       │
-│  ┌───────────────────────────────────────────────────────────────┐ │
-│  │                    ERFANA Services Integration                 │ │
-│  │                                                                 │ │
-│  │  ┌────────────────────┐         ┌────────────────────────┐   │ │
-│  │  │ FileWatcherService │ ───────▶│  GraphEngineService    │   │ │
-│  │  │ (Event Emitter)    │ Events  │  (Subscriber)          │   │ │
-│  │  │                    │         │                        │   │ │
-│  │  │ • file:saved       │         │ • Listens to events    │   │ │
-│  │  │ • file:created     │         │ • Queues indexing      │   │ │
-│  │  │ • file:deleted     │         │ • Debounces changes    │   │ │
-│  │  │ • project:changed  │         │ • Emits progress       │   │ │
-│  │  └────────────────────┘         └────────────────────────┘   │ │
-│  │                                                                 │ │
-│  │  ┌────────────────────┐         ┌────────────────────────┐   │ │
-│  │  │  MCPServerService  │ ◀───────│  GraphEngineService    │   │ │
-│  │  │  (stdio transport) │ Queries │  (Data Provider)       │   │ │
-│  │  │                    │         │                        │   │ │
-│  │  │ • erfana_graph_    │         │ • search()             │   │ │
-│  │  │   search           │         │ • getRelated()         │   │ │
-│  │  │ • erfana_graph_    │         │ • getEntities()        │   │ │
-│  │  │   related          │         │ • getBacklinks()       │   │ │
-│  │  │ • erfana_graph_    │         │ • getTimeline()        │   │ │
-│  │  │   entities/etc.    │         │                        │   │ │
-│  │  └────────────────────┘         └────────────────────────┘   │ │
-│  │           │                                   │                │ │
-│  │           │ Claude Code (Terminal)            │                │ │
-│  │           ▼                                   ▼                │ │
-│  └───────────────────────────────────────────────────────────────┘ │
-│                                                                       │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │               GraphEngineService (Core)                      │   │
-│  │  - Orchestrates all graph operations                         │   │
-│  │  - Manages debouncing and queueing                           │   │
-│  │  - Exposes IPC API surface                                   │   │
-│  │  - Subscribes to FileWatcherService events                   │   │
-│  │  - Provides data to MCPServerService                         │   │
-│  └───┬──────────────────┬──────────────────┬──────────────────┘   │
-│      │                  │                  │                        │
-│  ┌───▼──────┐   ┌───────▼────────┐   ┌────▼──────┐                │
-│  │ SQLite   │   │ EmbedderWorker │   │ GraphStore│                │
-│  │ Database │   │ (worker_thread)│   │(graphology)│                │
-│  │          │   │                │   │           │                │
-│  │ • FTS5   │   │ • ONNX Runtime │   │ • Page-  │                │
-│  │ • sqlite-│   │ • Tokenizer    │   │   Rank   │                │
-│  │   vec    │   │ • Batching     │   │ • Betwe- │                │
-│  │ • Edges  │   │ • Normalize    │   │   enness │                │
-│  │ • Entities│   │                │   │ • On-    │                │
-│  │ • Mentions│   │ [Limit: 2-4    │   │   demand │                │
-│  │          │   │  concurrent]   │   │          │                │
-│  └──────────┘   └────────────────┘   └───────────┘                │
-│                                                                       │
-└───────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph RendererProcess["RENDERER PROCESS (React)"]
+        direction LR
+
+        subgraph UIComponents[" "]
+            RelatedSidebar["Related Sidebar<br/>• Top-k results<br/>• Citations<br/>• Auto-update"]
+            KnowledgePanel["Knowledge Panel<br/>• Entities<br/>• Backlinks<br/>• Mentions"]
+            GlobalSearch["Global Search<br/>• Filters<br/>• Time slider<br/>• Replace grep"]
+        end
+
+        subgraph UIControls[" "]
+            SettingsPanel["Settings Panel<br/>• Hybrid weights<br/>• Re-index<br/>• Quantization"]
+            StatusIndicator["Status Indicator<br/>• Indexing progress (%)<br/>• MCP server status (🟢/🔴)<br/>• Click for details"]
+        end
+
+        ZustandStore["useGraphSettingsStore (Zustand)<br/>• Hybrid weights (α, β, γ, δ)<br/>• Chunk size, overlap<br/>• Active embedder ID"]
+    end
+
+    IPC["IPC (contextBridge)<br/>window.api.graph.*"]
+
+    RendererProcess --> IPC
+
+    subgraph MainProcess["MAIN PROCESS (Node.js)"]
+        direction TB
+
+        subgraph ServicesIntegration["ERFANA Services Integration"]
+            FileWatcherService["FileWatcherService<br/>(Event Emitter)<br/>• file:saved<br/>• file:created<br/>• file:deleted<br/>• project:changed"]
+            GraphEngineServiceSub["GraphEngineService<br/>(Subscriber)<br/>• Listens to events<br/>• Queues indexing<br/>• Debounces changes<br/>• Emits progress"]
+
+            FileWatcherService -->|Events| GraphEngineServiceSub
+
+            MCPServerService["MCPServerService<br/>(stdio transport)<br/>• erfana_graph_search<br/>• erfana_graph_related<br/>• erfana_graph_entities/etc."]
+            GraphEngineServiceData["GraphEngineService<br/>(Data Provider)<br/>• search()<br/>• getRelated()<br/>• getEntities()<br/>• getBacklinks()<br/>• getTimeline()"]
+
+            GraphEngineServiceData -->|Queries| MCPServerService
+        end
+
+        ClaudeCodeTerminal["Claude Code<br/>(Terminal)"]
+        MCPServerService -.->|Exposes Tools| ClaudeCodeTerminal
+        GraphEngineServiceSub -.->|Provides Data| ClaudeCodeTerminal
+
+        subgraph GraphEngineCore["GraphEngineService (Core)"]
+            CoreOrchestrator["• Orchestrates all graph operations<br/>• Manages debouncing and queueing<br/>• Exposes IPC API surface<br/>• Subscribes to FileWatcherService events<br/>• Provides data to MCPServerService"]
+        end
+
+        subgraph DataLayer[" "]
+            SQLiteDB["SQLite Database<br/>• FTS5<br/>• sqlite-vec<br/>• Edges<br/>• Entities<br/>• Mentions"]
+            EmbedderWorker["EmbedderWorker<br/>(worker_thread)<br/>• ONNX Runtime<br/>• Tokenizer<br/>• Batching<br/>• Normalize<br/>[Limit: 2-4 concurrent]"]
+            GraphStore["GraphStore<br/>(graphology)<br/>• PageRank<br/>• Betweenness<br/>• On-demand"]
+        end
+
+        GraphEngineCore --> SQLiteDB
+        GraphEngineCore --> EmbedderWorker
+        GraphEngineCore --> GraphStore
+    end
+
+    IPC --> MainProcess
+
+    classDef rendererClass fill:#bbdefb,stroke:#0d47a1,stroke-width:3px,color:#000
+    classDef mainClass fill:#ffe0b2,stroke:#e65100,stroke-width:3px,color:#000
+    classDef serviceClass fill:#e1bee7,stroke:#4a148c,stroke-width:3px,color:#000
+    classDef dataClass fill:#c8e6c9,stroke:#1b5e20,stroke-width:3px,color:#000
+    classDef externalClass fill:#fff59d,stroke:#f57f17,stroke-width:3px,stroke-dasharray: 5 5,color:#000
+
+    class RendererProcess,UIComponents,UIControls rendererClass
+    class MainProcess,ServicesIntegration,GraphEngineCore mainClass
+    class FileWatcherService,GraphEngineServiceSub,MCPServerService,GraphEngineServiceData serviceClass
+    class SQLiteDB,EmbedderWorker,GraphStore dataClass
+    class ClaudeCodeTerminal externalClass
 ```
 
 ### Component Responsibilities
@@ -324,188 +312,211 @@ Renderer (untrusted) <--> Preload (bridge) <--> Main (trusted)
 
 **Overview:** The Graph Engine integrates with ERFANA through an event-driven architecture where services communicate via an EventEmitter bus.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Event-Driven Flow                            │
-│                                                                   │
-│  User Action          Service Events         Graph Engine        │
-│  ────────────         ──────────────         ────────────        │
-│                                                                   │
-│  Open Project    ──▶  project:changed   ──▶  Discover .md files │
-│                       (EventEmitter)          Queue full index   │
-│                                               Emit: graph:       │
-│                                                 indexing:started │
-│                                                                   │
-│  Save File       ──▶  file:saved        ──▶  Re-index changed   │
-│                       (300ms debounce)        sections only      │
-│                                               Emit: graph:file:  │
-│                                                 indexed          │
-│                                                                   │
-│  Create File     ──▶  file:created      ──▶  Index new file     │
-│                                                                   │
-│  Delete File     ──▶  file:deleted      ──▶  Remove from index  │
-│                                                                   │
-│  Claude Code     ──▶  MCP Tool Call     ──▶  Query graph DB     │
-│  (Terminal)           (stdio)                 Return results     │
-│                                                                   │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph LR
+    subgraph UserActions["User Actions"]
+        OpenProject["Open Project"]
+        SaveFile["Save File"]
+        CreateFile["Create File"]
+        DeleteFile["Delete File"]
+        ClaudeCodeAction["Claude Code<br/>(Terminal)"]
+    end
+
+    subgraph ServiceEvents["Service Events<br/>(EventEmitter)"]
+        ProjectChanged["project:changed"]
+        FileSaved["file:saved<br/>(300ms debounce)"]
+        FileCreated["file:created"]
+        FileDeleted["file:deleted"]
+        MCPToolCall["MCP Tool Call<br/>(stdio)"]
+    end
+
+    subgraph GraphEngine["Graph Engine Operations"]
+        DiscoverFiles["Discover .md files<br/>Queue full index<br/>Emit: graph:indexing:started"]
+        ReindexChanged["Re-index changed<br/>sections only<br/>Emit: graph:file:indexed"]
+        IndexNewFile["Index new file"]
+        RemoveFromIndex["Remove from index"]
+        QueryGraphDB["Query graph DB<br/>Return results"]
+    end
+
+    OpenProject --> ProjectChanged --> DiscoverFiles
+    SaveFile --> FileSaved --> ReindexChanged
+    CreateFile --> FileCreated --> IndexNewFile
+    DeleteFile --> FileDeleted --> RemoveFromIndex
+    ClaudeCodeAction --> MCPToolCall --> QueryGraphDB
+
+    classDef userClass fill:#bbdefb,stroke:#0d47a1,stroke-width:3px,color:#000
+    classDef eventClass fill:#ffe0b2,stroke:#e65100,stroke-width:3px,color:#000
+    classDef engineClass fill:#c8e6c9,stroke:#1b5e20,stroke-width:3px,color:#000
+
+    class UserActions,OpenProject,SaveFile,CreateFile,DeleteFile,ClaudeCodeAction userClass
+    class ServiceEvents,ProjectChanged,FileSaved,FileCreated,FileDeleted,MCPToolCall eventClass
+    class GraphEngine,DiscoverFiles,ReindexChanged,IndexNewFile,RemoveFromIndex,QueryGraphDB engineClass
 ```
 
 ### Project Initialization Flow
 
-```
-1. User opens project (File → Open Project)
-   │
-   ▼
-2. EventEmitter emits 'project:changed'
-   │
-   ▼
-3. GraphEngineService receives event
-   │
-   ├─▶ 4a. Discover all .md files recursively
-   │       Exclude: node_modules/, .git/, dist/
-   │       Priority: Currently open files first
-   │
-   ├─▶ 4b. Create/migrate SQLite database
-   │       Path: {projectPath}/.erfana/graph.db
-   │       Schema version check
-   │
-   ├─▶ 4c. Queue indexing jobs (batches of 10 files)
-   │       Emit: graph:indexing:started { total: N }
-   │
-   └─▶ 4d. Process batches in parallel
-           For each batch:
-             - Parse markdown → sections
-             - Compute text_hash
-             - Check if changed (compare hash)
-             - If changed: embed + store
-             - Emit: graph:indexing:progress { current, total }
+```mermaid
+graph TD
+    Step1["1. User opens project<br/>(File → Open Project)"]
+    Step2["2. EventEmitter emits<br/>'project:changed'"]
+    Step3["3. GraphEngineService<br/>receives event"]
 
-           When done:
-             - Emit: graph:indexing:complete { indexed: N, skipped: M }
-             - Start MCP server (if Claude Code running)
+    Step4a["4a. Discover .md files<br/>• Exclude: node_modules/, .git/, dist/<br/>• Priority: Currently open files first"]
+    Step4b["4b. Create/migrate SQLite DB<br/>• Path: {projectPath}/.erfana/graph.db<br/>• Schema version check"]
+    Step4c["4c. Queue indexing jobs<br/>• Batches of 10 files<br/>• Emit: graph:indexing:started"]
+
+    Step4d["4d. Process batches in parallel"]
+
+    BatchOps["For each batch:<br/>• Parse markdown → sections<br/>• Compute text_hash<br/>• Check if changed<br/>• If changed: embed + store<br/>• Emit: graph:indexing:progress"]
+
+    Complete["When done:<br/>• Emit: graph:indexing:complete<br/>• Start MCP server<br/>(if Claude Code running)"]
+
+    Step1 --> Step2
+    Step2 --> Step3
+    Step3 --> Step4a
+    Step3 --> Step4b
+    Step3 --> Step4c
+    Step4a --> Step4d
+    Step4b --> Step4d
+    Step4c --> Step4d
+    Step4d --> BatchOps
+    BatchOps --> Complete
+
+    classDef userAction fill:#bbdefb,stroke:#0d47a1,stroke-width:3px,color:#000
+    classDef eventAction fill:#ffe0b2,stroke:#e65100,stroke-width:3px,color:#000
+    classDef serviceAction fill:#e1bee7,stroke:#4a148c,stroke-width:3px,color:#000
+    classDef processAction fill:#c8e6c9,stroke:#1b5e20,stroke-width:3px,color:#000
+
+    class Step1 userAction
+    class Step2 eventAction
+    class Step3,Step4a,Step4b,Step4c serviceAction
+    class Step4d,BatchOps,Complete processAction
 ```
 
 ### Indexing Flow (File Save)
 
-```
-1. User saves file in editor
-   │
-   ▼
-2. FileWatcherService detects change (debounced 300ms)
-   │
-   ▼
-3. FileWatcherService emits 'file:saved' event
-   │
-   ▼
-4. GraphEngineService.handleFileSaved(event)
-   │
-   ├─▶ 5a. Parse markdown → sections (H1-H6)
-   │       Compute text_hash per section (SHA-256)
-   │
-   ├─▶ 5b. Diff against DB (SELECT text_hash WHERE file_id = ?)
-   │       Compare hashes to find changed sections
-   │
-   ├─▶ 5c. Tokenize + chunk changed sections only
-   │       (256-384 tokens, 10-15% overlap)
-   │       Store in sections table
-   │
-   ├─▶ 5d. FTS5 sync via triggers (automatic)
-   │
-   ├─▶ 5e. Send chunks to EmbedderWorker
-   │       │
-   │       ▼
-   │       Worker: Batch embed (32-128 chunks)
-   │       Worker: L2 normalize vectors
-   │       Worker: Return embeddings
-   │
-   ├─▶ 5f. INSERT OR REPLACE into embeddings table
-   │       INSERT OR REPLACE into vss_sections (vector index)
-   │
-   ├─▶ 5g. [Optional M3+] Extract entities/mentions/edges
-   │       - LLM-based extraction OR
-   │       - Rule-based patterns (e.g., [[wikilinks]], #tags)
-   │
-   └─▶ 5h. Emit 'graph:file:indexed' event
-           Renderer updates Related Sidebar (if visible)
+```mermaid
+graph TD
+    Step1["1. User saves file in editor"]
+    Step2["2. FileWatcherService detects change<br/>(debounced 300ms)"]
+    Step3["3. FileWatcherService emits<br/>'file:saved' event"]
+    Step4["4. GraphEngineService.handleFileSaved(event)"]
+
+    Step5a["5a. Parse markdown → sections<br/>• H1-H6 headings<br/>• Compute text_hash (SHA-256)"]
+    Step5b["5b. Diff against DB<br/>• SELECT text_hash WHERE file_id = ?<br/>• Find changed sections"]
+    Step5c["5c. Tokenize + chunk<br/>• Changed sections only<br/>• 256-384 tokens, 10-15% overlap<br/>• Store in sections table"]
+    Step5d["5d. FTS5 sync<br/>(automatic via triggers)"]
+
+    Step5e["5e. Send chunks to<br/>EmbedderWorker"]
+    Worker["Worker Operations:<br/>• Batch embed (32-128 chunks)<br/>• L2 normalize vectors<br/>• Return embeddings"]
+
+    Step5f["5f. INSERT OR REPLACE<br/>• embeddings table<br/>• vss_sections (vector index)"]
+    Step5g["5g. [Optional M3+]<br/>Extract entities/mentions/edges<br/>• LLM-based extraction OR<br/>• Rule-based ([[wikilinks]], #tags)"]
+    Step5h["5h. Emit 'graph:file:indexed'<br/>→ Renderer updates Related Sidebar"]
+
+    Step1 --> Step2
+    Step2 --> Step3
+    Step3 --> Step4
+    Step4 --> Step5a
+    Step4 --> Step5b
+    Step4 --> Step5c
+    Step4 --> Step5d
+    Step5c --> Step5e
+    Step5e --> Worker
+    Worker --> Step5f
+    Step5f --> Step5g
+    Step5g --> Step5h
+
+    classDef userAction fill:#bbdefb,stroke:#0d47a1,stroke-width:3px,color:#000
+    classDef serviceAction fill:#ffe0b2,stroke:#e65100,stroke-width:3px,color:#000
+    classDef processingAction fill:#e1bee7,stroke:#4a148c,stroke-width:3px,color:#000
+    classDef workerAction fill:#c8e6c9,stroke:#1b5e20,stroke-width:3px,color:#000
+
+    class Step1 userAction
+    class Step2,Step3 serviceAction
+    class Step4,Step5a,Step5b,Step5c,Step5d,Step5f,Step5g,Step5h processingAction
+    class Step5e,Worker workerAction
 ```
 
 ### Search Flow (Hybrid Retrieval)
 
-```
-1. User enters query in Global Search
-   │
-   ▼
-2. window.api.graph.search({ q, k, filters, asOf })
-   │
-   ▼
-3. GraphEngineService.search()
-   │
-   ├─▶ 4a. BM25 keyword search (FTS5)
-   │       SELECT ... FROM fts_sections WHERE fts_sections MATCH :q
-   │       Returns: [(section_id, bm25_score), ...]
-   │
-   ├─▶ 4b. Embed query (EmbedderWorker)
-   │       Returns: query_vector (float32[])
-   │
-   ├─▶ 4c. Vector similarity search (sqlite-vec)
-   │       SELECT ... FROM vss_sections WHERE vss_search(...)
-   │       Returns: [(section_id, cosine_distance), ...]
-   │
-   ├─▶ 4d. [Optional] Graph boost
-   │       For each candidate, compute:
-   │       - Shared entities with query context
-   │       - Distance to focused entity (if any)
-   │       - Centrality (if graphology loaded)
-   │
-   └─▶ 5. Combine + normalize scores
-           score = α*bm25 + β*cosine + γ*graph_boost + δ*recency
-           Sort by score DESC, apply filters, return top-k
-   │
-   ▼
-6. Renderer displays results in UI
+```mermaid
+graph TD
+    Step1["1. User enters query<br/>in Global Search"]
+    Step2["2. window.api.graph.search()<br/>{ q, k, filters, asOf }"]
+    Step3["3. GraphEngineService.search()"]
+
+    Step4a["4a. BM25 keyword search (FTS5)<br/>SELECT ... FROM fts_sections<br/>WHERE fts_sections MATCH :q<br/>Returns: [(section_id, bm25_score), ...]"]
+    Step4b["4b. Embed query (EmbedderWorker)<br/>Returns: query_vector (float32[])"]
+    Step4c["4c. Vector similarity search<br/>(sqlite-vec)<br/>SELECT ... FROM vss_sections<br/>WHERE vss_search(...)<br/>Returns: [(section_id, cosine_distance), ...]"]
+    Step4d["4d. [Optional] Graph boost<br/>For each candidate:<br/>• Shared entities with query<br/>• Distance to focused entity<br/>• Centrality (if graphology loaded)"]
+
+    Step5["5. Combine + normalize scores<br/>score = α×bm25 + β×cosine + γ×graph_boost + δ×recency<br/>Sort by score DESC, apply filters, return top-k"]
+
+    Step6["6. Renderer displays<br/>results in UI"]
+
+    Step1 --> Step2
+    Step2 --> Step3
+    Step3 --> Step4a
+    Step3 --> Step4b
+    Step3 --> Step4c
+    Step3 --> Step4d
+    Step4a --> Step5
+    Step4b --> Step5
+    Step4c --> Step5
+    Step4d --> Step5
+    Step5 --> Step6
+
+    classDef userAction fill:#bbdefb,stroke:#0d47a1,stroke-width:3px,color:#000
+    classDef ipcAction fill:#ffe0b2,stroke:#e65100,stroke-width:3px,color:#000
+    classDef searchAction fill:#e1bee7,stroke:#4a148c,stroke-width:3px,color:#000
+    classDef combineAction fill:#c8e6c9,stroke:#1b5e20,stroke-width:3px,color:#000
+    classDef renderAction fill:#bbdefb,stroke:#0d47a1,stroke-width:3px,color:#000
+
+    class Step1 userAction
+    class Step2 ipcAction
+    class Step3,Step4a,Step4b,Step4c,Step4d searchAction
+    class Step5 combineAction
+    class Step6 renderAction
 ```
 
 ### MCP Server Integration Flow (Claude Code)
 
-```
-1. Claude Code starts in Terminal panel
-   │
-   ▼
-2. ERFANA launches MCPServerService (stdio transport)
-   │
-   ▼
-3. MCPServerService registers 5 tools:
-   - erfana_graph_search
-   - erfana_graph_related
-   - erfana_graph_entities
-   - erfana_graph_backlinks
-   - erfana_graph_timeline
-   │
-   ▼
-4. Claude Code queries: "Show me docs about SQLite"
-   │
-   ▼
-5. MCP client calls erfana_graph_search({ query: "SQLite", k: 10 })
-   │
-   ▼
-6. MCPServerService.handleToolCall()
-   │
-   ├─▶ 7a. Check rate limit (100 queries/min for search)
-   │
-   ├─▶ 7b. Call graphEngineService.search({ q: "SQLite", k: 10 })
-   │       (This uses the same hybrid search as UI)
-   │
-   ├─▶ 7c. Format results as MCP response
-   │       {
-   │         results: [
-   │           { title, file, snippet, score, ... },
-   │           ...
-   │         ]
-   │       }
-   │
-   └─▶ 7d. Return to Claude Code via stdio
-           Claude uses results to inform response
+```mermaid
+graph TD
+    Step1["1. Claude Code starts<br/>in Terminal panel"]
+    Step2["2. ERFANA launches<br/>MCPServerService<br/>(stdio transport)"]
+    Step3["3. MCPServerService registers 5 tools:<br/>• erfana_graph_search<br/>• erfana_graph_related<br/>• erfana_graph_entities<br/>• erfana_graph_backlinks<br/>• erfana_graph_timeline"]
+    Step4["4. Claude Code queries:<br/>'Show me docs about SQLite'"]
+    Step5["5. MCP client calls<br/>erfana_graph_search()<br/>{ query: 'SQLite', k: 10 }"]
+    Step6["6. MCPServerService.handleToolCall()"]
+
+    Step7a["7a. Check rate limit<br/>(100 queries/min for search)"]
+    Step7b["7b. Call graphEngineService.search()<br/>{ q: 'SQLite', k: 10 }<br/>(Same hybrid search as UI)"]
+    Step7c["7c. Format results as MCP response<br/>{ results: [<br/>  { title, file, snippet, score, ... },<br/>  ...<br/>] }"]
+    Step7d["7d. Return to Claude Code via stdio<br/>→ Claude uses results to inform response"]
+
+    Step1 --> Step2
+    Step2 --> Step3
+    Step3 --> Step4
+    Step4 --> Step5
+    Step5 --> Step6
+    Step6 --> Step7a
+    Step6 --> Step7b
+    Step6 --> Step7c
+    Step7a --> Step7d
+    Step7b --> Step7d
+    Step7c --> Step7d
+
+    classDef externalAction fill:#fff59d,stroke:#f57f17,stroke-width:3px,color:#000
+    classDef serviceAction fill:#ffe0b2,stroke:#e65100,stroke-width:3px,color:#000
+    classDef mcpAction fill:#e1bee7,stroke:#4a148c,stroke-width:3px,color:#000
+    classDef processingAction fill:#c8e6c9,stroke:#1b5e20,stroke-width:3px,color:#000
+
+    class Step1,Step4 externalAction
+    class Step2,Step3 serviceAction
+    class Step5,Step6 mcpAction
+    class Step7a,Step7b,Step7c,Step7d processingAction
 ```
 
 **Security & Isolation:**
