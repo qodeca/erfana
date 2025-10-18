@@ -208,6 +208,18 @@ const api = {
         callback(data)
       ipcRenderer.on('terminal:error', listener)
       return () => ipcRenderer.removeListener('terminal:error', listener)
+    },
+
+    // Clear control channel (bypass normal data filter)
+    onClear: (callback: (data: { terminalId: string }) => void) => {
+      const listener = (_event: unknown, data: { terminalId: string }) => callback(data)
+      ipcRenderer.on('terminal:clear', listener)
+      return () => ipcRenderer.removeListener('terminal:clear', listener)
+    },
+
+    // Confirm clear was processed
+    markClearComplete: (terminalId: string): void => {
+      ipcRenderer.send('terminal:clearComplete', { terminalId })
     }
   }
 }

@@ -131,5 +131,18 @@ export function registerTerminalHandlers() {
     }
   })
 
+  // Clear terminal control event (separate from data channel)
+  terminalService.on('clearTerminal', ({ terminalId }) => {
+    const windows = BrowserWindow.getAllWindows()
+    if (windows.length > 0 && !windows[0].isDestroyed()) {
+      windows[0].webContents.send('terminal:clear', { terminalId })
+    }
+  })
+
+  // Receive confirmation that clear was processed
+  ipcMain.on('terminal:clearComplete', (_event, { terminalId }) => {
+    terminalService.markInitializationComplete(terminalId)
+  })
+
   console.log('✅ Terminal IPC handlers registered')
 }

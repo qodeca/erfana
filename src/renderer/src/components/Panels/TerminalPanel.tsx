@@ -151,6 +151,11 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // Open terminal in DOM
       xterm.open(terminalRef.current!)
 
+      // Clear terminal immediately and write clear sequences to ensure clean start
+      // This clears both the buffer and any pending data
+      xterm.clear()
+      xterm.write('\x1b[2J\x1b[3J\x1b[H')
+
       // Load WebGL renderer AFTER open (fixes canvas rendering issues in Electron)
       try {
         const { WebglAddon } = await import('@xterm/addon-webgl')
@@ -177,6 +182,25 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // Get project path for initial CWD
       const projectPath = await window.api.file.getProjectPath()
 
+      // Set up clear event handler BEFORE creating PTY to avoid race condition
+      // The PTY immediately starts marker detection, so we must subscribe first
+      let clearUnsubscribe: (() => void) | null = null
+      const handleClearForInit = (data: { terminalId: string }) => {
+        console.log(`[INIT] Received clear event for terminal ${data.terminalId}`)
+        // Write clear sequence with callback for deterministic confirmation
+        xterm.write('\x1b[2J\x1b[3J\x1b[H', () => {
+          console.log(`[INIT] Clear sequence complete, calling markClearComplete`)
+          window.api.terminal.markClearComplete(data.terminalId)
+
+          // Cleanup this one-time handler
+          if (clearUnsubscribe) {
+            clearUnsubscribe()
+            clearUnsubscribe = null
+          }
+        })
+      }
+      clearUnsubscribe = window.api.terminal.onClear(handleClearForInit)
+
       // Create PTY
       const result = await window.api.terminal.create({
         cwd: projectPath || undefined,
@@ -192,8 +216,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       setActiveTerminalId(result.terminalId) // Register in store
       warmupUntilRef.current = Date.now() + 500
 
-      // Clear screen and show clean prompt
-      xterm.write('\x1b[2J\x1b[H')
+      // Don't manually clear - let the bypass channel clear handle it
 
       // Handle user input
       xterm.onData((data) => {
@@ -293,6 +316,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         setError(data.error)
       }
     })
+
+    // Note: Clear event is handled by one-time handler in initializeTerminal()
+    // No need for duplicate handler here - clear only happens once during init
 
     return () => {
       unsubscribeData()
