@@ -38,6 +38,10 @@ interface TerminalInstance {
   ptyProcess: IPty
   cwd: string
   title: string
+  initializationComplete: boolean // Track whether terminal has finished init
+  isClearing: boolean // Track clearing phase to prevent forwarding clear sequence
+  clearFallbackTimeout?: NodeJS.Timeout // Safety timeout for clear confirmation
+  hasReceivedMarker: boolean // Track if marker was detected (prevents late data forwarding)
 }
 
 /**
@@ -60,6 +64,35 @@ export class TerminalService extends EventEmitter {
    */
   isAvailable(): boolean {
     return pty !== null
+  }
+
+  /**
+   * Clean environment variables before passing to PTY
+   * Removes development/build-specific variables that leak into terminal
+   */
+  private cleanEnvironment(
+    baseEnv: NodeJS.ProcessEnv
+  ): Record<string, string | undefined> {
+    const filtered: Record<string, string | undefined> = {}
+
+    // Development/build variables to exclude
+    const excludePatterns = [
+      /^NODE_ENV$/,
+      /^ELECTRON_/,
+      /^npm_/,
+      /^INIT_CWD$/,
+      /^VITE_/,
+      /^FORCE_COLOR$/,
+      /^COLORTERM$/ // Will be set explicitly in spawn options
+    ]
+
+    for (const [key, value] of Object.entries(baseEnv)) {
+      if (!excludePatterns.some((pattern) => pattern.test(key))) {
+        filtered[key] = value
+      }
+    }
+
+    return filtered
   }
 
   /**
@@ -89,31 +122,49 @@ export class TerminalService extends EventEmitter {
     console.log(`🔵 Size: ${cols}x${rows}`)
 
     try {
-      // Determine shell arguments based on platform
-      // Windows shells (PowerShell, cmd) don't support -l flag
-      // Unix shells (zsh, bash) use -l to source RC files and load full environment
+      // Generate unique marker for CWD verification
+      const marker = `__ERFANA_PWD_MARKER_${Date.now()}__`
+
+      // Build bootstrap script that verifies CWD non-interactively, then execs into interactive shell
+      // This prevents TTY echo of verification commands (no interactive input = no echo)
       const shellArgs: string[] = []
 
       if (osPlatform() === 'win32') {
-        // Windows: PowerShell uses -NoProfile to load full environment
-        // cmd.exe has no equivalent, so no arguments needed
+        // Windows: PowerShell bootstrap then start interactive session
         if (shell.includes('powershell')) {
-          shellArgs.push('-NoProfile')
+          const pwshPath = cwd.replace(/`/g, '``').replace(/"/g, '`"')
+          const bootstrapScript = [
+            `Set-Location -Path "${pwshPath}"`,
+            'Write-Output (Get-Location).Path',
+            `Write-Output ${marker}`,
+            // Start interactive PowerShell session (Windows doesn't have exec)
+            `& "${shell}" -NoLogo`
+          ].join('; ')
+          shellArgs.push('-NoProfile', '-Command', bootstrapScript)
+        } else {
+          // cmd.exe - no verification, just use cwd
+          // cmd.exe has no equivalent to exec
         }
       } else {
-        // macOS/Linux: Use login shell (-l) to source RC files
-        // This ensures Homebrew paths and other shell configurations are available
-        shellArgs.push('-l')
+        // POSIX: Run non-interactive bootstrap, then exec into login interactive shell
+        // The exec replaces the process, so PTY continues but now running interactive shell
+        const bootstrapScript = [
+          `cd "${cwd}"`,           // Change to target directory
+          'pwd',                    // Print working directory (for verification)
+          `echo ${marker}`,         // Print marker (triggers clear handshake)
+          `exec -l "$SHELL" -i`     // Exec into login interactive shell (replaces process)
+        ].join('; ')
+        shellArgs.push('-c', bootstrapScript)
       }
 
-      // Spawn PTY process
+      // Spawn PTY process with bootstrap script
       const ptyProcess = pty.spawn(shell, shellArgs, {
         name: 'xterm-256color',
         cols,
         rows,
         cwd,
         env: {
-          ...process.env,
+          ...this.cleanEnvironment(process.env),
           ...config.env,
           TERM: 'xterm-256color',
           COLORTERM: 'truecolor',
@@ -131,14 +182,74 @@ export class TerminalService extends EventEmitter {
         id: terminalId,
         ptyProcess,
         cwd,
-        title: `Terminal ${this.terminalCounter}`
+        title: `Terminal ${this.terminalCounter}`,
+        initializationComplete: false, // Will be set to true after cwd verification
+        isClearing: false, // Will be set to true during terminal clear phase
+        hasReceivedMarker: false // Will be set to true when marker is detected
       }
 
       this.terminals.set(terminalId, terminal)
 
-      // Forward PTY output to renderer
+      // Marker detection: buffer data until we see the marker from bootstrap script
+      let markerBuffer = ''
+      let markerDetected = false
+      const markerDetector = (data: string) => {
+        if (markerDetected) return
+        markerBuffer += data
+        if (markerBuffer.includes(marker)) {
+          markerDetected = true
+
+          // Parse PWD from output (line before marker)
+          const lines = markerBuffer.split(/\r?\n/).filter(Boolean)
+          const markerIdx = lines.findIndex((l) => l.includes(marker))
+          if (markerIdx > 0) {
+            const detectedCwd = lines[markerIdx - 1].trim()
+            if (detectedCwd) {
+              const term = this.terminals.get(terminalId)
+              if (term) term.cwd = detectedCwd
+            }
+          }
+
+          // Trigger clear handshake
+          console.log(`[MARKER DETECTED] Terminal ${terminalId} - emitting clearTerminal event`)
+          const term = this.terminals.get(terminalId)
+          if (term) {
+            console.log(`[MARKER DETECTED] Setting hasReceivedMarker=true, isClearing=true`)
+            term.hasReceivedMarker = true
+            term.isClearing = true
+
+            this.emit('clearTerminal', { terminalId })
+
+            // Safety fallback: if renderer doesn't respond in 3 seconds, enable anyway
+            term.clearFallbackTimeout = setTimeout(() => {
+              const t = this.terminals.get(terminalId)
+              if (t && t.isClearing) {
+                console.warn(`⚠️ Terminal ${terminalId} clear confirmation timeout, forcing enable`)
+                t.isClearing = false
+                t.initializationComplete = true
+                t.clearFallbackTimeout = undefined
+              }
+            }, 3000)
+          }
+        }
+      }
+      ptyProcess.onData(markerDetector)
+
+      // Forward PTY output to renderer (only after initialization)
       ptyProcess.onData((data: string) => {
-        this.emit('data', { terminalId, data })
+        const term = this.terminals.get(terminalId)
+        console.log(`[PRIMARY onData] term=${!!term}, init=${term?.initializationComplete}, clearing=${term?.isClearing}, marker=${term?.hasReceivedMarker}, dataPreview=${data.substring(0, 50).replace(/\n/g, '\\n')}`)
+
+        // STRICT BLOCKING: Only forward if:
+        // 1. Initialization complete (clear confirmed by renderer)
+        // 2. NOT currently clearing
+        // 3. Marker has been received (ensures no pre-marker data leaks through)
+        if (term && term.initializationComplete && !term.isClearing && term.hasReceivedMarker) {
+          console.log(`[PRIMARY onData] FORWARDING data`)
+          this.emit('data', { terminalId, data })
+        } else {
+          console.log(`[PRIMARY onData] BLOCKING data`)
+        }
       })
 
       // Handle PTY exit
@@ -148,13 +259,7 @@ export class TerminalService extends EventEmitter {
         this.terminals.delete(terminalId)
       })
 
-      console.log(`✅ Terminal ${terminalId} created`)
-      // Ensure shell actually starts in requested cwd; then confirm with marker
-      try {
-        await this.verifyAndSetCwd(terminal, shell)
-      } catch (e) {
-        console.warn('Failed to verify working directory:', e)
-      }
+      console.log(`✅ Terminal ${terminalId} created (bootstrap pattern - no interactive echo)`)
       return terminalId
     } catch (error) {
       console.error(`❌ Failed to create terminal:`, error)
@@ -164,72 +269,29 @@ export class TerminalService extends EventEmitter {
     }
   }
 
+
   /**
-   * Ensure the PTY process is in the expected cwd by issuing a cd and
-   * then printing the directory with a unique marker. Updates the
-   * terminal instance cwd when detected.
+   * Called by renderer after clear sequence is processed
+   * Enables normal terminal output
    */
-  private async verifyAndSetCwd(terminal: { id: string; ptyProcess: IPty; cwd: string }, shell: string) {
-    const marker = `__ERFANA_PWD_MARKER_${Date.now()}__`
-    const platform = osPlatform()
-    const target = terminal.cwd
+  markInitializationComplete(terminalId: string): void {
+    const terminal = this.terminals.get(terminalId)
+    if (terminal) {
+      console.log(`✅ Terminal ${terminalId} initialization complete (clear confirmed)`)
 
-    // Compose platform-specific commands
-    let cmd = ''
-    if (platform === 'win32') {
-      const isPwsh = shell.toLowerCase().includes('powershell')
-      if (isPwsh) {
-        // PowerShell: escape backticks and quotes using PowerShell conventions
-        const pwshPath = target.replace(/`/g, '``').replace(/"/g, '`"')
-        cmd = [
-          `Set-Location -Path "${pwshPath}"`,
-          'Write-Output (Get-Location).Path',
-          `Write-Output ${marker}`
-        ].join('\r\n')
-      } else {
-        // cmd.exe: wrap in double quotes
-        cmd = [
-          `cd /d "${target}"`,
-          'cd',
-          `echo ${marker}`
-        ].join('\r\n')
+      // Clear safety fallback timeout
+      if (terminal.clearFallbackTimeout) {
+        clearTimeout(terminal.clearFallbackTimeout)
+        terminal.clearFallbackTimeout = undefined
       }
-    } else {
-      // POSIX shells
-      cmd = [
-        `cd "${target}"`,
-        'printf "%s\\n" "$(pwd)"',
-        `echo ${marker}`
-      ].join('\n')
-    }
 
-    let buffer = ''
-    let done = false
-    const onData = (data: string) => {
-      if (done) return
-      buffer += data
-      if (buffer.includes(marker)) {
-        done = true
-        // try to parse last path before marker
-        const lines = buffer.split(/\r?\n/).filter(Boolean)
-        const idx = lines.findIndex((l) => l.includes(marker))
-        if (idx > 0) {
-          const detected = lines[idx - 1].trim()
-          if (detected) {
-            const t = this.terminals.get(terminal.id)
-            if (t) t.cwd = detected
-          }
-        }
-      }
-    }
+      terminal.isClearing = false
+      terminal.initializationComplete = true
 
-    // Add a secondary onData handler (node-pty supports multiple onData subscribers)
-    terminal.ptyProcess.onData(onData)
-    // Issue commands
-    try {
-      terminal.ptyProcess.write(cmd)
-    } catch {
-      // Ignore if write fails; verification is best-effort
+      // Note: We intentionally do NOT send a newline here
+      // Sending '\r' would cause the shell to flush its output buffer,
+      // which may still contain echoes from initialization commands
+      // The terminal will remain clean until the user first interacts with it
     }
   }
 
