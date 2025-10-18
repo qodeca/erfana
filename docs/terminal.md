@@ -92,6 +92,75 @@ cursor: '#4fc1ff'      // Cyan
 - **Windows (PowerShell)**: `-NoProfile` - Loads full environment profile
 - **Windows (cmd.exe)**: No arguments - Uses default environment
 
+### Terminal Initialization
+
+**Clean Start Behavior**: Terminal uses a non-interactive bootstrap pattern to eliminate initialization artifacts and provide a clean user experience.
+
+**Bootstrap Pattern** (No TTY Echo):
+
+Shell is spawned with a non-interactive `-c` script that:
+1. Changes to target directory
+2. Prints working directory (for verification)
+3. Echoes unique marker
+4. Execs into interactive login shell
+
+```bash
+# POSIX (zsh/bash)
+shell -c 'cd "/target/path"; pwd; echo __ERFANA_PWD_MARKER_...; exec -l "$SHELL" -i'
+
+# Windows PowerShell
+powershell -NoProfile -Command 'Set-Location "..."; Write-Output (Get-Location).Path; Write-Output marker; & shell'
+```
+
+**Why Bootstrap Pattern**:
+- Non-interactive mode prevents TTY echo of verification commands
+- No visible `cd`, `pwd`, or `echo` commands in terminal
+- `exec` replaces bootstrap process with interactive shell seamlessly
+- Shell prompt appears only after user interaction (by design)
+
+**Initialization Phases**:
+
+1. **Environment Filtering** (Security Layer)
+   - Development/build variables filtered before passing to PTY
+   - Excluded: `NODE_ENV`, `ELECTRON_*`, `npm_*`, `INIT_CWD`, `VITE_*`, `FORCE_COLOR`
+   - Preserved: `PATH`, `HOME`, `USER`, `SHELL`, `LANG`, etc.
+   - Prevents environment variable leakage
+
+2. **Non-Interactive Bootstrap** (Zero Artifacts)
+   - Verification runs in non-interactive shell context
+   - No TTY echo = no visible commands
+   - Output (pwd + marker) buffered by service
+
+3. **Marker Detection & Clear Handshake**
+   - Service detects marker in buffered output
+   - Parses working directory from output
+   - Emits clear event on bypass channel
+   - Renderer clears xterm and confirms completion
+   - Service enables output forwarding
+
+4. **Three-Flag Gating System**
+   - Output only forwarded when ALL conditions true:
+     - `hasReceivedMarker = true` (bootstrap completed)
+     - `initializationComplete = true` (clear confirmed)
+     - `isClearing = false` (not currently clearing)
+
+5. **Interactive Shell Starts**
+   - User sees only clean prompt
+   - All commands and output display normally
+   - Zero initialization artifacts
+
+**Implementation**:
+- `TerminalService.ts` (lines 124-236): Bootstrap script generation, marker detection, three-flag gating
+- `TerminalPanel.tsx` (lines 185-202): One-time clear handler before PTY creation
+- `terminal-handlers.ts`: Clear event bypass channel
+- `preload/index.ts`: onClear() and markClearComplete() API
+
+**Design Rationale**:
+- Bootstrap eliminates TTY echo at the source (no interactive input)
+- Gating prevents any pre-marker data from leaking through
+- Bypass channel ensures deterministic clear handshake
+- Works across all platforms and shell configurations
+
 ## Architecture
 
 ### Service Layer
