@@ -270,7 +270,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       })
 
       const { terminalService } = await import('./TerminalService')
-      const tid = await terminalService.createTerminal({ cwd: '/tmp' })
+      await terminalService.createTerminal({ cwd: '/tmp' })
       const { pty } = spawnedPTYs[0]
 
       const dataSpy = vi.fn()
@@ -290,7 +290,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       })
 
       const { terminalService } = await import('./TerminalService')
-      const tid = await terminalService.createTerminal({ cwd: '/tmp' })
+      await terminalService.createTerminal({ cwd: '/tmp' })
       const { pty } = spawnedPTYs[0]
 
       // Extract marker and emit it (sets hasReceivedMarker=true, isClearing=true)
@@ -315,7 +315,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       })
 
       const { terminalService } = await import('./TerminalService')
-      const tid = await terminalService.createTerminal({ cwd: '/tmp' })
+      await terminalService.createTerminal({ cwd: '/tmp' })
       const { pty } = spawnedPTYs[0]
 
       // Extract marker and emit it (sets isClearing=true)

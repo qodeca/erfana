@@ -83,6 +83,9 @@ declare global {
           callback: (data: { terminalId: string; exitCode: number; signal?: number }) => void
         ) => () => void
         onError: (callback: (data: { terminalId: string; error: string }) => void) => () => void
+        // Bootstrap pattern clear handshake methods
+        onClear: (callback: (data: { terminalId: string }) => void) => () => void
+        markClearComplete: (terminalId: string) => void
       }
     }
   }

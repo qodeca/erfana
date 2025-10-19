@@ -35,6 +35,19 @@ See [Automated Testing Plan](./automated-testing-plan.md) for the phased rollout
 - Tests validate non-interactive terminal initialization, eliminating visible artifacts
 - See [Terminal Documentation](../terminal.md) for implementation details
 
+**TerminalPanel Scroll Fix** (`src/renderer/src/components/Panels/TerminalPanel.scroll.test.tsx`) **NEW in v0.3.1**
+- **6 comprehensive tests** covering terminal scroll position preservation
+- **Test Categories**:
+  - Scroll-preserving options initialization
+  - Position preservation when scrolled up
+  - Auto-scroll when at bottom
+  - Multiple consecutive writes tracking
+  - Edge case handling (viewportY === baseY === 0)
+  - Scroll options verification
+- Tests validate fix for terminal jumping to top during Claude CLI streaming output
+- Related GitHub issues: #826, #1413, #1426
+- See [Terminal - Terminal Scroll Fix](../terminal.md#terminal-scroll-fix-v031)
+
 ---
 
 ### E2E/UI (Playwright Electron)
