@@ -7,7 +7,7 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 
 ### Core Documentation
 - [Architecture](./architecture.md) - System architecture and design patterns
-- [Architectural Review](./architectural-review.md) - Comprehensive code quality assessment (2,353 lines)
+- [Architectural Review](./architectural-review/README.md) - Comprehensive code quality assessment (split into 8 focused documents)
 - [API Services](./api-services.md) - Main process services and IPC handlers
 - [IPC Patterns](./ipc-patterns.md) - Inter-process communication patterns
 - [Security](./security.md) - Security considerations and implementations
@@ -30,7 +30,7 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
   - [Embedding Pipeline](./graph-engine/embedding-pipeline.md) - ONNX Runtime integration
   - [Hybrid Search](./graph-engine/hybrid-search.md) - BM25 + vector fusion
   - [Graph Capabilities](./graph-engine/graph-capabilities.md) - Entity extraction and temporal queries
-  - [Implementation Guide](./graph-engine/implementation-guide.md) - Step-by-step milestones (M1-M5)
+  - [Implementation Guide](./graph-engine/implementation-guide/README.md) - Step-by-step milestones (M1-M5, split into 6 milestone documents)
   - [Performance](./graph-engine/performance.md) - Benchmarks and optimization
   - [Packaging](./graph-engine/packaging.md) - Native module configuration
   - [Production Readiness](./graph-engine/production-readiness.md) - Deployment checklist

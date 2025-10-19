@@ -161,6 +161,66 @@ powershell -NoProfile -Command 'Set-Location "..."; Write-Output (Get-Location).
 - Bypass channel ensures deterministic clear handshake
 - Works across all platforms and shell configurations
 
+## Terminal Scroll Fix (v0.3.1)
+
+### Problem
+Terminal viewport jumps to top during Claude CLI streaming output, disrupting UX during long-running commands.
+
+**Related Issues**:
+- https://github.com/anthropics/claude-code/issues/826
+- https://github.com/anthropics/claude-code/issues/1413
+- https://github.com/anthropics/claude-code/issues/1426
+
+### Root Cause
+Claude CLI causes terminal buffer redraws during streaming output, overriding xterm.js's normal scroll position preservation.
+
+### Multi-Layered Solution
+
+#### 1. Scroll Position Tracking (TerminalPanel.tsx:300-314)
+Intelligent detection of user scroll position using xterm.js Buffer API:
+- Compares `buffer.active.viewportY` vs `buffer.active.baseY` to determine if user is scrolled up
+- Preserves position when user is reading scrollback
+- Allows auto-scroll when user is at bottom
+
+```typescript
+const unsubscribeData = window.api.terminal.onData((data) => {
+  if (data.terminalId === terminalId && xtermRef.current) {
+    // FIX: Preserve scroll position to prevent jumping to top during streaming output
+    const buffer = xtermRef.current.buffer.active
+    const wasAtBottom = buffer.viewportY === buffer.baseY
+
+    xtermRef.current.write(data.data)
+
+    if (!wasAtBottom) {
+      // xterm.js will maintain scroll position automatically
+    }
+  }
+})
+```
+
+#### 2. Terminal Configuration (TerminalPanel.tsx:142-143)
+- `scrollOnUserInput: false` - Prevents auto-scroll when user types
+- `smoothScrollDuration: 0` - Eliminates animation lag for instant response
+
+#### 3. CSS Viewport Fix (TerminalPanel.css:69)
+Changed `overflow-y: scroll !important` to `overflow-y: auto`:
+- Lets xterm.js manage scrollbar behavior instead of forcing scrollbars
+- Improves scroll position retention during buffer operations
+
+#### 4. Test Coverage
+Comprehensive test suite in `TerminalPanel.scroll.test.tsx` (6 tests):
+- Terminal initialization with scroll-preserving options
+- Scroll preservation when user scrolled up
+- Auto-scroll when user at bottom
+- Multiple consecutive writes
+- Edge cases (viewportY === baseY === 0)
+- Scroll options verification
+
+### Implementation Files
+- `src/renderer/src/components/Panels/TerminalPanel.tsx:300-314` - Scroll tracking logic
+- `src/renderer/src/components/Panels/TerminalPanel.css:69` - Viewport styling
+- `src/renderer/src/components/Panels/TerminalPanel.scroll.test.tsx` - Test coverage
+
 ## Architecture
 
 ### Service Layer

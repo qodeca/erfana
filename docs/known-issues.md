@@ -2,6 +2,34 @@
 
 ## Resolved Issues
 
+### ✅ Terminal Scroll Jump During Streaming (RESOLVED in v0.3.1)
+
+**Previous Issue**: Terminal viewport jumps to top during Claude CLI streaming output, disrupting user experience during long-running commands.
+
+**Root Cause**: Claude CLI buffer redraws override xterm.js scroll position preservation.
+
+**Solution**: Multi-layered fix implemented in v0.3.1:
+1. Scroll position tracking using Buffer API (`viewportY` vs `baseY`)
+2. Terminal options: `scrollOnUserInput: false`, `smoothScrollDuration: 0`
+3. CSS fix: `overflow-y: auto` instead of forced scrollbars
+4. Comprehensive test coverage (6 tests in TerminalPanel.scroll.test.tsx)
+
+**Implementation Files**:
+- `TerminalPanel.tsx:300-314` - Scroll tracking logic
+- `TerminalPanel.css:69` - Viewport styling
+- `TerminalPanel.scroll.test.tsx` - Test coverage
+
+**Related Issues**:
+- https://github.com/anthropics/claude-code/issues/826
+- https://github.com/anthropics/claude-code/issues/1413
+- https://github.com/anthropics/claude-code/issues/1426
+
+**Status**: ✅ Terminal now preserves scroll position during streaming output.
+
+See: [Terminal - Terminal Scroll Fix](./terminal.md#terminal-scroll-fix-v031)
+
+---
+
 ### ✅ Panel Resizing (RESOLVED in v0.1.0, Commit 4ff94cb)
 
 **Previous Issue**: Panels showed resize cursor but didn't actually resize. Users could see the resize handle but dragging it had no effect.

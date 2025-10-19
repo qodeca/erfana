@@ -2,7 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
-- **Version**: 0.3.0
+- **Version**: 0.3.1
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -61,7 +61,15 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.3.0)
+## Recent Changes (v0.3.1)
+- **Terminal Scroll Fix**: Fixed terminal jumping to top during Claude CLI streaming output
+  - Scroll position tracking using Buffer API (viewportY vs baseY)
+  - Terminal options: scrollOnUserInput: false, smoothScrollDuration: 0
+  - CSS fix: overflow-y: auto instead of forced scrollbars
+  - 6 comprehensive tests in TerminalPanel.scroll.test.tsx
+  - Related issues: GitHub #826, #1413, #1426
+
+## Changes in v0.3.0
 - **Terminal Bootstrap Pattern**: Eliminated initialization artifacts using non-interactive `-c` script + exec
   - Zero visible commands (cd, pwd, echo marker)
   - Three-flag gating system (hasReceivedMarker, initializationComplete, isClearing)

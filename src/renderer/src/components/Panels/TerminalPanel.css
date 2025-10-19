@@ -61,9 +61,12 @@
   padding: 8px;
 }
 
+/* FIX: Changed from 'scroll' to 'auto' to let xterm.js handle scroll behavior
+ * The !important on overflow-y: scroll was forcing scrollbars and interfering
+ * with xterm's internal viewport management, contributing to scroll jump issues */
 .terminal-container .xterm-viewport {
   background: #000000 !important;
-  overflow-y: scroll !important;
+  overflow-y: auto;
 }
 
 .terminal-container .xterm-screen {

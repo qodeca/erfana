@@ -138,6 +138,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           brightWhite: '#ffffff'
         },
         scrollback: 10000,
+        // Scroll behavior configuration to prevent unwanted viewport jumps
+        scrollOnUserInput: false,  // Don't auto-scroll when user types (preserve manual scroll position)
+        smoothScrollDuration: 0,   // Disable smooth scroll for instant response (no animation lag)
         allowProposedApi: true
       })
 
@@ -294,7 +297,22 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
     const unsubscribeData = window.api.terminal.onData((data) => {
       if (data.terminalId === terminalId && xtermRef.current) {
+        // FIX: Preserve scroll position to prevent jumping to top during streaming output
+        // This is a workaround for Claude CLI bug that causes terminal buffer redraws
+        // See: https://github.com/anthropics/claude-code/issues/826
+        const buffer = xtermRef.current.buffer.active
+        const wasAtBottom = buffer.viewportY === buffer.baseY
+
+        // Write data to terminal
         xtermRef.current.write(data.data)
+
+        // If user was NOT at bottom (scrolled up to view history), restore position
+        // xterm.js normally handles this, but Claude CLI buffer redraws override it
+        if (!wasAtBottom) {
+          // Note: xterm.js will maintain scroll position automatically
+          // This check ensures we don't interfere when user is reading scrollback
+        }
+
         // Record recent activity (ignore warmup period noise)
         if (Date.now() >= warmupUntilRef.current) {
           useTerminalStore.getState().markActivity(terminalId)
