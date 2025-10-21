@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { ISplitviewPanelProps } from 'dockview'
-import { Terminal as TerminalIcon, RotateCw } from 'lucide-react'
+import { Terminal as TerminalIcon, RotateCw, ArrowDownToLine } from 'lucide-react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
@@ -163,10 +163,27 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       try {
         const { WebglAddon } = await import('@xterm/addon-webgl')
         const webglAddon = new WebglAddon()
+
         webglAddon.onContextLoss(() => {
-          console.warn('WebGL context lost, disposing addon')
+          console.warn('WebGL context lost, attempting recovery')
           webglAddon.dispose()
+
+          // Attempt one recovery after brief delay to let GPU stabilize
+          setTimeout(() => {
+            try {
+              const recoveryAddon = new WebglAddon()
+              recoveryAddon.onContextLoss(() => {
+                console.warn('Second WebGL context loss, staying with canvas renderer')
+                recoveryAddon.dispose()
+              })
+              xterm.loadAddon(recoveryAddon)
+              console.info('✅ WebGL context recovered successfully')
+            } catch (err) {
+              console.warn('WebGL recovery failed, canvas renderer active:', err)
+            }
+          }, 100)
         })
+
         xterm.loadAddon(webglAddon)
       } catch (error) {
         console.warn('WebGL renderer failed, falling back to canvas:', error)
@@ -349,14 +366,30 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   useEffect(() => {
     if (!fitAddonRef.current || !terminalId || !terminalRef.current) return
 
+    // Track last dimensions to prevent flickering from tiny changes
+    let lastCols = 0
+    let lastRows = 0
+
     const handleResize = () => {
       try {
         fitAddonRef.current?.fit()
 
         if (xtermRef.current) {
-          const cols = xtermRef.current.cols
-          const rows = xtermRef.current.rows
-          window.api.terminal.resize(terminalId, cols, rows)
+          // CRITICAL: Enforce integer dimensions to prevent oscillation
+          // Fractional dimensions at certain devicePixelRatios cause flickering
+          const cols = Math.floor(xtermRef.current.cols)
+          const rows = Math.floor(xtermRef.current.rows)
+
+          // THRESHOLD: Only resize PTY if change is >= 2 columns or >= 1 row
+          // Prevents flickering from devicePixelRatio rounding oscillation
+          const colsDiff = Math.abs(cols - lastCols)
+          const rowsDiff = Math.abs(rows - lastRows)
+
+          if ((colsDiff >= 2 || rowsDiff >= 1) && cols > 0 && rows > 0) {
+            window.api.terminal.resize(terminalId, cols, rows)
+            lastCols = cols
+            lastRows = rows
+          }
         }
       } catch (error) {
         console.error('Failed to resize terminal:', error)
@@ -405,19 +438,34 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }
 
+  const handleScrollToBottom = () => {
+    if (xtermRef.current) {
+      xtermRef.current.scrollToBottom()
+    }
+  }
+
   return (
     <div className="terminal-panel sidebar-panel">
       <div className="sidebar-panel-header">
         <TerminalIcon size={16} className="panel-header-icon" />
         <span className="sidebar-panel-title">Terminal</span>
         {terminalId && (
-          <button
-            className="icon-btn"
-            onClick={handleRestartTerminal}
-            title="Restart Terminal"
-          >
-            <RotateCw size={14} />
-          </button>
+          <>
+            <button
+              className="icon-btn"
+              onClick={handleScrollToBottom}
+              title="Scroll to Bottom"
+            >
+              <ArrowDownToLine size={14} />
+            </button>
+            <button
+              className="icon-btn"
+              onClick={handleRestartTerminal}
+              title="Restart Terminal"
+            >
+              <RotateCw size={14} />
+            </button>
+          </>
         )}
       </div>
       <div className="sidebar-panel-content">

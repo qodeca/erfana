@@ -16,6 +16,12 @@ import { installSafeConsole } from './utils/safe-console'
 // Must be called before any other code that uses console.log
 installSafeConsole()
 
+// WebGL Command Line Switches for Electron 33+
+// Fixes WebGL context creation issues and terminal flickering in production builds
+app.commandLine.appendSwitch('enable-webgl')
+app.commandLine.appendSwitch('enable-webgl2-compute-context')
+app.commandLine.appendSwitch('ignore-gpu-blocklist')
+
 function createWindow(): BrowserWindow {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -30,7 +36,9 @@ function createWindow(): BrowserWindow {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      webgl: true,
+      experimentalFeatures: true
     }
   })
 
