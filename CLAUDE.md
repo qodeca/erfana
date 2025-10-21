@@ -2,7 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
-- **Version**: 0.3.1
+- **Version**: 0.3.2
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -45,10 +45,10 @@ src/
 ## Documentation
 See `docs/` for details (keep Claude's context focused):
 - [Architecture](docs/architecture.md) — System design patterns
-- [Architectural Review](docs/architectural-review.md) — Code quality assessment, security, testing gaps
-- [Terminal](docs/terminal.md) — Bootstrap pattern, integration, clean initialization
+- [Architectural Review](docs/architectural-review/README.md) — Code quality assessment, security, testing gaps
+- [Terminal](docs/terminal/README.md) — Bootstrap pattern, flickering prevention, scroll fixes
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
-- [File Watching](docs/file-watching.md) — Auto-refresh, recoverable ENOENT, session tokens
+- [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
 - [Testing](docs/testing/README.md) — Workspace, coverage (46% TerminalService)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
@@ -61,7 +61,23 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.3.1)
+## Recent Changes (v0.3.2)
+- **Terminal Flickering Prevention**: Fixed terminal rendering flicker in production builds
+  - Added Electron WebGL command line switches for Electron 33 compatibility
+  - Enhanced WebGL context recovery with automatic retry after loss
+  - Integer dimension enforcement (Math.floor) to prevent fractional oscillation
+  - Dimension change threshold (≥2 cols OR ≥1 row) to filter devicePixelRatio noise
+  - 6 comprehensive tests in TerminalPanel.flickering.test.tsx
+  - Related: xterm.js #4922, Electron 33 WebGL context management
+- **Scroll to Bottom Button**: Added manual workaround for Claude Code scroll jumping
+  - New button (⬇️ icon) in terminal header
+  - Quick recovery from scroll position loss
+  - Uses xterm.js scrollToBottom() API
+- **Documentation Restructuring**: Split oversized documentation files
+  - terminal.md split into terminal/ subfolder (5 focused files)
+  - All files now comply with 500-line limit for Claude Code efficiency
+
+## Changes in v0.3.1
 - **Terminal Scroll Fix**: Fixed terminal jumping to top during Claude CLI streaming output
   - Scroll position tracking using Buffer API (viewportY vs baseY)
   - Terminal options: scrollOnUserInput: false, smoothScrollDuration: 0
