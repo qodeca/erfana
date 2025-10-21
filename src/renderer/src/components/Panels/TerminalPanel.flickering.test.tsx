@@ -71,12 +71,10 @@ vi.mock('../../utils/domUtils', () => ({
 }))
 
 describe('TerminalPanel flickering prevention', () => {
-  let mockOnDataCallback: ((data: { terminalId: string; data: string }) => void) | null = null
   let mockOnClearCallback: ((data: { terminalId: string }) => void) | null = null
 
   beforeEach(() => {
     vi.clearAllMocks()
-    mockOnDataCallback = null
     mockOnClearCallback = null
 
     // Reset mock xterm state
@@ -96,10 +94,7 @@ describe('TerminalPanel flickering prevention', () => {
         write: vi.fn(),
         resize: vi.fn(),
         kill: vi.fn().mockResolvedValue({ success: true }),
-        onData: vi.fn().mockImplementation((callback) => {
-          mockOnDataCallback = callback
-          return vi.fn() // unsubscribe
-        }),
+        onData: vi.fn().mockReturnValue(vi.fn()),
         onExit: vi.fn().mockReturnValue(vi.fn()),
         onError: vi.fn().mockReturnValue(vi.fn()),
         onClear: vi.fn().mockImplementation((callback) => {
