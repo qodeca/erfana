@@ -78,56 +78,8 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
       return false
     }
 
-    console.log(`📝 sendToTerminal: text length=${text.length}, autoExecute=${autoExecute}, terminalId=${terminalId}`)
-
     try {
-      // Wait for terminal to be fully initialized with polling
-      const maxWait = 5000 // 5 seconds max wait
-      const pollInterval = 50 // Check every 50ms
-      const startTime = Date.now()
-
-      console.log(`⏱️ sendToTerminal: Waiting for terminal initialization...`)
-
-      while (Date.now() - startTime < maxWait) {
-        try {
-          const availabilityResult = await window.api.terminal.isAvailable(terminalId)
-
-          if (!availabilityResult.available) {
-            console.warn('❌ sendToTerminal: Terminal not available')
-            return false
-          }
-
-          if (availabilityResult.initialized) {
-            console.log(`✅ sendToTerminal: Terminal initialized (waited ${Date.now() - startTime}ms)`)
-            break
-          }
-
-          // Still initializing, wait a bit more
-          await new Promise(resolve => setTimeout(resolve, pollInterval))
-        } catch (error) {
-          console.error('❌ sendToTerminal: Error checking availability during polling:', error)
-          return false
-        }
-      }
-
-      // Final check after timeout
-      const finalCheck = await window.api.terminal.isAvailable(terminalId)
-      if (!finalCheck.available) {
-        console.error('❌ sendToTerminal: Terminal became unavailable during wait')
-        return false
-      }
-      if (!finalCheck.initialized) {
-        // For autoExecute, fail hard to prevent command corruption
-        // For manual writes, proceed with warning (user may want to send text anyway)
-        if (autoExecute) {
-          console.error(`❌ sendToTerminal: Terminal not initialized after ${maxWait}ms, aborting autoExecute to prevent command corruption`)
-          return false
-        }
-        console.warn(`⚠️ sendToTerminal: Terminal not initialized after ${maxWait}ms, proceeding anyway (manual write)`)
-      }
-
-      // AWAIT the write operation to ensure it completes
-      console.log(`📤 sendToTerminal: Writing ${text.length} characters...`)
+      // Write text to terminal
       const writeResult = await window.api.terminal.write(terminalId, text)
 
       if (!writeResult.success) {
@@ -135,25 +87,20 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
         return false
       }
 
-      console.log(`✅ sendToTerminal: Text written successfully`)
-
-      // If autoExecute is enabled, send Enter key
+      // If autoExecute is enabled, send Enter key after a short delay
       if (autoExecute) {
-        // Wait 200ms to ensure text rendering is complete before Enter
-        // This is more conservative than the previous 100ms
-        console.log(`⏱️ sendToTerminal: Waiting 200ms before sending Enter...`)
+        // Wait 200ms to ensure text is rendered in terminal before sending Enter
+        // This delay accounts for: PTY buffering (1-20ms) + shell processing (1-50ms)
+        // + GPU rendering (10-100ms) + margin for loaded systems
         await new Promise(resolve => setTimeout(resolve, 200))
 
-        // AWAIT the Enter key write
-        console.log(`⏎ sendToTerminal: Sending Enter key...`)
+        // Send Enter key
         const enterResult = await window.api.terminal.write(terminalId, '\r')
 
         if (!enterResult.success) {
           console.error(`❌ sendToTerminal: Failed to send Enter: ${enterResult.error}`)
           return false
         }
-
-        console.log('✅ sendToTerminal: Auto-executed command (Enter sent)')
       }
 
       return true

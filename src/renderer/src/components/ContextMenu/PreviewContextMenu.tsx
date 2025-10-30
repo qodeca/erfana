@@ -112,8 +112,13 @@ export function PreviewContextMenu({
 
       // Create submit and cancel handlers
       const handleSubmit = async (userInput: string) => {
-        await executePrompt(config, userInput)
-        onOpenUserInputDialog(null) // Close dialog
+        try {
+          await executePrompt(config, userInput)
+          onOpenUserInputDialog(null) // Close dialog
+        } catch (error) {
+          console.error(`❌ Failed to execute prompt:`, error)
+          onOpenUserInputDialog(null) // Close dialog even on error
+        }
       }
 
       const handleCancel = () => {

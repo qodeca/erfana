@@ -19,7 +19,12 @@ The template system enables AI-powered text operations through right-click conte
 
 - [Template Syntax](./template-syntax.md) - Variables, conditionals, helpers
 - [Examples](./examples.md) - Template examples and use cases
-- [Implementation Guide](./implementation.md) - AutoExecute technical details (v0.3.3)
+
+### AutoExecute Implementation (v0.3.4)
+- [Overview](./autoexecute-overview.md) - Feature overview and architecture
+- [Technical Details](./autoexecute-technical.md) - Write pipeline and 200ms delay rationale
+- [Testing](./autoexecute-testing.md) - Test coverage and mocking strategy
+- [Reference](./autoexecute-reference.md) - Error handling and implementation files
 
 ## Architecture
 
@@ -76,7 +81,7 @@ Text: {{selectedText}}
 
 All templates target Terminal panel:
 - `sendDirectly: false` - User can edit before running
-- `autoExecute: true` - Auto-press Enter after paste (v0.3.3: enhanced with Promise-based writes, initialization polling, and race condition prevention)
+- `autoExecute: true` - Auto-press Enter after paste (v0.3.4: simplified fire-and-forget with 200ms delay)
 
 ## Implementation Files
 
@@ -87,4 +92,4 @@ All templates target Terminal panel:
 
 ## Related
 - [Editor Documentation](../editor/README.md)
-- [Terminal](../terminal.md)
+- [Terminal](../terminal/README.md)
