@@ -52,9 +52,9 @@ export function registerTerminalHandlers() {
   /**
    * Write data to terminal
    */
-  ipcMain.handle('terminal:write', async (_event, { terminalId, data }) => {
+  ipcMain.handle('terminal:write', (_event, { terminalId, data }) => {
     try {
-      const success = await terminalService.write(terminalId, data)
+      const success = terminalService.write(terminalId, data)
       return { success }
     } catch (error) {
       console.error('❌ Failed to write to terminal:', error)

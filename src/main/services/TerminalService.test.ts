@@ -476,8 +476,9 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       const { pty } = spawnedPTYs[0]
       const writeSpy = vi.spyOn(pty, 'write')
 
-      await terminalService.write(tid!, 'ls\n')
-      expect(writeSpy).toHaveBeenCalledWith('ls\n', expect.any(Function))
+      // v0.3.4: Simplified fire-and-forget approach (no callback)
+      terminalService.write(tid!, 'ls\n')
+      expect(writeSpy).toHaveBeenCalledWith('ls\n')
     })
 
     it('resize updates PTY dimensions', async () => {

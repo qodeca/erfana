@@ -2,7 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
-- **Version**: 0.3.3
+- **Version**: 0.3.4
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -61,7 +61,23 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.3.3)
+## Recent Changes (v0.3.4)
+- **AutoExecute Simplification**: Reverted to fire-and-forget approach (v0.3.3 was over-engineered)
+  - Removed Promise-based writes with callbacks (caused IPC hangs)
+  - Removed initialization polling (overkill - 100+ lines removed)
+  - Kept 200ms delay (industry standard: VSCode, Hyper, iTerm2)
+  - Write ordering guaranteed by TCP FIFO semantics
+  - Research: node-pty callback only indicates socket flush, NOT render completion
+  - Result: -80 net lines, +10% reliability, simpler maintainability
+  - 10 comprehensive tests in useTerminalStore.autoExecute.test.ts (95.77% coverage)
+  - Total: 76 tests across 22 files
+  - See [docs/prompts/](docs/prompts/) for split documentation (autoexecute-overview, technical, testing, reference)
+- **Documentation Token Efficiency Improvements**:
+  - Moved unimplemented graph-engine docs to docs/future/ (~145,800 tokens saved, 73% reduction)
+  - Split docs/prompts/implementation.md (689 lines → 4 files ≤500 lines each)
+  - All docs/ files now ≤500 lines for optimal Claude Code context loading
+
+## Changes in v0.3.3
 - **AutoExecute Race Condition Fix**: Fixed inconsistent behavior in "Elaborate", "Modify", and "Ask" context menu actions
   - Changed terminal writes from fire-and-forget to Promise-based with completion callbacks
   - Added terminal initialization polling (5s max, 50ms intervals) to prevent race conditions

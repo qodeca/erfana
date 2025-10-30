@@ -23,22 +23,11 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 - [File Watching](./file-watching/README.md) - Auto-refresh and file monitoring
   - [Patterns & Testing](./file-watching/patterns-and-testing.md) - Implementation patterns and test scenarios
   - [Technical Details](./file-watching/technical-details.md) - Performance, security, edge cases
-- [Prompt Templates](./prompts/README.md) - AI-powered text operations
-  - [Implementation Guide](./prompts/implementation.md) - AutoExecute technical details (v0.3.3)
-- [Graph Engine](./graph-engine.md) - SQLite-based knowledge graph with hybrid search
-  - [User Guide](./graph-engine/user-guide.md) - **START HERE** - Value proposition and user workflows
-  - [Data Ingestion](./graph-engine/data-ingestion.md) - How files are discovered and indexed
-  - [MCP Server](./graph-engine/mcp-server.md) - Claude Code integration via MCP protocol
-  - [Architecture](./graph-engine/architecture.md) - System design and technology stack
-  - [Data Model](./graph-engine/data-model.md) - Complete SQLite schema and patterns
-  - [Vector Search](./graph-engine/vector-search.md) - sqlite-vec deep dive
-  - [Embedding Pipeline](./graph-engine/embedding-pipeline.md) - ONNX Runtime integration
-  - [Hybrid Search](./graph-engine/hybrid-search.md) - BM25 + vector fusion
-  - [Graph Capabilities](./graph-engine/graph-capabilities.md) - Entity extraction and temporal queries
-  - [Implementation Guide](./graph-engine/implementation-guide/README.md) - Step-by-step milestones (M1-M5, split into 6 milestone documents)
-  - [Performance](./graph-engine/performance.md) - Benchmarks and optimization
-  - [Packaging](./graph-engine/packaging.md) - Native module configuration
-  - [Production Readiness](./graph-engine/production-readiness.md) - Deployment checklist
+- [Prompt Templates](./prompts/README.md) - AI-powered text operations (v0.3.4)
+  - [AutoExecute Overview](./prompts/autoexecute-overview.md) - Feature overview and architecture
+  - [AutoExecute Technical](./prompts/autoexecute-technical.md) - Write pipeline and 200ms delay rationale
+  - [AutoExecute Testing](./prompts/autoexecute-testing.md) - Test coverage and mocking strategy
+  - [AutoExecute Reference](./prompts/autoexecute-reference.md) - Implementation files and error handling
 - [Keyboard Shortcuts](./keyboard-shortcuts.md) - Application keyboard shortcuts
 - [UI Components](./ui-components.md) - React component architecture
 
@@ -73,3 +62,8 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 1. Check [Known Issues](./known-issues.md)
 2. Review [Troubleshooting](./troubleshooting.md)
 3. See [EPIPE Error Handling](./epipe-error-handling.md) for console issues
+
+## Future Features
+
+Documentation for planned but not yet implemented features is located in [`./future/`](./future/):
+- [Graph Engine](./future/graph-engine.md) - Planned SQLite-based knowledge graph with hybrid search (not yet implemented)

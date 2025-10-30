@@ -28,7 +28,7 @@ console.log('📝 Loaded prompt templates:', parsedTemplates.length)
  */
 export const PROMPT_REGISTRY: Record<string, PromptConfig> = parsedTemplates.reduce(
   (acc, parsed) => {
-    acc[parsed.id] = {
+    const config = {
       id: parsed.id,
       label: parsed.frontmatter.name,
       icon: parsed.frontmatter.icon,
@@ -45,6 +45,7 @@ export const PROMPT_REGISTRY: Record<string, PromptConfig> = parsedTemplates.red
       inputLabel: parsed.frontmatter.inputLabel,
       inputPlaceholder: parsed.frontmatter.inputPlaceholder
     }
+    acc[parsed.id] = config
     return acc
   },
   {} as Record<string, PromptConfig>
@@ -82,20 +83,12 @@ export function getAllPromptIds(): string[] {
  * @returns Array of prompt configurations matching the area and optionally sub-area, sorted by order
  */
 export function getPromptsForArea(area: string, subArea?: string): PromptConfig[] {
-  const allPrompts = Object.values(PROMPT_REGISTRY)
-  console.log(`🔍 getPromptsForArea('${area}', '${subArea}')`)
-  console.log(`  Total prompts in registry: ${allPrompts.length}`)
-
-  const filtered = allPrompts.filter((prompt) => {
-    const areaMatch = prompt.area === area
-    const subAreaMatch = subArea ? prompt.subArea === subArea : true
-    const enabledMatch = prompt.enabled !== false
-    console.log(
-      `  - ${prompt.id}: area=${prompt.area} (${areaMatch}), subArea=${prompt.subArea} (${subAreaMatch}), enabled=${prompt.enabled} (${enabledMatch})`
-    )
-    return areaMatch && subAreaMatch && enabledMatch
-  })
-
-  console.log(`  Filtered prompts: ${filtered.length}`)
-  return filtered.sort((a, b) => (a.order || 0) - (b.order || 0))
+  return Object.values(PROMPT_REGISTRY)
+    .filter((prompt) => {
+      const areaMatch = prompt.area === area
+      const subAreaMatch = subArea ? prompt.subArea === subArea : true
+      const enabledMatch = prompt.enabled !== false
+      return areaMatch && subAreaMatch && enabledMatch
+    })
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
 }
