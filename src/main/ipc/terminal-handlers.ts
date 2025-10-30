@@ -20,11 +20,12 @@ export function registerTerminalHandlers() {
 
   /**
    * Check if terminal support is available (node-pty loaded)
+   * Optionally check initialization state for a specific terminal
    */
-  ipcMain.handle('terminal:isAvailable', () => {
-    const available = terminalService.isAvailable()
-    console.log(`🔍 Terminal available: ${available}`)
-    return { success: true, available }
+  ipcMain.handle('terminal:isAvailable', (_event, terminalId?: string) => {
+    const result = terminalService.isAvailable(terminalId)
+    console.log(`🔍 Terminal available: ${result.available}, initialized: ${result.initialized ?? 'N/A'}`)
+    return { success: true, ...result }
   })
 
   /**
@@ -51,8 +52,15 @@ export function registerTerminalHandlers() {
   /**
    * Write data to terminal
    */
-  ipcMain.on('terminal:write', (_event, { terminalId, data }) => {
-    terminalService.write(terminalId, data)
+  ipcMain.handle('terminal:write', async (_event, { terminalId, data }) => {
+    try {
+      const success = await terminalService.write(terminalId, data)
+      return { success }
+    } catch (error) {
+      console.error('❌ Failed to write to terminal:', error)
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
+    }
   })
 
   /**

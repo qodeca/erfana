@@ -6,7 +6,7 @@ import { EventEmitter } from 'events'
 // =============================================================================
 
 interface MockPTY extends EventEmitter {
-  write: (d: string) => void
+  write: (d: string, callback?: () => void) => void
   resize: (cols: number, rows: number) => void
   kill: () => void
   onData: (cb: (d: string) => void) => void
@@ -23,7 +23,10 @@ const spawnedPTYs: Array<{
 
 function createMockPTY(): MockPTY {
   const emitter = new EventEmitter() as MockPTY
-  emitter.write = vi.fn()
+  emitter.write = vi.fn((data: string, callback?: () => void) => {
+    // Call callback immediately to simulate successful write
+    if (callback) callback()
+  })
   emitter.resize = vi.fn()
   emitter.kill = vi.fn()
   emitter.onData = (cb) => emitter.on('data', cb)
@@ -473,8 +476,8 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       const { pty } = spawnedPTYs[0]
       const writeSpy = vi.spyOn(pty, 'write')
 
-      terminalService.write(tid!, 'ls\n')
-      expect(writeSpy).toHaveBeenCalledWith('ls\n')
+      await terminalService.write(tid!, 'ls\n')
+      expect(writeSpy).toHaveBeenCalledWith('ls\n', expect.any(Function))
     })
 
     it('resize updates PTY dimensions', async () => {

@@ -57,7 +57,7 @@ declare global {
         setDirectoryWatchDepth: (depth: number | null) => Promise<{ success: boolean; error?: string }>
       }
       terminal: {
-        isAvailable: () => Promise<{ success: boolean; available: boolean }>
+        isAvailable: (terminalId?: string) => Promise<{ success: boolean; available: boolean; initialized?: boolean }>
         create: (config?: {
           shell?: string
           cwd?: string
@@ -65,7 +65,7 @@ declare global {
           cols?: number
           rows?: number
         }) => Promise<{ success: boolean; terminalId?: string; error?: string }>
-        write: (terminalId: string, data: string) => void
+        write: (terminalId: string, data: string) => Promise<{ success: boolean; error?: string }>
         resize: (terminalId: string, cols: number, rows: number) => void
         kill: (terminalId: string) => Promise<{ success: boolean; error?: string }>
         getInfo: (terminalId: string) => Promise<{

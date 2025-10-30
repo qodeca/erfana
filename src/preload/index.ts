@@ -146,8 +146,8 @@ const api = {
   // Terminal operations
   terminal: {
     // Check availability
-    isAvailable: (): Promise<{ success: boolean; available: boolean }> =>
-      ipcRenderer.invoke('terminal:isAvailable'),
+    isAvailable: (terminalId?: string): Promise<{ success: boolean; available: boolean; initialized?: boolean }> =>
+      ipcRenderer.invoke('terminal:isAvailable', terminalId),
 
     // Create terminal
     create: (config?: {
@@ -160,9 +160,8 @@ const api = {
       ipcRenderer.invoke('terminal:create', config),
 
     // Write to terminal
-    write: (terminalId: string, data: string): void => {
-      ipcRenderer.send('terminal:write', { terminalId, data })
-    },
+    write: (terminalId: string, data: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('terminal:write', { terminalId, data }),
 
     // Resize terminal
     resize: (terminalId: string, cols: number, rows: number): void => {

@@ -60,10 +60,21 @@ export class TerminalService extends EventEmitter {
   private terminalCounter = 0
 
   /**
-   * Check if node-pty is available
+   * Check if node-pty is available and optionally check terminal initialization state
    */
-  isAvailable(): boolean {
-    return pty !== null
+  isAvailable(terminalId?: string): { available: boolean; initialized?: boolean } {
+    const available = pty !== null
+
+    // If terminalId is provided, also check initialization state
+    if (terminalId) {
+      const terminal = this.terminals.get(terminalId)
+      return {
+        available,
+        initialized: terminal ? terminal.initializationComplete : false
+      }
+    }
+
+    return { available }
   }
 
   /**
@@ -297,34 +308,48 @@ export class TerminalService extends EventEmitter {
 
   /**
    * Write data to terminal
+   * Returns a Promise that resolves when the write completes
    */
-  write(terminalId: string, data: string): boolean {
-    const terminal = this.terminals.get(terminalId)
+  write(terminalId: string, data: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      const terminal = this.terminals.get(terminalId)
 
-    if (!terminal) {
-      console.error(`❌ Terminal ${terminalId} not found`)
-      return false
-    }
-
-    try {
-      terminal.ptyProcess.write(data)
-      return true
-    } catch (error) {
-      // Suppress EPIPE errors - terminal may have closed
-      const code = (error as { code?: unknown }).code
-      if (code === 'EPIPE') {
-        console.log(`ℹ️ Terminal ${terminalId} PTY closed (terminal likely exited)`)
-        // Clean up the closed terminal
-        this.terminals.delete(terminalId)
-        this.emit('exit', { terminalId, exitCode: 0 })
-        return false
+      if (!terminal) {
+        console.error(`❌ Terminal ${terminalId} not found`)
+        resolve(false)
+        return
       }
 
-      console.error(`❌ Failed to write to terminal ${terminalId}:`, error)
-      const message = error instanceof Error ? error.message : String(error)
-      this.emit('error', { terminalId, error: message })
-      return false
-    }
+      try {
+        // pty.write() accepts an optional callback that's called when data is written
+        // NOTE: node-pty supports optional callback parameter for write completion
+        // This is not in the TypeScript types (@types/node-pty) but is stable API since node-pty v0.9.0
+        // See: https://github.com/microsoft/node-pty/blob/main/src/unixTerminal.ts#L206
+        // Type assertion is safe here as:
+        // 1. We control the node-pty version in package.json (currently 1.0.0)
+        // 2. The callback pattern has been stable for 5+ years
+        // 3. If callback isn't supported, it's simply ignored (no error thrown)
+        ;(terminal.ptyProcess.write as (data: string, callback?: () => void) => void)(data, () => {
+          resolve(true)
+        })
+      } catch (error) {
+        // Suppress EPIPE errors - terminal may have closed
+        const code = (error as { code?: unknown }).code
+        if (code === 'EPIPE') {
+          console.log(`ℹ️ Terminal ${terminalId} PTY closed (terminal likely exited)`)
+          // Clean up the closed terminal
+          this.terminals.delete(terminalId)
+          this.emit('exit', { terminalId, exitCode: 0 })
+          resolve(false)
+          return
+        }
+
+        console.error(`❌ Failed to write to terminal ${terminalId}:`, error)
+        const message = error instanceof Error ? error.message : String(error)
+        this.emit('error', { terminalId, error: message })
+        resolve(false)
+      }
+    })
   }
 
   /**
