@@ -60,6 +60,41 @@ See [Automated Testing Plan](./automated-testing-plan.md) for the phased rollout
 - Ensures Enter key is reliably sent after prompt paste in context menu actions
 - See [Prompt Templates - Implementation Guide](../prompts/implementation.md)
 
+**Prompt System** (`src/renderer/src/prompts/`) **NEW in v0.3.4**
+- **319 comprehensive tests** covering the entire prompt template system
+- **Coverage**: 98.59% statements, 96.59% branches, 100% functions, 98.59% lines
+- **Test Organization**:
+
+  *Core System Tests (177 tests)*:
+  - `parser.test.ts` (31 tests) - YAML frontmatter parsing, validation, error handling
+  - `renderer.test.ts` (32 tests) - CSP-safe Handlebars rendering, conditionals, helpers
+  - `helpers.test.ts` (59 tests) - Utility functions (truncate, basename, dirname, formatLineRange)
+  - `schema.test.ts` (29 tests) - Zod schema validation for template configuration
+  - `registry.test.ts` (26 tests) - Template registry, filtering by area/subArea
+
+  *UI Component Tests (75 tests)*:
+  - `UserInputDialog.test.tsx` (31 tests) - Modal dialog, validation, keyboard shortcuts
+  - `PreviewContextMenu.test.tsx` (20 tests) - Context menu rendering, prompt execution, icon mapping
+  - `MarkdownPreview.prompt.test.tsx` (24 tests) - Integration tests for line tracking, markdown features, sanitization
+
+  *Regression Tests (67 tests)*:
+  - `prompt-command.test.ts` (32 tests) - New "Prompt" command feature validation
+  - `existing-commands.test.ts` (35 tests) - Ensures Elaborate, Modify, Ask commands still work correctly
+
+- **Test Utilities**:
+  - `__test-utils__/fixtures.ts` - Factory functions for mock data (mockPromptVariables, mockPromptConfig, TEST_TEMPLATES)
+  - `__test-utils__/mocks.ts` - Mock utilities (createMockWindowApi, installMockWindowApi, resetStores)
+
+- **Key Testing Patterns**:
+  - Factory functions for consistent test data generation
+  - jsdom environment with portal-root for modal testing
+  - Mock window.api and navigator.clipboard for IPC/clipboard operations
+  - Component integration tests focused on structural rendering (not full E2E)
+  - Regression tests to prevent breaking existing functionality
+
+- Tests validate the complete prompt template system including YAML parsing, CSP-safe rendering, UI components, and context menu integration
+- See [Prompt System Documentation](../prompts/) for implementation details
+
 ---
 
 ### E2E/UI (Playwright Electron)
@@ -151,5 +186,11 @@ For MCP visual testing:
 ---
 
 ## 💡 Examples
-- Unit: see renderer tests under `src/renderer/src/**/*.test.tsx`
-- Visual/MCP: follow flows in [ui-scenarios.md](./ui-scenarios.md) and [interaction-scenarios.md](./interaction-scenarios.md)
+
+### Unit Tests
+- Renderer tests: `src/renderer/src/**/*.test.tsx`
+- Prompt system tests: `src/renderer/src/prompts/*.test.ts` and `src/renderer/src/prompts/*.test.tsx`
+- Test utilities: `src/renderer/src/prompts/__test-utils__/` (fixtures, mocks)
+
+### Visual/MCP Tests
+- Follow flows in [ui-scenarios.md](./ui-scenarios.md) and [interaction-scenarios.md](./interaction-scenarios.md)

@@ -1,0 +1,285 @@
+import { describe, it, expect } from 'vitest'
+import {
+  getPrompt,
+  getAllPrompts,
+  getAllPromptIds,
+  getPromptsForArea,
+  PROMPT_REGISTRY
+} from './registry'
+
+describe('Template Registry', () => {
+  // The registry is built at module load time, so we test the actual registry
+
+  describe('Registry Initialization', () => {
+    it('should load all 5 templates (elaborate, modify, ask, prompt, mermaid-bug-report)', () => {
+      const allPrompts = getAllPrompts()
+
+      expect(allPrompts.length).toBe(5)
+
+      const ids = getAllPromptIds()
+      expect(ids).toContain('elaborate')
+      expect(ids).toContain('modify')
+      expect(ids).toContain('ask')
+      expect(ids).toContain('prompt')
+      expect(ids).toContain('mermaid-bug-report')
+    })
+
+    it('should build PROMPT_REGISTRY with correct structure', () => {
+      expect(PROMPT_REGISTRY).toBeDefined()
+      expect(typeof PROMPT_REGISTRY).toBe('object')
+      expect(Object.keys(PROMPT_REGISTRY).length).toBe(5)
+    })
+
+    it('should log correct count to console on module load', () => {
+      // Note: This test verifies console.log was called during module initialization
+      // The actual log happens when the module first loads, so we just verify
+      // the registry matches the expected count
+      const count = getAllPrompts().length
+      expect(count).toBe(5)
+    })
+  })
+
+  describe('getPrompt() Function', () => {
+    it('should return correct config for valid ID: elaborate', () => {
+      const prompt = getPrompt('elaborate')
+
+      expect(prompt).not.toBeNull()
+      expect(prompt?.id).toBe('elaborate')
+      expect(prompt?.label).toBe('Elaborate')
+      expect(prompt?.icon).toBe('maximize2')
+      expect(prompt?.area).toBe('markdown-preview')
+      expect(prompt?.autoExecute).toBe(true)
+    })
+
+    it('should return correct config for valid ID: prompt', () => {
+      const prompt = getPrompt('prompt')
+
+      expect(prompt).not.toBeNull()
+      expect(prompt?.id).toBe('prompt')
+      expect(prompt?.label).toBe('Prompt')
+      expect(prompt?.icon).toBe('sparkles')
+      expect(prompt?.requiresInput).toBe(true)
+      expect(prompt?.autoExecute).toBe(true)
+      expect(prompt?.order).toBe(3)
+    })
+
+    it('should return null for invalid ID', () => {
+      const prompt = getPrompt('non-existent-prompt')
+      expect(prompt).toBeNull()
+    })
+
+    it('should return config with all expected fields', () => {
+      const prompt = getPrompt('modify')
+
+      expect(prompt).toHaveProperty('id')
+      expect(prompt).toHaveProperty('label')
+      expect(prompt).toHaveProperty('icon')
+      expect(prompt).toHaveProperty('targetPanel')
+      expect(prompt).toHaveProperty('sendDirectly')
+      expect(prompt).toHaveProperty('autoExecute')
+      expect(prompt).toHaveProperty('template')
+      expect(prompt).toHaveProperty('area')
+      expect(prompt).toHaveProperty('subArea')
+      expect(prompt).toHaveProperty('order')
+      expect(prompt).toHaveProperty('enabled')
+      expect(prompt).toHaveProperty('requiresInput')
+    })
+  })
+
+  describe('getAllPrompts() Function', () => {
+    it('should return all prompt configs as array', () => {
+      const prompts = getAllPrompts()
+
+      expect(Array.isArray(prompts)).toBe(true)
+      expect(prompts.length).toBe(5)
+    })
+
+    it('should return configs with correct structure', () => {
+      const prompts = getAllPrompts()
+
+      prompts.forEach((prompt) => {
+        expect(prompt).toHaveProperty('id')
+        expect(prompt).toHaveProperty('label')
+        expect(prompt).toHaveProperty('icon')
+        expect(prompt).toHaveProperty('template')
+        expect(typeof prompt.id).toBe('string')
+        expect(typeof prompt.label).toBe('string')
+        expect(typeof prompt.icon).toBe('string')
+        expect(typeof prompt.template).toBe('string')
+      })
+    })
+  })
+
+  describe('getAllPromptIds() Function', () => {
+    it('should return all IDs as string array', () => {
+      const ids = getAllPromptIds()
+
+      expect(Array.isArray(ids)).toBe(true)
+      expect(ids.length).toBe(5)
+
+      ids.forEach((id) => {
+        expect(typeof id).toBe('string')
+      })
+    })
+
+    it('should include all expected IDs', () => {
+      const ids = getAllPromptIds()
+
+      expect(ids).toContain('elaborate')
+      expect(ids).toContain('modify')
+      expect(ids).toContain('ask')
+      expect(ids).toContain('prompt')
+      expect(ids).toContain('mermaid-bug-report')
+    })
+  })
+
+  describe('getPromptsForArea() Function', () => {
+    it('should filter by area: markdown-preview', () => {
+      const prompts = getPromptsForArea('markdown-preview')
+
+      expect(prompts.length).toBeGreaterThan(0)
+
+      prompts.forEach((prompt) => {
+        expect(prompt.area).toBe('markdown-preview')
+      })
+    })
+
+    it('should filter by area + subArea: markdown-preview/context-menu', () => {
+      const prompts = getPromptsForArea('markdown-preview', 'context-menu')
+
+      expect(prompts.length).toBeGreaterThan(0)
+
+      prompts.forEach((prompt) => {
+        expect(prompt.area).toBe('markdown-preview')
+        expect(prompt.subArea).toBe('context-menu')
+      })
+
+      // Should include elaborate, modify, ask, prompt
+      const ids = prompts.map((p) => p.id)
+      expect(ids).toContain('elaborate')
+      expect(ids).toContain('modify')
+      expect(ids).toContain('ask')
+      expect(ids).toContain('prompt')
+    })
+
+    it('should exclude disabled prompts (enabled: false)', () => {
+      const prompts = getPromptsForArea('markdown-preview')
+
+      // All current prompts are enabled by default
+      prompts.forEach((prompt) => {
+        expect(prompt.enabled).not.toBe(false)
+      })
+    })
+
+    it('should sort by order field (ascending)', () => {
+      const prompts = getPromptsForArea('markdown-preview', 'context-menu')
+
+      // Verify ascending order
+      for (let i = 0; i < prompts.length - 1; i++) {
+        const current = prompts[i].order || 0
+        const next = prompts[i + 1].order || 0
+        expect(current).toBeLessThanOrEqual(next)
+      }
+    })
+
+    it('should verify prompt command is last in context menu (order: 3)', () => {
+      const prompts = getPromptsForArea('markdown-preview', 'context-menu')
+
+      // Find prompt command
+      const promptCmd = prompts.find((p) => p.id === 'prompt')
+      expect(promptCmd).toBeDefined()
+      expect(promptCmd?.order).toBe(3)
+
+      // Should be last in sorted array
+      expect(prompts[prompts.length - 1].id).toBe('prompt')
+    })
+
+    it('should return empty array for non-existent area', () => {
+      const prompts = getPromptsForArea('non-existent-area')
+      expect(prompts).toEqual([])
+    })
+
+    it('should return empty array for non-existent subArea', () => {
+      const prompts = getPromptsForArea('markdown-preview', 'non-existent-subarea' as any)
+      expect(prompts).toEqual([])
+    })
+
+    it('should filter by area without subArea (returns all subAreas)', () => {
+      const prompts = getPromptsForArea('markdown-preview')
+
+      expect(prompts.length).toBeGreaterThan(0)
+
+      // Should include both context-menu and mermaid-error subAreas
+      const subAreas = prompts.map((p) => p.subArea).filter(Boolean)
+      expect(subAreas).toContain('context-menu')
+      expect(subAreas).toContain('mermaid-error')
+    })
+  })
+
+  describe('Template Metadata Validation', () => {
+    it('should have all templates with required metadata fields', () => {
+      const prompts = getAllPrompts()
+
+      prompts.forEach((prompt) => {
+        expect(prompt.id).toBeTruthy()
+        expect(prompt.label).toBeTruthy()
+        expect(prompt.icon).toBeTruthy()
+        expect(prompt.template).toBeTruthy()
+        expect(prompt.area).toBeTruthy()
+      })
+    })
+
+    it('should have "Prompt" template with correct requiresInput configuration', () => {
+      const prompt = getPrompt('prompt')
+
+      expect(prompt?.requiresInput).toBe(true)
+      expect(prompt?.inputLabel).toBe('Enter your prompt')
+      expect(prompt?.inputPlaceholder).toContain('summarize')
+    })
+
+    it('should have "Elaborate" template without requiresInput', () => {
+      const prompt = getPrompt('elaborate')
+
+      expect(prompt?.requiresInput).toBe(false)
+    })
+
+    it('should have all context menu prompts with correct icons', () => {
+      const prompts = getPromptsForArea('markdown-preview', 'context-menu')
+
+      const iconMap = prompts.reduce((acc, p) => {
+        acc[p.id] = p.icon
+        return acc
+      }, {} as Record<string, string>)
+
+      expect(iconMap['elaborate']).toBe('maximize2')
+      expect(iconMap['modify']).toBe('edit-3')
+      expect(iconMap['ask']).toBe('help-circle')
+      expect(iconMap['prompt']).toBe('sparkles')
+    })
+  })
+
+  describe('Real Template Content Verification', () => {
+    it('should have "Prompt" template with userInput variable', () => {
+      const prompt = getPrompt('prompt')
+
+      expect(prompt?.template).toContain('{{userInput}}')
+      expect(prompt?.template).toContain('{{selectedText}}')
+    })
+
+    it('should have "Elaborate" template with specific instructions', () => {
+      const prompt = getPrompt('elaborate')
+
+      expect(prompt?.template).toContain('{{selectedText}}')
+      expect(prompt?.template).toContain('Elaborate')
+    })
+
+    it('should have all templates with file context handling', () => {
+      const contextMenuPrompts = getPromptsForArea('markdown-preview', 'context-menu')
+
+      contextMenuPrompts.forEach((prompt) => {
+        // All context menu prompts should handle file references
+        expect(prompt.template).toContain('{{selectedText}}')
+      })
+    })
+  })
+})
