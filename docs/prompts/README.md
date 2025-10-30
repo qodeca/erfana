@@ -19,6 +19,7 @@ The template system enables AI-powered text operations through right-click conte
 
 - [Template Syntax](./template-syntax.md) - Variables, conditionals, helpers
 - [Examples](./examples.md) - Template examples and use cases
+- [Implementation Guide](./implementation.md) - AutoExecute technical details (v0.3.3)
 
 ## Architecture
 
@@ -75,7 +76,7 @@ Text: {{selectedText}}
 
 All templates target Terminal panel:
 - `sendDirectly: false` - User can edit before running
-- `autoExecute: true` - Auto-press Enter after paste
+- `autoExecute: true` - Auto-press Enter after paste (v0.3.3: enhanced with Promise-based writes, initialization polling, and race condition prevention)
 
 ## Implementation Files
 

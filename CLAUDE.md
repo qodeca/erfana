@@ -2,7 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
-- **Version**: 0.3.2
+- **Version**: 0.3.3
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -61,7 +61,18 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.3.2)
+## Recent Changes (v0.3.3)
+- **AutoExecute Race Condition Fix**: Fixed inconsistent behavior in "Elaborate", "Modify", and "Ask" context menu actions
+  - Changed terminal writes from fire-and-forget to Promise-based with completion callbacks
+  - Added terminal initialization polling (5s max, 50ms intervals) to prevent race conditions
+  - Enhanced error handling: autoExecute fails fast, manual writes proceed with warning
+  - Increased delay from 100ms to 200ms for reliability
+  - Promise-based IPC pattern (terminal:write changed from ipcMain.on to ipcMain.handle)
+  - 13 comprehensive tests in useTerminalStore.autoExecute.test.ts
+  - Total: 79 tests across 22 files (was 66 tests in v0.3.2)
+  - See [docs/prompts/implementation.md](docs/prompts/implementation.md) for implementation details
+
+## Changes in v0.3.2
 - **Terminal Flickering Prevention**: Fixed terminal rendering flicker in production builds
   - Added Electron WebGL command line switches for Electron 33 compatibility
   - Enhanced WebGL context recovery with automatic retry after loss

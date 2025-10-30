@@ -48,6 +48,18 @@ See [Automated Testing Plan](./automated-testing-plan.md) for the phased rollout
 - Related GitHub issues: #826, #1413, #1426
 - See [Terminal - Terminal Scroll Fix](../terminal.md#terminal-scroll-fix-v031)
 
+**useTerminalStore AutoExecute** (`src/renderer/src/stores/useTerminalStore.autoExecute.test.ts`) **NEW in v0.3.3**
+- **13 comprehensive tests** covering autoExecute functionality and race condition prevention
+- **Test Categories**:
+  - AutoExecute true/false behavior (2 tests)
+  - Terminal initialization polling (1 test)
+  - Error handling (terminal unavailable, write failures) (5 tests)
+  - Timeout behaviors (autoExecute vs manual) (2 tests)
+  - Concurrent calls and timing validation (3 tests)
+- Tests validate Promise-based terminal writes with initialization polling
+- Ensures Enter key is reliably sent after prompt paste in context menu actions
+- See [Prompt Templates - Implementation Guide](../prompts/implementation.md)
+
 ---
 
 ### E2E/UI (Playwright Electron)

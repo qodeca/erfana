@@ -115,7 +115,7 @@ class TerminalService extends EventEmitter {
   dispose(): Promise<void>
 
   // Operations
-  write(terminalId: string, data: string): boolean
+  write(terminalId: string, data: string): Promise<boolean>  // v0.3.3: Promise-based with completion callback
   resize(terminalId: string, cols: number, rows: number): boolean
 
   // Info
@@ -128,6 +128,8 @@ export const terminalService = new TerminalService()
 
 **Pattern**: OOP service with singleton instance (follows FileService pattern)
 
+**v0.3.3 Enhancement**: The `write()` method now returns a Promise that resolves when the write operation completes. This enables reliable autoExecute behavior for prompt templates, preventing race conditions between text write and Enter key. See [Prompt Templates - Implementation Guide](../prompts/implementation.md) for details.
+
 ### IPC Handlers
 
 **File**: `src/main/ipc/terminal-handlers.ts` (~120 lines)
@@ -135,9 +137,9 @@ export const terminalService = new TerminalService()
 **Exposed via contextBridge**:
 ```typescript
 window.api.terminal = {
-  isAvailable: () => Promise<{available: boolean}>
+  isAvailable: (terminalId?) => Promise<{success, available, initialized?}>
   create: (config) => Promise<{success, terminalId?, error?}>
-  write: (terminalId, data) => void
+  write: (terminalId, data) => Promise<{success, error?}>  // v0.3.3: Promise-based
   resize: (terminalId, cols, rows) => void
   kill: (terminalId) => void
 
@@ -188,11 +190,13 @@ useEffect(() => {
 interface TerminalStore {
   activeTerminalId: string | null
   setActiveTerminalId: (id: string | null) => void
-  sendToTerminal: (text: string) => Promise<boolean>
+  sendToTerminal: (text: string, autoExecute?: boolean) => Promise<boolean>  // v0.3.3: autoExecute support
 }
 ```
 
 **Purpose**: Cross-component communication (PreviewContextMenu → Terminal Panel)
+
+**v0.3.3 Enhancement**: `sendToTerminal()` now supports `autoExecute` parameter to automatically send Enter key after text. Includes initialization polling (5s timeout, 50ms intervals) to prevent race conditions. See [Prompt Templates - Implementation Guide](../prompts/implementation.md).
 
 ## Addons
 
