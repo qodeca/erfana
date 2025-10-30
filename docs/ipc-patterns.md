@@ -26,6 +26,66 @@ ipcMain.handle('file:readFile', async (_event, filePath: string) => {
 const content = await window.api.file.readFile('/path/to/file.md')
 ```
 
+## Promise-Based Pattern with Completion Callback (v0.3.3)
+
+For operations requiring confirmation of completion (e.g., terminal write operations), use Promise-based IPC with completion callbacks:
+
+**1. Service layer with completion callback** (`src/main/services/TerminalService.ts`):
+```typescript
+write(terminalId: string, data: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const terminal = this.terminals.get(terminalId)
+    if (!terminal) {
+      resolve(false)
+      return
+    }
+    try {
+      // node-pty callback API - resolves when write completes
+      ;(terminal.ptyProcess.write as (data: string, callback?: () => void) => void)(
+        data,
+        () => resolve(true)
+      )
+    } catch (error) {
+      resolve(false)
+    }
+  })
+}
+```
+
+**2. IPC handler awaits service promise** (`src/main/ipc/terminal-handlers.ts`):
+```typescript
+ipcMain.handle('terminal:write', async (_event, { terminalId, data }) => {
+  try {
+    const success = await terminalService.write(terminalId, data)
+    return { success }
+  } catch (error) {
+    return { success: false, error: String(error) }
+  }
+})
+```
+
+**3. Preload exposes Promise API** (`src/preload/index.ts`):
+```typescript
+write: (terminalId: string, data: string): Promise<{ success: boolean; error?: string }> =>
+  ipcRenderer.invoke('terminal:write', { terminalId, data })
+```
+
+**4. Renderer awaits completion** (`src/renderer/src/stores/useTerminalStore.ts`):
+```typescript
+const writeResult = await window.api.terminal.write(terminalId, text)
+if (!writeResult.success) {
+  console.error('Write failed:', writeResult.error)
+  return false
+}
+// Write confirmed complete, safe to send Enter key
+```
+
+**Benefits**:
+- Guarantees operation completion before proceeding
+- Prevents race conditions (e.g., sending Enter before text is written)
+- Enables reliable sequential operations
+- See [Prompt Templates - Implementation Guide](../prompts/implementation.md) for full autoExecute implementation
+
 ## Adding New IPC Channel
 
 1. Add to preload API with TypeScript types
