@@ -6,6 +6,7 @@ import { parseTemplates } from './parser'
 import elaborateTemplate from './templates/elaborate.md?raw'
 import modifyTemplate from './templates/modify.md?raw'
 import askTemplate from './templates/ask.md?raw'
+import promptTemplate from './templates/prompt.md?raw'
 import mermaidBugReportTemplate from './templates/mermaid-bug-report.md?raw'
 
 /**
@@ -16,6 +17,7 @@ const parsedTemplates = parseTemplates([
   { raw: elaborateTemplate, filename: 'elaborate.md' },
   { raw: modifyTemplate, filename: 'modify.md' },
   { raw: askTemplate, filename: 'ask.md' },
+  { raw: promptTemplate, filename: 'prompt.md' },
   { raw: mermaidBugReportTemplate, filename: 'mermaid-bug-report.md' }
 ])
 

@@ -2,7 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
-- **Version**: 0.3.4
+- **Version**: 0.3.5
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -61,7 +61,25 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.3.4)
+## Recent Changes (v0.3.5)
+- **Comprehensive Test Coverage for Prompt System**: Added 319 new automated tests
+  - Core System Tests (177 tests): parser, renderer, helpers, schema, registry
+  - UI Component Tests (75 tests): UserInputDialog, PreviewContextMenu, MarkdownPreview
+  - Regression Tests (67 tests): prompt command validation, existing commands preservation
+  - Total: 395 tests passing (32 test files)
+  - Coverage: 98.59% statements, 96.59% branches, 100% functions, 98.59% lines
+- **Test Infrastructure**: Created comprehensive test utilities
+  - fixtures.ts: Factory functions for mock data (mockPromptVariables, mockPromptConfig, TEST_TEMPLATES)
+  - mocks.ts: Mock utilities (createMockWindowApi, installMockWindowApi, resetStores)
+  - Consistent test patterns across all test suites
+- **Code Quality Improvements**:
+  - Fixed 6 TypeScript errors in test utilities (Map initialization, ActivityBarStore state)
+  - Fixed 19 ESLint errors (unused variables, explicit any types, unused imports)
+  - All tests passing, typecheck clean, lint clean
+- **Testing Documentation**: Updated docs/testing/README.md with comprehensive prompt system testing information
+- **Test Fixes**: Fixed userEvent.type() issues in coverage runs by switching to userEvent.paste()
+
+## Changes in v0.3.4
 - **AutoExecute Simplification**: Reverted to fire-and-forget approach (v0.3.3 was over-engineered)
   - Removed Promise-based writes with callbacks (caused IPC hangs)
   - Removed initialization polling (overkill - 100+ lines removed)
