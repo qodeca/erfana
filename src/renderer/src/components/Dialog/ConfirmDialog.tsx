@@ -1,3 +1,4 @@
+import { HelpCircle, AlertTriangle } from 'lucide-react'
 import { BaseDialog } from './BaseDialog'
 import type { ConfirmDialogConfig } from './types'
 
@@ -12,8 +13,9 @@ interface ConfirmDialogProps {
  * ConfirmDialog - Yes/No confirmation dialog
  *
  * Features:
+ * - Dynamic icon (HelpCircle for normal, AlertTriangle for danger)
  * - Confirm/Cancel buttons
- * - Danger mode for destructive actions
+ * - Danger mode for destructive actions (red button + warning icon)
  * - Keyboard shortcuts (Enter to confirm, Esc to cancel)
  * - Promise-based API via useDialog()
  *
@@ -23,7 +25,7 @@ interface ConfirmDialogProps {
  * const confirmed = await showConfirm({
  *   title: 'Delete File',
  *   message: 'Are you sure?',
- *   danger: true
+ *   danger: true  // Shows AlertTriangle icon and red button
  * })
  * if (confirmed) deleteFile()
  * ```
@@ -62,13 +64,20 @@ export function ConfirmDialog({ config, zIndex, onConfirm, onCancel }: ConfirmDi
       isOpen={true}
       onClose={handleCancel}
       zIndex={zIndex}
-      closeOnBackdrop={true}
+      closeOnBackdrop={false}
       closeOnEscape={true}
       ariaLabelledBy={titleId}
       ariaDescribedBy={messageId}
     >
       <div onKeyDown={handleKeyDown}>
-        <div className="dialog-header">
+        <div className="dialog-header-with-icon">
+          <div className="dialog-icon">
+            {danger ? (
+              <AlertTriangle size={20} strokeWidth={2} />
+            ) : (
+              <HelpCircle size={20} strokeWidth={2} />
+            )}
+          </div>
           <h3 id={titleId} className="dialog-title">{title}</h3>
         </div>
 
