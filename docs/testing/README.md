@@ -95,6 +95,57 @@ See [Automated Testing Plan](./automated-testing-plan.md) for the phased rollout
 - Tests validate the complete prompt template system including YAML parsing, CSP-safe rendering, UI components, and context menu integration
 - See [Prompt System Documentation](../prompts/) for implementation details
 
+**Dialog System** (`src/renderer/src/components/Dialog/`, `src/renderer/src/utils/fileValidation.ts`) **NEW in v0.3.6**
+- **129 comprehensive tests** covering unified dialog system and SOLID refactoring
+- **Test Organization**:
+
+  *Validation Tests (80 tests)*:
+  - `fileValidation.test.ts` (80 tests) - File/folder name validation utilities
+    - EMPTY, TOO_LONG, INVALID_CHARS validation (18 tests)
+    - RESERVED names (Windows: CON, PRN, AUX, COM1-9, LPT1-9, etc.) (15 tests)
+    - UNCHANGED validation for rename operations (8 tests)
+    - DUPLICATE detection with case-insensitive matching (12 tests)
+    - Dotfile edge cases (`.CON` valid, `CON` reserved) (8 tests)
+    - Cross-platform compatibility (19 tests)
+
+  *Component Tests (49 tests)*:
+  - `FileSystemDialog.test.tsx` (49 tests) - Base component for file system operations
+    - Rendering: Different icons (file/folder), operations (create/rename), labels (6 tests)
+    - Focus: Auto-focus on mount, select-all for rename, no-select for create (3 tests)
+    - Input: Character counter, whitespace trimming, 255 char limit (4 tests)
+    - Validation: Error display, error classes, clearing errors on type (8 tests)
+    - Button state: Disabled when empty/invalid, enabled when valid (3 tests)
+    - Keyboard: Enter to submit, Esc to cancel (5 tests)
+    - Handlers: Submit/cancel callbacks with correct values (6 tests)
+    - Rename: CurrentName population, case-only changes allowed (2 tests)
+    - Accessibility: ARIA attributes, tooltips, keyboard shortcuts info (3 tests)
+
+  *Integration Tests*:
+  - `WrapperDialogs.test.tsx` - NewFileDialog, NewFolderDialog, RenameDialog
+    - Wrapper configuration: Icon selection (file vs folder), button labels
+    - Validation messages: File-specific ("A file with this name already exists")
+    - Cross-dialog consistency: Keyboard shortcuts, behavior patterns
+
+- **Key Features Tested**:
+  - Portal rendering with `#portal-root` (all dialogs)
+  - Cross-platform validation (case-insensitive on macOS/Windows)
+  - Windows reserved names (CON, PRN, AUX, COM1-9, LPT1-9)
+  - Invalid characters: `/\?*:|"<>`
+  - Dotfile edge cases (`.CON` valid, `CON` without dot reserved)
+  - Auto-focus with select-all for rename operations
+  - Character counter with 255 limit
+  - Inline validation errors with error class styling
+  - Submit button disabled when invalid/empty
+
+- **SOLID Principles Applied**:
+  - Single Responsibility: Validation (fileValidation.ts), base component (FileSystemDialog.tsx), wrappers
+  - Open/Closed: Base component configurable via props, closed for modification
+  - Dependency Inversion: Validation abstracted from UI components
+
+- **Total Tests**: 549 tests passing (35 test files)
+- Tests validate SOLID refactoring of file system dialogs with comprehensive validation logic
+- See [Architecture - Dialog System](../architecture.md#dialog-system) for implementation details
+
 ---
 
 ### E2E/UI (Playwright Electron)

@@ -191,4 +191,54 @@ if (confirmed) await deleteFile()
 - Type-safe API with full TypeScript support
 - Focus management and keyboard shortcuts built-in
 
-See: [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md) | [Security](./security.md)
+### File System Dialogs (SOLID Architecture)
+
+**SOLID Principles Applied** to file/folder creation and rename operations:
+
+**Base Component**: `FileSystemDialog.tsx`
+- Consolidates common logic for file system operations
+- Shared validation, keyboard shortcuts, focus management, UI consistency
+- Configurable via props: `itemType` (file/folder), `operation` (create/rename), `parentPath`, `currentName`
+- Single Responsibility Principle: One component, one clear purpose
+
+**Validation Utilities**: `utils/fileValidation.ts`
+- Cross-platform validation logic extracted to reusable module
+- Handles 6 validation error codes:
+  - `EMPTY` - Name cannot be empty
+  - `TOO_LONG` - Exceeds 255 character limit
+  - `INVALID_CHARS` - Contains forbidden characters (/\?*:|"<>)
+  - `RESERVED` - Windows reserved names (CON, PRN, AUX, COM1-9, LPT1-9)
+  - `UNCHANGED` - Rename operation with same name
+  - `DUPLICATE` - Case-insensitive duplicate detection
+- Edge cases: Dotfiles (`.CON` is valid, `CON` without dot is reserved)
+- Function: `validateFileSystemName(name, existingNames?, currentName?, itemType?)`
+
+**Wrapper Components** (Thin wrappers following Open/Closed Principle):
+- `NewFileDialog.tsx` - Configures FileSystemDialog for file creation
+- `NewFolderDialog.tsx` - Configures FileSystemDialog for folder creation
+- `RenameDialog.tsx` - Configures FileSystemDialog for rename (file ↔ folder)
+- Each wrapper: ~50 lines, just props configuration and icon selection
+- Easy to add new file system dialog types without modifying base component
+
+**Features**:
+- Auto-focus input on mount (select-all for rename operations)
+- Character counter with visual feedback (0/255 characters)
+- Inline validation errors below input field
+- Error class styling (red border when validation fails)
+- Keyboard shortcuts: Enter to submit, Esc to cancel
+- Submit button disabled when input invalid/empty
+- Context display showing parent path (e.g., "in /project/docs")
+
+**Test Coverage**: 129 tests (see [Testing](./testing/README.md#dialog-system))
+- `fileValidation.test.ts` - 80 tests covering all validation scenarios
+- `FileSystemDialog.test.tsx` - 49 tests covering component behavior
+- `WrapperDialogs.test.tsx` - Integration tests for wrapper components
+
+**Benefits of SOLID Refactoring**:
+- DRY: Eliminated duplication across 3 dialog types
+- Maintainability: Single source of truth for validation logic
+- Testability: Validation logic testable independently of UI
+- Extensibility: Easy to add new file system operations
+- Type Safety: Shared TypeScript interfaces enforce consistency
+
+See: [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md) | [Security](./security.md) | [Testing](./testing/README.md)

@@ -2,7 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
-- **Version**: 0.3.5
+- **Version**: 0.3.6
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -61,7 +61,34 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.3.5)
+## Recent Changes (v0.3.6)
+- **Unified Dialog System**: Complete rewrite of dialog framework
+  - Replaced old ConfirmDialog and UserInputDialog with new unified system
+  - Created Dialog/ folder with BaseDialog, DialogContext, DialogManager, dialogService
+  - Promise-based API via useDialog() hook (85% code reduction per usage)
+  - Added AlertDialog (simple notifications), ConfirmDialog (yes/no with danger mode), PromptDialog (text input)
+  - Z-index stacking for multiple dialogs, portal rendering (#portal-root)
+  - Accessibility: ARIA labels, keyboard shortcuts (Enter/Esc), focus management
+  - See [docs/architecture.md](docs/architecture.md#dialog-system)
+- **SOLID Refactoring of File System Dialogs**: Applied SOLID principles to file/folder operations
+  - Created fileValidation.ts with shared validation utilities (6 error codes)
+  - Created FileSystemDialog.tsx as base component (consolidates common logic)
+  - Created thin wrappers: NewFileDialog, NewFolderDialog, RenameDialog (~50 lines each)
+  - Single Responsibility: Separated validation, base component, wrappers
+  - Open/Closed: Base component configurable via props, closed for modification
+  - Dependency Inversion: Validation abstracted from UI
+  - Cross-platform validation: case-insensitive duplicates, Windows reserved names (CON, PRN, etc.)
+  - Dotfile edge cases: `.CON` is valid, `CON` without dot is reserved
+  - Features: Character counter (255 limit), inline validation, auto-focus, keyboard shortcuts
+- **Comprehensive Test Coverage**: Added 129 new tests
+  - fileValidation.test.ts: 80 tests covering all validation scenarios
+  - FileSystemDialog.test.tsx: 49 tests covering component behavior (focus, input, validation, keyboard, ARIA)
+  - WrapperDialogs.test.tsx: Integration tests for wrapper components
+  - **Total: 549 tests passing (35 test files)**
+  - All typecheck, lint, and tests passing
+  - See [docs/testing/README.md](docs/testing/README.md#dialog-system)
+
+## Changes in v0.3.5
 - **Comprehensive Test Coverage for Prompt System**: Added 319 new automated tests
   - Core System Tests (177 tests): parser, renderer, helpers, schema, registry
   - UI Component Tests (75 tests): UserInputDialog, PreviewContextMenu, MarkdownPreview
