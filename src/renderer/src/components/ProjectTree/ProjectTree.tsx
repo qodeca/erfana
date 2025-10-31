@@ -4,7 +4,7 @@ import type { FileNode } from '../../../../preload/index'
 import type { FilterMode } from '../../types/filters'
 import { ProjectTreeNode } from './ProjectTreeNode'
 import { ContextMenu, ContextMenuItem } from '../ContextMenu/ContextMenu'
-import { ConfirmDialog } from '../ConfirmDialog/ConfirmDialog'
+import { useDialog } from '../Dialog'
 import './ProjectTree.css'
 import { showGlobalToast } from '../Toast/toastService'
 
@@ -43,12 +43,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     node: FileNode
   } | null>(null)
 
-  // Confirmation dialog state
-  const [confirmDialog, setConfirmDialog] = useState<{
-    title: string
-    message: string
-    onConfirm: () => void
-  } | null>(null)
+  // New unified dialog system
+  const { showConfirm } = useDialog()
 
   // Load last project on mount
   useEffect(() => {
@@ -173,44 +169,42 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         .catch(() => false)
 
       if (hasDirty || terminalBusy) {
-        return setConfirmDialog({
+        const confirmed = await showConfirm({
           title: hasDirty ? 'Unsaved Changes' : 'Active Terminal Session',
           message: hasDirty
             ? 'You have unsaved changes. Discard and switch project?'
             : 'Terminal shows recent activity. Stop it and switch project?',
-          onConfirm: async () => {
-            setConfirmDialog(null)
-            // Graceful signal to terminal if active
-            try {
-              const { useTerminalStore } = await import('../../stores/useTerminalStore')
-              const tid = useTerminalStore.getState().getActiveTerminalId()
-              if (tid) {
-                // Send Ctrl+C signal
-                window.api.terminal.write(tid, '\u0003')
-                await new Promise((r) => setTimeout(r, 300))
-                // If no new activity, mark idle
-                if (!useTerminalStore.getState().isRecentlyActiveId(tid, 300)) {
-                  useTerminalStore.getState().clearActivity(tid)
-                }
-              }
-            } catch (e) {
-              console.warn('Failed to signal terminal before switching project:', e)
-            }
-            const currentToken = ++switchTokenRef.current
-            const path = await window.api.file.openProject()
-            if (path && currentToken === switchTokenRef.current) {
-              setProjectPath(path)
-              const fileTree = await window.api.file.readDirectory(path)
-              setFiles(fileTree)
-              showGlobalToast({ type: 'success', title: 'Project Opened', message: path })
-            }
-            setIsSwitchingProject(false)
-          }
+          confirmLabel: 'Switch Anyway',
+          danger: true
         })
+
+        if (!confirmed) {
+          setIsSwitchingProject(false)
+          return
+        }
+
+        // Graceful signal to terminal if active
+        try {
+          const { useTerminalStore } = await import('../../stores/useTerminalStore')
+          const tid = useTerminalStore.getState().getActiveTerminalId()
+          if (tid) {
+            // Send Ctrl+C signal
+            window.api.terminal.write(tid, '\u0003')
+            await new Promise((r) => setTimeout(r, 300))
+            // If no new activity, mark idle
+            if (!useTerminalStore.getState().isRecentlyActiveId(tid, 300)) {
+              useTerminalStore.getState().clearActivity(tid)
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to signal terminal before switching project:', e)
+        }
       }
+
+      const currentToken = ++switchTokenRef.current
       const path = await window.api.file.openProject()
 
-      if (path) {
+      if (path && currentToken === switchTokenRef.current) {
         setProjectPath(path)
         const fileTree = await window.api.file.readDirectory(path)
         setFiles(fileTree)
@@ -239,40 +233,38 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         })
         .catch(() => false)
       if (hasDirty || terminalBusy) {
-        return setConfirmDialog({
+        const confirmed = await showConfirm({
           title: hasDirty ? 'Unsaved Changes' : 'Active Terminal Session',
           message: hasDirty
             ? 'You have unsaved changes. Discard and close project?'
             : 'Terminal shows recent activity. Stop it and close project?',
-          onConfirm: async () => {
-            setConfirmDialog(null)
-            try {
-              const { useTerminalStore } = await import('../../stores/useTerminalStore')
-              const tid = useTerminalStore.getState().getActiveTerminalId()
-              if (tid) {
-                window.api.terminal.write(tid, '\u0003')
-                await new Promise((r) => setTimeout(r, 300))
-                if (!useTerminalStore.getState().isRecentlyActiveId(tid, 300)) {
-                  useTerminalStore.getState().clearActivity(tid)
-                }
-              }
-            } catch (e) {
-              console.warn('Failed to signal terminal before closing project:', e)
-            }
-            const currentToken = ++switchTokenRef.current
-            const ok = await window.api.file.closeProject()
-            if (ok && currentToken === switchTokenRef.current) {
-              setProjectPath(null)
-              setFiles([])
-              setExpandedFolders(new Set())
-              showGlobalToast({ type: 'info', title: 'Project Closed', message: 'Current project has been closed.' })
-            }
-            setIsSwitchingProject(false)
-          }
+          confirmLabel: 'Close Anyway',
+          danger: true
         })
+
+        if (!confirmed) {
+          setIsSwitchingProject(false)
+          return
+        }
+
+        try {
+          const { useTerminalStore } = await import('../../stores/useTerminalStore')
+          const tid = useTerminalStore.getState().getActiveTerminalId()
+          if (tid) {
+            window.api.terminal.write(tid, '\u0003')
+            await new Promise((r) => setTimeout(r, 300))
+            if (!useTerminalStore.getState().isRecentlyActiveId(tid, 300)) {
+              useTerminalStore.getState().clearActivity(tid)
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to signal terminal before closing project:', e)
+        }
       }
+
+      const currentToken = ++switchTokenRef.current
       const ok = await window.api.file.closeProject()
-      if (ok) {
+      if (ok && currentToken === switchTokenRef.current) {
         setProjectPath(null)
         setFiles([])
         setExpandedFolders(new Set())
@@ -576,87 +568,91 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   }
 
   const handleDeleteFile = async (filePath: string, fileName: string) => {
-    setConfirmDialog({
+    setContextMenu(null)
+
+    const confirmed = await showConfirm({
       title: 'Delete File',
       message: `Are you sure you want to delete "${fileName}"? This action cannot be undone.`,
-      onConfirm: async () => {
-        try {
-          setLoading(true)
-          setError(null)
-
-          // Mark as internal operation and pause directory watcher
-          isInternalOperation.current = true
-          if (projectPath) {
-            await window.api.directoryWatch.pause(projectPath)
-          }
-
-          await window.api.file.deleteFile(filePath)
-          await refreshProjectTree()
-
-          // Resume directory watcher
-          if (projectPath) {
-            await window.api.directoryWatch.resume(projectPath)
-          }
-          isInternalOperation.current = false
-
-          setConfirmDialog(null)
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'Failed to delete file')
-          console.error('Error deleting file:', err)
-
-          // Make sure to resume watcher even on error
-          if (projectPath) {
-            await window.api.directoryWatch.resume(projectPath)
-          }
-          isInternalOperation.current = false
-        } finally {
-          setLoading(false)
-        }
-      }
+      confirmLabel: 'Delete',
+      danger: true
     })
-    setContextMenu(null)
+
+    if (!confirmed) return
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Mark as internal operation and pause directory watcher
+      isInternalOperation.current = true
+      if (projectPath) {
+        await window.api.directoryWatch.pause(projectPath)
+      }
+
+      await window.api.file.deleteFile(filePath)
+      await refreshProjectTree()
+
+      // Resume directory watcher
+      if (projectPath) {
+        await window.api.directoryWatch.resume(projectPath)
+      }
+      isInternalOperation.current = false
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete file')
+      console.error('Error deleting file:', err)
+
+      // Make sure to resume watcher even on error
+      if (projectPath) {
+        await window.api.directoryWatch.resume(projectPath)
+      }
+      isInternalOperation.current = false
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleDeleteFolder = async (folderPath: string, folderName: string) => {
-    setConfirmDialog({
+    setContextMenu(null)
+
+    const confirmed = await showConfirm({
       title: 'Delete Folder',
       message: `Are you sure you want to delete "${folderName}" and all its contents? This action cannot be undone.`,
-      onConfirm: async () => {
-        try {
-          setLoading(true)
-          setError(null)
-
-          // Mark as internal operation and pause directory watcher
-          isInternalOperation.current = true
-          if (projectPath) {
-            await window.api.directoryWatch.pause(projectPath)
-          }
-
-          await window.api.file.deleteFolder(folderPath)
-          await refreshProjectTree()
-
-          // Resume directory watcher
-          if (projectPath) {
-            await window.api.directoryWatch.resume(projectPath)
-          }
-          isInternalOperation.current = false
-
-          setConfirmDialog(null)
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'Failed to delete folder')
-          console.error('Error deleting folder:', err)
-
-          // Make sure to resume watcher even on error
-          if (projectPath) {
-            await window.api.directoryWatch.resume(projectPath)
-          }
-          isInternalOperation.current = false
-        } finally {
-          setLoading(false)
-        }
-      }
+      confirmLabel: 'Delete',
+      danger: true
     })
-    setContextMenu(null)
+
+    if (!confirmed) return
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Mark as internal operation and pause directory watcher
+      isInternalOperation.current = true
+      if (projectPath) {
+        await window.api.directoryWatch.pause(projectPath)
+      }
+
+      await window.api.file.deleteFolder(folderPath)
+      await refreshProjectTree()
+
+      // Resume directory watcher
+      if (projectPath) {
+        await window.api.directoryWatch.resume(projectPath)
+      }
+      isInternalOperation.current = false
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete folder')
+      console.error('Error deleting folder:', err)
+
+      // Make sure to resume watcher even on error
+      if (projectPath) {
+        await window.api.directoryWatch.resume(projectPath)
+      }
+      isInternalOperation.current = false
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleRename = (path: string, currentName: string) => {
@@ -1010,16 +1006,6 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         />
       )}
 
-      {confirmDialog && (
-        <ConfirmDialog
-          title={confirmDialog.title}
-          message={confirmDialog.message}
-          confirmLabel="Delete"
-          danger={true}
-          onConfirm={confirmDialog.onConfirm}
-          onCancel={() => setConfirmDialog(null)}
-        />
-      )}
     </div>
   )
 }

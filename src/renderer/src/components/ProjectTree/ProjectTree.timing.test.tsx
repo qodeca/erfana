@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render } from '@testing-library/react'
 import React from 'react'
 import { ProjectTree } from './ProjectTree'
+import { DialogProvider } from '../Dialog'
 
 declare global {
   interface Window {
@@ -32,12 +33,14 @@ describe('ProjectTree watcher start timing', () => {
     }
 
     render(
-      <ProjectTree
-        onFileSelect={() => {}}
-        showControlPanel={false}
-        filterMode={'all' as any}
-        onFilterModeChange={() => {}}
-      />
+      <DialogProvider>
+        <ProjectTree
+          onFileSelect={() => {}}
+          showControlPanel={false}
+          filterMode={'all' as any}
+          onFilterModeChange={() => {}}
+        />
+      </DialogProvider>
     )
 
     // wait a tick for effects

@@ -7,7 +7,6 @@ import rehypeSanitize from 'rehype-sanitize'
 import type { PluggableList } from 'unified'
 import { defaultSchema } from 'hast-util-sanitize'
 import { PreviewContextMenu } from '../ContextMenu/PreviewContextMenu'
-import { UserInputDialog } from '../Dialogs/UserInputDialog'
 import { MermaidDiagram } from './MermaidDiagram'
 import './MarkdownPreview.css'
 
@@ -407,18 +406,6 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
       x: number
       y: number
     } | null>(null)
-    const [userInputDialog, setUserInputDialog] = useState<{
-      isOpen: boolean
-      selectedText: string
-      filePath: string
-      fullDocument: string
-      startLine?: number
-      endLine?: number
-      inputLabel?: string
-      inputPlaceholder?: string
-      onSubmit: (userInput: string) => void
-      onCancel: () => void
-    } | null>(null)
     const localRef = useRef<HTMLDivElement>(null)
     const previewRef = (ref as React.RefObject<HTMLDivElement>) || localRef
 
@@ -532,18 +519,6 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
             startLine={selection.startLine}
             endLine={selection.endLine}
             onClose={handleCloseContextMenu}
-            onOpenUserInputDialog={setUserInputDialog}
-          />
-        )}
-
-        {userInputDialog && (
-          <UserInputDialog
-            isOpen={userInputDialog.isOpen}
-            selectedText={userInputDialog.selectedText}
-            inputLabel={userInputDialog.inputLabel}
-            inputPlaceholder={userInputDialog.inputPlaceholder}
-            onSubmit={userInputDialog.onSubmit}
-            onCancel={userInputDialog.onCancel}
           />
         )}
       </div>
