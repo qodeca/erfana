@@ -5,7 +5,7 @@ import * as monaco from 'monaco-editor'
 import { MonacoMarkdownEditor, MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
 import { MarkdownPreview } from '../Editor/MarkdownPreview'
 import { ResizableDivider } from '../Editor/ResizableDivider'
-import { ConfirmDialog } from '../ConfirmDialog/ConfirmDialog'
+import { useDialog } from '../Dialog'
 import { FileConflictNotification } from '../FileConflictNotification/FileConflictNotification'
 import './MarkdownEditorPanel.css'
 
@@ -59,8 +59,10 @@ export function MarkdownEditorPanel(
   const [currentFile, setCurrentFile] = useState<EditorFile | null>(null)
   const [viewMode, setViewMode] = useState<'split' | 'split-horizontal' | 'editor' | 'preview'>('preview')
   const [selectedText, setSelectedText] = useState<string>('')
-  const [showCloseConfirm, setShowCloseConfirm] = useState(false)
   const [isAutoSaving, setIsAutoSaving] = useState(false)
+
+  // New unified dialog system
+  const { showConfirm } = useDialog()
 
   // Vertical split divider position (side-by-side)
   const [dividerPosition, setDividerPosition] = useState<number>(() => {
@@ -422,7 +424,7 @@ export function MarkdownEditorPanel(
 
   // Keyboard shortcuts
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
       const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
       const modKey = isMac ? e.metaKey : e.ctrlKey
 
@@ -437,7 +439,15 @@ export function MarkdownEditorPanel(
         e.preventDefault()
         if (currentFile?.modified) {
           // Show confirmation dialog if unsaved changes
-          setShowCloseConfirm(true)
+          const confirmed = await showConfirm({
+            title: 'Unsaved Changes',
+            message: `File "${currentFile.path.split('/').pop()}" has unsaved changes. Close anyway?`,
+            confirmLabel: 'Close Without Saving',
+            danger: true
+          })
+          if (confirmed) {
+            props.api.close()
+          }
         } else {
           props.api.close()
         }
@@ -1098,22 +1108,6 @@ export function MarkdownEditorPanel(
         </div>
       )}
 
-      {showCloseConfirm && currentFile && (
-        <ConfirmDialog
-          title="Unsaved Changes"
-          message={`File "${currentFile.path.split('/').pop()}" has unsaved changes. Close anyway?`}
-          confirmLabel="Close Without Saving"
-          cancelLabel="Cancel"
-          danger={true}
-          onConfirm={() => {
-            setShowCloseConfirm(false)
-            props.api.close()
-          }}
-          onCancel={() => {
-            setShowCloseConfirm(false)
-          }}
-        />
-      )}
     </div>
   )
 }

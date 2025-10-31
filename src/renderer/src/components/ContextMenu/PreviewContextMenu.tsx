@@ -1,6 +1,7 @@
 import { ReactNode } from 'react'
 import { Maximize2, Minimize2, RefreshCw, Sparkles, Copy, Edit3, HelpCircle } from 'lucide-react'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
+import { useDialog } from '../Dialog'
 import { executePromptTemplate } from '../../utils/panelUtils'
 import { PROMPT_REGISTRY, getPromptsForArea } from '../../prompts/registry'
 import type { PromptVariables, PromptConfig } from '../../prompts/types'
@@ -14,18 +15,6 @@ interface PreviewContextMenuProps {
   startLine?: number
   endLine?: number
   onClose: () => void
-  onOpenUserInputDialog: (dialog: {
-    isOpen: boolean
-    selectedText: string
-    filePath: string
-    fullDocument: string
-    startLine?: number
-    endLine?: number
-    inputLabel?: string
-    inputPlaceholder?: string
-    onSubmit: (userInput: string) => void
-    onCancel: () => void
-  } | null) => void
 }
 
 /**
@@ -87,9 +76,10 @@ export function PreviewContextMenu({
   fullDocument,
   startLine,
   endLine,
-  onClose,
-  onOpenUserInputDialog
+  onClose
 }: PreviewContextMenuProps) {
+  // New unified dialog system
+  const { showPrompt } = useDialog()
   const handleAction = async (promptId: string) => {
     // Get prompt configuration
     const config = PROMPT_REGISTRY[promptId]
@@ -110,36 +100,29 @@ export function PreviewContextMenu({
         }
       }
 
-      // Create submit and cancel handlers
-      const handleSubmit = async (userInput: string) => {
-        try {
-          await executePrompt(config, userInput)
-          onOpenUserInputDialog(null) // Close dialog
-        } catch (error) {
-          console.error(`❌ Failed to execute prompt:`, error)
-          onOpenUserInputDialog(null) // Close dialog even on error
-        }
-      }
+      // Close context menu first
+      onClose()
 
-      const handleCancel = () => {
-        onOpenUserInputDialog(null) // Close dialog
-      }
-
-      // Open dialog via callback and close context menu
-      onOpenUserInputDialog({
-        isOpen: true,
-        selectedText: sourceText, // Use source markdown, not preview text
-        filePath,
-        fullDocument,
-        startLine,
-        endLine,
-        inputLabel: config.inputLabel,
-        inputPlaceholder: config.inputPlaceholder,
-        onSubmit: handleSubmit,
-        onCancel: handleCancel
+      // Show prompt dialog using new unified system
+      const userInput = await showPrompt({
+        title: config.inputLabel || 'What would you like to do?',
+        message: `Selected text: "${sourceText.slice(0, 100)}${sourceText.length > 100 ? '...' : ''}"`,
+        inputLabel: 'Your input:',
+        inputPlaceholder: config.inputPlaceholder || 'Enter your instructions or question here...',
+        minLength: 3,
+        maxLength: 2000
       })
 
-      onClose() // Close context menu
+      // If user canceled or input is empty, return
+      if (!userInput) return
+
+      // Execute prompt with user input
+      try {
+        await executePrompt(config, userInput)
+      } catch (error) {
+        console.error(`❌ Failed to execute prompt:`, error)
+      }
+
       return
     }
 

@@ -89,9 +89,9 @@ src/
         │   ├── Panels/          # Panel implementations + WelcomePanel
         │   ├── Editor/          # Monaco + Preview + Context Menus
         │   ├── ProjectTree/     # Project tree with context menu
-        │   ├── Dialogs/         # Modal dialogs (UserInputDialog)
+        │   ├── Dialog/          # Unified dialog system (Context + Provider + Hook)
         │   ├── ContextMenu/     # Right-click context menu
-        │   └── ConfirmDialog/   # Confirmation dialog component
+        │   └── Toast/           # Toast notification system
         ├── prompts/             # Prompt template system
         │   ├── templates/       # Markdown templates with YAML frontmatter
         │   ├── parser.ts        # CSP-safe YAML parser
@@ -150,5 +150,45 @@ Dual vertical activity bars (VS Code-style):
 - `activityBarConfig.ts` - Panel configuration
 
 **State**: Managed by `useActivityBarStore` (Zustand), persists sidebar widths and active panels.
+
+## Dialog System
+
+**Unified Dialog Framework** (following Toast system pattern):
+
+**Architecture**:
+- **Context + Provider + Hook**: `DialogContext.tsx` provides `useDialog()` hook
+- **Promise-based API**: `showConfirm()`, `showPrompt()`, `showAlert()` return Promises
+- **Auto-incrementing Z-index**: Supports stacked dialogs
+- **Portal rendering**: All dialogs render to `#portal-root`
+- **Shared styling**: `Dialog.css` with CSS variables for consistent theming
+
+**Components**:
+- `DialogContext.tsx` - Context, Provider, and useDialog hook
+- `DialogManager.tsx` - Renders active dialogs from context
+- `BaseDialog.tsx` - Shared dialog logic (keyboard, focus, backdrop)
+- `ConfirmDialog.tsx` - Confirmation dialogs (confirm/cancel with danger mode)
+- `PromptDialog.tsx` - Text input dialogs (validation, character count)
+- `AlertDialog.tsx` - Simple alert dialogs (single OK button)
+- `dialogService.ts` - Non-React imperative API for global dialogs
+
+**Usage**:
+```typescript
+// Before: 20+ lines of boilerplate
+const [confirmDialog, setConfirmDialog] = useState(null)
+setConfirmDialog({ title: 'Delete', message: '...', onConfirm: ... })
+{confirmDialog && <ConfirmDialog {...confirmDialog} />}
+
+// After: 2-3 lines
+const { showConfirm } = useDialog()
+const confirmed = await showConfirm({ title: 'Delete', message: '...', danger: true })
+if (confirmed) await deleteFile()
+```
+
+**Benefits**:
+- 85% code reduction per dialog usage
+- Consistent UX across all dialogs
+- No manual state management required
+- Type-safe API with full TypeScript support
+- Focus management and keyboard shortcuts built-in
 
 See: [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md) | [Security](./security.md)
