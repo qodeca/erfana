@@ -6,7 +6,10 @@ import type {
   ConfirmDialogConfig,
   PromptDialogConfig,
   AlertDialogConfig,
-  CustomDialogConfig
+  CustomDialogConfig,
+  RenameDialogConfig,
+  NewFileDialogConfig,
+  NewFolderDialogConfig
 } from './types'
 
 const DialogContext = createContext<DialogContextType | undefined>(undefined)
@@ -54,8 +57,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
           type: 'confirm',
           config: { ...config, id },
           zIndex,
-          resolve,
-          reject: () => resolve(false)
+          resolve: resolve as (value: unknown) => void,
+          reject: (() => resolve(false)) as (reason?: unknown) => void
         }
 
         setDialogs((prev) => [...prev, dialog])
@@ -76,8 +79,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
           type: 'prompt',
           config: { ...config, id },
           zIndex,
-          resolve,
-          reject: () => resolve(null)
+          resolve: resolve as (value: unknown) => void,
+          reject: (() => resolve(null)) as (reason?: unknown) => void
         }
 
         setDialogs((prev) => [...prev, dialog])
@@ -98,8 +101,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
           type: 'alert',
           config: { ...config, id },
           zIndex,
-          resolve,
-          reject: resolve
+          resolve: resolve as (value: unknown) => void,
+          reject: resolve as (reason?: unknown) => void
         }
 
         setDialogs((prev) => [...prev, dialog])
@@ -120,8 +123,74 @@ export function DialogProvider({ children }: { children: ReactNode }) {
           type: 'custom',
           config: { ...config, id },
           zIndex,
-          resolve,
-          reject: resolve
+          resolve: resolve as (value: unknown) => void,
+          reject: resolve as (reason?: unknown) => void
+        }
+
+        setDialogs((prev) => [...prev, dialog])
+      })
+    },
+    [generateId, getNextZIndex]
+  )
+
+  // Show rename dialog (replaces prompt for file/folder renaming)
+  const showRename = useCallback(
+    (config: Omit<RenameDialogConfig, 'id'>): Promise<string | null> => {
+      return new Promise((resolve) => {
+        const id = generateId()
+        const zIndex = getNextZIndex()
+
+        const dialog: Dialog = {
+          id,
+          type: 'rename',
+          config: { ...config, id },
+          zIndex,
+          resolve: resolve as (value: unknown) => void,
+          reject: (() => resolve(null)) as (reason?: unknown) => void
+        }
+
+        setDialogs((prev) => [...prev, dialog])
+      })
+    },
+    [generateId, getNextZIndex]
+  )
+
+  // Show new file dialog
+  const showNewFile = useCallback(
+    (config: Omit<NewFileDialogConfig, 'id'>): Promise<string | null> => {
+      return new Promise((resolve) => {
+        const id = generateId()
+        const zIndex = getNextZIndex()
+
+        const dialog: Dialog = {
+          id,
+          type: 'newFile',
+          config: { ...config, id },
+          zIndex,
+          resolve: resolve as (value: unknown) => void,
+          reject: (() => resolve(null)) as (reason?: unknown) => void
+        }
+
+        setDialogs((prev) => [...prev, dialog])
+      })
+    },
+    [generateId, getNextZIndex]
+  )
+
+  // Show new folder dialog
+  const showNewFolder = useCallback(
+    (config: Omit<NewFolderDialogConfig, 'id'>): Promise<string | null> => {
+      return new Promise((resolve) => {
+        const id = generateId()
+        const zIndex = getNextZIndex()
+
+        const dialog: Dialog = {
+          id,
+          type: 'newFolder',
+          config: { ...config, id },
+          zIndex,
+          resolve: resolve as (value: unknown) => void,
+          reject: (() => resolve(null)) as (reason?: unknown) => void
         }
 
         setDialogs((prev) => [...prev, dialog])
@@ -181,6 +250,9 @@ export function DialogProvider({ children }: { children: ReactNode }) {
         showPrompt,
         showAlert,
         showCustom,
+        showRename,
+        showNewFile,
+        showNewFolder,
         closeDialog,
         closeAll
       }}

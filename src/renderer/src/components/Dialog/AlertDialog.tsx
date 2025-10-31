@@ -1,3 +1,4 @@
+import { Info, AlertTriangle } from 'lucide-react'
 import { BaseDialog } from './BaseDialog'
 import type { AlertDialogConfig } from './types'
 
@@ -11,16 +12,27 @@ interface AlertDialogProps {
  * AlertDialog - Simple alert/notification dialog
  *
  * Features:
+ * - Dynamic icon (Info for normal, AlertTriangle for danger)
  * - Single "OK" button
+ * - Danger mode for error alerts (red button + warning icon)
  * - Keyboard shortcuts (Enter or Esc to close)
  * - Promise-based API via useDialog()
  *
  * @example
  * ```typescript
  * const { showAlert } = useDialog()
+ *
+ * // Normal alert (shows Info icon)
  * await showAlert({
  *   title: 'Success',
  *   message: 'File saved successfully'
+ * })
+ *
+ * // Error alert (shows AlertTriangle icon)
+ * await showAlert({
+ *   title: 'Error',
+ *   message: 'Failed to save file',
+ *   danger: true
  * })
  * ```
  */
@@ -53,13 +65,20 @@ export function AlertDialog({ config, zIndex, onConfirm }: AlertDialogProps) {
       isOpen={true}
       onClose={handleConfirm}
       zIndex={zIndex}
-      closeOnBackdrop={true}
+      closeOnBackdrop={false}
       closeOnEscape={true}
       ariaLabelledBy={titleId}
       ariaDescribedBy={messageId}
     >
       <div onKeyDown={handleKeyDown}>
-        <div className="dialog-header">
+        <div className="dialog-header-with-icon">
+          <div className="dialog-icon">
+            {danger ? (
+              <AlertTriangle size={20} strokeWidth={2} />
+            ) : (
+              <Info size={20} strokeWidth={2} />
+            )}
+          </div>
           <h3 id={titleId} className="dialog-title">{title}</h3>
         </div>
 

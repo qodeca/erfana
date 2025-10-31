@@ -560,7 +560,7 @@ describe('DialogContext', () => {
   })
 
   describe('Backdrop Click', () => {
-    it('should close dialog on backdrop click by default', async () => {
+    it('should NOT close dialog on backdrop click', async () => {
       const user = userEvent.setup()
 
       render(
@@ -583,8 +583,9 @@ describe('DialogContext', () => {
         await user.click(overlay as HTMLElement)
       }
 
+      // Dialog should still be visible - backdrop click should not close it
       await waitFor(() => {
-        expect(screen.queryByText('Confirm Test')).not.toBeInTheDocument()
+        expect(screen.getByText('Confirm Test')).toBeInTheDocument()
       })
     })
   })

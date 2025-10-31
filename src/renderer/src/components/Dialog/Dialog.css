@@ -15,6 +15,12 @@
   --dialog-btn-danger-hover: #e03e18;
   --dialog-btn-secondary-bg: #3c3c3c;
   --dialog-btn-secondary-hover: #505050;
+  --dialog-spacing-large: 24px;
+  --dialog-tooltip-min-width: 280px;
+  --dialog-icon-size: 32px;
+  --dialog-icon-gap: 12px;
+  --dialog-icon-radius: 4px;
+  --dialog-header-margin: 16px;
 }
 
 /* Overlay - Full screen backdrop */
@@ -49,7 +55,7 @@
   border-radius: 0;
   padding: 28px;
   min-width: 400px;
-  max-width: 90%;
+  max-width: 800px;
   max-height: 85vh;
   overflow-y: auto;
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.8),
@@ -243,6 +249,140 @@
   font-family: monospace;
 }
 
+/* Selected text preview section (for PromptDialog) */
+.dialog-selected-text {
+  background-color: #2d2d30;
+  border-left: 3px solid #4ec9b0;
+  padding: 14px 16px;
+  border-radius: 0;
+  max-height: 200px;
+  overflow-y: scroll;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: var(--dialog-spacing-large);
+}
+
+/* Custom scrollbar for selected text (Webkit browsers only) */
+/* Firefox will use default scrollbar styling */
+.dialog-selected-text::-webkit-scrollbar {
+  width: 10px;
+}
+
+.dialog-selected-text::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.dialog-selected-text::-webkit-scrollbar-thumb {
+  background: #454545;
+  border: 2px solid #2d2d30;
+}
+
+.dialog-selected-text::-webkit-scrollbar-thumb:hover {
+  background: #555555;
+}
+
+.dialog-selected-text-label {
+  font-size: 11px;
+  color: #9d9d9d;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.dialog-selected-text-content {
+  font-size: 13px;
+  color: #c8c8c8;
+  font-style: italic;
+  line-height: 1.6;
+  word-break: break-word;
+  white-space: pre-wrap;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  overflow-wrap: break-word;
+}
+
+/* Input section spacing (for PromptDialog) */
+.dialog-input-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Info icon with tooltip (for PromptDialog) */
+.dialog-info-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-right: auto;
+}
+
+.dialog-info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: #858585;
+  cursor: help;
+  transition: color 0.2s ease;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.dialog-info-icon:hover,
+.dialog-info-icon:focus {
+  color: #d4d4d4;
+  outline: none;
+}
+
+.dialog-info-icon:focus-visible {
+  outline: 2px solid #007acc;
+  outline-offset: 2px;
+}
+
+.dialog-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  background-color: #252526;
+  border: 1px solid #454545;
+  border-radius: 0;
+  padding: 10px 12px;
+  min-width: var(--dialog-tooltip-min-width);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.dialog-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.dialog-tooltip-content {
+  font-size: 12px;
+  color: #d4d4d4;
+  line-height: 1.5;
+}
+
+.dialog-tooltip-content kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  background-color: #1e1e1e;
+  border: 1px solid #454545;
+  border-radius: 0;
+  font-size: 11px;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  color: #d4d4d4;
+  font-weight: 500;
+}
+
 /* Scrollbar styling for dialog content */
 .dialog-container::-webkit-scrollbar {
   width: 10px;
@@ -259,4 +399,84 @@
 
 .dialog-container::-webkit-scrollbar-thumb:hover {
   background: #555555;
+}
+
+/* Shared Dialog Header with Icon Styles */
+
+/* Base header style for all dialogs with icons */
+.dialog-header-with-icon {
+  display: flex;
+  align-items: center;
+  gap: var(--dialog-icon-gap);
+  margin-bottom: var(--dialog-header-margin);
+}
+
+/* Base icon container style for all dialogs */
+.dialog-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--dialog-icon-size);
+  height: var(--dialog-icon-size);
+  border-radius: var(--dialog-icon-radius);
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--dialog-text-secondary);
+}
+
+.dialog-icon svg {
+  flex-shrink: 0;
+}
+
+/* Rename Dialog Specific Styles */
+
+/* Compact rename dialog */
+.dialog-rename .dialog-container {
+  min-width: 400px;
+  max-width: 500px;
+}
+
+/* Parent path context */
+.dialog-rename-context {
+  font-size: 12px;
+  color: var(--dialog-text-muted);
+  margin-bottom: 20px;
+  font-style: italic;
+}
+
+/* Input section */
+.dialog-rename-input-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Input field */
+.dialog-rename-input {
+  width: 100%;
+  padding: 10px 12px;
+  background-color: #2d2d30;
+  border: 1px solid var(--dialog-border);
+  border-radius: 0;
+  color: var(--dialog-text-secondary);
+  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: all 0.2s ease;
+}
+
+.dialog-rename-input:focus {
+  outline: none;
+  border-color: var(--dialog-btn-primary-bg);
+  background-color: #252526;
+  box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.15);
+}
+
+.dialog-rename-input.error {
+  color: #f48771;
+}
+
+/* Validation error */
+.dialog-rename-validation-error {
+  color: #f48771;
+  font-size: 12px;
+  margin-top: 4px;
 }

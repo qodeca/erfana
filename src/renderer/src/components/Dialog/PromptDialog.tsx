@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Info, MessageSquare } from 'lucide-react'
 import { BaseDialog } from './BaseDialog'
 import type { PromptDialogConfig } from './types'
 
@@ -13,10 +14,12 @@ interface PromptDialogProps {
  * PromptDialog - Input dialog with validation
  *
  * Features:
+ * - MessageSquare icon for all text input prompts
  * - Text input with validation
  * - Character count
  * - Min/max length enforcement
  * - Custom validation function
+ * - Selected text preview (for AI prompts)
  * - Keyboard shortcuts (Cmd/Ctrl+Enter to submit, Esc to cancel)
  * - Auto-focus input
  * - Promise-based API via useDialog()
@@ -38,6 +41,7 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
     id,
     title,
     message,
+    selectedText,
     inputLabel = 'Your input:',
     inputPlaceholder = '',
     defaultValue = '',
@@ -48,6 +52,7 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
 
   const [inputValue, setInputValue] = useState(defaultValue)
   const [validationError, setValidationError] = useState<string | null>(null)
+  const [showTooltip, setShowTooltip] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Generate unique IDs for ARIA attributes
@@ -61,15 +66,8 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
     }
   }, [])
 
-  // Validate default value on mount if provided
-  useEffect(() => {
-    if (defaultValue && defaultValue.trim().length > 0) {
-      validateInput(defaultValue)
-    }
-  }, []) // Only run on mount
-
-  // Validate input
-  const validateInput = (value: string): boolean => {
+  // Validate input - wrapped in useCallback for stable reference
+  const validateInput = useCallback((value: string): boolean => {
     const trimmed = value.trim()
 
     // Check min length
@@ -101,7 +99,14 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
 
     setValidationError(null)
     return true
-  }
+  }, [minLength, maxLength, validation])
+
+  // Validate default value on mount if provided
+  useEffect(() => {
+    if (defaultValue && defaultValue.trim().length > 0) {
+      validateInput(defaultValue)
+    }
+  }, [defaultValue, validateInput])
 
   const handleSubmit = () => {
     const trimmed = inputValue.trim()
@@ -138,25 +143,51 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
   const trimmedLength = inputValue.trim().length
   const isValid = trimmedLength >= minLength && trimmedLength <= maxLength
 
+  // Truncate very long selectedText to prevent performance issues
+  // Max 10,000 characters for display (still scrollable up to this limit)
+  const displayText = selectedText && selectedText.length > 10000
+    ? selectedText.substring(0, 10000) + '\n\n... (text truncated for performance)'
+    : selectedText
+
   return (
     <BaseDialog
       isOpen={true}
       onClose={handleCancel}
       zIndex={zIndex}
-      closeOnBackdrop={true}
+      closeOnBackdrop={false}
       closeOnEscape={true}
       ariaLabelledBy={titleId}
       ariaDescribedBy={messageId}
     >
       <div>
-        <div className="dialog-header">
+        <div className="dialog-header-with-icon">
+          <div className="dialog-icon">
+            <MessageSquare size={20} strokeWidth={2} />
+          </div>
           <h3 id={titleId} className="dialog-title">{title}</h3>
         </div>
 
         <div className="dialog-body">
-          <p id={messageId} className="dialog-message">{message}</p>
+          {message && <p id={messageId} className="dialog-message">{message}</p>}
 
-          <div style={{ marginTop: '20px' }}>
+          {/* Selected text preview section */}
+          {displayText && (
+            <div
+              className="dialog-selected-text"
+              role="region"
+              aria-label="Selected text preview"
+            >
+              <div className="dialog-selected-text-label" aria-hidden="true">
+                Selected text:
+              </div>
+              {/* React automatically escapes displayText to prevent XSS */}
+              <div className="dialog-selected-text-content">
+                &quot;{displayText}&quot;
+              </div>
+            </div>
+          )}
+
+          <div className="dialog-input-section">
             <label className="dialog-input-label">{inputLabel}</label>
             <textarea
               ref={textareaRef}
@@ -182,6 +213,31 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
         </div>
 
         <div className="dialog-actions">
+          {/* Info icon with tooltip - keyboard accessible */}
+          <div className="dialog-info-wrapper">
+            <button
+              type="button"
+              className="dialog-info-icon"
+              aria-label="View keyboard shortcuts"
+              onFocus={() => setShowTooltip(true)}
+              onBlur={() => setShowTooltip(false)}
+              onMouseEnter={() => setShowTooltip(true)}
+              onMouseLeave={() => setShowTooltip(false)}
+            >
+              <Info size={16} strokeWidth={2} />
+            </button>
+            <div
+              className={`dialog-tooltip ${showTooltip ? 'visible' : ''}`}
+              role="tooltip"
+              aria-hidden={!showTooltip}
+            >
+              <div className="dialog-tooltip-content">
+                <kbd>Cmd/Ctrl+Enter</kbd> to submit
+                <br />
+                <kbd>Esc</kbd> to cancel
+              </div>
+            </div>
+          </div>
           <button className="dialog-btn dialog-btn-secondary" onClick={handleCancel}>
             Cancel
           </button>
@@ -192,11 +248,6 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
           >
             Submit
           </button>
-        </div>
-
-        {/* Keyboard hint */}
-        <div className="dialog-keyboard-hint">
-          <kbd>Cmd/Ctrl+Enter</kbd> to submit, <kbd>Esc</kbd> to cancel
         </div>
       </div>
     </BaseDialog>

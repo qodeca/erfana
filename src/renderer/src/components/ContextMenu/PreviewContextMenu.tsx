@@ -106,7 +106,8 @@ export function PreviewContextMenu({
       // Show prompt dialog using new unified system
       const userInput = await showPrompt({
         title: config.inputLabel || 'What would you like to do?',
-        message: `Selected text: "${sourceText.slice(0, 100)}${sourceText.length > 100 ? '...' : ''}"`,
+        message: '',
+        selectedText: sourceText,
         inputLabel: 'Your input:',
         inputPlaceholder: config.inputPlaceholder || 'Enter your instructions or question here...',
         minLength: 3,

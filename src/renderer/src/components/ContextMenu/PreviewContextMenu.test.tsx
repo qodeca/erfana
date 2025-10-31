@@ -186,7 +186,7 @@ describe('PreviewContextMenu Component', () => {
         expect(mockShowPrompt).toHaveBeenCalled()
         const promptConfig = mockShowPrompt.mock.calls[0][0]
         expect(promptConfig.title).toContain('modif')
-        expect(promptConfig.message).toContain('Sample selected text')
+        expect(promptConfig.selectedText).toContain('Sample selected text')
         expect(promptConfig.minLength).toBe(3)
         expect(promptConfig.maxLength).toBe(2000)
       })
@@ -212,11 +212,11 @@ describe('PreviewContextMenu Component', () => {
         expect(mockReadFile).toHaveBeenCalledWith('/test/document.md')
       })
 
-      // showPrompt should receive source lines in message (2-4)
+      // showPrompt should receive source lines in selectedText (2-4)
       await waitFor(() => {
         expect(mockShowPrompt).toHaveBeenCalled()
         const promptConfig = mockShowPrompt.mock.calls[0][0]
-        expect(promptConfig.message).toContain('Line 2')
+        expect(promptConfig.selectedText).toContain('Line 2')
       })
     })
 
@@ -241,7 +241,7 @@ describe('PreviewContextMenu Component', () => {
       await waitFor(() => {
         expect(mockShowPrompt).toHaveBeenCalled()
         const promptConfig = mockShowPrompt.mock.calls[0][0]
-        expect(promptConfig.message).toContain('Fallback text')
+        expect(promptConfig.selectedText).toContain('Fallback text')
       })
     })
 
