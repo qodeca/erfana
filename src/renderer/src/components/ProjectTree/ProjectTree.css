@@ -329,11 +329,20 @@
 
 /* Highlight the children area for expanded folders */
 .project-tree-node[data-drop-highlight="true"] > .project-tree-children {
+  position: relative;
   background-color: rgba(79, 193, 255, 0.05);
-  border-left: 2px solid rgba(79, 193, 255, 0.3);
-  margin-left: 8px;
-  padding-left: 8px;
   border-radius: 0 0 4px 0;
+}
+
+/* Visual left border using pseudo-element (no layout shift) */
+.project-tree-node[data-drop-highlight="true"] > .project-tree-children::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: rgba(79, 193, 255, 0.3);
 }
 
 /* Invalid drop target (e.g., trying to move folder into itself) */
