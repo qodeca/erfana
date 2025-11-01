@@ -332,7 +332,16 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   }
 
   const handleFileClick = (filePath: string) => {
-    onFileSelect(filePath)
+    // Find the node to determine type
+    const node = enhancedFlattenedItems.find(item => item.path === filePath)
+
+    if (node?.type === 'directory') {
+      // Set selected folder for paste operations
+      setSelectedFolder(filePath)
+    } else {
+      // Open file in editor
+      onFileSelect(filePath)
+    }
   }
 
   const handleNewFile = async () => {
