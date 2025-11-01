@@ -1002,8 +1002,10 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedFolder, flattenedItems, clipboard])
 
-  const handlePaste = async () => {
-    if (!selectedFolder) {
+  const handlePaste = async (targetFolder?: string) => {
+    const targetPath = targetFolder || selectedFolder
+
+    if (!targetPath) {
       showGlobalToast({
         title: 'Error',
         message: 'Select a folder to paste into',
@@ -1021,7 +1023,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         await window.api.directoryWatch.pause(projectPath)
       }
 
-      const result = await clipboard.paste(selectedFolder)
+      const result = await clipboard.paste(targetPath)
 
       if (result.success) {
         // Refresh tree
@@ -1103,8 +1105,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         label: 'Paste',
         icon: <Clipboard size={14} strokeWidth={2} />,
         action: () => {
-          setSelectedFolder(node.path)
-          handlePaste()
+          handlePaste(node.path)
         }
       })
     }
