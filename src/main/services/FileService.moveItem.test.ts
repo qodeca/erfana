@@ -327,4 +327,67 @@ describe('FileService.moveItem', () => {
       await expect(stat(sourceFolder)).rejects.toThrow()
     })
   })
+
+  describe('Replace existing items (replaceExisting parameter)', () => {
+    it('should replace existing file when replaceExisting=true', async () => {
+      // Setup: Create source file and existing target file
+      const sourceFile = join(testDir, 'source.md')
+      const targetFolder = join(testDir, 'folder')
+      await writeFile(sourceFile, 'source content', 'utf-8')
+      await mkdir(targetFolder)
+      await writeFile(join(targetFolder, 'source.md'), 'old content', 'utf-8')
+
+      // Execute move with replaceExisting=true
+      const result = await fileService.moveItem(sourceFile, targetFolder, undefined, true)
+
+      // Verify: New file replaced old file
+      expect(result.path).toBe(join(targetFolder, 'source.md'))
+      const content = await fileService.readFile(result.path)
+      expect(content).toBe('source content') // New content, not old
+
+      // Verify source no longer exists
+      await expect(stat(sourceFile)).rejects.toThrow()
+    })
+
+    it('should replace existing directory when replaceExisting=true', async () => {
+      // Setup: Create source directory and existing target directory
+      const sourceFolder = join(testDir, 'source')
+      const targetFolder = join(testDir, 'target')
+      await mkdir(sourceFolder)
+      await mkdir(targetFolder)
+      await writeFile(join(sourceFolder, 'new-file.md'), 'new content', 'utf-8')
+
+      // Create existing directory with old content
+      await mkdir(join(targetFolder, 'source'))
+      await writeFile(join(targetFolder, 'source', 'old-file.md'), 'old content', 'utf-8')
+
+      // Execute move with replaceExisting=true
+      const result = await fileService.moveItem(sourceFolder, targetFolder, undefined, true)
+
+      // Verify: New directory replaced old directory
+      expect(result.path).toBe(join(targetFolder, 'source'))
+      const entries = await readdir(result.path)
+      expect(entries).toEqual(['new-file.md']) // Only new file, old-file.md deleted
+
+      // Verify source no longer exists
+      await expect(stat(sourceFolder)).rejects.toThrow()
+    })
+
+    it('should still throw error when replaceExisting=false', async () => {
+      // Setup: Create source file and existing target file
+      const sourceFile = join(testDir, 'file.md')
+      const targetFolder = join(testDir, 'folder')
+      await writeFile(sourceFile, 'source', 'utf-8')
+      await mkdir(targetFolder)
+      await writeFile(join(targetFolder, 'file.md'), 'existing', 'utf-8')
+
+      // Execute & Verify: Should still throw error
+      await expect(
+        fileService.moveItem(sourceFile, targetFolder, undefined, false)
+      ).rejects.toThrow('An item named "file.md" already exists')
+    })
+
+    // Note: Permission error testing is platform-specific and unreliable
+    // Omitted for cross-platform compatibility (macOS ignores file permissions for owner)
+  })
 })
