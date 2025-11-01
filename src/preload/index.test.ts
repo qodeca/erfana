@@ -85,5 +85,67 @@ describe('preload api exposure', () => {
     ;(ipcRenderer as any).__emit('project:changed', { oldPath: '/x', newPath: '/y' })
     expect(received.length).toBe(2)
   })
+
+  describe('file.moveItem parameter passing', () => {
+    it('should pass all 4 parameters to IPC when replaceExisting=true', async () => {
+      const { ipcRenderer } = await import('electron')
+
+      await window.api.file.moveItem('/source/file.md', '/target', 'newname.md', true)
+
+      expect((ipcRenderer.invoke as any)).toHaveBeenCalledWith(
+        'file:moveItem',
+        '/source/file.md',
+        '/target',
+        'newname.md',
+        true
+      )
+    })
+
+    it('should pass all 4 parameters to IPC when replaceExisting=false', async () => {
+      const { ipcRenderer } = await import('electron')
+
+      await window.api.file.moveItem('/source/file.md', '/target', undefined, false)
+
+      expect((ipcRenderer.invoke as any)).toHaveBeenCalledWith(
+        'file:moveItem',
+        '/source/file.md',
+        '/target',
+        undefined,
+        false
+      )
+    })
+
+    it('should pass replaceExisting=undefined when not provided', async () => {
+      const { ipcRenderer } = await import('electron')
+
+      await window.api.file.moveItem('/source/file.md', '/target')
+
+      // Should be called with 4 arguments, last being undefined
+      const calls = (ipcRenderer.invoke as any).mock.calls
+      const lastCall = calls[calls.length - 1]
+      expect(lastCall).toHaveLength(5) // channel + 4 parameters
+      expect(lastCall[0]).toBe('file:moveItem')
+      expect(lastCall[1]).toBe('/source/file.md')
+      expect(lastCall[2]).toBe('/target')
+      expect(lastCall[3]).toBeUndefined()
+      expect(lastCall[4]).toBeUndefined()
+    })
+
+    it('should pass newName without replaceExisting', async () => {
+      const { ipcRenderer } = await import('electron')
+
+      await window.api.file.moveItem('/source/file.md', '/target', 'renamed.md')
+
+      const calls = (ipcRenderer.invoke as any).mock.calls
+      const lastCall = calls[calls.length - 1]
+      expect(lastCall).toEqual([
+        'file:moveItem',
+        '/source/file.md',
+        '/target',
+        'renamed.md',
+        undefined
+      ])
+    })
+  })
 })
 

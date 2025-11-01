@@ -90,7 +90,13 @@ describe('useClipboardStore (with dependency injection)', () => {
       cut('/project/file.md', 'file.md', 'file')
       const result = await paste('/project/target')
 
-      expect(mockMoveItem).toHaveBeenCalledWith('/project/file.md', '/project/target')
+      // Updated to expect all 4 parameters (last two undefined)
+      expect(mockMoveItem).toHaveBeenCalledWith(
+        '/project/file.md',
+        '/project/target',
+        undefined,
+        undefined
+      )
       expect(result).toEqual({
         success: true,
         newPath: '/project/target/file.md'
@@ -254,6 +260,74 @@ describe('useClipboardStore (with dependency injection)', () => {
 
       copy('/project/other.md', 'other.md', 'file')
       expect(getOperation()).toBe('copy')
+    })
+  })
+
+  describe('paste with replaceExisting parameter', () => {
+    it('should pass replaceExisting=true to moveItem for cut operations', async () => {
+      mockMoveItem.mockResolvedValue({ path: '/project/target/file.md' })
+
+      const { cut, paste } = useClipboardStore.getState()
+
+      cut('/project/file.md', 'file.md', 'file')
+      await paste('/project/target', true)
+
+      // Verify moveItem called with 4 parameters including replaceExisting=true
+      expect(mockMoveItem).toHaveBeenCalledWith(
+        '/project/file.md',
+        '/project/target',
+        undefined,
+        true
+      )
+    })
+
+    it('should pass replaceExisting=false to moveItem for cut operations', async () => {
+      mockMoveItem.mockResolvedValue({ path: '/project/target/file.md' })
+
+      const { cut, paste } = useClipboardStore.getState()
+
+      cut('/project/file.md', 'file.md', 'file')
+      await paste('/project/target', false)
+
+      // Verify moveItem called with replaceExisting=false
+      expect(mockMoveItem).toHaveBeenCalledWith(
+        '/project/file.md',
+        '/project/target',
+        undefined,
+        false
+      )
+    })
+
+    it('should pass replaceExisting=undefined when not provided', async () => {
+      mockMoveItem.mockResolvedValue({ path: '/project/target/file.md' })
+
+      const { cut, paste } = useClipboardStore.getState()
+
+      cut('/project/file.md', 'file.md', 'file')
+      await paste('/project/target')
+
+      // Verify moveItem called with undefined for replaceExisting (default behavior)
+      expect(mockMoveItem).toHaveBeenCalledWith(
+        '/project/file.md',
+        '/project/target',
+        undefined,
+        undefined
+      )
+    })
+
+    it('should not pass replaceExisting to copyItem (copy operations)', async () => {
+      mockCopyItem.mockResolvedValue({ path: '/project/target/file.md' })
+
+      const { copy, paste } = useClipboardStore.getState()
+
+      copy('/project/file.md', 'file.md', 'file')
+      await paste('/project/target', true)
+
+      // Copy operations don't use replaceExisting (auto-rename behavior)
+      expect(mockCopyItem).toHaveBeenCalledWith('/project/file.md', '/project/target')
+      expect(mockCopyItem).toHaveBeenCalledTimes(1)
+      // Verify it was called with exactly 2 arguments (no replaceExisting)
+      expect(mockCopyItem.mock.calls[0]).toHaveLength(2)
     })
   })
 })
