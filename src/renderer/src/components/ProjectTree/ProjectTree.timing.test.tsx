@@ -28,7 +28,8 @@ describe('ProjectTree watcher start timing', () => {
         onProjectChanged: (_cb: any) => { /* no-op; return unsub */ return () => {} },
         // Add missing methods from our refactoring
         moveItem: vi.fn(async () => ({ path: '/moved' })),
-        copyItem: vi.fn(async () => ({ path: '/copied' }))
+        copyItem: vi.fn(async () => ({ path: '/copied' })),
+        checkConflict: vi.fn(async () => false)
       },
       directoryWatch: {
         start,
@@ -50,8 +51,8 @@ describe('ProjectTree watcher start timing', () => {
       </DialogProvider>
     )
 
-    // wait a tick for effects
-    await new Promise((r) => setTimeout(r, 0))
+    // Wait for effects to complete
+    await new Promise((r) => setTimeout(r, 50))
 
     // Ensure readDirectory was called before start
     const readIdx = calls.indexOf('readDirectory')
