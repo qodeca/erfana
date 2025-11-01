@@ -32,6 +32,8 @@ export function createMockWindowApi() {
       deleteFile: vi.fn().mockResolvedValue({ success: true }),
       deleteFolder: vi.fn().mockResolvedValue({ success: true }),
       rename: vi.fn().mockResolvedValue({ success: true }),
+      moveItem: vi.fn().mockResolvedValue({ path: '/test/project/moved-item' }),
+      copyItem: vi.fn().mockResolvedValue({ path: '/test/project/copied-item' }),
       readDirectory: vi.fn().mockResolvedValue({
         name: 'project',
         path: '/test/project',

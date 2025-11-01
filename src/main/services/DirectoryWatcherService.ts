@@ -1,13 +1,15 @@
 import chokidar, { FSWatcher } from 'chokidar'
 import { BrowserWindow, WebContents } from 'electron'
 import { settingsService } from './SettingsService'
+import { PauseController } from '../utils/PauseController'
+import { DebounceManager } from '../utils/DebounceManager'
 
 interface WatchedDirectory {
   dirPath: string
   watcher: FSWatcher
   webContentsIds: Set<number>
-  isPaused: boolean
-  debounceTimer: NodeJS.Timeout | null
+  pauseController: PauseController
+  debounceManager: DebounceManager
   pendingEvents: DirectoryChangeEvent[]
   version: number
 }
@@ -37,9 +39,7 @@ export class DirectoryWatcherService {
   async stopAll(): Promise<void> {
     this.safeLog('👁️  Stopping all directory watchers...')
     for (const [, watched] of this.watchedDirectories.entries()) {
-      if (watched.debounceTimer) {
-        clearTimeout(watched.debounceTimer)
-      }
+      watched.debounceManager.cancel()
       try {
         await watched.watcher.close()
       } catch {
@@ -129,8 +129,12 @@ export class DirectoryWatcherService {
       dirPath,
       watcher,
       webContentsIds: new Set([webContentsId]),
-      isPaused: false,
-      debounceTimer: null,
+      pauseController: new PauseController(),
+      debounceManager: new DebounceManager(
+        this.DEBOUNCE_DELAY,
+        this.MIN_EVENTS_FOR_BULK,
+        300 // Normal delay for single events
+      ),
       pendingEvents: [],
       version: this.switchVersion
     }
@@ -192,9 +196,7 @@ export class DirectoryWatcherService {
     // If no more webContents watching this directory, stop watching entirely
     if (watched.webContentsIds.size === 0) {
       this.safeLog(`👁️  Stopping directory watch for: ${dirPath}`)
-      if (watched.debounceTimer) {
-        clearTimeout(watched.debounceTimer)
-      }
+      watched.debounceManager.cancel()
       await watched.watcher.close()
       this.watchedDirectories.delete(dirPath)
     }
@@ -224,23 +226,31 @@ export class DirectoryWatcherService {
 
   /**
    * Pause watching (during internal operations to prevent race conditions)
+   * Uses reference counting to support nested pause/resume operations
    */
   pauseWatch(dirPath: string): void {
     const watched = this.watchedDirectories.get(dirPath)
     if (watched) {
-      watched.isPaused = true
-      this.safeLog(`⏸️  Paused directory watch for: ${dirPath}`)
+      const count = watched.pauseController.pause()
+      this.safeLog(`⏸️  Paused directory watch for: ${dirPath} (count: ${count})`)
     }
   }
 
   /**
    * Resume watching after internal operations complete
+   * Only resumes when all pause operations have completed (pauseCount reaches 0)
    */
   resumeWatch(dirPath: string): void {
     const watched = this.watchedDirectories.get(dirPath)
     if (watched) {
-      watched.isPaused = false
-      this.safeLog(`▶️  Resumed directory watch for: ${dirPath}`)
+      const isFullyResumed = watched.pauseController.resume()
+
+      // Only resume when all operations complete
+      if (isFullyResumed) {
+        this.safeLog(`▶️  Resumed directory watch for: ${dirPath}`)
+      } else {
+        this.safeLog(`⏸️  Directory watch still paused: ${dirPath} (count: ${watched.pauseController.getCount()})`)
+      }
     }
   }
 
@@ -257,7 +267,7 @@ export class DirectoryWatcherService {
     }
 
     // Ignore if paused (during our own operations)
-    if (watched.isPaused) {
+    if (watched.pauseController.isPaused()) {
       this.safeLog(`⏸️  Ignoring directory change (paused): ${event.type} ${event.path}`)
       return
     }
@@ -265,21 +275,11 @@ export class DirectoryWatcherService {
     // Add to pending events
     watched.pendingEvents.push(event)
 
-    // Clear existing debounce timer
-    if (watched.debounceTimer) {
-      clearTimeout(watched.debounceTimer)
-    }
-
-    // Determine debounce delay based on event frequency
-    // If we have many pending events, it's likely a bulk operation (git, npm, etc)
-    const isBulkOperation = watched.pendingEvents.length >= this.MIN_EVENTS_FOR_BULK
-    const delay = isBulkOperation ? this.DEBOUNCE_DELAY : 300 // Shorter delay for single events
-
-    // Debounce: wait for changes to settle
-    watched.debounceTimer = setTimeout(() => {
-      this.processEvents(dirPath)
-      watched.debounceTimer = null
-    }, delay)
+    // Schedule processing with adaptive debouncing
+    watched.debounceManager.schedule(
+      () => this.processEvents(dirPath),
+      watched.pendingEvents.length
+    )
   }
 
   /**
@@ -379,9 +379,7 @@ export class DirectoryWatcherService {
     this.safeLog('👁️  Disposing all directory watchers...')
 
     for (const [, watched] of this.watchedDirectories.entries()) {
-      if (watched.debounceTimer) {
-        clearTimeout(watched.debounceTimer)
-      }
+      watched.debounceManager.cancel()
       try {
         await watched.watcher.close()
       } catch {

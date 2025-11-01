@@ -283,3 +283,109 @@
   background: rgba(79, 193, 255, 0.25);
   border-color: rgba(79, 193, 255, 0.4);
 }
+
+/* ===================================================================
+   Drag and Drop Styles
+   =================================================================== */
+
+/* Dragging state - dim the original item */
+.project-tree-item[data-dragging="true"] {
+  opacity: 0.4;
+  cursor: grabbing !important;
+}
+
+/* Grab cursor on hover (drag handle) */
+.project-tree-item .file-icon {
+  cursor: grab;
+}
+
+.project-tree-item[data-dragging="true"] .file-icon {
+  cursor: grabbing;
+}
+
+/* VS Code-style folder highlighting during drag */
+/* Highlight the folder row when it's a drop target */
+.project-tree-item[data-drop-target="true"].directory {
+  background-color: rgba(79, 193, 255, 0.2);
+  border-radius: 4px;
+  position: relative;
+}
+
+/* Subtle pulse animation while hovering (indicates auto-expand countdown) */
+.project-tree-node[data-drop-highlight="true"] > .project-tree-item.directory {
+  background-color: rgba(79, 193, 255, 0.2);
+  border-radius: 4px;
+  animation: dropPulse 1s ease-in-out;
+}
+
+@keyframes dropPulse {
+  0%, 100% {
+    background-color: rgba(79, 193, 255, 0.2);
+  }
+  50% {
+    background-color: rgba(79, 193, 255, 0.3);
+  }
+}
+
+/* Highlight the children area for expanded folders */
+.project-tree-node[data-drop-highlight="true"] > .project-tree-children {
+  background-color: rgba(79, 193, 255, 0.05);
+  border-left: 2px solid rgba(79, 193, 255, 0.3);
+  margin-left: 8px;
+  padding-left: 8px;
+  border-radius: 0 0 4px 0;
+}
+
+/* Invalid drop target (e.g., trying to move folder into itself) */
+.project-tree-item[data-drop-invalid="true"] {
+  background-color: rgba(244, 135, 113, 0.2);
+  border-radius: 4px;
+  cursor: not-allowed;
+}
+
+/* Cut operation - dim item until paste */
+.project-tree-item[data-clipboard-cut="true"] {
+  opacity: 0.6;
+  position: relative;
+}
+
+.project-tree-item[data-clipboard-cut="true"]::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: repeating-linear-gradient(
+    90deg,
+    #858585,
+    #858585 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+/* Drag overlay (ghost element) */
+.drag-overlay {
+  background: #252526;
+  border: 1px solid #4fc1ff;
+  border-radius: 4px;
+  padding: 4px 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  cursor: grabbing;
+  opacity: 0.95;
+}
+
+.drag-overlay .file-name {
+  color: #cccccc;
+  font-weight: 500;
+}
+
+/* ARIA live region for drag announcements */
+.drag-announcements {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}

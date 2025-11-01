@@ -17,7 +17,7 @@
     "test:main": "vitest --run --config vitest.main.ts",
     "test:preload": "vitest --run --config vitest.preload.ts",
     "test:renderer": "vitest --run --config vitest.renderer.ts",
-    "test:cov": "rm -rf coverage && ([ -d out ] && mv out temp/.out_backup || true) && vitest --run --config vitest.main.ts --coverage && vitest --run --config vitest.preload.ts --coverage && vitest --run --config vitest.renderer.ts --coverage && ([ -d temp/.out_backup ] && mv temp/.out_backup out || true)",
+    "test:cov": "rm -rf coverage && mkdir -p temp && ([ -d out ] && mv out temp/.out_backup || true) && vitest --run --config vitest.main.ts --coverage && vitest --run --config vitest.preload.ts --coverage && vitest --run --config vitest.renderer.ts --coverage && ([ -d temp/.out_backup ] && mv temp/.out_backup out || true)",
     "start": "electron-vite preview",
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
@@ -28,6 +28,9 @@
     "build:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/utils": "^3.0.0",
     "@monaco-editor/react": "^4.7.0",

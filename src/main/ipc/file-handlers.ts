@@ -339,4 +339,85 @@ export function registerFileHandlers(): void {
       throw error
     }
   })
+
+  // Move file or folder
+  ipcMain.handle('file:moveItem', async (_event, sourcePath: string, targetParentPath: string, newName?: string) => {
+    try {
+      // Validate inputs
+      if (!sourcePath || typeof sourcePath !== 'string') {
+        throw new Error('Invalid source path')
+      }
+      if (!targetParentPath || typeof targetParentPath !== 'string') {
+        throw new Error('Invalid target path')
+      }
+      if (newName !== undefined && typeof newName !== 'string') {
+        throw new Error('Invalid new name')
+      }
+
+      // Sanitize new name if provided
+      let sanitizedNewName: string | undefined = newName
+      if (newName) {
+        sanitizedNewName = newName.replace(/[/\\]/g, '')
+        if (!sanitizedNewName) {
+          throw new Error('Invalid new name')
+        }
+      }
+
+      const newPath = await fileService.moveItem(sourcePath, targetParentPath, sanitizedNewName)
+      return newPath
+    } catch (error) {
+      console.error('Error moving item:', error)
+      throw error
+    }
+  })
+
+  // Copy file or folder
+  ipcMain.handle('file:copyItem', async (_event, sourcePath: string, targetParentPath: string, newName?: string) => {
+    try {
+      // Validate inputs
+      if (!sourcePath || typeof sourcePath !== 'string') {
+        throw new Error('Invalid source path')
+      }
+      if (!targetParentPath || typeof targetParentPath !== 'string') {
+        throw new Error('Invalid target path')
+      }
+      if (newName !== undefined && typeof newName !== 'string') {
+        throw new Error('Invalid new name')
+      }
+
+      // Sanitize new name if provided
+      let sanitizedNewName: string | undefined = newName
+      if (newName) {
+        sanitizedNewName = newName.replace(/[/\\]/g, '')
+        if (!sanitizedNewName) {
+          throw new Error('Invalid new name')
+        }
+      }
+
+      const newPath = await fileService.copyItem(sourcePath, targetParentPath, sanitizedNewName)
+      return newPath
+    } catch (error) {
+      console.error('Error copying item:', error)
+      throw error
+    }
+  })
+
+  // Check name conflict
+  ipcMain.handle('file:checkConflict', async (_event, targetParentPath: string, itemName: string) => {
+    try {
+      // Validate inputs
+      if (!targetParentPath || typeof targetParentPath !== 'string') {
+        throw new Error('Invalid target path')
+      }
+      if (!itemName || typeof itemName !== 'string') {
+        throw new Error('Invalid item name')
+      }
+
+      const hasConflict = await fileService.checkNameConflict(targetParentPath, itemName)
+      return hasConflict
+    } catch (error) {
+      console.error('Error checking conflict:', error)
+      throw error
+    }
+  })
 }

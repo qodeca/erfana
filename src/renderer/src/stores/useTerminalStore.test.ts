@@ -1,5 +1,14 @@
-import { describe, it, expect } from 'vitest'
-import { useTerminalStore } from './useTerminalStore'
+import { describe, it, expect, vi } from 'vitest'
+import { createTerminalStore } from './useTerminalStore'
+import type { ITerminalOperations } from '../interfaces/ITerminalOperations'
+
+// Mock terminal operations (not used in these tests, but required for store creation)
+const mockTerminalOps: ITerminalOperations = {
+  write: vi.fn()
+}
+
+// Create store instance with mocked dependencies
+const useTerminalStore = createTerminalStore(mockTerminalOps)
 
 describe('useTerminalStore activity tracking', () => {
   it('tracks per-terminal activity and clears', async () => {

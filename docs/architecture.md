@@ -241,4 +241,177 @@ if (confirmed) await deleteFile()
 - Extensibility: Easy to add new file system operations
 - Type Safety: Shared TypeScript interfaces enforce consistency
 
-See: [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md) | [Security](./security.md) | [Testing](./testing/README.md)
+## Drag-Drop File Reorganization
+
+**VS Code-style drag-drop** for project tree file/folder manipulation.
+
+### Architecture Overview
+
+**Three-layer system**:
+1. **Backend Layer** (`FileService`): File system operations with cross-filesystem fallback
+2. **IPC Layer** (`file-handlers`): Secure bridge with input sanitization
+3. **Frontend Layer** (`ProjectTree` + `useDragDropTree`): Tree manipulation algorithms + UI
+
+### Core Components
+
+**FileService Methods** (`src/main/services/FileService.ts`):
+- `moveItem(source, target, newName?)` - Move with fs.rename + copy/delete fallback for EXDEV
+- `copyItem(source, target, newName?)` - Copy with automatic name conflict numbering (1), (2), etc.
+- `checkNameConflict(targetPath, itemName)` - Case-insensitive duplicate detection
+
+**Tree Algorithm Hook** (`src/renderer/src/hooks/useDragDropTree.ts`):
+- `flattenTree()` - Convert hierarchy to flat array with depth/parent metadata
+- `buildTree()` - Reconstruct hierarchy from flat array
+- `getProjection()` - Calculate target depth/parent based on horizontal drag offset
+- `isDescendant()` - Detect circular move attempts (folder into its own subfolder)
+- `validateMove()` - Validate all constraints before operation
+
+**Clipboard Store** (`src/renderer/src/stores/useClipboardStore.ts`):
+- Zustand store for cut/copy/paste state management
+- Cut: Move operation, clears clipboard after paste
+- Copy: Copy operation, keeps clipboard for multiple pastes
+- Visual feedback via `data-clipboard-cut` attribute
+
+### Key Design Decisions
+
+**dnd-kit Library Choice**:
+- Chosen over alternatives for small bundle size (10kb vs 96kb)
+- Tree flattening strategy compatible with dnd-kit's flat array expectation
+- `useSortable` hook per tree node, `DndContext` + `SortableContext` at container level
+
+**Cross-Filesystem Move Pattern**:
+```typescript
+try {
+  await fsRename(sourcePath, targetPath)  // Fast atomic rename
+} catch (error) {
+  if (error.code === 'EXDEV') {
+    await cp(sourcePath, targetPath, { recursive: true })  // Fallback
+    await rm(sourcePath, { recursive: true, force: true })
+  }
+}
+```
+- Try `fs.rename()` first (instant for same filesystem)
+- Fallback to `copy + delete` on EXDEV error (cross-volume moves)
+- Preserves timestamps with `preserveTimestamps: true`
+
+**Watcher Synchronization**:
+- Problem: File watcher triggers refresh during move, causing stale tree state
+- Solution: Pause watcher → execute operation → refresh tree → resume watcher
+- Pattern used for all file mutations (drag-drop, keyboard shortcuts, context menu)
+
+**Tree Flattening Algorithm**:
+```typescript
+interface FlattenedNode extends FileNode {
+  parentId: string | null  // Track parent for hierarchy reconstruction
+  depth: number           // Track depth for indentation/projection
+  index: number           // Track sibling order
+}
+```
+- Depth-first traversal preserves visual order
+- Metadata enables validation (circular move detection)
+- Memoized via `useMemo(() => flattenTree(files), [files])`
+
+### Validation Constraints
+
+**Circular Move Prevention**:
+- Cannot drag folder into its own descendant
+- Validation: `isDescendant(targetPath, sourcePath)` checks path prefix
+
+**Project Root Protection**:
+- Cannot move/rename project root directory itself
+- Enforced in FileService validation layer
+
+**Name Conflict Handling**:
+- Move conflicts: Show confirm dialog (overwrite or cancel)
+- Copy conflicts: Auto-numbering (file.md → file (1).md → file (2).md)
+- Case-insensitive detection for cross-platform compatibility
+
+### Keyboard Shortcuts
+
+**Cut/Copy/Paste**:
+- `Ctrl+X` / `Cmd+X` - Cut selected item
+- `Ctrl+C` / `Cmd+C` - Copy selected item
+- `Ctrl+V` / `Cmd+V` - Paste into selected folder
+
+**Visual Feedback**:
+- Cut items: 50% opacity + dashed underline
+- Clipboard persists across re-renders (Zustand store)
+
+### Visual Feedback States
+
+**Drag States** (CSS data attributes):
+- `data-dragging="true"` - 40% opacity on source item
+- `data-drop-target="true"` - Blue outline + background on target folder
+- `data-drop-invalid="true"` - Red outline for invalid drop locations
+- `data-clipboard-cut="true"` - Dimmed + dashed underline for cut items
+
+**Drop Indicators**:
+- `DropIndicator.tsx` - Horizontal blue line showing exact drop position
+- `FolderDropHighlight.tsx` - Folder outline during "move into" operation
+- Position calculated from projected depth × indentation width
+
+### Accessibility
+
+**ARIA Live Announcements**:
+- "Dragging [filename]" on drag start
+- "Moved [filename] to [folder]" on successful drop
+- "Cut/Copied [filename]" on keyboard operations
+- Off-screen live region (`aria-live="polite"`, `aria-atomic="true"`)
+
+**Keyboard Support**:
+- Full cut/copy/paste via keyboard shortcuts
+- Context menu accessible via right-click or context menu key
+- Focus management during dialog interactions
+
+### Integration Points
+
+**IPC Handlers** (`src/main/ipc/file-handlers.ts`):
+- `file:moveItem` - Sanitizes input (strips path separators), calls FileService
+- `file:copyItem` - Same sanitization, handles numbering
+- `file:checkConflict` - Returns boolean for duplicate detection
+
+**Preload Bridge** (`src/preload/index.ts`):
+```typescript
+moveItem: (sourcePath, targetParentPath, newName?) =>
+  ipcRenderer.invoke('file:moveItem', sourcePath, targetParentPath, newName)
+```
+- Type-safe API via `index.d.ts` definitions
+- No direct Node.js access from renderer
+
+**ProjectTree Component** (`src/renderer/src/components/ProjectTree/ProjectTree.tsx`):
+- DndContext with sensors (5px activation distance prevents accidental drags)
+- Drag handlers: `onDragStart`, `onDragOver`, `onDragEnd`
+- Keyboard event listener for Ctrl+X/C/V
+- Context menu integration with Cut/Copy/Paste items
+
+### Performance Considerations
+
+**Tree Flattening**:
+- Memoized: Only recalculates when `files` array changes
+- Typical project (500 files) flattens in <5ms
+
+**Watcher Pause/Resume**:
+- Brief delay (<100ms) during operations
+- Trade-off: Prevents race conditions vs. slight UX latency
+
+**Drag Sensor Configuration**:
+- 5px activation distance (prevents click interference)
+- `closestCenter` collision detection (better performance than `closestCorners`)
+
+### Known Limitations
+
+1. No undo/redo - Operations are immediate and permanent
+2. No multi-select drag - One item at a time
+3. No manual file ordering - Alphabetical sort only
+4. No auto-open folders on hover during drag
+5. No progress indicators for large folder copies
+
+### Future Enhancements
+
+- **Undo/Redo System**: Track operation history with reverse operations
+- **Multi-Select Drag**: Shift+Click range, Ctrl+Click individual selection
+- **Custom Drag Previews**: Show file icon + name, count for multi-select
+- **Auto-Open on Hover**: Expand folders during drag after 1s hover
+- **Progress Indicators**: Show progress for large operations with cancel option
+
+See: [Drag-Drop Implementation](./drag-drop.md) | [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md) | [Security](./security.md) | [Testing](./testing/README.md)

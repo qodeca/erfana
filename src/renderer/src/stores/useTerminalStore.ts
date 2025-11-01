@@ -1,4 +1,5 @@
-import { create } from 'zustand'
+import { create, type StoreApi, type UseBoundStore } from 'zustand'
+import type { ITerminalOperations } from '../interfaces/ITerminalOperations'
 
 interface TerminalStore {
   // Active terminal ID (null if no terminal is active)
@@ -18,7 +19,14 @@ interface TerminalStore {
   sendToTerminal: (text: string, autoExecute?: boolean) => Promise<boolean>
 }
 
-export const useTerminalStore = create<TerminalStore>((set, get) => ({
+/**
+ * Factory function to create terminal store with injected terminal operations
+ * Enables dependency injection and testing
+ */
+export function createTerminalStore(
+  terminalOps: ITerminalOperations
+): UseBoundStore<StoreApi<TerminalStore>> {
+  return create<TerminalStore>((set, get) => ({
   activeTerminalId: null,
   activityById: new Map<string, number>(),
   userInputById: new Map<string, number>(),
@@ -79,8 +87,8 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
     }
 
     try {
-      // Write text to terminal
-      const writeResult = await window.api.terminal.write(terminalId, text)
+      // Write text to terminal using injected terminal operations
+      const writeResult = await terminalOps.write(terminalId, text)
 
       if (!writeResult.success) {
         console.error(`❌ sendToTerminal: Write failed: ${writeResult.error}`)
@@ -95,7 +103,7 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
         await new Promise(resolve => setTimeout(resolve, 200))
 
         // Send Enter key
-        const enterResult = await window.api.terminal.write(terminalId, '\r')
+        const enterResult = await terminalOps.write(terminalId, '\r')
 
         if (!enterResult.success) {
           console.error(`❌ sendToTerminal: Failed to send Enter: ${enterResult.error}`)
@@ -109,4 +117,32 @@ export const useTerminalStore = create<TerminalStore>((set, get) => ({
       return false
     }
   }
-}))
+  }))
+}
+
+// Default instance using window.api for backward compatibility
+// TODO: Remove after all consumers use dependency injection
+// Lazy initialization to avoid accessing window.api at module load time
+let _defaultStore: ReturnType<typeof createTerminalStore> | null = null
+
+function getDefaultStore() {
+  if (!_defaultStore) {
+    _defaultStore = createTerminalStore(window.api.terminal)
+  }
+  return _defaultStore
+}
+
+// Export as a proxy to enable lazy initialization
+// The Proxy needs to support both function calls (for hook usage) and property access
+export const useTerminalStore = new Proxy(
+  function(...args: Parameters<ReturnType<typeof createTerminalStore>>) {
+    // When called as a hook, forward to the real store
+    return getDefaultStore()(...args)
+  } as ReturnType<typeof createTerminalStore>,
+  {
+    get(_target, prop) {
+      // When accessing properties, get from the real store
+      return getDefaultStore()[prop as keyof ReturnType<typeof createTerminalStore>]
+    }
+  }
+)
