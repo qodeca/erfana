@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { PauseController } from '../utils/PauseController'
+import { DebounceManager } from '../utils/DebounceManager'
 
 // Capture sends
 const sends: Array<{ id: number; channel: string; payload: any }> = []
@@ -30,8 +32,8 @@ describe('DirectoryWatcherService ENOENT handling', () => {
       dirPath: '/proj',
       watcher: fakeWatcher,
       webContentsIds: new Set([1]),
-      isPaused: false,
-      debounceTimer: null,
+      pauseController: new PauseController(),
+      debounceManager: new DebounceManager(),
       pendingEvents: [],
       version: svc.switchVersion
     })

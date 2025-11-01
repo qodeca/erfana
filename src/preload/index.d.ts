@@ -18,6 +18,9 @@ declare global {
         deleteFile: (filePath: string) => Promise<boolean>
         deleteFolder: (folderPath: string) => Promise<boolean>
         rename: (oldPath: string, newName: string) => Promise<string>
+        moveItem: (sourcePath: string, targetParentPath: string, newName?: string) => Promise<{ path: string; isSymlink?: boolean }>
+        copyItem: (sourcePath: string, targetParentPath: string, newName?: string) => Promise<{ path: string; isSymlink?: boolean }>
+        checkConflict: (targetParentPath: string, itemName: string) => Promise<boolean>
         onProjectChanged: (
           callback: (data: { oldPath: string | null; newPath: string | null }) => void
         ) => () => void

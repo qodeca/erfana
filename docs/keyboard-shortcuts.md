@@ -160,6 +160,26 @@ Keyboard navigation in the file tree.
 | `Space` | Preview file (single-click equivalent) |
 | Right-click | Show context menu |
 
+### File Operations
+
+Cut, copy, and paste files/folders within the project tree.
+
+| Shortcut | Action | Description |
+|----------|--------|-------------|
+| `Cmd/Ctrl+X` | Cut | Cut selected file/folder for move operation |
+| `Cmd/Ctrl+C` | Copy | Copy selected file/folder for copy operation |
+| `Cmd/Ctrl+V` | Paste | Paste cut/copied item into selected folder |
+
+**Visual Feedback:**
+- Cut items appear dimmed with dashed underline until pasted
+- Copy operation can be pasted multiple times (clipboard persists)
+- Cut operation clears clipboard after paste (item moved)
+
+**Drag-Drop Alternative:**
+- Drag files into folders to move them
+- Hold `Cmd/Ctrl` while dragging to copy (not implemented yet)
+- Visual drop indicators show target location during drag
+
 ### Project Panel Context Menu
 
 Right-click on files/folders:
@@ -170,6 +190,9 @@ Right-click on files/folders:
 | **New Folder** | Create new subfolder |
 | **Rename** | Rename file or folder |
 | **Delete** | Delete file or folder (with confirmation) |
+| **Cut** | Cut for move operation (Cmd/Ctrl+X) |
+| **Copy** | Copy for duplicate operation (Cmd/Ctrl+C) |
+| **Paste** | Paste into folder (Cmd/Ctrl+V) |
 | **Reveal in Finder** | (Future) Open in file manager |
 | **Copy Path** | (Future) Copy absolute path to clipboard |
 
@@ -333,7 +356,9 @@ Planned for future releases:
 | Command palette | `F1` |
 | Toggle sidebar | `Cmd/Ctrl+B` |
 | Toggle terminal | `Cmd/Ctrl+J` |
- 
+| Cut file/folder | `Cmd/Ctrl+X` |
+| Copy file/folder | `Cmd/Ctrl+C` |
+| Paste file/folder | `Cmd/Ctrl+V` |
 | Multi-cursor | `Alt+Click` |
 | Comment line | `Cmd/Ctrl+/` |
 | Undo/Redo | `Cmd/Ctrl+Z` / `Cmd/Ctrl+Shift+Z` |

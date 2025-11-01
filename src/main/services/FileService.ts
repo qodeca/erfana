@@ -1,5 +1,8 @@
-import { readdir, readFile, writeFile, stat, rm, mkdir } from 'fs/promises'
-import { join, extname } from 'path'
+import { readdir, readFile, writeFile, stat, rm, mkdir, rename as fsRename, cp, copyFile } from 'fs/promises'
+import { join, extname, basename, relative } from 'path'
+import type { IFileService } from '../interfaces/IFileService'
+import { SymlinkDetector } from '../utils/SymlinkDetector'
+import { RollbackHandler } from '../utils/RollbackHandler'
 
 export interface FileNode {
   name: string
@@ -10,8 +13,13 @@ export interface FileNode {
   isSymlink?: boolean
 }
 
-export class FileService {
+// Maximum number of auto-numbered copies before rejecting operation (e.g., file.md, file (1).md, ... file (999).md)
+const MAX_COPY_ATTEMPTS = 1000
+
+export class FileService implements IFileService {
   private projectPath: string | null = null
+  private symlinkDetector = new SymlinkDetector()
+  private rollbackHandler = new RollbackHandler()
 
   setProjectPath(path: string): void {
     this.projectPath = path
@@ -38,7 +46,7 @@ export class FileService {
         type: entry.isDirectory() ? 'directory' : 'file'
       }
       // Flag symlinks for UI indication/security awareness
-      if (entry.isSymbolicLink()) {
+      if (this.symlinkDetector.checkDirent(entry)) {
         node.isSymlink = true
       }
 
@@ -216,7 +224,180 @@ export class FileService {
 
     return newPath
   }
+
+  /**
+   * Check if a name conflicts with existing items in target directory (case-insensitive)
+   */
+  async checkNameConflict(targetParentPath: string, itemName: string): Promise<boolean> {
+    try {
+      const entries = await readdir(targetParentPath)
+      const lowerName = itemName.toLowerCase()
+      return entries.some(entry => entry.toLowerCase() === lowerName)
+    } catch {
+      // If directory doesn't exist or can't be read, no conflict
+      return false
+    }
+  }
+
+  /**
+   * Check if a path is a descendant of another path
+   */
+  private isDescendant(possibleDescendant: string, possibleAncestor: string): boolean {
+    const rel = relative(possibleAncestor, possibleDescendant)
+    return !rel.startsWith('..') && !join(possibleAncestor, rel).startsWith(possibleDescendant)
+  }
+
+  /**
+   * Move a file or folder to a new parent directory
+   * Uses fs.rename() for same-filesystem moves, falls back to copy+delete for cross-filesystem
+   */
+  async moveItem(sourcePath: string, targetParentPath: string, newName?: string): Promise<{ path: string; isSymlink?: boolean }> {
+    // Validate source exists and check if it's a symlink
+    const sourceStats = await stat(sourcePath)
+    const isSymlink = await this.symlinkDetector.checkPath(sourcePath)
+    const sourceItemName = basename(sourcePath)
+    const finalName = newName || sourceItemName
+
+    // Validate target parent is a directory
+    const targetStats = await stat(targetParentPath)
+    if (!targetStats.isDirectory()) {
+      throw new Error('Target must be a directory')
+    }
+
+    // Construct final target path
+    const targetPath = join(targetParentPath, finalName)
+
+    // Prevent moving to the same location
+    if (sourcePath === targetPath) {
+      throw new Error('Source and target paths are the same')
+    }
+
+    // Prevent moving project root
+    if (this.projectPath && sourcePath === this.projectPath) {
+      throw new Error('Cannot move the project root directory')
+    }
+
+    // Prevent moving items outside project
+    if (this.projectPath && !sourcePath.startsWith(this.projectPath)) {
+      throw new Error('Cannot move items outside the project directory')
+    }
+
+    // Prevent moving items to outside project
+    if (this.projectPath && !targetParentPath.startsWith(this.projectPath)) {
+      throw new Error('Cannot move items to outside the project directory')
+    }
+
+    // Prevent circular move (folder into its own descendant)
+    if (sourceStats.isDirectory() && this.isDescendant(targetParentPath, sourcePath)) {
+      throw new Error('Cannot move a folder into its own subfolder')
+    }
+
+    // Check if target already exists (case-insensitive for cross-platform compatibility)
+    const conflictExists = await this.checkNameConflict(targetParentPath, finalName)
+    if (conflictExists) {
+      throw new Error(`An item named "${finalName}" already exists in the target location`)
+    }
+
+    // Try fs.rename first (fast, atomic for same filesystem)
+    try {
+      await fsRename(sourcePath, targetPath)
+      return { path: targetPath, isSymlink: this.symlinkDetector.toOptionalFlag(isSymlink) }
+    } catch (error) {
+      const code = (error as { code?: string }).code
+
+      // EXDEV error means cross-filesystem move, fallback to copy+delete with rollback
+      if (code === 'EXDEV') {
+        // Copy to target
+        if (sourceStats.isDirectory()) {
+          await cp(sourcePath, targetPath, { recursive: true, preserveTimestamps: true })
+        } else {
+          await copyFile(sourcePath, targetPath)
+        }
+
+        // Delete original after successful copy
+        try {
+          await rm(sourcePath, { recursive: true, force: true })
+        } catch (deleteError) {
+          // Rollback: Delete the copied item if original deletion fails
+          await this.rollbackHandler.rollbackCopyOnDeleteFailure(
+            sourcePath,
+            targetPath,
+            deleteError
+          )
+        }
+
+        return { path: targetPath, isSymlink: this.symlinkDetector.toOptionalFlag(isSymlink) }
+      }
+
+      // Other errors, rethrow
+      throw error
+    }
+  }
+
+  /**
+   * Copy a file or folder to a new location with automatic name conflict resolution
+   */
+  async copyItem(sourcePath: string, targetParentPath: string, newName?: string): Promise<{ path: string; isSymlink?: boolean }> {
+    // Validate source exists and check if it's a symlink
+    const sourceStats = await stat(sourcePath)
+    const isSymlink = await this.symlinkDetector.checkPath(sourcePath)
+    const sourceItemName = basename(sourcePath)
+    const finalName = newName || sourceItemName
+
+    // Validate target parent is a directory
+    const targetStats = await stat(targetParentPath)
+    if (!targetStats.isDirectory()) {
+      throw new Error('Target must be a directory')
+    }
+
+    // Prevent copying items outside project
+    if (this.projectPath && !sourcePath.startsWith(this.projectPath)) {
+      throw new Error('Cannot copy items outside the project directory')
+    }
+
+    // Prevent copying items to outside project
+    if (this.projectPath && !targetParentPath.startsWith(this.projectPath)) {
+      throw new Error('Cannot copy items to outside the project directory')
+    }
+
+    // Handle name conflicts by adding (1), (2), etc.
+    let targetPath = join(targetParentPath, finalName)
+    let copyNumber = 1
+
+    while (await this.checkNameConflict(targetParentPath, basename(targetPath))) {
+      // Extract name and extension
+      const ext = extname(finalName)
+      const nameWithoutExt = ext ? finalName.slice(0, -ext.length) : finalName
+
+      // Generate new name with copy number
+      targetPath = join(targetParentPath, `${nameWithoutExt} (${copyNumber})${ext}`)
+      copyNumber++
+
+      // Safety limit to prevent infinite loops
+      if (copyNumber > MAX_COPY_ATTEMPTS) {
+        throw new Error(`Cannot create more than ${MAX_COPY_ATTEMPTS} copies with the same name`)
+      }
+    }
+
+    // Perform the copy
+    if (sourceStats.isDirectory()) {
+      await cp(sourcePath, targetPath, { recursive: true, preserveTimestamps: true })
+    } else {
+      await copyFile(sourcePath, targetPath)
+    }
+
+    return { path: targetPath, isSymlink: this.symlinkDetector.toOptionalFlag(isSymlink) }
+  }
 }
 
-// Singleton instance
-export const fileService = new FileService()
+/**
+ * Factory function to create FileService instance
+ * Enables dependency injection and testing
+ */
+export function createFileService(): IFileService {
+  return new FileService()
+}
+
+// Singleton instance for backward compatibility
+// TODO: Remove after all consumers use dependency injection
+export const fileService = createFileService()

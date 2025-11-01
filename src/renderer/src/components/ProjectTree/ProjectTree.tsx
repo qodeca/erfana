@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { FilePlus, FolderPlus, FolderOpen, Replace, Trash, Edit, FileText, Files, RotateCw, X as CloseIcon } from 'lucide-react'
+import { FilePlus, FolderPlus, FolderOpen, Replace, Trash, Edit, FileText, Files, RotateCw, X as CloseIcon, Copy, Scissors, Clipboard } from 'lucide-react'
 import type { FileNode } from '../../../../preload/index'
 import type { FilterMode } from '../../types/filters'
 import { ProjectTreeNode } from './ProjectTreeNode'
@@ -7,6 +7,22 @@ import { ContextMenu, ContextMenuItem } from '../ContextMenu/ContextMenu'
 import { useDialog } from '../Dialog'
 import './ProjectTree.css'
 import { showGlobalToast } from '../Toast/toastService'
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragOverEvent,
+  DragEndEvent,
+  DragOverlay,
+  type CollisionDetection,
+  pointerWithin,
+  rectIntersection
+} from '@dnd-kit/core'
+import { useDragDropTree } from '../../hooks/useDragDropTree'
+import { useClipboardStore } from '../../stores/useClipboardStore'
+import { formatFileOperationError } from '../../utils/errorUtils'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -21,7 +37,10 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => {
+    // Initialize with project root expanded
+    return projectPath ? new Set([projectPath]) : new Set()
+  })
   const isInternalOperation = useRef(false)
   const [isSwitchingProject, setIsSwitchingProject] = useState(false)
   const initialLoadCompleteRef = useRef(false)
@@ -35,6 +54,49 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
   // New unified dialog system
   const { showConfirm, showRename, showNewFile, showNewFolder } = useDialog()
+
+  // Drag-drop state
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [overId, setOverId] = useState<string | null>(null)
+  const autoExpandTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const autoScrollIntervalRef = useRef<number | null>(null)
+  const treeContainerRef = useRef<HTMLDivElement | null>(null)
+
+  // Drag-drop hooks
+  const { flattenedItems, isDescendant } = useDragDropTree(files, projectPath)
+  const clipboard = useClipboardStore()
+
+  // Drag sensors - require 5px movement to prevent accidental drags
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5
+      }
+    })
+  )
+
+  // Custom collision detection that prioritizes folders
+  const customCollisionDetection: CollisionDetection = (args) => {
+    // First use pointer intersection for immediate feedback
+    const pointerCollisions = pointerWithin(args)
+
+    if (pointerCollisions.length > 0) {
+      // Prioritize directories over files
+      const directoryCollisions = pointerCollisions.filter(collision => {
+        const droppableData = args.droppableContainers.find(c => c.id === collision.id)?.data.current
+        return droppableData?.type === 'directory'
+      })
+
+      if (directoryCollisions.length > 0) {
+        return directoryCollisions
+      }
+
+      return pointerCollisions
+    }
+
+    // Fallback to rectangle intersection
+    return rectIntersection(args)
+  }
 
   // Load last project on mount
   useEffect(() => {
@@ -65,8 +127,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     const unsubscribe = window.api.file.onProjectChanged(async (data) => {
       console.log('🌳 ProjectTree: Project changed event received:', data)
 
-      // Clear UI state for new project
-      setExpandedFolders(new Set())
+      // Clear UI state for new project and expand root folder
+      setExpandedFolders(data.newPath ? new Set([data.newPath]) : new Set())
       setSelectedFolder(null)
       setError(null)
 
@@ -433,6 +495,52 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
   }, [files, filterMode])
 
+  /**
+   * Create synthetic root folder node (VS Code style)
+   * The project root appears as the first item in the tree
+   */
+  const rootFolderNode: FileNode | null = useMemo(() => {
+    if (!projectPath || filteredFiles.length === 0) {
+      return null
+    }
+
+    const projectName = projectPath.split('/').pop() || 'Project'
+    return {
+      name: projectName,
+      path: projectPath,
+      type: 'directory',
+      children: filteredFiles,
+      extension: undefined
+    }
+  }, [projectPath, filteredFiles])
+
+  /**
+   * Enhanced flattenedItems that includes the root folder node
+   * This ensures the root folder can be found during drag-drop operations
+   */
+  const enhancedFlattenedItems = useMemo(() => {
+    if (!rootFolderNode) {
+      return flattenedItems
+    }
+
+    // Add root folder as first item with depth 0, parentId null
+    return [
+      {
+        ...rootFolderNode,
+        parentId: null,
+        depth: 0,
+        index: 0
+      },
+      ...flattenedItems.map(item => ({
+        ...item,
+        // Adjust depth to account for root folder
+        depth: item.depth + 1,
+        // If item has no parent, its parent is now the root folder
+        parentId: item.parentId || rootFolderNode.path
+      }))
+    ]
+  }, [rootFolderNode, flattenedItems])
+
   const handleToggleFolder = (folderPath: string) => {
     setExpandedFolders((prev) => {
       const newSet = new Set(prev)
@@ -601,47 +709,402 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       // Refresh project tree
       await refreshProjectTree()
 
-      // Resume directory watcher
-      if (projectPath) {
-        await window.api.directoryWatch.resume(projectPath)
-      }
-      isInternalOperation.current = false
-
       showGlobalToast({
         title: 'Success',
         message: 'Item renamed successfully',
         type: 'success'
       })
     } catch (err) {
-      // Clean up error message for better UX
-      let errorMessage = 'Failed to rename'
-      if (err instanceof Error) {
-        errorMessage = err.message.replace(/^Error invoking remote method.*?Error:\s*/i, '')
-
-        if (errorMessage.includes('already exists')) {
-          errorMessage = 'An item with this name already exists'
-        }
-      }
+      const errorMessage = formatFileOperationError(err, 'rename')
       showGlobalToast({
         title: 'Error',
         message: errorMessage,
         type: 'error'
       })
       console.error('Error renaming:', err)
-
-      // Make sure to resume watcher even on error
+    } finally {
+      // Resume watcher - wrap in try-catch to ensure cleanup always happens
       if (projectPath) {
-        await window.api.directoryWatch.resume(projectPath)
+        try {
+          await window.api.directoryWatch.resume(projectPath)
+        } catch (resumeErr) {
+          console.error('Failed to resume directory watcher:', resumeErr)
+        }
       }
       isInternalOperation.current = false
+      setLoading(false)
+    }
+  }
+
+  // Auto-scroll logic
+  const startAutoScroll = (direction: 'up' | 'down') => {
+    if (autoScrollIntervalRef.current) return // Already scrolling
+
+    const container = treeContainerRef.current
+    if (!container) return
+
+    autoScrollIntervalRef.current = window.setInterval(() => {
+      const scrollAmount = direction === 'up' ? -5 : 5
+      container.scrollTop += scrollAmount
+    }, 16) // ~60fps
+  }
+
+  const stopAutoScroll = () => {
+    if (autoScrollIntervalRef.current) {
+      window.clearInterval(autoScrollIntervalRef.current)
+      autoScrollIntervalRef.current = null
+    }
+  }
+
+  // Auto-expand logic
+  const startAutoExpandTimer = (folderId: string) => {
+    // Cancel any existing timer
+    if (autoExpandTimeoutRef.current) {
+      clearTimeout(autoExpandTimeoutRef.current)
+      autoExpandTimeoutRef.current = null
+    }
+
+    // Don't auto-expand if already expanded
+    if (expandedFolders.has(folderId)) return
+
+    // Set new timer for 1 second
+    autoExpandTimeoutRef.current = setTimeout(() => {
+      console.log('🔓 Auto-expanding folder:', folderId)
+      setExpandedFolders(prev => new Set([...prev, folderId]))
+      autoExpandTimeoutRef.current = null
+    }, 1000)
+  }
+
+  const cancelAutoExpandTimer = () => {
+    if (autoExpandTimeoutRef.current) {
+      clearTimeout(autoExpandTimeoutRef.current)
+      autoExpandTimeoutRef.current = null
+    }
+  }
+
+  // Drag-drop handlers
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
+    console.log('🔵 Drag start:', event.active.id)
+  }
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const newOverId = event.over?.id as string | null
+
+    // Handle auto-scroll based on pointer position
+    if (treeContainerRef.current && event.activatorEvent) {
+      const container = treeContainerRef.current
+      const rect = container.getBoundingClientRect()
+
+      // Type guard for mouse/pointer events
+      const pointerY = ('clientY' in event.activatorEvent && typeof event.activatorEvent.clientY === 'number')
+        ? event.activatorEvent.clientY
+        : 0
+
+      const distanceFromTop = pointerY - rect.top
+      const distanceFromBottom = rect.bottom - pointerY
+
+      if (distanceFromTop < 50 && distanceFromTop > 0) {
+        startAutoScroll('up')
+      } else if (distanceFromBottom < 50 && distanceFromBottom > 0) {
+        startAutoScroll('down')
+      } else {
+        stopAutoScroll()
+      }
+    }
+
+    // Handle auto-expand
+    if (newOverId && newOverId !== overId) {
+      // Moved to a new target
+      cancelAutoExpandTimer()
+
+      // Check if the new target is a collapsed folder
+      const overNode = enhancedFlattenedItems.find(item => item.path === newOverId)
+      if (overNode && overNode.type === 'directory' && !expandedFolders.has(newOverId)) {
+        startAutoExpandTimer(newOverId)
+      }
+    }
+
+    setOverId(newOverId)
+  }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    // Cleanup timers and state
+    stopAutoScroll()
+    cancelAutoExpandTimer()
+
+    setActiveId(null)
+    setOverId(null)
+
+    if (!over || active.id === over.id) {
+      console.log('🔵 Drag cancelled - no valid drop target')
+      return
+    }
+
+    const sourcePath = active.id as string
+    const targetPath = over.id as string
+
+    console.log('🔵 Drag end:', { sourcePath, targetPath })
+
+    // Simple validation: prevent moving folder into its own descendant
+    if (isDescendant(targetPath, sourcePath)) {
+      showGlobalToast({
+        title: 'Invalid Move',
+        message: 'Cannot move folder into its own subfolder',
+        type: 'error'
+      })
+      return
+    }
+
+    // Prevent moving project root
+    if (projectPath && sourcePath === projectPath) {
+      showGlobalToast({
+        title: 'Invalid Move',
+        message: 'Cannot move project root',
+        type: 'error'
+      })
+      return
+    }
+
+    // Get target folder - if dropping on a file, use its parent directory
+    const targetNode = enhancedFlattenedItems.find(item => item.path === targetPath)
+    if (!targetNode) {
+      showGlobalToast({
+        title: 'Error',
+        message: 'Cannot determine target location',
+        type: 'error'
+      })
+      return
+    }
+
+    // Determine target parent directory
+    let targetParent: string
+    if (targetNode.type === 'directory') {
+      // Dropping into a folder - use the folder itself
+      targetParent = targetNode.path
+    } else {
+      // Dropping on a file - use the file's parent directory
+      targetParent = targetNode.parentId || projectPath || ''
+    }
+
+    if (!targetParent) {
+      showGlobalToast({
+        title: 'Error',
+        message: 'Cannot determine target location',
+        type: 'error'
+      })
+      return
+    }
+
+    try {
+      setLoading(true)
+      isInternalOperation.current = true
+
+      // Pause watcher
+      if (projectPath) {
+        await window.api.directoryWatch.pause(projectPath)
+      }
+
+      // Execute move
+      const result = await window.api.file.moveItem(sourcePath, targetParent)
+      console.log('✅ Move completed:', result.path)
+
+      // Refresh tree
+      if (projectPath) {
+        const fileTree = await window.api.file.readDirectory(projectPath)
+        setFiles(fileTree)
+      }
+
+      // Show success message with symlink warning if applicable
+      if (result.isSymlink) {
+        showGlobalToast({
+          title: 'Symlink Moved',
+          message: 'Warning: You moved a symbolic link. The target file remains at its original location.',
+          type: 'warning'
+        })
+      } else {
+        showGlobalToast({
+          title: 'Success',
+          message: 'Item moved successfully',
+          type: 'success'
+        })
+      }
+    } catch (err) {
+      const errorMessage = formatFileOperationError(err, 'move')
+      showGlobalToast({
+        title: 'Error',
+        message: errorMessage,
+        type: 'error'
+      })
+      console.error('Error moving item:', err)
     } finally {
+      // Resume watcher - wrap in try-catch to ensure cleanup always happens
+      if (projectPath) {
+        try {
+          await window.api.directoryWatch.resume(projectPath)
+        } catch (resumeErr) {
+          console.error('Failed to resume directory watcher:', resumeErr)
+        }
+      }
+      isInternalOperation.current = false
+      setLoading(false)
+    }
+  }
+
+  // Keyboard shortcuts for cut/copy/paste
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Ctrl/Cmd + X/C/V
+      if ((e.ctrlKey || e.metaKey) && selectedFolder) {
+        const node = flattenedItems.find(item => item.path === selectedFolder)
+        if (!node) return
+
+        if (e.key === 'x') {
+          // Cut
+          e.preventDefault()
+          clipboard.cut(node.path, node.name, node.type)
+          console.log('✂️ Cut:', node.name)
+          showGlobalToast({
+            title: 'Cut',
+            message: `"${node.name}" ready to move`,
+            type: 'info'
+          })
+        } else if (e.key === 'c') {
+          // Copy
+          e.preventDefault()
+          clipboard.copy(node.path, node.name, node.type)
+          console.log('📋 Copy:', node.name)
+          showGlobalToast({
+            title: 'Copied',
+            message: `"${node.name}" ready to paste`,
+            type: 'info'
+          })
+        } else if (e.key === 'v' && clipboard.hasClipboard()) {
+          // Paste
+          e.preventDefault()
+          handlePaste()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedFolder, flattenedItems, clipboard])
+
+  const handlePaste = async () => {
+    if (!selectedFolder) {
+      showGlobalToast({
+        title: 'Error',
+        message: 'Select a folder to paste into',
+        type: 'error'
+      })
+      return
+    }
+
+    try {
+      setLoading(true)
+      isInternalOperation.current = true
+
+      // Pause watcher
+      if (projectPath) {
+        await window.api.directoryWatch.pause(projectPath)
+      }
+
+      const result = await clipboard.paste(selectedFolder)
+
+      if (result.success) {
+        // Refresh tree
+        if (projectPath) {
+          const fileTree = await window.api.file.readDirectory(projectPath)
+          setFiles(fileTree)
+        }
+
+        // Show success message with symlink warning if applicable
+        if (result.isSymlink) {
+          const operation = clipboard.getOperation() === 'cut' ? 'moved' : 'copied'
+          showGlobalToast({
+            title: 'Symlink ' + (clipboard.getOperation() === 'cut' ? 'Moved' : 'Copied'),
+            message: `Warning: You ${operation} a symbolic link. The target file remains at its original location.`,
+            type: 'warning'
+          })
+        } else {
+          showGlobalToast({
+            title: 'Success',
+            message: clipboard.getOperation() === 'cut' ? 'Item moved' : 'Item copied',
+            type: 'success'
+          })
+        }
+      } else {
+        showGlobalToast({
+          title: 'Error',
+          message: result.error || 'Failed to paste',
+          type: 'error'
+        })
+      }
+    } catch (err) {
+      const errorMessage = formatFileOperationError(err, 'paste')
+      showGlobalToast({
+        title: 'Error',
+        message: errorMessage,
+        type: 'error'
+      })
+      console.error('Error pasting:', err)
+    } finally {
+      // Resume watcher - wrap in try-catch to ensure cleanup always happens
+      if (projectPath) {
+        try {
+          await window.api.directoryWatch.resume(projectPath)
+        } catch (resumeErr) {
+          console.error('Failed to resume directory watcher:', resumeErr)
+        }
+      }
+      isInternalOperation.current = false
       setLoading(false)
     }
   }
 
   const getContextMenuItems = (node: FileNode): ContextMenuItem[] => {
+    const baseItems: ContextMenuItem[] = []
+
+    // Cut/Copy/Paste for all items
+    baseItems.push(
+      {
+        label: 'Cut',
+        icon: <Scissors size={14} strokeWidth={2} />,
+        action: () => {
+          clipboard.cut(node.path, node.name, node.type)
+          showGlobalToast({ title: 'Cut', message: `"${node.name}" ready to move`, type: 'info' })
+        }
+      },
+      {
+        label: 'Copy',
+        icon: <Copy size={14} strokeWidth={2} />,
+        action: () => {
+          clipboard.copy(node.path, node.name, node.type)
+          showGlobalToast({ title: 'Copied', message: `"${node.name}" ready to paste`, type: 'info' })
+        }
+      }
+    )
+
+    // Paste only for directories
+    if (node.type === 'directory' && clipboard.hasClipboard()) {
+      baseItems.push({
+        label: 'Paste',
+        icon: <Clipboard size={14} strokeWidth={2} />,
+        action: () => {
+          setSelectedFolder(node.path)
+          handlePaste()
+        }
+      })
+    }
+
+    baseItems.push({ separator: true } as ContextMenuItem)
+
     if (node.type === 'directory') {
       return [
+        ...baseItems,
         {
           label: 'New File',
           icon: <FilePlus size={14} strokeWidth={2} />,
@@ -667,6 +1130,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       ]
     } else {
       return [
+        ...baseItems,
         {
           label: 'Rename',
           icon: <Edit size={14} strokeWidth={2} />,
@@ -771,25 +1235,43 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       </div>
     )}
 
-      <div className="project-tree-content">
-        {filteredFiles.length > 0 ? (
-          filteredFiles.map((node) => (
+      <div className="project-tree-content" ref={treeContainerRef}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={customCollisionDetection}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+        >
+          {rootFolderNode ? (
             <ProjectTreeNode
-              key={node.path}
-              node={node}
+              key={rootFolderNode.path}
+              node={rootFolderNode}
               level={0}
               onFileClick={handleFileClick}
               onContextMenu={handleContextMenu}
               selectedFolder={selectedFolder}
               expandedFolders={expandedFolders}
               onToggleFolder={handleToggleFolder}
+              isDragging={activeId === rootFolderNode.path}
+              isDropTarget={overId === rootFolderNode.path}
+              clipboardCut={clipboard.itemPath === rootFolderNode.path && clipboard.operation === 'cut'}
             />
-          ))
-        ) : (
-          <div className="project-tree-empty">
-            {projectPath ? (filterMode === 'markdown' ? 'No markdown files found' : 'No files found') : 'Open a project to get started'}
-          </div>
-        )}
+          ) : (
+            <div className="project-tree-empty">
+              {projectPath ? (filterMode === 'markdown' ? 'No markdown files found' : 'No files found') : 'Open a project to get started'}
+            </div>
+          )}
+          <DragOverlay>
+            {activeId ? (
+              <div className="drag-overlay">
+                <span className="file-name">
+                  {enhancedFlattenedItems.find(item => item.path === activeId)?.name}
+                </span>
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       </div>
 
       {contextMenu && (

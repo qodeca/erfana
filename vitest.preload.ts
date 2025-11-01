@@ -21,10 +21,12 @@ export default defineConfig({
     thresholds: { lines: 10, functions: 10, branches: 5, statements: 10 },
     exclude: [
       'node_modules/**',
+      'out/**',
       '**/out/**',
       '**/dist/**',
       '**/release/**',
       '**/coverage/**',
+      '**/temp/**',
       '**/*.test.*',
       '**/__tests__/**',
       'vitest.*.ts',

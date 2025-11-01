@@ -1,5 +1,6 @@
 import { ChevronRight, ChevronDown, File, FileText, AlertTriangle, Link as LinkIcon } from 'lucide-react'
 import type { FileNode } from '../../../../preload/index'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
 import './ProjectTree.css'
 
 /**
@@ -61,6 +62,12 @@ interface ProjectTreeNodeProps {
   selectedFolder?: string | null
   expandedFolders: Set<string>
   onToggleFolder: (folderPath: string) => void
+  // Drag-drop props
+  isDragging?: boolean
+  isDropTarget?: boolean
+  isDropInvalid?: boolean
+  clipboardCut?: boolean
+  dragDisabled?: boolean
 }
 
 export function ProjectTreeNode({
@@ -70,10 +77,49 @@ export function ProjectTreeNode({
   onContextMenu,
   selectedFolder,
   expandedFolders,
-  onToggleFolder
+  onToggleFolder,
+  isDragging = false,
+  isDropTarget = false,
+  isDropInvalid = false,
+  clipboardCut = false,
+  dragDisabled = false
 }: ProjectTreeNodeProps) {
   // Controlled component - check if this folder is expanded
   const isExpanded = expandedFolders.has(node.path)
+
+  // Drag-drop integration - separate draggable and droppable
+  const {
+    attributes: dragAttributes,
+    listeners: dragListeners,
+    setNodeRef: setDragRef,
+    isDragging: draggableIsDragging
+  } = useDraggable({
+    id: node.path,
+    disabled: dragDisabled,
+    data: {
+      type: node.type,
+      path: node.path,
+      name: node.name
+    }
+  })
+
+  const {
+    setNodeRef: setDropRef,
+    isOver
+  } = useDroppable({
+    id: node.path,
+    data: {
+      type: node.type,
+      path: node.path,
+      accepts: ['file', 'directory'] // Accepts both files and directories
+    }
+  })
+
+  // Combine refs - element needs to be both draggable and droppable
+  const setRefs = (element: HTMLDivElement | null) => {
+    setDragRef(element)
+    setDropRef(element)
+  }
 
   const handleClick = () => {
     if (node.type === 'directory') {
@@ -110,13 +156,28 @@ export function ProjectTreeNode({
     }
   }
 
+  const actuallyDragging = isDragging || draggableIsDragging
+  // Show drop target highlight if: 1) something is being dragged over this node, 2) it's a valid drop target (folder)
+  const showDropHighlight = isOver && node.type === 'directory' && !actuallyDragging
+
   return (
-    <div className="project-tree-node">
+    <div
+      className="project-tree-node"
+      ref={setRefs}
+      data-dragging={actuallyDragging}
+      data-drop-highlight={showDropHighlight}
+    >
       <div
         className={`project-tree-item ${node.type} ${isSelected ? 'selected' : ''}`}
         style={{ paddingLeft: `${level * 16 + 8}px` }}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
+        data-dragging={actuallyDragging}
+        data-drop-target={isDropTarget || showDropHighlight}
+        data-drop-invalid={isDropInvalid}
+        data-clipboard-cut={clipboardCut}
+        {...dragAttributes}
+        {...dragListeners}
       >
         <span className="file-icon">{renderIcon()}</span>
         <span
@@ -140,6 +201,7 @@ export function ProjectTreeNode({
               selectedFolder={selectedFolder}
               expandedFolders={expandedFolders}
               onToggleFolder={onToggleFolder}
+              dragDisabled={dragDisabled}
             />
           ))}
         </div>

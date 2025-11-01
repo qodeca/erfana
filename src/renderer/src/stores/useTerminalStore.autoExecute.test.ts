@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useTerminalStore } from './useTerminalStore'
+import { createTerminalStore } from './useTerminalStore'
+import type { ITerminalOperations } from '../interfaces/ITerminalOperations'
 
 /**
  * Comprehensive test suite for sendToTerminal autoExecute functionality
@@ -8,29 +9,18 @@ import { useTerminalStore } from './useTerminalStore'
  * Covers error handling, write ordering, and 200ms delay for rendering
  *
  * v0.3.4 - Simplified fire-and-forget approach (no initialization polling)
+ * v0.3.6 - Updated to use dependency injection for ISP compliance
  */
 
-// Mock the window.api.terminal interface
-const mockTerminalApi = {
-  write: vi.fn(),
-  create: vi.fn(),
-  resize: vi.fn(),
-  kill: vi.fn(),
-  getInfo: vi.fn(),
-  list: vi.fn(),
-  onData: vi.fn(),
-  onExit: vi.fn(),
-  onError: vi.fn(),
-  onClear: vi.fn(),
-  markClearComplete: vi.fn()
+// Mock terminal operations
+const mockWrite = vi.fn()
+
+const mockTerminalOps: ITerminalOperations = {
+  write: mockWrite
 }
 
-// Setup global window.api mock
-;(global as unknown as { window: { api: { terminal: typeof mockTerminalApi } } }).window = {
-  api: {
-    terminal: mockTerminalApi
-  }
-}
+// Create store instance with mocked dependencies
+const useTerminalStore = createTerminalStore(mockTerminalOps)
 
 describe('useTerminalStore.sendToTerminal with autoExecute', () => {
   beforeEach(() => {
@@ -45,7 +35,7 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
     vi.clearAllMocks()
 
     // Default mock implementation - write succeeds
-    mockTerminalApi.write.mockResolvedValue({ success: true })
+    mockWrite.mockResolvedValue({ success: true })
   })
 
   it('should send Enter key after text when autoExecute is true', async () => {
@@ -57,9 +47,9 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
 
     // Verify
     expect(result).toBe(true)
-    expect(mockTerminalApi.write).toHaveBeenCalledTimes(2)
-    expect(mockTerminalApi.write).toHaveBeenNthCalledWith(1, 'term1', 'echo hello')
-    expect(mockTerminalApi.write).toHaveBeenNthCalledWith(2, 'term1', '\r')
+    expect(mockWrite).toHaveBeenCalledTimes(2)
+    expect(mockWrite).toHaveBeenNthCalledWith(1, 'term1', 'echo hello')
+    expect(mockWrite).toHaveBeenNthCalledWith(2, 'term1', '\r')
   })
 
   it('should NOT send Enter key when autoExecute is false', async () => {
@@ -71,8 +61,8 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
 
     // Verify
     expect(result).toBe(true)
-    expect(mockTerminalApi.write).toHaveBeenCalledTimes(1)
-    expect(mockTerminalApi.write).toHaveBeenCalledWith('term1', 'echo hello')
+    expect(mockWrite).toHaveBeenCalledTimes(1)
+    expect(mockWrite).toHaveBeenCalledWith('term1', 'echo hello')
   })
 
   it('should return false if no active terminal', async () => {
@@ -84,26 +74,26 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
 
     // Verify
     expect(result).toBe(false)
-    expect(mockTerminalApi.write).not.toHaveBeenCalled()
+    expect(mockWrite).not.toHaveBeenCalled()
   })
 
   it('should return false if text write fails', async () => {
     // Setup
     useTerminalStore.setState({ activeTerminalId: 'term1' })
-    mockTerminalApi.write.mockResolvedValue({ success: false, error: 'Write failed' })
+    mockWrite.mockResolvedValue({ success: false, error: 'Write failed' })
 
     // Execute
     const result = await useTerminalStore.getState().sendToTerminal('test', true)
 
     // Verify
     expect(result).toBe(false)
-    expect(mockTerminalApi.write).toHaveBeenCalledTimes(1) // Only text write, no Enter
+    expect(mockWrite).toHaveBeenCalledTimes(1) // Only text write, no Enter
   })
 
   it('should return false if Enter write fails', async () => {
     // Setup
     useTerminalStore.setState({ activeTerminalId: 'term1' })
-    mockTerminalApi.write
+    mockWrite
       .mockResolvedValueOnce({ success: true }) // Text write succeeds
       .mockResolvedValueOnce({ success: false, error: 'Enter failed' }) // Enter fails
 
@@ -112,7 +102,7 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
 
     // Verify
     expect(result).toBe(false)
-    expect(mockTerminalApi.write).toHaveBeenCalledTimes(2)
+    expect(mockWrite).toHaveBeenCalledTimes(2)
   })
 
   it('should handle long text content correctly', async () => {
@@ -125,9 +115,9 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
 
     // Verify
     expect(result).toBe(true)
-    expect(mockTerminalApi.write).toHaveBeenCalledTimes(2)
-    expect(mockTerminalApi.write).toHaveBeenNthCalledWith(1, 'term1', longText)
-    expect(mockTerminalApi.write).toHaveBeenNthCalledWith(2, 'term1', '\r')
+    expect(mockWrite).toHaveBeenCalledTimes(2)
+    expect(mockWrite).toHaveBeenNthCalledWith(1, 'term1', longText)
+    expect(mockWrite).toHaveBeenNthCalledWith(2, 'term1', '\r')
   })
 
   it('should handle multiple concurrent calls correctly', async () => {
@@ -135,7 +125,7 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
     useTerminalStore.setState({ activeTerminalId: 'term1' })
     const writeOrder: string[] = []
 
-    mockTerminalApi.write.mockImplementation(async (_id: string, data: string) => {
+    mockWrite.mockImplementation(async (_id: string, data: string) => {
       writeOrder.push(data)
       return { success: true }
     })
@@ -162,7 +152,7 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
     useTerminalStore.setState({ activeTerminalId: 'term1' })
     const timestamps: number[] = []
 
-    mockTerminalApi.write.mockImplementation(async () => {
+    mockWrite.mockImplementation(async () => {
       timestamps.push(Date.now())
       return { success: true }
     })
@@ -180,14 +170,14 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
   it('should handle unexpected errors gracefully', async () => {
     // Setup
     useTerminalStore.setState({ activeTerminalId: 'term1' })
-    mockTerminalApi.write.mockRejectedValue(new Error('Unexpected IPC error'))
+    mockWrite.mockRejectedValue(new Error('Unexpected IPC error'))
 
     // Execute
     const result = await useTerminalStore.getState().sendToTerminal('test', true)
 
     // Verify - should return false and log error
     expect(result).toBe(false)
-    expect(mockTerminalApi.write).toHaveBeenCalledTimes(1) // Only attempted text write
+    expect(mockWrite).toHaveBeenCalledTimes(1) // Only attempted text write
   })
 
   it('should use getActiveTerminalId getter', () => {
