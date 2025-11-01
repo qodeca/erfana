@@ -43,8 +43,8 @@ const api = {
       ipcRenderer.invoke('file:deleteFolder', folderPath),
     rename: (oldPath: string, newName: string): Promise<string> =>
       ipcRenderer.invoke('file:rename', oldPath, newName),
-    moveItem: (sourcePath: string, targetParentPath: string, newName?: string): Promise<string> =>
-      ipcRenderer.invoke('file:moveItem', sourcePath, targetParentPath, newName),
+    moveItem: (sourcePath: string, targetParentPath: string, newName?: string, replaceExisting?: boolean): Promise<string> =>
+      ipcRenderer.invoke('file:moveItem', sourcePath, targetParentPath, newName, replaceExisting),
     copyItem: (sourcePath: string, targetParentPath: string, newName?: string): Promise<string> =>
       ipcRenderer.invoke('file:copyItem', sourcePath, targetParentPath, newName),
     checkConflict: (targetParentPath: string, itemName: string): Promise<boolean> =>
