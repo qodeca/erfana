@@ -1014,6 +1014,44 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       return
     }
 
+    // Check for name conflict BEFORE attempting paste (cut operations only)
+    const sourceItemName = clipboard.itemName
+    const sourceItemType = clipboard.itemType
+    if (sourceItemName && clipboard.operation === 'cut') {
+      try {
+        const hasConflict = await window.api.file.checkConflict(targetPath, sourceItemName)
+
+        if (hasConflict) {
+          // Show replace confirmation dialog
+          const itemTypeLabel = sourceItemType === 'directory' ? 'folder' : 'file'
+          const shouldReplace = await showConfirm({
+            title: 'Replace Item',
+            message: `A ${itemTypeLabel} named "${sourceItemName}" already exists in the target folder. Do you want to replace it?`,
+            confirmLabel: 'Replace',
+            cancelLabel: 'Cancel',
+            danger: true
+          })
+
+          if (!shouldReplace) {
+            return // User cancelled
+          }
+
+          // User confirmed, proceed with replace
+          await executePaste(targetPath, true)
+          return
+        }
+      } catch (error) {
+        console.error('Error checking conflict:', error)
+        // Fall through to normal paste (backend will handle error)
+      }
+    }
+
+    // No conflict or copy operation, proceed normally
+    await executePaste(targetPath, false)
+  }
+
+  // Helper function to execute paste operation
+  const executePaste = async (targetPath: string, replaceExisting: boolean) => {
     try {
       setLoading(true)
       isInternalOperation.current = true
@@ -1023,7 +1061,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         await window.api.directoryWatch.pause(projectPath)
       }
 
-      const result = await clipboard.paste(targetPath)
+      const result = await clipboard.paste(targetPath, replaceExisting)
 
       if (result.success) {
         // Refresh tree
@@ -1041,9 +1079,11 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
             type: 'warning'
           })
         } else {
+          const operationLabel = clipboard.getOperation() === 'cut' ? 'moved' : 'copied'
+          const replacedLabel = replaceExisting ? ' and replaced existing item' : ''
           showGlobalToast({
             title: 'Success',
-            message: clipboard.getOperation() === 'cut' ? 'Item moved' : 'Item copied',
+            message: `Item ${operationLabel}${replacedLabel}`,
             type: 'success'
           })
         }

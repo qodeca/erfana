@@ -341,7 +341,7 @@ export function registerFileHandlers(): void {
   })
 
   // Move file or folder
-  ipcMain.handle('file:moveItem', async (_event, sourcePath: string, targetParentPath: string, newName?: string) => {
+  ipcMain.handle('file:moveItem', async (_event, sourcePath: string, targetParentPath: string, newName?: string, replaceExisting?: boolean) => {
     try {
       // Validate inputs
       if (!sourcePath || typeof sourcePath !== 'string') {
@@ -353,6 +353,9 @@ export function registerFileHandlers(): void {
       if (newName !== undefined && typeof newName !== 'string') {
         throw new Error('Invalid new name')
       }
+      if (replaceExisting !== undefined && typeof replaceExisting !== 'boolean') {
+        throw new Error('Invalid replaceExisting flag')
+      }
 
       // Sanitize new name if provided
       let sanitizedNewName: string | undefined = newName
@@ -363,7 +366,7 @@ export function registerFileHandlers(): void {
         }
       }
 
-      const newPath = await fileService.moveItem(sourcePath, targetParentPath, sanitizedNewName)
+      const newPath = await fileService.moveItem(sourcePath, targetParentPath, sanitizedNewName, replaceExisting)
       return newPath
     } catch (error) {
       console.error('Error moving item:', error)

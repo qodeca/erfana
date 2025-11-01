@@ -13,7 +13,7 @@ interface ClipboardStore {
   // Actions
   cut: (path: string, name: string, type: 'file' | 'directory') => void
   copy: (path: string, name: string, type: 'file' | 'directory') => void
-  paste: (targetPath: string) => Promise<{ success: boolean; newPath?: string; isSymlink?: boolean; error?: string }>
+  paste: (targetPath: string, replaceExisting?: boolean) => Promise<{ success: boolean; newPath?: string; isSymlink?: boolean; error?: string }>
   clear: () => void
   hasClipboard: () => boolean
   getOperation: () => ClipboardOperation | null
@@ -56,7 +56,7 @@ export function createClipboardStore(
   },
 
   // Paste operation - executes move or copy via IPC
-  paste: async (targetPath: string) => {
+  paste: async (targetPath: string, replaceExisting?: boolean) => {
     const state = get()
 
     if (!state.itemPath || !state.operation) {
@@ -69,7 +69,8 @@ export function createClipboardStore(
     console.log('📋 Clipboard: Paste', {
       operation: state.operation,
       from: state.itemPath,
-      to: targetPath
+      to: targetPath,
+      replaceExisting
     })
 
     try {
@@ -77,7 +78,7 @@ export function createClipboardStore(
 
       if (state.operation === 'cut') {
         // Move item using injected file operations
-        result = await fileOps.moveItem(state.itemPath, targetPath)
+        result = await fileOps.moveItem(state.itemPath, targetPath, undefined, replaceExisting)
         console.log('✅ Clipboard: Move completed', { path: result.path })
 
         // Clear clipboard after successful cut
