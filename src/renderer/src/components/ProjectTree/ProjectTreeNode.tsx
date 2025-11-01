@@ -124,6 +124,7 @@ export function ProjectTreeNode({
   const handleClick = () => {
     if (node.type === 'directory') {
       onToggleFolder(node.path)
+      onFileClick(node.path)  // Also notify parent for folder selection
     } else {
       onFileClick(node.path)
     }
@@ -137,7 +138,7 @@ export function ProjectTreeNode({
   }
 
   const isMarkdown = node.extension === '.md' || node.extension === '.markdown'
-  const isSelected = node.type === 'directory' && node.path === selectedFolder
+  const isSelected = node.path === selectedFolder  // Show selection for both files and directories
   const isSensitive = node.type === 'file' && isSensitiveFile(node.name)
   const isHidden = node.name.startsWith('.')
   const isSymlink = node.isSymlink === true
