@@ -1262,7 +1262,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
               {projectPath ? (filterMode === 'markdown' ? 'No markdown files found' : 'No files found') : 'Open a project to get started'}
             </div>
           )}
-          <DragOverlay>
+          <DragOverlay dropAnimation={null}>
             {activeId ? (
               <div className="drag-overlay">
                 <span className="file-name">

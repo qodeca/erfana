@@ -311,20 +311,10 @@
   position: relative;
 }
 
-/* Subtle pulse animation while hovering (indicates auto-expand countdown) */
+/* Folder highlighting during drag (auto-expand countdown) */
 .project-tree-node[data-drop-highlight="true"] > .project-tree-item.directory {
   background-color: rgba(79, 193, 255, 0.2);
   border-radius: 4px;
-  animation: dropPulse 1s ease-in-out;
-}
-
-@keyframes dropPulse {
-  0%, 100% {
-    background-color: rgba(79, 193, 255, 0.2);
-  }
-  50% {
-    background-color: rgba(79, 193, 255, 0.3);
-  }
 }
 
 /* Highlight the children area for expanded folders */
