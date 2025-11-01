@@ -38,19 +38,20 @@ src/
 
 ## Core Features
 1. **Markdown Editor** - Monaco with live preview, scroll sync, Mermaid diagrams
-2. **Project Tree** - File explorer with markdown filtering, context menu
+2. **Project Tree** - File explorer with drag-drop reorganization, markdown filtering, context menu
 3. **Terminal** - xterm.js with PTY backend
 4. **Prompt Templates** - AI text operations via context menu
 
 ## Documentation
 See `docs/` for details (keep Claude's context focused):
-- [Architecture](docs/architecture.md) — System design patterns
+- [Architecture](docs/architecture.md) — System design patterns, SOLID principles, DI
 - [Architectural Review](docs/architectural-review/README.md) — Code quality assessment, security, testing gaps
+- [Drag-Drop](docs/drag-drop/README.md) — VS Code-style file reorganization, visual feedback, validation
 - [Terminal](docs/terminal/README.md) — Bootstrap pattern, flickering prevention, scroll fixes
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (46% TerminalService)
+- [Testing](docs/testing/README.md) — Workspace, coverage
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 
 ## Code Style & Conventions
@@ -62,6 +63,20 @@ See `docs/` for details (keep Claude's context focused):
 - Lucide React for icons
 
 ## Recent Changes (v0.3.6)
+- **Drag-Drop CSS Layout Fix** (Nov 1, 2025):
+  - Fixed layout shift issue (18px) when dragging items over folders
+  - Replaced layout-affecting CSS with pseudo-element approach
+  - Visual feedback preserved, zero layout shifts
+  - See [docs/drag-drop/visual-feedback.md](docs/drag-drop/visual-feedback.md#css-layout-shift-fix)
+- **Comprehensive Drag-Drop UX Improvements** (Nov 1, 2025):
+  - Complete rewrite with VS Code-style behavior
+  - Root folder node (project root as first tree item)
+  - Auto-scroll (50px threshold, 60fps), Auto-expand (1s delay)
+  - Smooth dragging (no jumping/shifting), custom collision detection
+  - Keyboard shortcuts (Ctrl+X/C/V), context menu integration
+  - SOLID refactoring: IFileService, PauseController, SymlinkDetector, RollbackHandler
+  - 896 lines of new tests, architecture score 60→100
+  - See [docs/drag-drop/README.md](docs/drag-drop/README.md)
 - **Unified Dialog System**: Complete rewrite of dialog framework
   - Replaced old ConfirmDialog and UserInputDialog with new unified system
   - Created Dialog/ folder with BaseDialog, DialogContext, DialogManager, dialogService
