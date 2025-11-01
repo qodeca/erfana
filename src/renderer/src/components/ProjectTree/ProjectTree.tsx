@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { FilePlus, FolderPlus, FolderOpen, Replace, Trash, Edit, FileText, Files, RotateCw, X as CloseIcon, Copy, Scissors, Clipboard } from 'lucide-react'
+import { FilePlus, FolderPlus, FolderOpen, Replace, FileText, Files, RotateCw, X as CloseIcon } from 'lucide-react'
 import type { FileNode } from '../../../../preload/index'
 import type { FilterMode } from '../../types/filters'
 import { ProjectTreeNode } from './ProjectTreeNode'
@@ -7,6 +7,8 @@ import { ContextMenu, ContextMenuItem } from '../ContextMenu/ContextMenu'
 import { useDialog } from '../Dialog'
 import './ProjectTree.css'
 import { showGlobalToast } from '../Toast/toastService'
+import type { MenuContext } from './context-menu/types'
+import { ContextMenuFactory } from './context-menu/factory'
 import {
   DndContext,
   PointerSensor,
@@ -23,6 +25,11 @@ import {
 import { useDragDropTree } from '../../hooks/useDragDropTree'
 import { useClipboardStore } from '../../stores/useClipboardStore'
 import { formatFileOperationError } from '../../utils/errorUtils'
+import { DRAG_DROP, AUTO_SCROLL, AUTO_EXPAND } from './constants'
+import { withWatcherPause } from './withWatcherPause'
+import { useDirectoryWatcher } from '../../hooks/useDirectoryWatcher'
+import { useProjectManagement } from '../../hooks/useProjectManagement'
+import { useFileOperations } from '../../hooks/useFileOperations'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -32,18 +39,48 @@ interface ProjectTreeProps {
 }
 
 export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilterModeChange }: ProjectTreeProps) {
-  const [projectPath, setProjectPath] = useState<string | null>(null)
-  const [files, setFiles] = useState<FileNode[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // UI-specific state (not managed by hooks)
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => {
-    // Initialize with project root expanded
-    return projectPath ? new Set([projectPath]) : new Set()
-  })
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const isInternalOperation = useRef(false)
-  const [isSwitchingProject, setIsSwitchingProject] = useState(false)
-  const initialLoadCompleteRef = useRef(false)
+
+  // Project lifecycle management via hook
+  const {
+    projectPath,
+    files,
+    loading,
+    error,
+    isSwitchingProject,
+    initialLoadComplete,
+    handleOpenProject,
+    handleCloseProject,
+    refreshFiles
+  } = useProjectManagement({
+    onProjectChanged: (newPath) => {
+      // Reset UI state when project changes
+      setExpandedFolders(newPath ? new Set([newPath]) : new Set())
+      setSelectedFolder(null)
+    }
+  })
+
+  // Local loading state for file operations (separate from project loading)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_fileOperationLoading, setFileOperationLoading] = useState<boolean>(false)
+
+  // File operation handlers via hook (only toolbar actions; context menu uses commands)
+  const {
+    handleNewFile,
+    handleNewFolder
+  } = useFileOperations({
+    projectPath,
+    files,
+    selectedFolder,
+    setSelectedFolder,
+    onFileSelect,
+    refreshProjectTree: refreshFiles,
+    isInternalOperationRef: isInternalOperation,
+    setFileOperationLoading
+  })
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -51,9 +88,6 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     y: number
     node: FileNode
   } | null>(null)
-
-  // New unified dialog system
-  const { showConfirm, showRename, showNewFile, showNewFolder } = useDialog()
 
   // Drag-drop state
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -66,11 +100,17 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const { flattenedItems, isDescendant } = useDragDropTree(files, projectPath)
   const clipboard = useClipboardStore()
 
-  // Drag sensors - require 5px movement to prevent accidental drags
+  // Context menu factory (Strategy + Command pattern)
+  const contextMenuFactory = useMemo(() => new ContextMenuFactory(), [])
+
+  // Dialog hooks
+  const { showConfirm, showRename, showNewFile, showNewFolder } = useDialog()
+
+  // Drag sensors - require movement to prevent accidental drags
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5
+        distance: DRAG_DROP.ACTIVATION_DISTANCE
       }
     })
   )
@@ -98,238 +138,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     return rectIntersection(args)
   }
 
-  // Load last project on mount
-  useEffect(() => {
-    const loadLastProject = async () => {
-      try {
-        setLoading(true)
-        const lastPath = await window.api.file.getLastProjectPath()
-
-        if (lastPath) {
-          setProjectPath(lastPath)
-          const fileTree = await window.api.file.readDirectory(lastPath)
-          setFiles(fileTree)
-          initialLoadCompleteRef.current = true
-        }
-      } catch (err) {
-        console.error('Error loading last project:', err)
-        // Don't show error to user, just fail silently
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadLastProject()
-  }, [])
-
-  // Listen for project change events from other components
-  useEffect(() => {
-    const unsubscribe = window.api.file.onProjectChanged(async (data) => {
-      console.log('🌳 ProjectTree: Project changed event received:', data)
-
-      // Clear UI state for new project and expand root folder
-      setExpandedFolders(data.newPath ? new Set([data.newPath]) : new Set())
-      setSelectedFolder(null)
-      setError(null)
-
-      // Update project path and load new tree
-      if (data.newPath) {
-        setProjectPath(data.newPath)
-        try {
-          setLoading(true)
-          const fileTree = await window.api.file.readDirectory(data.newPath)
-          setFiles(fileTree)
-          initialLoadCompleteRef.current = true
-        } catch (err) {
-          console.error('Error loading new project tree:', err)
-          setError(err instanceof Error ? err.message : 'Failed to load project')
-        } finally {
-          setLoading(false)
-        }
-      } else {
-        // Project was closed
-        setProjectPath(null)
-        setFiles([])
-      }
-    })
-
-    return () => {
-      unsubscribe()
-    }
-  }, [])
-
-  // Directory watching for auto-refresh
-  useEffect(() => {
-    if (!projectPath) return
-    if (!initialLoadCompleteRef.current) return
-
-    // Start watching the project directory
-    window.api.directoryWatch.start(projectPath).catch((err) => {
-      console.error('Failed to start directory watch:', err)
-    })
-
-      // Listen for directory changes
-      const unsubscribeChanged = window.api.directoryWatch.onDirectoryChanged((data) => {
-      // Only refresh if not during our own internal operations
-      if (!isInternalOperation.current) {
-        console.log(`📁 Directory changed, refreshing project tree... (${data.eventCount} events)`)
-        refreshProjectTree()
-      }
-    })
-
-    // Listen for project deletion
-    const unsubscribeDeleted = window.api.directoryWatch.onProjectDeleted(() => {
-      setError('Project folder no longer exists')
-      setProjectPath(null)
-      setFiles([])
-      setExpandedFolders(new Set())
-    })
-
-    // Listen for errors
-    const unsubscribeError = window.api.directoryWatch.onDirectoryError((data) => {
-      console.error('Directory watch error:', data.error)
-    })
-
-    // Cleanup on unmount or when project changes
-    return () => {
-      window.api.directoryWatch.stop(projectPath)
-      unsubscribeChanged()
-      unsubscribeDeleted()
-      unsubscribeError()
-    }
-  }, [projectPath])
-
-  // no watch depth control in UI
-
-  const switchTokenRef = useRef(0)
-
-  const handleOpenProject = async () => {
-    try {
-      setIsSwitchingProject(true)
-      setError(null)
-      // Check for unsaved editors
-      const hasDirty = await import('../../stores/useProjectStore')
-        .then(({ useProjectStore }) => useProjectStore.getState().hasDirtyEditors())
-        .catch(() => false)
-
-      // Terminal recent activity check (3s window)
-      const terminalBusy = await import('../../stores/useTerminalStore')
-        .then(({ useTerminalStore }) => {
-          const store = useTerminalStore.getState()
-          return store.hasUserInteracted() && store.isRecentlyActive(20000)
-        })
-        .catch(() => false)
-
-      if (hasDirty || terminalBusy) {
-        const confirmed = await showConfirm({
-          title: hasDirty ? 'Unsaved Changes' : 'Active Terminal Session',
-          message: hasDirty
-            ? 'You have unsaved changes. Discard and switch project?'
-            : 'Terminal shows recent activity. Stop it and switch project?',
-          confirmLabel: 'Switch Anyway',
-          danger: true
-        })
-
-        if (!confirmed) {
-          setIsSwitchingProject(false)
-          return
-        }
-
-        // Graceful signal to terminal if active
-        try {
-          const { useTerminalStore } = await import('../../stores/useTerminalStore')
-          const tid = useTerminalStore.getState().getActiveTerminalId()
-          if (tid) {
-            // Send Ctrl+C signal
-            window.api.terminal.write(tid, '\u0003')
-            await new Promise((r) => setTimeout(r, 300))
-            // If no new activity, mark idle
-            if (!useTerminalStore.getState().isRecentlyActiveId(tid, 300)) {
-              useTerminalStore.getState().clearActivity(tid)
-            }
-          }
-        } catch (e) {
-          console.warn('Failed to signal terminal before switching project:', e)
-        }
-      }
-
-      const currentToken = ++switchTokenRef.current
-      const path = await window.api.file.openProject()
-
-      if (path && currentToken === switchTokenRef.current) {
-        setProjectPath(path)
-        const fileTree = await window.api.file.readDirectory(path)
-        setFiles(fileTree)
-        showGlobalToast({ type: 'success', title: 'Project Opened', message: path })
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to open project')
-      console.error('Error opening project:', err)
-      showGlobalToast({ type: 'error', title: 'Open Project Failed', message: String(err instanceof Error ? err.message : err) })
-    } finally {
-      setIsSwitchingProject(false)
-    }
-  }
-
-  const handleCloseProject = async () => {
-    try {
-      setIsSwitchingProject(true)
-      setError(null)
-      const hasDirty = await import('../../stores/useProjectStore')
-        .then(({ useProjectStore }) => useProjectStore.getState().hasDirtyEditors())
-        .catch(() => false)
-      const terminalBusy = await import('../../stores/useTerminalStore')
-        .then(({ useTerminalStore }) => {
-          const store = useTerminalStore.getState()
-          return store.hasUserInteracted() && store.isRecentlyActive(20000)
-        })
-        .catch(() => false)
-      if (hasDirty || terminalBusy) {
-        const confirmed = await showConfirm({
-          title: hasDirty ? 'Unsaved Changes' : 'Active Terminal Session',
-          message: hasDirty
-            ? 'You have unsaved changes. Discard and close project?'
-            : 'Terminal shows recent activity. Stop it and close project?',
-          confirmLabel: 'Close Anyway',
-          danger: true
-        })
-
-        if (!confirmed) {
-          setIsSwitchingProject(false)
-          return
-        }
-
-        try {
-          const { useTerminalStore } = await import('../../stores/useTerminalStore')
-          const tid = useTerminalStore.getState().getActiveTerminalId()
-          if (tid) {
-            window.api.terminal.write(tid, '\u0003')
-            await new Promise((r) => setTimeout(r, 300))
-            if (!useTerminalStore.getState().isRecentlyActiveId(tid, 300)) {
-              useTerminalStore.getState().clearActivity(tid)
-            }
-          }
-        } catch (e) {
-          console.warn('Failed to signal terminal before closing project:', e)
-        }
-      }
-
-      const currentToken = ++switchTokenRef.current
-      const ok = await window.api.file.closeProject()
-      if (ok && currentToken === switchTokenRef.current) {
-        setProjectPath(null)
-        setFiles([])
-        setExpandedFolders(new Set())
-        showGlobalToast({ type: 'info', title: 'Project Closed', message: 'Current project has been closed.' })
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to close project')
-      console.error('Error closing project:', err)
-      showGlobalToast({ type: 'error', title: 'Close Project Failed', message: String(err instanceof Error ? err.message : err) })
-    } finally {
-      setIsSwitchingProject(false)
-    }
-  }
+  // Project management (loading, switching, closing) now handled by useProjectManagement hook
 
   const handleFileClick = (filePath: string) => {
     // Find the node to determine type
@@ -344,118 +153,34 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
   }
 
-  const handleNewFile = async () => {
-    const targetPath = selectedFolder || projectPath
-    if (!targetPath) return
+  // File operation handlers (create, delete, rename) now handled by useFileOperations hook
 
-    const relativePath = targetPath.replace(projectPath || '', '') || '/'
-    const fileName = await showNewFile({
-      title: 'Create New File',
-      message: '',
-      parentPath: relativePath,
-      inputPlaceholder: 'notes.md'
-    })
+  // Alias for hook's refreshFiles for use in file operations
+  const refreshProjectTree = refreshFiles
 
-    if (!fileName) return
-
-    try {
-      setLoading(true)
-      isInternalOperation.current = true
-      if (projectPath) {
-        await window.api.directoryWatch.pause(projectPath)
-      }
-
-      const createdFilePath = await window.api.file.createFile(targetPath, fileName)
-      await refreshProjectTree()
-
-      if (projectPath) {
-        await window.api.directoryWatch.resume(projectPath)
-      }
-      isInternalOperation.current = false
-
-      onFileSelect(createdFilePath)
-      setSelectedFolder(null)
-    } catch (err) {
-      let errorMessage = 'Failed to create file'
-      if (err instanceof Error) {
-        errorMessage = err.message.replace(/^Error invoking remote method.*?Error:\s*/i, '')
-        if (errorMessage.includes('already exists')) {
-          errorMessage = 'A file with this name already exists'
-        }
-      }
-      showGlobalToast({ type: 'error', title: 'Operation Failed', message: errorMessage })
-      console.error('Error creating file:', err)
-
-      if (projectPath) {
-        await window.api.directoryWatch.resume(projectPath)
-      }
-      isInternalOperation.current = false
-    } finally {
-      setLoading(false)
+  // Directory watching for auto-refresh
+  useDirectoryWatcher({
+    projectPath,
+    initialLoadComplete,
+    isInternalOperationRef: isInternalOperation,
+    onRefresh: refreshProjectTree,
+    onProjectDeleted: () => {
+      // Show toast notification and close project via API
+      showGlobalToast({
+        type: 'error',
+        title: 'Project Deleted',
+        message: 'Project folder no longer exists'
+      })
+      // Close project via API (hook will update state via onProjectChanged listener)
+      window.api.file.closeProject().catch(err => {
+        console.error('Error closing deleted project:', err)
+      })
+      setExpandedFolders(new Set())
+    },
+    onError: (error) => {
+      console.error('Directory watch error:', error)
     }
-  }
-
-  const handleNewFolder = async () => {
-    const targetPath = selectedFolder || projectPath
-    if (!targetPath) return
-
-    const relativePath = targetPath.replace(projectPath || '', '') || '/'
-    const folderName = await showNewFolder({
-      title: 'Create New Folder',
-      message: '',
-      parentPath: relativePath,
-      inputPlaceholder: 'new-folder'
-    })
-
-    if (!folderName) return
-
-    try {
-      setLoading(true)
-      isInternalOperation.current = true
-      if (projectPath) {
-        await window.api.directoryWatch.pause(projectPath)
-      }
-
-      await window.api.file.createFolder(targetPath, folderName)
-      await refreshProjectTree()
-
-      if (projectPath) {
-        await window.api.directoryWatch.resume(projectPath)
-      }
-      isInternalOperation.current = false
-
-      setSelectedFolder(null)
-    } catch (err) {
-      let errorMessage = 'Failed to create folder'
-      if (err instanceof Error) {
-        errorMessage = err.message.replace(/^Error invoking remote method.*?Error:\s*/i, '')
-        if (errorMessage.includes('already exists')) {
-          errorMessage = 'A folder with this name already exists'
-        }
-      }
-      showGlobalToast({ type: 'error', title: 'Operation Failed', message: errorMessage })
-      console.error('Error creating folder:', err)
-
-      if (projectPath) {
-        await window.api.directoryWatch.resume(projectPath)
-      }
-      isInternalOperation.current = false
-    } finally {
-      setLoading(false)
-    }
-  }
-
-
-  const refreshProjectTree = async () => {
-    if (!projectPath) return
-    try {
-      const fileTree = await window.api.file.readDirectory(projectPath)
-      setFiles(fileTree)
-      // Expanded folders are preserved automatically via state
-    } catch (err) {
-      console.error('Error refreshing project tree:', err)
-    }
-  }
+  })
 
   /**
    * Check if a file is a markdown file
@@ -576,174 +301,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     setContextMenu(null)
   }
 
-  const handleNewFileInFolder = (folderPath: string) => {
-    setSelectedFolder(folderPath)
-    setContextMenu(null)
-    handleNewFile()
-  }
-
-  const handleNewFolderInFolder = (folderPath: string) => {
-    setSelectedFolder(folderPath)
-    setContextMenu(null)
-    handleNewFolder()
-  }
-
-  const handleDeleteFile = async (filePath: string, fileName: string) => {
-    setContextMenu(null)
-
-    const confirmed = await showConfirm({
-      title: 'Delete File',
-      message: `Are you sure you want to delete "${fileName}"? This action cannot be undone.`,
-      confirmLabel: 'Delete',
-      danger: true
-    })
-
-    if (!confirmed) return
-
-    try {
-      setLoading(true)
-      setError(null)
-
-      // Mark as internal operation and pause directory watcher
-      isInternalOperation.current = true
-      if (projectPath) {
-        await window.api.directoryWatch.pause(projectPath)
-      }
-
-      await window.api.file.deleteFile(filePath)
-      await refreshProjectTree()
-
-      // Resume directory watcher
-      if (projectPath) {
-        await window.api.directoryWatch.resume(projectPath)
-      }
-      isInternalOperation.current = false
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete file')
-      console.error('Error deleting file:', err)
-
-      // Make sure to resume watcher even on error
-      if (projectPath) {
-        await window.api.directoryWatch.resume(projectPath)
-      }
-      isInternalOperation.current = false
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleDeleteFolder = async (folderPath: string, folderName: string) => {
-    setContextMenu(null)
-
-    const confirmed = await showConfirm({
-      title: 'Delete Folder',
-      message: `Are you sure you want to delete "${folderName}" and all its contents? This action cannot be undone.`,
-      confirmLabel: 'Delete',
-      danger: true
-    })
-
-    if (!confirmed) return
-
-    try {
-      setLoading(true)
-      setError(null)
-
-      // Mark as internal operation and pause directory watcher
-      isInternalOperation.current = true
-      if (projectPath) {
-        await window.api.directoryWatch.pause(projectPath)
-      }
-
-      await window.api.file.deleteFolder(folderPath)
-      await refreshProjectTree()
-
-      // Resume directory watcher
-      if (projectPath) {
-        await window.api.directoryWatch.resume(projectPath)
-      }
-      isInternalOperation.current = false
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete folder')
-      console.error('Error deleting folder:', err)
-
-      // Make sure to resume watcher even on error
-      if (projectPath) {
-        await window.api.directoryWatch.resume(projectPath)
-      }
-      isInternalOperation.current = false
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleRename = async (path: string, currentName: string, itemType: 'file' | 'directory') => {
-    setContextMenu(null)
-
-    // Extract parent directory path
-    const lastSlash = path.lastIndexOf('/')
-    const parentPath = lastSlash > 0 ? path.substring(0, lastSlash) : '/'
-
-    // Get existing sibling names for duplicate detection
-    const siblings = files.filter((file) => {
-      const siblingParent = file.path.substring(0, file.path.lastIndexOf('/'))
-      return siblingParent === parentPath && file.name !== currentName
-    })
-    const existingNames = siblings.map((s) => s.name)
-
-    // Show specialized rename dialog
-    const newName = await showRename({
-      title: itemType === 'file' ? 'Rename File' : 'Rename Folder',
-      message: '',
-      currentName,
-      itemPath: path,
-      itemType,
-      parentPath,
-      existingNames
-    })
-
-    // User cancelled
-    if (!newName) return
-
-    try {
-      setLoading(true)
-
-      // Mark as internal operation and pause directory watcher
-      isInternalOperation.current = true
-      if (projectPath) {
-        await window.api.directoryWatch.pause(projectPath)
-      }
-
-      await window.api.file.rename(path, newName)
-
-      // Refresh project tree
-      await refreshProjectTree()
-
-      showGlobalToast({
-        title: 'Success',
-        message: 'Item renamed successfully',
-        type: 'success'
-      })
-    } catch (err) {
-      const errorMessage = formatFileOperationError(err, 'rename')
-      showGlobalToast({
-        title: 'Error',
-        message: errorMessage,
-        type: 'error'
-      })
-      console.error('Error renaming:', err)
-    } finally {
-      // Resume watcher - wrap in try-catch to ensure cleanup always happens
-      if (projectPath) {
-        try {
-          await window.api.directoryWatch.resume(projectPath)
-        } catch (resumeErr) {
-          console.error('Failed to resume directory watcher:', resumeErr)
-        }
-      }
-      isInternalOperation.current = false
-      setLoading(false)
-    }
-  }
+  // Remaining handlers now provided by useFileOperations hook
 
   // Auto-scroll logic
   const startAutoScroll = (direction: 'up' | 'down') => {
@@ -753,9 +311,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     if (!container) return
 
     autoScrollIntervalRef.current = window.setInterval(() => {
-      const scrollAmount = direction === 'up' ? -5 : 5
+      const scrollAmount = direction === 'up' ? -AUTO_SCROLL.SCROLL_AMOUNT : AUTO_SCROLL.SCROLL_AMOUNT
       container.scrollTop += scrollAmount
-    }, 16) // ~60fps
+    }, AUTO_SCROLL.SCROLL_INTERVAL) // ~60fps
   }
 
   const stopAutoScroll = () => {
@@ -776,12 +334,12 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     // Don't auto-expand if already expanded
     if (expandedFolders.has(folderId)) return
 
-    // Set new timer for 1 second
+    // Set new timer for auto-expand
     autoExpandTimeoutRef.current = setTimeout(() => {
       console.log('🔓 Auto-expanding folder:', folderId)
       setExpandedFolders(prev => new Set([...prev, folderId]))
       autoExpandTimeoutRef.current = null
-    }, 1000)
+    }, AUTO_EXPAND.HOVER_DELAY)
   }
 
   const cancelAutoExpandTimer = () => {
@@ -813,9 +371,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       const distanceFromTop = pointerY - rect.top
       const distanceFromBottom = rect.bottom - pointerY
 
-      if (distanceFromTop < 50 && distanceFromTop > 0) {
+      if (distanceFromTop < AUTO_SCROLL.TRIGGER_DISTANCE_TOP && distanceFromTop > 0) {
         startAutoScroll('up')
-      } else if (distanceFromBottom < 50 && distanceFromBottom > 0) {
+      } else if (distanceFromBottom < AUTO_SCROLL.TRIGGER_DISTANCE_BOTTOM && distanceFromBottom > 0) {
         startAutoScroll('down')
       } else {
         stopAutoScroll()
@@ -908,23 +466,16 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
 
     try {
-      setLoading(true)
-      isInternalOperation.current = true
+      const result = await withWatcherPause(projectPath, isInternalOperation, setFileOperationLoading, async () => {
+        // Execute move
+        const moveResult = await window.api.file.moveItem(sourcePath, targetParent)
+        console.log('✅ Move completed:', moveResult.path)
 
-      // Pause watcher
-      if (projectPath) {
-        await window.api.directoryWatch.pause(projectPath)
-      }
+        // Refresh tree
+        await refreshProjectTree()
 
-      // Execute move
-      const result = await window.api.file.moveItem(sourcePath, targetParent)
-      console.log('✅ Move completed:', result.path)
-
-      // Refresh tree
-      if (projectPath) {
-        const fileTree = await window.api.file.readDirectory(projectPath)
-        setFiles(fileTree)
-      }
+        return moveResult
+      })
 
       // Show success message with symlink warning if applicable
       if (result.isSymlink) {
@@ -948,17 +499,6 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         type: 'error'
       })
       console.error('Error moving item:', err)
-    } finally {
-      // Resume watcher - wrap in try-catch to ensure cleanup always happens
-      if (projectPath) {
-        try {
-          await window.api.directoryWatch.resume(projectPath)
-        } catch (resumeErr) {
-          console.error('Failed to resume directory watcher:', resumeErr)
-        }
-      }
-      isInternalOperation.current = false
-      setLoading(false)
     }
   }
 
@@ -1053,23 +593,18 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   // Helper function to execute paste operation
   const executePaste = async (targetPath: string, replaceExisting: boolean) => {
     try {
-      setLoading(true)
-      isInternalOperation.current = true
+      const result = await withWatcherPause(projectPath, isInternalOperation, setFileOperationLoading, async () => {
+        const pasteResult = await clipboard.paste(targetPath, replaceExisting)
 
-      // Pause watcher
-      if (projectPath) {
-        await window.api.directoryWatch.pause(projectPath)
-      }
-
-      const result = await clipboard.paste(targetPath, replaceExisting)
-
-      if (result.success) {
-        // Refresh tree
-        if (projectPath) {
-          const fileTree = await window.api.file.readDirectory(projectPath)
-          setFiles(fileTree)
+        if (pasteResult.success) {
+          // Refresh tree
+          await refreshProjectTree()
         }
 
+        return pasteResult
+      })
+
+      if (result.success) {
         // Show success message with symlink warning if applicable
         if (result.isSymlink) {
           const operation = clipboard.getOperation() === 'cut' ? 'moved' : 'copied'
@@ -1102,99 +637,50 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         type: 'error'
       })
       console.error('Error pasting:', err)
-    } finally {
-      // Resume watcher - wrap in try-catch to ensure cleanup always happens
-      if (projectPath) {
-        try {
-          await window.api.directoryWatch.resume(projectPath)
-        } catch (resumeErr) {
-          console.error('Failed to resume directory watcher:', resumeErr)
-        }
-      }
-      isInternalOperation.current = false
-      setLoading(false)
     }
   }
 
-  const getContextMenuItems = (node: FileNode): ContextMenuItem[] => {
-    const baseItems: ContextMenuItem[] = []
-
-    // Cut/Copy/Paste for all items
-    baseItems.push(
-      {
-        label: 'Cut',
-        icon: <Scissors size={14} strokeWidth={2} />,
-        action: () => {
-          clipboard.cut(node.path, node.name, node.type)
-          showGlobalToast({ title: 'Cut', message: `"${node.name}" ready to move`, type: 'info' })
-        }
-      },
-      {
-        label: 'Copy',
-        icon: <Copy size={14} strokeWidth={2} />,
-        action: () => {
-          clipboard.copy(node.path, node.name, node.type)
-          showGlobalToast({ title: 'Copied', message: `"${node.name}" ready to paste`, type: 'info' })
-        }
-      }
-    )
-
-    // Paste only for directories
-    if (node.type === 'directory' && clipboard.hasClipboard()) {
-      baseItems.push({
-        label: 'Paste',
-        icon: <Clipboard size={14} strokeWidth={2} />,
-        action: () => {
-          handlePaste(node.path)
-        }
+  /**
+   * Helper: Build MenuContext for context menu factory
+   * Provides all dependencies needed by command execution
+   */
+  const buildMenuContext = (): MenuContext => ({
+    projectPath,
+    clipboard,
+    dialogs: { showConfirm, showRename, showNewFile, showNewFolder },
+    toast: showGlobalToast,
+    // Cast to IProjectTreeApi['file'] to match interface (runtime behavior is compatible)
+    api: window.api.file as unknown as MenuContext['api'],
+    withWatcherPause: <T,>(op: () => Promise<T>) =>
+      withWatcherPause(projectPath, isInternalOperation, setFileOperationLoading, op),
+    refreshProjectTree: refreshFiles,
+    formatFileOperationError,
+    getSiblingNames: (nodePath: string, currentName: string) => {
+      const parentPath = nodePath.substring(0, nodePath.lastIndexOf('/'))
+      const siblings = files.filter((file) => {
+        const siblingParent = file.path.substring(0, file.path.lastIndexOf('/'))
+        return siblingParent === parentPath && file.name !== currentName
       })
+      return siblings.map((s) => s.name)
     }
+  })
 
-    baseItems.push({ separator: true } as ContextMenuItem)
+  /**
+   * Get context menu items using Strategy + Command pattern
+   * Uses factory to select appropriate strategy and build menu
+   */
+  const getContextMenuItems = (node: FileNode): ContextMenuItem[] => {
+    const ctx = buildMenuContext()
+    const menuItems = contextMenuFactory.build(node, ctx)
 
-    if (node.type === 'directory') {
-      return [
-        ...baseItems,
-        {
-          label: 'New File',
-          icon: <FilePlus size={14} strokeWidth={2} />,
-          action: () => handleNewFileInFolder(node.path)
-        },
-        {
-          label: 'New Folder',
-          icon: <FolderPlus size={14} strokeWidth={2} />,
-          action: () => handleNewFolderInFolder(node.path)
-        },
-        {
-          label: 'Rename',
-          icon: <Edit size={14} strokeWidth={2} />,
-          action: () => handleRename(node.path, node.name, 'directory')
-        },
-        { separator: true } as ContextMenuItem,
-        {
-          label: 'Delete',
-          icon: <Trash size={14} strokeWidth={2} />,
-          danger: true,
-          action: () => handleDeleteFolder(node.path, node.name)
-        }
-      ]
-    } else {
-      return [
-        ...baseItems,
-        {
-          label: 'Rename',
-          icon: <Edit size={14} strokeWidth={2} />,
-          action: () => handleRename(node.path, node.name, 'file')
-        },
-        { separator: true } as ContextMenuItem,
-        {
-          label: 'Delete',
-          icon: <Trash size={14} strokeWidth={2} />,
-          danger: true,
-          action: () => handleDeleteFile(node.path, node.name)
-        }
-      ]
-    }
+    // Adapt IMenuItem to ContextMenuItem (execute -> action)
+    return menuItems.map((item) => ({
+      label: item.label,
+      icon: item.icon,
+      danger: item.danger,
+      separator: item.separator,
+      action: item.execute
+    }))
   }
 
   return (

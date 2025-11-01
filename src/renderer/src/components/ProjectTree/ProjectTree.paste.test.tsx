@@ -1,8 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, waitFor } from '@testing-library/react'
-import React from 'react'
-import { ProjectTree } from './ProjectTree'
-import { DialogProvider } from '../Dialog'
 import { createClipboardStore } from '../../stores/useClipboardStore'
 import type { IFileOperations } from '../../interfaces/IFileOperations'
 
