@@ -74,11 +74,13 @@ export interface IFileService {
   /**
    * Move a file or folder to a new parent directory
    * Returns path and symlink indicator
+   * @param replaceExisting - If true, delete existing item at target before moving
    */
   moveItem(
     sourcePath: string,
     targetParentPath: string,
-    newName?: string
+    newName?: string,
+    replaceExisting?: boolean
   ): Promise<{ path: string; isSymlink?: boolean }>
 
   /**

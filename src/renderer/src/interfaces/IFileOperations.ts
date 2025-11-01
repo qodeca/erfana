@@ -5,11 +5,13 @@
 export interface IFileOperations {
   /**
    * Move a file or folder to a new parent directory
+   * @param replaceExisting - If true, delete existing item at target before moving
    */
   moveItem(
     sourcePath: string,
     targetParentPath: string,
-    newName?: string
+    newName?: string,
+    replaceExisting?: boolean
   ): Promise<{ path: string; isSymlink?: boolean }>
 
   /**

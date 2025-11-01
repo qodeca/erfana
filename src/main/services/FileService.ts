@@ -250,8 +250,9 @@ export class FileService implements IFileService {
   /**
    * Move a file or folder to a new parent directory
    * Uses fs.rename() for same-filesystem moves, falls back to copy+delete for cross-filesystem
+   * @param replaceExisting - If true, delete existing item at target before moving
    */
-  async moveItem(sourcePath: string, targetParentPath: string, newName?: string): Promise<{ path: string; isSymlink?: boolean }> {
+  async moveItem(sourcePath: string, targetParentPath: string, newName?: string, replaceExisting?: boolean): Promise<{ path: string; isSymlink?: boolean }> {
     // Validate source exists and check if it's a symlink
     const sourceStats = await stat(sourcePath)
     const isSymlink = await this.symlinkDetector.checkPath(sourcePath)
@@ -295,7 +296,26 @@ export class FileService implements IFileService {
     // Check if target already exists (case-insensitive for cross-platform compatibility)
     const conflictExists = await this.checkNameConflict(targetParentPath, finalName)
     if (conflictExists) {
-      throw new Error(`An item named "${finalName}" already exists in the target location`)
+      if (replaceExisting) {
+        // Delete existing item before move
+        const existingItemPath = join(targetParentPath, finalName)
+        try {
+          const existingStats = await stat(existingItemPath)
+
+          if (existingStats.isDirectory()) {
+            await rm(existingItemPath, { recursive: true, force: true })
+          } else {
+            await rm(existingItemPath)
+          }
+
+          console.log(`Replaced existing item: ${existingItemPath}`)
+        } catch (deleteError) {
+          const message = deleteError instanceof Error ? deleteError.message : String(deleteError)
+          throw new Error(`Failed to replace existing item: ${message}`)
+        }
+      } else {
+        throw new Error(`An item named "${finalName}" already exists in the target location`)
+      }
     }
 
     // Try fs.rename first (fast, atomic for same filesystem)
