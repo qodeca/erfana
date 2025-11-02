@@ -29,6 +29,26 @@ import {
   openProjectWithTokenGuard,
   closeProjectWithTokenGuard
 } from '../components/ProjectTree/switchHelpers'
+import {
+  shouldLoadLastProject,
+  shouldOpenExternalProject,
+  shouldProceedWithStateUpdate,
+  shouldMarkInitialLoadComplete,
+  shouldRefreshFiles,
+  createProjectOpenedMessage,
+  createProjectClosedMessage,
+  createOpenErrorMessage,
+  createCloseErrorMessage,
+  createLoadErrorMessage,
+  formatErrorForState,
+  createProjectChangedLogMessage,
+  createCallbackWarningMessage,
+  createLoadProjectErrorLog,
+  createNewProjectTreeErrorLog,
+  createRefreshErrorLog,
+  createOpenProjectErrorLog,
+  createCloseProjectErrorLog
+} from './useProjectManagement.logic'
 
 /**
  * Hook for managing project lifecycle
@@ -60,20 +80,24 @@ export function useProjectManagement(
       try {
         setLoading(true)
         const lastPath = await api.file.getLastProjectPath()
-        if (!mounted) return
+        if (!shouldLoadLastProject(mounted)) return
 
-        if (lastPath) {
+        if (shouldProceedWithStateUpdate(mounted, lastPath)) {
           setProjectPath(lastPath)
-          const fileTree = await api.file.readDirectory(lastPath)
-          if (!mounted) return
+          const fileTree = await api.file.readDirectory(lastPath!)
+          if (!shouldLoadLastProject(mounted)) return
           setFiles(fileTree)
-          initialLoadCompleteRef.current = true
+          if (shouldMarkInitialLoadComplete(lastPath, fileTree)) {
+            initialLoadCompleteRef.current = true
+          }
         }
       } catch (err) {
         // Silent fail as in original implementation
-        console.error('Error loading last project:', err)
+        console.error(createLoadProjectErrorLog(), err)
       } finally {
-        if (mounted) setLoading(false)
+        if (shouldLoadLastProject(mounted)) {
+          setLoading(false)
+        }
       }
     }
 
@@ -86,28 +110,30 @@ export function useProjectManagement(
   // Listen for external project changes (e.g., from menu bar, shortcuts)
   useEffect(() => {
     const unsubscribe = api.file.onProjectChanged(async (data) => {
-      console.log('🌳 useProjectManagement: Project changed:', data)
+      console.log(createProjectChangedLogMessage(data))
 
       // Notify consumer to reset UI state
       try {
         options?.onProjectChanged?.(data.newPath ?? null)
       } catch (cbErr) {
-        console.warn('onProjectChanged callback threw:', cbErr)
+        console.warn(createCallbackWarningMessage(cbErr))
       }
 
       setError(null)
 
-      if (data.newPath) {
+      if (shouldOpenExternalProject(data.newPath)) {
         // New project opened externally
         setProjectPath(data.newPath)
         try {
           setLoading(true)
-          const fileTree = await api.file.readDirectory(data.newPath)
+          const fileTree = await api.file.readDirectory(data.newPath!)
           setFiles(fileTree)
-          initialLoadCompleteRef.current = true
+          if (shouldMarkInitialLoadComplete(data.newPath, fileTree)) {
+            initialLoadCompleteRef.current = true
+          }
         } catch (err) {
-          console.error('Error loading new project tree:', err)
-          setError(err instanceof Error ? err.message : 'Failed to load project')
+          console.error(createNewProjectTreeErrorLog(), err)
+          setError(createLoadErrorMessage(err))
         } finally {
           setLoading(false)
         }
@@ -158,16 +184,19 @@ export function useProjectManagement(
       // Open project with race guard
       const openedPath = await openProjectWithTokenGuard(switchTokenRef, setProjectPath, setFiles)
       if (openedPath) {
-        showGlobalToast({ type: 'success', title: 'Project Opened', message: openedPath })
+        showGlobalToast({
+          type: 'success',
+          title: 'Project Opened',
+          message: createProjectOpenedMessage(openedPath)
+        })
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to open project'
-      setError(message)
-      console.error('Error opening project:', err)
+      setError(formatErrorForState(err))
+      console.error(createOpenProjectErrorLog(), err)
       showGlobalToast({
         type: 'error',
         title: 'Open Project Failed',
-        message: String(err instanceof Error ? err.message : err)
+        message: createOpenErrorMessage(err)
       })
     } finally {
       setIsSwitchingProject(false)
@@ -214,16 +243,19 @@ export function useProjectManagement(
         () => {} // expanded folders will be managed by ProjectTree
       )
       if (closed) {
-        showGlobalToast({ type: 'info', title: 'Project Closed', message: 'Current project has been closed.' })
+        showGlobalToast({
+          type: 'info',
+          title: 'Project Closed',
+          message: createProjectClosedMessage()
+        })
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to close project'
-      setError(message)
-      console.error('Error closing project:', err)
+      setError(formatErrorForState(err))
+      console.error(createCloseProjectErrorLog(), err)
       showGlobalToast({
         type: 'error',
         title: 'Close Project Failed',
-        message: String(err instanceof Error ? err.message : err)
+        message: createCloseErrorMessage(err)
       })
     } finally {
       setIsSwitchingProject(false)
@@ -236,12 +268,12 @@ export function useProjectManagement(
    * Used by file operations to update the tree after making changes
    */
   const refreshFiles = async (): Promise<void> => {
-    if (!projectPath) return
+    if (!shouldRefreshFiles(projectPath)) return
     try {
-      const fileTree = await api.file.readDirectory(projectPath)
+      const fileTree = await api.file.readDirectory(projectPath!)
       setFiles(fileTree)
     } catch (err) {
-      console.error('Error refreshing file tree:', err)
+      console.error(createRefreshErrorLog(), err)
     }
   }
 

@@ -19,6 +19,13 @@
  */
 
 import { useEffect } from 'react'
+import {
+  shouldStartWatcher,
+  shouldHandleDirectoryChange,
+  createDirectoryChangeMessage,
+  createWatcherErrorMessage,
+  createDirectoryErrorMessage
+} from './useDirectoryWatcher.logic'
 
 interface UseDirectoryWatcherOptions {
   projectPath: string | null
@@ -38,19 +45,21 @@ export function useDirectoryWatcher({
   onError
 }: UseDirectoryWatcherOptions): void {
   useEffect(() => {
-    if (!projectPath) return
-    if (!initialLoadComplete) return
+    // Guard: Should we start the watcher?
+    if (!shouldStartWatcher(projectPath, initialLoadComplete)) {
+      return
+    }
 
     // Start watching the project directory
-    window.api.directoryWatch.start(projectPath).catch((err) => {
-      console.error('Failed to start directory watch:', err)
+    window.api.directoryWatch.start(projectPath as string).catch((err) => {
+      console.error(createWatcherErrorMessage(), err)
     })
 
     // Listen for directory changes
     const unsubscribeChanged = window.api.directoryWatch.onDirectoryChanged((data) => {
       // Only refresh if not during our own internal operations
-      if (!isInternalOperationRef.current) {
-        console.log(`📁 Directory changed, refreshing project tree... (${data.eventCount} events)`)
+      if (shouldHandleDirectoryChange(isInternalOperationRef.current)) {
+        console.log(createDirectoryChangeMessage(data.eventCount))
         onRefresh()
       }
     })
@@ -62,13 +71,13 @@ export function useDirectoryWatcher({
 
     // Listen for errors
     const unsubscribeError = window.api.directoryWatch.onDirectoryError((data) => {
-      console.error('Directory watch error:', data.error)
+      console.error(createDirectoryErrorMessage(), data.error)
       onError(data.error)
     })
 
     // Cleanup on unmount or when project changes
     return () => {
-      window.api.directoryWatch.stop(projectPath)
+      window.api.directoryWatch.stop(projectPath as string)
       unsubscribeChanged()
       unsubscribeDeleted()
       unsubscribeError()
