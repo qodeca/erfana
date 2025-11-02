@@ -1,4 +1,4 @@
-import { useState, useRef, forwardRef, useMemo } from 'react'
+import { useState, useRef, forwardRef, useMemo, useImperativeHandle, useCallback, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -8,12 +8,39 @@ import type { PluggableList } from 'unified'
 import { defaultSchema } from 'hast-util-sanitize'
 import { PreviewContextMenu } from '../ContextMenu/PreviewContextMenu'
 import { MermaidDiagram } from './MermaidDiagram'
+import { useToast } from '../Toast/ToastContext'
+import { resolveMarkdownLink, getLinkTooltip, type ResolvedLink } from '../../utils/markdownLinkResolver'
+import {
+  isDangerousProtocol,
+  isExternalProtocol,
+  isInternalLink,
+  cleanMailtoLink,
+  cleanTelLink
+} from '../../utils/linkProtocols'
 import './MarkdownPreview.css'
+
+// Anchor scroll configuration
+const ANCHOR_SCROLL_TIMEOUT_MS = 2000 // Wait up to 2s for anchor element to appear in DOM
+const ANCHOR_SCROLL_RETRY_INTERVAL_MS = 100 // Check every 100ms if anchor exists
 
 interface MarkdownPreviewProps {
   content: string
   filePath?: string
   className?: string
+  onOpenFile?: (filePath: string, anchor?: string) => Promise<void>
+}
+
+export interface MarkdownPreviewHandle {
+  /**
+   * Scroll to a heading anchor by ID
+   * Uses MutationObserver and polling to wait for the element to appear
+   * @param anchorId - The heading ID to scroll to
+   * @param options - Optional configuration
+   * @param options.timeout - Max time to wait for element (default: 2000ms)
+   * @param options.retryInterval - Interval between retries (default: 100ms)
+   */
+  scrollToAnchor: (anchorId: string, options?: { timeout?: number; retryInterval?: number }) => void
+  element: HTMLDivElement | null
 }
 
 /**
@@ -48,7 +75,13 @@ interface MarkdownPreviewProps {
  *
  * Reference: https://github.com/rehypejs/rehype-sanitize
  */
-const sanitizationSchema = defaultSchema
+const sanitizationSchema = {
+  ...defaultSchema,
+  protocols: {
+    ...defaultSchema.protocols,
+    href: [...(defaultSchema.protocols?.href || []), 'tel', 'ftp']
+  }
+}
 
 /**
  * Helper function to extract line range from node position
@@ -119,8 +152,49 @@ const rehypePlugins: PluggableList = [
  * Markdown components configuration factory
  * Returns components with filePath context for Mermaid error reporting
  * Called with filePath to enable bug report functionality
+ * @param filePath - Current file path for Mermaid error reporting
+ * @param handleInternalLink - Callback for handling internal markdown link clicks
+ * @param resolvedLinks - Map of resolved link information for tooltips and styling
  */
-function createMarkdownComponents(filePath?: string): Components {
+function createMarkdownComponents(
+  filePath?: string,
+  handleInternalLink?: (href: string) => Promise<void>,
+  resolvedLinks?: Map<string, ResolvedLink | null>
+): Components {
+  // Track used heading IDs to prevent duplicates
+  // Map: base ID -> count (e.g., "example" -> 2 means next "example" becomes "example-3")
+  const usedHeadingIds = new Map<string, number>()
+
+  /**
+   * Generate unique heading ID using GitHub-compatible slug algorithm
+   * - Converts to lowercase
+   * - Removes special characters (except hyphens and underscores)
+   * - Replaces spaces with hyphens
+   * - Handles duplicates with numeric suffix (-2, -3, etc.)
+   *
+   * @param text - Heading text content
+   * @returns Unique ID (appends -2, -3, etc. for duplicates)
+   *
+   * @example
+   * generateUniqueHeadingId('Hello World!') // => 'hello-world'
+   * generateUniqueHeadingId('Hello, World?') // => 'hello-world'
+   * generateUniqueHeadingId('Café') // => 'café'
+   */
+  function generateUniqueHeadingId(text: string): string {
+    const baseId = text
+      .toLowerCase()
+      .trim()
+      .replace(/[^\p{L}\p{N}\s-]/gu, '') // Remove special chars, keep letters/numbers (including unicode), spaces, hyphens
+      .replace(/\s+/g, '-')              // Replace spaces with hyphens
+      .replace(/-+/g, '-')               // Collapse multiple hyphens
+      .replace(/^-|-$/g, '')             // Remove leading/trailing hyphens
+
+    const count = usedHeadingIds.get(baseId) || 0
+    usedHeadingIds.set(baseId, count + 1)
+
+    return count === 0 ? baseId : `${baseId}-${count + 1}`
+  }
+
   return {
   // Inject line range on all block elements for scroll synchronization
   p: withLineRange('p'),
@@ -207,7 +281,7 @@ function createMarkdownComponents(filePath?: string): Components {
   h1({ node, children }: { node?: unknown; children?: React.ReactNode }) {
     const range = extractLineRange(node)
     const text = String(children)
-    const id = text.toLowerCase().replace(/\s+/g, '-')
+    const id = generateUniqueHeadingId(text)
     return (
       <h1 data-line-start={range?.start} data-line-end={range?.end} data-line={range?.start} id={id}>
         {children}
@@ -217,7 +291,7 @@ function createMarkdownComponents(filePath?: string): Components {
   h2({ node, children }: { node?: unknown; children?: React.ReactNode }) {
     const range = extractLineRange(node)
     const text = String(children)
-    const id = text.toLowerCase().replace(/\s+/g, '-')
+    const id = generateUniqueHeadingId(text)
     return (
       <h2 data-line-start={range?.start} data-line-end={range?.end} data-line={range?.start} id={id}>
         {children}
@@ -227,30 +301,135 @@ function createMarkdownComponents(filePath?: string): Components {
   h3({ node, children }: { node?: unknown; children?: React.ReactNode }) {
     const range = extractLineRange(node)
     const text = String(children)
-    const id = text.toLowerCase().replace(/\s+/g, '-')
+    const id = generateUniqueHeadingId(text)
     return (
       <h3 data-line-start={range?.start} data-line-end={range?.end} data-line={range?.start} id={id}>
         {children}
       </h3>
     )
   },
-  h4: withLineRange('h4'),
-  h5: withLineRange('h5'),
-  h6: withLineRange('h6'),
-  // Links open in external browser with line range tracking
+  h4({ node, children }: { node?: unknown; children?: React.ReactNode }) {
+    const range = extractLineRange(node)
+    const text = String(children)
+    const id = generateUniqueHeadingId(text)
+    return (
+      <h4 data-line-start={range?.start} data-line-end={range?.end} data-line={range?.start} id={id}>
+        {children}
+      </h4>
+    )
+  },
+  h5({ node, children }: { node?: unknown; children?: React.ReactNode }) {
+    const range = extractLineRange(node)
+    const text = String(children)
+    const id = generateUniqueHeadingId(text)
+    return (
+      <h5 data-line-start={range?.start} data-line-end={range?.end} data-line={range?.start} id={id}>
+        {children}
+      </h5>
+    )
+  },
+  h6({ node, children }: { node?: unknown; children?: React.ReactNode }) {
+    const range = extractLineRange(node)
+    const text = String(children)
+    const id = generateUniqueHeadingId(text)
+    return (
+      <h6 data-line-start={range?.start} data-line-end={range?.end} data-line={range?.start} id={id}>
+        {children}
+      </h6>
+    )
+  },
+  // Links - handle both external (browser) and internal (file navigation)
   a({ node, href, children, ...props }: { node?: unknown; href?: string; children?: React.ReactNode } & Record<string, unknown>) {
     const range = extractLineRange(node)
-    const handleClick = (e: React.MouseEvent) => {
-      if (href?.startsWith('http')) {
-        e.preventDefault()
-        // @ts-expect-error - shell is available but not typed in ElectronAPI
-        window.electron.shell.openExternal(href)
+
+    // Security: Block dangerous protocols
+    if (href && isDangerousProtocol(href)) {
+      console.warn('[MarkdownPreview] Blocked dangerous protocol in link:', href.split(':')[0])
+      return (
+        <span className="blocked-link" title="⚠️ This link has been blocked for security reasons">
+          {children}
+        </span>
+      )
+    }
+
+    // Check if link is external using protocol utility
+    const isExternal = href ? isExternalProtocol(href) : false
+    const isAnchorOnly = href?.startsWith('#') ?? false
+
+    // Get resolved link info for tooltip and styling (for internal links only)
+    const resolved = href && isInternalLink(href) ? resolvedLinks?.get(href) : undefined
+    const isBroken = resolved !== undefined && resolved !== null && !resolved.exists
+
+    // Determine CSS class based on link type
+    let linkClass = 'external-link'
+    if (isAnchorOnly) {
+      linkClass = 'anchor-link'
+    } else if (!isExternal) {
+      linkClass = isBroken ? 'broken-link' : 'internal-link'
+    }
+
+    // Generate tooltip with query param cleanup
+    let title: string | undefined
+    if (isExternal && href) {
+      if (href.startsWith('mailto:')) {
+        title = `Send email to: ${cleanMailtoLink(href)}`
+      } else if (href.startsWith('tel:')) {
+        title = `Call: ${cleanTelLink(href)}`
+      } else {
+        title = `Open in browser: ${href}`
+      }
+    } else if (isAnchorOnly && href) {
+      title = `Jump to section: ${href.slice(1)}`
+    } else if (resolved && href) {
+      title = getLinkTooltip(href, resolved.filePath, resolved.exists)
+    } else if (href) {
+      title = `Navigate to: ${href}`
+    }
+
+    const handleClick = async (e: React.MouseEvent) => {
+      if (!href) return
+      e.preventDefault()
+
+      // Handle anchor-only links (same-document navigation)
+      if (isAnchorOnly) {
+        const anchorId = href.slice(1)
+        // Scroll to anchor within current preview
+        const targetElement = document.getElementById(anchorId)
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        } else {
+          console.warn('[MarkdownPreview] Anchor not found:', anchorId)
+        }
+        return
+      }
+
+      // External URLs open in browser/system
+      if (isExternal) {
+        try {
+          // @ts-expect-error - shell is available but not typed in ElectronAPI
+          await window.electron.shell.openExternal(href)
+        } catch (error) {
+          console.error('[MarkdownPreview] Failed to open external link:', error)
+        }
+        return
+      }
+
+      // Internal markdown links navigate within project
+      if (handleInternalLink) {
+        try {
+          await handleInternalLink(href)
+        } catch (error) {
+          console.error('[MarkdownPreview] Failed to navigate to internal link:', error)
+        }
       }
     }
+
     return (
       <a
         href={href}
         onClick={handleClick}
+        className={linkClass}
+        title={title}
         data-line-start={range?.start}
         data-line-end={range?.end}
         data-line={range?.start}
@@ -394,8 +573,8 @@ function getLineNumbersFromSelection(
   return null
 }
 
-export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
-  ({ content, filePath, className = '' }, ref) => {
+export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreviewProps>(
+  ({ content, filePath, className = '', onOpenFile }, ref) => {
     const [selection, setSelection] = useState<{
       text: string
       rect: DOMRect
@@ -406,14 +585,223 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
       x: number
       y: number
     } | null>(null)
-    const localRef = useRef<HTMLDivElement>(null)
-    const previewRef = (ref as React.RefObject<HTMLDivElement>) || localRef
+    const [resolvedLinks, setResolvedLinks] = useState<Map<string, ResolvedLink | null>>(new Map())
+    const previewRef = useRef<HTMLDivElement>(null)
+    const { showToast } = useToast()
+
+    // Use refs to avoid recreating handleInternalLink when props change
+    const filePathRef = useRef(filePath)
+    const onOpenFileRef = useRef(onOpenFile)
+
+    // Update refs when props change
+    useEffect(() => {
+      filePathRef.current = filePath
+      onOpenFileRef.current = onOpenFile
+    }, [filePath, onOpenFile])
+
+    /**
+     * Extract internal markdown links from content (memoized)
+     * Only extracts links that need resolution (not external, not anchors, not dangerous)
+     */
+    const internalLinks = useMemo(() => {
+      const linkRegex = /\[([^\]]*)\]\(([^)]+)\)/g
+      const links = new Set<string>()
+      let match: RegExpExecArray | null
+
+      while ((match = linkRegex.exec(content)) !== null) {
+        const href = match[2]
+
+        // Skip dangerous protocols
+        if (isDangerousProtocol(href)) {
+          continue
+        }
+
+        // Skip external protocols and anchor-only links
+        if (!isExternalProtocol(href) && !href.startsWith('#')) {
+          links.add(href)
+        }
+      }
+
+      return links
+    }, [content])
+
+    /**
+     * Resolve all internal markdown links when content or filePath changes
+     * This enables tooltips and broken link detection before user clicks
+     */
+    useEffect(() => {
+      // Skip if no filePath (no project context for resolution)
+      if (!filePath) {
+        setResolvedLinks(new Map())
+        return
+      }
+
+      // Skip if no internal links to resolve
+      if (internalLinks.size === 0) {
+        setResolvedLinks(new Map())
+        return
+      }
+
+      // Resolve all links in parallel
+      const resolveAllLinks = async () => {
+        const projectRoot = await window.api.file.getProjectPath()
+        if (!projectRoot) return
+
+        const resolutions = await Promise.all(
+          Array.from(internalLinks).map(async (href) => {
+            try {
+              const resolved = await resolveMarkdownLink(href, filePath, projectRoot)
+              return [href, resolved] as [string, ResolvedLink | null]
+            } catch (error) {
+              console.error(`[MarkdownPreview] Failed to resolve link ${href}:`, error)
+              return [href, null] as [string, ResolvedLink | null]
+            }
+          })
+        )
+
+        setResolvedLinks(new Map(resolutions))
+      }
+
+      resolveAllLinks()
+    }, [internalLinks, filePath])
+
+    /**
+     * Handle internal markdown link clicks
+     * Resolves the link, validates security, checks existence, and opens the file
+     * Uses refs for current values to avoid recreation when props change
+     */
+    const handleInternalLink = useCallback(
+      async (href: string) => {
+        const currentFilePath = filePathRef.current
+        const currentOnOpenFile = onOpenFileRef.current
+
+        if (!currentFilePath || !currentOnOpenFile) return
+
+        try {
+          const projectRoot = await window.api.file.getProjectPath()
+          if (!projectRoot) {
+            showToast({
+              title: 'Error',
+              message: 'No project open',
+              type: 'error',
+              duration: 3000
+            })
+            return
+          }
+
+          const resolved = await resolveMarkdownLink(href, currentFilePath, projectRoot)
+
+          if (!resolved) {
+            showToast({
+              title: 'Invalid Link',
+              message: 'Link points outside project directory',
+              type: 'warning',
+              duration: 3000
+            })
+            return
+          }
+
+          if (!resolved.exists) {
+            showToast({
+              title: 'File Not Found',
+              message: `Cannot find: ${href}`,
+              type: 'error',
+              duration: 3000
+            })
+            return
+          }
+
+          await currentOnOpenFile(resolved.filePath, resolved.anchor)
+        } catch (error) {
+          showToast({
+            title: 'Error Opening File',
+            message: String(error),
+            type: 'error',
+            duration: 3000
+          })
+        }
+      },
+      [showToast] // Only depend on showToast, not on filePath or onOpenFile
+    )
+
+    /**
+     * Scroll to a heading anchor by ID with retry mechanism
+     * Used for fragment navigation (e.g., #section-name)
+     *
+     * Uses MutationObserver to wait for the anchor element to appear in the DOM,
+     * avoiding the need for arbitrary setTimeout delays.
+     *
+     * @param anchorId - The heading ID to scroll to
+     * @param options - Configuration options
+     * @param options.timeout - Max time to wait for element (default: 2000ms)
+     * @param options.retryInterval - Interval between retries (default: 100ms)
+     */
+    const scrollToAnchor = useCallback((anchorId: string, options?: { timeout?: number; retryInterval?: number }) => {
+      if (!previewRef.current) return
+
+      const { timeout = ANCHOR_SCROLL_TIMEOUT_MS, retryInterval = ANCHOR_SCROLL_RETRY_INTERVAL_MS } = options || {}
+      const startTime = Date.now()
+
+      const attemptScroll = () => {
+        if (!previewRef.current) return
+
+        const targetElement = previewRef.current.querySelector(`#${CSS.escape(anchorId)}`)
+
+        if (targetElement) {
+          targetElement.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          })
+          return true
+        }
+        return false
+      }
+
+      // Try immediate scroll first
+      if (attemptScroll()) return
+
+      // Set up MutationObserver to watch for the anchor element appearing
+      const observer = new MutationObserver(() => {
+        if (attemptScroll()) {
+          observer.disconnect()
+        }
+      })
+
+      observer.observe(previewRef.current, {
+        childList: true,
+        subtree: true
+      })
+
+      // Fallback: Also poll with intervals in case MutationObserver misses it
+      const intervalId = setInterval(() => {
+        if (attemptScroll() || Date.now() - startTime > timeout) {
+          clearInterval(intervalId)
+          observer.disconnect()
+
+          if (Date.now() - startTime > timeout) {
+            console.warn('[MarkdownPreview] Anchor not found after timeout:', anchorId)
+          }
+        }
+      }, retryInterval)
+
+      // Cleanup after timeout
+      setTimeout(() => {
+        clearInterval(intervalId)
+        observer.disconnect()
+      }, timeout)
+    }, [])
+
+    // Expose scrollToAnchor method and DOM element via ref
+    useImperativeHandle(ref, () => ({
+      scrollToAnchor,
+      element: previewRef.current
+    }))
 
     // Memoize markdown components to prevent unnecessary re-renders
-    // Only recreate when filePath changes (needed for MermaidDiagram bug reporting)
+    // Only recreate when filePath, handleInternalLink, or resolvedLinks changes
     const markdownComponents = useMemo(
-      () => createMarkdownComponents(filePath),
-      [filePath]
+      () => createMarkdownComponents(filePath, handleInternalLink, resolvedLinks),
+      [filePath, handleInternalLink, resolvedLinks]
     )
 
     // Memoize ReactMarkdown rendering to prevent re-renders when selection state changes
@@ -500,7 +888,7 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
     }
 
     return (
-      <div className={`markdown-preview ${className}`} ref={ref}>
+      <div className={`markdown-preview ${className}`} ref={previewRef}>
         <div
           className="markdown-preview-content"
           onMouseUp={handleMouseUp}

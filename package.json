@@ -1,6 +1,6 @@
 {
   "name": "erfana",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "description": "Project IDE with Markdown, Project Tree, and Terminal",
   "main": "./out/main/index.js",
   "author": "Marcin Obel",
@@ -41,6 +41,7 @@
     "@xterm/addon-webgl": "^0.18.0",
     "@xterm/xterm": "^5.5.0",
     "chokidar": "^4.0.3",
+    "deepmerge": "^4.3.1",
     "dockview": "^4.9.0",
     "electron-store": "^11.0.2",
     "hast-util-sanitize": "^5.0.2",
@@ -49,6 +50,7 @@
     "mermaid": "^11.12.0",
     "monaco-editor": "^0.54.0",
     "node-pty": "^1.0.0",
+    "path-browserify": "^1.0.1",
     "react-markdown": "^10.1.0",
     "react-syntax-highlighter": "^15.6.6",
     "rehype-raw": "^7.0.0",

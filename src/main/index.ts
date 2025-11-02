@@ -24,12 +24,15 @@ app.commandLine.appendSwitch('ignore-gpu-blocklist')
 
 function createWindow(): BrowserWindow {
   // Create the browser window.
+  // In production, show version in title bar for easy identification
+  const windowTitle = is.dev ? 'ERFANA' : `ERFANA v${app.getVersion()}`
+
   const mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     show: false,
     autoHideMenuBar: true,
-    title: 'ERFANA',
+    title: windowTitle,
     roundedCorners: false,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {

@@ -2,7 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
-- **Version**: 0.3.7
+- **Version**: 0.3.8
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -62,7 +62,25 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.3.7)
+## Recent Changes (v0.3.8)
+- **Markdown Link Security & Features** (Nov 2, 2025):
+  - Fixed email links treated as internal links, changed color from teal to blue
+  - Added dangerous protocol blocking (javascript:, data:, vbscript:, file://)
+  - Fixed anchor-only links (#section) with smooth scrolling
+  - Fixed heading slug generation (GitHub-compatible with unicode support)
+  - Fixed email/tel tooltip cleanup (removes query parameters)
+  - Created linkProtocols.ts utility for protocol validation
+  - Memoized link extraction for performance optimization
+  - Added 55 new tests (96.7% coverage for link features)
+  - **Total: 1079 tests passing (60 test files)**
+- **Version Display in Title Bar** (Nov 2, 2025):
+  - Production builds show "ERFANA v{version}" in system title bar
+  - Development builds show "ERFANA" (no version)
+  - Uses Electron's app.getVersion() API
+  - Added 9 comprehensive tests for window creation and title configuration
+  - See [src/main/index.ts](src/main/index.ts:28) and [src/main/index.test.ts](src/main/index.test.ts)
+
+## Changes in v0.3.7
 - **Electron Builder Optimization** (Nov 2, 2025):
   - Fixed critical recursive packaging bug (3.6GB → 231MB DMG)
   - Added exclusions: !release/**, !coverage/**, !tests/**, !vitest.*.ts, !*.md
