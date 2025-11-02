@@ -1,0 +1,310 @@
+/**
+ * Pure Logic for useFileOperations Hook
+ *
+ * Extracted for unit testing without React rendering.
+ * All functions are pure - no side effects, deterministic outputs.
+ */
+
+import type { FileNode } from '../interfaces/IProjectTreeApi'
+
+/**
+ * Gets the target path for file/folder operations
+ *
+ * @param selectedFolder - Currently selected folder path
+ * @param projectPath - Project root path
+ * @returns Target path for operation, or null if no valid target
+ */
+export function getTargetPath(
+  selectedFolder: string | null,
+  projectPath: string | null
+): string | null {
+  return selectedFolder || projectPath
+}
+
+/**
+ * Checks if target path is valid for operations
+ *
+ * @param targetPath - Path to validate
+ * @returns true if valid, false otherwise
+ */
+export function isValidTargetPath(targetPath: string | null): boolean {
+  return targetPath !== null && targetPath !== undefined && targetPath !== ''
+}
+
+/**
+ * Gets relative path for display purposes
+ *
+ * @param targetPath - Full target path
+ * @param projectPath - Project root path
+ * @returns Relative path string, or '/' if at root
+ */
+export function getRelativePath(targetPath: string, projectPath: string | null): string {
+  if (!projectPath) return targetPath
+  const relative = targetPath.replace(projectPath, '')
+  return relative || '/'
+}
+
+/**
+ * Extracts parent directory path from full path
+ *
+ * @param fullPath - Full file/folder path
+ * @returns Parent directory path
+ */
+export function extractParentPath(fullPath: string): string {
+  const lastSlash = fullPath.lastIndexOf('/')
+  return lastSlash > 0 ? fullPath.substring(0, lastSlash) : '/'
+}
+
+/**
+ * Extracts sibling names from file tree for duplicate detection
+ *
+ * @param files - File tree nodes
+ * @param itemPath - Path of the item being operated on
+ * @param currentName - Current name of the item (to exclude from siblings)
+ * @returns Array of sibling names
+ */
+export function getSiblingNames(
+  files: FileNode[],
+  itemPath: string,
+  currentName: string
+): string[] {
+  const parentPath = extractParentPath(itemPath)
+  const siblings = files.filter((file) => {
+    const siblingParent = file.path.substring(0, file.path.lastIndexOf('/'))
+    return siblingParent === parentPath && file.name !== currentName
+  })
+  return siblings.map((s) => s.name)
+}
+
+/**
+ * Creates confirmation message for file deletion
+ *
+ * @param fileName - Name of file to delete
+ * @returns Confirmation message
+ */
+export function createDeleteFileMessage(fileName: string): string {
+  return `Are you sure you want to delete "${fileName}"? This action cannot be undone.`
+}
+
+/**
+ * Creates confirmation message for folder deletion
+ *
+ * @param folderName - Name of folder to delete
+ * @returns Confirmation message
+ */
+export function createDeleteFolderMessage(folderName: string): string {
+  return `Are you sure you want to delete "${folderName}" and all its contents? This action cannot be undone.`
+}
+
+/**
+ * Creates success message for rename operation
+ *
+ * @returns Success message
+ */
+export function createRenameSuccessMessage(): string {
+  return 'Item renamed successfully'
+}
+
+/**
+ * Strips IPC error prefix from error messages
+ *
+ * @param message - Error message from IPC
+ * @returns Cleaned error message
+ */
+export function stripIpcErrorPrefix(message: string): string {
+  return message.replace(/^Error invoking remote method.*?Error:\s*/i, '')
+}
+
+/**
+ * Detects if error message indicates "already exists"
+ *
+ * @param message - Error message to check
+ * @returns true if error is about duplicate, false otherwise
+ */
+export function isAlreadyExistsError(message: string): boolean {
+  return message.includes('already exists')
+}
+
+/**
+ * Formats error message for file creation
+ *
+ * @param error - Error object
+ * @returns User-friendly error message
+ */
+export function formatCreateFileError(error: unknown): string {
+  if (error instanceof Error) {
+    const cleaned = stripIpcErrorPrefix(error.message)
+    if (isAlreadyExistsError(cleaned)) {
+      return 'A file with this name already exists'
+    }
+    return cleaned
+  }
+  return 'Failed to create file'
+}
+
+/**
+ * Formats error message for folder creation
+ *
+ * @param error - Error object
+ * @returns User-friendly error message
+ */
+export function formatCreateFolderError(error: unknown): string {
+  if (error instanceof Error) {
+    const cleaned = stripIpcErrorPrefix(error.message)
+    if (isAlreadyExistsError(cleaned)) {
+      return 'A folder with this name already exists'
+    }
+    return cleaned
+  }
+  return 'Failed to create folder'
+}
+
+/**
+ * Formats error message for delete operation
+ *
+ * @param error - Error object
+ * @param itemType - Type of item being deleted
+ * @returns User-friendly error message
+ */
+export function formatDeleteError(error: unknown, itemType: 'file' | 'folder'): string {
+  if (error instanceof Error) {
+    return error.message
+  }
+  return `Failed to delete ${itemType}`
+}
+
+/**
+ * Determines if error indicates permission issue
+ *
+ * @param error - Error object to check
+ * @returns true if permission error, false otherwise
+ */
+export function isPermissionError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase()
+    return message.includes('eacces') || message.includes('eperm') || message.includes('permission')
+  }
+  return false
+}
+
+/**
+ * Determines if error indicates disk space issue
+ *
+ * @param error - Error object to check
+ * @returns true if disk space error, false otherwise
+ */
+export function isDiskSpaceError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase()
+    return message.includes('enospc') || message.includes('no space')
+  }
+  return false
+}
+
+/**
+ * Determines if error indicates item not found
+ *
+ * @param error - Error object to check
+ * @returns true if not found error, false otherwise
+ */
+export function isNotFoundError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase()
+    return message.includes('enoent') || message.includes('not found')
+  }
+  return false
+}
+
+/**
+ * Creates log message for file creation error
+ *
+ * @returns Log message prefix
+ */
+export function createFileCreationErrorLog(): string {
+  return 'Error creating file:'
+}
+
+/**
+ * Creates log message for folder creation error
+ *
+ * @returns Log message prefix
+ */
+export function createFolderCreationErrorLog(): string {
+  return 'Error creating folder:'
+}
+
+/**
+ * Creates log message for file deletion error
+ *
+ * @returns Log message prefix
+ */
+export function createFileDeletionErrorLog(): string {
+  return 'Error deleting file:'
+}
+
+/**
+ * Creates log message for folder deletion error
+ *
+ * @returns Log message prefix
+ */
+export function createFolderDeletionErrorLog(): string {
+  return 'Error deleting folder:'
+}
+
+/**
+ * Creates log message for rename error
+ *
+ * @returns Log message prefix
+ */
+export function createRenameErrorLog(): string {
+  return 'Error renaming item:'
+}
+
+/**
+ * Builds full child path from parent and child name
+ *
+ * @param parentPath - Parent directory path
+ * @param childName - Name of child file/folder
+ * @returns Full path to child
+ */
+export function buildChildPath(parentPath: string, childName: string): string {
+  // Handle root path
+  if (parentPath === '/') {
+    return `/${childName}`
+  }
+  // Handle normal path with trailing slash check
+  return parentPath.endsWith('/') ? `${parentPath}${childName}` : `${parentPath}/${childName}`
+}
+
+/**
+ * Checks if operation requires confirmation dialog
+ *
+ * @param operation - Operation type
+ * @returns true if requires confirmation, false otherwise
+ */
+export function requiresConfirmation(operation: 'create' | 'rename' | 'delete'): boolean {
+  return operation === 'delete'
+}
+
+/**
+ * Gets operation title for dialogs
+ *
+ * @param operation - Operation type
+ * @param itemType - Type of item
+ * @returns Dialog title
+ */
+export function getOperationTitle(
+  operation: 'create' | 'rename' | 'delete',
+  itemType: 'file' | 'folder'
+): string {
+  const itemLabel = itemType === 'file' ? 'File' : 'Folder'
+
+  switch (operation) {
+    case 'create':
+      return `Create New ${itemLabel}`
+    case 'rename':
+      return `Rename ${itemLabel}`
+    case 'delete':
+      return `Delete ${itemLabel}`
+  }
+}

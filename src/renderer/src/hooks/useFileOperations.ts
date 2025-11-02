@@ -20,6 +20,24 @@ import { useDialog } from '../components/Dialog'
 import { showGlobalToast } from '../components/Toast/toastService'
 import { withWatcherPause } from '../components/ProjectTree/withWatcherPause'
 import { formatFileOperationError } from '../utils/errorUtils'
+import {
+  getTargetPath,
+  isValidTargetPath,
+  getRelativePath,
+  extractParentPath,
+  getSiblingNames,
+  createDeleteFileMessage,
+  createDeleteFolderMessage,
+  createRenameSuccessMessage,
+  formatCreateFileError,
+  formatCreateFolderError,
+  formatDeleteError,
+  createFileCreationErrorLog,
+  createFolderCreationErrorLog,
+  createFileDeletionErrorLog,
+  createFolderDeletionErrorLog,
+  createRenameErrorLog
+} from './useFileOperations.logic'
 
 /**
  * Hook for managing file/folder operations
@@ -48,10 +66,10 @@ export function useFileOperations(
    * Create a new file in the current selected folder or project root
    */
   const handleNewFile = async (): Promise<void> => {
-    const targetPath = selectedFolder || projectPath
-    if (!targetPath) return
+    const targetPath = getTargetPath(selectedFolder, projectPath)
+    if (!isValidTargetPath(targetPath)) return
 
-    const relativePath = targetPath.replace(projectPath || '', '') || '/'
+    const relativePath = getRelativePath(targetPath!, projectPath)
     const fileName = await showNewFile({
       title: 'Create New File',
       message: '',
@@ -67,7 +85,7 @@ export function useFileOperations(
         isInternalOperationRef,
         setFileOperationLoading,
         async () => {
-          const filePath = await api.file.createFile(targetPath, fileName)
+          const filePath = await api.file.createFile(targetPath!, fileName)
           await refreshProjectTree()
           return filePath
         }
@@ -76,15 +94,9 @@ export function useFileOperations(
       onFileSelect(createdFilePath)
       setSelectedFolder(null)
     } catch (err) {
-      let errorMessage = 'Failed to create file'
-      if (err instanceof Error) {
-        errorMessage = err.message.replace(/^Error invoking remote method.*?Error:\s*/i, '')
-        if (errorMessage.includes('already exists')) {
-          errorMessage = 'A file with this name already exists'
-        }
-      }
+      const errorMessage = formatCreateFileError(err)
       showGlobalToast({ type: 'error', title: 'Operation Failed', message: errorMessage })
-      console.error('Error creating file:', err)
+      console.error(createFileCreationErrorLog(), err)
     }
   }
 
@@ -92,10 +104,10 @@ export function useFileOperations(
    * Create a new folder in the current selected folder or project root
    */
   const handleNewFolder = async (): Promise<void> => {
-    const targetPath = selectedFolder || projectPath
-    if (!targetPath) return
+    const targetPath = getTargetPath(selectedFolder, projectPath)
+    if (!isValidTargetPath(targetPath)) return
 
-    const relativePath = targetPath.replace(projectPath || '', '') || '/'
+    const relativePath = getRelativePath(targetPath!, projectPath)
     const folderName = await showNewFolder({
       title: 'Create New Folder',
       message: '',
@@ -111,22 +123,16 @@ export function useFileOperations(
         isInternalOperationRef,
         setFileOperationLoading,
         async () => {
-          await api.file.createFolder(targetPath, folderName)
+          await api.file.createFolder(targetPath!, folderName)
           await refreshProjectTree()
         }
       )
 
       setSelectedFolder(null)
     } catch (err) {
-      let errorMessage = 'Failed to create folder'
-      if (err instanceof Error) {
-        errorMessage = err.message.replace(/^Error invoking remote method.*?Error:\s*/i, '')
-        if (errorMessage.includes('already exists')) {
-          errorMessage = 'A folder with this name already exists'
-        }
-      }
+      const errorMessage = formatCreateFolderError(err)
       showGlobalToast({ type: 'error', title: 'Operation Failed', message: errorMessage })
-      console.error('Error creating folder:', err)
+      console.error(createFolderCreationErrorLog(), err)
     }
   }
 
@@ -156,7 +162,7 @@ export function useFileOperations(
   const handleDeleteFile = async (filePath: string, fileName: string): Promise<void> => {
     const confirmed = await showConfirm({
       title: 'Delete File',
-      message: `Are you sure you want to delete "${fileName}"? This action cannot be undone.`,
+      message: createDeleteFileMessage(fileName),
       confirmLabel: 'Delete',
       danger: true
     })
@@ -174,9 +180,9 @@ export function useFileOperations(
         }
       )
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to delete file'
+      const message = formatDeleteError(err, 'file')
       showGlobalToast({ type: 'error', title: 'Delete Failed', message })
-      console.error('Error deleting file:', err)
+      console.error(createFileDeletionErrorLog(), err)
     }
   }
 
@@ -186,7 +192,7 @@ export function useFileOperations(
   const handleDeleteFolder = async (folderPath: string, folderName: string): Promise<void> => {
     const confirmed = await showConfirm({
       title: 'Delete Folder',
-      message: `Are you sure you want to delete "${folderName}" and all its contents? This action cannot be undone.`,
+      message: createDeleteFolderMessage(folderName),
       confirmLabel: 'Delete',
       danger: true
     })
@@ -204,9 +210,9 @@ export function useFileOperations(
         }
       )
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to delete folder'
+      const message = formatDeleteError(err, 'folder')
       showGlobalToast({ type: 'error', title: 'Delete Failed', message })
-      console.error('Error deleting folder:', err)
+      console.error(createFolderDeletionErrorLog(), err)
     }
   }
 
@@ -219,15 +225,10 @@ export function useFileOperations(
     itemType: 'file' | 'directory'
   ): Promise<void> => {
     // Extract parent directory path
-    const lastSlash = path.lastIndexOf('/')
-    const parentPath = lastSlash > 0 ? path.substring(0, lastSlash) : '/'
+    const parentPath = extractParentPath(path)
 
     // Get existing sibling names for duplicate detection
-    const siblings = files.filter((file) => {
-      const siblingParent = file.path.substring(0, file.path.lastIndexOf('/'))
-      return siblingParent === parentPath && file.name !== currentName
-    })
-    const existingNames = siblings.map((s) => s.name)
+    const existingNames = getSiblingNames(files, path, currentName)
 
     // Show specialized rename dialog
     const newName = await showRename({
@@ -256,7 +257,7 @@ export function useFileOperations(
 
       showGlobalToast({
         title: 'Success',
-        message: 'Item renamed successfully',
+        message: createRenameSuccessMessage(),
         type: 'success'
       })
     } catch (err) {
@@ -266,7 +267,7 @@ export function useFileOperations(
         message: errorMessage,
         type: 'error'
       })
-      console.error('Error renaming item:', err)
+      console.error(createRenameErrorLog(), err)
     }
   }
 
