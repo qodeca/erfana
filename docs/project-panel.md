@@ -13,116 +13,64 @@ Project panel displays hierarchical file tree with filtering, visual indicators,
 **ProjectPanel.tsx** - Outer wrapper with header and controls
 **ProjectTree.tsx** - Inner tree component with file operations
 
-**Benefits**:
-- Separation of concerns (UI chrome vs tree logic)
-- Reusable tree component
-- Consistent panel header pattern across app
-- Centralized filter state management
+**Benefits**: Separation of concerns, reusable tree, consistent panel header, centralized filter state.
 
-```typescript
+```
 <ProjectPanel>
-  <Header>
-    <FolderOpen icon />
-    <Label />
-    <Chevron toggle />
-  </Header>
-  <ControlPanel>
-    <FilterButtons />
-  </ControlPanel>
+  <Header> FolderOpen icon + Label + Chevron toggle </Header>
+  <ControlPanel> FilterButtons </ControlPanel>
   <ProjectTree />
 </ProjectPanel>
 ```
 
-### Component Responsibilities
+### Responsibilities
 
-**ProjectPanel** (wrapper):
-- Panel header with icon and chevron toggle
-- Control panel visibility state
-- Filter mode state (All Files | Markdown Only)
-- Filter persistence via electron-store
-- Props passing to ProjectTree
-
-**ProjectTree** (tree logic):
-- File tree rendering
-- Node expansion/collapse
-- Context menu operations
-- File opening in editor
-- Recursive filtering logic
+**ProjectPanel**: Header, control panel visibility, filter mode state & persistence
+**ProjectTree**: Tree rendering, expansion/collapse, context menu, file opening, recursive filtering
 
 ## Control Panel
 
-Collapsible panel with chevron toggle in header (common pattern across panels).
+Collapsible panel with chevron toggle (common pattern across panels).
 
 ### Toggle Behavior
 
-**Chevron Icon**:
-- ChevronDown - Control panel visible
-- ChevronLeft - Control panel collapsed
-- 8px spacing after "Project" label
-- Smooth rotation transition (150ms)
-
+**Chevron**: ChevronDown (visible) / ChevronLeft (collapsed), 8px spacing, 150ms rotation
 **State**: Local component state (`showControlPanel`)
-
-**CSS**:
-```css
-.chevron-toggle {
-  cursor: pointer;
-  transition: transform 0.15s ease;
-}
-
-.chevron-toggle.collapsed {
-  transform: rotate(-90deg);
-}
-```
 
 ### Filter Options
 
 Two mutually exclusive radio buttons:
-- **All Files** - Show all files and folders
-- **Markdown Only** - Show only .md files and folders containing them
+- **All Files** - Show all
+- **Markdown Only** - Show only .md files + folders containing them
 
-**Visual Design**:
-- Radio buttons with checkmark icons (blue when selected)
-- Gray text, blue when active (#007acc)
-- 12px spacing between options
-- 16px padding horizontal/vertical
-
-**Persistence**: Saved via electron-store, survives app restarts
+**Visual**: Radio with checkmark icons, gray text (blue when active #007acc), 12px spacing
+**Persistence**: electron-store, survives restarts
 
 See: [IPC Patterns](./ipc-patterns.md) for filter persistence channels
 
 ### Watching
 
-- Symlink indicator: small chain icon on symlink entries in the tree (watchers do not follow symlinks)
-- Depth: configuration exists via settings (`directoryWatchDepth`), not exposed in UI
+- Symlink indicator: small chain icon (watchers don't follow symlinks)
+- Depth: config via `directoryWatchDepth` (not exposed in UI)
 
 ## Unsaved Changes Prompt
 
-When switching projects (Open Project or Close Project), the app safeguards against data loss:
+When switching projects (Open/Close), detects dirty editor tabs and shows confirmation dialog.
 
-- Detects dirty editor tabs via a global store
-- Shows a confirmation dialog if any unsaved changes exist
-- Options:
-  - Discard: proceed with the operation; tabs are cleared
-  - Cancel: abort; current project and tabs remain untouched
-
-The prompt appears before opening the OS folder dialog to avoid half-switched states.
+**Options**: Discard (proceed, clear tabs) | Cancel (abort)
+**Timing**: Appears before OS folder dialog to avoid half-switched states
 
 ## File Filtering
 
 ### Filter Modes
 
 **Type**: `FilterMode = 'all' | 'markdown'`
-
 **Location**: `src/renderer/src/types/filters.ts`
+**IPC**: `settings:getProjectFilterMode`, `settings:setProjectFilterMode`
 
-**IPC Channels**:
-- `settings:getProjectFilterMode` - Load preference
-- `settings:setProjectFilterMode` - Save preference
+### Recursive Algorithm
 
-### Recursive Filtering Algorithm
-
-**Goal**: Show only .md files and folders containing them (directly or in descendants)
+**Goal**: Show only .md files and folders containing them
 
 **Implementation**: Depth-first traversal with memoization
 
@@ -131,146 +79,86 @@ const filterTree = useMemo(() => {
   if (filterMode === 'all') return fileTree
 
   const shouldInclude = (entry: FileEntry): boolean => {
-    if (entry.type === 'file') {
-      return isMarkdownFile(entry.name)
-    }
-
-    // Folder: check if any child (recursive) is markdown
+    if (entry.type === 'file') return isMarkdownFile(entry.name)
     return entry.children?.some(shouldInclude) ?? false
   }
 
-  const filterEntries = (entries: FileEntry[]): FileEntry[] => {
-    return entries
-      .filter(shouldInclude)
-      .map(entry => {
-        if (entry.type === 'folder' && entry.children) {
-          return { ...entry, children: filterEntries(entry.children) }
-        }
-        return entry
-      })
-  }
+  const filterEntries = (entries: FileEntry[]): FileEntry[] =>
+    entries.filter(shouldInclude).map(entry =>
+      entry.type === 'folder' && entry.children
+        ? { ...entry, children: filterEntries(entry.children) }
+        : entry
+    )
 
   return filterEntries(fileTree)
 }, [fileTree, filterMode])
 ```
 
-**Performance**: `useMemo` prevents re-filtering on every render
+**Helper**: `isMarkdownFile()` checks `.md`, `.markdown`, `.mdown`, `.mkd`, `.mdx`
 
-**Helper**: `isMarkdownFile()` checks `.md`, `.markdown`, `.mdown`, `.mkd`, `.mdx` extensions
+### Behavior
 
-### Filter Behavior
-
-**Markdown Mode**:
-- Files: Only .md files visible
-- Folders: Only folders containing markdown (any depth)
-- Empty folders: Hidden
-- Expansion state: Preserved when toggling filters
-
-**All Mode**:
-- Files: All files visible (including dotfiles)
-- Folders: All folders visible
-- Hidden files: Styled with reduced opacity
+**Markdown Mode**: Only .md files + containing folders, empty folders hidden, expansion state preserved
+**All Mode**: All files/folders visible, hidden files styled with reduced opacity
 
 ## Visual Indicators
 
 ### Sensitive Files
 
-**Categories** (5 total):
+**5 Categories**:
+1. Environment: `.env*`, `.npmrc`, `*.pem`, `*.key`
+2. Cloud: `.aws/`, `.azure/`, `.gcloud/`
+3. SSH: `.ssh/`, `id_rsa*`, `known_hosts`
+4. Security: `credentials*`, `secrets*`, `*.keystore`, `*.jks`
+5. Config: `config.json`, `settings.json`, `*.config.js`
 
-1. **Environment files**: `.env*`, `.npmrc`, `*.pem`, `*.key`
-2. **Cloud credentials**: `.aws/`, `.azure/`, `.gcloud/`
-3. **SSH keys**: `.ssh/`, `id_rsa*`, `known_hosts`
-4. **Security files**: `credentials*`, `secrets*`, `*.keystore`, `*.jks`
-5. **Config files**: `config.json`, `settings.json`, `*.config.js`
-
-**Visual Treatment**:
-- Color: `#d97706` (amber)
-- Icon: `⚠️` Warning triangle (14px)
-- ARIA label: "Sensitive file"
-- Tooltip: "Contains sensitive information"
-
-**Detection**: `isSensitiveFile()` function with regex pattern matching
-
-**Location**: `src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx`
+**Visual**: Color `#d97706` (amber), icon ⚠️ (14px), ARIA label "Sensitive file"
+**Detection**: `isSensitiveFile()` with regex patterns
+**Location**: `ProjectTreeNode.tsx`
 
 ### Hidden Files
 
-Files/folders starting with `.` (dot):
+Files/folders starting with `.`
 
-**Visual Treatment**:
-- Opacity: 70%
-- Font style: italic
-- Color: Inherited from parent
-- Combined with sensitive styling if both apply
-
-**CSS Specificity**:
-```css
-.tree-node-label.hidden-file {
-  opacity: 0.7;
-  font-style: italic;
-}
-
-.tree-node-label.sensitive-file.hidden-file {
-  opacity: 1; /* Override - sensitive files always visible */
-  font-style: italic; /* Keep italic */
-}
-```
-
+**Visual**: 70% opacity, italic font
+**CSS**: Sensitive files override opacity (always 100% visible, keep italic)
 **Examples**: `.git/`, `.env`, `.gitignore`, `.DS_Store`
 
 ### Icon System
 
-**File Icons**:
-- Markdown: Blue FileText icon
-- Sensitive: Amber AlertTriangle icon
-- Regular: Gray FileText icon
-
-**Folder Icons**:
-- Expanded: Blue FolderOpen icon
-- Collapsed: Gray Folder icon
-- Sensitive folders: Amber AlertTriangle + folder icon
-
-**Size**: 14px (increased from 10px for better visibility)
+**Files**: Blue FileText (markdown), Amber AlertTriangle (sensitive), Gray FileText (regular)
+**Folders**: Blue FolderOpen (expanded), Gray Folder (collapsed), Amber + folder (sensitive)
+**Size**: 14px
 
 ## Context Menu Operations
 
-**v0.3.7**: Redesigned using Strategy + Command + Factory patterns for extensible, testable menus.
+**v0.3.7**: Strategy + Command + Factory patterns for extensible, testable menus.
 
 ### Architecture
 
-**Design Patterns**:
-- **Strategy Pattern**: Node type-specific menu generation (FileStrategy, FolderStrategy)
-- **Command Pattern**: Menu actions as testable command objects (11 command classes)
-- **Factory Pattern**: Automatic strategy selection based on node type
+**Patterns**:
+- **Strategy**: Node type-specific menus (FileStrategy, FolderStrategy)
+- **Command**: Testable command objects (11 classes)
+- **Factory**: Automatic strategy selection
 
 **Structure**:
 ```
 context-menu/
-├── types.ts        # MenuContext, IMenuCommand, IMenuStrategy interfaces
-├── commands.tsx    # 11 command classes (NewFileCommand, DeleteCommand, etc.)
+├── types.ts        # Interfaces
+├── commands.tsx    # 11 command classes
 ├── strategies.tsx  # FileStrategy, FolderStrategy
 └── factory.ts      # createContextMenu(context, nodeType)
 ```
 
 ### Menu Items
 
-**For Files**:
-- Rename
-- --- (separator)
-- Delete
-
-**For Folders**:
-- New File
-- New Folder
-- Rename
-- --- (separator)
-- Delete
-
+**Files**: Rename, ---, Delete
+**Folders**: New File, New Folder, Rename, ---, Delete
 **Separator**: Visual separator before destructive actions
 
 ### Command Classes
 
-Each command implements `IMenuCommand` interface:
+Each implements `IMenuCommand` interface:
 ```typescript
 interface IMenuCommand {
   label: string
@@ -281,67 +169,47 @@ interface IMenuCommand {
 }
 ```
 
-**Available Commands**:
-- `NewFileCommand`: Create new file in folder
-- `NewFolderCommand`: Create new folder in folder
-- `RenameFileCommand`: Rename file with dialog and validation
-- `RenameFolderCommand`: Rename folder with dialog and validation
-- `DeleteFileCommand`: Delete file with confirmation
-- `DeleteFolderCommand`: Delete folder with confirmation
-- `SeparatorCommand`: Visual separator
+**Available**: NewFileCommand, NewFolderCommand, RenameFileCommand, RenameFolderCommand, DeleteFileCommand, DeleteFolderCommand, SeparatorCommand
 
 ### Extensibility
 
-**To Add New Menu Item**:
-1. Create new command class in `commands.tsx`
-2. Implement `IMenuCommand` interface
-3. Add to appropriate strategy in `strategies.tsx`
+**Add Menu Item**:
+1. Create command class in `commands.tsx`
+2. Implement `IMenuCommand`
+3. Add to strategy in `strategies.tsx`
 
-**To Customize Menu for New Node Type**:
-1. Create new strategy class in `strategies.tsx`
-2. Implement `IMenuStrategy` interface
-3. Update factory in `factory.ts`
+**New Node Type**:
+1. Create strategy in `strategies.tsx`
+2. Implement `IMenuStrategy`
+3. Update factory
 
 ### Benefits
 
-- **Single Responsibility**: Each command does one thing
-- **Open/Closed**: Extend with new commands without modifying existing code
-- **Testable**: Each command tested independently (87 tests total)
-- **Maintainable**: No conditional sprawl, clean composition
-- **Flexible**: Easy to reorder, add, remove menu items per node type
+Single Responsibility, Open/Closed, Testable (87 tests), Maintainable, Flexible
 
 ### Dialog Integration
 
 **File System Dialogs** (v0.3.6+):
-- Unified dialog system with promise-based API via `useDialog()` hook
-- `showNewFile()`: Create file dialog with validation
-- `showNewFolder()`: Create folder dialog with validation
-- `showRename()`: Rename dialog with duplicate detection
-- `showConfirm()`: Confirmation dialog for deletions
+- `useDialog()` hook with promise-based API
+- `showNewFile()`, `showNewFolder()`, `showRename()`, `showConfirm()`
 
 **Validation** (utils/fileValidation.ts):
-- Empty name detection
-- 255 character limit
-- Invalid characters (`/\?*:|"<>`)
-- Windows reserved names (CON, PRN, AUX, COM1-9, LPT1-9)
-- Case-insensitive duplicate detection
+- Empty name, 255 char limit, invalid chars (`/\\?*:|\"<>`)
+- Windows reserved (CON, PRN, AUX, COM1-9, LPT1-9)
+- Case-insensitive duplicates
 - Dotfile edge cases (`.CON` valid, `CON` reserved)
 
-**Auto-Refresh**: Directory watcher detects changes, updates tree automatically
+**Auto-Refresh**: Directory watcher detects changes, updates tree
 
-See: [Architecture - ProjectTree Modularization](./architecture.md#projecttree-modularization) | [File Watching](./file-watching.md)
+See: [Architecture - ProjectTree](./architecture.md#projecttree-modularization) | [File Watching](./file-watching.md)
 
-## Directory Watching Integration
+## Directory Watching
 
 ### Watch Lifecycle
 
-**Start**: When project folder opened
-**Stop**: When project closed or changed
-
-**IPC Channels**:
-- `directory-watch:start` - Begin watching
-- `directory-watch:stop` - End watching
-- `directory-watch:changed` - Event: Changes detected
+**Start**: Project folder opened
+**Stop**: Project closed/changed
+**IPC**: `directory-watch:start`, `directory-watch:stop`, `directory-watch:changed`
 
 ### Pause/Resume Pattern
 
@@ -349,23 +217,21 @@ Prevents double-refresh during internal CRUD operations.
 
 **Pattern**:
 1. Set `isInternalOperation.current = true`
-2. Pause watcher: `window.api.directoryWatch.pause()`
-3. Perform operation (create/rename/delete)
+2. Pause: `window.api.directoryWatch.pause()`
+3. Perform operation
 4. Refresh tree manually
-5. Resume watcher: `window.api.directoryWatch.resume()`
+5. Resume: `window.api.directoryWatch.resume()`
 6. Set `isInternalOperation.current = false`
 
-**Race Prevention**: Debounced events arriving during pause are ignored
+**Race Prevention**: Debounced events during pause are ignored
 
 **Example**:
 ```typescript
 const handleCreateFile = async () => {
   isInternalOperation.current = true
   await window.api.directoryWatch.pause(projectPath)
-
   await window.api.file.createFile(targetPath, fileName)
   await refreshFileTree()
-
   await window.api.directoryWatch.resume(projectPath)
   isInternalOperation.current = false
 }
@@ -373,75 +239,70 @@ const handleCreateFile = async () => {
 
 ### Tree State Preservation
 
-**Expansion State**: Maintained across refreshes via `expandedFolders` Set
+**Expansion State**: Maintained via `expandedFolders` Set
 
 **Logic**:
 ```typescript
 const handleDirectoryChanged = async () => {
-  if (isInternalOperation.current) return // Skip if we caused the change
-
+  if (isInternalOperation.current) return
   const previouslyExpanded = new Set(expandedFolders)
-  await refreshFileTree() // Re-fetch tree
-  setExpandedFolders(previouslyExpanded) // Restore expansion
+  await refreshFileTree()
+  setExpandedFolders(previouslyExpanded)
 }
 ```
 
 **Benefits**: External changes (git, npm, IDE) don't collapse folders
 
-See: [File Watching](./file-watching.md#directory-watching) for full details
+See: [File Watching](./file-watching.md#directory-watching)
 
 ## File Opening
 
 **Flow**:
-1. User clicks file in tree
-2. ProjectTree receives `dockviewApi` via params
-3. Checks if file already open (find by ID)
-4. If open: activate existing panel
-5. If closed: add new panel with `dockviewApi.addPanel()`
+1. User clicks file → receives `dockviewApi` via params
+2. Check if already open (find by ID)
+3. If open: activate panel
+4. If closed: add panel with `dockviewApi.addPanel()`
 
-**Panel ID**: Sanitized file path (replace `/` with `_`)
+**Panel ID**: Sanitized path (replace `/` with `_`)
+**Tab Title**: Basename (e.g., `README.md`)
+**Component**: `markdownEditor` - Monaco + preview
 
-**Tab Title**: File basename only (e.g., `README.md`)
-
-**Component**: `markdownEditor` - Monaco editor with preview
-
-See: [UI Components](./ui-components.md#panel-communication-pattern) for API passing details
+See: [UI Components](./ui-components.md#panel-communication-pattern)
 
 ## Keyboard Navigation
 
-**Arrow Keys**: Navigate tree nodes
-**Enter**: Open selected file
-**Space**: Expand/collapse selected folder
-**Right-Click**: Open context menu
-
-**Accessibility**: ARIA labels, roles, keyboard focus indicators
+**Arrow Keys**: Navigate nodes
+**Enter**: Open file
+**Space**: Expand/collapse folder
+**Right-Click**: Context menu
+**Accessibility**: ARIA labels, roles, focus indicators
 
 ## Development Patterns
 
-### Adding New Control
+### Add Control
 
-1. Add control to control panel div
-2. Add state management (local or via props)
+1. Add to control panel div
+2. Add state (local or props)
 3. Add persistence if needed (electron-store)
-4. Update ProjectTree to respect new control
+4. Update ProjectTree to respect control
 
-### Adding New File Operation
+### Add File Operation
 
 1. Add menu item to context menu config
-2. Add handler function in ProjectTree
-3. Implement IPC channel in main process
+2. Add handler in ProjectTree
+3. Implement IPC channel in main
 4. Add pause/resume around operation
 
-### Adding New Visual Indicator
+### Add Visual Indicator
 
-1. Add detection logic to ProjectTreeNode
-2. Add CSS classes for styling
-3. Add ARIA labels for accessibility
-4. Add tooltip for context
+1. Add detection in ProjectTreeNode
+2. Add CSS classes
+3. Add ARIA labels
+4. Add tooltip
 
 ## Related Documentation
 
-- [Architecture](./architecture.md) - Hybrid layout system
+- [Architecture](./architecture.md) - Hybrid layout, ProjectTree modularization
 - [UI Components](./ui-components.md) - Activity bars, panel system
 - [IPC Patterns](./ipc-patterns.md) - File operations, settings
 - [File Watching](./file-watching.md) - Auto-refresh system
