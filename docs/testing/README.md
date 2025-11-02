@@ -213,25 +213,23 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 ### Visual/MCP Test Scenarios
 
-#### UI Verification Tests
-**[ui-scenarios.md](./ui-scenarios.md)** - Test scenarios 1-5
+**[test-scenarios.md](./test-scenarios.md)** - 10 comprehensive test scenarios
+
+**UI Verification** (1-5):
 - Application launch & UI verification
 - File tree navigation
 - Markdown formatting toolbar
 - View mode switching
 - Auto-save functionality
 
-**Perfect for:** Verifying UI loads correctly and visual elements work.
-
-#### Interaction Tests
-**[interaction-scenarios.md](./interaction-scenarios.md)** - Test scenarios 6-10
+**Interaction Tests** (6-10):
 - Keyboard shortcuts
 - Context menu operations
 - Multi-file tabs
 - Document statistics
 - Panel protection
 
-**Perfect for:** Testing user interactions and application behavior.
+**Perfect for:** Verifying UI and testing user interactions with Circuit Electron MCP
 
 ---
 
