@@ -2,7 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
-- **Version**: 0.3.6
+- **Version**: 0.3.7
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -62,7 +62,33 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.3.6)
+## Recent Changes (v0.3.7)
+- **Electron Builder Optimization** (Nov 2, 2025):
+  - Fixed critical recursive packaging bug (3.6GB → 231MB DMG)
+  - Added exclusions: !release/**, !coverage/**, !tests/**, !vitest.*.ts, !*.md
+  - Normal size for universal Electron app with Monaco + Mermaid
+  - See [docs/build/build-optimization.md](docs/build/build-optimization.md)
+- **ProjectTree.tsx Modularization** (Nov 1, 2025):
+  - Reduced complexity by 38.4% (1,338 → 824 lines)
+  - Applied SOLID principles + design patterns (Strategy, Command, Factory)
+  - Created custom hooks: useProjectManagement, useFileOperations, useDirectoryWatcher
+  - Context menu redesign: 11 command classes, node-type strategies, factory selection
+  - New modules: switchHelpers, withWatcherPause, constants
+  - See [docs/architecture.md](docs/architecture.md#projecttree-modularization)
+- **Comprehensive Test Coverage** (Nov 1, 2025):
+  - Added 320 new tests using "Extract Pure Logic" pattern
+  - Phase 1-2: 147 P0 tests (context menu, switchHelpers, withWatcherPause)
+  - Phase 3: 173 P1 tests (57 pure functions extracted from 3 hooks)
+  - **Total: 964 tests passing (50 test files)**
+  - Pattern: Extract pure logic → test independently → refactor hooks
+  - Benefits: Fast (173 tests in ~24ms), deterministic, portable, maintainable
+  - See [docs/testing/README.md](docs/testing/README.md#projecttree-refactoring)
+- **Replace Confirmation Dialog** (Nov 1, 2025):
+  - Added confirmation when cut+paste would overwrite existing files
+  - New checkConflict detection before paste operations
+  - replaceExisting parameter for moveItem operations
+
+## Changes in v0.3.6
 - **Drag-Drop CSS Layout Fix** (Nov 1, 2025):
   - Fixed layout shift issue (18px) when dragging items over folders
   - Replaced layout-affecting CSS with pseudo-element approach

@@ -146,6 +146,57 @@ See [Automated Testing Plan](./automated-testing-plan.md) for the phased rollout
 - Tests validate SOLID refactoring of file system dialogs with comprehensive validation logic
 - See [Architecture - Dialog System](../architecture.md#dialog-system) for implementation details
 
+**ProjectTree Refactoring** (`src/renderer/src/hooks/*.logic.ts`, `src/renderer/src/components/ProjectTree/`) **NEW in v0.3.7**
+- **320 comprehensive tests** covering ProjectTree modularization using "Extract Pure Logic" pattern
+- **Total Repository Tests**: 964 tests passing (50 test files)
+- **Test Organization**:
+
+  *Phase 1-2: P0 Critical Tests (147 tests)*:
+  - `constants.test.ts` (10 tests) - ProjectTree constants (DRAG_DROP, TERMINAL, AUTO_SCROLL)
+  - `switchHelpers.test.ts` (34 tests) - Project switching logic with terminal activity tracking
+  - `withWatcherPause.test.ts` (16 tests) - Watcher pause/resume mechanism for file operations
+  - `context-menu/commands.test.tsx` (65 tests) - 11 command classes (NewFileCommand, DeleteCommand, RenameCommand, etc.)
+  - `context-menu/strategies.test.tsx` (15 tests) - Node-type strategies (FileStrategy, FolderStrategy)
+  - `context-menu/factory.test.ts` (7 tests) - Strategy selection factory pattern
+
+  *Phase 3: P1 Hook Logic Tests (173 tests) - "Extract Pure Logic" Pattern*:
+  - `useDirectoryWatcher.logic.ts + .test.ts` (23 tests, 5 pure functions)
+    - State guards, message creation, error handling
+  - `useProjectManagement.logic.ts + .test.ts` (71 tests, 25 pure functions)
+    - Path utilities, validation, state guards, message creators, error formatters
+  - `useFileOperations.logic.ts + .test.ts` (79 tests, 27 pure functions)
+    - Path logic, sibling extraction, message creation, error handling/detection
+
+- **Pure Functions Extracted**: 57 total across 3 hooks
+  - Path manipulation, validation, duplicate detection
+  - Message creation for user feedback
+  - Error handling, detection, formatting
+  - All deterministic with no side effects
+
+- **"Extract Pure Logic" Pattern Benefits**:
+  - **Fast**: 173 pure logic tests run in ~24ms (no React rendering overhead)
+  - **Deterministic**: No async race conditions or timing issues
+  - **Portable**: Works in any test environment (no jsdom/React 18 conflicts)
+  - **Better Design**: Pure logic separated from React effects/hooks
+  - **Easier Debugging**: Simple function inputs/outputs, no hidden state
+  - **Maintainable**: Centralized, testable logic easy to understand
+
+- **Key Features Tested**:
+  - Project management: Load, open, close, refresh operations with error handling
+  - File operations: Create, rename, delete files/folders with validation
+  - Directory watching: Start, stop, error recovery, state guards
+  - Context menu: Command pattern, strategy selection, factory logic
+  - Watcher synchronization: Pause during operations, resume after completion
+
+- **Pattern Application**:
+  1. Identify complex hooks with business logic embedded in React effects
+  2. Extract pure functions to separate `.logic.ts` file (deterministic, no side effects)
+  3. Create comprehensive tests in `.logic.test.ts` (fast, independent)
+  4. Refactor hooks to use pure functions (cleaner, more testable)
+  5. Result: Zero breaking changes, dramatically improved testability
+
+- See [Architecture - ProjectTree Modularization](../architecture.md#projecttree-modularization) for implementation details
+
 ---
 
 ### E2E/UI (Playwright Electron)

@@ -234,82 +234,102 @@ Files/folders starting with `.` (dot):
 
 ## Context Menu Operations
 
-Right-click context menu with validation and error handling.
+**v0.3.7**: Redesigned using Strategy + Command + Factory patterns for extensible, testable menus.
+
+### Architecture
+
+**Design Patterns**:
+- **Strategy Pattern**: Node type-specific menu generation (FileStrategy, FolderStrategy)
+- **Command Pattern**: Menu actions as testable command objects (11 command classes)
+- **Factory Pattern**: Automatic strategy selection based on node type
+
+**Structure**:
+```
+context-menu/
+├── types.ts        # MenuContext, IMenuCommand, IMenuStrategy interfaces
+├── commands.tsx    # 11 command classes (NewFileCommand, DeleteCommand, etc.)
+├── strategies.tsx  # FileStrategy, FolderStrategy
+└── factory.ts      # createContextMenu(context, nodeType)
+```
 
 ### Menu Items
 
 **For Files**:
 - Rename
+- --- (separator)
 - Delete
 
 **For Folders**:
 - New File
 - New Folder
 - Rename
+- --- (separator)
 - Delete
 
-**Separator**: Isolates destructive actions (Delete)
+**Separator**: Visual separator before destructive actions
 
-### Rename Functionality
+### Command Classes
 
-**Dialog Features**:
-- Pre-fills current name
-- Input validation (non-empty, no duplicates)
-- Path separator sanitization
-- Inline error messages
-- Keyboard: Enter to confirm, Escape to cancel
-
-**IPC Channel**: `file:rename`
-
-**Validation**:
+Each command implements `IMenuCommand` interface:
 ```typescript
-if (!newName.trim()) {
-  setRenameError('Name cannot be empty')
-  return
-}
-
-const sanitized = sanitizeFilePath(newName)
-const targetPath = path.join(parentPath, sanitized)
-
-if (fs.existsSync(targetPath)) {
-  setRenameError('A file or folder with this name already exists')
-  return
+interface IMenuCommand {
+  label: string
+  icon?: LucideIcon
+  onClick: () => void | Promise<void>
+  danger?: boolean
+  separator?: boolean
 }
 ```
 
-**Helper**: `sanitizeFilePath()` removes `/`, `\`, `..` from input
+**Available Commands**:
+- `NewFileCommand`: Create new file in folder
+- `NewFolderCommand`: Create new folder in folder
+- `RenameFileCommand`: Rename file with dialog and validation
+- `RenameFolderCommand`: Rename folder with dialog and validation
+- `DeleteFileCommand`: Delete file with confirmation
+- `DeleteFolderCommand`: Delete folder with confirmation
+- `SeparatorCommand`: Visual separator
 
-**Location**: `src/renderer/src/utils/fileUtils.ts`
+### Extensibility
 
-### Delete Functionality
+**To Add New Menu Item**:
+1. Create new command class in `commands.tsx`
+2. Implement `IMenuCommand` interface
+3. Add to appropriate strategy in `strategies.tsx`
 
-**Confirmation Dialog**:
-- File deletion: "Are you sure you want to delete [filename]?"
-- Folder deletion: "Are you sure you want to delete [foldername] and all its contents?"
+**To Customize Menu for New Node Type**:
+1. Create new strategy class in `strategies.tsx`
+2. Implement `IMenuStrategy` interface
+3. Update factory in `factory.ts`
 
-**IPC Channels**:
-- `file:deleteFile` - Delete single file
-- `file:deleteFolder` - Delete folder recursively
+### Benefits
 
-**Safety**: Confirmation dialog prevents accidental deletion
+- **Single Responsibility**: Each command does one thing
+- **Open/Closed**: Extend with new commands without modifying existing code
+- **Testable**: Each command tested independently (87 tests total)
+- **Maintainable**: No conditional sprawl, clean composition
+- **Flexible**: Easy to reorder, add, remove menu items per node type
 
-### Create Operations
+### Dialog Integration
 
-**New File**:
-- Only available on folders
-- Dialog with name input
-- Validation prevents empty names, duplicates
-- IPC: `file:createFile`
+**File System Dialogs** (v0.3.6+):
+- Unified dialog system with promise-based API via `useDialog()` hook
+- `showNewFile()`: Create file dialog with validation
+- `showNewFolder()`: Create folder dialog with validation
+- `showRename()`: Rename dialog with duplicate detection
+- `showConfirm()`: Confirmation dialog for deletions
 
-**New Folder**:
-- Only available on folders
-- Dialog with name input
-- Validation prevents empty names, duplicates
-- IPC: `file:createFolder`
+**Validation** (utils/fileValidation.ts):
+- Empty name detection
+- 255 character limit
+- Invalid characters (`/\?*:|"<>`)
+- Windows reserved names (CON, PRN, AUX, COM1-9, LPT1-9)
+- Case-insensitive duplicate detection
+- Dotfile edge cases (`.CON` valid, `CON` reserved)
 
 **Auto-Refresh**: Directory watcher detects changes, updates tree automatically
 
-See: [File Watching](./file-watching.md) for auto-refresh details
+See: [Architecture - ProjectTree Modularization](./architecture.md#projecttree-modularization) | [File Watching](./file-watching.md)
 
 ## Directory Watching Integration
 
