@@ -3,10 +3,13 @@ import { FileEdit, Columns2, Rows2, Eye, Bold, Italic, Code, Link, Image, Headin
 import { IDockviewPanelProps } from 'dockview'
 import * as monaco from 'monaco-editor'
 import { MonacoMarkdownEditor, MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
-import { MarkdownPreview } from '../Editor/MarkdownPreview'
+import { MarkdownPreview, MarkdownPreviewHandle } from '../Editor/MarkdownPreview'
 import { ResizableDivider } from '../Editor/ResizableDivider'
 import { useDialog } from '../Dialog'
+import { useToast } from '../Toast/ToastContext'
 import { FileConflictNotification } from '../FileConflictNotification/FileConflictNotification'
+import { useProjectStore } from '../../stores/useProjectStore'
+import { sanitizeFilePath } from '../../utils/fileUtils'
 import './MarkdownEditorPanel.css'
 
 interface EditorFile {
@@ -63,6 +66,51 @@ export function MarkdownEditorPanel(
 
   // New unified dialog system
   const { showConfirm } = useDialog()
+  const { showToast } = useToast()
+
+  /**
+   * Handle opening markdown files from internal links
+   * Switches to existing tab or creates new tab, then scrolls to anchor if provided
+   */
+  const handleOpenFile = useCallback(async (targetFilePath: string, anchor?: string) => {
+    const dockviewApi = useProjectStore.getState().dockviewApi
+    if (!dockviewApi) {
+      showToast({
+        title: 'Error',
+        message: 'Editor not ready',
+        type: 'error',
+        duration: 3000
+      })
+      return
+    }
+
+    const fileName = targetFilePath.split('/').pop() || 'Editor'
+    const panelId = `editor-${sanitizeFilePath(targetFilePath)}`
+
+    // Check if already open
+    let editorPanel = dockviewApi.getPanel(panelId)
+
+    if (!editorPanel) {
+      // Create new panel
+      editorPanel = dockviewApi.addPanel({
+        id: panelId,
+        component: 'editor',
+        title: fileName,
+        params: { filePath: targetFilePath, panelId }
+      })
+      useProjectStore.getState().registerEditorPanel(panelId)
+    }
+
+    // Switch to panel
+    editorPanel.api.setActive()
+    editorPanel.group.focus()
+
+    // Scroll to anchor if provided
+    // scrollToAnchor now has built-in retry logic with MutationObserver
+    if (anchor) {
+      previewHandleRef.current?.scrollToAnchor(anchor)
+    }
+  }, [showToast])
 
   // Vertical split divider position (side-by-side)
   const [dividerPosition, setDividerPosition] = useState<number>(() => {
@@ -85,6 +133,7 @@ export function MarkdownEditorPanel(
 
   const editorRef = useRef<MonacoEditorHandle>(null)
   const previewRef = useRef<HTMLDivElement>(null)
+  const previewHandleRef = useRef<MarkdownPreviewHandle>(null)
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
   const isSavingRef = useRef(false) // Track save operations to prevent race conditions
 
@@ -96,6 +145,13 @@ export function MarkdownEditorPanel(
   // Unified helper: detect any split mode (vertical or horizontal)
   // Used consistently across all scroll sync effects to avoid code duplication
   const isAnySplitMode = viewMode === 'split' || viewMode === 'split-horizontal'
+
+  // Sync previewRef with previewHandleRef.element for DOM operations
+  useEffect(() => {
+    if (previewHandleRef.current?.element) {
+      (previewRef as React.MutableRefObject<HTMLDivElement | null>).current = previewHandleRef.current.element
+    }
+  }, [viewMode, currentFile])
 
   // Debug logging
   console.log('MarkdownEditorPanel render:', {
@@ -1011,7 +1067,7 @@ export function MarkdownEditorPanel(
                 className="preview-pane"
                 style={{ height: `${dividerPositionHorizontal}%` }}
               >
-                <MarkdownPreview key={`preview-${viewMode}`} ref={previewRef} content={currentFile.content} filePath={currentFile.path} />
+                <MarkdownPreview key={`preview-${viewMode}`} ref={previewHandleRef} content={currentFile.content} filePath={currentFile.path} onOpenFile={handleOpenFile} />
               </div>
               <ResizableDivider orientation="horizontal" onResize={handleDividerResizeHorizontal} onResizeEnd={handleDividerResizeEnd} />
               <div
@@ -1058,7 +1114,7 @@ export function MarkdownEditorPanel(
                   className="preview-pane"
                   style={viewMode === 'split' ? { width: `${100 - dividerPosition}%` } : undefined}
                 >
-                  <MarkdownPreview key={`preview-${viewMode}`} ref={previewRef} content={currentFile.content} filePath={currentFile.path} />
+                  <MarkdownPreview key={`preview-${viewMode}`} ref={previewHandleRef} content={currentFile.content} filePath={currentFile.path} onOpenFile={handleOpenFile} />
                 </div>
               )}
             </>
