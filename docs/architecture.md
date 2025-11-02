@@ -415,3 +415,25 @@ moveItem: (sourcePath, targetParentPath, newName?) =>
 - **Progress Indicators**: Show progress for large operations with cancel option
 
 See: [Drag-Drop Implementation](./drag-drop.md) | [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md) | [Security](./security.md) | [Testing](./testing/README.md)
+
+## ProjectTree Modularization
+
+**v0.3.7 Refactoring**: Reduced ProjectTree.tsx complexity by 38.4% (1,338 → 824 lines) through SOLID principles and design patterns.
+
+**Key Achievements**:
+- Applied Strategy + Command + Factory patterns for context menus
+- Created 3 custom hooks: useProjectManagement, useFileOperations, useDirectoryWatcher
+- Extracted 57 pure functions using "Extract Pure Logic" pattern
+- Added 320 comprehensive tests (964 total tests passing)
+- Zero breaking changes
+
+**Architecture Components**:
+- **Custom Hooks**: useProjectManagement (project lifecycle), useFileOperations (CRUD), useDirectoryWatcher (monitoring)
+- **Context Menu**: 11 command classes, node-type strategies, factory selection
+- **Helper Functions**: switchHelpers (terminal activity tracking), withWatcherPause (race prevention), constants
+- **Pure Logic**: 57 functions extracted to `.logic.ts` files for fast, deterministic testing
+
+**SOLID Principles Applied**:
+- Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion
+
+**See**: [Project Tree Architecture](./project-tree-architecture.md) for complete details

@@ -20,6 +20,7 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
   - [Flickering Prevention](./terminal/flickering-prevention.md) - v0.3.2 rendering stability fixes
   - [Troubleshooting](./terminal/troubleshooting.md) - Known issues and solutions
 - [Project Panel](./project-panel.md) - File explorer and project management
+- [Drag-Drop](./drag-drop/README.md) - VS Code-style file reorganization with keyboard shortcuts
 - [File Watching](./file-watching/README.md) - Auto-refresh and file monitoring
   - [Patterns & Testing](./file-watching/patterns-and-testing.md) - Implementation patterns and test scenarios
   - [Technical Details](./file-watching/technical-details.md) - Performance, security, edge cases
@@ -33,6 +34,7 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 
 ### Development
 - [Development Tasks](./development-tasks.md) - Build, test, and deployment
+- [Build Optimization](./build/build-optimization.md) - electron-builder configuration and size optimization
 - [Testing](./testing/README.md) - Testing strategies and scenarios
   - [Automated Testing Plan](./testing/automated-testing-plan.md) - Phased rollout and setup
   - [Quick Checks](./testing/quick-checks.md) - Minimal Terminal/Watcher smoke checks
