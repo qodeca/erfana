@@ -46,10 +46,6 @@ Manages:
 - **Hover effect**: Icon color changes to white
 - **Size**: 48x48px click target per item
 
-## Copilot Panel
-
-Removed.
-
 ## Global Toasts
 
 Lightweight, centralized toast notifications displayed in the bottom-left corner.

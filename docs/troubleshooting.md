@@ -81,98 +81,28 @@ const lastPath = settingsService.getLastProjectPath()
 
 ---
 
-## Copilot Panel
-
-Removed.
-
-Removed.
-
- 
-
 ---
 
-### Authentication Failed
+## Terminal
 
- 
+### Terminal Not Available
 
-**Error:**
-```
- 
-```
+**Symptom:** Terminal panel shows "Terminal Not Available" message
 
- 
-
----
-
-### Session Won't Start
-
- 
-
-**Debug Steps:**
-1. Check main process console for errors
-2. Verify project path is valid directory
- 
-
-**Common Causes:**
-- Invalid project path (must be absolute)
-- Project path doesn't exist
-- Insufficient permissions on project directory
- 
-
-**Solution:**
- 
-
----
-
-### Tool Approval Dialog Won't Dismiss
-
-**Symptom:** Dialog stuck open after approval
-
-**Cause:** Session restart timing issue.
-
-**Workaround:**
-1. Close dialog manually
-2. Wait 2-3 seconds for session restart
-3. Resend message if needed
-
-**Note:** This is expected behavior - session must restart to update tool permissions.
-
----
-
-### Conversation Not Preserved After Tool Approval
-
-**Symptom:** Context lost after approving tool
-
-**Verification:**
-Check that `--continue` flag is being used:
-```bash
-# In main process console, should see:
-✅ Using --continue flag for conversation preservation
-```
-
-**Solution:**
-Verify session restart uses `--continue` (automatic in `restartWithNewPermissions()`):
+**Check:**
 ```typescript
-private async restartWithNewPermissions(): Promise<void> {
-  // ...
-  await this.startSession(projectPath, planningMode)  // Uses --continue by default
-  // ...
+const result = await window.api.terminal.isAvailable()
+if (!result.available) {
+  // node-pty not available, check build logs
 }
 ```
 
- 
+**Solution:** Rebuild node-pty
+```bash
+npm rebuild node-pty --build-from-source
+```
 
----
-
- 
-
- 
-
- 
-
- 
-
- 
+**For Advanced Terminal Issues:** See [Terminal Troubleshooting](./terminal/troubleshooting.md) for comprehensive coverage of WebGL context loss, scroll issues, resize problems, and debugging tips.
 
 ---
 
