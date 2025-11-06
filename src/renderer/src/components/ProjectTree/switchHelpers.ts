@@ -16,7 +16,6 @@
  */
 
 import type { MutableRefObject } from 'react'
-import type { FileNode } from '../../../../preload/index'
 import { TERMINAL } from './constants'
 
 /**
@@ -147,15 +146,17 @@ export async function interruptActiveTerminalIfAny(): Promise<void> {
  * - Only update state if token matches after operation completes
  * - Prevents stale responses from overriding newer ones
  *
+ * Note: This function only updates project path. The IPC event listener
+ * (onProjectChanged) is the single source of truth for file tree updates,
+ * preventing race conditions from duplicate state updates.
+ *
  * @param switchTokenRef - Ref holding current switch token
  * @param setProjectPath - Callback to update project path state
- * @param setFiles - Callback to update files state
  * @returns Opened project path, or null if operation was cancelled or token mismatch
  */
 export async function openProjectWithTokenGuard(
   switchTokenRef: MutableRefObject<number>,
-  setProjectPath: (path: string) => void,
-  setFiles: (nodes: FileNode[]) => void
+  setProjectPath: (path: string) => void
 ): Promise<string | null> {
   const currentToken = ++switchTokenRef.current
   const path = await window.api.file.openProject()
@@ -166,26 +167,25 @@ export async function openProjectWithTokenGuard(
     return null
   }
 
+  // Only update project path - IPC event will handle file tree loading
   setProjectPath(path)
-  const fileTree = await window.api.file.readDirectory(path)
-  setFiles(fileTree)
   return path
 }
 
 /**
  * Close project with token-based race guard
  *
+ * Note: This function only updates project path. The IPC event listener
+ * (onProjectChanged) is the single source of truth for file tree and UI state updates,
+ * preventing race conditions from duplicate state updates.
+ *
  * @param switchTokenRef - Ref holding current switch token
  * @param setProjectPath - Callback to update project path state
- * @param setFiles - Callback to update files state
- * @param setExpandedFolders - Callback to clear expanded folders state
  * @returns true if project was closed successfully
  */
 export async function closeProjectWithTokenGuard(
   switchTokenRef: MutableRefObject<number>,
-  setProjectPath: (path: string | null) => void,
-  setFiles: (nodes: FileNode[]) => void,
-  setExpandedFolders: (folders: Set<string>) => void
+  setProjectPath: (path: string | null) => void
 ): Promise<boolean> {
   const currentToken = ++switchTokenRef.current
   const ok = await window.api.file.closeProject()
@@ -196,8 +196,7 @@ export async function closeProjectWithTokenGuard(
     return false
   }
 
+  // Only update project path - IPC event will clear files and UI state
   setProjectPath(null)
-  setFiles([])
-  setExpandedFolders(new Set())
   return true
 }

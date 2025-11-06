@@ -131,9 +131,20 @@ export function useProjectManagement(
           if (shouldMarkInitialLoadComplete(data.newPath, fileTree)) {
             initialLoadCompleteRef.current = true
           }
+          // Show success toast after files are loaded
+          showGlobalToast({
+            type: 'success',
+            title: 'Project Opened',
+            message: createProjectOpenedMessage(data.newPath!)
+          })
         } catch (err) {
           console.error(createNewProjectTreeErrorLog(), err)
           setError(createLoadErrorMessage(err))
+          showGlobalToast({
+            type: 'error',
+            title: 'Failed to Load Project',
+            message: createLoadErrorMessage(err)
+          })
         } finally {
           setLoading(false)
         }
@@ -141,6 +152,11 @@ export function useProjectManagement(
         // Project closed externally
         setProjectPath(null)
         setFiles([])
+        showGlobalToast({
+          type: 'info',
+          title: 'Project Closed',
+          message: createProjectClosedMessage()
+        })
       }
     })
 
@@ -181,13 +197,14 @@ export function useProjectManagement(
         await interruptActiveTerminalIfAny()
       }
 
-      // Open project with race guard
-      const openedPath = await openProjectWithTokenGuard(switchTokenRef, setProjectPath, setFiles)
+      // Open project with race guard (files will be loaded by IPC event)
+      const openedPath = await openProjectWithTokenGuard(switchTokenRef, setProjectPath)
       if (openedPath) {
+        // Show loading toast - success toast will be shown by IPC listener after files load
         showGlobalToast({
-          type: 'success',
-          title: 'Project Opened',
-          message: createProjectOpenedMessage(openedPath)
+          type: 'info',
+          title: 'Loading Project',
+          message: 'Loading file tree...'
         })
       }
     } catch (err) {
@@ -235,19 +252,11 @@ export function useProjectManagement(
         await interruptActiveTerminalIfAny()
       }
 
-      // Close project with race guard (also clears expanded folders)
-      const closed = await closeProjectWithTokenGuard(
-        switchTokenRef,
-        setProjectPath,
-        setFiles,
-        () => {} // expanded folders will be managed by ProjectTree
-      )
+      // Close project with race guard (files and UI state cleared by IPC event)
+      const closed = await closeProjectWithTokenGuard(switchTokenRef, setProjectPath)
       if (closed) {
-        showGlobalToast({
-          type: 'info',
-          title: 'Project Closed',
-          message: createProjectClosedMessage()
-        })
+        // Success toast will be shown by IPC listener after state is cleared
+        // No toast needed here to avoid duplicate
       }
     } catch (err) {
       setError(formatErrorForState(err))
