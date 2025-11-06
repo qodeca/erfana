@@ -13,7 +13,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { MutableRefObject } from 'react'
-import type { FileNode } from '../../../../preload/index'
 import {
   checkHasDirtyEditors,
   checkTerminalBusy,
@@ -372,43 +371,35 @@ describe('switchHelpers', () => {
   describe('openProjectWithTokenGuard', () => {
     let switchTokenRef: MutableRefObject<number>
     let setProjectPath: ReturnType<typeof vi.fn>
-    let setFiles: ReturnType<typeof vi.fn>
 
     beforeEach(() => {
       switchTokenRef = { current: 0 }
       setProjectPath = vi.fn()
-      setFiles = vi.fn()
     })
 
     it('should increment token and open project successfully', async () => {
-      const fileTree: FileNode[] = [
-        { name: 'file.md', path: '/opened/project/file.md', type: 'file' }
-      ]
       mockWindowApi.file.openProject.mockResolvedValue('/opened/project')
-      mockWindowApi.file.readDirectory.mockResolvedValue(fileTree)
 
-      const result = await openProjectWithTokenGuard(switchTokenRef, setProjectPath, setFiles)
+      const result = await openProjectWithTokenGuard(switchTokenRef, setProjectPath)
 
       expect(switchTokenRef.current).toBe(1)
       expect(result).toBe('/opened/project')
       expect(setProjectPath).toHaveBeenCalledWith('/opened/project')
-      expect(setFiles).toHaveBeenCalledWith(fileTree)
     })
 
     it('should return null when user cancels dialog', async () => {
       mockWindowApi.file.openProject.mockResolvedValue(null)
 
-      const result = await openProjectWithTokenGuard(switchTokenRef, setProjectPath, setFiles)
+      const result = await openProjectWithTokenGuard(switchTokenRef, setProjectPath)
 
       expect(result).toBeNull()
       expect(setProjectPath).not.toHaveBeenCalled()
-      expect(setFiles).not.toHaveBeenCalled()
     })
 
     it('should return null when token mismatch (race condition)', async () => {
       mockWindowApi.file.openProject.mockResolvedValue('/opened/project')
 
-      const promise = openProjectWithTokenGuard(switchTokenRef, setProjectPath, setFiles)
+      const promise = openProjectWithTokenGuard(switchTokenRef, setProjectPath)
 
       // Simulate another operation incrementing the token
       switchTokenRef.current = 10
@@ -417,81 +408,51 @@ describe('switchHelpers', () => {
 
       expect(result).toBeNull()
       expect(setProjectPath).not.toHaveBeenCalled()
-      expect(setFiles).not.toHaveBeenCalled()
     })
 
-    it('should set project path and load files when successful', async () => {
-      const fileTree: FileNode[] = [
-        { name: 'file1.md', path: '/opened/project/file1.md', type: 'file' },
-        { name: 'folder', path: '/opened/project/folder', type: 'directory', children: [] }
-      ]
+    it('should only update project path, not load files (IPC event handles files)', async () => {
       mockWindowApi.file.openProject.mockResolvedValue('/opened/project')
-      mockWindowApi.file.readDirectory.mockResolvedValue(fileTree)
 
-      await openProjectWithTokenGuard(switchTokenRef, setProjectPath, setFiles)
+      await openProjectWithTokenGuard(switchTokenRef, setProjectPath)
 
       expect(mockWindowApi.file.openProject).toHaveBeenCalled()
-      expect(mockWindowApi.file.readDirectory).toHaveBeenCalledWith('/opened/project')
+      expect(mockWindowApi.file.readDirectory).not.toHaveBeenCalled()
       expect(setProjectPath).toHaveBeenCalledWith('/opened/project')
-      expect(setFiles).toHaveBeenCalledWith(fileTree)
     })
   })
 
   describe('closeProjectWithTokenGuard', () => {
     let switchTokenRef: MutableRefObject<number>
     let setProjectPath: ReturnType<typeof vi.fn>
-    let setFiles: ReturnType<typeof vi.fn>
-    let setExpandedFolders: ReturnType<typeof vi.fn>
 
     beforeEach(() => {
       switchTokenRef = { current: 0 }
       setProjectPath = vi.fn()
-      setFiles = vi.fn()
-      setExpandedFolders = vi.fn()
     })
 
     it('should increment token and close project successfully', async () => {
       mockWindowApi.file.closeProject.mockResolvedValue(true)
 
-      const result = await closeProjectWithTokenGuard(
-        switchTokenRef,
-        setProjectPath,
-        setFiles,
-        setExpandedFolders
-      )
+      const result = await closeProjectWithTokenGuard(switchTokenRef, setProjectPath)
 
       expect(switchTokenRef.current).toBe(1)
       expect(result).toBe(true)
       expect(setProjectPath).toHaveBeenCalledWith(null)
-      expect(setFiles).toHaveBeenCalledWith([])
-      expect(setExpandedFolders).toHaveBeenCalledWith(new Set())
     })
 
     it('should return false when close operation fails', async () => {
       mockWindowApi.file.closeProject.mockResolvedValue(false)
 
-      const result = await closeProjectWithTokenGuard(
-        switchTokenRef,
-        setProjectPath,
-        setFiles,
-        setExpandedFolders
-      )
+      const result = await closeProjectWithTokenGuard(switchTokenRef, setProjectPath)
 
       expect(result).toBe(false)
       expect(setProjectPath).not.toHaveBeenCalled()
-      expect(setFiles).not.toHaveBeenCalled()
-      expect(setExpandedFolders).not.toHaveBeenCalled()
     })
 
     it('should return false when token mismatch', async () => {
       mockWindowApi.file.closeProject.mockResolvedValue(true)
 
-      const promise = closeProjectWithTokenGuard(
-        switchTokenRef,
-        setProjectPath,
-        setFiles,
-        setExpandedFolders
-      )
+      const promise = closeProjectWithTokenGuard(switchTokenRef, setProjectPath)
 
       // Simulate another operation incrementing the token
       switchTokenRef.current = 10
@@ -502,21 +463,13 @@ describe('switchHelpers', () => {
       expect(setProjectPath).not.toHaveBeenCalled()
     })
 
-    it('should clear all state (path, files, expanded folders)', async () => {
+    it('should only update project path, not clear files/UI state (IPC event handles that)', async () => {
       mockWindowApi.file.closeProject.mockResolvedValue(true)
 
-      await closeProjectWithTokenGuard(
-        switchTokenRef,
-        setProjectPath,
-        setFiles,
-        setExpandedFolders
-      )
+      await closeProjectWithTokenGuard(switchTokenRef, setProjectPath)
 
       expect(setProjectPath).toHaveBeenCalledWith(null)
-      expect(setFiles).toHaveBeenCalledWith([])
-      expect(setExpandedFolders).toHaveBeenCalledWith(expect.any(Set))
-      const expandedSet = setExpandedFolders.mock.calls[0][0]
-      expect(expandedSet.size).toBe(0)
+      // Files and UI state are cleared by IPC event listener, not here
     })
   })
 })
