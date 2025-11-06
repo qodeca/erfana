@@ -198,15 +198,8 @@ export function useProjectManagement(
       }
 
       // Open project with race guard (files will be loaded by IPC event)
-      const openedPath = await openProjectWithTokenGuard(switchTokenRef, setProjectPath)
-      if (openedPath) {
-        // Show loading toast - success toast will be shown by IPC listener after files load
-        showGlobalToast({
-          type: 'info',
-          title: 'Loading Project',
-          message: 'Loading file tree...'
-        })
-      }
+      // Success toast will be shown by IPC listener after files load
+      await openProjectWithTokenGuard(switchTokenRef, setProjectPath)
     } catch (err) {
       setError(formatErrorForState(err))
       console.error(createOpenProjectErrorLog(), err)
