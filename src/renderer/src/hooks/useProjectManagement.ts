@@ -123,7 +123,9 @@ export function useProjectManagement(
 
       if (shouldOpenExternalProject(data.newPath)) {
         // New project opened externally
+        // Clear old project files immediately before loading new ones
         setProjectPath(data.newPath)
+        setFiles([]) // Clear tree to show empty state during transition
         try {
           setLoading(true)
           const fileTree = await api.file.readDirectory(data.newPath!)
