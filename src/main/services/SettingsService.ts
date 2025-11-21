@@ -10,6 +10,7 @@ import { access, constants } from 'fs/promises'
 import { MonotonicTimestampGenerator } from './MonotonicTimestampGenerator'
 import { RecentProjectsDeduplicator } from './RecentProjectsDeduplicator'
 import { RecentProjectsRepository } from './RecentProjectsRepository'
+import { MAX_RECENT_PROJECTS } from '../../shared/constants'
 
 export interface RecentProject {
   path: string
@@ -247,8 +248,8 @@ export class SettingsService {
         lastOpened: timestamp
       }
 
-      // Keep only the 5 most recent
-      const updatedProjects = [newProject, ...filteredProjects].slice(0, 5)
+      // Keep only the most recent projects
+      const updatedProjects = [newProject, ...filteredProjects].slice(0, MAX_RECENT_PROJECTS)
 
       repository.save(updatedProjects)
     } catch (error) {

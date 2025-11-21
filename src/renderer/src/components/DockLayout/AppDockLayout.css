@@ -284,6 +284,26 @@
   background-color: #505050;
 }
 
+/* todo028: CSS classes for disabled/opening states (replaced inline styles) */
+.recent-project-item.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.recent-project-item.opening {
+  cursor: wait;
+}
+
+.recent-project-opening-text {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #858585;
+}
+
+.recent-project-remove.disabled {
+  opacity: 0.5;
+}
+
 /* Remove Dockview's default padding from welcome tab container */
 .dockview-theme-dark .dv-default-tab:has(.welcome-tab) {
   padding: 0 !important;
