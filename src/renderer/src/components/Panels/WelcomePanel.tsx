@@ -69,6 +69,14 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
     loadRecentProjects()
   }, [loadRecentProjects])
 
+  // Auto-refresh recent projects when any project change occurs (open/close)
+  useEffect(() => {
+    const unsubscribe = window.api.file.onProjectChanged(() => {
+      loadRecentProjects()
+    })
+    return () => unsubscribe()
+  }, [loadRecentProjects])
+
   const handleProjectClick = async (projectPath: string) => {
     if (isProjectChanging) {
       showWarningToast('Please Wait', 'Please wait for the current operation to complete')
