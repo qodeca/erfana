@@ -62,5 +62,41 @@ export function registerSettingsHandlers(): void {
     }
   })
 
+  // Get recent projects
+  ipcMain.handle('settings:getRecentProjects', async () => {
+    try {
+      const projects = await settingsService.getRecentProjects()
+      return { success: true, projects }
+    } catch (error) {
+      console.error('❌ Error getting recent projects:', error)
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
+    }
+  })
+
+  // Add recent project
+  ipcMain.handle('settings:addRecentProject', async (_event, path: string, name: string) => {
+    try {
+      await settingsService.addRecentProject(path, name)
+      return { success: true }
+    } catch (error) {
+      console.error('❌ Error adding recent project:', error)
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
+    }
+  })
+
+  // Remove recent project
+  ipcMain.handle('settings:removeRecentProject', async (_event, path: string) => {
+    try {
+      await settingsService.removeRecentProject(path)
+      return { success: true }
+    } catch (error) {
+      console.error('❌ Error removing recent project:', error)
+      const message = error instanceof Error ? error.message : String(error)
+      return { success: false, error: message }
+    }
+  })
+
   console.log('✅ Settings IPC handlers registered')
 }

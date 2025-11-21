@@ -58,6 +58,9 @@ declare global {
         setProjectFilterMode: (mode: string) => Promise<{ success: boolean; error?: string }>
         getDirectoryWatchDepth: () => Promise<{ success: boolean; depth?: number; error?: string }>
         setDirectoryWatchDepth: (depth: number | null) => Promise<{ success: boolean; error?: string }>
+        getRecentProjects: () => Promise<{ success: boolean; projects?: Array<{ path: string; name: string; lastOpened: number }>; error?: string }>
+        addRecentProject: (path: string, name: string) => Promise<{ success: boolean; error?: string }>
+        removeRecentProject: (path: string) => Promise<{ success: boolean; error?: string }>
       }
       terminal: {
         isAvailable: (terminalId?: string) => Promise<{ success: boolean; available: boolean; initialized?: boolean }>

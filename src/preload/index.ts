@@ -144,7 +144,14 @@ const api = {
     getDirectoryWatchDepth: (): Promise<{ success: boolean; depth?: number; error?: string }> =>
       ipcRenderer.invoke('settings:getDirectoryWatchDepth'),
     setDirectoryWatchDepth: (depth: number | null): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('settings:setDirectoryWatchDepth', depth)
+      ipcRenderer.invoke('settings:setDirectoryWatchDepth', depth),
+    // Recent projects
+    getRecentProjects: (): Promise<{ success: boolean; projects?: Array<{ path: string; name: string; lastOpened: number }>; error?: string }> =>
+      ipcRenderer.invoke('settings:getRecentProjects'),
+    addRecentProject: (path: string, name: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('settings:addRecentProject', path, name),
+    removeRecentProject: (path: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('settings:removeRecentProject', path)
   },
 
   // Copilot/Claude Code removed
