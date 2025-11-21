@@ -2,24 +2,32 @@ import { useProjectStore } from '../../stores/useProjectStore'
 import './UIBlocker.css'
 
 /**
- * UIBlocker Component
+ * Props for the reusable UIBlocker component (todo031)
+ */
+export interface UIBlockerProps {
+  /** Whether the blocker is visible */
+  visible: boolean
+  /** Message to display */
+  message?: string
+  /** Tooltip text */
+  tooltip?: string
+}
+
+/**
+ * UIBlockerBase - Reusable overlay component
  *
- * Global overlay that blocks ALL user interactions when a critical operation
- * is in progress (e.g., native folder selection dialog is open).
- *
- * Prevents:
+ * Blocks ALL user interactions when visible:
  * - Mouse clicks (left, right, middle)
  * - Context menus
  * - Keyboard input
  * - Scrolling
- * - Any other user interactions
- *
- * Visible when: isProjectChanging === true
  */
-export function UIBlocker() {
-  const isProjectChanging = useProjectStore((state) => state.isProjectChanging)
-
-  if (!isProjectChanging) {
+export function UIBlockerBase({
+  visible,
+  message = 'Please wait...',
+  tooltip = message
+}: UIBlockerProps) {
+  if (!visible) {
     return null
   }
 
@@ -34,12 +42,30 @@ export function UIBlocker() {
       onKeyDown={(e) => e.preventDefault()}
       onKeyUp={(e) => e.preventDefault()}
       onWheel={(e) => e.preventDefault()}
-      title="Waiting for folder selection..."
+      title={tooltip}
     >
       <div className="ui-blocker-content">
         <div className="ui-blocker-spinner"></div>
-        <div className="ui-blocker-message">Waiting for folder selection...</div>
+        <div className="ui-blocker-message">{message}</div>
       </div>
     </div>
+  )
+}
+
+/**
+ * UIBlocker - Project-aware wrapper (backward compatible)
+ *
+ * Automatically shows when isProjectChanging === true.
+ * Use UIBlockerBase directly for custom visibility control.
+ */
+export function UIBlocker() {
+  const isProjectChanging = useProjectStore((state) => state.isProjectChanging)
+
+  return (
+    <UIBlockerBase
+      visible={isProjectChanging}
+      message="Waiting for folder selection..."
+      tooltip="Waiting for folder selection..."
+    />
   )
 }

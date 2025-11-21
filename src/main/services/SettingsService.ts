@@ -34,6 +34,19 @@ type StoreLike<T> = {
   delete: (key: keyof T) => void
 }
 
+/**
+ * Creates a typed electron-store instance
+ *
+ * Note: electron-store is an ES Module with complex internal types that don't
+ * export a compatible constructor signature. This factory encapsulates the
+ * necessary type assertion in one place.
+ */
+async function createElectronStore<T>(name: string): Promise<StoreLike<T>> {
+  const module = await import('electron-store')
+  const ElectronStore = module.default as unknown as new (opts: { name: string }) => StoreLike<T>
+  return new ElectronStore({ name })
+}
+
 export class SettingsServiceError extends Error {
   constructor(
     message: string,
@@ -63,13 +76,8 @@ export class SettingsService {
   private repository: RecentProjectsRepository | null = null
 
   constructor() {
-    // electron-store is an ES Module, so we need to import it dynamically
     this.store = null
-    this.storePromise = import('electron-store').then((module) => {
-      const ElectronStore = module.default as unknown as new <S>(
-        options?: unknown
-      ) => StoreLike<S>
-      const instance = new ElectronStore<Settings>({ name: 'erfana-settings' })
+    this.storePromise = createElectronStore<Settings>('erfana-settings').then((instance) => {
       this.store = instance
 
       // Initialize repository with store

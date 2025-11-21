@@ -15,7 +15,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { homedir } from 'os'
-import { sep } from 'path'
 import { ErrorCode } from '../../shared/errors'
 
 // Mock fs/promises
