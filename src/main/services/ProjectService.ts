@@ -14,6 +14,7 @@ import { stat, realpath } from 'fs/promises'
 import { normalize, sep, parse } from 'path'
 import { BrowserWindow } from 'electron'
 import { validatePath, PathSecurityError } from '../utils/pathSecurity'
+import { AppError, ErrorCode } from '../../shared/errors'
 import type { ProjectChanged } from '../../shared/ipc/schema'
 
 // Use interface types for dependency injection
@@ -210,9 +211,23 @@ export class ProjectService {
 
     try {
       // 3. Validate directory exists and is accessible
-      const stats = await stat(newProjectPath)
+      let stats
+      try {
+        stats = await stat(newProjectPath)
+      } catch (error) {
+        const originalError = error instanceof Error ? error : undefined
+        throw new AppError(
+          'Project directory not found or not accessible',
+          ErrorCode.PROJECT_NOT_FOUND,
+          originalError
+        )
+      }
+
       if (!stats.isDirectory()) {
-        throw new Error('Selected path is not a directory')
+        throw new AppError(
+          'Selected path is not a directory',
+          ErrorCode.PROJECT_NOT_DIRECTORY
+        )
       }
 
       // 4. Stop all existing watchers before switching
