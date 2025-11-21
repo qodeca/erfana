@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 
 declare global {
   interface Window {
@@ -51,23 +51,41 @@ describe('TerminalPanel unavailable flow', () => {
     const { TerminalPanel } = await import('./TerminalPanel')
     render(<TerminalPanel /> as any)
 
-    // Expect unavailable header
-    expect(await screen.findByText('Terminal Not Available')).toBeInTheDocument()
+    // Wait for unavailable header (uses real timers, fine for async rendering)
+    await waitFor(() => {
+      expect(screen.getByText('Terminal Not Available')).toBeInTheDocument()
+    })
 
     const recheckBtn = screen.getByRole('button', { name: /recheck/i })
     expect(recheckBtn).toBeEnabled()
+
     // Click recheck triggers cooldown
     fireEvent.click(recheckBtn)
     expect(recheckBtn).toBeDisabled()
-    // Wait real time to release cooldown
-    await new Promise((r) => setTimeout(r, 1100))
+
+    // NOW switch to fake timers for the cooldown part
+    vi.useFakeTimers()
+
+    // Advance fake timers to release cooldown (1000ms cooldown + buffer)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1100)
+    })
+
+    // Button should be enabled after cooldown
     expect(recheckBtn).toBeEnabled()
+
+    vi.useRealTimers()
   })
 
   it('copies fix command to clipboard', async () => {
     const { TerminalPanel } = await import('./TerminalPanel')
     render(<TerminalPanel /> as any)
-    const copyBtn = await screen.findByRole('button', { name: /copy fix command/i })
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /copy fix command/i })).toBeInTheDocument()
+    })
+
+    const copyBtn = screen.getByRole('button', { name: /copy fix command/i })
     fireEvent.click(copyBtn)
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('npm rebuild node-pty --build-from-source')
   })

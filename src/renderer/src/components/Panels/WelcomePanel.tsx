@@ -36,9 +36,11 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
   const isProjectChanging = useProjectStore((state) => state.isProjectChanging)
 
   // todo019: Prevent state updates on unmounted components
+  // FIXED: Reset isMounted on each mount to handle React 18 StrictMode double-mount
   const isMounted = useRef(true)
 
   useEffect(() => {
+    isMounted.current = true  // Reset on mount (important for StrictMode)
     return () => {
       isMounted.current = false
     }

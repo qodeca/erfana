@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, act } from '@testing-library/react'
 import { MarkdownPreview } from './MarkdownPreview'
 import { ToastProvider } from '../Toast/ToastContext'
 
@@ -8,6 +8,18 @@ import { ToastProvider } from '../Toast/ToastContext'
  */
 const renderWithToast = (ui: React.ReactElement) => {
   return render(<ToastProvider>{ui}</ToastProvider>)
+}
+
+/**
+ * Async test wrapper that waits for effects to complete
+ * Use this for tests where the component has async useEffect hooks
+ */
+const renderWithToastAsync = async (ui: React.ReactElement) => {
+  let result: ReturnType<typeof render>
+  await act(async () => {
+    result = render(<ToastProvider>{ui}</ToastProvider>)
+  })
+  return result!
 }
 
 /**
@@ -109,9 +121,9 @@ describe('MarkdownPreview Link Features', () => {
   })
 
   describe('Internal Link Styling', () => {
-    it('should apply internal-link class to markdown links', () => {
+    it('should apply internal-link class to markdown links', async () => {
       const markdown = '[Link](./file.md)'
-      const { container } = renderWithToast(<MarkdownPreview content={markdown} filePath="/test/file.md" />)
+      const { container } = await renderWithToastAsync(<MarkdownPreview content={markdown} filePath="/test/file.md" />)
 
       const link = container.querySelector('a')
       expect(link?.className).toContain('internal-link')
@@ -181,9 +193,9 @@ describe('MarkdownPreview Link Features', () => {
       expect(link?.getAttribute('href')).toBe('#section')
     })
 
-    it('should handle links with anchors', () => {
+    it('should handle links with anchors', async () => {
       const markdown = '[Link](./file.md#section)'
-      const { container } = renderWithToast(<MarkdownPreview content={markdown} filePath="/test/file.md" />)
+      const { container } = await renderWithToastAsync(<MarkdownPreview content={markdown} filePath="/test/file.md" />)
 
       const link = container.querySelector('a')
       expect(link?.getAttribute('href')).toBe('./file.md#section')
@@ -200,10 +212,7 @@ describe('MarkdownPreview Link Features', () => {
 [External](https://example.com)
 [Anchor](#section)
       `
-      renderWithToast(<MarkdownPreview content={markdown} filePath="/test/file.md" />)
-
-      // Wait for async link resolution
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await renderWithToastAsync(<MarkdownPreview content={markdown} filePath="/test/file.md" />)
 
       // Verify getProjectPath was called for link resolution
       expect(window.api.file.getProjectPath).toHaveBeenCalled()
@@ -218,17 +227,8 @@ describe('MarkdownPreview Link Features', () => {
     })
   })
 
-  describe('Focus Accessibility', () => {
-    it('should have focus-visible styles defined', () => {
-      const markdown = '[Link](./file.md)'
-      const { container } = renderWithToast(<MarkdownPreview content={markdown} filePath="/test/file.md" />)
-
-      const link = container.querySelector('a')
-      expect(link).toBeTruthy()
-      // Focus styles are in CSS, just verify link is tabbable
-      expect(link?.tagName).toBe('A')
-    })
-  })
+  // Note: "Focus Accessibility" test removed - it only verified that an <a> tag exists,
+  // which provides no value. Actual focus-visible styles are CSS and tested visually.
 
   describe('Security: Dangerous Protocols', () => {
     // Note: Dangerous protocols are sanitized by rehype-sanitize BEFORE reaching our component
@@ -338,9 +338,9 @@ describe('MarkdownPreview Link Features', () => {
       expect(link?.getAttribute('title')).toBe('Jump to section: section')
     })
 
-    it('should style anchor links differently from internal links', () => {
+    it('should style anchor links differently from internal links', async () => {
       const markdown = '[Anchor](#section)\n\n[Internal](./file.md)'
-      const { container } = renderWithToast(<MarkdownPreview content={markdown} filePath="/test/file.md" />)
+      const { container } = await renderWithToastAsync(<MarkdownPreview content={markdown} filePath="/test/file.md" />)
 
       const anchorLink = container.querySelectorAll('a')[0]
       const internalLink = container.querySelectorAll('a')[1]

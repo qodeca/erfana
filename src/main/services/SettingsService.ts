@@ -40,11 +40,17 @@ type StoreLike<T> = {
  * Note: electron-store is an ES Module with complex internal types that don't
  * export a compatible constructor signature. This factory encapsulates the
  * necessary type assertion in one place.
+ *
+ * The `projectName` option is required by the underlying `conf` package when
+ * `cwd` isn't available (e.g., before app.whenReady()).
  */
 async function createElectronStore<T>(name: string): Promise<StoreLike<T>> {
   const module = await import('electron-store')
-  const ElectronStore = module.default as unknown as new (opts: { name: string }) => StoreLike<T>
-  return new ElectronStore({ name })
+  const ElectronStore = module.default as unknown as new (opts: {
+    name: string
+    projectName?: string
+  }) => StoreLike<T>
+  return new ElectronStore({ name, projectName: 'erfana' })
 }
 
 export class SettingsServiceError extends Error {
