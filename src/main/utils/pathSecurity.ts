@@ -1,4 +1,4 @@
-import { isAbsolute, normalize, resolve, dirname } from 'path'
+import { isAbsolute, normalize, resolve, dirname, sep } from 'path'
 import { lstat, readlink, access, constants } from 'fs/promises'
 import { homedir } from 'os'
 
@@ -57,20 +57,22 @@ function getSensitiveUserDirectories(): string[] {
 
 /**
  * Check if a path points to a system or sensitive directory
+ *
+ * SECURITY FIX (todo010): Use platform-specific path separator instead of hardcoded '/'
  */
 export function isSystemDirectory(path: string): boolean {
   const normalized = normalize(path)
 
   // Check system directories
   for (const sysDir of SYSTEM_DIRECTORIES) {
-    if (normalized === sysDir || normalized.startsWith(sysDir + '/')) {
+    if (normalized === sysDir || normalized.startsWith(sysDir + sep)) {
       return true
     }
   }
 
   // Check sensitive user directories
   for (const sensitiveDir of getSensitiveUserDirectories()) {
-    if (normalized === sensitiveDir || normalized.startsWith(sensitiveDir + '/')) {
+    if (normalized === sensitiveDir || normalized.startsWith(sensitiveDir + sep)) {
       return true
     }
   }
@@ -87,6 +89,17 @@ export function isSystemDirectory(path: string): boolean {
  * - Path doesn't contain path traversal patterns
  * - Path is not a system or sensitive directory
  * - Path is accessible (exists and readable)
+ *
+ * SECURITY NOTE: TOCTOU Limitation (todo011)
+ *
+ * This validation checks path accessibility at validation time, but permissions
+ * could change between check (validation) and actual use (file operations).
+ * This is an inherent limitation of filesystem operations known as TOCTOU
+ * (Time-of-Check-Time-of-Use).
+ *
+ * Mitigation: All filesystem operations include proper error handling at use-site
+ * to catch permission changes, file deletions, or other state changes that occur
+ * after validation.
  *
  * @throws PathSecurityError if validation fails
  */
@@ -154,7 +167,11 @@ export async function validateSymlink(projectPath: string): Promise<boolean> {
   // It's a symlink - validate the target
   try {
     const target = await readlink(projectPath)
-    const resolvedTarget = resolve(dirname(projectPath), target)
+    // SECURITY FIX (todo009): Explicitly handle absolute vs relative symlink targets
+    // readlink() can return either absolute or relative paths
+    const resolvedTarget = isAbsolute(target)
+      ? normalize(target) // Absolute symlink target
+      : resolve(dirname(projectPath), target) // Relative symlink target
 
     // Check if symlink target is a system directory
     if (isSystemDirectory(resolvedTarget)) {
