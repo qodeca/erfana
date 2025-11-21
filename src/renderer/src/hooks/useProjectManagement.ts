@@ -30,9 +30,7 @@ import {
   closeProjectWithTokenGuard
 } from '../components/ProjectTree/switchHelpers'
 import {
-  shouldLoadLastProject,
   shouldOpenExternalProject,
-  shouldProceedWithStateUpdate,
   shouldMarkInitialLoadComplete,
   shouldRefreshFiles,
   createProjectOpenedMessage,
@@ -43,7 +41,6 @@ import {
   formatErrorForState,
   createProjectChangedLogMessage,
   createCallbackWarningMessage,
-  createLoadProjectErrorLog,
   createNewProjectTreeErrorLog,
   createRefreshErrorLog,
   createOpenProjectErrorLog,
@@ -72,40 +69,13 @@ export function useProjectManagement(
   const initialLoadCompleteRef = useRef<boolean>(false)
   const switchTokenRef = useRef<number>(0)
 
-  // Load last project on mount
+  // Load last project on mount - DISABLED
+  // Now shows welcome screen with recent projects instead of auto-loading
   useEffect(() => {
-    let mounted = true
-
-    const loadLastProject = async () => {
-      try {
-        setLoading(true)
-        const lastPath = await api.file.getLastProjectPath()
-        if (!shouldLoadLastProject(mounted)) return
-
-        if (shouldProceedWithStateUpdate(mounted, lastPath)) {
-          setProjectPath(lastPath)
-          const fileTree = await api.file.readDirectory(lastPath!)
-          if (!shouldLoadLastProject(mounted)) return
-          setFiles(fileTree)
-          if (shouldMarkInitialLoadComplete(lastPath, fileTree)) {
-            initialLoadCompleteRef.current = true
-          }
-        }
-      } catch (err) {
-        // Silent fail as in original implementation
-        console.error(createLoadProjectErrorLog(), err)
-      } finally {
-        if (shouldLoadLastProject(mounted)) {
-          setLoading(false)
-        }
-      }
-    }
-
-    loadLastProject()
-    return () => {
-      mounted = false
-    }
-  }, [api.file])
+    // Mark initial load as complete immediately (no auto-load)
+    initialLoadCompleteRef.current = true
+    setLoading(false)
+  }, [])
 
   // Listen for external project changes (e.g., from menu bar, shortcuts)
   useEffect(() => {
