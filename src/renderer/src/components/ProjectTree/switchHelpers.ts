@@ -158,18 +158,29 @@ export async function openProjectWithTokenGuard(
   switchTokenRef: MutableRefObject<number>,
   setProjectPath: (path: string) => void
 ): Promise<string | null> {
-  const currentToken = ++switchTokenRef.current
-  const path = await window.api.file.openProject()
+  // Import store dynamically to avoid circular dependencies
+  const { useProjectStore } = await import('../../stores/useProjectStore')
 
-  if (!path) return null
-  if (currentToken !== switchTokenRef.current) {
-    // Another switch operation started while we were waiting
-    return null
+  // Set global lock to prevent UI interactions during folder dialog
+  useProjectStore.getState().setProjectChanging(true)
+
+  try {
+    const currentToken = ++switchTokenRef.current
+    const path = await window.api.file.openProject()
+
+    if (!path) return null
+    if (currentToken !== switchTokenRef.current) {
+      // Another switch operation started while we were waiting
+      return null
+    }
+
+    // Only update project path - IPC event will handle file tree loading
+    setProjectPath(path)
+    return path
+  } finally {
+    // Always release the lock, even if operation was canceled or failed
+    useProjectStore.getState().setProjectChanging(false)
   }
-
-  // Only update project path - IPC event will handle file tree loading
-  setProjectPath(path)
-  return path
 }
 
 /**

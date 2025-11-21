@@ -2,6 +2,7 @@ import { IDockviewPanelProps } from 'dockview'
 import { Home, Folder, Clock, X } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { showGlobalToast } from '../Toast/toastService'
+import { useProjectStore } from '../../stores/useProjectStore'
 
 interface RecentProject {
   path: string
@@ -13,6 +14,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([])
   const [loading, setLoading] = useState(true)
   const [openingPath, setOpeningPath] = useState<string | null>(null)
+  const isProjectChanging = useProjectStore((state) => state.isProjectChanging)
 
   useEffect(() => {
     loadRecentProjects()
@@ -45,6 +47,11 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
   }
 
   const handleProjectClick = async (projectPath: string) => {
+    // Prevent interactions if folder dialog is open (Change Project button was clicked)
+    if (isProjectChanging) {
+      return
+    }
+
     setOpeningPath(projectPath)
     try {
       // Open project using the proper flow that updates recent projects
@@ -84,6 +91,11 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
   const handleRemoveProject = async (projectPath: string, event: React.MouseEvent) => {
     // Stop event from bubbling up to the parent div (which opens the project)
     event.stopPropagation()
+
+    // Prevent interactions if folder dialog is open (Change Project button was clicked)
+    if (isProjectChanging) {
+      return
+    }
 
     try {
       const result = await window.api.settings.removeRecentProject(projectPath)
@@ -146,13 +158,23 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
               <div className="recent-projects-list">
                 {recentProjects.map((project) => {
                   const isOpening = openingPath === project.path
+                  const isDisabled = isOpening || isProjectChanging
                   return (
                     <div
                       key={project.path}
-                      className={`recent-project-item ${isOpening ? 'loading' : ''}`}
-                      onClick={() => !isOpening && handleProjectClick(project.path)}
-                      title={isOpening ? 'Opening project...' : project.path}
-                      style={{ cursor: isOpening ? 'wait' : 'pointer' }}
+                      className={`recent-project-item ${isOpening ? 'loading' : ''} ${isProjectChanging ? 'disabled' : ''}`}
+                      onClick={() => !isDisabled && handleProjectClick(project.path)}
+                      title={
+                        isProjectChanging
+                          ? 'Waiting for folder selection...'
+                          : isOpening
+                            ? 'Opening project...'
+                            : project.path
+                      }
+                      style={{
+                        cursor: isDisabled ? 'not-allowed' : 'pointer',
+                        opacity: isProjectChanging ? 0.6 : 1
+                      }}
                     >
                       <Folder size={16} className="recent-project-icon" />
                       <div className="recent-project-info">
@@ -170,8 +192,8 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
                         onClick={(e) => handleRemoveProject(project.path, e)}
                         title="Remove from recent projects"
                         aria-label="Remove from recent projects"
-                        disabled={isOpening}
-                        style={{ opacity: isOpening ? 0.5 : 1 }}
+                        disabled={isDisabled}
+                        style={{ opacity: isDisabled ? 0.5 : 1 }}
                       >
                         <X size={16} />
                       </button>
