@@ -2,7 +2,7 @@
 
 ## Status Summary
 
-**Overall Assessment:** 72/100 → 85/100 → 90/100 → 92/100 → 95/100 (after P1 error handling)
+**Overall Assessment:** 72/100 → 85/100 → 90/100 → 92/100 → 95/100 → 97/100 (after P2 code quality)
 **Priority Status:** P0 testing items (todo001-006) must be completed before merge to main
 
 **Completed:**
@@ -10,6 +10,7 @@
 - ✅ todo014-017
 - ✅ todo018-020
 - ✅ todo021-024
+- ✅ todo025-029
 
 **Legend:**
 - 🔴 P0 - Critical (Must Fix Before Merge)
@@ -271,132 +272,6 @@ describe('Recent Projects Integration')
 ## 🟡 P2 - Medium Priority (Nice to Have)
 
 ### Code Quality
-
-#### todo025: Extract error toast helper to reduce duplication
-**Priority:** P2
-**File:** `src/renderer/src/utils/toastHelpers.ts` (NEW)
-**Estimated Effort:** 0.1 day
-**Issue:** Error toast logic duplicated 3 times in WelcomePanel
-**Fix:**
-```typescript
-export function showErrorToast(title: string, message: string, duration = 5000) {
-  showGlobalToast({ title, message, type: 'error', duration })
-}
-
-export function showSuccessToast(title: string, message: string, duration = 3000) {
-  showGlobalToast({ title, message, type: 'success', duration })
-}
-```
-
----
-
-#### todo026: Extract project item title logic to helper function
-**Priority:** P2
-**File:** `src/renderer/src/components/Panels/WelcomePanel.tsx:167-173`
-**Estimated Effort:** 0.1 day
-**Issue:** Complex nested ternary creates cognitive overhead
-**Fix:**
-```typescript
-function getProjectItemTitle(
-  project: RecentProject,
-  isOpening: boolean,
-  isProjectChanging: boolean
-): string {
-  if (isProjectChanging) return 'Waiting for folder selection...'
-  if (isOpening) return 'Opening project...'
-  return project.path
-}
-```
-
----
-
-#### todo027: Extract time formatting to utility file
-**Priority:** P2
-**File:** `src/renderer/src/utils/timeFormatting.ts` (NEW)
-**Estimated Effort:** 0.25 day
-**Issue:** 13-line function in component, not reusable
-**Options:**
-- **Option A:** Use library (date-fns, dayjs)
-- **Option B:** Extract to utility with tests
-
-**Option B:**
-```typescript
-// src/renderer/src/utils/timeFormatting.ts
-export function formatRelativeTime(timestamp: number): string {
-  const now = Date.now()
-  const diff = now - timestamp
-
-  const MINUTE = 60_000
-  const HOUR = 3600_000
-  const DAY = 86400_000
-  const WEEK = 604800_000
-
-  if (diff < MINUTE) return 'Just now'
-
-  const minutes = Math.floor(diff / MINUTE)
-  if (diff < HOUR) return formatUnit(minutes, 'minute')
-
-  const hours = Math.floor(diff / HOUR)
-  if (diff < DAY) return formatUnit(hours, 'hour')
-
-  const days = Math.floor(diff / DAY)
-  if (diff < WEEK) return formatUnit(days, 'day')
-
-  return new Date(timestamp).toLocaleDateString()
-}
-
-function formatUnit(value: number, unit: string): string {
-  return `${value} ${unit}${value > 1 ? 's' : ''} ago`
-}
-```
-
----
-
-#### todo028: Replace inline styles with CSS classes in WelcomePanel
-**Priority:** P2
-**File:** `src/renderer/src/components/Panels/WelcomePanel.tsx:174-177, 183`
-**Estimated Effort:** 0.1 day
-**Issue:** New style objects created on every render
-**Fix:**
-```typescript
-// Add to AppDockLayout.css:
-.recent-project-item.disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.recent-project-item.opening {
-  cursor: wait;
-}
-
-.recent-project-opening-text {
-  margin-left: 8px;
-  font-size: 12px;
-  color: #858585;
-}
-
-// Then in component:
-<div className={`recent-project-item ${getItemClasses(isOpening, isProjectChanging)}`}>
-```
-
----
-
-#### todo029: Extract magic numbers to constants
-**Priority:** P2
-**Files:** Multiple
-**Estimated Effort:** 0.1 day
-**Issue:** Magic numbers scattered throughout code
-**Fix:**
-```typescript
-// Create src/shared/constants.ts
-export const MAX_RECENT_PROJECTS = 5
-export const MIN_TIMESTAMP_INCREMENT = 1
-export const TOAST_DURATION_ERROR = 5000
-export const TOAST_DURATION_SUCCESS = 3000
-export const PROJECT_NAME_MAX_LENGTH = 255
-```
-
----
 
 #### todo030: Improve TypeScript safety - Remove 'as unknown as' casts
 **Priority:** P2
@@ -707,21 +582,21 @@ export async function validateProjectPath(projectPath: string): Promise<void>
 
 ## Summary
 
-**Total Items:** 48 todos (30 remaining)
-**Completed:** 18 items (todo007-013, todo014-017, todo018-020, todo021-024)
+**Total Items:** 48 todos (25 remaining)
+**Completed:** 23 items (todo007-013, todo014-017, todo018-020, todo021-029)
 
 **Estimated Effort (Remaining):**
 - **P0 (Critical):** ~4 days (todo001-006: testing only)
 - **P1 (High):** 0 days (all completed!)
-- **P2 (Medium):** 1-2 days
+- **P2 (Medium):** ~0.35 days (todo030-035)
 - **P3 (Low):** 10-12 days
 
 **Recommended Approach:**
 1. Complete all P0 testing items before merge (~4 days focused work)
-2. Cherry-pick P2 items based on user feedback
+2. Cherry-pick remaining P2 items based on user feedback
 3. Consider P3 items for future major versions
 
 **Next Steps:**
 1. Write comprehensive test suite (170+ tests) for P0 completion
-2. Review and prioritize P2 items based on user feedback
+2. Review and prioritize remaining P2 items based on user feedback
 3. Set milestone for P0 testing completion before merge
