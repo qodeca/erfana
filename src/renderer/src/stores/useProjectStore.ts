@@ -5,18 +5,22 @@ interface ProjectState {
   dockviewApi: DockviewApi | null
   editorPanelIds: Set<string>
   dirtyPanelIds: Set<string>
+  isProjectChanging: boolean
   setDockviewApi: (api: DockviewApi | null) => void
   registerEditorPanel: (id: string) => void
   setEditorDirty: (id: string, dirty: boolean) => void
   hasDirtyEditors: () => boolean
   clearAllEditorTabs: () => void
+  setProjectChanging: (changing: boolean) => void
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
   dockviewApi: null,
   editorPanelIds: new Set<string>(),
   dirtyPanelIds: new Set<string>(),
+  isProjectChanging: false,
   setDockviewApi: (api) => set({ dockviewApi: api }),
+  setProjectChanging: (changing: boolean) => set({ isProjectChanging: changing }),
   registerEditorPanel: (id: string) => {
     const next = new Set(get().editorPanelIds)
     next.add(id)
