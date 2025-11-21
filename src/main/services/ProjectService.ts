@@ -13,7 +13,7 @@
 import { stat, realpath } from 'fs/promises'
 import { normalize, sep, parse } from 'path'
 import { BrowserWindow } from 'electron'
-import { validatePath, PathSecurityError } from '../utils/pathSecurity'
+import { validatePath } from '../utils/pathSecurity'
 import { AppError, ErrorCode } from '../../shared/errors'
 import type { ProjectChanged } from '../../shared/ipc/schema'
 
@@ -185,7 +185,7 @@ export class ProjectService {
     try {
       await validatePath(newProjectPath)
     } catch (error) {
-      if (error instanceof PathSecurityError) {
+      if (error instanceof AppError) {
         const errorMsg = `Security validation failed: ${error.message}`
         return {
           success: false,
@@ -211,17 +211,14 @@ export class ProjectService {
 
     try {
       // 3. Validate directory exists and is accessible
-      let stats
-      try {
-        stats = await stat(newProjectPath)
-      } catch (error) {
+      const stats = await stat(newProjectPath).catch((error) => {
         const originalError = error instanceof Error ? error : undefined
         throw new AppError(
           'Project directory not found or not accessible',
           ErrorCode.PROJECT_NOT_FOUND,
           originalError
         )
-      }
+      })
 
       if (!stats.isDirectory()) {
         throw new AppError(

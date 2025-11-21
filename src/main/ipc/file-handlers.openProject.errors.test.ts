@@ -18,9 +18,14 @@ vi.mock('electron', () => ({
 }))
 
 // Mock fs/promises.stat to throw (simulate inaccessible dir)
+// Mock lstat to succeed so validatePath passes, but stat fails for project validation
 vi.mock('fs/promises', async () => {
   const actual = await vi.importActual<any>('fs/promises')
-  return { ...actual, stat: vi.fn(async () => { throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }) }) }
+  return {
+    ...actual,
+    stat: vi.fn(async () => { throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }) }),
+    lstat: vi.fn(async () => ({ isSymbolicLink: () => false })) // Not a symlink, so validatePath passes
+  }
 })
 
 // Mock services used by file-handlers
