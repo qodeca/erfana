@@ -96,6 +96,10 @@ export function registerFileHandlers(): void {
       // Persist last project path
       await settingsService.setLastProjectPath(newProjectPath)
 
+      // Add to recent projects (max 5)
+      const projectName = parse(newProjectPath).base || newProjectPath
+      await settingsService.addRecentProject(newProjectPath, projectName)
+
       // Notify renderers
       const payload: ProjectChanged = {
         oldPath: oldProjectPath,
@@ -144,6 +148,9 @@ export function registerFileHandlers(): void {
         } catch (e) {
           console.warn('Failed to set DirectoryWatcherService projectPath on restore:', e)
         }
+        // Update recent projects on startup
+        const projectName = parse(lastPath).base || lastPath
+        await settingsService.addRecentProject(lastPath, projectName)
         return lastPath
       }
     } catch {

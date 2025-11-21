@@ -5,10 +5,17 @@
  * Note: electron-store is ES Module, so we use dynamic import()
  */
 
+export interface RecentProject {
+  path: string
+  name: string
+  lastOpened: number // timestamp
+}
+
 interface Settings {
   lastProjectPath?: string
   projectFilterMode?: string
   directoryWatchDepth?: number | null
+  recentProjects?: RecentProject[]
 }
 
 // Copilot removed: no approved tools management
@@ -92,6 +99,46 @@ export class SettingsService {
     const store = await this.ensureStore()
     // null clears to undefined behavior (chokidar unlimited)
     store.set('directoryWatchDepth', depth === null ? null : Math.max(0, Math.floor(depth)))
+  }
+
+  // Recent Projects Management (max 5)
+
+  async getRecentProjects(): Promise<RecentProject[]> {
+    const store = await this.ensureStore()
+    const projects = store.get('recentProjects') || []
+    return projects
+  }
+
+  async addRecentProject(path: string, name: string): Promise<void> {
+    const store = await this.ensureStore()
+    const projects = store.get('recentProjects') || []
+
+    // Remove existing entry for this path (if any)
+    const filteredProjects = projects.filter((p) => p.path !== path)
+
+    // Add new entry at the front
+    const newProject: RecentProject = {
+      path,
+      name,
+      lastOpened: Date.now()
+    }
+
+    // Keep only the 5 most recent
+    const updatedProjects = [newProject, ...filteredProjects].slice(0, 5)
+
+    store.set('recentProjects', updatedProjects)
+  }
+
+  async removeRecentProject(path: string): Promise<void> {
+    const store = await this.ensureStore()
+    const projects = store.get('recentProjects') || []
+    const filteredProjects = projects.filter((p) => p.path !== path)
+    store.set('recentProjects', filteredProjects)
+  }
+
+  async clearRecentProjects(): Promise<void> {
+    const store = await this.ensureStore()
+    store.delete('recentProjects')
   }
 }
 
