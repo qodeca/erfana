@@ -165,6 +165,41 @@ describe('UIBlocker', () => {
       expect(blocker).toBeInTheDocument()
     })
   })
+
+  describe('Blocking mechanism', () => {
+    /**
+     * UIBlocker prevents interactions via TWO mechanisms:
+     * 1. CSS: position: fixed, inset: 0, z-index: 9999 - visually covers all content
+     * 2. JS: preventDefault() on all events - prevents default browser actions
+     *
+     * Note: We don't use stopPropagation() because:
+     * - In production, CSS positioning ensures clicks hit the blocker first
+     * - The blocker doesn't need to stop propagation; it intercepts clicks directly
+     * - stopPropagation() would break event delegation patterns if added
+     */
+
+    it('should call preventDefault on click events', () => {
+      mockIsProjectChanging.mockReturnValue(true)
+      const { container } = render(<UIBlocker />)
+
+      const blocker = container.querySelector('.ui-blocker')!
+      const event = fireEvent.click(blocker)
+
+      // fireEvent returns false when preventDefault was called
+      expect(event).toBe(false)
+    })
+
+    it('should have blocking CSS class for visual coverage', () => {
+      mockIsProjectChanging.mockReturnValue(true)
+      const { container } = render(<UIBlocker />)
+
+      // The ui-blocker class applies: position: fixed, inset: 0, z-index: 9999
+      // This ensures visual coverage (CSS cannot be tested in jsdom)
+      const blocker = container.querySelector('.ui-blocker')
+      expect(blocker).toBeInTheDocument()
+      expect(blocker).toHaveClass('ui-blocker')
+    })
+  })
 })
 
 describe('UIBlockerBase (reusable)', () => {

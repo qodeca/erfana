@@ -96,13 +96,21 @@ describe('WelcomePanel', () => {
       })
     })
 
-    it('should show welcome message', () => {
+    it('should show welcome message', async () => {
       render(<WelcomePanel {...mockDockviewProps} />)
+      // Wait for async loading to complete to avoid act() warnings
+      await waitFor(() => {
+        expect(mockGetRecentProjects).toHaveBeenCalled()
+      })
       expect(screen.getByText('Welcome to ERFANA')).toBeInTheDocument()
     })
 
-    it('should show instructions', () => {
+    it('should show instructions', async () => {
       render(<WelcomePanel {...mockDockviewProps} />)
+      // Wait for async loading to complete to avoid act() warnings
+      await waitFor(() => {
+        expect(mockGetRecentProjects).toHaveBeenCalled()
+      })
       expect(screen.getByText('Open a folder from the Project panel to start editing')).toBeInTheDocument()
     })
 

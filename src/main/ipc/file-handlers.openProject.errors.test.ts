@@ -1,3 +1,19 @@
+/**
+ * file-handlers.openProject.errors.test.ts
+ *
+ * Tests for openProject error hardening at the IPC handler layer.
+ *
+ * IMPORTANT: This test file validates the THIN ADAPTER pattern.
+ * - It mocks fs/promises and services to test the error handling WIRING
+ * - It does NOT test actual FileService behavior (that's in FileService.test.ts)
+ * - The value is verifying: error propagation, rollback invocation, broadcast prevention
+ *
+ * Why this approach is valid:
+ * - IPC handlers are adapters connecting main process services to renderer
+ * - Testing the adapter layer with mocks verifies the CONTRACT between layers
+ * - Integration tests would duplicate FileService tests without additional value
+ */
+
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Capture handlers
@@ -17,14 +33,14 @@ vi.mock('electron', () => ({
   }
 }))
 
-// Mock fs/promises.stat to throw (simulate inaccessible dir)
-// Mock lstat to succeed so validatePath passes, but stat fails for project validation
+// Mock fs/promises: access and lstat succeed (validatePath passes), but stat fails
 vi.mock('fs/promises', async () => {
   const actual = await vi.importActual<any>('fs/promises')
   return {
     ...actual,
     stat: vi.fn(async () => { throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }) }),
-    lstat: vi.fn(async () => ({ isSymbolicLink: () => false })) // Not a symlink, so validatePath passes
+    lstat: vi.fn(async () => ({ isSymbolicLink: () => false })), // Not a symlink
+    access: vi.fn(async () => {}) // Path is accessible (validatePath passes)
   }
 })
 
