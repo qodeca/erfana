@@ -22,6 +22,7 @@ const api = {
   // File operations
   file: {
     openProject: (): Promise<string | null> => ipcRenderer.invoke('file:openProject'),
+    openProjectByPath: (projectPath: string): Promise<string> => ipcRenderer.invoke('file:openProjectByPath', projectPath),
     getLastProjectPath: (): Promise<string | null> =>
       ipcRenderer.invoke('file:getLastProjectPath'),
     readDirectory: (dirPath: string): Promise<FileNode[]> =>

@@ -31,13 +31,10 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
 
   const handleProjectClick = async (projectPath: string) => {
     try {
-      // Trigger project opening through the existing flow
-      // The project will be opened and added to recent projects automatically
-      const fileTree = await window.api.file.readDirectory(projectPath)
-      if (fileTree) {
-        // Broadcast project change to trigger the normal project opening flow
-        window.location.reload() // Simple approach: reload to trigger fresh project load
-      }
+      // Open project using the proper flow that updates recent projects
+      await window.api.file.openProjectByPath(projectPath)
+      // The project:changed event will trigger UI updates automatically
+      // Recent projects timestamp is updated in the IPC handler
     } catch (error) {
       console.error('Failed to open project:', error)
       // Project might not exist anymore, remove it from recent list
