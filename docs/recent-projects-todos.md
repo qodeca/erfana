@@ -2,12 +2,13 @@
 
 ## Status Summary
 
-**Overall Assessment:** 72/100 → 85/100 → 90/100 (after SOLID refactoring)
+**Overall Assessment:** 72/100 → 85/100 → 90/100 → 92/100 (after P1 React improvements)
 **Priority Status:** P0 testing items (todo001-006) must be completed before merge to main
 
 **Completed:**
 - ✅ todo007-013 (performance, security, reliability fixes)
 - ✅ todo014-017 (SOLID refactoring: extracted 4 service classes)
+- ✅ todo018-020 (React improvements: useEffect deps, unmounted state, unified loading)
 
 **Legend:**
 - 🔴 P0 - Critical (Must Fix Before Merge)
@@ -265,85 +266,6 @@ describe('Recent Projects Integration')
 ---
 
 ## 🟠 P1 - High Priority (Should Fix)
-
-### React Improvements
-
-#### todo018: Fix missing useEffect dependencies in WelcomePanel
-**Priority:** P1
-**File:** `src/renderer/src/components/Panels/WelcomePanel.tsx:19-21`
-**Estimated Effort:** 0.1 day
-**Issue:** ESLint warning, `loadRecentProjects` not in deps
-**Fix:**
-```typescript
-// Change from:
-useEffect(() => {
-  loadRecentProjects()
-}, [])
-
-// To:
-const loadRecentProjects = useCallback(async () => {
-  // ... existing logic
-}, [])
-
-useEffect(() => {
-  loadRecentProjects()
-}, [loadRecentProjects])
-```
-
----
-
-#### todo019: Prevent state updates on unmounted components in WelcomePanel
-**Priority:** P1
-**File:** `src/renderer/src/components/Panels/WelcomePanel.tsx:55-88`
-**Estimated Effort:** 0.1 day
-**Issue:** React warning if component unmounts during async operation
-**Fix:**
-```typescript
-const isMounted = useRef(true)
-
-useEffect(() => {
-  return () => { isMounted.current = false }
-}, [])
-
-const handleProjectClick = async (projectPath: string) => {
-  if (isProjectChanging) return
-
-  setOpeningPath(projectPath)
-  try {
-    await window.api.file.openProjectByPath(projectPath)
-  } catch (error) {
-    // ... error handling
-  } finally {
-    if (isMounted.current) {  // Check before state update
-      setOpeningPath(null)
-    }
-  }
-}
-```
-
----
-
-#### todo020: Unify loading states in WelcomePanel
-**Priority:** P1
-**File:** `src/renderer/src/components/Panels/WelcomePanel.tsx:14-15`
-**Estimated Effort:** 0.25 day
-**Issue:** Two separate loading states create inconsistent UX
-**Fix:**
-```typescript
-type LoadingState =
-  | { type: 'initial' }
-  | { type: 'opening', path: string }
-  | { type: 'removing', path: string }
-  | { type: 'idle' }
-
-const [loadingState, setLoadingState] = useState<LoadingState>({ type: 'initial' })
-
-// Usage:
-const isLoading = loadingState.type === 'initial'
-const isOpening = loadingState.type === 'opening' && loadingState.path === project.path
-```
-
----
 
 ### Error Handling Improvements
 
@@ -884,8 +806,8 @@ export async function validateProjectPath(projectPath: string): Promise<void>
 
 ## Summary
 
-**Total Items:** 48 todos (37 remaining)
-**Completed:** 11 items (todo007-013: performance, security, reliability; todo014-017: SOLID refactoring)
+**Total Items:** 48 todos (34 remaining)
+**Completed:** 14 items (todo007-013: performance/security/reliability; todo014-017: SOLID refactoring; todo018-020: React improvements)
 
 **Estimated Effort (Remaining):**
 - **P0 (Critical):** ~4 days (todo001-006: testing only)
