@@ -52,7 +52,8 @@ const mockApi = {
     removeRecentProject: mockRemoveRecentProject
   },
   file: {
-    openProjectByPath: mockOpenProjectByPath
+    openProjectByPath: mockOpenProjectByPath,
+    onProjectChanged: vi.fn(() => vi.fn()) // Returns unsubscribe function
   }
 }
 

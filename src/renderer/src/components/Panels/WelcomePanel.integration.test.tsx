@@ -64,7 +64,8 @@ const mockApi = {
         simulatedProjects = simulatedProjects.slice(0, 5)
       }
       return path
-    })
+    }),
+    onProjectChanged: vi.fn(() => vi.fn()) // Returns unsubscribe function
   }
 }
 
