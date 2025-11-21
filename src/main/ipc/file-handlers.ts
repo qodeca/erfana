@@ -6,6 +6,7 @@ import { directoryWatcherService } from '../services/DirectoryWatcherService'
 import { stat, realpath } from 'fs/promises'
 import { normalize, sep, parse } from 'path'
 import type { ProjectChanged } from '../../shared/ipc/schema'
+import { validatePath, PathSecurityError } from '../utils/pathSecurity'
 
 async function canonicalizePath(p: string): Promise<string> {
   // Normalize separators
@@ -51,6 +52,16 @@ export function broadcastProjectChanged(payload: { oldPath: string | null; newPa
  */
 async function openProjectByPath(newProjectPath: string): Promise<string> {
   const oldProjectPath = fileService.getProjectPath()
+
+  // SECURITY: Validate path before any operations
+  try {
+    await validatePath(newProjectPath)
+  } catch (error) {
+    if (error instanceof PathSecurityError) {
+      throw new Error(`Security validation failed: ${error.message}`)
+    }
+    throw error
+  }
 
   // If same path (canonical comparison), just return null (no-op)
   if (oldProjectPath) {
@@ -135,10 +146,18 @@ export function registerFileHandlers(): void {
 
   // Open project folder by path (for recent projects, etc.)
   ipcMain.handle('file:openProjectByPath', async (_event, projectPath: string) => {
+    // Input validation
     if (!projectPath || typeof projectPath !== 'string') {
-      throw new Error('Invalid project path')
+      throw new Error('Invalid project path: must be a non-empty string')
     }
-    return await openProjectByPath(projectPath)
+
+    // Trim whitespace
+    const trimmedPath = projectPath.trim()
+    if (!trimmedPath) {
+      throw new Error('Invalid project path: path is empty after trimming')
+    }
+
+    return await openProjectByPath(trimmedPath)
   })
 
   // Get last opened project path if it still exists
@@ -164,9 +183,9 @@ export function registerFileHandlers(): void {
         } catch (e) {
           console.warn('Failed to set DirectoryWatcherService projectPath on restore:', e)
         }
-        // Update recent projects on startup
-        const projectName = parse(lastPath).base || lastPath
-        await settingsService.addRecentProject(lastPath, projectName)
+        // NOTE: Do NOT call addRecentProject here!
+        // It's only called in openProjectByPath() to avoid duplicate writes
+        // and ensure single source of truth for recent projects updates
         return lastPath
       }
     } catch {

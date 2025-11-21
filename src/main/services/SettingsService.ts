@@ -5,6 +5,9 @@
  * Note: electron-store is ES Module, so we use dynamic import()
  */
 
+import { Mutex } from 'async-mutex'
+import { realpathSync } from 'fs'
+
 export interface RecentProject {
   path: string
   name: string
@@ -26,6 +29,17 @@ type StoreLike<T> = {
   delete: (key: keyof T) => void
 }
 
+export class SettingsServiceError extends Error {
+  constructor(
+    message: string,
+    public operation: string,
+    public originalError?: Error
+  ) {
+    super(message)
+    this.name = 'SettingsServiceError'
+  }
+}
+
 export class SettingsService {
   /**
    * FIXED (Issue #4): Changed from `any` to conceptually `Store<Settings>`
@@ -34,6 +48,12 @@ export class SettingsService {
    */
   private store: StoreLike<Settings> | null
   private storePromise: Promise<StoreLike<Settings>>
+
+  // Mutex for preventing race conditions in recent projects operations
+  private recentProjectsMutex = new Mutex()
+
+  // Track last timestamp to ensure monotonicity (prevent clock skew issues)
+  private lastTimestamp = 0
 
   constructor() {
     // electron-store is an ES Module, so we need to import it dynamically
@@ -56,19 +76,59 @@ export class SettingsService {
     return this.store as StoreLike<Settings>
   }
 
+  /**
+   * Get canonical path for comparison (resolves case and symlinks)
+   * Returns original path if resolution fails (e.g., path doesn't exist)
+   */
+  private getCanonicalPath(path: string): string {
+    try {
+      return realpathSync(path)
+    } catch {
+      // Path doesn't exist or not accessible, return as-is
+      return path
+    }
+  }
+
   async getLastProjectPath(): Promise<string | null> {
-    const store = await this.ensureStore()
-    return store.get('lastProjectPath') || null
+    try {
+      const store = await this.ensureStore()
+      return store.get('lastProjectPath') || null
+    } catch (error) {
+      console.error('Failed to get last project path:', error)
+      throw new SettingsServiceError(
+        'Failed to retrieve last project path from settings',
+        'getLastProjectPath',
+        error instanceof Error ? error : undefined
+      )
+    }
   }
 
   async setLastProjectPath(path: string): Promise<void> {
-    const store = await this.ensureStore()
-    store.set('lastProjectPath', path)
+    try {
+      const store = await this.ensureStore()
+      store.set('lastProjectPath', path)
+    } catch (error) {
+      console.error('Failed to set last project path:', error)
+      throw new SettingsServiceError(
+        'Failed to save last project path to settings',
+        'setLastProjectPath',
+        error instanceof Error ? error : undefined
+      )
+    }
   }
 
   async clearLastProjectPath(): Promise<void> {
-    const store = await this.ensureStore()
-    store.delete('lastProjectPath')
+    try {
+      const store = await this.ensureStore()
+      store.delete('lastProjectPath')
+    } catch (error) {
+      console.error('Failed to clear last project path:', error)
+      throw new SettingsServiceError(
+        'Failed to clear last project path from settings',
+        'clearLastProjectPath',
+        error instanceof Error ? error : undefined
+      )
+    }
   }
 
   // Approved Tools Management removed
@@ -76,69 +136,174 @@ export class SettingsService {
   // Project Filter Mode Management
 
   async getProjectFilterMode(): Promise<string> {
-    const store = await this.ensureStore()
-    // Default to 'all' mode
-    return store.get('projectFilterMode') || 'all'
+    try {
+      const store = await this.ensureStore()
+      // Default to 'all' mode
+      return store.get('projectFilterMode') || 'all'
+    } catch (error) {
+      console.error('Failed to get project filter mode:', error)
+      throw new SettingsServiceError(
+        'Failed to retrieve project filter mode from settings',
+        'getProjectFilterMode',
+        error instanceof Error ? error : undefined
+      )
+    }
   }
 
   async setProjectFilterMode(mode: string): Promise<void> {
-    const store = await this.ensureStore()
-    store.set('projectFilterMode', mode)
+    try {
+      const store = await this.ensureStore()
+      store.set('projectFilterMode', mode)
+    } catch (error) {
+      console.error('Failed to set project filter mode:', error)
+      throw new SettingsServiceError(
+        'Failed to save project filter mode to settings',
+        'setProjectFilterMode',
+        error instanceof Error ? error : undefined
+      )
+    }
   }
 
   // Directory watcher depth (performance tuning)
   async getDirectoryWatchDepth(): Promise<number | undefined> {
-    const store = await this.ensureStore()
-    const v = store.get('directoryWatchDepth')
-    if (v === null || v === undefined) return undefined
-    if (typeof v === 'number' && v >= 0) return v
-    return undefined
+    try {
+      const store = await this.ensureStore()
+      const v = store.get('directoryWatchDepth')
+      if (v === null || v === undefined) return undefined
+      if (typeof v === 'number' && v >= 0) return v
+      return undefined
+    } catch (error) {
+      console.error('Failed to get directory watch depth:', error)
+      throw new SettingsServiceError(
+        'Failed to retrieve directory watch depth from settings',
+        'getDirectoryWatchDepth',
+        error instanceof Error ? error : undefined
+      )
+    }
   }
 
   async setDirectoryWatchDepth(depth: number | null): Promise<void> {
-    const store = await this.ensureStore()
-    // null clears to undefined behavior (chokidar unlimited)
-    store.set('directoryWatchDepth', depth === null ? null : Math.max(0, Math.floor(depth)))
+    try {
+      const store = await this.ensureStore()
+      // null clears to undefined behavior (chokidar unlimited)
+      store.set('directoryWatchDepth', depth === null ? null : Math.max(0, Math.floor(depth)))
+    } catch (error) {
+      console.error('Failed to set directory watch depth:', error)
+      throw new SettingsServiceError(
+        'Failed to save directory watch depth to settings',
+        'setDirectoryWatchDepth',
+        error instanceof Error ? error : undefined
+      )
+    }
   }
 
   // Recent Projects Management (max 5)
 
   async getRecentProjects(): Promise<RecentProject[]> {
-    const store = await this.ensureStore()
-    const projects = store.get('recentProjects') || []
-    return projects
+    try {
+      const store = await this.ensureStore()
+      const projects = store.get('recentProjects') || []
+      return projects
+    } catch (error) {
+      console.error('Failed to get recent projects:', error)
+      throw new SettingsServiceError(
+        'Failed to retrieve recent projects from settings',
+        'getRecentProjects',
+        error instanceof Error ? error : undefined
+      )
+    }
   }
 
   async addRecentProject(path: string, name: string): Promise<void> {
-    const store = await this.ensureStore()
-    const projects = store.get('recentProjects') || []
+    // Use mutex to prevent race conditions from parallel project opens
+    const release = await this.recentProjectsMutex.acquire()
+    try {
+      const store = await this.ensureStore()
+      const projects = store.get('recentProjects') || []
 
-    // Remove existing entry for this path (if any)
-    const filteredProjects = projects.filter((p) => p.path !== path)
+      // Get canonical path for comparison (resolves case-sensitivity and symlinks)
+      const canonicalPath = this.getCanonicalPath(path)
 
-    // Add new entry at the front
-    const newProject: RecentProject = {
-      path,
-      name,
-      lastOpened: Date.now()
+      // Remove existing entry using canonical comparison
+      // This prevents duplicates on case-insensitive filesystems (macOS)
+      const filteredProjects = projects.filter((p) => {
+        const canonicalP = this.getCanonicalPath(p.path)
+        return canonicalP !== canonicalPath
+      })
+
+      // Ensure timestamp is always increasing (handle clock skew from NTP, DST, manual adjustments)
+      const currentTime = Date.now()
+      const timestamp = Math.max(currentTime, this.lastTimestamp + 1)
+      this.lastTimestamp = timestamp
+
+      // Add new entry at the front
+      const newProject: RecentProject = {
+        path, // Store original path (not canonical) for display
+        name,
+        lastOpened: timestamp
+      }
+
+      // Keep only the 5 most recent
+      const updatedProjects = [newProject, ...filteredProjects].slice(0, 5)
+
+      store.set('recentProjects', updatedProjects)
+    } catch (error) {
+      console.error('Failed to add recent project:', error)
+      throw new SettingsServiceError(
+        'Failed to save recent project to settings',
+        'addRecentProject',
+        error instanceof Error ? error : undefined
+      )
+    } finally {
+      release()
     }
-
-    // Keep only the 5 most recent
-    const updatedProjects = [newProject, ...filteredProjects].slice(0, 5)
-
-    store.set('recentProjects', updatedProjects)
   }
 
   async removeRecentProject(path: string): Promise<void> {
-    const store = await this.ensureStore()
-    const projects = store.get('recentProjects') || []
-    const filteredProjects = projects.filter((p) => p.path !== path)
-    store.set('recentProjects', filteredProjects)
+    // Use mutex to prevent race conditions
+    const release = await this.recentProjectsMutex.acquire()
+    try {
+      const store = await this.ensureStore()
+      const projects = store.get('recentProjects') || []
+
+      // Get canonical path for comparison
+      const canonicalPath = this.getCanonicalPath(path)
+
+      // Remove using canonical comparison
+      const filteredProjects = projects.filter((p) => {
+        const canonicalP = this.getCanonicalPath(p.path)
+        return canonicalP !== canonicalPath
+      })
+
+      store.set('recentProjects', filteredProjects)
+    } catch (error) {
+      console.error('Failed to remove recent project:', error)
+      throw new SettingsServiceError(
+        'Failed to remove recent project from settings',
+        'removeRecentProject',
+        error instanceof Error ? error : undefined
+      )
+    } finally {
+      release()
+    }
   }
 
   async clearRecentProjects(): Promise<void> {
-    const store = await this.ensureStore()
-    store.delete('recentProjects')
+    // Use mutex to prevent race conditions
+    const release = await this.recentProjectsMutex.acquire()
+    try {
+      const store = await this.ensureStore()
+      store.delete('recentProjects')
+    } catch (error) {
+      console.error('Failed to clear recent projects:', error)
+      throw new SettingsServiceError(
+        'Failed to clear recent projects from settings',
+        'clearRecentProjects',
+        error instanceof Error ? error : undefined
+      )
+    } finally {
+      release()
+    }
   }
 }
 

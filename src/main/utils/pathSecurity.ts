@@ -1,0 +1,205 @@
+import { isAbsolute, normalize, resolve, dirname } from 'path'
+import { lstat, readlink, access, constants } from 'fs/promises'
+import { homedir } from 'os'
+
+/**
+ * Path Security Utilities
+ *
+ * Validates project paths to prevent:
+ * - Path traversal attacks (../, ../../, etc.)
+ * - Access to system directories (/System, /usr, /etc, etc.)
+ * - Symlink attacks (symlinks to sensitive directories)
+ * - Non-absolute or malformed paths
+ */
+
+export class PathSecurityError extends Error {
+  constructor(
+    message: string,
+    public code: 'INVALID_PATH' | 'SYSTEM_DIR' | 'SYMLINK_ATTACK' | 'NOT_ABSOLUTE' | 'NOT_ACCESSIBLE'
+  ) {
+    super(message)
+    this.name = 'PathSecurityError'
+  }
+}
+
+/**
+ * List of system directories that should never be opened as projects
+ */
+const SYSTEM_DIRECTORIES = [
+  '/System',
+  '/Library',
+  '/usr',
+  '/bin',
+  '/sbin',
+  '/etc',
+  '/var',
+  '/tmp',
+  '/private',
+  '/dev',
+  '/proc'
+]
+
+/**
+ * List of sensitive user directories that should be protected
+ */
+function getSensitiveUserDirectories(): string[] {
+  const home = homedir()
+  return [
+    `${home}/.ssh`,
+    `${home}/.gnupg`,
+    `${home}/.aws`,
+    `${home}/.config/gcloud`,
+    `${home}/Library/Keychains`,
+    `${home}/Library/Application Support/Google/Chrome`,
+    `${home}/Library/Application Support/Firefox`
+  ]
+}
+
+/**
+ * Check if a path points to a system or sensitive directory
+ */
+export function isSystemDirectory(path: string): boolean {
+  const normalized = normalize(path)
+
+  // Check system directories
+  for (const sysDir of SYSTEM_DIRECTORIES) {
+    if (normalized === sysDir || normalized.startsWith(sysDir + '/')) {
+      return true
+    }
+  }
+
+  // Check sensitive user directories
+  for (const sensitiveDir of getSensitiveUserDirectories()) {
+    if (normalized === sensitiveDir || normalized.startsWith(sensitiveDir + '/')) {
+      return true
+    }
+  }
+
+  return false
+}
+
+/**
+ * Validate that a path is safe to use as a project directory
+ *
+ * Checks:
+ * - Path is a non-empty string
+ * - Path is absolute (not relative)
+ * - Path doesn't contain path traversal patterns
+ * - Path is not a system or sensitive directory
+ * - Path is accessible (exists and readable)
+ *
+ * @throws PathSecurityError if validation fails
+ */
+export async function validateProjectPath(projectPath: string): Promise<void> {
+  // Check path is a valid string
+  if (!projectPath || typeof projectPath !== 'string') {
+    throw new PathSecurityError('Project path must be a non-empty string', 'INVALID_PATH')
+  }
+
+  // Check path is absolute
+  if (!isAbsolute(projectPath)) {
+    throw new PathSecurityError(
+      'Project path must be absolute. Relative paths are not allowed for security reasons.',
+      'NOT_ABSOLUTE'
+    )
+  }
+
+  // Normalize path to resolve any .. or . segments
+  const normalized = normalize(projectPath)
+
+  // Check if path is a system directory
+  if (isSystemDirectory(normalized)) {
+    throw new PathSecurityError(
+      'Cannot open system or sensitive directories as projects',
+      'SYSTEM_DIR'
+    )
+  }
+
+  // Check path is accessible
+  try {
+    await access(normalized, constants.R_OK | constants.X_OK)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new PathSecurityError(
+      `Cannot access project directory: ${message}`,
+      'NOT_ACCESSIBLE'
+    )
+  }
+}
+
+/**
+ * Validate a symlink and its target
+ *
+ * Checks:
+ * - If path is a symlink
+ * - If symlink target is accessible
+ * - If symlink target is not a system/sensitive directory
+ *
+ * @returns true if path is a symlink, false otherwise
+ * @throws PathSecurityError if symlink is dangerous
+ */
+export async function validateSymlink(projectPath: string): Promise<boolean> {
+  let stats
+  try {
+    stats = await lstat(projectPath) // Don't follow symlinks
+  } catch {
+    // Path doesn't exist or not accessible
+    return false
+  }
+
+  if (!stats.isSymbolicLink()) {
+    return false // Not a symlink, nothing to validate
+  }
+
+  // It's a symlink - validate the target
+  try {
+    const target = await readlink(projectPath)
+    const resolvedTarget = resolve(dirname(projectPath), target)
+
+    // Check if symlink target is a system directory
+    if (isSystemDirectory(resolvedTarget)) {
+      throw new PathSecurityError(
+        'Cannot open symlink to system or sensitive directory',
+        'SYMLINK_ATTACK'
+      )
+    }
+
+    // Check symlink target is accessible
+    try {
+      await access(resolvedTarget, constants.R_OK | constants.X_OK)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      throw new PathSecurityError(
+        `Symlink target is not accessible: ${message}`,
+        'NOT_ACCESSIBLE'
+      )
+    }
+
+    return true // Valid symlink
+  } catch (_error) {
+    if (_error instanceof PathSecurityError) {
+      throw _error // Re-throw security errors
+    }
+    // Other errors (broken symlink, etc.)
+    throw new PathSecurityError(
+      `Invalid symlink: ${_error instanceof Error ? _error.message : String(_error)}`,
+      'SYMLINK_ATTACK'
+    )
+  }
+}
+
+/**
+ * Comprehensive path security validation
+ *
+ * Validates both regular paths and symlinks
+ * Use this as the main entry point for path validation
+ *
+ * @throws PathSecurityError if validation fails
+ */
+export async function validatePath(projectPath: string): Promise<void> {
+  // First validate the path itself
+  await validateProjectPath(projectPath)
+
+  // Then validate if it's a symlink
+  await validateSymlink(projectPath)
+}

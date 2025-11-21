@@ -1,6 +1,7 @@
 import { IDockviewPanelProps } from 'dockview'
 import { Home, Folder, Clock, X } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { showGlobalToast } from '../Toast/toastService'
 
 interface RecentProject {
   path: string
@@ -11,6 +12,7 @@ interface RecentProject {
 export function WelcomePanel(_props: IDockviewPanelProps) {
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([])
   const [loading, setLoading] = useState(true)
+  const [openingPath, setOpeningPath] = useState<string | null>(null)
 
   useEffect(() => {
     loadRecentProjects()
@@ -21,15 +23,29 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
       const result = await window.api.settings.getRecentProjects()
       if (result.success && result.projects) {
         setRecentProjects(result.projects)
+      } else if (result.error) {
+        showGlobalToast({
+          title: 'Failed to Load Recent Projects',
+          message: result.error,
+          type: 'error',
+          duration: 5000
+        })
       }
     } catch (error) {
       console.error('Failed to load recent projects:', error)
+      showGlobalToast({
+        title: 'Failed to Load Recent Projects',
+        message: error instanceof Error ? error.message : 'An unknown error occurred',
+        type: 'error',
+        duration: 5000
+      })
     } finally {
       setLoading(false)
     }
   }
 
   const handleProjectClick = async (projectPath: string) => {
+    setOpeningPath(projectPath)
     try {
       // Open project using the proper flow that updates recent projects
       await window.api.file.openProjectByPath(projectPath)
@@ -37,9 +53,31 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
       // Recent projects timestamp is updated in the IPC handler
     } catch (error) {
       console.error('Failed to open project:', error)
-      // Project might not exist anymore, remove it from recent list
-      await window.api.settings.removeRecentProject(projectPath)
-      loadRecentProjects()
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
+
+      // Check if it's a "file not found" type error
+      const isNotFound = errorMessage.includes('ENOENT') || errorMessage.includes('Cannot access') || errorMessage.includes('not found')
+
+      showGlobalToast({
+        title: 'Failed to Open Project',
+        message: isNotFound
+          ? `Project no longer exists at this location. It has been removed from recent projects.`
+          : errorMessage,
+        type: 'error',
+        duration: 5000
+      })
+
+      // If project doesn't exist, remove it from recent list
+      if (isNotFound) {
+        try {
+          await window.api.settings.removeRecentProject(projectPath)
+          loadRecentProjects()
+        } catch (removeError) {
+          console.error('Failed to remove stale project:', removeError)
+        }
+      }
+    } finally {
+      setOpeningPath(null)
     }
   }
 
@@ -48,11 +86,32 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
     event.stopPropagation()
 
     try {
-      await window.api.settings.removeRecentProject(projectPath)
-      // Reload the list to reflect the removal
-      loadRecentProjects()
+      const result = await window.api.settings.removeRecentProject(projectPath)
+      if (result.success) {
+        // Reload the list to reflect the removal
+        loadRecentProjects()
+        showGlobalToast({
+          title: 'Project Removed',
+          message: 'Project removed from recent projects',
+          type: 'success',
+          duration: 3000
+        })
+      } else if (result.error) {
+        showGlobalToast({
+          title: 'Failed to Remove Project',
+          message: result.error,
+          type: 'error',
+          duration: 5000
+        })
+      }
     } catch (error) {
       console.error('Failed to remove project from recent list:', error)
+      showGlobalToast({
+        title: 'Failed to Remove Project',
+        message: error instanceof Error ? error.message : 'An unknown error occurred',
+        type: 'error',
+        duration: 5000
+      })
     }
   }
 
@@ -85,31 +144,40 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
                 Recent Projects
               </h3>
               <div className="recent-projects-list">
-                {recentProjects.map((project) => (
-                  <div
-                    key={project.path}
-                    className="recent-project-item"
-                    onClick={() => handleProjectClick(project.path)}
-                    title={project.path}
-                  >
-                    <Folder size={16} className="recent-project-icon" />
-                    <div className="recent-project-info">
-                      <div className="recent-project-name">{project.name}</div>
-                      <div className="recent-project-path">{project.path}</div>
-                    </div>
-                    <div className="recent-project-time">
-                      {formatLastOpened(project.lastOpened)}
-                    </div>
-                    <button
-                      className="recent-project-remove"
-                      onClick={(e) => handleRemoveProject(project.path, e)}
-                      title="Remove from recent projects"
-                      aria-label="Remove from recent projects"
+                {recentProjects.map((project) => {
+                  const isOpening = openingPath === project.path
+                  return (
+                    <div
+                      key={project.path}
+                      className={`recent-project-item ${isOpening ? 'loading' : ''}`}
+                      onClick={() => !isOpening && handleProjectClick(project.path)}
+                      title={isOpening ? 'Opening project...' : project.path}
+                      style={{ cursor: isOpening ? 'wait' : 'pointer' }}
                     >
-                      <X size={16} />
-                    </button>
-                  </div>
-                ))}
+                      <Folder size={16} className="recent-project-icon" />
+                      <div className="recent-project-info">
+                        <div className="recent-project-name">
+                          {project.name}
+                          {isOpening && <span style={{ marginLeft: '8px', fontSize: '12px', color: '#858585' }}>Opening...</span>}
+                        </div>
+                        <div className="recent-project-path">{project.path}</div>
+                      </div>
+                      <div className="recent-project-time">
+                        {formatLastOpened(project.lastOpened)}
+                      </div>
+                      <button
+                        className="recent-project-remove"
+                        onClick={(e) => handleRemoveProject(project.path, e)}
+                        title="Remove from recent projects"
+                        aria-label="Remove from recent projects"
+                        disabled={isOpening}
+                        style={{ opacity: isOpening ? 0.5 : 1 }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
