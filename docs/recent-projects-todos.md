@@ -6,10 +6,10 @@
 **Priority Status:** P0 testing items (todo001-006) must be completed before merge to main
 
 **Completed:**
-- ✅ todo007-013 (performance, security, reliability fixes)
-- ✅ todo014-017 (SOLID refactoring: extracted 4 service classes)
-- ✅ todo018-020 (React improvements: useEffect deps, unmounted state, unified loading)
-- ✅ todo021-024 (Error handling: standardized types, error codes, user messages, feedback)
+- ✅ todo007-013
+- ✅ todo014-017
+- ✅ todo018-020
+- ✅ todo021-024
 
 **Legend:**
 - 🔴 P0 - Critical (Must Fix Before Merge)
@@ -708,7 +708,7 @@ export async function validateProjectPath(projectPath: string): Promise<void>
 ## Summary
 
 **Total Items:** 48 todos (30 remaining)
-**Completed:** 18 items (todo007-013: performance/security/reliability; todo014-017: SOLID refactoring; todo018-020: React improvements; todo021-024: error handling)
+**Completed:** 18 items (todo007-013, todo014-017, todo018-020, todo021-024)
 
 **Estimated Effort (Remaining):**
 - **P0 (Critical):** ~4 days (todo001-006: testing only)
