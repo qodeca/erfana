@@ -2,8 +2,10 @@
 
 ## Status Summary
 
-**Overall Assessment:** 72/100
-**Priority Status:** P0 (Critical) items must be completed before merge to main
+**Overall Assessment:** 72/100 → 85/100 (after P0 performance/security/reliability fixes)
+**Priority Status:** P0 testing items (todo001-006) must be completed before merge to main
+
+**Completed:** ✅ todo007-013 (performance, security, reliability fixes)
 
 **Legend:**
 - 🔴 P0 - Critical (Must Fix Before Merge)
@@ -256,193 +258,6 @@ describe('Recent Projects Integration')
   - should maintain max 5 projects after multiple operations
   - should update timestamps correctly on re-open
   - should handle symlink and case-insensitive duplicates
-```
-
----
-
-### Performance Fixes
-
-#### todo007: Make getCanonicalPath async in SettingsService
-**Priority:** P0
-**File:** `src/main/services/SettingsService.ts:84-88`
-**Estimated Effort:** 0.25 day
-**Issue:** Synchronous `realpathSync` blocks main process
-**Fix:**
-```typescript
-// Change from:
-private getCanonicalPath(path: string): string {
-  try {
-    return realpathSync(path)
-  } catch {
-    return path
-  }
-}
-
-// To:
-private async getCanonicalPathAsync(path: string): Promise<string> {
-  try {
-    return await realpath(path)  // Non-blocking
-  } catch {
-    return path
-  }
-}
-```
-
----
-
-#### todo008: Parallelize canonical path resolution in addRecentProject
-**Priority:** P0
-**File:** `src/main/services/SettingsService.ts:229-232`
-**Estimated Effort:** 0.25 day
-**Issue:** N filesystem calls inside mutex (blocks all concurrent operations)
-**Fix:**
-```typescript
-// Change from:
-const filteredProjects = projects.filter((p) => {
-  const canonicalP = this.getCanonicalPath(p.path)  // N calls
-  return canonicalP !== canonicalPath
-})
-
-// To:
-const canonicalPath = await this.getCanonicalPathAsync(path)
-const canonicalPaths = await Promise.all(
-  projects.map(p => this.getCanonicalPathAsync(p.path))
-)
-const filteredProjects = projects.filter((p, i) =>
-  canonicalPaths[i] !== canonicalPath
-)
-```
-
----
-
-### Security Fixes
-
-#### todo009: Fix symlink validation to handle absolute vs relative targets
-**Priority:** P0
-**File:** `src/main/utils/pathSecurity.ts:157`
-**Estimated Effort:** 0.1 day
-**Issue:** `readlink()` can return absolute path, but code assumes relative
-**Fix:**
-```typescript
-// Change from:
-const resolvedTarget = resolve(dirname(projectPath), target)
-
-// To:
-import { isAbsolute } from 'path'
-const resolvedTarget = isAbsolute(target)
-  ? normalize(target)
-  : resolve(dirname(projectPath), target)
-```
-
----
-
-#### todo010: Fix Windows path separator bug in isSystemDirectory
-**Priority:** P0
-**File:** `src/main/utils/pathSecurity.ts:66-68`
-**Estimated Effort:** 0.1 day
-**Issue:** Hardcoded `/` separator doesn't work on Windows
-**Fix:**
-```typescript
-// Change from:
-if (normalized === sysDir || normalized.startsWith(sysDir + '/')) {
-
-// To:
-import { sep } from 'path'
-if (normalized === sysDir || normalized.startsWith(sysDir + sep)) {
-```
-
----
-
-#### todo011: Document TOCTOU vulnerability limitations
-**Priority:** P0
-**File:** `src/main/utils/pathSecurity.ts` (add JSDoc comment)
-**Estimated Effort:** 0.1 day
-**Description:**
-Add documentation explaining TOCTOU (Time-of-Check-Time-of-Use) is inherent in filesystem operations and how errors are handled at use-site.
-
-**Add Comment:**
-```typescript
-/**
- * SECURITY NOTE: TOCTOU Limitation
- *
- * This validation checks path accessibility at validation time, but permissions
- * could change between check and actual use. This is an inherent limitation
- * of filesystem operations.
- *
- * Mitigation: All filesystem operations include proper error handling at use-site
- * to catch permission changes or file deletions.
- */
-```
-
----
-
-### Reliability Fixes
-
-#### todo012: Add stale project cleanup on app startup
-**Priority:** P0
-**File:** `src/main/services/SettingsService.ts` (add method), `src/main/index.ts` (call on startup)
-**Estimated Effort:** 0.25 day
-**Issue:** Deleted projects still occupy recent list slots
-**Fix:**
-```typescript
-// In SettingsService.ts
-async cleanupStaleProjects(): Promise<void> {
-  const release = await this.recentProjectsMutex.acquire()
-  try {
-    const store = await this.ensureStore()
-    const projects = store.get('recentProjects') || []
-
-    const validProjects = []
-    for (const project of projects) {
-      try {
-        await access(project.path, constants.R_OK | constants.X_OK)
-        validProjects.push(project)
-      } catch {
-        // Project no longer exists, skip it
-      }
-    }
-
-    if (validProjects.length !== projects.length) {
-      store.set('recentProjects', validProjects)
-    }
-  } finally {
-    release()
-  }
-}
-
-// In main/index.ts (after app ready)
-await settingsService.cleanupStaleProjects()
-```
-
----
-
-#### todo013: Persist lastTimestamp or remove monotonicity requirement
-**Priority:** P0
-**File:** `src/main/services/SettingsService.ts:56`
-**Estimated Effort:** 0.25 day
-**Issue:** In-memory `lastTimestamp` is lost on restart, monotonicity breaks
-**Option A - Persist:**
-```typescript
-async addRecentProject(path: string, name: string): Promise<void> {
-  const release = await this.recentProjectsMutex.acquire()
-  try {
-    const store = await this.ensureStore()
-    const lastPersisted = store.get('lastTimestamp') || 0
-    const currentTime = Date.now()
-    const timestamp = Math.max(currentTime, lastPersisted + 1)
-
-    store.set('lastTimestamp', timestamp)
-    // ... rest of logic
-  } finally {
-    release()
-  }
-}
-```
-
-**Option B - Remove (simpler):**
-```typescript
-// Just use Date.now() and accept potential collisions
-const timestamp = Date.now()
 ```
 
 ---
@@ -1194,21 +1009,32 @@ export async function validateProjectPath(projectPath: string): Promise<void>
 
 ## Summary
 
-**Total Items:** 48 todos
-**Estimated Effort:**
-- **P0 (Critical):** 3.5-4 days
+**Total Items:** 48 todos (41 remaining)
+**Completed:** 7 items (todo007-013: performance, security, reliability)
+
+**Estimated Effort (Remaining):**
+- **P0 (Critical):** ~4 days (todo001-006: testing only)
 - **P1 (High):** 2-3 days
 - **P2 (Medium):** 1-2 days
 - **P3 (Low):** 10-12 days
 
+**Completed in Latest Commit (6e36038):**
+- ✅ todo007: Async canonical path resolution (non-blocking filesystem)
+- ✅ todo008: Parallelized path resolution (Promise.all)
+- ✅ todo009: Fixed symlink validation (absolute vs relative targets)
+- ✅ todo010: Fixed Windows path separator bug (platform-specific sep)
+- ✅ todo011: Documented TOCTOU vulnerability limitations
+- ✅ todo012: Added stale project cleanup on startup
+- ✅ todo013: Persisted lastTimestamp for monotonicity across restarts
+
 **Recommended Approach:**
-1. Complete all P0 items before merge (4 days focused work)
+1. Complete all P0 testing items before merge (~4 days focused work)
 2. Address P1 items in follow-up PR (3 days)
 3. Cherry-pick P2 items based on user feedback
 4. Consider P3 items for future major versions
 
 **Next Steps:**
-1. Review and prioritize with team
-2. Create GitHub issues for P0/P1 items
-3. Assign owners for each todo
-4. Set milestone for P0 completion
+1. Write comprehensive test suite (170+ tests)
+2. Review and prioritize P1 items with team
+3. Create GitHub issues for P1 items
+4. Set milestone for P0 testing completion
