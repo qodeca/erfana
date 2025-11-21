@@ -2,10 +2,12 @@
 
 ## Status Summary
 
-**Overall Assessment:** 72/100 → 85/100 (after P0 performance/security/reliability fixes)
+**Overall Assessment:** 72/100 → 85/100 → 90/100 (after SOLID refactoring)
 **Priority Status:** P0 testing items (todo001-006) must be completed before merge to main
 
-**Completed:** ✅ todo007-013 (performance, security, reliability fixes)
+**Completed:**
+- ✅ todo007-013 (performance, security, reliability fixes)
+- ✅ todo014-017 (SOLID refactoring: extracted 4 service classes)
 
 **Legend:**
 - 🔴 P0 - Critical (Must Fix Before Merge)
@@ -263,133 +265,6 @@ describe('Recent Projects Integration')
 ---
 
 ## 🟠 P1 - High Priority (Should Fix)
-
-### Refactoring
-
-#### todo014: Refactor SettingsService.addRecentProject - Extract duplicate removal
-**Priority:** P1
-**File:** `src/main/services/SettingsService.ts:217-260`
-**Estimated Effort:** 0.5 day
-**Issue:** Function has 12 responsibilities (SRP violation)
-**Fix:**
-```typescript
-// Create new file: src/main/services/RecentProjectsDeduplicator.ts
-export class RecentProjectsDeduplicator {
-  async removeDuplicates(
-    projects: RecentProject[],
-    newPath: string
-  ): Promise<RecentProject[]> {
-    const canonicalPath = await this.getCanonicalPathAsync(newPath)
-    const canonicalPaths = await Promise.all(
-      projects.map(p => this.getCanonicalPathAsync(p.path))
-    )
-    return projects.filter((p, i) => canonicalPaths[i] !== canonicalPath)
-  }
-}
-```
-
----
-
-#### todo015: Refactor SettingsService.addRecentProject - Extract timestamp generation
-**Priority:** P1
-**File:** `src/main/services/SettingsService.ts:234-237`
-**Estimated Effort:** 0.25 day
-**Fix:**
-```typescript
-// Create new file: src/main/services/MonotonicTimestampGenerator.ts
-export class MonotonicTimestampGenerator {
-  private lastTimestamp = 0
-
-  async generate(): Promise<number> {
-    const currentTime = Date.now()
-    const timestamp = Math.max(currentTime, this.lastTimestamp + 1)
-    this.lastTimestamp = timestamp
-    return timestamp
-  }
-
-  async restore(persistedTimestamp: number): Promise<void> {
-    this.lastTimestamp = persistedTimestamp
-  }
-}
-```
-
----
-
-#### todo016: Refactor SettingsService.addRecentProject - Extract repository pattern
-**Priority:** P1
-**File:** `src/main/services/SettingsService.ts`
-**Estimated Effort:** 0.5 day
-**Fix:**
-```typescript
-// Create new file: src/main/services/RecentProjectsRepository.ts
-export class RecentProjectsRepository {
-  constructor(private store: StoreLike<Settings>) {}
-
-  async getAll(): Promise<RecentProject[]> {
-    return this.store.get('recentProjects') || []
-  }
-
-  async save(projects: RecentProject[]): Promise<void> {
-    this.store.set('recentProjects', projects)
-  }
-
-  async clear(): Promise<void> {
-    this.store.delete('recentProjects')
-  }
-}
-```
-
----
-
-#### todo017: Extract ProjectService for orchestration
-**Priority:** P1
-**File:** `src/main/services/ProjectService.ts` (NEW)
-**Estimated Effort:** 1 day
-**Issue:** IPC handler doing orchestration (should be thin adapter)
-**Fix:**
-```typescript
-// Create new service that orchestrates project switching
-export class ProjectService {
-  constructor(
-    private fileService: FileService,
-    private fileWatcherService: FileWatcherService,
-    private directoryWatcherService: DirectoryWatcherService,
-    private settingsService: SettingsService
-  ) {}
-
-  async switchProject(newPath: string): Promise<ProjectSwitchResult> {
-    // 1. Validate
-    await validatePath(newPath)
-
-    // 2. Check if same
-    const oldPath = this.fileService.getProjectPath()
-    if (oldPath && await this.isSameProject(oldPath, newPath)) {
-      return { success: true, path: newPath, action: 'noop' }
-    }
-
-    // 3. Stop watchers
-    await this.stopAllWatchers()
-
-    // 4. Update services
-    await this.updateServices(newPath)
-
-    // 5. Persist
-    await this.persistProjectChange(newPath)
-
-    // 6. Broadcast
-    this.broadcastProjectChanged(oldPath, newPath)
-
-    return { success: true, path: newPath, action: 'switched' }
-  }
-}
-
-// Then in file-handlers.ts:
-ipcMain.handle('file:openProjectByPath', async (_event, path: string) => {
-  return await projectService.switchProject(path)
-})
-```
-
----
 
 ### React Improvements
 
