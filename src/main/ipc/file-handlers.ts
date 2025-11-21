@@ -1,39 +1,17 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
+import { stat } from 'fs/promises'
+import { ProjectService } from '../services/ProjectService'
 import { fileService } from '../services/FileService'
-import { settingsService } from '../services/SettingsService'
 import { fileWatcherService } from '../services/FileWatcherService'
 import { directoryWatcherService } from '../services/DirectoryWatcherService'
-import { stat, realpath } from 'fs/promises'
-import { normalize, sep, parse } from 'path'
+import { settingsService } from '../services/SettingsService'
 import type { ProjectChanged } from '../../shared/ipc/schema'
-import { validatePath, PathSecurityError } from '../utils/pathSecurity'
 
-async function canonicalizePath(p: string): Promise<string> {
-  // Normalize separators
-  let n = normalize(p)
-
-  // Preserve root; trim trailing separators only past root length
-  const root = parse(n).root
-  while (n.length > root.length && n.endsWith(sep)) {
-    n = n.slice(0, -1)
-  }
-
-  // Resolve symlinks if possible
-  let r = n
-  try {
-    r = await realpath(n)
-  } catch {
-    // ignore, fallback to normalized path
-  }
-
-  // Case fold only on Windows (case-insensitive by default)
-  if (process.platform === 'win32') {
-    r = r.toLowerCase()
-  }
-  return r
-}
-
-export function broadcastProjectChanged(payload: { oldPath: string | null; newPath: string | null }) {
+/**
+ * Broadcast project change to all renderer processes
+ * Used by handlers that need to notify renderers of project changes
+ */
+export function broadcastProjectChanged(payload: ProjectChanged): void {
   const windows = BrowserWindow.getAllWindows()
   for (const win of windows) {
     if (win && !win.isDestroyed()) {
@@ -46,85 +24,29 @@ export function broadcastProjectChanged(payload: { oldPath: string | null; newPa
   }
 }
 
+// REFACTORING (todo017): Create ProjectService singleton for orchestration
+// Thin adapter pattern: IPC handler depends on service, not orchestration logic
+const projectService = new ProjectService(
+  fileService,
+  fileWatcherService,
+  directoryWatcherService,
+  settingsService
+)
+
 /**
  * Common logic for opening a project by path
  * Used by both file:openProject (dialog) and file:openProjectByPath (direct)
+ *
+ * REFACTORING (todo017): Simplified to thin adapter delegating to ProjectService
  */
 async function openProjectByPath(newProjectPath: string): Promise<string> {
-  const oldProjectPath = fileService.getProjectPath()
+  const result = await projectService.switchProject(newProjectPath)
 
-  // SECURITY: Validate path before any operations
-  try {
-    await validatePath(newProjectPath)
-  } catch (error) {
-    if (error instanceof PathSecurityError) {
-      throw new Error(`Security validation failed: ${error.message}`)
-    }
-    throw error
+  if (!result.success) {
+    throw new Error(result.error || 'Unknown error')
   }
 
-  // If same path (canonical comparison), just return null (no-op)
-  if (oldProjectPath) {
-    const [canonOld, canonNew] = await Promise.all([
-      canonicalizePath(oldProjectPath),
-      canonicalizePath(newProjectPath)
-    ])
-    if (canonOld === canonNew) {
-      return newProjectPath
-    }
-  }
-
-  try {
-    // Validate directory exists and is accessible before touching current state
-    const stats = await stat(newProjectPath)
-    if (!stats.isDirectory()) {
-      throw new Error('Selected path is not a directory')
-    }
-
-    // Stop all existing watchers before switching
-    try {
-      await fileWatcherService.stopAll()
-      await directoryWatcherService.stopAll()
-    } catch (e) {
-      // Non-fatal: proceed with switch, guards prevent stale events
-      console.warn('Stopping watchers failed (continuing):', e)
-    }
-
-    // Update project path across services
-    fileService.setProjectPath(newProjectPath)
-    fileWatcherService.setProjectPath(newProjectPath)
-    directoryWatcherService.setProjectPath(newProjectPath)
-
-    // Persist last project path
-    await settingsService.setLastProjectPath(newProjectPath)
-
-    // Add to recent projects (max 5) - CRITICAL: Updates timestamp!
-    const projectName = parse(newProjectPath).base || newProjectPath
-    await settingsService.addRecentProject(newProjectPath, projectName)
-
-    // Notify renderers
-    const payload: ProjectChanged = {
-      oldPath: oldProjectPath,
-      newPath: newProjectPath
-    }
-    broadcastProjectChanged(payload)
-
-    return newProjectPath
-  } catch (error) {
-    // Roll back to previous project path in services on failure
-    try {
-      fileService.setProjectPath(oldProjectPath || '')
-      fileWatcherService.setProjectPath(oldProjectPath || '')
-      directoryWatcherService.setProjectPath(oldProjectPath || '')
-    } catch (e) {
-      // Best-effort rollback
-      console.warn('Rollback failed after openProject error:', e)
-    }
-    const message = error instanceof Error ? error.message : String(error)
-    console.error('Open project failed:', message)
-    // Throw so renderer can show toast
-    throw new Error(message)
-  }
+  return result.path
 }
 
 export function registerFileHandlers(): void {

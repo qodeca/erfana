@@ -6,7 +6,10 @@
  */
 
 import { Mutex } from 'async-mutex'
-import { realpath, access, constants } from 'fs/promises'
+import { access, constants } from 'fs/promises'
+import { MonotonicTimestampGenerator } from './MonotonicTimestampGenerator'
+import { RecentProjectsDeduplicator } from './RecentProjectsDeduplicator'
+import { RecentProjectsRepository } from './RecentProjectsRepository'
 
 export interface RecentProject {
   path: string
@@ -53,8 +56,10 @@ export class SettingsService {
   // Mutex for preventing race conditions in recent projects operations
   private recentProjectsMutex = new Mutex()
 
-  // Track last timestamp to ensure monotonicity (prevent clock skew issues)
-  private lastTimestamp = 0
+  // REFACTORING (todo014-016): Extract responsibilities to dedicated classes
+  private timestampGenerator = new MonotonicTimestampGenerator()
+  private deduplicator = new RecentProjectsDeduplicator()
+  private repository: RecentProjectsRepository | null = null
 
   constructor() {
     // electron-store is an ES Module, so we need to import it dynamically
@@ -66,10 +71,13 @@ export class SettingsService {
       const instance = new ElectronStore<Settings>({ name: 'erfana-settings' })
       this.store = instance
 
-      // RELIABILITY FIX (todo013): Load persisted timestamp on startup
-      const persistedTimestamp = instance.get('lastTimestamp')
+      // Initialize repository with store
+      this.repository = new RecentProjectsRepository(instance)
+
+      // Restore persisted timestamp
+      const persistedTimestamp = this.repository.getLastTimestamp()
       if (persistedTimestamp && typeof persistedTimestamp === 'number') {
-        this.lastTimestamp = persistedTimestamp
+        this.timestampGenerator.restore(persistedTimestamp)
       }
 
       return instance
@@ -84,19 +92,12 @@ export class SettingsService {
     return this.store as StoreLike<Settings>
   }
 
-  /**
-   * Get canonical path for comparison (resolves case and symlinks)
-   * Returns original path if resolution fails (e.g., path doesn't exist)
-   *
-   * PERFORMANCE FIX (todo007): Changed from synchronous to async to prevent blocking main process
-   */
-  private async getCanonicalPathAsync(path: string): Promise<string> {
-    try {
-      return await realpath(path)
-    } catch {
-      // Path doesn't exist or not accessible, return as-is
-      return path
+  private async ensureRepository(): Promise<RecentProjectsRepository> {
+    await this.ensureStore()
+    if (!this.repository) {
+      throw new Error('Repository not initialized')
     }
+    return this.repository
   }
 
   async getLastProjectPath(): Promise<string | null> {
@@ -211,9 +212,8 @@ export class SettingsService {
 
   async getRecentProjects(): Promise<RecentProject[]> {
     try {
-      const store = await this.ensureStore()
-      const projects = store.get('recentProjects') || []
-      return projects
+      const repository = await this.ensureRepository()
+      return repository.getAll()
     } catch (error) {
       console.error('Failed to get recent projects:', error)
       throw new SettingsServiceError(
@@ -228,27 +228,17 @@ export class SettingsService {
     // Use mutex to prevent race conditions from parallel project opens
     const release = await this.recentProjectsMutex.acquire()
     try {
-      const store = await this.ensureStore()
-      const projects = store.get('recentProjects') || []
+      const repository = await this.ensureRepository()
+      const projects = repository.getAll()
 
-      // PERFORMANCE FIX (todo008): Parallelize canonical path resolution
-      // Instead of N sequential filesystem calls inside filter, resolve all paths in parallel
-      const canonicalPath = await this.getCanonicalPathAsync(path)
-      const canonicalPaths = await Promise.all(
-        projects.map((p) => this.getCanonicalPathAsync(p.path))
-      )
+      // REFACTORING (todo014): Use deduplicator for canonical path comparison
+      const filteredProjects = await this.deduplicator.removeDuplicates(projects, path)
 
-      // Remove existing entry using canonical comparison
-      // This prevents duplicates on case-insensitive filesystems (macOS)
-      const filteredProjects = projects.filter((_p, i) => canonicalPaths[i] !== canonicalPath)
+      // REFACTORING (todo015): Use timestamp generator for monotonic timestamps
+      const timestamp = this.timestampGenerator.generate()
 
-      // Ensure timestamp is always increasing (handle clock skew from NTP, DST, manual adjustments)
-      const currentTime = Date.now()
-      const timestamp = Math.max(currentTime, this.lastTimestamp + 1)
-      this.lastTimestamp = timestamp
-
-      // RELIABILITY FIX (todo013): Persist timestamp to maintain monotonicity across restarts
-      store.set('lastTimestamp', timestamp)
+      // REFACTORING (todo016): Use repository for persistence
+      repository.saveLastTimestamp(timestamp)
 
       // Add new entry at the front
       const newProject: RecentProject = {
@@ -260,7 +250,7 @@ export class SettingsService {
       // Keep only the 5 most recent
       const updatedProjects = [newProject, ...filteredProjects].slice(0, 5)
 
-      store.set('recentProjects', updatedProjects)
+      repository.save(updatedProjects)
     } catch (error) {
       console.error('Failed to add recent project:', error)
       throw new SettingsServiceError(
@@ -277,19 +267,14 @@ export class SettingsService {
     // Use mutex to prevent race conditions
     const release = await this.recentProjectsMutex.acquire()
     try {
-      const store = await this.ensureStore()
-      const projects = store.get('recentProjects') || []
+      const repository = await this.ensureRepository()
+      const projects = repository.getAll()
 
-      // PERFORMANCE FIX (todo008): Parallelize canonical path resolution
-      const canonicalPath = await this.getCanonicalPathAsync(path)
-      const canonicalPaths = await Promise.all(
-        projects.map((p) => this.getCanonicalPathAsync(p.path))
-      )
+      // REFACTORING (todo014): Use deduplicator for canonical path comparison
+      const filteredProjects = await this.deduplicator.removeDuplicates(projects, path)
 
-      // Remove using canonical comparison
-      const filteredProjects = projects.filter((_p, i) => canonicalPaths[i] !== canonicalPath)
-
-      store.set('recentProjects', filteredProjects)
+      // REFACTORING (todo016): Use repository for persistence
+      repository.save(filteredProjects)
     } catch (error) {
       console.error('Failed to remove recent project:', error)
       throw new SettingsServiceError(
@@ -311,8 +296,8 @@ export class SettingsService {
   async cleanupStaleProjects(): Promise<void> {
     const release = await this.recentProjectsMutex.acquire()
     try {
-      const store = await this.ensureStore()
-      const projects = store.get('recentProjects') || []
+      const repository = await this.ensureRepository()
+      const projects = repository.getAll()
 
       // Check each project's accessibility in parallel
       const accessibilityChecks = await Promise.allSettled(
@@ -324,7 +309,7 @@ export class SettingsService {
 
       // Only write if something changed
       if (validProjects.length !== projects.length) {
-        store.set('recentProjects', validProjects)
+        repository.save(validProjects)
         const removedCount = projects.length - validProjects.length
         console.log(`Cleaned up ${removedCount} stale project(s) from recent list`)
       }
@@ -344,8 +329,8 @@ export class SettingsService {
     // Use mutex to prevent race conditions
     const release = await this.recentProjectsMutex.acquire()
     try {
-      const store = await this.ensureStore()
-      store.delete('recentProjects')
+      const repository = await this.ensureRepository()
+      repository.clear()
     } catch (error) {
       console.error('Failed to clear recent projects:', error)
       throw new SettingsServiceError(
