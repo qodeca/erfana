@@ -893,15 +893,6 @@ export async function validateProjectPath(projectPath: string): Promise<void>
 - **P2 (Medium):** 1-2 days
 - **P3 (Low):** 10-12 days
 
-**Completed in Latest Commit (6e36038):**
-- ✅ todo007: Async canonical path resolution (non-blocking filesystem)
-- ✅ todo008: Parallelized path resolution (Promise.all)
-- ✅ todo009: Fixed symlink validation (absolute vs relative targets)
-- ✅ todo010: Fixed Windows path separator bug (platform-specific sep)
-- ✅ todo011: Documented TOCTOU vulnerability limitations
-- ✅ todo012: Added stale project cleanup on startup
-- ✅ todo013: Persisted lastTimestamp for monotonicity across restarts
-
 **Recommended Approach:**
 1. Complete all P0 testing items before merge (~4 days focused work)
 2. Address P1 items in follow-up PR (3 days)
