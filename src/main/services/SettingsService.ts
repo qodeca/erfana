@@ -6,7 +6,7 @@
  */
 
 import { Mutex } from 'async-mutex'
-import { realpathSync } from 'fs'
+import { realpath, access, constants } from 'fs/promises'
 
 export interface RecentProject {
   path: string
@@ -19,6 +19,7 @@ interface Settings {
   projectFilterMode?: string
   directoryWatchDepth?: number | null
   recentProjects?: RecentProject[]
+  lastTimestamp?: number // RELIABILITY FIX (todo013): Persist for monotonic timestamps across restarts
 }
 
 // Copilot removed: no approved tools management
@@ -64,6 +65,13 @@ export class SettingsService {
       ) => StoreLike<S>
       const instance = new ElectronStore<Settings>({ name: 'erfana-settings' })
       this.store = instance
+
+      // RELIABILITY FIX (todo013): Load persisted timestamp on startup
+      const persistedTimestamp = instance.get('lastTimestamp')
+      if (persistedTimestamp && typeof persistedTimestamp === 'number') {
+        this.lastTimestamp = persistedTimestamp
+      }
+
       return instance
     })
   }
@@ -79,10 +87,12 @@ export class SettingsService {
   /**
    * Get canonical path for comparison (resolves case and symlinks)
    * Returns original path if resolution fails (e.g., path doesn't exist)
+   *
+   * PERFORMANCE FIX (todo007): Changed from synchronous to async to prevent blocking main process
    */
-  private getCanonicalPath(path: string): string {
+  private async getCanonicalPathAsync(path: string): Promise<string> {
     try {
-      return realpathSync(path)
+      return await realpath(path)
     } catch {
       // Path doesn't exist or not accessible, return as-is
       return path
@@ -221,20 +231,24 @@ export class SettingsService {
       const store = await this.ensureStore()
       const projects = store.get('recentProjects') || []
 
-      // Get canonical path for comparison (resolves case-sensitivity and symlinks)
-      const canonicalPath = this.getCanonicalPath(path)
+      // PERFORMANCE FIX (todo008): Parallelize canonical path resolution
+      // Instead of N sequential filesystem calls inside filter, resolve all paths in parallel
+      const canonicalPath = await this.getCanonicalPathAsync(path)
+      const canonicalPaths = await Promise.all(
+        projects.map((p) => this.getCanonicalPathAsync(p.path))
+      )
 
       // Remove existing entry using canonical comparison
       // This prevents duplicates on case-insensitive filesystems (macOS)
-      const filteredProjects = projects.filter((p) => {
-        const canonicalP = this.getCanonicalPath(p.path)
-        return canonicalP !== canonicalPath
-      })
+      const filteredProjects = projects.filter((_p, i) => canonicalPaths[i] !== canonicalPath)
 
       // Ensure timestamp is always increasing (handle clock skew from NTP, DST, manual adjustments)
       const currentTime = Date.now()
       const timestamp = Math.max(currentTime, this.lastTimestamp + 1)
       this.lastTimestamp = timestamp
+
+      // RELIABILITY FIX (todo013): Persist timestamp to maintain monotonicity across restarts
+      store.set('lastTimestamp', timestamp)
 
       // Add new entry at the front
       const newProject: RecentProject = {
@@ -266,14 +280,14 @@ export class SettingsService {
       const store = await this.ensureStore()
       const projects = store.get('recentProjects') || []
 
-      // Get canonical path for comparison
-      const canonicalPath = this.getCanonicalPath(path)
+      // PERFORMANCE FIX (todo008): Parallelize canonical path resolution
+      const canonicalPath = await this.getCanonicalPathAsync(path)
+      const canonicalPaths = await Promise.all(
+        projects.map((p) => this.getCanonicalPathAsync(p.path))
+      )
 
       // Remove using canonical comparison
-      const filteredProjects = projects.filter((p) => {
-        const canonicalP = this.getCanonicalPath(p.path)
-        return canonicalP !== canonicalPath
-      })
+      const filteredProjects = projects.filter((_p, i) => canonicalPaths[i] !== canonicalPath)
 
       store.set('recentProjects', filteredProjects)
     } catch (error) {
@@ -281,6 +295,44 @@ export class SettingsService {
       throw new SettingsServiceError(
         'Failed to remove recent project from settings',
         'removeRecentProject',
+        error instanceof Error ? error : undefined
+      )
+    } finally {
+      release()
+    }
+  }
+
+  /**
+   * Remove stale projects from recent list (projects that no longer exist)
+   *
+   * RELIABILITY FIX (todo012): Clean up deleted projects on app startup
+   * to free up slots for valid projects
+   */
+  async cleanupStaleProjects(): Promise<void> {
+    const release = await this.recentProjectsMutex.acquire()
+    try {
+      const store = await this.ensureStore()
+      const projects = store.get('recentProjects') || []
+
+      // Check each project's accessibility in parallel
+      const accessibilityChecks = await Promise.allSettled(
+        projects.map((project) => access(project.path, constants.R_OK | constants.X_OK))
+      )
+
+      // Keep only projects that are still accessible
+      const validProjects = projects.filter((_, i) => accessibilityChecks[i].status === 'fulfilled')
+
+      // Only write if something changed
+      if (validProjects.length !== projects.length) {
+        store.set('recentProjects', validProjects)
+        const removedCount = projects.length - validProjects.length
+        console.log(`Cleaned up ${removedCount} stale project(s) from recent list`)
+      }
+    } catch (error) {
+      console.error('Failed to cleanup stale projects:', error)
+      throw new SettingsServiceError(
+        'Failed to cleanup stale projects from settings',
+        'cleanupStaleProjects',
         error instanceof Error ? error : undefined
       )
     } finally {

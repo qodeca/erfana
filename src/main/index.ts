@@ -10,6 +10,7 @@ import { registerTerminalHandlers } from './ipc/terminal-handlers'
 import { fileWatcherService } from './services/FileWatcherService'
 import { directoryWatcherService } from './services/DirectoryWatcherService'
 import { terminalService } from './services/TerminalService'
+import { settingsService } from './services/SettingsService'
 import { installSafeConsole } from './utils/safe-console'
 
 // Install safe console logging to prevent EPIPE crashes
@@ -88,6 +89,12 @@ app.whenReady().then(() => {
   registerDirectoryWatcherHandlers()
   registerSettingsHandlers()
   registerTerminalHandlers()
+
+  // RELIABILITY FIX (todo012): Clean up stale projects on startup
+  // This runs asynchronously but doesn't block window creation
+  settingsService.cleanupStaleProjects().catch((error) => {
+    console.error('Failed to cleanup stale projects on startup:', error)
+  })
 
   // Create main window
   createWindow()

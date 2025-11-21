@@ -1,0 +1,1214 @@
+# Recent Projects Feature - TODO List
+
+## Status Summary
+
+**Overall Assessment:** 72/100
+**Priority Status:** P0 (Critical) items must be completed before merge to main
+
+**Legend:**
+- 🔴 P0 - Critical (Must Fix Before Merge)
+- 🟠 P1 - High Priority (Should Fix)
+- 🟡 P2 - Medium Priority (Nice to Have)
+- 🔵 P3 - Low Priority (Future)
+
+---
+
+## 🔴 P0 - Critical (Must Fix Before Merge)
+
+### Testing (170+ tests required)
+
+#### todo001: Create pathSecurity.test.ts with comprehensive test coverage
+**Priority:** P0
+**File:** `src/main/utils/pathSecurity.test.ts` (NEW)
+**Estimated Effort:** 1 day
+**Description:**
+- Minimum 50 test cases covering all validation scenarios
+- Test groups:
+  - Input validation (5 tests)
+  - Absolute path requirement (5 tests)
+  - Path traversal protection (10 tests)
+  - System directory protection (10 tests)
+  - Sensitive directory protection (5 tests)
+  - Access permissions (5 tests)
+  - Symlink validation (10 tests)
+
+**Test Cases to Write:**
+```typescript
+describe('validateProjectPath')
+  - should reject empty string
+  - should reject null/undefined
+  - should reject relative paths (./foo, ../foo, foo/bar)
+  - should block /Users/foo/../../etc
+  - should block /Users/../../../etc
+  - should block encoded traversal (%2e%2e%2f)
+  - should block /System, /usr, /etc
+  - should block subdirectories (/usr/local)
+  - should block ~/.ssh, ~/.gnupg, ~/.aws
+  - should reject non-existent paths
+  - should reject paths without R+X permissions
+  - should accept valid absolute paths
+
+describe('validateSymlink')
+  - should return false for regular files/directories
+  - should detect symlinks correctly
+  - should block symlinks to /etc, ~/.ssh
+  - should handle broken symlinks gracefully
+  - should handle circular symlinks
+  - should handle absolute vs relative symlink targets
+
+describe('isSystemDirectory')
+  - should detect exact matches
+  - should detect subdirectories
+  - should be case-sensitive on Linux
+  - should handle trailing slashes
+```
+
+---
+
+#### todo002: Create SettingsService.recentProjects.test.ts
+**Priority:** P0
+**File:** `src/main/services/SettingsService.test.ts` (extend existing or NEW)
+**Estimated Effort:** 1 day
+**Description:**
+- Minimum 40 test cases
+- Focus on race conditions, concurrency, clock skew
+
+**Test Cases to Write:**
+```typescript
+describe('addRecentProject')
+  - should add a new project
+  - should limit to 5 projects (FIFO)
+  - should maintain timestamp order
+  - should update timestamp on re-add
+  - should prevent duplicate paths
+  - should handle case-insensitive duplicates (macOS)
+  - should handle symlink duplicates
+  - should ensure monotonic timestamps
+  - should handle Date.now() returning same value
+  - should handle clock going backwards
+  - should handle parallel addRecentProject calls
+  - should handle parallel add + remove calls
+  - should not lose updates under load
+  - should throw SettingsServiceError on store failure
+  - should release mutex on error
+  - should handle realpathSync failures
+
+describe('removeRecentProject')
+  - should remove existing project
+  - should handle non-existent project gracefully
+  - should use canonical comparison
+  - should handle concurrent removes
+
+describe('getRecentProjects')
+  - should return empty array initially
+  - should return projects in timestamp order
+  - should not mutate internal state
+
+describe('clearRecentProjects')
+  - should clear all projects
+  - should return empty array after clear
+```
+
+---
+
+#### todo003: Create file-handlers.openProjectByPath.test.ts
+**Priority:** P0
+**File:** `src/main/ipc/file-handlers.test.ts` (extend existing or NEW)
+**Estimated Effort:** 0.5 day
+**Description:**
+- Minimum 30 test cases
+- Focus on validation, state management, error handling
+
+**Test Cases to Write:**
+```typescript
+describe('openProjectByPath')
+  - should validate path before operations
+  - should reject empty path
+  - should trim whitespace
+  - should reject system directories
+  - should return immediately if same path
+  - should use canonical comparison
+  - should update all services (file, fileWatcher, directoryWatcher)
+  - should persist to settingsService
+  - should add to recent projects
+  - should broadcast project:changed event
+  - should rollback on validation failure
+  - should rollback on stat failure
+  - should rollback on settings failure
+  - should stop watchers before switching
+  - should continue on watcher stop failure
+
+describe('file:openProjectByPath IPC handler')
+  - should validate input type
+  - should trim whitespace from input
+  - should propagate errors to renderer
+  - should return project path on success
+```
+
+---
+
+#### todo004: Create UIBlocker.test.tsx
+**Priority:** P0
+**File:** `src/renderer/src/components/UIBlocker/UIBlocker.test.tsx` (NEW)
+**Estimated Effort:** 0.25 day
+**Description:**
+- Minimum 15 test cases
+- Focus on visibility, event blocking, styling
+
+**Test Cases to Write:**
+```typescript
+describe('UIBlocker')
+  describe('Visibility')
+    - should render when isProjectChanging is true
+    - should not render when isProjectChanging is false
+    - should update when store changes
+
+  describe('Event Blocking')
+    - should prevent onClick
+    - should prevent onContextMenu
+    - should prevent onDoubleClick
+    - should prevent onMouseDown
+    - should prevent keyboard events
+    - should prevent wheel events
+
+  describe('Styling')
+    - should have z-index 9999
+    - should cover entire viewport
+    - should show spinner animation
+    - should show "Waiting for folder selection..." message
+```
+
+---
+
+#### todo005: Create WelcomePanel.test.tsx
+**Priority:** P0
+**File:** `src/renderer/src/components/Panels/WelcomePanel.test.tsx` (NEW)
+**Estimated Effort:** 1 day
+**Description:**
+- Minimum 35 test cases
+- Focus on loading, display, interactions, error handling
+
+**Test Cases to Write:**
+```typescript
+describe('WelcomePanel')
+  describe('Loading State')
+    - should show loading initially
+    - should call getRecentProjects on mount
+    - should hide loading after data loads
+
+  describe('Recent Projects Display')
+    - should render empty state when no projects
+    - should render projects list
+    - should show project name, path, time
+    - should limit to 5 projects
+    - should sort by timestamp descending
+
+  describe('Project Opening')
+    - should call openProjectByPath on click
+    - should show "Opening..." indicator
+    - should disable item while opening
+    - should remove stale project on ENOENT
+    - should show error toast on failure
+    - should prevent click when isProjectChanging
+
+  describe('Project Removal')
+    - should call removeRecentProject on X click
+    - should reload list after removal
+    - should show success toast
+    - should stop propagation to parent
+    - should prevent removal when isProjectChanging
+
+  describe('Time Formatting')
+    - should show "Just now" for < 1 minute
+    - should show "X minutes ago" for < 1 hour
+    - should show "X hours ago" for < 24 hours
+    - should show "X days ago" for < 7 days
+    - should show date for older projects
+
+  describe('UI Blocking')
+    - should disable all items when isProjectChanging
+    - should show not-allowed cursor
+    - should show "Waiting" tooltip
+    - should reduce opacity to 0.6
+
+  describe('Error Handling')
+    - should show toast on getRecentProjects failure
+    - should show toast on removeRecentProject failure
+```
+
+---
+
+#### todo006: Create integration tests for recent projects flow
+**Priority:** P0
+**File:** `src/renderer/src/components/Panels/WelcomePanel.integration.test.tsx` (NEW)
+**Estimated Effort:** 0.5 day
+**Description:**
+- End-to-end scenarios with real IPC mocks
+
+**Test Scenarios:**
+```typescript
+describe('Recent Projects Integration')
+  - should open project and update recent list
+  - should handle rapid project switches without corruption
+  - should remove non-existent projects automatically
+  - should block UI during folder dialog
+  - should handle concurrent add + remove operations
+  - should maintain max 5 projects after multiple operations
+  - should update timestamps correctly on re-open
+  - should handle symlink and case-insensitive duplicates
+```
+
+---
+
+### Performance Fixes
+
+#### todo007: Make getCanonicalPath async in SettingsService
+**Priority:** P0
+**File:** `src/main/services/SettingsService.ts:84-88`
+**Estimated Effort:** 0.25 day
+**Issue:** Synchronous `realpathSync` blocks main process
+**Fix:**
+```typescript
+// Change from:
+private getCanonicalPath(path: string): string {
+  try {
+    return realpathSync(path)
+  } catch {
+    return path
+  }
+}
+
+// To:
+private async getCanonicalPathAsync(path: string): Promise<string> {
+  try {
+    return await realpath(path)  // Non-blocking
+  } catch {
+    return path
+  }
+}
+```
+
+---
+
+#### todo008: Parallelize canonical path resolution in addRecentProject
+**Priority:** P0
+**File:** `src/main/services/SettingsService.ts:229-232`
+**Estimated Effort:** 0.25 day
+**Issue:** N filesystem calls inside mutex (blocks all concurrent operations)
+**Fix:**
+```typescript
+// Change from:
+const filteredProjects = projects.filter((p) => {
+  const canonicalP = this.getCanonicalPath(p.path)  // N calls
+  return canonicalP !== canonicalPath
+})
+
+// To:
+const canonicalPath = await this.getCanonicalPathAsync(path)
+const canonicalPaths = await Promise.all(
+  projects.map(p => this.getCanonicalPathAsync(p.path))
+)
+const filteredProjects = projects.filter((p, i) =>
+  canonicalPaths[i] !== canonicalPath
+)
+```
+
+---
+
+### Security Fixes
+
+#### todo009: Fix symlink validation to handle absolute vs relative targets
+**Priority:** P0
+**File:** `src/main/utils/pathSecurity.ts:157`
+**Estimated Effort:** 0.1 day
+**Issue:** `readlink()` can return absolute path, but code assumes relative
+**Fix:**
+```typescript
+// Change from:
+const resolvedTarget = resolve(dirname(projectPath), target)
+
+// To:
+import { isAbsolute } from 'path'
+const resolvedTarget = isAbsolute(target)
+  ? normalize(target)
+  : resolve(dirname(projectPath), target)
+```
+
+---
+
+#### todo010: Fix Windows path separator bug in isSystemDirectory
+**Priority:** P0
+**File:** `src/main/utils/pathSecurity.ts:66-68`
+**Estimated Effort:** 0.1 day
+**Issue:** Hardcoded `/` separator doesn't work on Windows
+**Fix:**
+```typescript
+// Change from:
+if (normalized === sysDir || normalized.startsWith(sysDir + '/')) {
+
+// To:
+import { sep } from 'path'
+if (normalized === sysDir || normalized.startsWith(sysDir + sep)) {
+```
+
+---
+
+#### todo011: Document TOCTOU vulnerability limitations
+**Priority:** P0
+**File:** `src/main/utils/pathSecurity.ts` (add JSDoc comment)
+**Estimated Effort:** 0.1 day
+**Description:**
+Add documentation explaining TOCTOU (Time-of-Check-Time-of-Use) is inherent in filesystem operations and how errors are handled at use-site.
+
+**Add Comment:**
+```typescript
+/**
+ * SECURITY NOTE: TOCTOU Limitation
+ *
+ * This validation checks path accessibility at validation time, but permissions
+ * could change between check and actual use. This is an inherent limitation
+ * of filesystem operations.
+ *
+ * Mitigation: All filesystem operations include proper error handling at use-site
+ * to catch permission changes or file deletions.
+ */
+```
+
+---
+
+### Reliability Fixes
+
+#### todo012: Add stale project cleanup on app startup
+**Priority:** P0
+**File:** `src/main/services/SettingsService.ts` (add method), `src/main/index.ts` (call on startup)
+**Estimated Effort:** 0.25 day
+**Issue:** Deleted projects still occupy recent list slots
+**Fix:**
+```typescript
+// In SettingsService.ts
+async cleanupStaleProjects(): Promise<void> {
+  const release = await this.recentProjectsMutex.acquire()
+  try {
+    const store = await this.ensureStore()
+    const projects = store.get('recentProjects') || []
+
+    const validProjects = []
+    for (const project of projects) {
+      try {
+        await access(project.path, constants.R_OK | constants.X_OK)
+        validProjects.push(project)
+      } catch {
+        // Project no longer exists, skip it
+      }
+    }
+
+    if (validProjects.length !== projects.length) {
+      store.set('recentProjects', validProjects)
+    }
+  } finally {
+    release()
+  }
+}
+
+// In main/index.ts (after app ready)
+await settingsService.cleanupStaleProjects()
+```
+
+---
+
+#### todo013: Persist lastTimestamp or remove monotonicity requirement
+**Priority:** P0
+**File:** `src/main/services/SettingsService.ts:56`
+**Estimated Effort:** 0.25 day
+**Issue:** In-memory `lastTimestamp` is lost on restart, monotonicity breaks
+**Option A - Persist:**
+```typescript
+async addRecentProject(path: string, name: string): Promise<void> {
+  const release = await this.recentProjectsMutex.acquire()
+  try {
+    const store = await this.ensureStore()
+    const lastPersisted = store.get('lastTimestamp') || 0
+    const currentTime = Date.now()
+    const timestamp = Math.max(currentTime, lastPersisted + 1)
+
+    store.set('lastTimestamp', timestamp)
+    // ... rest of logic
+  } finally {
+    release()
+  }
+}
+```
+
+**Option B - Remove (simpler):**
+```typescript
+// Just use Date.now() and accept potential collisions
+const timestamp = Date.now()
+```
+
+---
+
+## 🟠 P1 - High Priority (Should Fix)
+
+### Refactoring
+
+#### todo014: Refactor SettingsService.addRecentProject - Extract duplicate removal
+**Priority:** P1
+**File:** `src/main/services/SettingsService.ts:217-260`
+**Estimated Effort:** 0.5 day
+**Issue:** Function has 12 responsibilities (SRP violation)
+**Fix:**
+```typescript
+// Create new file: src/main/services/RecentProjectsDeduplicator.ts
+export class RecentProjectsDeduplicator {
+  async removeDuplicates(
+    projects: RecentProject[],
+    newPath: string
+  ): Promise<RecentProject[]> {
+    const canonicalPath = await this.getCanonicalPathAsync(newPath)
+    const canonicalPaths = await Promise.all(
+      projects.map(p => this.getCanonicalPathAsync(p.path))
+    )
+    return projects.filter((p, i) => canonicalPaths[i] !== canonicalPath)
+  }
+}
+```
+
+---
+
+#### todo015: Refactor SettingsService.addRecentProject - Extract timestamp generation
+**Priority:** P1
+**File:** `src/main/services/SettingsService.ts:234-237`
+**Estimated Effort:** 0.25 day
+**Fix:**
+```typescript
+// Create new file: src/main/services/MonotonicTimestampGenerator.ts
+export class MonotonicTimestampGenerator {
+  private lastTimestamp = 0
+
+  async generate(): Promise<number> {
+    const currentTime = Date.now()
+    const timestamp = Math.max(currentTime, this.lastTimestamp + 1)
+    this.lastTimestamp = timestamp
+    return timestamp
+  }
+
+  async restore(persistedTimestamp: number): Promise<void> {
+    this.lastTimestamp = persistedTimestamp
+  }
+}
+```
+
+---
+
+#### todo016: Refactor SettingsService.addRecentProject - Extract repository pattern
+**Priority:** P1
+**File:** `src/main/services/SettingsService.ts`
+**Estimated Effort:** 0.5 day
+**Fix:**
+```typescript
+// Create new file: src/main/services/RecentProjectsRepository.ts
+export class RecentProjectsRepository {
+  constructor(private store: StoreLike<Settings>) {}
+
+  async getAll(): Promise<RecentProject[]> {
+    return this.store.get('recentProjects') || []
+  }
+
+  async save(projects: RecentProject[]): Promise<void> {
+    this.store.set('recentProjects', projects)
+  }
+
+  async clear(): Promise<void> {
+    this.store.delete('recentProjects')
+  }
+}
+```
+
+---
+
+#### todo017: Extract ProjectService for orchestration
+**Priority:** P1
+**File:** `src/main/services/ProjectService.ts` (NEW)
+**Estimated Effort:** 1 day
+**Issue:** IPC handler doing orchestration (should be thin adapter)
+**Fix:**
+```typescript
+// Create new service that orchestrates project switching
+export class ProjectService {
+  constructor(
+    private fileService: FileService,
+    private fileWatcherService: FileWatcherService,
+    private directoryWatcherService: DirectoryWatcherService,
+    private settingsService: SettingsService
+  ) {}
+
+  async switchProject(newPath: string): Promise<ProjectSwitchResult> {
+    // 1. Validate
+    await validatePath(newPath)
+
+    // 2. Check if same
+    const oldPath = this.fileService.getProjectPath()
+    if (oldPath && await this.isSameProject(oldPath, newPath)) {
+      return { success: true, path: newPath, action: 'noop' }
+    }
+
+    // 3. Stop watchers
+    await this.stopAllWatchers()
+
+    // 4. Update services
+    await this.updateServices(newPath)
+
+    // 5. Persist
+    await this.persistProjectChange(newPath)
+
+    // 6. Broadcast
+    this.broadcastProjectChanged(oldPath, newPath)
+
+    return { success: true, path: newPath, action: 'switched' }
+  }
+}
+
+// Then in file-handlers.ts:
+ipcMain.handle('file:openProjectByPath', async (_event, path: string) => {
+  return await projectService.switchProject(path)
+})
+```
+
+---
+
+### React Improvements
+
+#### todo018: Fix missing useEffect dependencies in WelcomePanel
+**Priority:** P1
+**File:** `src/renderer/src/components/Panels/WelcomePanel.tsx:19-21`
+**Estimated Effort:** 0.1 day
+**Issue:** ESLint warning, `loadRecentProjects` not in deps
+**Fix:**
+```typescript
+// Change from:
+useEffect(() => {
+  loadRecentProjects()
+}, [])
+
+// To:
+const loadRecentProjects = useCallback(async () => {
+  // ... existing logic
+}, [])
+
+useEffect(() => {
+  loadRecentProjects()
+}, [loadRecentProjects])
+```
+
+---
+
+#### todo019: Prevent state updates on unmounted components in WelcomePanel
+**Priority:** P1
+**File:** `src/renderer/src/components/Panels/WelcomePanel.tsx:55-88`
+**Estimated Effort:** 0.1 day
+**Issue:** React warning if component unmounts during async operation
+**Fix:**
+```typescript
+const isMounted = useRef(true)
+
+useEffect(() => {
+  return () => { isMounted.current = false }
+}, [])
+
+const handleProjectClick = async (projectPath: string) => {
+  if (isProjectChanging) return
+
+  setOpeningPath(projectPath)
+  try {
+    await window.api.file.openProjectByPath(projectPath)
+  } catch (error) {
+    // ... error handling
+  } finally {
+    if (isMounted.current) {  // Check before state update
+      setOpeningPath(null)
+    }
+  }
+}
+```
+
+---
+
+#### todo020: Unify loading states in WelcomePanel
+**Priority:** P1
+**File:** `src/renderer/src/components/Panels/WelcomePanel.tsx:14-15`
+**Estimated Effort:** 0.25 day
+**Issue:** Two separate loading states create inconsistent UX
+**Fix:**
+```typescript
+type LoadingState =
+  | { type: 'initial' }
+  | { type: 'opening', path: string }
+  | { type: 'removing', path: string }
+  | { type: 'idle' }
+
+const [loadingState, setLoadingState] = useState<LoadingState>({ type: 'initial' })
+
+// Usage:
+const isLoading = loadingState.type === 'initial'
+const isOpening = loadingState.type === 'opening' && loadingState.path === project.path
+```
+
+---
+
+### Error Handling Improvements
+
+#### todo021: Standardize error types across all layers
+**Priority:** P1
+**Files:** `src/main/utils/pathSecurity.ts`, `src/main/services/SettingsService.ts`, etc.
+**Estimated Effort:** 0.5 day
+**Issue:** Inconsistent error handling (some throw custom errors, some throw generic)
+**Fix:**
+```typescript
+// Create src/shared/errors.ts
+export enum ErrorCode {
+  PATH_INVALID = 'PATH_INVALID',
+  PATH_NOT_ABSOLUTE = 'PATH_NOT_ABSOLUTE',
+  PATH_SYSTEM_DIR = 'PATH_SYSTEM_DIR',
+  PATH_NOT_ACCESSIBLE = 'PATH_NOT_ACCESSIBLE',
+  SYMLINK_ATTACK = 'SYMLINK_ATTACK',
+  SETTINGS_READ_FAILED = 'SETTINGS_READ_FAILED',
+  SETTINGS_WRITE_FAILED = 'SETTINGS_WRITE_FAILED',
+  PROJECT_NOT_FOUND = 'PROJECT_NOT_FOUND',
+}
+
+export class AppError extends Error {
+  constructor(
+    message: string,
+    public code: ErrorCode,
+    public originalError?: Error
+  ) {
+    super(message)
+    this.name = 'AppError'
+  }
+}
+```
+
+---
+
+#### todo022: Replace string-based error detection with error codes
+**Priority:** P1
+**File:** `src/renderer/src/components/Panels/WelcomePanel.tsx:66`
+**Estimated Effort:** 0.25 day
+**Issue:** Fragile string matching (`includes('ENOENT')`)
+**Fix:**
+```typescript
+// Change from:
+const isNotFound = errorMessage.includes('ENOENT') ||
+                   errorMessage.includes('Cannot access') ||
+                   errorMessage.includes('not found')
+
+// To:
+import { ErrorCode } from '@shared/errors'
+const isNotFound = error instanceof AppError &&
+                   (error.code === ErrorCode.PROJECT_NOT_FOUND ||
+                    error.code === ErrorCode.PATH_NOT_ACCESSIBLE)
+```
+
+---
+
+#### todo023: Improve error messages for end users
+**Priority:** P1
+**Files:** Multiple
+**Estimated Effort:** 0.25 day
+**Issue:** Technical error messages shown to users
+**Fix:**
+```typescript
+// Create error message translator
+const ERROR_MESSAGES: Record<ErrorCode, string> = {
+  [ErrorCode.PATH_INVALID]: 'The selected path is invalid',
+  [ErrorCode.PATH_NOT_ABSOLUTE]: 'Please select an absolute path',
+  [ErrorCode.PATH_SYSTEM_DIR]: 'System directories cannot be opened as projects',
+  [ErrorCode.PATH_NOT_ACCESSIBLE]: 'Cannot access the selected directory. Please check permissions.',
+  [ErrorCode.SYMLINK_ATTACK]: 'This directory link points to a protected location',
+  [ErrorCode.PROJECT_NOT_FOUND]: 'This project no longer exists',
+  // ... etc
+}
+```
+
+---
+
+#### todo024: Add user feedback for blocked interactions during isProjectChanging
+**Priority:** P1
+**File:** `src/renderer/src/components/Panels/WelcomePanel.tsx:49-52`
+**Estimated Effort:** 0.1 day
+**Issue:** User clicks are silently ignored, no feedback
+**Fix:**
+```typescript
+const handleProjectClick = async (projectPath: string) => {
+  if (isProjectChanging) {
+    showGlobalToast({
+      title: 'Please Wait',
+      message: 'Please wait for the current operation to complete',
+      type: 'warning',
+      duration: 3000
+    })
+    return
+  }
+  // ... rest of logic
+}
+```
+
+---
+
+## 🟡 P2 - Medium Priority (Nice to Have)
+
+### Code Quality
+
+#### todo025: Extract error toast helper to reduce duplication
+**Priority:** P2
+**File:** `src/renderer/src/utils/toastHelpers.ts` (NEW)
+**Estimated Effort:** 0.1 day
+**Issue:** Error toast logic duplicated 3 times in WelcomePanel
+**Fix:**
+```typescript
+export function showErrorToast(title: string, message: string, duration = 5000) {
+  showGlobalToast({ title, message, type: 'error', duration })
+}
+
+export function showSuccessToast(title: string, message: string, duration = 3000) {
+  showGlobalToast({ title, message, type: 'success', duration })
+}
+```
+
+---
+
+#### todo026: Extract project item title logic to helper function
+**Priority:** P2
+**File:** `src/renderer/src/components/Panels/WelcomePanel.tsx:167-173`
+**Estimated Effort:** 0.1 day
+**Issue:** Complex nested ternary creates cognitive overhead
+**Fix:**
+```typescript
+function getProjectItemTitle(
+  project: RecentProject,
+  isOpening: boolean,
+  isProjectChanging: boolean
+): string {
+  if (isProjectChanging) return 'Waiting for folder selection...'
+  if (isOpening) return 'Opening project...'
+  return project.path
+}
+```
+
+---
+
+#### todo027: Extract time formatting to utility file
+**Priority:** P2
+**File:** `src/renderer/src/utils/timeFormatting.ts` (NEW)
+**Estimated Effort:** 0.25 day
+**Issue:** 13-line function in component, not reusable
+**Options:**
+- **Option A:** Use library (date-fns, dayjs)
+- **Option B:** Extract to utility with tests
+
+**Option B:**
+```typescript
+// src/renderer/src/utils/timeFormatting.ts
+export function formatRelativeTime(timestamp: number): string {
+  const now = Date.now()
+  const diff = now - timestamp
+
+  const MINUTE = 60_000
+  const HOUR = 3600_000
+  const DAY = 86400_000
+  const WEEK = 604800_000
+
+  if (diff < MINUTE) return 'Just now'
+
+  const minutes = Math.floor(diff / MINUTE)
+  if (diff < HOUR) return formatUnit(minutes, 'minute')
+
+  const hours = Math.floor(diff / HOUR)
+  if (diff < DAY) return formatUnit(hours, 'hour')
+
+  const days = Math.floor(diff / DAY)
+  if (diff < WEEK) return formatUnit(days, 'day')
+
+  return new Date(timestamp).toLocaleDateString()
+}
+
+function formatUnit(value: number, unit: string): string {
+  return `${value} ${unit}${value > 1 ? 's' : ''} ago`
+}
+```
+
+---
+
+#### todo028: Replace inline styles with CSS classes in WelcomePanel
+**Priority:** P2
+**File:** `src/renderer/src/components/Panels/WelcomePanel.tsx:174-177, 183`
+**Estimated Effort:** 0.1 day
+**Issue:** New style objects created on every render
+**Fix:**
+```typescript
+// Add to AppDockLayout.css:
+.recent-project-item.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.recent-project-item.opening {
+  cursor: wait;
+}
+
+.recent-project-opening-text {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #858585;
+}
+
+// Then in component:
+<div className={`recent-project-item ${getItemClasses(isOpening, isProjectChanging)}`}>
+```
+
+---
+
+#### todo029: Extract magic numbers to constants
+**Priority:** P2
+**Files:** Multiple
+**Estimated Effort:** 0.1 day
+**Issue:** Magic numbers scattered throughout code
+**Fix:**
+```typescript
+// Create src/shared/constants.ts
+export const MAX_RECENT_PROJECTS = 5
+export const MIN_TIMESTAMP_INCREMENT = 1
+export const TOAST_DURATION_ERROR = 5000
+export const TOAST_DURATION_SUCCESS = 3000
+export const PROJECT_NAME_MAX_LENGTH = 255
+```
+
+---
+
+#### todo030: Improve TypeScript safety - Remove 'as unknown as' casts
+**Priority:** P2
+**File:** `src/main/services/SettingsService.ts:62-64`
+**Estimated Effort:** 0.25 day
+**Issue:** Unsafe type assertion
+**Fix:**
+```typescript
+// Option A: Install @types/electron-store
+npm install --save-dev @types/electron-store
+
+// Option B: Create proper typing
+interface ElectronStoreConstructor {
+  new <T>(options?: { name: string }): Store<T>
+}
+```
+
+---
+
+### UI/UX Enhancements
+
+#### todo031: Refactor UIBlocker to be reusable
+**Priority:** P2
+**File:** `src/renderer/src/components/UIBlocker/UIBlocker.tsx:20`
+**Estimated Effort:** 0.25 day
+**Issue:** Tightly coupled to useProjectStore, not reusable
+**Fix:**
+```typescript
+interface UIBlockerProps {
+  visible: boolean
+  message?: string
+  reason?: 'folder-selection' | 'loading' | 'processing'
+}
+
+export function UIBlocker({
+  visible,
+  message = 'Please wait...',
+  reason = 'processing'
+}: UIBlockerProps) {
+  if (!visible) return null
+
+  return (
+    <div className={`ui-blocker ui-blocker--${reason}`}>
+      <div className="ui-blocker-content">
+        <div className="ui-blocker-spinner"></div>
+        <div className="ui-blocker-message">{message}</div>
+      </div>
+    </div>
+  )
+}
+
+// Usage:
+<UIBlocker
+  visible={isProjectChanging}
+  message="Waiting for folder selection..."
+  reason="folder-selection"
+/>
+```
+
+---
+
+#### todo032: Add fade-in/fade-out animation to UIBlocker
+**Priority:** P2
+**File:** `src/renderer/src/components/UIBlocker/UIBlocker.css`
+**Estimated Effort:** 0.1 day
+**Fix:**
+```css
+.ui-blocker {
+  animation: ui-blocker-fade-in 0.2s ease-out;
+}
+
+@keyframes ui-blocker-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ui-blocker.exiting {
+  animation: ui-blocker-fade-out 0.2s ease-out;
+}
+
+@keyframes ui-blocker-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+```
+
+---
+
+#### todo033: Add keyboard shortcuts for recent projects
+**Priority:** P2
+**File:** `src/renderer/src/components/Panels/WelcomePanel.tsx`
+**Estimated Effort:** 0.25 day
+**Description:**
+- Cmd/Ctrl + 1-5: Open recent project by index
+- Cmd/Ctrl + Shift + Delete: Clear recent projects
+
+---
+
+#### todo034: Add project icons/thumbnails to recent list
+**Priority:** P2
+**File:** `src/renderer/src/components/Panels/WelcomePanel.tsx`
+**Estimated Effort:** 1 day
+**Description:**
+- Detect project type (React, Node, Python, etc.) from files
+- Show appropriate icon
+- Optional: Generate thumbnail from README.md
+
+---
+
+#### todo035: Add project metadata to recent list
+**Priority:** P2
+**File:** `src/main/services/SettingsService.ts`, `WelcomePanel.tsx`
+**Estimated Effort:** 0.5 day
+**Description:**
+- Show file count
+- Show last modified date
+- Show project size
+
+---
+
+## 🔵 P3 - Low Priority (Future)
+
+### Infrastructure
+
+#### todo036: Replace console.log/error/warn with logging framework
+**Priority:** P3
+**Files:** Multiple
+**Estimated Effort:** 0.5 day
+**Options:** winston, pino, electron-log
+**Fix:**
+```typescript
+// Create src/main/utils/logger.ts
+import log from 'electron-log'
+
+export const logger = {
+  debug: log.debug,
+  info: log.info,
+  warn: log.warn,
+  error: log.error,
+}
+
+// Then replace:
+console.error('Open project failed:', message)
+// With:
+logger.error('Open project failed', { message, path })
+```
+
+---
+
+#### todo037: Add structured logging with context
+**Priority:** P3
+**Estimated Effort:** 0.25 day
+**Fix:**
+```typescript
+logger.info('Project opened', {
+  operation: 'openProject',
+  path: projectPath,
+  duration: Date.now() - startTime,
+  user: getUserId(),
+  session: getSessionId()
+})
+```
+
+---
+
+#### todo038: Add telemetry for recent projects usage
+**Priority:** P3
+**Files:** Multiple
+**Estimated Effort:** 1 day
+**Metrics to Track:**
+- Recent project click rate
+- Time between opens
+- Stale project removal rate
+- Error rates by type
+- Average list size
+
+---
+
+#### todo039: Add performance monitoring
+**Priority:** P3
+**Estimated Effort:** 0.5 day
+**Metrics:**
+- Time to load recent projects
+- Time to open project
+- Canonical path resolution time
+- Mutex wait time
+
+---
+
+### Documentation
+
+#### todo040: Add JSDoc comments to all public methods
+**Priority:** P3
+**Files:** `pathSecurity.ts`, `SettingsService.ts`, etc.
+**Estimated Effort:** 0.5 day
+**Example:**
+```typescript
+/**
+ * Validates that a project path is safe to open.
+ *
+ * @param projectPath - Absolute path to validate
+ * @throws {PathSecurityError} If path is invalid, relative, system directory, or inaccessible
+ *
+ * @example
+ * await validateProjectPath('/Users/john/projects/myapp')  // OK
+ * await validateProjectPath('./myapp')  // Throws: PATH_NOT_ABSOLUTE
+ * await validateProjectPath('/etc')  // Throws: PATH_SYSTEM_DIR
+ */
+export async function validateProjectPath(projectPath: string): Promise<void>
+```
+
+---
+
+#### todo041: Create architecture decision records (ADRs)
+**Priority:** P3
+**File:** `docs/adr/` (NEW)
+**Estimated Effort:** 0.5 day
+**ADRs to Create:**
+- ADR-001: Why mutex for recent projects (not optimistic locking)
+- ADR-002: Why canonical path comparison (not string comparison)
+- ADR-003: Why max 5 projects (not configurable)
+- ADR-004: Why global UI blocker (not per-component)
+
+---
+
+#### todo042: Create user documentation for recent projects
+**Priority:** P3
+**File:** `docs/user-guide/recent-projects.md` (NEW)
+**Estimated Effort:** 0.25 day
+**Sections:**
+- What are recent projects?
+- How to open from recent list
+- How to remove from recent list
+- Maximum 5 projects explanation
+- Keyboard shortcuts
+
+---
+
+### Advanced Features
+
+#### todo043: Make MAX_RECENT_PROJECTS user-configurable
+**Priority:** P3
+**Estimated Effort:** 0.5 day
+**Implementation:**
+- Add settings UI
+- Persist to electron-store
+- Validate range (1-20)
+
+---
+
+#### todo044: Add search/filter to recent projects
+**Priority:** P3
+**Estimated Effort:** 0.5 day
+**Implementation:**
+- Search by project name or path
+- Fuzzy matching
+- Keyboard navigation
+
+---
+
+#### todo045: Add "Pin" functionality for favorite projects
+**Priority:** P3
+**Estimated Effort:** 1 day
+**Implementation:**
+- Separate pinned list (always shown first)
+- Pin icon in recent list
+- Persist pinned state
+
+---
+
+#### todo046: Sync recent projects across devices
+**Priority:** P3
+**Estimated Effort:** 3 days
+**Implementation:**
+- Cloud storage integration (optional)
+- Conflict resolution
+- Privacy considerations
+
+---
+
+#### todo047: Add project categories/tags
+**Priority:** P3
+**Estimated Effort:** 2 days
+**Implementation:**
+- Manual tagging
+- Auto-detect from .git, package.json, etc.
+- Filter by tag
+
+---
+
+#### todo048: Add project templates
+**Priority:** P3
+**Estimated Effort:** 2 days
+**Implementation:**
+- "New Project" button in welcome screen
+- Template selection (React, Node, Python, etc.)
+- Scaffold from templates
+
+---
+
+## Summary
+
+**Total Items:** 48 todos
+**Estimated Effort:**
+- **P0 (Critical):** 3.5-4 days
+- **P1 (High):** 2-3 days
+- **P2 (Medium):** 1-2 days
+- **P3 (Low):** 10-12 days
+
+**Recommended Approach:**
+1. Complete all P0 items before merge (4 days focused work)
+2. Address P1 items in follow-up PR (3 days)
+3. Cherry-pick P2 items based on user feedback
+4. Consider P3 items for future major versions
+
+**Next Steps:**
+1. Review and prioritize with team
+2. Create GitHub issues for P0/P1 items
+3. Assign owners for each todo
+4. Set milestone for P0 completion
