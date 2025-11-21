@@ -2,7 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
-- **Version**: 0.3.8
+- **Version**: 0.3.9
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -30,6 +30,7 @@ src/
 │   ├── services/   # FileService, TerminalService, SettingsService
 │   └── ipc/        # IPC handlers
 ├── preload/        # Context bridge API
+├── shared/         # Shared code (errors.ts, constants.ts)
 └── renderer/       # React UI
     ├── components/ # UI components
     ├── stores/     # Zustand state
@@ -45,13 +46,12 @@ src/
 ## Documentation
 See `docs/` for details (keep Claude's context focused):
 - [Architecture](docs/architecture.md) — System design patterns, SOLID principles, DI
-- [Architectural Review](docs/architectural-review/README.md) — Code quality assessment, security, testing gaps
 - [Drag-Drop](docs/drag-drop/README.md) — VS Code-style file reorganization, visual feedback, validation
 - [Terminal](docs/terminal/README.md) — Bootstrap pattern, flickering prevention, scroll fixes
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage
+- [Testing](docs/testing/README.md) — Workspace, coverage (1301 tests)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 
 ## Code Style & Conventions
@@ -62,7 +62,35 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.3.8)
+## Recent Changes (v0.3.9)
+- **Auto-refresh Recent Projects** (Nov 21, 2025):
+  - WelcomePanel subscribes to `project:changed` IPC event
+  - Recent projects list updates automatically when opening/closing projects
+  - No manual refresh needed
+- **React 18 StrictMode Bug Fix** (Nov 21, 2025):
+  - Fixed `isMounted` ref not resetting after StrictMode double-mount
+  - Root cause: useRef values persist across unmount/remount
+  - Fix: Reset `isMounted.current = true` in mount effect
+- **Error Handling System** (Nov 21, 2025):
+  - Created `src/shared/errors.ts` with `ErrorCode` enum (12 codes), `AppError` class
+  - Utilities: `isProjectNotFoundError()`, `getUserFriendlyMessage()`, `ERROR_MESSAGES` map
+  - Updated pathSecurity.ts and ProjectService.ts to use AppError
+- **Shared Utilities** (Nov 21, 2025):
+  - `src/shared/constants.ts`: MAX_RECENT_PROJECTS, TIME constants, TOAST_DURATION
+  - `src/renderer/src/utils/toastHelpers.ts`: showErrorToast, showSuccessToast, showWarningToast
+  - `src/renderer/src/utils/timeFormatting.ts`: formatRelativeTime utility
+- **UIBlocker Refactoring** (Nov 21, 2025):
+  - Split into UIBlockerBase (props-based) + UIBlocker (store-based)
+  - Added fade-in animation (0.15s ease-out)
+- **Test Coverage Improvements** (Nov 21, 2025):
+  - pathSecurity.test.ts: 79 tests for security validation
+  - SettingsService.recentProjects.test.ts: 39 tests
+  - WelcomePanel.test.tsx: 34 tests + 11 integration tests
+  - UIBlocker.test.tsx: 25 tests
+  - file-handlers.openProjectByPath.test.ts: 34 tests
+  - **Total: 1301 tests passing (60 test files)**
+
+## Changes in v0.3.8
 - **Markdown Link Security & Features** (Nov 2, 2025):
   - Fixed email links treated as internal links, changed color from teal to blue
   - Added dangerous protocol blocking (javascript:, data:, vbscript:, file://)
@@ -70,14 +98,11 @@ See `docs/` for details (keep Claude's context focused):
   - Fixed heading slug generation (GitHub-compatible with unicode support)
   - Fixed email/tel tooltip cleanup (removes query parameters)
   - Created linkProtocols.ts utility for protocol validation
-  - Memoized link extraction for performance optimization
   - Added 55 new tests (96.7% coverage for link features)
-  - **Total: 1079 tests passing (60 test files)**
 - **Version Display in Title Bar** (Nov 2, 2025):
   - Production builds show "ERFANA v{version}" in system title bar
   - Development builds show "ERFANA" (no version)
   - Uses Electron's app.getVersion() API
-  - Added 9 comprehensive tests for window creation and title configuration
   - See [src/main/index.ts](src/main/index.ts:28) and [src/main/index.test.ts](src/main/index.test.ts)
 
 ## Changes in v0.3.7

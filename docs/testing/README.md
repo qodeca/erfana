@@ -11,7 +11,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
   - `npm run test:renderer` — renderer tests
   - `npm run test:main` — main process tests
   - `npm run test:preload` — preload tests
-- **964 tests passing** across 50 test files (v0.3.7)
+- **1301 tests passing** across 60 test files (v0.3.9)
 
 #### Renderer tips
 - When testing TerminalPanel in jsdom, mock xterm and addons to avoid canvas errors:
@@ -145,9 +145,9 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 - Tests validate SOLID refactoring of file system dialogs with comprehensive validation logic
 - See [Architecture - Dialog System](../architecture.md#dialog-system) for implementation details
 
-**ProjectTree Refactoring** (`src/renderer/src/hooks/*.logic.ts`, `src/renderer/src/components/ProjectTree/`) **NEW in v0.3.7**
+**ProjectTree Refactoring** (`src/renderer/src/hooks/*.logic.ts`, `src/renderer/src/components/ProjectTree/`) **v0.3.7**
 - **320 comprehensive tests** covering ProjectTree modularization using "Extract Pure Logic" pattern
-- **Total Repository Tests**: 964 tests passing (50 test files)
+- **Total Repository Tests**: 1301 tests passing (60 test files)
 - **Test Organization**:
 
   *Phase 1-2: P0 Critical Tests (147 tests)*:
