@@ -1,9 +1,12 @@
 import { isAbsolute, normalize, resolve, dirname, sep } from 'path'
 import { lstat, readlink, access, constants } from 'fs/promises'
 import { homedir } from 'os'
+import { AppError, ErrorCode } from '../../shared/errors'
 
 /**
  * Path Security Utilities
+ *
+ * todo021: Uses standardized AppError with ErrorCode enum
  *
  * Validates project paths to prevent:
  * - Path traversal attacks (../, ../../, etc.)
@@ -12,15 +15,8 @@ import { homedir } from 'os'
  * - Non-absolute or malformed paths
  */
 
-export class PathSecurityError extends Error {
-  constructor(
-    message: string,
-    public code: 'INVALID_PATH' | 'SYSTEM_DIR' | 'SYMLINK_ATTACK' | 'NOT_ABSOLUTE' | 'NOT_ACCESSIBLE'
-  ) {
-    super(message)
-    this.name = 'PathSecurityError'
-  }
-}
+// Re-export for backwards compatibility
+export { AppError as PathSecurityError }
 
 /**
  * List of system directories that should never be opened as projects
@@ -101,19 +97,19 @@ export function isSystemDirectory(path: string): boolean {
  * to catch permission changes, file deletions, or other state changes that occur
  * after validation.
  *
- * @throws PathSecurityError if validation fails
+ * @throws AppError if validation fails
  */
 export async function validateProjectPath(projectPath: string): Promise<void> {
   // Check path is a valid string
   if (!projectPath || typeof projectPath !== 'string') {
-    throw new PathSecurityError('Project path must be a non-empty string', 'INVALID_PATH')
+    throw new AppError('Project path must be a non-empty string', ErrorCode.PATH_INVALID)
   }
 
   // Check path is absolute
   if (!isAbsolute(projectPath)) {
-    throw new PathSecurityError(
+    throw new AppError(
       'Project path must be absolute. Relative paths are not allowed for security reasons.',
-      'NOT_ABSOLUTE'
+      ErrorCode.PATH_NOT_ABSOLUTE
     )
   }
 
@@ -122,9 +118,9 @@ export async function validateProjectPath(projectPath: string): Promise<void> {
 
   // Check if path is a system directory
   if (isSystemDirectory(normalized)) {
-    throw new PathSecurityError(
+    throw new AppError(
       'Cannot open system or sensitive directories as projects',
-      'SYSTEM_DIR'
+      ErrorCode.PATH_SYSTEM_DIR
     )
   }
 
@@ -133,9 +129,11 @@ export async function validateProjectPath(projectPath: string): Promise<void> {
     await access(normalized, constants.R_OK | constants.X_OK)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    throw new PathSecurityError(
+    const originalError = error instanceof Error ? error : undefined
+    throw new AppError(
       `Cannot access project directory: ${message}`,
-      'NOT_ACCESSIBLE'
+      ErrorCode.PATH_NOT_ACCESSIBLE,
+      originalError
     )
   }
 }
@@ -149,7 +147,7 @@ export async function validateProjectPath(projectPath: string): Promise<void> {
  * - If symlink target is not a system/sensitive directory
  *
  * @returns true if path is a symlink, false otherwise
- * @throws PathSecurityError if symlink is dangerous
+ * @throws AppError if symlink is dangerous
  */
 export async function validateSymlink(projectPath: string): Promise<boolean> {
   let stats
@@ -175,9 +173,9 @@ export async function validateSymlink(projectPath: string): Promise<boolean> {
 
     // Check if symlink target is a system directory
     if (isSystemDirectory(resolvedTarget)) {
-      throw new PathSecurityError(
+      throw new AppError(
         'Cannot open symlink to system or sensitive directory',
-        'SYMLINK_ATTACK'
+        ErrorCode.SYMLINK_ATTACK
       )
     }
 
@@ -186,21 +184,25 @@ export async function validateSymlink(projectPath: string): Promise<boolean> {
       await access(resolvedTarget, constants.R_OK | constants.X_OK)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      throw new PathSecurityError(
+      const originalError = error instanceof Error ? error : undefined
+      throw new AppError(
         `Symlink target is not accessible: ${message}`,
-        'NOT_ACCESSIBLE'
+        ErrorCode.PATH_NOT_ACCESSIBLE,
+        originalError
       )
     }
 
     return true // Valid symlink
   } catch (_error) {
-    if (_error instanceof PathSecurityError) {
-      throw _error // Re-throw security errors
+    if (_error instanceof AppError) {
+      throw _error // Re-throw AppError
     }
     // Other errors (broken symlink, etc.)
-    throw new PathSecurityError(
+    const originalError = _error instanceof Error ? _error : undefined
+    throw new AppError(
       `Invalid symlink: ${_error instanceof Error ? _error.message : String(_error)}`,
-      'SYMLINK_ATTACK'
+      ErrorCode.SYMLINK_ATTACK,
+      originalError
     )
   }
 }
@@ -211,7 +213,7 @@ export async function validateSymlink(projectPath: string): Promise<boolean> {
  * Validates both regular paths and symlinks
  * Use this as the main entry point for path validation
  *
- * @throws PathSecurityError if validation fails
+ * @throws AppError if validation fails
  */
 export async function validatePath(projectPath: string): Promise<void> {
   // First validate the path itself

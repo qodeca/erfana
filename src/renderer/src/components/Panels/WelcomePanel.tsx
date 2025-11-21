@@ -3,6 +3,7 @@ import { Home, Folder, Clock, X } from 'lucide-react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { showGlobalToast } from '../Toast/toastService'
 import { useProjectStore } from '../../stores/useProjectStore'
+import { isProjectNotFoundError, getUserFriendlyMessage } from '../../../../shared/errors'
 
 interface RecentProject {
   path: string
@@ -47,9 +48,10 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
       }
     } catch (error) {
       console.error('Failed to load recent projects:', error)
+      // todo023: Use user-friendly error messages
       showGlobalToast({
         title: 'Failed to Load Recent Projects',
-        message: error instanceof Error ? error.message : 'An unknown error occurred',
+        message: getUserFriendlyMessage(error),
         type: 'error',
         duration: 5000
       })
@@ -65,8 +67,14 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
   }, [loadRecentProjects])
 
   const handleProjectClick = async (projectPath: string) => {
-    // Prevent interactions if folder dialog is open (Change Project button was clicked)
+    // todo024: Add user feedback for blocked interactions
     if (isProjectChanging) {
+      showGlobalToast({
+        title: 'Please Wait',
+        message: 'Please wait for the current operation to complete',
+        type: 'warning',
+        duration: 3000
+      })
       return
     }
 
@@ -78,16 +86,17 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
       // Recent projects timestamp is updated in the IPC handler
     } catch (error) {
       console.error('Failed to open project:', error)
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred'
 
-      // Check if it's a "file not found" type error
-      const isNotFound = errorMessage.includes('ENOENT') || errorMessage.includes('Cannot access') || errorMessage.includes('not found')
+      // todo022: Replace string-based error detection with error codes
+      // todo023: Use user-friendly error messages
+      const isNotFound = isProjectNotFoundError(error)
+      const userMessage = getUserFriendlyMessage(error)
 
       showGlobalToast({
         title: 'Failed to Open Project',
         message: isNotFound
           ? `Project no longer exists at this location. It has been removed from recent projects.`
-          : errorMessage,
+          : userMessage,
         type: 'error',
         duration: 5000
       })
@@ -112,8 +121,14 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
     // Stop event from bubbling up to the parent div (which opens the project)
     event.stopPropagation()
 
-    // Prevent interactions if folder dialog is open (Change Project button was clicked)
+    // todo024: Add user feedback for blocked interactions
     if (isProjectChanging) {
+      showGlobalToast({
+        title: 'Please Wait',
+        message: 'Please wait for the current operation to complete',
+        type: 'warning',
+        duration: 3000
+      })
       return
     }
 
@@ -139,9 +154,10 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
       }
     } catch (error) {
       console.error('Failed to remove project from recent list:', error)
+      // todo023: Use user-friendly error messages
       showGlobalToast({
         title: 'Failed to Remove Project',
-        message: error instanceof Error ? error.message : 'An unknown error occurred',
+        message: getUserFriendlyMessage(error),
         type: 'error',
         duration: 5000
       })
