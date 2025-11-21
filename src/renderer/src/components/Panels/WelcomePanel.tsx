@@ -1,5 +1,5 @@
 import { IDockviewPanelProps } from 'dockview'
-import { Home, Folder, Clock } from 'lucide-react'
+import { Home, Folder, Clock, X } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 interface RecentProject {
@@ -40,6 +40,19 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
       // Project might not exist anymore, remove it from recent list
       await window.api.settings.removeRecentProject(projectPath)
       loadRecentProjects()
+    }
+  }
+
+  const handleRemoveProject = async (projectPath: string, event: React.MouseEvent) => {
+    // Stop event from bubbling up to the parent div (which opens the project)
+    event.stopPropagation()
+
+    try {
+      await window.api.settings.removeRecentProject(projectPath)
+      // Reload the list to reflect the removal
+      loadRecentProjects()
+    } catch (error) {
+      console.error('Failed to remove project from recent list:', error)
     }
   }
 
@@ -87,6 +100,14 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
                     <div className="recent-project-time">
                       {formatLastOpened(project.lastOpened)}
                     </div>
+                    <button
+                      className="recent-project-remove"
+                      onClick={(e) => handleRemoveProject(project.path, e)}
+                      title="Remove from recent projects"
+                      aria-label="Remove from recent projects"
+                    >
+                      <X size={16} />
+                    </button>
                   </div>
                 ))}
               </div>

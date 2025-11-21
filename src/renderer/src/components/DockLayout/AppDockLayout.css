@@ -257,6 +257,31 @@
   color: #858585;
   font-size: 12px;
   flex-shrink: 0;
+  margin-left: 24px;
+}
+
+.recent-project-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #858585;
+  cursor: pointer;
+  padding: 4px;
+  margin-left: 8px;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.recent-project-remove:hover {
+  background-color: #3c3c3c;
+  color: #cccccc;
+}
+
+.recent-project-remove:active {
+  background-color: #505050;
 }
 
 /* Remove Dockview's default padding from welcome tab container */
