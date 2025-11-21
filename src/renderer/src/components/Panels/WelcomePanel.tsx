@@ -1,6 +1,6 @@
 import { IDockviewPanelProps } from 'dockview'
 import { Home, Folder, Clock, X } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { showGlobalToast } from '../Toast/toastService'
 import { useProjectStore } from '../../stores/useProjectStore'
 
@@ -10,17 +10,29 @@ interface RecentProject {
   lastOpened: number
 }
 
+// todo020: Unified loading state using discriminated union
+type LoadingState =
+  | { type: 'initial' }
+  | { type: 'opening'; path: string }
+  | { type: 'removing'; path: string }
+  | { type: 'idle' }
+
 export function WelcomePanel(_props: IDockviewPanelProps) {
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([])
-  const [loading, setLoading] = useState(true)
-  const [openingPath, setOpeningPath] = useState<string | null>(null)
+  const [loadingState, setLoadingState] = useState<LoadingState>({ type: 'initial' })
   const isProjectChanging = useProjectStore((state) => state.isProjectChanging)
 
+  // todo019: Prevent state updates on unmounted components
+  const isMounted = useRef(true)
+
   useEffect(() => {
-    loadRecentProjects()
+    return () => {
+      isMounted.current = false
+    }
   }, [])
 
-  const loadRecentProjects = async () => {
+  // todo018: Fix missing useEffect dependencies by wrapping in useCallback
+  const loadRecentProjects = useCallback(async () => {
     try {
       const result = await window.api.settings.getRecentProjects()
       if (result.success && result.projects) {
@@ -42,9 +54,15 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
         duration: 5000
       })
     } finally {
-      setLoading(false)
+      if (isMounted.current) {
+        setLoadingState({ type: 'idle' })
+      }
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadRecentProjects()
+  }, [loadRecentProjects])
 
   const handleProjectClick = async (projectPath: string) => {
     // Prevent interactions if folder dialog is open (Change Project button was clicked)
@@ -52,7 +70,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
       return
     }
 
-    setOpeningPath(projectPath)
+    setLoadingState({ type: 'opening', path: projectPath })
     try {
       // Open project using the proper flow that updates recent projects
       await window.api.file.openProjectByPath(projectPath)
@@ -84,7 +102,9 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
         }
       }
     } finally {
-      setOpeningPath(null)
+      if (isMounted.current) {
+        setLoadingState({ type: 'idle' })
+      }
     }
   }
 
@@ -97,6 +117,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
       return
     }
 
+    setLoadingState({ type: 'removing', path: projectPath })
     try {
       const result = await window.api.settings.removeRecentProject(projectPath)
       if (result.success) {
@@ -124,6 +145,10 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
         type: 'error',
         duration: 5000
       })
+    } finally {
+      if (isMounted.current) {
+        setLoadingState({ type: 'idle' })
+      }
     }
   }
 
@@ -141,6 +166,8 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
     return new Date(timestamp).toLocaleDateString()
   }
 
+  const isLoading = loadingState.type === 'initial'
+
   return (
     <div className="panel-content" tabIndex={0}>
       <div className="welcome-panel">
@@ -149,7 +176,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
           <h2>Welcome to ERFANA</h2>
           <p>Open a folder from the Project panel to start editing</p>
 
-          {!loading && recentProjects.length > 0 && (
+          {!isLoading && recentProjects.length > 0 && (
             <div className="recent-projects-section">
               <h3 className="recent-projects-title">
                 <Clock size={16} />
@@ -157,8 +184,9 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
               </h3>
               <div className="recent-projects-list">
                 {recentProjects.map((project) => {
-                  const isOpening = openingPath === project.path
-                  const isDisabled = isOpening || isProjectChanging
+                  const isOpening = loadingState.type === 'opening' && loadingState.path === project.path
+                  const isRemoving = loadingState.type === 'removing' && loadingState.path === project.path
+                  const isDisabled = isOpening || isRemoving || isProjectChanging
                   return (
                     <div
                       key={project.path}
