@@ -4,6 +4,7 @@ import { ToastProvider } from './components/Toast/ToastContext'
 import { ToastNotification } from './components/Toast/ToastNotification'
 import { DialogProvider } from './components/Dialog/DialogContext'
 import { DialogManager } from './components/Dialog/DialogManager'
+import { UIBlocker } from './components/UIBlocker/UIBlocker'
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
           <AppDockLayout />
           <ToastNotification />
           <DialogManager />
+          <UIBlocker />
         </div>
       </ToastProvider>
     </DialogProvider>
