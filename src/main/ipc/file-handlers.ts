@@ -45,8 +45,79 @@ export function broadcastProjectChanged(payload: { oldPath: string | null; newPa
   }
 }
 
+/**
+ * Common logic for opening a project by path
+ * Used by both file:openProject (dialog) and file:openProjectByPath (direct)
+ */
+async function openProjectByPath(newProjectPath: string): Promise<string> {
+  const oldProjectPath = fileService.getProjectPath()
+
+  // If same path (canonical comparison), just return null (no-op)
+  if (oldProjectPath) {
+    const [canonOld, canonNew] = await Promise.all([
+      canonicalizePath(oldProjectPath),
+      canonicalizePath(newProjectPath)
+    ])
+    if (canonOld === canonNew) {
+      return newProjectPath
+    }
+  }
+
+  try {
+    // Validate directory exists and is accessible before touching current state
+    const stats = await stat(newProjectPath)
+    if (!stats.isDirectory()) {
+      throw new Error('Selected path is not a directory')
+    }
+
+    // Stop all existing watchers before switching
+    try {
+      await fileWatcherService.stopAll()
+      await directoryWatcherService.stopAll()
+    } catch (e) {
+      // Non-fatal: proceed with switch, guards prevent stale events
+      console.warn('Stopping watchers failed (continuing):', e)
+    }
+
+    // Update project path across services
+    fileService.setProjectPath(newProjectPath)
+    fileWatcherService.setProjectPath(newProjectPath)
+    directoryWatcherService.setProjectPath(newProjectPath)
+
+    // Persist last project path
+    await settingsService.setLastProjectPath(newProjectPath)
+
+    // Add to recent projects (max 5) - CRITICAL: Updates timestamp!
+    const projectName = parse(newProjectPath).base || newProjectPath
+    await settingsService.addRecentProject(newProjectPath, projectName)
+
+    // Notify renderers
+    const payload: ProjectChanged = {
+      oldPath: oldProjectPath,
+      newPath: newProjectPath
+    }
+    broadcastProjectChanged(payload)
+
+    return newProjectPath
+  } catch (error) {
+    // Roll back to previous project path in services on failure
+    try {
+      fileService.setProjectPath(oldProjectPath || '')
+      fileWatcherService.setProjectPath(oldProjectPath || '')
+      directoryWatcherService.setProjectPath(oldProjectPath || '')
+    } catch (e) {
+      // Best-effort rollback
+      console.warn('Rollback failed after openProject error:', e)
+    }
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('Open project failed:', message)
+    // Throw so renderer can show toast
+    throw new Error(message)
+  }
+}
+
 export function registerFileHandlers(): void {
-  // Open project folder
+  // Open project folder via dialog
   ipcMain.handle('file:openProject', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory', 'createDirectory'],
@@ -59,70 +130,15 @@ export function registerFileHandlers(): void {
     }
 
     const newProjectPath = result.filePaths[0]
-    const oldProjectPath = fileService.getProjectPath()
+    return await openProjectByPath(newProjectPath)
+  })
 
-    // If same path (canonical comparison), just return null (no-op)
-    if (oldProjectPath) {
-      const [canonOld, canonNew] = await Promise.all([
-        canonicalizePath(oldProjectPath),
-        canonicalizePath(newProjectPath)
-      ])
-      if (canonOld === canonNew) {
-        return null
-      }
+  // Open project folder by path (for recent projects, etc.)
+  ipcMain.handle('file:openProjectByPath', async (_event, projectPath: string) => {
+    if (!projectPath || typeof projectPath !== 'string') {
+      throw new Error('Invalid project path')
     }
-
-    try {
-      // Validate directory exists and is accessible before touching current state
-      const stats = await stat(newProjectPath)
-      if (!stats.isDirectory()) {
-        throw new Error('Selected path is not a directory')
-      }
-
-      // Stop all existing watchers before switching
-      try {
-        await fileWatcherService.stopAll()
-        await directoryWatcherService.stopAll()
-      } catch (e) {
-        // Non-fatal: proceed with switch, guards prevent stale events
-        console.warn('Stopping watchers failed (continuing):', e)
-      }
-
-      // Update project path across services
-      fileService.setProjectPath(newProjectPath)
-      fileWatcherService.setProjectPath(newProjectPath)
-      directoryWatcherService.setProjectPath(newProjectPath)
-
-      // Persist last project path
-      await settingsService.setLastProjectPath(newProjectPath)
-
-      // Add to recent projects (max 5)
-      const projectName = parse(newProjectPath).base || newProjectPath
-      await settingsService.addRecentProject(newProjectPath, projectName)
-
-      // Notify renderers
-      const payload: ProjectChanged = {
-        oldPath: oldProjectPath,
-        newPath: newProjectPath
-      }
-      broadcastProjectChanged(payload)
-
-      return newProjectPath
-    } catch (error) {
-      // Roll back to previous project path in services on failure
-      try {
-        fileService.setProjectPath(oldProjectPath || '')
-        fileWatcherService.setProjectPath(oldProjectPath || '')
-        directoryWatcherService.setProjectPath(oldProjectPath || '')
-      } catch (e) {
-        // Best-effort rollback
-        console.warn('Rollback failed after openProject error:', e)
-      }
-      const message = error instanceof Error ? error.message : String(error)
-      console.error('Open project failed:', message)
-      // Throw so renderer can show toast
-      throw new Error(message)
-    }
+    return await openProjectByPath(projectPath)
   })
 
   // Get last opened project path if it still exists

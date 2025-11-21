@@ -7,6 +7,7 @@ declare global {
     api: {
       file: {
         openProject: () => Promise<string | null>
+        openProjectByPath: (projectPath: string) => Promise<string>
         getLastProjectPath: () => Promise<string | null>
         readDirectory: (dirPath: string) => Promise<FileNode[]>
         readFile: (filePath: string) => Promise<string>
