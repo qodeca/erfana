@@ -13,6 +13,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import { showGlobalToast } from '../Toast/toastService'
+import { useScrollAnomalyRecovery } from '../../hooks/useScrollAnomalyRecovery'
 import '@xterm/xterm/css/xterm.css'
 import './TerminalPanel.css'
 import { isElementVisible } from '../../utils/domUtils'
@@ -33,6 +34,15 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
   // Terminal store for cross-component communication
   const setActiveTerminalId = useTerminalStore((state) => state.setActiveTerminalId)
+
+  // Auto-recovery for Claude Code scroll anomalies (issue #12)
+  // Detects unexpected scroll-to-top during streaming and auto-recovers
+  const { wrapOnDataHandler } = useScrollAnomalyRecovery(xtermRef, terminalRef, {
+    enabled: true,
+    onRecovery: () => {
+      console.debug('[ScrollRecovery] Auto-recovered from anomalous scroll-to-top')
+    }
+  })
 
   // Keep ref in sync with state for cleanup
   useEffect(() => {
@@ -312,23 +322,12 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   useEffect(() => {
     if (!terminalId) return
 
-    const unsubscribeData = window.api.terminal.onData((data) => {
+    // Wrap data handler with scroll anomaly detection (issue #12)
+    // This detects Claude Code's Ink library scroll-to-top anomalies and auto-recovers
+    const wrappedDataHandler = wrapOnDataHandler((data: { terminalId: string; data: string }) => {
       if (data.terminalId === terminalId && xtermRef.current) {
-        // FIX: Preserve scroll position to prevent jumping to top during streaming output
-        // This is a workaround for Claude CLI bug that causes terminal buffer redraws
-        // See: https://github.com/anthropics/claude-code/issues/826
-        const buffer = xtermRef.current.buffer.active
-        const wasAtBottom = buffer.viewportY === buffer.baseY
-
         // Write data to terminal
         xtermRef.current.write(data.data)
-
-        // If user was NOT at bottom (scrolled up to view history), restore position
-        // xterm.js normally handles this, but Claude CLI buffer redraws override it
-        if (!wasAtBottom) {
-          // Note: xterm.js will maintain scroll position automatically
-          // This check ensures we don't interfere when user is reading scrollback
-        }
 
         // Record recent activity (ignore warmup period noise)
         if (Date.now() >= warmupUntilRef.current) {
@@ -336,6 +335,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         }
       }
     })
+
+    const unsubscribeData = window.api.terminal.onData(wrappedDataHandler)
 
     const unsubscribeExit = window.api.terminal.onExit((data) => {
       if (data.terminalId === terminalId) {
@@ -360,7 +361,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       unsubscribeExit()
       unsubscribeError()
     }
-  }, [terminalId])
+  }, [terminalId, wrapOnDataHandler])
 
   // Handle resize (panel drag, window resize, show/hide)
   useEffect(() => {
