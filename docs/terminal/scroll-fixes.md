@@ -239,8 +239,113 @@ new Terminal({
 }
 ```
 
+## Auto-Recovery from Scroll Anomalies (v0.4.3)
+
+### Purpose
+
+Automatic detection and recovery from Claude Code's Ink library scroll-to-top anomalies during streaming output. Complements the manual "Scroll to Bottom" button with intelligent auto-recovery.
+
+**Related Issue**: [#12](https://github.com/user/erfana/issues/12)
+
+### How It Works
+
+The system detects "anomalous" scroll events by correlating three signals:
+
+1. **User Scroll Activity**: Tracks wheel/touch events on `.xterm-viewport` (300ms window)
+2. **Data Streaming Activity**: Tracks terminal data arrivals (500ms window)
+3. **Scroll Position Delta**: Detects large jumps (≥10 lines) to near-top (≤3 lines)
+
+```
+Anomaly = (DataStreaming within 500ms) AND
+          (NO UserScroll within 300ms) AND
+          (Jump ≥ 10 lines) AND
+          (Landed at viewportY ≤ 3) AND
+          (Was NOT already near top)
+```
+
+When an anomaly is detected, the terminal auto-scrolls to bottom after 100ms debounce.
+
+### Architecture
+
+```
+scrollAnomalyDetector.ts     Pure detection logic (testable, no React)
+├── isAnomalousScroll()      Main detection algorithm
+├── wasUserScrollRecent()    Signal 1: user activity check
+├── wasDataStreamActive()    Signal 2: streaming check
+├── calculateJumpMagnitude() Signal 3: delta calculation
+└── isNearTop()              Position threshold check
+
+useScrollAnomalyRecovery.ts  React hook integration
+├── wrapOnDataHandler()      Wraps terminal data handler
+├── User scroll listener     Attaches to .xterm-viewport
+└── Recovery with debounce   scrollToBottom() after 100ms
+```
+
+### Configuration
+
+Default values (tunable via hook options):
+
+```typescript
+{
+  userScrollRecencyMs: 300,   // User scroll recency window
+  dataStreamRecencyMs: 500,   // Data streaming recency window
+  jumpThresholdLines: 10,     // Minimum lines for anomaly
+  nearTopThreshold: 3,        // Lines from top to be "near top"
+  recoveryDebounceMs: 100     // Debounce before recovery
+}
+```
+
+### Usage in TerminalPanel
+
+```typescript
+const { wrapOnDataHandler } = useScrollAnomalyRecovery(xtermRef, terminalRef, {
+  enabled: true,
+  onRecovery: () => {
+    console.debug('[ScrollRecovery] Auto-recovered from anomalous scroll-to-top')
+  }
+})
+
+const wrappedHandler = wrapOnDataHandler((data) => {
+  if (data.terminalId === terminalId && xtermRef.current) {
+    xtermRef.current.write(data.data)
+  }
+})
+
+window.api.terminal.onData(wrappedHandler)
+```
+
+### Test Coverage
+
+- **Pure Logic Tests** (`scrollAnomalyDetector.test.ts`): 34 tests
+  - All detection functions with boundary conditions
+  - Positive, negative, and edge cases
+  - Custom configuration scenarios
+
+- **Hook Tests** (`useScrollAnomalyRecovery.test.ts`): 10 tests
+  - Handler wrapping and API
+  - Anomaly detection and recovery
+  - User scroll prevention
+  - Debounce behavior
+  - Cleanup on unmount
+
+### Implementation Files
+
+- `src/renderer/src/utils/scrollAnomalyDetector.ts` - Pure detection logic
+- `src/renderer/src/hooks/useScrollAnomalyRecovery.ts` - React hook
+- `src/renderer/src/utils/scrollAnomalyDetector.test.ts` - Pure logic tests
+- `src/renderer/src/hooks/useScrollAnomalyRecovery.test.ts` - Hook tests
+
+### Why Three Signals?
+
+1. **User Scroll Check**: Prevents fighting against intentional user scrolling up to read history
+2. **Data Streaming Check**: Ink anomalies only occur during active streaming, not at rest
+3. **Jump Magnitude Check**: Normal scroll adjustments are small; Ink redraws cause large jumps to top
+
+This multi-signal approach minimizes false positives while reliably detecting the Ink library's characteristic scroll behavior.
+
 ## References
 
 - [xterm.js Buffer API](https://github.com/xtermjs/xterm.js/blob/master/typings/xterm.d.ts)
 - [xterm.js Scroll Methods](https://xtermjs.org/docs/api/terminal/)
 - [Claude Code Issue #826](https://github.com/anthropics/claude-code/issues/826) (183+ upvotes)
+- [xterm.js onScroll Limitation](https://github.com/xtermjs/xterm.js/issues/3864)

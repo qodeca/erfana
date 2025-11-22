@@ -2,7 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
-- **Version**: 0.4.2
+- **Version**: 0.4.3
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -52,7 +52,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (1392 tests)
+- [Testing](docs/testing/README.md) — Workspace, coverage (1436 tests)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -64,7 +64,19 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.4.2)
+## Recent Changes (v0.4.3)
+- **Terminal Scroll Auto-Recovery** (Nov 22, 2025):
+  - Automatic detection and recovery from Claude Code Ink library scroll anomalies
+  - Three-signal correlation: user scroll (300ms), data streaming (500ms), jump magnitude (≥10 lines)
+  - `scrollAnomalyDetector.ts`: Pure detection logic (testable, no React)
+  - `useScrollAnomalyRecovery.ts`: React hook integration with debounce
+  - Complements existing "Scroll to Bottom" button with intelligent auto-recovery
+  - 44 new tests (34 pure logic + 10 hook tests)
+  - Closes #12
+  - Files: `src/renderer/src/utils/scrollAnomalyDetector.ts`, `src/renderer/src/hooks/useScrollAnomalyRecovery.ts`
+- **Test Coverage**: **1436 tests passing (66 test files)**
+
+## Changes in v0.4.2
 - **Chrome-style Dynamic Tabs** (Nov 22, 2025):
   - EditorTab component with dynamic sizing (min 80px, max 300px, flex 1 1 0)
   - Dirty indicator (filled circle) for unsaved changes
@@ -85,7 +97,6 @@ See `docs/` for details (keep Claude's context focused):
   - Agent orchestration with explicit Task tool examples
   - Templates for implementation plans and PR descriptions
   - Located in `.claude/skills/implementing-github-issues/`
-- **Test Coverage**: **1392 tests passing (64 test files)**
 
 ## Changes in v0.4.0-0.4.1
 - **ProjectManagementContext Singleton** (Nov 22, 2025):
