@@ -7,7 +7,6 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 
 ### Core Documentation
 - [Architecture](./architecture.md) - System architecture and design patterns
-- [Architectural Review](./architectural-review/README.md) - Comprehensive code quality assessment (split into 8 focused documents)
 - [API Services](./api-services.md) - Main process services and IPC handlers
 - [IPC Patterns](./ipc-patterns.md) - Inter-process communication patterns
 - [Security](./security.md) - Security considerations and implementations
@@ -44,6 +43,9 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 - [Known Issues](./known-issues.md) - Current limitations and workarounds
 - [Troubleshooting](./troubleshooting.md) - Common problems and solutions
 - [Advanced Troubleshooting](./troubleshooting-advanced.md) - Deep debugging techniques
+
+### Claude Code Integration
+- [GitHub Issues Protocol](./claude-code/github-issues-protocol.md) - When/how Claude Code uses `gh` CLI for issues
 
 ### Technical Details
 - [HTML Rendering](./rendering/README.md) - Markdown to HTML conversion architecture

@@ -2,7 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
-- **Version**: 0.4.0
+- **Version**: 0.4.1
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -51,7 +51,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (1301 tests)
+- [Testing](docs/testing/README.md) — Workspace, coverage (1330 tests)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -63,7 +63,21 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.3.9)
+## Recent Changes (v0.4.0-0.4.1)
+- **ProjectManagementContext Singleton** (Nov 22, 2025):
+  - Fixed duplicate toast issue when opening projects from Recent Projects
+  - Both ProjectTree and WelcomePanel were creating separate useProjectManagement instances
+  - Each registered their own IPC listeners causing duplicate "Project Opened" toasts
+  - Solution: Context ensures only ONE instance, meaning ONE IPC listener and ONE toast per event
+  - ISP-compliant hooks: `useProjectManagementContext()`, `useOpenProjectByPath()`, `useProjectChangedEffect()`
+  - See `src/renderer/src/context/ProjectManagementContext.tsx`
+- **Claude Code Skills** (Nov 22, 2025):
+  - Added `creating-skills`: Guides through skill creation following best practices
+  - Added `creating-github-issues`: Creates structured GitHub issues from user descriptions
+  - Skills located in `.claude/skills/`
+- **Test Coverage**: **1330 tests passing (62 test files)**
+
+## Changes in v0.3.9
 - **Auto-refresh Recent Projects** (Nov 21, 2025):
   - WelcomePanel subscribes to `project:changed` IPC event
   - Recent projects list updates automatically when opening/closing projects
@@ -89,7 +103,7 @@ See `docs/` for details (keep Claude's context focused):
   - WelcomePanel.test.tsx: 34 tests + 11 integration tests
   - UIBlocker.test.tsx: 25 tests
   - file-handlers.openProjectByPath.test.ts: 34 tests
-  - **Total: 1301 tests passing (60 test files)**
+  - **Total: 1330 tests passing (62 test files)**
 
 ## Changes in v0.3.8
 - **Markdown Link Security & Features** (Nov 2, 2025):
