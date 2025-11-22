@@ -52,8 +52,9 @@ The skill will:
 | 3. Implementation | Write code + tests | code-implementer, test-writer | - |
 | 4. Review | Code quality check | code-reviewer, security-auditor (Tier 3) | Tier 3 |
 | 5. Documentation | Update docs | project-documenter | - |
-| 6. Finalization | Quality gates, commit | diff-summarizer | All tiers |
-| 7. Release (optional) | Production release | release-engineer | When releasing |
+| 6. UAT | Manual testing | - | Tier 2+ |
+| 7. Finalization | Quality gates, commit, branch | diff-summarizer | All tiers |
+| 8. Release (optional) | Production release | release-engineer | When releasing |
 
 ---
 
@@ -64,17 +65,17 @@ Determine tier from issue labels:
 ### Tier 1: Trivial
 **Labels:** `good first issue`, `documentation`, `typo`, `chore`
 **Checkpoints:** Before Commit only (1 total)
-**Skip phases:** Architecture, Review
+**Skip phases:** Architecture, Review, UAT
 **Estimated time:** 15-30 minutes
 
 ### Tier 2: Standard (Default)
 **Labels:** `bug`, `enhancement`, or unlabeled
-**Checkpoints:** After Discovery, After Architecture, Before Commit (3 total)
+**Checkpoints:** After Discovery, After Architecture, After UAT, Before Commit (4 total)
 **Estimated time:** 30 minutes - 2 hours
 
 ### Tier 3: Complex
 **Labels:** `breaking-change`, `architecture`, `security`, `major`
-**Checkpoints:** All phases (5 total)
+**Checkpoints:** All phases (6 total)
 **Additional:** Security review required
 **Estimated time:** 2+ hours
 
@@ -417,7 +418,62 @@ For security-sensitive changes, verify:
 
 ---
 
-## Phase 6: Finalization
+## Phase 6: User Acceptance Testing (UAT)
+
+**Goal:** Verify changes work correctly in running application before committing.
+**Skip for:** Tier 1 (trivial changes)
+
+### Steps
+
+1. **Build the Project**
+   ```bash
+   npm run build
+   ```
+   Verify build completes without errors.
+
+2. **Start Development Server**
+   ```bash
+   npm run dev
+   ```
+   Launch the application for manual testing.
+
+3. **Request Manual Testing**
+   Ask user to manually test the implemented functionality against acceptance criteria.
+
+### UAT Checkpoint (Tier 2+)
+
+Present to user:
+```markdown
+## User Acceptance Testing
+
+The application is running. Please manually test the changes.
+
+**Acceptance Criteria to Verify:**
+- [ ] Criterion 1
+- [ ] Criterion 2
+
+**How to test:**
+1. [Step-by-step testing instructions]
+2. [What to look for]
+
+When finished, select an option:
+```
+
+**Options:**
+- **UAT passed** - All acceptance criteria verified, proceed to finalization
+- **Found issues** - Problems discovered during testing (please describe)
+- **Skip UAT** - Skip manual testing (Tier 1 only)
+
+### If Issues Found
+
+1. Stop the dev server
+2. Fix the reported issues
+3. Re-run quality gates (`npm test`, `npm run typecheck`)
+4. Restart UAT from Step 1
+
+---
+
+## Phase 7: Finalization
 
 **Goal:** Pass quality gates and create commit.
 
@@ -484,9 +540,54 @@ EOF
 
 Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 
+### Branch Management Checkpoint
+
+After commit succeeds, present options to user:
+
+```markdown
+## Branch Management
+
+Commit created successfully. How would you like to proceed?
+```
+
+**Options:**
+- **Merge to main and delete branch** - Recommended for completed work
+- **Merge to main and keep branch** - If follow-up work expected on same branch
+- **Push to remote only** - Keep on feature branch, create PR later
+- **Local only** - Don't push or merge yet (manual handling)
+
+### Branch Management Actions
+
+Based on user selection:
+
+**Merge to main and delete branch:**
+```bash
+git checkout main
+git merge <branch-name>
+git push origin main
+git branch -d <branch-name>
+git push origin --delete <branch-name>  # if remote branch exists
+```
+
+**Merge to main and keep branch:**
+```bash
+git checkout main
+git merge <branch-name>
+git push origin main
+git checkout <branch-name>
+```
+
+**Push to remote only:**
+```bash
+git push -u origin <branch-name>
+```
+
+**Local only:**
+No git operations performed. User handles manually.
+
 ---
 
-## Phase 7: Release (Optional)
+## Phase 8: Release (Optional)
 
 **Goal:** Prepare production release with user-friendly release notes.
 **Agent:** `release-engineer`
@@ -599,10 +700,12 @@ If implementation cannot continue:
 **Issue:** #42 - Fix typo in README
 ```
 1. Pre-flight: Check issue is open ✓
-2. Skip Discovery, Architecture, Review
+2. Skip Discovery, Architecture, Review, UAT
 3. Implementation: Fix typo directly
 4. Finalization: Run lint, commit
    "docs: fix typo in README - Closes #42"
+   → Checkpoint: Approve commit
+   → Checkpoint: Branch management (usually "Local only" for trivial)
 ```
 
 ### Example 2: Standard Feature (Tier 2)
@@ -617,8 +720,11 @@ If implementation cannot continue:
 4. Implementation: Create EditorTab.tsx, CSS, tests
 5. Review: code-reviewer checks quality
 6. Documentation: Update CLAUDE.md changelog
-7. Finalization: Pass quality gates
+7. UAT: Build project, run dev server
+   → Checkpoint: User tests manually, selects "UAT passed"
+8. Finalization: Pass quality gates, commit
    → Checkpoint: Approve commit
+   → Checkpoint: Select "Merge to main and delete branch"
 ```
 
 ### Example 3: Complex Security Issue (Tier 3)
@@ -634,8 +740,11 @@ If implementation cannot continue:
 5. Review: code-reviewer + security checklist
    → Checkpoint: Approve security review
 6. Documentation: Update security docs
-7. Finalization: All quality gates + security gates
-   → Checkpoint: Final approval
+7. UAT: Build, run dev, test path traversal scenarios
+   → Checkpoint: User verifies security, selects "UAT passed"
+8. Finalization: All quality gates + security gates
+   → Checkpoint: Approve commit
+   → Checkpoint: Select "Merge to main and delete branch"
 ```
 
 ---
