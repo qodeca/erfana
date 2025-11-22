@@ -11,7 +11,7 @@ Start here for the authoritative sources.
 | Resource | Description |
 |----------|-------------|
 | [Agent Skills Documentation](https://code.claude.com/docs/en/skills) | Official specification for SKILL.md format, YAML fields, and directory structure |
-| [Skill Authoring Best Practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices) | Comprehensive guide covering progressive disclosure, descriptions, cross-model testing, and anti-patterns |
+| [Equipping Agents with Skills](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills) | Comprehensive guide covering progressive disclosure, descriptions, cross-model testing, and anti-patterns |
 | [Official Skills Repository](https://github.com/anthropics/skills) | 18+ production skills from Anthropic demonstrating real-world patterns |
 
 ---
@@ -84,7 +84,7 @@ Official support documentation.
 ## Related Topics
 
 ### Slash Commands (User-Invoked)
-- [Slash Commands Documentation](https://docs.anthropic.com/en/docs/claude-code/slash-commands)
+- [Slash Commands Documentation](https://code.claude.com/docs/en/slash-commands)
 - Different from skills: explicitly triggered with `/command`
 
 ### MCP (Model Context Protocol)
@@ -103,7 +103,7 @@ Connect with other skill creators.
 
 | Resource | Description |
 |----------|-------------|
-| [Claude Code GitHub Discussions](https://github.com/anthropics/claude-code/discussions) | Official community discussions |
+| [Claude Code GitHub Issues](https://github.com/anthropics/claude-code/issues) | Bug reports, feature requests, and community discussions |
 | [Anthropic Discord](https://discord.gg/anthropic) | Real-time community chat |
 
 ---
