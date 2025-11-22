@@ -28,7 +28,7 @@ import { formatFileOperationError } from '../../utils/errorUtils'
 import { DRAG_DROP, AUTO_SCROLL, AUTO_EXPAND } from './constants'
 import { withWatcherPause } from './withWatcherPause'
 import { useDirectoryWatcher } from '../../hooks/useDirectoryWatcher'
-import { useProjectManagement } from '../../hooks/useProjectManagement'
+import { useProjectManagementContext, useProjectChangedEffect } from '../../context/ProjectManagementContext'
 import { useFileOperations } from '../../hooks/useFileOperations'
 
 interface ProjectTreeProps {
@@ -44,7 +44,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
   const isInternalOperation = useRef(false)
 
-  // Project lifecycle management via hook
+  // Project lifecycle management via context (singleton - avoids duplicate IPC listeners)
   const {
     projectPath,
     files,
@@ -55,12 +55,13 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     handleOpenProject,
     handleCloseProject,
     refreshFiles
-  } = useProjectManagement({
-    onProjectChanged: (newPath) => {
-      // Reset UI state when project changes
-      setExpandedFolders(newPath ? new Set([newPath]) : new Set())
-      setSelectedFolder(null)
-    }
+  } = useProjectManagementContext()
+
+  // Register for project change notifications to reset UI state
+  useProjectChangedEffect((newPath) => {
+    // Reset UI state when project changes
+    setExpandedFolders(newPath ? new Set([newPath]) : new Set())
+    setSelectedFolder(null)
   })
 
   // Local loading state for file operations (separate from project loading)

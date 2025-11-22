@@ -89,4 +89,15 @@ export interface IUseProjectManagementReturn {
    * Used by file operations to update the tree after making changes
    */
   refreshFiles: () => Promise<void>
+
+  /**
+   * Open a project by direct path (for recent projects)
+   * - Checks for unsaved changes and terminal activity
+   * - Requests confirmation if needed
+   * - Opens project directly without file picker dialog
+   *
+   * @param projectPath - Path to the project folder
+   * @returns true if project was opened, false if cancelled by user
+   */
+  handleOpenProjectByPath: (projectPath: string) => Promise<boolean>
 }

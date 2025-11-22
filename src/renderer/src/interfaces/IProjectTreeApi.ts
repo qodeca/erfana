@@ -32,6 +32,7 @@ export interface IProjectTreeApi {
    */
   file: {
     openProject(): Promise<string | null>
+    openProjectByPath(projectPath: string): Promise<string>
     closeProject(): Promise<boolean>
     getLastProjectPath(): Promise<string | null>
     readDirectory(path: string): Promise<FileNode[]>
