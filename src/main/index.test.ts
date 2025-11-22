@@ -82,6 +82,11 @@ describe('Main Process - Window Creation', () => {
     vi.doMock('./services/TerminalService', () => ({
       terminalService: { dispose: vi.fn() }
     }))
+    vi.doMock('./services/SettingsService', () => ({
+      settingsService: {
+        cleanupStaleProjects: vi.fn(() => Promise.resolve())
+      }
+    }))
 
     // Mock IPC handler registration
     vi.doMock('./ipc/file-handlers', () => ({
@@ -98,6 +103,9 @@ describe('Main Process - Window Creation', () => {
     }))
     vi.doMock('./ipc/terminal-handlers', () => ({
       registerTerminalHandlers: vi.fn()
+    }))
+    vi.doMock('./ipc/pdf-import-handlers', () => ({
+      registerPdfImportHandlers: vi.fn()
     }))
 
     // Mock safe console

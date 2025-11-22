@@ -31,13 +31,24 @@ vi.mock('../../components/Toast/toastService', () => ({
   showGlobalToast: (options: unknown) => mockShowGlobalToast(options)
 }))
 
-// Mock useOpenProjectByPath from context to avoid Provider requirement
+// Mock useOpenProjectByPath and useProjectManagementContext from context to avoid Provider requirement
 // The integration tests still use window.api mocks directly for the actual behavior
 const mockHandleOpenProjectByPath = vi.fn()
 vi.mock('../../context/ProjectManagementContext', () => ({
   useOpenProjectByPath: () => ({
     handleOpenProjectByPath: mockHandleOpenProjectByPath,
     isSwitchingProject: false
+  }),
+  useProjectManagementContext: () => ({
+    projectPath: null
+  })
+}))
+
+// Mock usePdfImport hook
+vi.mock('../../hooks/usePdfImport', () => ({
+  usePdfImport: () => ({
+    isImporting: false,
+    importPdf: vi.fn(() => Promise.resolve(null))
   })
 }))
 

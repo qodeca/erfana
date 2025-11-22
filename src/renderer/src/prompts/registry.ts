@@ -8,6 +8,7 @@ import modifyTemplate from './templates/modify.md?raw'
 import askTemplate from './templates/ask.md?raw'
 import promptTemplate from './templates/prompt.md?raw'
 import mermaidBugReportTemplate from './templates/mermaid-bug-report.md?raw'
+import organizeImportTemplate from './templates/organize-import.md?raw'
 
 /**
  * Parse all template files with frontmatter
@@ -18,7 +19,8 @@ const parsedTemplates = parseTemplates([
   { raw: modifyTemplate, filename: 'modify.md' },
   { raw: askTemplate, filename: 'ask.md' },
   { raw: promptTemplate, filename: 'prompt.md' },
-  { raw: mermaidBugReportTemplate, filename: 'mermaid-bug-report.md' }
+  { raw: mermaidBugReportTemplate, filename: 'mermaid-bug-report.md' },
+  { raw: organizeImportTemplate, filename: 'organize-import.md' }
 ])
 
 console.log('📝 Loaded prompt templates:', parsedTemplates.length)

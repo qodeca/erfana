@@ -234,6 +234,26 @@ const api = {
     markClearComplete: (terminalId: string): void => {
       ipcRenderer.send('terminal:clearComplete', { terminalId })
     }
+  },
+
+  // PDF import operations
+  pdfImport: {
+    selectFile: (): Promise<{ path: string; name: string; sizeInMB: number } | null> =>
+      ipcRenderer.invoke('pdf:selectFile'),
+
+    validate: (pdfPath: string): Promise<{
+      valid: boolean
+      error?: string
+      sizeInMB: number
+      fileName: string
+    }> => ipcRenderer.invoke('pdf:validate', pdfPath),
+
+    import: (pdfPath: string): Promise<{
+      success: boolean
+      outputPath?: string
+      error?: string
+      errorCode?: string
+    }> => ipcRenderer.invoke('pdf:import', pdfPath)
   }
 }
 

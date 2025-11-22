@@ -30,6 +30,7 @@ import { withWatcherPause } from './withWatcherPause'
 import { useDirectoryWatcher } from '../../hooks/useDirectoryWatcher'
 import { useProjectManagementContext, useProjectChangedEffect } from '../../context/ProjectManagementContext'
 import { useFileOperations } from '../../hooks/useFileOperations'
+import { usePdfImport } from '../../hooks/usePdfImport'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -100,6 +101,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   // Drag-drop hooks
   const { flattenedItems, isDescendant } = useDragDropTree(files, projectPath)
   const clipboard = useClipboardStore()
+
+  // PDF import hook (for context menu)
+  const { importPdf } = usePdfImport()
 
   // Context menu factory (Strategy + Command pattern)
   const contextMenuFactory = useMemo(() => new ContextMenuFactory(), [])
@@ -663,7 +667,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         return siblingParent === parentPath && file.name !== currentName
       })
       return siblings.map((s) => s.name)
-    }
+    },
+    importPdf
   })
 
   /**

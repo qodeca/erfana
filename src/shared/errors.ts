@@ -23,6 +23,13 @@ export enum ErrorCode {
   PROJECT_NOT_DIRECTORY = 'PROJECT_NOT_DIRECTORY',
   PROJECT_OPEN_FAILED = 'PROJECT_OPEN_FAILED',
 
+  // PDF import errors
+  PDF_ENCRYPTED = 'PDF_ENCRYPTED',
+  PDF_EMPTY = 'PDF_EMPTY',
+  PDF_CORRUPT = 'PDF_CORRUPT',
+  PDF_TOO_LARGE = 'PDF_TOO_LARGE',
+  PDF_CONVERSION_FAILED = 'PDF_CONVERSION_FAILED',
+
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
 }
@@ -98,6 +105,13 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.PROJECT_NOT_FOUND]: 'This project no longer exists',
   [ErrorCode.PROJECT_NOT_DIRECTORY]: 'Selected path is not a directory',
   [ErrorCode.PROJECT_OPEN_FAILED]: 'Failed to open project',
+
+  // PDF import errors
+  [ErrorCode.PDF_ENCRYPTED]: 'This PDF is password protected',
+  [ErrorCode.PDF_EMPTY]: 'PDF has no text content to convert',
+  [ErrorCode.PDF_CORRUPT]: 'Unable to read PDF file',
+  [ErrorCode.PDF_TOO_LARGE]: 'PDF file is too large',
+  [ErrorCode.PDF_CONVERSION_FAILED]: 'Failed to convert PDF to markdown',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'

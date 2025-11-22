@@ -94,6 +94,21 @@ declare global {
         onClear: (callback: (data: { terminalId: string }) => void) => () => void
         markClearComplete: (terminalId: string) => void
       }
+      pdfImport: {
+        selectFile: () => Promise<{ path: string; name: string; sizeInMB: number } | null>
+        validate: (pdfPath: string) => Promise<{
+          valid: boolean
+          error?: string
+          sizeInMB: number
+          fileName: string
+        }>
+        import: (pdfPath: string) => Promise<{
+          success: boolean
+          outputPath?: string
+          error?: string
+          errorCode?: string
+        }>
+      }
     }
   }
 }

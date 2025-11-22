@@ -40,11 +40,22 @@ vi.mock('../../stores/useProjectStore', () => ({
   }
 }))
 
-// Mock useOpenProjectByPath from context
+// Mock useOpenProjectByPath and useProjectManagementContext from context
 vi.mock('../../context/ProjectManagementContext', () => ({
   useOpenProjectByPath: () => ({
     handleOpenProjectByPath: mockHandleOpenProjectByPath,
     isSwitchingProject: false
+  }),
+  useProjectManagementContext: () => ({
+    projectPath: null
+  })
+}))
+
+// Mock usePdfImport hook
+vi.mock('../../hooks/usePdfImport', () => ({
+  usePdfImport: () => ({
+    isImporting: false,
+    importPdf: vi.fn(() => Promise.resolve(null))
   })
 }))
 

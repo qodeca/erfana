@@ -35,6 +35,9 @@ export interface PromptVariables {
 
   /** User-provided input for prompts that require custom instructions */
   userInput?: string
+
+  /** Path to an imported file (for organize-import prompt) */
+  importedFilePath?: string
 }
 
 /**

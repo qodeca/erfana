@@ -22,6 +22,7 @@ import {
   DeleteDirectoryCommand,
   NewFileInDirectoryCommand,
   NewFolderInDirectoryCommand,
+  ImportPdfCommand,
   separatorItem
 } from './commands'
 
@@ -53,6 +54,12 @@ export class DirectoryContextMenuStrategy implements IContextMenuStrategy {
     items.push(new NewFileInDirectoryCommand(ctx, dirNode).toMenuItem())
     items.push(new NewFolderInDirectoryCommand(ctx, dirNode).toMenuItem())
     items.push(new RenameDirectoryCommand(ctx, dirNode).toMenuItem())
+
+    // Import operations (only if importPdf is provided)
+    if (ctx.importPdf) {
+      items.push(separatorItem())
+      items.push(new ImportPdfCommand(ctx, dirNode, ctx.importPdf).toMenuItem())
+    }
 
     items.push(separatorItem())
 
