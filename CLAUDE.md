@@ -53,6 +53,7 @@ See `docs/` for details (keep Claude's context focused):
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
 - [Testing](docs/testing/README.md) — Workspace, coverage (1301 tests)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
+- [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
 ## Code Style & Conventions
 - TypeScript strict mode enabled
