@@ -27,7 +27,7 @@ const mockProjects = [
 // Mocks
 const mockGetRecentProjects = vi.fn()
 const mockRemoveRecentProject = vi.fn()
-const mockOpenProjectByPath = vi.fn()
+const mockHandleOpenProjectByPath = vi.fn()
 const mockShowGlobalToast = vi.fn()
 
 // Use a getter pattern for dynamic mock value
@@ -38,6 +38,14 @@ vi.mock('../../stores/useProjectStore', () => ({
   useProjectStore: (selector: (state: { isProjectChanging: boolean }) => boolean) => {
     return selector(mockState)
   }
+}))
+
+// Mock useOpenProjectByPath from context
+vi.mock('../../context/ProjectManagementContext', () => ({
+  useOpenProjectByPath: () => ({
+    handleOpenProjectByPath: mockHandleOpenProjectByPath,
+    isSwitchingProject: false
+  })
 }))
 
 // Mock toast service
@@ -52,7 +60,6 @@ const mockApi = {
     removeRecentProject: mockRemoveRecentProject
   },
   file: {
-    openProjectByPath: mockOpenProjectByPath,
     onProjectChanged: vi.fn(() => vi.fn()) // Returns unsubscribe function
   }
 }
@@ -80,7 +87,7 @@ describe('WelcomePanel', () => {
       success: true,
       projects: mockProjects
     })
-    mockOpenProjectByPath.mockResolvedValue('/path/project-a')
+    mockHandleOpenProjectByPath.mockResolvedValue(true) // Success by default
     mockRemoveRecentProject.mockResolvedValue({ success: true })
   })
 
@@ -192,7 +199,7 @@ describe('WelcomePanel', () => {
   })
 
   describe('Project opening', () => {
-    it('should call openProjectByPath on click', async () => {
+    it('should call handleOpenProjectByPath on click', async () => {
       const user = userEvent.setup()
       render(<WelcomePanel {...mockDockviewProps} />)
 
@@ -203,11 +210,11 @@ describe('WelcomePanel', () => {
       const projectItem = screen.getByText('project-a').closest('.recent-project-item')
       await user.click(projectItem!)
 
-      expect(mockOpenProjectByPath).toHaveBeenCalledWith('/path/project-a')
+      expect(mockHandleOpenProjectByPath).toHaveBeenCalledWith('/path/project-a')
     })
 
     it('should show "Opening..." indicator while opening', async () => {
-      mockOpenProjectByPath.mockImplementation(() => new Promise(() => {})) // Never resolves
+      mockHandleOpenProjectByPath.mockImplementation(() => new Promise(() => {})) // Never resolves
       const user = userEvent.setup()
       render(<WelcomePanel {...mockDockviewProps} />)
 
@@ -224,7 +231,7 @@ describe('WelcomePanel', () => {
     })
 
     it('should disable item while opening', async () => {
-      mockOpenProjectByPath.mockImplementation(() => new Promise(() => {}))
+      mockHandleOpenProjectByPath.mockImplementation(() => new Promise(() => {}))
       const user = userEvent.setup()
       render(<WelcomePanel {...mockDockviewProps} />)
 
@@ -242,7 +249,7 @@ describe('WelcomePanel', () => {
     })
 
     it('should show error toast on open failure', async () => {
-      mockOpenProjectByPath.mockRejectedValue(new Error('Open failed'))
+      mockHandleOpenProjectByPath.mockRejectedValue(new Error('Open failed'))
       const user = userEvent.setup()
       render(<WelcomePanel {...mockDockviewProps} />)
 
@@ -265,7 +272,7 @@ describe('WelcomePanel', () => {
 
     it('should remove stale project on PROJECT_NOT_FOUND error', async () => {
       const notFoundError = new AppError('Project not found', ErrorCode.PROJECT_NOT_FOUND)
-      mockOpenProjectByPath.mockRejectedValue(notFoundError)
+      mockHandleOpenProjectByPath.mockRejectedValue(notFoundError)
       const user = userEvent.setup()
       render(<WelcomePanel {...mockDockviewProps} />)
 
@@ -283,7 +290,7 @@ describe('WelcomePanel', () => {
 
     it('should reload projects after removing stale project', async () => {
       const notFoundError = new AppError('Project not found', ErrorCode.PROJECT_NOT_FOUND)
-      mockOpenProjectByPath.mockRejectedValue(notFoundError)
+      mockHandleOpenProjectByPath.mockRejectedValue(notFoundError)
       const user = userEvent.setup()
       render(<WelcomePanel {...mockDockviewProps} />)
 
@@ -312,7 +319,7 @@ describe('WelcomePanel', () => {
       const projectItem = screen.getByText('project-a').closest('.recent-project-item')
       await user.click(projectItem!)
 
-      expect(mockOpenProjectByPath).not.toHaveBeenCalled()
+      expect(mockHandleOpenProjectByPath).not.toHaveBeenCalled()
     })
   })
 
@@ -381,7 +388,7 @@ describe('WelcomePanel', () => {
       await user.click(removeButtons[0])
 
       // Should not open project when clicking remove
-      expect(mockOpenProjectByPath).not.toHaveBeenCalled()
+      expect(mockHandleOpenProjectByPath).not.toHaveBeenCalled()
       expect(mockRemoveRecentProject).toHaveBeenCalled()
     })
 
@@ -444,7 +451,7 @@ describe('WelcomePanel', () => {
 
       // When isDisabled is true, onClick short-circuits and handleProjectClick is never called
       // Therefore no toast is shown - the click is simply ignored
-      expect(mockOpenProjectByPath).not.toHaveBeenCalled()
+      expect(mockHandleOpenProjectByPath).not.toHaveBeenCalled()
       expect(mockShowGlobalToast).not.toHaveBeenCalled()
     })
 
@@ -469,7 +476,7 @@ describe('WelcomePanel', () => {
       const projectItem = screen.getByText('project-a').closest('.recent-project-item')
       fireEvent.click(projectItem!)
 
-      expect(mockOpenProjectByPath).not.toHaveBeenCalled()
+      expect(mockHandleOpenProjectByPath).not.toHaveBeenCalled()
     })
 
     it('should not call removeRecentProject when blocked', async () => {
@@ -542,7 +549,7 @@ describe('WelcomePanel', () => {
 
     it('should not crash when stale removal fails', async () => {
       const notFoundError = new AppError('Project not found', ErrorCode.PROJECT_NOT_FOUND)
-      mockOpenProjectByPath.mockRejectedValue(notFoundError)
+      mockHandleOpenProjectByPath.mockRejectedValue(notFoundError)
       mockRemoveRecentProject.mockRejectedValue(new Error('Remove also failed'))
 
       const user = userEvent.setup()
@@ -559,7 +566,7 @@ describe('WelcomePanel', () => {
     })
 
     it('should provide user-friendly error messages', async () => {
-      mockOpenProjectByPath.mockRejectedValue(new Error('Technical error details'))
+      mockHandleOpenProjectByPath.mockRejectedValue(new Error('Technical error details'))
       const user = userEvent.setup()
       render(<WelcomePanel {...mockDockviewProps} />)
 

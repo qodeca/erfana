@@ -237,6 +237,54 @@ export function useProjectManagement(
   }
 
   /**
+   * Open a project by direct path (for recent projects)
+   *
+   * Flow:
+   * 1. Check for unsaved editors and terminal activity
+   * 2. Request confirmation if needed
+   * 3. Interrupt terminal if busy
+   * 4. Open project directly by path (no file picker dialog)
+   *
+   * @param projectPath - Path to the project folder
+   * @returns true if project was opened, false if cancelled by user
+   */
+  const handleOpenProjectByPath = async (projectPath: string): Promise<boolean> => {
+    try {
+      setIsSwitchingProject(true)
+      setError(null)
+
+      // Check for unsaved changes and terminal activity in parallel
+      const [hasDirty, terminalBusy] = await Promise.all([
+        checkHasDirtyEditors(),
+        checkTerminalBusy(TERMINAL.RECENT_ACTIVITY_WINDOW)
+      ])
+
+      // Ask for confirmation if needed
+      const confirmed = await confirmProjectSwitch(hasDirty, terminalBusy, 'switch', showConfirm)
+      if (!confirmed) {
+        return false
+      }
+
+      // Gracefully interrupt terminal if it was busy
+      if (terminalBusy) {
+        await interruptActiveTerminalIfAny()
+      }
+
+      // Open project directly by path (files will be loaded by IPC event)
+      // Success toast will be shown by IPC listener after files load
+      await api.file.openProjectByPath(projectPath)
+      return true
+    } catch (err) {
+      setError(formatErrorForState(err))
+      console.error(createOpenProjectErrorLog(), err)
+      // Re-throw to allow caller-specific handling (e.g., stale project removal)
+      throw err
+    } finally {
+      setIsSwitchingProject(false)
+    }
+  }
+
+  /**
    * Refresh the file tree
    *
    * Used by file operations to update the tree after making changes
@@ -260,6 +308,7 @@ export function useProjectManagement(
     initialLoadComplete: initialLoadCompleteRef.current,
     handleOpenProject,
     handleCloseProject,
+    handleOpenProjectByPath,
     refreshFiles
   }
 }

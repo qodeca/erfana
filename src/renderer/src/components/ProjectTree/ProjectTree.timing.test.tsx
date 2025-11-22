@@ -17,6 +17,7 @@ import { render, waitFor, act } from '@testing-library/react'
 import React from 'react'
 import { ProjectTree } from './ProjectTree'
 import { DialogProvider } from '../Dialog'
+import { ProjectManagementProvider } from '../../context/ProjectManagementContext'
 
 declare global {
   interface Window {
@@ -61,12 +62,14 @@ describe('ProjectTree project switching timing', () => {
 
     render(
       <DialogProvider>
-        <ProjectTree
-          onFileSelect={() => {}}
-          showControlPanel={false}
-          filterMode={'all' as any}
-          onFilterModeChange={() => {}}
-        />
+        <ProjectManagementProvider>
+          <ProjectTree
+            onFileSelect={() => {}}
+            showControlPanel={false}
+            filterMode={'all' as any}
+            onFilterModeChange={() => {}}
+          />
+        </ProjectManagementProvider>
       </DialogProvider>
     )
 
@@ -113,12 +116,14 @@ describe('ProjectTree project switching timing', () => {
 
     render(
       <DialogProvider>
-        <ProjectTree
-          onFileSelect={() => {}}
-          showControlPanel={false}
-          filterMode={'all' as any}
-          onFilterModeChange={() => {}}
-        />
+        <ProjectManagementProvider>
+          <ProjectTree
+            onFileSelect={() => {}}
+            showControlPanel={false}
+            filterMode={'all' as any}
+            onFilterModeChange={() => {}}
+          />
+        </ProjectManagementProvider>
       </DialogProvider>
     )
 

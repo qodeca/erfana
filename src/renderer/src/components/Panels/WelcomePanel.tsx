@@ -2,6 +2,7 @@ import { IDockviewPanelProps } from 'dockview'
 import { Home, Folder, Clock, X } from 'lucide-react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useProjectStore } from '../../stores/useProjectStore'
+import { useOpenProjectByPath } from '../../context/ProjectManagementContext'
 import { isProjectNotFoundError, getUserFriendlyMessage } from '../../../../shared/errors'
 import { showErrorToast, showSuccessToast, showWarningToast } from '../../utils/toastHelpers'
 import { formatRelativeTime } from '../../utils/timeFormatting'
@@ -34,6 +35,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([])
   const [loadingState, setLoadingState] = useState<LoadingState>({ type: 'initial' })
   const isProjectChanging = useProjectStore((state) => state.isProjectChanging)
+  const { handleOpenProjectByPath } = useOpenProjectByPath()
 
   // todo019: Prevent state updates on unmounted components
   // FIXED: Reset isMounted on each mount to handle React 18 StrictMode double-mount
@@ -85,8 +87,14 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
 
     setLoadingState({ type: 'opening', path: projectPath })
     try {
-      // Open project using the proper flow that updates recent projects
-      await window.api.file.openProjectByPath(projectPath)
+      // Open project with safety checks (dirty editors, terminal activity)
+      // The hook handles confirmations and terminal interruption
+      const opened = await handleOpenProjectByPath(projectPath)
+
+      if (!opened) {
+        // User cancelled the confirmation dialog
+        return
+      }
       // The project:changed event will trigger UI updates automatically
       // Recent projects timestamp is updated in the IPC handler
     } catch (error) {

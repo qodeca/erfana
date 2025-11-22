@@ -31,6 +31,16 @@ vi.mock('../../components/Toast/toastService', () => ({
   showGlobalToast: (options: unknown) => mockShowGlobalToast(options)
 }))
 
+// Mock useOpenProjectByPath from context to avoid Provider requirement
+// The integration tests still use window.api mocks directly for the actual behavior
+const mockHandleOpenProjectByPath = vi.fn()
+vi.mock('../../context/ProjectManagementContext', () => ({
+  useOpenProjectByPath: () => ({
+    handleOpenProjectByPath: mockHandleOpenProjectByPath,
+    isSwitchingProject: false
+  })
+}))
+
 // Simulated API that mimics real behavior
 const mockApi = {
   settings: {
@@ -86,6 +96,17 @@ describe('Recent Projects Integration', () => {
     nextTimestamp = 1000
     mockState.isProjectChanging = false
     ;(window as unknown as { api: typeof mockApi }).api = mockApi
+    // Configure mock to call the simulated API (for integration behavior)
+    mockHandleOpenProjectByPath.mockImplementation(async (path: string) => {
+      // Simulate the API call behavior
+      const name = path.split('/').pop() || path
+      simulatedProjects = simulatedProjects.filter(p => p.path !== path)
+      simulatedProjects.unshift({ path, name, lastOpened: nextTimestamp++ })
+      if (simulatedProjects.length > 5) {
+        simulatedProjects = simulatedProjects.slice(0, 5)
+      }
+      return true
+    })
   })
 
   afterEach(() => {
@@ -110,8 +131,8 @@ describe('Recent Projects Integration', () => {
       const projectItem = screen.getByText('old-project').closest('.recent-project-item')
       await user.click(projectItem!)
 
-      // Verify API was called
-      expect(mockApi.file.openProjectByPath).toHaveBeenCalledWith('/path/old-project')
+      // Verify hook method was called
+      expect(mockHandleOpenProjectByPath).toHaveBeenCalledWith('/path/old-project')
     })
 
     it('should update timestamp when re-opening existing project', async () => {
@@ -228,7 +249,7 @@ describe('Recent Projects Integration', () => {
       const projectItem = screen.getByText('project-a').closest('.recent-project-item')
       await user.click(projectItem!)
 
-      expect(mockApi.file.openProjectByPath).not.toHaveBeenCalled()
+      expect(mockHandleOpenProjectByPath).not.toHaveBeenCalled()
     })
   })
 

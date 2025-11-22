@@ -16,6 +16,7 @@ export const createMockProjectTreeApi = (overrides?: Partial<IProjectTreeApi>): 
   return {
     file: {
       openProject: vi.fn().mockResolvedValue('/test/project'),
+      openProjectByPath: vi.fn().mockResolvedValue('/test/project'),
       closeProject: vi.fn().mockResolvedValue(true),
       getLastProjectPath: vi.fn().mockResolvedValue(null),
       readDirectory: vi.fn().mockResolvedValue([]),
