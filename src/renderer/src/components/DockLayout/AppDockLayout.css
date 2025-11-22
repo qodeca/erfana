@@ -25,6 +25,21 @@
   --dv-activegroup-hiddenpanel-tab-color: #cccccc;
   --dv-inactivegroup-visiblepanel-tab-color: #cccccc;
   --dv-inactivegroup-hiddenpanel-tab-color: #858585;
+  /* Sash (resize handle) styling - Issue #10 */
+  --dv-sash-color: transparent;
+  --dv-active-sash-color: #4ec9b0;
+  --dv-active-sash-transition-duration: 0.15s;
+  --dv-active-sash-transition-delay: 0s;
+}
+
+/* Sash (resize handle) hit area improvement - Issue #10
+   Increase width from 4px to 8px for easier grabbing */
+.dockview-theme-dark .dv-split-view-container.dv-horizontal > .dv-sash-container > .dv-sash {
+  width: 8px;
+}
+
+.dockview-theme-dark .dv-split-view-container.dv-vertical > .dv-sash-container > .dv-sash {
+  height: 8px;
 }
 
 /* Set tab height to 41px to match sidebar panels */
