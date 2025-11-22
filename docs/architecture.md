@@ -101,6 +101,7 @@ src/
         │   ├── helpers.ts       # Template helper functions
         │   └── types.ts         # TypeScript interfaces
         ├── stores/              # Zustand stores (useActivityBarStore)
+        ├── context/             # React contexts (ProjectManagementContext)
         ├── hooks/               # React hooks
         ├── types/               # Shared TypeScript types (filters.ts)
         ├── utils/               # Shared utilities (fileUtils.ts, panelUtils.ts)
@@ -436,4 +437,22 @@ See: [Drag-Drop Implementation](./drag-drop.md) | [IPC Patterns](./ipc-patterns.
 **SOLID Principles Applied**:
 - Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion
 
-**See**: [Project Tree Architecture](./project-tree-architecture.md) for complete details
+## ProjectManagementContext
+
+**Singleton Pattern** for project management state (v0.4.0):
+
+**Problem**: Both ProjectTree and WelcomePanel were creating separate `useProjectManagement` instances, each registering their own IPC listeners, causing duplicate "Project Opened" toasts.
+
+**Solution**: Context ensures only ONE instance of the hook exists, meaning ONE IPC listener and ONE toast per event.
+
+**Components** (`src/renderer/src/context/ProjectManagementContext.tsx`):
+- `ProjectManagementProvider` - Wraps app, provides singleton instance
+- `useProjectManagementContext()` - Full hook access (ProjectTree)
+- `useOpenProjectByPath()` - ISP-compliant focused subset (WelcomePanel)
+- `useProjectChangedEffect()` - Register for project change notifications
+- `registerProjectChangedCallback()` - Manual callback registration
+
+**SOLID Principles Applied**:
+- **SRP**: Context has single responsibility (singleton management)
+- **ISP**: `useOpenProjectByPath()` provides focused subset for components that only need project opening
+- **DIP**: Components depend on context abstractions, not concrete hook implementations
