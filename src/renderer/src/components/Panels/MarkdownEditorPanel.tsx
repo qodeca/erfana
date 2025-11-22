@@ -96,6 +96,7 @@ export function MarkdownEditorPanel(
         id: panelId,
         component: 'editor',
         title: fileName,
+        tabComponent: 'editorTab',
         params: { filePath: targetFilePath, panelId }
       })
       useProjectStore.getState().registerEditorPanel(panelId)

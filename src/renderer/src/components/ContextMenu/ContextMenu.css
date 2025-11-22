@@ -20,8 +20,13 @@
   transition: background-color 0.1s;
 }
 
-.context-menu-item:hover {
+.context-menu-item:hover:not(.disabled) {
   background-color: #2a2d2e;
+}
+
+.context-menu-item.disabled {
+  color: #6e6e6e;
+  cursor: not-allowed;
 }
 
 .context-menu-item.danger {
