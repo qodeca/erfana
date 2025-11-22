@@ -370,7 +370,7 @@ export class NewFolderInDirectoryCommand extends CommandBase {
  * Uses the usePdfImport hook indirectly via passed callback
  */
 export class ImportPdfCommand extends CommandBase {
-  label = 'Import PDF...'
+  label = 'Import PDF'
   icon = <FileUp size={14} strokeWidth={2} />
 
   private importPdf: () => Promise<string | null>
