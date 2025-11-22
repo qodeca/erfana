@@ -2,7 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
-- **Version**: 0.4.1
+- **Version**: 0.4.2
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -32,7 +32,8 @@ src/
 ├── preload/        # Context bridge API
 ├── shared/         # Shared code (errors.ts, constants.ts)
 └── renderer/       # React UI
-    ├── components/ # UI components
+    ├── components/ # UI components (Tabs/, Dialog/, ContextMenu/, etc.)
+    ├── context/    # React contexts (ProjectManagementContext)
     ├── stores/     # Zustand state
     └── prompts/    # Template system
 ```
@@ -51,7 +52,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (1330 tests)
+- [Testing](docs/testing/README.md) — Workspace, coverage (1392 tests)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -63,7 +64,30 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.4.0-0.4.1)
+## Recent Changes (v0.4.2)
+- **Chrome-style Dynamic Tabs** (Nov 22, 2025):
+  - EditorTab component with dynamic sizing (min 80px, max 300px, flex 1 1 0)
+  - Dirty indicator (filled circle) for unsaved changes
+  - Close button with confirmation dialog for dirty files
+  - Middle-click to close support
+  - Context menu: Close, Close Others (with disabled state), Close All
+  - Relative path tooltips from project root
+  - Home/Welcome tab fixed at 41px (no scaling)
+  - Hover indication on tabs
+  - 62 new tests for tab functionality
+  - Files: `src/renderer/src/components/Tabs/`
+- **ContextMenu Disabled State** (Nov 22, 2025):
+  - Added `disabled` property to ContextMenuItem interface
+  - Disabled items are grayed out and non-clickable
+- **implementing-github-issues skill** (Nov 22, 2025):
+  - 7-phase workflow (Pre-flight → Finalization)
+  - 3 complexity tiers with appropriate checkpoints
+  - Agent orchestration with explicit Task tool examples
+  - Templates for implementation plans and PR descriptions
+  - Located in `.claude/skills/implementing-github-issues/`
+- **Test Coverage**: **1392 tests passing (64 test files)**
+
+## Changes in v0.4.0-0.4.1
 - **ProjectManagementContext Singleton** (Nov 22, 2025):
   - Fixed duplicate toast issue when opening projects from Recent Projects
   - Both ProjectTree and WelcomePanel were creating separate useProjectManagement instances
@@ -75,7 +99,6 @@ See `docs/` for details (keep Claude's context focused):
   - Added `creating-skills`: Guides through skill creation following best practices
   - Added `creating-github-issues`: Creates structured GitHub issues from user descriptions
   - Skills located in `.claude/skills/`
-- **Test Coverage**: **1330 tests passing (62 test files)**
 
 ## Changes in v0.3.9
 - **Auto-refresh Recent Projects** (Nov 21, 2025):

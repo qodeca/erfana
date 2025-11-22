@@ -107,7 +107,24 @@ Integrated terminal with xterm.js + node-pty.
 
 **Location**: `src/renderer/src/components/ContextMenu/ContextMenu.tsx`
 
-Reusable menu for Project Panel file/folder operations (Rename, Delete, New File/Folder).
+Reusable menu for Project Panel file/folder operations and tab actions.
+
+**Features**:
+- Portal rendering (#portal-root)
+- Keyboard navigation
+- Separator support
+- Disabled state (grayed out, non-clickable) - v0.4.2
+
+**Interface**:
+```typescript
+interface ContextMenuItem {
+  label: string
+  icon?: ReactNode
+  action: () => void
+  separator?: boolean
+  disabled?: boolean  // NEW: Grays out item, prevents click
+}
+```
 
 📚 **Full docs**: [Project Panel](./project-panel.md#context-menu-operations)
 
@@ -165,14 +182,34 @@ leftPanel.api.onDidSizeChange(() => {
 
 ## Tab Styling
 
-**Location**: `AppDockLayout.css`, `AppDockLayout.tsx`
+**Location**: `AppDockLayout.css`, `src/renderer/src/components/Tabs/`
 
-VS Code-style hover and active indicators.
+VS Code-style hover and active indicators with Chrome-style dynamic sizing.
+
+### EditorTab Component (v0.4.2)
+
+**Location**: `src/renderer/src/components/Tabs/EditorTab.tsx`
+
+Custom tab component for editor panels with:
+- **Dynamic sizing**: Flex 1 1 0, min 80px, max 300px (Chrome-style)
+- **Dirty indicator**: Filled circle when file has unsaved changes
+- **Close button**: X icon, confirmation dialog for dirty files
+- **Middle-click close**: Standard browser tab behavior
+- **Context menu**: Close, Close Others, Close All
+- **Tooltip**: Shows filename + relative path from project root
+- **Hover indication**: Subtle background change
+
+### WelcomeTab
+
+**Location**: `WelcomeTab.tsx`
+
+Home icon tab (41px fixed, non-draggable, no scaling).
 
 ### Hover
 
 **Inactive**: `#3a3d41` background
 **Active**: `#2d2d30` with 0.9 opacity
+**EditorTab**: `rgba(255, 255, 255, 0.05)` on hover
 
 ### Active Indicator
 
