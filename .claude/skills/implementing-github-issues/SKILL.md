@@ -47,12 +47,13 @@ The skill will:
 | Phase | Purpose | Agent(s) | Checkpoint |
 |-------|---------|----------|------------|
 | 0. Pre-flight | Validate environment | - | - |
-| 1. Discovery | Understand issue & codebase | - | Tier 2+ |
-| 2. Architecture | Design solution | architect-reviewer | Tier 2+ |
-| 3. Implementation | Write code + tests | typescript-pro, test-automator | - |
-| 4. Review | Code quality check | code-reviewer | Tier 3 |
-| 5. Documentation | Update docs | documentation-engineer | - |
-| 6. Finalization | Quality gates, commit | - | All tiers |
+| 1. Discovery | Understand issue & codebase | codebase-explorer | Tier 2+ |
+| 2. Architecture | Design solution | solution-architect | Tier 2+ |
+| 3. Implementation | Write code + tests | code-implementer, test-writer | - |
+| 4. Review | Code quality check | code-reviewer, security-auditor (Tier 3) | Tier 3 |
+| 5. Documentation | Update docs | project-documenter | - |
+| 6. Finalization | Quality gates, commit | diff-summarizer | All tiers |
+| 7. Release (optional) | Production release | release-engineer | When releasing |
 
 ---
 
@@ -184,15 +185,15 @@ Proceed with architecture planning? [Yes/No/Clarify]
 ## Phase 2: Architecture
 
 **Goal:** Design the implementation approach.
-**Agent:** `architect-reviewer`
+**Agent:** `solution-architect`
 
 ### Steps
 
 1. **Invoke Architect Agent**
 
-   Use the Task tool to spawn the architect-reviewer agent:
+   Use the Task tool to spawn the solution-architect agent:
    ```
-   Task(subagent_type='architect-reviewer')
+   Task(subagent_type='solution-architect')
 
    Prompt: "Design implementation for issue #11 - Add Chrome-style tabs
 
@@ -217,10 +218,10 @@ Proceed with architecture planning? [Yes/No/Clarify]
 
 3. **Identify Agent Needs**
    Based on issue type:
-   - Feature: typescript-pro (required)
-   - Bug fix (complex): error-detective
-   - Refactor: refactoring-specialist
-   - Tests only: test-automator
+   - Feature: code-implementer (required)
+   - Bug fix (complex): bug-investigator
+   - Refactor: refactoring-advisor
+   - Tests only: test-writer
 
 ### Architecture Checkpoint (Tier 2+)
 
@@ -258,15 +259,15 @@ Approve plan? [Yes/Revise/Abort]
 ## Phase 3: Implementation
 
 **Goal:** Write code and tests following the approved plan.
-**Agents:** `typescript-pro`, `test-automator`
+**Agents:** `code-implementer`, `test-writer`
 
 ### Steps
 
-1. **Implementation with typescript-pro**
+1. **Implementation with code-implementer**
 
-   Use the Task tool to spawn the typescript-pro agent:
+   Use the Task tool to spawn the code-implementer agent:
    ```
-   Task(subagent_type='typescript-pro')
+   Task(subagent_type='code-implementer')
 
    Prompt: "Implement EditorTab component for issue #11
 
@@ -289,7 +290,7 @@ Approve plan? [Yes/Revise/Abort]
 
 2. **Write Tests (TDD-friendly)**
    - Write tests alongside or before implementation
-   - Use `test-automator` for complex test scenarios
+   - Use `test-writer` for complex test scenarios
    - Target >80% coverage for new code
 
 3. **Incremental Verification**
@@ -309,11 +310,10 @@ Approve plan? [Yes/Revise/Abort]
 
 ```
 Issue Type → Agent
-├── TypeScript code → typescript-pro
-├── CLI/scripts → cli-developer
-├── Complex tests → test-automator
-├── Bug diagnosis → error-detective
-└── Code cleanup → refactoring-specialist
+├── TypeScript code → code-implementer
+├── Complex tests → test-writer
+├── Bug diagnosis → bug-investigator
+└── Code cleanup → refactoring-advisor
 ```
 
 ---
@@ -390,7 +390,7 @@ For security-sensitive changes, verify:
 ## Phase 5: Documentation
 
 **Goal:** Update relevant documentation.
-**Agent:** `documentation-engineer` (if significant changes)
+**Agent:** `project-documenter` (if significant changes), `docs-updater` (for simple fixes)
 
 ### Steps
 
@@ -483,6 +483,47 @@ EOF
 ```
 
 Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
+
+---
+
+## Phase 7: Release (Optional)
+
+**Goal:** Prepare production release with user-friendly release notes.
+**Agent:** `release-engineer`
+
+Use this phase only when preparing an actual release (not for every issue).
+
+### Steps
+
+1. **Invoke Release Engineer**
+
+   Use the Task tool to spawn the release-engineer agent:
+   ```
+   Task(subagent_type='release-engineer')
+
+   Prompt: "Prepare release v0.4.3
+
+   Previous release: v0.4.2
+   Analyze commits since last release.
+   Generate release notes in release/0.4.3/ folder.
+   Follow v0.4.1 release notes format."
+   ```
+
+2. **Release Checklist**
+   - [ ] Version bumped in package.json
+   - [ ] Release notes generated
+   - [ ] CLAUDE.md updated
+   - [ ] All tests passing
+   - [ ] Build completes successfully
+   - [ ] Git tag created
+
+### Release Notes Format
+
+Follow the established format from `release/0.4.1/erfana-0.4.1-release-notes.md`:
+- User-friendly language (not technical jargon)
+- "What's New" section with feature benefits
+- "Bug Fixes" section
+- "Technical Details" with test count and build info
 
 ---
 
