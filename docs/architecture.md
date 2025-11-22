@@ -89,6 +89,7 @@ src/
         │   ├── Panels/          # Panel implementations + WelcomePanel
         │   ├── Editor/          # Monaco + Preview + Context Menus
         │   ├── ProjectTree/     # Project tree with context menu
+        │   ├── Tabs/            # EditorTab, WelcomeTab (Chrome-style tabs)
         │   ├── Dialog/          # Unified dialog system (Context + Provider + Hook)
         │   ├── ContextMenu/     # Right-click context menu
         │   └── Toast/           # Toast notification system
