@@ -1,11 +1,12 @@
 import { IDockviewPanelProps } from 'dockview'
-import { Home, Folder, Clock, X } from 'lucide-react'
+import { Home, Folder, Clock, X, FileUp } from 'lucide-react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useProjectStore } from '../../stores/useProjectStore'
-import { useOpenProjectByPath } from '../../context/ProjectManagementContext'
+import { useOpenProjectByPath, useProjectManagementContext } from '../../context/ProjectManagementContext'
 import { isProjectNotFoundError, getUserFriendlyMessage } from '../../../../shared/errors'
 import { showErrorToast, showSuccessToast, showWarningToast } from '../../utils/toastHelpers'
 import { formatRelativeTime } from '../../utils/timeFormatting'
+import { usePdfImport } from '../../hooks/usePdfImport'
 
 interface RecentProject {
   path: string
@@ -36,6 +37,8 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
   const [loadingState, setLoadingState] = useState<LoadingState>({ type: 'initial' })
   const isProjectChanging = useProjectStore((state) => state.isProjectChanging)
   const { handleOpenProjectByPath } = useOpenProjectByPath()
+  const { projectPath } = useProjectManagementContext()
+  const { isImporting, importPdf } = usePdfImport()
 
   // todo019: Prevent state updates on unmounted components
   // FIXED: Reset isMounted on each mount to handle React 18 StrictMode double-mount
@@ -160,6 +163,20 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
           <Home size={64} strokeWidth={1.5} className="welcome-icon" />
           <h2>Welcome to ERFANA</h2>
           <p>Open a folder from the Project panel to start editing</p>
+
+          {projectPath && (
+            <div className="welcome-actions">
+              <button
+                className="welcome-action-button"
+                onClick={importPdf}
+                disabled={isImporting || isProjectChanging}
+                title={isImporting ? 'Importing PDF...' : 'Import a PDF and convert to markdown'}
+              >
+                <FileUp size={16} />
+                {isImporting ? 'Importing...' : 'Import PDF'}
+              </button>
+            </div>
+          )}
 
           {!isLoading && recentProjects.length > 0 && (
             <div className="recent-projects-section">

@@ -2,7 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
-- **Version**: 0.4.3
+- **Version**: 0.4.4
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -27,7 +27,7 @@ npm run test:cov     # Coverage (v8) per project
 ```
 src/
 ├── main/           # Electron main process
-│   ├── services/   # FileService, TerminalService, SettingsService
+│   ├── services/   # FileService, TerminalService, SettingsService, PdfImportService
 │   └── ipc/        # IPC handlers
 ├── preload/        # Context bridge API
 ├── shared/         # Shared code (errors.ts, constants.ts)
@@ -64,7 +64,19 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.4.3)
+## Recent Changes (v0.4.4)
+- **PDF Import with AI-Assisted Organization** (Nov 22, 2025):
+  - Import PDF files and convert to Markdown using @opendocsg/pdf2md
+  - Output saved to `{project}/import/` directory (auto-created)
+  - AI prompt auto-executes to help organize imported files
+  - Entry points: WelcomePanel "Import PDF" button, ProjectTree context menu
+  - Error handling: Encrypted PDFs, empty PDFs, corrupted files, large files (>50MB warning)
+  - Filename conflict resolution with auto-increment (file.md, file (1).md, etc.)
+  - Closes #19
+  - Files: `src/main/services/PdfImportService.ts`, `src/main/ipc/pdf-import-handlers.ts`, `src/renderer/src/hooks/usePdfImport.ts`, `src/renderer/src/prompts/templates/organize-import.md`
+- **Test Coverage**: **1436 tests passing (66 test files)**
+
+## Changes in v0.4.3
 - **Terminal Scroll Auto-Recovery** (Nov 22, 2025):
   - Automatic detection and recovery from Claude Code Ink library scroll anomalies
   - Three-signal correlation: user scroll (300ms), data streaming (500ms), jump magnitude (≥10 lines)
@@ -74,7 +86,6 @@ See `docs/` for details (keep Claude's context focused):
   - 44 new tests (34 pure logic + 10 hook tests)
   - Closes #12
   - Files: `src/renderer/src/utils/scrollAnomalyDetector.ts`, `src/renderer/src/hooks/useScrollAnomalyRecovery.ts`
-- **Test Coverage**: **1436 tests passing (66 test files)**
 
 ## Changes in v0.4.2
 - **Chrome-style Dynamic Tabs** (Nov 22, 2025):

@@ -14,7 +14,7 @@
  * All commands are testable via dependency injection (MenuContext).
  */
 
-import { Copy, Scissors, Clipboard as ClipboardIcon, Edit, Trash, FilePlus, FolderPlus } from 'lucide-react'
+import { Copy, Scissors, Clipboard as ClipboardIcon, Edit, Trash, FilePlus, FolderPlus, FileUp } from 'lucide-react'
 import type { IMenuItem, MenuContext, FileNode, FileNodeDirectory, FileNodeFile } from './types'
 
 /**
@@ -360,6 +360,28 @@ export class NewFolderInDirectoryCommand extends CommandBase {
       const msg = this.ctx.formatFileOperationError(err, 'create')
       this.ctx.toast({ type: 'error', title: 'Error', message: msg })
     }
+  }
+}
+
+/* ========== Import Commands ========== */
+
+/**
+ * Import PDF command - imports a PDF file and converts to markdown
+ * Uses the usePdfImport hook indirectly via passed callback
+ */
+export class ImportPdfCommand extends CommandBase {
+  label = 'Import PDF...'
+  icon = <FileUp size={14} strokeWidth={2} />
+
+  private importPdf: () => Promise<string | null>
+
+  constructor(ctx: MenuContext, node: FileNodeDirectory, importPdf: () => Promise<string | null>) {
+    super(ctx, node)
+    this.importPdf = importPdf
+  }
+
+  async execute(): Promise<void> {
+    await this.importPdf()
   }
 }
 
