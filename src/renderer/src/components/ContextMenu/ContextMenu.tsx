@@ -8,6 +8,7 @@ export interface ContextMenuItem {
   action: () => void
   danger?: boolean
   separator?: boolean
+  disabled?: boolean
 }
 
 interface ContextMenuProps {
@@ -88,7 +89,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   }, [x, y])
 
   const handleItemClick = (item: ContextMenuItem) => {
-    if (!item.separator) {
+    if (!item.separator && !item.disabled) {
       item.action()
       onClose()
     }
@@ -113,7 +114,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
         ) : (
           <div
             key={index}
-            className={`context-menu-item ${item.danger ? 'danger' : ''}`}
+            className={`context-menu-item ${item.danger ? 'danger' : ''} ${item.disabled ? 'disabled' : ''}`}
             onClick={() => handleItemClick(item)}
           >
             {item.icon && <span className="context-menu-icon">{item.icon}</span>}
