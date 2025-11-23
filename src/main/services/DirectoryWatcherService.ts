@@ -2,15 +2,23 @@ import chokidar, { FSWatcher } from 'chokidar'
 import { BrowserWindow, WebContents } from 'electron'
 import { settingsService } from './SettingsService'
 import { PauseController } from '../utils/PauseController'
-import { DebounceManager } from '../utils/DebounceManager'
+import {
+  WatcherMetrics,
+  EventCoalescer,
+  AtomicSaveDetector,
+  ThrottledWorker,
+  getPlatformConfig,
+  getPlatformDiagnostics,
+  type FileChangeEvent
+} from './watcher'
 
 interface WatchedDirectory {
   dirPath: string
   watcher: FSWatcher
   webContentsIds: Set<number>
   pauseController: PauseController
-  debounceManager: DebounceManager
-  pendingEvents: DirectoryChangeEvent[]
+  throttledWorker: ThrottledWorker<FileChangeEvent>
+  atomicSaveDetector: AtomicSaveDetector
   version: number
 }
 
@@ -88,12 +96,16 @@ const shouldIgnorePath = (filePath: string): boolean => {
 
 export class DirectoryWatcherService {
   private watchedDirectories: Map<string, WatchedDirectory> = new Map()
-  private readonly DEBOUNCE_DELAY = 1000 // 1s for bulk operations
-  private readonly MIN_EVENTS_FOR_BULK = 5 // Threshold for bulk operation detection
   private projectPath: string | null = null
   private isDisposing: boolean = false // Flag to prevent operations during cleanup
   // Session token to guard against late/stale events during project switches
   private switchVersion = 0
+
+  // Performance metrics (VS Code pattern)
+  private readonly metrics = new WatcherMetrics()
+
+  // Platform configuration
+  private readonly platformConfig = getPlatformConfig()
 
   setProjectPath(path: string): void {
     this.projectPath = path
@@ -106,7 +118,8 @@ export class DirectoryWatcherService {
   async stopAll(): Promise<void> {
     this.safeLog('👁️  Stopping all directory watchers...')
     for (const [, watched] of this.watchedDirectories.entries()) {
-      watched.debounceManager.cancel()
+      watched.throttledWorker.dispose()
+      watched.atomicSaveDetector.dispose()
       try {
         await watched.watcher.close()
       } catch {
@@ -114,6 +127,7 @@ export class DirectoryWatcherService {
       }
     }
     this.watchedDirectories.clear()
+    this.metrics.setActiveWatchers(0)
     // Increment session to ignore late events from the previous watchers
     this.switchVersion++
   }
@@ -176,17 +190,30 @@ export class DirectoryWatcherService {
       followSymlinks: false // Security: don't follow symlinks
     })
 
+    // Create throttled worker with VS Code values
+    const throttledWorker = new ThrottledWorker<FileChangeEvent>(
+      {
+        maxWorkChunkSize: this.platformConfig.recommendedChunkSize, // 500
+        throttleDelay: 200, // VS Code value
+        maxBufferedWork: this.platformConfig.recommendedBufferLimit, // 30,000
+        collectionDelay: 75 // VS Code: 75ms collection window
+      },
+      {
+        onWork: (events) => this.processEvents(dirPath, events),
+        onOverflow: (count) => {
+          this.metrics.recordBufferOverflow(count)
+          this.safeLog(`⚠️  Buffer overflow: dropped ${count} oldest events for ${dirPath}`)
+        }
+      }
+    )
+
     const watched: WatchedDirectory = {
       dirPath,
       watcher,
       webContentsIds: new Set([webContentsId]),
       pauseController: new PauseController(),
-      debounceManager: new DebounceManager(
-        this.DEBOUNCE_DELAY,
-        this.MIN_EVENTS_FOR_BULK,
-        300 // Normal delay for single events
-      ),
-      pendingEvents: [],
+      throttledWorker,
+      atomicSaveDetector: new AtomicSaveDetector(),
       version: this.switchVersion
     }
 
@@ -225,9 +252,11 @@ export class DirectoryWatcherService {
     // Handle watcher ready
     watcher.on('ready', () => {
       this.safeLog(`✅ Directory watcher ready for: ${dirPath}`)
+      this.metrics.setActiveWatchers(this.watchedDirectories.size)
     })
 
     this.watchedDirectories.set(dirPath, watched)
+    this.metrics.setActiveWatchers(this.watchedDirectories.size)
   }
 
   /**
@@ -247,9 +276,11 @@ export class DirectoryWatcherService {
     // If no more webContents watching this directory, stop watching entirely
     if (watched.webContentsIds.size === 0) {
       this.safeLog(`👁️  Stopping directory watch for: ${dirPath}`)
-      watched.debounceManager.cancel()
+      watched.throttledWorker.dispose()
+      watched.atomicSaveDetector.dispose()
       await watched.watcher.close()
       this.watchedDirectories.delete(dirPath)
+      this.metrics.setActiveWatchers(this.watchedDirectories.size)
     }
   }
 
@@ -306,7 +337,7 @@ export class DirectoryWatcherService {
   }
 
   /**
-   * Queue an event for debounced processing
+   * Queue an event for throttled processing with VS Code patterns
    */
   private queueEvent(dirPath: string, event: DirectoryChangeEvent): void {
     if (this.isDisposing) return // Ignore events during disposal
@@ -323,33 +354,57 @@ export class DirectoryWatcherService {
       return
     }
 
-    // Add to pending events
-    watched.pendingEvents.push(event)
+    // Track metrics
+    this.metrics.recordEventReceived()
 
-    // Schedule processing with adaptive debouncing
-    watched.debounceManager.schedule(
-      () => this.processEvents(dirPath),
-      watched.pendingEvents.length
-    )
+    // Handle delete events with atomic save detection (VS Code 100ms pattern)
+    if (event.type === 'unlink') {
+      watched.atomicSaveDetector.registerDelete(event.path, (path, wasAtomicSave) => {
+        if (wasAtomicSave) {
+          // File reappeared → atomic save, emit as change
+          watched.throttledWorker.work({ type: 'change', path })
+        } else {
+          // Actual delete
+          watched.throttledWorker.work({ type: 'unlink', path })
+        }
+      })
+      return
+    }
+
+    // For non-delete events, queue directly
+    watched.throttledWorker.work({ type: event.type, path: event.path })
   }
 
   /**
-   * Process all pending events and notify renderer
+   * Process events with coalescing (VS Code pattern)
    */
-  private processEvents(dirPath: string): void {
+  private processEvents(dirPath: string, events: FileChangeEvent[]): void {
     if (this.isDisposing) return // Ignore events during disposal
     const watched = this.watchedDirectories.get(dirPath)
     if (!watched) return
-    // Guard against stale timers/events from old sessions
+    // Guard against stale events from old sessions
     if (watched.version !== this.switchVersion) {
       return
     }
 
-    const eventCount = watched.pendingEvents.length
-    if (eventCount === 0) return
+    if (events.length === 0) return
+
+    // Apply event coalescing (VS Code pattern)
+    const coalescer = new EventCoalescer()
+    coalescer.processEvents(events)
+    const { events: coalescedEvents, coalescedCount } = coalescer.coalesce()
+
+    // Track metrics
+    this.metrics.recordEventsCoalesced(coalescedCount)
+    this.metrics.recordEventsEmitted(coalescedEvents.length)
+
+    if (coalescedEvents.length === 0) {
+      this.safeLog(`📁 All ${events.length} events coalesced away for: ${dirPath}`)
+      return
+    }
 
     // Log summary
-    const summary = watched.pendingEvents.reduce(
+    const summary = coalescedEvents.reduce(
       (acc, e) => {
         acc[e.type] = (acc[e.type] || 0) + 1
         return acc
@@ -357,19 +412,22 @@ export class DirectoryWatcherService {
       {} as Record<string, number>
     )
 
+    const efficiency = events.length > 0
+      ? Math.round((coalescedCount / events.length) * 100)
+      : 0
+
     this.safeLog(
-      `📁 Directory changed: ${dirPath} (${eventCount} events: ${JSON.stringify(summary)})`
+      `📁 Directory changed: ${dirPath} (${coalescedEvents.length} events after coalescing ${events.length}, ${efficiency}% reduced: ${JSON.stringify(summary)})`
     )
 
     // Notify all watching webContents
     this.notifyWebContents(dirPath, 'directory-watch:changed', {
       dirPath,
-      eventCount,
+      eventCount: coalescedEvents.length,
+      originalEventCount: events.length,
+      coalescedCount,
       summary
     })
-
-    // Clear pending events
-    watched.pendingEvents = []
   }
 
   /**
@@ -406,20 +464,31 @@ export class DirectoryWatcherService {
   }
 
   /**
-   * Get statistics about watched directories (for debugging)
+   * Get statistics about watched directories and performance metrics
    */
   getStats(): {
     totalWatched: number
-    directoryDetails: Array<{ path: string; watchers: number; pendingEvents: number }>
+    directoryDetails: Array<{ path: string; watchers: number; bufferSize: number }>
+    metrics: ReturnType<WatcherMetrics['getSnapshot']>
+    platform: ReturnType<typeof getPlatformDiagnostics>
   } {
     return {
       totalWatched: this.watchedDirectories.size,
       directoryDetails: Array.from(this.watchedDirectories.entries()).map(([path, watched]) => ({
         path,
         watchers: watched.webContentsIds.size,
-        pendingEvents: watched.pendingEvents.length
-      }))
+        bufferSize: watched.throttledWorker.getBufferSize()
+      })),
+      metrics: this.metrics.getSnapshot(),
+      platform: getPlatformDiagnostics()
     }
+  }
+
+  /**
+   * Get formatted metrics string for logging
+   */
+  getFormattedMetrics(): string {
+    return this.metrics.getFormattedStats()
   }
 
   /**
@@ -428,9 +497,11 @@ export class DirectoryWatcherService {
   async dispose(): Promise<void> {
     this.isDisposing = true // Set flag FIRST to stop all event processing
     this.safeLog('👁️  Disposing all directory watchers...')
+    this.safeLog(this.metrics.getFormattedStats()) // Log final metrics
 
     for (const [, watched] of this.watchedDirectories.entries()) {
-      watched.debounceManager.cancel()
+      watched.throttledWorker.dispose()
+      watched.atomicSaveDetector.dispose()
       try {
         await watched.watcher.close()
       } catch {
@@ -444,8 +515,12 @@ export class DirectoryWatcherService {
    * Centralized error handling for watcher errors to keep the service recoverable
    */
   private handleWatcherError(dirPath: string, errorMessage: string): void {
+    // Track error in metrics
+    const errorType = this.classifyError(errorMessage)
+    this.metrics.recordError(errorType)
+
     // If project root was deleted, notify and cleanup in a recoverable way
-    if (errorMessage.includes('ENOENT') || errorMessage.toLowerCase().includes('no such file')) {
+    if (errorType === 'ENOENT') {
       this.notifyWebContents(dirPath, 'directory-watch:project-deleted', { dirPath })
       // Use stopAll instead of dispose to keep service reusable without setting isDisposing
       void this.stopAll()
@@ -455,8 +530,22 @@ export class DirectoryWatcherService {
     // Generic error path
     this.notifyWebContents(dirPath, 'directory-watch:error', {
       dirPath,
-      error: errorMessage
+      error: errorMessage,
+      errorType
     })
+  }
+
+  /**
+   * Classify error message into error type (VS Code pattern)
+   */
+  private classifyError(errorMessage: string): string {
+    const msg = errorMessage.toLowerCase()
+    if (msg.includes('enoent') || msg.includes('no such file')) return 'ENOENT'
+    if (msg.includes('emfile') || msg.includes('too many')) return 'EMFILE'
+    if (msg.includes('enospc') || msg.includes('no space')) return 'ENOSPC'
+    if (msg.includes('eperm') || msg.includes('permission')) return 'EPERM'
+    if (msg.includes('estale') || msg.includes('stale')) return 'ESTALE'
+    return 'UNKNOWN'
   }
 }
 
