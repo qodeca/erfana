@@ -52,7 +52,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (1732 tests)
+- [Testing](docs/testing/README.md) — Workspace, coverage (1765 tests)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -65,6 +65,12 @@ See `docs/` for details (keep Claude's context focused):
 - Lucide React for icons
 
 ## Recent Changes (v0.4.5)
+- **File Watcher Selective Blacklist** (Nov 23, 2025):
+  - Fixed issue #21: dotfolders like `.claude`, `.github` now properly watched
+  - VS Code-style function-based ignore (more reliable than regex patterns)
+  - Watches: `.claude/`, `.github/`, `.vscode/`, `.env`, dotfiles
+  - Ignores (performance): `node_modules/`, `.venv/`, `.git/objects/`, build outputs
+  - Closes #21
 - **Unified Import System with Strategy Pattern** (Nov 23, 2025):
   - Refactored PDF import into extensible multi-file-type import architecture
   - Strategy Pattern: IConverter interface with PdfConverter, TextConverter implementations
