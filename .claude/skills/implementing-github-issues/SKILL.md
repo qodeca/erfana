@@ -48,9 +48,10 @@ The skill will:
 |-------|---------|----------|------------|
 | 0. Pre-flight | Validate environment | - | - |
 | 1. Discovery | Understand issue & codebase | codebase-explorer | Tier 2+ |
-| 2. Architecture | Design solution | solution-architect | Tier 2+ |
+| 2. Architecture | Design solution + verify plan | solution-architect | Tier 2+ |
 | 3. Implementation | Write code + tests | code-implementer, test-writer | - |
 | 4. Review | Code quality check | code-reviewer, security-auditor (Tier 3) | Tier 3 |
+| 4.5 Arch Verification | Verify implementation matches plan | solution-architect | Tier 2+ |
 | 5. Documentation | Update docs | project-documenter | - |
 | 6. UAT | Manual testing | - | Tier 2+ |
 | 7. Finalization | Quality gates, commit, branch | diff-summarizer | All tiers |
@@ -65,17 +66,19 @@ Determine tier from issue labels:
 ### Tier 1: Trivial
 **Labels:** `good first issue`, `documentation`, `typo`, `chore`
 **Checkpoints:** Before Commit only (1 total)
-**Skip phases:** Architecture, Review, UAT
+**Skip phases:** Architecture, Architecture Verification, Review, UAT
 **Estimated time:** 15-30 minutes
 
 ### Tier 2: Standard (Default)
 **Labels:** `bug`, `enhancement`, or unlabeled
-**Checkpoints:** After Discovery, After Architecture, After UAT, Before Commit (4 total)
+**Checkpoints:** After Discovery, After Architecture (with plan verification), After Arch Verification, After UAT, Before Commit (5 total)
+**Verification gates:** Plan verification (Phase 2), Implementation verification (Phase 4.5)
 **Estimated time:** 30 minutes - 2 hours
 
 ### Tier 3: Complex
 **Labels:** `breaking-change`, `architecture`, `security`, `major`
-**Checkpoints:** All phases (6 total)
+**Checkpoints:** All phases (7 total)
+**Verification gates:** Plan verification (Phase 2), Implementation verification (Phase 4.5)
 **Additional:** Security review required
 **Estimated time:** 2+ hours
 
@@ -223,6 +226,43 @@ Proceed with architecture planning? [Yes/No/Clarify]
    - Bug fix (complex): bug-investigator
    - Refactor: refactoring-advisor
    - Tests only: test-writer
+
+4. **Plan Verification Gate** (Definition of Done - Tier 2+)
+
+   BEFORE presenting plan to user, solution-architect verifies the plan:
+
+   ```
+   Task(subagent_type='solution-architect')
+
+   Prompt: "Verify implementation plan for issue #<number>:
+
+   Plan to verify:
+   <include the generated implementation plan>
+
+   Verification criteria:
+   - Completeness: All acceptance criteria addressed?
+   - Feasibility: Aligns with existing codebase patterns?
+   - Risks: All risks identified with mitigations?
+   - Testing: Strategy covers all changes adequately?
+   - Dependencies: All affected files/modules identified?
+
+   Report: [APPROVED / NEEDS REVISION]
+
+   If NEEDS REVISION, provide specific issues to address."
+   ```
+
+   **Correction Loop (mandatory):**
+   ```
+   IF architect reports NEEDS REVISION:
+     1. Address each identified issue
+     2. Update the implementation plan
+     3. Re-invoke solution-architect for verification
+     4. Repeat until APPROVED
+
+   ONLY proceed to user checkpoint after architect APPROVED.
+   ```
+
+   This gate ensures users only see architect-approved plans.
 
 ### Architecture Checkpoint (Tier 2+)
 
@@ -385,6 +425,85 @@ For security-sensitive changes, verify:
 - [ ] No secrets in code
 - [ ] CSP not weakened
 - [ ] Dangerous protocols still blocked
+
+---
+
+## Phase 4.5: Implementation Verification Gate
+
+**Goal:** Verify implementation matches approved plan before marking as complete.
+**Agent:** `solution-architect`
+**Skip for:** Tier 1 (trivial changes)
+
+Implementation is NOT complete until architect verifies conformance. This is part of the **Definition of Done**.
+
+### Steps
+
+1. **Invoke Architect for Verification**
+
+   After code review passes and all tests pass, verify implementation integrity:
+
+   ```
+   Task(subagent_type='solution-architect')
+
+   Prompt: "Verify implementation for issue #<number> against approved plan:
+
+   Approved plan summary:
+   <include key points from the approved implementation plan>
+
+   Implemented changes:
+   <list of files changed/created>
+
+   Verification criteria:
+   - Plan conformance: Does the implementation match the approved design?
+   - Acceptance criteria: All requirements from issue implemented?
+   - Patterns: Codebase conventions and architecture followed?
+   - Test coverage: All changes adequately tested?
+   - Technical debt: Any shortcuts or deviations introduced?
+
+   Report: [VERIFIED / NEEDS CORRECTION]
+
+   If NEEDS CORRECTION, provide specific issues to address."
+   ```
+
+2. **Correction Loop (mandatory)**
+
+   ```
+   IF architect reports NEEDS CORRECTION:
+     1. Re-invoke code-implementer to address specific issues
+     2. Re-run tests (npm run test)
+     3. Re-invoke code-reviewer if substantial changes were made
+     4. Re-invoke solution-architect for verification
+     5. Repeat until VERIFIED
+
+   ONLY proceed to Documentation after architect VERIFIED.
+   ```
+
+### Implementation Verification Checkpoint (Tier 2+)
+
+Present verification result to user:
+```markdown
+## Implementation Verification
+
+**Status:** [VERIFIED / NEEDS CORRECTION]
+
+**Plan Conformance:**
+- <assessment of how well implementation matches plan>
+
+**Deviations (if any):**
+- <list any deviations from original plan>
+
+**Recommendations:**
+- <any suggestions for improvement>
+
+[Proceed to Documentation / Address Issues]
+```
+
+### Definition of Done (Phase 4.5)
+
+Before proceeding to Phase 5, ALL must be true:
+- [ ] All tests pass
+- [ ] Code review passed (Phase 4)
+- [ ] **Architect verification: VERIFIED**
 
 ---
 
@@ -700,7 +819,7 @@ If implementation cannot continue:
 **Issue:** #42 - Fix typo in README
 ```
 1. Pre-flight: Check issue is open ✓
-2. Skip Discovery, Architecture, Review, UAT
+2. Skip Discovery, Architecture, Architecture Verification, Review, UAT
 3. Implementation: Fix typo directly
 4. Finalization: Run lint, commit
    "docs: fix typo in README - Closes #42"
@@ -716,13 +835,17 @@ If implementation cannot continue:
 2. Discovery: Understand DockviewReact tabs, identify components
    → Checkpoint: Confirm understanding
 3. Architecture: Design EditorTab component, context menu
-   → Checkpoint: Approve plan
+   → Plan Verification Gate: Architect verifies plan → APPROVED
+   → Checkpoint: Present approved plan to user → Approve plan
 4. Implementation: Create EditorTab.tsx, CSS, tests
 5. Review: code-reviewer checks quality
-6. Documentation: Update CLAUDE.md changelog
-7. UAT: Build project, run dev server
+6. Arch Verification: Architect verifies implementation matches plan
+   → Verification Gate: solution-architect confirms → VERIFIED
+   → Checkpoint: Present verification to user → Proceed
+7. Documentation: Update CLAUDE.md changelog
+8. UAT: Build project, run dev server
    → Checkpoint: User tests manually, selects "UAT passed"
-8. Finalization: Pass quality gates, commit
+9. Finalization: Pass quality gates, commit
    → Checkpoint: Approve commit
    → Checkpoint: Select "Merge to main and delete branch"
 ```
@@ -735,6 +858,7 @@ If implementation cannot continue:
 2. Discovery: Analyze all file operations
    → Checkpoint: Confirm scope
 3. Architecture: Design pathSecurity.ts module
+   → Plan Verification Gate: Architect verifies plan → APPROVED
    → Checkpoint: Approve security approach
 4. Implementation: Implement with comprehensive tests
 5. Review: code-reviewer + security checklist

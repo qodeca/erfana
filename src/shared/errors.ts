@@ -23,12 +23,25 @@ export enum ErrorCode {
   PROJECT_NOT_DIRECTORY = 'PROJECT_NOT_DIRECTORY',
   PROJECT_OPEN_FAILED = 'PROJECT_OPEN_FAILED',
 
-  // PDF import errors
+  // PDF import errors (legacy - prefer IMPORT_* for new code)
   PDF_ENCRYPTED = 'PDF_ENCRYPTED',
   PDF_EMPTY = 'PDF_EMPTY',
   PDF_CORRUPT = 'PDF_CORRUPT',
   PDF_TOO_LARGE = 'PDF_TOO_LARGE',
   PDF_CONVERSION_FAILED = 'PDF_CONVERSION_FAILED',
+
+  // Generic import errors
+  IMPORT_FILE_NOT_FOUND = 'IMPORT_FILE_NOT_FOUND',
+  IMPORT_FILE_UNREADABLE = 'IMPORT_FILE_UNREADABLE',
+  IMPORT_ENCRYPTED = 'IMPORT_ENCRYPTED',
+  IMPORT_EMPTY = 'IMPORT_EMPTY',
+  IMPORT_CORRUPT = 'IMPORT_CORRUPT',
+  IMPORT_TOO_LARGE = 'IMPORT_TOO_LARGE',
+  IMPORT_CONVERSION_FAILED = 'IMPORT_CONVERSION_FAILED',
+  IMPORT_UNSUPPORTED_TYPE = 'IMPORT_UNSUPPORTED_TYPE',
+  IMPORT_TEXT_ENCODING_ERROR = 'IMPORT_TEXT_ENCODING_ERROR',
+  IMPORT_DIR_CREATE_FAILED = 'IMPORT_DIR_CREATE_FAILED',
+  IMPORT_WRITE_FAILED = 'IMPORT_WRITE_FAILED',
 
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
@@ -106,12 +119,25 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.PROJECT_NOT_DIRECTORY]: 'Selected path is not a directory',
   [ErrorCode.PROJECT_OPEN_FAILED]: 'Failed to open project',
 
-  // PDF import errors
+  // PDF import errors (legacy)
   [ErrorCode.PDF_ENCRYPTED]: 'This PDF is password protected',
   [ErrorCode.PDF_EMPTY]: 'PDF has no text content to convert',
   [ErrorCode.PDF_CORRUPT]: 'Unable to read PDF file',
   [ErrorCode.PDF_TOO_LARGE]: 'PDF file is too large',
   [ErrorCode.PDF_CONVERSION_FAILED]: 'Failed to convert PDF to markdown',
+
+  // Generic import errors
+  [ErrorCode.IMPORT_FILE_NOT_FOUND]: 'File not found',
+  [ErrorCode.IMPORT_FILE_UNREADABLE]: 'Cannot read file',
+  [ErrorCode.IMPORT_ENCRYPTED]: 'File is password protected',
+  [ErrorCode.IMPORT_EMPTY]: 'File has no content to import',
+  [ErrorCode.IMPORT_CORRUPT]: 'File appears to be corrupted',
+  [ErrorCode.IMPORT_TOO_LARGE]: 'File is too large',
+  [ErrorCode.IMPORT_CONVERSION_FAILED]: 'Failed to convert file',
+  [ErrorCode.IMPORT_UNSUPPORTED_TYPE]: 'File type is not supported',
+  [ErrorCode.IMPORT_TEXT_ENCODING_ERROR]: 'File has invalid text encoding',
+  [ErrorCode.IMPORT_DIR_CREATE_FAILED]: 'Failed to create import directory',
+  [ErrorCode.IMPORT_WRITE_FAILED]: 'Failed to write imported file',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'

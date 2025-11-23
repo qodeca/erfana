@@ -6,7 +6,7 @@ import { useOpenProjectByPath, useProjectManagementContext } from '../../context
 import { isProjectNotFoundError, getUserFriendlyMessage } from '../../../../shared/errors'
 import { showErrorToast, showSuccessToast, showWarningToast } from '../../utils/toastHelpers'
 import { formatRelativeTime } from '../../utils/timeFormatting'
-import { usePdfImport } from '../../hooks/usePdfImport'
+import { useImport } from '../../hooks/useImport'
 
 interface RecentProject {
   path: string
@@ -38,7 +38,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
   const isProjectChanging = useProjectStore((state) => state.isProjectChanging)
   const { handleOpenProjectByPath } = useOpenProjectByPath()
   const { projectPath } = useProjectManagementContext()
-  const { isImporting, importPdf } = usePdfImport()
+  const { isImporting, importFile } = useImport()
 
   // todo019: Prevent state updates on unmounted components
   // FIXED: Reset isMounted on each mount to handle React 18 StrictMode double-mount
@@ -168,12 +168,12 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
             <div className="welcome-actions">
               <button
                 className="welcome-action-button"
-                onClick={importPdf}
+                onClick={importFile}
                 disabled={isImporting || isProjectChanging}
-                title={isImporting ? 'Importing PDF...' : 'Import a PDF and convert to markdown'}
+                title={isImporting ? 'Importing file...' : 'Import a file (PDF, text, or other supported formats)'}
               >
                 <FileUp size={16} />
-                {isImporting ? 'Importing...' : 'Import PDF'}
+                {isImporting ? 'Importing...' : 'Import...'}
               </button>
             </div>
           )}

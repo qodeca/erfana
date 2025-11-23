@@ -366,24 +366,29 @@ export class NewFolderInDirectoryCommand extends CommandBase {
 /* ========== Import Commands ========== */
 
 /**
- * Import PDF command - imports a PDF file and converts to markdown
- * Uses the usePdfImport hook indirectly via passed callback
+ * Import command - imports a file (PDF, text, or other supported formats)
+ * Uses the useImport hook indirectly via passed callback
  */
-export class ImportPdfCommand extends CommandBase {
-  label = 'Import PDF'
+export class ImportCommand extends CommandBase {
+  label = 'Import...'
   icon = <FileUp size={14} strokeWidth={2} />
 
-  private importPdf: () => Promise<string | null>
+  private importFile: () => Promise<string | null>
 
-  constructor(ctx: MenuContext, node: FileNodeDirectory, importPdf: () => Promise<string | null>) {
+  constructor(ctx: MenuContext, node: FileNodeDirectory, importFile: () => Promise<string | null>) {
     super(ctx, node)
-    this.importPdf = importPdf
+    this.importFile = importFile
   }
 
   async execute(): Promise<void> {
-    await this.importPdf()
+    await this.importFile()
   }
 }
+
+/**
+ * @deprecated Use ImportCommand instead
+ */
+export const ImportPdfCommand = ImportCommand
 
 /* ========== Utility ========== */
 

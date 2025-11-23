@@ -94,20 +94,27 @@ declare global {
         onClear: (callback: (data: { terminalId: string }) => void) => () => void
         markClearComplete: (terminalId: string) => void
       }
-      pdfImport: {
-        selectFile: () => Promise<{ path: string; name: string; sizeInMB: number } | null>
-        validate: (pdfPath: string) => Promise<{
+      import: {
+        selectFile: () => Promise<{
+          path: string
+          name: string
+          sizeInMB: number
+          extension: string
+        } | null>
+        validate: (filePath: string) => Promise<{
           valid: boolean
           error?: string
           sizeInMB: number
           fileName: string
         }>
-        import: (pdfPath: string) => Promise<{
+        process: (filePath: string) => Promise<{
           success: boolean
           outputPath?: string
           error?: string
           errorCode?: string
         }>
+        getSupportedExtensions: () => Promise<string[]>
+        isSupported: (extension: string) => Promise<boolean>
       }
     }
   }
