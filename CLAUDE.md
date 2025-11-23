@@ -76,7 +76,7 @@ See `docs/` for details (keep Claude's context focused):
   - Architecture ready for future audio/video converters
   - Files: `src/main/services/import/` (types, converters/, ConverterRegistry, ImportService)
   - 296 new tests for import system (100% coverage)
-- **Test Coverage**: **1732 tests passing (72 test files)**
+- **Test Coverage**: **1765 tests passing (73 test files)**
 
 ## Changes in v0.4.4
 - **PDF Import with AI-Assisted Organization** (Nov 22, 2025):
@@ -86,6 +86,13 @@ See `docs/` for details (keep Claude's context focused):
   - Error handling: Encrypted PDFs, empty PDFs, corrupted files, large files (>50MB warning)
   - Filename conflict resolution with auto-increment (file.md, file (1).md, etc.)
   - Closes #19
+- **Organize-Import Prompt Enhancements** (Nov 22, 2025):
+  - 7-step workflow: analyze document, analyze project conventions, suggest names/locations
+  - 3-5 file name suggestions based on content and project conventions
+  - 2-3 location suggestions with explanations
+  - Cleanup option to delete original from import folder
+  - Changed "Import PDF..." to "Import PDF" in menu
+  - Closes #20
 
 ## Changes in v0.4.3
 - **Terminal Scroll Auto-Recovery** (Nov 22, 2025):

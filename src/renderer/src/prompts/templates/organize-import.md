@@ -6,50 +6,86 @@ targetPanel: terminal
 autoExecute: true
 enabled: true
 ---
-I've imported a PDF and converted it to markdown:
+I've imported a file into my project:
 
 **File**: {{importedFilePath}}
 
-Please help me organize this file:
+Please help me organize this file through a step-by-step conversation.
 
-## Step 1: Analyze the Document
-Read and analyze the document content to understand:
-- Main topic/subject
-- Key terms and concepts
-- Document type (guide, reference, notes, etc.)
+---
 
-## Step 2: Analyze Project Conventions
-Examine the project structure to identify:
-- Naming conventions used (kebab-case, snake_case, PascalCase, etc.)
-- Folder organization patterns
-- Where similar documents are located
+## Phase 1: Analysis
 
-## Step 3: Suggest File Names
-Based on the document content and project naming conventions, provide **3-5 file name suggestions**. Format as a numbered list with brief reasoning.
+First, analyze both the imported file and my project:
 
-Example format:
-1. `suggested-name.md` - Based on [reason]
-2. `alternative-name.md` - Based on [reason]
+### 1.1 Analyze the Imported File
+- Read the file content
+- Identify: document type, main topic, key concepts
+- Note the file format (markdown from PDF conversion, or original text/code file)
 
-## Step 4: Suggest Locations
-Provide **2-3 location suggestions** where this file could be moved. For each location, explain why it's appropriate based on:
-- Document content/topic
-- Existing project structure
-- Similar files in the project
+### 1.2 Analyze Project Structure
+- Examine folder organization patterns
+- Identify naming conventions (kebab-case, snake_case, PascalCase, etc.)
+- Find where similar content is located
 
-Example format:
-1. `docs/topic/` - Contains related documentation about [topic]
-2. `reference/` - Reference materials are stored here
+---
 
-## Step 5: Get User Choice
-Ask me to:
-- Choose a file name (or provide a custom one)
-- Choose a location (or provide a custom path)
+## Phase 2: Location Decision
 
-## Step 6: Move the File
-Once I confirm my choices, rename and move the file to the selected location.
+Based on your analysis, suggest where this file should live:
 
-## Step 7: Cleanup
-After successfully moving the file, ask if I want to **delete the original file from the import folder** to keep the import directory clean.
+### Primary Recommendation
+Provide your **best recommendation** with clear reasoning:
+> **Recommended location**: `path/to/folder/`
+> **Why**: [Explanation based on content and project structure]
 
-Ask: "Would you like me to delete the original file `{{importedFilePath}}` from the import folder? (Type **Yes** or **No**)"
+### Alternatives
+If other locations make sense, provide **up to 2 alternatives**:
+1. `alternative/path/` - [Brief reason]
+2. `another/option/` - [Brief reason]
+
+### Ask for Decision
+Then ask:
+> "Which location would you like? Type **1** for the recommended location, **2** or **3** for alternatives, or provide a **custom path**."
+
+**STOP HERE** - Wait for my response before proceeding to file naming.
+
+---
+
+## Phase 3: File Name Decision
+
+After I choose a location, suggest a file name:
+
+### Primary Recommendation
+Based on the chosen location and file content:
+> **Recommended name**: `suggested-name.ext`
+> **Why**: [Matches naming convention, describes content, etc.]
+
+### Alternatives
+Provide **2 alternative names**:
+1. `alternative-name.ext` - [Brief reason]
+2. `another-name.ext` - [Brief reason]
+
+### Ask for Decision
+Then ask:
+> "Which name would you like? Type **1** for the recommended name, **2** or **3** for alternatives, or provide a **custom name**."
+
+**STOP HERE** - Wait for my response before moving the file.
+
+---
+
+## Phase 4: Execute
+
+Once I confirm both location and name:
+1. Move and rename the file to the chosen destination
+2. Report the result:
+> "Moved `{{importedFilePath}}` to `[final/path/filename.ext]`"
+
+---
+
+## Phase 5: Cleanup
+
+After successful move, ask:
+> "Would you like me to delete the original file from the import folder to keep it clean? (Yes/No)"
+
+If I say yes, delete the original file and confirm.
