@@ -74,23 +74,27 @@ Monitors entire project folder for structural changes (files/folders created, de
 - **Scope**: Entire project directory (recursive)
 - **Cleanup**: Automatic on window close and app quit
 
-### Ignored Patterns
+### Watched Files
 
-Prevents watching unnecessary files for performance:
+Uses a **selective blacklist** approach (same as VS Code) with function-based ignore for reliability.
 
-```javascript
-ignored: [
-  /(^|[\/\\])\.[^\/\\]+$/,          // Hidden files
-  /(^|[\/\\])node_modules($|[\/\\])/, // Dependencies
-  /(^|[\/\\])\.git($|[\/\\])/,       // Git metadata
-  /(^|[\/\\])out($|[\/\\])/,         // Build output
-  /(^|[\/\\])dist($|[\/\\])/,
-  /(^|[\/\\])build($|[\/\\])/,
-  /\.DS_Store$/,                     // macOS system
-  /\.swp$/,                          // Vim temp files
-  /(^|[\/\\])\.vscode($|[\/\\])/,    // Editor config
-]
-```
+**What IS watched:**
+- Dotfolders: `.claude/`, `.github/`, `.vscode/`, `.idea/`
+- Dotfiles: `.env`, `.gitignore`, `.npmrc`, etc.
+- Git state: `.git/HEAD`, `.git/config`, `.git/refs/`
+- Build outputs: `out/`, `dist/`, `build/`
+
+This ensures AI agent file changes (e.g., Claude Code creating `.claude/commands/`) are immediately detected.
+
+**What is NOT watched (performance):**
+- `node_modules/`, `.pnpm/`, `.yarn/cache/`, `bower_components/` - JS package managers
+- `.venv/`, `venv/`, `.virtualenv/`, `.conda/` - Python virtual environments
+- `.git/objects/`, `.git/subtree-cache/`, `.git/lfs/` - Git internals
+- `dist/`, `build/`, `out/`, `.output/` - Build outputs
+- `.next/`, `.nuxt/`, `.cache/`, `.parcel-cache/`, `.turbo/`, `.vite/` - Framework caches
+- `coverage/`, `__pycache__/`, `.pytest_cache/`, `target/` - Test/build artifacts
+
+This approach provides full dotfolder visibility while maintaining performance on large projects.
 
 ### Watch Depth (Performance)
 
