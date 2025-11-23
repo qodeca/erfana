@@ -50,7 +50,8 @@ The skill will:
 | 1. Discovery | Understand issue & codebase | codebase-explorer | Tier 2+ |
 | 2. Architecture | Design solution + verify plan | solution-architect | Tier 2+ |
 | 3. Implementation | Write code + tests | code-implementer, test-writer | - |
-| 4. Review | Code quality check | code-reviewer, security-auditor (Tier 3) | Tier 3 |
+| 3.5 Security Scan | Shift-left security check | security-auditor (Tier 3) | All tiers |
+| 4. Review | Code quality check | code-reviewer | Tier 3 |
 | 4.5 Arch Verification | Verify implementation matches plan | solution-architect | Tier 2+ |
 | 5. Documentation | Update docs | project-documenter | - |
 | 6. UAT | Manual testing | - | Tier 2+ |
@@ -65,21 +66,23 @@ Determine tier from issue labels:
 
 ### Tier 1: Trivial
 **Labels:** `good first issue`, `documentation`, `typo`, `chore`
-**Checkpoints:** Before Commit only (1 total)
-**Skip phases:** Architecture, Architecture Verification, Review, UAT
+**Checkpoints:** Security Scan, Before Commit (2 total)
+**Skip phases:** Discovery, Architecture, Architecture Verification, Review, UAT
+**Security:** Basic scan required (npm audit, secret detection)
 **Estimated time:** 15-30 minutes
 
 ### Tier 2: Standard (Default)
 **Labels:** `bug`, `enhancement`, or unlabeled
-**Checkpoints:** After Discovery, After Architecture (with plan verification), After Arch Verification, After UAT, Before Commit (5 total)
+**Checkpoints:** After Discovery, After Architecture (with plan verification), Security Scan, After Arch Verification, After UAT, Before Commit (6 total)
 **Verification gates:** Plan verification (Phase 2), Implementation verification (Phase 4.5)
+**Security:** Full security scan required
 **Estimated time:** 30 minutes - 2 hours
 
 ### Tier 3: Complex
 **Labels:** `breaking-change`, `architecture`, `security`, `major`
-**Checkpoints:** All phases (7 total)
+**Checkpoints:** All phases (8 total)
 **Verification gates:** Plan verification (Phase 2), Implementation verification (Phase 4.5)
-**Additional:** Security review required
+**Security:** Full security scan + security-auditor agent review + OWASP verification
 **Estimated time:** 2+ hours
 
 ---
@@ -105,17 +108,25 @@ npm run typecheck                 # Types valid
 - [ ] Tests pass on current branch
 - [ ] No uncommitted changes in working directory
 - [ ] Check for duplicate issues: `gh issue list --search "<keywords>"`
+- [ ] **Feature branch created** (see Branch Strategy below)
 
-### Branch Strategy
+### Branch Strategy (Required - All Tiers)
 
-For Tier 2+ issues, create a feature branch:
+Create a feature branch before starting any implementation:
 ```bash
-# Create feature branch (recommended)
 git checkout -b fix/<number>-<short-description>
 # Example: git checkout -b fix/11-chrome-style-tabs
-
-# Or work on current branch for trivial fixes (Tier 1)
 ```
+
+**Branch naming convention:**
+- `fix/<number>-<description>` for bug fixes and general issues
+- `feat/<number>-<description>` for new features
+- `docs/<number>-<description>` for documentation-only changes
+
+Branch creation is **mandatory** - never work directly on main. This ensures:
+- Clean rollback if implementation fails
+- Isolated changes for review
+- Consistent workflow across all tiers
 
 ### Abort Pre-flight If
 - Issue is CLOSED or DRAFT state
@@ -357,6 +368,80 @@ Issue Type → Agent
 └── Code cleanup → refactoring-advisor
 ```
 
+### Modern Testing Approaches (Tier 2+)
+
+Consider these 2025 testing practices where applicable:
+
+1. **Property-Based Testing**
+   - For functions with complex input domains
+   - Generate random inputs to find edge cases
+   - Tools: fast-check (TypeScript)
+
+2. **Contract Testing**
+   - For IPC handlers and API endpoints
+   - Verify interface contracts remain stable
+   - Catches breaking changes early
+
+3. **AI-Assisted Test Generation**
+   - Use `test-writer` agent for edge case discovery
+   - Generate tests from acceptance criteria automatically
+   - Focus human effort on test strategy, not boilerplate
+
+4. **Mutation Testing** (Optional, Tier 3)
+   - Verify test quality by introducing code mutations
+   - Ensure tests catch actual bugs, not just achieve coverage
+   - Run after implementation is stable
+
+---
+
+## Phase 3.5: Security Scan (All Tiers)
+
+**Goal:** Catch security issues early (shift-left security).
+**Skip for:** None - security scanning applies to ALL changes.
+
+Security is not optional. Every change, regardless of tier, must pass security checks before review.
+
+### Steps
+
+1. **Dependency Vulnerability Scan**
+   ```bash
+   npm audit
+   ```
+   Address any high or critical vulnerabilities before proceeding.
+
+2. **Secret Detection**
+   - Check for hardcoded secrets, API keys, tokens
+   - Review any new environment variables
+   - Ensure no credentials in committed code
+
+3. **Static Analysis** (Tier 2+)
+   - Code patterns that could lead to vulnerabilities
+   - Input validation completeness
+   - Output encoding for XSS prevention
+
+### Security Scan Checklist (All Tiers)
+
+- [ ] `npm audit` reports no high/critical vulnerabilities
+- [ ] No secrets or API keys in committed code
+- [ ] No new dangerous dependencies added
+- [ ] User input properly validated at entry points
+
+### Additional Security Review (Tier 3)
+
+For Tier 3 issues, also complete:
+- [ ] Full `security-auditor` agent review
+- [ ] OWASP Top 10 verification
+- [ ] Path traversal protection verified
+- [ ] IPC handlers validate all input
+- [ ] CSP not weakened
+- [ ] Dangerous protocols blocked
+
+### If Security Issues Found
+
+1. **Critical/High vulnerabilities:** STOP. Fix before proceeding.
+2. **Medium vulnerabilities:** Document and fix in this PR if possible.
+3. **Low vulnerabilities:** Document, may defer to follow-up issue.
+
 ---
 
 ## Phase 4: Review
@@ -509,7 +594,7 @@ Before proceeding to Phase 5, ALL must be true:
 
 ## Phase 5: Documentation
 
-**Goal:** Update relevant documentation.
+**Goal:** Update relevant documentation with automation where possible.
 **Agent:** `project-documenter` (if significant changes), `docs-updater` (for simple fixes)
 
 ### Steps
@@ -529,11 +614,43 @@ Before proceeding to Phase 5, ALL must be true:
    - Only if new user-facing feature
    - Follow existing doc patterns
 
+### Documentation Automation (2025 Best Practices)
+
+1. **Auto-Generated Documentation**
+   - Update JSDoc/TSDoc for new public APIs
+   - Ensure TypeScript types serve as documentation
+   - Generate documentation from code where possible
+
+2. **Changelog Management**
+   - Add entry to CLAUDE.md "Recent Changes" section
+   - Follow existing changelog format consistently
+   - Include: what changed, why, affected files
+
+3. **Documentation Testing**
+   - Verify code examples in docs still work
+   - Check that links are not broken
+   - Ensure screenshots are current (if applicable)
+
+4. **API Documentation** (if applicable)
+   - Update OpenAPI/Swagger specs for REST endpoints
+   - Regenerate API docs from code
+   - Document IPC channel changes
+
+### Documentation Checklist
+
+- [ ] CLAUDE.md "Recent Changes" updated
+- [ ] Test count updated: `**Total: X tests passing (Y test files)**`
+- [ ] New public APIs have JSDoc/TSDoc
+- [ ] Complex logic has inline comments
+- [ ] Feature docs updated (if user-facing change)
+- [ ] Code examples in docs still work
+
 ### Documentation Guidelines
 
 - Prefer inline code comments over external docs for implementation details
-- Update test count in CLAUDE.md: `**Total: X tests passing (Y test files)**`
-- Don't document obvious code
+- Don't document obvious code - focus on the "why" not the "what"
+- Keep docs close to code they describe
+- Update docs in the same PR as code changes
 
 ---
 
@@ -762,11 +879,11 @@ If implementation cannot continue:
    git clean -fd                     # Remove untracked files
    ```
 
-3. **Clean Up Branch (if created)**
+3. **Clean Up Feature Branch**
    ```bash
-   # Only if you created a feature branch
    git checkout main
    git branch -D fix/<number>-<description>
+   git push origin --delete fix/<number>-<description>  # if pushed to remote
    ```
 
 4. **Update Issue**
@@ -818,20 +935,22 @@ If implementation cannot continue:
 
 **Issue:** #42 - Fix typo in README
 ```
-1. Pre-flight: Check issue is open ✓
+1. Pre-flight: Check issue is open, create branch ✓
+   git checkout -b docs/42-fix-readme-typo
 2. Skip Discovery, Architecture, Architecture Verification, Review, UAT
 3. Implementation: Fix typo directly
 4. Finalization: Run lint, commit
    "docs: fix typo in README - Closes #42"
    → Checkpoint: Approve commit
-   → Checkpoint: Branch management (usually "Local only" for trivial)
+   → Checkpoint: Branch management (select "Merge to main and delete branch")
 ```
 
 ### Example 2: Standard Feature (Tier 2)
 
 **Issue:** #11 - Add Chrome-style tabs
 ```
-1. Pre-flight: Verify environment ✓
+1. Pre-flight: Verify environment, create branch ✓
+   git checkout -b feat/11-chrome-style-tabs
 2. Discovery: Understand DockviewReact tabs, identify components
    → Checkpoint: Confirm understanding
 3. Architecture: Design EditorTab component, context menu
@@ -854,7 +973,8 @@ If implementation cannot continue:
 
 **Issue:** #99 - Add path traversal protection
 ```
-1. Pre-flight: Verify environment ✓
+1. Pre-flight: Verify environment, create branch ✓
+   git checkout -b fix/99-path-traversal-protection
 2. Discovery: Analyze all file operations
    → Checkpoint: Confirm scope
 3. Architecture: Design pathSecurity.ts module
@@ -863,10 +983,13 @@ If implementation cannot continue:
 4. Implementation: Implement with comprehensive tests
 5. Review: code-reviewer + security checklist
    → Checkpoint: Approve security review
-6. Documentation: Update security docs
-7. UAT: Build, run dev, test path traversal scenarios
+6. Arch Verification: Architect verifies implementation matches plan
+   → Verification Gate: solution-architect confirms → VERIFIED
+   → Checkpoint: Present verification to user → Proceed
+7. Documentation: Update security docs
+8. UAT: Build, run dev, test path traversal scenarios
    → Checkpoint: User verifies security, selects "UAT passed"
-8. Finalization: All quality gates + security gates
+9. Finalization: All quality gates + security gates
    → Checkpoint: Approve commit
    → Checkpoint: Select "Merge to main and delete branch"
 ```
