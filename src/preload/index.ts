@@ -236,24 +236,52 @@ const api = {
     }
   },
 
-  // PDF import operations
-  pdfImport: {
-    selectFile: (): Promise<{ path: string; name: string; sizeInMB: number } | null> =>
-      ipcRenderer.invoke('pdf:selectFile'),
+  // Unified import operations (supports PDF, text, and future formats)
+  import: {
+    /**
+     * Open native file dialog for selecting files to import
+     * Returns file info or null if cancelled
+     */
+    selectFile: (): Promise<{
+      path: string
+      name: string
+      sizeInMB: number
+      extension: string
+    } | null> => ipcRenderer.invoke('import:selectFile'),
 
-    validate: (pdfPath: string): Promise<{
+    /**
+     * Validate a file before import
+     * Returns validation result with any warnings/errors
+     */
+    validate: (filePath: string): Promise<{
       valid: boolean
       error?: string
       sizeInMB: number
       fileName: string
-    }> => ipcRenderer.invoke('pdf:validate', pdfPath),
+    }> => ipcRenderer.invoke('import:validate', filePath),
 
-    import: (pdfPath: string): Promise<{
+    /**
+     * Import a file into the current project
+     * Full workflow: validate → convert → write to import/
+     */
+    process: (filePath: string): Promise<{
       success: boolean
       outputPath?: string
       error?: string
       errorCode?: string
-    }> => ipcRenderer.invoke('pdf:import', pdfPath)
+    }> => ipcRenderer.invoke('import:process', filePath),
+
+    /**
+     * Get list of supported file extensions
+     */
+    getSupportedExtensions: (): Promise<string[]> =>
+      ipcRenderer.invoke('import:getSupportedExtensions'),
+
+    /**
+     * Check if a file type is supported for import
+     */
+    isSupported: (extension: string): Promise<boolean> =>
+      ipcRenderer.invoke('import:isSupported', extension)
   }
 }
 

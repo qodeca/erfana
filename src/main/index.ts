@@ -7,7 +7,7 @@ import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
 import { registerSettingsHandlers } from './ipc/settings-handlers'
 import { registerTerminalHandlers } from './ipc/terminal-handlers'
-import { registerPdfImportHandlers } from './ipc/pdf-import-handlers'
+import { registerImportHandlers } from './ipc/import-handlers'
 import { fileWatcherService } from './services/FileWatcherService'
 import { directoryWatcherService } from './services/DirectoryWatcherService'
 import { terminalService } from './services/TerminalService'
@@ -90,7 +90,7 @@ app.whenReady().then(() => {
   registerDirectoryWatcherHandlers()
   registerSettingsHandlers()
   registerTerminalHandlers()
-  registerPdfImportHandlers()
+  registerImportHandlers()
 
   // RELIABILITY FIX (todo012): Clean up stale projects on startup
   // This runs asynchronously but doesn't block window creation

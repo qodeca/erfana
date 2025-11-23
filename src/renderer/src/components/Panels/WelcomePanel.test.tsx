@@ -51,11 +51,11 @@ vi.mock('../../context/ProjectManagementContext', () => ({
   })
 }))
 
-// Mock usePdfImport hook
-vi.mock('../../hooks/usePdfImport', () => ({
-  usePdfImport: () => ({
+// Mock useImport hook
+vi.mock('../../hooks/useImport', () => ({
+  useImport: () => ({
     isImporting: false,
-    importPdf: vi.fn(() => Promise.resolve(null))
+    importFile: vi.fn(() => Promise.resolve(null))
   })
 }))
 

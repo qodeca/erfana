@@ -32,3 +32,13 @@ export const UI = {
   ICON_SIZE_SM: 16,
   ICON_SIZE_LG: 64
 } as const
+
+/** Import system constants */
+export const IMPORT = {
+  /** Directory name for imported files */
+  DIR_NAME: 'import',
+  /** Size warning threshold in bytes (50MB) */
+  SIZE_WARNING_THRESHOLD: 50 * 1024 * 1024,
+  /** Maximum number of auto-numbered copies before rejecting */
+  MAX_COPY_ATTEMPTS: 1000
+} as const

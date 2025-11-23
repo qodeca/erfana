@@ -104,8 +104,8 @@ describe('Main Process - Window Creation', () => {
     vi.doMock('./ipc/terminal-handlers', () => ({
       registerTerminalHandlers: vi.fn()
     }))
-    vi.doMock('./ipc/pdf-import-handlers', () => ({
-      registerPdfImportHandlers: vi.fn()
+    vi.doMock('./ipc/import-handlers', () => ({
+      registerImportHandlers: vi.fn()
     }))
 
     // Mock safe console

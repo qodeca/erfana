@@ -105,8 +105,8 @@ export interface MenuContext {
   ) => string
   // For rename duplicate checking
   getSiblingNames: (nodePath: string, currentName: string) => string[]
-  // For PDF import command
-  importPdf?: () => Promise<string | null>
+  // For file import command
+  importFile?: () => Promise<string | null>
 }
 
 /**
