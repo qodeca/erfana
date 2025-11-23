@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { PauseController } from '../utils/PauseController'
-import { DebounceManager } from '../utils/DebounceManager'
+import { ThrottledWorker, AtomicSaveDetector } from './watcher'
 
 // Capture sends
-const sends: Array<{ id: number; channel: string; payload: any }> = []
+const sends: Array<{ id: number; channel: string; payload: unknown }> = []
 
 vi.mock('electron', () => {
   const mkWin = (id: number) => ({
@@ -28,13 +28,21 @@ describe('DirectoryWatcherService ENOENT handling', () => {
 
     // Seed a fake watched directory so notifyWebContents has a target
     const fakeWatcher = { close: vi.fn(async () => {}) }
+    const fakeThrottledWorker = {
+      dispose: vi.fn(),
+      work: vi.fn(),
+      getBufferSize: vi.fn(() => 0)
+    } as unknown as ThrottledWorker<any>
+    const fakeAtomicSaveDetector = {
+      dispose: vi.fn()
+    } as unknown as AtomicSaveDetector
     svc.watchedDirectories.set('/proj', {
       dirPath: '/proj',
       watcher: fakeWatcher,
       webContentsIds: new Set([1]),
       pauseController: new PauseController(),
-      debounceManager: new DebounceManager(),
-      pendingEvents: [],
+      throttledWorker: fakeThrottledWorker,
+      atomicSaveDetector: fakeAtomicSaveDetector,
       version: svc.switchVersion
     })
 
@@ -53,13 +61,21 @@ describe('DirectoryWatcherService ENOENT handling', () => {
     const mod = await import('./DirectoryWatcherService')
     const svc: any = mod.directoryWatcherService
     const fakeWatcher = { close: vi.fn(async () => {}) }
+    const fakeThrottledWorker = {
+      dispose: vi.fn(),
+      work: vi.fn(),
+      getBufferSize: vi.fn(() => 0)
+    } as unknown as ThrottledWorker<any>
+    const fakeAtomicSaveDetector = {
+      dispose: vi.fn()
+    } as unknown as AtomicSaveDetector
     svc.watchedDirectories.set('/proj', {
       dirPath: '/proj',
       watcher: fakeWatcher,
       webContentsIds: new Set([1]),
-      isPaused: false,
-      debounceTimer: null,
-      pendingEvents: [],
+      pauseController: new PauseController(),
+      throttledWorker: fakeThrottledWorker,
+      atomicSaveDetector: fakeAtomicSaveDetector,
       version: svc.switchVersion
     })
 
@@ -79,13 +95,21 @@ describe('DirectoryWatcherService session token guards', () => {
 
     // Seed watched directory with old version 0
     const fakeWatcher = { close: vi.fn(async () => {}) }
+    const fakeThrottledWorker = {
+      dispose: vi.fn(),
+      work: vi.fn(),
+      getBufferSize: vi.fn(() => 0)
+    } as unknown as ThrottledWorker<any>
+    const fakeAtomicSaveDetector = {
+      dispose: vi.fn()
+    } as unknown as AtomicSaveDetector
     svc.watchedDirectories.set('/proj', {
       dirPath: '/proj',
       watcher: fakeWatcher,
       webContentsIds: new Set([1]),
-      isPaused: false,
-      debounceTimer: null,
-      pendingEvents: [],
+      pauseController: new PauseController(),
+      throttledWorker: fakeThrottledWorker,
+      atomicSaveDetector: fakeAtomicSaveDetector,
       version: 0
     })
 
