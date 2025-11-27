@@ -57,7 +57,7 @@ const calculateStats = (content: string): DocumentStats => {
 }
 
 export function MarkdownEditorPanel(
-  props: IDockviewPanelProps<{ filePath?: string; panelId?: string }>
+  props: IDockviewPanelProps<{ filePath?: string; panelId?: string; initialLine?: number; initialColumn?: number }>
 ) {
   const [currentFile, setCurrentFile] = useState<EditorFile | null>(null)
   const [viewMode, setViewMode] = useState<'split' | 'split-horizontal' | 'editor' | 'preview'>('preview')
@@ -176,6 +176,16 @@ export function MarkdownEditorPanel(
       loadFile(filePath)
     }
   }, [props.params?.filePath])
+
+  // Handle initial line/column positioning from terminal file links (issue #26)
+  useEffect(() => {
+    const { initialLine, initialColumn } = props.params || {}
+    if (!isEditorReady || !initialLine || !editorRef.current) return
+
+    // Use setPositionAndReveal to jump to the specified location
+    editorRef.current.setPositionAndReveal(initialLine, initialColumn)
+    console.log(`📍 Positioned editor at line ${initialLine}${initialColumn ? `:${initialColumn}` : ''}`)
+  }, [isEditorReady, props.params?.initialLine, props.params?.initialColumn])
 
   // Update tab title when modified state changes
   useEffect(() => {

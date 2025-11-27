@@ -1,0 +1,81 @@
+/**
+ * FilePickerDialog Styles
+ *
+ * VS Code-inspired file picker dialog for disambiguating
+ * multiple file matches in smart path resolution.
+ */
+
+.file-picker-dialog .dialog-content {
+  min-width: 400px;
+  max-width: 600px;
+  outline: none;
+}
+
+.file-picker-dialog .dialog-title {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #cccccc);
+  word-break: break-word;
+}
+
+.file-picker-dialog .dialog-subtitle {
+  margin: 0 0 12px 0;
+  font-size: 12px;
+  color: var(--text-secondary, #888888);
+}
+
+.file-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color, #3c3c3c);
+  border-radius: 4px;
+  background: var(--bg-secondary, #252526);
+}
+
+.file-picker-item {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-color, #3c3c3c);
+  transition: background-color 0.1s ease;
+}
+
+.file-picker-item:last-child {
+  border-bottom: none;
+}
+
+.file-picker-item:hover,
+.file-picker-item.selected {
+  background: var(--selection-bg, #094771);
+}
+
+.file-picker-item.selected {
+  outline: 1px solid var(--focus-border, #007fd4);
+  outline-offset: -1px;
+}
+
+.file-picker-filename {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #cccccc);
+  margin-bottom: 2px;
+}
+
+.file-picker-path {
+  font-size: 11px;
+  color: var(--text-secondary, #888888);
+  word-break: break-all;
+}
+
+.file-picker-dialog .dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color, #3c3c3c);
+}

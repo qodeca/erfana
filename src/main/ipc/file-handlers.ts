@@ -387,4 +387,58 @@ export function registerFileHandlers(): void {
       throw error
     }
   })
+
+  // Validate file path exists and return info
+  // Note: projectRoot is optional to allow validation of absolute paths from terminal output.
+  // When projectRoot is provided, path traversal protection is enforced.
+  // When omitted, only absolute paths that the user can see in terminal output are validated.
+  // This is acceptable because:
+  // 1. Terminal output comes from user-initiated commands (not external input)
+  // 2. The user can already see and access any file path shown in their terminal
+  // 3. This handler only checks existence, it doesn't read or modify files
+  ipcMain.handle('file:validatePath', async (_event, filePath: string, projectRoot?: string) => {
+    try {
+      // Validate input
+      if (!filePath || typeof filePath !== 'string') {
+        return { exists: false, error: 'Invalid file path' }
+      }
+
+      const trimmedPath = filePath.trim()
+      if (!trimmedPath) {
+        return { exists: false, error: 'Empty file path' }
+      }
+
+      // Security check: if projectRoot provided, ensure path is within it
+      if (projectRoot) {
+        const path = await import('path')
+        const resolvedPath = path.resolve(trimmedPath)
+        const resolvedRoot = path.resolve(projectRoot)
+        if (!resolvedPath.startsWith(resolvedRoot)) {
+          return { exists: false, error: 'Path outside project root' }
+        }
+      }
+
+      // Check if file exists and is a file (not directory)
+      const stats = await stat(trimmedPath)
+      if (!stats.isFile()) {
+        return { exists: false, error: 'Path is not a file' }
+      }
+
+      return {
+        exists: true,
+        absolutePath: trimmedPath,
+        isFile: true
+      }
+    } catch (error) {
+      // ENOENT means file doesn't exist - this is expected, not an error
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return { exists: false }
+      }
+      // Other errors (permissions, etc.)
+      return {
+        exists: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }
+    }
+  })
 }
