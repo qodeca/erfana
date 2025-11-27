@@ -52,7 +52,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (2410 tests)
+- [Testing](docs/testing/README.md) — Workspace, coverage (2410 tests, 89 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -68,16 +68,16 @@ See `docs/` for details (keep Claude's context focused):
 - **Full-Screen Mermaid Diagram Viewer** (Nov 27, 2025):
   - Expand Mermaid diagrams to full-screen overlay for detailed examination
   - Expand button appears on hover over diagrams (always visible on touch devices)
-  - Zoom controls: mouse wheel, pinch-to-zoom, +/- buttons
-  - Pan support: click-drag to move diagram
-  - Zoom indicator displays current zoom level (e.g., "125%")
+  - Zoom controls: mouse wheel zoom, +/- toolbar buttons
+  - Pan support: click-drag to move diagram around viewport
+  - Zoom indicator displays current zoom level percentage (e.g., "125%")
   - Fit-to-screen and reset buttons for quick navigation
   - Keyboard shortcuts: +/= (zoom in), - (zoom out), 0 (reset), F (fit), Escape (close)
   - Close via X button, Escape key, or backdrop click
-  - Backdrop click protected during drag to prevent accidental close
-  - Accessibility: ARIA labels, role="dialog", aria-modal, focus management
+  - Accessibility: ARIA labels, role="dialog", aria-modal, focus management, aria-live zoom indicator
   - Architecture: Pure logic extraction (`diagramViewer.logic.ts`) for testability
-  - Uses `react-zoom-pan-pinch` v3.7.0 for smooth zoom/pan interactions
+  - Custom CSS transform-based pan/zoom (no third-party library)
+  - SVG rendering uses same innerHTML injection as preview mode (Mermaid strict security)
   - Files: `src/renderer/src/components/Editor/DiagramViewer/`
   - 117 new tests (77 logic + 40 component)
   - Closes #30
