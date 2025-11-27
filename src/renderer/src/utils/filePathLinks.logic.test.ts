@@ -552,6 +552,600 @@ describe('filePathLinks.logic', () => {
       })
     })
 
+    describe('bare filenames', () => {
+      it('detects simple filename with extension', () => {
+        const matches = detectFilePaths('README.md')
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          fullMatch: 'README.md',
+          path: 'README.md'
+        })
+      })
+
+      it('detects TypeScript filename', () => {
+        const matches = detectFilePaths('file.ts')
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          fullMatch: 'file.ts',
+          path: 'file.ts'
+        })
+      })
+
+      it('detects filename in ls output', () => {
+        const matches = detectFilePaths('classes_report.md       home.png')
+        expect(matches).toHaveLength(2)
+        expect(matches[0].path).toBe('classes_report.md')
+        expect(matches[1].path).toBe('home.png')
+      })
+
+      it('detects filename with line number', () => {
+        const matches = detectFilePaths('error in file.ts:42')
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          fullMatch: 'file.ts:42',
+          path: 'file.ts',
+          line: 42
+        })
+      })
+
+      it('detects filename with line and column', () => {
+        const matches = detectFilePaths('error in file.tsx:42:10')
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          fullMatch: 'file.tsx:42:10',
+          path: 'file.tsx',
+          line: 42,
+          column: 10
+        })
+      })
+
+      it('detects filename in TypeScript error format', () => {
+        const matches = detectFilePaths('file.ts(15,3)')
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          fullMatch: 'file.ts(15,3)',
+          path: 'file.ts',
+          line: 15,
+          column: 3
+        })
+      })
+
+      it('detects multiple bare filenames', () => {
+        const matches = detectFilePaths('package.json tsconfig.json README.md')
+        expect(matches).toHaveLength(3)
+        expect(matches[0].path).toBe('package.json')
+        expect(matches[1].path).toBe('tsconfig.json')
+        expect(matches[2].path).toBe('README.md')
+      })
+
+      it('detects filename with hyphen', () => {
+        const matches = detectFilePaths('my-component.tsx')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('my-component.tsx')
+      })
+
+      it('detects filename with underscore', () => {
+        const matches = detectFilePaths('my_module.ts')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('my_module.ts')
+      })
+
+      it('detects filename with dots', () => {
+        const matches = detectFilePaths('component.test.ts')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('component.test.ts')
+      })
+
+      it('skips domain-like patterns', () => {
+        const matches = detectFilePaths('google.com example.org')
+        expect(matches).toHaveLength(0)
+      })
+    })
+
+    describe('unquoted paths with spaces', () => {
+      it('detects absolute path with space in directory name', () => {
+        const matches = detectFilePaths('/Users/test/my project/file.ts')
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          path: '/Users/test/my project/file.ts'
+        })
+      })
+
+      it('detects path with multiple spaces', () => {
+        const matches = detectFilePaths('/Users/test/my project/sub folder/file.md')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('/Users/test/my project/sub folder/file.md')
+      })
+
+      it('detects path with space and line number', () => {
+        const matches = detectFilePaths('/path/to my file.ts:42')
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          path: '/path/to my file.ts',
+          line: 42
+        })
+      })
+
+      it('detects path with space and line:column', () => {
+        const matches = detectFilePaths('/path/to my file.ts:42:10')
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          path: '/path/to my file.ts',
+          line: 42,
+          column: 10
+        })
+      })
+
+      it('detects real-world path with space (README.md)', () => {
+        const matches = detectFilePaths('/Users/marcinobel/Projects/test project/basic/README.md')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('/Users/marcinobel/Projects/test project/basic/README.md')
+      })
+
+      it('detects python file with space', () => {
+        const matches = detectFilePaths('/Users/test/my project/filter_urls.py')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('/Users/test/my project/filter_urls.py')
+      })
+
+      it('detects json file with space in .claude folder', () => {
+        const matches = detectFilePaths('/Users/test/my project/.claude/settings.local.json')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('/Users/test/my project/.claude/settings.local.json')
+      })
+
+      it('detects path with dash before it', () => {
+        const matches = detectFilePaths('- /Users/test/my project/file.md')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('/Users/test/my project/file.md')
+      })
+    })
+
+    describe('quoted paths with spaces', () => {
+      it('detects double-quoted path with space', () => {
+        const matches = detectFilePaths('Error in "/Users/test/my project/file.ts"')
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          fullMatch: '/Users/test/my project/file.ts',
+          path: '/Users/test/my project/file.ts'
+        })
+      })
+
+      it('detects single-quoted path with space', () => {
+        const matches = detectFilePaths("Error in '/Users/test/my project/file.ts'")
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          fullMatch: '/Users/test/my project/file.ts',
+          path: '/Users/test/my project/file.ts'
+        })
+      })
+
+      it('detects quoted path with line number', () => {
+        const matches = detectFilePaths('Error at "/path/to file.ts:42"')
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          path: '/path/to file.ts',
+          line: 42
+        })
+      })
+
+      it('detects quoted path with line and column', () => {
+        const matches = detectFilePaths('"/path/to file.ts:42:10"')
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          path: '/path/to file.ts',
+          line: 42,
+          column: 10
+        })
+      })
+
+      it('detects multiple quoted paths with spaces', () => {
+        const matches = detectFilePaths('Move "/path/my file.ts" to "/other/new file.ts"')
+        expect(matches).toHaveLength(2)
+        expect(matches[0].path).toBe('/path/my file.ts')
+        expect(matches[1].path).toBe('/other/new file.ts')
+      })
+
+      it('handles real-world path with spaces', () => {
+        const matches = detectFilePaths('"/Users/marcinobel/Projects/test project/basic/README.md"')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('/Users/marcinobel/Projects/test project/basic/README.md')
+      })
+    })
+
+    describe('dotfiles', () => {
+      it('detects .gitignore', () => {
+        const matches = detectFilePaths('.gitignore')
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          fullMatch: '.gitignore',
+          path: '.gitignore'
+        })
+      })
+
+      it('detects .env', () => {
+        const matches = detectFilePaths('.env')
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          fullMatch: '.env',
+          path: '.env'
+        })
+      })
+
+      it('detects .eslintrc', () => {
+        const matches = detectFilePaths('.eslintrc')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('.eslintrc')
+      })
+
+      it('detects multiple dotfiles', () => {
+        const matches = detectFilePaths('.gitignore .env .prettierrc')
+        expect(matches).toHaveLength(3)
+        expect(matches[0].path).toBe('.gitignore')
+        expect(matches[1].path).toBe('.env')
+        expect(matches[2].path).toBe('.prettierrc')
+      })
+
+      it('detects dotfile with extension', () => {
+        const matches = detectFilePaths('.eslintrc.js')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('.eslintrc.js')
+      })
+
+      it('detects dotfile in ls output with regular files', () => {
+        const matches = detectFilePaths('.gitignore README.md package.json')
+        expect(matches).toHaveLength(3)
+        expect(matches[0].path).toBe('.gitignore')
+        expect(matches[1].path).toBe('README.md')
+        expect(matches[2].path).toBe('package.json')
+      })
+    })
+
+    describe('fallback matchers (VS Code style)', () => {
+      // These test the VS Code-inspired fallback matchers for paths with spaces
+      // See: https://github.com/microsoft/vscode/issues/97941
+
+      describe('Python error format', () => {
+        it('detects Python error with path containing spaces', () => {
+          const matches = detectFilePaths('  File "/Users/test/my project/main.py", line 42')
+          expect(matches).toHaveLength(1)
+          expect(matches[0]).toMatchObject({
+            path: '/Users/test/my project/main.py',
+            line: 42
+          })
+        })
+
+        it('detects Python error with single quotes', () => {
+          const matches = detectFilePaths("  File '/path/to my file.py', line 10")
+          expect(matches).toHaveLength(1)
+          expect(matches[0]).toMatchObject({
+            path: '/path/to my file.py',
+            line: 10
+          })
+        })
+
+        it('detects Python error without line number', () => {
+          const matches = detectFilePaths('File "/path/with spaces/script.py"')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('/path/with spaces/script.py')
+        })
+
+        it('handles Python error with line:col notation inside quotes', () => {
+          const matches = detectFilePaths('File "/path/my script.py:42:10"')
+          expect(matches).toHaveLength(1)
+          expect(matches[0]).toMatchObject({
+            path: '/path/my script.py',
+            line: 42,
+            column: 10
+          })
+        })
+      })
+
+      describe('standalone paths on own line', () => {
+        it('detects path with space on own line', () => {
+          const matches = detectFilePaths('/Users/john/My Documents/report.pdf')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('/Users/john/My Documents/report.pdf')
+        })
+
+        it('detects path with spaces and line number', () => {
+          const matches = detectFilePaths('/home/user/Project Files/src/main.js:42')
+          expect(matches).toHaveLength(1)
+          expect(matches[0]).toMatchObject({
+            path: '/home/user/Project Files/src/main.js',
+            line: 42
+          })
+        })
+
+        it('detects path with spaces and line:column', () => {
+          const matches = detectFilePaths('/home/user/My Project/index.ts:100:5')
+          expect(matches).toHaveLength(1)
+          expect(matches[0]).toMatchObject({
+            path: '/home/user/My Project/index.ts',
+            line: 100,
+            column: 5
+          })
+        })
+
+        it('detects path with leading dash', () => {
+          const matches = detectFilePaths('- /Users/test/my project/file.ts')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('/Users/test/my project/file.ts')
+        })
+
+        it('detects path with leading spaces', () => {
+          const matches = detectFilePaths('   /path/to my file/script.py')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('/path/to my file/script.py')
+        })
+
+        it('detects path with tab prefix', () => {
+          const matches = detectFilePaths('\t/Users/test/some path/file.md')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('/Users/test/some path/file.md')
+        })
+
+        it('handles path with multiple spaces', () => {
+          const matches = detectFilePaths('/Users/john doe/My Documents/My Report.pdf')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('/Users/john doe/My Documents/My Report.pdf')
+        })
+      })
+
+      describe('Claude Code output format', () => {
+        // Real-world test cases from Claude Code terminal output
+        it('detects path from Claude Code suggestion', () => {
+          const matches = detectFilePaths('/Users/john/My Documents/report.pdf')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('/Users/john/My Documents/report.pdf')
+        })
+
+        it('detects JavaScript path with spaces', () => {
+          const matches = detectFilePaths('/home/user/Project Files/src/main.js')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('/home/user/Project Files/src/main.js')
+        })
+
+        it('detects Windows path with spaces', () => {
+          const matches = detectFilePaths('C:\\Program Files\\My Application\\app.exe')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('C:\\Program Files\\My Application\\app.exe')
+        })
+
+        it('detects Windows path with line number', () => {
+          const matches = detectFilePaths('C:\\Users\\test\\my project\\file.ts:42')
+          expect(matches).toHaveLength(1)
+          expect(matches[0]).toMatchObject({
+            path: 'C:\\Users\\test\\my project\\file.ts',
+            line: 42
+          })
+        })
+
+        it('detects Windows path with line:column', () => {
+          const matches = detectFilePaths('C:\\Users\\test\\src\\main.ts:100:15')
+          expect(matches).toHaveLength(1)
+          expect(matches[0]).toMatchObject({
+            path: 'C:\\Users\\test\\src\\main.ts',
+            line: 100,
+            column: 15
+          })
+        })
+
+        it('handles bullet point list item', () => {
+          const matches = detectFilePaths('- /path/to my/project/config.json')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('/path/to my/project/config.json')
+        })
+      })
+
+      describe('edge cases', () => {
+        it('does NOT match full path with spaces in middle of sentence (no clear boundary)', () => {
+          // Without clear anchors (start/end of line), we can't reliably detect where the path with spaces ends
+          // However, the main pattern WILL detect the bare filename "file.ts" at the end
+          const matches = detectFilePaths('Error in /Users/test/my project/file.ts somewhere else')
+          // Main pattern detects bare filenames
+          expect(matches.length).toBeGreaterThanOrEqual(1)
+          // The path with spaces is NOT matched as a complete path
+          expect(matches.some(m => m.path.includes('my project'))).toBe(false)
+        })
+
+        it('handles path with trailing whitespace', () => {
+          const matches = detectFilePaths('/Users/test/my project/file.ts   ')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('/Users/test/my project/file.ts')
+        })
+
+        it('handles empty line', () => {
+          const matches = detectFilePaths('')
+          expect(matches).toHaveLength(0)
+        })
+
+        it('does not match non-path text with spaces', () => {
+          const matches = detectFilePaths('Hello world this is a test')
+          expect(matches).toHaveLength(0)
+        })
+      })
+
+      describe('Claude Code tool output format', () => {
+        it('detects Read(path) format', () => {
+          const matches = detectFilePaths('Read(04-deliverables/recommendations/critical-recommendations.md)')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('04-deliverables/recommendations/critical-recommendations.md')
+        })
+
+        it('detects Update(path) format', () => {
+          const matches = detectFilePaths('Update(04-deliverables/recommendations/critical-recommendations.md)')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('04-deliverables/recommendations/critical-recommendations.md')
+        })
+
+        it('detects Write(path) format', () => {
+          const matches = detectFilePaths('Write(src/main/services/FileService.ts)')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('src/main/services/FileService.ts')
+        })
+
+        it('detects Edit(path) format', () => {
+          const matches = detectFilePaths('Edit(src/renderer/src/components/App.tsx)')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('src/renderer/src/components/App.tsx')
+        })
+
+        it('detects path with spaces in tool output', () => {
+          const matches = detectFilePaths('Read(path/to my project/file.md)')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('path/to my project/file.md')
+        })
+
+        it('detects Glob(path) format', () => {
+          const matches = detectFilePaths('Glob(src/**/*.tsx)')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('src/**/*.tsx')
+        })
+
+        it('detects Grep(path) format', () => {
+          const matches = detectFilePaths('Grep(src/renderer/src/utils/helper.ts)')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('src/renderer/src/utils/helper.ts')
+        })
+
+        it('detects tool with absolute path', () => {
+          const matches = detectFilePaths('Read(/Users/test/project/src/index.ts)')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('/Users/test/project/src/index.ts')
+        })
+
+        it('detects tool with nested path and special chars', () => {
+          const matches = detectFilePaths('Edit(src/components/UI/Button.test.tsx)')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('src/components/UI/Button.test.tsx')
+        })
+      })
+
+      describe('File: label format', () => {
+        it('detects File: label with path', () => {
+          const matches = detectFilePaths('File: 03-analysis/03.01-customer-issues/20251125-issues.md')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('03-analysis/03.01-customer-issues/20251125-issues.md')
+        })
+
+        it('detects File: label with leading spaces', () => {
+          const matches = detectFilePaths('  File: path/to/document.md')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('path/to/document.md')
+        })
+
+        it('detects File: label with path containing spaces', () => {
+          const matches = detectFilePaths('File: path/to my/document.md')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('path/to my/document.md')
+        })
+      })
+
+      describe('Git status format', () => {
+        it('detects M (modified) status', () => {
+          const matches = detectFilePaths('M 04-deliverables/recommendations/critical-recommendations.md')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('04-deliverables/recommendations/critical-recommendations.md')
+        })
+
+        it('detects A (added) status', () => {
+          const matches = detectFilePaths('A src/main/services/NewService.ts')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('src/main/services/NewService.ts')
+        })
+
+        it('detects ?? (untracked) status', () => {
+          const matches = detectFilePaths('?? new-file.ts')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('new-file.ts')
+        })
+
+        it('detects status with leading spaces', () => {
+          const matches = detectFilePaths('  M path/to/file.md')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('path/to/file.md')
+        })
+
+        it('detects D (deleted) status', () => {
+          const matches = detectFilePaths('D src/old-file.ts')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('src/old-file.ts')
+        })
+
+        it('detects R (renamed) status', () => {
+          const matches = detectFilePaths('R src/renamed-file.ts')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('src/renamed-file.ts')
+        })
+
+        it('detects path with spaces in git status', () => {
+          const matches = detectFilePaths('M path/to my project/file.md')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('path/to my project/file.md')
+        })
+
+        it('detects !! (ignored) status', () => {
+          const matches = detectFilePaths('!! node_modules/package/index.js')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('node_modules/package/index.js')
+        })
+      })
+
+      describe('Markdown link format', () => {
+        it('detects markdown link path', () => {
+          const matches = detectFilePaths('[RSK-0066](../../03-analysis/03.04-risks/scoring/categories/reputation.md)')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('../../03-analysis/03.04-risks/scoring/categories/reputation.md')
+        })
+
+        it('detects markdown link with anchor', () => {
+          const matches = detectFilePaths('[text](path/to/file.md#section-anchor)')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('path/to/file.md')
+        })
+
+        it('detects multiple markdown links', () => {
+          const matches = detectFilePaths('[link1](file1.md) and [link2](file2.md)')
+          expect(matches).toHaveLength(2)
+          expect(matches[0].path).toBe('file1.md')
+          expect(matches[1].path).toBe('file2.md')
+        })
+
+        it('detects markdown link with spaces in path', () => {
+          const matches = detectFilePaths('[doc](path/to my/document.md)')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('path/to my/document.md')
+        })
+
+        it('detects markdown link with complex anchor', () => {
+          const matches = detectFilePaths('[link](docs/api.md#section-1-introduction)')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('docs/api.md')
+        })
+
+        it('detects inline markdown image', () => {
+          const matches = detectFilePaths('![alt](images/screenshot.png)')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('images/screenshot.png')
+        })
+      })
+
+      describe('Git diff stat format', () => {
+        it('detects truncated path in diff stat', () => {
+          const matches = detectFilePaths('.../recommendations/critical-recommendations.md    | 32 ++++++++++++----------')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('.../recommendations/critical-recommendations.md')
+        })
+
+        it('detects path with spaces in diff stat', () => {
+          const matches = detectFilePaths(' .../to my project/file.md | 5 ++')
+          expect(matches).toHaveLength(1)
+          expect(matches[0].path).toBe('.../to my project/file.md')
+        })
+      })
+    })
+
     describe('TypeScript error format', () => {
       it('detects TypeScript format with project-relative path', () => {
         const matches = detectFilePaths('Error in src/file.ts(15,3)')
@@ -875,6 +1469,20 @@ describe('filePathLinks.logic', () => {
 
     afterEach(() => {
       vi.useRealTimers()
+    })
+
+    describe('validation', () => {
+      it('throws error if maxSize is 0', () => {
+        expect(() => createPathCache(0, 30000)).toThrow('PathCache maxSize must be at least 1')
+      })
+
+      it('throws error if maxSize is negative', () => {
+        expect(() => createPathCache(-1, 30000)).toThrow('PathCache maxSize must be at least 1')
+      })
+
+      it('accepts maxSize of 1', () => {
+        expect(() => createPathCache(1, 30000)).not.toThrow()
+      })
     })
 
     describe('basic operations', () => {

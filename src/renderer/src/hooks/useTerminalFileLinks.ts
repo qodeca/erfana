@@ -17,8 +17,9 @@
  * - File picker dialog when multiple matches exist
  */
 
-import { useEffect, useRef, useMemo, useCallback } from 'react'
+import { useEffect, useRef, useMemo, useCallback, useState } from 'react'
 import type { Terminal, ILinkProvider, ILink, ILinkDecorations } from '@xterm/xterm'
+import type React from 'react'
 import type { FileNode } from '../../../preload/index'
 import {
   detectFilePaths,
@@ -38,8 +39,8 @@ import type { PathScore } from '../utils/pathScoring'
 const pathCache = createPathCache(100, 30000)
 
 export interface UseTerminalFileLinksOptions {
-  /** xterm Terminal instance */
-  terminal: Terminal | null
+  /** Reference to xterm Terminal instance */
+  terminalRef: React.RefObject<Terminal | null>
   /** Terminal ID for fetching CWD */
   terminalId: string | null
   /** Current project root for resolving project-relative paths */
@@ -115,8 +116,36 @@ const SMART_LINK_DECORATIONS: ILinkDecorations = {
 export function useTerminalFileLinks(
   options: UseTerminalFileLinksOptions
 ): UseTerminalFileLinksReturn {
-  const { terminal, terminalId, projectRoot, files = [], onFileOpen, onShowPicker, onError } =
+  const { terminalRef, terminalId, projectRoot, files = [], onFileOpen, onShowPicker, onError } =
     options
+
+  // Track terminal readiness with state to trigger re-renders when terminal is created
+  const [terminalReady, setTerminalReady] = useState(false)
+
+  // Check terminal availability when terminalId changes (terminal created)
+  useEffect(() => {
+    const checkTerminal = () => {
+      const hasTerminal = !!terminalRef.current
+      if (hasTerminal !== terminalReady) {
+        setTerminalReady(hasTerminal)
+      }
+    }
+
+    // Check immediately
+    checkTerminal()
+
+    // If no terminal yet but we have terminalId, poll briefly
+    // (terminal ref is set synchronously after terminal creation)
+    if (terminalId && !terminalRef.current) {
+      const timeoutId = setTimeout(checkTerminal, 100)
+      return () => clearTimeout(timeoutId)
+    }
+
+    return undefined
+  }, [terminalId, terminalReady, terminalRef])
+
+  // Get terminal from ref (will be null until terminal is created)
+  const terminal = terminalRef.current
 
   // Use filename index for smart resolution
   const { getIndex } = useFilenameIndex({ files })
@@ -303,7 +332,8 @@ export function useTerminalFileLinks(
         }
       }
     }
-  }, [terminal, fetchCwd, validatePath, projectRoot, files, getIndex, onFileOpen, onShowPicker, onError])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- terminalReady triggers recalculation when terminal ref is set
+  }, [terminal, terminalReady, fetchCwd, validatePath, projectRoot, files, getIndex, onFileOpen, onShowPicker, onError])
 
   // Register the link provider with xterm
   useEffect(() => {

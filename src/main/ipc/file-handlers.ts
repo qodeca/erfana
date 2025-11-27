@@ -408,10 +408,24 @@ export function registerFileHandlers(): void {
         return { exists: false, error: 'Empty file path' }
       }
 
+      const path = await import('path')
+      const resolvedPath = path.resolve(trimmedPath)
+
+      // Security check: block system-critical paths even without projectRoot
+      // Defense-in-depth: prevent validation of sensitive system directories
+      const blockedPrefixes = process.platform === 'win32'
+        ? ['C:\\Windows', 'C:\\Program Files', 'C:\\ProgramData', 'C:\\System']
+        : ['/etc', '/usr', '/bin', '/sbin', '/System', '/Library', '/private/var']
+
+      const isBlockedPath = blockedPrefixes.some(prefix =>
+        resolvedPath.toLowerCase().startsWith(prefix.toLowerCase())
+      )
+      if (isBlockedPath) {
+        return { exists: false, error: 'Access to system paths not allowed' }
+      }
+
       // Security check: if projectRoot provided, ensure path is within it
       if (projectRoot) {
-        const path = await import('path')
-        const resolvedPath = path.resolve(trimmedPath)
         const resolvedRoot = path.resolve(projectRoot)
         if (!resolvedPath.startsWith(resolvedRoot)) {
           return { exists: false, error: 'Path outside project root' }

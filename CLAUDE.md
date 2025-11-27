@@ -52,7 +52,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (2189 tests)
+- [Testing](docs/testing/README.md) — Workspace, coverage (2263 tests)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -73,13 +73,20 @@ See `docs/` for details (keep Claude's context focused):
   - Smart resolution: Falls back to filename search when exact path not found
   - FilePickerDialog: VS Code-style disambiguation when multiple files match
   - Keyboard navigation (Arrow Up/Down, Enter to select, Escape to cancel)
+  - **Paths with spaces support** (VS Code-style fallback matchers):
+    - Detects paths with spaces on their own line (e.g., `/Users/john/My Documents/report.pdf`)
+    - Python error format: `File "/path/with spaces/file.py", line 42`
+    - Windows paths: `C:\Program Files\My App\app.exe`
+    - Bullet point lists: `- /path/to my/project/file.ts`
+    - Based on VS Code Issue #97941 and PR #43733
   - Architecture: Pure logic extraction pattern for testability
     - `filenameIndex.ts`: Map-based O(1) filename lookup
     - `pathScoring.ts`: Candidate ranking algorithm
     - `smartPathResolver.logic.ts`: Resolution orchestration
     - `useFilenameIndex.ts`: Lazy index management hook
     - `FilePickerDialog.tsx`: Disambiguation UI component
-  - 138 new tests for smart resolution feature
+    - `filePathLinks.logic.ts`: Fallback matchers for paths with spaces
+  - 157 new tests for smart resolution and paths with spaces
   - Closes #26
 
 ## Changes in v0.4.7

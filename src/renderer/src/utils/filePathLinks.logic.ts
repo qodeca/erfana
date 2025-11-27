@@ -73,6 +73,112 @@ const MAX_PATH_LENGTH = 512;
 const MAX_FILENAME_LENGTH = 255;
 
 /**
+ * Common file extensions for fallback matchers.
+ * Used to anchor the end of paths that may contain spaces.
+ */
+const COMMON_EXTENSIONS =
+  'ts|tsx|js|jsx|json|md|txt|py|rb|go|rs|java|c|cpp|h|hpp|css|scss|html|xml|yaml|yml|toml|sh|bash|zsh|sql|graphql|vue|svelte|astro|pdf|png|jpg|jpeg|gif|svg|ico|webp|mp3|mp4|wav|avi|mov|zip|tar|gz|rar|doc|docx|xls|xlsx|ppt|pptx|csv|log|env|lock|config|conf|ini|properties|gradle|kt|swift|m|mm|scala|clj|ex|exs|erl|hs|lua|pl|php|r|jl|nim|zig|v|d|ada|f90|f95|cob|asm|s|vhd|vhdl|sv|tcl|ps1|bat|cmd|exe|dll|so|dylib|bin|app|dmg|pkg|deb|rpm';
+
+/**
+ * Interface for fallback matchers that detect paths with spaces.
+ * VS Code uses this approach for known output formats where path boundaries are clear.
+ */
+interface FallbackMatcher {
+  /** Regex pattern to match */
+  pattern: RegExp;
+  /** Index of the path capture group */
+  pathGroup: number;
+  /** Index of the line number capture group (optional) */
+  lineGroup?: number;
+  /** Index of the column capture group (optional) */
+  colGroup?: number;
+}
+
+/**
+ * Fallback matchers for paths with spaces.
+ *
+ * These run BEFORE the main pattern and handle specific output formats
+ * where path boundaries are clear (standalone lines, quoted paths, etc.).
+ *
+ * Based on VS Code's approach: https://github.com/microsoft/vscode/issues/97941
+ */
+const fallbackMatchers: FallbackMatcher[] = [
+  // 1. Python errors: File "/path/to file.py", line 42
+  {
+    pattern: /^ *File ["']([^"']+)["'](?:, line (\d+))?/gm,
+    pathGroup: 1,
+    lineGroup: 2,
+  },
+  // 2. Absolute POSIX path on own line (allows spaces)
+  // Matches: /path/to my file.ts or /path/to file.ts:42:10 or - /path/file.ts
+  {
+    pattern: new RegExp(
+      `^[ \\t\\-]*(\\/[^\\n\\r]+\\.(?:${COMMON_EXTENSIONS}))(?::(\\d+)(?::(\\d+))?)?[ \\t]*$`,
+      'gim'
+    ),
+    pathGroup: 1,
+    lineGroup: 2,
+    colGroup: 3,
+  },
+  // 3. Windows path on own line (allows spaces)
+  // Matches: C:\path\to my file.ts or C:\path\file.ts:42:10
+  {
+    pattern: new RegExp(
+      `^[ \\t\\-]*([A-Za-z]:\\\\[^\\n\\r]+\\.(?:${COMMON_EXTENSIONS}))(?::(\\d+)(?::(\\d+))?)?[ \\t]*$`,
+      'gim'
+    ),
+    pathGroup: 1,
+    lineGroup: 2,
+    colGroup: 3,
+  },
+  // 4. Claude Code tool output: Read(path), Update(path), Write(path), Edit(path)
+  // Matches: Read(04-deliverables/recommendations/file.md)
+  {
+    pattern: new RegExp(
+      `(?:Read|Update|Write|Edit|Glob|Grep)\\(([^)\\n]+\\.(?:${COMMON_EXTENSIONS}))\\)`,
+      'gi'
+    ),
+    pathGroup: 1,
+  },
+  // 5. File: label format (common in documentation and tool output)
+  // Matches: File: 03-analysis/03.01-customer-issues/file.md
+  {
+    pattern: new RegExp(
+      `^[ \\t]*File:[ \\t]+([^\\n\\r]+\\.(?:${COMMON_EXTENSIONS}))`,
+      'gim'
+    ),
+    pathGroup: 1,
+  },
+  // 6. Git status format: M path, A path, D path, ?? path
+  // Matches: M 04-deliverables/recommendations/file.md
+  {
+    pattern: new RegExp(
+      `^[ \\t]*[MADRCU?!]{1,2}[ \\t]+([^\\n\\r|]+\\.(?:${COMMON_EXTENSIONS}))`,
+      'gim'
+    ),
+    pathGroup: 1,
+  },
+  // 7. Markdown link format: [text](path.md) or [text](path.md#anchor)
+  // Matches: [RSK-0066](../../03-analysis/file.md#anchor)
+  {
+    pattern: new RegExp(
+      `\\]\\(([^)\\n]+\\.(?:${COMMON_EXTENSIONS}))(?:#[^)]*)?\\)`,
+      'gi'
+    ),
+    pathGroup: 1,
+  },
+  // 8. Git diff stat format: .../path/file.md | 32 +++
+  // Matches: .../recommendations/critical-recommendations.md    | 32
+  {
+    pattern: new RegExp(
+      `(?:^|[ \\t])(\\.{3}\\/[^|\\n]+\\.(?:${COMMON_EXTENSIONS}))[ \\t]*\\|`,
+      'gim'
+    ),
+    pathGroup: 1,
+  },
+];
+
+/**
  * ANSI escape sequence pattern for stripping terminal formatting.
  * Matches CSI sequences: ESC [ ... m
  */
@@ -176,6 +282,30 @@ function looksLikeEmail(text: string): boolean {
 }
 
 /**
+ * Common top-level domains that indicate a domain name rather than a filename.
+ */
+const COMMON_TLDS = [
+  'com', 'org', 'net', 'io', 'dev', 'co', 'app', 'edu', 'gov',
+  'info', 'biz', 'me', 'uk', 'de', 'fr', 'eu', 'au', 'ca', 'jp'
+];
+
+/**
+ * Checks if a string looks like a domain name (to avoid false positives).
+ * Matches patterns like: google.com, example.org, site.io
+ *
+ * @param text - Text to check
+ * @returns True if text looks like a domain name
+ */
+function looksLikeDomain(text: string): boolean {
+  // Check if it ends with a common TLD
+  const parts = text.split('.');
+  if (parts.length < 2) return false;
+
+  const lastPart = parts[parts.length - 1].toLowerCase();
+  return COMMON_TLDS.includes(lastPart);
+}
+
+/**
  * Detects file paths in a terminal line.
  *
  * Supports the following formats:
@@ -183,6 +313,9 @@ function looksLikeEmail(text: string): boolean {
  * - Absolute Windows: `C:\path\to\file.ts:42:10` or `C:/path/to/file.ts`
  * - Relative: `./src/file.ts:42` or `../utils/helper.ts`
  * - Project-relative: `src/main/index.ts:100`
+ * - Bare filenames: `README.md`, `file.ts`, `image.png`
+ * - Dotfiles: `.gitignore`, `.env`, `.eslintrc`
+ * - Quoted paths (with spaces): `"/path/to my file.ts"` or `'/path/to file.ts'`
  * - TypeScript error format: `file.ts(15,3)`
  * - Grep output: `src/main/index.ts:42:`
  *
@@ -195,7 +328,86 @@ export function detectFilePaths(line: string): FilePathMatch[] {
 
   const matches: FilePathMatch[] = [];
 
-  // Pattern for file paths with optional line:column notation
+  // FIRST: Run fallback matchers for paths with spaces
+  // These have clear anchors (start/end of line) that make them reliable
+  for (const matcher of fallbackMatchers) {
+    // Reset regex state - critical for global patterns (/g flag) which persist
+    // lastIndex between exec() calls. Without reset, subsequent calls would
+    // start matching from where the previous match ended, causing missed matches.
+    matcher.pattern.lastIndex = 0;
+    let fallbackMatch: RegExpExecArray | null;
+    while ((fallbackMatch = matcher.pattern.exec(cleanLine)) !== null) {
+      const rawPath = fallbackMatch[matcher.pathGroup];
+
+      // Parse line:column from within the path itself (e.g., "/path/file.ts:42:10")
+      const { path, line: parsedLine, column: parsedCol } = parseLineColumn(rawPath);
+
+      // Line number from the pattern groups (e.g., Python's ", line 42")
+      const groupLine = matcher.lineGroup && fallbackMatch[matcher.lineGroup]
+        ? parseInt(fallbackMatch[matcher.lineGroup], 10)
+        : undefined;
+      const groupCol = matcher.colGroup && fallbackMatch[matcher.colGroup]
+        ? parseInt(fallbackMatch[matcher.colGroup], 10)
+        : undefined;
+
+      // Use parsed values first, fall back to group values
+      const lineNum = parsedLine ?? groupLine;
+      const col = parsedCol ?? groupCol;
+
+      // Calculate full match text for display
+      const fullMatch = col
+        ? `${path}:${lineNum}:${col}`
+        : lineNum
+          ? `${path}:${lineNum}`
+          : path;
+
+      // Find the path start index within the matched string
+      const pathStartInMatch = fallbackMatch[0].indexOf(rawPath);
+      const startIndex = fallbackMatch.index + pathStartInMatch;
+      const endIndex = startIndex + rawPath.length;
+
+      matches.push({
+        fullMatch,
+        path,
+        line: lineNum,
+        column: col,
+        startIndex,
+        endIndex,
+      });
+    }
+  }
+
+  // SECOND: Detect quoted paths (can contain spaces)
+  // Matches: "path/to file.ext" or 'path/to file.ext'
+  const quotedPathPattern = /(['"])(\/[^'"]+\.[a-zA-Z0-9]{1,10}(?::\d{1,6}(?::\d{1,6})?)?)\1/g;
+  let quotedMatch: RegExpExecArray | null;
+  while ((quotedMatch = quotedPathPattern.exec(cleanLine)) !== null) {
+    const fullMatch = quotedMatch[2]; // Path without quotes
+    const { path, line: lineNum, column } = parseLineColumn(fullMatch);
+
+    // Verify it has a file extension
+    const hasExtension = /\.[a-zA-Z0-9]{1,10}(?::\d+|$)/.test(path);
+    if (!hasExtension) continue;
+
+    // Skip if already matched by fallback matchers
+    const startIndex = quotedMatch.index + 1; // Skip opening quote
+    const endIndex = startIndex + fullMatch.length;
+    const overlapsWithExisting = matches.some(
+      (existing) => startIndex < existing.endIndex && endIndex > existing.startIndex
+    );
+    if (overlapsWithExisting) continue;
+
+    matches.push({
+      fullMatch,
+      path,
+      line: lineNum,
+      column,
+      startIndex,
+      endIndex,
+    });
+  }
+
+  // THIRD: Pattern for file paths with optional line:column notation
   // Matches:
   // - Absolute POSIX: /path/to/file.ext
   // - Absolute Windows: C:\path\to\file.ext or C:/path/to/file.ext
@@ -231,6 +443,12 @@ export function detectFilePaths(line: string): FilePathMatch[] {
       '[a-zA-Z0-9_-]+(?:/[^\\s:()\\[\\]{}"\',;<>|*?\\x00-\\x1f]{1,' +
       MAX_FILENAME_LENGTH +
       '})+' +
+      '|' +
+      // 5. Bare filename with extension: file.ext, README.md, image.png
+      '[a-zA-Z0-9_][a-zA-Z0-9_.-]*\\.[a-zA-Z0-9]{1,10}' +
+      '|' +
+      // 6. Dotfiles: .gitignore, .env, .eslintrc
+      '\\.[a-zA-Z0-9_][a-zA-Z0-9_.-]*' +
       ')' +
       // Optional position notation
       '(?:' +
@@ -250,19 +468,22 @@ export function detectFilePaths(line: string): FilePathMatch[] {
   while ((match = pathPattern.exec(cleanLine)) !== null) {
     const fullMatch = match[1];
 
-    // Skip if it looks like a URL or email
-    if (looksLikeUrl(fullMatch) || looksLikeEmail(fullMatch)) {
+    // Skip if it looks like a URL, email, or domain name
+    if (looksLikeUrl(fullMatch) || looksLikeEmail(fullMatch) || looksLikeDomain(fullMatch)) {
       continue;
     }
 
     // Skip if path doesn't have a file extension (likely not a file)
-    // Exception: directories ending with known patterns like /bin, /src
+    // Exceptions:
+    // - Directories ending with known patterns like /bin, /src
+    // - Dotfiles like .gitignore, .env (start with dot, no path separator)
     const hasExtension = /\.[a-zA-Z0-9]{1,8}(?::\d+|$|\(|:)/.test(fullMatch);
     const isKnownDir = /(?:[/\\])(?:bin|src|lib|dist|node_modules|test|tests)(?:[/:()]|$)/.test(
       fullMatch
     );
+    const isDotfile = /^\.[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/.test(fullMatch);
 
-    if (!hasExtension && !isKnownDir) {
+    if (!hasExtension && !isKnownDir && !isDotfile) {
       continue;
     }
 
@@ -273,6 +494,14 @@ export function detectFilePaths(line: string): FilePathMatch[] {
     // This is a simplified approach - for precise mapping we'd need to track ANSI codes
     const startIndex = match.index;
     const endIndex = startIndex + fullMatch.length;
+
+    // Skip if this match overlaps with an already detected quoted path
+    const overlapsWithExisting = matches.some(
+      (existing) => startIndex < existing.endIndex && endIndex > existing.startIndex
+    );
+    if (overlapsWithExisting) {
+      continue;
+    }
 
     matches.push({
       fullMatch,
@@ -341,6 +570,11 @@ export function createPathCache(
   maxSize: number = DEFAULT_CACHE_MAX_SIZE,
   ttlMs: number = DEFAULT_CACHE_TTL_MS
 ): PathCache {
+  // Validate maxSize to prevent edge case bugs
+  if (maxSize < 1) {
+    throw new Error('PathCache maxSize must be at least 1')
+  }
+
   // Use Map to maintain insertion order
   const cache = new Map<string, PathCacheEntry>();
 

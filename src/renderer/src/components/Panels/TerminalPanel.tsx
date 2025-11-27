@@ -127,7 +127,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
   // Terminal file links hook - enables clickable file paths with smart resolution
   useTerminalFileLinks({
-    terminal: xtermRef.current,
+    terminalRef: xtermRef,
     terminalId: terminalId,
     projectRoot: projectPath,
     files: files,
