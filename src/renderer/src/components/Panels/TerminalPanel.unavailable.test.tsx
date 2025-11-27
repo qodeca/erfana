@@ -17,6 +17,12 @@ vi.mock('@xterm/xterm', () => {
     loadAddon(_a?: any) {}
     dispose() {}
     write(_d?: string) {}
+    attachCustomKeyEventHandler(_handler?: any) {}
+    hasSelection() { return false }
+    getSelection() { return '' }
+    clearSelection() {}
+    onSelectionChange() { return { dispose() {} } }
+    paste(_text?: string) {}
   }
   return { Terminal: MockTerminal }
 })

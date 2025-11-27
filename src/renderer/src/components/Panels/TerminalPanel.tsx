@@ -5,7 +5,7 @@
  * Follows the panel style established by ProjectPanel.
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { ISplitviewPanelProps } from 'dockview'
 import { Terminal as TerminalIcon, RotateCw, ArrowDownToLine } from 'lucide-react'
 import { Terminal } from '@xterm/xterm'
@@ -14,6 +14,8 @@ import { WebLinksAddon } from '@xterm/addon-web-links'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import { showGlobalToast } from '../Toast/toastService'
 import { useScrollAnomalyRecovery } from '../../hooks/useScrollAnomalyRecovery'
+import { useTerminalClipboard } from '../../hooks/useTerminalClipboard'
+import { TerminalContextMenu } from '../ContextMenu/TerminalContextMenu'
 import '@xterm/xterm/css/xterm.css'
 import './TerminalPanel.css'
 import { isElementVisible } from '../../utils/domUtils'
@@ -23,6 +25,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const [terminalId, setTerminalId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [recheckCooldown, setRecheckCooldown] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
   const terminalRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<Terminal | null>(null)
@@ -41,6 +44,17 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     enabled: true,
     onRecovery: () => {
       console.debug('[ScrollRecovery] Auto-recovered from anomalous scroll-to-top')
+    }
+  })
+
+  // Clipboard support for copy/paste operations (issue #28)
+  const { hasSelection, copy, paste, handleKeyEvent } = useTerminalClipboard(xtermRef, {
+    onCopy: () => {
+      showGlobalToast({ type: 'info', title: 'Copied', message: 'Text copied to clipboard' })
+    },
+    onError: (error) => {
+      console.warn('Clipboard operation failed:', error)
+      showGlobalToast({ type: 'warning', title: 'Clipboard Error', message: error.message })
     }
   })
 
@@ -163,6 +177,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
       // Open terminal in DOM
       xterm.open(terminalRef.current!)
+
+      // Attach clipboard key handler (issue #28)
+      xterm.attachCustomKeyEventHandler(handleKeyEvent)
 
       // Clear terminal immediately and write clear sequences to ensure clean start
       // This clears both the buffer and any pending data
@@ -445,6 +462,15 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }
 
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY })
+  }, [])
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null)
+  }, [])
+
   return (
     <div className="terminal-panel sidebar-panel">
       <div className="sidebar-panel-header">
@@ -503,9 +529,19 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           </div>
         ) : (
           // Terminal ready
-          <div ref={terminalRef} className="terminal-container" />
+          <div ref={terminalRef} className="terminal-container" onContextMenu={handleContextMenu} />
         )}
       </div>
+      {contextMenu && (
+        <TerminalContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          hasSelection={hasSelection}
+          onCopy={copy}
+          onPaste={paste}
+          onClose={handleCloseContextMenu}
+        />
+      )}
     </div>
   )
 }

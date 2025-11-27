@@ -35,7 +35,13 @@ const mockXtermInstance = {
   dispose: vi.fn(),
   write: vi.fn(),
   clear: vi.fn(),
-  onData: vi.fn().mockReturnValue({ dispose: vi.fn() })
+  onData: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+  attachCustomKeyEventHandler: vi.fn(),
+  hasSelection: vi.fn().mockReturnValue(false),
+  getSelection: vi.fn().mockReturnValue(''),
+  clearSelection: vi.fn(),
+  onSelectionChange: vi.fn().mockReturnValue({ dispose: vi.fn() }),
+  paste: vi.fn()
 }
 
 vi.mock('@xterm/xterm', () => {

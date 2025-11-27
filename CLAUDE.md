@@ -2,7 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
-- **Version**: 0.4.5
+- **Version**: 0.4.7
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -52,7 +52,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (1765 tests)
+- [Testing](docs/testing/README.md) — Workspace, coverage (1923 tests)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -64,7 +64,24 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.4.5)
+## Recent Changes (v0.4.7)
+- **Terminal Clipboard Support** (Nov 27, 2025):
+  - Copy/paste operations in terminal panel via keyboard shortcuts and context menu
+  - Smart Ctrl/Cmd+C: copies text when selected, sends SIGINT when no selection
+  - Keyboard shortcuts: Ctrl+C/V (Windows/Linux), Cmd+C/V (macOS), Ctrl+Shift+C/V (explicit)
+  - Right-click context menu with Copy (disabled when no selection) and Paste
+  - Platform-specific shortcut display (⌘C/⌘V on macOS, Ctrl+C/Ctrl+V on Windows)
+  - Selection preserved after copy (VS Code behavior), toast notification on success
+  - Pure logic extraction pattern: `terminalClipboard.logic.ts` for testability
+  - 103 new tests for clipboard functionality
+  - Closes #28
+
+## Changes in v0.4.6
+- **VS Code-Inspired Watcher Performance** (Nov 25, 2025):
+  - EventCoalescer, ThrottledWorker, AtomicSaveDetector, WatcherMetrics
+  - 57 new tests for watcher components
+
+## Changes in v0.4.5
 - **File Watcher Selective Blacklist** (Nov 23, 2025):
   - Fixed issue #21: dotfolders like `.claude`, `.github` now properly watched
   - VS Code-style function-based ignore (more reliable than regex patterns)
@@ -82,7 +99,7 @@ See `docs/` for details (keep Claude's context focused):
   - Architecture ready for future audio/video converters
   - Files: `src/main/services/import/` (types, converters/, ConverterRegistry, ImportService)
   - 296 new tests for import system (100% coverage)
-- **Test Coverage**: **1765 tests passing (73 test files)**
+- **Test Coverage**: **1923 tests passing (80 test files)**
 
 ## Changes in v0.4.4
 - **PDF Import with AI-Assisted Organization** (Nov 22, 2025):

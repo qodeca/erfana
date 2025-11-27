@@ -50,6 +50,13 @@
   flex: 1;
 }
 
+.context-menu-shortcut {
+  margin-left: 16px;
+  font-size: 11px;
+  color: #858585;
+  font-family: monospace;
+}
+
 .context-menu-separator {
   height: 1px;
   background-color: #454545;
