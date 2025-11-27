@@ -43,7 +43,11 @@ describe('TerminalPanel unavailable flow', () => {
         onExit: vi.fn().mockReturnValue(() => {}),
         onError: vi.fn().mockReturnValue(() => {})
       },
-      file: { onProjectChanged: vi.fn().mockReturnValue(() => {}) }
+      file: {
+        onProjectChanged: vi.fn().mockReturnValue(() => {}),
+        getProjectPath: vi.fn().mockResolvedValue(null),
+        validatePath: vi.fn().mockResolvedValue({ exists: false })
+      }
     }
     // Mock clipboard
     Object.assign(navigator, {
