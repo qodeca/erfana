@@ -1,0 +1,229 @@
+/* DiagramViewer.css - Full-screen Mermaid diagram viewer */
+
+/* Theme CSS Custom Properties */
+.diagram-viewer-overlay {
+  --viewer-bg: rgba(0, 0, 0, 0.9);
+  --viewer-toolbar-bg: #252526;
+  --viewer-content-bg: #1e1e1e;
+  --viewer-border: #3c3c3c;
+  --viewer-text-primary: #cccccc;
+  --viewer-text-secondary: #888888;
+  --viewer-btn-bg: transparent;
+  --viewer-btn-hover: rgba(255, 255, 255, 0.1);
+  --viewer-btn-active: rgba(255, 255, 255, 0.15);
+  --viewer-btn-disabled-opacity: 0.4;
+  --viewer-zoom-indicator-bg: #3c3c3c;
+  --viewer-focus-border: #007fd4;
+}
+
+/* Full-screen overlay */
+.diagram-viewer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--viewer-bg);
+  display: flex;
+  flex-direction: column;
+  animation: viewerFadeIn 0.15s ease-out;
+  z-index: 1000;
+}
+
+@keyframes viewerFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* TransformWrapper container - needs to fill available space */
+.diagram-viewer-overlay > .react-transform-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+/* Override react-zoom-pan-pinch internal fit-content that causes 0 dimensions */
+.diagram-viewer-overlay .react-transform-wrapper,
+.diagram-viewer-overlay .react-transform-component {
+  width: 100% !important;
+  height: auto !important;
+}
+
+.diagram-viewer-overlay .react-transform-component {
+  min-height: calc(100vh - 48px);
+}
+
+/* Toolbar */
+.diagram-viewer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--viewer-toolbar-bg);
+  border-bottom: 1px solid var(--viewer-border);
+  flex-shrink: 0;
+}
+
+.diagram-viewer-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.diagram-viewer-title {
+  color: var(--viewer-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  margin-right: 16px;
+}
+
+.diagram-viewer-toolbar-center {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.diagram-viewer-toolbar-right {
+  display: flex;
+  align-items: center;
+}
+
+/* Buttons */
+.diagram-viewer-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--viewer-btn-bg);
+  border: none;
+  border-radius: 4px;
+  color: var(--viewer-text-primary);
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+
+.diagram-viewer-btn:hover:not(:disabled) {
+  background: var(--viewer-btn-hover);
+}
+
+.diagram-viewer-btn:active:not(:disabled) {
+  background: var(--viewer-btn-active);
+}
+
+.diagram-viewer-btn:disabled {
+  opacity: var(--viewer-btn-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.diagram-viewer-btn:focus-visible {
+  outline: 1px solid var(--viewer-focus-border);
+  outline-offset: 1px;
+}
+
+.diagram-viewer-btn-close {
+  width: 32px;
+  height: 32px;
+}
+
+/* Zoom indicator */
+.diagram-viewer-zoom-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  padding: 4px 8px;
+  background: var(--viewer-zoom-indicator-bg);
+  border-radius: 4px;
+  color: var(--viewer-text-primary);
+  font-size: 12px;
+  font-family: monospace;
+}
+
+/* Content area - TransformComponent wrapper */
+.diagram-viewer-content {
+  width: 100% !important;
+  height: calc(100vh - 48px) !important; /* Full height minus toolbar */
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  background: var(--viewer-content-bg);
+  overflow: hidden;
+  cursor: grab;
+}
+
+.diagram-viewer-content:active {
+  cursor: grabbing;
+}
+
+/* SVG container */
+.diagram-viewer-svg-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.diagram-viewer-svg-container svg {
+  max-width: none !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+/* Expand button on MermaidDiagram */
+.mermaid-expand-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: rgba(45, 45, 48, 0.9);
+  border: 1px solid #454545;
+  border-radius: 4px;
+  color: #cccccc;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.1s ease;
+  z-index: 10;
+}
+
+.mermaid-container:hover .mermaid-expand-btn,
+.mermaid-expand-btn:focus {
+  opacity: 1;
+}
+
+.mermaid-expand-btn:hover {
+  background: rgba(60, 60, 64, 0.95);
+}
+
+.mermaid-expand-btn:focus-visible {
+  outline: 1px solid #007fd4;
+  outline-offset: 1px;
+  opacity: 1;
+}
+
+/* Always visible on touch devices */
+@media (pointer: coarse) {
+  .mermaid-expand-btn {
+    opacity: 1;
+  }
+}
+
+/* Separator in toolbar */
+.diagram-viewer-separator {
+  width: 1px;
+  height: 20px;
+  background: var(--viewer-border);
+  margin: 0 8px;
+}
+
+/* Keyboard shortcuts hint */
+.diagram-viewer-shortcuts-hint {
+  color: var(--viewer-text-secondary);
+  font-size: 11px;
+  margin-left: 12px;
+}

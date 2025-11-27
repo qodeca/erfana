@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import mermaid from 'mermaid'
-import { Bug } from 'lucide-react'
+import { Bug, Maximize2 } from 'lucide-react'
 import { executePromptTemplate } from '../../utils/panelUtils'
+import { DiagramViewer } from './DiagramViewer'
 
 interface MermaidDiagramProps {
   code: string
@@ -16,6 +17,9 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [initialized, setInitialized] = useState(false)
+  const [showViewer, setShowViewer] = useState(false)
+  const [svgContent, setSvgContent] = useState<string>('')
+  const expandButtonRef = useRef<HTMLButtonElement>(null)
 
   // Handle bug report button click
   const handleBugReport = async () => {
@@ -56,6 +60,7 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
     console.log('🔷 Mermaid: Initializing...')
     mermaid.initialize({
       startOnLoad: false,
+      securityLevel: 'strict', // Explicit security mode for XSS prevention
       theme: 'dark',
       themeVariables: {
         darkMode: true,
@@ -155,6 +160,7 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
 
         if (containerRef.current) {
           containerRef.current.innerHTML = svg
+          setSvgContent(svg)
 
           // Make SVG responsive
           const svgElement = containerRef.current.querySelector('svg')
@@ -202,6 +208,12 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
     renderDiagram()
   }, [code, initialized])
 
+  const handleExpandClick = () => {
+    if (svgContent) {
+      setShowViewer(true)
+    }
+  }
+
   return (
     <div className={`mermaid-container ${className}`}>
       {error && (
@@ -243,11 +255,29 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
       )}
 
       {!error && (
-        <div
-          ref={containerRef}
-          className="mermaid-diagram"
-          style={{ display: isLoading ? 'none' : 'flex' }}
-        />
+        <>
+          <button
+            ref={expandButtonRef}
+            className="mermaid-expand-btn"
+            onClick={handleExpandClick}
+            title="View fullscreen"
+            aria-label="Open diagram in fullscreen"
+            style={{ display: isLoading ? 'none' : 'flex' }}
+          >
+            <Maximize2 size={14} />
+          </button>
+          <div
+            ref={containerRef}
+            className="mermaid-diagram"
+            style={{ display: isLoading ? 'none' : 'flex' }}
+          />
+          <DiagramViewer
+            isOpen={showViewer}
+            onClose={() => setShowViewer(false)}
+            svgContent={svgContent}
+            title="Mermaid Diagram"
+          />
+        </>
       )}
     </div>
   )
