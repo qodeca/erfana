@@ -332,7 +332,6 @@ export function useTerminalFileLinks(
         }
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- terminalReady triggers recalculation when terminal ref is set
   }, [terminal, terminalReady, fetchCwd, validatePath, projectRoot, files, getIndex, onFileOpen, onShowPicker, onError])
 
   // Register the link provider with xterm
