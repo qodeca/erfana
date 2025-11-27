@@ -2,7 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
-- **Version**: 0.4.8
+- **Version**: 0.5.1
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -52,7 +52,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (2263 tests)
+- [Testing](docs/testing/README.md) — Workspace, coverage (2410 tests)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -64,7 +64,25 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.4.8)
+## Recent Changes (v0.5.1)
+- **Full-Screen Mermaid Diagram Viewer** (Nov 27, 2025):
+  - Expand Mermaid diagrams to full-screen overlay for detailed examination
+  - Expand button appears on hover over diagrams (always visible on touch devices)
+  - Zoom controls: mouse wheel, pinch-to-zoom, +/- buttons
+  - Pan support: click-drag to move diagram
+  - Zoom indicator displays current zoom level (e.g., "125%")
+  - Fit-to-screen and reset buttons for quick navigation
+  - Keyboard shortcuts: +/= (zoom in), - (zoom out), 0 (reset), F (fit), Escape (close)
+  - Close via X button, Escape key, or backdrop click
+  - Backdrop click protected during drag to prevent accidental close
+  - Accessibility: ARIA labels, role="dialog", aria-modal, focus management
+  - Architecture: Pure logic extraction (`diagramViewer.logic.ts`) for testability
+  - Uses `react-zoom-pan-pinch` v3.7.0 for smooth zoom/pan interactions
+  - Files: `src/renderer/src/components/Editor/DiagramViewer/`
+  - 117 new tests (77 logic + 40 component)
+  - Closes #30
+
+## Changes in v0.5.0 (was v0.4.8)
 - **Smart Terminal File Links** (Nov 27, 2025):
   - Clickable file path links in terminal output with line:column support
   - Base feature: Detects absolute, relative, project-relative paths

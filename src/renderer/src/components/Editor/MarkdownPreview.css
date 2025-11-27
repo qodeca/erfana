@@ -369,6 +369,7 @@
 
 /* Mermaid Diagrams */
 .mermaid-container {
+  position: relative;
   margin: 24px 0;
 }
 
