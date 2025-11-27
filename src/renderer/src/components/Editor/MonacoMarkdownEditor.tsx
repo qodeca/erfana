@@ -34,6 +34,14 @@ export interface MonacoEditorHandle {
   getScrollTop: () => number
   setScrollTop: (offset: number) => void
   getTopForLineNumber: (line: number) => number
+
+  /**
+   * Set cursor position and reveal line in center of editor.
+   * Used by terminal file links to open files at specific locations.
+   * @param line 1-based line number
+   * @param column 1-based column (default: 1)
+   */
+  setPositionAndReveal: (line: number, column?: number) => void
 }
 
 export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdownEditorProps>(
@@ -257,6 +265,29 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
       return editor.getTopForLineNumber(line)
     }
 
+    const setPositionAndReveal = (line: number, column: number = 1): void => {
+      const editor = editorRef.current
+      if (!editor) return
+
+      // Ensure line and column are valid (1-based)
+      const model = editor.getModel()
+      if (!model) return
+
+      const lineCount = model.getLineCount()
+      const safeLine = Math.max(1, Math.min(line, lineCount))
+      const lineContent = model.getLineContent(safeLine)
+      const safeColumn = Math.max(1, Math.min(column, lineContent.length + 1))
+
+      // Set cursor position
+      editor.setPosition({ lineNumber: safeLine, column: safeColumn })
+
+      // Reveal line in center of viewport
+      editor.revealLineInCenter(safeLine)
+
+      // Focus the editor
+      editor.focus()
+    }
+
     const getEditor = (): monaco.editor.IStandaloneCodeEditor | null => {
       return editorRef.current
     }
@@ -280,7 +311,8 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
       // Scroll synchronization methods
       getScrollTop,
       setScrollTop,
-      getTopForLineNumber
+      getTopForLineNumber,
+      setPositionAndReveal
     }))
 
     return (

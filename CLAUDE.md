@@ -2,7 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
-- **Version**: 0.4.7
+- **Version**: 0.4.8
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -52,7 +52,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (1923 tests)
+- [Testing](docs/testing/README.md) — Workspace, coverage (2189 tests)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -64,7 +64,25 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.4.7)
+## Recent Changes (v0.4.8)
+- **Smart Terminal File Links** (Nov 27, 2025):
+  - Clickable file path links in terminal output with line:column support
+  - Base feature: Detects absolute, relative, project-relative paths
+  - Supports line:column notation (:42:10, (15,3))
+  - Path validation with LRU cache (100 entries, 30s TTL)
+  - Smart resolution: Falls back to filename search when exact path not found
+  - FilePickerDialog: VS Code-style disambiguation when multiple files match
+  - Keyboard navigation (Arrow Up/Down, Enter to select, Escape to cancel)
+  - Architecture: Pure logic extraction pattern for testability
+    - `filenameIndex.ts`: Map-based O(1) filename lookup
+    - `pathScoring.ts`: Candidate ranking algorithm
+    - `smartPathResolver.logic.ts`: Resolution orchestration
+    - `useFilenameIndex.ts`: Lazy index management hook
+    - `FilePickerDialog.tsx`: Disambiguation UI component
+  - 138 new tests for smart resolution feature
+  - Closes #26
+
+## Changes in v0.4.7
 - **Terminal Clipboard Support** (Nov 27, 2025):
   - Copy/paste operations in terminal panel via keyboard shortcuts and context menu
   - Smart Ctrl/Cmd+C: copies text when selected, sends SIGINT when no selection

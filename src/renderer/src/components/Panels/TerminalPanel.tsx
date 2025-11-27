@@ -12,10 +12,16 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { useTerminalStore } from '../../stores/useTerminalStore'
+import { useProjectStore } from '../../stores/useProjectStore'
 import { showGlobalToast } from '../Toast/toastService'
 import { useScrollAnomalyRecovery } from '../../hooks/useScrollAnomalyRecovery'
 import { useTerminalClipboard } from '../../hooks/useTerminalClipboard'
+import { useTerminalFileLinks } from '../../hooks/useTerminalFileLinks'
+import { useFilePicker } from '../../hooks/useFilePicker'
+import { useProjectManagementContextSafe } from '../../context/ProjectManagementContext'
 import { TerminalContextMenu } from '../ContextMenu/TerminalContextMenu'
+import { FilePickerDialog } from '../Dialog/FilePickerDialog'
+import { sanitizeFilePath } from '../../utils/fileUtils'
 import '@xterm/xterm/css/xterm.css'
 import './TerminalPanel.css'
 import { isElementVisible } from '../../utils/domUtils'
@@ -34,9 +40,13 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const pendingInitRef = useRef<boolean>(false)
   const visibilityObserverRef = useRef<ResizeObserver | null>(null)
   const warmupUntilRef = useRef<number>(0)
+  const [projectPath, setProjectPath] = useState<string | null>(null)
 
   // Terminal store for cross-component communication
   const setActiveTerminalId = useTerminalStore((state) => state.setActiveTerminalId)
+
+  // Project store for file opening functionality (issue #26)
+  const dockviewApi = useProjectStore((state) => state.dockviewApi)
 
   // Auto-recovery for Claude Code scroll anomalies (issue #12)
   // Detects unexpected scroll-to-top during streaming and auto-recovers
@@ -58,10 +68,97 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   })
 
+  // Get project files for smart path resolution (issue #26 enhancement)
+  // Use safe version to gracefully degrade in tests without provider
+  const projectContext = useProjectManagementContextSafe()
+  const files = projectContext?.files ?? []
+
+  // File picker for disambiguation when multiple files match (issue #26 enhancement)
+  const { showPicker, pickerProps } = useFilePicker({ projectRoot: projectPath })
+
+  // File path link support (issue #26)
+  // Handler to open files from terminal links
+  const handleFileOpen = useCallback((filePath: string, line?: number, column?: number) => {
+    if (!dockviewApi) {
+      console.warn('Cannot open file: dockviewApi not available')
+      showGlobalToast({
+        type: 'warning',
+        title: 'Editor Not Ready',
+        message: 'Cannot open file - editor not available'
+      })
+      return
+    }
+
+    // Create panel ID from file path (sanitize for use as ID)
+    const panelId = `editor-${sanitizeFilePath(filePath)}`
+
+    // Check if panel already exists
+    const existingPanel = dockviewApi.getPanel(panelId)
+    if (existingPanel) {
+      existingPanel.api.setActive()
+      // TODO: Set cursor position after panel is active (requires editor API enhancement)
+      // For now, just activate the existing panel
+      console.log(`Activated existing panel for ${filePath}`, { line, column })
+      return
+    }
+
+    // Create new editor panel
+    const fileName = filePath.split('/').pop() || 'Untitled'
+    const editorPanel = dockviewApi.addPanel({
+      id: panelId,
+      component: 'editor',
+      title: fileName,
+      tabComponent: 'editorTab',
+      params: {
+        filePath: filePath,
+        panelId,
+        initialLine: line,
+        initialColumn: column
+      }
+    })
+
+    // Register the panel and activate it
+    useProjectStore.getState().registerEditorPanel(panelId)
+    editorPanel.api.setActive()
+    editorPanel.group.focus()
+
+    console.log(`Opened new panel for ${filePath}`, { line, column })
+  }, [dockviewApi])
+
+  // Terminal file links hook - enables clickable file paths with smart resolution
+  useTerminalFileLinks({
+    terminal: xtermRef.current,
+    terminalId: terminalId,
+    projectRoot: projectPath,
+    files: files,
+    onFileOpen: handleFileOpen,
+    onShowPicker: showPicker,
+    onError: (error) => {
+      console.warn('Terminal file link error:', error)
+    }
+  })
+
   // Keep ref in sync with state for cleanup
   useEffect(() => {
     terminalIdRef.current = terminalId
   }, [terminalId])
+
+  // Fetch project path on mount and update when project changes
+  useEffect(() => {
+    const fetchProjectPath = async () => {
+      const path = await window.api.file.getProjectPath()
+      setProjectPath(path)
+    }
+    fetchProjectPath()
+
+    // Subscribe to project changes
+    const unsubscribe = window.api.file.onProjectChanged(async () => {
+      const path = await window.api.file.getProjectPath()
+      setProjectPath(path)
+    })
+
+    return unsubscribe
+  }, [])
 
   async function checkAvailability() {
     try {
@@ -542,6 +639,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           onClose={handleCloseContextMenu}
         />
       )}
+      {/* File picker dialog for smart path resolution disambiguation */}
+      <FilePickerDialog {...pickerProps} />
     </div>
   )
 }

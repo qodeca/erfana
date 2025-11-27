@@ -50,6 +50,12 @@ const api = {
       ipcRenderer.invoke('file:copyItem', sourcePath, targetParentPath, newName),
     checkConflict: (targetParentPath: string, itemName: string): Promise<boolean> =>
       ipcRenderer.invoke('file:checkConflict', targetParentPath, itemName),
+    validatePath: (filePath: string, projectRoot?: string): Promise<{
+      exists: boolean
+      absolutePath?: string
+      isFile?: boolean
+      error?: string
+    }> => ipcRenderer.invoke('file:validatePath', filePath, projectRoot),
 
     // Project change event listener
     onProjectChanged: (callback: (data: ProjectChanged) => void) => {

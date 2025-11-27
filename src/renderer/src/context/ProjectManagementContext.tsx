@@ -82,6 +82,14 @@ export function useProjectManagementContext(): IUseProjectManagementReturn {
 }
 
 /**
+ * Safe version that returns null if outside provider.
+ * Use for optional features that should degrade gracefully.
+ */
+export function useProjectManagementContextSafe(): IUseProjectManagementReturn | null {
+  return useContext(ProjectManagementContext)
+}
+
+/**
  * Focused hook for components that only need to open projects (ISP).
  * Use this in components like WelcomePanel that only need handleOpenProjectByPath.
  *

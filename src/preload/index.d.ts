@@ -22,6 +22,12 @@ declare global {
         moveItem: (sourcePath: string, targetParentPath: string, newName?: string) => Promise<{ path: string; isSymlink?: boolean }>
         copyItem: (sourcePath: string, targetParentPath: string, newName?: string) => Promise<{ path: string; isSymlink?: boolean }>
         checkConflict: (targetParentPath: string, itemName: string) => Promise<boolean>
+        validatePath: (filePath: string, projectRoot?: string) => Promise<{
+          exists: boolean
+          absolutePath?: string
+          isFile?: boolean
+          error?: string
+        }>
         onProjectChanged: (
           callback: (data: { oldPath: string | null; newPath: string | null }) => void
         ) => () => void
