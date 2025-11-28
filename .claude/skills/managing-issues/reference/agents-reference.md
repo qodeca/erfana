@@ -14,6 +14,14 @@ All agents are embedded in `agents/` directory with full input/output contracts.
 |-------|---------|
 | draft-issue | Draft GitHub issues following templates |
 
+### Review Operation Agents
+
+| Agent | Purpose |
+|-------|---------|
+| review-standalone | Orchestrate standalone code reviews by scope and level |
+
+*Note: Review operation also reuses Implement agents (review-architecture, review-code, audit-security) for deep analysis.*
+
 ### Implement Operation Agents (Core Workflow)
 
 | Agent | Phase | Purpose |
@@ -43,44 +51,65 @@ All agents are embedded in `agents/` directory with full input/output contracts.
 ## Agent Selection Decision Tree
 
 ```
-Start: What phase are you in?
+Start: What operation are you in?
 │
-├── Phase 1: Business Analysis
-│   └── analyze-requirements
+├── Create Operation
+│   └── draft-issue
 │
-├── Phase 2: Discovery
-│   └── explore-codebase
+├── Review Operation
+│   │
+│   ├── Quick Level
+│   │   └── review-standalone (security, anti-patterns)
+│   │
+│   ├── Standard Level
+│   │   ├── review-standalone (orchestrator)
+│   │   ├── review-code (quality)
+│   │   └── audit-security (security)
+│   │
+│   └── Deep Level
+│       ├── review-standalone (orchestrator)
+│       ├── review-architecture (SOLID)
+│       ├── review-code (quality)
+│       └── audit-security (OWASP)
 │
-├── Phase 3: Architecture
-│   └── design-solution
-│
-├── Phase 4: Implementation
-│   ├── Code → implement-code
-│   └── Tests → write-tests
-│
-├── Phase 5: Architectural Review
-│   └── review-architecture
-│
-├── Phase 6: Security
-│   └── audit-security
-│
-├── Phase 7: Quality Review
-│   └── review-code
-│
-├── Phase 8: Verification
-│   └── design-solution (verify mode)
-│
-├── Phase 9: Documentation
-│   └── update-docs
-│
-├── Phase 10: UAT
-│   └── (manual user testing)
-│
-├── Phase 11: Finalization
-│   └── summarize-diff
-│
-└── Phase 12: Release
-    └── prepare-release
+└── Implement Operation: What phase are you in?
+    │
+    ├── Phase 1: Business Analysis
+    │   └── analyze-requirements
+    │
+    ├── Phase 2: Discovery
+    │   └── explore-codebase
+    │
+    ├── Phase 3: Architecture
+    │   └── design-solution
+    │
+    ├── Phase 4: Implementation
+    │   ├── Code → implement-code
+    │   └── Tests → write-tests
+    │
+    ├── Phase 5: Architectural Review
+    │   └── review-architecture
+    │
+    ├── Phase 6: Security
+    │   └── audit-security
+    │
+    ├── Phase 7: Quality Review
+    │   └── review-code
+    │
+    ├── Phase 8: Verification
+    │   └── design-solution (verify mode)
+    │
+    ├── Phase 9: Documentation
+    │   └── update-docs
+    │
+    ├── Phase 10: UAT
+    │   └── (manual user testing)
+    │
+    ├── Phase 11: Finalization
+    │   └── summarize-diff
+    │
+    └── Phase 12: Release
+        └── prepare-release
 ```
 
 ### By Issue Label
@@ -121,6 +150,40 @@ Start: What phase are you in?
 - NEVER include file paths or line numbers
 - ALWAYS use checkbox format for criteria
 - Focus on behavior, not implementation
+
+---
+
+### review-standalone
+
+**Operation:** Review
+**File:** `agents/review-standalone.md`
+
+**Modes (by level):**
+- `quick`: Security and anti-patterns only
+- `standard`: + Code quality, basic SOLID, testing
+- `deep`: + All SOLID, coupling, cohesion, performance, documentation
+
+**Inputs:**
+- scope (file, component, module, feature, pr, codebase)
+- level (quick, standard, deep)
+- target_files, dimensions
+
+**Outputs:**
+- review_status, scope, level, files_reviewed, findings, summary, recommendations
+
+**Use When:**
+- Standalone code review (not tied to issue)
+- PR review before merge
+- Component/module quality check
+- Architecture assessment
+- Security audit
+
+**Key Features:**
+- ALWAYS asks for scope and level
+- Supports 6 review scopes
+- 3 review levels with increasing depth
+- 10 review dimensions
+- Categorizes findings by severity (critical/high/medium/low)
 
 ---
 
