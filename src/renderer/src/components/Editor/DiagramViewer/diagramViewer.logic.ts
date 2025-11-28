@@ -89,3 +89,91 @@ export function calculateFitScale(
   // Use the smaller scale to fit entire diagram, but cap at 1 (don't upscale)
   return Math.min(scaleX, scaleY, 1)
 }
+
+// ============================================================================
+// ViewBox-based zoom functions (fixes pixelation issue #31)
+// ============================================================================
+
+export interface ViewBox {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** Parse SVG viewBox attribute string to object */
+export function parseViewBox(viewBoxAttr: string | null): ViewBox | null {
+  if (!viewBoxAttr || typeof viewBoxAttr !== 'string') {
+    return null
+  }
+
+  const parts = viewBoxAttr.trim().split(/[\s,]+/)
+  if (parts.length !== 4) {
+    return null
+  }
+
+  const [x, y, width, height] = parts.map(Number)
+
+  // Validate all values are finite numbers
+  if ([x, y, width, height].some(v => !Number.isFinite(v))) {
+    return null
+  }
+
+  // Width and height must be positive
+  if (width <= 0 || height <= 0) {
+    return null
+  }
+
+  return { x, y, width, height }
+}
+
+/** Create viewBox from SVG dimensions when viewBox attribute is missing */
+export function createViewBoxFromDimensions(width: number, height: number): ViewBox | null {
+  if (width <= 0 || height <= 0 || !Number.isFinite(width) || !Number.isFinite(height)) {
+    return null
+  }
+  return { x: 0, y: 0, width, height }
+}
+
+/** Calculate new viewBox based on scale and pan offset */
+export function calculateViewBox(
+  original: ViewBox,
+  scale: number,
+  panX: number,
+  panY: number
+): ViewBox {
+  // Clamp scale to avoid division issues
+  const safeScale = Math.max(scale, 0.01)
+
+  const newWidth = original.width / safeScale
+  const newHeight = original.height / safeScale
+
+  // Center the scaled view, then apply pan
+  // Pan is in viewBox units, positive panX moves content left (viewBox x decreases)
+  const centerOffsetX = (original.width - newWidth) / 2
+  const centerOffsetY = (original.height - newHeight) / 2
+
+  return {
+    x: original.x + centerOffsetX - panX,
+    y: original.y + centerOffsetY - panY,
+    width: newWidth,
+    height: newHeight
+  }
+}
+
+/** Format viewBox object to SVG attribute string */
+export function formatViewBox(viewBox: ViewBox): string {
+  return `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`
+}
+
+/** Convert pixel delta to viewBox units for panning */
+export function pixelToViewBoxDelta(
+  pixelDelta: number,
+  viewportSize: number,
+  viewBoxSize: number
+): number {
+  if (viewportSize <= 0) {
+    return 0
+  }
+  return pixelDelta * (viewBoxSize / viewportSize)
+}

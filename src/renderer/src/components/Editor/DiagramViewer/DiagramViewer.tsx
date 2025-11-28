@@ -18,8 +18,13 @@ interface DiagramViewerProps {
 
 interface Transform {
   scale: number
-  translateX: number
-  translateY: number
+  translateX: number // Pan offset in pixels
+  translateY: number // Pan offset in pixels
+}
+
+interface SvgDimensions {
+  width: number
+  height: number
 }
 
 export function DiagramViewer({ isOpen, onClose, svgContent, title }: DiagramViewerProps) {
@@ -35,6 +40,7 @@ export function DiagramViewer({ isOpen, onClose, svgContent, title }: DiagramVie
     translateX: 0,
     translateY: 0
   })
+  const [svgDimensions, setSvgDimensions] = useState<SvgDimensions | null>(null)
 
   // Inject SVG content exactly like MermaidDiagram does - via innerHTML
   // SECURITY: svgContent must be pre-sanitized. This component trusts that the
@@ -45,12 +51,33 @@ export function DiagramViewer({ isOpen, onClose, svgContent, title }: DiagramVie
 
     svgContainerRef.current.innerHTML = svgContent
 
-    // Make SVG fill the container
+    // Capture original dimensions and set up SVG for scaling
     const svgElement = svgContainerRef.current.querySelector('svg')
     if (svgElement) {
       svgElement.style.display = 'block'
       svgElement.style.maxWidth = 'none'
       svgElement.style.maxHeight = 'none'
+
+      // Get original dimensions from viewBox or attributes
+      const viewBox = svgElement.viewBox?.baseVal
+      let width: number
+      let height: number
+
+      if (viewBox && viewBox.width > 0 && viewBox.height > 0) {
+        width = viewBox.width
+        height = viewBox.height
+      } else {
+        // Fallback to width/height attributes or computed size
+        width = svgElement.width?.baseVal?.value || svgElement.getBoundingClientRect().width
+        height = svgElement.height?.baseVal?.value || svgElement.getBoundingClientRect().height
+      }
+
+      if (width > 0 && height > 0) {
+        // Set explicit dimensions so we can scale them
+        svgElement.setAttribute('width', String(width))
+        svgElement.setAttribute('height', String(height))
+        setSvgDimensions({ width, height })
+      }
     }
   }, [isOpen, svgContent])
 
@@ -257,6 +284,22 @@ export function DiagramViewer({ isOpen, onClose, svgContent, title }: DiagramVie
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, onClose, handleZoomIn, handleZoomOut, handleReset, handleFitToView])
 
+  // Apply dimension-based zoom (fixes pixelation - issue #31)
+  // Scales SVG width/height for native vector rendering at any size
+  useEffect(() => {
+    if (!isOpen || !svgContainerRef.current || !svgDimensions) return
+
+    const svgElement = svgContainerRef.current.querySelector('svg')
+    if (!svgElement) return
+
+    // Scale the SVG's display size - browser renders at this size natively
+    const scaledWidth = svgDimensions.width * transform.scale
+    const scaledHeight = svgDimensions.height * transform.scale
+
+    svgElement.setAttribute('width', String(scaledWidth))
+    svgElement.setAttribute('height', String(scaledHeight))
+  }, [isOpen, svgDimensions, transform.scale])
+
   if (!isOpen) return null
 
   const portalRoot = document.getElementById('portal-root')
@@ -345,7 +388,7 @@ export function DiagramViewer({ isOpen, onClose, svgContent, title }: DiagramVie
         </div>
       </div>
 
-      {/* SVG Content with CSS Transform */}
+      {/* SVG Content with dimension-based zoom (fixes pixelation - issue #31) */}
       {/* Cursor is managed via document.body.style.cursor in handleMouseDown/handleMouseUp */}
       <div
         ref={containerRef}
@@ -356,8 +399,7 @@ export function DiagramViewer({ isOpen, onClose, svgContent, title }: DiagramVie
           ref={svgContainerRef}
           className="diagram-viewer-svg-container"
           style={{
-            transform: `translate(${transform.translateX}px, ${transform.translateY}px) scale(${transform.scale})`,
-            transformOrigin: 'center center'
+            transform: `translate(${transform.translateX}px, ${transform.translateY}px)`
           }}
         />
       </div>

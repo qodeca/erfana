@@ -138,13 +138,11 @@
   cursor: grabbing;
 }
 
-/* SVG container with CSS transforms */
+/* SVG container - viewBox-based zoom (no CSS transforms needed) */
 .diagram-viewer-svg-container {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: none; /* No transition for smooth dragging */
-  will-change: transform;
 }
 
 .diagram-viewer-svg-container svg {

@@ -18,8 +18,14 @@ import {
   clampScale,
   getZoomButtonStates,
   calculateFitScale,
+  parseViewBox,
+  createViewBoxFromDimensions,
+  calculateViewBox,
+  formatViewBox,
+  pixelToViewBoxDelta,
   ZOOM_CONFIG,
-  type KeyEventInfo
+  type KeyEventInfo,
+  type ViewBox
 } from './diagramViewer.logic'
 
 describe('diagramViewer.logic', () => {
@@ -453,6 +459,264 @@ describe('diagramViewer.logic', () => {
 
     it('has MAX_SCALE greater than INITIAL_SCALE', () => {
       expect(ZOOM_CONFIG.MAX_SCALE).toBeGreaterThan(ZOOM_CONFIG.INITIAL_SCALE)
+    })
+  })
+
+  // ============================================================================
+  // ViewBox-based zoom tests (issue #31 fix)
+  // ============================================================================
+
+  describe('parseViewBox()', () => {
+    it('parses valid viewBox with spaces', () => {
+      const result = parseViewBox('0 0 100 200')
+      expect(result).toEqual({ x: 0, y: 0, width: 100, height: 200 })
+    })
+
+    it('parses viewBox with negative values', () => {
+      const result = parseViewBox('-50 -100 200 300')
+      expect(result).toEqual({ x: -50, y: -100, width: 200, height: 300 })
+    })
+
+    it('parses viewBox with comma separators', () => {
+      const result = parseViewBox('0,0,100,200')
+      expect(result).toEqual({ x: 0, y: 0, width: 100, height: 200 })
+    })
+
+    it('parses viewBox with mixed separators', () => {
+      const result = parseViewBox('0, 0, 100 200')
+      expect(result).toEqual({ x: 0, y: 0, width: 100, height: 200 })
+    })
+
+    it('parses viewBox with decimal values', () => {
+      const result = parseViewBox('0.5 1.5 100.25 200.75')
+      expect(result).toEqual({ x: 0.5, y: 1.5, width: 100.25, height: 200.75 })
+    })
+
+    it('trims whitespace', () => {
+      const result = parseViewBox('  0 0 100 200  ')
+      expect(result).toEqual({ x: 0, y: 0, width: 100, height: 200 })
+    })
+
+    it('returns null for null input', () => {
+      expect(parseViewBox(null)).toBeNull()
+    })
+
+    it('returns null for empty string', () => {
+      expect(parseViewBox('')).toBeNull()
+    })
+
+    it('returns null for too few values', () => {
+      expect(parseViewBox('0 0 100')).toBeNull()
+    })
+
+    it('returns null for too many values', () => {
+      expect(parseViewBox('0 0 100 200 300')).toBeNull()
+    })
+
+    it('returns null for non-numeric values', () => {
+      expect(parseViewBox('a b c d')).toBeNull()
+    })
+
+    it('returns null for zero width', () => {
+      expect(parseViewBox('0 0 0 200')).toBeNull()
+    })
+
+    it('returns null for zero height', () => {
+      expect(parseViewBox('0 0 100 0')).toBeNull()
+    })
+
+    it('returns null for negative width', () => {
+      expect(parseViewBox('0 0 -100 200')).toBeNull()
+    })
+
+    it('returns null for negative height', () => {
+      expect(parseViewBox('0 0 100 -200')).toBeNull()
+    })
+
+    it('returns null for Infinity values', () => {
+      expect(parseViewBox('0 0 Infinity 200')).toBeNull()
+    })
+
+    it('returns null for NaN values', () => {
+      expect(parseViewBox('0 0 NaN 200')).toBeNull()
+    })
+  })
+
+  describe('createViewBoxFromDimensions()', () => {
+    it('creates viewBox from positive dimensions', () => {
+      const result = createViewBoxFromDimensions(800, 600)
+      expect(result).toEqual({ x: 0, y: 0, width: 800, height: 600 })
+    })
+
+    it('creates viewBox from decimal dimensions', () => {
+      const result = createViewBoxFromDimensions(100.5, 200.75)
+      expect(result).toEqual({ x: 0, y: 0, width: 100.5, height: 200.75 })
+    })
+
+    it('returns null for zero width', () => {
+      expect(createViewBoxFromDimensions(0, 600)).toBeNull()
+    })
+
+    it('returns null for zero height', () => {
+      expect(createViewBoxFromDimensions(800, 0)).toBeNull()
+    })
+
+    it('returns null for negative width', () => {
+      expect(createViewBoxFromDimensions(-800, 600)).toBeNull()
+    })
+
+    it('returns null for negative height', () => {
+      expect(createViewBoxFromDimensions(800, -600)).toBeNull()
+    })
+
+    it('returns null for Infinity width', () => {
+      expect(createViewBoxFromDimensions(Infinity, 600)).toBeNull()
+    })
+
+    it('returns null for NaN height', () => {
+      expect(createViewBoxFromDimensions(800, NaN)).toBeNull()
+    })
+  })
+
+  describe('calculateViewBox()', () => {
+    const original: ViewBox = { x: 0, y: 0, width: 100, height: 100 }
+
+    it('returns original viewBox at scale 1 with no pan', () => {
+      const result = calculateViewBox(original, 1, 0, 0)
+      expect(result).toEqual({ x: 0, y: 0, width: 100, height: 100 })
+    })
+
+    it('zooms in (scale 2) - smaller viewBox centered', () => {
+      const result = calculateViewBox(original, 2, 0, 0)
+      expect(result).toEqual({ x: 25, y: 25, width: 50, height: 50 })
+    })
+
+    it('zooms out (scale 0.5) - larger viewBox centered', () => {
+      const result = calculateViewBox(original, 0.5, 0, 0)
+      expect(result).toEqual({ x: -50, y: -50, width: 200, height: 200 })
+    })
+
+    it('pans right (positive panX moves view left, viewBox x decreases)', () => {
+      const result = calculateViewBox(original, 1, 10, 0)
+      expect(result).toEqual({ x: -10, y: 0, width: 100, height: 100 })
+    })
+
+    it('pans left (negative panX moves view right, viewBox x increases)', () => {
+      const result = calculateViewBox(original, 1, -10, 0)
+      expect(result).toEqual({ x: 10, y: 0, width: 100, height: 100 })
+    })
+
+    it('pans down (positive panY moves view up, viewBox y decreases)', () => {
+      const result = calculateViewBox(original, 1, 0, 10)
+      expect(result).toEqual({ x: 0, y: -10, width: 100, height: 100 })
+    })
+
+    it('pans up (negative panY moves view down, viewBox y increases)', () => {
+      const result = calculateViewBox(original, 1, 0, -10)
+      expect(result).toEqual({ x: 0, y: 10, width: 100, height: 100 })
+    })
+
+    it('combines zoom and pan', () => {
+      // Scale 2 centers at (25, 25) with size (50, 50)
+      // Pan (10, 5) shifts viewBox by (-10, -5)
+      const result = calculateViewBox(original, 2, 10, 5)
+      expect(result).toEqual({ x: 15, y: 20, width: 50, height: 50 })
+    })
+
+    it('handles non-zero original x and y', () => {
+      const offsetOriginal: ViewBox = { x: 10, y: 20, width: 100, height: 100 }
+      const result = calculateViewBox(offsetOriginal, 2, 0, 0)
+      expect(result).toEqual({ x: 35, y: 45, width: 50, height: 50 })
+    })
+
+    it('clamps very small scale to 0.01 to avoid division issues', () => {
+      const result = calculateViewBox(original, 0.001, 0, 0)
+      // scale clamped to 0.01: width = 100/0.01 = 10000
+      expect(result.width).toBe(10000)
+      expect(result.height).toBe(10000)
+    })
+
+    it('handles scale of 0 by clamping to 0.01', () => {
+      const result = calculateViewBox(original, 0, 0, 0)
+      expect(result.width).toBe(10000) // 100/0.01
+      expect(result.height).toBe(10000)
+    })
+
+    it('handles negative scale by clamping to 0.01', () => {
+      const result = calculateViewBox(original, -1, 0, 0)
+      expect(result.width).toBe(10000) // 100/0.01
+    })
+
+    it('handles rectangular viewBox (width != height)', () => {
+      const rectangular: ViewBox = { x: 0, y: 0, width: 200, height: 100 }
+      const result = calculateViewBox(rectangular, 2, 0, 0)
+      // width: 200/2 = 100, height: 100/2 = 50
+      // centerOffsetX: (200-100)/2 = 50, centerOffsetY: (100-50)/2 = 25
+      expect(result).toEqual({ x: 50, y: 25, width: 100, height: 50 })
+    })
+  })
+
+  describe('formatViewBox()', () => {
+    it('formats viewBox with integers', () => {
+      const viewBox: ViewBox = { x: 0, y: 0, width: 100, height: 200 }
+      expect(formatViewBox(viewBox)).toBe('0 0 100 200')
+    })
+
+    it('formats viewBox with decimals', () => {
+      const viewBox: ViewBox = { x: 0.5, y: 1.5, width: 100.25, height: 200.75 }
+      expect(formatViewBox(viewBox)).toBe('0.5 1.5 100.25 200.75')
+    })
+
+    it('formats viewBox with negative values', () => {
+      const viewBox: ViewBox = { x: -50, y: -100, width: 200, height: 300 }
+      expect(formatViewBox(viewBox)).toBe('-50 -100 200 300')
+    })
+
+    it('formats viewBox with very small values', () => {
+      const viewBox: ViewBox = { x: 0.001, y: 0.002, width: 0.003, height: 0.004 }
+      expect(formatViewBox(viewBox)).toBe('0.001 0.002 0.003 0.004')
+    })
+  })
+
+  describe('pixelToViewBoxDelta()', () => {
+    it('converts pixel delta to viewBox units', () => {
+      // 10px in 100px viewport with 50 viewBox units = 5 viewBox units
+      expect(pixelToViewBoxDelta(10, 100, 50)).toBe(5)
+    })
+
+    it('returns 0 for zero pixel delta', () => {
+      expect(pixelToViewBoxDelta(0, 100, 50)).toBe(0)
+    })
+
+    it('handles 1:1 ratio', () => {
+      expect(pixelToViewBoxDelta(10, 100, 100)).toBe(10)
+    })
+
+    it('handles viewBox larger than viewport', () => {
+      // 10px in 100px viewport with 200 viewBox units = 20 viewBox units
+      expect(pixelToViewBoxDelta(10, 100, 200)).toBe(20)
+    })
+
+    it('handles viewBox smaller than viewport', () => {
+      // 10px in 200px viewport with 100 viewBox units = 5 viewBox units
+      expect(pixelToViewBoxDelta(10, 200, 100)).toBe(5)
+    })
+
+    it('handles negative pixel delta', () => {
+      expect(pixelToViewBoxDelta(-10, 100, 50)).toBe(-5)
+    })
+
+    it('returns 0 for zero viewport size', () => {
+      expect(pixelToViewBoxDelta(10, 0, 50)).toBe(0)
+    })
+
+    it('returns 0 for negative viewport size', () => {
+      expect(pixelToViewBoxDelta(10, -100, 50)).toBe(0)
+    })
+
+    it('handles decimal values', () => {
+      const result = pixelToViewBoxDelta(5.5, 100, 50)
+      expect(result).toBeCloseTo(2.75)
     })
   })
 })

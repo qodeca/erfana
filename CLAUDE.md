@@ -52,7 +52,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (2410 tests, 89 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (2461 tests, 89 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -65,6 +65,15 @@ See `docs/` for details (keep Claude's context focused):
 - Lucide React for icons
 
 ## Recent Changes (v0.5.1)
+- **Fix: DiagramViewer Zoom Pixelation** (Nov 28, 2025):
+  - Fixed Mermaid diagrams becoming pixelated when zooming (issue #31)
+  - Root cause: CSS `transform: scale()` rasterizes SVG before scaling → pixelation
+  - Solution: Scale SVG's width/height attributes directly (browser renders at target size natively)
+  - Approach: Capture original dimensions → scale by zoom factor → CSS translate for panning
+  - New pure functions for viewBox parsing (kept for potential future use)
+  - Removed `will-change: transform` from CSS (no longer needed)
+  - 51 new tests for viewBox functions
+  - Closes #31
 - **Full-Screen Mermaid Diagram Viewer** (Nov 27, 2025):
   - Expand Mermaid diagrams to full-screen overlay for detailed examination
   - Expand button appears on hover over diagrams (always visible on touch devices)
@@ -76,10 +85,10 @@ See `docs/` for details (keep Claude's context focused):
   - Close via X button, Escape key, or backdrop click
   - Accessibility: ARIA labels, role="dialog", aria-modal, focus management, aria-live zoom indicator
   - Architecture: Pure logic extraction (`diagramViewer.logic.ts`) for testability
-  - Custom CSS transform-based pan/zoom (no third-party library)
+  - ViewBox-based zoom for crisp SVG scaling at any magnification level
   - SVG rendering uses same innerHTML injection as preview mode (Mermaid strict security)
   - Files: `src/renderer/src/components/Editor/DiagramViewer/`
-  - 117 new tests (77 logic + 40 component)
+  - 168 tests (128 logic + 40 component)
   - Closes #30
 
 ## Changes in v0.5.0 (was v0.4.8)
