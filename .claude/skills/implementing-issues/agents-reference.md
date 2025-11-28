@@ -1,404 +1,327 @@
 # Agent Reference Guide
 
-Quick reference for selecting and using specialized agents during issue implementation.
+Quick reference for selecting and using embedded agents during issue implementation.
+
+---
+
+## Agent Overview
+
+All agents are embedded in `agents/` directory with full input/output contracts.
+
+### Core Workflow Agents
+
+| Agent | Phase | Purpose |
+|-------|-------|---------|
+| analyze-requirements | 0.5 | Prior art research + requirements |
+| explore-codebase | 1 | Find files and patterns |
+| design-solution | 2, 6 | Plan + verify implementation |
+| implement-code | 3 | Write production code |
+| write-tests | 3 | Create comprehensive tests |
+| review-code | 5 | Pre-commit review |
+| audit-security | 4 | Security scanning |
+| update-docs | 7 | Update documentation |
+| summarize-diff | 9 | Generate commit messages |
+| prepare-release | 10 | Prepare releases |
+
+### Conditional Agents
+
+| Agent | Trigger | Purpose |
+|-------|---------|---------|
+| investigate-bug | `bug` label | Root cause analysis |
+| advise-refactor | `refactor` label | Code smell detection |
+| fix-docs | Tier 1 doc issues | Quick doc fixes |
 
 ---
 
 ## Agent Selection Decision Tree
 
 ```
-Start: What type of work?
+Start: What phase are you in?
 │
-├── Prior Art Research / Requirements?
+├── Phase 0.5: Business Analysis
 │   └── analyze-requirements
 │
-├── Discovery/Exploration?
-│   └── codebase-explorer
+├── Phase 1: Discovery
+│   └── explore-codebase
 │
-├── Planning/Design?
-│   └── solution-architect
+├── Phase 2: Architecture
+│   └── design-solution
 │
-├── Code Implementation?
-│   └── code-implementer
+├── Phase 3: Implementation
+│   ├── Code → implement-code
+│   └── Tests → write-tests
 │
-├── Testing?
-│   └── test-writer
+├── Phase 4: Security
+│   └── audit-security
 │
-├── Bug Investigation?
-│   └── bug-investigator
+├── Phase 5: Review
+│   └── review-code
 │
-├── Code Quality?
-│   ├── Pre-commit → code-reviewer
-│   └── Security → security-auditor
+├── Phase 6: Verification
+│   └── design-solution (verify mode)
 │
-├── Refactoring?
-│   └── refactoring-advisor
+├── Phase 7: Documentation
+│   └── update-docs
 │
-├── Documentation?
-│   ├── Project docs → project-documenter
-│   └── Simple fixes → docs-updater
+├── Phase 9: Finalization
+│   └── summarize-diff
 │
-├── Commit/PR?
-│   └── diff-summarizer
-│
-└── Release?
-    └── release-engineer
+└── Phase 10: Release
+    └── prepare-release
 ```
 
----
+### By Issue Label
 
-## Agent Overview
-
-### Core Agents (7)
-
-| Agent | Model | Tools | Purpose |
-|-------|-------|-------|---------|
-| `codebase-explorer` | haiku | Read, Grep, Glob, Bash | Fast codebase navigation |
-| `solution-architect` | opus | Read, Grep, Glob, WebSearch | System design and planning |
-| `code-implementer` | sonnet | Read, Write, Edit, Bash, Glob, Grep | Write production code |
-| `test-writer` | sonnet | Read, Write, Edit, Bash, Glob, Grep | Create tests |
-| `code-reviewer` | sonnet | Read, Grep, Glob | Pre-commit review |
-| `project-documenter` | sonnet | Read, Write, Edit, Glob, Grep | CLAUDE.md, architecture docs |
-| `diff-summarizer` | haiku | Read, Grep, Glob, Bash | Commit messages, PR descriptions |
-
-### Conditional Agents (6)
-
-| Agent | Model | Tools | Trigger |
-|-------|-------|-------|---------|
-| `analyze-requirements` | haiku/sonnet/opus | Read, WebSearch, AskUserQuestion, Grep, Glob | Phase 0.5 (all tiers) |
-| `bug-investigator` | sonnet | Read, Grep, Glob, Bash | `bug` label |
-| `refactoring-advisor` | sonnet | Read, Grep, Glob | `refactor` label |
-| `security-auditor` | opus | Read, Grep, Glob | Tier 3, `security` label |
-| `release-engineer` | sonnet | Read, Write, Edit, Bash, Glob, Grep | Version releases |
-| `docs-updater` | haiku | Read, Write, Edit, Glob, Grep | Simple doc fixes |
+| Label | Primary Agent | Supporting |
+|-------|---------------|------------|
+| `bug` | investigate-bug | implement-code, write-tests |
+| `enhancement` | analyze-requirements | design-solution, implement-code |
+| `documentation` | fix-docs or update-docs | - |
+| `refactor` | advise-refactor | implement-code, review-code |
+| `security` | audit-security | implement-code |
 
 ---
 
-## Agent Capabilities
+## Agent Details
 
 ### analyze-requirements
 
-**Purpose**: Conduct prior art research and structured requirements gathering before codebase exploration.
+**Phase:** 0.5 (Business Analysis)
+**File:** `agents/analyze-requirements.md`
 
-**Use When**:
-- Starting Phase 0.5 (Business Analysis)
-- Need to research existing solutions/libraries
-- Requirements are unclear or incomplete
-- Acceptance criteria need validation
-- Identifying scope boundaries
+**Inputs:**
+- issue_number, issue_body, issue_labels, tier
 
-**Model Selection**:
-- Tier 1: haiku (quick research)
-- Tier 2: sonnet (focused research)
-- Tier 3: opus (comprehensive research)
+**Outputs:**
+- issue_type, research_summary, requirements, acceptance_criteria, scope_boundaries, risks
 
-**Outputs**:
-- Prior art research summary
-- Requirements clarification document
-- Validated acceptance criteria
-- Scope boundaries (in/out of scope)
-- Risk identification
-
-**Example Prompt**:
-```
-Conduct business analysis for issue #11 (Tier 2).
-
-Issue: Add Chrome-style dynamic tabs
-Labels: enhancement
-Body: "Tabs should resize dynamically, show dirty indicator, support context menu"
-
-Steps:
-1. Classify issue type
-2. Search for existing tab implementations (npm, VS Code, patterns)
-3. Present 3-5 questions about reference implementation, scope, edge cases
-4. Validate acceptance criteria completeness
-5. Document scope boundaries
-6. Return research summary with recommendation
-```
-
-**Details**: See `agents/analyze-requirements.md`
+**Use When:**
+- Starting any issue implementation
+- Requirements need clarification
+- Prior art research needed
 
 ---
 
-### codebase-explorer
+### explore-codebase
 
-**Purpose**: Fast codebase navigation, pattern search, file discovery.
+**Phase:** 1 (Discovery)
+**File:** `agents/explore-codebase.md`
 
-**Use When**:
-- Starting Discovery phase
-- Finding affected code areas
+**Inputs:**
+- issue_number, issue_summary, search_targets, research_findings
+
+**Outputs:**
+- affected_files, patterns_found, recommended_examination, structure_notes
+
+**Use When:**
+- Need to find related code
 - Understanding project structure
-- Searching for patterns or keywords
-
-**Outputs**:
-- File paths with line numbers
-- Pattern locations
-- Recommended files to examine
-
-**Example Prompt**:
-```
-Find all files related to tab management in the codebase.
-Search for components that handle file tabs, dirty indicators,
-and close functionality.
-```
+- Identifying affected areas
 
 ---
 
-### solution-architect
+### design-solution
 
-**Purpose**: System design validation and implementation planning.
+**Phase:** 2 (Architecture), 6 (Verification)
+**File:** `agents/design-solution.md`
 
-**Use When**:
-- Designing new features (Phase 2)
+**Inputs:**
+- issue_number, issue_body, acceptance_criteria, affected_files, patterns_found, tier
+
+**Outputs:**
+- implementation_plan, file_changes, test_strategy, risks, estimates, verification_criteria
+
+**Use When:**
+- Planning new features (Phase 2)
+- Verifying implementation (Phase 6)
 - Evaluating technical approaches
-- Creating implementation plans
-- Assessing risks
-
-**Outputs**:
-- Implementation plans
-- Component designs
-- Risk assessments
-- Agent assignments
-
-**Example Prompt**:
-```
-Design implementation for issue #11 (Chrome-style tabs).
-Consider: DockviewReact integration, state management, CSS approach.
-Evaluate patterns used elsewhere in the codebase.
-```
 
 ---
 
-### code-implementer
+### implement-code
 
-**Purpose**: Write production-quality code following approved plans.
+**Phase:** 3 (Implementation)
+**File:** `agents/implement-code.md`
 
-**Use When**:
-- Implementing features (Phase 3)
+**Inputs:**
+- issue_number, implementation_plan, step_number, patterns_to_follow
+
+**Outputs:**
+- files_created, files_modified, implementation_notes, typecheck_status
+
+**Use When:**
 - Writing new components
 - Modifying existing code
-- Following approved architecture
+- Following approved plan
 
-**Outputs**:
-- Production-ready code
-- Modified files
-- Typecheck verification
-
-**Example Prompt**:
-```
-Implement EditorTab component following the approved plan.
-Interface: IDockviewPanelHeaderProps<EditorTabParams>
-Include: dirty indicator, close button, context menu support.
-Follow existing patterns in src/renderer/src/components/.
-```
+**Constraints:**
+- NEVER add features not in plan
+- NEVER refactor surrounding code
+- ALWAYS verify typecheck
 
 ---
 
-### test-writer
+### write-tests
 
-**Purpose**: Create comprehensive tests with >80% coverage.
+**Phase:** 3 (Implementation)
+**File:** `agents/write-tests.md`
 
-**Use When**:
+**Inputs:**
+- issue_number, files_to_test, acceptance_criteria, test_strategy
+
+**Outputs:**
+- test_files_created, test_count, coverage_estimate, scenarios_covered
+
+**Use When:**
 - After implementation
 - During TDD
 - Improving coverage
-- Writing regression tests
 
-**Outputs**:
-- Test files
-- Coverage reports
-- Test scenarios
-
-**Example Prompt**:
-```
-Write comprehensive tests for EditorTab component.
-Cover: rendering, dirty indicator, close button, middle-click,
-context menu, drag prevention, accessibility.
-Target >80% coverage.
-```
+**Target:** >80% coverage for new code
 
 ---
 
-### code-reviewer
+### review-code
 
-**Purpose**: Code quality validation before commits.
+**Phase:** 5 (Review)
+**File:** `agents/review-code.md`
 
-**Use When**:
-- Before git commit (Phase 4)
+**Inputs:**
+- issue_number, files_changed, acceptance_criteria
+
+**Outputs:**
+- review_status, findings, critical_issues, suggestions, security_concerns
+
+**Use When:**
+- Before git commit
 - After implementation
-- Security review
-- Best practices check
-
-**Outputs**:
-- Review findings (Critical/Medium/Low)
-- Security concerns
-- Improvement suggestions
-
-**Example Prompt**:
-```
-Review changes for issue #11.
-Files: EditorTab.tsx, EditorTab.css, useTabContextMenu.tsx
-Check: security, performance, patterns, test coverage.
-```
+- Security review needed
 
 ---
 
-### project-documenter
+### audit-security
 
-**Purpose**: Maintain CLAUDE.md, architecture docs, changelogs.
+**Phase:** 4 (Security)
+**File:** `agents/audit-security.md`
 
-**Use When**:
-- After features (Phase 5)
+**Inputs:**
+- issue_number, files_changed, issue_labels, tier, ipc_handlers_modified
+
+**Outputs:**
+- audit_status, vulnerabilities, npm_audit_result, owasp_checklist, blocking_issues
+
+**Use When:**
+- All tiers (basic scan)
+- Tier 3 (full audit)
+- Security label present
+
+---
+
+### update-docs
+
+**Phase:** 7 (Documentation)
+**File:** `agents/update-docs.md`
+
+**Inputs:**
+- issue_number, issue_summary, files_changed, test_count, test_files
+
+**Outputs:**
+- files_updated, claude_md_section, test_count_updated
+
+**Use When:**
+- After features
+- Updating CLAUDE.md
 - Before releases
-- Version updates
-- Architecture changes
-
-**Outputs**:
-- Updated CLAUDE.md
-- Changelog entries
-- Architecture docs
-
-**Example Prompt**:
-```
-Update CLAUDE.md for v0.4.2 release.
-Add Chrome-style tabs feature to Recent Changes.
-Update test count to 1392.
-```
 
 ---
 
-### diff-summarizer
+### summarize-diff
 
-**Purpose**: Generate commit messages and PR descriptions.
+**Phase:** 9 (Finalization)
+**File:** `agents/summarize-diff.md`
 
-**Use When**:
-- Before finalizing commits (Phase 6)
+**Inputs:**
+- issue_number, issue_summary, commit_type
+
+**Outputs:**
+- commit_message, commit_type, commit_scope, pr_description
+
+**Use When:**
+- Before commits
 - Creating PRs
-- Writing release notes
-
-**Outputs**:
-- Conventional commit messages
-- PR descriptions
-- Change summaries
-
-**Example Prompt**:
-```
-Generate commit message for the staged changes.
-This implements Chrome-style tabs for issue #11.
-```
+- Generating changelogs
 
 ---
 
-### bug-investigator
+### prepare-release
 
-**Purpose**: Root cause analysis and fix recommendations.
+**Phase:** 10 (Release)
+**File:** `agents/prepare-release.md`
 
-**Use When**:
-- Issue has `bug` label
-- Diagnosing unexpected behavior
-- Error investigation
+**Inputs:**
+- version, previous_version, release_type
 
-**Outputs**:
-- Root cause identification
-- Execution path trace
-- Fix recommendations
+**Outputs:**
+- release_notes, version_updated, changelog_entry, tag_created, build_status
 
-**Example Prompt**:
-```
-Investigate terminal scroll jumping during streaming output.
-Symptoms: Scroll position resets to top during Claude CLI output.
-Affected: TerminalPanel.tsx, xterm.js integration.
-```
-
----
-
-### refactoring-advisor
-
-**Purpose**: Code smell detection and improvement recommendations.
-
-**Use When**:
-- Issue has `refactor` label
-- Code complexity too high
-- Technical debt cleanup
-
-**Outputs**:
-- Code smell list
-- Refactoring steps
-- Risk assessment
-
-**Example Prompt**:
-```
-Analyze ProjectTree.tsx for refactoring opportunities.
-Current: 1338 lines, high complexity.
-Recommend SOLID improvements and extractions.
-```
-
----
-
-### security-auditor
-
-**Purpose**: Deep security analysis for critical changes.
-
-**Use When**:
-- Tier 3 issues
-- `security` label present
-- Authentication/authorization changes
-- IPC handler modifications
-
-**Outputs**:
-- Security audit report
-- Vulnerability findings
-- Security checklist
-
-**Example Prompt**:
-```
-Security audit for path traversal prevention in FileService.
-Review all file operations for proper path validation.
-Check IPC handlers for input sanitization.
-```
-
----
-
-### release-engineer
-
-**Purpose**: Prepare production releases with user-friendly notes.
-
-**Use When**:
-- Preparing a release
+**Use When:**
+- Preparing production release
 - Version bumping
-- Creating release artifacts
-
-**Outputs**:
-- Release notes (v0.4.1 format)
-- Updated package.json
-- Git tag
-
-**Example Prompt**:
-```
-Prepare release v0.4.2.
-Analyze commits since v0.4.1.
-Generate release notes in release/0.4.2/ folder.
-```
+- Creating tags
 
 ---
 
-### docs-updater
+### investigate-bug
 
-**Purpose**: Quick fixes for typos and simple doc changes.
+**Conditional:** `bug` label
+**File:** `agents/investigate-bug.md`
 
-**Use When**:
-- Tier 1 documentation issues
+**Inputs:**
+- issue_number, issue_body, symptoms, reproduction_steps
+
+**Outputs:**
+- root_cause, execution_trace, affected_files, fix_recommendations
+
+**Use When:**
+- Bug investigation
+- Root cause analysis
+- Diagnosing errors
+
+---
+
+### advise-refactor
+
+**Conditional:** `refactor` label
+**File:** `agents/advise-refactor.md`
+
+**Inputs:**
+- issue_number, target_files, refactor_goals, constraints
+
+**Outputs:**
+- code_smells, refactoring_steps, patterns_to_apply, risk_assessment
+
+**Use When:**
+- Code complexity high
+- Technical debt cleanup
+- SOLID improvements
+
+---
+
+### fix-docs
+
+**Conditional:** Tier 1 documentation
+**File:** `agents/fix-docs.md`
+
+**Inputs:**
+- issue_number, file_path, fix_description, line_number
+
+**Outputs:**
+- file_updated, changes_made, lines_modified
+
+**Use When:**
 - Typo fixes
-- Minor text corrections
-
-**Outputs**:
-- Fixed documentation
-
-**Example Prompt**:
-```
-Fix typo in README.md line 42.
-"recieve" should be "receive".
-```
+- Minor corrections
+- Simple doc updates
 
 ---
 
@@ -406,146 +329,49 @@ Fix typo in README.md line 42.
 
 Agents add overhead. Skip them for:
 
-| Scenario | Reason |
+| Scenario | Action |
 |----------|--------|
-| < 10 lines of code | Direct implementation faster |
-| Simple typo fixes | Use docs-updater or edit directly |
-| Single file changes | Context already available |
-| Trivial bugs | Root cause obvious |
+| <10 lines of code | Edit directly |
+| Simple typo | Edit directly |
+| Single file change | Edit directly |
+| Obvious bug fix | Edit directly |
 
 ---
 
-## Agent Orchestration Patterns
+## Agent Invocation Pattern
 
-### Sequential (Dependencies)
+All agents follow this pattern:
 
-```
-analyze-requirements → codebase-explorer → solution-architect → code-implementer → test-writer → code-reviewer
-```
-
-Each step depends on previous output. Business analyst outputs inform discovery and architecture.
-
-### Parallel (Independent)
-
-```
-┌─ code-implementer (component A)
-│
-├─ code-implementer (component B)
-│
-└─ test-writer (test utilities)
-```
-
-Multiple agents can work simultaneously on independent parts.
-
-### Iterative (Feedback Loop)
-
-```
-code-implementer → code-reviewer → code-implementer (fixes) → code-reviewer
-```
-
-Repeat until quality standards met.
-
----
-
-## Agent Failure Handling
-
-### If Agent Fails to Complete
-
-| Agent | Failure Mode | Recovery Action |
-|-------|--------------|-----------------|
-| analyze-requirements | WebSearch fails | Document attempt, proceed with reduced findings |
-| analyze-requirements | User skips question | Re-present with "required for clarity" |
-| codebase-explorer | Search too broad | Add constraints, retry |
-| solution-architect | Plan incomplete | Manual architecture, skip to implementation |
-| code-implementer | Code not compiling | Fix errors manually, re-invoke |
-| test-writer | Tests not covering all cases | Write additional tests manually |
-| code-reviewer | Review incomplete | Manual review using checklist |
-| bug-investigator | Root cause unclear | Add logging, reproduce manually |
-
-### Retry Strategy
-
-1. **First failure**: Review agent output, refine prompt, retry once
-2. **Second failure**: Fall back to manual work for that phase
-3. **Document**: Note what failed in commit message or issue comment
-
----
-
-## Agent Invocation Examples
-
-### Phase 0.5: Business Analysis
-```
-@analyze-requirements Conduct requirements analysis for issue #11 (Tier 2).
-Issue: Add Chrome-style dynamic tabs
-Labels: enhancement
-Research: npm libraries, VS Code implementation, design patterns
-Questions: reference implementation, scope boundaries, edge cases
-```
-
-### Phase 1: Discovery
-```
-@codebase-explorer Find all files related to tab management.
-Search for DockviewReact usage and tab components.
-Use business analysis findings: recommend VS Code-style custom implementation.
-```
-
-### Phase 2: Architecture
-```
-@solution-architect Design implementation for issue #11.
-Acceptance criteria: dynamic sizing, dirty indicator, context menu.
-Review existing patterns in src/renderer/src/components/Tabs/.
-```
-
-### Phase 3: Implementation
-```
-@code-implementer Implement EditorTab.tsx following approved plan.
-Create: EditorTab.tsx, EditorTab.css
-Modify: AppDockLayout.tsx to register component.
-```
-
-### Phase 3: Testing
-```
-@test-writer Write tests for EditorTab component.
-Cover all acceptance criteria. Target >80% coverage.
-```
-
-### Phase 4: Review
-```
-@code-reviewer Review all changes for issue #11.
-Check security, performance, patterns.
-```
-
-### Phase 6: Finalization
-```
-@diff-summarizer Generate commit message.
-Type: feat, Scope: tabs, Issue: #11
+```markdown
+1. Read agent file: `agents/<agent-name>.md`
+2. Validate inputs against Input Contract
+3. Execute steps using tools (Glob, Grep, Read, Write, Edit, Bash)
+4. Validate outputs against Output Contract
+5. Check Quality Gate
+6. Return structured output
 ```
 
 ---
 
-## Agent Selection by Issue Label
+## Error Recovery
 
-| Label | Primary Agent | Supporting Agents |
-|-------|--------------|-------------------|
-| `bug` | bug-investigator | analyze-requirements, code-implementer, test-writer |
-| `enhancement` | analyze-requirements | solution-architect, code-implementer, code-reviewer |
-| `feature` | analyze-requirements | solution-architect, code-implementer, test-writer |
-| `documentation` | project-documenter or docs-updater | - |
-| `refactor` | refactoring-advisor | code-implementer, code-reviewer |
-| `security` | analyze-requirements | security-auditor, code-implementer |
-| `test` | test-writer | - |
-
-**Note:** analyze-requirements is used first (Phase 0.5) for all non-trivial issues before other agents.
+| Agent | Common Failure | Recovery |
+|-------|----------------|----------|
+| explore-codebase | No files found | Broaden search, retry |
+| design-solution | Plan incomplete | Manual architecture |
+| implement-code | Typecheck fails | Fix errors, retry |
+| write-tests | Coverage low | Add more tests |
+| review-code | Critical issues | Fix issues, re-review |
+| audit-security | Vulnerabilities | STOP, fix security |
 
 ---
 
 ## Quality Thresholds
 
-Agents should ensure:
-
 | Metric | Target |
 |--------|--------|
-| Test coverage (new code) | > 80% |
+| Test coverage (new code) | >80% |
 | TypeScript strict | No errors |
 | ESLint | No errors |
 | Critical review issues | 0 before commit |
-| Medium review issues | Document if deferring |
+| Security vulnerabilities | 0 high/critical |

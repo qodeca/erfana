@@ -33,7 +33,7 @@ Security is not optional. Every change, regardless of tier, must pass security c
 ## Additional Security Review (Tier 3)
 
 For Tier 3 issues, also complete:
-- [ ] Full `security-auditor` agent review
+- [ ] Full `audit-security` agent review
 - [ ] OWASP Top 10 verification
 - [ ] Path traversal protection verified
 - [ ] IPC handlers validate all input

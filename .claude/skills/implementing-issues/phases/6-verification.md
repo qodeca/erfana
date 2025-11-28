@@ -1,7 +1,7 @@
 # Phase 6: Implementation Verification
 
 **Goal:** Verify implementation matches approved plan before marking as complete.
-**Agent:** `solution-architect`
+**Agent:** `design-solution`
 **Skip for:** Tier 1 (trivial changes)
 
 Implementation is NOT complete until architect verifies conformance. This is part of the **Definition of Done**.
@@ -10,39 +10,32 @@ Implementation is NOT complete until architect verifies conformance. This is par
 
 1. **Invoke Architect for Verification**
 
-   After code review passes and all tests pass, verify implementation integrity:
+   After code review passes and all tests pass, use `design-solution` in verification mode:
 
-   ```
-   Task(subagent_type='solution-architect')
+   Follow the agent steps (see `agents/design-solution.md`):
 
-   Prompt: "Verify implementation for issue #<number> against approved plan:
+   1. Read implemented files
+   2. Compare against approved plan
+   3. Check acceptance criteria coverage
+   4. Verify codebase patterns followed
+   5. Assess test coverage
+   6. Report [VERIFIED / NEEDS CORRECTION]
 
-   Approved plan summary:
-   <include key points from the approved implementation plan>
-
-   Implemented changes:
-   <list of files changed/created>
-
-   Verification criteria:
+   **Verification criteria:**
    - Plan conformance: Does the implementation match the approved design?
    - Acceptance criteria: All requirements from issue implemented?
    - Patterns: Codebase conventions and architecture followed?
    - Test coverage: All changes adequately tested?
    - Technical debt: Any shortcuts or deviations introduced?
 
-   Report: [VERIFIED / NEEDS CORRECTION]
-
-   If NEEDS CORRECTION, provide specific issues to address."
-   ```
-
 2. **Correction Loop (mandatory)**
 
    ```
    IF architect reports NEEDS CORRECTION:
-     1. Re-invoke code-implementer to address specific issues
+     1. Re-invoke implement-code to address specific issues
      2. Re-run tests (npm run test)
-     3. Re-invoke code-reviewer if substantial changes were made
-     4. Re-invoke solution-architect for verification
+     3. Re-invoke review-code if substantial changes were made
+     4. Re-invoke design-solution for verification
      5. Repeat until VERIFIED
 
    ONLY proceed to Documentation after architect VERIFIED.
@@ -82,7 +75,7 @@ Before proceeding to Phase 7, ALL must be true:
 - **Max retries:** 3 per phase
 - **On failure:**
   1. Review architect feedback, understand deviations
-  2. Invoke code-implementer to address issues, retry verification
+  2. Invoke implement-code to address issues, retry verification
   3. After 3 failures: Present issue to user with options
 - **Escalation:** User decides: [Retry/Accept deviations (with documentation)/Abort]
 

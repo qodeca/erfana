@@ -1,7 +1,7 @@
 # Phase 10: Release (Optional)
 
 **Goal:** Prepare production release with user-friendly release notes.
-**Agent:** `release-engineer`
+**Agent:** `prepare-release`
 
 Use this phase only when preparing an actual release (not for every issue).
 
@@ -9,17 +9,21 @@ Use this phase only when preparing an actual release (not for every issue).
 
 1. **Invoke Release Engineer**
 
-   Use the Task tool to spawn the release-engineer agent:
-   ```
-   Task(subagent_type='release-engineer')
+   Follow the `prepare-release` agent steps (see `agents/prepare-release.md`):
 
-   Prompt: "Prepare release v0.4.3
+   1. Verify clean git state
+   2. Analyze commits since previous version
+   3. Run quality gates (lint, typecheck, test)
+   4. Generate release notes
+   5. Update version in package.json
+   6. Update CLAUDE.md
+   7. Build project
+   8. Create git tag (optional)
 
-   Previous release: v0.4.2
-   Analyze commits since last release.
-   Generate release notes in release/0.4.3/ folder.
-   Follow v0.4.1 release notes format."
-   ```
+   **Example inputs:**
+   - version: "0.4.3"
+   - previous_version: "0.4.2"
+   - release_type: "minor"
 
 2. **Release Checklist**
    - [ ] Version bumped in package.json
@@ -43,7 +47,7 @@ Follow the established format from `release/0.4.1/erfana-0.4.1-release-notes.md`
 
 - **Max retries:** 3 per phase
 - **On failure:**
-  1. Review release-engineer output and release notes quality
+  1. Review prepare-release output and release notes quality
   2. Retry with refined instructions
   3. After 3 failures: Present issue to user with options
 - **Escalation:** User decides: [Retry/Skip/Abort]
