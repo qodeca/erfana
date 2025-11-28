@@ -1,5 +1,7 @@
 ---
 name: implementing-issues
+version: 1.0.0
+status: active
 description: Implement GitHub issues through structured phases with specialized agents and human checkpoints. Supports 3 complexity tiers (trivial/standard/complex) with appropriate checkpoint levels. Requires GitHub issue number. Use when working on an issue, 'implement #N', 'fix issue #N', or 'work on issue'.
 ---
 
@@ -132,7 +134,7 @@ Determine tier from issue labels:
 ### Phase 0: Pre-flight
 **Goal:** Validate environment and create feature branch.
 **Checkpoint:** Pre-flight checklist passed
-**Details:** See `phases/0-preflight.md`
+**Details:** See [phases/0-preflight.md](phases/0-preflight.md)
 
 **Quick checklist:**
 - [ ] Issue exists and is OPEN
@@ -149,7 +151,7 @@ Determine tier from issue labels:
 **Goal:** Research prior art and clarify requirements before exploring codebase.
 **Agent:** analyze-requirements
 **Checkpoint:** Research findings + requirements confirmed (Tier 2+)
-**Details:** See `phases/0.5-business-analysis.md`
+**Details:** See [phases/0.5-business-analysis.md](phases/0.5-business-analysis.md)
 
 **Steps:**
 1. Classify issue type (bug/enhancement/feature/security/refactor)
@@ -171,7 +173,7 @@ Determine tier from issue labels:
 **Goal:** Understand issue and affected codebase.
 **Agent:** explore-codebase
 **Checkpoint:** Issue understanding confirmed
-**Details:** See `phases/1-discovery.md`
+**Details:** See [phases/1-discovery.md](phases/1-discovery.md)
 
 **Deliverable:** Issue understanding report with acceptance criteria, affected areas, complexity estimate.
 
@@ -181,7 +183,7 @@ Determine tier from issue labels:
 **Goal:** Design implementation approach with verification.
 **Agent:** design-solution
 **Checkpoint:** Plan approved by user
-**Details:** See `phases/2-architecture.md`
+**Details:** See [phases/2-architecture.md](phases/2-architecture.md)
 
 **Steps:**
 1. Invoke design-solution to create implementation plan
@@ -197,7 +199,7 @@ Determine tier from issue labels:
 **Goal:** Write code and tests following approved plan.
 **Agents:** implement-code, write-tests
 **Checkpoint:** Tests passing, typecheck clean
-**Details:** See `phases/3-implementation.md`
+**Details:** See [phases/3-implementation.md](phases/3-implementation.md)
 
 **Guidelines:**
 - Follow existing codebase patterns
@@ -211,7 +213,7 @@ Determine tier from issue labels:
 **Goal:** Catch security issues early.
 **Agent:** audit-security (Tier 3)
 **Checkpoint:** Security checklist passed
-**Details:** See `phases/4-security.md`
+**Details:** See [phases/4-security.md](phases/4-security.md)
 
 **All Tiers Checklist:**
 - [ ] `npm audit` reports no high/critical vulnerabilities
@@ -233,7 +235,7 @@ Determine tier from issue labels:
 **Goal:** Validate code quality.
 **Agent:** review-code
 **Checkpoint:** Critical issues addressed
-**Details:** See `phases/5-review.md`
+**Details:** See [phases/5-review.md](phases/5-review.md)
 
 **Review categories:** Security, performance, best practices, test coverage, documentation.
 
@@ -245,7 +247,7 @@ Determine tier from issue labels:
 **Goal:** Verify implementation matches approved plan.
 **Agent:** design-solution
 **Checkpoint:** Architect confirms VERIFIED
-**Details:** See `phases/6-verification.md`
+**Details:** See [phases/6-verification.md](phases/6-verification.md)
 
 **Steps:**
 1. Invoke design-solution to verify implementation against approved plan
@@ -264,7 +266,7 @@ Determine tier from issue labels:
 **Goal:** Update relevant documentation.
 **Agent:** update-docs
 **Checkpoint:** CLAUDE.md updated
-**Details:** See `phases/7-documentation.md`
+**Details:** See [phases/7-documentation.md](phases/7-documentation.md)
 
 **Checklist:**
 - [ ] CLAUDE.md "Recent Changes" updated
@@ -278,7 +280,7 @@ Determine tier from issue labels:
 ### Phase 8: UAT (Tier 2+)
 **Goal:** Manual testing by user.
 **Checkpoint:** User confirms acceptance criteria
-**Details:** See `phases/8-uat.md`
+**Details:** See [phases/8-uat.md](phases/8-uat.md)
 
 **Steps:**
 1. Build project: `npm run build`
@@ -292,7 +294,7 @@ Determine tier from issue labels:
 **Goal:** Pass quality gates, create commit, manage branch.
 **Agent:** summarize-diff
 **Checkpoint:** Quality gates pass, commit approved
-**Details:** See `phases/9-finalization.md`
+**Details:** See [phases/9-finalization.md](phases/9-finalization.md)
 
 **Quality Gates (Required):**
 ```bash
@@ -328,7 +330,7 @@ Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 **Goal:** Prepare production release.
 **Agent:** prepare-release
 **Checkpoint:** Release notes approved
-**Details:** See `phases/10-release.md`
+**Details:** See [phases/10-release.md](phases/10-release.md)
 
 **Use only when preparing actual release (not for every issue).**
 
@@ -421,9 +423,9 @@ See `examples.md` for detailed walkthroughs of each tier:
 
 ## Reference
 
-- **Phase Guides:** See `phases/` directory for detailed instructions
-- **Agent Reference:** See `agents-reference.md` for agent capabilities
-- **Templates:** See `templates/` directory
+- **Phase Guides:** See [phases/](phases/) directory for detailed instructions
+- **Agent Reference:** See [agents-reference.md](agents-reference.md) for agent capabilities
+- **Templates:** See [templates/](templates/) directory
 
 ## Architecture Note
 
