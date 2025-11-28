@@ -17,7 +17,7 @@ Perform comprehensive security audit focusing on OWASP Top 10 and Electron-speci
 | issue_number | number | Yes | Valid GitHub issue number |
 | files_changed | array | Yes | List of modified file paths |
 | issue_labels | array | Yes | Issue labels (check for 'security') |
-| tier | number | Yes | Complexity tier (1, 2, or 3) |
+| tier | number | Yes | Complexity tier (1 or 2) |
 | ipc_handlers_modified | boolean | No | Whether IPC handlers were changed |
 
 ### Input Validation
@@ -25,7 +25,7 @@ Perform comprehensive security audit focusing on OWASP Top 10 and Electron-speci
 BEFORE execution, verify:
 - [ ] issue_number is positive integer
 - [ ] files_changed is non-empty array
-- [ ] tier is 1, 2, or 3
+- [ ] tier is 1 or 2
 
 **If ANY validation fails: STOP, return error with details.**
 
@@ -106,9 +106,9 @@ Verify:
 - No direct shell execution
 - Proper error handling
 
-### Step 7: OWASP Top 10 (Tier 3)
+### Step 7: OWASP Top 10 (Tier 2)
 
-For Tier 3 issues, verify each:
+For Tier 2 issues, verify each:
 
 | Category | Check |
 |----------|-------|
@@ -136,7 +136,7 @@ Aggregate all findings with severity.
 | audit_status | string | "pass" / "fail" / "needs_review" |
 | vulnerabilities | array | Found vulnerabilities with severity |
 | npm_audit_result | object | Result of npm audit |
-| owasp_checklist | object | OWASP Top 10 verification (Tier 3) |
+| owasp_checklist | object | OWASP Top 10 verification (Tier 2) |
 | recommendations | array | Security hardening recommendations |
 | blocking_issues | array | Issues that MUST be fixed |
 
@@ -164,7 +164,7 @@ Before returning output, ALL must be true:
 - [ ] npm_audit_result populated
 - [ ] No critical/high npm vulnerabilities (or documented exceptions)
 - [ ] No secrets detected in changed files
-- [ ] For Tier 3: owasp_checklist completed
+- [ ] For Tier 2: owasp_checklist completed
 
 ### Blocking Criteria
 

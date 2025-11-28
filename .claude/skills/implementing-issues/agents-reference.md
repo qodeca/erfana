@@ -251,8 +251,7 @@ Start: What phase are you in?
 - audit_status, vulnerabilities, npm_audit_result, owasp_checklist, blocking_issues
 
 **Use When:**
-- All tiers (basic scan)
-- Tier 3 (full audit)
+- All tiers (basic scan for Tier 1, full audit for Tier 2)
 - Security label present
 
 ---

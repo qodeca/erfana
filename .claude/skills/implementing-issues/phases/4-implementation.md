@@ -51,7 +51,7 @@ Issue Type → Agent
 └── Code cleanup → advise-refactor
 ```
 
-## Modern Testing Approaches (Tier 2+)
+## Modern Testing Approaches (Tier 2)
 
 Consider these 2025 testing practices where applicable:
 
@@ -70,7 +70,7 @@ Consider these 2025 testing practices where applicable:
 - Generate tests from acceptance criteria automatically
 - Focus human effort on test strategy, not boilerplate
 
-### 4. Mutation Testing (Optional, Tier 3)
+### 4. Mutation Testing (Optional, Tier 2)
 - Verify test quality by introducing code mutations
 - Ensure tests catch actual bugs, not just achieve coverage
 - Run after implementation is stable

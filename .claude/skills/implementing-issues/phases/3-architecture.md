@@ -36,7 +36,7 @@ Based on issue type:
 - Refactor: advise-refactor
 - Tests only: write-tests
 
-### 4. Plan Verification Gate (Definition of Done - Tier 2+)
+### 4. Plan Verification Gate (Definition of Done - Tier 2)
 
 BEFORE presenting plan to user, verify the plan using `design-solution` verification mode:
 
@@ -65,7 +65,7 @@ ONLY proceed to user checkpoint after architect APPROVED.
 
 This gate ensures users only see architect-approved plans.
 
-## Architecture Checkpoint (Tier 2+)
+## Architecture Checkpoint (Tier 2)
 
 Present implementation plan to user:
 
@@ -120,7 +120,7 @@ Before proceeding to next phase, ALL must be checked:
 - [ ] All affected files identified
 - [ ] Testing strategy defined
 - [ ] Risks identified with mitigations
-- [ ] Architect verification: APPROVED (Tier 2+)
-- [ ] User approved architecture checkpoint (Tier 2+)
+- [ ] Architect verification: APPROVED (Tier 2)
+- [ ] User approved architecture checkpoint (Tier 2)
 
 **STOP if any item unchecked. Do not proceed.**
