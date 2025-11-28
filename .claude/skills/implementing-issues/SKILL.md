@@ -83,7 +83,7 @@ TodoWrite([
 | Phase | Purpose | Agent(s) | Checkpoint |
 |-------|---------|----------|------------|
 | 0. Pre-flight | Validate environment | - | - |
-| 0.5. Business Analysis | Research prior art + clarify requirements | business-analyst | Tier 2+ |
+| 0.5. Business Analysis | Research prior art + clarify requirements | analyze-requirements | Tier 2+ |
 | 1. Discovery | Understand issue & codebase | codebase-explorer | Tier 2+ |
 | 2. Architecture | Design solution + verify plan | solution-architect | Tier 2+ |
 | 3. Implementation | Write code + tests | code-implementer, test-writer | - |
@@ -147,7 +147,7 @@ Determine tier from issue labels:
 
 ### Phase 0.5: Business Analysis (All Tiers)
 **Goal:** Research prior art and clarify requirements before exploring codebase.
-**Agent:** business-analyst
+**Agent:** analyze-requirements
 **Checkpoint:** Research findings + requirements confirmed (Tier 2+)
 **Details:** See `phases/0.5-business-analysis.md`
 
@@ -409,82 +409,13 @@ If implementation cannot continue:
 
 ## Examples
 
-### Example 1: Trivial Issue (Tier 1)
+See `examples.md` for detailed walkthroughs of each tier:
 
-**Issue:** #42 - Fix typo in README
-```
-1. Pre-flight: Check issue is open, create branch ✓
-   git checkout -b docs/42-fix-readme-typo
-2. Skip Discovery, Architecture, Verification, Review, UAT
-3. Implementation: Fix typo directly
-4. Security (Phase 4): npm audit, secret check → Pass
-5. Finalization (Phase 9): Run lint, commit
-   "docs: fix typo in README - Closes #42"
-   → Checkpoint: Approve commit
-   → Checkpoint: Branch management (select "Merge to main and delete branch")
-```
-
-### Example 2: Standard Feature (Tier 2)
-
-**Issue:** #11 - Add Chrome-style tabs
-```
-1. Pre-flight (Phase 0): Verify environment, create branch ✓
-   git checkout -b feat/11-chrome-style-tabs
-2. Business Analysis (Phase 0.5): Research tab implementations
-   → WebSearch: "chrome style tabs react", "dockview custom tabs", "VS Code tab implementation"
-   → Found: No suitable library, VS Code uses custom implementation
-   → Questionnaire: Reference=VS Code, Scope=defined, Edge cases=comprehensive
-   → Checkpoint: Present research + requirements → Approved
-3. Discovery (Phase 1): Understand DockviewReact tabs, identify components
-   → Checkpoint: Confirm understanding
-4. Architecture (Phase 2): Design EditorTab component, context menu
-   → Plan Verification Gate: Architect verifies plan → APPROVED
-   → Checkpoint: Present approved plan to user → Approve plan
-5. Implementation (Phase 3): Create EditorTab.tsx, CSS, tests
-6. Security (Phase 4): Full security scan → Pass
-7. Review (Phase 5): Skipped (Tier 2)
-8. Verification (Phase 6): Architect verifies implementation matches plan
-   → Verification Gate: solution-architect confirms → VERIFIED
-   → Checkpoint: Present verification to user → Proceed
-9. Documentation (Phase 7): Update CLAUDE.md changelog
-10. UAT (Phase 8): Build project, run dev server
-    → Checkpoint: User tests manually, selects "UAT passed"
-11. Finalization (Phase 9): Pass quality gates, commit
-    → Checkpoint: Approve commit
-    → Checkpoint: Select "Merge to main and delete branch"
-```
-
-### Example 3: Complex Security Issue (Tier 3)
-
-**Issue:** #99 - Add path traversal protection
-```
-1. Pre-flight (Phase 0): Verify environment, create branch ✓
-   git checkout -b fix/99-path-traversal-protection
-2. Business Analysis (Phase 0.5): Comprehensive security research
-   → WebSearch: "OWASP path traversal prevention", "electron file security", "node.js path validation"
-   → Found: OWASP guidelines, path.resolve() patterns, realpath validation
-   → Questionnaire: Threat model=comprehensive, Compliance=standard, Scope=all file ops
-   → Checkpoint: Present research + requirements → Approved
-3. Discovery (Phase 1): Analyze all file operations
-   → Checkpoint: Confirm scope
-4. Architecture (Phase 2): Design pathSecurity.ts module
-   → Plan Verification Gate: Architect verifies plan → APPROVED
-   → Checkpoint: Approve security approach
-5. Implementation (Phase 3): Implement with comprehensive tests
-6. Security (Phase 4): Full scan + security-auditor agent + OWASP
-   → Pass all security gates
-7. Review (Phase 5): code-reviewer + security checklist
-   → Checkpoint: Approve security review
-8. Verification (Phase 6): Architect verifies implementation matches plan
-   → Verification Gate: solution-architect confirms → VERIFIED
-   → Checkpoint: Present verification to user → Proceed
-9. Documentation (Phase 7): Update security docs
-10. UAT (Phase 8): Build, run dev, test path traversal scenarios
-    → Checkpoint: User verifies security, selects "UAT passed"
-11. Finalization (Phase 9): All quality gates + security gates
-    → Checkpoint: Approve commit
-    → Checkpoint: Select "Merge to main and delete branch"
-```
+| Example | Tier | Checkpoints | Key Phases |
+|---------|------|-------------|------------|
+| Fix typo in README | 1 | 2 | Pre-flight → Implementation → Security → Finalization |
+| Add Chrome-style tabs | 2 | 7 | All except Review |
+| Path traversal protection | 3 | 9 | All phases |
 
 ---
 
@@ -496,20 +427,19 @@ If implementation cannot continue:
 
 ## Architecture Note
 
-This skill is an **orchestrator** that delegates work to agents via `Task(subagent_type='...')`. It uses:
+This skill is an **orchestrator** that delegates work to agents via `Task(subagent_type='...')`.
 
-**Built-in System Agents:**
-- `codebase-explorer` - Fast codebase navigation
-- `solution-architect` - System design and planning
-- `code-implementer` - Write production code
-- `test-writer` - Create tests
-- `code-reviewer` - Pre-commit review
-- `security-auditor` - Security analysis
-- `project-documenter` - Documentation updates
-- `diff-summarizer` - Commit messages
-- `release-engineer` - Release preparation
+### Hybrid Agent Pattern (Intentional Exception)
+
+This skill intentionally uses a **hybrid pattern** combining built-in system agents with skill-specific agents. This is an acknowledged exception to the "no external agents" rule because:
+
+1. **System agents provide battle-tested capabilities** - Code implementation, testing, security auditing are complex domains where system agents excel
+2. **Skill focuses on orchestration** - The skill's value is in workflow coordination, not reimplementing agent capabilities
+3. **Single custom agent fills the gap** - `analyze-requirements` handles the unique business analysis workflow not covered by system agents
+
+**Built-in System Agents Used:**
+- `codebase-explorer`, `solution-architect`, `code-implementer`, `test-writer`
+- `code-reviewer`, `security-auditor`, `project-documenter`, `diff-summarizer`, `release-engineer`
 
 **Skill-Specific Agent:**
-- `business-analyst` - Prior art research + requirements clarification (see `agents/business-analyst.md`)
-
-The hybrid pattern (built-in + custom agents) is valid for skills that need specialized capabilities beyond system defaults.
+- `analyze-requirements` - Prior art research + requirements clarification (see `agents/analyze-requirements.md`)
