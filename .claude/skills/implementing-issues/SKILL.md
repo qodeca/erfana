@@ -12,9 +12,10 @@ This skill guides the complete implementation of GitHub issues through structure
 ## CRITICAL RULES
 
 - MUST create TodoWrite list at skill start (see Progress Tracking)
-- MUST NOT skip security scan (Phase 4)
+- MUST NOT skip security scan (Phase 6)
 - MUST NOT commit without quality gates passing
 - STOP if any pre-flight check fails
+- Retry failed steps max 3 times, then escalate to user
 
 ## When to Use This Skill
 
