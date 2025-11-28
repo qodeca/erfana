@@ -1,0 +1,131 @@
+/**
+ * MermaidToolbar - Unified toolbar for Mermaid diagrams
+ * Shows direction buttons (for supported chart types) and expand button
+ */
+
+import { Maximize2 } from 'lucide-react'
+import { executePromptTemplate } from '../../../utils/panelUtils'
+import {
+  detectChartType,
+  supportsDirection,
+  getAvailableDirections,
+  detectCurrentDirection,
+  isDirectionDisabled,
+  isDirectionActive,
+  getDirectionTooltip,
+  DIRECTION_LABELS
+} from '../../../utils/mermaidDirections'
+import './MermaidToolbar.css'
+
+export interface MermaidToolbarProps {
+  /** The Mermaid diagram code */
+  code: string
+  /** Whether the diagram has rendered SVG content available */
+  hasSvgContent: boolean
+  /** File path for prompt context */
+  filePath?: string
+  /** Start line number for prompt context */
+  startLine?: number
+  /** End line number for prompt context */
+  endLine?: number
+  /** Whether the diagram is still loading */
+  isLoading: boolean
+  /** Callback when expand button is clicked */
+  onExpand: () => void
+}
+
+export function MermaidToolbar({
+  code,
+  hasSvgContent,
+  filePath,
+  startLine,
+  endLine,
+  isLoading,
+  onExpand
+}: MermaidToolbarProps) {
+  const chartType = detectChartType(code)
+  const showDirectionButtons = supportsDirection(chartType)
+  const availableDirections = getAvailableDirections(chartType)
+  const currentDirection = detectCurrentDirection(code, chartType)
+
+  const handleDirectionClick = async (direction: string) => {
+    console.log('🔄 Direction click:', { direction, filePath, startLine, endLine })
+    if (!filePath) {
+      console.warn('⚠️ No filePath provided, cannot execute direction change')
+      return
+    }
+
+    try {
+      // Construct file reference
+      const fileRef =
+        startLine && endLine ? `@${filePath}:${startLine}-${endLine}` : `@${filePath}`
+
+      // Format line range string
+      const lineRange =
+        startLine && endLine
+          ? startLine === endLine
+            ? `line ${startLine}`
+            : `lines ${startLine}-${endLine}`
+          : undefined
+
+      // Execute prompt template
+      console.log('📝 Executing prompt template: change-mermaid-direction')
+      const result = await executePromptTemplate('change-mermaid-direction', {
+        selectedText: '',
+        filePath,
+        fullDocument: '',
+        startLine,
+        endLine,
+        lineRange,
+        fileRef,
+        mermaidCode: code,
+        targetDirection: direction,
+        directionLabel: DIRECTION_LABELS[direction] || direction
+      })
+      console.log('✅ Prompt template result:', result)
+    } catch (err) {
+      console.error('❌ Failed to execute direction change prompt:', err)
+    }
+  }
+
+  if (isLoading) {
+    return null
+  }
+
+  return (
+    <div className="mermaid-toolbar" role="toolbar" aria-label="Mermaid diagram toolbar">
+      {showDirectionButtons && (
+        <div className="mermaid-toolbar-directions" role="group" aria-label="Layout direction">
+          {availableDirections.map((direction) => {
+            const disabled = isDirectionDisabled(direction, currentDirection, chartType)
+            const active = isDirectionActive(direction, currentDirection, chartType)
+
+            return (
+              <button
+                key={direction}
+                className={`mermaid-direction-btn ${active ? 'mermaid-direction-btn--active' : ''}`}
+                onClick={() => handleDirectionClick(direction)}
+                disabled={disabled}
+                title={getDirectionTooltip(direction)}
+                aria-label={`Change layout to ${getDirectionTooltip(direction)}`}
+                aria-pressed={active}
+              >
+                {direction}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      <button
+        className="mermaid-toolbar-expand-btn"
+        onClick={onExpand}
+        disabled={!hasSvgContent}
+        title="View fullscreen"
+        aria-label="Open diagram in fullscreen"
+      >
+        <Maximize2 size={14} />
+      </button>
+    </div>
+  )
+}

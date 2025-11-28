@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import mermaid from 'mermaid'
-import { Bug, Maximize2 } from 'lucide-react'
+import { Bug } from 'lucide-react'
 import { executePromptTemplate } from '../../utils/panelUtils'
 import { DiagramViewer } from './DiagramViewer'
+import { MermaidToolbar } from './MermaidToolbar'
 import { getMermaidConfig } from '../../utils/mermaidThemes'
 
 interface MermaidDiagramProps {
@@ -20,7 +21,6 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
   const [initialized, setInitialized] = useState(false)
   const [showViewer, setShowViewer] = useState(false)
   const [svgContent, setSvgContent] = useState<string>('')
-  const expandButtonRef = useRef<HTMLButtonElement>(null)
 
   // Handle bug report button click
   const handleBugReport = async () => {
@@ -178,16 +178,17 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
 
       {!error && (
         <>
-          <button
-            ref={expandButtonRef}
-            className="mermaid-expand-btn"
-            onClick={handleExpandClick}
-            title="View fullscreen"
-            aria-label="Open diagram in fullscreen"
-            style={{ display: isLoading ? 'none' : 'flex' }}
-          >
-            <Maximize2 size={14} />
-          </button>
+          {!isLoading && (
+            <MermaidToolbar
+              code={code}
+              hasSvgContent={!!svgContent}
+              filePath={filePath}
+              startLine={startLine}
+              endLine={endLine}
+              isLoading={isLoading}
+              onExpand={handleExpandClick}
+            />
+          )}
           <div
             ref={containerRef}
             className="mermaid-diagram"
