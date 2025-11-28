@@ -449,8 +449,7 @@ See `examples.md` for detailed walkthroughs of each tier:
 | Example | Tier | Checkpoints | Key Phases |
 |---------|------|-------------|------------|
 | Fix typo in README | 1 | 2 | Pre-flight → Implementation → Security → Finalization |
-| Add Chrome-style tabs | 2 | 7 | All except Review |
-| Path traversal protection | 3 | 9 | All phases |
+| Add Chrome-style tabs | 2 | 10 | All phases |
 
 ---
 

@@ -200,7 +200,7 @@ Start: What phase are you in?
 - assessment, solid_analysis, coupling_score, cohesion_score, findings, critical_issues, recommendations, technical_debt
 
 **Use When:**
-- After implementation complete (Tier 2+)
+- After implementation complete (Tier 2)
 - Validating SOLID principles
 - Assessing coupling and cohesion
 - Checking design pattern usage
