@@ -1,13 +1,13 @@
 ---
 name: managing-issues
-version: 1.0.1
+version: 1.1.0
 status: active
-description: Full lifecycle management of GitHub issues - create and implement. Routes to appropriate operation based on user intent. Use when creating issues, reporting bugs, requesting features, implementing issues, or working on GitHub issues.
+description: Full lifecycle management of GitHub issues - create, implement, and review. Routes to appropriate operation based on user intent. Use when creating issues, reporting bugs, requesting features, implementing issues, reviewing code, or working on GitHub issues.
 ---
 
 # Managing GitHub Issues
 
-Complete lifecycle management for GitHub issues through structured operations with specialized agents and human checkpoints.
+Complete lifecycle management for GitHub issues and source code through structured operations with specialized agents and human checkpoints. Includes issue creation, implementation, and standalone code review.
 
 ## CRITICAL RULES
 
@@ -26,6 +26,7 @@ Complete lifecycle management for GitHub issues through structured operations wi
 |-----------|-----------------|-------------|
 | **Create** | "create issue", "report bug", "request feature", "file issue" | Create new GitHub issues from user descriptions |
 | **Implement** | "implement #N", "fix #N", "work on #N", "tackle issue" | Implement existing GitHub issues |
+| **Review** | "review", "check code", "analyze", "audit" | Comprehensive source code review |
 
 ### Future Operations (Planned)
 
@@ -57,6 +58,14 @@ This skill auto-activates when user input matches these patterns:
 - "tackle issue", "address issue"
 - "let's fix", "let's implement", "let's work on"
 
+### Review Operation Triggers
+- "review", "review code", "review file", "review component"
+- "check", "check code", "check this", "check my code"
+- "analyze", "analyze code", "analyze architecture"
+- "audit", "audit security", "security audit"
+- "look at", "take a look at", "examine"
+- "what do you think of", "is this code good"
+
 ### Ambiguous (Will Ask for Clarification)
 - "issue #N" (view? implement?)
 - "help with issues" (create? implement?)
@@ -77,17 +86,21 @@ User says "create issue" / "report bug" / "request feature"
 User says "implement #N" / "fix #N" / "work on issue"
   → Route to Implement operation
 
+User says "review" / "check code" / "analyze" / "audit"
+  → Route to Review operation
+
 User says "show issue #N" / "view #N"
   → Not yet implemented (inform user)
 
 Ambiguous input
-  → Ask: "Would you like to create a new issue or implement an existing one?"
+  → Ask: "Would you like to create a new issue, implement an existing one, or review code?"
 ```
 
 ### Step 2: Route to Operation
 
 - **Create**: See [operations/create.md](operations/create.md)
 - **Implement**: See [operations/implement.md](operations/implement.md)
+- **Review**: See [operations/review.md](operations/review.md)
 
 ---
 
@@ -127,6 +140,18 @@ TodoWrite([
 ])
 ```
 
+### Review Operation Todos
+
+```
+TodoWrite([
+  {content: "Phase 0: Select review scope", status: "in_progress", activeForm: "Selecting review scope"},
+  {content: "Phase 1: Identify target files", status: "pending", activeForm: "Identifying target files"},
+  {content: "Phase 2: Select review level", status: "pending", activeForm: "Selecting review level"},
+  {content: "Phase 3: Execute review", status: "pending", activeForm: "Executing review"},
+  {content: "Phase 4: Present results", status: "pending", activeForm: "Presenting results"}
+])
+```
+
 **Rules:**
 - Mark phase `in_progress` BEFORE starting
 - Mark phase `completed` IMMEDIATELY after quality gate passes
@@ -159,6 +184,14 @@ All agents are embedded in `agents/` directory with full execution logic.
 | update-docs | 9 | Update documentation |
 | summarize-diff | 11 | Generate commit messages |
 | prepare-release | 12 | Prepare releases |
+
+### Review Operation Agents
+
+| Agent | Purpose |
+|-------|---------|
+| review-standalone | Orchestrate standalone code reviews by scope and level |
+
+*Note: Review operation also reuses Implement agents (review-architecture, review-code, audit-security) for deep analysis.*
 
 ### Conditional Agents
 
@@ -234,6 +267,9 @@ See [examples.md](examples.md) for detailed walkthroughs:
 | Request dark mode | Create | Feature request flow |
 | Fix README typo | Implement | Tier 1 trivial issue |
 | Add Chrome-style tabs | Implement | Tier 2 standard feature |
+| Review EditorTab | Review | Standard component review |
+| Quick PR review | Review | Quick review of changes |
+| Deep services audit | Review | Deep module review |
 
 ---
 
