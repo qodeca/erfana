@@ -9,6 +9,7 @@ import askTemplate from './templates/ask.md?raw'
 import promptTemplate from './templates/prompt.md?raw'
 import mermaidBugReportTemplate from './templates/mermaid-bug-report.md?raw'
 import mermaidChangeDirectionTemplate from './templates/mermaid-change-direction.md?raw'
+import mermaidChatTemplate from './templates/mermaid-chat.md?raw'
 import organizeImportTemplate from './templates/organize-import.md?raw'
 
 /**
@@ -22,6 +23,7 @@ const parsedTemplates = parseTemplates([
   { raw: promptTemplate, filename: 'prompt.md' },
   { raw: mermaidBugReportTemplate, filename: 'mermaid-bug-report.md' },
   { raw: mermaidChangeDirectionTemplate, filename: 'mermaid-change-direction.md' },
+  { raw: mermaidChatTemplate, filename: 'mermaid-chat.md' },
   { raw: organizeImportTemplate, filename: 'organize-import.md' }
 ])
 

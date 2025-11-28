@@ -8,6 +8,8 @@ import type { PluggableList } from 'unified'
 import { defaultSchema } from 'hast-util-sanitize'
 import { PreviewContextMenu } from '../ContextMenu/PreviewContextMenu'
 import { MermaidDiagram } from './MermaidDiagram'
+import { DiagramViewer } from './DiagramViewer'
+import { useDiagramViewerStore } from '../../stores/useDiagramViewerStore'
 import { useToast } from '../Toast/ToastContext'
 import { resolveMarkdownLink, getLinkTooltip, type ResolvedLink } from '../../utils/markdownLinkResolver'
 import {
@@ -589,6 +591,9 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     const previewRef = useRef<HTMLDivElement>(null)
     const { showToast } = useToast()
 
+    // DiagramViewer state from store (persists across MermaidDiagram remounts)
+    const isViewerOpen = useDiagramViewerStore(state => state.isOpen)
+
     // Use refs to avoid recreating handleInternalLink when props change
     const filePathRef = useRef(filePath)
     const onOpenFileRef = useRef(onOpenFile)
@@ -909,6 +914,9 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
             onClose={handleCloseContextMenu}
           />
         )}
+
+        {/* DiagramViewer - rendered at this level to persist across MermaidDiagram remounts */}
+        {isViewerOpen && <DiagramViewer />}
       </div>
     )
   }

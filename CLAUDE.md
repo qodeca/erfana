@@ -64,7 +64,27 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.5.2)
+## Recent Changes (v0.5.3)
+- **AI Chat Bubble in DiagramViewer** (Nov 28, 2025):
+  - Floating chat bubble for contextual AI-assisted diagram modifications (issue #34)
+  - FAB button in bottom-right corner of DiagramViewer, expands to slide-up panel
+  - Auto-includes diagram context: Mermaid code, file path, line range
+  - Cmd/Ctrl+Enter to send (matches PromptDialog pattern), Enter for newlines
+  - Character limit: warning at 1000, max at 2000 characters
+  - Click outside or Escape to collapse (preserves draft)
+  - Input clears after send but panel stays expanded for follow-up messages
+  - Zoom/pan state now persists across file changes (hasInitialized flag)
+  - Pure logic extraction: `chatBubble.logic.ts` for testability
+  - New files:
+    - `src/renderer/src/components/Editor/DiagramViewer/ChatBubble.tsx`: Chat component
+    - `src/renderer/src/components/Editor/DiagramViewer/ChatBubble.css`: Styles
+    - `src/renderer/src/components/Editor/DiagramViewer/chatBubble.logic.ts`: Validation
+    - `src/renderer/src/prompts/templates/mermaid-chat.md`: Prompt template
+  - 66 new tests (38 logic + 28 component)
+  - **Total: 2684 tests passing (94 test files)**
+  - Closes #34
+
+## Changes in v0.5.2
 - **Mermaid Diagram Layout Direction Buttons** (Nov 28, 2025):
   - Add layout direction controls to Mermaid diagram hover toolbar (issue #32)
   - Unified toolbar: direction buttons + expand button appear on diagram hover
