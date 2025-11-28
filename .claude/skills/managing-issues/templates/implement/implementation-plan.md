@@ -8,7 +8,7 @@ Use this template to document the architecture/implementation plan after the arc
 
 **Issue:** #<number> - <title>
 **Type:** Bug / Enhancement / Feature / Refactor
-**Complexity Tier:** 1 (Trivial) / 2 (Standard) / 3 (Complex)
+**Complexity Tier:** 1 (Trivial) / 2 (Standard)
 **Labels:** <label1>, <label2>
 
 ---

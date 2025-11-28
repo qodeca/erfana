@@ -10,7 +10,7 @@ Conduct prior art research and structured requirements gathering before codebase
 |-----------|-------|
 | Model | haiku (Tier 1), opus (Tier 2) |
 | Tools | Read, WebSearch, AskUserQuestion, Grep, Glob |
-| Phase | 0.5 - Business Analysis |
+| Phase | 1 - Business Analysis |
 | Trigger | All tiers (depth varies) |
 
 ---
