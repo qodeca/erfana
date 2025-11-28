@@ -20,11 +20,37 @@ interface SendToPanelOptions {
 }
 
 /**
+ * Wait for terminal to be ready (activeTerminalId set in store)
+ * Polls the store until terminal is initialized or timeout is reached.
+ *
+ * @param timeoutMs - Maximum time to wait (default 5000ms)
+ * @param intervalMs - Polling interval (default 50ms)
+ * @returns true if terminal is ready, false if timed out
+ */
+async function waitForTerminalReady(
+  timeoutMs = 5000,
+  intervalMs = 50
+): Promise<boolean> {
+  const startTime = Date.now()
+
+  while (Date.now() - startTime < timeoutMs) {
+    const { activeTerminalId } = useTerminalStore.getState()
+    if (activeTerminalId) {
+      return true
+    }
+    await new Promise(resolve => setTimeout(resolve, intervalMs))
+  }
+
+  console.warn('⚠️ Terminal readiness timeout after', timeoutMs, 'ms')
+  return false
+}
+
+/**
  * Opens a panel and sends content to it with proper initialization wait
  *
  * This function ensures reliable content delivery by:
  * 1. Opening the target panel
- * 2. Waiting 100ms for panel initialization
+ * 2. Polling until terminal is ready (activeTerminalId set)
  * 3. Sending content using panel-specific methods
  *
  * @param options - Panel configuration
@@ -37,9 +63,6 @@ interface SendToPanelOptions {
  *   location: 'right',
  *   content: 'npm install'
  * })
- *
- * @example
- * // Copilot removed; prompts target terminal
  */
 export async function openPanelAndSendContent({
   panel,
@@ -53,12 +76,15 @@ export async function openPanelAndSendContent({
   // Open panel
   setActivePanel(panel, location)
 
-  // Wait for panel initialization (ensures component is mounted)
-  // This prevents race conditions where content is sent before the panel is ready
-  await new Promise((resolve) => setTimeout(resolve, 100))
-
   // Send content based on panel type
   if (panel === 'terminal') {
+    // Wait for terminal to be ready (polls until activeTerminalId is set)
+    const isReady = await waitForTerminalReady()
+    if (!isReady) {
+      console.error('❌ Terminal failed to initialize within timeout')
+      return false
+    }
+
     const { sendToTerminal } = useTerminalStore.getState()
     return await sendToTerminal(content, autoExecute)
   }

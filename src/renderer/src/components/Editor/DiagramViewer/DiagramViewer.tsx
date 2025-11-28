@@ -7,14 +7,9 @@ import {
   getZoomButtonStates,
   ZOOM_CONFIG
 } from './diagramViewer.logic'
+import { ChatBubble } from './ChatBubble'
+import { useDiagramViewerStore } from '../../../stores/useDiagramViewerStore'
 import './DiagramViewer.css'
-
-interface DiagramViewerProps {
-  isOpen: boolean
-  onClose: () => void
-  svgContent: string
-  title?: string
-}
 
 interface Transform {
   scale: number
@@ -27,7 +22,24 @@ interface SvgDimensions {
   height: number
 }
 
-export function DiagramViewer({ isOpen, onClose, svgContent, title }: DiagramViewerProps) {
+/**
+ * DiagramViewer - Full-screen diagram viewer with zoom/pan support
+ *
+ * Reads state from useDiagramViewerStore instead of props.
+ * This allows the viewer to stay open and receive updates when the source
+ * markdown file is edited (MermaidDiagram components are recreated but store persists).
+ */
+export function DiagramViewer() {
+  // Read all state from the store
+  const {
+    isOpen,
+    mermaidCode,
+    svgContent,
+    filePath,
+    startLine,
+    endLine,
+    closeViewer
+  } = useDiagramViewerStore()
   const overlayRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const svgContainerRef = useRef<HTMLDivElement>(null)
@@ -41,6 +53,9 @@ export function DiagramViewer({ isOpen, onClose, svgContent, title }: DiagramVie
     translateY: 0
   })
   const [svgDimensions, setSvgDimensions] = useState<SvgDimensions | null>(null)
+  // Track whether we've done the initial fit-to-view for this session
+  // This prevents zoom/pan from resetting when svgContent changes (file updates)
+  const [hasInitialized, setHasInitialized] = useState(false)
 
   // Inject SVG content exactly like MermaidDiagram does - via innerHTML
   // SECURITY: svgContent must be pre-sanitized. This component trusts that the
@@ -81,9 +96,19 @@ export function DiagramViewer({ isOpen, onClose, svgContent, title }: DiagramVie
     }
   }, [isOpen, svgContent])
 
-  // Fit to view on open
+  // Reset hasInitialized when viewer closes
+  useEffect(() => {
+    if (!isOpen) {
+      setHasInitialized(false)
+    }
+  }, [isOpen])
+
+  // Fit to view on FIRST open only (not on every svgContent change)
+  // This preserves zoom/pan when file is edited while viewer is open
   useEffect(() => {
     if (!isOpen || !containerRef.current || !svgContainerRef.current) return
+    // Skip if already initialized this session - preserves zoom/pan on content changes
+    if (hasInitialized) return
 
     const fitToView = () => {
       const container = containerRef.current
@@ -110,12 +135,15 @@ export function DiagramViewer({ isOpen, onClose, svgContent, title }: DiagramVie
         translateX: 0,
         translateY: 0
       })
+
+      // Mark as initialized so subsequent content changes preserve zoom/pan
+      setHasInitialized(true)
     }
 
     // Small delay to ensure SVG is rendered
     const timer = setTimeout(fitToView, 100)
     return () => clearTimeout(timer)
-  }, [isOpen, svgContent])
+  }, [isOpen, svgContent, hasInitialized])
 
   // Focus management - store previous focus
   useEffect(() => {
@@ -238,10 +266,10 @@ export function DiagramViewer({ isOpen, onClose, svgContent, title }: DiagramVie
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent) => {
       if (e.target === overlayRef.current) {
-        onClose()
+        closeViewer()
       }
     },
-    [onClose]
+    [closeViewer]
   )
 
   // Keyboard shortcuts - must come after handler definitions
@@ -275,14 +303,14 @@ export function DiagramViewer({ isOpen, onClose, svgContent, title }: DiagramVie
           break
         case 'close':
           e.preventDefault()
-          onClose()
+          closeViewer()
           break
       }
     }
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose, handleZoomIn, handleZoomOut, handleReset, handleFitToView])
+  }, [isOpen, closeViewer, handleZoomIn, handleZoomOut, handleReset, handleFitToView])
 
   // Apply dimension-based zoom (fixes pixelation - issue #31)
   // Scales SVG width/height for native vector rendering at any size
@@ -320,13 +348,13 @@ export function DiagramViewer({ isOpen, onClose, svgContent, title }: DiagramVie
       className="diagram-viewer-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label={title || 'Diagram Viewer'}
+      aria-label="Mermaid Diagram"
       onClick={handleBackdropClick}
     >
       {/* Toolbar */}
       <div className="diagram-viewer-toolbar" role="toolbar" aria-label="Diagram viewer controls">
         <div className="diagram-viewer-toolbar-left">
-          <span className="diagram-viewer-title">{title || 'Diagram Viewer'}</span>
+          <span className="diagram-viewer-title">Mermaid Diagram</span>
         </div>
 
         <div className="diagram-viewer-toolbar-center">
@@ -378,7 +406,7 @@ export function DiagramViewer({ isOpen, onClose, svgContent, title }: DiagramVie
         <div className="diagram-viewer-toolbar-right">
           <button
             className="diagram-viewer-btn diagram-viewer-btn-close"
-            onClick={onClose}
+            onClick={closeViewer}
             title="Close (Escape)"
             aria-label="Close viewer"
             autoFocus
@@ -403,6 +431,16 @@ export function DiagramViewer({ isOpen, onClose, svgContent, title }: DiagramVie
           }}
         />
       </div>
+
+      {/* Chat bubble for AI-assisted diagram modifications */}
+      {mermaidCode && filePath && (
+        <ChatBubble
+          mermaidCode={mermaidCode}
+          filePath={filePath}
+          startLine={startLine}
+          endLine={endLine}
+        />
+      )}
     </div>,
     portalRoot
   )

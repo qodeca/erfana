@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import mermaid from 'mermaid'
 import { Bug } from 'lucide-react'
 import { executePromptTemplate } from '../../utils/panelUtils'
-import { DiagramViewer } from './DiagramViewer'
 import { MermaidToolbar } from './MermaidToolbar'
 import { getMermaidConfig } from '../../utils/mermaidThemes'
+import { useDiagramViewerStore, buildDiagramId } from '../../stores/useDiagramViewerStore'
 
 interface MermaidDiagramProps {
   code: string
@@ -19,8 +19,16 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [initialized, setInitialized] = useState(false)
-  const [showViewer, setShowViewer] = useState(false)
   const [svgContent, setSvgContent] = useState<string>('')
+
+  // Store for persisting viewer state across component remounts
+  const { isOpen, diagramId, openViewer, updateDiagram } = useDiagramViewerStore()
+
+  // Generate unique ID for this diagram
+  const currentDiagramId = buildDiagramId(filePath, startLine, endLine)
+
+  // Check if THIS diagram is the one currently open in the viewer
+  const isViewerOpenForThis = isOpen && diagramId === currentDiagramId
 
   // Handle bug report button click
   const handleBugReport = async () => {
@@ -131,10 +139,25 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
   }, [code, initialized])
 
   const handleExpandClick = () => {
-    if (svgContent) {
-      setShowViewer(true)
+    if (svgContent && filePath) {
+      openViewer({
+        diagramId: currentDiagramId,
+        mermaidCode: code,
+        svgContent,
+        filePath,
+        startLine,
+        endLine
+      })
     }
   }
+
+  // When diagram re-renders with new code/SVG, update the store if viewer is open for this diagram
+  // This enables live updates when editing the source file with viewer open
+  useEffect(() => {
+    if (svgContent && isViewerOpenForThis) {
+      updateDiagram(currentDiagramId, code, svgContent)
+    }
+  }, [svgContent, code, isViewerOpenForThis, currentDiagramId, updateDiagram])
 
   return (
     <div className={`mermaid-container ${className}`}>
@@ -193,12 +216,6 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
             ref={containerRef}
             className="mermaid-diagram"
             style={{ display: isLoading ? 'none' : 'flex' }}
-          />
-          <DiagramViewer
-            isOpen={showViewer}
-            onClose={() => setShowViewer(false)}
-            svgContent={svgContent}
-            title="Mermaid Diagram"
           />
         </>
       )}

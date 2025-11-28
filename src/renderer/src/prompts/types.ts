@@ -44,6 +44,9 @@ export interface PromptVariables {
 
   /** Human-readable label for the target direction (e.g., "Left to Right") */
   directionLabel?: string
+
+  /** User's free-form instruction for AI (e.g., for diagram chat) */
+  userInstruction?: string
 }
 
 /**

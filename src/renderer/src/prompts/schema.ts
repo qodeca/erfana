@@ -6,10 +6,10 @@ import { z } from 'zod'
  */
 export const PromptFrontmatterSchema = z.object({
   /** The area where this prompt appears (e.g., markdown-preview, code-editor) */
-  area: z.enum(['markdown-preview', 'code-editor', 'global']),
+  area: z.enum(['markdown-preview', 'code-editor', 'global', 'diagram-viewer']),
 
   /** Optional sub-area for more specific placement */
-  subArea: z.enum(['context-menu', 'toolbar', 'command-palette', 'mermaid-error', 'mermaid-direction']).optional(),
+  subArea: z.enum(['context-menu', 'toolbar', 'command-palette', 'mermaid-error', 'mermaid-direction', 'chat']).optional(),
 
   /** Display name shown in the UI */
   name: z.string().min(1, 'Name is required'),
