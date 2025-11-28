@@ -10,7 +10,7 @@ Quick reference for selecting and using specialized agents during issue implemen
 Start: What type of work?
 │
 ├── Prior Art Research / Requirements?
-│   └── business-analyst
+│   └── analyze-requirements
 │
 ├── Discovery/Exploration?
 │   └── codebase-explorer
@@ -65,7 +65,7 @@ Start: What type of work?
 
 | Agent | Model | Tools | Trigger |
 |-------|-------|-------|---------|
-| `business-analyst` | haiku/sonnet/opus | Read, WebSearch, AskUserQuestion, Grep, Glob | Phase 0.5 (all tiers) |
+| `analyze-requirements` | haiku/sonnet/opus | Read, WebSearch, AskUserQuestion, Grep, Glob | Phase 0.5 (all tiers) |
 | `bug-investigator` | sonnet | Read, Grep, Glob, Bash | `bug` label |
 | `refactoring-advisor` | sonnet | Read, Grep, Glob | `refactor` label |
 | `security-auditor` | opus | Read, Grep, Glob | Tier 3, `security` label |
@@ -76,7 +76,7 @@ Start: What type of work?
 
 ## Agent Capabilities
 
-### business-analyst
+### analyze-requirements
 
 **Purpose**: Conduct prior art research and structured requirements gathering before codebase exploration.
 
@@ -116,7 +116,7 @@ Steps:
 6. Return research summary with recommendation
 ```
 
-**Details**: See `agents/business-analyst.md`
+**Details**: See `agents/analyze-requirements.md`
 
 ---
 
@@ -420,7 +420,7 @@ Agents add overhead. Skip them for:
 ### Sequential (Dependencies)
 
 ```
-business-analyst → codebase-explorer → solution-architect → code-implementer → test-writer → code-reviewer
+analyze-requirements → codebase-explorer → solution-architect → code-implementer → test-writer → code-reviewer
 ```
 
 Each step depends on previous output. Business analyst outputs inform discovery and architecture.
@@ -453,8 +453,8 @@ Repeat until quality standards met.
 
 | Agent | Failure Mode | Recovery Action |
 |-------|--------------|-----------------|
-| business-analyst | WebSearch fails | Document attempt, proceed with reduced findings |
-| business-analyst | User skips question | Re-present with "required for clarity" |
+| analyze-requirements | WebSearch fails | Document attempt, proceed with reduced findings |
+| analyze-requirements | User skips question | Re-present with "required for clarity" |
 | codebase-explorer | Search too broad | Add constraints, retry |
 | solution-architect | Plan incomplete | Manual architecture, skip to implementation |
 | code-implementer | Code not compiling | Fix errors manually, re-invoke |
@@ -474,7 +474,7 @@ Repeat until quality standards met.
 
 ### Phase 0.5: Business Analysis
 ```
-@business-analyst Conduct business analysis for issue #11 (Tier 2).
+@analyze-requirements Conduct requirements analysis for issue #11 (Tier 2).
 Issue: Add Chrome-style dynamic tabs
 Labels: enhancement
 Research: npm libraries, VS Code implementation, design patterns
@@ -526,15 +526,15 @@ Type: feat, Scope: tabs, Issue: #11
 
 | Label | Primary Agent | Supporting Agents |
 |-------|--------------|-------------------|
-| `bug` | bug-investigator | business-analyst, code-implementer, test-writer |
-| `enhancement` | business-analyst | solution-architect, code-implementer, code-reviewer |
-| `feature` | business-analyst | solution-architect, code-implementer, test-writer |
+| `bug` | bug-investigator | analyze-requirements, code-implementer, test-writer |
+| `enhancement` | analyze-requirements | solution-architect, code-implementer, code-reviewer |
+| `feature` | analyze-requirements | solution-architect, code-implementer, test-writer |
 | `documentation` | project-documenter or docs-updater | - |
 | `refactor` | refactoring-advisor | code-implementer, code-reviewer |
-| `security` | business-analyst | security-auditor, code-implementer |
+| `security` | analyze-requirements | security-auditor, code-implementer |
 | `test` | test-writer | - |
 
-**Note:** business-analyst is used first (Phase 0.5) for all non-trivial issues before other agents.
+**Note:** analyze-requirements is used first (Phase 0.5) for all non-trivial issues before other agents.
 
 ---
 

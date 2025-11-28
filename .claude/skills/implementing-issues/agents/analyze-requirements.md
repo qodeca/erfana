@@ -1,4 +1,4 @@
-# Agent: business-analyst
+# Agent: analyze-requirements
 
 Conduct prior art research and structured requirements gathering before codebase exploration.
 
@@ -209,7 +209,7 @@ Before returning output, ALL must be true:
 ### Tier 1: Quick Analysis
 
 ```
-Conduct quick business analysis for issue #42 (Tier 1).
+Conduct quick requirements analysis for issue #42 (Tier 1).
 
 Issue: Fix typo in error message
 Labels: documentation
@@ -225,7 +225,7 @@ Steps:
 ### Tier 2: Standard Analysis
 
 ```
-Conduct business analysis for issue #11 (Tier 2).
+Analyze requirements for issue #11 (Tier 2).
 
 Issue: Add Chrome-style dynamic tabs
 Labels: enhancement
@@ -243,7 +243,7 @@ Steps:
 ### Tier 3: Comprehensive Analysis
 
 ```
-Conduct comprehensive business analysis for issue #99 (Tier 3).
+Conduct comprehensive requirements analysis for issue #99 (Tier 3).
 
 Issue: Add path traversal protection
 Labels: security
