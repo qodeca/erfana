@@ -20,6 +20,63 @@ The Terminal Panel provides a full-featured terminal emulator using:
 
 ## Features
 
+### Clipboard Support (v0.4.7)
+
+Full copy/paste operations with keyboard shortcuts and context menu.
+
+**Keyboard Shortcuts**:
+- **Smart Ctrl/Cmd+C**: Copies text when selected, sends SIGINT when no selection
+- **Cmd+V / Ctrl+V**: Paste (handled natively by xterm.js)
+- **Ctrl+Shift+C / Ctrl+Shift+V**: Explicit copy/paste (Windows/Linux style)
+
+**Context Menu**:
+- Right-click opens context menu with Copy and Paste options
+- Copy is disabled when no text is selected
+- Platform-specific shortcut display (⌘C/⌘V on macOS, Ctrl+C/Ctrl+V on Windows)
+
+**Behavior**:
+- Selection preserved after copy (VS Code behavior)
+- Toast notification on copy success
+- Pure logic extraction pattern: `terminalClipboard.logic.ts` for testability
+
+**Files**:
+- `src/renderer/src/components/Panels/Terminal/terminalClipboard.logic.ts`
+- `src/renderer/src/components/Panels/Terminal/useTerminalClipboard.ts`
+- `src/renderer/src/components/Panels/Terminal/TerminalContextMenu.tsx`
+
+### Smart File Path Links (v0.5.0)
+
+Clickable file path links in terminal output with intelligent path resolution.
+
+**Base Features**:
+- Detects absolute, relative, and project-relative paths
+- Supports line:column notation (`:42:10`, `(15,3)`)
+- Path validation with LRU cache (100 entries, 30s TTL)
+- Click to open file in editor at specified location
+
+**Smart Resolution**:
+- Falls back to filename search when exact path not found
+- FilePickerDialog for disambiguation when multiple files match
+- Keyboard navigation (Arrow Up/Down, Enter to select, Escape to cancel)
+
+**Paths with Spaces Support** (VS Code-style fallback matchers):
+- Detects paths with spaces on their own line
+- Python error format: `File "/path/with spaces/file.py", line 42`
+- Windows paths: `C:\Program Files\My App\app.exe`
+- Bullet point lists: `- /path/to my/project/file.ts`
+- Based on VS Code Issue #97941 and PR #43733
+
+**Architecture** (Pure Logic Extraction):
+- `filenameIndex.ts`: Map-based O(1) filename lookup
+- `pathScoring.ts`: Candidate ranking algorithm
+- `smartPathResolver.logic.ts`: Resolution orchestration
+- `useFilenameIndex.ts`: Lazy index management hook
+- `FilePickerDialog.tsx`: Disambiguation UI component
+- `filePathLinks.logic.ts`: Fallback matchers for paths with spaces
+
+**Files**:
+- `src/renderer/src/components/Panels/Terminal/FileLinks/`
+
 ### Core Capabilities
 
 - **Native Shell**: Spawns real PTY process (zsh on macOS, bash on Linux)
