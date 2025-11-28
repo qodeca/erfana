@@ -1,31 +1,26 @@
 # Phase 5: Review
 
 **Goal:** Validate code quality and catch issues early.
-**Agent:** `code-reviewer`
+**Agent:** `review-code`
 **Skip for:** Tier 1 (trivial changes)
 
 ## Steps
 
 1. **Invoke Code Reviewer**
 
-   Use the Task tool to spawn the code-reviewer agent:
-   ```
-   Task(subagent_type='code-reviewer')
+   Follow the `review-code` agent steps (see `agents/review-code.md`):
 
-   Prompt: "Review changes for issue #11 - Chrome-style tabs
+   1. Read all changed files
+   2. Check for security issues (secrets, injection, XSS)
+   3. Check performance (re-renders, memory leaks)
+   4. Verify best practices (TypeScript types, error handling)
+   5. Check test coverage
+   6. Compile findings by severity
 
-   Changed files:
-   - src/renderer/src/components/Tabs/EditorTab.tsx (new)
-   - src/renderer/src/components/Tabs/EditorTab.css (new)
-   - src/renderer/src/components/Tabs/useTabContextMenu.tsx (new)
-   - src/renderer/src/components/ContextMenu/ContextMenu.tsx (modified)
-
-   Focus areas:
-   - Security (XSS in tooltips, event handling)
-   - Performance (re-renders, memoization)
-   - Accessibility (aria labels, keyboard navigation)
-   - Test coverage adequacy"
-   ```
+   **Example inputs:**
+   - issue_number: 11
+   - files_changed: ["EditorTab.tsx", "EditorTab.css"]
+   - acceptance_criteria: ["Dynamic sizing", "Context menu"]
 
 2. **Review Categories**
    - Security vulnerabilities
@@ -72,7 +67,7 @@ For security-sensitive changes, verify:
 
 - **Max retries:** 3 per phase
 - **On failure:**
-  1. Review code-reviewer output, understand issues
+  1. Review review-code output, understand issues
   2. Fix identified issues, retry review
   3. After 3 failures: Present issue to user with options
 - **Escalation:** User decides: [Retry/Accept (with documented risks)/Abort]

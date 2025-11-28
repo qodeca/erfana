@@ -84,16 +84,16 @@ TodoWrite([
 |-------|---------|----------|------------|
 | 0. Pre-flight | Validate environment | - | - |
 | 0.5. Business Analysis | Research prior art + clarify requirements | analyze-requirements | Tier 2+ |
-| 1. Discovery | Understand issue & codebase | codebase-explorer | Tier 2+ |
-| 2. Architecture | Design solution + verify plan | solution-architect | Tier 2+ |
-| 3. Implementation | Write code + tests | code-implementer, test-writer | - |
-| 4. Security | Shift-left security check | security-auditor (Tier 3) | All tiers |
-| 5. Review | Code quality check | code-reviewer | Tier 3 |
-| 6. Verification | Verify implementation matches plan | solution-architect | Tier 2+ |
-| 7. Documentation | Update docs | project-documenter | - |
+| 1. Discovery | Understand issue & codebase | explore-codebase | Tier 2+ |
+| 2. Architecture | Design solution + verify plan | design-solution | Tier 2+ |
+| 3. Implementation | Write code + tests | implement-code, write-tests | - |
+| 4. Security | Shift-left security check | audit-security (Tier 3) | All tiers |
+| 5. Review | Code quality check | review-code | Tier 3 |
+| 6. Verification | Verify implementation matches plan | design-solution | Tier 2+ |
+| 7. Documentation | Update docs | update-docs | - |
 | 8. UAT | Manual testing | - | Tier 2+ |
-| 9. Finalization | Quality gates, commit, branch | diff-summarizer | All tiers |
-| 10. Release (optional) | Production release | release-engineer | When releasing |
+| 9. Finalization | Quality gates, commit, branch | summarize-diff | All tiers |
+| 10. Release (optional) | Production release | prepare-release | When releasing |
 
 ---
 
@@ -169,7 +169,7 @@ Determine tier from issue labels:
 
 ### Phase 1: Discovery (Tier 2+)
 **Goal:** Understand issue and affected codebase.
-**Agent:** codebase-explorer
+**Agent:** explore-codebase
 **Checkpoint:** Issue understanding confirmed
 **Details:** See `phases/1-discovery.md`
 
@@ -179,12 +179,12 @@ Determine tier from issue labels:
 
 ### Phase 2: Architecture (Tier 2+)
 **Goal:** Design implementation approach with verification.
-**Agent:** solution-architect
+**Agent:** design-solution
 **Checkpoint:** Plan approved by user
 **Details:** See `phases/2-architecture.md`
 
 **Steps:**
-1. Invoke solution-architect to create implementation plan
+1. Invoke design-solution to create implementation plan
 2. **Plan Verification Gate:** Architect verifies plan completeness/feasibility → Must get APPROVED
 3. Present approved plan to user for final approval
 4. Only proceed after user approval
@@ -195,7 +195,7 @@ Determine tier from issue labels:
 
 ### Phase 3: Implementation
 **Goal:** Write code and tests following approved plan.
-**Agents:** code-implementer, test-writer
+**Agents:** implement-code, write-tests
 **Checkpoint:** Tests passing, typecheck clean
 **Details:** See `phases/3-implementation.md`
 
@@ -209,7 +209,7 @@ Determine tier from issue labels:
 
 ### Phase 4: Security (All Tiers)
 **Goal:** Catch security issues early.
-**Agent:** security-auditor (Tier 3)
+**Agent:** audit-security (Tier 3)
 **Checkpoint:** Security checklist passed
 **Details:** See `phases/4-security.md`
 
@@ -220,7 +220,7 @@ Determine tier from issue labels:
 - [ ] User input properly validated at entry points
 
 **Tier 3 Additional:**
-- [ ] Full `security-auditor` agent review
+- [ ] Full `audit-security` agent review
 - [ ] OWASP Top 10 verification
 - [ ] Path traversal protection verified
 - [ ] IPC handlers validate all input
@@ -231,7 +231,7 @@ Determine tier from issue labels:
 
 ### Phase 5: Review (Tier 3)
 **Goal:** Validate code quality.
-**Agent:** code-reviewer
+**Agent:** review-code
 **Checkpoint:** Critical issues addressed
 **Details:** See `phases/5-review.md`
 
@@ -243,12 +243,12 @@ Determine tier from issue labels:
 
 ### Phase 6: Verification (Tier 2+)
 **Goal:** Verify implementation matches approved plan.
-**Agent:** solution-architect
+**Agent:** design-solution
 **Checkpoint:** Architect confirms VERIFIED
 **Details:** See `phases/6-verification.md`
 
 **Steps:**
-1. Invoke solution-architect to verify implementation against approved plan
+1. Invoke design-solution to verify implementation against approved plan
 2. **Verification Gate:** Architect checks plan conformance, acceptance criteria, patterns, tests
 3. If NEEDS CORRECTION: Fix issues → Re-verify (loop until VERIFIED)
 4. Only proceed after architect reports VERIFIED
@@ -262,7 +262,7 @@ Determine tier from issue labels:
 
 ### Phase 7: Documentation
 **Goal:** Update relevant documentation.
-**Agent:** project-documenter
+**Agent:** update-docs
 **Checkpoint:** CLAUDE.md updated
 **Details:** See `phases/7-documentation.md`
 
@@ -290,7 +290,7 @@ Determine tier from issue labels:
 
 ### Phase 9: Finalization (All Tiers)
 **Goal:** Pass quality gates, create commit, manage branch.
-**Agent:** diff-summarizer
+**Agent:** summarize-diff
 **Checkpoint:** Quality gates pass, commit approved
 **Details:** See `phases/9-finalization.md`
 
@@ -326,7 +326,7 @@ Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 
 ### Phase 10: Release (Optional)
 **Goal:** Prepare production release.
-**Agent:** release-engineer
+**Agent:** prepare-release
 **Checkpoint:** Release notes approved
 **Details:** See `phases/10-release.md`
 
@@ -427,19 +427,30 @@ See `examples.md` for detailed walkthroughs of each tier:
 
 ## Architecture Note
 
-This skill is an **orchestrator** that delegates work to agents via `Task(subagent_type='...')`.
+This skill is an **orchestrator** that uses specialized agents for each phase.
 
-### Hybrid Agent Pattern (Intentional Exception)
+### Embedded Agents
 
-This skill intentionally uses a **hybrid pattern** combining built-in system agents with skill-specific agents. This is an acknowledged exception to the "no external agents" rule because:
+All agents are self-contained in `agents/` directory with full execution logic:
 
-1. **System agents provide battle-tested capabilities** - Code implementation, testing, security auditing are complex domains where system agents excel
-2. **Skill focuses on orchestration** - The skill's value is in workflow coordination, not reimplementing agent capabilities
-3. **Single custom agent fills the gap** - `analyze-requirements` handles the unique business analysis workflow not covered by system agents
+| Agent | Purpose |
+|-------|---------|
+| analyze-requirements | Prior art research + requirements clarification |
+| explore-codebase | Find files and patterns related to issue |
+| design-solution | Create and verify implementation plans |
+| implement-code | Write production code following plan |
+| write-tests | Create tests with >80% coverage |
+| review-code | Pre-commit quality review |
+| audit-security | Security scan and OWASP verification |
+| update-docs | Update CLAUDE.md and docs |
+| summarize-diff | Generate commit messages |
+| prepare-release | Prepare production releases |
+| investigate-bug | Root cause analysis |
+| advise-refactor | Code smell detection |
+| fix-docs | Quick documentation fixes |
 
-**Built-in System Agents Used:**
-- `codebase-explorer`, `solution-architect`, `code-implementer`, `test-writer`
-- `code-reviewer`, `security-auditor`, `project-documenter`, `diff-summarizer`, `release-engineer`
-
-**Skill-Specific Agent:**
-- `analyze-requirements` - Prior art research + requirements clarification (see `agents/analyze-requirements.md`)
+Each agent defines:
+- Input/output contracts
+- Self-contained execution steps using tools (Glob, Grep, Read, Write, Edit, Bash)
+- Quality gates
+- Error handling

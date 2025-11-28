@@ -1,34 +1,28 @@
 # Phase 2: Architecture
 
 **Goal:** Design the implementation approach.
-**Agent:** `solution-architect`
+**Agent:** `design-solution`
 
 ## Steps
 
 ### 1. Invoke Architect Agent
 
-Use the Task tool to spawn the solution-architect agent:
+Follow the `design-solution` agent steps (see `agents/design-solution.md`):
 
-```
-Task(subagent_type='solution-architect')
+1. Read acceptance criteria from issue
+2. Search for affected files using Glob/Grep
+3. Read existing code patterns
+4. Design component structure
+5. Plan implementation steps
+6. Define test strategy
+7. Identify risks
 
-Prompt: "Design implementation for issue #11 - Add Chrome-style tabs
-
-Acceptance criteria:
-- Dynamic tab sizing (min 80px, max 300px)
-- Dirty indicator for unsaved changes
-- Context menu (Close, Close Others, Close All)
-
-Affected areas:
-- src/renderer/src/components/Tabs/
-- DockviewReact tab components
-
-Existing patterns:
-- Review WelcomeTab.tsx for component structure
-- Check useProjectStore for state management
-
-Deliverable: Implementation plan with file changes, risks, and estimates."
-```
+**Example inputs:**
+- issue_number: 11
+- issue_body: "Add Chrome-style tabs"
+- acceptance_criteria: [sizing, dirty indicator, context menu]
+- affected_files: [from explore-codebase]
+- patterns_found: [from explore-codebase]
 
 ### 2. Produce Implementation Plan
 
@@ -37,34 +31,25 @@ Use template: `templates/implementation-plan.md`
 ### 3. Identify Agent Needs
 
 Based on issue type:
-- Feature: code-implementer (required)
-- Bug fix (complex): bug-investigator
-- Refactor: refactoring-advisor
-- Tests only: test-writer
+- Feature: implement-code (required)
+- Bug fix (complex): investigate-bug
+- Refactor: advise-refactor
+- Tests only: write-tests
 
 ### 4. Plan Verification Gate (Definition of Done - Tier 2+)
 
-BEFORE presenting plan to user, solution-architect verifies the plan:
+BEFORE presenting plan to user, verify the plan using `design-solution` verification mode:
 
-```
-Task(subagent_type='solution-architect')
-
-Prompt: "Verify implementation plan for issue #<number>:
-
-Plan to verify:
-<include the generated implementation plan>
-
-Verification criteria:
+**Verification criteria:**
 - Completeness: All acceptance criteria addressed?
 - Feasibility: Aligns with existing codebase patterns?
 - Risks: All risks identified with mitigations?
 - Testing: Strategy covers all changes adequately?
 - Dependencies: All affected files/modules identified?
 
-Report: [APPROVED / NEEDS REVISION]
+**Report:** [APPROVED / NEEDS REVISION]
 
-If NEEDS REVISION, provide specific issues to address."
-```
+If NEEDS REVISION, provide specific issues to address.
 
 **Correction Loop (mandatory):**
 
@@ -72,7 +57,7 @@ If NEEDS REVISION, provide specific issues to address."
 IF architect reports NEEDS REVISION:
   1. Address each identified issue
   2. Update the implementation plan
-  3. Re-invoke solution-architect for verification
+  3. Re-invoke design-solution for verification
   4. Repeat until APPROVED
 
 ONLY proceed to user checkpoint after architect APPROVED.
@@ -130,7 +115,7 @@ Approve plan? [Yes/Revise/Abort]
 
 Before proceeding to next phase, ALL must be checked:
 
-- [ ] Implementation plan produced by solution-architect
+- [ ] Implementation plan produced by design-solution
 - [ ] Plan addresses all acceptance criteria
 - [ ] All affected files identified
 - [ ] Testing strategy defined

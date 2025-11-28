@@ -1,40 +1,30 @@
 # Phase 3: Implementation
 
 **Goal:** Write code and tests following the approved plan.
-**Agents:** `code-implementer`, `test-writer`
+**Agents:** `implement-code`, `write-tests`
 
 ## Steps
 
-### 1. Implementation with code-implementer
+### 1. Implementation with implement-code
 
-Use the Task tool to spawn the code-implementer agent:
+Follow the `implement-code` agent steps (see `agents/implement-code.md`):
 
-```
-Task(subagent_type='code-implementer')
+1. Review implementation plan
+2. Read existing code patterns
+3. Create new files using Write()
+4. Modify existing files using Edit()
+5. Verify with Bash(command="npm run typecheck")
 
-Prompt: "Implement EditorTab component for issue #11
-
-Plan summary:
-- Create EditorTab.tsx with IDockviewPanelHeaderProps interface
-- Add EditorTab.css with dynamic sizing (80-300px flex)
-- Include dirty indicator, close button, context menu
-
-Files to create:
-- src/renderer/src/components/Tabs/EditorTab.tsx
-- src/renderer/src/components/Tabs/EditorTab.css
-
-Patterns to follow:
-- Use useProjectStore for dirty state
-- Use useDialog for confirmation
-- Follow WelcomeTab.tsx structure
-
-Include comprehensive tests."
-```
+**Example inputs:**
+- issue_number: 11
+- implementation_plan: (from design-solution)
+- step_number: 1
+- patterns_to_follow: ["WelcomeTab.tsx", "useProjectStore"]
 
 ### 2. Write Tests (TDD-friendly)
 
 - Write tests alongside or before implementation
-- Use `test-writer` for complex test scenarios
+- Use `write-tests` for complex test scenarios
 - Target >80% coverage for new code
 
 ### 3. Incremental Verification
@@ -55,10 +45,10 @@ npm test             # Frequently
 
 ```
 Issue Type → Agent
-├── TypeScript code → code-implementer
-├── Complex tests → test-writer
-├── Bug diagnosis → bug-investigator
-└── Code cleanup → refactoring-advisor
+├── TypeScript code → implement-code
+├── Complex tests → write-tests
+├── Bug diagnosis → investigate-bug
+└── Code cleanup → advise-refactor
 ```
 
 ## Modern Testing Approaches (Tier 2+)
@@ -76,7 +66,7 @@ Consider these 2025 testing practices where applicable:
 - Catches breaking changes early
 
 ### 3. AI-Assisted Test Generation
-- Use `test-writer` agent for edge case discovery
+- Use `write-tests` agent for edge case discovery
 - Generate tests from acceptance criteria automatically
 - Focus human effort on test strategy, not boilerplate
 

@@ -1,7 +1,7 @@
 # Phase 7: Documentation
 
 **Goal:** Update relevant documentation with automation where possible.
-**Agent:** `project-documenter` (if significant changes), `docs-updater` (for simple fixes)
+**Agent:** `update-docs` (if significant changes), `fix-docs` (for simple fixes)
 
 ## Steps
 
