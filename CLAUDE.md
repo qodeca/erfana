@@ -186,12 +186,12 @@ See `docs/` for details (keep Claude's context focused):
 - **ContextMenu Disabled State** (Nov 22, 2025):
   - Added `disabled` property to ContextMenuItem interface
   - Disabled items are grayed out and non-clickable
-- **implementing-github-issues skill** (Nov 22, 2025):
-  - 7-phase workflow (Pre-flight → Finalization)
+- **implementing-issues skill** (Nov 22, 2025):
+  - 11-phase workflow (Pre-flight → Release)
   - 3 complexity tiers with appropriate checkpoints
   - Agent orchestration with explicit Task tool examples
   - Templates for implementation plans and PR descriptions
-  - Located in `.claude/skills/implementing-github-issues/`
+  - Located in `.claude/skills/implementing-issues/`
 
 ## Changes in v0.4.0-0.4.1
 - **ProjectManagementContext Singleton** (Nov 22, 2025):
@@ -202,8 +202,8 @@ See `docs/` for details (keep Claude's context focused):
   - ISP-compliant hooks: `useProjectManagementContext()`, `useOpenProjectByPath()`, `useProjectChangedEffect()`
   - See `src/renderer/src/context/ProjectManagementContext.tsx`
 - **Claude Code Skills** (Nov 22, 2025):
-  - Added `creating-skills`: Guides through skill creation following best practices
-  - Added `creating-github-issues`: Creates structured GitHub issues from user descriptions
+  - Added `managing-skills`: Guides through skill creation following best practices
+  - Added `creating-issues`: Creates structured GitHub issues from user descriptions
   - Skills located in `.claude/skills/`
 
 ## Changes in v0.3.9

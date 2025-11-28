@@ -36,6 +36,52 @@ graph TD
 - Bug report button (🐛) sends to Terminal
 - Links to documentation
 
+#### Full-Screen Diagram Viewer (v0.5.1)
+
+Expand Mermaid diagrams to full-screen overlay for detailed examination.
+
+**Access:**
+- Expand button appears on hover over diagrams (always visible on touch devices)
+- Click expand button to open full-screen overlay
+
+**Zoom & Pan:**
+- Mouse wheel zoom (10% increments)
+- +/- toolbar buttons for zoom control
+- Click-drag to pan diagram around viewport
+- Zoom indicator displays current percentage (e.g., "125%")
+- Custom CSS transform-based implementation (no third-party library)
+
+**Navigation:**
+- Fit-to-screen button: Scale diagram to fit viewport
+- Reset button: Return to 100% zoom, centered
+- Zoom range: 10% to 500%
+
+**Keyboard Shortcuts:**
+- `+` or `=`: Zoom in
+- `-`: Zoom out
+- `0`: Reset zoom to 100%
+- `F`: Fit to screen
+- `Escape`: Close viewer
+
+**Close Methods:**
+- X button in toolbar
+- Escape key
+- Click backdrop (outside diagram)
+
+**Accessibility:**
+- ARIA labels on all controls
+- `role="dialog"` with `aria-modal`
+- Focus management (trapped in overlay)
+- `aria-live` zoom indicator for screen readers
+
+**Architecture:**
+- Pure logic extraction: `diagramViewer.logic.ts` (testable)
+- React component: `DiagramViewer.tsx`
+- SVG rendering uses same innerHTML injection as preview mode (Mermaid strict security)
+
+**Files:**
+- `src/renderer/src/components/Editor/DiagramViewer/`
+
 #### HTML Embedding
 Safe HTML rendering with security sanitization.
 

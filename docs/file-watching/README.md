@@ -154,6 +154,61 @@ This avoids a non‑recoverable state after disruptive filesystem events.
 
 ---
 
+## VS Code-Inspired Performance Optimizations (v0.4.6)
+
+The DirectoryWatcherService includes performance optimizations inspired by VS Code's file watching implementation.
+
+### Watcher Components
+
+Located in `src/main/services/watcher/`:
+
+**EventCoalescer** (`EventCoalescer.ts`)
+- Deduplicates and collapses redundant events
+- 5 coalescing rules:
+  - CREATE + DELETE → ∅ (cancel out)
+  - DELETE + CREATE → CHANGE
+  - Multiple CHANGEs → single CHANGE
+  - etc.
+- Prevents cascade effects from atomic save operations
+
+**ThrottledWorker** (`ThrottledWorker.ts`)
+- 75ms collection window for batching events
+- 200ms throttle between processing rounds
+- 500-event chunks to prevent UI blocking
+- Queue management with size limits
+
+**AtomicSaveDetector** (`AtomicSaveDetector.ts`)
+- Detects write-to-temp-then-rename save patterns
+- 100ms delay to distinguish atomic saves from deletes
+- Prevents false "file deleted" events from editors that use atomic saves
+
+**WatcherMetrics** (`WatcherMetrics.ts`)
+- Throughput tracking (events/second)
+- Latency measurement (event-to-process time)
+- Coalesce efficiency (events removed by coalescing)
+- Useful for debugging and performance monitoring
+
+**PlatformConfig** (`PlatformConfig.ts`)
+- Platform-specific handling (macOS, Linux, Windows)
+- FSEvents configuration on macOS
+- inotify handling on Linux
+
+### DirectoryWatcherService Integration
+
+The service integrates these components:
+- ThrottledWorker replaces simple debounce for chunked processing
+- EventCoalescer runs before event delivery
+- AtomicSaveDetector distinguishes save vs delete
+- WatcherMetrics available for monitoring
+- 30,000 event buffer limit with FIFO overflow
+
+### Files
+
+- `src/main/services/watcher/` - All watcher optimization modules
+- 57 tests in `src/main/services/watcher/__tests__/`
+
+---
+
 ## Symlinks
 
 - Watchers do not follow symlinks (security)
