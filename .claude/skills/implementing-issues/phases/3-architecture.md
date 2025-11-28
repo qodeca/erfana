@@ -1,4 +1,4 @@
-# Phase 2: Architecture
+# Phase 3: Architecture
 
 **Goal:** Design the implementation approach.
 **Agent:** `design-solution`

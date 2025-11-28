@@ -1,4 +1,4 @@
-# Phase 4: Security Scan (All Tiers)
+# Phase 6: Security Scan (All Tiers)
 
 **Goal:** Catch security issues early (shift-left security).
 **Skip for:** None - security scanning applies to ALL changes.

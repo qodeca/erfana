@@ -1,4 +1,4 @@
-# Phase 3: Implementation
+# Phase 4: Implementation
 
 **Goal:** Write code and tests following the approved plan.
 **Agents:** `implement-code`, `write-tests`

@@ -1,4 +1,4 @@
-# Phase 10: Release (Optional)
+# Phase 12: Release (Optional)
 
 **Goal:** Prepare production release with user-friendly release notes.
 **Agent:** `prepare-release`

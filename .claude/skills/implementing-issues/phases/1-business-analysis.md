@@ -1,4 +1,4 @@
-# Phase 0.5: Business Analysis
+# Phase 1: Business Analysis
 
 **Goal:** Research prior art and clarify requirements before exploring codebase.
 **Agent:** analyze-requirements
@@ -483,7 +483,7 @@ Present to user before proceeding to Discovery:
 
 ## Validation Checklist
 
-Before proceeding to Phase 1 (Discovery), ALL must be checked:
+Before proceeding to Phase 2 (Discovery), ALL must be checked:
 
 - [ ] Issue type classified
 - [ ] Prior art research completed (appropriate depth for tier)

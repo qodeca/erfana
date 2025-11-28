@@ -122,7 +122,7 @@ Use AskUserQuestion tool with tier-appropriate questions.
 | 2 | 3-5 questions covering scope and edge cases |
 | 3 | 5-8 comprehensive questions |
 
-See `phases/0.5-business-analysis.md` for full questionnaire templates.
+See `phases/1-business-analysis.md` for full questionnaire templates.
 
 ### Step 4: Validate Acceptance Criteria
 
