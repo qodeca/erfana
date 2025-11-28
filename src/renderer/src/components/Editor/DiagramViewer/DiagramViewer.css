@@ -1,10 +1,14 @@
 /* DiagramViewer.css - Full-screen Mermaid diagram viewer */
 
-/* Theme CSS Custom Properties */
+/* Theme CSS Custom Properties - Dark Mode
+ * TEMPORARY: Always dark mode until Settings UI is implemented.
+ * Light mode variables are defined but commented out for future use.
+ */
 .diagram-viewer-overlay {
   --viewer-bg: rgba(0, 0, 0, 0.9);
   --viewer-toolbar-bg: #252526;
   --viewer-content-bg: #1e1e1e;
+  --viewer-svg-bg: #f8f9fa;
   --viewer-border: #3c3c3c;
   --viewer-text-primary: #cccccc;
   --viewer-text-secondary: #888888;
@@ -15,6 +19,25 @@
   --viewer-zoom-indicator-bg: #3c3c3c;
   --viewer-focus-border: #007fd4;
 }
+
+/* Light Mode Theme Overrides - DISABLED until Settings UI is implemented
+ * Uncomment when theme switching via Settings is available.
+ *
+ * @media (prefers-color-scheme: light) {
+ *   .diagram-viewer-overlay {
+ *     --viewer-bg: rgba(255, 255, 255, 0.95);
+ *     --viewer-toolbar-bg: #f5f5f5;
+ *     --viewer-content-bg: #ffffff;
+ *     --viewer-svg-bg: #ffffff;
+ *     --viewer-border: #e0e0e0;
+ *     --viewer-text-primary: #333333;
+ *     --viewer-text-secondary: #666666;
+ *     --viewer-btn-hover: rgba(0, 0, 0, 0.08);
+ *     --viewer-btn-active: rgba(0, 0, 0, 0.12);
+ *     --viewer-zoom-indicator-bg: #e0e0e0;
+ *   }
+ * }
+ */
 
 /* Full-screen overlay */
 .diagram-viewer-overlay {
@@ -146,9 +169,8 @@
 }
 
 .diagram-viewer-svg-container svg {
-  background: #ffffff;
-  border-radius: 4px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  background: var(--viewer-svg-bg);
+  border-radius: 8px;
 }
 
 /* Separator in toolbar */
