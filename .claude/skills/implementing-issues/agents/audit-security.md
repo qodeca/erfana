@@ -68,7 +68,7 @@ Grep(pattern="eval\\(|Function\\(|innerHTML|dangerouslySetInnerHTML")
 Grep(pattern="child_process|exec\\(|spawn\\(|execSync")
 ```
 
-### Step 4: Input Validation Review (Tier 2+)
+### Step 4: Input Validation Review (Tier 2)
 
 For each file handling user input:
 
@@ -82,7 +82,7 @@ Check:
 - Length limits enforced
 - Sanitization applied
 
-### Step 5: Path Traversal Check (Tier 2+)
+### Step 5: Path Traversal Check (Tier 2)
 
 ```
 Grep(pattern="readFile|writeFile|unlink|rmdir|access|stat", path="src/main/")
@@ -93,7 +93,7 @@ For each file operation:
 - Check for `..` prevention
 - Ensure paths are normalized
 
-### Step 6: IPC Security Review (Tier 2+)
+### Step 6: IPC Security Review (Tier 2)
 
 If ipc_handlers_modified:
 

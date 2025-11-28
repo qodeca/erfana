@@ -41,7 +41,7 @@ Implementation is NOT complete until architect verifies conformance. This is par
    ONLY proceed to Documentation after architect VERIFIED.
    ```
 
-## Implementation Verification Checkpoint (Tier 2+)
+## Implementation Verification Checkpoint (Tier 2)
 
 Present verification result to user:
 ```markdown
