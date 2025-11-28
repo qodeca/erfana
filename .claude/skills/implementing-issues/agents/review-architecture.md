@@ -26,7 +26,7 @@ BEFORE execution, verify:
 - [ ] issue_number is positive integer
 - [ ] files_changed is non-empty array
 - [ ] implementation_plan is object with steps
-- [ ] tier is 2 or 3 (not used for tier 1)
+- [ ] tier is 2 (not used for tier 1)
 
 **If ANY validation fails: STOP, return error with details.**
 

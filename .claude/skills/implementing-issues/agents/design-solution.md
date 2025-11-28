@@ -29,7 +29,7 @@ BEFORE execution, verify:
 - [ ] issue_body is non-empty string
 - [ ] acceptance_criteria has at least 1 item
 - [ ] affected_files is array
-- [ ] tier is 1, 2, or 3
+- [ ] tier is 1 or 2
 
 **If ANY validation fails: STOP, return error with details.**
 
