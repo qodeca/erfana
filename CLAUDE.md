@@ -52,7 +52,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (2461 tests, 89 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (2504 tests, 91 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -65,6 +65,19 @@ See `docs/` for details (keep Claude's context focused):
 - Lucide React for icons
 
 ## Recent Changes (v0.5.1)
+- **Mermaid Diagram Theming with Dark/Light Mode** (Nov 28, 2025):
+  - Unified theming system for Mermaid diagrams with system preference detection
+  - Consistent background colors between Preview and DiagramViewer components
+  - Neutral/professional color palette optimized for readability in both modes
+  - Auto-switching: Uses `prefers-color-scheme` media query with live updates
+  - Architecture: Theme registry pattern for future theme expansion
+  - New files:
+    - `src/renderer/src/utils/mermaidThemes.ts`: Light/dark theme configurations
+    - `src/renderer/src/stores/useThemeStore.ts`: System theme detection store
+  - CSS updates: `@media (prefers-color-scheme: light)` blocks in MarkdownPreview.css and DiagramViewer.css
+  - Fixed: DiagramViewer SVG had hardcoded white background (#ffffff) - now theme-aware
+  - 43 new tests (22 for mermaidThemes, 21 for useThemeStore)
+  - Closes #33
 - **Fix: DiagramViewer Zoom Pixelation** (Nov 28, 2025):
   - Fixed Mermaid diagrams becoming pixelated when zooming (issue #31)
   - Root cause: CSS `transform: scale()` rasterizes SVG before scaling → pixelation

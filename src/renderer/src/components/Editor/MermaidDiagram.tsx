@@ -3,6 +3,7 @@ import mermaid from 'mermaid'
 import { Bug, Maximize2 } from 'lucide-react'
 import { executePromptTemplate } from '../../utils/panelUtils'
 import { DiagramViewer } from './DiagramViewer'
+import { getMermaidConfig } from '../../utils/mermaidThemes'
 
 interface MermaidDiagramProps {
   code: string
@@ -55,93 +56,18 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
     }
   }
 
-  // Initialize mermaid once on component mount
+  // Initialize mermaid with built-in theme
   useEffect(() => {
-    console.log('🔷 Mermaid: Initializing...')
-    mermaid.initialize({
-      startOnLoad: false,
-      securityLevel: 'strict', // Explicit security mode for XSS prevention
-      theme: 'dark',
-      themeVariables: {
-        darkMode: true,
-        background: '#1e1e1e',
-        primaryColor: '#4fc3f7',
-        primaryTextColor: '#d4d4d4',
-        primaryBorderColor: '#555',
-        lineColor: '#888',
-        secondaryColor: '#2d2d30',
-        tertiaryColor: '#3e3e42',
-        // Additional theme variables for better dark mode
-        noteBkgColor: '#2d2d30',
-        noteTextColor: '#d4d4d4',
-        noteBorderColor: '#555',
-        // Sequence diagram colors
-        actorBkg: '#2d2d30',
-        actorBorder: '#555',
-        actorTextColor: '#d4d4d4',
-        actorLineColor: '#888',
-        signalColor: '#d4d4d4',
-        signalTextColor: '#d4d4d4',
-        labelBoxBkgColor: '#2d2d30',
-        labelBoxBorderColor: '#555',
-        labelTextColor: '#d4d4d4',
-        // Flowchart colors
-        mainBkg: '#2d2d30',
-        secondBkg: '#3e3e42',
-        border1: '#555',
-        border2: '#666',
-        // Class diagram colors
-        classText: '#d4d4d4',
-        // State diagram colors
-        labelColor: '#d4d4d4',
-        // Git graph colors
-        git0: '#4fc3f7',
-        git1: '#ce9178',
-        git2: '#dcdcaa',
-        git3: '#569cd6',
-        git4: '#c586c0',
-        git5: '#4ec9b0',
-        git6: '#d7ba7d',
-        git7: '#b267e6'
-      },
-      // Additional config for better rendering
-      flowchart: {
-        htmlLabels: true,
-        curve: 'basis'
-      },
-      sequence: {
-        diagramMarginX: 50,
-        diagramMarginY: 10,
-        actorMargin: 50,
-        width: 150,
-        height: 65,
-        boxMargin: 10,
-        boxTextMargin: 5,
-        noteMargin: 10,
-        messageMargin: 35
-      },
-      gantt: {
-        titleTopMargin: 25,
-        barHeight: 20,
-        barGap: 4,
-        topPadding: 50,
-        leftPadding: 75,
-        gridLineStartPadding: 35,
-        fontSize: 11
-      }
-    })
-    console.log('✅ Mermaid: Initialized')
+    const config = getMermaidConfig(true) // isDarkMode param ignored, uses ACTIVE_THEME
+    mermaid.initialize(config)
     setInitialized(true)
   }, [])
 
   // Render diagram whenever code changes
   useEffect(() => {
     if (!initialized || !containerRef.current) {
-      console.log('⏳ Mermaid: Waiting for initialization or container...', { initialized, hasContainer: !!containerRef.current })
       return
     }
-
-    console.log('🎨 Mermaid: Starting render...', { codeLength: code.length })
 
     const renderDiagram = async () => {
       try {
@@ -151,12 +77,8 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
         // Generate unique ID for this diagram
         const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`
 
-        console.log('🔨 Mermaid: Calling mermaid.render() with ID:', id)
-
         // Render diagram using mermaid v11 API
         const { svg } = await mermaid.render(id, code)
-
-        console.log('✅ Mermaid: Render successful, SVG length:', svg.length)
 
         if (containerRef.current) {
           containerRef.current.innerHTML = svg
@@ -184,7 +106,7 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
           target.dispatchEvent(event)
         }
       } catch (err) {
-        console.error('❌ Mermaid rendering error:', err)
+        console.error('Mermaid rendering error:', err)
         const errorMessage = err instanceof Error ? err.message : 'Failed to render diagram'
         // Clean up error message - remove technical details
         const cleanMessage = errorMessage
