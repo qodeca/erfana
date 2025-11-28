@@ -36,7 +36,7 @@ Detailed examples showing the implementing-issues workflow for each complexity t
 1. Pre-flight (Phase 0): Verify environment, create branch ✓
    git checkout -b feat/11-chrome-style-tabs
 
-2. Business Analysis (Phase 1): Research tab implementations
+2. Business Analysis (Phase 1): Comprehensive research
    → WebSearch: "chrome style tabs react", "dockview custom tabs", "VS Code tab implementation"
    → Found: No suitable library, VS Code uses custom implementation
    → Questionnaire: Reference=VS Code, Scope=defined, Edge cases=comprehensive
@@ -54,9 +54,11 @@ Detailed examples showing the implementing-issues workflow for each complexity t
 6. Architectural Review (Phase 5): Review SOLID principles, coupling, cohesion
    → Report: APPROVED
 
-7. Security (Phase 6): Full security scan → Pass
+7. Security (Phase 6): Full scan + security-auditor agent + OWASP
+   → Pass all security gates
 
-8. Review (Phase 7): Skipped (Tier 2)
+8. Review (Phase 7): code-reviewer + quality checklist
+   → Checkpoint: Approve quality review
 
 9. Verification (Phase 8): Architect verifies implementation matches plan
    → Verification Gate: solution-architect confirms → VERIFIED
@@ -73,85 +75,31 @@ Detailed examples showing the implementing-issues workflow for each complexity t
 ```
 
 **Key Points:**
-- All phases except Review (Phase 7)
-- Business Analysis checkpoint required
-- Two verification gates: Plan (Phase 3) + Implementation (Phase 8)
-- UAT with user testing
-- 8 checkpoints total
-
----
-
-## Example 3: Complex Security Issue (Tier 3)
-
-**Issue:** #99 - Add path traversal protection
-
-```
-1. Pre-flight (Phase 0): Verify environment, create branch ✓
-   git checkout -b fix/99-path-traversal-protection
-
-2. Business Analysis (Phase 1): Comprehensive security research
-   → WebSearch: "OWASP path traversal prevention", "electron file security", "node.js path validation"
-   → Found: OWASP guidelines, path.resolve() patterns, realpath validation
-   → Questionnaire: Threat model=comprehensive, Compliance=standard, Scope=all file ops
-   → Checkpoint: Present research + requirements → Approved
-
-3. Discovery (Phase 2): Analyze all file operations
-   → Checkpoint: Confirm scope
-
-4. Architecture (Phase 3): Design pathSecurity.ts module
-   → Plan Verification Gate: Architect verifies plan → APPROVED
-   → Checkpoint: Approve security approach
-
-5. Implementation (Phase 4): Implement with comprehensive tests
-
-6. Architectural Review (Phase 5): Review SOLID principles, coupling, cohesion
-   → Report: APPROVED
-
-7. Security (Phase 6): Full scan + security-auditor agent + OWASP
-   → Pass all security gates
-
-8. Review (Phase 7): code-reviewer + security checklist
-   → Checkpoint: Approve security review
-
-9. Verification (Phase 8): Architect verifies implementation matches plan
-   → Verification Gate: solution-architect confirms → VERIFIED
-   → Checkpoint: Present verification to user → Proceed
-
-10. Documentation (Phase 9): Update security docs
-
-11. UAT (Phase 10): Build, run dev, test path traversal scenarios
-    → Checkpoint: User verifies security, selects "UAT passed"
-
-12. Finalization (Phase 11): All quality gates + security gates
-    → Checkpoint: Approve commit
-    → Checkpoint: Select "Merge to main and delete branch"
-```
-
-**Key Points:**
 - All 12 phases active (0-11)
 - Comprehensive business analysis (5-8 searches)
-- security-auditor agent required (Phase 6)
+- security-auditor agent + OWASP verification (Phase 6)
 - code-reviewer required (Phase 7)
-- OWASP verification for security issues
+- Two verification gates: Plan (Phase 3) + Implementation (Phase 8)
+- UAT with user testing
 - 10 checkpoints total
 
 ---
 
 ## Checkpoint Summary by Tier
 
-| Checkpoint | Tier 1 | Tier 2 | Tier 3 |
-|------------|--------|--------|--------|
-| Business Analysis | - | ✓ | ✓ |
-| Discovery | - | ✓ | ✓ |
-| Architecture (Plan) | - | ✓ | ✓ |
-| Architectural Review | - | ✓ | ✓ |
-| Security Scan | ✓ | ✓ | ✓ |
-| Quality Review | - | - | ✓ |
-| Verification | - | ✓ | ✓ |
-| UAT | - | ✓ | ✓ |
-| Commit | ✓ | ✓ | ✓ |
-| Branch Management | ✓ | ✓ | ✓ |
-| **Total** | **2** | **8** | **10** |
+| Checkpoint | Tier 1 | Tier 2 |
+|------------|--------|--------|
+| Business Analysis | - | ✓ |
+| Discovery | - | ✓ |
+| Architecture (Plan) | - | ✓ |
+| Architectural Review | - | ✓ |
+| Security Scan | ✓ | ✓ |
+| Quality Review | - | ✓ |
+| Verification | - | ✓ |
+| UAT | - | ✓ |
+| Commit | ✓ | ✓ |
+| Branch Management | ✓ | ✓ |
+| **Total** | **2** | **10** |
 
 ---
 
@@ -163,6 +111,6 @@ Detailed examples showing the implementing-issues workflow for each complexity t
 | Update test count | 1 | Trivial change |
 | Add new UI component | 2 | Requires design, testing |
 | Implement new feature | 2 | Standard development flow |
-| Security vulnerability | 3 | Requires security-auditor |
-| Breaking API change | 3 | Requires comprehensive review |
-| Architecture refactor | 3 | High impact, many files |
+| Security vulnerability | 2 | Requires security-auditor |
+| Breaking API change | 2 | Requires comprehensive review |
+| Architecture refactor | 2 | High impact, many files |

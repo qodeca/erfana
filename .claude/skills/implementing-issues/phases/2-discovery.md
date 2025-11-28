@@ -29,7 +29,7 @@ gh issue view <number> --json title,body,labels,assignees
 - Identify cross-cutting concerns
 - Check for breaking change potential
 
-## Discovery Checkpoint (Tier 2+)
+## Discovery Checkpoint (Tier 2)
 
 Present to user:
 
@@ -76,6 +76,6 @@ Before proceeding to next phase, ALL must be checked:
 - [ ] Complexity tier determined (1/2/3)
 - [ ] Existing patterns in affected areas reviewed
 - [ ] Related tests identified
-- [ ] User approved discovery checkpoint (Tier 2+)
+- [ ] User approved discovery checkpoint (Tier 2)
 
 **STOP if any item unchecked. Do not proceed.**

@@ -8,7 +8,7 @@ Conduct prior art research and structured requirements gathering before codebase
 
 | Attribute | Value |
 |-----------|-------|
-| Model | haiku (Tier 1), sonnet (Tier 2), opus (Tier 3) |
+| Model | haiku (Tier 1), opus (Tier 2) |
 | Tools | Read, WebSearch, AskUserQuestion, Grep, Glob |
 | Phase | 0.5 - Business Analysis |
 | Trigger | All tiers (depth varies) |
@@ -197,7 +197,7 @@ Before returning output, ALL must be true:
 
 ## Token Budget
 
-| Metric | Tier 1 | Tier 2 | Tier 3 |
+| Metric | Tier 1 | Tier 2 | Tier 2 |
 |--------|--------|--------|--------|
 | Target | 300 | 500 | 800 |
 | Maximum | 500 | 800 | 1200 |
@@ -240,10 +240,10 @@ Steps:
 6. Return research summary with recommendation
 ```
 
-### Tier 3: Comprehensive Analysis
+### Tier 2: Comprehensive Analysis
 
 ```
-Conduct comprehensive requirements analysis for issue #99 (Tier 3).
+Conduct comprehensive requirements analysis for issue #99 (Tier 2).
 
 Issue: Add path traversal protection
 Labels: security

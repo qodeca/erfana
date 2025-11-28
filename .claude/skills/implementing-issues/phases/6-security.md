@@ -18,21 +18,20 @@ Security is not optional. Every change, regardless of tier, must pass security c
    - Review any new environment variables
    - Ensure no credentials in committed code
 
-3. **Static Analysis** (Tier 2+)
+3. **Static Analysis** (Tier 2)
    - Code patterns that could lead to vulnerabilities
    - Input validation completeness
    - Output encoding for XSS prevention
 
-## Security Scan Checklist (All Tiers)
+## Security Scan Checklist
 
+**Basic (All Tiers):**
 - [ ] `npm audit` reports no high/critical vulnerabilities
 - [ ] No secrets or API keys in committed code
 - [ ] No new dangerous dependencies added
 - [ ] User input properly validated at entry points
 
-## Additional Security Review (Tier 3)
-
-For Tier 3 issues, also complete:
+**Full Security Review (Tier 2):**
 - [ ] Full `audit-security` agent review
 - [ ] OWASP Top 10 verification
 - [ ] Path traversal protection verified
@@ -65,7 +64,7 @@ Before proceeding to next phase, ALL must be checked:
 
 - [ ] `npm audit` passes (no high/critical vulnerabilities)
 - [ ] No hardcoded secrets found
-- [ ] Static analysis passed (Tier 2+)
-- [ ] Additional security review completed (Tier 3 only)
+- [ ] Static analysis passed (Tier 2)
+- [ ] Additional security review completed (Tier 2 only)
 
 **STOP if any item unchecked. Do not proceed.**

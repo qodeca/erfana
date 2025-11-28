@@ -20,7 +20,7 @@
 3. **Request Manual Testing**
    Ask user to manually test the implemented functionality against acceptance criteria.
 
-## UAT Checkpoint (Tier 2+)
+## UAT Checkpoint (Tier 2)
 
 Present to user:
 ```markdown

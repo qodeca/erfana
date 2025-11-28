@@ -2,7 +2,7 @@
 name: implementing-issues
 version: 1.0.0
 status: active
-description: Implement GitHub issues through structured phases with specialized agents and human checkpoints. Supports 3 complexity tiers (trivial/standard/complex) with appropriate checkpoint levels. Requires GitHub issue number. Use when working on an issue, 'implement #N', 'fix issue #N', or 'work on issue'.
+description: Implement GitHub issues through structured phases with specialized agents and human checkpoints. Supports 2 complexity tiers (trivial/standard) with appropriate checkpoint levels. Requires GitHub issue number. Use when working on an issue, 'implement #N', 'fix issue #N', or 'work on issue'.
 ---
 
 # Implementing GitHub Issues
@@ -86,16 +86,16 @@ TodoWrite([
 | Phase | Purpose | Agent(s) | Checkpoint |
 |-------|---------|----------|------------|
 | 0. Pre-flight | Validate environment | - | - |
-| 1. Business Analysis | Research prior art + clarify requirements | analyze-requirements | Tier 2+ |
-| 2. Discovery | Understand issue & codebase | explore-codebase | Tier 2+ |
-| 3. Architecture | Design solution + verify plan | design-solution | Tier 2+ |
+| 1. Business Analysis | Research prior art + clarify requirements | analyze-requirements | Tier 2 |
+| 2. Discovery | Understand issue & codebase | explore-codebase | Tier 2 |
+| 3. Architecture | Design solution + verify plan | design-solution | Tier 2 |
 | 4. Implementation | Write code + tests | implement-code, write-tests | - |
-| 5. Architectural Review | Validate SOLID, patterns, structure | review-architecture | Tier 2+ |
-| 6. Security | Shift-left security check | audit-security (Tier 3) | All tiers |
-| 7. Quality Review | Comprehensive code quality review | review-code | Tier 2+ |
-| 8. Verification | Verify implementation matches plan | design-solution | Tier 2+ |
+| 5. Architectural Review | Validate SOLID, patterns, structure | review-architecture | Tier 2 |
+| 6. Security | Shift-left security check | audit-security | All tiers |
+| 7. Quality Review | Comprehensive code quality review | review-code | Tier 2 |
+| 8. Verification | Verify implementation matches plan | design-solution | Tier 2 |
 | 9. Documentation | Update docs | update-docs | - |
-| 10. UAT | Manual testing | - | Tier 2+ |
+| 10. UAT | Manual testing | - | Tier 2 |
 | 11. Finalization | Quality gates, commit, branch | summarize-diff | All tiers |
 | 12. Release (optional) | Production release | prepare-release | When releasing |
 
@@ -114,22 +114,13 @@ Determine tier from issue labels:
 **Estimated time:** 15-30 minutes
 
 ### Tier 2: Standard (Default)
-**Labels:** `bug`, `enhancement`, or unlabeled
-**Checkpoints:** After phases 1, 2, 3, 5, 6, 7, 8, 10, 11 (9 total)
-**Business Analysis:** Standard mode (3-5 searches, 3-5 questions, checkpoint required)
-**Review gates:** Architectural Review (Phase 5), Quality Review (Phase 7)
-**Verification gates:** Plan verification (Phase 3), Implementation verification (Phase 8)
-**Security:** Full security scan required
-**Estimated time:** 30 minutes - 2 hours
-
-### Tier 3: Complex
-**Labels:** `breaking-change`, `architecture`, `security`, `major`
-**Checkpoints:** All phases (11 total)
+**Labels:** `bug`, `enhancement`, `breaking-change`, `architecture`, `security`, `major`, or unlabeled
+**Checkpoints:** All phases (10 total)
 **Business Analysis:** Comprehensive mode (5-8 searches, 5-8 questions, checkpoint required)
 **Review gates:** Deep Architectural Review (Phase 5), Deep Quality Review (Phase 7)
 **Verification gates:** Plan verification (Phase 3), Implementation verification (Phase 8)
 **Security:** Full security scan + security-auditor agent review + OWASP verification
-**Estimated time:** 2+ hours
+**Estimated time:** 1-3 hours
 
 ---
 
@@ -154,7 +145,7 @@ Determine tier from issue labels:
 ### Phase 1: Business Analysis (All Tiers)
 **Goal:** Research prior art and clarify requirements before exploring codebase.
 **Agent:** analyze-requirements
-**Checkpoint:** Research findings + requirements confirmed (Tier 2+)
+**Checkpoint:** Research findings + requirements confirmed (Tier 2)
 **Details:** See [phases/1-business-analysis.md](phases/1-business-analysis.md)
 
 **Steps:**
@@ -166,14 +157,13 @@ Determine tier from issue labels:
 
 **Tier Variations:**
 - **Tier 1:** Quick mode (1-2 searches, 1-2 questions, no checkpoint)
-- **Tier 2:** Standard mode (3-5 searches, 3-5 questions, checkpoint required)
-- **Tier 3:** Comprehensive mode (5-8 searches, 5-8 questions, checkpoint required)
+- **Tier 2:** Comprehensive mode (5-8 searches, 5-8 questions, checkpoint required)
 
 **Deliverable:** Research summary + requirements clarification document
 
 ---
 
-### Phase 2: Discovery (Tier 2+)
+### Phase 2: Discovery (Tier 2)
 **Goal:** Understand issue and affected codebase.
 **Agent:** explore-codebase
 **Checkpoint:** Issue understanding confirmed
@@ -183,7 +173,7 @@ Determine tier from issue labels:
 
 ---
 
-### Phase 3: Architecture (Tier 2+)
+### Phase 3: Architecture (Tier 2)
 **Goal:** Design implementation approach with verification.
 **Agent:** design-solution
 **Checkpoint:** Plan approved by user
@@ -213,7 +203,7 @@ Determine tier from issue labels:
 
 ---
 
-### Phase 5: Architectural Review (Tier 2+)
+### Phase 5: Architectural Review (Tier 2)
 **Goal:** Validate architectural quality of implemented code.
 **Agent:** review-architecture
 **Checkpoint:** Architectural assessment approved
@@ -242,53 +232,51 @@ Determine tier from issue labels:
 
 ### Phase 6: Security (All Tiers)
 **Goal:** Catch security issues early.
-**Agent:** audit-security (Tier 3)
+**Agent:** audit-security
 **Checkpoint:** Security checklist passed
 **Details:** See [phases/6-security.md](phases/6-security.md)
 
-**All Tiers Checklist:**
+**Security Checklist:**
 - [ ] `npm audit` reports no high/critical vulnerabilities
 - [ ] No secrets or API keys in committed code
 - [ ] No new dangerous dependencies added
 - [ ] User input properly validated at entry points
-
-**Tier 3 Additional:**
-- [ ] Full `audit-security` agent review
-- [ ] OWASP Top 10 verification
-- [ ] Path traversal protection verified
-- [ ] IPC handlers validate all input
+- [ ] Full `audit-security` agent review (Tier 2)
+- [ ] OWASP Top 10 verification (Tier 2)
+- [ ] Path traversal protection verified (Tier 2)
+- [ ] IPC handlers validate all input (Tier 2)
 
 **STOP if critical/high vulnerabilities found.**
 
 ---
 
-### Phase 7: Quality Review (Tier 2+)
+### Phase 7: Quality Review (Tier 2)
 **Goal:** Comprehensive code quality assessment.
 **Agent:** review-code
 **Checkpoint:** Quality metrics pass thresholds
 **Details:** See [phases/7-review.md](phases/7-review.md)
 
-**Review Categories (Expanded):**
-| Category | Tier 2 | Tier 3 |
-|----------|--------|--------|
-| Security vulnerabilities | Basic | Deep |
-| Performance issues | Standard | Profiled |
-| Code smell detection | 5 core smells | 12+ smells |
-| Complexity analysis | Cyclomatic | + Cognitive |
-| Maintainability scoring | Yes | Yes |
-| Test quality assessment | Basic | Deep |
-| Readability evaluation | Yes | Yes |
+**Review Categories:**
+| Category | Assessment |
+|----------|------------|
+| Security vulnerabilities | Deep analysis |
+| Performance issues | Profiled |
+| Code smell detection | 12+ smells |
+| Complexity analysis | Cyclomatic + Cognitive |
+| Maintainability scoring | Yes |
+| Test quality assessment | Deep |
+| Readability evaluation | Yes |
 
 **Quality Thresholds:**
 - Maintainability score: ≥60/100
 - Cyclomatic complexity: <15 per function
-- Test coverage: >70% (Tier 2), >80% (Tier 3)
+- Test coverage: >80%
 
 **Action required:** Fix all critical and high severity issues before proceeding.
 
 ---
 
-### Phase 8: Verification (Tier 2+)
+### Phase 8: Verification (Tier 2)
 **Goal:** Verify implementation matches approved plan.
 **Agent:** design-solution
 **Checkpoint:** Architect confirms VERIFIED
@@ -322,7 +310,7 @@ Determine tier from issue labels:
 
 ---
 
-### Phase 10: UAT (Tier 2+)
+### Phase 10: UAT (Tier 2)
 **Goal:** Manual testing by user.
 **Checkpoint:** User confirms acceptance criteria
 **Details:** See [phases/10-uat.md](phases/10-uat.md)

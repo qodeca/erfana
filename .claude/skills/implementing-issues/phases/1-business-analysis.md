@@ -2,7 +2,7 @@
 
 **Goal:** Research prior art and clarify requirements before exploring codebase.
 **Agent:** analyze-requirements
-**Checkpoint:** Research findings + requirements confirmed (Tier 2+)
+**Checkpoint:** Research findings + requirements confirmed (Tier 2)
 
 ---
 
@@ -125,7 +125,7 @@ Compile all findings:
 
 ---
 
-#### Tier 2+ (add these)
+#### Tier 2 (add these)
 
 **Q2: Reproduction Confidence**
 
@@ -178,7 +178,7 @@ Compile all findings:
 
 ---
 
-#### Tier 3 (add this)
+#### Tier 2 (add this)
 
 **Q5: Root Cause Depth**
 
@@ -222,7 +222,7 @@ Compile all findings:
 
 ---
 
-#### Tier 2+ (add these)
+#### Tier 2 (add these)
 
 **Q2: Scope Boundaries**
 
@@ -275,7 +275,7 @@ Compile all findings:
 
 ---
 
-#### Tier 3 (add these)
+#### Tier 2 (add these)
 
 **Q5: Performance Considerations**
 
@@ -333,7 +333,7 @@ Compile all findings:
 
 ---
 
-#### Tier 2+ (add these)
+#### Tier 2 (add these)
 
 **Q2: Integration Depth**
 
@@ -385,7 +385,7 @@ Compile all findings:
 
 ---
 
-#### Tier 3 (add these)
+#### Tier 2 (add these)
 
 **Q5: Testing Strategy**
 
@@ -421,7 +421,7 @@ Compile all findings:
 
 ---
 
-## Checkpoint (Tier 2+)
+## Checkpoint (Tier 2)
 
 Present to user before proceeding to Discovery:
 
@@ -492,7 +492,7 @@ Before proceeding to Phase 2 (Discovery), ALL must be checked:
 - [ ] Acceptance criteria validated
 - [ ] Scope boundaries documented
 - [ ] Research summary created
-- [ ] User approved checkpoint (Tier 2+)
+- [ ] User approved checkpoint (Tier 2)
 
 **STOP if any item unchecked. Do not proceed.**
 

@@ -2,13 +2,13 @@
 
 **Goal:** Comprehensive code quality assessment covering correctness, maintainability, and craftsmanship.
 **Agent:** `review-code`
-**Applies to:** Tier 2+ (skip for Tier 1 trivial changes)
+**Applies to:** Tier 2 (skip for Tier 1 trivial changes)
 
 This phase ensures the implementation is not just functional, but maintainable, readable, and follows best practices.
 
 ## Why This Phase Expanded to Tier 2
 
-Previously Tier 3 only. Now Tier 2+ because:
+Previously Tier 2 only. Now Tier 2 because:
 - Code quality issues compound over time
 - Earlier detection = cheaper fixes
 - Tier 2 issues are often the "foundation" for future features
@@ -35,24 +35,24 @@ Follow the `review-code` agent steps (see `agents/review-code.md`):
 - acceptance_criteria: ["Dynamic sizing", "Context menu"]
 - tier: 2
 
-### 2. Review Categories (Expanded)
+### 2. Review Categories
 
-| Category | Tier 2 | Tier 3 |
-|----------|--------|--------|
-| Security vulnerabilities | Basic | Deep |
-| Performance issues | Standard | Profiled |
-| Best practices compliance | Yes | Yes |
-| Test coverage adequacy | Yes | Yes |
-| **Code smell detection** | Standard | Deep |
-| **Complexity analysis** | Basic | Detailed |
-| **Maintainability scoring** | Yes | Yes |
-| **Test quality assessment** | Basic | Deep |
-| **Readability evaluation** | Yes | Yes |
-| Documentation completeness | Basic | Full |
+| Category | Assessment |
+|----------|------------|
+| Security vulnerabilities | Deep |
+| Performance issues | Profiled |
+| Best practices compliance | Yes |
+| Test coverage adequacy | Yes |
+| **Code smell detection** | Deep |
+| **Complexity analysis** | Detailed |
+| **Maintainability scoring** | Yes |
+| **Test quality assessment** | Deep |
+| **Readability evaluation** | Yes |
+| Documentation completeness | Full |
 
-### 3. Code Smell Detection (NEW)
+### 3. Code Smell Detection
 
-**Tier 2 - Standard Detection:**
+**Standard Detection:**
 
 | Smell | Detection | Threshold |
 |-------|-----------|-----------|
@@ -62,7 +62,7 @@ Follow the `review-code` agent steps (see `agents/review-code.md`):
 | Feature Envy | External references | >3 external deps |
 | Data Clumps | Repeated field groups | >2 occurrences |
 
-**Tier 3 - Deep Detection (Additional):**
+**Deep Detection:**
 
 | Smell | Detection | Action |
 |-------|-----------|--------|
@@ -128,8 +128,8 @@ Where:
 | **Speed** | Do tests run quickly? | >100ms per unit test |
 
 **Test Coverage Requirements:**
-- Tier 2: >70% line coverage for new code
-- Tier 3: >80% line coverage, >70% branch coverage
+- >80% line coverage for new code
+- >70% branch coverage
 
 **Test Quality Checklist:**
 - [ ] Each acceptance criterion has corresponding test(s)
@@ -168,7 +168,7 @@ Where:
 | **Medium** | Notable concern | Document if deferring |
 | **Low** | Suggestion | Optional improvement |
 
-## Review Checkpoint (Tier 2+)
+## Review Checkpoint (Tier 2)
 
 Present findings to user:
 
@@ -212,7 +212,7 @@ Present findings to user:
 [Proceed / Address Issues First]
 ```
 
-## Security Review (Tier 3 Enhanced)
+## Security Review (Tier 2 Enhanced)
 
 For security-sensitive changes, verify:
 - [ ] No path traversal vulnerabilities
@@ -233,7 +233,7 @@ For security-sensitive changes, verify:
 - Naming and formatting review
 - Security basics
 
-### Tier 3: Deep Review (All of Tier 2 plus)
+### Tier 2: Deep Review (All of Tier 2 plus)
 - Full code smell catalog (12+ smells)
 - Cognitive complexity analysis
 - Branch coverage verification (>70%)
@@ -262,11 +262,11 @@ Before proceeding to next phase, ALL must be checked:
 
 - [ ] Code review completed successfully
 - [ ] All critical issues addressed
-- [ ] All high severity issues addressed (Tier 3) or documented (Tier 2)
+- [ ] All high severity issues addressed (Tier 2) or documented (Tier 2)
 - [ ] Medium issues fixed or documented with justification
 - [ ] Maintainability score >= 60 (or documented exception)
 - [ ] Test coverage meets tier threshold
-- [ ] Security review completed (Tier 3)
+- [ ] Security review completed (Tier 2)
 - [ ] Code smells addressed or documented
 
 **STOP if any item unchecked. Do not proceed.**

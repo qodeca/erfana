@@ -110,7 +110,7 @@ Infrastructure Layer
 - Infrastructure importing business logic
 - Circular dependencies between layers
 
-## Architectural Review Checkpoint (Tier 2+)
+## Architectural Review Checkpoint (Tier 2)
 
 Present findings to user:
 
@@ -161,7 +161,7 @@ Present findings to user:
 - Pattern misuse detection
 - Dependency direction verification
 
-### Tier 3: Deep Architectural Review
+### Tier 2: Deep Architectural Review
 - Full SOLID analysis with specific violations
 - Detailed coupling metrics
 - Anti-pattern detection
