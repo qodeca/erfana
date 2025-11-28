@@ -203,7 +203,7 @@ audit_status = "fail" if ANY:
   "issue_number": 99,
   "files_changed": ["src/main/services/FileService.ts"],
   "issue_labels": ["security"],
-  "tier": 3,
+  "tier": 2,
   "ipc_handlers_modified": true
 }
 ```
