@@ -56,6 +56,7 @@ The skill will:
 ```
 TodoWrite([
   {content: "Phase 0: Pre-flight checks", status: "in_progress", activeForm: "Running pre-flight checks"},
+  {content: "Phase 0.5: Business Analysis", status: "pending", activeForm: "Researching prior art and clarifying requirements"},
   {content: "Phase 1: Discovery", status: "pending", activeForm: "Discovering codebase"},
   {content: "Phase 2: Architecture", status: "pending", activeForm: "Designing architecture"},
   {content: "Phase 3: Implementation", status: "pending", activeForm: "Implementing code"},
@@ -82,6 +83,7 @@ TodoWrite([
 | Phase | Purpose | Agent(s) | Checkpoint |
 |-------|---------|----------|------------|
 | 0. Pre-flight | Validate environment | - | - |
+| 0.5. Business Analysis | Research prior art + clarify requirements | business-analyst | Tier 2+ |
 | 1. Discovery | Understand issue & codebase | codebase-explorer | Tier 2+ |
 | 2. Architecture | Design solution + verify plan | solution-architect | Tier 2+ |
 | 3. Implementation | Write code + tests | code-implementer, test-writer | - |
@@ -103,19 +105,22 @@ Determine tier from issue labels:
 **Labels:** `good first issue`, `documentation`, `typo`, `chore`
 **Checkpoints:** Security Scan, Before Commit (2 total)
 **Skip phases:** Discovery, Architecture, Verification, Review, UAT
+**Business Analysis:** Quick mode (1-2 searches, 1-2 questions, no checkpoint)
 **Security:** Basic scan required (npm audit, secret detection)
 **Estimated time:** 15-30 minutes
 
 ### Tier 2: Standard (Default)
 **Labels:** `bug`, `enhancement`, or unlabeled
-**Checkpoints:** After Discovery, After Architecture (with plan verification), Security Scan, After Verification, After UAT, Before Commit (6 total)
+**Checkpoints:** After Business Analysis, After Discovery, After Architecture (with plan verification), Security Scan, After Verification, After UAT, Before Commit (7 total)
+**Business Analysis:** Standard mode (3-5 searches, 3-5 questions, checkpoint required)
 **Verification gates:** Plan verification (Phase 2), Implementation verification (Phase 6)
 **Security:** Full security scan required
 **Estimated time:** 30 minutes - 2 hours
 
 ### Tier 3: Complex
 **Labels:** `breaking-change`, `architecture`, `security`, `major`
-**Checkpoints:** All phases (8 total)
+**Checkpoints:** All phases (9 total)
+**Business Analysis:** Comprehensive mode (5-8 searches, 5-8 questions, checkpoint required)
 **Verification gates:** Plan verification (Phase 2), Implementation verification (Phase 6)
 **Security:** Full security scan + security-auditor agent review + OWASP verification
 **Estimated time:** 2+ hours
@@ -137,6 +142,28 @@ Determine tier from issue labels:
 - [ ] **Feature branch created** (e.g., `git checkout -b fix/11-short-description`)
 
 **Abort if:** Issue closed, blocked, baseline tests fail, uncommitted changes exist.
+
+---
+
+### Phase 0.5: Business Analysis (All Tiers)
+**Goal:** Research prior art and clarify requirements before exploring codebase.
+**Agent:** business-analyst
+**Checkpoint:** Research findings + requirements confirmed (Tier 2+)
+**Details:** See `phases/0.5-business-analysis.md`
+
+**Steps:**
+1. Classify issue type (bug/enhancement/feature/security/refactor)
+2. Research prior art (libraries, patterns, similar implementations)
+3. Present requirements questionnaire (tier-appropriate depth)
+4. Validate acceptance criteria completeness
+5. Document scope boundaries and risks
+
+**Tier Variations:**
+- **Tier 1:** Quick mode (1-2 searches, 1-2 questions, no checkpoint)
+- **Tier 2:** Standard mode (3-5 searches, 3-5 questions, checkpoint required)
+- **Tier 3:** Comprehensive mode (5-8 searches, 5-8 questions, checkpoint required)
+
+**Deliverable:** Research summary + requirements clarification document
 
 ---
 
@@ -403,21 +430,26 @@ If implementation cannot continue:
 ```
 1. Pre-flight (Phase 0): Verify environment, create branch ✓
    git checkout -b feat/11-chrome-style-tabs
-2. Discovery (Phase 1): Understand DockviewReact tabs, identify components
+2. Business Analysis (Phase 0.5): Research tab implementations
+   → WebSearch: "chrome style tabs react", "dockview custom tabs", "VS Code tab implementation"
+   → Found: No suitable library, VS Code uses custom implementation
+   → Questionnaire: Reference=VS Code, Scope=defined, Edge cases=comprehensive
+   → Checkpoint: Present research + requirements → Approved
+3. Discovery (Phase 1): Understand DockviewReact tabs, identify components
    → Checkpoint: Confirm understanding
-3. Architecture (Phase 2): Design EditorTab component, context menu
+4. Architecture (Phase 2): Design EditorTab component, context menu
    → Plan Verification Gate: Architect verifies plan → APPROVED
    → Checkpoint: Present approved plan to user → Approve plan
-4. Implementation (Phase 3): Create EditorTab.tsx, CSS, tests
-5. Security (Phase 4): Full security scan → Pass
-6. Review (Phase 5): Skipped (Tier 2)
-7. Verification (Phase 6): Architect verifies implementation matches plan
+5. Implementation (Phase 3): Create EditorTab.tsx, CSS, tests
+6. Security (Phase 4): Full security scan → Pass
+7. Review (Phase 5): Skipped (Tier 2)
+8. Verification (Phase 6): Architect verifies implementation matches plan
    → Verification Gate: solution-architect confirms → VERIFIED
    → Checkpoint: Present verification to user → Proceed
-8. Documentation (Phase 7): Update CLAUDE.md changelog
-9. UAT (Phase 8): Build project, run dev server
-   → Checkpoint: User tests manually, selects "UAT passed"
-10. Finalization (Phase 9): Pass quality gates, commit
+9. Documentation (Phase 7): Update CLAUDE.md changelog
+10. UAT (Phase 8): Build project, run dev server
+    → Checkpoint: User tests manually, selects "UAT passed"
+11. Finalization (Phase 9): Pass quality gates, commit
     → Checkpoint: Approve commit
     → Checkpoint: Select "Merge to main and delete branch"
 ```
@@ -428,23 +460,28 @@ If implementation cannot continue:
 ```
 1. Pre-flight (Phase 0): Verify environment, create branch ✓
    git checkout -b fix/99-path-traversal-protection
-2. Discovery (Phase 1): Analyze all file operations
+2. Business Analysis (Phase 0.5): Comprehensive security research
+   → WebSearch: "OWASP path traversal prevention", "electron file security", "node.js path validation"
+   → Found: OWASP guidelines, path.resolve() patterns, realpath validation
+   → Questionnaire: Threat model=comprehensive, Compliance=standard, Scope=all file ops
+   → Checkpoint: Present research + requirements → Approved
+3. Discovery (Phase 1): Analyze all file operations
    → Checkpoint: Confirm scope
-3. Architecture (Phase 2): Design pathSecurity.ts module
+4. Architecture (Phase 2): Design pathSecurity.ts module
    → Plan Verification Gate: Architect verifies plan → APPROVED
    → Checkpoint: Approve security approach
-4. Implementation (Phase 3): Implement with comprehensive tests
-5. Security (Phase 4): Full scan + security-auditor agent + OWASP
+5. Implementation (Phase 3): Implement with comprehensive tests
+6. Security (Phase 4): Full scan + security-auditor agent + OWASP
    → Pass all security gates
-6. Review (Phase 5): code-reviewer + security checklist
+7. Review (Phase 5): code-reviewer + security checklist
    → Checkpoint: Approve security review
-7. Verification (Phase 6): Architect verifies implementation matches plan
+8. Verification (Phase 6): Architect verifies implementation matches plan
    → Verification Gate: solution-architect confirms → VERIFIED
    → Checkpoint: Present verification to user → Proceed
-8. Documentation (Phase 7): Update security docs
-9. UAT (Phase 8): Build, run dev, test path traversal scenarios
-   → Checkpoint: User verifies security, selects "UAT passed"
-10. Finalization (Phase 9): All quality gates + security gates
+9. Documentation (Phase 7): Update security docs
+10. UAT (Phase 8): Build, run dev, test path traversal scenarios
+    → Checkpoint: User verifies security, selects "UAT passed"
+11. Finalization (Phase 9): All quality gates + security gates
     → Checkpoint: Approve commit
     → Checkpoint: Select "Merge to main and delete branch"
 ```
@@ -459,8 +496,9 @@ If implementation cannot continue:
 
 ## Architecture Note
 
-This skill is an **orchestrator** that delegates work to built-in system agents via `Task(subagent_type='...')`. It does NOT have a dedicated `agents/` directory because it uses Claude Code's built-in agents:
+This skill is an **orchestrator** that delegates work to agents via `Task(subagent_type='...')`. It uses:
 
+**Built-in System Agents:**
 - `codebase-explorer` - Fast codebase navigation
 - `solution-architect` - System design and planning
 - `code-implementer` - Write production code
@@ -471,4 +509,7 @@ This skill is an **orchestrator** that delegates work to built-in system agents 
 - `diff-summarizer` - Commit messages
 - `release-engineer` - Release preparation
 
-This is a valid pattern for skills that orchestrate reusable system capabilities.
+**Skill-Specific Agent:**
+- `business-analyst` - Prior art research + requirements clarification (see `agents/business-analyst.md`)
+
+The hybrid pattern (built-in + custom agents) is valid for skills that need specialized capabilities beyond system defaults.

@@ -9,6 +9,9 @@ Quick reference for selecting and using specialized agents during issue implemen
 ```
 Start: What type of work?
 │
+├── Prior Art Research / Requirements?
+│   └── business-analyst
+│
 ├── Discovery/Exploration?
 │   └── codebase-explorer
 │
@@ -58,10 +61,11 @@ Start: What type of work?
 | `project-documenter` | sonnet | Read, Write, Edit, Glob, Grep | CLAUDE.md, architecture docs |
 | `diff-summarizer` | haiku | Read, Grep, Glob, Bash | Commit messages, PR descriptions |
 
-### Conditional Agents (5)
+### Conditional Agents (6)
 
 | Agent | Model | Tools | Trigger |
 |-------|-------|-------|---------|
+| `business-analyst` | haiku/sonnet/opus | Read, WebSearch, AskUserQuestion, Grep, Glob | Phase 0.5 (all tiers) |
 | `bug-investigator` | sonnet | Read, Grep, Glob, Bash | `bug` label |
 | `refactoring-advisor` | sonnet | Read, Grep, Glob | `refactor` label |
 | `security-auditor` | opus | Read, Grep, Glob | Tier 3, `security` label |
@@ -71,6 +75,50 @@ Start: What type of work?
 ---
 
 ## Agent Capabilities
+
+### business-analyst
+
+**Purpose**: Conduct prior art research and structured requirements gathering before codebase exploration.
+
+**Use When**:
+- Starting Phase 0.5 (Business Analysis)
+- Need to research existing solutions/libraries
+- Requirements are unclear or incomplete
+- Acceptance criteria need validation
+- Identifying scope boundaries
+
+**Model Selection**:
+- Tier 1: haiku (quick research)
+- Tier 2: sonnet (focused research)
+- Tier 3: opus (comprehensive research)
+
+**Outputs**:
+- Prior art research summary
+- Requirements clarification document
+- Validated acceptance criteria
+- Scope boundaries (in/out of scope)
+- Risk identification
+
+**Example Prompt**:
+```
+Conduct business analysis for issue #11 (Tier 2).
+
+Issue: Add Chrome-style dynamic tabs
+Labels: enhancement
+Body: "Tabs should resize dynamically, show dirty indicator, support context menu"
+
+Steps:
+1. Classify issue type
+2. Search for existing tab implementations (npm, VS Code, patterns)
+3. Present 3-5 questions about reference implementation, scope, edge cases
+4. Validate acceptance criteria completeness
+5. Document scope boundaries
+6. Return research summary with recommendation
+```
+
+**Details**: See `agents/business-analyst.md`
+
+---
 
 ### codebase-explorer
 
@@ -372,10 +420,10 @@ Agents add overhead. Skip them for:
 ### Sequential (Dependencies)
 
 ```
-codebase-explorer → solution-architect → code-implementer → test-writer → code-reviewer
+business-analyst → codebase-explorer → solution-architect → code-implementer → test-writer → code-reviewer
 ```
 
-Each step depends on previous output.
+Each step depends on previous output. Business analyst outputs inform discovery and architecture.
 
 ### Parallel (Independent)
 
@@ -405,6 +453,8 @@ Repeat until quality standards met.
 
 | Agent | Failure Mode | Recovery Action |
 |-------|--------------|-----------------|
+| business-analyst | WebSearch fails | Document attempt, proceed with reduced findings |
+| business-analyst | User skips question | Re-present with "required for clarity" |
 | codebase-explorer | Search too broad | Add constraints, retry |
 | solution-architect | Plan incomplete | Manual architecture, skip to implementation |
 | code-implementer | Code not compiling | Fix errors manually, re-invoke |
@@ -422,10 +472,20 @@ Repeat until quality standards met.
 
 ## Agent Invocation Examples
 
+### Phase 0.5: Business Analysis
+```
+@business-analyst Conduct business analysis for issue #11 (Tier 2).
+Issue: Add Chrome-style dynamic tabs
+Labels: enhancement
+Research: npm libraries, VS Code implementation, design patterns
+Questions: reference implementation, scope boundaries, edge cases
+```
+
 ### Phase 1: Discovery
 ```
 @codebase-explorer Find all files related to tab management.
 Search for DockviewReact usage and tab components.
+Use business analysis findings: recommend VS Code-style custom implementation.
 ```
 
 ### Phase 2: Architecture
@@ -466,12 +526,15 @@ Type: feat, Scope: tabs, Issue: #11
 
 | Label | Primary Agent | Supporting Agents |
 |-------|--------------|-------------------|
-| `bug` | bug-investigator | code-implementer, test-writer |
-| `enhancement` | solution-architect | code-implementer, code-reviewer |
+| `bug` | bug-investigator | business-analyst, code-implementer, test-writer |
+| `enhancement` | business-analyst | solution-architect, code-implementer, code-reviewer |
+| `feature` | business-analyst | solution-architect, code-implementer, test-writer |
 | `documentation` | project-documenter or docs-updater | - |
 | `refactor` | refactoring-advisor | code-implementer, code-reviewer |
-| `security` | security-auditor | code-implementer |
+| `security` | business-analyst | security-auditor, code-implementer |
 | `test` | test-writer | - |
+
+**Note:** business-analyst is used first (Phase 0.5) for all non-trivial issues before other agents.
 
 ---
 
