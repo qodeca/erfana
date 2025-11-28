@@ -1,5 +1,5 @@
 ---
-name: creating-github-issues
+name: creating-issues
 description: Create Claude Code-friendly GitHub issues from user problem descriptions. Guides through codebase analysis, clarifying questions, issue classification (bug/enhancement), and structured issue creation using gh CLI. Use when user reports a bug, requests a feature, mentions creating an issue, or discusses problems that should be tracked in GitHub Issues.
 ---
 

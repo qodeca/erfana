@@ -1,5 +1,5 @@
 ---
-name: implementing-github-issues
+name: implementing-issues
 description: Implement GitHub issues through structured phases with specialized agents and human checkpoints. Supports 3 complexity tiers (trivial/standard/complex) with appropriate checkpoint levels. Requires GitHub issue number. Use when working on an issue, 'implement #N', 'fix issue #N', or 'work on issue'.
 ---
 
@@ -9,7 +9,7 @@ This skill guides the complete implementation of GitHub issues through structure
 
 ## When to Use This Skill
 
-Use `implementing-github-issues` when:
+Use `implementing-issues` when:
 - Assigned a GitHub issue to implement
 - Asked to "implement", "fix", or "work on" an issue
 - Need structured workflow with checkpoints for quality control
