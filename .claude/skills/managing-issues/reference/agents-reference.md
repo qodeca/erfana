@@ -1,6 +1,6 @@
 # Agent Reference Guide
 
-Quick reference for selecting and using embedded agents during issue implementation.
+Quick reference for selecting and using embedded agents during issue management.
 
 ---
 
@@ -8,7 +8,13 @@ Quick reference for selecting and using embedded agents during issue implementat
 
 All agents are embedded in `agents/` directory with full input/output contracts.
 
-### Core Workflow Agents
+### Create Operation Agents
+
+| Agent | Purpose |
+|-------|---------|
+| draft-issue | Draft GitHub issues following templates |
+
+### Implement Operation Agents (Core Workflow)
 
 | Agent | Phase | Purpose |
 |-------|-------|---------|
@@ -90,6 +96,33 @@ Start: What phase are you in?
 ---
 
 ## Agent Details
+
+### draft-issue
+
+**Operation:** Create
+**File:** `agents/draft-issue.md`
+
+**Modes:**
+- `gather-requirements`: Ask clarifying questions
+- `draft`: Generate issue using template
+
+**Inputs:**
+- mode, issue_type, user_description, gathered_requirements
+
+**Outputs:**
+- title, body, labels, template_used
+
+**Use When:**
+- Creating new GitHub issues
+- Drafting bug reports
+- Drafting feature requests
+
+**Constraints:**
+- NEVER include file paths or line numbers
+- ALWAYS use checkbox format for criteria
+- Focus on behavior, not implementation
+
+---
 
 ### analyze-requirements
 
