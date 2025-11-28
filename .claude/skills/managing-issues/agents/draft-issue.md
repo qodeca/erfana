@@ -37,7 +37,7 @@ Draft GitHub issues following templates and Claude Code-friendly principles.
 BEFORE execution, verify:
 - [ ] Mode is valid ("gather-requirements" or "draft")
 - [ ] Issue type is valid ("bug" or "enhancement")
-- [ ] User description is not empty
+- [ ] User description is not empty (min 10 chars, max 5000 chars)
 
 **If ANY fails: STOP, return error.**
 
@@ -92,7 +92,7 @@ Use AskUserQuestion with type-appropriate questions.
       "question": "Which areas or features are affected?",
       "header": "Affected",
       "options": [
-        {"label": "Editor", "description": "Text editing, Monaco"},
+        {"label": "Editor", "description": "Text editing, Monaco **✓**"},
         {"label": "File Tree", "description": "Project navigation"},
         {"label": "Terminal", "description": "Command line interface"},
         {"label": "Preview", "description": "Markdown preview"}
