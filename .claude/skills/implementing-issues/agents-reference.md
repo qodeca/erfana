@@ -12,16 +12,17 @@ All agents are embedded in `agents/` directory with full input/output contracts.
 
 | Agent | Phase | Purpose |
 |-------|-------|---------|
-| analyze-requirements | 0.5 | Prior art research + requirements |
-| explore-codebase | 1 | Find files and patterns |
-| design-solution | 2, 6 | Plan + verify implementation |
-| implement-code | 3 | Write production code |
-| write-tests | 3 | Create comprehensive tests |
-| review-code | 5 | Pre-commit review |
-| audit-security | 4 | Security scanning |
-| update-docs | 7 | Update documentation |
-| summarize-diff | 9 | Generate commit messages |
-| prepare-release | 10 | Prepare releases |
+| analyze-requirements | 1 | Prior art research + requirements |
+| explore-codebase | 2 | Find files and patterns |
+| design-solution | 3, 8 | Plan + verify implementation |
+| implement-code | 4 | Write production code |
+| write-tests | 4 | Create comprehensive tests |
+| review-architecture | 5 | SOLID principles, coupling, patterns |
+| audit-security | 6 | Security scanning |
+| review-code | 7 | Comprehensive quality review |
+| update-docs | 9 | Update documentation |
+| summarize-diff | 11 | Generate commit messages |
+| prepare-release | 12 | Prepare releases |
 
 ### Conditional Agents
 
@@ -38,35 +39,41 @@ All agents are embedded in `agents/` directory with full input/output contracts.
 ```
 Start: What phase are you in?
 │
-├── Phase 0.5: Business Analysis
+├── Phase 1: Business Analysis
 │   └── analyze-requirements
 │
-├── Phase 1: Discovery
+├── Phase 2: Discovery
 │   └── explore-codebase
 │
-├── Phase 2: Architecture
+├── Phase 3: Architecture
 │   └── design-solution
 │
-├── Phase 3: Implementation
+├── Phase 4: Implementation
 │   ├── Code → implement-code
 │   └── Tests → write-tests
 │
-├── Phase 4: Security
+├── Phase 5: Architectural Review
+│   └── review-architecture
+│
+├── Phase 6: Security
 │   └── audit-security
 │
-├── Phase 5: Review
+├── Phase 7: Quality Review
 │   └── review-code
 │
-├── Phase 6: Verification
+├── Phase 8: Verification
 │   └── design-solution (verify mode)
 │
-├── Phase 7: Documentation
+├── Phase 9: Documentation
 │   └── update-docs
 │
-├── Phase 9: Finalization
+├── Phase 10: UAT
+│   └── (manual user testing)
+│
+├── Phase 11: Finalization
 │   └── summarize-diff
 │
-└── Phase 10: Release
+└── Phase 12: Release
     └── prepare-release
 ```
 
@@ -86,7 +93,7 @@ Start: What phase are you in?
 
 ### analyze-requirements
 
-**Phase:** 0.5 (Business Analysis)
+**Phase:** 1 (Business Analysis)
 **File:** `agents/analyze-requirements.md`
 
 **Inputs:**
@@ -104,7 +111,7 @@ Start: What phase are you in?
 
 ### explore-codebase
 
-**Phase:** 1 (Discovery)
+**Phase:** 2 (Discovery)
 **File:** `agents/explore-codebase.md`
 
 **Inputs:**
@@ -122,7 +129,7 @@ Start: What phase are you in?
 
 ### design-solution
 
-**Phase:** 2 (Architecture), 6 (Verification)
+**Phase:** 3 (Architecture), 8 (Verification)
 **File:** `agents/design-solution.md`
 
 **Inputs:**
@@ -132,15 +139,15 @@ Start: What phase are you in?
 - implementation_plan, file_changes, test_strategy, risks, estimates, verification_criteria
 
 **Use When:**
-- Planning new features (Phase 2)
-- Verifying implementation (Phase 6)
+- Planning new features (Phase 3)
+- Verifying implementation (Phase 8)
 - Evaluating technical approaches
 
 ---
 
 ### implement-code
 
-**Phase:** 3 (Implementation)
+**Phase:** 4 (Implementation)
 **File:** `agents/implement-code.md`
 
 **Inputs:**
@@ -163,7 +170,7 @@ Start: What phase are you in?
 
 ### write-tests
 
-**Phase:** 3 (Implementation)
+**Phase:** 4 (Implementation)
 **File:** `agents/write-tests.md`
 
 **Inputs:**
@@ -181,9 +188,42 @@ Start: What phase are you in?
 
 ---
 
+### review-architecture
+
+**Phase:** 5 (Architectural Review)
+**File:** `agents/review-architecture.md`
+
+**Inputs:**
+- issue_number, files_changed, implementation_plan, tier, codebase_patterns
+
+**Outputs:**
+- assessment, solid_analysis, coupling_score, cohesion_score, findings, critical_issues, recommendations, technical_debt
+
+**Use When:**
+- After implementation complete (Tier 2+)
+- Validating SOLID principles
+- Assessing coupling and cohesion
+- Checking design pattern usage
+
+**Key Evaluations:**
+| Principle | Check |
+|-----------|-------|
+| Single Responsibility | ONE reason to change per component |
+| Open/Closed | Extensible without modification |
+| Liskov Substitution | Subtypes replaceable |
+| Interface Segregation | Minimal, focused interfaces |
+| Dependency Inversion | Depend on abstractions |
+
+**Assessment Outcomes:**
+- SOUND: No critical issues, max 2 high
+- NEEDS_IMPROVEMENT: High issues or multiple medium
+- ARCHITECTURAL_ISSUES: Has critical issues
+
+---
+
 ### review-code
 
-**Phase:** 5 (Review)
+**Phase:** 7 (Quality Review)
 **File:** `agents/review-code.md`
 
 **Inputs:**
@@ -201,7 +241,7 @@ Start: What phase are you in?
 
 ### audit-security
 
-**Phase:** 4 (Security)
+**Phase:** 6 (Security)
 **File:** `agents/audit-security.md`
 
 **Inputs:**
@@ -219,7 +259,7 @@ Start: What phase are you in?
 
 ### update-docs
 
-**Phase:** 7 (Documentation)
+**Phase:** 9 (Documentation)
 **File:** `agents/update-docs.md`
 
 **Inputs:**
@@ -237,7 +277,7 @@ Start: What phase are you in?
 
 ### summarize-diff
 
-**Phase:** 9 (Finalization)
+**Phase:** 11 (Finalization)
 **File:** `agents/summarize-diff.md`
 
 **Inputs:**
@@ -255,7 +295,7 @@ Start: What phase are you in?
 
 ### prepare-release
 
-**Phase:** 10 (Release)
+**Phase:** 12 (Release)
 **File:** `agents/prepare-release.md`
 
 **Inputs:**
@@ -361,6 +401,7 @@ All agents follow this pattern:
 | design-solution | Plan incomplete | Manual architecture |
 | implement-code | Typecheck fails | Fix errors, retry |
 | write-tests | Coverage low | Add more tests |
+| review-architecture | SOLID violations | Fix issues, re-review |
 | review-code | Critical issues | Fix issues, re-review |
 | audit-security | Vulnerabilities | STOP, fix security |
 

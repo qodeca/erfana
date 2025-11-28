@@ -1,4 +1,4 @@
-# Phase 6: Implementation Verification
+# Phase 8: Implementation Verification
 
 **Goal:** Verify implementation matches approved plan before marking as complete.
 **Agent:** `design-solution`
@@ -61,11 +61,11 @@ Present verification result to user:
 [Proceed to Documentation / Address Issues]
 ```
 
-## Definition of Done (Phase 6)
+## Definition of Done (Phase 8)
 
-Before proceeding to Phase 7, ALL must be true:
+Before proceeding to Phase 9, ALL must be true:
 - [ ] All tests pass
-- [ ] Code review passed (Phase 5)
+- [ ] Code review passed (Phase 7)
 - [ ] **Architect verification: VERIFIED**
 
 ---

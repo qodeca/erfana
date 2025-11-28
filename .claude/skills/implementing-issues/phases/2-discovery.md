@@ -1,4 +1,4 @@
-# Phase 1: Discovery
+# Phase 2: Discovery
 
 **Goal:** Understand the issue and affected codebase areas.
 
