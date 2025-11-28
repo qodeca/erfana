@@ -237,6 +237,33 @@ If implementation cannot continue:
 
 ---
 
+## User Override
+
+Users may override workflow gates with documented justification.
+
+### Override Procedure
+
+1. **User explicitly requests override** (e.g., "skip architectural review")
+2. **Document justification** - Why the override is appropriate
+3. **Record in commit** - Note skipped step in commit message
+4. **Cannot override:**
+   - Security scan (Phase 6) - NEVER skippable
+   - Pre-flight checks (Phase 0) - NEVER skippable
+   - Quality gates in Finalization (Phase 11)
+
+### Override Examples
+
+| Request | Response |
+|---------|----------|
+| "Skip UAT, I tested manually" | Allowed - document in commit |
+| "Skip architectural review for hotfix" | Allowed - document justification |
+| "Skip security scan" | DENIED - security is mandatory |
+| "Skip tests, it's trivial" | Allowed for Tier 1 only |
+
+**Note:** All overrides must be explicit. Never assume user wants to skip steps.
+
+---
+
 ## Checkpoint Summary by Tier
 
 | Checkpoint | Tier 1 | Tier 2 |

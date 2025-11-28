@@ -32,14 +32,15 @@ Ensure we:
 | issue_number | number | Yes | GitHub issue number |
 | issue_body | string | Yes | Issue description text |
 | issue_labels | array | Yes | Issue labels list |
-| tier | number | Yes | Complexity tier (1, 2, or 3) |
+| tier | number | Yes | Complexity tier (1 or 2) |
 
 ### Input Validation
 
 BEFORE execution, verify:
-- [ ] Issue number exists and is valid
-- [ ] Issue body is not empty
-- [ ] Tier is 1, 2, or 3
+- [ ] Issue number exists and is valid (positive integer)
+- [ ] Issue body is not empty (min 10 chars, max 10000 chars)
+- [ ] Issue labels is array (may be empty)
+- [ ] Tier is 1 or 2
 
 **If ANY fails: STOP, return error with missing/invalid inputs.**
 
@@ -83,8 +84,7 @@ Search for existing solutions based on issue type and tier.
 | Tier | Searches | Time Budget |
 |------|----------|-------------|
 | 1 | 1-2 | 2 minutes |
-| 2 | 3-5 | 5 minutes |
-| 3 | 5-8 | 10 minutes |
+| 2 | 5-8 | 10 minutes |
 
 **Search Templates by Issue Type:**
 
@@ -119,8 +119,7 @@ Use AskUserQuestion tool with tier-appropriate questions.
 | Tier | Questions |
 |------|-----------|
 | 1 | 1-2 essential questions |
-| 2 | 3-5 questions covering scope and edge cases |
-| 3 | 5-8 comprehensive questions |
+| 2 | 5-8 comprehensive questions |
 
 See `phases/1-business-analysis.md` for full questionnaire templates.
 
@@ -197,10 +196,10 @@ Before returning output, ALL must be true:
 
 ## Token Budget
 
-| Metric | Tier 1 | Tier 2 | Tier 2 |
-|--------|--------|--------|--------|
-| Target | 300 | 500 | 800 |
-| Maximum | 500 | 800 | 1200 |
+| Metric | Tier 1 | Tier 2 |
+|--------|--------|--------|
+| Target | 300 | 800 |
+| Maximum | 500 | 1200 |
 
 ---
 
@@ -240,7 +239,7 @@ Steps:
 6. Return research summary with recommendation
 ```
 
-### Tier 2: Comprehensive Analysis
+### Tier 2: Security Analysis
 
 ```
 Conduct comprehensive requirements analysis for issue #99 (Tier 2).

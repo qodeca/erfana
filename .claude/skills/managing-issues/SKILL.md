@@ -1,6 +1,6 @@
 ---
 name: managing-issues
-version: 1.0.0
+version: 1.0.1
 status: active
 description: Full lifecycle management of GitHub issues - create and implement. Routes to appropriate operation based on user intent. Use when creating issues, reporting bugs, requesting features, implementing issues, or working on GitHub issues.
 ---
@@ -36,6 +36,31 @@ Complete lifecycle management for GitHub issues through structured operations wi
 | Update | Update issue status, labels, assignees | Planned |
 | Close | Close issues with resolution | Planned |
 | Triage | Prioritize and categorize issues | Planned |
+
+---
+
+## Auto-Discovery Triggers
+
+This skill auto-activates when user input matches these patterns:
+
+### Create Operation Triggers
+- "create issue", "create an issue", "file an issue"
+- "report bug", "report a bug", "found a bug"
+- "request feature", "want a feature", "new feature"
+- "file issue", "open issue", "submit issue"
+- "there's a problem with...", "something's broken"
+
+### Implement Operation Triggers
+- "implement #N", "implement issue #N"
+- "fix #N", "fix issue #N", "resolve #N"
+- "work on #N", "work on issue #N"
+- "tackle issue", "address issue"
+- "let's fix", "let's implement", "let's work on"
+
+### Ambiguous (Will Ask for Clarification)
+- "issue #N" (view? implement?)
+- "help with issues" (create? implement?)
+- "GitHub issue" (without clear action)
 
 ---
 
