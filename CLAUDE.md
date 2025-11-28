@@ -2,7 +2,7 @@
 
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
-- **Version**: 0.5.1
+- **Version**: 0.5.2
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -52,7 +52,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (2504 tests, 91 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (2618 tests, 92 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -64,7 +64,27 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
-## Recent Changes (v0.5.1)
+## Recent Changes (v0.5.2)
+- **Mermaid Diagram Layout Direction Buttons** (Nov 28, 2025):
+  - Add layout direction controls to Mermaid diagram hover toolbar (issue #32)
+  - Unified toolbar: direction buttons + expand button appear on diagram hover
+  - Comprehensive chart support: 7 Mermaid diagram types with direction capability:
+    - flowchart/graph: TB, TD, BT, LR, RL (inline syntax)
+    - stateDiagram, classDiagram, erDiagram, requirementDiagram: TB, BT, LR, RL (direction statement)
+    - gitGraph: LR, TB, BT (colon syntax, LR default)
+  - Current direction: disabled + highlighted (blue accent)
+  - Clicking direction button executes prompt template with diagram context
+  - Prompt includes file reference, line range, code, and target direction
+  - Pure logic extraction: `mermaidDirections.ts` for testability
+  - Helper functions: `usesDirectionStatement()`, `usesColonSyntax()` for syntax-aware prompts
+  - New files:
+    - `src/renderer/src/utils/mermaidDirections.ts`: Chart type detection, direction parsing
+    - `src/renderer/src/components/Editor/MermaidToolbar/`: Unified toolbar component
+    - `src/renderer/src/prompts/templates/mermaid-change-direction.md`: Prompt template
+  - 151 new tests (125 logic + 26 component)
+  - Closes #32
+
+## Changes in v0.5.1
 - **Mermaid Diagram Theming with Dark/Light Mode** (Nov 28, 2025):
   - Unified theming system for Mermaid diagrams with system preference detection
   - Consistent background colors between Preview and DiagramViewer components

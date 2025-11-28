@@ -38,6 +38,12 @@ export interface PromptVariables {
 
   /** Path to an imported file (for organize-import prompt) */
   importedFilePath?: string
+
+  /** Target direction for Mermaid diagram layout change (e.g., "LR", "TB") */
+  targetDirection?: string
+
+  /** Human-readable label for the target direction (e.g., "Left to Right") */
+  directionLabel?: string
 }
 
 /**

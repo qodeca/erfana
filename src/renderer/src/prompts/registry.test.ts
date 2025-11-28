@@ -11,10 +11,10 @@ describe('Template Registry', () => {
   // The registry is built at module load time, so we test the actual registry
 
   describe('Registry Initialization', () => {
-    it('should load all 6 templates (elaborate, modify, ask, prompt, mermaid-bug-report, organize-import)', () => {
+    it('should load all 7 templates (elaborate, modify, ask, prompt, mermaid-bug-report, change-mermaid-direction, organize-import)', () => {
       const allPrompts = getAllPrompts()
 
-      expect(allPrompts.length).toBe(6)
+      expect(allPrompts.length).toBe(7)
 
       const ids = getAllPromptIds()
       expect(ids).toContain('elaborate')
@@ -22,13 +22,14 @@ describe('Template Registry', () => {
       expect(ids).toContain('ask')
       expect(ids).toContain('prompt')
       expect(ids).toContain('mermaid-bug-report')
+      expect(ids).toContain('change-mermaid-direction')
       expect(ids).toContain('organize-import')
     })
 
     it('should build PROMPT_REGISTRY with correct structure', () => {
       expect(PROMPT_REGISTRY).toBeDefined()
       expect(typeof PROMPT_REGISTRY).toBe('object')
-      expect(Object.keys(PROMPT_REGISTRY).length).toBe(6)
+      expect(Object.keys(PROMPT_REGISTRY).length).toBe(7)
     })
 
     it('should log correct count to console on module load', () => {
@@ -36,7 +37,7 @@ describe('Template Registry', () => {
       // The actual log happens when the module first loads, so we just verify
       // the registry matches the expected count
       const count = getAllPrompts().length
-      expect(count).toBe(6)
+      expect(count).toBe(7)
     })
   })
 
@@ -92,7 +93,7 @@ describe('Template Registry', () => {
       const prompts = getAllPrompts()
 
       expect(Array.isArray(prompts)).toBe(true)
-      expect(prompts.length).toBe(6)
+      expect(prompts.length).toBe(7)
     })
 
     it('should return configs with correct structure', () => {
@@ -116,7 +117,7 @@ describe('Template Registry', () => {
       const ids = getAllPromptIds()
 
       expect(Array.isArray(ids)).toBe(true)
-      expect(ids.length).toBe(6)
+      expect(ids.length).toBe(7)
 
       ids.forEach((id) => {
         expect(typeof id).toBe('string')
@@ -131,6 +132,7 @@ describe('Template Registry', () => {
       expect(ids).toContain('ask')
       expect(ids).toContain('prompt')
       expect(ids).toContain('mermaid-bug-report')
+      expect(ids).toContain('change-mermaid-direction')
       expect(ids).toContain('organize-import')
     })
   })
@@ -211,10 +213,11 @@ describe('Template Registry', () => {
 
       expect(prompts.length).toBeGreaterThan(0)
 
-      // Should include both context-menu and mermaid-error subAreas
+      // Should include context-menu, mermaid-error, and mermaid-direction subAreas
       const subAreas = prompts.map((p) => p.subArea).filter(Boolean)
       expect(subAreas).toContain('context-menu')
       expect(subAreas).toContain('mermaid-error')
+      expect(subAreas).toContain('mermaid-direction')
     })
   })
 

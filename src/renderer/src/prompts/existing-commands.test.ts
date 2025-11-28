@@ -235,22 +235,23 @@ describe('Existing Commands - Regression Tests', () => {
   })
 
   describe('Total Template Count - No Regression', () => {
-    it('should have exactly 5 templates total', () => {
+    it('should have exactly 6 templates total', () => {
       const prompts = getPromptsForArea('markdown-preview')
 
-      // 4 context-menu + 1 mermaid-error
-      expect(prompts.length).toBe(5)
+      // 4 context-menu + 1 mermaid-error + 1 mermaid-direction
+      expect(prompts.length).toBe(6)
     })
 
-    it('should include all original templates plus new Prompt', () => {
+    it('should include all original templates plus new Prompt and direction change', () => {
       const prompts = getPromptsForArea('markdown-preview')
       const ids = prompts.map((p) => p.id)
 
       expect(ids).toContain('elaborate')
       expect(ids).toContain('modify')
       expect(ids).toContain('ask')
-      expect(ids).toContain('prompt') // New
+      expect(ids).toContain('prompt')
       expect(ids).toContain('mermaid-bug-report')
+      expect(ids).toContain('change-mermaid-direction')
     })
   })
 
