@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useState } from 'react'
+import { useRef, useEffect, useLayoutEffect, useCallback, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, ZoomIn, ZoomOut, Maximize, RotateCcw, Terminal, ChevronLeft } from 'lucide-react'
 import {
@@ -130,21 +130,20 @@ export function DiagramViewer() {
   }, [isOpen])
 
   // Portal management: move terminal into viewer when open, back to main when closed
-  useEffect(() => {
-    if (!portalContext) return
+  // CRITICAL: Use useLayoutEffect for synchronous cleanup before React unmounts the container
+  useLayoutEffect(() => {
+    if (!portalContext || !isOpen) return
 
-    if (isOpen) {
-      portalContext.setPortalTarget('diagram-viewer')
-      // Request refit after portal move
-      portalContext.requestRefit()
-    } else {
-      portalContext.setPortalTarget('main')
-      portalContext.requestRefit()
-    }
+    portalContext.setPortalTarget('diagram-viewer')
+    // Request refit after portal move
+    portalContext.requestRefit()
 
     return () => {
-      // Ensure terminal returns to main on unmount
-      portalContext.setPortalTarget('main')
+      // CRITICAL: Synchronously move terminal back BEFORE React unmounts our container
+      // If we only set state here, the state update might be deferred and the terminal
+      // would still be in our container when React removes it
+      portalContext.returnToMain()
+      portalContext.requestRefit()
     }
   }, [isOpen, portalContext])
 
@@ -559,35 +558,36 @@ export function DiagramViewer() {
           )}
         </div>
 
-        {/* Resize handle (only when terminal visible) */}
-        {isTerminalVisible && (
-          <div
-            className={`diagram-viewer-resizer ${isResizing.current ? 'dragging' : ''}`}
-            onMouseDown={handleResizeStart}
-          />
-        )}
+        {/* Resize handle - use display:none instead of conditional render */}
+        <div
+          className={`diagram-viewer-resizer ${isResizing.current ? 'dragging' : ''}`}
+          onMouseDown={handleResizeStart}
+          style={{ display: isTerminalVisible ? 'block' : 'none' }}
+        />
 
-        {/* Terminal pane (portal target) */}
-        {isTerminalVisible && (
-          <div
-            ref={portalContext?.diagramViewerContainerRef}
-            className="diagram-viewer-terminal-pane"
-            style={{ width: paneWidths.terminalWidth }}
-          />
-        )}
+        {/* Terminal pane (portal target) - NEVER unmount, use display:none
+            CRITICAL: If we conditionally render this, the terminal DOM node
+            gets orphaned when toggling visibility with Cmd+J */}
+        <div
+          ref={portalContext?.diagramViewerContainerRef}
+          className="diagram-viewer-terminal-pane"
+          style={{
+            display: isTerminalVisible ? 'flex' : 'none',
+            width: isTerminalVisible ? paneWidths.terminalWidth : 0
+          }}
+        />
 
         {/* Collapsed state: vertical toggle bar */}
-        {!isTerminalVisible && (
-          <div
-            className="diagram-viewer-terminal-collapsed"
-            onClick={toggleTerminal}
-            title="Show Terminal (⌘J)"
-            role="button"
-            aria-label="Show terminal"
-          >
-            <ChevronLeft size={16} />
-          </div>
-        )}
+        <div
+          className="diagram-viewer-terminal-collapsed"
+          onClick={toggleTerminal}
+          title="Show Terminal (⌘J)"
+          role="button"
+          aria-label="Show terminal"
+          style={{ display: isTerminalVisible ? 'none' : 'flex' }}
+        >
+          <ChevronLeft size={16} />
+        </div>
       </div>
     </div>,
     portalRoot

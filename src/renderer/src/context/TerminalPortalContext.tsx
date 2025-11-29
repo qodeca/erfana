@@ -29,6 +29,13 @@ interface TerminalPortalContextValue {
   /** Change where terminal renders */
   setPortalTarget: (target: PortalTarget) => void
 
+  /**
+   * Synchronously move terminal back to main container.
+   * CRITICAL: Must be called in cleanup before DiagramViewer unmounts,
+   * otherwise the terminal DOM node gets removed with the container.
+   */
+  returnToMain: () => void
+
   /** Request terminal to refit after portal change */
   requestRefit: () => void
 
@@ -55,6 +62,26 @@ export function TerminalPortalProvider({ children }: TerminalPortalProviderProps
     setPortalTargetState(target)
   }, [])
 
+  /**
+   * Synchronously move terminal back to main container.
+   * This must be called in DiagramViewer's useLayoutEffect cleanup
+   * BEFORE React unmounts the container, otherwise the terminal gets removed.
+   */
+  const returnToMain = useCallback(() => {
+    const diagramContainer = diagramViewerContainerRef.current
+    const mainContainer = mainContainerRef.current
+
+    // Find the terminal panel (it's the child of the diagram container)
+    const terminalPanel = diagramContainer?.querySelector('.terminal-panel')
+
+    if (terminalPanel && mainContainer) {
+      // Physically move the DOM node back to main container
+      mainContainer.appendChild(terminalPanel)
+    }
+
+    setPortalTargetState('main')
+  }, [])
+
   const requestRefit = useCallback(() => {
     // Small delay to allow DOM to update after portal change
     setTimeout(() => {
@@ -74,6 +101,7 @@ export function TerminalPortalProvider({ children }: TerminalPortalProviderProps
     diagramViewerContainerRef,
     mainContainerRef,
     setPortalTarget,
+    returnToMain,
     requestRefit,
     onRefitRequest
   }

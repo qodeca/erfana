@@ -8,8 +8,7 @@
  * When DiagramViewer is open, the terminal UI portals into its split view.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { ISplitviewPanelProps } from 'dockview'
 import { Terminal as TerminalIcon, RotateCw, ArrowDownToLine } from 'lucide-react'
 import { Terminal } from '@xterm/xterm'
@@ -85,6 +84,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const portalContext = useTerminalPortalOptional()
   const portalTarget = portalContext?.portalTarget ?? 'main'
   const mainContainerRef = useRef<HTMLDivElement>(null)
+  const terminalPanelRef = useRef<HTMLDivElement>(null)
 
   // File path link support (issue #26)
   // Handler to open files from terminal links
@@ -559,25 +559,47 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     return unsubscribe
   }, [portalContext, terminalId])
 
-  // Refit when portal target changes
-  useEffect(() => {
-    if (!fitAddonRef.current || !terminalId) return
+  // DOM-based portal: physically move terminal panel between containers
+  // CRITICAL: We use appendChild() instead of React's createPortal because:
+  // - createPortal re-renders JSX, creating NEW DOM nodes
+  // - xterm.js is attached to the original DOM node
+  // - Moving the actual DOM node preserves the xterm.js attachment
+  useLayoutEffect(() => {
+    const terminalPanel = terminalPanelRef.current
+    if (!terminalPanel) return
 
-    // Small delay to allow DOM to update after portal change
+    const diagramViewerContainer = portalContext?.diagramViewerContainerRef?.current
+    const mainContainer = mainContainerRef.current
+
+    if (portalTarget === 'diagram-viewer' && diagramViewerContainer) {
+      // Move terminal panel into DiagramViewer
+      diagramViewerContainer.appendChild(terminalPanel)
+    } else if (mainContainer && terminalPanel.parentElement !== mainContainer) {
+      // Move terminal panel back to main view
+      mainContainer.appendChild(terminalPanel)
+    }
+
+    // Refit after move
     const timer = setTimeout(() => {
       fitAddonRef.current?.fit()
 
-      if (xtermRef.current) {
+      if (xtermRef.current && terminalId) {
         const cols = Math.floor(xtermRef.current.cols)
         const rows = Math.floor(xtermRef.current.rows)
         if (cols > 0 && rows > 0) {
           window.api.terminal.resize(terminalId, cols, rows)
         }
       }
-    }, 100)
+    }, 50)
 
-    return () => clearTimeout(timer)
-  }, [portalTarget, terminalId])
+    return () => {
+      clearTimeout(timer)
+      // Return to main on unmount (defensive - ensures terminal isn't orphaned)
+      if (terminalPanel && mainContainer && terminalPanel.parentElement !== mainContainer) {
+        mainContainer.appendChild(terminalPanel)
+      }
+    }
+  }, [portalTarget, portalContext?.diagramViewerContainerRef, terminalId])
 
   const handleRestartTerminal = async () => {
     // Kill current terminal session
@@ -620,96 +642,88 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     setContextMenu(null)
   }, [])
 
-  // Determine portal render target
-  const diagramViewerContainer = portalContext?.diagramViewerContainerRef?.current
-  const renderTarget = portalTarget === 'diagram-viewer' && diagramViewerContainer
-    ? diagramViewerContainer
-    : mainContainerRef.current
-
-  // Terminal UI content (will be portaled)
-  const terminalContent = (
-    <div className="terminal-panel sidebar-panel">
-      <div className="sidebar-panel-header">
-        <TerminalIcon size={16} className="panel-header-icon" />
-        <span className="sidebar-panel-title">Terminal</span>
-        {terminalId && (
-          <>
-            <button
-              className="icon-btn"
-              onClick={handleScrollToBottom}
-              title="Scroll to Bottom"
-            >
-              <ArrowDownToLine size={14} />
-            </button>
-            <button
-              className="icon-btn"
-              onClick={handleRestartTerminal}
-              title="Restart Terminal"
-            >
-              <RotateCw size={14} />
-            </button>
-          </>
-        )}
-      </div>
-      <div className="sidebar-panel-content">
-        {isAvailable === null ? (
-          // Checking availability
-          <div className="terminal-status">
-            <p>Checking terminal availability...</p>
-          </div>
-        ) : !isAvailable ? (
-          // Not available
-          <div className="terminal-status">
-            <div className="terminal-error-icon">⚠️</div>
-            <h3>Terminal Not Available</h3>
-            <p>
-              node-pty is not available. Terminal functionality requires node-pty to be built
-              successfully.
-            </p>
-            {error && <p className="error-details">{error}</p>}
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <button className="icon-btn" onClick={handleRecheck} disabled={recheckCooldown} aria-label="Recheck">
-                Recheck
-              </button>
-              <button className="icon-btn" onClick={handleCopyFix} aria-label="Copy Fix Command">
-                Copy Fix Command
-              </button>
-            </div>
-          </div>
-        ) : error ? (
-          // Error occurred
-          <div className="terminal-status">
-            <div className="terminal-error-icon">❌</div>
-            <h3>Terminal Error</h3>
-            <p className="error-details">{error}</p>
-          </div>
-        ) : (
-          // Terminal ready
-          <div ref={terminalRef} className="terminal-container" onContextMenu={handleContextMenu} />
-        )}
-      </div>
-      {contextMenu && (
-        <TerminalContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          hasSelection={hasSelection}
-          onCopy={copy}
-          onPaste={paste}
-          onClose={handleCloseContextMenu}
-        />
-      )}
-      {/* File picker dialog for smart path resolution disambiguation */}
-      <FilePickerDialog {...pickerProps} />
-    </div>
-  )
-
+  // Render terminal panel inside mainContainer shell
+  // The useLayoutEffect above will move terminalPanelRef.current between containers
+  // This approach uses DOM manipulation instead of React portals because:
+  // - createPortal re-renders JSX, creating NEW DOM nodes each time
+  // - xterm.js is attached to the original DOM node and won't move
+  // - appendChild() physically moves the existing DOM node, preserving xterm.js
   return (
-    <>
-      {/* Shell container for main view - serves as default portal target */}
-      <div ref={mainContainerRef} className="terminal-portal-shell" />
-
-      {/* Portal terminal content to appropriate container */}
-      {renderTarget && createPortal(terminalContent, renderTarget)}
-    </>
+    <div ref={mainContainerRef} className="terminal-portal-shell">
+      {/* Terminal panel - rendered here initially, moved by useLayoutEffect */}
+      <div ref={terminalPanelRef} className="terminal-panel sidebar-panel">
+        <div className="sidebar-panel-header">
+          <TerminalIcon size={16} className="panel-header-icon" />
+          <span className="sidebar-panel-title">Terminal</span>
+          {terminalId && (
+            <>
+              <button
+                className="icon-btn"
+                onClick={handleScrollToBottom}
+                title="Scroll to Bottom"
+              >
+                <ArrowDownToLine size={14} />
+              </button>
+              <button
+                className="icon-btn"
+                onClick={handleRestartTerminal}
+                title="Restart Terminal"
+              >
+                <RotateCw size={14} />
+              </button>
+            </>
+          )}
+        </div>
+        <div className="sidebar-panel-content">
+          {isAvailable === null ? (
+            // Checking availability
+            <div className="terminal-status">
+              <p>Checking terminal availability...</p>
+            </div>
+          ) : !isAvailable ? (
+            // Not available
+            <div className="terminal-status">
+              <div className="terminal-error-icon">⚠️</div>
+              <h3>Terminal Not Available</h3>
+              <p>
+                node-pty is not available. Terminal functionality requires node-pty to be built
+                successfully.
+              </p>
+              {error && <p className="error-details">{error}</p>}
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button className="icon-btn" onClick={handleRecheck} disabled={recheckCooldown} aria-label="Recheck">
+                  Recheck
+                </button>
+                <button className="icon-btn" onClick={handleCopyFix} aria-label="Copy Fix Command">
+                  Copy Fix Command
+                </button>
+              </div>
+            </div>
+          ) : error ? (
+            // Error occurred
+            <div className="terminal-status">
+              <div className="terminal-error-icon">❌</div>
+              <h3>Terminal Error</h3>
+              <p className="error-details">{error}</p>
+            </div>
+          ) : (
+            // Terminal ready
+            <div ref={terminalRef} className="terminal-container" onContextMenu={handleContextMenu} />
+          )}
+        </div>
+        {contextMenu && (
+          <TerminalContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            hasSelection={hasSelection}
+            onCopy={copy}
+            onPaste={paste}
+            onClose={handleCloseContextMenu}
+          />
+        )}
+        {/* File picker dialog for smart path resolution disambiguation */}
+        <FilePickerDialog {...pickerProps} />
+      </div>
+    </div>
   )
 }
