@@ -480,3 +480,12 @@
   font-size: 12px;
   margin-top: 4px;
 }
+
+/* Prompt Dialog Specific Styles */
+
+/* Fixed width for PromptDialog to prevent width changes based on selected text */
+.dialog-container.dialog-prompt {
+  width: 600px;
+  min-width: 600px;
+  max-width: 600px;
+}

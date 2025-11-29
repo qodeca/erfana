@@ -245,6 +245,7 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
       zIndex={zIndex}
       closeOnBackdrop={false}
       closeOnEscape={true}
+      className="dialog-prompt"
       ariaLabelledBy={titleId}
       ariaDescribedBy={messageId}
     >
