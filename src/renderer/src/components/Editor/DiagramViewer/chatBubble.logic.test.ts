@@ -232,8 +232,9 @@ describe('chatBubble.logic', () => {
       expect(formatLineRange(undefined, 15)).toBe(undefined)
     })
 
-    it('should return undefined for missing end', () => {
-      expect(formatLineRange(10, undefined)).toBe(undefined)
+    it('should format single line when end is missing', () => {
+      // When end line is missing, treat as single line (consistent with helpers.ts)
+      expect(formatLineRange(10, undefined)).toBe('line 10')
     })
 
     it('should return undefined for both missing', () => {

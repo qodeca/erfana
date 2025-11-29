@@ -58,9 +58,8 @@ export function DiagramViewer() {
   const [hasInitialized, setHasInitialized] = useState(false)
 
   // Inject SVG content exactly like MermaidDiagram does - via innerHTML
-  // SECURITY: svgContent must be pre-sanitized. This component trusts that the
-  // SVG comes from MermaidDiagram which uses mermaid.render() with securityLevel: 'strict'.
-  // Never pass untrusted/user-provided SVG directly to this component.
+  // SECURITY: svgContent comes from MermaidDiagram which uses mermaid.render()
+  // with securityLevel: 'strict'. No additional sanitization needed.
   useEffect(() => {
     if (!isOpen || !svgContainerRef.current || !svgContent) return
 

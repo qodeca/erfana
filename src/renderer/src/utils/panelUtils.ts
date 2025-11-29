@@ -3,13 +3,32 @@
  * Provides consistent "open panel → wait → send content" workflow
  * Used by context menus and other components that need to programmatically
  * open panels and send content to them.
+ *
+ * Uses dependency injection for testability - accepts managers as optional
+ * parameters, defaulting to Zustand store implementations.
+ *
+ * Error handling:
+ * - Returns PromptResult with success/error information
+ * - Shows toast notifications for user-facing errors
+ * - Uses AppError with typed ErrorCode for structured error handling
  */
 
-import { useActivityBarStore } from '../stores/useActivityBarStore'
-import { useTerminalStore } from '../stores/useTerminalStore'
 import { PROMPT_REGISTRY } from '../prompts/registry'
 import { promptRenderer } from '../prompts/renderer'
+import { validateVariables } from '../prompts/validation'
+import { createDefaultManagers } from './panelManager.factory'
+import { showErrorToast } from './toastHelpers'
+import { AppError, ErrorCode, ERROR_MESSAGES } from '../../../shared/errors'
 import type { PromptVariables } from '../prompts/types'
+import type { ITerminalManager, PanelManagers } from './panelManager.types'
+
+/**
+ * Result of a prompt execution
+ */
+export interface PromptResult {
+  success: boolean
+  error?: AppError
+}
 
 interface SendToPanelOptions {
   panel: 'terminal'
@@ -17,25 +36,52 @@ interface SendToPanelOptions {
   content: string
   sendImmediately?: boolean
   autoExecute?: boolean
+  /** Optional managers for dependency injection (testing) */
+  managers?: PanelManagers
+  /** Timeout for terminal readiness in ms (default: 5000) */
+  terminalTimeout?: number
+  /** Show toast notification on error (default: true) */
+  showToast?: boolean
+}
+
+/** Default managers lazily initialized */
+let defaultManagers: PanelManagers | null = null
+
+/**
+ * Get or create default managers
+ * Lazily initialized to avoid importing stores at module load time
+ */
+function getDefaultManagers(): PanelManagers {
+  if (!defaultManagers) {
+    defaultManagers = createDefaultManagers()
+  }
+  return defaultManagers
 }
 
 /**
  * Wait for terminal to be ready (activeTerminalId set in store)
- * Polls the store until terminal is initialized or timeout is reached.
+ * Uses event-based waiting if available (preferred), falls back to polling.
  *
+ * @param terminalManager - Terminal manager to check readiness
  * @param timeoutMs - Maximum time to wait (default 5000ms)
- * @param intervalMs - Polling interval (default 50ms)
+ * @param intervalMs - Polling interval for fallback (default 50ms)
  * @returns true if terminal is ready, false if timed out
  */
-async function waitForTerminalReady(
+export async function waitForTerminalReady(
+  terminalManager: ITerminalManager,
   timeoutMs = 5000,
   intervalMs = 50
 ): Promise<boolean> {
+  // Prefer event-based waiting (more efficient, immediate response)
+  if (terminalManager.waitForReady) {
+    return terminalManager.waitForReady(timeoutMs)
+  }
+
+  // Fallback to polling for backwards compatibility
   const startTime = Date.now()
 
   while (Date.now() - startTime < timeoutMs) {
-    const { activeTerminalId } = useTerminalStore.getState()
-    if (activeTerminalId) {
+    if (terminalManager.isReady()) {
       return true
     }
     await new Promise(resolve => setTimeout(resolve, intervalMs))
@@ -54,42 +100,76 @@ async function waitForTerminalReady(
  * 3. Sending content using panel-specific methods
  *
  * @param options - Panel configuration
- * @returns Promise<boolean> - Success status (true if sent successfully)
+ * @returns Promise<PromptResult> - Result with success status and optional error
  *
  * @example
  * // Send text to terminal
- * await openPanelAndSendContent({
+ * const result = await openPanelAndSendContent({
  *   panel: 'terminal',
  *   location: 'right',
  *   content: 'npm install'
  * })
+ * if (!result.success) {
+ *   console.error(result.error?.message)
+ * }
  */
 export async function openPanelAndSendContent({
   panel,
   location,
   content,
-  autoExecute = false
-}: SendToPanelOptions): Promise<boolean> {
-  // Get store actions
-  const { setActivePanel } = useActivityBarStore.getState()
+  autoExecute = false,
+  managers,
+  terminalTimeout = 5000,
+  showToast = true
+}: SendToPanelOptions): Promise<PromptResult> {
+  // Use provided managers or get defaults
+  const { panelManager, terminalManager } = managers ?? getDefaultManagers()
 
   // Open panel
-  setActivePanel(panel, location)
+  panelManager.setActivePanel(panel, location)
 
   // Send content based on panel type
   if (panel === 'terminal') {
     // Wait for terminal to be ready (polls until activeTerminalId is set)
-    const isReady = await waitForTerminalReady()
+    const isReady = await waitForTerminalReady(terminalManager, terminalTimeout)
     if (!isReady) {
-      console.error('❌ Terminal failed to initialize within timeout')
-      return false
+      const error = new AppError(
+        'Terminal failed to initialize within timeout',
+        ErrorCode.PROMPT_TERMINAL_TIMEOUT
+      )
+      console.error('❌', error.message)
+      if (showToast) {
+        showErrorToast('Terminal Error', ERROR_MESSAGES[ErrorCode.PROMPT_TERMINAL_TIMEOUT])
+      }
+      return { success: false, error }
     }
 
-    const { sendToTerminal } = useTerminalStore.getState()
-    return await sendToTerminal(content, autoExecute)
+    const sent = await terminalManager.sendToTerminal(content, autoExecute)
+    if (!sent) {
+      const error = new AppError(
+        'Failed to send content to terminal',
+        ErrorCode.PROMPT_SEND_FAILED
+      )
+      console.error('❌', error.message)
+      if (showToast) {
+        showErrorToast('Terminal Error', ERROR_MESSAGES[ErrorCode.PROMPT_SEND_FAILED])
+      }
+      return { success: false, error }
+    }
+
+    return { success: true }
   }
 
-  return false
+  return { success: false }
+}
+
+interface ExecutePromptOptions {
+  /** Optional managers for dependency injection (testing) */
+  managers?: PanelManagers
+  /** Timeout for terminal readiness in ms (default: 5000) */
+  terminalTimeout?: number
+  /** Show toast notification on error (default: true) */
+  showToast?: boolean
 }
 
 /**
@@ -98,25 +178,53 @@ export async function openPanelAndSendContent({
  *
  * @param promptId - The prompt template ID from PROMPT_REGISTRY
  * @param variables - Variables to pass to the template renderer
- * @returns Promise<boolean> - Success status
+ * @param options - Optional configuration including managers for DI
+ * @returns Promise<PromptResult> - Result with success status and optional error
  *
  * @example
  * // Execute a prompt from a button click
- * await executePromptTemplate('mermaid-bug-report', {
+ * const result = await executePromptTemplate('mermaid-bug-report', {
  *   mermaidError: 'Parse error',
  *   mermaidCode: 'graph TD...',
  *   filePath: '/path/to/file.md'
  * })
+ * if (!result.success) {
+ *   console.error(result.error?.message)
+ * }
  */
 export async function executePromptTemplate(
   promptId: string,
-  variables: PromptVariables
-): Promise<boolean> {
+  variables: PromptVariables,
+  options?: ExecutePromptOptions
+): Promise<PromptResult> {
+  const showToast = options?.showToast ?? true
+
   // Get prompt configuration from registry
   const config = PROMPT_REGISTRY[promptId]
   if (!config) {
-    console.error(`❌ Prompt template not found: ${promptId}`)
-    return false
+    const error = new AppError(
+      `Prompt template not found: ${promptId}`,
+      ErrorCode.PROMPT_NOT_FOUND
+    )
+    console.error('❌', error.message)
+    if (showToast) {
+      showErrorToast('Prompt Error', ERROR_MESSAGES[ErrorCode.PROMPT_NOT_FOUND])
+    }
+    return { success: false, error }
+  }
+
+  // Validate required variables are present
+  const validationResult = validateVariables(promptId, variables)
+  if (!validationResult.valid) {
+    const error = new AppError(
+      validationResult.errorMessage || 'Validation failed',
+      ErrorCode.PROMPT_VALIDATION_FAILED
+    )
+    console.error('❌', error.message)
+    if (showToast) {
+      showErrorToast('Prompt Error', validationResult.errorMessage || ERROR_MESSAGES[ErrorCode.PROMPT_VALIDATION_FAILED])
+    }
+    return { success: false, error }
   }
 
   // Render template with variables
@@ -131,6 +239,17 @@ export async function executePromptTemplate(
     location: 'right',
     content: renderedPrompt,
     sendImmediately: config.sendDirectly || false,
-    autoExecute: config.autoExecute || false
+    autoExecute: config.autoExecute || false,
+    managers: options?.managers,
+    terminalTimeout: options?.terminalTimeout,
+    showToast
   })
+}
+
+/**
+ * Reset default managers (for testing)
+ * Call this between tests to ensure clean state
+ */
+export function resetDefaultManagers(): void {
+  defaultManagers = null
 }

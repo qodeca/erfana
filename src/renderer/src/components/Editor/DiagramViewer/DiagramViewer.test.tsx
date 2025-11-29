@@ -14,7 +14,7 @@
  * UPDATED: DiagramViewer now reads state from useDiagramViewerStore instead of props.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { DiagramViewer } from './DiagramViewer'
 import { useDiagramViewerStore } from '../../../stores/useDiagramViewerStore'

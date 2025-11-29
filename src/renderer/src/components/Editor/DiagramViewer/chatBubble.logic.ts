@@ -3,6 +3,8 @@
  * Handles validation, character counting, and message state
  */
 
+import { formatLineRange as formatLineRangeHelper } from '../../../prompts/helpers'
+
 export const CHAT_LIMITS = {
   MIN_LENGTH: 3,
   WARNING_THRESHOLD: 1000,
@@ -147,15 +149,12 @@ export function buildFileRef(
 
 /**
  * Format line range for display
+ * Wrapper around prompts/helpers.formatLineRange that returns undefined for invalid input
  * @param startLine - Start line number
  * @param endLine - End line number
- * @returns Formatted string like "lines 10-15" or "line 10"
+ * @returns Formatted string like "lines 10-15" or "line 10", or undefined if invalid
  */
 export function formatLineRange(startLine?: number, endLine?: number): string | undefined {
-  if (!startLine || !endLine) return undefined
-
-  if (startLine === endLine) {
-    return `line ${startLine}`
-  }
-  return `lines ${startLine}-${endLine}`
+  const result = formatLineRangeHelper(startLine, endLine)
+  return result || undefined
 }

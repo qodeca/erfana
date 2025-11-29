@@ -4,7 +4,7 @@ subArea: context-menu
 name: Modify
 icon: edit-3
 targetPanel: terminal
-autoExecute: true
+autoExecute: false
 requiresInput: true
 inputLabel: How should this be modified?
 inputPlaceholder: e.g., make more concise, add examples, use simpler language...

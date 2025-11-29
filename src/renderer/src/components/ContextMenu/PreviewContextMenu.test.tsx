@@ -49,7 +49,7 @@ describe('PreviewContextMenu Component', () => {
     } as any
 
     // Mock executePromptTemplate
-    vi.spyOn(panelUtils, 'executePromptTemplate').mockResolvedValue()
+    vi.spyOn(panelUtils, 'executePromptTemplate').mockResolvedValue({ success: true })
 
     // Mock useDialog hook
     vi.spyOn(DialogModule, 'useDialog').mockReturnValue({
