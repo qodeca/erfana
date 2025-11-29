@@ -6,19 +6,22 @@ import { DialogProvider } from './components/Dialog/DialogContext'
 import { DialogManager } from './components/Dialog/DialogManager'
 import { UIBlocker } from './components/UIBlocker/UIBlocker'
 import { ProjectManagementProvider } from './context/ProjectManagementContext'
+import { TerminalPortalProvider } from './context/TerminalPortalContext'
 
 function App() {
   return (
     <DialogProvider>
       <ProjectManagementProvider>
-        <ToastProvider>
-          <div className="app">
-            <AppDockLayout />
-            <ToastNotification />
-            <DialogManager />
-            <UIBlocker />
-          </div>
-        </ToastProvider>
+        <TerminalPortalProvider>
+          <ToastProvider>
+            <div className="app">
+              <AppDockLayout />
+              <ToastNotification />
+              <DialogManager />
+              <UIBlocker />
+            </div>
+          </ToastProvider>
+        </TerminalPortalProvider>
       </ProjectManagementProvider>
     </DialogProvider>
   )

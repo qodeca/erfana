@@ -1,14 +1,19 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, ZoomIn, ZoomOut, Maximize, RotateCcw } from 'lucide-react'
+import { X, ZoomIn, ZoomOut, Maximize, RotateCcw, Terminal, ChevronLeft } from 'lucide-react'
 import {
   getKeyboardAction,
   formatZoomLevel,
   getZoomButtonStates,
   ZOOM_CONFIG
 } from './diagramViewer.logic'
+import {
+  calculatePaneWidths,
+  handleResizeDrag
+} from './diagramViewerResize.logic'
 import { ChatBubble } from './ChatBubble'
 import { useDiagramViewerStore } from '../../../stores/useDiagramViewerStore'
+import { useTerminalPortalOptional } from '../../../context/TerminalPortalContext'
 import './DiagramViewer.css'
 
 interface Transform {
@@ -38,14 +43,29 @@ export function DiagramViewer() {
     filePath,
     startLine,
     endLine,
-    closeViewer
+    closeViewer,
+    // Terminal panel state
+    isTerminalVisible,
+    terminalWidth,
+    toggleTerminal,
+    setTerminalWidth
   } = useDiagramViewerStore()
+
+  // Portal context for terminal integration
+  const portalContext = useTerminalPortalOptional()
+
   const overlayRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const svgContainerRef = useRef<HTMLDivElement>(null)
+  const splitContainerRef = useRef<HTMLDivElement>(null)
   const previousActiveElement = useRef<Element | null>(null)
   const isDragging = useRef(false)
   const lastMousePos = useRef({ x: 0, y: 0 })
+
+  // Resize state
+  const isResizing = useRef(false)
+  const resizeStartX = useRef(0)
+  const resizeStartWidth = useRef(0)
 
   const [transform, setTransform] = useState<Transform>({
     scale: 1,
@@ -108,6 +128,32 @@ export function DiagramViewer() {
       setHasInitialized(false)
     }
   }, [isOpen])
+
+  // Portal management: move terminal into viewer when open, back to main when closed
+  useEffect(() => {
+    if (!portalContext) return
+
+    if (isOpen) {
+      portalContext.setPortalTarget('diagram-viewer')
+      // Request refit after portal move
+      portalContext.requestRefit()
+    } else {
+      portalContext.setPortalTarget('main')
+      portalContext.requestRefit()
+    }
+
+    return () => {
+      // Ensure terminal returns to main on unmount
+      portalContext.setPortalTarget('main')
+    }
+  }, [isOpen, portalContext])
+
+  // Request terminal refit when visibility or width changes
+  useEffect(() => {
+    if (portalContext && isOpen && isTerminalVisible) {
+      portalContext.requestRefit()
+    }
+  }, [isTerminalVisible, terminalWidth, portalContext, isOpen])
 
   // Fit to view on FIRST open only (not on every svgContent change)
   // This preserves zoom/pan when file is edited while viewer is open
@@ -268,6 +314,46 @@ export function DiagramViewer() {
     setTransform({ scale: 1, translateX: 0, translateY: 0 })
   }, [])
 
+  // Resize handle for split pane
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    isResizing.current = true
+    resizeStartX.current = e.clientX
+    resizeStartWidth.current = terminalWidth
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }, [terminalWidth])
+
+  // Split resize mouse move handler
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleResizeMove = (e: MouseEvent) => {
+      if (!isResizing.current || !splitContainerRef.current) return
+
+      const deltaX = e.clientX - resizeStartX.current
+      const containerWidth = splitContainerRef.current.getBoundingClientRect().width
+      const newWidth = handleResizeDrag(resizeStartWidth.current, deltaX, containerWidth)
+      setTerminalWidth(newWidth)
+    }
+
+    const handleResizeEnd = () => {
+      if (isResizing.current) {
+        isResizing.current = false
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+    }
+
+    document.addEventListener('mousemove', handleResizeMove)
+    document.addEventListener('mouseup', handleResizeEnd)
+
+    return () => {
+      document.removeEventListener('mousemove', handleResizeMove)
+      document.removeEventListener('mouseup', handleResizeEnd)
+    }
+  }, [isOpen, setTerminalWidth])
+
   // Backdrop click handler
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent) => {
@@ -307,16 +393,17 @@ export function DiagramViewer() {
           e.preventDefault()
           handleFitToView()
           break
-        case 'close':
+        case 'toggle-terminal':
           e.preventDefault()
-          closeViewer()
+          toggleTerminal()
           break
+        // Note: 'close' action removed - use X button instead
       }
     }
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, closeViewer, handleZoomIn, handleZoomOut, handleReset, handleFitToView])
+  }, [isOpen, handleZoomIn, handleZoomOut, handleReset, handleFitToView, toggleTerminal])
 
   // Apply dimension-based zoom (fixes pixelation - issue #31)
   // Scales SVG width/height for native vector rendering at any size
@@ -347,6 +434,10 @@ export function DiagramViewer() {
     ZOOM_CONFIG.MIN_SCALE,
     ZOOM_CONFIG.MAX_SCALE
   )
+
+  // Calculate pane widths based on container and terminal width
+  const containerWidth = splitContainerRef.current?.getBoundingClientRect().width ?? 800
+  const paneWidths = calculatePaneWidths(containerWidth, terminalWidth)
 
   return createPortal(
     <div
@@ -407,13 +498,26 @@ export function DiagramViewer() {
           >
             <RotateCcw size={16} />
           </button>
+
+          <div className="diagram-viewer-separator" />
+
+          {/* Terminal toggle button */}
+          <button
+            className={`diagram-viewer-btn ${isTerminalVisible ? 'diagram-viewer-btn-active' : ''}`}
+            onClick={toggleTerminal}
+            title={isTerminalVisible ? 'Hide Terminal (⌘J)' : 'Show Terminal (⌘J)'}
+            aria-label={isTerminalVisible ? 'Hide terminal' : 'Show terminal'}
+            aria-pressed={isTerminalVisible}
+          >
+            <Terminal size={16} />
+          </button>
         </div>
 
         <div className="diagram-viewer-toolbar-right">
           <button
             className="diagram-viewer-btn diagram-viewer-btn-close"
             onClick={closeViewer}
-            title="Close (Escape)"
+            title="Close"
             aria-label="Close viewer"
             autoFocus
           >
@@ -422,31 +526,69 @@ export function DiagramViewer() {
         </div>
       </div>
 
-      {/* SVG Content with dimension-based zoom (fixes pixelation - issue #31) */}
-      {/* Cursor is managed via document.body.style.cursor in handleMouseDown/handleMouseUp */}
-      <div
-        ref={containerRef}
-        className="diagram-viewer-content"
-        onMouseDown={handleMouseDown}
-      >
+      {/* Split container: Diagram + Terminal */}
+      <div ref={splitContainerRef} className="diagram-viewer-split">
+        {/* Diagram pane */}
         <div
-          ref={svgContainerRef}
-          className="diagram-viewer-svg-container"
-          style={{
-            transform: `translate(${transform.translateX}px, ${transform.translateY}px)`
-          }}
-        />
-      </div>
+          className="diagram-viewer-diagram-pane"
+          style={{ flex: isTerminalVisible ? `0 0 ${paneWidths.diagramWidth}px` : 1 }}
+        >
+          {/* SVG Content with dimension-based zoom (fixes pixelation - issue #31) */}
+          <div
+            ref={containerRef}
+            className="diagram-viewer-content"
+            onMouseDown={handleMouseDown}
+          >
+            <div
+              ref={svgContainerRef}
+              className="diagram-viewer-svg-container"
+              style={{
+                transform: `translate(${transform.translateX}px, ${transform.translateY}px)`
+              }}
+            />
+          </div>
 
-      {/* Chat bubble for AI-assisted diagram modifications */}
-      {mermaidCode && filePath && (
-        <ChatBubble
-          mermaidCode={mermaidCode}
-          filePath={filePath}
-          startLine={startLine}
-          endLine={endLine}
-        />
-      )}
+          {/* Chat bubble for AI-assisted diagram modifications */}
+          {mermaidCode && filePath && (
+            <ChatBubble
+              mermaidCode={mermaidCode}
+              filePath={filePath}
+              startLine={startLine}
+              endLine={endLine}
+            />
+          )}
+        </div>
+
+        {/* Resize handle (only when terminal visible) */}
+        {isTerminalVisible && (
+          <div
+            className={`diagram-viewer-resizer ${isResizing.current ? 'dragging' : ''}`}
+            onMouseDown={handleResizeStart}
+          />
+        )}
+
+        {/* Terminal pane (portal target) */}
+        {isTerminalVisible && (
+          <div
+            ref={portalContext?.diagramViewerContainerRef}
+            className="diagram-viewer-terminal-pane"
+            style={{ width: paneWidths.terminalWidth }}
+          />
+        )}
+
+        {/* Collapsed state: vertical toggle bar */}
+        {!isTerminalVisible && (
+          <div
+            className="diagram-viewer-terminal-collapsed"
+            onClick={toggleTerminal}
+            title="Show Terminal (⌘J)"
+            role="button"
+            aria-label="Show terminal"
+          >
+            <ChevronLeft size={16} />
+          </div>
+        )}
+      </div>
     </div>,
     portalRoot
   )

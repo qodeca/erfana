@@ -93,13 +93,27 @@ describe('diagramViewer.logic', () => {
       })
     })
 
-    describe('close shortcuts', () => {
-      it('returns close for Escape key', () => {
-        expect(getKeyboardAction(createEvent('Escape'))).toBe('close')
+    describe('toggle-terminal shortcuts', () => {
+      it('returns toggle-terminal for Cmd+J', () => {
+        expect(getKeyboardAction(createEvent('j', { metaKey: true }))).toBe('toggle-terminal')
       })
 
-      it('returns close for Escape with shift', () => {
-        expect(getKeyboardAction(createEvent('Escape', { shiftKey: true }))).toBe('close')
+      it('returns toggle-terminal for Ctrl+J', () => {
+        expect(getKeyboardAction(createEvent('j', { ctrlKey: true }))).toBe('toggle-terminal')
+      })
+
+      it('returns toggle-terminal for Cmd+J (uppercase)', () => {
+        expect(getKeyboardAction(createEvent('J', { metaKey: true }))).toBe('toggle-terminal')
+      })
+    })
+
+    describe('escape key (no longer closes)', () => {
+      it('returns none for Escape key (use X button to close)', () => {
+        expect(getKeyboardAction(createEvent('Escape'))).toBe('none')
+      })
+
+      it('returns none for Escape with shift', () => {
+        expect(getKeyboardAction(createEvent('Escape', { shiftKey: true }))).toBe('none')
       })
     })
 

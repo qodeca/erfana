@@ -3,9 +3,13 @@
  *
  * Terminal emulator panel using xterm.js + node-pty.
  * Follows the panel style established by ProjectPanel.
+ *
+ * Supports portal rendering to DiagramViewer via TerminalPortalContext.
+ * When DiagramViewer is open, the terminal UI portals into its split view.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { ISplitviewPanelProps } from 'dockview'
 import { Terminal as TerminalIcon, RotateCw, ArrowDownToLine } from 'lucide-react'
 import { Terminal } from '@xterm/xterm'
@@ -19,6 +23,7 @@ import { useTerminalClipboard } from '../../hooks/useTerminalClipboard'
 import { useTerminalFileLinks } from '../../hooks/useTerminalFileLinks'
 import { useFilePicker } from '../../hooks/useFilePicker'
 import { useProjectManagementContextSafe } from '../../context/ProjectManagementContext'
+import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { TerminalContextMenu } from '../ContextMenu/TerminalContextMenu'
 import { FilePickerDialog } from '../Dialog/FilePickerDialog'
 import { sanitizeFilePath } from '../../utils/fileUtils'
@@ -75,6 +80,11 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
   // File picker for disambiguation when multiple files match (issue #26 enhancement)
   const { showPicker, pickerProps } = useFilePicker({ projectRoot: projectPath })
+
+  // Portal context for rendering in DiagramViewer (optional - may not have provider yet)
+  const portalContext = useTerminalPortalOptional()
+  const portalTarget = portalContext?.portalTarget ?? 'main'
+  const mainContainerRef = useRef<HTMLDivElement>(null)
 
   // File path link support (issue #26)
   // Handler to open files from terminal links
@@ -526,6 +536,48 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     return () => resizeObserver.disconnect()
   }, [terminalId])
 
+  // Subscribe to portal refit requests (for DiagramViewer integration)
+  useEffect(() => {
+    if (!portalContext?.onRefitRequest || !fitAddonRef.current) return
+
+    const unsubscribe = portalContext.onRefitRequest(() => {
+      // Refit terminal after portal move
+      setTimeout(() => {
+        fitAddonRef.current?.fit()
+
+        // Also notify PTY of new size
+        if (xtermRef.current && terminalId) {
+          const cols = Math.floor(xtermRef.current.cols)
+          const rows = Math.floor(xtermRef.current.rows)
+          if (cols > 0 && rows > 0) {
+            window.api.terminal.resize(terminalId, cols, rows)
+          }
+        }
+      }, 50)
+    })
+
+    return unsubscribe
+  }, [portalContext, terminalId])
+
+  // Refit when portal target changes
+  useEffect(() => {
+    if (!fitAddonRef.current || !terminalId) return
+
+    // Small delay to allow DOM to update after portal change
+    const timer = setTimeout(() => {
+      fitAddonRef.current?.fit()
+
+      if (xtermRef.current) {
+        const cols = Math.floor(xtermRef.current.cols)
+        const rows = Math.floor(xtermRef.current.rows)
+        if (cols > 0 && rows > 0) {
+          window.api.terminal.resize(terminalId, cols, rows)
+        }
+      }
+    }, 100)
+
+    return () => clearTimeout(timer)
+  }, [portalTarget, terminalId])
 
   const handleRestartTerminal = async () => {
     // Kill current terminal session
@@ -568,7 +620,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     setContextMenu(null)
   }, [])
 
-  return (
+  // Determine portal render target
+  const diagramViewerContainer = portalContext?.diagramViewerContainerRef?.current
+  const renderTarget = portalTarget === 'diagram-viewer' && diagramViewerContainer
+    ? diagramViewerContainer
+    : mainContainerRef.current
+
+  // Terminal UI content (will be portaled)
+  const terminalContent = (
     <div className="terminal-panel sidebar-panel">
       <div className="sidebar-panel-header">
         <TerminalIcon size={16} className="panel-header-icon" />
@@ -642,5 +701,15 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       {/* File picker dialog for smart path resolution disambiguation */}
       <FilePickerDialog {...pickerProps} />
     </div>
+  )
+
+  return (
+    <>
+      {/* Shell container for main view - serves as default portal target */}
+      <div ref={mainContainerRef} className="terminal-portal-shell" />
+
+      {/* Portal terminal content to appropriate container */}
+      {renderTarget && createPortal(terminalContent, renderTarget)}
+    </>
   )
 }
