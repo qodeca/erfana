@@ -16,6 +16,12 @@ import { createContext, useContext, useRef, useState, useCallback, type ReactNod
 
 export type PortalTarget = 'main' | 'diagram-viewer'
 
+/** Terminal control functions that TerminalPanel registers */
+interface TerminalControls {
+  scrollToBottom: () => void
+  restart: () => Promise<void>
+}
+
 interface TerminalPortalContextValue {
   /** Current render target for terminal */
   portalTarget: PortalTarget
@@ -41,6 +47,18 @@ interface TerminalPortalContextValue {
 
   /** Subscribe to refit requests */
   onRefitRequest: (callback: () => void) => () => void
+
+  /** Terminal control functions (registered by TerminalPanel) */
+  terminalControls: TerminalControls | null
+
+  /** Register terminal control functions (called by TerminalPanel) */
+  registerTerminalControls: (controls: TerminalControls) => void
+
+  /** Unregister terminal controls (called on TerminalPanel unmount) */
+  unregisterTerminalControls: () => void
+
+  /** Whether terminal is ready (has registered controls) */
+  isTerminalReady: boolean
 }
 
 const TerminalPortalContext = createContext<TerminalPortalContextValue | null>(null)
@@ -51,6 +69,7 @@ interface TerminalPortalProviderProps {
 
 export function TerminalPortalProvider({ children }: TerminalPortalProviderProps) {
   const [portalTarget, setPortalTargetState] = useState<PortalTarget>('main')
+  const [terminalControls, setTerminalControls] = useState<TerminalControls | null>(null)
 
   const diagramViewerContainerRef = useRef<HTMLDivElement>(null)
   const mainContainerRef = useRef<HTMLDivElement>(null)
@@ -96,6 +115,14 @@ export function TerminalPortalProvider({ children }: TerminalPortalProviderProps
     }
   }, [])
 
+  const registerTerminalControls = useCallback((controls: TerminalControls) => {
+    setTerminalControls(controls)
+  }, [])
+
+  const unregisterTerminalControls = useCallback(() => {
+    setTerminalControls(null)
+  }, [])
+
   const value: TerminalPortalContextValue = {
     portalTarget,
     diagramViewerContainerRef,
@@ -103,7 +130,11 @@ export function TerminalPortalProvider({ children }: TerminalPortalProviderProps
     setPortalTarget,
     returnToMain,
     requestRefit,
-    onRefitRequest
+    onRefitRequest,
+    terminalControls,
+    registerTerminalControls,
+    unregisterTerminalControls,
+    isTerminalReady: terminalControls !== null
   }
 
   return (

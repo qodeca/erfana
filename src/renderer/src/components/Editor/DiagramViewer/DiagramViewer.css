@@ -58,93 +58,35 @@
   to { opacity: 1; }
 }
 
-/* Toolbar */
-.diagram-viewer-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
-  background: var(--viewer-toolbar-bg);
-  border-bottom: 1px solid var(--viewer-border);
-  height: 48px;
-  flex-shrink: 0;
-}
-
-.diagram-viewer-toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.diagram-viewer-title {
-  color: var(--viewer-text-primary);
-  font-size: 13px;
-  font-weight: 500;
-  margin-right: 16px;
-}
-
-.diagram-viewer-toolbar-center {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.diagram-viewer-toolbar-right {
-  display: flex;
-  align-items: center;
-}
-
-/* Buttons */
-.diagram-viewer-btn {
+/* Floating close button (issue #37) */
+.diagram-viewer-close-floating {
+  position: fixed;
+  top: 16px;
+  right: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 28px;
-  background: var(--viewer-btn-bg);
-  border: none;
+  background: rgba(45, 45, 48, 0.9);
+  border: 1px solid #454545;
   border-radius: 4px;
-  color: var(--viewer-text-primary);
+  color: #858585;
   cursor: pointer;
-  transition: background-color 0.1s ease;
+  z-index: 50;
+  transition: background-color 0.1s ease, color 0.1s ease;
 }
 
-.diagram-viewer-btn:hover:not(:disabled) {
-  background: var(--viewer-btn-hover);
+.diagram-viewer-close-floating:hover {
+  background: rgba(60, 60, 64, 0.95);
+  color: #cccccc;
 }
 
-.diagram-viewer-btn:active:not(:disabled) {
-  background: var(--viewer-btn-active);
-}
-
-.diagram-viewer-btn:disabled {
-  opacity: var(--viewer-btn-disabled-opacity);
-  cursor: not-allowed;
-}
-
-.diagram-viewer-btn:focus-visible {
+.diagram-viewer-close-floating:focus-visible {
   outline: 1px solid var(--viewer-focus-border);
   outline-offset: 1px;
 }
 
-.diagram-viewer-btn-close {
-  width: 32px;
-  height: 32px;
-}
-
-/* Zoom indicator */
-.diagram-viewer-zoom-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 52px;
-  padding: 4px 8px;
-  background: var(--viewer-zoom-indicator-bg);
-  border-radius: 4px;
-  color: var(--viewer-text-primary);
-  font-size: 12px;
-  font-family: monospace;
-}
 
 /* Content wrapper - full width, contains diagram and chat bubble */
 .diagram-viewer-content-wrapper {
@@ -181,13 +123,6 @@
   border-radius: 8px;
 }
 
-/* Separator in toolbar */
-.diagram-viewer-separator {
-  width: 1px;
-  height: 20px;
-  background: var(--viewer-border);
-  margin: 0 8px;
-}
 
 /* Expand button on MermaidDiagram */
 .mermaid-expand-btn {

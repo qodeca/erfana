@@ -1,8 +1,29 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { MessageCircle, X, Send, Info } from 'lucide-react'
+import {
+  Pencil,
+  Send,
+  Info,
+  ZoomIn,
+  ZoomOut,
+  Maximize,
+  RotateCcw,
+  ArrowDownToLine,
+  RotateCw
+} from 'lucide-react'
 import { executePromptTemplate } from '../../../utils/panelUtils'
 import { useTerminalPortalOptional } from '../../../context/TerminalPortalContext'
 import { useDiagramViewerStore } from '../../../stores/useDiagramViewerStore'
+import { formatLineRange } from '../../../prompts/helpers'
+import {
+  detectChartType,
+  supportsDirection,
+  getAvailableDirections,
+  detectCurrentDirection,
+  isDirectionDisabled,
+  isDirectionActive,
+  getDirectionTooltip,
+  DIRECTION_LABELS
+} from '../../../utils/mermaidDirections'
 import {
   validateMessage,
   formatCharCount,
@@ -10,17 +31,32 @@ import {
   shouldClose,
   getValidationClass,
   buildFileRef,
-  formatLineRange,
+  formatLineRange as formatLineRangeChat,
   calculateResizedHeight,
   CHAT_LIMITS
 } from './chatBubble.logic'
+import { formatZoomLevel } from './diagramViewer.logic'
 import './ChatBubble.css'
+
+interface Transform {
+  scale: number
+  translateX: number
+  translateY: number
+}
 
 interface ChatBubbleProps {
   mermaidCode: string
   filePath?: string
   startLine?: number
   endLine?: number
+  // Zoom controls (issue #37)
+  transform: Transform
+  onZoomIn: () => void
+  onZoomOut: () => void
+  onFitToView: () => void
+  onReset: () => void
+  zoomInDisabled: boolean
+  zoomOutDisabled: boolean
 }
 
 /**
@@ -36,7 +72,19 @@ interface ChatBubbleProps {
  * - Auto-includes diagram context in prompt
  * - Character limit with warning at 1000, max at 2000
  */
-export function ChatBubble({ mermaidCode, filePath, startLine, endLine }: ChatBubbleProps) {
+export function ChatBubble({
+  mermaidCode,
+  filePath,
+  startLine,
+  endLine,
+  transform,
+  onZoomIn,
+  onZoomOut,
+  onFitToView,
+  onReset,
+  zoomInDisabled,
+  zoomOutDisabled
+}: ChatBubbleProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [message, setMessage] = useState('')
   const [showTooltip, setShowTooltip] = useState(false)
@@ -52,8 +100,14 @@ export function ChatBubble({ mermaidCode, filePath, startLine, endLine }: ChatBu
   // Get panel height from store
   const { chatPanelHeight, setChatPanelHeight } = useDiagramViewerStore()
 
-  // Portal context for terminal integration
+  // Portal context for terminal integration and controls
   const portalContext = useTerminalPortalOptional()
+
+  // Direction button state for supported diagrams
+  const chartType = detectChartType(mermaidCode)
+  const showDirectionButtons = supportsDirection(chartType)
+  const availableDirections = getAvailableDirections(chartType)
+  const currentDirection = detectCurrentDirection(mermaidCode, chartType)
 
   const validation = validateMessage(message)
 
@@ -157,7 +211,7 @@ export function ChatBubble({ mermaidCode, filePath, startLine, endLine }: ChatBu
 
     const trimmedMessage = message.trim()
     const fileRef = buildFileRef(filePath, startLine, endLine)
-    const lineRange = formatLineRange(startLine, endLine)
+    const lineRange = formatLineRangeChat(startLine, endLine)
 
     try {
       const success = await executePromptTemplate('diagram-chat', {
@@ -180,6 +234,44 @@ export function ChatBubble({ mermaidCode, filePath, startLine, endLine }: ChatBu
       console.error('Failed to send chat message:', err)
     }
   }, [message, validation.canSubmit, filePath, startLine, endLine, mermaidCode])
+
+  // Direction button click handler (issue #37 - moved from MermaidToolbar)
+  const handleDirectionClick = useCallback(
+    async (direction: string) => {
+      if (!filePath) return
+
+      try {
+        const fileRef =
+          startLine && endLine ? `@${filePath}:${startLine}-${endLine}` : `@${filePath}`
+        const lineRange = formatLineRange(startLine, endLine) || undefined
+
+        await executePromptTemplate('change-mermaid-direction', {
+          selectedText: '',
+          filePath,
+          fullDocument: '',
+          startLine,
+          endLine,
+          lineRange,
+          fileRef,
+          mermaidCode,
+          targetDirection: direction,
+          directionLabel: DIRECTION_LABELS[direction] || direction
+        })
+      } catch (err) {
+        console.error('Failed to execute direction change prompt:', err)
+      }
+    },
+    [filePath, startLine, endLine, mermaidCode]
+  )
+
+  // Terminal control handlers (issue #37)
+  const handleScrollToBottom = useCallback(() => {
+    portalContext?.terminalControls?.scrollToBottom()
+  }, [portalContext])
+
+  const handleRestartTerminal = useCallback(async () => {
+    await portalContext?.terminalControls?.restart()
+  }, [portalContext])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -206,9 +298,7 @@ export function ChatBubble({ mermaidCode, filePath, startLine, endLine }: ChatBu
     setIsExpanded(true)
   }
 
-  const handleCloseClick = () => {
-    setIsExpanded(false)
-  }
+  // Note: Panel closes via click-outside or Escape key (no header close button - issue #37)
 
   // Don't render if no file context
   if (!filePath) return null
@@ -220,11 +310,11 @@ export function ChatBubble({ mermaidCode, filePath, startLine, endLine }: ChatBu
         <button
           className="chat-bubble-btn"
           onClick={handleBubbleClick}
-          title="Chat about this diagram"
-          aria-label="Open chat to modify diagram"
+          title="Edit diagram"
+          aria-label="Open panel to modify diagram"
           aria-expanded={false}
         >
-          <MessageCircle size={20} />
+          <Pencil size={20} />
         </button>
       )}
 
@@ -238,20 +328,98 @@ export function ChatBubble({ mermaidCode, filePath, startLine, endLine }: ChatBu
           aria-label="Chat about diagram"
           style={{ height: chatPanelHeight }}
         >
-          {/* Header - also serves as resize handle */}
+          {/* Header - controls + resize handle (issue #37) */}
           <div
             className="chat-panel-header chat-panel-resize-handle"
             onMouseDown={handleResizeStart}
+            role="toolbar"
+            aria-label="Diagram controls"
           >
-            <span className="chat-panel-title">Modify Diagram</span>
-            <button
-              className="chat-panel-close"
-              onClick={handleCloseClick}
-              title="Close (Escape)"
-              aria-label="Close chat panel"
-            >
-              <X size={16} />
-            </button>
+            {/* Zoom controls group */}
+            <div className="chat-header-group chat-header-zoom" role="group" aria-label="Zoom controls">
+              <button
+                className="chat-header-btn"
+                onClick={onZoomOut}
+                disabled={zoomOutDisabled}
+                title="Zoom out (-)"
+                aria-label="Zoom out"
+              >
+                <ZoomOut size={14} />
+              </button>
+              <span className="chat-zoom-indicator" aria-live="polite">
+                {formatZoomLevel(transform.scale)}
+              </span>
+              <button
+                className="chat-header-btn"
+                onClick={onZoomIn}
+                disabled={zoomInDisabled}
+                title="Zoom in (+)"
+                aria-label="Zoom in"
+              >
+                <ZoomIn size={14} />
+              </button>
+              <button
+                className="chat-header-btn"
+                onClick={onFitToView}
+                title="Fit to screen (F)"
+                aria-label="Fit to screen"
+              >
+                <Maximize size={14} />
+              </button>
+              <button
+                className="chat-header-btn"
+                onClick={onReset}
+                title="Reset view (0)"
+                aria-label="Reset view"
+              >
+                <RotateCcw size={14} />
+              </button>
+            </div>
+
+            {/* Direction buttons group (only for supported chart types) */}
+            {showDirectionButtons && (
+              <div className="chat-header-group chat-header-directions" role="group" aria-label="Layout direction">
+                {availableDirections.map((direction) => {
+                  const disabled = isDirectionDisabled(direction, currentDirection, chartType)
+                  const active = isDirectionActive(direction, currentDirection, chartType)
+                  return (
+                    <button
+                      key={direction}
+                      className={`chat-direction-btn ${active ? 'chat-direction-btn--active' : ''}`}
+                      onClick={() => handleDirectionClick(direction)}
+                      disabled={disabled}
+                      title={getDirectionTooltip(direction)}
+                      aria-label={`Change layout to ${getDirectionTooltip(direction)}`}
+                      aria-pressed={active}
+                    >
+                      {direction}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Terminal controls group */}
+            <div className="chat-header-group chat-header-terminal" role="group" aria-label="Terminal controls">
+              <button
+                className="chat-header-btn"
+                onClick={handleScrollToBottom}
+                disabled={!portalContext?.isTerminalReady}
+                title="Scroll to Bottom"
+                aria-label="Scroll terminal to bottom"
+              >
+                <ArrowDownToLine size={14} />
+              </button>
+              <button
+                className="chat-header-btn"
+                onClick={handleRestartTerminal}
+                disabled={!portalContext?.isTerminalReady}
+                title="Restart Terminal"
+                aria-label="Restart terminal"
+              >
+                <RotateCw size={14} />
+              </button>
+            </div>
           </div>
 
           <div className="chat-panel-body">
