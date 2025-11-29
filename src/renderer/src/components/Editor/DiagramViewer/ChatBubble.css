@@ -66,15 +66,16 @@
   }
 }
 
-/* Panel header - also serves as resize handle */
+/* Panel header - controls + resize handle (issue #37) */
 .chat-panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 8px 12px;
   background: #2d2d30;
   border-bottom: 1px solid #3c3c3c;
   flex-shrink: 0;
+  gap: 12px;
 }
 
 /* Resize handle behavior on header */
@@ -87,36 +88,103 @@
   background: #333337;
 }
 
-.chat-panel-title {
-  font-size: 13px;
-  font-weight: 500;
-  color: #cccccc;
-  pointer-events: none; /* Allow clicks to pass through for resize */
+/* Header control groups */
+.chat-header-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto; /* Re-enable clicks on buttons */
 }
 
-.chat-panel-close {
+.chat-header-zoom {
+  flex: 0 0 auto;
+}
+
+.chat-header-directions {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+.chat-header-terminal {
+  flex: 0 0 auto;
+}
+
+/* Header buttons */
+.chat-header-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   background: transparent;
   border: none;
   border-radius: 4px;
-  color: #888888;
+  color: #cccccc;
   cursor: pointer;
-  transition: background-color 0.1s ease, color 0.1s ease;
-  pointer-events: auto; /* Re-enable clicks on close button */
+  transition: background-color 0.1s ease;
 }
 
-.chat-panel-close:hover {
+.chat-header-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.1);
+}
+
+.chat-header-btn:active:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.chat-header-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chat-header-btn:focus-visible {
+  outline: 1px solid #007fd4;
+  outline-offset: 1px;
+}
+
+/* Zoom indicator */
+.chat-zoom-indicator {
+  min-width: 44px;
+  padding: 2px 6px;
+  background: #3c3c3c;
+  border-radius: 3px;
+  color: #cccccc;
+  font-size: 11px;
+  font-family: monospace;
+  text-align: center;
+}
+
+/* Direction buttons */
+.chat-direction-btn {
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid #454545;
+  border-radius: 3px;
+  color: #888888;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.1s ease, border-color 0.1s ease, color 0.1s ease;
+}
+
+.chat-direction-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #666666;
   color: #cccccc;
 }
 
-.chat-panel-close:focus-visible {
-  outline: 1px solid #007fd4;
-  outline-offset: 1px;
+.chat-direction-btn:disabled {
+  cursor: not-allowed;
+}
+
+.chat-direction-btn--active {
+  background: rgba(0, 127, 212, 0.2);
+  border-color: #007fd4;
+  color: #5cb3f2;
+}
+
+.chat-direction-btn--active:disabled {
+  opacity: 1; /* Keep active state visible when disabled */
 }
 
 /* Panel body - flex container for terminal + input */

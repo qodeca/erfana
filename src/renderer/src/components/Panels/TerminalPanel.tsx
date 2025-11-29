@@ -601,7 +601,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }, [portalTarget, portalContext?.diagramViewerContainerRef, terminalId])
 
-  const handleRestartTerminal = async () => {
+  const handleRestartTerminal = useCallback(async () => {
     // Kill current terminal session
     if (terminalIdRef.current) {
       await window.api.terminal.kill(terminalIdRef.current)
@@ -625,13 +625,28 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     if (terminalRef.current && isAvailable) {
       await initializeTerminal()
     }
-  }
+  }, [setActiveTerminalId, isAvailable])
 
-  const handleScrollToBottom = () => {
+  const handleScrollToBottom = useCallback(() => {
     if (xtermRef.current) {
       xtermRef.current.scrollToBottom()
     }
-  }
+  }, [])
+
+  // Register terminal controls with portal context (issue #37)
+  // Allows ChatBubble to access scroll/restart functions
+  useEffect(() => {
+    if (!portalContext || !terminalId) return
+
+    portalContext.registerTerminalControls({
+      scrollToBottom: handleScrollToBottom,
+      restart: handleRestartTerminal
+    })
+
+    return () => {
+      portalContext.unregisterTerminalControls()
+    }
+  }, [portalContext, terminalId, handleScrollToBottom, handleRestartTerminal])
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
