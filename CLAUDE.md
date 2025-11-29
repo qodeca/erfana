@@ -75,7 +75,7 @@ See `docs/` for details (keep Claude's context focused):
   - Handles all scenarios: internal edits, external file changes, multiple identical diagrams
   - Store changes: Added `contentHash` and `originalEndLine` fields
   - 30 new regression tests for multi-diagram scenarios
-  - **Total: 2976 tests passing (104 test files)**
+  - **Total: 3003 tests passing (105 test files)**
   - Closes #39
 - **Consolidate DiagramViewer Controls into Chat Panel** (Nov 29, 2025):
   - Moved toolbar controls into ChatBubble panel header (issue #37)
