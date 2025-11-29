@@ -2,101 +2,155 @@
 
 **Goal:** Write code and tests following the approved plan.
 **Agents:** `implement-code`, `write-tests`
+**Quality Gate:** QG-4 (Automated)
 
-## Steps
+---
 
-### 1. Implementation with implement-code
+## INPUT CONDITIONS
 
-Follow the `implement-code` agent steps (see `agents/implement-code.md`):
+**STOP if ANY condition is unchecked. Do not proceed.**
+
+- [ ] QG-3 = PASS (Architecture approved by user)
+- [ ] Implementation plan available and APPROVED
+- [ ] Test strategy defined
+- [ ] Affected files list available
+- [ ] Patterns inventory available
+
+---
+
+## Execution Steps
+
+### Step 1: Implementation with implement-code
+
+Follow `implement-code` agent:
 
 1. Review implementation plan
 2. Read existing code patterns
 3. Create new files using Write()
 4. Modify existing files using Edit()
-5. Verify with Bash(command="npm run typecheck")
+5. Verify with `npm run typecheck`
 
-**Example inputs:**
-- issue_number: 11
-- implementation_plan: (from design-solution)
-- step_number: 1
-- patterns_to_follow: ["WelcomeTab.tsx", "useProjectStore"]
+**Follow the plan sequence exactly.**
 
-### 2. Write Tests (TDD-friendly)
+### Step 2: Write Tests (TDD-friendly)
 
-- Write tests alongside or before implementation
-- Use `write-tests` for complex test scenarios
-- Target >80% coverage for new code
+Use `write-tests` agent for:
+- Unit tests for new functions
+- Integration tests for components
+- Edge case coverage
 
-### 3. Incremental Verification
+**Target:** >80% coverage for new code
+
+### Step 3: Incremental Verification
+
+After each major change:
+```bash
+npm run typecheck    # Must pass
+npm run test         # Must pass
+```
+
+### Step 4: Modern Testing Approaches (Tier 2)
+
+Consider where applicable:
+
+| Approach | When to Use |
+|----------|-------------|
+| Property-based | Complex input domains |
+| Contract testing | IPC handlers, APIs |
+| AI-assisted generation | Edge case discovery |
+| Mutation testing | Verify test quality |
+
+---
+
+## OUTPUT ARTIFACTS
+
+| Artifact | Description |
+|----------|-------------|
+| Code Changes | New/modified files per plan |
+| Test Suite | Tests for all new code |
+| Type Check Results | `npm run typecheck` output |
+| Test Results | `npm run test` output |
+
+---
+
+## OUTPUT CONDITIONS
+
+**ALL must be checked before proceeding to Phase 5.**
+
+- [ ] All planned files created/modified
+- [ ] Implementation follows approved plan
+- [ ] Code follows existing codebase patterns
+- [ ] Typecheck passes (`npm run typecheck`)
+- [ ] All tests pass (`npm run test`)
+- [ ] Tests written for new code (>80% coverage target)
+- [ ] No scope creep (only acceptance criteria addressed)
+
+---
+
+## QUALITY GATE: QG-4
+
+**Gate Type:** Automated (ALL tiers)
+**Gate ID:** QG-4
+
+### Pass Criteria
+
+| Criterion | Check |
+|-----------|-------|
+| Typecheck | `npm run typecheck` exits 0 |
+| Tests | `npm run test` exits 0 |
+| Coverage | New code >80% covered |
+| Plan conformance | All planned changes made |
+| No scope creep | Only acceptance criteria addressed |
+
+### Automated Verification
 
 ```bash
-npm run typecheck    # After each major change
-npm test             # Frequently
+# Run all checks
+npm run typecheck && npm run test
 ```
+
+**Both must pass.**
+
+### Result
+
+**QG-4 Result:** [PASS | FAIL]
+
+### On FAIL
+
+1. Identify specific failure (typecheck, test, coverage)
+2. Fix the identified issue
+3. Re-run verification
+4. Max 3 retries, then ESCALATE
+
+### Common Failures
+
+| Failure | Resolution |
+|---------|------------|
+| Type error | Fix type annotations or implementation |
+| Test failure | Debug and fix implementation or test |
+| Low coverage | Add missing tests |
+| Scope creep detected | Revert unplanned changes |
+
+---
 
 ## Implementation Guidelines
 
+**DO:**
 - Follow existing patterns in codebase
 - Keep changes focused on acceptance criteria
-- NO scope creep ("while I'm here..." belongs in separate issue)
-- Simple changes (<10 lines) don't need agent orchestration
+- Write tests alongside implementation
+- Verify after each major change
 
-## Agent Selection for Implementation
-
-```
-Issue Type → Agent
-├── TypeScript code → implement-code
-├── Complex tests → write-tests
-├── Bug diagnosis → investigate-bug
-└── Code cleanup → advise-refactor
-```
-
-## Modern Testing Approaches (Tier 2)
-
-Consider these 2025 testing practices where applicable:
-
-### 1. Property-Based Testing
-- For functions with complex input domains
-- Generate random inputs to find edge cases
-- Tools: fast-check (TypeScript)
-
-### 2. Contract Testing
-- For IPC handlers and API endpoints
-- Verify interface contracts remain stable
-- Catches breaking changes early
-
-### 3. AI-Assisted Test Generation
-- Use `write-tests` agent for edge case discovery
-- Generate tests from acceptance criteria automatically
-- Focus human effort on test strategy, not boilerplate
-
-### 4. Mutation Testing (Optional, Tier 2)
-- Verify test quality by introducing code mutations
-- Ensure tests catch actual bugs, not just achieve coverage
-- Run after implementation is stable
+**DO NOT:**
+- Add unplanned features ("while I'm here...")
+- Change unrelated code
+- Skip test writing
+- Ignore typecheck warnings
 
 ---
 
-## Retry Logic
+## NEXT PHASE
 
-- **Max retries:** 3 per phase
-- **On failure:**
-  1. Review agent output and typecheck/test errors
-  2. Retry with refined guidance or corrected patterns
-  3. After 3 failures: Present issue to user with options
-- **Escalation:** User decides: [Retry/Manual Implementation/Abort]
+**QG-4 = PASS required to proceed to Phase 5: Architectural Review**
 
----
-
-## Phase Validation
-
-Before proceeding to next phase, ALL must be checked:
-
-- [ ] All planned files created/modified
-- [ ] Typecheck passes (npm run typecheck)
-- [ ] Tests written for new code (>80% coverage target)
-- [ ] All tests pass (npm test)
-- [ ] Code follows existing codebase patterns
-- [ ] No scope creep - only acceptance criteria addressed
-
-**STOP if any item unchecked. Do not proceed.**
+**STOP if QG-4 ≠ PASS. Do not proceed.**

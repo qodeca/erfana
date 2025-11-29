@@ -1,57 +1,63 @@
 # Phase 3: Architecture
 
-**Goal:** Design the implementation approach.
+**Goal:** Design implementation approach with architect verification.
 **Agent:** `design-solution`
+**Quality Gate:** QG-3 (User-Approval - ALL tiers)
 
-## Steps
+---
 
-### 1. Invoke Architect Agent
+## INPUT CONDITIONS
 
-Follow the `design-solution` agent steps (see `agents/design-solution.md`):
+**STOP if ANY condition is unchecked. Do not proceed.**
 
-1. Read acceptance criteria from issue
-2. Search for affected files using Glob/Grep
-3. Read existing code patterns
+- [ ] QG-2 = PASS (Discovery completed)
+- [ ] Affected files list available
+- [ ] Patterns inventory available
+- [ ] Complexity assessment available
+- [ ] Acceptance criteria validated
+
+---
+
+## Execution Steps
+
+### Step 1: Invoke Architect Agent
+
+Use `design-solution` agent to:
+1. Read acceptance criteria
+2. Review affected files
+3. Consider existing patterns
 4. Design component structure
 5. Plan implementation steps
 6. Define test strategy
 7. Identify risks
 
-**Example inputs:**
-- issue_number: 11
-- issue_body: "Add Chrome-style tabs"
-- acceptance_criteria: [sizing, dirty indicator, context menu]
-- affected_files: [from explore-codebase]
-- patterns_found: [from explore-codebase]
+### Step 2: Produce Implementation Plan
 
-### 2. Produce Implementation Plan
+Use template: `templates/implement/implementation-plan.md`
 
-Use template: `templates/implementation-plan.md`
+Plan must include:
+- Approach summary
+- Files to modify/create
+- Implementation sequence
+- Test strategy
+- Risks and mitigations
 
-### 3. Identify Agent Needs
+### Step 3: Architect Verification Gate
 
-Based on issue type:
-- Feature: implement-code (required)
-- Bug fix (complex): investigate-bug
-- Refactor: advise-refactor
-- Tests only: write-tests
+**BEFORE presenting to user**, verify plan internally:
 
-### 4. Plan Verification Gate (Definition of Done - Tier 2)
+```
+Verification criteria:
+- [ ] All acceptance criteria addressed
+- [ ] Aligns with existing patterns
+- [ ] All risks identified with mitigations
+- [ ] Test strategy covers all changes
+- [ ] All affected files/modules identified
+```
 
-BEFORE presenting plan to user, verify the plan using `design-solution` verification mode:
+**Report:** [APPROVED | NEEDS REVISION]
 
-**Verification criteria:**
-- Completeness: All acceptance criteria addressed?
-- Feasibility: Aligns with existing codebase patterns?
-- Risks: All risks identified with mitigations?
-- Testing: Strategy covers all changes adequately?
-- Dependencies: All affected files/modules identified?
-
-**Report:** [APPROVED / NEEDS REVISION]
-
-If NEEDS REVISION, provide specific issues to address.
-
-**Correction Loop (mandatory):**
+### Step 4: Correction Loop (if NEEDS REVISION)
 
 ```
 IF architect reports NEEDS REVISION:
@@ -60,67 +66,116 @@ IF architect reports NEEDS REVISION:
   3. Re-invoke design-solution for verification
   4. Repeat until APPROVED
 
-ONLY proceed to user checkpoint after architect APPROVED.
+ONLY present to user after architect APPROVED.
 ```
 
-This gate ensures users only see architect-approved plans.
+### Step 5: Present to User
 
-## Architecture Checkpoint (Tier 2)
+Present architect-approved plan for user approval.
 
-Present implementation plan to user:
+---
+
+## OUTPUT ARTIFACTS
+
+| Artifact | Description |
+|----------|-------------|
+| Implementation Plan | Complete plan with sequence and tests |
+| Architect Verification | APPROVED status |
+| Risk Register | All risks with mitigations |
+| Test Strategy | How changes will be tested |
+
+---
+
+## OUTPUT CONDITIONS
+
+**ALL must be checked before proceeding to Phase 4.**
+
+- [ ] Implementation plan produced by design-solution
+- [ ] Plan addresses ALL acceptance criteria
+- [ ] All affected files identified in plan
+- [ ] Testing strategy defined
+- [ ] Risks identified with mitigations
+- [ ] Architect verification: APPROVED
+- [ ] User approved implementation plan
+
+---
+
+## QUALITY GATE: QG-3
+
+**Gate Type:** User-Approval (ALL tiers)
+**Gate ID:** QG-3
+
+### Pass Criteria
+
+| Criterion | Required |
+|-----------|----------|
+| Plan completeness | All acceptance criteria covered |
+| Architect verified | APPROVED (not NEEDS REVISION) |
+| User approved | Explicit approval received |
+
+### User Checkpoint
+
+Present to user:
 
 ```markdown
 ## Implementation Plan
 
-**Approach:** <summary>
+**Issue:** #<number> - <title>
+**Architect Verification:** APPROVED
 
-**Changes:**
-1. <file>: <change description>
-2. <file>: <change description>
+### Approach
+<summary of approach>
 
-**New Files:**
-- <path>: <purpose>
+### Changes
+| File | Action | Description |
+|------|--------|-------------|
+| <file1> | Modify | <what changes> |
+| <file2> | Create | <purpose> |
 
-**Tests Required:**
-- <test type>: <coverage area>
+### Implementation Sequence
+1. <step 1>
+2. <step 2>
+3. <step 3>
 
-**Risks:**
-- <potential issue>
+### Test Strategy
+- Unit tests: <coverage>
+- Integration tests: <scope>
+- Edge cases: <list>
 
-**Estimated Effort:** <time>
+### Risks
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| <risk> | <impact> | <action> |
 
-Approve plan? [Yes/Revise/Abort]
+### Estimated Effort
+<effort assessment>
+
+**Approve plan?** [Approve / Revise / Abort]
 ```
 
-## Abort Criteria
+### Result
+
+**QG-3 Result:** [PASS | FAIL]
+
+### On FAIL
+
+If user requests revision:
+1. Gather specific feedback
+2. Re-invoke design-solution with feedback
+3. Re-run architect verification
+4. Present revised plan
+5. Max 3 revision cycles, then discuss alternatives
+
+### Abort Criteria
 
 - Issue is poorly scoped → Request issue refinement
-- Requires breaking changes not labeled → Request label update
+- Breaking changes not labeled → Request label update
 - Blocked by missing dependency → Document blocker
 
 ---
 
-## Retry Logic
+## NEXT PHASE
 
-- **Max retries:** 3 per phase
-- **On failure:**
-  1. Review architect output, refine prompt with more context
-  2. Retry with adjusted parameters or clearer requirements
-  3. After 3 failures: Present issue to user with options
-- **Escalation:** User decides: [Retry/Revise Requirements/Abort]
+**QG-3 = PASS (user approved) required to proceed to Phase 4: Implementation**
 
----
-
-## Phase Validation
-
-Before proceeding to next phase, ALL must be checked:
-
-- [ ] Implementation plan produced by design-solution
-- [ ] Plan addresses all acceptance criteria
-- [ ] All affected files identified
-- [ ] Testing strategy defined
-- [ ] Risks identified with mitigations
-- [ ] Architect verification: APPROVED (Tier 2)
-- [ ] User approved architecture checkpoint (Tier 2)
-
-**STOP if any item unchecked. Do not proceed.**
+**STOP if QG-3 ≠ PASS. Do not proceed.**

@@ -1,86 +1,139 @@
 # Phase 0: Pre-flight Checks
 
-Before starting, verify the environment and project state.
+**Goal:** Validate environment, issue state, and create feature branch.
+**Quality Gate:** QG-0 (Mandatory)
 
-## Pre-flight Commands
+---
+
+## INPUT CONDITIONS
+
+**STOP if ANY condition is unchecked. Do not proceed.**
+
+- [ ] Git repository exists in current directory
+- [ ] `gh` CLI installed and authenticated
+- [ ] Issue number provided by user
+- [ ] No other implementation in progress
+
+---
+
+## Execution Steps
+
+### Step 1: Validate Issue
 
 ```bash
-# Issue validation
 gh issue view <number> --json state,title,labels,body
-
-# Environment checks
-git status --porcelain           # No uncommitted changes
-npm test                          # Tests pass
-npm run typecheck                 # Types valid
 ```
 
-## Pre-flight Checklist
+**Check:**
+- Issue exists
+- State is OPEN (not closed, not draft)
+- No `blocked` label
 
-- [ ] Issue exists and is OPEN
-- [ ] Issue has acceptance criteria (or request clarification)
-- [ ] No `blocked` label on issue
-- [ ] Tests pass on current branch
-- [ ] No uncommitted changes in working directory
-- [ ] Check for duplicate issues: `gh issue list --search "<keywords>"`
-- [ ] **Feature branch created** (see Branch Strategy below)
-
-## Branch Strategy (Required - All Tiers)
-
-Create a feature branch before starting any implementation:
+### Step 2: Validate Working Directory
 
 ```bash
-git checkout -b fix/<number>-<short-description>
-# Example: git checkout -b fix/11-chrome-style-tabs
+git status --porcelain
 ```
 
-**Branch naming convention:**
-- `fix/<number>-<description>` for bug fixes and general issues
-- `feat/<number>-<description>` for new features
-- `docs/<number>-<description>` for documentation-only changes
+**Check:**
+- No uncommitted changes
+- No untracked files in src/
 
-Branch creation is **mandatory** - never work directly on main. This ensures:
-- Clean rollback if implementation fails
-- Isolated changes for review
-- Consistent workflow across all tiers
+### Step 3: Run Baseline Tests
 
-## Abort Pre-flight If
+```bash
+npm run test
+npm run typecheck
+```
 
-- Issue is CLOSED or DRAFT state
-- `blocked` label is present
-- Tests failing on main branch (fix baseline first)
-- Uncommitted changes exist (stash or commit first)
+**Check:**
+- All tests pass
+- No type errors
 
-**DO NOT proceed without resolving blockers.**
+### Step 4: Determine Complexity Tier
 
-## If Pre-flight Fails
+| Labels | Tier |
+|--------|------|
+| `good first issue`, `documentation`, `typo`, `chore` | Tier 1 (Trivial) |
+| `bug`, `enhancement`, `breaking-change`, `security`, unlabeled | Tier 2 (Standard) |
 
-- Uncommitted changes: `git stash` or commit first
-- Tests failing: Fix baseline before starting new work
-- Issue blocked: Wait or work on blocker first
-- Missing acceptance criteria: Comment on issue requesting details
+### Step 5: Create Feature Branch
 
----
+```bash
+git checkout -b <type>/<number>-<short-description>
+```
 
-## Retry Logic
-
-- **Max retries:** 3 per phase
-- **On failure:**
-  1. Review validation output, address specific blockers
-  2. Retry after fixing issues
-  3. After 3 failures: Present issue to user with options
-- **Escalation:** User decides: [Retry/Skip/Abort]
+**Branch naming:**
+- `fix/<number>-<description>` - Bug fixes
+- `feat/<number>-<description>` - New features
+- `docs/<number>-<description>` - Documentation only
 
 ---
 
-## Phase Validation
+## OUTPUT ARTIFACTS
 
-Before proceeding to next phase, ALL must be checked:
+| Artifact | Description |
+|----------|-------------|
+| Feature Branch | Named branch checked out |
+| Issue Metadata | Title, labels, body, acceptance criteria |
+| Tier Classification | Tier 1 or Tier 2 |
+
+---
+
+## OUTPUT CONDITIONS
+
+**ALL must be checked before proceeding to Phase 1.**
 
 - [ ] Issue is OPEN and not blocked
-- [ ] Working directory is clean (no uncommitted changes)
+- [ ] Issue has acceptance criteria (or clarification requested)
+- [ ] Working directory is clean
 - [ ] All tests pass (npm test)
 - [ ] Typecheck passes (npm run typecheck)
 - [ ] Feature branch created and checked out
-- [ ] Acceptance criteria identified or clarification requested
+- [ ] Tier classification determined
 
-**STOP if any item unchecked. Do not proceed.**
+---
+
+## QUALITY GATE: QG-0
+
+**Gate Type:** Mandatory
+**Gate ID:** QG-0
+
+### Pass Criteria
+
+| Criterion | Check |
+|-----------|-------|
+| Issue valid | OPEN state, no `blocked` label |
+| Clean state | No uncommitted changes |
+| Tests pass | `npm test` exits 0 |
+| Types valid | `npm run typecheck` exits 0 |
+| Branch created | Feature branch checked out |
+
+### Result
+
+**QG-0 Result:** [PASS | FAIL]
+
+### On FAIL
+
+1. Identify specific failure reason
+2. Present to user with fix suggestion
+3. Retry after user addresses issue
+4. Max 3 retries, then ESCALATE
+
+### Escalation Options
+
+| Failure | Resolution |
+|---------|------------|
+| Issue closed | Abort - cannot implement closed issue |
+| Issue blocked | Abort - resolve blocker first |
+| Tests failing | Fix baseline before starting new work |
+| Uncommitted changes | `git stash` or commit first |
+| Missing acceptance criteria | Request clarification on issue |
+
+---
+
+## NEXT PHASE
+
+**QG-0 = PASS required to proceed to Phase 1: Business Analysis**
+
+**STOP if QG-0 ≠ PASS. Do not proceed.**
