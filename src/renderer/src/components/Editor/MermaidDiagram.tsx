@@ -86,9 +86,15 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
         const { svg } = await mermaid.render(id, code)
 
         if (containerRef.current) {
-          // SECURITY: Mermaid's securityLevel: 'strict' sanitizes output.
-          // No additional sanitization needed - it can break SVG features
-          // like markers, foreignObject, and xlink:href references.
+          // ⚠️  DO NOT ADD SVG SANITIZATION HERE (e.g., DOMPurify)
+          //
+          // Mermaid's securityLevel: 'strict' (default since v10) already sanitizes output.
+          // Additional sanitization BREAKS diagrams:
+          // - DOMPurify strips foreignObject content (GitHub DOMPurify #1002, #1088)
+          // - DOMPurify strips xlink:href internal references used for markers (#233)
+          // - These SVG features are essential for flowcharts, sequence diagrams, etc.
+          //
+          // See: https://github.com/cure53/DOMPurify/issues/1002
           containerRef.current.innerHTML = svg
           setSvgContent(svg)
 
