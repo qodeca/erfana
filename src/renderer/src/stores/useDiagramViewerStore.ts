@@ -25,8 +25,11 @@ interface DiagramViewerState {
   mermaidCode: string
   svgContent: string
   filePath: string | null
+  /** Current line numbers (updated as diagram drifts) */
   startLine: number | undefined
   endLine: number | undefined
+  /** Original line numbers when viewer was opened (NEVER updated, used for matching) */
+  originalStartLine: number | undefined
 
   // Chat panel state (contains terminal when expanded)
   chatPanelHeight: number
@@ -41,7 +44,13 @@ interface DiagramViewerState {
     endLine?: number
   }) => void
   closeViewer: () => void
-  updateDiagram: (diagramId: string, mermaidCode: string, svgContent: string) => void
+  updateDiagram: (params: {
+    filePath: string
+    mermaidCode: string
+    svgContent: string
+    startLine?: number
+    endLine?: number
+  }) => void
 
   // Chat panel actions
   setChatPanelHeight: (height: number) => void
@@ -55,6 +64,7 @@ export const useDiagramViewerStore = create<DiagramViewerState>((set, get) => ({
   filePath: null,
   startLine: undefined,
   endLine: undefined,
+  originalStartLine: undefined,
 
   // Chat panel height - persists across viewer opens/closes
   chatPanelHeight: CHAT_PANEL_CONFIG.DEFAULT_HEIGHT,
@@ -67,7 +77,8 @@ export const useDiagramViewerStore = create<DiagramViewerState>((set, get) => ({
       svgContent,
       filePath,
       startLine,
-      endLine
+      endLine,
+      originalStartLine: startLine // Capture original position - never updated
       // Note: chatPanelHeight persists from previous session
     })
   },
@@ -80,16 +91,25 @@ export const useDiagramViewerStore = create<DiagramViewerState>((set, get) => ({
       svgContent: '',
       filePath: null,
       startLine: undefined,
-      endLine: undefined
+      endLine: undefined,
+      originalStartLine: undefined
       // Note: chatPanelHeight persists for next open
     })
   },
 
-  updateDiagram: (diagramId, mermaidCode, svgContent) => {
+  updateDiagram: ({ filePath, mermaidCode, svgContent, startLine, endLine }) => {
     const state = get()
-    // Only update if this is the currently open diagram
-    if (state.isOpen && state.diagramId === diagramId) {
-      set({ mermaidCode, svgContent })
+    // Match by filePath only - allows updates even when line numbers shift
+    // (e.g., when user adds/removes lines above the diagram)
+    if (state.isOpen && state.filePath === filePath) {
+      const newDiagramId = buildDiagramId(filePath, startLine, endLine)
+      set({
+        mermaidCode,
+        svgContent,
+        startLine,
+        endLine,
+        diagramId: newDiagramId // Sync ID to current line numbers
+      })
     }
   },
 

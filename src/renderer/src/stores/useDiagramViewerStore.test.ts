@@ -130,11 +130,11 @@ describe('useDiagramViewerStore', () => {
   })
 
   describe('updateDiagram', () => {
-    it('should update content when diagramId matches and viewer is open', () => {
+    it('should update content when filePath matches and viewer is open', () => {
       const { openViewer, updateDiagram } = useDiagramViewerStore.getState()
 
       openViewer({
-        diagramId: 'file.md:10-20',
+        diagramId: '/file.md:10-20',
         mermaidCode: 'original code',
         svgContent: '<svg>original</svg>',
         filePath: '/file.md',
@@ -142,18 +142,24 @@ describe('useDiagramViewerStore', () => {
         endLine: 20
       })
 
-      updateDiagram('file.md:10-20', 'updated code', '<svg>updated</svg>')
+      updateDiagram({
+        filePath: '/file.md',
+        mermaidCode: 'updated code',
+        svgContent: '<svg>updated</svg>',
+        startLine: 10,
+        endLine: 20
+      })
 
       const { mermaidCode, svgContent } = useDiagramViewerStore.getState()
       expect(mermaidCode).toBe('updated code')
       expect(svgContent).toBe('<svg>updated</svg>')
     })
 
-    it('should NOT update when diagramId does not match', () => {
+    it('should NOT update when filePath does not match', () => {
       const { openViewer, updateDiagram } = useDiagramViewerStore.getState()
 
       openViewer({
-        diagramId: 'file.md:10-20',
+        diagramId: '/file.md:10-20',
         mermaidCode: 'original code',
         svgContent: '<svg>original</svg>',
         filePath: '/file.md',
@@ -161,8 +167,14 @@ describe('useDiagramViewerStore', () => {
         endLine: 20
       })
 
-      // Try to update with different diagramId
-      updateDiagram('different:1-5', 'new code', '<svg>new</svg>')
+      // Try to update with different filePath
+      updateDiagram({
+        filePath: '/different.md',
+        mermaidCode: 'new code',
+        svgContent: '<svg>new</svg>',
+        startLine: 1,
+        endLine: 5
+      })
 
       const { mermaidCode, svgContent } = useDiagramViewerStore.getState()
       expect(mermaidCode).toBe('original code')
@@ -173,18 +185,59 @@ describe('useDiagramViewerStore', () => {
       const { updateDiagram } = useDiagramViewerStore.getState()
 
       // Viewer is closed by default (isOpen: false)
-      updateDiagram('file.md:10-20', 'new code', '<svg>new</svg>')
+      updateDiagram({
+        filePath: '/file.md',
+        mermaidCode: 'new code',
+        svgContent: '<svg>new</svg>',
+        startLine: 10,
+        endLine: 20
+      })
 
       const { mermaidCode, svgContent } = useDiagramViewerStore.getState()
       expect(mermaidCode).toBe('')
       expect(svgContent).toBe('')
     })
 
-    it('should preserve other state fields when updating', () => {
+    it('should update line numbers and diagramId when they change (line drift fix)', () => {
+      const { openViewer, updateDiagram } = useDiagramViewerStore.getState()
+
+      // Open viewer with diagram at lines 10-20
+      openViewer({
+        diagramId: '/file.md:10-20',
+        mermaidCode: 'original',
+        svgContent: '<svg></svg>',
+        filePath: '/file.md',
+        startLine: 10,
+        endLine: 20
+      })
+
+      // Simulate user adding lines above the diagram, shifting it to lines 15-25
+      updateDiagram({
+        filePath: '/file.md',
+        mermaidCode: 'updated',
+        svgContent: '<svg>new</svg>',
+        startLine: 15,
+        endLine: 25
+      })
+
+      const state = useDiagramViewerStore.getState()
+      // Content should be updated
+      expect(state.mermaidCode).toBe('updated')
+      expect(state.svgContent).toBe('<svg>new</svg>')
+      // Line numbers should be synced
+      expect(state.startLine).toBe(15)
+      expect(state.endLine).toBe(25)
+      // diagramId should be updated to reflect new line numbers
+      expect(state.diagramId).toBe('/file.md:15-25')
+      // Viewer should remain open
+      expect(state.isOpen).toBe(true)
+    })
+
+    it('should preserve isOpen and filePath when updating', () => {
       const { openViewer, updateDiagram } = useDiagramViewerStore.getState()
 
       openViewer({
-        diagramId: 'file.md:10-20',
+        diagramId: '/project/file.md:10-20',
         mermaidCode: 'original',
         svgContent: '<svg></svg>',
         filePath: '/project/file.md',
@@ -192,15 +245,18 @@ describe('useDiagramViewerStore', () => {
         endLine: 20
       })
 
-      updateDiagram('file.md:10-20', 'updated', '<svg>new</svg>')
+      updateDiagram({
+        filePath: '/project/file.md',
+        mermaidCode: 'updated',
+        svgContent: '<svg>new</svg>',
+        startLine: 10,
+        endLine: 20
+      })
 
       const state = useDiagramViewerStore.getState()
       // These should NOT change
       expect(state.isOpen).toBe(true)
-      expect(state.diagramId).toBe('file.md:10-20')
       expect(state.filePath).toBe('/project/file.md')
-      expect(state.startLine).toBe(10)
-      expect(state.endLine).toBe(20)
     })
   })
 
@@ -210,7 +266,7 @@ describe('useDiagramViewerStore', () => {
 
       // 1. User opens diagram viewer
       openViewer({
-        diagramId: 'README.md:5-15',
+        diagramId: '/project/README.md:5-15',
         mermaidCode: 'flowchart TD\n  A-->B',
         svgContent: '<svg>v1</svg>',
         filePath: '/project/README.md',
@@ -222,7 +278,13 @@ describe('useDiagramViewerStore', () => {
       expect(useDiagramViewerStore.getState().isOpen).toBe(true)
 
       // 2. User edits the markdown file (simulated by MermaidDiagram calling updateDiagram)
-      updateDiagram('README.md:5-15', 'flowchart TD\n  A-->B-->C', '<svg>v2</svg>')
+      updateDiagram({
+        filePath: '/project/README.md',
+        mermaidCode: 'flowchart TD\n  A-->B-->C',
+        svgContent: '<svg>v2</svg>',
+        startLine: 5,
+        endLine: 15
+      })
 
       // 3. Viewer should still be open with updated content
       const state = useDiagramViewerStore.getState()
@@ -235,16 +297,18 @@ describe('useDiagramViewerStore', () => {
       const { openViewer, updateDiagram } = useDiagramViewerStore.getState()
 
       openViewer({
-        diagramId: 'test:1-10',
+        diagramId: '/test.md:1-10',
         mermaidCode: 'v1',
         svgContent: '<svg>1</svg>',
-        filePath: '/test.md'
+        filePath: '/test.md',
+        startLine: 1,
+        endLine: 10
       })
 
       // Multiple updates (simulating rapid typing)
-      updateDiagram('test:1-10', 'v2', '<svg>2</svg>')
-      updateDiagram('test:1-10', 'v3', '<svg>3</svg>')
-      updateDiagram('test:1-10', 'v4', '<svg>4</svg>')
+      updateDiagram({ filePath: '/test.md', mermaidCode: 'v2', svgContent: '<svg>2</svg>', startLine: 1, endLine: 10 })
+      updateDiagram({ filePath: '/test.md', mermaidCode: 'v3', svgContent: '<svg>3</svg>', startLine: 1, endLine: 10 })
+      updateDiagram({ filePath: '/test.md', mermaidCode: 'v4', svgContent: '<svg>4</svg>', startLine: 1, endLine: 10 })
 
       // Viewer should still be open
       const { isOpen, mermaidCode } = useDiagramViewerStore.getState()

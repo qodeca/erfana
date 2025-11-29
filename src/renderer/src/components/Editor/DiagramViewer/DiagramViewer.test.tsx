@@ -411,22 +411,27 @@ describe('DiagramViewer', () => {
 
   describe('live update scenario (file edit while viewer open)', () => {
     it('should display updated content when store is updated', async () => {
-      // Initial diagram
+      // Initial diagram - include filePath since we now match by filePath
       setupStore({
         isOpen: true,
         svgContent: '<svg><circle cx="50" cy="50" r="40"/></svg>',
-        mermaidCode: 'flowchart TD\n  A-->B'
+        mermaidCode: 'flowchart TD\n  A-->B',
+        filePath: '/test/file.md',
+        startLine: 10,
+        endLine: 20
       })
       render(<DiagramViewer />)
 
       expect(document.querySelector('circle')).toBeInTheDocument()
 
       // Simulate file edit - MermaidDiagram would call updateDiagram
-      useDiagramViewerStore.getState().updateDiagram(
-        '/test/file.md:10-20',
-        'flowchart TD\n  A-->B-->C',
-        '<svg><rect width="50" height="50"/></svg>'
-      )
+      useDiagramViewerStore.getState().updateDiagram({
+        filePath: '/test/file.md',
+        mermaidCode: 'flowchart TD\n  A-->B-->C',
+        svgContent: '<svg><rect width="50" height="50"/></svg>',
+        startLine: 10,
+        endLine: 20
+      })
 
       // New content should be visible
       await waitFor(() => {

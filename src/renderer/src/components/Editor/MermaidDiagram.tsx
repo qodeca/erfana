@@ -23,13 +23,30 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
   const [svgContent, setSvgContent] = useState<string>('')
 
   // Store for persisting viewer state across component remounts
-  const { isOpen, diagramId, openViewer, updateDiagram } = useDiagramViewerStore()
+  const {
+    isOpen,
+    filePath: storedFilePath,
+    originalStartLine,
+    openViewer,
+    updateDiagram
+  } = useDiagramViewerStore()
 
   // Generate unique ID for this diagram
   const currentDiagramId = buildDiagramId(filePath, startLine, endLine)
 
   // Check if THIS diagram is the one currently open in the viewer
-  const isViewerOpenForThis = isOpen && diagramId === currentDiagramId
+  // Match by filePath AND check if line ranges are close (handles line drift from edits above)
+  // but distinguishes between different diagrams in the same file
+  // IMPORTANT: Compare against originalStartLine (fixed at open time), not startLine (which drifts)
+  const LINE_DRIFT_TOLERANCE = 20 // lines - handles typical edits while distinguishing diagrams
+  const isViewerOpenForThis = (() => {
+    if (!isOpen || filePath !== storedFilePath) return false
+    if (startLine === undefined || originalStartLine === undefined) return false
+
+    // Check if this diagram's start line is within tolerance of the ORIGINAL start line
+    // originalStartLine never changes, so other diagrams can't "drift" into matching
+    return Math.abs(startLine - originalStartLine) <= LINE_DRIFT_TOLERANCE
+  })()
 
   // Handle bug report button click
   const handleBugReport = async () => {
@@ -160,10 +177,16 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
   // When diagram re-renders with new code/SVG, update the store if viewer is open for this diagram
   // This enables live updates when editing the source file with viewer open
   useEffect(() => {
-    if (svgContent && isViewerOpenForThis) {
-      updateDiagram(currentDiagramId, code, svgContent)
+    if (svgContent && isViewerOpenForThis && filePath) {
+      updateDiagram({
+        filePath,
+        mermaidCode: code,
+        svgContent,
+        startLine,
+        endLine
+      })
     }
-  }, [svgContent, code, isViewerOpenForThis, currentDiagramId, updateDiagram])
+  }, [svgContent, code, isViewerOpenForThis, filePath, startLine, endLine, updateDiagram])
 
   return (
     <div className={`mermaid-container ${className}`}>
