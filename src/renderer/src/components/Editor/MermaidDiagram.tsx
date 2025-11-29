@@ -5,7 +5,7 @@ import { executePromptTemplate } from '../../utils/panelUtils'
 import { formatLineRange } from '../../prompts/helpers'
 import { MermaidToolbar } from './MermaidToolbar'
 import { getMermaidConfig } from '../../utils/mermaidThemes'
-import { useDiagramViewerStore, buildDiagramId } from '../../stores/useDiagramViewerStore'
+import { useDiagramViewerStore, buildDiagramId, hashDiagramContent } from '../../stores/useDiagramViewerStore'
 
 interface MermaidDiagramProps {
   code: string
@@ -26,6 +26,7 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
   const {
     isOpen,
     filePath: storedFilePath,
+    contentHash: storedContentHash,
     originalStartLine,
     openViewer,
     updateDiagram
@@ -34,18 +35,31 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
   // Generate unique ID for this diagram
   const currentDiagramId = buildDiagramId(filePath, startLine, endLine)
 
+  // Reduced tolerance - only for tie-breaking when content changes
+  const LINE_DRIFT_TOLERANCE = 10
+
   // Check if THIS diagram is the one currently open in the viewer
-  // Match by filePath AND check if line ranges are close (handles line drift from edits above)
-  // but distinguishes between different diagrams in the same file
-  // IMPORTANT: Compare against originalStartLine (fixed at open time), not startLine (which drifts)
-  const LINE_DRIFT_TOLERANCE = 20 // lines - handles typical edits while distinguishing diagrams
+  // Primary identity: content hash (survives line drift and external file reloads)
+  // Secondary: position tie-breaker (for identical diagrams or when content is edited)
   const isViewerOpenForThis = (() => {
     if (!isOpen || filePath !== storedFilePath) return false
+
+    // Primary check: Content hash match
+    // If content is identical, this IS the diagram (regardless of position)
+    if (storedContentHash) {
+      const currentHash = hashDiagramContent(code)
+      if (currentHash === storedContentHash) {
+        return true
+      }
+    }
+
+    // Secondary check: Position-based matching for edited content
+    // When user edits the diagram, content hash changes but it's still "the same diagram"
+    // Accept if position is close to where we opened the viewer
     if (startLine === undefined || originalStartLine === undefined) return false
 
-    // Check if this diagram's start line is within tolerance of the ORIGINAL start line
-    // originalStartLine never changes, so other diagrams can't "drift" into matching
-    return Math.abs(startLine - originalStartLine) <= LINE_DRIFT_TOLERANCE
+    const positionDrift = Math.abs(startLine - originalStartLine)
+    return positionDrift <= LINE_DRIFT_TOLERANCE
   })()
 
   // Handle bug report button click

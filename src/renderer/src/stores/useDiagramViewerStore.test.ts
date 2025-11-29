@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useDiagramViewerStore, buildDiagramId } from './useDiagramViewerStore'
+import { useDiagramViewerStore, buildDiagramId, hashDiagramContent } from './useDiagramViewerStore'
 
 describe('useDiagramViewerStore', () => {
   // Reset store state before each test
@@ -342,5 +342,618 @@ describe('buildDiagramId', () => {
   it('should handle mixed undefined values', () => {
     const id = buildDiagramId('/file.md', 5, undefined)
     expect(id).toBe('/file.md:5-0')
+  })
+})
+
+describe('issue #39 regression tests - multi-diagram scenarios', () => {
+  beforeEach(() => {
+    useDiagramViewerStore.getState().closeViewer()
+  })
+
+  describe('hashDiagramContent', () => {
+    it('should return consistent hash for same content', () => {
+      const code = 'flowchart TD\n    A --> B'
+      expect(hashDiagramContent(code)).toBe(hashDiagramContent(code))
+    })
+
+    it('should return different hash for different content', () => {
+      const codeA = 'flowchart TD\n    A --> B'
+      const codeB = 'flowchart TD\n    C --> D'
+      expect(hashDiagramContent(codeA)).not.toBe(hashDiagramContent(codeB))
+    })
+
+    it('should handle empty string', () => {
+      expect(hashDiagramContent('')).toBe('0')
+    })
+
+    it('should handle whitespace differences', () => {
+      const codeA = 'flowchart TD\n    A --> B'
+      const codeB = 'flowchart TD\n    A --> B '  // trailing space
+      expect(hashDiagramContent(codeA)).not.toBe(hashDiagramContent(codeB))
+    })
+
+    it('should be case-sensitive', () => {
+      const codeA = 'flowchart TD\n    A --> B'
+      const codeB = 'flowchart td\n    a --> b'
+      expect(hashDiagramContent(codeA)).not.toBe(hashDiagramContent(codeB))
+    })
+
+    it('should handle multiline diagrams', () => {
+      const code = 'flowchart TD\n    A --> B\n    B --> C\n    C --> D'
+      const hash = hashDiagramContent(code)
+      expect(hash).toBeTruthy()
+      expect(typeof hash).toBe('string')
+    })
+
+    it('should handle special characters', () => {
+      const code = 'flowchart TD\n    A["Special: @#$%^&*()"] --> B'
+      const hash = hashDiagramContent(code)
+      expect(hash).toBeTruthy()
+    })
+  })
+
+  describe('openViewer stores content hash', () => {
+    it('should store contentHash when opening viewer', () => {
+      const { openViewer } = useDiagramViewerStore.getState()
+      const code = 'flowchart TD\n    A --> B'
+
+      openViewer({
+        diagramId: '/file.md:10-20',
+        mermaidCode: code,
+        svgContent: '<svg></svg>',
+        filePath: '/file.md',
+        startLine: 10,
+        endLine: 20
+      })
+
+      const state = useDiagramViewerStore.getState()
+      expect(state.contentHash).toBe(hashDiagramContent(code))
+    })
+
+    it('should store originalEndLine when opening viewer', () => {
+      const { openViewer } = useDiagramViewerStore.getState()
+
+      openViewer({
+        diagramId: '/file.md:10-20',
+        mermaidCode: 'test',
+        svgContent: '<svg></svg>',
+        filePath: '/file.md',
+        startLine: 10,
+        endLine: 20
+      })
+
+      const state = useDiagramViewerStore.getState()
+      expect(state.originalEndLine).toBe(20)
+    })
+
+    it('should store originalStartLine when opening viewer', () => {
+      const { openViewer } = useDiagramViewerStore.getState()
+
+      openViewer({
+        diagramId: '/file.md:15-25',
+        mermaidCode: 'test',
+        svgContent: '<svg></svg>',
+        filePath: '/file.md',
+        startLine: 15,
+        endLine: 25
+      })
+
+      const state = useDiagramViewerStore.getState()
+      expect(state.originalStartLine).toBe(15)
+    })
+
+    it('should handle undefined line numbers gracefully', () => {
+      const { openViewer } = useDiagramViewerStore.getState()
+      const code = 'flowchart TD\n    A --> B'
+
+      openViewer({
+        diagramId: '/file.md:0-0',
+        mermaidCode: code,
+        svgContent: '<svg></svg>',
+        filePath: '/file.md'
+      })
+
+      const state = useDiagramViewerStore.getState()
+      expect(state.contentHash).toBe(hashDiagramContent(code))
+      expect(state.originalStartLine).toBeUndefined()
+      expect(state.originalEndLine).toBeUndefined()
+    })
+  })
+
+  describe('closeViewer resets identity fields', () => {
+    it('should reset contentHash on close', () => {
+      const { openViewer, closeViewer } = useDiagramViewerStore.getState()
+
+      openViewer({
+        diagramId: '/file.md:10-20',
+        mermaidCode: 'test',
+        svgContent: '<svg></svg>',
+        filePath: '/file.md',
+        startLine: 10,
+        endLine: 20
+      })
+
+      closeViewer()
+
+      const state = useDiagramViewerStore.getState()
+      expect(state.contentHash).toBeNull()
+      expect(state.originalEndLine).toBeUndefined()
+    })
+
+    it('should reset all identity fields on close', () => {
+      const { openViewer, closeViewer } = useDiagramViewerStore.getState()
+
+      openViewer({
+        diagramId: '/file.md:10-20',
+        mermaidCode: 'test',
+        svgContent: '<svg></svg>',
+        filePath: '/file.md',
+        startLine: 10,
+        endLine: 20
+      })
+
+      expect(useDiagramViewerStore.getState().contentHash).not.toBeNull()
+      expect(useDiagramViewerStore.getState().originalStartLine).toBeDefined()
+
+      closeViewer()
+
+      const state = useDiagramViewerStore.getState()
+      expect(state.contentHash).toBeNull()
+      expect(state.originalStartLine).toBeUndefined()
+      expect(state.originalEndLine).toBeUndefined()
+    })
+  })
+
+  describe('content-based identity scenarios', () => {
+    it('should correctly identify diagram by content hash when lines drift', () => {
+      const { openViewer } = useDiagramViewerStore.getState()
+      const code = 'flowchart TD\n    A --> B'
+
+      // Open diagram at lines 10-20
+      openViewer({
+        diagramId: '/file.md:10-20',
+        mermaidCode: code,
+        svgContent: '<svg></svg>',
+        filePath: '/file.md',
+        startLine: 10,
+        endLine: 20
+      })
+
+      const state = useDiagramViewerStore.getState()
+
+      // Same content at new position (lines 50-60) should have matching hash
+      const originalHash = state.contentHash
+      const newPositionHash = hashDiagramContent(code)
+      expect(newPositionHash).toBe(originalHash)
+    })
+
+    it('should distinguish different diagrams even if within position tolerance', () => {
+      const { openViewer } = useDiagramViewerStore.getState()
+      const codeA = 'flowchart TD\n    A --> B'
+      const codeB = 'flowchart TD\n    C --> D'
+
+      // Open diagram A at lines 10-20
+      openViewer({
+        diagramId: '/file.md:10-20',
+        mermaidCode: codeA,
+        svgContent: '<svg>A</svg>',
+        filePath: '/file.md',
+        startLine: 10,
+        endLine: 20
+      })
+
+      const state = useDiagramViewerStore.getState()
+
+      // Diagram B at lines 15-25 (within tolerance) has different hash
+      const hashB = hashDiagramContent(codeB)
+      expect(hashB).not.toBe(state.contentHash)
+    })
+
+    it('should track same diagram when content is identical but position changes significantly', () => {
+      const { openViewer } = useDiagramViewerStore.getState()
+      const code = 'flowchart TD\n    Original --> Diagram'
+
+      // Open diagram at lines 10-20
+      openViewer({
+        diagramId: '/file.md:10-20',
+        mermaidCode: code,
+        svgContent: '<svg></svg>',
+        filePath: '/file.md',
+        startLine: 10,
+        endLine: 20
+      })
+
+      const originalHash = useDiagramViewerStore.getState().contentHash
+
+      // Same diagram at completely different position (100 lines away)
+      const movedHash = hashDiagramContent(code)
+      expect(movedHash).toBe(originalHash)
+    })
+  })
+
+  describe('external file change scenarios', () => {
+    it('should track original diagram when external edit adds new diagram at old position', () => {
+      const { openViewer } = useDiagramViewerStore.getState()
+      const originalCode = 'flowchart TD\n    Original --> Diagram'
+      const newCode = 'flowchart TD\n    New --> Diagram'
+
+      // Open original diagram at lines 10-20
+      openViewer({
+        diagramId: '/file.md:10-20',
+        mermaidCode: originalCode,
+        svgContent: '<svg>Original</svg>',
+        filePath: '/file.md',
+        startLine: 10,
+        endLine: 20
+      })
+
+      const state = useDiagramViewerStore.getState()
+      const originalHash = state.contentHash
+
+      // New diagram at same position has different hash
+      const newHash = hashDiagramContent(newCode)
+      expect(newHash).not.toBe(originalHash)
+
+      // Original diagram moved elsewhere still has matching hash
+      const movedOriginalHash = hashDiagramContent(originalCode)
+      expect(movedOriginalHash).toBe(originalHash)
+    })
+
+    it('should handle complete file reload with diagram moved to different position', () => {
+      const { openViewer, updateDiagram } = useDiagramViewerStore.getState()
+      const code = 'flowchart TD\n    A --> B'
+
+      // Open at lines 10-20
+      openViewer({
+        diagramId: '/file.md:10-20',
+        mermaidCode: code,
+        svgContent: '<svg></svg>',
+        filePath: '/file.md',
+        startLine: 10,
+        endLine: 20
+      })
+
+      const originalHash = useDiagramViewerStore.getState().contentHash
+
+      // External edit: diagram moves to lines 50-60
+      // updateDiagram is called by MermaidDiagram when it re-renders
+      updateDiagram({
+        filePath: '/file.md',
+        mermaidCode: code,
+        svgContent: '<svg>updated</svg>',
+        startLine: 50,
+        endLine: 60
+      })
+
+      const state = useDiagramViewerStore.getState()
+
+      // Store should update position but contentHash remains the same
+      expect(state.startLine).toBe(50)
+      expect(state.endLine).toBe(60)
+      // contentHash is NEVER updated - it's the original identity
+      expect(state.contentHash).toBe(originalHash)
+    })
+
+    it('should handle diagram being deleted and recreated at different position', () => {
+      const { openViewer, updateDiagram } = useDiagramViewerStore.getState()
+      const code = 'flowchart TD\n    Persistent --> Diagram'
+
+      openViewer({
+        diagramId: '/file.md:10-20',
+        mermaidCode: code,
+        svgContent: '<svg></svg>',
+        filePath: '/file.md',
+        startLine: 10,
+        endLine: 20
+      })
+
+      const originalHash = useDiagramViewerStore.getState().contentHash
+
+      // External edit: diagram deleted at 10-20, recreated at 100-110
+      updateDiagram({
+        filePath: '/file.md',
+        mermaidCode: code,
+        svgContent: '<svg>new position</svg>',
+        startLine: 100,
+        endLine: 110
+      })
+
+      const state = useDiagramViewerStore.getState()
+      expect(state.contentHash).toBe(originalHash)
+      expect(state.startLine).toBe(100)
+      expect(state.endLine).toBe(110)
+    })
+  })
+
+  describe('identical diagrams tie-breaking', () => {
+    it('should store position for tie-breaking identical diagrams', () => {
+      const { openViewer } = useDiagramViewerStore.getState()
+      const code = 'flowchart TD\n    A --> B'
+
+      // Two identical diagrams exist at lines 10-20 and 50-60
+      // User opens the second one
+      openViewer({
+        diagramId: '/file.md:50-60',
+        mermaidCode: code,
+        svgContent: '<svg></svg>',
+        filePath: '/file.md',
+        startLine: 50,
+        endLine: 60
+      })
+
+      const state = useDiagramViewerStore.getState()
+
+      // Both have same content hash (identical diagrams)
+      expect(state.contentHash).toBe(hashDiagramContent(code))
+
+      // Position stored for tie-breaking
+      expect(state.originalStartLine).toBe(50)
+      expect(state.originalEndLine).toBe(60)
+    })
+
+    it('should maintain original position even when diagram drifts', () => {
+      const { openViewer, updateDiagram } = useDiagramViewerStore.getState()
+      const code = 'flowchart TD\n    A --> B'
+
+      openViewer({
+        diagramId: '/file.md:50-60',
+        mermaidCode: code,
+        svgContent: '<svg></svg>',
+        filePath: '/file.md',
+        startLine: 50,
+        endLine: 60
+      })
+
+      // Lines above added, diagram drifts to 55-65
+      updateDiagram({
+        filePath: '/file.md',
+        mermaidCode: code,
+        svgContent: '<svg></svg>',
+        startLine: 55,
+        endLine: 65
+      })
+
+      const state = useDiagramViewerStore.getState()
+
+      // Original position preserved for tie-breaking
+      expect(state.originalStartLine).toBe(50)
+      expect(state.originalEndLine).toBe(60)
+
+      // Current position updated
+      expect(state.startLine).toBe(55)
+      expect(state.endLine).toBe(65)
+    })
+  })
+
+  describe('updateDiagram does NOT change identity fields', () => {
+    it('should NOT update contentHash when updateDiagram is called', () => {
+      const { openViewer, updateDiagram } = useDiagramViewerStore.getState()
+      const originalCode = 'flowchart TD\n    A --> B'
+      const editedCode = 'flowchart TD\n    A --> B --> C'
+
+      openViewer({
+        diagramId: '/file.md:10-20',
+        mermaidCode: originalCode,
+        svgContent: '<svg></svg>',
+        filePath: '/file.md',
+        startLine: 10,
+        endLine: 20
+      })
+
+      const originalHash = useDiagramViewerStore.getState().contentHash
+
+      // User edits the diagram
+      updateDiagram({
+        filePath: '/file.md',
+        mermaidCode: editedCode,
+        svgContent: '<svg>edited</svg>',
+        startLine: 10,
+        endLine: 22  // grew by 2 lines
+      })
+
+      const state = useDiagramViewerStore.getState()
+
+      // contentHash should NOT change (it's the original identity)
+      expect(state.contentHash).toBe(originalHash)
+
+      // originalStartLine should NOT change
+      expect(state.originalStartLine).toBe(10)
+      expect(state.originalEndLine).toBe(20)
+
+      // Current position fields DO update
+      expect(state.startLine).toBe(10)
+      expect(state.endLine).toBe(22)
+      expect(state.mermaidCode).toBe(editedCode)
+    })
+
+    it('should preserve original identity across multiple edits', () => {
+      const { openViewer, updateDiagram } = useDiagramViewerStore.getState()
+      const v1 = 'flowchart TD\n    A --> B'
+      const v2 = 'flowchart TD\n    A --> B --> C'
+      const v3 = 'flowchart TD\n    A --> B --> C --> D'
+
+      openViewer({
+        diagramId: '/file.md:10-20',
+        mermaidCode: v1,
+        svgContent: '<svg>v1</svg>',
+        filePath: '/file.md',
+        startLine: 10,
+        endLine: 20
+      })
+
+      const originalHash = useDiagramViewerStore.getState().contentHash
+      const originalStart = useDiagramViewerStore.getState().originalStartLine
+      const originalEnd = useDiagramViewerStore.getState().originalEndLine
+
+      // Multiple rapid edits
+      updateDiagram({
+        filePath: '/file.md',
+        mermaidCode: v2,
+        svgContent: '<svg>v2</svg>',
+        startLine: 10,
+        endLine: 21
+      })
+
+      updateDiagram({
+        filePath: '/file.md',
+        mermaidCode: v3,
+        svgContent: '<svg>v3</svg>',
+        startLine: 10,
+        endLine: 22
+      })
+
+      const state = useDiagramViewerStore.getState()
+
+      // Original identity NEVER changes
+      expect(state.contentHash).toBe(originalHash)
+      expect(state.originalStartLine).toBe(originalStart)
+      expect(state.originalEndLine).toBe(originalEnd)
+
+      // Current content reflects latest edit
+      expect(state.mermaidCode).toBe(v3)
+      expect(state.endLine).toBe(22)
+    })
+  })
+
+  describe('multi-diagram file scenarios (issue #39 reproduction)', () => {
+    it('should distinguish between first and second diagram when expanding', () => {
+      const { openViewer } = useDiagramViewerStore.getState()
+      const diagram1 = 'flowchart TD\n    First --> Diagram'
+      const diagram2 = 'flowchart TD\n    Second --> Diagram'
+
+      // User expands SECOND diagram (lines 50-60)
+      openViewer({
+        diagramId: '/file.md:50-60',
+        mermaidCode: diagram2,
+        svgContent: '<svg>Second</svg>',
+        filePath: '/file.md',
+        startLine: 50,
+        endLine: 60
+      })
+
+      const state = useDiagramViewerStore.getState()
+
+      // Should store hash of second diagram, NOT first
+      expect(state.contentHash).toBe(hashDiagramContent(diagram2))
+      expect(state.contentHash).not.toBe(hashDiagramContent(diagram1))
+      expect(state.originalStartLine).toBe(50)
+    })
+
+    it('should track correct diagram when file has 3+ diagrams', () => {
+      const { openViewer } = useDiagramViewerStore.getState()
+      const diagram1 = 'flowchart TD\n    First'
+      const diagram2 = 'flowchart TD\n    Second'
+      const diagram3 = 'flowchart TD\n    Third'
+
+      // User expands middle diagram
+      openViewer({
+        diagramId: '/file.md:50-60',
+        mermaidCode: diagram2,
+        svgContent: '<svg>Second</svg>',
+        filePath: '/file.md',
+        startLine: 50,
+        endLine: 60
+      })
+
+      const state = useDiagramViewerStore.getState()
+      const hash2 = hashDiagramContent(diagram2)
+
+      expect(state.contentHash).toBe(hash2)
+      expect(state.contentHash).not.toBe(hashDiagramContent(diagram1))
+      expect(state.contentHash).not.toBe(hashDiagramContent(diagram3))
+    })
+
+    it('should handle expanding different diagram while viewer is already open', () => {
+      const { openViewer } = useDiagramViewerStore.getState()
+      const diagram1 = 'flowchart TD\n    First'
+      const diagram2 = 'flowchart TD\n    Second'
+
+      // Open first diagram
+      openViewer({
+        diagramId: '/file.md:10-20',
+        mermaidCode: diagram1,
+        svgContent: '<svg>First</svg>',
+        filePath: '/file.md',
+        startLine: 10,
+        endLine: 20
+      })
+
+      const hash1 = useDiagramViewerStore.getState().contentHash
+
+      // User clicks expand on second diagram
+      openViewer({
+        diagramId: '/file.md:50-60',
+        mermaidCode: diagram2,
+        svgContent: '<svg>Second</svg>',
+        filePath: '/file.md',
+        startLine: 50,
+        endLine: 60
+      })
+
+      const state = useDiagramViewerStore.getState()
+
+      // Should now track second diagram
+      expect(state.contentHash).not.toBe(hash1)
+      expect(state.contentHash).toBe(hashDiagramContent(diagram2))
+      expect(state.originalStartLine).toBe(50)
+    })
+  })
+
+  describe('edge cases', () => {
+    it('should handle diagram with only whitespace differences', () => {
+      const code1 = 'flowchart TD\n    A --> B'
+      const code2 = 'flowchart TD\n\n    A --> B' // extra newline
+
+      const hash1 = hashDiagramContent(code1)
+      const hash2 = hashDiagramContent(code2)
+
+      expect(hash1).not.toBe(hash2)
+    })
+
+    it('should handle very long diagram code', () => {
+      const longCode = 'flowchart TD\n' +
+        Array.from({ length: 100 }, (_, i) => `    Node${i} --> Node${i + 1}`).join('\n')
+
+      const { openViewer } = useDiagramViewerStore.getState()
+
+      openViewer({
+        diagramId: '/file.md:10-110',
+        mermaidCode: longCode,
+        svgContent: '<svg>long</svg>',
+        filePath: '/file.md',
+        startLine: 10,
+        endLine: 110
+      })
+
+      const state = useDiagramViewerStore.getState()
+      expect(state.contentHash).toBeTruthy()
+      expect(state.contentHash).toBe(hashDiagramContent(longCode))
+    })
+
+    it('should handle unicode characters in diagram content', () => {
+      const code = 'flowchart TD\n    A["Hello 世界 🚀"] --> B["Ñoño"]'
+
+      const { openViewer } = useDiagramViewerStore.getState()
+
+      openViewer({
+        diagramId: '/file.md:10-20',
+        mermaidCode: code,
+        svgContent: '<svg></svg>',
+        filePath: '/file.md',
+        startLine: 10,
+        endLine: 20
+      })
+
+      const state = useDiagramViewerStore.getState()
+      expect(state.contentHash).toBe(hashDiagramContent(code))
+    })
+
+    it('should handle diagram code with escaped characters', () => {
+      const code = 'flowchart TD\n    A["Text with \\"quotes\\""] --> B[\'Single \\\'quotes\\\']'
+
+      const hash = hashDiagramContent(code)
+      expect(hash).toBeTruthy()
+      expect(hashDiagramContent(code)).toBe(hash) // deterministic
+    })
   })
 })
