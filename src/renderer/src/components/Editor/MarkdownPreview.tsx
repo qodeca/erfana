@@ -7,6 +7,7 @@ import rehypeSanitize from 'rehype-sanitize'
 import type { PluggableList } from 'unified'
 import { defaultSchema } from 'hast-util-sanitize'
 import { PreviewContextMenu } from '../ContextMenu/PreviewContextMenu'
+import { showGlobalToast } from '../Toast/toastService'
 import { MermaidDiagram } from './MermaidDiagram'
 import { DiagramViewer } from './DiagramViewer'
 import { useDiagramViewerStore } from '../../stores/useDiagramViewerStore'
@@ -891,6 +892,33 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     const handleCloseContextMenu = () => {
       setContextMenu(null)
     }
+
+    // Keyboard shortcut for copy (Cmd/Ctrl+C)
+    useEffect(() => {
+      const handleKeyDown = async (e: KeyboardEvent) => {
+        // Check for Cmd/Ctrl+C
+        if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+          // Only handle if selection exists and is within the preview
+          const sel = window.getSelection()
+          if (sel && sel.toString().trim().length > 0 && previewRef.current) {
+            // Check if selection is within the preview element
+            const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null
+            if (range && previewRef.current.contains(range.commonAncestorContainer)) {
+              e.preventDefault()
+              try {
+                await navigator.clipboard.writeText(sel.toString())
+                showGlobalToast({ type: 'info', title: 'Copied to clipboard', message: 'Text copied successfully' })
+              } catch {
+                showGlobalToast({ type: 'error', title: 'Failed to copy', message: 'Clipboard access denied' })
+              }
+            }
+          }
+        }
+      }
+
+      document.addEventListener('keydown', handleKeyDown)
+      return () => document.removeEventListener('keydown', handleKeyDown)
+    }, [])
 
     return (
       <div className={`markdown-preview ${className}`} ref={previewRef}>

@@ -34,12 +34,11 @@ describe('Prompt Command - New Feature Tests', () => {
       expect(prompt?.requiresInput).toBe(true)
     })
 
-    it('should have autoExecute disabled (security: user input)', () => {
-      // Security fix: autoExecute disabled for templates with user input
-      // to prevent command injection (e.g., "ignore and rm -rf ~/")
+    it('should have autoExecute enabled', () => {
+      // autoExecute enabled for all prompts (v0.5.3+)
       const prompt = getPrompt('prompt')
 
-      expect(prompt?.autoExecute).toBe(false)
+      expect(prompt?.autoExecute).toBe(true)
     })
 
     it('should be positioned last in context menu (order: 3)', () => {
@@ -263,17 +262,12 @@ describe('Prompt Command - New Feature Tests', () => {
       expect(ids.length).toBe(3)
     })
 
-    it('should follow security rule: autoExecute matches requiresInput status', () => {
-      // Security rule: requiresInput=true → autoExecute=false (prevent command injection)
-      //                requiresInput=false → autoExecute=true
+    it('should have autoExecute=true for all prompts (v0.5.3+)', () => {
+      // v0.5.3+: autoExecute enabled for all prompts
       const prompts = getPromptsForArea('markdown-preview', 'context-menu')
 
       prompts.forEach((prompt) => {
-        if (prompt.requiresInput) {
-          expect(prompt.autoExecute).toBe(false)
-        } else {
-          expect(prompt.autoExecute).toBe(true)
-        }
+        expect(prompt.autoExecute).toBe(true)
       })
     })
 
