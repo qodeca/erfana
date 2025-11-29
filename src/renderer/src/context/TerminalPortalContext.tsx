@@ -20,6 +20,12 @@ export type PortalTarget = 'main' | 'diagram-viewer'
 interface TerminalControls {
   scrollToBottom: () => void
   restart: () => Promise<void>
+  /** Copy selected text to clipboard */
+  copy: () => Promise<void>
+  /** Paste from clipboard to terminal */
+  paste: () => Promise<void>
+  /** Check if terminal has text selection */
+  hasSelection: () => boolean
 }
 
 interface TerminalPortalContextValue {

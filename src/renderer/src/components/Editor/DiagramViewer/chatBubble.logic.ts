@@ -17,7 +17,7 @@ export const CHAT_LIMITS = {
  */
 export const CHAT_PANEL_CONFIG = {
   /** Default panel height in pixels */
-  DEFAULT_HEIGHT: 350,
+  DEFAULT_HEIGHT: 450,
   /** Minimum panel height in pixels */
   MIN_HEIGHT: 200,
   /** Maximum panel height as fraction of viewport (0.7 = 70%) */
