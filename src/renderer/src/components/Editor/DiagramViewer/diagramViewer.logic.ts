@@ -10,7 +10,7 @@ export interface KeyEventInfo {
   shiftKey: boolean
 }
 
-export type ViewerKeyAction = 'zoom-in' | 'zoom-out' | 'reset' | 'fit' | 'toggle-terminal' | 'none'
+export type ViewerKeyAction = 'zoom-in' | 'zoom-out' | 'reset' | 'fit' | 'none'
 
 export const ZOOM_CONFIG = {
   MIN_SCALE: 0.1,
@@ -23,12 +23,7 @@ export const ZOOM_CONFIG = {
 export function getKeyboardAction(event: KeyEventInfo): ViewerKeyAction {
   const hasModifier = event.ctrlKey || event.metaKey
 
-  // Cmd/Ctrl+J = Toggle terminal panel
-  if (hasModifier && event.key.toLowerCase() === 'j') {
-    return 'toggle-terminal'
-  }
-
-  // Non-modifier shortcuts
+  // Non-modifier shortcuts only
   if (!hasModifier) {
     switch (event.key) {
       case '+':

@@ -146,9 +146,17 @@
   font-family: monospace;
 }
 
+/* Content wrapper - full width, contains diagram and chat bubble */
+.diagram-viewer-content-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
 /* Content area */
 .diagram-viewer-content {
-  flex: 1;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -228,80 +236,4 @@
   color: var(--viewer-text-secondary);
   font-size: 11px;
   margin-left: 12px;
-}
-
-/* ============================================
- * Split Layout - Diagram + Terminal
- * ============================================ */
-
-/* Split container */
-.diagram-viewer-split {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-}
-
-/* Diagram pane - left side of split */
-.diagram-viewer-diagram-pane {
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  overflow: hidden;
-  min-width: 200px;
-}
-
-/* Resize handle between panes */
-.diagram-viewer-resizer {
-  width: 4px;
-  background: var(--viewer-border);
-  cursor: col-resize;
-  flex-shrink: 0;
-  transition: background-color 0.15s ease;
-}
-
-.diagram-viewer-resizer:hover,
-.diagram-viewer-resizer.dragging {
-  background: var(--viewer-focus-border);
-}
-
-/* Terminal pane - right side of split */
-.diagram-viewer-terminal-pane {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  min-width: 200px;
-  border-left: 1px solid var(--viewer-border);
-  background: #000000;
-}
-
-/* Collapsed terminal toggle bar */
-.diagram-viewer-terminal-collapsed {
-  width: 24px;
-  background: var(--viewer-toolbar-bg);
-  border-left: 1px solid var(--viewer-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-  flex-shrink: 0;
-}
-
-.diagram-viewer-terminal-collapsed:hover {
-  background: var(--viewer-btn-hover);
-}
-
-.diagram-viewer-terminal-collapsed svg {
-  color: var(--viewer-text-secondary);
-  transition: color 0.15s ease;
-}
-
-.diagram-viewer-terminal-collapsed:hover svg {
-  color: var(--viewer-text-primary);
-}
-
-/* Active state for terminal toggle button */
-.diagram-viewer-btn-active {
-  background: var(--viewer-btn-active);
-  color: var(--viewer-focus-border);
 }

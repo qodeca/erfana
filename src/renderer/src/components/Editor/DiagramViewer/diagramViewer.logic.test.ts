@@ -93,20 +93,6 @@ describe('diagramViewer.logic', () => {
       })
     })
 
-    describe('toggle-terminal shortcuts', () => {
-      it('returns toggle-terminal for Cmd+J', () => {
-        expect(getKeyboardAction(createEvent('j', { metaKey: true }))).toBe('toggle-terminal')
-      })
-
-      it('returns toggle-terminal for Ctrl+J', () => {
-        expect(getKeyboardAction(createEvent('j', { ctrlKey: true }))).toBe('toggle-terminal')
-      })
-
-      it('returns toggle-terminal for Cmd+J (uppercase)', () => {
-        expect(getKeyboardAction(createEvent('J', { metaKey: true }))).toBe('toggle-terminal')
-      })
-    })
-
     describe('escape key (no longer closes)', () => {
       it('returns none for Escape key (use X button to close)', () => {
         expect(getKeyboardAction(createEvent('Escape'))).toBe('none')

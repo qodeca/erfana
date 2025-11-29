@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { SPLIT_CONFIG } from '../components/Editor/DiagramViewer/diagramViewerResize.logic'
+import { CHAT_PANEL_CONFIG } from '../components/Editor/DiagramViewer/chatBubble.logic'
 
 /**
  * Diagram Viewer State Store
@@ -28,9 +28,8 @@ interface DiagramViewerState {
   startLine: number | undefined
   endLine: number | undefined
 
-  // Terminal panel state (for split view)
-  isTerminalVisible: boolean
-  terminalWidth: number
+  // Chat panel state (contains terminal when expanded)
+  chatPanelHeight: number
 
   // Actions
   openViewer: (params: {
@@ -44,10 +43,8 @@ interface DiagramViewerState {
   closeViewer: () => void
   updateDiagram: (diagramId: string, mermaidCode: string, svgContent: string) => void
 
-  // Terminal panel actions
-  setTerminalVisible: (visible: boolean) => void
-  toggleTerminal: () => void
-  setTerminalWidth: (width: number) => void
+  // Chat panel actions
+  setChatPanelHeight: (height: number) => void
 }
 
 export const useDiagramViewerStore = create<DiagramViewerState>((set, get) => ({
@@ -59,9 +56,8 @@ export const useDiagramViewerStore = create<DiagramViewerState>((set, get) => ({
   startLine: undefined,
   endLine: undefined,
 
-  // Terminal panel state - persists across viewer opens/closes
-  isTerminalVisible: true,
-  terminalWidth: SPLIT_CONFIG.DEFAULT_TERMINAL_WIDTH,
+  // Chat panel height - persists across viewer opens/closes
+  chatPanelHeight: CHAT_PANEL_CONFIG.DEFAULT_HEIGHT,
 
   openViewer: ({ diagramId, mermaidCode, svgContent, filePath, startLine, endLine }) => {
     set({
@@ -72,7 +68,7 @@ export const useDiagramViewerStore = create<DiagramViewerState>((set, get) => ({
       filePath,
       startLine,
       endLine
-      // Note: isTerminalVisible and terminalWidth persist from previous session
+      // Note: chatPanelHeight persists from previous session
     })
   },
 
@@ -85,7 +81,7 @@ export const useDiagramViewerStore = create<DiagramViewerState>((set, get) => ({
       filePath: null,
       startLine: undefined,
       endLine: undefined
-      // Note: isTerminalVisible and terminalWidth persist for next open
+      // Note: chatPanelHeight persists for next open
     })
   },
 
@@ -97,17 +93,9 @@ export const useDiagramViewerStore = create<DiagramViewerState>((set, get) => ({
     }
   },
 
-  // Terminal panel actions
-  setTerminalVisible: (visible) => {
-    set({ isTerminalVisible: visible })
-  },
-
-  toggleTerminal: () => {
-    set((state) => ({ isTerminalVisible: !state.isTerminalVisible }))
-  },
-
-  setTerminalWidth: (width) => {
-    set({ terminalWidth: width })
+  // Chat panel actions
+  setChatPanelHeight: (height) => {
+    set({ chatPanelHeight: height })
   }
 }))
 

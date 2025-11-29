@@ -1,6 +1,6 @@
 /**
  * Pure logic functions for ChatBubble component
- * Handles validation, character counting, and message state
+ * Handles validation, character counting, message state, and panel resize
  */
 
 import { formatLineRange as formatLineRangeHelper } from '../../../prompts/helpers'
@@ -9,6 +9,23 @@ export const CHAT_LIMITS = {
   MIN_LENGTH: 3,
   WARNING_THRESHOLD: 1000,
   MAX_LENGTH: 2000
+} as const
+
+/**
+ * Chat panel height configuration
+ * Panel contains terminal + textarea, resizable by dragging top edge
+ */
+export const CHAT_PANEL_CONFIG = {
+  /** Default panel height in pixels */
+  DEFAULT_HEIGHT: 350,
+  /** Minimum panel height in pixels */
+  MIN_HEIGHT: 200,
+  /** Maximum panel height as fraction of viewport (0.7 = 70%) */
+  MAX_HEIGHT_RATIO: 0.7,
+  /** Minimum terminal container height in pixels */
+  MIN_TERMINAL_HEIGHT: 100,
+  /** Fixed panel width in pixels */
+  PANEL_WIDTH: 640
 } as const
 
 export type ValidationState = 'valid' | 'too-short' | 'warning' | 'error'
@@ -157,4 +174,59 @@ export function buildFileRef(
 export function formatLineRange(startLine?: number, endLine?: number): string | undefined {
   const result = formatLineRangeHelper(startLine, endLine)
   return result || undefined
+}
+
+// ============================================================================
+// Panel resize logic
+// ============================================================================
+
+/**
+ * Clamp a value between min and max
+ */
+export function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
+}
+
+/**
+ * Calculate maximum panel height based on viewport
+ * @param viewportHeight - Current viewport height in pixels
+ * @returns Maximum allowed panel height in pixels
+ */
+export function getMaxPanelHeight(viewportHeight: number): number {
+  return Math.floor(viewportHeight * CHAT_PANEL_CONFIG.MAX_HEIGHT_RATIO)
+}
+
+/**
+ * Calculate new panel height during resize drag
+ * Dragging up (negative deltaY) increases height
+ * @param startHeight - Panel height when drag started
+ * @param deltaY - Mouse movement from start (negative = up)
+ * @param viewportHeight - Current viewport height
+ * @returns New panel height (clamped to valid range)
+ */
+export function calculateResizedHeight(
+  startHeight: number,
+  deltaY: number,
+  viewportHeight: number
+): number {
+  // Dragging up (negative deltaY) = increase height
+  const newHeight = startHeight - deltaY
+  const maxHeight = getMaxPanelHeight(viewportHeight)
+  return clamp(newHeight, CHAT_PANEL_CONFIG.MIN_HEIGHT, maxHeight)
+}
+
+/**
+ * Check if panel height is at minimum
+ */
+export function isAtMinHeight(height: number): boolean {
+  return height <= CHAT_PANEL_CONFIG.MIN_HEIGHT
+}
+
+/**
+ * Check if panel height is at maximum
+ * @param height - Current height
+ * @param viewportHeight - Current viewport height
+ */
+export function isAtMaxHeight(height: number, viewportHeight: number): boolean {
+  return height >= getMaxPanelHeight(viewportHeight)
 }
