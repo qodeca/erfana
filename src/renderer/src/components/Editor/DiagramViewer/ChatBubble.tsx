@@ -11,6 +11,7 @@ import {
   RotateCw
 } from 'lucide-react'
 import { executePromptTemplate } from '../../../utils/panelUtils'
+import { showGlobalToast } from '../../../components/Toast/toastService'
 import { useTerminalPortalOptional } from '../../../context/TerminalPortalContext'
 import { useDiagramViewerStore } from '../../../stores/useDiagramViewerStore'
 import { formatLineRange } from '../../../prompts/helpers'
@@ -277,19 +278,6 @@ export function ChatBubble({
     await portalContext?.terminalControls?.restart()
   }, [portalContext])
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (shouldSubmit(e.key, e.ctrlKey, e.metaKey, e.shiftKey)) {
-        e.preventDefault()
-        handleSubmit()
-      } else if (shouldClose(e.key)) {
-        e.preventDefault()
-        setIsExpanded(false)
-      }
-    },
-    [handleSubmit]
-  )
-
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value
     // Enforce max length at input level
@@ -327,10 +315,12 @@ export function ChatBubble({
       // Remove selected text
       const newValue = message.substring(0, start) + message.substring(end)
       setMessage(newValue)
+      showGlobalToast({ type: 'info', title: 'Cut to clipboard', message: 'Text cut successfully' })
       // Set cursor position at cut location
-      setTimeout(() => {
-        textarea.selectionStart = textarea.selectionEnd = start
-      }, 0)
+      requestAnimationFrame(() => {
+        textarea.focus()
+        textarea.setSelectionRange(start, start)
+      })
     }
   }, [message])
 
@@ -339,25 +329,54 @@ export function ChatBubble({
     const textarea = textareaRef.current
     const selectedText = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd)
     if (selectedText) {
-      await navigator.clipboard.writeText(selectedText)
+      try {
+        await navigator.clipboard.writeText(selectedText)
+        showGlobalToast({ type: 'info', title: 'Copied to clipboard', message: 'Text copied successfully' })
+      } catch {
+        showGlobalToast({ type: 'error', title: 'Failed to copy', message: 'Clipboard access denied' })
+      }
     }
   }, [])
 
   const handlePasteText = useCallback(async () => {
     if (!textareaRef.current) return
     const textarea = textareaRef.current
-    const clipboardText = await navigator.clipboard.readText()
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const newValue = message.substring(0, start) + clipboardText + message.substring(end)
-    if (newValue.length <= CHAT_LIMITS.MAX_LENGTH) {
-      setMessage(newValue)
-      // Set cursor position after paste
-      setTimeout(() => {
-        textarea.selectionStart = textarea.selectionEnd = start + clipboardText.length
-      }, 0)
+    try {
+      const clipboardText = await navigator.clipboard.readText()
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      const newValue = message.substring(0, start) + clipboardText + message.substring(end)
+      if (newValue.length <= CHAT_LIMITS.MAX_LENGTH) {
+        setMessage(newValue)
+        showGlobalToast({ type: 'info', title: 'Pasted from clipboard', message: 'Text pasted successfully' })
+        // Set cursor position after paste
+        requestAnimationFrame(() => {
+          textarea.focus()
+          textarea.setSelectionRange(start + clipboardText.length, start + clipboardText.length)
+        })
+      } else {
+        showGlobalToast({ type: 'warning', title: 'Paste would exceed character limit', message: `Maximum ${CHAT_LIMITS.MAX_LENGTH} characters allowed` })
+      }
+    } catch {
+      showGlobalToast({ type: 'error', title: 'Failed to paste from clipboard', message: 'Clipboard access denied' })
     }
   }, [message])
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Note: Native clipboard shortcuts (Cmd/Ctrl+C/X/V) work automatically.
+      // Context menu provides cut/copy/paste for right-click operations.
+
+      if (shouldSubmit(e.key, e.ctrlKey, e.metaKey, e.shiftKey)) {
+        e.preventDefault()
+        handleSubmit()
+      } else if (shouldClose(e.key)) {
+        e.preventDefault()
+        setIsExpanded(false)
+      }
+    },
+    [handleSubmit]
+  )
 
   const hasTextSelection = useCallback(() => {
     if (!textareaRef.current) return false

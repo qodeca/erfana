@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback, ReactNode } from 'react'
 import { Info } from 'lucide-react'
 import { BaseDialog } from './BaseDialog'
+import { TextareaContextMenu } from '../ContextMenu/TextareaContextMenu'
+import { showGlobalToast } from '../Toast/toastService'
 import { validateFileSystemName, ValidationErrorCode } from '../../utils/fileValidation'
 
 interface FileSystemDialogProps {
@@ -67,6 +69,8 @@ export function FileSystemDialog({
   const [inputValue, setInputValue] = useState(currentName || '')
   const [validationError, setValidationError] = useState<string | null>(null)
   const [showTooltip, setShowTooltip] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const [hasSelection, setHasSelection] = useState(false)
 
   // Generate unique IDs for ARIA attributes
   const titleId = `dialog-title-${id}`
@@ -142,6 +146,93 @@ export function FileSystemDialog({
     }
   }
 
+  // Track selection changes for context menu state
+  const handleSelect = useCallback(() => {
+    if (inputRef.current) {
+      const { selectionStart, selectionEnd } = inputRef.current
+      setHasSelection(selectionStart !== null && selectionEnd !== null && selectionStart !== selectionEnd)
+    }
+  }, [])
+
+  // Context menu handlers
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY })
+    handleSelect()
+  }, [handleSelect])
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null)
+  }, [])
+
+  // Clipboard operations
+  const handleCut = useCallback(async () => {
+    if (!inputRef.current) return
+    const input = inputRef.current
+    const start = input.selectionStart ?? 0
+    const end = input.selectionEnd ?? 0
+    const selectedText = input.value.substring(start, end)
+
+    if (selectedText) {
+      await navigator.clipboard.writeText(selectedText)
+      const newValue = input.value.substring(0, start) + input.value.substring(end)
+      setInputValue(newValue)
+      showGlobalToast({ type: 'info', title: 'Cut to clipboard', message: 'Text cut successfully' })
+
+      // Restore cursor position
+      requestAnimationFrame(() => {
+        input.focus()
+        input.setSelectionRange(start, start)
+      })
+    }
+  }, [])
+
+  const handleCopy = useCallback(async () => {
+    if (!inputRef.current) return
+    const input = inputRef.current
+    const start = input.selectionStart ?? 0
+    const end = input.selectionEnd ?? 0
+    const selectedText = input.value.substring(start, end)
+
+    if (selectedText) {
+      try {
+        await navigator.clipboard.writeText(selectedText)
+        showGlobalToast({ type: 'info', title: 'Copied to clipboard', message: 'Text copied successfully' })
+      } catch {
+        showGlobalToast({ type: 'error', title: 'Failed to copy', message: 'Clipboard access denied' })
+      }
+    }
+  }, [])
+
+  const handlePaste = useCallback(async () => {
+    if (!inputRef.current) return
+    const input = inputRef.current
+
+    try {
+      const clipboardText = await navigator.clipboard.readText()
+      const start = input.selectionStart ?? 0
+      const end = input.selectionEnd ?? 0
+      const newValue = input.value.substring(0, start) + clipboardText + input.value.substring(end)
+
+      // Respect maxLength (255 for file names)
+      if (newValue.length <= 255) {
+        setInputValue(newValue)
+        showGlobalToast({ type: 'info', title: 'Pasted from clipboard', message: 'Text pasted successfully' })
+
+        // Position cursor after pasted text
+        requestAnimationFrame(() => {
+          input.focus()
+          const newCursorPos = start + clipboardText.length
+          input.setSelectionRange(newCursorPos, newCursorPos)
+        })
+      } else {
+        showGlobalToast({ type: 'warning', title: 'Paste would exceed character limit', message: 'Maximum 255 characters allowed' })
+      }
+    } catch {
+      showGlobalToast({ type: 'error', title: 'Failed to paste from clipboard', message: 'Clipboard access denied' })
+    }
+  }, [])
+
   // Derive labels and text based on operation and item type
   const inputLabel = operation === 'rename' ? 'New name:' : `${itemType === 'file' ? 'File' : 'Folder'} name:`
   const primaryButtonText = operation === 'rename' ? 'Rename' : 'Create'
@@ -184,6 +275,8 @@ export function FileSystemDialog({
               value={inputValue}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
+              onContextMenu={handleContextMenu}
+              onSelect={handleSelect}
               placeholder={inputPlaceholder}
               maxLength={255}
             />
@@ -228,6 +321,19 @@ export function FileSystemDialog({
           </button>
         </div>
       </div>
+
+      {/* Context menu for input clipboard operations */}
+      {contextMenu && (
+        <TextareaContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          hasSelection={hasSelection}
+          onCut={handleCut}
+          onCopy={handleCopy}
+          onPaste={handlePaste}
+          onClose={handleCloseContextMenu}
+        />
+      )}
     </BaseDialog>
   )
 }

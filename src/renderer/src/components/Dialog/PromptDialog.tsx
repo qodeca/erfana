@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Info, MessageSquare } from 'lucide-react'
 import { BaseDialog } from './BaseDialog'
+import { TextareaContextMenu } from '../ContextMenu/TextareaContextMenu'
+import { showGlobalToast } from '../Toast/toastService'
 import type { PromptDialogConfig } from './types'
 
 interface PromptDialogProps {
@@ -53,6 +55,8 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
   const [inputValue, setInputValue] = useState(defaultValue)
   const [validationError, setValidationError] = useState<string | null>(null)
   const [showTooltip, setShowTooltip] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const [hasSelection, setHasSelection] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Generate unique IDs for ARIA attributes
@@ -140,6 +144,91 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
     }
   }
 
+  // Track selection changes for context menu state
+  const handleSelect = useCallback(() => {
+    if (textareaRef.current) {
+      const { selectionStart, selectionEnd } = textareaRef.current
+      setHasSelection(selectionStart !== selectionEnd)
+    }
+  }, [])
+
+  // Context menu handlers
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY })
+    handleSelect()
+  }, [handleSelect])
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null)
+  }, [])
+
+  // Clipboard operations
+  const handleCut = useCallback(async () => {
+    if (!textareaRef.current) return
+    const textarea = textareaRef.current
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selectedText = textarea.value.substring(start, end)
+
+    if (selectedText) {
+      await navigator.clipboard.writeText(selectedText)
+      const newValue = textarea.value.substring(0, start) + textarea.value.substring(end)
+      setInputValue(newValue)
+      showGlobalToast({ type: 'info', title: 'Cut to clipboard', message: 'Text cut successfully' })
+
+      // Restore cursor position
+      requestAnimationFrame(() => {
+        textarea.focus()
+        textarea.setSelectionRange(start, start)
+      })
+    }
+  }, [])
+
+  const handleCopy = useCallback(async () => {
+    if (!textareaRef.current) return
+    const textarea = textareaRef.current
+    const selectedText = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd)
+
+    if (selectedText) {
+      try {
+        await navigator.clipboard.writeText(selectedText)
+        showGlobalToast({ type: 'info', title: 'Copied to clipboard', message: 'Text copied successfully' })
+      } catch {
+        showGlobalToast({ type: 'error', title: 'Failed to copy', message: 'Clipboard access denied' })
+      }
+    }
+  }, [])
+
+  const handlePaste = useCallback(async () => {
+    if (!textareaRef.current) return
+    const textarea = textareaRef.current
+
+    try {
+      const clipboardText = await navigator.clipboard.readText()
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      const newValue = textarea.value.substring(0, start) + clipboardText + textarea.value.substring(end)
+
+      // Respect maxLength
+      if (newValue.length <= maxLength) {
+        setInputValue(newValue)
+        showGlobalToast({ type: 'info', title: 'Pasted from clipboard', message: 'Text pasted successfully' })
+
+        // Position cursor after pasted text
+        requestAnimationFrame(() => {
+          textarea.focus()
+          const newCursorPos = start + clipboardText.length
+          textarea.setSelectionRange(newCursorPos, newCursorPos)
+        })
+      } else {
+        showGlobalToast({ type: 'warning', title: 'Paste would exceed character limit', message: `Maximum ${maxLength} characters allowed` })
+      }
+    } catch {
+      showGlobalToast({ type: 'error', title: 'Failed to paste from clipboard', message: 'Clipboard access denied' })
+    }
+  }, [maxLength])
+
   const trimmedLength = inputValue.trim().length
   const isValid = trimmedLength >= minLength && trimmedLength <= maxLength
 
@@ -195,6 +284,8 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
               value={inputValue}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
+              onContextMenu={handleContextMenu}
+              onSelect={handleSelect}
               placeholder={inputPlaceholder}
               rows={6}
               maxLength={maxLength}
@@ -250,6 +341,19 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
           </button>
         </div>
       </div>
+
+      {/* Context menu for textarea clipboard operations */}
+      {contextMenu && (
+        <TextareaContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          hasSelection={hasSelection}
+          onCut={handleCut}
+          onCopy={handleCopy}
+          onPaste={handlePaste}
+          onClose={handleCloseContextMenu}
+        />
+      )}
     </BaseDialog>
   )
 }
