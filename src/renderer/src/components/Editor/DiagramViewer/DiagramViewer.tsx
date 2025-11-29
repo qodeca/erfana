@@ -58,8 +58,15 @@ export function DiagramViewer() {
   const [hasInitialized, setHasInitialized] = useState(false)
 
   // Inject SVG content exactly like MermaidDiagram does - via innerHTML
-  // SECURITY: svgContent comes from MermaidDiagram which uses mermaid.render()
-  // with securityLevel: 'strict'. No additional sanitization needed.
+  //
+  // ⚠️  DO NOT ADD SVG SANITIZATION HERE (e.g., DOMPurify)
+  //
+  // svgContent comes from MermaidDiagram which uses mermaid.render() with
+  // securityLevel: 'strict' (default since v10). Additional sanitization BREAKS diagrams:
+  // - DOMPurify strips foreignObject content (GitHub DOMPurify #1002, #1088)
+  // - DOMPurify strips xlink:href internal references used for markers (#233)
+  //
+  // See: https://github.com/cure53/DOMPurify/issues/1002
   useEffect(() => {
     if (!isOpen || !svgContainerRef.current || !svgContent) return
 
