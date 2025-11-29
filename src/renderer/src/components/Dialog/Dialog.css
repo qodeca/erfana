@@ -19,7 +19,7 @@
   --dialog-tooltip-min-width: 280px;
   --dialog-icon-size: 32px;
   --dialog-icon-gap: 12px;
-  --dialog-icon-radius: 4px;
+  --dialog-icon-radius: 0;
   --dialog-header-margin: 16px;
 }
 
@@ -104,7 +104,16 @@
   display: flex;
   gap: 12px;
   justify-content: flex-end;
+  align-items: center;
   padding-top: 4px;
+}
+
+/* Left side of actions row (info icon + char count) */
+.dialog-actions-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: auto;
 }
 
 /* Button styles */
@@ -217,18 +226,23 @@
   letter-spacing: 0.1px;
 }
 
-/* Character count */
-.dialog-char-count {
-  font-size: 12px;
-  color: #858585;
-  text-align: right;
-  margin-top: 8px;
-  font-variant-numeric: tabular-nums;
-}
-
 /* Validation error message */
 .dialog-validation-error {
   color: #f48771;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+/* Validation warning message (approaching limit) */
+.dialog-validation-warning {
+  color: #cca700;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+/* Validation hint message (too short) */
+.dialog-validation-hint {
+  color: #858585;
   font-size: 13px;
   margin-top: 8px;
 }
@@ -314,7 +328,6 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  margin-right: auto;
 }
 
 .dialog-info-icon {

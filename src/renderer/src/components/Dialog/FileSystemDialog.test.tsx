@@ -3,12 +3,6 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { FileSystemDialog } from './FileSystemDialog'
 import { File, Folder } from 'lucide-react'
-import { showGlobalToast } from '../Toast/toastService'
-
-// Mock toast service
-vi.mock('../Toast/toastService', () => ({
-  showGlobalToast: vi.fn()
-}))
 
 describe('FileSystemDialog', () => {
   const defaultProps = {
@@ -658,11 +652,7 @@ const _clipboardTestsRemoved = `
         fireEvent.click(cutItem)
 
         await waitFor(() => {
-          expect(showGlobalToast).toHaveBeenCalledWith({
-            type: 'info',
-            title: 'Cut to clipboard',
-            message: 'Text cut successfully'
-          })
+          expect(showInfoToast).toHaveBeenCalledWith('Cut to clipboard', 'Text cut successfully')
         })
       })
 
@@ -725,11 +715,7 @@ const _clipboardTestsRemoved = `
         fireEvent.click(copyItem)
 
         await waitFor(() => {
-          expect(showGlobalToast).toHaveBeenCalledWith({
-            type: 'info',
-            title: 'Copied to clipboard',
-            message: 'Text copied successfully'
-          })
+          expect(showInfoToast).toHaveBeenCalledWith('Copied to clipboard', 'Text copied successfully')
         })
       })
 
@@ -789,11 +775,7 @@ const _clipboardTestsRemoved = `
         fireEvent.click(pasteItem)
 
         await waitFor(() => {
-          expect(showGlobalToast).toHaveBeenCalledWith({
-            type: 'info',
-            title: 'Pasted from clipboard',
-            message: 'Text pasted successfully'
-          })
+          expect(showInfoToast).toHaveBeenCalledWith('Pasted from clipboard', 'Text pasted successfully')
         })
       })
 
@@ -858,11 +840,7 @@ const _clipboardTestsRemoved = `
         fireEvent.click(pasteItem)
 
         await waitFor(() => {
-          expect(showGlobalToast).toHaveBeenCalledWith({
-            type: 'warning',
-            title: 'Paste would exceed character limit',
-            message: 'Maximum 255 characters allowed'
-          })
+          expect(showWarningToast).toHaveBeenCalledWith('Paste would exceed character limit', 'Maximum 255 characters allowed')
         })
 
         // Text should not be pasted
@@ -882,11 +860,7 @@ const _clipboardTestsRemoved = `
         fireEvent.click(pasteItem)
 
         await waitFor(() => {
-          expect(showGlobalToast).toHaveBeenCalledWith({
-            type: 'error',
-            title: 'Failed to paste from clipboard',
-            message: 'Clipboard access denied'
-          })
+          expect(showErrorToast).toHaveBeenCalledWith('Failed to paste from clipboard', 'Clipboard access denied')
         })
       })
 

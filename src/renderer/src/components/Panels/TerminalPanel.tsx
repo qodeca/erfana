@@ -16,7 +16,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import { useProjectStore } from '../../stores/useProjectStore'
-import { showGlobalToast } from '../Toast/toastService'
+import { showWarningToast } from '../../utils/toastHelpers'
 import { useScrollAnomalyRecovery } from '../../hooks/useScrollAnomalyRecovery'
 import { useTerminalClipboard } from '../../hooks/useTerminalClipboard'
 import { useTerminalFileLinks } from '../../hooks/useTerminalFileLinks'
@@ -63,12 +63,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
   // Clipboard support for copy/paste operations (issue #28)
   const { hasSelection, copy, paste, handleKeyEvent } = useTerminalClipboard(xtermRef, {
-    onCopy: () => {
-      showGlobalToast({ type: 'info', title: 'Copied', message: 'Text copied to clipboard' })
-    },
     onError: (error) => {
       console.warn('Clipboard operation failed:', error)
-      showGlobalToast({ type: 'warning', title: 'Clipboard Error', message: error.message })
     }
   })
 
@@ -91,11 +87,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const handleFileOpen = useCallback((filePath: string, line?: number, column?: number) => {
     if (!dockviewApi) {
       console.warn('Cannot open file: dockviewApi not available')
-      showGlobalToast({
-        type: 'warning',
-        title: 'Editor Not Ready',
-        message: 'Cannot open file - editor not available'
-      })
+      showWarningToast('Editor not ready', 'Cannot open file - editor not available')
       return
     }
 
@@ -196,10 +188,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     const cmd = 'npm rebuild node-pty --build-from-source'
     try {
       await navigator.clipboard.writeText(cmd)
-      showGlobalToast({ type: 'info', title: 'Copied', message: 'Fix command copied to clipboard.' })
     } catch (e) {
       console.warn('Clipboard write failed:', e)
-      showGlobalToast({ type: 'warning', title: 'Copy Failed', message: cmd })
     }
   }
 

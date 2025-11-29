@@ -15,7 +15,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { BaseDialog } from './BaseDialog'
-import { showGlobalToast } from '../Toast/toastService'
 import type { PathScore } from '../../utils/pathScoring'
 import { getRelativePath } from '../../utils/pathScoring'
 import './FilePickerDialog.css'
@@ -79,9 +78,8 @@ export function FilePickerDialog({
       const path = candidates[selectedIndex].path
       try {
         await navigator.clipboard.writeText(path)
-        showGlobalToast({ type: 'info', title: 'Copied to clipboard', message: 'File path copied' })
       } catch {
-        showGlobalToast({ type: 'error', title: 'Failed to copy', message: 'Clipboard access denied' })
+        // Silently fail
       }
     }
   }, [candidates, selectedIndex])

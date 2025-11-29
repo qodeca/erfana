@@ -5,6 +5,7 @@ import { executePromptTemplate } from '../../utils/panelUtils'
 import { PROMPT_REGISTRY, getPromptsForArea } from '../../prompts/registry'
 import { formatLineRange } from '../../prompts/helpers'
 import { renderIcon, DEFAULT_ICON_PROPS } from '../../utils/iconRegistry'
+import { TEXT_INPUT_LIMITS } from '../../../../shared/constants'
 import type { PromptVariables, PromptConfig } from '../../prompts/types'
 
 interface PreviewContextMenuProps {
@@ -86,8 +87,8 @@ export function PreviewContextMenu({
         selectedText: sourceText,
         inputLabel: 'Your input:',
         inputPlaceholder: config.inputPlaceholder || 'Enter your instructions or question here...',
-        minLength: 3,
-        maxLength: 2000
+        minLength: TEXT_INPUT_LIMITS.MIN_LENGTH,
+        maxLength: TEXT_INPUT_LIMITS.MAX_LENGTH
       })
 
       // If user canceled or input is empty, return

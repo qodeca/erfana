@@ -11,7 +11,6 @@ import {
   RotateCw
 } from 'lucide-react'
 import { executePromptTemplate } from '../../../utils/panelUtils'
-import { showGlobalToast } from '../../../components/Toast/toastService'
 import { useTerminalPortalOptional } from '../../../context/TerminalPortalContext'
 import { useDiagramViewerStore } from '../../../stores/useDiagramViewerStore'
 import { formatLineRange } from '../../../prompts/helpers'
@@ -27,10 +26,8 @@ import {
 } from '../../../utils/mermaidDirections'
 import {
   validateMessage,
-  formatCharCount,
   shouldSubmit,
   shouldClose,
-  getValidationClass,
   buildFileRef,
   formatLineRange as formatLineRangeChat,
   calculateResizedHeight,
@@ -38,6 +35,7 @@ import {
 } from './chatBubble.logic'
 import { formatZoomLevel } from './diagramViewer.logic'
 import { TextareaContextMenu } from '../../ContextMenu/TextareaContextMenu'
+import { CharacterCount } from '../../shared'
 import './ChatBubble.css'
 
 interface Transform {
@@ -310,17 +308,20 @@ export function ChatBubble({
     const selectedText = textarea.value.substring(start, end)
 
     if (selectedText) {
-      // Copy to clipboard
-      await navigator.clipboard.writeText(selectedText)
-      // Remove selected text
-      const newValue = message.substring(0, start) + message.substring(end)
-      setMessage(newValue)
-      showGlobalToast({ type: 'info', title: 'Cut to clipboard', message: 'Text cut successfully' })
-      // Set cursor position at cut location
-      requestAnimationFrame(() => {
-        textarea.focus()
-        textarea.setSelectionRange(start, start)
-      })
+      try {
+        // Copy to clipboard
+        await navigator.clipboard.writeText(selectedText)
+        // Remove selected text
+        const newValue = message.substring(0, start) + message.substring(end)
+        setMessage(newValue)
+        // Set cursor position at cut location
+        requestAnimationFrame(() => {
+          textarea.focus()
+          textarea.setSelectionRange(start, start)
+        })
+      } catch {
+        // Silently fail
+      }
     }
   }, [message])
 
@@ -331,9 +332,8 @@ export function ChatBubble({
     if (selectedText) {
       try {
         await navigator.clipboard.writeText(selectedText)
-        showGlobalToast({ type: 'info', title: 'Copied to clipboard', message: 'Text copied successfully' })
       } catch {
-        showGlobalToast({ type: 'error', title: 'Failed to copy', message: 'Clipboard access denied' })
+        // Silently fail
       }
     }
   }, [])
@@ -346,19 +346,17 @@ export function ChatBubble({
       const start = textarea.selectionStart
       const end = textarea.selectionEnd
       const newValue = message.substring(0, start) + clipboardText + message.substring(end)
+      // Silently reject if exceeds max length
       if (newValue.length <= CHAT_LIMITS.MAX_LENGTH) {
         setMessage(newValue)
-        showGlobalToast({ type: 'info', title: 'Pasted from clipboard', message: 'Text pasted successfully' })
         // Set cursor position after paste
         requestAnimationFrame(() => {
           textarea.focus()
           textarea.setSelectionRange(start + clipboardText.length, start + clipboardText.length)
         })
-      } else {
-        showGlobalToast({ type: 'warning', title: 'Paste would exceed character limit', message: `Maximum ${CHAT_LIMITS.MAX_LENGTH} characters allowed` })
       }
     } catch {
-      showGlobalToast({ type: 'error', title: 'Failed to paste from clipboard', message: 'Clipboard access denied' })
+      // Silently fail
     }
   }, [message])
 
@@ -538,46 +536,45 @@ export function ChatBubble({
               />
 
               <div className="chat-panel-footer">
-                <div className="chat-footer-left">
-                  <span
-                    className={`chat-char-count ${getValidationClass(validation.state)}`}
+                {/* Info icon with tooltip */}
+                <div className="chat-info-wrapper">
+                  <button
+                    type="button"
+                    className="chat-info-icon"
+                    aria-label="View keyboard shortcuts"
+                    onFocus={() => setShowTooltip(true)}
+                    onBlur={() => setShowTooltip(false)}
+                    onMouseEnter={() => setShowTooltip(true)}
+                    onMouseLeave={() => setShowTooltip(false)}
                   >
-                    {formatCharCount(validation.charCount)}
-                  </span>
+                    <Info size={14} />
+                  </button>
+                  <div
+                    className={`chat-tooltip ${showTooltip ? 'visible' : ''}`}
+                    role="tooltip"
+                    aria-hidden={!showTooltip}
+                  >
+                    <div className="chat-tooltip-content">
+                      <kbd>Cmd/Ctrl+Enter</kbd> to send
+                      <br />
+                      <kbd>Esc</kbd> to close
+                    </div>
+                  </div>
+                </div>
+
+                <div className="chat-footer-left">
+                  <CharacterCount
+                    charCount={validation.charCount}
+                    validationState={validation.state}
+                  />
                   {validation.message && validation.state !== 'too-short' && (
-                    <span className={`chat-validation-message ${getValidationClass(validation.state)}`}>
+                    <span className={`chat-validation-message chat-validation-${validation.state}`}>
                       {validation.message}
                     </span>
                   )}
                 </div>
 
                 <div className="chat-footer-right">
-                  {/* Info icon with tooltip */}
-                  <div className="chat-info-wrapper">
-                    <button
-                      type="button"
-                      className="chat-info-icon"
-                      aria-label="View keyboard shortcuts"
-                      onFocus={() => setShowTooltip(true)}
-                      onBlur={() => setShowTooltip(false)}
-                      onMouseEnter={() => setShowTooltip(true)}
-                      onMouseLeave={() => setShowTooltip(false)}
-                    >
-                      <Info size={14} />
-                    </button>
-                    <div
-                      className={`chat-tooltip ${showTooltip ? 'visible' : ''}`}
-                      role="tooltip"
-                      aria-hidden={!showTooltip}
-                    >
-                      <div className="chat-tooltip-content">
-                        <kbd>Cmd/Ctrl+Enter</kbd> to send
-                        <br />
-                        <kbd>Esc</kbd> to close
-                      </div>
-                    </div>
-                  </div>
-
                   <button
                     className="chat-send-btn"
                     onClick={handleSubmit}

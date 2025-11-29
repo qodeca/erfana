@@ -7,7 +7,6 @@ import rehypeSanitize from 'rehype-sanitize'
 import type { PluggableList } from 'unified'
 import { defaultSchema } from 'hast-util-sanitize'
 import { PreviewContextMenu } from '../ContextMenu/PreviewContextMenu'
-import { showGlobalToast } from '../Toast/toastService'
 import { MermaidDiagram } from './MermaidDiagram'
 import { DiagramViewer } from './DiagramViewer'
 import { useDiagramViewerStore } from '../../stores/useDiagramViewerStore'
@@ -907,9 +906,8 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
               e.preventDefault()
               try {
                 await navigator.clipboard.writeText(sel.toString())
-                showGlobalToast({ type: 'info', title: 'Copied to clipboard', message: 'Text copied successfully' })
               } catch {
-                showGlobalToast({ type: 'error', title: 'Failed to copy', message: 'Clipboard access denied' })
+                // Silently fail
               }
             }
           }

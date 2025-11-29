@@ -88,7 +88,7 @@
   min-width: 20px;
   padding: 0;
   border: none;
-  border-radius: 3px;
+  border-radius: 0;
   background: transparent;
   color: #858585;
   cursor: pointer;

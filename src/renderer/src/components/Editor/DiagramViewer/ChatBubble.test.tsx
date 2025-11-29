@@ -144,7 +144,7 @@ describe('ChatBubble', () => {
       const textarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
 
       typeIntoTextarea(textarea, 'Hello')
-      expect(screen.getByText('5/2000')).toBeInTheDocument()
+      expect(screen.getByText('5/2000 characters')).toBeInTheDocument()
     })
 
     it('enforces max length', () => {
