@@ -1,32 +1,23 @@
 # Phase 1: Business Analysis
 
 **Goal:** Research prior art and clarify requirements before exploring codebase.
-**Agent:** analyze-requirements
-**Checkpoint:** Research findings + requirements confirmed (Tier 2)
+**Agent:** `analyze-requirements`
+**Quality Gate:** QG-1 (Checkpoint for T2, Automated for T1)
 
 ---
 
-## Overview
+## INPUT CONDITIONS
 
-This phase ensures we:
-1. Don't reinvent the wheel (find existing solutions/libraries)
-2. Understand requirements completely before implementation
-3. Identify edge cases and scope boundaries early
-4. Validate acceptance criteria are testable
+**STOP if ANY condition is unchecked. Do not proceed.**
 
----
-
-## Tier Variations
-
-| Tier | Research Depth | Questions | Checkpoint |
-|------|----------------|-----------|------------|
-| 1 (Trivial) | Quick (1-2 searches) | 1-2 | None |
-| 2 (Standard) | Focused (3-5 searches) | 3-5 | Required |
-| 3 (Complex) | Comprehensive (5-8 searches) | 5-8 | Required |
+- [ ] QG-0 = PASS (Pre-flight completed)
+- [ ] Feature branch checked out
+- [ ] Issue metadata available (title, body, labels)
+- [ ] Tier classification determined
 
 ---
 
-## Steps
+## Execution Steps
 
 ### Step 1: Issue Classification
 
@@ -34,487 +25,147 @@ Determine issue type from labels and body:
 
 | Type | Labels | Research Focus |
 |------|--------|----------------|
-| Bug | `bug`, `defect` | Root cause patterns, known issues, workarounds |
-| Enhancement | `enhancement`, `improvement` | Similar features, design patterns, UX standards |
-| Feature | `feature`, unlabeled | Libraries, prior art, reference implementations |
-| Security | `security`, `vulnerability` | OWASP, CVE databases, security best practices |
-| Refactor | `refactor`, `cleanup` | Design patterns, SOLID principles, examples |
+| Bug | `bug`, `defect` | Root cause patterns, known issues |
+| Enhancement | `enhancement`, `improvement` | Similar features, design patterns |
+| Feature | `feature`, unlabeled | Libraries, prior art, references |
+| Security | `security`, `vulnerability` | OWASP, CVE databases |
+| Refactor | `refactor`, `cleanup` | Design patterns, SOLID |
 
-### Step 2: Prior Art Research (AUTOMATIC)
+### Step 2: Prior Art Research
 
-Research existing solutions using WebSearch. Fresh research every time (no caching).
+**Tier 1:** 1-2 searches (quick)
+**Tier 2:** 3-5 searches (focused)
 
-**Search Strategy by Issue Type:**
-
-#### Features/Enhancements
-1. `"<feature> library npm 2024"` - Find existing packages
-2. `"<feature> implementation pattern react"` - Design patterns
-3. `"<feature> electron app example"` - Framework-specific solutions
-4. `"VS Code <feature> implementation"` - Reference implementations
-
-#### Bugs
-1. `"<symptom> <technology> issue github"` - Known issues
-2. `"<error message> fix solution"` - Existing solutions
-3. `"<library> bug workaround"` - Library-specific workarounds
-
-#### Security
-1. `"<vulnerability type> prevention best practices"` - Security patterns
-2. `"OWASP <topic> 2024"` - Current standards
-3. `"electron security <topic>"` - Framework guidance
-
-**Output:** Research Summary (see `templates/research-summary.md`)
+Use WebSearch to find:
+- Existing libraries/packages
+- Similar implementations
+- Best practices
+- Known issues and solutions
 
 ### Step 3: Requirements Questionnaire
 
-Present tier-appropriate questions using AskUserQuestion tool.
+Present tier-appropriate questions using AskUserQuestion:
 
-**Question Categories:**
-1. **Requirements clarification** - What's unclear about acceptance criteria?
-2. **Edge cases & boundaries** - Error handling, limits, special cases?
-3. **Reference implementations** - "Should this work like X?"
-4. **Scope boundaries** - What's explicitly OUT of scope?
+**Tier 1:** 1-2 questions
+**Tier 2:** 3-5 questions
 
-**Output:** Requirements Clarification (see `templates/requirements-clarification.md`)
+Categories:
+1. Requirements clarification
+2. Edge cases & boundaries
+3. Reference implementations
+4. Scope boundaries
 
 ### Step 4: Acceptance Criteria Validation
 
-Verify acceptance criteria completeness:
+Verify all criteria are:
+- [ ] Testable (observable behavior)
+- [ ] Measurable (success metrics)
+- [ ] Bounded (explicit scope)
 
-- [ ] All criteria are testable (observable behavior)
-- [ ] Success metrics defined
-- [ ] Edge cases documented
-- [ ] Scope boundaries explicit (what's OUT of scope)
-- [ ] Dependencies identified
-
-If gaps found: Add suggested criteria to requirements document for user approval.
+If gaps found: Add suggested criteria for user approval.
 
 ### Step 5: Create Requirements Summary
 
-Compile all findings:
-
+Compile:
 1. Issue classification
 2. Prior art findings with recommendations
 3. Clarified requirements
 4. Validated acceptance criteria
-5. Identified risks/unknowns
-6. Recommended approach based on research
+5. Identified risks
+6. Recommended approach
 
 ---
 
-## Questionnaires by Issue Type
+## OUTPUT ARTIFACTS
 
-### Bug Fix Questionnaire
-
-#### Tier 1 (1-2 questions)
-
-**Q1: Scope of Fix**
-
-```json
-{
-  "question": "How extensive should this fix be?",
-  "header": "Fix scope",
-  "options": [
-    {"label": "Minimal", "description": "Fix exact symptom only"},
-    {"label": "Root cause", "description": "Address underlying issue"},
-    {"label": "Comprehensive", "description": "Fix + prevent similar bugs"}
-  ],
-  "multiSelect": false
-}
-```
-**Recommendation:** Minimal - reduces regression risk for trivial issues.
+| Artifact | Description |
+|----------|-------------|
+| Research Summary | Prior art findings, library recommendations |
+| Requirements Document | Clarified requirements from questionnaire |
+| Validated Criteria | Acceptance criteria with gaps addressed |
+| Risk Assessment | Identified risks and mitigations |
 
 ---
 
-#### Tier 2 (add these)
+## OUTPUT CONDITIONS
 
-**Q2: Reproduction Confidence**
-
-```json
-{
-  "question": "How consistently can the bug be reproduced?",
-  "header": "Reproducibility",
-  "options": [
-    {"label": "Always", "description": "100% reproducible with steps"},
-    {"label": "Usually", "description": ">50% of attempts"},
-    {"label": "Intermittent", "description": "Sometimes, unclear pattern"},
-    {"label": "Once", "description": "Happened once, can't reproduce"}
-  ],
-  "multiSelect": false
-}
-```
-**Recommendation:** Always - enables fix verification.
-
-**Q3: Related Functionality**
-
-```json
-{
-  "question": "Should the fix consider related functionality?",
-  "header": "Related code",
-  "options": [
-    {"label": "Isolated", "description": "Fix only affects reported area"},
-    {"label": "Check related", "description": "Verify similar code paths"},
-    {"label": "Broader audit", "description": "Review entire subsystem"}
-  ],
-  "multiSelect": false
-}
-```
-**Recommendation:** Check related - balances thoroughness and scope.
-
-**Q4: Regression Risk**
-
-```json
-{
-  "question": "What's the regression risk level?",
-  "header": "Risk level",
-  "options": [
-    {"label": "Low", "description": "Isolated change, minimal impact"},
-    {"label": "Medium", "description": "Touches shared code"},
-    {"label": "High", "description": "Core functionality affected"}
-  ],
-  "multiSelect": false
-}
-```
-**Recommendation:** Low - preferred when possible.
-
----
-
-#### Tier 2 (add this)
-
-**Q5: Root Cause Depth**
-
-```json
-{
-  "question": "How deep should root cause analysis go?",
-  "header": "Analysis depth",
-  "options": [
-    {"label": "Surface", "description": "Fix symptoms only"},
-    {"label": "Immediate", "description": "One level deep"},
-    {"label": "Root cause", "description": "Full analysis"},
-    {"label": "Architecture", "description": "Consider design implications"}
-  ],
-  "multiSelect": false
-}
-```
-**Recommendation:** Root cause - complex bugs often have deeper causes.
-
----
-
-### Enhancement Questionnaire
-
-#### Tier 1 (1-2 questions)
-
-**Q1: Reference Implementation**
-
-```json
-{
-  "question": "Should this match an existing implementation?",
-  "header": "Reference",
-  "options": [
-    {"label": "VS Code", "description": "Match VS Code behavior"},
-    {"label": "Other app", "description": "Specify which application"},
-    {"label": "Custom", "description": "New UX approach"},
-    {"label": "Standards", "description": "Follow platform conventions"}
-  ],
-  "multiSelect": false
-}
-```
-**Recommendation:** VS Code - familiar to most users.
-
----
-
-#### Tier 2 (add these)
-
-**Q2: Scope Boundaries**
-
-```json
-{
-  "question": "What's explicitly OUT of scope?",
-  "header": "Out of scope",
-  "options": [
-    {"label": "Define now", "description": "List exclusions explicitly"},
-    {"label": "Discover later", "description": "Determine during implementation"},
-    {"label": "None", "description": "Everything related is in scope"}
-  ],
-  "multiSelect": false
-}
-```
-**Recommendation:** Define now - prevents scope creep.
-
-**Q3: Edge Cases**
-
-```json
-{
-  "question": "Which edge cases should be handled?",
-  "header": "Edge cases",
-  "options": [
-    {"label": "Common only", "description": "80% use cases"},
-    {"label": "All documented", "description": "All listed in issue"},
-    {"label": "Comprehensive", "description": "Include discovered edge cases"},
-    {"label": "Deferred", "description": "Handle in follow-up issues"}
-  ],
-  "multiSelect": false
-}
-```
-**Recommendation:** Comprehensive - improves quality.
-
-**Q4: UX Consistency**
-
-```json
-{
-  "question": "How important is UX consistency with existing features?",
-  "header": "UX consistency",
-  "options": [
-    {"label": "Critical", "description": "Must match existing patterns"},
-    {"label": "Important", "description": "Similar but can differ"},
-    {"label": "Flexible", "description": "New patterns acceptable"}
-  ],
-  "multiSelect": false
-}
-```
-**Recommendation:** Critical - improves user experience.
-
----
-
-#### Tier 2 (add these)
-
-**Q5: Performance Considerations**
-
-```json
-{
-  "question": "Are there performance requirements?",
-  "header": "Performance",
-  "options": [
-    {"label": "No constraints", "description": "Performance not critical"},
-    {"label": "Reasonable", "description": "Should not noticeably slow app"},
-    {"label": "Strict", "description": "Specific targets required"}
-  ],
-  "multiSelect": false
-}
-```
-**Recommendation:** Reasonable - avoids premature optimization.
-
-**Q6: Accessibility Requirements**
-
-```json
-{
-  "question": "What accessibility level is needed?",
-  "header": "Accessibility",
-  "options": [
-    {"label": "Basic", "description": "Keyboard navigable"},
-    {"label": "Standard", "description": "ARIA labels, focus management"},
-    {"label": "Full", "description": "WCAG 2.1 AA compliance"}
-  ],
-  "multiSelect": false
-}
-```
-**Recommendation:** Standard - covers most needs.
-
----
-
-### Feature Questionnaire
-
-#### Tier 1 (1-2 questions)
-
-**Q1: Existing Library**
-
-```json
-{
-  "question": "Should we use an existing library?",
-  "header": "Library",
-  "options": [
-    {"label": "Prefer library", "description": "Use if quality library exists"},
-    {"label": "Custom only", "description": "Build from scratch"},
-    {"label": "Evaluate", "description": "Compare options first"}
-  ],
-  "multiSelect": false
-}
-```
-**Recommendation:** Prefer library - saves time, reduces bugs.
-
----
-
-#### Tier 2 (add these)
-
-**Q2: Integration Depth**
-
-```json
-{
-  "question": "How tightly should this integrate with existing features?",
-  "header": "Integration",
-  "options": [
-    {"label": "Standalone", "description": "Minimal integration"},
-    {"label": "Integrated", "description": "Works with existing features"},
-    {"label": "Deep", "description": "Requires existing feature changes"}
-  ],
-  "multiSelect": false
-}
-```
-**Recommendation:** Integrated - provides value without extensive rework.
-
-**Q3: MVP vs Complete**
-
-```json
-{
-  "question": "Should this be MVP or complete feature?",
-  "header": "Completeness",
-  "options": [
-    {"label": "MVP", "description": "Core functionality only"},
-    {"label": "Standard", "description": "Core + common use cases"},
-    {"label": "Complete", "description": "Full feature set"}
-  ],
-  "multiSelect": false
-}
-```
-**Recommendation:** Standard - balances value and effort.
-
-**Q4: Future Extensibility**
-
-```json
-{
-  "question": "How important is future extensibility?",
-  "header": "Extensibility",
-  "options": [
-    {"label": "Not needed", "description": "One-time feature"},
-    {"label": "Desirable", "description": "Design for extension"},
-    {"label": "Critical", "description": "Architecture must support growth"}
-  ],
-  "multiSelect": false
-}
-```
-**Recommendation:** Desirable - enables future enhancements.
-
----
-
-#### Tier 2 (add these)
-
-**Q5: Testing Strategy**
-
-```json
-{
-  "question": "What testing approach is needed?",
-  "header": "Testing",
-  "options": [
-    {"label": "Unit only", "description": "Test isolated logic"},
-    {"label": "Unit + Integration", "description": "Standard test coverage"},
-    {"label": "Full", "description": "Include E2E tests"}
-  ],
-  "multiSelect": false
-}
-```
-**Recommendation:** Unit + Integration - covers most scenarios.
-
-**Q6: Documentation Needs**
-
-```json
-{
-  "question": "What documentation is required?",
-  "header": "Documentation",
-  "options": [
-    {"label": "Code comments", "description": "Inline documentation only"},
-    {"label": "Standard", "description": "Comments + CLAUDE.md update"},
-    {"label": "Full", "description": "Add dedicated docs page"}
-  ],
-  "multiSelect": false
-}
-```
-**Recommendation:** Standard - maintains project consistency.
-
----
-
-## Checkpoint (Tier 2)
-
-Present to user before proceeding to Discovery:
-
-```markdown
-## Business Analysis Complete
-
-**Issue:** #<number> - <title>
-**Type:** <Bug/Enhancement/Feature/Security/Refactor>
-**Tier:** <1/2/3>
-
-### Prior Art Findings
-
-**Searches Conducted:** <N>
-
-**Existing Solutions Found:**
-- <Library/pattern 1>: <one-sentence summary>
-- <Library/pattern 2>: <one-sentence summary>
-
-**Recommendation:** <Use library X / Build custom because Y / Hybrid approach>
-
-**Sources:**
-- [<Title>](<URL>)
-
-### Requirements Clarification
-
-| Question | Your Answer | Impact |
-|----------|-------------|--------|
-| <Q1> | <Answer> | <How this affects implementation> |
-| <Q2> | <Answer> | <How this affects implementation> |
-
-### Validated Acceptance Criteria
-
-- [ ] <Criterion 1 - original>
-- [ ] <Criterion 2 - original>
-- [ ] <NEW: Suggested criterion based on research>
-
-### Scope Boundaries
-
-**In Scope:**
-- <Item 1>
-- <Item 2>
-
-**Out of Scope:**
-- <Item 1>
-- <Item 2>
-
-### Identified Risks
-
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| <Risk 1> | Low/Med/High | Low/Med/High | <Action> |
-
----
-
-**Proceed to Discovery?** [Yes / Revise / Add Questions]
-```
-
----
-
-## Validation Checklist
-
-Before proceeding to Phase 2 (Discovery), ALL must be checked:
+**ALL must be checked before proceeding to Phase 2.**
 
 - [ ] Issue type classified
-- [ ] Prior art research completed (appropriate depth for tier)
+- [ ] Prior art research completed (depth per tier)
 - [ ] Requirements questionnaire completed
 - [ ] All user answers explicit (no skipped questions)
 - [ ] Acceptance criteria validated
 - [ ] Scope boundaries documented
 - [ ] Research summary created
-- [ ] User approved checkpoint (Tier 2)
-
-**STOP if any item unchecked. Do not proceed.**
 
 ---
 
-## Retry Logic
+## QUALITY GATE: QG-1
 
-- **Max retries:** 3 per step
-- **On research failure:** Document what was searched, proceed with reduced findings
-- **On questionnaire skip:** Re-present with "This question is required"
-- **Escalation:** After 3 retries, user decides: [Retry / Skip Research / Proceed Anyway]
+**Gate Type:** Checkpoint (T2) | Automated (T1)
+**Gate ID:** QG-1
+
+### Pass Criteria
+
+| Criterion | Tier 1 | Tier 2 |
+|-----------|--------|--------|
+| Research completed | 1-2 searches | 3-5 searches |
+| Questions answered | 1-2 | 3-5 |
+| Criteria validated | Basic check | Full validation |
+| User checkpoint | Not required | Required |
+
+### Tier 2 Checkpoint
+
+Present to user:
+
+```markdown
+## Business Analysis Complete
+
+**Issue:** #<number> - <title>
+**Type:** <classification>
+**Tier:** <tier>
+
+### Prior Art Findings
+- <finding 1>
+- <finding 2>
+
+### Requirements Clarification
+| Question | Answer | Impact |
+|----------|--------|--------|
+| <Q1> | <A1> | <impact> |
+
+### Validated Acceptance Criteria
+- [ ] <criterion 1>
+- [ ] <criterion 2>
+
+### Scope Boundaries
+**In Scope:** <items>
+**Out of Scope:** <items>
+
+### Risks
+| Risk | Likelihood | Impact | Mitigation |
+|------|------------|--------|------------|
+| <risk> | <L/M/H> | <L/M/H> | <action> |
+
+**Proceed to Discovery?** [Approve / Revise / Add Questions]
+```
+
+### Result
+
+**QG-1 Result:** [PASS | FAIL]
+
+### On FAIL
+
+1. Review specific failure reason
+2. Address missing requirements or research
+3. Re-run questionnaire if needed
+4. Max 3 retries, then ESCALATE
 
 ---
 
-## Data Flow to Discovery
+## NEXT PHASE
 
-Business Analysis outputs inform Discovery phase:
+**QG-1 = PASS required to proceed to Phase 2: Discovery**
 
-| BA Output | Discovery Input |
-|-----------|-----------------|
-| Issue type classification | Focus area prioritization |
-| Existing library findings | Integration considerations |
-| Scope boundaries | Search constraints |
-| Identified risks | Areas to investigate |
-| Reference implementations | Pattern matching targets |
+**STOP if QG-1 ≠ PASS. Do not proceed.**

@@ -1,6 +1,6 @@
 ---
 name: managing-issues
-version: 1.1.0
+version: 2.0.0
 status: active
 description: Full lifecycle management of GitHub issues - create, implement, and review. Routes to appropriate operation based on user intent. Use when creating issues, reporting bugs, requesting features, implementing issues, reviewing code, or working on GitHub issues.
 ---
@@ -11,12 +11,24 @@ Complete lifecycle management for GitHub issues and source code through structur
 
 ## CRITICAL RULES
 
+**These rules are NON-NEGOTIABLE. Violations cause automatic failures.**
+
+### General Rules
 - MUST create TodoWrite list at operation start
-- MUST NOT skip security scan (Implement operation)
-- MUST NOT create/modify issues without user approval (Create operation)
 - MUST delegate to agents, not execute directly
-- STOP if any pre-flight check fails
 - Retry failed steps max 3 times, then escalate to user
+
+### Implement Operation Enforcement Rules
+- **NO PHASE SKIPPING** - ALL 12 phases (0-11) MUST execute
+- **QUALITY GATES MANDATORY** - Every phase ends with QG-N
+- **SEQUENTIAL EXECUTION** - Phase N cannot start until QG-(N-1) = PASS
+- **INPUT CONDITIONS REQUIRED** - STOP if any input condition unchecked
+- **OUTPUT CONDITIONS REQUIRED** - STOP if any output condition unchecked
+- **NON-OVERRIDABLE GATES** - QG-0, QG-6, QG-8 CANNOT be skipped
+- MUST NOT skip security scan (QG-6 - NEVER skippable)
+
+### Create Operation Rules
+- MUST NOT create/modify issues without user approval
 
 ---
 
@@ -124,19 +136,18 @@ TodoWrite([
 
 ```
 TodoWrite([
-  {content: "Phase 0: Pre-flight checks", status: "in_progress", activeForm: "Running pre-flight checks"},
-  {content: "Phase 1: Business Analysis", status: "pending", activeForm: "Analyzing requirements"},
-  {content: "Phase 2: Discovery", status: "pending", activeForm: "Discovering codebase"},
-  {content: "Phase 3: Architecture", status: "pending", activeForm: "Designing architecture"},
-  {content: "Phase 4: Implementation", status: "pending", activeForm: "Implementing code"},
-  {content: "Phase 5: Architectural Review", status: "pending", activeForm: "Reviewing architecture"},
-  {content: "Phase 6: Security scan", status: "pending", activeForm: "Scanning for security issues"},
-  {content: "Phase 7: Quality Review", status: "pending", activeForm: "Reviewing code quality"},
-  {content: "Phase 8: Verification", status: "pending", activeForm: "Verifying implementation"},
-  {content: "Phase 9: Documentation", status: "pending", activeForm: "Updating documentation"},
-  {content: "Phase 10: UAT", status: "pending", activeForm: "Running acceptance tests"},
-  {content: "Phase 11: Finalization", status: "pending", activeForm: "Finalizing commit"},
-  {content: "Phase 12: Release (optional)", status: "pending", activeForm: "Preparing release"}
+  {content: "Phase 0: Pre-flight (QG-0)", status: "in_progress", activeForm: "Running pre-flight checks"},
+  {content: "Phase 1: Business Analysis (QG-1)", status: "pending", activeForm: "Analyzing requirements"},
+  {content: "Phase 2: Discovery (QG-2)", status: "pending", activeForm: "Discovering codebase"},
+  {content: "Phase 3: Architecture (QG-3)", status: "pending", activeForm: "Designing architecture"},
+  {content: "Phase 4: Implementation (QG-4)", status: "pending", activeForm: "Implementing code"},
+  {content: "Phase 5: Architectural Review (QG-5)", status: "pending", activeForm: "Reviewing architecture"},
+  {content: "Phase 6: Security (QG-6)", status: "pending", activeForm: "Scanning security"},
+  {content: "Phase 7: Quality Review (QG-7)", status: "pending", activeForm: "Reviewing quality"},
+  {content: "Phase 8: Verification (QG-8)", status: "pending", activeForm: "Verifying implementation"},
+  {content: "Phase 9: Documentation (QG-9)", status: "pending", activeForm: "Updating documentation"},
+  {content: "Phase 10: UAT (QG-10)", status: "pending", activeForm: "Running acceptance tests"},
+  {content: "Phase 11: Finalization (QG-11)", status: "pending", activeForm: "Finalizing commit"}
 ])
 ```
 
@@ -156,6 +167,7 @@ TodoWrite([
 - Mark phase `in_progress` BEFORE starting
 - Mark phase `completed` IMMEDIATELY after quality gate passes
 - Only ONE phase should be `in_progress` at a time
+- **STOP if quality gate fails after 3 retries**
 
 ---
 
@@ -183,7 +195,6 @@ All agents are embedded in `agents/` directory with full execution logic.
 | review-code | 7 | Comprehensive quality review |
 | update-docs | 9 | Update documentation |
 | summarize-diff | 11 | Generate commit messages |
-| prepare-release | 12 | Prepare releases |
 
 ### Review Operation Agents
 
@@ -202,6 +213,48 @@ All agents are embedded in `agents/` directory with full execution logic.
 | fix-docs | Tier 1 doc issues | Quick doc fixes |
 
 See [reference/agents-reference.md](reference/agents-reference.md) for detailed agent specifications.
+
+---
+
+## Quality Gate Summary (Implement Operation)
+
+| Gate | Phase | Type | Can Override |
+|------|-------|------|--------------|
+| QG-0 | Pre-flight | Mandatory | **NO** |
+| QG-1 | Business Analysis | Checkpoint (T2) | Yes |
+| QG-2 | Discovery | Checkpoint (T2) | Yes |
+| QG-3 | Architecture | User-Approval | Yes |
+| QG-4 | Implementation | Automated | Yes |
+| QG-5 | Architectural Review | Checkpoint (T2) | Yes |
+| QG-6 | Security | Mandatory | **NO** |
+| QG-7 | Quality Review | Checkpoint (T2) | Yes |
+| QG-8 | Verification | Mandatory | **NO** |
+| QG-9 | Documentation | Automated | Yes |
+| QG-10 | UAT | User-Approval (T2) | Yes |
+| QG-11 | Finalization | User-Approval | Yes |
+
+---
+
+## Implement Workflow Overview
+
+```
+START → QG-0 (Pre-flight) [MANDATORY]
+          ↓ PASS
+        QG-1 → QG-2 → QG-3 (Architecture)
+                        ↓ User Approval
+        QG-4 (Implement) → QG-5 (Arch Review)
+                            ↓
+        QG-6 (Security) [MANDATORY - NEVER SKIP]
+          ↓ PASS
+        QG-7 → QG-8 (Verify) [MANDATORY]
+                ↓ PASS
+        QG-9 → QG-10 → QG-11 (Finalize)
+                         ↓ User Approval
+                       DONE
+
+On FAIL (after 3 retries): ESCALATE to user
+Mandatory gates (QG-0, QG-6, QG-8): Cannot override
+```
 
 ---
 
@@ -248,12 +301,15 @@ gh issue close 123
 
 ### DO NOT:
 
-1. **Create issues without approval** - Always wait for explicit user confirmation
-2. **Include file paths in issues** - They become stale
-3. **Skip duplicate check** - Always search first
-4. **Execute directly** - Delegate to agents
-5. **Scope creep** - Stay within acceptance criteria
-6. **Skip security scan** - Required for all tiers
+1. **Skip phases** - ALL phases must execute (tier determines depth, not skip)
+2. **Skip quality gates** - Every phase MUST end with QG-N check
+3. **Proceed on FAIL** - STOP if any quality gate fails after retries
+4. **Override mandatory gates** - QG-0, QG-6, QG-8 are NEVER skippable
+5. **Create issues without approval** - Always wait for explicit user confirmation
+6. **Include file paths in issues** - They become stale
+7. **Skip duplicate check** - Always search first
+8. **Execute directly** - Delegate to agents
+9. **Scope creep** - Stay within acceptance criteria
 
 ---
 
@@ -275,8 +331,8 @@ See [examples.md](examples.md) for detailed walkthroughs:
 
 ## Reference
 
-- **Operations**: [operations/](operations/) - Create and Implement workflows
+- **Operations**: [operations/](operations/) - Create, Implement, Review workflows
 - **Agents**: [agents/](agents/) - Specialized execution agents
-- **Phases**: [phases/](phases/) - Implement operation phase guides
+- **Phases**: [phases/](phases/) - Implement operation phase guides (0-11)
 - **Templates**: [templates/](templates/) - Issue and implementation templates
 - **Reference**: [reference/](reference/) - Agent specs and issue principles

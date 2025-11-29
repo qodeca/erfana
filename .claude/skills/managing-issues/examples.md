@@ -14,25 +14,40 @@ Detailed examples showing workflows for each operation.
 
 ---
 
-## Checkpoint Summary (All Operations)
+## Quality Gate Summary (All Operations)
 
-| Checkpoint | Create | Implement T1 | Implement T2 | Review |
-|------------|--------|--------------|--------------|--------|
-| Business Analysis | - | - | ✓ | - |
-| Discovery | - | - | ✓ | - |
-| Architecture | - | - | ✓ | - |
-| Duplicate Check | ✓ | - | - | - |
-| Draft Approval | ✓ | - | - | - |
-| Scope Selection | - | - | - | ✓ |
-| Level Selection | - | - | - | ✓ |
-| Architectural Review | - | - | ✓ | - |
-| Security Scan | - | ✓ | ✓ | - |
-| Quality Review | - | - | ✓ | - |
-| Verification | - | - | ✓ | - |
-| UAT | - | - | ✓ | - |
-| Commit | - | ✓ | ✓ | - |
-| Branch Management | - | ✓ | ✓ | - |
-| **Total** | **2** | **2** | **10** | **2** |
+### Implement Operation Quality Gates
+
+| Quality Gate | Phase | Tier 1 | Tier 2 | Can Override |
+|--------------|-------|--------|--------|--------------|
+| QG-0: Pre-flight | 0 | Mandatory | Mandatory | **NO** |
+| QG-1: Business Analysis | 1 | Automated | Checkpoint | Yes |
+| QG-2: Discovery | 2 | Automated | Checkpoint | Yes |
+| QG-3: Architecture | 3 | User-Approval | User-Approval | Yes |
+| QG-4: Implementation | 4 | Automated | Automated | Yes |
+| QG-5: Architectural Review | 5 | Automated | Checkpoint | Yes |
+| QG-6: Security | 6 | Mandatory | Mandatory | **NO** |
+| QG-7: Quality Review | 7 | Automated | Checkpoint | Yes |
+| QG-8: Verification | 8 | Mandatory | Mandatory | **NO** |
+| QG-9: Documentation | 9 | Automated | Automated | Yes |
+| QG-10: UAT | 10 | Automated | User-Approval | Yes |
+| QG-11: Finalization | 11 | User-Approval | User-Approval | Yes |
+
+**Note:** ALL phases execute for both tiers. Tier determines validation depth, not phase skipping.
+
+### Create Operation Checkpoints
+
+| Checkpoint | Required |
+|------------|----------|
+| Duplicate Check | ✓ |
+| Draft Approval | ✓ |
+
+### Review Operation Checkpoints
+
+| Checkpoint | Required |
+|------------|----------|
+| Scope Selection | ✓ |
+| Level Selection | ✓ |
 
 ---
 

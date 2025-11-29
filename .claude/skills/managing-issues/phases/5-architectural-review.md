@@ -1,26 +1,27 @@
 # Phase 5: Architectural Review
 
-**Goal:** Validate the architectural quality of implemented code against design principles.
+**Goal:** Validate architectural quality of implemented code.
 **Agent:** `review-architecture`
-**Skip for:** Tier 1 (trivial changes)
+**Quality Gate:** QG-5 (Checkpoint for T2, Automated for T1)
 
-This phase ensures the implementation follows sound architectural principles, not just that it "works."
+---
 
-## Why This Phase Matters
+## INPUT CONDITIONS
 
-Phase 8 (Verification) checks if implementation matches the *plan*. But a bad plan executed perfectly is still bad architecture. This phase catches:
+**STOP if ANY condition is unchecked. Do not proceed.**
 
-- SOLID violations introduced during implementation
-- Accidental coupling between components
-- Design pattern misuse or anti-patterns
-- Technical debt accumulated during implementation
-- Abstraction leaks or layer violations
+- [ ] QG-4 = PASS (Implementation completed)
+- [ ] All tests passing
+- [ ] Typecheck passing
+- [ ] Implementation plan available for comparison
 
-## Steps
+---
 
-### 1. Invoke Architecture Reviewer
+## Execution Steps
 
-Follow the `review-architecture` agent steps (see `agents/review-architecture.md`):
+### Step 1: Invoke Architecture Reviewer
+
+Use `review-architecture` agent:
 
 1. Identify all files changed in implementation
 2. Analyze component boundaries and responsibilities
@@ -30,94 +31,99 @@ Follow the `review-architecture` agent steps (see `agents/review-architecture.md
 6. Check dependency directions
 7. Report findings by severity
 
-**Example inputs:**
-- issue_number: 11
-- files_changed: ["EditorTab.tsx", "EditorTab.css", "AppDockLayout.tsx"]
-- implementation_plan: (from design-solution)
-- tier: 2
-
-### 2. SOLID Principles Check
-
-For each changed file, evaluate:
+### Step 2: SOLID Principles Check
 
 | Principle | Question | Red Flags |
 |-----------|----------|-----------|
-| **S**ingle Responsibility | Does each class/component have ONE reason to change? | >300 line components, mixed concerns |
-| **O**pen/Closed | Is code open for extension, closed for modification? | Switch statements on types, hardcoded conditionals |
-| **L**iskov Substitution | Can subtypes replace their base types? | Type checks (instanceof), overridden methods with different behavior |
-| **I**nterface Segregation | Are interfaces minimal and focused? | Large interfaces with unused methods |
-| **D**ependency Inversion | Do high-level modules depend on abstractions? | Direct imports of concrete implementations |
+| **S**ingle Responsibility | One reason to change? | >300 line components |
+| **O**pen/Closed | Open for extension? | Switch on types |
+| **L**iskov Substitution | Subtypes replaceable? | instanceof checks |
+| **I**nterface Segregation | Interfaces minimal? | Large unused interfaces |
+| **D**ependency Inversion | Depend on abstractions? | Direct concrete imports |
 
-### 3. Design Pattern Evaluation
+### Step 3: Coupling/Cohesion Analysis
 
-Check pattern usage:
-
-**Correct Usage:**
-- [ ] Pattern solves actual problem (not over-engineering)
-- [ ] Pattern implemented completely (not half-patterns)
-- [ ] Pattern follows established conventions
-
-**Anti-Patterns to Flag:**
-- God objects (classes that know/do too much)
-- Feature envy (methods more interested in other classes)
-- Shotgun surgery (changes requiring edits across many files)
-- Parallel inheritance hierarchies
-
-### 4. Coupling and Cohesion Analysis
-
-**Coupling Assessment:**
-```
-Low Coupling (Good):
-- Components communicate via interfaces
+**Good (Low Coupling):**
+- Components via interfaces
 - No circular dependencies
-- Changes localize to single module
+- Localized changes
 
-High Coupling (Bad):
-- Components directly reference each other's internals
+**Bad (High Coupling):**
+- Direct internal references
 - Circular imports
-- Changes cascade across multiple modules
-```
+- Cascading changes
 
-**Cohesion Assessment:**
-```
-High Cohesion (Good):
-- Related functionality grouped together
-- Clear module boundaries
-- Intuitive code organization
+### Step 4: Design Pattern Evaluation
 
-Low Cohesion (Bad):
-- Unrelated functionality mixed together
-- "Utility" classes with random methods
-- Feature scattered across modules
-```
+Check:
+- [ ] Pattern solves actual problem
+- [ ] Pattern implemented completely
+- [ ] Pattern follows conventions
 
-### 5. Dependency Direction Check
+**Anti-patterns to flag:**
+- God objects
+- Feature envy
+- Shotgun surgery
+- Parallel inheritance
 
-Verify dependencies flow in the correct direction:
+### Step 5: Address Findings
 
-```
-Renderer Layer
-    ↓ depends on
-Store/State Layer
-    ↓ depends on
-Service/Logic Layer
-    ↓ depends on
-Infrastructure Layer
-```
+| Severity | Definition | Action |
+|----------|------------|--------|
+| Critical | Architectural flaw | MUST fix |
+| High | Significant deviation | Should fix |
+| Medium | Minor concern | Document |
+| Low | Suggestion | Optional |
 
-**Violations to flag:**
-- Service layer importing React components
-- Infrastructure importing business logic
-- Circular dependencies between layers
+---
 
-## Architectural Review Checkpoint (Tier 2)
+## OUTPUT ARTIFACTS
 
-Present findings to user:
+| Artifact | Description |
+|----------|-------------|
+| SOLID Assessment | Per-principle evaluation |
+| Coupling Analysis | Coupling/cohesion scores |
+| Pattern Review | Design pattern usage evaluation |
+| Issue List | All findings by severity |
+
+---
+
+## OUTPUT CONDITIONS
+
+**ALL must be checked before proceeding to Phase 6.**
+
+- [ ] Architectural review completed
+- [ ] No critical architectural issues
+- [ ] High severity issues addressed OR documented
+- [ ] SOLID principles assessment completed
+- [ ] Coupling/cohesion acceptable for change scope
+
+---
+
+## QUALITY GATE: QG-5
+
+**Gate Type:** Checkpoint (T2) | Automated (T1)
+**Gate ID:** QG-5
+
+### Pass Criteria
+
+| Criterion | Tier 1 | Tier 2 |
+|-----------|--------|--------|
+| SOLID check | Basic | Full analysis |
+| Coupling analysis | Quick | Detailed |
+| Pattern review | N/A | Required |
+| Critical issues | 0 | 0 |
+| High issues | Document | Address |
+| User checkpoint | Not required | Required |
+
+### Tier 2 Checkpoint
+
+Present to user:
 
 ```markdown
 ## Architectural Review Results
 
-**Overall Assessment:** [SOUND / NEEDS IMPROVEMENT / ARCHITECTURAL ISSUES]
+**Overall Assessment:** [SOUND | NEEDS IMPROVEMENT | ARCHITECTURAL ISSUES]
 
 ### SOLID Analysis
 | Principle | Status | Notes |
@@ -129,68 +135,37 @@ Present findings to user:
 | Dependency Inversion | ✅/⚠️/❌ | <assessment> |
 
 ### Design Quality
-- **Coupling:** [Low/Medium/High] - <explanation>
-- **Cohesion:** [High/Medium/Low] - <explanation>
+- **Coupling:** [Low/Medium/High]
+- **Cohesion:** [High/Medium/Low]
 - **Patterns:** [Appropriate/Over-engineered/Missing]
 
 ### Issues Found
 | Severity | Issue | Location | Recommendation |
 |----------|-------|----------|----------------|
-| High | <issue> | <file:line> | <fix> |
+| <sev> | <issue> | <file:line> | <fix> |
 
 ### Recommendations
-- <architectural improvement suggestions>
+- <suggestion 1>
+- <suggestion 2>
 
-[Proceed / Address Issues First]
+**Proceed to Security?** [Approve / Address Issues First]
 ```
 
-## Severity Levels
+### Result
 
-| Severity | Definition | Action Required |
-|----------|------------|-----------------|
-| **Critical** | Architectural flaw that will cause problems | MUST fix before proceeding |
-| **High** | Significant deviation from principles | Should fix before proceeding |
-| **Medium** | Minor architectural concern | Document, can fix in follow-up |
-| **Low** | Suggestion for improvement | Optional |
+**QG-5 Result:** [PASS | FAIL]
 
-## Tier-Specific Depth
+### On FAIL
 
-### Tier 2: Standard Review
-- SOLID principles check (high-level)
-- Basic coupling analysis
-- Pattern misuse detection
-- Dependency direction verification
-
-### Tier 2: Deep Architectural Review
-- Full SOLID analysis with specific violations
-- Detailed coupling metrics
-- Anti-pattern detection
-- Layer boundary verification
-- Technical debt assessment
-- Extensibility evaluation
+1. Review architectural feedback
+2. Re-invoke implement-code to address issues
+3. Re-run architectural review
+4. Max 3 retries, then ESCALATE
 
 ---
 
-## Retry Logic
+## NEXT PHASE
 
-- **Max retries:** 3 per phase
-- **On failure:**
-  1. Review architect feedback, understand issues
-  2. Re-invoke implement-code to address architectural issues
-  3. Re-run architectural review
-  4. After 3 failures: Present to user with options
-- **Escalation:** User decides: [Retry/Accept (document technical debt)/Abort]
+**QG-5 = PASS required to proceed to Phase 6: Security**
 
----
-
-## Phase Validation
-
-Before proceeding to next phase, ALL must be checked:
-
-- [ ] Architectural review completed
-- [ ] No critical architectural issues
-- [ ] High severity issues addressed OR documented with justification
-- [ ] SOLID principles assessment completed
-- [ ] Coupling/cohesion acceptable for the change scope
-
-**STOP if any item unchecked. Do not proceed.**
+**STOP if QG-5 ≠ PASS. Do not proceed.**

@@ -1,110 +1,63 @@
 # Phase 7: Implementation Quality Review
 
-**Goal:** Comprehensive code quality assessment covering correctness, maintainability, and craftsmanship.
+**Goal:** Comprehensive code quality assessment.
 **Agent:** `review-code`
-**Applies to:** Tier 2 (skip for Tier 1 trivial changes)
+**Quality Gate:** QG-7 (Checkpoint for T2, Automated for T1)
 
-This phase ensures the implementation is not just functional, but maintainable, readable, and follows best practices.
+---
 
-## Why This Phase Expanded to Tier 2
+## INPUT CONDITIONS
 
-Previously Tier 2 only. Now Tier 2 because:
-- Code quality issues compound over time
-- Earlier detection = cheaper fixes
-- Tier 2 issues are often the "foundation" for future features
-- Maintainability matters even for medium complexity changes
+**STOP if ANY condition is unchecked. Do not proceed.**
 
-## Steps
+- [ ] QG-6 = PASS (Security scan completed)
+- [ ] No critical/high security vulnerabilities
+- [ ] All tests passing
+- [ ] Typecheck passing
 
-### 1. Invoke Code Reviewer
+---
 
-Follow the `review-code` agent steps (see `agents/review-code.md`):
+## Execution Steps
+
+### Step 1: Invoke Code Reviewer
+
+Use `review-code` agent:
 
 1. Read all changed files
-2. Check for security issues (secrets, injection, XSS)
-3. Check performance (re-renders, memory leaks)
-4. Verify best practices (TypeScript types, error handling)
-5. Analyze code smells and complexity
-6. Evaluate test quality (not just coverage)
-7. Assess readability and maintainability
-8. Compile findings by severity
+2. Check for security issues
+3. Check performance
+4. Verify best practices
+5. Analyze code smells
+6. Evaluate test quality
+7. Assess readability
+8. Compile findings
 
-**Example inputs:**
-- issue_number: 11
-- files_changed: ["EditorTab.tsx", "EditorTab.css"]
-- acceptance_criteria: ["Dynamic sizing", "Context menu"]
-- tier: 2
-
-### 2. Review Categories
-
-| Category | Assessment |
-|----------|------------|
-| Security vulnerabilities | Deep |
-| Performance issues | Profiled |
-| Best practices compliance | Yes |
-| Test coverage adequacy | Yes |
-| **Code smell detection** | Deep |
-| **Complexity analysis** | Detailed |
-| **Maintainability scoring** | Yes |
-| **Test quality assessment** | Deep |
-| **Readability evaluation** | Yes |
-| Documentation completeness | Full |
-
-### 3. Code Smell Detection
-
-**Standard Detection:**
+### Step 2: Code Smell Detection
 
 | Smell | Detection | Threshold |
 |-------|-----------|-----------|
 | Long Method | Line count | >50 lines |
 | Large Class | Total lines | >300 lines |
-| Long Parameter List | Parameter count | >5 params |
-| Feature Envy | External references | >3 external deps |
-| Data Clumps | Repeated field groups | >2 occurrences |
+| Long Parameter List | Params | >5 params |
+| Feature Envy | External refs | >3 deps |
+| Data Clumps | Repeated groups | >2 occurrences |
 
-**Deep Detection:**
+### Step 3: Complexity Analysis
 
-| Smell | Detection | Action |
-|-------|-----------|--------|
-| Shotgun Surgery | Change impact analysis | Flag for refactor |
-| Divergent Change | Multiple change reasons | Split responsibilities |
-| Parallel Inheritance | Hierarchy duplication | Consider composition |
-| Lazy Class | Minimal functionality | Consider merging |
-| Speculative Generality | Unused abstractions | Remove premature |
-| Temporary Field | Conditionally used fields | Extract to params |
+**Cyclomatic Complexity:**
+| Score | Rating | Action |
+|-------|--------|--------|
+| 1-5 | Simple | OK |
+| 6-10 | Moderate | Review |
+| 11-20 | Complex | Justify |
+| 21+ | Very Complex | Refactor |
 
-### 4. Complexity Analysis (NEW)
+**Target:** < 15 per function
 
-**Cyclomatic Complexity Assessment:**
-
-| Complexity | Score | Action |
-|------------|-------|--------|
-| Simple | 1-5 | Acceptable |
-| Moderate | 6-10 | Review necessity |
-| Complex | 11-20 | Requires justification |
-| Very Complex | 21+ | Must refactor |
-
-**Detection approach:**
-- Count decision points (if, else, case, &&, ||, ?)
-- Each function analyzed independently
-- Flag functions exceeding threshold for tier
-
-**Cognitive Complexity:**
-- Measure mental effort to understand code
-- Penalize nesting, breaks in flow, recursion
-- Target: < 15 for any single function
-
-### 5. Maintainability Scoring (NEW)
-
-**Maintainability Index (simplified):**
+### Step 4: Maintainability Scoring
 
 ```
 Score = (readability + testability + modifiability) / 3
-
-Where:
-- readability: naming + formatting + documentation (0-100)
-- testability: pure functions + dependency injection + isolation (0-100)
-- modifiability: coupling + cohesion + complexity (0-100)
 ```
 
 | Score | Rating | Action |
@@ -114,63 +67,77 @@ Where:
 | 40-59 | Fair | Recommend improvements |
 | 0-39 | Poor | Require improvements |
 
-### 6. Test Quality Assessment (NEW)
+### Step 5: Test Quality Assessment
 
-**Beyond Coverage - Evaluate:**
+| Aspect | Check |
+|--------|-------|
+| Assertion Quality | Meaningful assertions? |
+| Edge Cases | Boundaries tested? |
+| Isolation | Tests independent? |
+| Readability | Clear test names? |
+| Determinism | Repeatable? |
+| Speed | <100ms per unit? |
 
-| Aspect | Question | Red Flags |
-|--------|----------|-----------|
-| **Assertion Quality** | Are assertions meaningful? | `expect(true).toBe(true)` |
-| **Edge Cases** | Are boundaries tested? | Only happy path |
-| **Isolation** | Are tests independent? | Shared mutable state |
-| **Readability** | Can you understand what's tested? | No test descriptions |
-| **Determinism** | Are tests repeatable? | Time/random dependencies |
-| **Speed** | Do tests run quickly? | >100ms per unit test |
+**Coverage requirements:**
+- Line coverage: >80%
+- Branch coverage: >70%
 
-**Test Coverage Requirements:**
-- >80% line coverage for new code
-- >70% branch coverage
+### Step 6: Address Findings
 
-**Test Quality Checklist:**
-- [ ] Each acceptance criterion has corresponding test(s)
-- [ ] Edge cases covered (null, empty, boundary values)
-- [ ] Error paths tested
-- [ ] Tests are isolated (no order dependency)
-- [ ] Test names describe behavior, not implementation
+| Severity | Action |
+|----------|--------|
+| Critical | MUST fix |
+| High | Should fix |
+| Medium | Document if deferring |
+| Low | Optional |
 
-### 7. Readability Evaluation (NEW)
+---
 
-**Naming Assessment:**
-- [ ] Variables describe content, not type (`users` not `arr`)
-- [ ] Functions describe action (`calculateTotal` not `calc`)
-- [ ] Classes describe entity (`UserRepository` not `UserMgr`)
-- [ ] No single-letter variables (except loop indices)
-- [ ] No abbreviations without context
+## OUTPUT ARTIFACTS
 
-**Formatting Assessment:**
-- [ ] Consistent indentation (enforced by linter)
-- [ ] Reasonable line lengths (<120 chars)
-- [ ] Logical grouping of related code
-- [ ] Blank lines separate logical sections
+| Artifact | Description |
+|----------|-------------|
+| Quality Score | Overall score /100 |
+| Code Smells | Detected smells with locations |
+| Complexity Metrics | Per-function complexity |
+| Test Quality Report | Coverage and quality assessment |
+| Issue List | All findings by severity |
 
-**Comprehension Assessment:**
-- [ ] Code flow is linear (no jumping around)
-- [ ] Early returns reduce nesting
-- [ ] Complex expressions broken into named variables
-- [ ] Magic numbers replaced with named constants
+---
 
-### 8. Address Findings
+## OUTPUT CONDITIONS
 
-| Severity | Definition | Action Required |
-|----------|------------|-----------------|
-| **Critical** | Breaks functionality or security | MUST fix before proceeding |
-| **High** | Significant quality issue | Should fix before proceeding |
-| **Medium** | Notable concern | Document if deferring |
-| **Low** | Suggestion | Optional improvement |
+**ALL must be checked before proceeding to Phase 8.**
 
-## Review Checkpoint (Tier 2)
+- [ ] Code review completed
+- [ ] All critical issues addressed
+- [ ] High severity issues addressed (T2) or documented (T1)
+- [ ] Medium issues fixed or documented
+- [ ] Maintainability score >= 60 (or documented exception)
+- [ ] Test coverage meets threshold (>80% line, >70% branch)
+- [ ] Code smells addressed or documented
 
-Present findings to user:
+---
+
+## QUALITY GATE: QG-7
+
+**Gate Type:** Checkpoint (T2) | Automated (T1)
+**Gate ID:** QG-7
+
+### Pass Criteria
+
+| Criterion | Tier 1 | Tier 2 |
+|-----------|--------|--------|
+| Critical issues | 0 | 0 |
+| High issues | Document | Address |
+| Maintainability | >= 50 | >= 60 |
+| Coverage | >70% | >80% |
+| Complexity | < 20 | < 15 |
+| User checkpoint | Not required | Required |
+
+### Tier 2 Checkpoint
+
+Present to user:
 
 ```markdown
 ## Implementation Quality Review
@@ -182,7 +149,7 @@ Present findings to user:
 |--------|-------|--------|
 | Maintainability | <score>/100 | ✅/⚠️/❌ |
 | Complexity | <score> (target: <15) | ✅/⚠️/❌ |
-| Test Quality | <assessment> | ✅/⚠️/❌ |
+| Test Coverage | <X>% (target: >80%) | ✅/⚠️/❌ |
 | Readability | <score>/100 | ✅/⚠️/❌ |
 
 ### Code Smells Detected
@@ -191,82 +158,36 @@ Present findings to user:
 | <smell> | <file:line> | <sev> | <fix> |
 
 ### Issues by Severity
-
-**Critical Issues:** <count>
-- <issue 1>
-
-**High Issues:** <count>
-- <issue 1>
-
-**Medium Issues:** <count>
-- <issue 1>
+- **Critical:** <count>
+- **High:** <count>
+- **Medium:** <count>
 
 ### Test Quality Notes
-- Coverage: <X>% (target: <Y>%)
-- <quality observations>
+- Coverage: <X>%
+- <observations>
 
 ### Recommendations
 - <suggestion 1>
 - <suggestion 2>
 
-[Proceed / Address Issues First]
+**Proceed to Verification?** [Approve / Address Issues First]
 ```
 
-## Security Review (Tier 2 Enhanced)
+### Result
 
-For security-sensitive changes, verify:
-- [ ] No path traversal vulnerabilities
-- [ ] IPC handlers validate all input
-- [ ] No secrets in code
-- [ ] CSP not weakened
-- [ ] Dangerous protocols still blocked
-- [ ] Authentication/authorization checks in place
-- [ ] Input sanitization at boundaries
-- [ ] Output encoding where needed
+**QG-7 Result:** [PASS | FAIL]
 
-## Tier-Specific Depth
+### On FAIL
 
-### Tier 2: Standard Review
-- Basic code smell detection (5 core smells)
-- Cyclomatic complexity check
-- Coverage verification (>70%)
-- Naming and formatting review
-- Security basics
-
-### Tier 2: Deep Review (All of Tier 2 plus)
-- Full code smell catalog (12+ smells)
-- Cognitive complexity analysis
-- Branch coverage verification (>70%)
-- Test mutation quality hints
-- Full security review
-- Maintainability index calculation
-- Technical debt assessment
+1. Review findings
+2. Fix critical/high issues
+3. Re-run review
+4. Max 3 retries, then ESCALATE
 
 ---
 
-## Retry Logic
+## NEXT PHASE
 
-- **Max retries:** 3 per phase
-- **On failure:**
-  1. Review review-code output, understand issues
-  2. Fix identified issues using implement-code
-  3. Re-run review
-  4. After 3 failures: Present issue to user with options
-- **Escalation:** User decides: [Retry/Accept (with documented risks)/Abort]
+**QG-7 = PASS required to proceed to Phase 8: Verification**
 
----
-
-## Phase Validation
-
-Before proceeding to next phase, ALL must be checked:
-
-- [ ] Code review completed successfully
-- [ ] All critical issues addressed
-- [ ] All high severity issues addressed (Tier 2) or documented (Tier 2)
-- [ ] Medium issues fixed or documented with justification
-- [ ] Maintainability score >= 60 (or documented exception)
-- [ ] Test coverage meets tier threshold
-- [ ] Security review completed (Tier 2)
-- [ ] Code smells addressed or documented
-
-**STOP if any item unchecked. Do not proceed.**
+**STOP if QG-7 ≠ PASS. Do not proceed.**

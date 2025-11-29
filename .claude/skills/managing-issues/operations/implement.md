@@ -1,6 +1,20 @@
 # Operation: Implement
 
-Implement GitHub issues through structured phases with specialized agents and human checkpoints.
+Implement GitHub issues through strictly enforced phases with mandatory quality gates after each phase.
+
+---
+
+## CRITICAL ENFORCEMENT RULES
+
+**These rules are NON-NEGOTIABLE. Violations are automatic failures.**
+
+1. **NO PHASE SKIPPING** - ALL phases MUST execute (Tier determines depth, not skip)
+2. **QUALITY GATES MANDATORY** - Every phase ends with a Quality Gate
+3. **SEQUENTIAL EXECUTION** - Phase N cannot start until QG-(N-1) = PASS
+4. **INPUT CONDITIONS REQUIRED** - Phase CANNOT start if any input condition unchecked
+5. **OUTPUT CONDITIONS REQUIRED** - Phase CANNOT complete if any output condition unchecked
+6. **3-RETRY LIMIT** - Max 3 retries per phase, then ESCALATE to user
+7. **STOP ON FAIL** - If Quality Gate = FAIL after 3 retries, STOP workflow
 
 ---
 
@@ -8,211 +22,354 @@ Implement GitHub issues through structured phases with specialized agents and hu
 
 | Attribute | Value |
 |-----------|-------|
-| Phases | 13 (0-12) |
+| Phases | 12 (0-11) |
 | Tiers | 2 (Trivial, Standard) |
-| Agents | 14 specialized agents |
-| Checkpoints | 2-10 depending on tier |
-
----
-
-## When to Use
-
-Activate when user:
-- Is assigned a GitHub issue to implement
-- Says "implement", "fix", or "work on" an issue
-- Needs structured workflow with quality checkpoints
-- Wants agent-assisted architecture and review
-
-**Trigger phrases:**
-- "Implement issue #123"
-- "Work on #45"
-- "Fix this GitHub issue"
-- "Let's tackle issue #99"
-
----
-
-## Prerequisites
-
-- [ ] GitHub CLI (`gh`) installed and authenticated
-- [ ] Git repository cloned locally
-- [ ] Node.js and npm available
-- [ ] Project uses conventional commits
+| Quality Gates | 12 (one per phase) |
+| Agents | 13 specialized agents |
 
 ---
 
 ## Complexity Tiers
 
-Determine tier from issue labels:
+**Tiers determine DEPTH of validation, NOT phase skipping.**
 
 ### Tier 1: Trivial
 **Labels:** `good first issue`, `documentation`, `typo`, `chore`
-**Checkpoints:** 2 (Security Scan, Before Commit)
-**Skip phases:** 2-Discovery, 3-Architecture, 5-Architectural Review, 7-Quality Review, 8-Verification, 10-UAT
-**Business Analysis:** Quick mode (1-2 searches, no checkpoint)
+**Validation Depth:** Light (automated checks, minimal user checkpoints)
+**Phases:** ALL phases execute with quick validation
 
 ### Tier 2: Standard (Default)
 **Labels:** `bug`, `enhancement`, `breaking-change`, `architecture`, `security`, `major`, or unlabeled
-**Checkpoints:** 10 (all phases)
-**Business Analysis:** Comprehensive mode (5-8 searches, checkpoint required)
-**Review gates:** Deep Architectural Review (Phase 5), Deep Quality Review (Phase 7)
-**Verification gates:** Plan verification (Phase 3), Implementation verification (Phase 8)
+**Validation Depth:** Full (comprehensive checks, all user checkpoints)
+**Phases:** ALL phases execute with deep validation
 
 ---
 
-## Phase Overview
+## Phase Overview with Quality Gates
 
-| Phase | Purpose | Agent(s) | Tier 1 | Tier 2 |
-|-------|---------|----------|--------|--------|
-| 0. Pre-flight | Validate environment | - | Yes | Yes |
-| 1. Business Analysis | Research + requirements | analyze-requirements | Quick | Full |
-| 2. Discovery | Understand codebase | explore-codebase | Skip | Yes |
-| 3. Architecture | Design solution | design-solution | Skip | Yes |
-| 4. Implementation | Write code + tests | implement-code, write-tests | Yes | Yes |
-| 5. Architectural Review | Validate SOLID | review-architecture | Skip | Yes |
-| 6. Security | Security check | audit-security | Basic | Full |
-| 7. Quality Review | Code quality | review-code | Skip | Yes |
-| 8. Verification | Verify vs plan | design-solution | Skip | Yes |
-| 9. Documentation | Update docs | update-docs | Yes | Yes |
-| 10. UAT | Manual testing | - | Skip | Yes |
-| 11. Finalization | Quality gates, commit | summarize-diff | Yes | Yes |
-| 12. Release | Production release | prepare-release | Optional | Optional |
+| Phase | Name | Agent(s) | Quality Gate | Gate Type |
+|-------|------|----------|--------------|-----------|
+| 0 | Pre-flight | - | QG-0 | Mandatory |
+| 1 | Business Analysis | analyze-requirements | QG-1 | Checkpoint (T2) |
+| 2 | Discovery | explore-codebase | QG-2 | Checkpoint (T2) |
+| 3 | Architecture | design-solution | QG-3 | User-Approval |
+| 4 | Implementation | implement-code, write-tests | QG-4 | Automated |
+| 5 | Architectural Review | review-architecture | QG-5 | Checkpoint (T2) |
+| 6 | Security | audit-security | QG-6 | Mandatory |
+| 7 | Quality Review | review-code | QG-7 | Checkpoint (T2) |
+| 8 | Verification | design-solution | QG-8 | Mandatory |
+| 9 | Documentation | update-docs | QG-9 | Automated |
+| 10 | UAT | - | QG-10 | User-Approval (T2) |
+| 11 | Finalization | summarize-diff | QG-11 | User-Approval |
+
+---
+
+## Quality Gate Types
+
+| Type | Description | Retry Allowed | User Interaction |
+|------|-------------|---------------|------------------|
+| **Mandatory** | MUST pass, no override | Yes (3x) | Escalate on fail |
+| **Checkpoint** | Requires acknowledgment (Tier 2) | Yes (3x) | Review findings |
+| **User-Approval** | Requires explicit user consent | No | Must approve |
+| **Automated** | Pass if automated checks pass | Yes (3x) | None unless fail |
+
+---
+
+## Phase Execution Pattern
+
+Every phase follows this EXACT pattern:
+
+```
+┌─────────────────────────────────────────┐
+│ PHASE N: <Name>                         │
+├─────────────────────────────────────────┤
+│ 1. CHECK INPUT CONDITIONS               │
+│    - IF any unchecked → STOP            │
+│    - IF previous QG ≠ PASS → STOP       │
+├─────────────────────────────────────────┤
+│ 2. EXECUTE PHASE                        │
+│    - Run agent(s)                       │
+│    - Produce artifacts                  │
+├─────────────────────────────────────────┤
+│ 3. VERIFY OUTPUT CONDITIONS             │
+│    - IF any unchecked → RETRY (max 3)   │
+├─────────────────────────────────────────┤
+│ 4. QUALITY GATE                         │
+│    - Evaluate pass criteria             │
+│    - IF PASS → Proceed to Phase N+1     │
+│    - IF FAIL → Retry or Escalate        │
+└─────────────────────────────────────────┘
+```
 
 ---
 
 ## Phases
 
 ### Phase 0: Pre-flight
-**Goal:** Validate environment and create feature branch.
 **Details:** See [phases/0-preflight.md](../phases/0-preflight.md)
 
-**Quick checklist:**
-- [ ] Issue exists and is OPEN
-- [ ] No `blocked` label
-- [ ] Tests pass on current branch
-- [ ] No uncommitted changes
-- [ ] Feature branch created (e.g., `git checkout -b fix/11-short-description`)
+| Attribute | Value |
+|-----------|-------|
+| Input Conditions | Git repo exists, gh CLI authenticated |
+| Output Artifacts | Feature branch, validated issue |
+| Quality Gate | QG-0 (Mandatory) |
 
-**Abort if:** Issue closed, blocked, baseline tests fail, uncommitted changes.
+**Quick Summary:**
+- Validate issue exists and is OPEN
+- Verify clean working directory
+- Run baseline tests
+- Create feature branch
 
 ---
 
 ### Phase 1: Business Analysis
-**Goal:** Research prior art and clarify requirements.
-**Agent:** analyze-requirements
 **Details:** See [phases/1-business-analysis.md](../phases/1-business-analysis.md)
 
-**Tier Variations:**
-- **Tier 1:** Quick mode (1-2 searches, 1-2 questions, no checkpoint)
-- **Tier 2:** Comprehensive mode (5-8 searches, 5-8 questions, checkpoint)
+| Attribute | Value |
+|-----------|-------|
+| Input Conditions | QG-0 = PASS |
+| Agent | analyze-requirements |
+| Output Artifacts | Research summary, requirements document |
+| Quality Gate | QG-1 (Checkpoint for T2, Automated for T1) |
 
-**Deliverable:** Research summary + requirements clarification document
+**Quick Summary:**
+- Research prior art
+- Clarify requirements via questionnaire
+- Validate acceptance criteria
 
 ---
 
-### Phase 2: Discovery (Tier 2 only)
-**Goal:** Understand issue and affected codebase.
-**Agent:** explore-codebase
-**Checkpoint:** Issue understanding confirmed
+### Phase 2: Discovery
 **Details:** See [phases/2-discovery.md](../phases/2-discovery.md)
 
+| Attribute | Value |
+|-----------|-------|
+| Input Conditions | QG-1 = PASS |
+| Agent | explore-codebase |
+| Output Artifacts | Affected files list, patterns found |
+| Quality Gate | QG-2 (Checkpoint for T2, Automated for T1) |
+
+**Quick Summary:**
+- Identify affected code areas
+- Map dependencies
+- Review existing patterns
+
 ---
 
-### Phase 3: Architecture (Tier 2 only)
-**Goal:** Design implementation approach with verification.
-**Agent:** design-solution
-**Checkpoint:** Plan approved by user
+### Phase 3: Architecture
 **Details:** See [phases/3-architecture.md](../phases/3-architecture.md)
 
-**Steps:**
-1. Invoke design-solution to create plan
-2. **Plan Verification Gate:** Architect verifies completeness → Must get APPROVED
-3. Present approved plan to user
-4. Proceed only after user approval
+| Attribute | Value |
+|-----------|-------|
+| Input Conditions | QG-2 = PASS |
+| Agent | design-solution |
+| Output Artifacts | Implementation plan |
+| Quality Gate | QG-3 (User-Approval) |
+
+**Quick Summary:**
+- Design implementation approach
+- Architect verifies plan completeness
+- User approves plan before implementation
 
 ---
 
 ### Phase 4: Implementation
-**Goal:** Write code and tests following approved plan.
-**Agents:** implement-code, write-tests
 **Details:** See [phases/4-implementation.md](../phases/4-implementation.md)
 
-**Guidelines:**
-- Follow existing codebase patterns
-- Keep changes focused on acceptance criteria
-- No scope creep
-- Target >80% coverage for new code
+| Attribute | Value |
+|-----------|-------|
+| Input Conditions | QG-3 = PASS |
+| Agents | implement-code, write-tests |
+| Output Artifacts | Code changes, tests |
+| Quality Gate | QG-4 (Automated) |
+
+**Quick Summary:**
+- Write code following approved plan
+- Write tests for new code
+- Verify typecheck and lint pass
 
 ---
 
-### Phase 5: Architectural Review (Tier 2 only)
-**Goal:** Validate architectural quality.
-**Agent:** review-architecture
-**Checkpoint:** Architectural assessment approved
+### Phase 5: Architectural Review
 **Details:** See [phases/5-architectural-review.md](../phases/5-architectural-review.md)
 
+| Attribute | Value |
+|-----------|-------|
+| Input Conditions | QG-4 = PASS |
+| Agent | review-architecture |
+| Output Artifacts | Architecture assessment |
+| Quality Gate | QG-5 (Checkpoint for T2, Automated for T1) |
+
+**Quick Summary:**
+- Validate SOLID principles
+- Check coupling/cohesion
+- Verify design patterns
+
 ---
 
-### Phase 6: Security (All Tiers)
-**Goal:** Catch security issues early.
-**Agent:** audit-security
-**Checkpoint:** Security checklist passed
+### Phase 6: Security
 **Details:** See [phases/6-security.md](../phases/6-security.md)
 
-**STOP if critical/high vulnerabilities found.**
+| Attribute | Value |
+|-----------|-------|
+| Input Conditions | QG-5 = PASS |
+| Agent | audit-security |
+| Output Artifacts | Security scan results |
+| Quality Gate | QG-6 (Mandatory - NEVER skippable) |
+
+**Quick Summary:**
+- Run npm audit
+- Check for secrets
+- Static analysis (T2)
+- OWASP verification (T2)
 
 ---
 
-### Phase 7: Quality Review (Tier 2 only)
-**Goal:** Comprehensive code quality assessment.
-**Agent:** review-code
-**Checkpoint:** Quality metrics pass
+### Phase 7: Quality Review
 **Details:** See [phases/7-review.md](../phases/7-review.md)
 
+| Attribute | Value |
+|-----------|-------|
+| Input Conditions | QG-6 = PASS |
+| Agent | review-code |
+| Output Artifacts | Quality assessment |
+| Quality Gate | QG-7 (Checkpoint for T2, Automated for T1) |
+
+**Quick Summary:**
+- Code smell detection
+- Complexity analysis
+- Maintainability scoring
+- Test quality assessment
+
 ---
 
-### Phase 8: Verification (Tier 2 only)
-**Goal:** Verify implementation matches approved plan.
-**Agent:** design-solution (verify mode)
-**Checkpoint:** Architect confirms VERIFIED
+### Phase 8: Verification
 **Details:** See [phases/8-verification.md](../phases/8-verification.md)
+
+| Attribute | Value |
+|-----------|-------|
+| Input Conditions | QG-7 = PASS |
+| Agent | design-solution (verify mode) |
+| Output Artifacts | Verification report |
+| Quality Gate | QG-8 (Mandatory) |
+
+**Quick Summary:**
+- Compare implementation vs approved plan
+- Verify all acceptance criteria met
+- Architect confirms VERIFIED
 
 ---
 
 ### Phase 9: Documentation
-**Goal:** Update relevant documentation.
-**Agent:** update-docs
 **Details:** See [phases/9-documentation.md](../phases/9-documentation.md)
 
+| Attribute | Value |
+|-----------|-------|
+| Input Conditions | QG-8 = PASS |
+| Agent | update-docs |
+| Output Artifacts | Updated documentation |
+| Quality Gate | QG-9 (Automated) |
+
+**Quick Summary:**
+- Update CLAUDE.md
+- Update test counts
+- Add JSDoc for new APIs
+
 ---
 
-### Phase 10: UAT (Tier 2 only)
-**Goal:** Manual testing by user.
-**Checkpoint:** User confirms acceptance criteria
+### Phase 10: UAT
 **Details:** See [phases/10-uat.md](../phases/10-uat.md)
 
+| Attribute | Value |
+|-----------|-------|
+| Input Conditions | QG-9 = PASS |
+| Agent | - (manual) |
+| Output Artifacts | User confirmation |
+| Quality Gate | QG-10 (User-Approval for T2, Automated for T1) |
+
+**Quick Summary:**
+- Build project
+- User manually tests
+- Verify acceptance criteria
+
 ---
 
-### Phase 11: Finalization (All Tiers)
-**Goal:** Pass quality gates, create commit, manage branch.
-**Agent:** summarize-diff
-**Checkpoint:** Quality gates pass, commit approved
+### Phase 11: Finalization
 **Details:** See [phases/11-finalization.md](../phases/11-finalization.md)
 
-**Quality Gates:**
-```bash
-npm run test        # All tests must pass
-npm run typecheck   # No type errors
-npm run lint        # No lint errors
+| Attribute | Value |
+|-----------|-------|
+| Input Conditions | QG-10 = PASS |
+| Agent | summarize-diff |
+| Output Artifacts | Commit, branch management |
+| Quality Gate | QG-11 (User-Approval) |
+
+**Quick Summary:**
+- Run all quality gates (test, typecheck, lint)
+- Create commit with proper message
+- Branch management (merge/push)
+
+---
+
+## Workflow State Diagram
+
+```
+START
+  │
+  ▼
+┌─────────────┐     FAIL (3x)     ┌──────────┐
+│   Phase 0   │──────────────────▶│ ESCALATE │
+│  Pre-flight │                   └──────────┘
+└─────┬───────┘
+      │ QG-0 PASS
+      ▼
+┌─────────────┐     FAIL (3x)     ┌──────────┐
+│   Phase 1   │──────────────────▶│ ESCALATE │
+│  Business   │                   └──────────┘
+└─────┬───────┘
+      │ QG-1 PASS
+      ▼
+     ...
+      │
+      ▼
+┌─────────────┐     FAIL (3x)     ┌──────────┐
+│  Phase 11   │──────────────────▶│ ESCALATE │
+│ Finalization│                   └──────────┘
+└─────┬───────┘
+      │ QG-11 PASS
+      ▼
+    DONE
 ```
 
 ---
 
-### Phase 12: Release (Optional)
-**Goal:** Prepare production release.
-**Agent:** prepare-release
-**Details:** See [phases/12-release.md](../phases/12-release.md)
+## Escalation Procedure
 
-**Use only when preparing actual release.**
+When a phase fails after 3 retries:
+
+1. **Present Issue Summary**
+   ```markdown
+   ## Phase <N> Failed
+
+   **Phase:** <name>
+   **Attempts:** 3/3
+   **Failure Reason:** <specific reason>
+
+   **Options:**
+   - [Retry] - Try again with different approach
+   - [Override] - Skip this check (if allowed)
+   - [Abort] - Stop implementation
+   ```
+
+2. **Document Decision**
+   - Record user's choice
+   - If override: document justification in commit
+
+3. **Non-Overridable Phases**
+   - Phase 0 (Pre-flight) - NEVER skippable
+   - Phase 6 (Security) - NEVER skippable
+   - Phase 8 (Verification) - NEVER skippable
+   - Phase 11 Quality Gates - NEVER skippable
 
 ---
 
@@ -237,45 +394,46 @@ If implementation cannot continue:
 
 ---
 
-## User Override
+## Quality Gate Summary by Tier
 
-Users may override workflow gates with documented justification.
+| Quality Gate | Tier 1 | Tier 2 | Can Override |
+|--------------|--------|--------|--------------|
+| QG-0: Pre-flight | Mandatory | Mandatory | **NO** |
+| QG-1: Business Analysis | Automated | Checkpoint | Yes |
+| QG-2: Discovery | Automated | Checkpoint | Yes |
+| QG-3: Architecture | User-Approval | User-Approval | Yes |
+| QG-4: Implementation | Automated | Automated | Yes |
+| QG-5: Architectural Review | Automated | Checkpoint | Yes |
+| QG-6: Security | Mandatory | Mandatory | **NO** |
+| QG-7: Quality Review | Automated | Checkpoint | Yes |
+| QG-8: Verification | Mandatory | Mandatory | **NO** |
+| QG-9: Documentation | Automated | Automated | Yes |
+| QG-10: UAT | Automated | User-Approval | Yes |
+| QG-11: Finalization | User-Approval | User-Approval | Yes |
 
-### Override Procedure
+**Gate Types:**
+- **Mandatory**: MUST pass, cannot be overridden (QG-0, QG-6, QG-8)
+- **Checkpoint**: User reviews findings before proceeding (Tier 2 only)
+- **User-Approval**: Requires explicit user consent
+- **Automated**: Passes if automated checks pass
 
-1. **User explicitly requests override** (e.g., "skip architectural review")
-2. **Document justification** - Why the override is appropriate
-3. **Record in commit** - Note skipped step in commit message
-4. **Cannot override:**
-   - Security scan (Phase 6) - NEVER skippable
-   - Pre-flight checks (Phase 0) - NEVER skippable
-   - Quality gates in Finalization (Phase 11)
-
-### Override Examples
-
-| Request | Response |
-|---------|----------|
-| "Skip UAT, I tested manually" | Allowed - document in commit |
-| "Skip architectural review for hotfix" | Allowed - document justification |
-| "Skip security scan" | DENIED - security is mandatory |
-| "Skip tests, it's trivial" | Allowed for Tier 1 only |
-
-**Note:** All overrides must be explicit. Never assume user wants to skip steps.
+**Note:** ALL phases execute for both tiers. Tier determines validation depth, not phase skipping.
 
 ---
 
-## Checkpoint Summary by Tier
+## Phase Files Reference
 
-| Checkpoint | Tier 1 | Tier 2 |
-|------------|--------|--------|
-| Business Analysis | - | Yes |
-| Discovery | - | Yes |
-| Architecture (Plan) | - | Yes |
-| Architectural Review | - | Yes |
-| Security Scan | Yes | Yes |
-| Quality Review | - | Yes |
-| Verification | - | Yes |
-| UAT | - | Yes |
-| Commit | Yes | Yes |
-| Branch Management | Yes | Yes |
-| **Total** | **2** | **10** |
+| Phase | File |
+|-------|------|
+| 0 | [phases/0-preflight.md](../phases/0-preflight.md) |
+| 1 | [phases/1-business-analysis.md](../phases/1-business-analysis.md) |
+| 2 | [phases/2-discovery.md](../phases/2-discovery.md) |
+| 3 | [phases/3-architecture.md](../phases/3-architecture.md) |
+| 4 | [phases/4-implementation.md](../phases/4-implementation.md) |
+| 5 | [phases/5-architectural-review.md](../phases/5-architectural-review.md) |
+| 6 | [phases/6-security.md](../phases/6-security.md) |
+| 7 | [phases/7-review.md](../phases/7-review.md) |
+| 8 | [phases/8-verification.md](../phases/8-verification.md) |
+| 9 | [phases/9-documentation.md](../phases/9-documentation.md) |
+| 10 | [phases/10-uat.md](../phases/10-uat.md) |
+| 11 | [phases/11-finalization.md](../phases/11-finalization.md) |

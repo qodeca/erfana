@@ -1,81 +1,164 @@
 # Phase 2: Discovery
 
-**Goal:** Understand the issue and affected codebase areas.
+**Goal:** Understand affected codebase areas and existing patterns.
+**Agent:** `explore-codebase`
+**Quality Gate:** QG-2 (Checkpoint for T2, Automated for T1)
 
-## Steps
+---
 
-### 1. Extract Issue Details
+## INPUT CONDITIONS
 
-```bash
-gh issue view <number> --json title,body,labels,assignees
+**STOP if ANY condition is unchecked. Do not proceed.**
+
+- [ ] QG-1 = PASS (Business Analysis completed)
+- [ ] Research summary available
+- [ ] Requirements document available
+- [ ] Acceptance criteria validated
+
+---
+
+## Execution Steps
+
+### Step 1: Extract Issue Details
+
+Review issue metadata:
+- Title and description
+- Acceptance criteria
+- Labels and priority
+
+### Step 2: Identify Affected Areas
+
+Using Glob and Grep, search for:
+- Files related to feature/bug
+- Components that will be modified
+- Shared utilities that might be affected
+
+```
+Search patterns:
+- Feature keywords in filenames
+- Related imports and dependencies
+- Test files for affected components
 ```
 
-### 2. Identify Acceptance Criteria
+### Step 3: Review Existing Patterns
 
-- Look for checkboxes in issue body
-- If none exist, derive from description
-- Confirm understanding with user
+Read affected files to understand:
+- Code style and conventions
+- Existing patterns (hooks, utilities)
+- Test patterns used
+- Error handling approaches
 
-### 3. Codebase Analysis
+### Step 4: Map Dependencies
 
-- Search for relevant code areas
-- Identify affected components (main/, renderer/, shared/)
-- Review existing patterns in target area
-- Check for related tests to understand expected behavior
+Identify:
+- Direct dependencies of affected files
+- Shared state/stores
+- IPC channels (if main/renderer)
+- External library usage
 
-### 4. Estimate Complexity
+### Step 5: Estimate Complexity
 
-- Count files likely affected
-- Identify cross-cutting concerns
-- Check for breaking change potential
+| Factor | Low | Medium | High |
+|--------|-----|--------|------|
+| Files affected | 1-3 | 4-8 | 9+ |
+| Cross-cutting | None | Some | Major |
+| Breaking changes | No | Possible | Likely |
+| Test coverage | Good | Partial | Missing |
 
-## Discovery Checkpoint (Tier 2)
+---
+
+## OUTPUT ARTIFACTS
+
+| Artifact | Description |
+|----------|-------------|
+| Affected Files List | All files that will be modified/created |
+| Dependency Map | How affected files relate to each other |
+| Pattern Inventory | Existing patterns to follow |
+| Complexity Assessment | Final tier confirmation |
+
+---
+
+## OUTPUT CONDITIONS
+
+**ALL must be checked before proceeding to Phase 3.**
+
+- [ ] Acceptance criteria clearly identified
+- [ ] All affected code areas mapped
+- [ ] Dependencies between affected files documented
+- [ ] Existing patterns in affected areas reviewed
+- [ ] Related test files identified
+- [ ] Complexity tier confirmed (may upgrade from T1 to T2)
+
+---
+
+## QUALITY GATE: QG-2
+
+**Gate Type:** Checkpoint (T2) | Automated (T1)
+**Gate ID:** QG-2
+
+### Pass Criteria
+
+| Criterion | Tier 1 | Tier 2 |
+|-----------|--------|--------|
+| Files identified | 1-3 files | All affected files |
+| Patterns reviewed | Basic | Comprehensive |
+| Dependencies mapped | Direct only | Full dependency tree |
+| User checkpoint | Not required | Required |
+
+### Tier 2 Checkpoint
 
 Present to user:
 
 ```markdown
-## Issue Understanding
+## Discovery Complete
 
 **Issue:** #<number> - <title>
-**Type:** Bug / Enhancement / Feature
-**Tier:** <1/2/3> based on <reason>
+**Tier:** <tier> (confirmed)
 
-**Acceptance Criteria:**
-- [ ] Criterion 1
-- [ ] Criterion 2
+### Acceptance Criteria
+- [ ] <criterion 1>
+- [ ] <criterion 2>
 
-**Affected Areas:**
-- <file/module 1>
-- <file/module 2>
+### Affected Areas
+| File | Change Type | Reason |
+|------|-------------|--------|
+| <file1> | Modify | <reason> |
+| <file2> | Create | <reason> |
 
-**Questions/Clarifications:**
-- <any ambiguities>
+### Existing Patterns Found
+- <pattern 1>: <where used>
+- <pattern 2>: <where used>
 
-Proceed with architecture planning? [Yes/No/Clarify]
+### Dependencies
+```
+<file1>
+  └── imports: <dep1>, <dep2>
+  └── used by: <consumer1>
 ```
 
+### Complexity Assessment
+- Files: <count>
+- Cross-cutting: <yes/no>
+- Breaking changes: <risk level>
+
+**Proceed to Architecture?** [Approve / Clarify / Re-analyze]
+```
+
+### Result
+
+**QG-2 Result:** [PASS | FAIL]
+
+### On FAIL
+
+1. Review search results
+2. Expand search patterns
+3. Re-analyze dependencies
+4. Max 3 retries, then ESCALATE
+
 ---
 
-## Retry Logic
+## NEXT PHASE
 
-- **Max retries:** 3 per phase
-- **On failure:**
-  1. Review issue details again, re-analyze codebase areas
-  2. Retry with refined search patterns or keywords
-  3. After 3 failures: Present issue to user with options
-- **Escalation:** User decides: [Retry/Skip/Abort]
+**QG-2 = PASS required to proceed to Phase 3: Architecture**
 
----
-
-## Phase Validation
-
-Before proceeding to next phase, ALL must be checked:
-
-- [ ] Acceptance criteria clearly identified
-- [ ] All affected code areas mapped
-- [ ] Complexity tier determined (1/2/3)
-- [ ] Existing patterns in affected areas reviewed
-- [ ] Related tests identified
-- [ ] User approved discovery checkpoint (Tier 2)
-
-**STOP if any item unchecked. Do not proceed.**
+**STOP if QG-2 ≠ PASS. Do not proceed.**

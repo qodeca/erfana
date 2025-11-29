@@ -36,7 +36,12 @@ All agents are embedded in `agents/` directory with full input/output contracts.
 | review-code | 7 | Comprehensive quality review |
 | update-docs | 9 | Update documentation |
 | summarize-diff | 11 | Generate commit messages |
-| prepare-release | 12 | Prepare releases |
+
+### Release Agents (Used by releasing-erfana skill)
+
+| Agent | Purpose |
+|-------|---------|
+| prepare-release | Prepare releases (not part of Implement operation) |
 
 ### Conditional Agents
 
@@ -105,12 +110,11 @@ Start: What operation are you in?
     ├── Phase 10: UAT
     │   └── (manual user testing)
     │
-    ├── Phase 11: Finalization
-    │   └── summarize-diff
-    │
-    └── Phase 12: Release
-        └── prepare-release
+    └── Phase 11: Finalization
+        └── summarize-diff
 ```
+
+*Note: Release functionality is handled by the separate `releasing-erfana` skill.*
 
 ### By Issue Label
 
@@ -390,7 +394,7 @@ Start: What operation are you in?
 
 ### prepare-release
 
-**Phase:** 12 (Release)
+**Skill:** releasing-erfana (NOT part of Implement operation)
 **File:** `agents/prepare-release.md`
 
 **Inputs:**
@@ -400,9 +404,11 @@ Start: What operation are you in?
 - release_notes, version_updated, changelog_entry, tag_created, build_status
 
 **Use When:**
-- Preparing production release
+- Preparing production release via `releasing-erfana` skill
 - Version bumping
 - Creating tags
+
+*Note: This agent is NOT used by the Implement operation. Use the `releasing-erfana` skill instead.*
 
 ---
 
