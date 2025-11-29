@@ -24,8 +24,14 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   const openTimeRef = useRef<number>(Date.now())
   const portalRoot = document.getElementById('portal-root')
 
+  // Store onClose in a ref to avoid re-running effect when it changes
+  // This prevents openTimeRef from being reset when context value updates
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
   useEffect(() => {
     // Record when menu was opened to ignore the opening click
+    // Only set once on mount, not on every effect re-run
     openTimeRef.current = Date.now()
 
     const handleClickOutside = (e: MouseEvent) => {
@@ -33,13 +39,13 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
       if (Date.now() - openTimeRef.current < 50) return
 
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose()
+        onCloseRef.current()
       }
     }
 
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose()
+        onCloseRef.current()
       }
     }
 
@@ -53,7 +59,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
       document.removeEventListener('mousedown', handleClickOutside, { capture: true })
       document.removeEventListener('keydown', handleEscape, { capture: true })
     }
-  }, [onClose])
+  }, []) // Empty deps - only run on mount/unmount
 
   // Calculate optimal position with viewport boundary checks
   useEffect(() => {
