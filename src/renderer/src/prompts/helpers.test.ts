@@ -183,6 +183,54 @@ describe('Template Helpers', () => {
       const result = formatLineRange(1000, 1500)
       expect(result).toBe('lines 1000-1500')
     })
+
+    // Boundary validation tests (#11)
+    describe('boundary validation', () => {
+      it('should return empty for negative start line', () => {
+        expect(formatLineRange(-1, 10)).toBe('')
+        expect(formatLineRange(-5)).toBe('')
+      })
+
+      it('should swap start and end if start > end', () => {
+        const result = formatLineRange(15, 10)
+        expect(result).toBe('lines 10-15')
+      })
+
+      it('should treat negative end line as single line', () => {
+        const result = formatLineRange(10, -5)
+        expect(result).toBe('line 10')
+      })
+
+      it('should treat zero end line as single line', () => {
+        const result = formatLineRange(10, 0)
+        expect(result).toBe('line 10')
+      })
+
+      it('should handle start = 1, end = 0 (single line)', () => {
+        const result = formatLineRange(1, 0)
+        expect(result).toBe('line 1')
+      })
+
+      it('should handle both negative (empty)', () => {
+        const result = formatLineRange(-1, -5)
+        expect(result).toBe('')
+      })
+
+      it('should handle NaN values (empty)', () => {
+        expect(formatLineRange(NaN, 10)).toBe('')
+        expect(formatLineRange(10, NaN)).toBe('line 10')
+      })
+
+      it('should handle string that converts to negative', () => {
+        const result = formatLineRange('-5', '10')
+        expect(result).toBe('')
+      })
+
+      it('should swap string numbers if out of order', () => {
+        const result = formatLineRange('20', '10')
+        expect(result).toBe('lines 10-20')
+      })
+    })
   })
 
   describe('uppercase()', () => {

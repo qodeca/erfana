@@ -62,7 +62,7 @@ describe('Template Registry', () => {
       expect(prompt?.label).toBe('Prompt')
       expect(prompt?.icon).toBe('sparkles')
       expect(prompt?.requiresInput).toBe(true)
-      expect(prompt?.autoExecute).toBe(true)
+      expect(prompt?.autoExecute).toBe(false) // Security: disabled for user input
       expect(prompt?.order).toBe(3)
     })
 

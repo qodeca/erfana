@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import mermaid from 'mermaid'
 import { Bug } from 'lucide-react'
 import { executePromptTemplate } from '../../utils/panelUtils'
+import { formatLineRange } from '../../prompts/helpers'
 import { MermaidToolbar } from './MermaidToolbar'
 import { getMermaidConfig } from '../../utils/mermaidThemes'
 import { useDiagramViewerStore, buildDiagramId } from '../../stores/useDiagramViewerStore'
@@ -41,11 +42,7 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
         : `@${filePath}`
 
       // Format line range string
-      const lineRange = startLine && endLine
-        ? startLine === endLine
-          ? `line ${startLine}`
-          : `lines ${startLine}-${endLine}`
-        : undefined
+      const lineRange = formatLineRange(startLine, endLine) || undefined
 
       // Execute prompt template using centralized function
       await executePromptTemplate('mermaid-bug-report', {
@@ -89,6 +86,9 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
         const { svg } = await mermaid.render(id, code)
 
         if (containerRef.current) {
+          // SECURITY: Mermaid's securityLevel: 'strict' sanitizes output.
+          // No additional sanitization needed - it can break SVG features
+          // like markers, foreignObject, and xlink:href references.
           containerRef.current.innerHTML = svg
           setSvgContent(svg)
 

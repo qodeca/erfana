@@ -21,7 +21,7 @@ const typeIntoTextarea = (textarea: HTMLTextAreaElement, value: string) => {
 
 // Mock executePromptTemplate
 vi.mock('../../../utils/panelUtils', () => ({
-  executePromptTemplate: vi.fn().mockResolvedValue(true)
+  executePromptTemplate: vi.fn().mockResolvedValue({ success: true })
 }))
 
 // Import after mock to get the mocked version
@@ -37,8 +37,8 @@ describe('ChatBubble', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    // Ensure mock returns true for each test
-    vi.mocked(executePromptTemplate).mockResolvedValue(true)
+    // Ensure mock returns success for each test
+    vi.mocked(executePromptTemplate).mockResolvedValue({ success: true })
   })
 
   afterEach(() => {

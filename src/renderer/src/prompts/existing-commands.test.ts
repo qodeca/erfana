@@ -71,10 +71,12 @@ describe('Existing Commands - Regression Tests', () => {
       expect(modify?.requiresInput).toBe(true)
     })
 
-    it('should still have autoExecute enabled', () => {
+    it('should have autoExecute disabled (security: user input)', () => {
+      // Security fix: autoExecute disabled for templates with user input
+      // to prevent command injection (e.g., "make concise; rm -rf ~/")
       const modify = getPrompt('modify')
 
-      expect(modify?.autoExecute).toBe(true)
+      expect(modify?.autoExecute).toBe(false)
     })
 
     it('should have correct inputLabel about modification', () => {
@@ -127,10 +129,11 @@ describe('Existing Commands - Regression Tests', () => {
       expect(ask?.requiresInput).toBe(true)
     })
 
-    it('should still have autoExecute enabled', () => {
+    it('should have autoExecute disabled (security: user input)', () => {
+      // Security fix: autoExecute disabled for templates with user input
       const ask = getPrompt('ask')
 
-      expect(ask?.autoExecute).toBe(true)
+      expect(ask?.autoExecute).toBe(false)
     })
 
     it('should have correct inputLabel about asking questions', () => {
@@ -255,12 +258,19 @@ describe('Existing Commands - Regression Tests', () => {
     })
   })
 
-  describe('AutoExecute Behavior - No Regression', () => {
-    it('should maintain autoExecute=true for all context menu commands', () => {
+  describe('AutoExecute Behavior - Security', () => {
+    it('should have autoExecute=true only for prompts without user input', () => {
       const prompts = getPromptsForArea('markdown-preview', 'context-menu')
 
+      // Security fix: Only prompts without user input have autoExecute=true
+      // Elaborate: no user input → autoExecute=true
+      // Modify, Ask, Prompt: have user input → autoExecute=false
       prompts.forEach((prompt) => {
-        expect(prompt.autoExecute).toBe(true)
+        if (prompt.requiresInput) {
+          expect(prompt.autoExecute).toBe(false)
+        } else {
+          expect(prompt.autoExecute).toBe(true)
+        }
       })
     })
 

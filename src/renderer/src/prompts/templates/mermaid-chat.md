@@ -4,7 +4,7 @@ subArea: chat
 name: Diagram Chat
 icon: message-circle
 targetPanel: terminal
-autoExecute: true
+autoExecute: false
 ---
 {{#if fileRef}}{{fileRef}}
 

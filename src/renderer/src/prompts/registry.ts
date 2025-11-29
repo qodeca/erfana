@@ -1,34 +1,44 @@
 import type { PromptConfig } from './types'
 import { parseTemplates } from './parser'
 
-// Import markdown templates as raw strings using Vite's ?raw suffix
-// These are bundled at build time, no runtime file I/O required
-import elaborateTemplate from './templates/elaborate.md?raw'
-import modifyTemplate from './templates/modify.md?raw'
-import askTemplate from './templates/ask.md?raw'
-import promptTemplate from './templates/prompt.md?raw'
-import mermaidBugReportTemplate from './templates/mermaid-bug-report.md?raw'
-import mermaidChangeDirectionTemplate from './templates/mermaid-change-direction.md?raw'
-import mermaidChatTemplate from './templates/mermaid-chat.md?raw'
-import organizeImportTemplate from './templates/organize-import.md?raw'
+/**
+ * Auto-discover all template files using Vite's import.meta.glob
+ *
+ * This automatically finds and imports all .md files in the templates/ directory.
+ * No need to manually add new templates - just create a .md file with proper
+ * frontmatter and it will be automatically discovered and registered.
+ *
+ * The { eager: true, query: '?raw' } options ensure templates are:
+ * - Loaded synchronously at build time (eager: true)
+ * - Imported as raw strings (query: '?raw')
+ */
+const templateModules = import.meta.glob<string>('./templates/*.md', {
+  eager: true,
+  query: '?raw',
+  import: 'default'
+})
+
+/**
+ * Convert glob results to template input format
+ * Extracts filename from path and pairs with raw content
+ */
+const templateInputs = Object.entries(templateModules).map(([path, raw]) => {
+  // Extract filename from path: './templates/elaborate.md' -> 'elaborate.md'
+  const filename = path.split('/').pop() || path
+  return { raw, filename }
+})
 
 /**
  * Parse all template files with frontmatter
  * This dynamically builds the registry from template metadata
  */
-const parsedTemplates = parseTemplates([
-  { raw: elaborateTemplate, filename: 'elaborate.md' },
-  { raw: modifyTemplate, filename: 'modify.md' },
-  { raw: askTemplate, filename: 'ask.md' },
-  { raw: promptTemplate, filename: 'prompt.md' },
-  { raw: mermaidBugReportTemplate, filename: 'mermaid-bug-report.md' },
-  { raw: mermaidChangeDirectionTemplate, filename: 'mermaid-change-direction.md' },
-  { raw: mermaidChatTemplate, filename: 'mermaid-chat.md' },
-  { raw: organizeImportTemplate, filename: 'organize-import.md' }
-])
+const parsedTemplates = parseTemplates(templateInputs)
 
-console.log('📝 Loaded prompt templates:', parsedTemplates.length)
-console.log('📝 Template IDs:', parsedTemplates.map(t => t.id))
+// Debug logging only in development mode
+if (import.meta.env.DEV) {
+  console.log('📝 Loaded prompt templates:', parsedTemplates.length)
+  console.log('📝 Template IDs:', parsedTemplates.map(t => t.id))
+}
 
 /**
  * Registry of all available prompt templates
