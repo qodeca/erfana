@@ -37,7 +37,6 @@ import {
 } from './chatBubble.logic'
 import { formatZoomLevel } from './diagramViewer.logic'
 import { TextareaContextMenu } from '../../ContextMenu/TextareaContextMenu'
-import { TerminalContextMenu } from '../../ContextMenu/TerminalContextMenu'
 import './ChatBubble.css'
 
 interface Transform {
@@ -91,7 +90,6 @@ export function ChatBubble({
   const [message, setMessage] = useState('')
   const [showTooltip, setShowTooltip] = useState(false)
   const [textareaContextMenu, setTextareaContextMenu] = useState<{ x: number; y: number } | null>(null)
-  const [terminalContextMenu, setTerminalContextMenu] = useState<{ x: number; y: number } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const terminalContainerRef = useRef<HTMLDivElement>(null)
@@ -314,15 +312,7 @@ export function ChatBubble({
     setTextareaContextMenu(null)
   }, [])
 
-  // Context menu handlers for terminal copy/paste (issue #37)
-  const handleTerminalContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    setTerminalContextMenu({ x: e.clientX, y: e.clientY })
-  }, [])
-
-  const handleCloseTerminalContextMenu = useCallback(() => {
-    setTerminalContextMenu(null)
-  }, [])
+  // Note: Terminal context menu is handled globally by TerminalPanel via xterm.element listener
 
   const handleCutText = useCallback(async () => {
     if (!textareaRef.current) return
@@ -500,7 +490,7 @@ export function ChatBubble({
           </div>
 
           <div className="chat-panel-body">
-            {/* Terminal container - portal target */}
+            {/* Terminal container - portal target (context menu handled by TerminalPanel) */}
             <div
               ref={(el) => {
                 // Store ref locally
@@ -511,7 +501,6 @@ export function ChatBubble({
                 }
               }}
               className="chat-terminal-container"
-              onContextMenu={handleTerminalContextMenu}
             />
 
             {/* Textarea section */}
@@ -596,22 +585,6 @@ export function ChatBubble({
           onCopy={handleCopyText}
           onPaste={handlePasteText}
           onClose={handleCloseTextareaContextMenu}
-        />
-      )}
-
-      {/* Context menu for terminal copy/paste */}
-      {terminalContextMenu && portalContext?.terminalControls && (
-        <TerminalContextMenu
-          x={terminalContextMenu.x}
-          y={terminalContextMenu.y}
-          hasSelection={portalContext.terminalControls.hasSelection()}
-          onCopy={async () => {
-            await portalContext.terminalControls?.copy()
-          }}
-          onPaste={async () => {
-            await portalContext.terminalControls?.paste()
-          }}
-          onClose={handleCloseTerminalContextMenu}
         />
       )}
     </div>
