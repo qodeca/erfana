@@ -35,7 +35,6 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const [terminalId, setTerminalId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [recheckCooldown, setRecheckCooldown] = useState(false)
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
   const terminalRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<Terminal | null>(null)
@@ -44,6 +43,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const pendingInitRef = useRef<boolean>(false)
   const visibilityObserverRef = useRef<ResizeObserver | null>(null)
   const warmupUntilRef = useRef<number>(0)
+  const contextMenuHandlerRef = useRef<((e: MouseEvent) => void) | null>(null)
   const [projectPath, setProjectPath] = useState<string | null>(null)
 
   // Terminal store for cross-component communication
@@ -288,6 +288,20 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // Attach clipboard key handler (issue #28)
       xterm.attachCustomKeyEventHandler(handleKeyEvent)
 
+      // Attach native context menu handler to xterm.element (issue #37)
+      // Must be on xterm.element, not parent container, because xterm captures events internally
+      // This ensures context menu works regardless of where terminal is portaled
+      if (xterm.element) {
+        const handleNativeContextMenu = (e: MouseEvent) => {
+          e.preventDefault()
+          e.stopPropagation()
+          xterm.blur() // Release focus so context menu is interactive
+          portalContext?.openTerminalContextMenu(e.clientX, e.clientY)
+        }
+        xterm.element.addEventListener('contextmenu', handleNativeContextMenu)
+        contextMenuHandlerRef.current = handleNativeContextMenu
+      }
+
       // Clear terminal immediately and write clear sequences to ensure clean start
       // This clears both the buffer and any pending data
       xterm.clear()
@@ -406,6 +420,11 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         window.api.terminal.kill(terminalIdRef.current)
         setActiveTerminalId(null)
       }
+      // Cleanup context menu handler before disposing xterm
+      if (xtermRef.current?.element && contextMenuHandlerRef.current) {
+        xtermRef.current.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
+        contextMenuHandlerRef.current = null
+      }
       if (xtermRef.current) {
         xtermRef.current.dispose()
       }
@@ -425,6 +444,11 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       if (terminalIdRef.current) {
         await window.api.terminal.kill(terminalIdRef.current)
         setActiveTerminalId(null)
+      }
+      // Cleanup context menu handler before disposing xterm
+      if (xtermRef.current?.element && contextMenuHandlerRef.current) {
+        xtermRef.current.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
+        contextMenuHandlerRef.current = null
       }
       // Dispose xterm
       if (xtermRef.current) {
@@ -608,6 +632,11 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       setActiveTerminalId(null)
     }
 
+    // Cleanup context menu handler before disposing xterm
+    if (xtermRef.current?.element && contextMenuHandlerRef.current) {
+      xtermRef.current.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
+      contextMenuHandlerRef.current = null
+    }
     // Dispose xterm instance
     if (xtermRef.current) {
       xtermRef.current.dispose()
@@ -651,14 +680,10 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }, [portalContext, terminalId, handleScrollToBottom, handleRestartTerminal, copy, paste, hasSelection])
 
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    setContextMenu({ x: e.clientX, y: e.clientY })
-  }, [])
-
+  // Context menu close handler - uses portal context for global support
   const handleCloseContextMenu = useCallback(() => {
-    setContextMenu(null)
-  }, [])
+    portalContext?.closeTerminalContextMenu()
+  }, [portalContext])
 
   // Render terminal panel inside mainContainer shell
   // The useLayoutEffect above will move terminalPanelRef.current between containers
@@ -728,14 +753,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
               <p className="error-details">{error}</p>
             </div>
           ) : (
-            // Terminal ready
-            <div ref={terminalRef} className="terminal-container" onContextMenu={handleContextMenu} />
+            // Terminal ready - context menu handled via native listener on xterm.element
+            <div ref={terminalRef} className="terminal-container" />
           )}
         </div>
-        {contextMenu && (
+        {portalContext?.terminalContextMenuPosition && (
           <TerminalContextMenu
-            x={contextMenu.x}
-            y={contextMenu.y}
+            x={portalContext.terminalContextMenuPosition.x}
+            y={portalContext.terminalContextMenuPosition.y}
             hasSelection={hasSelection}
             onCopy={copy}
             onPaste={paste}

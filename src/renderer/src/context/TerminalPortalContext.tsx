@@ -65,6 +65,15 @@ interface TerminalPortalContextValue {
 
   /** Whether terminal is ready (has registered controls) */
   isTerminalReady: boolean
+
+  /** Context menu position (null = closed) - global for xterm.js portability */
+  terminalContextMenuPosition: { x: number; y: number } | null
+
+  /** Open terminal context menu at position */
+  openTerminalContextMenu: (x: number, y: number) => void
+
+  /** Close terminal context menu */
+  closeTerminalContextMenu: () => void
 }
 
 const TerminalPortalContext = createContext<TerminalPortalContextValue | null>(null)
@@ -76,6 +85,7 @@ interface TerminalPortalProviderProps {
 export function TerminalPortalProvider({ children }: TerminalPortalProviderProps) {
   const [portalTarget, setPortalTargetState] = useState<PortalTarget>('main')
   const [terminalControls, setTerminalControls] = useState<TerminalControls | null>(null)
+  const [terminalContextMenuPosition, setTerminalContextMenuPosition] = useState<{ x: number; y: number } | null>(null)
 
   const diagramViewerContainerRef = useRef<HTMLDivElement>(null)
   const mainContainerRef = useRef<HTMLDivElement>(null)
@@ -129,6 +139,15 @@ export function TerminalPortalProvider({ children }: TerminalPortalProviderProps
     setTerminalControls(null)
   }, [])
 
+  // Context menu handlers for global xterm.js context menu support
+  const openTerminalContextMenu = useCallback((x: number, y: number) => {
+    setTerminalContextMenuPosition({ x, y })
+  }, [])
+
+  const closeTerminalContextMenu = useCallback(() => {
+    setTerminalContextMenuPosition(null)
+  }, [])
+
   const value: TerminalPortalContextValue = {
     portalTarget,
     diagramViewerContainerRef,
@@ -140,7 +159,10 @@ export function TerminalPortalProvider({ children }: TerminalPortalProviderProps
     terminalControls,
     registerTerminalControls,
     unregisterTerminalControls,
-    isTerminalReady: terminalControls !== null
+    isTerminalReady: terminalControls !== null,
+    terminalContextMenuPosition,
+    openTerminalContextMenu,
+    closeTerminalContextMenu
   }
 
   return (
