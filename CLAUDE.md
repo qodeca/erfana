@@ -52,7 +52,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (2945 tests, 104 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (2618 tests, 92 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -65,20 +65,20 @@ See `docs/` for details (keep Claude's context focused):
 - Lucide React for icons
 
 ## Recent Changes (v0.5.3)
-- **Terminal Integrated into Chat Panel** (Nov 29, 2025):
-  - Moved terminal from side-panel into the "Modify Diagram" chat panel (issue #36)
-  - Diagram now uses full width when chat panel is collapsed (FAB only)
-  - Terminal is always visible above textarea when panel is expanded
-  - Panel height resizable by dragging top edge (ns-resize cursor)
-  - Height persists across viewer sessions via useDiagramViewerStore
-  - Layout: Header (resize handle) → Terminal (flex: 1) → Textarea (fixed) → Footer
-  - Removed: split layout, terminal toggle button, Cmd+J shortcut
-  - Panel constraints: 200px min, 70% viewport max, 640px fixed width
-  - Store changes: `chatPanelHeight` replaces `terminalWidth`/`isTerminalVisible`
-  - Deleted: `diagramViewerResize.logic.ts` (no longer needed)
-  - 26 new tests for panel resize logic
-  - **Total: 2945 tests passing (104 test files)**
-  - Closes #36
+- **Fix: DiagramViewer Refresh on Code Edit** (Nov 29, 2025):
+  - Fixed bug where DiagramViewer would stop refreshing when diagram definition was modified (issue #38)
+  - Root cause: Line number drift broke ID matching when user added/removed lines above diagram
+  - Solution: Two-part matching strategy with `originalStartLine`:
+    1. Store captures `originalStartLine` when viewer opens (NEVER updated)
+    2. `updateDiagram` matches by `filePath` only (allows line drift)
+    3. `MermaidDiagram` checks `startLine` within 20-line tolerance of `originalStartLine`
+  - Now syncs `startLine`, `endLine`, and `diagramId` during updates
+  - Works for edits within diagram block and when line numbers shift
+  - Correctly handles multiple diagrams in same file (>20 lines apart)
+  - Zoom/pan state still preserved during updates
+  - Store changes: Added `originalStartLine` field
+  - **Total: 2946 tests passing (104 test files)**
+  - Closes #38
 - **AI Chat Bubble in DiagramViewer** (Nov 28, 2025):
   - Floating chat bubble for contextual AI-assisted diagram modifications (issue #34)
   - FAB button in bottom-right corner of DiagramViewer, expands to slide-up panel
@@ -95,6 +95,7 @@ See `docs/` for details (keep Claude's context focused):
     - `src/renderer/src/components/Editor/DiagramViewer/chatBubble.logic.ts`: Validation
     - `src/renderer/src/prompts/templates/mermaid-chat.md`: Prompt template
   - 66 new tests (38 logic + 28 component)
+  - **Total: 2684 tests passing (94 test files)**
   - Closes #34
 
 ## Changes in v0.5.2
