@@ -52,7 +52,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (2618 tests, 92 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (2976 tests, 104 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -65,6 +65,18 @@ See `docs/` for details (keep Claude's context focused):
 - Lucide React for icons
 
 ## Recent Changes (v0.5.3)
+- **Fix: DiagramViewer Wrong Diagram on Expand** (Nov 29, 2025):
+  - Fixed bug where expanding a Mermaid diagram in Preview sometimes opened a different diagram (issue #39)
+  - Root cause: Position-based matching (20-line tolerance) caused false positives when diagrams <20 lines apart
+  - Solution: Content-first identity with position tie-breaking:
+    1. **Primary identity**: Content hash (`hashDiagramContent`) - survives line drift and external file reloads
+    2. **Secondary identity**: Position proximity (10-line tolerance) - for edited content or identical diagrams
+  - Content hash computed once at `openViewer()`, NEVER updated (stable identity)
+  - Handles all scenarios: internal edits, external file changes, multiple identical diagrams
+  - Store changes: Added `contentHash` and `originalEndLine` fields
+  - 30 new regression tests for multi-diagram scenarios
+  - **Total: 2976 tests passing (104 test files)**
+  - Closes #39
 - **Fix: DiagramViewer Refresh on Code Edit** (Nov 29, 2025):
   - Fixed bug where DiagramViewer would stop refreshing when diagram definition was modified (issue #38)
   - Root cause: Line number drift broke ID matching when user added/removed lines above diagram
