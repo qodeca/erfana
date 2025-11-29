@@ -1,19 +1,13 @@
 /**
  * Tests for useTextareaClipboard Hook
  *
- * Tests clipboard operations (cut/copy/paste) with error handling,
- * toast notifications, and character limit enforcement.
+ * Tests clipboard operations (cut/copy/paste) with error handling
+ * and character limit enforcement.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { useTextareaClipboard } from './useTextareaClipboard'
-import { showGlobalToast } from '../components/Toast/toastService'
-
-// Mock toast service
-vi.mock('../components/Toast/toastService', () => ({
-  showGlobalToast: vi.fn()
-}))
 
 describe('useTextareaClipboard', () => {
   let mockRef: { current: HTMLTextAreaElement | HTMLInputElement | null }
@@ -75,11 +69,6 @@ describe('useTextareaClipboard', () => {
       })
 
       expect(mockClipboard.writeText).toHaveBeenCalledWith('hello')
-      expect(showGlobalToast).toHaveBeenCalledWith({
-        type: 'info',
-        title: 'Copied to clipboard',
-        message: 'Text copied successfully'
-      })
     })
 
     it('should not copy when no selection', async () => {
@@ -99,10 +88,9 @@ describe('useTextareaClipboard', () => {
       })
 
       expect(mockClipboard.writeText).not.toHaveBeenCalled()
-      expect(showGlobalToast).not.toHaveBeenCalled()
     })
 
-    it('should show error toast on clipboard failure', async () => {
+    it('should silently fail on clipboard error', async () => {
       mockRef.current!.selectionStart = 0
       mockRef.current!.selectionEnd = 5
       mockClipboard.writeText.mockRejectedValueOnce(new Error('Permission denied'))
@@ -119,11 +107,8 @@ describe('useTextareaClipboard', () => {
         await result.current.handleCopy()
       })
 
-      expect(showGlobalToast).toHaveBeenCalledWith({
-        type: 'error',
-        title: 'Failed to copy',
-        message: 'Clipboard access denied'
-      })
+      // Should not throw, just silently fail
+      expect(mockClipboard.writeText).toHaveBeenCalled()
     })
 
     it('should do nothing when ref is null', async () => {
@@ -164,11 +149,6 @@ describe('useTextareaClipboard', () => {
 
       expect(mockClipboard.writeText).toHaveBeenCalledWith('hello ')
       expect(mockSetValue).toHaveBeenCalledWith('world')
-      expect(showGlobalToast).toHaveBeenCalledWith({
-        type: 'info',
-        title: 'Cut to clipboard',
-        message: 'Text cut successfully'
-      })
     })
 
     it('should set cursor position after cut', async () => {
@@ -193,7 +173,7 @@ describe('useTextareaClipboard', () => {
       })
     })
 
-    it('should show error toast on clipboard failure', async () => {
+    it('should silently fail on clipboard error without updating value', async () => {
       mockRef.current!.selectionStart = 0
       mockRef.current!.selectionEnd = 5
       mockClipboard.writeText.mockRejectedValueOnce(new Error('Permission denied'))
@@ -210,12 +190,8 @@ describe('useTextareaClipboard', () => {
         await result.current.handleCut()
       })
 
+      // Should not update value if clipboard failed
       expect(mockSetValue).not.toHaveBeenCalled()
-      expect(showGlobalToast).toHaveBeenCalledWith({
-        type: 'error',
-        title: 'Failed to cut',
-        message: 'Clipboard access denied'
-      })
     })
   })
 
@@ -237,11 +213,6 @@ describe('useTextareaClipboard', () => {
       })
 
       expect(mockSetValue).toHaveBeenCalledWith('hello pasted textworld')
-      expect(showGlobalToast).toHaveBeenCalledWith({
-        type: 'info',
-        title: 'Pasted from clipboard',
-        message: 'Text pasted successfully'
-      })
     })
 
     it('should replace selected text when pasting', async () => {
@@ -286,7 +257,7 @@ describe('useTextareaClipboard', () => {
       })
     })
 
-    it('should enforce maxLength and show warning', async () => {
+    it('should silently reject paste exceeding maxLength', async () => {
       mockRef.current!.selectionStart = 0
       mockRef.current!.selectionEnd = 0
       mockClipboard.readText.mockResolvedValueOnce('very long text that exceeds limit')
@@ -304,12 +275,8 @@ describe('useTextareaClipboard', () => {
         await result.current.handlePaste()
       })
 
+      // Should not update value if exceeds maxLength
       expect(mockSetValue).not.toHaveBeenCalled()
-      expect(showGlobalToast).toHaveBeenCalledWith({
-        type: 'warning',
-        title: 'Paste would exceed character limit',
-        message: 'Maximum 10 characters allowed'
-      })
     })
 
     it('should allow paste when within maxLength', async () => {
@@ -333,7 +300,7 @@ describe('useTextareaClipboard', () => {
       expect(mockSetValue).toHaveBeenCalledWith('hihello')
     })
 
-    it('should show error toast on clipboard failure', async () => {
+    it('should silently fail on clipboard read error', async () => {
       mockClipboard.readText.mockRejectedValueOnce(new Error('Permission denied'))
 
       const { result } = renderHook(() =>
@@ -348,12 +315,8 @@ describe('useTextareaClipboard', () => {
         await result.current.handlePaste()
       })
 
+      // Should not update value if clipboard read failed
       expect(mockSetValue).not.toHaveBeenCalled()
-      expect(showGlobalToast).toHaveBeenCalledWith({
-        type: 'error',
-        title: 'Failed to paste from clipboard',
-        message: 'Clipboard access denied'
-      })
     })
   })
 

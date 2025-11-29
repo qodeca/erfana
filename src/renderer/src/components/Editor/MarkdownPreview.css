@@ -191,7 +191,7 @@
 .markdown-preview a:focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 /* Internal links - navigable project files */
@@ -225,7 +225,7 @@
 .markdown-preview a.broken-link:focus-visible {
   outline: 2px solid var(--text-error);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 /* Blocked links - dangerous protocols (javascript:, data:, vbscript:, file:) */
@@ -251,7 +251,7 @@
 .markdown-preview a.anchor-link:focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 0;
 }
 
 /* External links - default blue color maintained */
@@ -415,7 +415,7 @@
   align-items: center;
   padding: 24px;
   background-color: #f8f9fa;
-  border-radius: 8px;
+  border-radius: 0;
   overflow-x: auto;
 }
 

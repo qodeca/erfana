@@ -1,8 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Info, MessageSquare } from 'lucide-react'
 import { BaseDialog } from './BaseDialog'
 import { TextareaContextMenu } from '../ContextMenu/TextareaContextMenu'
-import { showGlobalToast } from '../Toast/toastService'
+import { CharacterCount } from '../shared'
+import { validateTextInput } from '../../utils/textInputValidation'
+import { TEXT_INPUT_LIMITS } from '../../../../shared/constants'
 import type { PromptDialogConfig } from './types'
 
 interface PromptDialogProps {
@@ -47,8 +49,8 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
     inputLabel = 'Your input:',
     inputPlaceholder = '',
     defaultValue = '',
-    maxLength = 2000,
-    minLength = 3,
+    maxLength = TEXT_INPUT_LIMITS.MAX_LENGTH,
+    minLength = TEXT_INPUT_LIMITS.MIN_LENGTH,
     validation
   } = config
 
@@ -70,35 +72,28 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
     }
   }, [])
 
-  // Validate input - wrapped in useCallback for stable reference
+  // Memoized validation result using shared validation utility
+  const validationResult = useMemo(() => {
+    return validateTextInput(inputValue, {
+      minLength,
+      maxLength,
+      warningThreshold: TEXT_INPUT_LIMITS.WARNING_THRESHOLD,
+      customValidation: validation
+    })
+  }, [inputValue, minLength, maxLength, validation])
+
+  // Validate input for submit - updates validation error state
   const validateInput = useCallback((value: string): boolean => {
-    const trimmed = value.trim()
+    const result = validateTextInput(value, {
+      minLength,
+      maxLength,
+      warningThreshold: TEXT_INPUT_LIMITS.WARNING_THRESHOLD,
+      customValidation: validation
+    })
 
-    // Check min length
-    if (trimmed.length < minLength) {
-      setValidationError(`Minimum ${minLength} characters required`)
+    if (!result.canSubmit) {
+      setValidationError(result.message)
       return false
-    }
-
-    // Check max length
-    if (trimmed.length > maxLength) {
-      setValidationError(`Maximum ${maxLength} characters allowed`)
-      return false
-    }
-
-    // Custom validation
-    if (validation) {
-      const result = validation(trimmed)
-      if (result === true) {
-        setValidationError(null)
-        return true
-      } else if (typeof result === 'string') {
-        setValidationError(result)
-        return false
-      } else {
-        setValidationError('Invalid input')
-        return false
-      }
     }
 
     setValidationError(null)
@@ -172,16 +167,19 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
     const selectedText = textarea.value.substring(start, end)
 
     if (selectedText) {
-      await navigator.clipboard.writeText(selectedText)
-      const newValue = textarea.value.substring(0, start) + textarea.value.substring(end)
-      setInputValue(newValue)
-      showGlobalToast({ type: 'info', title: 'Cut to clipboard', message: 'Text cut successfully' })
+      try {
+        await navigator.clipboard.writeText(selectedText)
+        const newValue = textarea.value.substring(0, start) + textarea.value.substring(end)
+        setInputValue(newValue)
 
-      // Restore cursor position
-      requestAnimationFrame(() => {
-        textarea.focus()
-        textarea.setSelectionRange(start, start)
-      })
+        // Restore cursor position
+        requestAnimationFrame(() => {
+          textarea.focus()
+          textarea.setSelectionRange(start, start)
+        })
+      } catch {
+        // Silently fail
+      }
     }
   }, [])
 
@@ -193,9 +191,8 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
     if (selectedText) {
       try {
         await navigator.clipboard.writeText(selectedText)
-        showGlobalToast({ type: 'info', title: 'Copied to clipboard', message: 'Text copied successfully' })
       } catch {
-        showGlobalToast({ type: 'error', title: 'Failed to copy', message: 'Clipboard access denied' })
+        // Silently fail
       }
     }
   }, [])
@@ -210,10 +207,9 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
       const end = textarea.selectionEnd
       const newValue = textarea.value.substring(0, start) + clipboardText + textarea.value.substring(end)
 
-      // Respect maxLength
+      // Respect maxLength - silently reject if exceeds
       if (newValue.length <= maxLength) {
         setInputValue(newValue)
-        showGlobalToast({ type: 'info', title: 'Pasted from clipboard', message: 'Text pasted successfully' })
 
         // Position cursor after pasted text
         requestAnimationFrame(() => {
@@ -221,16 +217,14 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
           const newCursorPos = start + clipboardText.length
           textarea.setSelectionRange(newCursorPos, newCursorPos)
         })
-      } else {
-        showGlobalToast({ type: 'warning', title: 'Paste would exceed character limit', message: `Maximum ${maxLength} characters allowed` })
       }
     } catch {
-      showGlobalToast({ type: 'error', title: 'Failed to paste from clipboard', message: 'Clipboard access denied' })
+      // Silently fail
     }
   }, [maxLength])
 
-  const trimmedLength = inputValue.trim().length
-  const isValid = trimmedLength >= minLength && trimmedLength <= maxLength
+  // Use validation result for UI state
+  const { charCount, canSubmit, state: validationState } = validationResult
 
   // Truncate very long selectedText to prevent performance issues
   // Max 10,000 characters for display (still scrollable up to this limit)
@@ -292,10 +286,7 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
               maxLength={maxLength}
             />
 
-            <div className="dialog-char-count">
-              {trimmedLength}/{maxLength} characters
-            </div>
-
+            {/* Error message (exceeds limit or custom validation) */}
             {validationError && (
               <div className="dialog-validation-error">
                 {validationError}
@@ -306,29 +297,36 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
 
         <div className="dialog-actions">
           {/* Info icon with tooltip - keyboard accessible */}
-          <div className="dialog-info-wrapper">
-            <button
-              type="button"
-              className="dialog-info-icon"
-              aria-label="View keyboard shortcuts"
-              onFocus={() => setShowTooltip(true)}
-              onBlur={() => setShowTooltip(false)}
-              onMouseEnter={() => setShowTooltip(true)}
-              onMouseLeave={() => setShowTooltip(false)}
-            >
-              <Info size={16} strokeWidth={2} />
-            </button>
-            <div
-              className={`dialog-tooltip ${showTooltip ? 'visible' : ''}`}
-              role="tooltip"
-              aria-hidden={!showTooltip}
-            >
-              <div className="dialog-tooltip-content">
-                <kbd>Cmd/Ctrl+Enter</kbd> to submit
-                <br />
-                <kbd>Esc</kbd> to cancel
+          <div className="dialog-actions-left">
+            <div className="dialog-info-wrapper">
+              <button
+                type="button"
+                className="dialog-info-icon"
+                aria-label="View keyboard shortcuts"
+                onFocus={() => setShowTooltip(true)}
+                onBlur={() => setShowTooltip(false)}
+                onMouseEnter={() => setShowTooltip(true)}
+                onMouseLeave={() => setShowTooltip(false)}
+              >
+                <Info size={16} strokeWidth={2} />
+              </button>
+              <div
+                className={`dialog-tooltip ${showTooltip ? 'visible' : ''}`}
+                role="tooltip"
+                aria-hidden={!showTooltip}
+              >
+                <div className="dialog-tooltip-content">
+                  <kbd>Cmd/Ctrl+Enter</kbd> to submit
+                  <br />
+                  <kbd>Esc</kbd> to cancel
+                </div>
               </div>
             </div>
+            <CharacterCount
+              charCount={charCount}
+              maxLength={maxLength}
+              validationState={validationState}
+            />
           </div>
           <button className="dialog-btn dialog-btn-secondary" onClick={handleCancel}>
             Cancel
@@ -336,7 +334,7 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
           <button
             className="dialog-btn dialog-btn-primary"
             onClick={handleSubmit}
-            disabled={!isValid}
+            disabled={!canSubmit}
           >
             Submit
           </button>

@@ -4,12 +4,13 @@
  */
 
 import { formatLineRange as formatLineRangeHelper } from '../../../prompts/helpers'
+import { TEXT_INPUT_LIMITS } from '../../../../../shared/constants'
 
-export const CHAT_LIMITS = {
-  MIN_LENGTH: 3,
-  WARNING_THRESHOLD: 1000,
-  MAX_LENGTH: 2000
-} as const
+/**
+ * Re-export TEXT_INPUT_LIMITS as CHAT_LIMITS for backward compatibility.
+ * New code should import TEXT_INPUT_LIMITS directly from shared/constants.
+ */
+export const CHAT_LIMITS = TEXT_INPUT_LIMITS
 
 /**
  * Chat panel height configuration

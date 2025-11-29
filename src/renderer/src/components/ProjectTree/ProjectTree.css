@@ -307,21 +307,21 @@
 /* Highlight the folder row when it's a drop target */
 .project-tree-item[data-drop-target="true"].directory {
   background-color: rgba(79, 193, 255, 0.2);
-  border-radius: 4px;
+  border-radius: 0;
   position: relative;
 }
 
 /* Folder highlighting during drag (auto-expand countdown) */
 .project-tree-node[data-drop-highlight="true"] > .project-tree-item.directory {
   background-color: rgba(79, 193, 255, 0.2);
-  border-radius: 4px;
+  border-radius: 0;
 }
 
 /* Highlight the children area for expanded folders */
 .project-tree-node[data-drop-highlight="true"] > .project-tree-children {
   position: relative;
   background-color: rgba(79, 193, 255, 0.05);
-  border-radius: 0 0 4px 0;
+  border-radius: 0;
 }
 
 /* Visual left border using pseudo-element (no layout shift) */
@@ -338,7 +338,7 @@
 /* Invalid drop target (e.g., trying to move folder into itself) */
 .project-tree-item[data-drop-invalid="true"] {
   background-color: rgba(244, 135, 113, 0.2);
-  border-radius: 4px;
+  border-radius: 0;
   cursor: not-allowed;
 }
 
@@ -368,7 +368,7 @@
 .drag-overlay {
   background: #252526;
   border: 1px solid #4fc1ff;
-  border-radius: 4px;
+  border-radius: 0;
   padding: 4px 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   cursor: grabbing;

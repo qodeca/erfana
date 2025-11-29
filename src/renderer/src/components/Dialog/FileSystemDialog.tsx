@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback, ReactNode } from 'react'
 import { Info } from 'lucide-react'
 import { BaseDialog } from './BaseDialog'
 import { TextareaContextMenu } from '../ContextMenu/TextareaContextMenu'
-import { showGlobalToast } from '../Toast/toastService'
 import { validateFileSystemName, ValidationErrorCode } from '../../utils/fileValidation'
 
 interface FileSystemDialogProps {
@@ -174,16 +173,19 @@ export function FileSystemDialog({
     const selectedText = input.value.substring(start, end)
 
     if (selectedText) {
-      await navigator.clipboard.writeText(selectedText)
-      const newValue = input.value.substring(0, start) + input.value.substring(end)
-      setInputValue(newValue)
-      showGlobalToast({ type: 'info', title: 'Cut to clipboard', message: 'Text cut successfully' })
+      try {
+        await navigator.clipboard.writeText(selectedText)
+        const newValue = input.value.substring(0, start) + input.value.substring(end)
+        setInputValue(newValue)
 
-      // Restore cursor position
-      requestAnimationFrame(() => {
-        input.focus()
-        input.setSelectionRange(start, start)
-      })
+        // Restore cursor position
+        requestAnimationFrame(() => {
+          input.focus()
+          input.setSelectionRange(start, start)
+        })
+      } catch {
+        // Silently fail
+      }
     }
   }, [])
 
@@ -197,9 +199,8 @@ export function FileSystemDialog({
     if (selectedText) {
       try {
         await navigator.clipboard.writeText(selectedText)
-        showGlobalToast({ type: 'info', title: 'Copied to clipboard', message: 'Text copied successfully' })
       } catch {
-        showGlobalToast({ type: 'error', title: 'Failed to copy', message: 'Clipboard access denied' })
+        // Silently fail
       }
     }
   }, [])
@@ -214,10 +215,9 @@ export function FileSystemDialog({
       const end = input.selectionEnd ?? 0
       const newValue = input.value.substring(0, start) + clipboardText + input.value.substring(end)
 
-      // Respect maxLength (255 for file names)
+      // Respect maxLength (255 for file names) - silently reject if exceeds
       if (newValue.length <= 255) {
         setInputValue(newValue)
-        showGlobalToast({ type: 'info', title: 'Pasted from clipboard', message: 'Text pasted successfully' })
 
         // Position cursor after pasted text
         requestAnimationFrame(() => {
@@ -225,11 +225,9 @@ export function FileSystemDialog({
           const newCursorPos = start + clipboardText.length
           input.setSelectionRange(newCursorPos, newCursorPos)
         })
-      } else {
-        showGlobalToast({ type: 'warning', title: 'Paste would exceed character limit', message: 'Maximum 255 characters allowed' })
       }
     } catch {
-      showGlobalToast({ type: 'error', title: 'Failed to paste from clipboard', message: 'Clipboard access denied' })
+      // Silently fail
     }
   }, [])
 

@@ -17,7 +17,7 @@
   height: 48px;
   background: rgba(0, 127, 212, 0.9);
   border: none;
-  border-radius: 50%;
+  border-radius: 0;
   color: #ffffff;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -49,7 +49,7 @@
   flex-direction: column;
   background: #252526;
   border: 1px solid #3c3c3c;
-  border-radius: 8px;
+  border-radius: 0;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   animation: chatPanelSlideUp 0.2s ease-out;
   overflow: hidden;
@@ -118,7 +118,7 @@
   height: 26px;
   background: transparent;
   border: none;
-  border-radius: 4px;
+  border-radius: 0;
   color: #cccccc;
   cursor: pointer;
   transition: background-color 0.1s ease;
@@ -147,7 +147,7 @@
   min-width: 44px;
   padding: 2px 6px;
   background: #3c3c3c;
-  border-radius: 3px;
+  border-radius: 0;
   color: #cccccc;
   font-size: 11px;
   font-family: monospace;
@@ -159,7 +159,7 @@
   padding: 2px 8px;
   background: transparent;
   border: 1px solid #454545;
-  border-radius: 3px;
+  border-radius: 0;
   color: #888888;
   font-size: 11px;
   font-weight: 500;
@@ -220,7 +220,7 @@
   padding: 10px 12px;
   background: #1e1e1e;
   border: 1px solid #3c3c3c;
-  border-radius: 4px;
+  border-radius: 0;
   color: #cccccc;
   font-family: inherit;
   font-size: 13px;
@@ -238,11 +238,11 @@
   border-color: #007fd4;
 }
 
-/* Panel footer */
+/* Panel footer - matches PromptDialog layout: [info] [char count] ---spacer--- [send] */
 .chat-panel-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
   margin-top: 10px;
 }
 
@@ -250,6 +250,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-right: auto;
 }
 
 .chat-footer-right {
@@ -285,6 +286,8 @@
 /* Info icon and tooltip */
 .chat-info-wrapper {
   position: relative;
+  display: inline-flex;
+  align-items: center;
 }
 
 .chat-info-icon {
@@ -295,7 +298,7 @@
   height: 24px;
   background: transparent;
   border: none;
-  border-radius: 4px;
+  border-radius: 0;
   color: #888888;
   cursor: pointer;
   transition: color 0.1s ease;
@@ -318,7 +321,7 @@
   padding: 8px 12px;
   background: #3c3c3c;
   border: 1px solid #4a4a4a;
-  border-radius: 4px;
+  border-radius: 0;
   white-space: nowrap;
   opacity: 0;
   visibility: hidden;
@@ -345,7 +348,7 @@
   padding: 2px 6px;
   background: #252526;
   border: 1px solid #3c3c3c;
-  border-radius: 3px;
+  border-radius: 0;
   font-family: monospace;
   font-size: 10px;
 }
@@ -359,7 +362,7 @@
   height: 32px;
   background: #007fd4;
   border: none;
-  border-radius: 4px;
+  border-radius: 0;
   color: #ffffff;
   cursor: pointer;
   transition: background-color 0.15s ease, opacity 0.15s ease;

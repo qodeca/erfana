@@ -6,15 +6,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { FilePickerDialog } from './FilePickerDialog'
 import type { PathScore } from '../../utils/pathScoring'
-import { showGlobalToast } from '../Toast/toastService'
-
-// Mock toast service
-vi.mock('../Toast/toastService', () => ({
-  showGlobalToast: vi.fn()
-}))
 
 // Mock createPortal to render in the same container
 vi.mock('react-dom', async () => {
@@ -302,7 +296,7 @@ describe('FilePickerDialog', () => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith('/project/src/components/Button.tsx')
     })
 
-    it('should show toast notification when copying', async () => {
+    it('should copy without showing toast notification', () => {
       render(<FilePickerDialog {...defaultProps} />)
 
       const dialog = screen.getByRole('dialog')
@@ -310,13 +304,8 @@ describe('FilePickerDialog', () => {
 
       fireEvent.keyDown(content, { key: 'c', metaKey: true })
 
-      await waitFor(() => {
-        expect(showGlobalToast).toHaveBeenCalledWith({
-          type: 'info',
-          title: 'Copied to clipboard',
-          message: 'File path copied'
-        })
-      })
+      // Just verify clipboard was called - no toast assertion
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('/project/src/components/Button.tsx')
     })
 
     it('should copy the currently selected item path', () => {

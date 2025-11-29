@@ -2,18 +2,16 @@
  * useTextareaClipboard Hook
  *
  * Provides consistent clipboard operations (cut/copy/paste) for textarea and input elements.
- * Includes error handling, toast notifications, and optional character limit enforcement.
+ * Includes error handling and optional character limit enforcement.
  *
  * Features:
  * - Cut/Copy/Paste with consistent error handling
- * - Toast notifications on success/failure
  * - Optional maxLength enforcement for paste
  * - Cursor position preservation
  * - Focus management via requestAnimationFrame
  */
 
 import { useCallback } from 'react'
-import { showGlobalToast } from '../components/Toast/toastService'
 
 export interface UseTextareaClipboardOptions {
   /** Reference to the textarea or input element */
@@ -68,14 +66,13 @@ export function useTextareaClipboard({
         await navigator.clipboard.writeText(selectedText)
         const newValue = value.substring(0, start) + value.substring(end)
         setValue(newValue)
-        showGlobalToast({ type: 'info', title: 'Cut to clipboard', message: 'Text cut successfully' })
         // Set cursor position at cut location
         requestAnimationFrame(() => {
           element.focus()
           element.setSelectionRange(start, start)
         })
       } catch {
-        showGlobalToast({ type: 'error', title: 'Failed to cut', message: 'Clipboard access denied' })
+        // Silently fail - clipboard access denied
       }
     }
   }, [textareaRef, value, setValue])
@@ -90,9 +87,8 @@ export function useTextareaClipboard({
     if (selectedText) {
       try {
         await navigator.clipboard.writeText(selectedText)
-        showGlobalToast({ type: 'info', title: 'Copied to clipboard', message: 'Text copied successfully' })
       } catch {
-        showGlobalToast({ type: 'error', title: 'Failed to copy', message: 'Clipboard access denied' })
+        // Silently fail - clipboard access denied
       }
     }
   }, [textareaRef, value])
@@ -107,25 +103,19 @@ export function useTextareaClipboard({
       const end = element.selectionEnd ?? 0
       const newValue = value.substring(0, start) + clipboardText + value.substring(end)
 
-      // Check maxLength if specified
+      // Check maxLength if specified - silently reject if exceeds
       if (maxLength !== undefined && newValue.length > maxLength) {
-        showGlobalToast({
-          type: 'warning',
-          title: 'Paste would exceed character limit',
-          message: `Maximum ${maxLength} characters allowed`
-        })
         return
       }
 
       setValue(newValue)
-      showGlobalToast({ type: 'info', title: 'Pasted from clipboard', message: 'Text pasted successfully' })
       // Set cursor position after paste
       requestAnimationFrame(() => {
         element.focus()
         element.setSelectionRange(start + clipboardText.length, start + clipboardText.length)
       })
     } catch {
-      showGlobalToast({ type: 'error', title: 'Failed to paste from clipboard', message: 'Clipboard access denied' })
+      // Silently fail - clipboard access denied
     }
   }, [textareaRef, value, setValue, maxLength])
 

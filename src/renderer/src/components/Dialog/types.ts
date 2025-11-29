@@ -50,9 +50,9 @@ export interface PromptDialogConfig extends BaseDialogConfig {
   inputPlaceholder?: string
   /** Pre-filled default value */
   defaultValue?: string
-  /** Maximum character length (default: 2000) */
+  /** Maximum character length (default: TEXT_INPUT_LIMITS.MAX_LENGTH = 2000) */
   maxLength?: number
-  /** Minimum character length (default: 3) */
+  /** Minimum character length (default: TEXT_INPUT_LIMITS.MIN_LENGTH = 3) */
   minLength?: number
   /** Custom validation function. Return true or error message string. */
   validation?: (value: string) => boolean | string
