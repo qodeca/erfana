@@ -1,12 +1,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, ZoomIn, ZoomOut, Maximize, RotateCcw } from 'lucide-react'
-import {
-  getKeyboardAction,
-  formatZoomLevel,
-  getZoomButtonStates,
-  ZOOM_CONFIG
-} from './diagramViewer.logic'
+import { X } from 'lucide-react'
+import { getKeyboardAction, getZoomButtonStates, ZOOM_CONFIG } from './diagramViewer.logic'
 import { ChatBubble } from './ChatBubble'
 import { useDiagramViewerStore } from '../../../stores/useDiagramViewerStore'
 import './DiagramViewer.css'
@@ -286,6 +281,13 @@ export function DiagramViewer() {
     if (!isOpen) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip keyboard shortcuts when user is typing in textarea or input
+      // This allows native copy/paste and text editing to work normally
+      const target = e.target as HTMLElement
+      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) {
+        return
+      }
+
       const action = getKeyboardAction({
         key: e.key,
         ctrlKey: e.ctrlKey,
@@ -357,70 +359,16 @@ export function DiagramViewer() {
       aria-label="Mermaid Diagram"
       onClick={handleBackdropClick}
     >
-      {/* Toolbar */}
-      <div className="diagram-viewer-toolbar" role="toolbar" aria-label="Diagram viewer controls">
-        <div className="diagram-viewer-toolbar-left">
-          <span className="diagram-viewer-title">Mermaid Diagram</span>
-        </div>
-
-        <div className="diagram-viewer-toolbar-center">
-          <button
-            className="diagram-viewer-btn"
-            onClick={handleZoomOut}
-            disabled={zoomOutDisabled}
-            title="Zoom out (-)"
-            aria-label="Zoom out"
-          >
-            <ZoomOut size={16} />
-          </button>
-
-          <div className="diagram-viewer-zoom-indicator" aria-live="polite">
-            {formatZoomLevel(transform.scale)}
-          </div>
-
-          <button
-            className="diagram-viewer-btn"
-            onClick={handleZoomIn}
-            disabled={zoomInDisabled}
-            title="Zoom in (+)"
-            aria-label="Zoom in"
-          >
-            <ZoomIn size={16} />
-          </button>
-
-          <div className="diagram-viewer-separator" />
-
-          <button
-            className="diagram-viewer-btn"
-            onClick={handleFitToView}
-            title="Fit to screen (F)"
-            aria-label="Fit to screen"
-          >
-            <Maximize size={16} />
-          </button>
-
-          <button
-            className="diagram-viewer-btn"
-            onClick={handleReset}
-            title="Reset view (0)"
-            aria-label="Reset view"
-          >
-            <RotateCcw size={16} />
-          </button>
-        </div>
-
-        <div className="diagram-viewer-toolbar-right">
-          <button
-            className="diagram-viewer-btn diagram-viewer-btn-close"
-            onClick={closeViewer}
-            title="Close"
-            aria-label="Close viewer"
-            autoFocus
-          >
-            <X size={18} />
-          </button>
-        </div>
-      </div>
+      {/* Floating close button (issue #37) */}
+      <button
+        className="diagram-viewer-close-floating"
+        onClick={closeViewer}
+        title="Close"
+        aria-label="Close diagram viewer"
+        autoFocus
+      >
+        <X size={16} />
+      </button>
 
       {/* Full-width diagram content area */}
       <div className="diagram-viewer-content-wrapper">
@@ -446,6 +394,13 @@ export function DiagramViewer() {
             filePath={filePath}
             startLine={startLine}
             endLine={endLine}
+            transform={transform}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onFitToView={handleFitToView}
+            onReset={handleReset}
+            zoomInDisabled={zoomInDisabled}
+            zoomOutDisabled={zoomOutDisabled}
           />
         )}
       </div>

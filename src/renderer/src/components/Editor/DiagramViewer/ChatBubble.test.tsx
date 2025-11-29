@@ -32,7 +32,15 @@ describe('ChatBubble', () => {
     mermaidCode: 'flowchart TD\n  A --> B',
     filePath: '/path/to/file.md',
     startLine: 10,
-    endLine: 15
+    endLine: 15,
+    // Zoom control props (issue #37)
+    transform: { scale: 1, translateX: 0, translateY: 0 },
+    onZoomIn: vi.fn(),
+    onZoomOut: vi.fn(),
+    onFitToView: vi.fn(),
+    onReset: vi.fn(),
+    zoomInDisabled: false,
+    zoomOutDisabled: false
   }
 
   beforeEach(() => {
@@ -47,18 +55,30 @@ describe('ChatBubble', () => {
 
   describe('rendering behavior', () => {
     it('does not render when filePath is missing', () => {
-      render(<ChatBubble mermaidCode="flowchart TD" />)
+      // @ts-expect-error - Testing behavior when filePath is undefined
+      render(
+        <ChatBubble
+          mermaidCode="flowchart TD"
+          transform={{ scale: 1, translateX: 0, translateY: 0 }}
+          onZoomIn={vi.fn()}
+          onZoomOut={vi.fn()}
+          onFitToView={vi.fn()}
+          onReset={vi.fn()}
+          zoomInDisabled={false}
+          zoomOutDisabled={false}
+        />
+      )
       expect(screen.queryByRole('button')).not.toBeInTheDocument()
     })
 
     it('renders FAB button when filePath is provided', () => {
       render(<ChatBubble {...defaultProps} />)
-      expect(screen.getByRole('button', { name: /open chat/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /open panel/i })).toBeInTheDocument()
     })
 
     it('shows collapsed state by default', () => {
       render(<ChatBubble {...defaultProps} />)
-      expect(screen.getByRole('button', { name: /open chat/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /open panel/i })).toBeInTheDocument()
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
   })
@@ -67,34 +87,24 @@ describe('ChatBubble', () => {
     it('expands when FAB button is clicked', async () => {
       render(<ChatBubble {...defaultProps} />)
 
-      const fabButton = screen.getByRole('button', { name: /open chat/i })
+      const fabButton = screen.getByRole('button', { name: /open panel/i })
       fireEvent.click(fabButton)
 
       expect(screen.getByRole('dialog')).toBeInTheDocument()
       expect(screen.getByPlaceholderText(/describe changes/i)).toBeInTheDocument()
     })
 
-    it('collapses when close button is clicked', async () => {
+    it('collapses when Escape key is pressed (issue #37 - no close button in header)', async () => {
       render(<ChatBubble {...defaultProps} />)
 
       // Expand
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       expect(screen.getByRole('dialog')).toBeInTheDocument()
 
-      // Collapse
-      fireEvent.click(screen.getByRole('button', { name: /close chat/i }))
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    })
-
-    it('collapses when Escape key is pressed', async () => {
-      render(<ChatBubble {...defaultProps} />)
-
-      // Expand
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      // Press Escape in the textarea
       const textarea = screen.getByPlaceholderText(/describe changes/i)
-
-      // Press Escape
       fireEvent.keyDown(textarea, { key: 'Escape' })
+
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
 
@@ -102,7 +112,7 @@ describe('ChatBubble', () => {
       render(<ChatBubble {...defaultProps} />)
 
       // Expand and type
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const textarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
       typeIntoTextarea(textarea, 'My draft message')
 
@@ -110,7 +120,7 @@ describe('ChatBubble', () => {
       fireEvent.keyDown(textarea, { key: 'Escape' })
 
       // Re-expand
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const reopenedTextarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
       expect(reopenedTextarea.value).toBe('My draft message')
     })
@@ -120,7 +130,7 @@ describe('ChatBubble', () => {
     it('accepts text input', () => {
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const textarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
 
       typeIntoTextarea(textarea, 'Add a new node')
@@ -130,7 +140,7 @@ describe('ChatBubble', () => {
     it('shows character count', () => {
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const textarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
 
       typeIntoTextarea(textarea, 'Hello')
@@ -140,7 +150,7 @@ describe('ChatBubble', () => {
     it('enforces max length', () => {
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const textarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
 
       // Try to type text exceeding max length
@@ -156,7 +166,7 @@ describe('ChatBubble', () => {
     it('disables send button when message is too short', () => {
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const sendButton = screen.getByRole('button', { name: /send message/i })
 
       expect(sendButton).toBeDisabled()
@@ -165,7 +175,7 @@ describe('ChatBubble', () => {
     it('enables send button when message is valid', () => {
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const textarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
       const sendButton = screen.getByRole('button', { name: /send message/i })
 
@@ -176,7 +186,7 @@ describe('ChatBubble', () => {
     it('shows warning when approaching character limit', () => {
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const textarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
 
       // Type text above warning threshold (1000 chars)
@@ -191,7 +201,7 @@ describe('ChatBubble', () => {
 
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const textarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
 
       typeIntoTextarea(textarea, 'Add a new node')
@@ -211,7 +221,7 @@ describe('ChatBubble', () => {
 
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const textarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
 
       typeIntoTextarea(textarea, 'Make it horizontal')
@@ -229,7 +239,7 @@ describe('ChatBubble', () => {
 
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const textarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
 
       typeIntoTextarea(textarea, 'Change colors')
@@ -245,7 +255,7 @@ describe('ChatBubble', () => {
     it('clears message after successful submission', async () => {
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const textarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
 
       typeIntoTextarea(textarea, 'Add a node')
@@ -259,7 +269,7 @@ describe('ChatBubble', () => {
     it('stays expanded after submission', async () => {
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const textarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
 
       typeIntoTextarea(textarea, 'Add a node')
@@ -275,7 +285,7 @@ describe('ChatBubble', () => {
 
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const textarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
 
       typeIntoTextarea(textarea, 'ab') // Only 2 chars
@@ -289,7 +299,7 @@ describe('ChatBubble', () => {
 
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const textarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
 
       typeIntoTextarea(textarea, 'Valid message text')
@@ -303,7 +313,7 @@ describe('ChatBubble', () => {
 
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const textarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
 
       typeIntoTextarea(textarea, 'Test message')
@@ -329,15 +339,15 @@ describe('ChatBubble', () => {
     it('FAB button has correct aria attributes', () => {
       render(<ChatBubble {...defaultProps} />)
 
-      const fabButton = screen.getByRole('button', { name: /open chat/i })
+      const fabButton = screen.getByRole('button', { name: /open panel/i })
       expect(fabButton).toHaveAttribute('aria-expanded', 'false')
-      expect(fabButton).toHaveAttribute('title', 'Chat about this diagram')
+      expect(fabButton).toHaveAttribute('title', 'Edit diagram')
     })
 
     it('expanded panel has dialog role', () => {
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
 
       const dialog = screen.getByRole('dialog')
       expect(dialog).toHaveAttribute('aria-label', 'Chat about diagram')
@@ -346,7 +356,7 @@ describe('ChatBubble', () => {
     it('textarea has correct aria-label', () => {
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
 
       const textarea = screen.getByPlaceholderText(/describe changes/i)
       expect(textarea).toHaveAttribute('aria-label')
@@ -355,7 +365,7 @@ describe('ChatBubble', () => {
     it('info tooltip is keyboard accessible', () => {
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
 
       const infoButton = screen.getByRole('button', { name: /view keyboard shortcuts/i })
       expect(infoButton).toBeInTheDocument()
@@ -364,7 +374,7 @@ describe('ChatBubble', () => {
     it('shows tooltip on focus', async () => {
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
 
       const infoButton = screen.getByRole('button', { name: /view keyboard shortcuts/i })
       fireEvent.focus(infoButton)
@@ -379,9 +389,21 @@ describe('ChatBubble', () => {
     it('handles missing startLine/endLine gracefully', async () => {
       const { executePromptTemplate } = await import('../../../utils/panelUtils')
 
-      render(<ChatBubble mermaidCode="flowchart TD" filePath="/path/file.md" />)
+      render(
+        <ChatBubble
+          mermaidCode="flowchart TD"
+          filePath="/path/file.md"
+          transform={{ scale: 1, translateX: 0, translateY: 0 }}
+          onZoomIn={vi.fn()}
+          onZoomOut={vi.fn()}
+          onFitToView={vi.fn()}
+          onReset={vi.fn()}
+          zoomInDisabled={false}
+          zoomOutDisabled={false}
+        />
+      )
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const textarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
 
       typeIntoTextarea(textarea, 'Test message')
@@ -400,7 +422,7 @@ describe('ChatBubble', () => {
 
       render(<ChatBubble {...defaultProps} />)
 
-      fireEvent.click(screen.getByRole('button', { name: /open chat/i }))
+      fireEvent.click(screen.getByRole('button', { name: /open panel/i }))
       const textarea = screen.getByPlaceholderText(/describe changes/i) as HTMLTextAreaElement
 
       typeIntoTextarea(textarea, '   Trimmed message   ')

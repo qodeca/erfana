@@ -77,6 +77,18 @@ See `docs/` for details (keep Claude's context focused):
   - 30 new regression tests for multi-diagram scenarios
   - **Total: 2976 tests passing (104 test files)**
   - Closes #39
+- **Consolidate DiagramViewer Controls into Chat Panel** (Nov 29, 2025):
+  - Moved toolbar controls into ChatBubble panel header (issue #37)
+  - Removed 48px top toolbar, replaced with floating close button (28×28px, top-right)
+  - Chat panel header now contains 3 control groups:
+    1. Zoom controls: zoom in/out, zoom indicator, fit-to-view, reset
+    2. Direction buttons: TB, LR, BT, RL (centered, for supported diagram types)
+    3. Terminal controls: scroll-to-bottom, restart
+  - FAB button icon changed from MessageCircle to Pencil (Edit diagram)
+  - Removed close button from panel header (Escape or click outside to collapse)
+  - Extended TerminalPortalContext with terminal control registration pattern
+  - All keyboard shortcuts preserved (+, -, 0, F for zoom/fit)
+  - Closes #37
 - **Fix: DiagramViewer Refresh on Code Edit** (Nov 29, 2025):
   - Fixed bug where DiagramViewer would stop refreshing when diagram definition was modified (issue #38)
   - Root cause: Line number drift broke ID matching when user added/removed lines above diagram
@@ -89,7 +101,7 @@ See `docs/` for details (keep Claude's context focused):
   - Correctly handles multiple diagrams in same file (>20 lines apart)
   - Zoom/pan state still preserved during updates
   - Store changes: Added `originalStartLine` field
-  - **Total: 2946 tests passing (104 test files)**
+  - **Total: 2941 tests passing (104 test files)**
   - Closes #38
 - **AI Chat Bubble in DiagramViewer** (Nov 28, 2025):
   - Floating chat bubble for contextual AI-assisted diagram modifications (issue #34)

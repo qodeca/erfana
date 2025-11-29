@@ -35,7 +35,6 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const [terminalId, setTerminalId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [recheckCooldown, setRecheckCooldown] = useState(false)
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
   const terminalRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<Terminal | null>(null)
@@ -44,6 +43,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const pendingInitRef = useRef<boolean>(false)
   const visibilityObserverRef = useRef<ResizeObserver | null>(null)
   const warmupUntilRef = useRef<number>(0)
+  const contextMenuHandlerRef = useRef<((e: MouseEvent) => void) | null>(null)
   const [projectPath, setProjectPath] = useState<string | null>(null)
 
   // Terminal store for cross-component communication
@@ -288,6 +288,20 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // Attach clipboard key handler (issue #28)
       xterm.attachCustomKeyEventHandler(handleKeyEvent)
 
+      // Attach native context menu handler to xterm.element (issue #37)
+      // Must be on xterm.element, not parent container, because xterm captures events internally
+      // This ensures context menu works regardless of where terminal is portaled
+      if (xterm.element) {
+        const handleNativeContextMenu = (e: MouseEvent) => {
+          e.preventDefault()
+          e.stopPropagation()
+          xterm.blur() // Release focus so context menu is interactive
+          portalContext?.openTerminalContextMenu(e.clientX, e.clientY)
+        }
+        xterm.element.addEventListener('contextmenu', handleNativeContextMenu)
+        contextMenuHandlerRef.current = handleNativeContextMenu
+      }
+
       // Clear terminal immediately and write clear sequences to ensure clean start
       // This clears both the buffer and any pending data
       xterm.clear()
@@ -406,6 +420,11 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         window.api.terminal.kill(terminalIdRef.current)
         setActiveTerminalId(null)
       }
+      // Cleanup context menu handler before disposing xterm
+      if (xtermRef.current?.element && contextMenuHandlerRef.current) {
+        xtermRef.current.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
+        contextMenuHandlerRef.current = null
+      }
       if (xtermRef.current) {
         xtermRef.current.dispose()
       }
@@ -425,6 +444,11 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       if (terminalIdRef.current) {
         await window.api.terminal.kill(terminalIdRef.current)
         setActiveTerminalId(null)
+      }
+      // Cleanup context menu handler before disposing xterm
+      if (xtermRef.current?.element && contextMenuHandlerRef.current) {
+        xtermRef.current.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
+        contextMenuHandlerRef.current = null
       }
       // Dispose xterm
       if (xtermRef.current) {
@@ -601,13 +625,18 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }, [portalTarget, portalContext?.diagramViewerContainerRef, terminalId])
 
-  const handleRestartTerminal = async () => {
+  const handleRestartTerminal = useCallback(async () => {
     // Kill current terminal session
     if (terminalIdRef.current) {
       await window.api.terminal.kill(terminalIdRef.current)
       setActiveTerminalId(null)
     }
 
+    // Cleanup context menu handler before disposing xterm
+    if (xtermRef.current?.element && contextMenuHandlerRef.current) {
+      xtermRef.current.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
+      contextMenuHandlerRef.current = null
+    }
     // Dispose xterm instance
     if (xtermRef.current) {
       xtermRef.current.dispose()
@@ -625,22 +654,36 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     if (terminalRef.current && isAvailable) {
       await initializeTerminal()
     }
-  }
+  }, [setActiveTerminalId, isAvailable])
 
-  const handleScrollToBottom = () => {
+  const handleScrollToBottom = useCallback(() => {
     if (xtermRef.current) {
       xtermRef.current.scrollToBottom()
     }
-  }
-
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    setContextMenu({ x: e.clientX, y: e.clientY })
   }, [])
 
+  // Register terminal controls with portal context (issue #37)
+  // Allows ChatBubble to access scroll/restart functions
+  useEffect(() => {
+    if (!portalContext || !terminalId) return
+
+    portalContext.registerTerminalControls({
+      scrollToBottom: handleScrollToBottom,
+      restart: handleRestartTerminal,
+      copy,
+      paste,
+      hasSelection: () => hasSelection
+    })
+
+    return () => {
+      portalContext.unregisterTerminalControls()
+    }
+  }, [portalContext, terminalId, handleScrollToBottom, handleRestartTerminal, copy, paste, hasSelection])
+
+  // Context menu close handler - uses portal context for global support
   const handleCloseContextMenu = useCallback(() => {
-    setContextMenu(null)
-  }, [])
+    portalContext?.closeTerminalContextMenu()
+  }, [portalContext])
 
   // Render terminal panel inside mainContainer shell
   // The useLayoutEffect above will move terminalPanelRef.current between containers
@@ -652,28 +695,31 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     <div ref={mainContainerRef} className="terminal-portal-shell">
       {/* Terminal panel - rendered here initially, moved by useLayoutEffect */}
       <div ref={terminalPanelRef} className="terminal-panel sidebar-panel">
-        <div className="sidebar-panel-header">
-          <TerminalIcon size={16} className="panel-header-icon" />
-          <span className="sidebar-panel-title">Terminal</span>
-          {terminalId && (
-            <>
-              <button
-                className="icon-btn"
-                onClick={handleScrollToBottom}
-                title="Scroll to Bottom"
-              >
-                <ArrowDownToLine size={14} />
-              </button>
-              <button
-                className="icon-btn"
-                onClick={handleRestartTerminal}
-                title="Restart Terminal"
-              >
-                <RotateCw size={14} />
-              </button>
-            </>
-          )}
-        </div>
+        {/* Hide header when portalled to DiagramViewer (issue #37) */}
+        {portalTarget !== 'diagram-viewer' && (
+          <div className="sidebar-panel-header">
+            <TerminalIcon size={16} className="panel-header-icon" />
+            <span className="sidebar-panel-title">Terminal</span>
+            {terminalId && (
+              <>
+                <button
+                  className="icon-btn"
+                  onClick={handleScrollToBottom}
+                  title="Scroll to Bottom"
+                >
+                  <ArrowDownToLine size={14} />
+                </button>
+                <button
+                  className="icon-btn"
+                  onClick={handleRestartTerminal}
+                  title="Restart Terminal"
+                >
+                  <RotateCw size={14} />
+                </button>
+              </>
+            )}
+          </div>
+        )}
         <div className="sidebar-panel-content">
           {isAvailable === null ? (
             // Checking availability
@@ -707,14 +753,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
               <p className="error-details">{error}</p>
             </div>
           ) : (
-            // Terminal ready
-            <div ref={terminalRef} className="terminal-container" onContextMenu={handleContextMenu} />
+            // Terminal ready - context menu handled via native listener on xterm.element
+            <div ref={terminalRef} className="terminal-container" />
           )}
         </div>
-        {contextMenu && (
+        {portalContext?.terminalContextMenuPosition && (
           <TerminalContextMenu
-            x={contextMenu.x}
-            y={contextMenu.y}
+            x={portalContext.terminalContextMenuPosition.x}
+            y={portalContext.terminalContextMenuPosition.y}
             hasSelection={hasSelection}
             onCopy={copy}
             onPaste={paste}

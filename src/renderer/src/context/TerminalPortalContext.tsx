@@ -16,6 +16,18 @@ import { createContext, useContext, useRef, useState, useCallback, type ReactNod
 
 export type PortalTarget = 'main' | 'diagram-viewer'
 
+/** Terminal control functions that TerminalPanel registers */
+interface TerminalControls {
+  scrollToBottom: () => void
+  restart: () => Promise<void>
+  /** Copy selected text to clipboard */
+  copy: () => Promise<void>
+  /** Paste from clipboard to terminal */
+  paste: () => Promise<void>
+  /** Check if terminal has text selection */
+  hasSelection: () => boolean
+}
+
 interface TerminalPortalContextValue {
   /** Current render target for terminal */
   portalTarget: PortalTarget
@@ -41,6 +53,27 @@ interface TerminalPortalContextValue {
 
   /** Subscribe to refit requests */
   onRefitRequest: (callback: () => void) => () => void
+
+  /** Terminal control functions (registered by TerminalPanel) */
+  terminalControls: TerminalControls | null
+
+  /** Register terminal control functions (called by TerminalPanel) */
+  registerTerminalControls: (controls: TerminalControls) => void
+
+  /** Unregister terminal controls (called on TerminalPanel unmount) */
+  unregisterTerminalControls: () => void
+
+  /** Whether terminal is ready (has registered controls) */
+  isTerminalReady: boolean
+
+  /** Context menu position (null = closed) - global for xterm.js portability */
+  terminalContextMenuPosition: { x: number; y: number } | null
+
+  /** Open terminal context menu at position */
+  openTerminalContextMenu: (x: number, y: number) => void
+
+  /** Close terminal context menu */
+  closeTerminalContextMenu: () => void
 }
 
 const TerminalPortalContext = createContext<TerminalPortalContextValue | null>(null)
@@ -51,6 +84,8 @@ interface TerminalPortalProviderProps {
 
 export function TerminalPortalProvider({ children }: TerminalPortalProviderProps) {
   const [portalTarget, setPortalTargetState] = useState<PortalTarget>('main')
+  const [terminalControls, setTerminalControls] = useState<TerminalControls | null>(null)
+  const [terminalContextMenuPosition, setTerminalContextMenuPosition] = useState<{ x: number; y: number } | null>(null)
 
   const diagramViewerContainerRef = useRef<HTMLDivElement>(null)
   const mainContainerRef = useRef<HTMLDivElement>(null)
@@ -96,6 +131,23 @@ export function TerminalPortalProvider({ children }: TerminalPortalProviderProps
     }
   }, [])
 
+  const registerTerminalControls = useCallback((controls: TerminalControls) => {
+    setTerminalControls(controls)
+  }, [])
+
+  const unregisterTerminalControls = useCallback(() => {
+    setTerminalControls(null)
+  }, [])
+
+  // Context menu handlers for global xterm.js context menu support
+  const openTerminalContextMenu = useCallback((x: number, y: number) => {
+    setTerminalContextMenuPosition({ x, y })
+  }, [])
+
+  const closeTerminalContextMenu = useCallback(() => {
+    setTerminalContextMenuPosition(null)
+  }, [])
+
   const value: TerminalPortalContextValue = {
     portalTarget,
     diagramViewerContainerRef,
@@ -103,7 +155,14 @@ export function TerminalPortalProvider({ children }: TerminalPortalProviderProps
     setPortalTarget,
     returnToMain,
     requestRefit,
-    onRefitRequest
+    onRefitRequest,
+    terminalControls,
+    registerTerminalControls,
+    unregisterTerminalControls,
+    isTerminalReady: terminalControls !== null,
+    terminalContextMenuPosition,
+    openTerminalContextMenu,
+    closeTerminalContextMenu
   }
 
   return (
