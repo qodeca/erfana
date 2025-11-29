@@ -4,7 +4,7 @@
  * Tests for DiagramViewer component:
  * - Rendering behavior (reads from useDiagramViewerStore)
  * - SVG content display
- * - Closing mechanisms (button, Escape, backdrop)
+ * - Closing mechanisms (button, backdrop) - Note: Escape intentionally removed
  * - Toolbar elements
  * - Accessibility attributes
  * - Focus management
@@ -166,15 +166,15 @@ describe('DiagramViewer', () => {
       })
     })
 
-    it('calls closeViewer when Escape key is pressed', async () => {
+    it('does NOT close viewer when Escape key is pressed (X button only)', () => {
       setupStore({ isOpen: true, svgContent: mockSvgContent })
       render(<DiagramViewer />)
 
       fireEvent.keyDown(document, { key: 'Escape' })
 
-      await waitFor(() => {
-        expect(useDiagramViewerStore.getState().isOpen).toBe(false)
-      })
+      // Escape should NOT close the viewer - use X button instead
+      expect(useDiagramViewerStore.getState().isOpen).toBe(true)
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
     it('calls closeViewer when backdrop is clicked', async () => {

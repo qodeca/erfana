@@ -1,3 +1,11 @@
+/* Shell container for portal - fills parent and holds portaled content */
+.terminal-portal-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
 .terminal-panel {
   display: flex;
   flex-direction: column;

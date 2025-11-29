@@ -10,7 +10,7 @@ export interface KeyEventInfo {
   shiftKey: boolean
 }
 
-export type ViewerKeyAction = 'zoom-in' | 'zoom-out' | 'reset' | 'fit' | 'close' | 'none'
+export type ViewerKeyAction = 'zoom-in' | 'zoom-out' | 'reset' | 'fit' | 'toggle-terminal' | 'none'
 
 export const ZOOM_CONFIG = {
   MIN_SCALE: 0.1,
@@ -21,25 +21,33 @@ export const ZOOM_CONFIG = {
 
 /** Get keyboard shortcut action from key event */
 export function getKeyboardAction(event: KeyEventInfo): ViewerKeyAction {
-  // Ignore modified keys (except for +/- which can use shift)
-  if (event.ctrlKey || event.metaKey) return 'none'
+  const hasModifier = event.ctrlKey || event.metaKey
 
-  switch (event.key) {
-    case '+':
-    case '=':
-      return 'zoom-in'
-    case '-':
-      return 'zoom-out'
-    case '0':
-      return 'reset'
-    case 'f':
-    case 'F':
-      return 'fit'
-    case 'Escape':
-      return 'close'
-    default:
-      return 'none'
+  // Cmd/Ctrl+J = Toggle terminal panel
+  if (hasModifier && event.key.toLowerCase() === 'j') {
+    return 'toggle-terminal'
   }
+
+  // Non-modifier shortcuts
+  if (!hasModifier) {
+    switch (event.key) {
+      case '+':
+      case '=':
+        return 'zoom-in'
+      case '-':
+        return 'zoom-out'
+      case '0':
+        return 'reset'
+      case 'f':
+      case 'F':
+        return 'fit'
+      // Note: Escape no longer closes viewer - use X button instead
+      default:
+        return 'none'
+    }
+  }
+
+  return 'none'
 }
 
 /** Calculate zoom percentage for display */
