@@ -299,6 +299,59 @@ describe('DiagramViewer', () => {
       // Viewer should still be open after fit
       expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
+
+    it('does not intercept keyboard shortcuts when typing in textarea', async () => {
+      setupStore({
+        isOpen: true,
+        svgContent: mockSvgContent,
+        mermaidCode: 'flowchart TD\n  A-->B',
+        filePath: '/test/file.md'
+      })
+      render(<DiagramViewer />)
+
+      // Open the chat panel
+      const openButton = screen.getByRole('button', { name: /open panel/i })
+      fireEvent.click(openButton)
+
+      // Wait for textarea to appear
+      const textarea = await screen.findByPlaceholderText('Describe changes to this diagram...')
+      expect(textarea).toBeInTheDocument()
+
+      // Focus the textarea
+      textarea.focus()
+
+      // Simulate typing keys that would normally trigger zoom
+      fireEvent.keyDown(textarea, { key: '+', target: textarea })
+      fireEvent.keyDown(textarea, { key: '-', target: textarea })
+      fireEvent.keyDown(textarea, { key: '0', target: textarea })
+      fireEvent.keyDown(textarea, { key: 'f', target: textarea })
+
+      // Viewer should still be open (shortcuts should be ignored when textarea is focused)
+      expect(screen.getByRole('dialog', { name: 'Mermaid Diagram' })).toBeInTheDocument()
+      // Textarea should still be there
+      expect(textarea).toBeInTheDocument()
+    })
+
+    it('does not intercept keyboard shortcuts when typing in input', () => {
+      setupStore({ isOpen: true, svgContent: mockSvgContent })
+      render(<DiagramViewer />)
+
+      // Create a mock input element inside the viewer
+      const input = document.createElement('input')
+      input.type = 'text'
+      document.body.appendChild(input)
+      input.focus()
+
+      // Simulate typing keys that would normally trigger zoom
+      fireEvent.keyDown(input, { key: '+', target: input })
+      fireEvent.keyDown(input, { key: '-', target: input })
+
+      // Viewer should still be open
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+      // Cleanup
+      document.body.removeChild(input)
+    })
   })
 
   // Note: Zoom control buttons are now in ChatBubble header (issue #37)

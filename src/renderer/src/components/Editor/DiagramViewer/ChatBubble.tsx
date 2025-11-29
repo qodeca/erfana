@@ -36,6 +36,8 @@ import {
   CHAT_LIMITS
 } from './chatBubble.logic'
 import { formatZoomLevel } from './diagramViewer.logic'
+import { TextareaContextMenu } from '../../ContextMenu/TextareaContextMenu'
+import { TerminalContextMenu } from '../../ContextMenu/TerminalContextMenu'
 import './ChatBubble.css'
 
 interface Transform {
@@ -88,6 +90,8 @@ export function ChatBubble({
   const [isExpanded, setIsExpanded] = useState(false)
   const [message, setMessage] = useState('')
   const [showTooltip, setShowTooltip] = useState(false)
+  const [textareaContextMenu, setTextareaContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const [terminalContextMenu, setTerminalContextMenu] = useState<{ x: number; y: number } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const terminalContainerRef = useRef<HTMLDivElement>(null)
@@ -122,7 +126,7 @@ export function ChatBubble({
     return () => clearTimeout(timer)
   }, [isExpanded])
 
-  // Handle click outside to collapse
+  // Handle click outside to collapse panel
   useEffect(() => {
     if (!isExpanded) return
 
@@ -131,6 +135,8 @@ export function ChatBubble({
       if (panelRef.current?.contains(e.target as Node)) return
       // Don't collapse if clicking the bubble button itself
       if ((e.target as HTMLElement).closest('.chat-bubble-btn')) return
+      // Don't collapse if clicking inside the context menu (rendered in portal)
+      if ((e.target as HTMLElement).closest('.context-menu')) return
 
       setIsExpanded(false)
     }
@@ -298,6 +304,77 @@ export function ChatBubble({
     setIsExpanded(true)
   }
 
+  // Context menu handlers for textarea copy/paste (issue #37)
+  const handleTextareaContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setTextareaContextMenu({ x: e.clientX, y: e.clientY })
+  }, [])
+
+  const handleCloseTextareaContextMenu = useCallback(() => {
+    setTextareaContextMenu(null)
+  }, [])
+
+  // Context menu handlers for terminal copy/paste (issue #37)
+  const handleTerminalContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setTerminalContextMenu({ x: e.clientX, y: e.clientY })
+  }, [])
+
+  const handleCloseTerminalContextMenu = useCallback(() => {
+    setTerminalContextMenu(null)
+  }, [])
+
+  const handleCutText = useCallback(async () => {
+    if (!textareaRef.current) return
+    const textarea = textareaRef.current
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selectedText = textarea.value.substring(start, end)
+
+    if (selectedText) {
+      // Copy to clipboard
+      await navigator.clipboard.writeText(selectedText)
+      // Remove selected text
+      const newValue = message.substring(0, start) + message.substring(end)
+      setMessage(newValue)
+      // Set cursor position at cut location
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start
+      }, 0)
+    }
+  }, [message])
+
+  const handleCopyText = useCallback(async () => {
+    if (!textareaRef.current) return
+    const textarea = textareaRef.current
+    const selectedText = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd)
+    if (selectedText) {
+      await navigator.clipboard.writeText(selectedText)
+    }
+  }, [])
+
+  const handlePasteText = useCallback(async () => {
+    if (!textareaRef.current) return
+    const textarea = textareaRef.current
+    const clipboardText = await navigator.clipboard.readText()
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const newValue = message.substring(0, start) + clipboardText + message.substring(end)
+    if (newValue.length <= CHAT_LIMITS.MAX_LENGTH) {
+      setMessage(newValue)
+      // Set cursor position after paste
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + clipboardText.length
+      }, 0)
+    }
+  }, [message])
+
+  const hasTextSelection = useCallback(() => {
+    if (!textareaRef.current) return false
+    const textarea = textareaRef.current
+    return textarea.selectionStart !== textarea.selectionEnd
+  }, [])
+
   // Note: Panel closes via click-outside or Escape key (no header close button - issue #37)
 
   // Don't render if no file context
@@ -434,6 +511,7 @@ export function ChatBubble({
                 }
               }}
               className="chat-terminal-container"
+              onContextMenu={handleTerminalContextMenu}
             />
 
             {/* Textarea section */}
@@ -444,6 +522,7 @@ export function ChatBubble({
                 value={message}
                 onChange={handleChange}
                 onKeyDown={handleKeyDown}
+                onContextMenu={handleTextareaContextMenu}
                 placeholder="Describe changes to this diagram..."
                 rows={3}
                 maxLength={CHAT_LIMITS.MAX_LENGTH}
@@ -505,6 +584,35 @@ export function ChatBubble({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Context menu for textarea copy/paste */}
+      {textareaContextMenu && (
+        <TextareaContextMenu
+          x={textareaContextMenu.x}
+          y={textareaContextMenu.y}
+          hasSelection={hasTextSelection()}
+          onCut={handleCutText}
+          onCopy={handleCopyText}
+          onPaste={handlePasteText}
+          onClose={handleCloseTextareaContextMenu}
+        />
+      )}
+
+      {/* Context menu for terminal copy/paste */}
+      {terminalContextMenu && portalContext?.terminalControls && (
+        <TerminalContextMenu
+          x={terminalContextMenu.x}
+          y={terminalContextMenu.y}
+          hasSelection={portalContext.terminalControls.hasSelection()}
+          onCopy={async () => {
+            await portalContext.terminalControls?.copy()
+          }}
+          onPaste={async () => {
+            await portalContext.terminalControls?.paste()
+          }}
+          onClose={handleCloseTerminalContextMenu}
+        />
       )}
     </div>
   )

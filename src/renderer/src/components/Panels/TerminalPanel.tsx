@@ -640,13 +640,16 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
     portalContext.registerTerminalControls({
       scrollToBottom: handleScrollToBottom,
-      restart: handleRestartTerminal
+      restart: handleRestartTerminal,
+      copy,
+      paste,
+      hasSelection: () => hasSelection
     })
 
     return () => {
       portalContext.unregisterTerminalControls()
     }
-  }, [portalContext, terminalId, handleScrollToBottom, handleRestartTerminal])
+  }, [portalContext, terminalId, handleScrollToBottom, handleRestartTerminal, copy, paste, hasSelection])
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -667,28 +670,31 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     <div ref={mainContainerRef} className="terminal-portal-shell">
       {/* Terminal panel - rendered here initially, moved by useLayoutEffect */}
       <div ref={terminalPanelRef} className="terminal-panel sidebar-panel">
-        <div className="sidebar-panel-header">
-          <TerminalIcon size={16} className="panel-header-icon" />
-          <span className="sidebar-panel-title">Terminal</span>
-          {terminalId && (
-            <>
-              <button
-                className="icon-btn"
-                onClick={handleScrollToBottom}
-                title="Scroll to Bottom"
-              >
-                <ArrowDownToLine size={14} />
-              </button>
-              <button
-                className="icon-btn"
-                onClick={handleRestartTerminal}
-                title="Restart Terminal"
-              >
-                <RotateCw size={14} />
-              </button>
-            </>
-          )}
-        </div>
+        {/* Hide header when portalled to DiagramViewer (issue #37) */}
+        {portalTarget !== 'diagram-viewer' && (
+          <div className="sidebar-panel-header">
+            <TerminalIcon size={16} className="panel-header-icon" />
+            <span className="sidebar-panel-title">Terminal</span>
+            {terminalId && (
+              <>
+                <button
+                  className="icon-btn"
+                  onClick={handleScrollToBottom}
+                  title="Scroll to Bottom"
+                >
+                  <ArrowDownToLine size={14} />
+                </button>
+                <button
+                  className="icon-btn"
+                  onClick={handleRestartTerminal}
+                  title="Restart Terminal"
+                >
+                  <RotateCw size={14} />
+                </button>
+              </>
+            )}
+          </div>
+        )}
         <div className="sidebar-panel-content">
           {isAvailable === null ? (
             // Checking availability

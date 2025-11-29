@@ -262,7 +262,7 @@ describe('chatBubble.logic', () => {
 
   describe('CHAT_PANEL_CONFIG', () => {
     it('should have correct config values', () => {
-      expect(CHAT_PANEL_CONFIG.DEFAULT_HEIGHT).toBe(350)
+      expect(CHAT_PANEL_CONFIG.DEFAULT_HEIGHT).toBe(450)
       expect(CHAT_PANEL_CONFIG.MIN_HEIGHT).toBe(200)
       expect(CHAT_PANEL_CONFIG.MAX_HEIGHT_RATIO).toBe(0.7)
       expect(CHAT_PANEL_CONFIG.MIN_TERMINAL_HEIGHT).toBe(100)

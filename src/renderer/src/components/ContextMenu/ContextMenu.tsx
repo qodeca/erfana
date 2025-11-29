@@ -21,10 +21,17 @@ interface ContextMenuProps {
 
 export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
+  const openTimeRef = useRef<number>(Date.now())
   const portalRoot = document.getElementById('portal-root')
 
   useEffect(() => {
+    // Record when menu was opened to ignore the opening click
+    openTimeRef.current = Date.now()
+
     const handleClickOutside = (e: MouseEvent) => {
+      // Ignore events within 50ms of menu opening (prevents closing from opening click)
+      if (Date.now() - openTimeRef.current < 50) return
+
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         onClose()
       }
@@ -36,16 +43,15 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
       }
     }
 
-    // Add listeners after a small delay to avoid closing immediately
-    const timeoutId = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside)
-      document.addEventListener('keydown', handleEscape)
-    }, 10)
+    // Use capture phase to catch events before any stopPropagation in children
+    // Add immediately (no delay) - timestamp check handles the opening click
+    document.addEventListener('mousedown', handleClickOutside, { capture: true })
+    document.addEventListener('keydown', handleEscape, { capture: true })
 
     return () => {
-      clearTimeout(timeoutId)
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleEscape)
+      // Must match capture option when removing
+      document.removeEventListener('mousedown', handleClickOutside, { capture: true })
+      document.removeEventListener('keydown', handleEscape, { capture: true })
     }
   }, [onClose])
 

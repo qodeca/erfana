@@ -281,6 +281,13 @@ export function DiagramViewer() {
     if (!isOpen) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip keyboard shortcuts when user is typing in textarea or input
+      // This allows native copy/paste and text editing to work normally
+      const target = e.target as HTMLElement
+      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) {
+        return
+      }
+
       const action = getKeyboardAction({
         key: e.key,
         ctrlKey: e.ctrlKey,
