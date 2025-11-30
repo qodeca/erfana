@@ -43,6 +43,12 @@ export enum ErrorCode {
   IMPORT_DIR_CREATE_FAILED = 'IMPORT_DIR_CREATE_FAILED',
   IMPORT_WRITE_FAILED = 'IMPORT_WRITE_FAILED',
 
+  // Prompt execution errors
+  PROMPT_NOT_FOUND = 'PROMPT_NOT_FOUND',
+  PROMPT_VALIDATION_FAILED = 'PROMPT_VALIDATION_FAILED',
+  PROMPT_TERMINAL_TIMEOUT = 'PROMPT_TERMINAL_TIMEOUT',
+  PROMPT_SEND_FAILED = 'PROMPT_SEND_FAILED',
+
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
 }
@@ -138,6 +144,12 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.IMPORT_TEXT_ENCODING_ERROR]: 'File has invalid text encoding',
   [ErrorCode.IMPORT_DIR_CREATE_FAILED]: 'Failed to create import directory',
   [ErrorCode.IMPORT_WRITE_FAILED]: 'Failed to write imported file',
+
+  // Prompt execution errors
+  [ErrorCode.PROMPT_NOT_FOUND]: 'Prompt template not found',
+  [ErrorCode.PROMPT_VALIDATION_FAILED]: 'Missing required information for this prompt',
+  [ErrorCode.PROMPT_TERMINAL_TIMEOUT]: 'Terminal took too long to initialize',
+  [ErrorCode.PROMPT_SEND_FAILED]: 'Failed to send prompt to terminal',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'

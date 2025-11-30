@@ -38,10 +38,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
     setToasts((prev) => [...prev, newToast])
 
-    // Auto-remove after duration
+    // Auto-remove after duration - use setToasts directly to avoid stale closure
     if (newToast.duration && newToast.duration > 0) {
       setTimeout(() => {
-        removeToast(id)
+        setToasts((prev) => prev.filter((t) => t.id !== id))
       }, newToast.duration)
     }
   }, [])

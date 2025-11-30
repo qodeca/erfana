@@ -59,7 +59,7 @@ describe('MarkdownPreview Prompt Integration', () => {
     })
 
     // Mock executePromptTemplate
-    vi.spyOn(panelUtils, 'executePromptTemplate').mockResolvedValue()
+    vi.spyOn(panelUtils, 'executePromptTemplate').mockResolvedValue({ success: true })
 
     // Create portal-root for modals
     const portalRoot = document.createElement('div')

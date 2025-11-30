@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow } from 'electron'
+import { app, shell, BrowserWindow, Menu } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -8,6 +8,7 @@ import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handle
 import { registerSettingsHandlers } from './ipc/settings-handlers'
 import { registerTerminalHandlers } from './ipc/terminal-handlers'
 import { registerImportHandlers } from './ipc/import-handlers'
+import { createApplicationMenu } from './menu'
 import { fileWatcherService } from './services/FileWatcherService'
 import { directoryWatcherService } from './services/DirectoryWatcherService'
 import { terminalService } from './services/TerminalService'
@@ -73,6 +74,10 @@ function createWindow(): BrowserWindow {
 app.whenReady().then(() => {
   // Set application name (shows in macOS menu bar)
   app.setName('ERFANA')
+
+  // Set application menu with Edit roles for native clipboard support
+  // Required for Cmd+C/V to work in textarea and input elements
+  Menu.setApplicationMenu(createApplicationMenu())
 
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.erfana')

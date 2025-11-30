@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import mermaid from 'mermaid'
 import { Bug } from 'lucide-react'
 import { executePromptTemplate } from '../../utils/panelUtils'
+import { formatLineRange } from '../../prompts/helpers'
 import { MermaidToolbar } from './MermaidToolbar'
 import { getMermaidConfig } from '../../utils/mermaidThemes'
-import { useDiagramViewerStore, buildDiagramId } from '../../stores/useDiagramViewerStore'
+import { useDiagramViewerStore, buildDiagramId, hashDiagramContent } from '../../stores/useDiagramViewerStore'
 
 interface MermaidDiagramProps {
   code: string
@@ -22,13 +23,44 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
   const [svgContent, setSvgContent] = useState<string>('')
 
   // Store for persisting viewer state across component remounts
-  const { isOpen, diagramId, openViewer, updateDiagram } = useDiagramViewerStore()
+  const {
+    isOpen,
+    filePath: storedFilePath,
+    contentHash: storedContentHash,
+    originalStartLine,
+    openViewer,
+    updateDiagram
+  } = useDiagramViewerStore()
 
   // Generate unique ID for this diagram
   const currentDiagramId = buildDiagramId(filePath, startLine, endLine)
 
+  // Reduced tolerance - only for tie-breaking when content changes
+  const LINE_DRIFT_TOLERANCE = 10
+
   // Check if THIS diagram is the one currently open in the viewer
-  const isViewerOpenForThis = isOpen && diagramId === currentDiagramId
+  // Primary identity: content hash (survives line drift and external file reloads)
+  // Secondary: position tie-breaker (for identical diagrams or when content is edited)
+  const isViewerOpenForThis = (() => {
+    if (!isOpen || filePath !== storedFilePath) return false
+
+    // Primary check: Content hash match
+    // If content is identical, this IS the diagram (regardless of position)
+    if (storedContentHash) {
+      const currentHash = hashDiagramContent(code)
+      if (currentHash === storedContentHash) {
+        return true
+      }
+    }
+
+    // Secondary check: Position-based matching for edited content
+    // When user edits the diagram, content hash changes but it's still "the same diagram"
+    // Accept if position is close to where we opened the viewer
+    if (startLine === undefined || originalStartLine === undefined) return false
+
+    const positionDrift = Math.abs(startLine - originalStartLine)
+    return positionDrift <= LINE_DRIFT_TOLERANCE
+  })()
 
   // Handle bug report button click
   const handleBugReport = async () => {
@@ -41,11 +73,7 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
         : `@${filePath}`
 
       // Format line range string
-      const lineRange = startLine && endLine
-        ? startLine === endLine
-          ? `line ${startLine}`
-          : `lines ${startLine}-${endLine}`
-        : undefined
+      const lineRange = formatLineRange(startLine, endLine) || undefined
 
       // Execute prompt template using centralized function
       await executePromptTemplate('mermaid-bug-report', {
@@ -89,6 +117,15 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
         const { svg } = await mermaid.render(id, code)
 
         if (containerRef.current) {
+          // ⚠️  DO NOT ADD SVG SANITIZATION HERE (e.g., DOMPurify)
+          //
+          // Mermaid's securityLevel: 'strict' (default since v10) already sanitizes output.
+          // Additional sanitization BREAKS diagrams:
+          // - DOMPurify strips foreignObject content (GitHub DOMPurify #1002, #1088)
+          // - DOMPurify strips xlink:href internal references used for markers (#233)
+          // - These SVG features are essential for flowcharts, sequence diagrams, etc.
+          //
+          // See: https://github.com/cure53/DOMPurify/issues/1002
           containerRef.current.innerHTML = svg
           setSvgContent(svg)
 
@@ -154,10 +191,16 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
   // When diagram re-renders with new code/SVG, update the store if viewer is open for this diagram
   // This enables live updates when editing the source file with viewer open
   useEffect(() => {
-    if (svgContent && isViewerOpenForThis) {
-      updateDiagram(currentDiagramId, code, svgContent)
+    if (svgContent && isViewerOpenForThis && filePath) {
+      updateDiagram({
+        filePath,
+        mermaidCode: code,
+        svgContent,
+        startLine,
+        endLine
+      })
     }
-  }, [svgContent, code, isViewerOpenForThis, currentDiagramId, updateDiagram])
+  }, [svgContent, code, isViewerOpenForThis, filePath, startLine, endLine, updateDiagram])
 
   return (
     <div className={`mermaid-container ${className}`}>

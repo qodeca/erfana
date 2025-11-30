@@ -5,6 +5,7 @@
 
 import { Maximize2 } from 'lucide-react'
 import { executePromptTemplate } from '../../../utils/panelUtils'
+import { formatLineRange } from '../../../prompts/helpers'
 import {
   detectChartType,
   supportsDirection,
@@ -49,9 +50,7 @@ export function MermaidToolbar({
   const currentDirection = detectCurrentDirection(code, chartType)
 
   const handleDirectionClick = async (direction: string) => {
-    console.log('🔄 Direction click:', { direction, filePath, startLine, endLine })
     if (!filePath) {
-      console.warn('⚠️ No filePath provided, cannot execute direction change')
       return
     }
 
@@ -61,16 +60,10 @@ export function MermaidToolbar({
         startLine && endLine ? `@${filePath}:${startLine}-${endLine}` : `@${filePath}`
 
       // Format line range string
-      const lineRange =
-        startLine && endLine
-          ? startLine === endLine
-            ? `line ${startLine}`
-            : `lines ${startLine}-${endLine}`
-          : undefined
+      const lineRange = formatLineRange(startLine, endLine) || undefined
 
       // Execute prompt template
-      console.log('📝 Executing prompt template: change-mermaid-direction')
-      const result = await executePromptTemplate('change-mermaid-direction', {
+      await executePromptTemplate('change-mermaid-direction', {
         selectedText: '',
         filePath,
         fullDocument: '',
@@ -82,9 +75,8 @@ export function MermaidToolbar({
         targetDirection: direction,
         directionLabel: DIRECTION_LABELS[direction] || direction
       })
-      console.log('✅ Prompt template result:', result)
     } catch (err) {
-      console.error('❌ Failed to execute direction change prompt:', err)
+      console.error('Failed to execute direction change prompt:', err)
     }
   }
 

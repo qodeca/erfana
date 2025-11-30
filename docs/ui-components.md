@@ -25,9 +25,9 @@ Dual vertical activity bars on left and right edges (VS Code-style).
 
 ### Design
 
-- Background: `#333333`
+- Background: `var(--color-gray-800)` (#3c3c3c)
 - Icons: Lucide React (`Folder`, `Terminal`)
-- Active indicator: 2px blue vertical bar
+- Active indicator: 2px Qodeca Lime vertical bar (`var(--color-brand-lime)`)
 - Hover: Icon changes to white
 
 ## Global Toasts
@@ -97,7 +97,7 @@ Integrated terminal with xterm.js + node-pty.
 - High contrast theme (white on black)
 - "Send Selection to Terminal" from preview context menu
 
-**Theme**: 12px SF Mono, #000 bg, #fff fg, #4fc1ff cursor
+**Theme**: Uses design tokens - `var(--color-black)` bg, white fg, `var(--color-cursor)` cursor
 
 **Tech**: xterm.js v5.5.0, node-pty v1.0.0, WebglAddon, FitAddon, WebLinksAddon
 
@@ -213,7 +213,7 @@ Home icon tab (41px fixed, non-draggable, no scaling).
 
 ### Active Indicator
 
-2px blue bottom border (`#007acc`) via `::after` pseudo-element, matches activity bar.
+2px Qodeca Violet bottom border via `::after` pseudo-element, matches activity bar styling.
 
 ### Focus
 

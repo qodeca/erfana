@@ -1,49 +1,49 @@
 .context-menu {
   min-width: 180px;
-  background-color: #252526;
-  border: 1px solid #454545;
-  border-radius: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
-  padding: 4px 0;
-  z-index: 10000;
+  background-color: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-2) 0;
+  z-index: var(--z-context-menu); /* Must be higher than dialogs (base 10000) to appear on top */
   user-select: none;
-  transition: opacity 0.1s ease-in-out;
+  transition: opacity var(--transition-fast);
 }
 
 .context-menu-item {
   display: flex;
   align-items: center;
-  padding: 6px 12px;
+  padding: var(--space-3) var(--space-6);
   cursor: pointer;
-  color: #cccccc;
-  font-size: 13px;
-  transition: background-color 0.1s;
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  transition: background-color var(--transition-fast);
 }
 
 .context-menu-item:hover:not(.disabled) {
-  background-color: #2a2d2e;
+  background-color: var(--color-bg-hover-solid);
 }
 
 .context-menu-item.disabled {
-  color: #6e6e6e;
+  color: var(--color-gray-600);
   cursor: not-allowed;
 }
 
 .context-menu-item.danger {
-  color: #f48771;
+  color: var(--color-error);
 }
 
 .context-menu-item.danger:hover {
-  background-color: #5a1d1d;
+  background-color: var(--color-bg-danger-hover);
 }
 
 .context-menu-icon {
-  margin-right: 8px;
-  font-size: 14px;
+  margin-right: var(--space-4);
+  font-size: var(--text-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 16px;
+  min-width: var(--icon-size-sm);
 }
 
 .context-menu-label {
@@ -51,14 +51,14 @@
 }
 
 .context-menu-shortcut {
-  margin-left: 16px;
-  font-size: 11px;
-  color: #858585;
-  font-family: monospace;
+  margin-left: var(--space-8);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
 }
 
 .context-menu-separator {
   height: 1px;
-  background-color: #454545;
-  margin: 4px 0;
+  background-color: var(--color-border-subtle);
+  margin: var(--space-2) 0;
 }

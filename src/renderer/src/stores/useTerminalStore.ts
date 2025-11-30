@@ -81,6 +81,9 @@ export function createTerminalStore(
   sendToTerminal: async (text: string, autoExecute = false): Promise<boolean> => {
     const terminalId = get().activeTerminalId
 
+    // Debug logging for issue #41
+    console.log(`📤 sendToTerminal: autoExecute=${autoExecute}, terminalId=${terminalId}, textLength=${text.length}`)
+
     if (!terminalId) {
       console.warn('❌ sendToTerminal: No active terminal available')
       return false
@@ -96,21 +99,24 @@ export function createTerminalStore(
       }
 
       // If autoExecute is enabled, send Enter key after a short delay
+      // IMPORTANT: The 200ms delay is REQUIRED - atomic writes don't work reliably
+      // This accounts for: PTY buffering + shell line discipline processing + rendering
+      // See: https://xtermjs.org/docs/guides/flowcontrol/
       if (autoExecute) {
-        // Wait 200ms to ensure text is rendered in terminal before sending Enter
-        // This delay accounts for: PTY buffering (1-20ms) + shell processing (1-50ms)
-        // + GPU rendering (10-100ms) + margin for loaded systems
+        console.log(`📤 sendToTerminal: autoExecute=true, waiting 200ms before sending Enter`)
         await new Promise(resolve => setTimeout(resolve, 200))
 
-        // Send Enter key
+        // Send Enter key (carriage return)
         const enterResult = await terminalOps.write(terminalId, '\r')
 
         if (!enterResult.success) {
           console.error(`❌ sendToTerminal: Failed to send Enter: ${enterResult.error}`)
           return false
         }
+        console.log(`✅ sendToTerminal: Enter sent successfully`)
       }
 
+      console.log(`✅ sendToTerminal: Write successful`)
       return true
     } catch (error) {
       console.error('❌ sendToTerminal: Unexpected error:', error)

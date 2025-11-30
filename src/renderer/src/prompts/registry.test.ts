@@ -62,7 +62,7 @@ describe('Template Registry', () => {
       expect(prompt?.label).toBe('Prompt')
       expect(prompt?.icon).toBe('sparkles')
       expect(prompt?.requiresInput).toBe(true)
-      expect(prompt?.autoExecute).toBe(true)
+      expect(prompt?.autoExecute).toBe(true) // v0.5.3+: enabled for all prompts
       expect(prompt?.order).toBe(3)
     })
 

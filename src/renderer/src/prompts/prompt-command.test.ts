@@ -35,6 +35,7 @@ describe('Prompt Command - New Feature Tests', () => {
     })
 
     it('should have autoExecute enabled', () => {
+      // autoExecute enabled for all prompts (v0.5.3+)
       const prompt = getPrompt('prompt')
 
       expect(prompt?.autoExecute).toBe(true)
@@ -261,7 +262,8 @@ describe('Prompt Command - New Feature Tests', () => {
       expect(ids.length).toBe(3)
     })
 
-    it('should have autoExecute like all other context menu commands', () => {
+    it('should have autoExecute=true for all prompts (v0.5.3+)', () => {
+      // v0.5.3+: autoExecute enabled for all prompts
       const prompts = getPromptsForArea('markdown-preview', 'context-menu')
 
       prompts.forEach((prompt) => {

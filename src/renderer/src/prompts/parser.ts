@@ -47,7 +47,7 @@ export function parseTemplate(raw: string, filename: string): ParsedTemplate {
   // Parse YAML frontmatter
   let data: unknown
   try {
-    data = yaml.load(frontmatterYaml)
+    data = yaml.load(frontmatterYaml, { schema: yaml.JSON_SCHEMA })
   } catch (error) {
     throw new Error(`Failed to parse YAML in ${filename}: ${error}`)
   }

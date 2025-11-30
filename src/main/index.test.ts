@@ -53,7 +53,16 @@ describe('Main Process - Window Creation', () => {
     vi.doMock('electron', () => ({
       app: mockApp,
       shell: { openExternal: vi.fn() },
-      BrowserWindow: mockBrowserWindow
+      BrowserWindow: mockBrowserWindow,
+      Menu: {
+        buildFromTemplate: vi.fn(() => ({})),
+        setApplicationMenu: vi.fn()
+      }
+    }))
+
+    // Mock menu module
+    vi.doMock('./menu', () => ({
+      createApplicationMenu: vi.fn(() => ({}))
     }))
 
     // Mock @electron-toolkit/utils
@@ -193,7 +202,15 @@ describe('Main Process - Window Creation', () => {
         vi.doMock('electron', () => ({
           app: mockApp,
           shell: { openExternal: vi.fn() },
-          BrowserWindow: mockBrowserWindow
+          BrowserWindow: mockBrowserWindow,
+          Menu: {
+            buildFromTemplate: vi.fn(() => ({})),
+            setApplicationMenu: vi.fn()
+          }
+        }))
+
+        vi.doMock('./menu', () => ({
+          createApplicationMenu: vi.fn(() => ({}))
         }))
 
         vi.doMock('@electron-toolkit/utils', () => ({
@@ -250,6 +267,25 @@ describe('Main Process - Window Creation', () => {
 
       // Verify 'on' was called with 'ready-to-show'
       expect(createdWindow.on).toHaveBeenCalledWith('ready-to-show', expect.any(Function))
+    })
+  })
+
+  describe('Application Menu Configuration', () => {
+    it('should set application menu on startup', async () => {
+      mockIs.dev = false
+
+      // Get mocked modules
+      const { Menu } = await import('electron')
+      const { createApplicationMenu } = await import('./menu')
+
+      await import('./index')
+
+      // Verify createApplicationMenu was called
+      expect(createApplicationMenu).toHaveBeenCalledTimes(1)
+
+      // Verify Menu.setApplicationMenu was called with the menu
+      expect(Menu.setApplicationMenu).toHaveBeenCalledTimes(1)
+      expect(Menu.setApplicationMenu).toHaveBeenCalledWith({})
     })
   })
 

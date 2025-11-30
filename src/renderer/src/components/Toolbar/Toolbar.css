@@ -3,9 +3,9 @@
   align-items: center;
   justify-content: space-between;
   height: 40px;
-  background: #2d2d30;
-  border-bottom: 1px solid #1e1e1e;
-  padding: 0 12px;
+  background: var(--color-bg-secondary);
+  border-bottom: var(--border-width) solid var(--color-bg-primary);
+  padding: 0 var(--space-6);
   flex-shrink: 0;
   user-select: none;
 }
@@ -13,7 +13,7 @@
 .toolbar-section {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-4);
 }
 
 .toolbar-left {
@@ -30,10 +30,10 @@
 }
 
 .toolbar-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #cccccc;
-  padding: 0 8px;
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  padding: 0 var(--space-4);
 }
 
 /* Icon-only toggle buttons (VS Code style) */
@@ -46,19 +46,19 @@
   padding: 0;
   background: transparent;
   border: none;
-  border-radius: 0;
-  color: #cccccc;
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
   cursor: pointer;
-  transition: all 0.1s ease;
+  transition: all var(--transition-fast);
   outline: none;
 }
 
 .toolbar-icon-button:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-hover);
 }
 
 .toolbar-icon-button.active {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--color-bg-active);
 }
 
 .toolbar-icon-button svg {

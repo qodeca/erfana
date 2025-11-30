@@ -71,7 +71,8 @@ describe('Existing Commands - Regression Tests', () => {
       expect(modify?.requiresInput).toBe(true)
     })
 
-    it('should still have autoExecute enabled', () => {
+    it('should have autoExecute enabled', () => {
+      // autoExecute enabled for all prompts (v0.5.3+)
       const modify = getPrompt('modify')
 
       expect(modify?.autoExecute).toBe(true)
@@ -127,7 +128,8 @@ describe('Existing Commands - Regression Tests', () => {
       expect(ask?.requiresInput).toBe(true)
     })
 
-    it('should still have autoExecute enabled', () => {
+    it('should have autoExecute enabled', () => {
+      // autoExecute enabled for all prompts (v0.5.3+)
       const ask = getPrompt('ask')
 
       expect(ask?.autoExecute).toBe(true)
@@ -255,10 +257,11 @@ describe('Existing Commands - Regression Tests', () => {
     })
   })
 
-  describe('AutoExecute Behavior - No Regression', () => {
-    it('should maintain autoExecute=true for all context menu commands', () => {
+  describe('AutoExecute Behavior', () => {
+    it('should have autoExecute=true for all prompts (v0.5.3+)', () => {
       const prompts = getPromptsForArea('markdown-preview', 'context-menu')
 
+      // v0.5.3+: autoExecute enabled for all prompts
       prompts.forEach((prompt) => {
         expect(prompt.autoExecute).toBe(true)
       })

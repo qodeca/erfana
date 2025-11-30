@@ -1,12 +1,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, ZoomIn, ZoomOut, Maximize, RotateCcw } from 'lucide-react'
-import {
-  getKeyboardAction,
-  formatZoomLevel,
-  getZoomButtonStates,
-  ZOOM_CONFIG
-} from './diagramViewer.logic'
+import { X } from 'lucide-react'
+import { getKeyboardAction, getZoomButtonStates, ZOOM_CONFIG } from './diagramViewer.logic'
 import { ChatBubble } from './ChatBubble'
 import { useDiagramViewerStore } from '../../../stores/useDiagramViewerStore'
 import './DiagramViewer.css'
@@ -28,6 +23,8 @@ interface SvgDimensions {
  * Reads state from useDiagramViewerStore instead of props.
  * This allows the viewer to stay open and receive updates when the source
  * markdown file is edited (MermaidDiagram components are recreated but store persists).
+ *
+ * The terminal is now integrated into the ChatBubble panel instead of a side pane.
  */
 export function DiagramViewer() {
   // Read all state from the store
@@ -40,6 +37,7 @@ export function DiagramViewer() {
     endLine,
     closeViewer
   } = useDiagramViewerStore()
+
   const overlayRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const svgContainerRef = useRef<HTMLDivElement>(null)
@@ -58,9 +56,15 @@ export function DiagramViewer() {
   const [hasInitialized, setHasInitialized] = useState(false)
 
   // Inject SVG content exactly like MermaidDiagram does - via innerHTML
-  // SECURITY: svgContent must be pre-sanitized. This component trusts that the
-  // SVG comes from MermaidDiagram which uses mermaid.render() with securityLevel: 'strict'.
-  // Never pass untrusted/user-provided SVG directly to this component.
+  //
+  // ⚠️  DO NOT ADD SVG SANITIZATION HERE (e.g., DOMPurify)
+  //
+  // svgContent comes from MermaidDiagram which uses mermaid.render() with
+  // securityLevel: 'strict' (default since v10). Additional sanitization BREAKS diagrams:
+  // - DOMPurify strips foreignObject content (GitHub DOMPurify #1002, #1088)
+  // - DOMPurify strips xlink:href internal references used for markers (#233)
+  //
+  // See: https://github.com/cure53/DOMPurify/issues/1002
   useEffect(() => {
     if (!isOpen || !svgContainerRef.current || !svgContent) return
 
@@ -272,11 +276,18 @@ export function DiagramViewer() {
     [closeViewer]
   )
 
-  // Keyboard shortcuts - must come after handler definitions
+  // Keyboard shortcuts
   useEffect(() => {
     if (!isOpen) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip keyboard shortcuts when user is typing in textarea or input
+      // This allows native copy/paste and text editing to work normally
+      const target = e.target as HTMLElement
+      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT')) {
+        return
+      }
+
       const action = getKeyboardAction({
         key: e.key,
         ctrlKey: e.ctrlKey,
@@ -301,16 +312,13 @@ export function DiagramViewer() {
           e.preventDefault()
           handleFitToView()
           break
-        case 'close':
-          e.preventDefault()
-          closeViewer()
-          break
+        // Note: 'close' action removed - use X button instead
       }
     }
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, closeViewer, handleZoomIn, handleZoomOut, handleReset, handleFitToView])
+  }, [isOpen, handleZoomIn, handleZoomOut, handleReset, handleFitToView])
 
   // Apply dimension-based zoom (fixes pixelation - issue #31)
   // Scales SVG width/height for native vector rendering at any size
@@ -351,96 +359,51 @@ export function DiagramViewer() {
       aria-label="Mermaid Diagram"
       onClick={handleBackdropClick}
     >
-      {/* Toolbar */}
-      <div className="diagram-viewer-toolbar" role="toolbar" aria-label="Diagram viewer controls">
-        <div className="diagram-viewer-toolbar-left">
-          <span className="diagram-viewer-title">Mermaid Diagram</span>
-        </div>
-
-        <div className="diagram-viewer-toolbar-center">
-          <button
-            className="diagram-viewer-btn"
-            onClick={handleZoomOut}
-            disabled={zoomOutDisabled}
-            title="Zoom out (-)"
-            aria-label="Zoom out"
-          >
-            <ZoomOut size={16} />
-          </button>
-
-          <div className="diagram-viewer-zoom-indicator" aria-live="polite">
-            {formatZoomLevel(transform.scale)}
-          </div>
-
-          <button
-            className="diagram-viewer-btn"
-            onClick={handleZoomIn}
-            disabled={zoomInDisabled}
-            title="Zoom in (+)"
-            aria-label="Zoom in"
-          >
-            <ZoomIn size={16} />
-          </button>
-
-          <div className="diagram-viewer-separator" />
-
-          <button
-            className="diagram-viewer-btn"
-            onClick={handleFitToView}
-            title="Fit to screen (F)"
-            aria-label="Fit to screen"
-          >
-            <Maximize size={16} />
-          </button>
-
-          <button
-            className="diagram-viewer-btn"
-            onClick={handleReset}
-            title="Reset view (0)"
-            aria-label="Reset view"
-          >
-            <RotateCcw size={16} />
-          </button>
-        </div>
-
-        <div className="diagram-viewer-toolbar-right">
-          <button
-            className="diagram-viewer-btn diagram-viewer-btn-close"
-            onClick={closeViewer}
-            title="Close (Escape)"
-            aria-label="Close viewer"
-            autoFocus
-          >
-            <X size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* SVG Content with dimension-based zoom (fixes pixelation - issue #31) */}
-      {/* Cursor is managed via document.body.style.cursor in handleMouseDown/handleMouseUp */}
-      <div
-        ref={containerRef}
-        className="diagram-viewer-content"
-        onMouseDown={handleMouseDown}
+      {/* Floating close button (issue #37) */}
+      <button
+        className="diagram-viewer-close-floating"
+        onClick={closeViewer}
+        title="Close"
+        aria-label="Close diagram viewer"
+        autoFocus
       >
-        <div
-          ref={svgContainerRef}
-          className="diagram-viewer-svg-container"
-          style={{
-            transform: `translate(${transform.translateX}px, ${transform.translateY}px)`
-          }}
-        />
-      </div>
+        <X size={16} />
+      </button>
 
-      {/* Chat bubble for AI-assisted diagram modifications */}
-      {mermaidCode && filePath && (
-        <ChatBubble
-          mermaidCode={mermaidCode}
-          filePath={filePath}
-          startLine={startLine}
-          endLine={endLine}
-        />
-      )}
+      {/* Full-width diagram content area */}
+      <div className="diagram-viewer-content-wrapper">
+        {/* SVG Content with dimension-based zoom (fixes pixelation - issue #31) */}
+        <div
+          ref={containerRef}
+          className="diagram-viewer-content"
+          onMouseDown={handleMouseDown}
+        >
+          <div
+            ref={svgContainerRef}
+            className="diagram-viewer-svg-container"
+            style={{
+              transform: `translate(${transform.translateX}px, ${transform.translateY}px)`
+            }}
+          />
+        </div>
+
+        {/* Chat bubble for AI-assisted diagram modifications (contains terminal) */}
+        {mermaidCode && filePath && (
+          <ChatBubble
+            mermaidCode={mermaidCode}
+            filePath={filePath}
+            startLine={startLine}
+            endLine={endLine}
+            transform={transform}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onFitToView={handleFitToView}
+            onReset={handleReset}
+            zoomInDisabled={zoomInDisabled}
+            zoomOutDisabled={zoomOutDisabled}
+          />
+        )}
+      </div>
     </div>,
     portalRoot
   )
