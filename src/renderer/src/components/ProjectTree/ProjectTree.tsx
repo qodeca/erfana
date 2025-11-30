@@ -33,6 +33,7 @@ import { useFileOperations } from '../../hooks/useFileOperations'
 import { useImport } from '../../hooks/useImport'
 import { useGitStatus } from '../../hooks/useGitStatus'
 import { GitStatusBar } from './GitStatusBar'
+import { GitErrorBoundary } from './GitErrorBoundary'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -71,6 +72,19 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_fileOperationLoading, setFileOperationLoading] = useState<boolean>(false)
 
+  // Git status hook (auto-refreshes on file changes)
+  // Must be called before useFileOperations so refreshGitStatus is available
+  const {
+    isGitRepo,
+    branch,
+    isDetached,
+    counts,
+    truncated,
+    getFileStatus,
+    getFolderStatus,
+    refresh: refreshGitStatus,
+  } = useGitStatus({ projectPath })
+
   // File operation handlers via hook (only toolbar actions; context menu uses commands)
   const {
     handleNewFile,
@@ -83,7 +97,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     onFileSelect,
     refreshProjectTree: refreshFiles,
     isInternalOperationRef: isInternalOperation,
-    setFileOperationLoading
+    setFileOperationLoading,
+    onGitRefresh: refreshGitStatus
   })
 
   // Context menu state
@@ -106,17 +121,6 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
   // Import hook (for context menu)
   const { importFile } = useImport()
-
-  // Git status hook (auto-refreshes on file changes)
-  const {
-    isGitRepo,
-    branch,
-    isDetached,
-    counts,
-    truncated,
-    getFileStatus,
-    getFolderStatus,
-  } = useGitStatus({ projectPath })
 
   // Context menu factory (Strategy + Command pattern)
   const contextMenuFactory = useMemo(() => new ContextMenuFactory(), [])
@@ -682,6 +686,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     withWatcherPause: <T,>(op: () => Promise<T>) =>
       withWatcherPause(projectPath, isInternalOperation, setFileOperationLoading, op),
     refreshProjectTree: refreshFiles,
+    onGitRefresh: refreshGitStatus,
     formatFileOperationError,
     getSiblingNames: (nodePath: string, currentName: string) => {
       const parentPath = nodePath.substring(0, nodePath.lastIndexOf('/'))
@@ -850,14 +855,16 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         />
       )}
 
-      {/* Git Status Bar (footer) */}
-      <GitStatusBar
-        isGitRepo={isGitRepo}
-        branch={branch}
-        isDetached={isDetached}
-        counts={counts}
-        truncated={truncated}
-      />
+      {/* Git Status Bar (footer) - wrapped in error boundary for resilience */}
+      <GitErrorBoundary>
+        <GitStatusBar
+          isGitRepo={isGitRepo}
+          branch={branch}
+          isDetached={isDetached}
+          counts={counts}
+          truncated={truncated}
+        />
+      </GitErrorBoundary>
 
     </div>
   )

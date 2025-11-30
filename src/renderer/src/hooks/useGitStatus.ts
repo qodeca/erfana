@@ -6,11 +6,11 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 import { useGitStore } from '../stores/useGitStore'
+import { GIT_STATUS } from '../components/ProjectTree/constants'
 import type { GitStatusCounts, GitDisplayStatus } from '../../../shared/ipc/git-schema'
 
-// Configuration constants
-const DEBOUNCE_DELAY = 1000 // 1s - wait for rapid file changes to settle
-const COOLDOWN_DURATION = 2000 // 2s - prevent excessive refreshes (reduced from 5s for better UX)
+// Use centralized constants
+const { DEBOUNCE_DELAY, COOLDOWN_DURATION } = GIT_STATUS
 
 interface UseGitStatusOptions {
   projectPath: string | null
@@ -60,10 +60,19 @@ export function useGitStatus({
     getFolderStatus,
     clear,
     lastRefreshTime,
+    // Subscribe to Maps to trigger re-renders when status changes
+    // Without this, getFileStatus/getFolderStatus are stable refs and won't trigger updates
+    fileStatuses: _fileStatuses,
+    folderStatuses: _folderStatuses,
   } = useGitStore()
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const cooldownTimerRef = useRef<NodeJS.Timeout | null>(null)
   const isWindowVisibleRef = useRef(true)
+  // Track current project to ignore stale responses from old project requests
+  const currentProjectRef = useRef<string | null>(null)
+  // Track if a refresh is pending (blocked by cooldown)
+  const pendingRefreshRef = useRef(false)
 
   /**
    * Core refresh function - calls IPC and updates store
@@ -73,20 +82,58 @@ export function useGitStatus({
     async (bypassCooldown: boolean = false) => {
       if (!projectPath || !enabled) return
 
+      // Capture project path for this request to detect stale responses
+      const requestProjectPath = projectPath
+      currentProjectRef.current = projectPath
+
       // Cooldown check (prevent excessive refreshes)
       if (!bypassCooldown) {
         const timeSinceLastRefresh = Date.now() - lastRefreshTime
         if (timeSinceLastRefresh < COOLDOWN_DURATION) {
-          console.log('[useGitStatus] Skipping refresh - cooldown active')
+          const remainingCooldown = COOLDOWN_DURATION - timeSinceLastRefresh
+
+          // Always cancel existing pending refresh - latest request wins
+          if (cooldownTimerRef.current) {
+            clearTimeout(cooldownTimerRef.current)
+          }
+
+          // Schedule new refresh after cooldown expires
+          pendingRefreshRef.current = true
+          cooldownTimerRef.current = setTimeout(() => {
+            cooldownTimerRef.current = null
+            pendingRefreshRef.current = false
+            // Re-check if still current project before executing
+            if (currentProjectRef.current === projectPath) {
+              executeRefresh(true) // Bypass cooldown for scheduled refresh
+            }
+          }, remainingCooldown)
+
           return
         }
       }
 
+      // Clear any pending refresh since we're executing now
+      pendingRefreshRef.current = false
+      if (cooldownTimerRef.current) {
+        clearTimeout(cooldownTimerRef.current)
+        cooldownTimerRef.current = null
+      }
+
       try {
         setRefreshing(true)
-        const response = await window.api.git.getStatus(projectPath)
+        const response = await window.api.git.getStatus(requestProjectPath)
+
+        // CRITICAL: Ignore response if project changed during request
+        if (currentProjectRef.current !== requestProjectPath) {
+          console.log('[useGitStatus] Ignoring stale response for:', requestProjectPath)
+          return
+        }
+
         setStatus(response)
       } catch (err) {
+        // Only set error if still current project
+        if (currentProjectRef.current !== requestProjectPath) return
+
         console.error('[useGitStatus] Refresh error:', err)
         setStatus({
           isGitRepo: false,
@@ -98,7 +145,10 @@ export function useGitStatus({
           error: err instanceof Error ? err.message : 'Unknown error',
         })
       } finally {
-        setRefreshing(false)
+        // Only clear refreshing if still current project
+        if (currentProjectRef.current === requestProjectPath) {
+          setRefreshing(false)
+        }
       }
     },
     [projectPath, enabled, lastRefreshTime, setRefreshing, setStatus]
@@ -135,8 +185,15 @@ export function useGitStatus({
       return
     }
 
+    // Clear old project's status before fetching new project
+    // This prevents stale data from briefly showing during the fetch
+    clear()
+
     // Initial load - bypass cooldown
-    // Note: executeRefresh is intentionally omitted from deps to prevent re-creation loop
+    // Note: executeRefresh is intentionally omitted from deps to prevent re-creation loop.
+    // This is safe because executeRefresh's identity changes only when its deps change,
+    // but we only want to trigger on projectPath/enabled changes, not on every refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     executeRefresh(true)
   }, [projectPath, enabled, clear])
 
@@ -157,6 +214,12 @@ export function useGitStatus({
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current)
       }
+      // Clear cooldown timer on unmount
+      if (cooldownTimerRef.current) {
+        clearTimeout(cooldownTimerRef.current)
+        cooldownTimerRef.current = null
+      }
+      pendingRefreshRef.current = false
     }
   }, [projectPath, enabled, debouncedRefresh])
 

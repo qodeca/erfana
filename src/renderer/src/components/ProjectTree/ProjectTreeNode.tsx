@@ -3,6 +3,7 @@ import type { FileNode } from '../../../../preload/index'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import type { GitDisplayStatus } from '../../../../shared/ipc/git-schema'
 import { GitStatusBadge } from './GitStatusBadge'
+import { GitErrorBoundary } from './GitErrorBoundary'
 import './ProjectTree.css'
 
 /**
@@ -207,7 +208,9 @@ export function ProjectTreeNode({
           {node.name}
         </span>
         {currentGitStatus && currentGitStatus !== 'unmodified' && (
-          <GitStatusBadge status={currentGitStatus} isFolder={node.type === 'directory'} />
+          <GitErrorBoundary>
+            <GitStatusBadge status={currentGitStatus} isFolder={node.type === 'directory'} />
+          </GitErrorBoundary>
         )}
       </div>
       {node.type === 'directory' && isExpanded && node.children && (

@@ -54,3 +54,20 @@ export const AUTO_EXPAND = {
   /** Delay in ms before auto-expanding a folder when hovering (1 second) */
   HOVER_DELAY: 1_000
 } as const
+
+/**
+ * Git Status Configuration
+ */
+export const GIT_STATUS = {
+  /**
+   * Debounce delay in ms for git status refresh.
+   * Waits for rapid file changes to settle before refreshing.
+   */
+  DEBOUNCE_DELAY: 1_000,
+
+  /**
+   * Cooldown duration in ms between git status refreshes.
+   * Prevents excessive refreshes during continuous file activity.
+   */
+  COOLDOWN_DURATION: 2_000
+} as const
