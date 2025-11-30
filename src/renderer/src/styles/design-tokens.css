@@ -102,6 +102,28 @@
   --color-info: #4fc3f7;
 
   /* ============================================
+   * COLORS: Error State (Extended Palette)
+   * For error dialogs, Mermaid errors, etc.
+   * ============================================ */
+  --color-error-bg: #3c1f1f;              /* Error container background */
+  --color-error-bg-dark: #2a1414;         /* Error code block background */
+  --color-error-border: #5c2e2e;          /* Error container border */
+  --color-error-text-light: #ffcccb;      /* Light error text (code blocks) */
+  --color-error-text-hint: #d4a5a5;       /* Muted error hints */
+
+  /* ============================================
+   * COLORS: Syntax Highlighting
+   * For code blocks and inline code
+   * ============================================ */
+  --color-syntax-string: #ce9178;         /* String literals, inline code */
+
+  /* ============================================
+   * COLORS: Special Backgrounds
+   * Component-specific backgrounds
+   * ============================================ */
+  --color-bg-diagram: #f8f9fa;            /* Mermaid SVG background (light for readability) */
+
+  /* ============================================
    * SPACING: 4px Base Grid
    * All spacing should use these values
    *
