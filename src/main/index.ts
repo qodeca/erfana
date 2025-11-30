@@ -8,6 +8,7 @@ import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handle
 import { registerSettingsHandlers } from './ipc/settings-handlers'
 import { registerTerminalHandlers } from './ipc/terminal-handlers'
 import { registerImportHandlers } from './ipc/import-handlers'
+import { registerGitHandlers } from './ipc/git-handlers'
 import { createApplicationMenu } from './menu'
 import { fileWatcherService } from './services/FileWatcherService'
 import { directoryWatcherService } from './services/DirectoryWatcherService'
@@ -96,6 +97,7 @@ app.whenReady().then(() => {
   registerSettingsHandlers()
   registerTerminalHandlers()
   registerImportHandlers()
+  registerGitHandlers()
 
   // RELIABILITY FIX (todo012): Clean up stale projects on startup
   // This runs asynchronously but doesn't block window creation

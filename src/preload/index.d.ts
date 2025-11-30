@@ -1,5 +1,6 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import { FileNode, FileStats } from './index'
+import type { GitStatusResponse } from '../shared/ipc/git-schema'
 
 declare global {
   interface Window {
@@ -121,6 +122,9 @@ declare global {
         }>
         getSupportedExtensions: () => Promise<string[]>
         isSupported: (extension: string) => Promise<boolean>
+      }
+      git: {
+        getStatus: (projectPath: string) => Promise<GitStatusResponse>
       }
     }
   }

@@ -32,6 +32,15 @@
   --color-brand-violet-muted: rgba(160, 168, 255, 0.2); /* For backgrounds */
 
   /* ============================================
+   * COLORS: Secondary Accent Palette
+   * Extended brand colors for UI variety
+   * ============================================ */
+  --color-brand-amber: #FFA335;          /* Qodeca Amber - warm orange */
+  --color-brand-coral: #FF626A;          /* Qodeca Coral - soft red-pink */
+  --color-brand-magenta: #FF3381;        /* Qodeca Magenta - vivid pink */
+  --color-brand-indigo: #3F3FBA;         /* Qodeca Indigo - deep blue-violet */
+
+  /* ============================================
    * COLORS: Neutral Scale
    * Gray scale from white to black
    * ============================================ */
@@ -148,6 +157,17 @@
    * Terminal-specific colors
    * ============================================ */
   --color-cursor: #4fc1ff;                /* Terminal cursor color */
+
+  /* ============================================
+   * COLORS: Git Status (Brand Palette)
+   * Visual indicators using Qodeca brand colors
+   * ============================================ */
+  --color-git-modified: var(--color-brand-amber);    /* Amber - modified files (attention) */
+  --color-git-untracked: var(--color-brand-lime);    /* Lime - untracked/new files (positive) */
+  --color-git-deleted: var(--color-brand-coral);     /* Coral - deleted files (removed) */
+  --color-git-staged: var(--color-brand-violet);     /* Violet - staged/added files (ready) */
+  --color-git-renamed: var(--color-brand-indigo);    /* Indigo - renamed files (transformed) */
+  --color-git-conflicted: var(--color-brand-magenta); /* Magenta - conflicted files (urgent) */
 
   /* ============================================
    * COLORS: Special Backgrounds

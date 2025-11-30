@@ -48,6 +48,7 @@
     "dompurify": "^3.3.0",
     "electron-store": "^11.0.2",
     "hast-util-sanitize": "^5.0.2",
+    "isomorphic-git": "^1.35.1",
     "js-yaml": "^4.1.0",
     "lucide-react": "^0.545.0",
     "mermaid": "^11.12.0",

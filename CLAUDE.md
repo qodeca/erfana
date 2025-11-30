@@ -41,7 +41,7 @@ src/
 
 ## Core Features
 1. **Markdown Editor** - Monaco with live preview, scroll sync, Mermaid diagrams
-2. **Project Tree** - File explorer with drag-drop reorganization, markdown filtering, context menu
+2. **Project Tree** - File explorer with drag-drop reorganization, markdown filtering, context menu, git status indicators
 3. **Terminal** - xterm.js with PTY backend
 4. **Prompt Templates** - AI text operations via context menu
 
@@ -53,7 +53,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (3172 tests, 109 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (3352 tests, 117 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -135,8 +135,28 @@ See `docs/` for details (keep Claude's context focused):
     - `src/renderer/src/components/Panels/TerminalPanel.tsx` - Simplified (removed scroll lock UI)
     - `src/renderer/src/components/Panels/TerminalPanel.css` - Removed scroll lock styles
   - 94 new tests (76 pure logic + 18 hook tests)
-  - **Total: 3172 tests passing (109 test files)**
   - Closes #22
+- **Git Status Indicators in Project Tree** (Nov 30, 2025):
+  - VS Code-style git status indicators showing file/folder modification state (issue #29)
+  - Read-only visual badges: Modified (M/Amber), Untracked (U/Lime), Deleted (D/Coral), Staged (A/Violet), Conflicted (!/Magenta)
+  - Folder status propagation with colored dots (horizontally aligned with badges)
+  - Git status bar at bottom of Project Tree: branch name + colored status counts
+  - Auto-refresh with 1s debounce, 2s cooldown, pauses when tab unfocused
+  - Uses isomorphic-git library (pure JavaScript, no git CLI dependency)
+  - Performance: 10,000 file cap for large repositories
+  - UI polish: Brighter text for unchanged files, violet icons for markdown files
+  - Brand palette colors for all git statuses (Qodeca brand alignment)
+  - New files:
+    - `src/shared/ipc/git-schema.ts`: Zod schemas for git status types
+    - `src/main/services/GitStatusService.ts`: Service using isomorphic-git statusMatrix()
+    - `src/main/ipc/git-handlers.ts`: IPC handler with path validation
+    - `src/renderer/src/stores/useGitStore.ts`: Zustand store for git state
+    - `src/renderer/src/hooks/useGitStatus.ts`: Hook with debounce/cooldown logic
+    - `src/renderer/src/utils/gitStatus.logic.ts`: Pure logic for status mapping
+    - `src/renderer/src/components/ProjectTree/GitStatusBadge.tsx`: File/folder status badge
+    - `src/renderer/src/components/ProjectTree/GitStatusBar.tsx`: Status bar component
+  - **Total: 3352 tests passing (117 test files)**
+  - Closes #29
 - **Terminal Panel Requires Project** (Nov 30, 2025):
   - Terminal panel completely hidden when no project is loaded (issue #46)
   - ActivityBar config extended with `requiresProject?: boolean` field
@@ -152,7 +172,6 @@ See `docs/` for details (keep Claude's context focused):
     - `src/renderer/src/components/ActivityBar/ActivityBar.tsx` - Filter panels, return null when empty
     - `src/renderer/src/components/DockLayout/AppDockLayout.tsx` - Dynamic panel add/remove with proper cleanup
   - 46 new tests for ActivityBar filtering logic
-  - **Total: 3122 tests passing (109 test files)**
   - Closes #46
 - **Fix: Terminal AutoExecute Regression & Infinite Loop** (Nov 30, 2025):
   - Fixed issue #41: AutoExecute regression in context menu actions (Elaborate, Modify, Ask)

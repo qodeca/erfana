@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { ProjectChanged } from '../shared/ipc/schema'
+import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import { electronAPI } from '@electron-toolkit/preload'
 
 export interface FileNode {
@@ -288,6 +289,16 @@ const api = {
      */
     isSupported: (extension: string): Promise<boolean> =>
       ipcRenderer.invoke('import:isSupported', extension)
+  },
+
+  // Git operations
+  git: {
+    /**
+     * Get git status for a project directory
+     * Returns branch name, file statuses, and status counts
+     */
+    getStatus: (projectPath: string): Promise<GitStatusResponse> =>
+      ipcRenderer.invoke('git:getStatus', projectPath)
   }
 }
 

@@ -69,6 +69,30 @@ The primary brand colors that define Erfana's visual identity.
 --color-brand-lime-muted: rgba(227, 232, 41, 0.3);    /* Backgrounds */
 ```
 
+### Secondary Accent Palette
+
+Extended brand colors for UI variety (git status, tags, badges, etc.):
+
+| Token | Hex | Name | Usage |
+|-------|-----|------|-------|
+| `--color-brand-amber` | `#FFA335` | **Qodeca Amber** | Warm orange - warnings, modified states |
+| `--color-brand-coral` | `#FF626A` | **Qodeca Coral** | Soft red-pink - errors, deletions |
+| `--color-brand-magenta` | `#FF3381` | **Qodeca Magenta** | Vivid pink - special highlights |
+| `--color-brand-indigo` | `#3F3FBA` | **Qodeca Indigo** | Deep blue-violet - secondary actions |
+
+### Git Status Colors
+
+Git status indicators use brand colors for visual consistency:
+
+| Token | Brand Color | Badge | UX Reasoning |
+|-------|-------------|-------|--------------|
+| `--color-git-modified` | Amber | M | Attention needed, file changed |
+| `--color-git-untracked` | Lime | U | New/positive - untracked file |
+| `--color-git-deleted` | Coral | D | Removed - file deleted |
+| `--color-git-staged` | Violet | A | Ready/prepared - staged for commit |
+| `--color-git-renamed` | Indigo | R | Transformed - file renamed |
+| `--color-git-conflicted` | Magenta | ! | Urgent - needs resolution |
+
 ### Neutral Scale
 
 The grayscale is the foundation of the UI. Use semantic tokens, not raw hex values.

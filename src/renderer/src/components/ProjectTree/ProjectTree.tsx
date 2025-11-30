@@ -31,6 +31,8 @@ import { useDirectoryWatcher } from '../../hooks/useDirectoryWatcher'
 import { useProjectManagementContext, useProjectChangedEffect } from '../../context/ProjectManagementContext'
 import { useFileOperations } from '../../hooks/useFileOperations'
 import { useImport } from '../../hooks/useImport'
+import { useGitStatus } from '../../hooks/useGitStatus'
+import { GitStatusBar } from './GitStatusBar'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -104,6 +106,17 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
   // Import hook (for context menu)
   const { importFile } = useImport()
+
+  // Git status hook (auto-refreshes on file changes)
+  const {
+    isGitRepo,
+    branch,
+    isDetached,
+    counts,
+    truncated,
+    getFileStatus,
+    getFolderStatus,
+  } = useGitStatus({ projectPath })
 
   // Context menu factory (Strategy + Command pattern)
   const contextMenuFactory = useMemo(() => new ContextMenuFactory(), [])
@@ -808,6 +821,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
               isDragging={activeId === rootFolderNode.path}
               isDropTarget={overId === rootFolderNode.path}
               clipboardCut={clipboard.itemPath === rootFolderNode.path && clipboard.operation === 'cut'}
+              getFileStatus={getFileStatus}
+              getFolderStatus={getFolderStatus}
             />
           ) : (
             <div className="project-tree-empty">
@@ -834,6 +849,15 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
           onClose={handleCloseContextMenu}
         />
       )}
+
+      {/* Git Status Bar (footer) */}
+      <GitStatusBar
+        isGitRepo={isGitRepo}
+        branch={branch}
+        isDetached={isDetached}
+        counts={counts}
+        truncated={truncated}
+      />
 
     </div>
   )
