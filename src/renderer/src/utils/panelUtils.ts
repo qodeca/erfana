@@ -144,6 +144,8 @@ export async function openPanelAndSendContent({
       return { success: false, error }
     }
 
+    // Debug logging for issue #41
+    console.log(`📋 openPanelAndSendContent: calling sendToTerminal with autoExecute=${autoExecute}`)
     const sent = await terminalManager.sendToTerminal(content, autoExecute)
     if (!sent) {
       const error = new AppError(
@@ -232,6 +234,9 @@ export async function executePromptTemplate(
 
   // Determine target panel (Copilot removed; default to terminal)
   const targetPanel = 'terminal' as const
+
+  // Debug logging for issue #41
+  console.log(`📋 executePromptTemplate: promptId=${promptId}, config.autoExecute=${config.autoExecute}, typeof=${typeof config.autoExecute}`)
 
   // Execute prompt by sending to target panel
   return await openPanelAndSendContent({
