@@ -33,10 +33,17 @@ export interface ScrollAnomalyConfig {
   nearTopThreshold: number
 
   /**
+   * @deprecated Use recoveryIntervalMs instead. Kept for backwards compatibility.
    * Debounce between recovery actions (ms)
-   * 100ms prevents rapid-fire corrections
    */
   recoveryDebounceMs: number
+
+  /**
+   * Fixed interval for checking anomaly queue and triggering recovery (ms)
+   * 500ms balances responsiveness with batching efficiency
+   * Issue #22: Changed from debounce to fixed-interval queue approach
+   */
+  recoveryIntervalMs: number
 }
 
 export interface ScrollState {
@@ -59,7 +66,8 @@ export const DEFAULT_SCROLL_ANOMALY_CONFIG: ScrollAnomalyConfig = {
   dataStreamRecencyMs: 500,
   jumpThresholdLines: 10,
   nearTopThreshold: 3,
-  recoveryDebounceMs: 100
+  recoveryDebounceMs: 100, // @deprecated - kept for backwards compatibility
+  recoveryIntervalMs: 500  // Issue #22: Fixed-interval queue approach
 }
 
 /**

@@ -53,7 +53,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (3122 tests, 109 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (3128 tests, 109 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -117,6 +117,24 @@ See `docs/` for details (keep Claude's context focused):
 - [ ] Focus states are visible (accessibility)
 
 ## Recent Changes (v0.5.3)
+- **Fix: Terminal Scroll Auto-Recovery Inconsistency** (Nov 30, 2025):
+  - Fixed issue #22: Terminal scroll auto-recovery only worked ~50% of the time during Claude Code streaming
+  - Root cause: "First wins" debounce pattern - only first anomaly in 100ms window triggered recovery
+  - Solution: Fixed-interval queue approach:
+    1. **Queue anomalies**: Every detected anomaly increments a counter (no immediate recovery)
+    2. **Fixed 500ms interval**: Check counter; if > 0, reset sync, scroll async via RAF
+    3. **No anomaly lost**: Counter reset happens synchronously before async scroll
+  - Added keyboard scroll detection (PageUp/Down, Arrow Up/Down, Home/End prevent recovery)
+  - Added RAF cancellation to prevent overlapping callbacks
+  - Config: Added `recoveryIntervalMs` (500ms), deprecated `recoveryDebounceMs`
+  - `onRecovery` callback now receives anomaly count for diagnostics
+  - Files changed:
+    - `src/renderer/src/utils/scrollAnomalyDetector.ts` - Added recoveryIntervalMs config
+    - `src/renderer/src/hooks/useScrollAnomalyRecovery.ts` - Fixed-interval queue implementation
+    - `src/renderer/src/components/Panels/TerminalPanel.tsx` - Updated onRecovery callback
+  - 6 new tests for queue approach and keyboard detection
+  - **Total: 3128 tests passing (109 test files)**
+  - Closes #22
 - **Terminal Panel Requires Project** (Nov 30, 2025):
   - Terminal panel completely hidden when no project is loaded (issue #46)
   - ActivityBar config extended with `requiresProject?: boolean` field
