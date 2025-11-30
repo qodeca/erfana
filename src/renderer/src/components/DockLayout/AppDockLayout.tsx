@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import {
   DockviewReact,
   DockviewReadyEvent,
@@ -190,41 +190,44 @@ export function AppDockLayout() {
   }
 
   // Handle activity bar panel clicks
-  const handleActivityBarClick = (panelId: string, side: 'left' | 'right') => {
-    if (!splitviewApiRef.current) {
-      console.warn('SplitView API not ready')
-      return
-    }
+  const handleActivityBarClick = useCallback(
+    (panelId: string, side: 'left' | 'right') => {
+      if (!splitviewApiRef.current) {
+        console.warn('SplitView API not ready')
+        return
+      }
 
-    const panelConfig = getPanelById(panelId)
-    if (!panelConfig) return
+      const panelConfig = getPanelById(panelId)
+      if (!panelConfig) return
 
-    if (side === 'left') {
-      // Left sidebar: simple toggle
-      const panel = splitviewApiRef.current.getPanel('left-sidebar')
-      if (!panel) return
+      if (side === 'left') {
+        // Left sidebar: simple toggle
+        const panel = splitviewApiRef.current.getPanel('left-sidebar')
+        if (!panel) return
 
-      const shouldShow = leftActivePanel !== panelId
-      panel.api.setVisible(shouldShow)
-      togglePanel(panelId, side)
-    } else {
-      // Right sidebar: only Terminal panel remains
-      const terminalPanel = splitviewApiRef.current.getPanel('terminal-panel')
-      if (!terminalPanel) return
-
-      const currentActive = rightActivePanel
-      if (currentActive === panelId) {
-        terminalPanel.api.setVisible(false)
+        const shouldShow = leftActivePanel !== panelId
+        panel.api.setVisible(shouldShow)
         togglePanel(panelId, side)
       } else {
-        terminalPanel.api.setVisible(false)
-        if (panelId === 'terminal') {
-          terminalPanel.api.setVisible(true)
+        // Right sidebar: only Terminal panel remains
+        const terminalPanel = splitviewApiRef.current.getPanel('terminal-panel')
+        if (!terminalPanel) return
+
+        const currentActive = rightActivePanel
+        if (currentActive === panelId) {
+          terminalPanel.api.setVisible(false)
+          togglePanel(panelId, side)
+        } else {
+          terminalPanel.api.setVisible(false)
+          if (panelId === 'terminal') {
+            terminalPanel.api.setVisible(true)
+          }
+          togglePanel(panelId, side)
         }
-        togglePanel(panelId, side)
       }
-    }
-  }
+    },
+    [leftActivePanel, rightActivePanel, togglePanel]
+  )
 
   // Dynamically add/remove terminal panel based on projectPath
   // This ensures the sash (resize handle) is also hidden when no project is loaded
@@ -309,7 +312,7 @@ export function AppDockLayout() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [leftActivePanel, rightActivePanel, projectPath])
+  }, [handleActivityBarClick, projectPath])
 
   // Splitview components registry
   const splitviewComponents = {
