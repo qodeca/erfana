@@ -3,8 +3,8 @@
  */
 
 .char-count {
-  font-size: 12px;
-  color: #858585;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
   display: flex;
   align-items: center;
@@ -12,13 +12,13 @@
 
 /* Validation state colors */
 .char-count--warning {
-  color: #cca700;
+  color: var(--color-warning);
 }
 
 .char-count--error {
-  color: #f48771;
+  color: var(--color-error);
 }
 
 .char-count--hint {
-  color: #858585;
+  color: var(--color-text-secondary);
 }
