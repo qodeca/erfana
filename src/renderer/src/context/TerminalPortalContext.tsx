@@ -12,7 +12,7 @@
  * 4. On DiagramViewer close, portal returns to 'main'
  */
 
-import { createContext, useContext, useRef, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useRef, useState, useCallback, useMemo, type ReactNode } from 'react'
 
 export type PortalTarget = 'main' | 'diagram-viewer'
 
@@ -84,7 +84,6 @@ interface TerminalPortalProviderProps {
 
 export function TerminalPortalProvider({ children }: TerminalPortalProviderProps) {
   const [portalTarget, setPortalTargetState] = useState<PortalTarget>('main')
-  const [terminalControls, setTerminalControls] = useState<TerminalControls | null>(null)
   const [terminalContextMenuPosition, setTerminalContextMenuPosition] = useState<{ x: number; y: number } | null>(null)
 
   const diagramViewerContainerRef = useRef<HTMLDivElement>(null)
@@ -131,12 +130,23 @@ export function TerminalPortalProvider({ children }: TerminalPortalProviderProps
     }
   }, [])
 
+  // CRITICAL: Use ONLY refs for terminal controls - NO STATE
+  // State causes infinite loops because:
+  // 1. TerminalPanel effect runs → registerTerminalControls({new object})
+  // 2. setState(controls) → context value changes
+  // 3. TerminalPanel re-renders → effect cleanup runs → unregisterTerminalControls()
+  // 4. setState(null) → context value changes → back to step 1
+  // Using refs avoids ALL state updates from terminal control registration
+  const terminalControlsRef = useRef<TerminalControls | null>(null)
+
   const registerTerminalControls = useCallback((controls: TerminalControls) => {
-    setTerminalControls(controls)
+    // Only store in ref - NO state update
+    terminalControlsRef.current = controls
   }, [])
 
   const unregisterTerminalControls = useCallback(() => {
-    setTerminalControls(null)
+    // Only clear ref - NO state update
+    terminalControlsRef.current = null
   }, [])
 
   // Context menu handlers for global xterm.js context menu support
@@ -148,22 +158,46 @@ export function TerminalPortalProvider({ children }: TerminalPortalProviderProps
     setTerminalContextMenuPosition(null)
   }, [])
 
-  const value: TerminalPortalContextValue = {
-    portalTarget,
-    diagramViewerContainerRef,
-    mainContainerRef,
-    setPortalTarget,
-    returnToMain,
-    requestRefit,
-    onRefitRequest,
-    terminalControls,
-    registerTerminalControls,
-    unregisterTerminalControls,
-    isTerminalReady: terminalControls !== null,
-    terminalContextMenuPosition,
-    openTerminalContextMenu,
-    closeTerminalContextMenu
-  }
+  // Memoize the context value to prevent unnecessary re-renders
+  // CRITICAL: terminalControls is accessed via getter function, not state
+  // This completely avoids the re-render loop from terminal control registration
+  const value = useMemo<TerminalPortalContextValue>(
+    () => ({
+      portalTarget,
+      diagramViewerContainerRef,
+      mainContainerRef,
+      setPortalTarget,
+      returnToMain,
+      requestRefit,
+      onRefitRequest,
+      // Getter returns current ref value - always fresh, no re-renders needed
+      get terminalControls() {
+        return terminalControlsRef.current
+      },
+      registerTerminalControls,
+      unregisterTerminalControls,
+      // Computed from ref - consumers should call this when they need to check
+      get isTerminalReady() {
+        return terminalControlsRef.current !== null
+      },
+      terminalContextMenuPosition,
+      openTerminalContextMenu,
+      closeTerminalContextMenu
+    }),
+    [
+      portalTarget,
+      terminalContextMenuPosition,
+      // All callbacks are stable (useCallback with empty deps)
+      setPortalTarget,
+      returnToMain,
+      requestRefit,
+      onRefitRequest,
+      registerTerminalControls,
+      unregisterTerminalControls,
+      openTerminalContextMenu,
+      closeTerminalContextMenu
+    ]
+  )
 
   return (
     <TerminalPortalContext.Provider value={value}>

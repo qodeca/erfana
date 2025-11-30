@@ -652,28 +652,44 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }, [])
 
+  // Ref to track hasSelection for use in callbacks without causing re-renders
+  // This prevents infinite loop: hasSelection state change → effect re-run → registerTerminalControls → context update → re-render
+  const hasSelectionRef = useRef(hasSelection)
+  useEffect(() => {
+    hasSelectionRef.current = hasSelection
+  }, [hasSelection])
+
+  // Extract stable callback functions from context to avoid infinite loop
+  // When terminalControls state changes in provider, portalContext object gets new reference,
+  // but these individual callbacks are stable (wrapped in useCallback with empty deps)
+  const registerTerminalControls = portalContext?.registerTerminalControls
+  const unregisterTerminalControls = portalContext?.unregisterTerminalControls
+  const closeTerminalContextMenu = portalContext?.closeTerminalContextMenu
+
   // Register terminal controls with portal context (issue #37)
   // Allows ChatBubble to access scroll/restart functions
+  // CRITICAL: Use stable callback refs, NOT portalContext object, to avoid infinite loop
+  // See: https://stackoverflow.com/questions/57853288/react-warning-maximum-update-depth-exceeded
   useEffect(() => {
-    if (!portalContext || !terminalId) return
+    if (!registerTerminalControls || !unregisterTerminalControls || !terminalId) return
 
-    portalContext.registerTerminalControls({
+    registerTerminalControls({
       scrollToBottom: handleScrollToBottom,
       restart: handleRestartTerminal,
       copy,
       paste,
-      hasSelection: () => hasSelection
+      hasSelection: () => hasSelectionRef.current  // Use ref to avoid re-registration on selection change
     })
 
     return () => {
-      portalContext.unregisterTerminalControls()
+      unregisterTerminalControls()
     }
-  }, [portalContext, terminalId, handleScrollToBottom, handleRestartTerminal, copy, paste, hasSelection])
+  }, [registerTerminalControls, unregisterTerminalControls, terminalId, handleScrollToBottom, handleRestartTerminal, copy, paste])
 
-  // Context menu close handler - uses portal context for global support
+  // Context menu close handler - uses stable callback ref
   const handleCloseContextMenu = useCallback(() => {
-    portalContext?.closeTerminalContextMenu()
-  }, [portalContext])
+    closeTerminalContextMenu?.()
+  }, [closeTerminalContextMenu])
 
   // Render terminal panel inside mainContainer shell
   // The useLayoutEffect above will move terminalPanelRef.current between containers
