@@ -55,7 +55,7 @@
 }
 
 .icon-btn:active:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-hover-solid);
 }
 
 .icon-btn:disabled {
@@ -258,7 +258,7 @@
   justify-content: center;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-6);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-bg-hover);
   border: var(--border-width) solid var(--color-bg-active);
   border-radius: var(--border-radius);
   color: var(--color-text-primary);
@@ -269,19 +269,19 @@
 }
 
 .filter-option:hover {
-  background: var(--color-bg-hover);
+  background: var(--color-bg-hover-solid);
   border-color: var(--color-bg-active);
 }
 
 .filter-option.active {
-  background: rgba(79, 193, 255, 0.15);
-  border-color: rgba(79, 193, 255, 0.3);
+  background: var(--color-accent-drag-bg);
+  border-color: var(--color-accent-drag-border);
   color: var(--color-accent-drag);
 }
 
 .filter-option.active:hover {
-  background: rgba(79, 193, 255, 0.25);
-  border-color: rgba(79, 193, 255, 0.4);
+  background: var(--color-brand-violet-muted);
+  border-color: var(--color-accent-drag);
 }
 
 /* ===================================================================
@@ -306,21 +306,21 @@
 /* VS Code-style folder highlighting during drag */
 /* Highlight the folder row when it's a drop target */
 .project-tree-item[data-drop-target="true"].directory {
-  background-color: rgba(79, 193, 255, 0.2);
+  background-color: var(--color-accent-drag-bg);
   border-radius: var(--border-radius);
   position: relative;
 }
 
 /* Folder highlighting during drag (auto-expand countdown) */
 .project-tree-node[data-drop-highlight="true"] > .project-tree-item.directory {
-  background-color: rgba(79, 193, 255, 0.2);
+  background-color: var(--color-accent-drag-bg);
   border-radius: var(--border-radius);
 }
 
 /* Highlight the children area for expanded folders */
 .project-tree-node[data-drop-highlight="true"] > .project-tree-children {
   position: relative;
-  background-color: rgba(79, 193, 255, 0.05);
+  background-color: var(--color-accent-drag-bg-subtle);
   border-radius: var(--border-radius);
 }
 
@@ -332,12 +332,12 @@
   top: 0;
   bottom: 0;
   width: var(--border-width-thick);
-  background-color: rgba(79, 193, 255, 0.3);
+  background-color: var(--color-accent-drag-border);
 }
 
 /* Invalid drop target (e.g., trying to move folder into itself) */
 .project-tree-item[data-drop-invalid="true"] {
-  background-color: rgba(244, 135, 113, 0.2);
+  background-color: var(--color-error-bg);
   border-radius: var(--border-radius);
   cursor: not-allowed;
 }

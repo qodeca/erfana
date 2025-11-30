@@ -285,7 +285,7 @@ border: var(--border-width-thick) solid ...;                    /* 2px - focus *
 | `--shadow-md` | `0 4px 12px rgba(0,0,0,0.3)` | Dropdowns, tooltips |
 | `--shadow-lg` | `0 8px 24px rgba(0,0,0,0.4)` | Modals, large cards |
 | `--shadow-xl` | `0 12px 48px rgba(0,0,0,0.8)` | Dialogs |
-| `--shadow-focus` | `0 0 0 3px rgba(0,127,212,0.15)` | Focus indicators |
+| `--shadow-focus` | `0 0 0 3px rgba(160,168,255,0.25)` | Focus indicators (Qodeca Violet) |
 
 ```css
 /* Primary button shadow */
@@ -329,7 +329,7 @@ All focusable elements must have visible focus indicators:
 
 ```css
 /* Standard focus */
-outline: 1px solid var(--color-border-focus);  /* #007fd4 */
+outline: 1px solid var(--color-border-focus);  /* Qodeca Violet */
 outline-offset: 1px;
 
 /* Enhanced focus (buttons, inputs) */
@@ -609,10 +609,11 @@ Before committing any UI changes, verify:
 /* Colors */
 --color-text-primary      /* Main text */
 --color-text-secondary    /* Muted text */
---color-bg-primary        /* Main background */
+--color-bg-primary        /* Main background (Smoky Black) */
 --color-bg-secondary      /* Panel background */
 --color-border-default    /* Standard borders */
---color-accent-primary    /* VS Code blue */
+--color-accent-primary    /* Qodeca Violet */
+--color-accent-secondary  /* Qodeca Lime (highlights, success) */
 
 /* Spacing */
 --space-4                 /* 8px - small */
@@ -636,7 +637,7 @@ Before committing any UI changes, verify:
 
 ## Migration Guide
 
-This system is designed for **new code only**. Existing CSS files have not been migrated.
+As of v0.5.3, **all CSS files have been migrated** to use design tokens.
 
 ### When Migrating Existing CSS
 
@@ -646,13 +647,15 @@ Use these find-replace patterns:
 |-----------|-----------|---------|
 | `#cccccc` | `var(--color-text-primary)` | Text color |
 | `#858585` | `var(--color-text-secondary)` | Muted text |
-| `#1e1e1e` | `var(--color-bg-primary)` | Main background |
+| `#1e1e1e` | `var(--color-bg-primary)` | Main background (now Smoky Black) |
 | `#2d2d30` | `var(--color-bg-secondary)` | Panel background |
 | `#252526` | `var(--color-bg-tertiary)` | Sidebar background |
 | `#3c3c3c` | `var(--color-border-default)` | Standard borders |
 | `#454545` | `var(--color-border-subtle)` | Subtle borders |
-| `#007fd4` | `var(--color-accent-primary)` | VS Code blue |
-| `#0e639c` | `var(--color-btn-primary-bg)` | Primary button |
+| `#007fd4` | `var(--color-accent-primary)` | ⚠️ Old VS Code blue → now Qodeca Violet |
+| `#A0A8FF` | `var(--color-accent-primary)` | Qodeca Violet (current) |
+| `#E3E829` | `var(--color-accent-secondary)` | Qodeca Lime |
+| `#0e639c` | `var(--color-btn-primary-bg)` | Primary button (now Qodeca Violet) |
 | `0.15s ease` | `var(--transition-normal)` | Transitions |
 | `border-radius: 4px` | `border-radius: var(--border-radius)` | Remove rounding |
 

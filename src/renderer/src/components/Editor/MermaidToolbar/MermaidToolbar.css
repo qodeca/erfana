@@ -2,14 +2,14 @@
 
 .mermaid-toolbar {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: var(--space-4);
+  right: var(--space-4);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-2);
   opacity: 0;
-  transition: opacity 0.15s ease;
-  z-index: 10;
+  transition: opacity var(--transition-normal);
+  z-index: var(--z-dropdown);
 }
 
 /* Show toolbar on container hover */
@@ -29,10 +29,10 @@
 .mermaid-toolbar-directions {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding: 2px;
-  background: rgba(45, 45, 48, 0.9);
-  border: 1px solid #454545;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--color-bg-tertiary-translucent);
+  border: var(--border-width) solid var(--color-gray-700);
   border-radius: 0;
 }
 
@@ -43,24 +43,24 @@
   justify-content: center;
   min-width: 28px;
   height: 24px;
-  padding: 0 6px;
+  padding: 0 var(--space-3);
   background: transparent;
   border: none;
   border-radius: 0;
-  color: #cccccc;
-  font-size: 11px;
-  font-weight: 500;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  font-family: var(--font-system);
   cursor: pointer;
-  transition: background-color 0.1s ease, color 0.1s ease;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .mermaid-direction-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-hover);
 }
 
 .mermaid-direction-btn:active:not(:disabled) {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--color-bg-hover-solid);
 }
 
 /* Active (current direction) state - both highlighted AND disabled */
@@ -75,7 +75,7 @@
 
 /* Disabled state */
 .mermaid-direction-btn:disabled {
-  opacity: 0.5;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 
@@ -92,20 +92,20 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  background: rgba(45, 45, 48, 0.9);
-  border: 1px solid #454545;
+  background: var(--color-bg-tertiary-translucent);
+  border: var(--border-width) solid var(--color-gray-700);
   border-radius: 0;
-  color: #cccccc;
+  color: var(--color-text-primary);
   cursor: pointer;
-  transition: background-color 0.1s ease;
+  transition: background-color var(--transition-fast);
 }
 
 .mermaid-toolbar-expand-btn:hover:not(:disabled) {
-  background: rgba(60, 60, 64, 0.95);
+  background: var(--color-bg-hover-solid);
 }
 
 .mermaid-toolbar-expand-btn:disabled {
-  opacity: 0.4;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 
@@ -117,16 +117,16 @@
 /* Light mode adjustments */
 @media (prefers-color-scheme: light) {
   .mermaid-toolbar-directions {
-    background: rgba(255, 255, 255, 0.95);
-    border-color: #d0d0d0;
+    background: var(--color-bg-primary-translucent);
+    border-color: var(--color-gray-400);
   }
 
   .mermaid-direction-btn {
-    color: #333333;
+    color: var(--color-gray-800);
   }
 
   .mermaid-direction-btn:hover:not(:disabled) {
-    background: rgba(0, 0, 0, 0.08);
+    background: var(--color-bg-hover);
   }
 
   .mermaid-direction-btn--active {
@@ -135,12 +135,12 @@
   }
 
   .mermaid-toolbar-expand-btn {
-    background: rgba(255, 255, 255, 0.95);
-    border-color: #d0d0d0;
-    color: #333333;
+    background: var(--color-bg-primary-translucent);
+    border-color: var(--color-gray-400);
+    color: var(--color-gray-800);
   }
 
   .mermaid-toolbar-expand-btn:hover:not(:disabled) {
-    background: rgba(245, 245, 245, 0.95);
+    background: var(--color-bg-hover-solid);
   }
 }

@@ -90,6 +90,9 @@
   --color-accent-secondary: var(--color-brand-lime); /* Secondary accent - Qodeca Lime */
   --color-accent-tertiary: var(--color-brand-violet); /* Tertiary accent - Qodeca Violet */
   --color-accent-drag: var(--color-brand-violet);    /* Drag-drop highlight - Qodeca Violet */
+  --color-accent-drag-bg: rgba(160, 168, 255, 0.2);  /* Drag-drop background */
+  --color-accent-drag-bg-subtle: rgba(160, 168, 255, 0.05); /* Drag-drop subtle background */
+  --color-accent-drag-border: rgba(160, 168, 255, 0.3);  /* Drag-drop border */
 
   /* ============================================
    * COLORS: Links
@@ -110,6 +113,7 @@
   --color-btn-secondary-hover: #505050;
   --color-btn-danger-bg: #c72e0f;
   --color-btn-danger-hover: #e03e18;
+  --color-bg-danger-hover: #5a1d1d;        /* Danger item hover background */
 
   /* ============================================
    * COLORS: Status / Feedback
@@ -118,6 +122,7 @@
   --color-success: var(--color-brand-lime);  /* Qodeca Lime - vibrant success */
   --color-warning: #cca700;                  /* Amber - unchanged */
   --color-warning-bright: #f59e0b;           /* Amber bright - unchanged */
+  --color-warning-icon: #dcdcaa;             /* Warning icon color */
   --color-error: #f48771;                    /* Coral - unchanged */
   --color-error-bright: #ff6b6b;             /* Coral bright - unchanged */
   --color-info: var(--color-brand-violet);   /* Qodeca Violet - info */
@@ -139,11 +144,28 @@
   --color-syntax-string: #ce9178;         /* String literals, inline code */
 
   /* ============================================
+   * COLORS: Terminal
+   * Terminal-specific colors
+   * ============================================ */
+  --color-cursor: #4fc1ff;                /* Terminal cursor color */
+
+  /* ============================================
    * COLORS: Special Backgrounds
    * Component-specific backgrounds
    * ============================================ */
   --color-bg-diagram: var(--color-brand-white); /* Mermaid SVG - Qodeca Powder White */
   --color-bg-preview: #1a1a1c;                  /* Markdown preview - softer than primary */
+  --color-bg-warning: rgba(204, 167, 0, 0.12);  /* Warning notification background */
+  --color-bg-tertiary-translucent: rgba(45, 45, 48, 0.9); /* Semi-transparent tertiary bg */
+  --color-bg-primary-translucent: rgba(255, 255, 255, 0.95); /* Light mode translucent */
+
+  /* ============================================
+   * COLORS: Warning States (Extended Palette)
+   * For warning notifications, alerts, etc.
+   * ============================================ */
+  --color-border-warning: rgba(204, 167, 0, 0.3); /* Warning container border */
+  --color-text-tertiary: #b0b0b0;                 /* Tertiary text (lighter than secondary) */
+  --color-text-bright: #e0e0e0;                   /* Bright text for emphasis */
 
   /* ============================================
    * SPACING: 4px Base Grid
@@ -160,6 +182,7 @@
   --space-4: 8px;
   --space-5: 10px;
   --space-6: 12px;
+  --space-7: 14px;
   --space-8: 16px;
   --space-10: 20px;
   --space-12: 24px;
@@ -174,6 +197,7 @@
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
                'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
                'Helvetica Neue', sans-serif;
+  --font-system: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono',
                Consolas, 'Courier New', monospace;
   --font-serif: Charter, Georgia, Cambria, 'Times New Roman', serif;
@@ -219,6 +243,7 @@
    * Depth scale from subtle to dramatic
    * ============================================ */
   --shadow-none: none;
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
