@@ -143,6 +143,7 @@
    * Component-specific backgrounds
    * ============================================ */
   --color-bg-diagram: var(--color-brand-white); /* Mermaid SVG - Qodeca Powder White */
+  --color-bg-preview: #1a1a1c;                  /* Markdown preview - softer than primary */
 
   /* ============================================
    * SPACING: 4px Base Grid
