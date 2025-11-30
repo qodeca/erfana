@@ -66,6 +66,18 @@ describe('useScrollAnomalyRecovery', () => {
     expect(typeof result.current.wrapOnDataHandler).toBe('function')
   })
 
+  it('returns resetQueue function', () => {
+    const xtermRef = { current: createMockXterm() }
+    const terminalRef = createMockTerminalRef()
+
+    const { result } = renderHook(() =>
+      useScrollAnomalyRecovery(xtermRef, terminalRef)
+    )
+
+    expect(result.current.resetQueue).toBeDefined()
+    expect(typeof result.current.resetQueue).toBe('function')
+  })
+
   it('calls original handler when disabled', () => {
     const xtermRef = { current: createMockXterm() }
     const terminalRef = createMockTerminalRef()
@@ -183,8 +195,12 @@ describe('useScrollAnomalyRecovery', () => {
         }
       })
 
+      // Use explicit config with 500ms interval so all 5 anomalies batch together
       const { result } = renderHook(() =>
-        useScrollAnomalyRecovery(xtermRef, terminalRef, { onRecovery })
+        useScrollAnomalyRecovery(xtermRef, terminalRef, {
+          onRecovery,
+          config: { recoveryIntervalMs: 500 }
+        })
       )
 
       const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
@@ -193,7 +209,7 @@ describe('useScrollAnomalyRecovery', () => {
       wrappedHandler({ terminalId: 'test', data: 'init' })
       triggerAnomaly = true
 
-      // Trigger 5 rapid anomalies (each at 50ms apart)
+      // Trigger 5 rapid anomalies (each at 50ms apart = 250ms total, before 500ms interval)
       for (let i = 0; i < 5; i++) {
         mockXterm.buffer.active.viewportY = 100
         wrappedHandler({ terminalId: 'test', data: `data-${i}` })
@@ -328,6 +344,57 @@ describe('useScrollAnomalyRecovery', () => {
       })
 
       // No recovery should have happened
+      expect(mockScrollToBottom).not.toHaveBeenCalled()
+      expect(onRecovery).not.toHaveBeenCalled()
+    })
+
+    it('resetQueue clears pending anomalies (issue #22)', async () => {
+      const mockXterm = createMockXterm(100, 100)
+      const xtermRef = { current: mockXterm }
+      const terminalRef = createMockTerminalRef()
+      const onRecovery = vi.fn()
+
+      let triggerAnomaly = false
+      const originalHandler = vi.fn().mockImplementation(() => {
+        if (triggerAnomaly) {
+          mockXterm.buffer.active.viewportY = 0
+        }
+      })
+
+      // Use explicit config with longer interval so anomalies queue up before reset
+      const { result } = renderHook(() =>
+        useScrollAnomalyRecovery(xtermRef, terminalRef, {
+          onRecovery,
+          config: { recoveryIntervalMs: 500 }
+        })
+      )
+
+      const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
+
+      // First call to establish lastDataTs (no anomaly)
+      wrappedHandler({ terminalId: 'test', data: 'init' })
+      triggerAnomaly = true
+
+      // Trigger 3 anomalies (all within 150ms, before 500ms interval)
+      for (let i = 0; i < 3; i++) {
+        mockXterm.buffer.active.viewportY = 100
+        wrappedHandler({ terminalId: 'test', data: `data-${i}` })
+        await act(async () => {
+          vi.advanceTimersByTime(50) // Less than interval
+        })
+      }
+
+      // Reset the queue before interval fires (we're at 150ms, interval is 500ms)
+      act(() => {
+        result.current.resetQueue()
+      })
+
+      // Run interval
+      await act(async () => {
+        vi.advanceTimersByTime(500)
+      })
+
+      // Should NOT have recovered because queue was cleared
       expect(mockScrollToBottom).not.toHaveBeenCalled()
       expect(onRecovery).not.toHaveBeenCalled()
     })
