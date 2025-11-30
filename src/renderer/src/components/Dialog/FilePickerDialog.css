@@ -51,11 +51,11 @@
 
 .file-picker-item:hover,
 .file-picker-item.selected {
-  background: var(--selection-bg, #094771);
+  background: var(--color-bg-selected);
 }
 
 .file-picker-item.selected {
-  outline: 1px solid var(--focus-border, #007fd4);
+  outline: 1px solid var(--color-border-focus);
   outline-offset: -1px;
 }
 

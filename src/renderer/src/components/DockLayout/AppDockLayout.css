@@ -89,7 +89,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: #007acc !important;
+  background: var(--color-brand-violet) !important;
   z-index: 100;
   pointer-events: none;
   display: block !important;
@@ -104,7 +104,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: #007acc !important;
+  background: var(--color-brand-violet) !important;
   z-index: 100;
   pointer-events: none;
   display: block !important;
@@ -236,7 +236,7 @@
 
 .recent-project-item:hover {
   background-color: #2a2d2e;
-  border-color: #007acc;
+  border-color: var(--color-brand-violet);
 }
 
 .recent-project-icon {
@@ -332,7 +332,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
-  background-color: #0e639c;
+  background-color: var(--color-btn-primary-bg);
   color: #ffffff;
   border: none;
   border-radius: 0;
@@ -343,11 +343,11 @@
 }
 
 .welcome-action-button:hover:not(:disabled) {
-  background-color: #1177bb;
+  background-color: var(--color-btn-primary-hover);
 }
 
 .welcome-action-button:active:not(:disabled) {
-  background-color: #0d5689;
+  background-color: var(--color-btn-primary-active);
 }
 
 .welcome-action-button:disabled {

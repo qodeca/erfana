@@ -120,7 +120,7 @@
 
 /* Close button focus state */
 .editor-tab-close:focus-visible {
-  outline: 1px solid #007acc;
+  outline: 1px solid var(--color-border-focus);
   outline-offset: -1px;
 }
 
@@ -205,6 +205,6 @@
 
 /* Focus state for entire tab (keyboard navigation) */
 .editor-tab:focus-visible {
-  outline: 1px solid #007acc;
+  outline: 1px solid var(--color-border-focus);
   outline-offset: -1px;
 }

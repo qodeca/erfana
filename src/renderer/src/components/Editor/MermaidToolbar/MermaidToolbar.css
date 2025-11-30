@@ -65,12 +65,12 @@
 
 /* Active (current direction) state - both highlighted AND disabled */
 .mermaid-direction-btn--active {
-  background: rgba(0, 127, 212, 0.3);
-  color: #4fc3f7;
+  background: var(--color-brand-violet-muted);
+  color: var(--color-brand-violet);
 }
 
 .mermaid-direction-btn--active:hover {
-  background: rgba(0, 127, 212, 0.3);
+  background: var(--color-brand-violet-muted);
 }
 
 /* Disabled state */
@@ -81,7 +81,7 @@
 
 /* Focus state for keyboard navigation */
 .mermaid-direction-btn:focus-visible {
-  outline: 1px solid #007fd4;
+  outline: 1px solid var(--color-border-focus);
   outline-offset: 1px;
 }
 
@@ -110,7 +110,7 @@
 }
 
 .mermaid-toolbar-expand-btn:focus-visible {
-  outline: 1px solid #007fd4;
+  outline: 1px solid var(--color-border-focus);
   outline-offset: 1px;
 }
 
@@ -130,8 +130,8 @@
   }
 
   .mermaid-direction-btn--active {
-    background: rgba(0, 127, 212, 0.15);
-    color: #0066cc;
+    background: var(--color-brand-violet-muted);
+    color: var(--color-brand-violet);
   }
 
   .mermaid-toolbar-expand-btn {

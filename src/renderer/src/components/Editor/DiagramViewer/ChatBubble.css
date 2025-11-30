@@ -182,7 +182,7 @@
 }
 
 .chat-direction-btn--active {
-  background: rgba(0, 127, 212, 0.2);
+  background: var(--color-brand-violet-muted);
   border-color: var(--color-accent-primary);
   color: var(--color-accent-tertiary);
 }
