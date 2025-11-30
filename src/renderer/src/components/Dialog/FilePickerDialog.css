@@ -12,17 +12,17 @@
 }
 
 .file-picker-dialog .dialog-title {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary, #cccccc);
+  margin: 0 0 var(--space-4) 0;
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
   word-break: break-word;
 }
 
 .file-picker-dialog .dialog-subtitle {
-  margin: 0 0 12px 0;
-  font-size: 12px;
-  color: var(--text-secondary, #888888);
+  margin: 0 0 var(--space-6) 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
 }
 
 .file-picker-list {
@@ -31,18 +31,18 @@
   padding: 0;
   max-height: 300px;
   overflow-y: auto;
-  border: 1px solid var(--border-color, #3c3c3c);
+  border: var(--border-width) solid var(--color-border-default);
   border-radius: 0;
-  background: var(--bg-secondary, #252526);
+  background: var(--color-bg-tertiary);
 }
 
 .file-picker-item {
   display: flex;
   flex-direction: column;
-  padding: 8px 12px;
+  padding: var(--space-4) var(--space-6);
   cursor: pointer;
-  border-bottom: 1px solid var(--border-color, #3c3c3c);
-  transition: background-color 0.1s ease;
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  transition: var(--transition-fast);
 }
 
 .file-picker-item:last-child {
@@ -60,22 +60,22 @@
 }
 
 .file-picker-filename {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary, #cccccc);
-  margin-bottom: 2px;
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
 }
 
 .file-picker-path {
-  font-size: 11px;
-  color: var(--text-secondary, #888888);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
   word-break: break-all;
 }
 
 .file-picker-dialog .dialog-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-color, #3c3c3c);
+  margin-top: var(--space-8);
+  padding-top: var(--space-6);
+  border-top: var(--border-width) solid var(--color-border-default);
 }

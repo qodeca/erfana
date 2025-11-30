@@ -51,7 +51,7 @@
 /* Dialog container */
 .dialog-container {
   background-color: var(--dialog-bg);
-  border: 1px solid var(--dialog-border);
+  border: var(--border-width) solid var(--dialog-border);
   border-radius: var(--border-radius);
   padding: var(--space-14);
   min-width: var(--dialog-min-width);
