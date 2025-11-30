@@ -127,7 +127,7 @@
 
 .project-tree-item.selected {
   background-color: var(--color-bg-selected);
-  border-left: var(--border-width-thick) solid var(--color-btn-primary-bg);
+  border-left: var(--border-width-thick) solid var(--color-brand-lime);
 }
 
 .file-icon {

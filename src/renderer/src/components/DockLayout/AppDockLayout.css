@@ -89,7 +89,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: var(--color-brand-violet) !important;
+  background: var(--color-brand-lime) !important;
   z-index: 100;
   pointer-events: none;
   display: block !important;
@@ -104,7 +104,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: var(--color-brand-violet) !important;
+  background: var(--color-brand-lime) !important;
   z-index: 100;
   pointer-events: none;
   display: block !important;
