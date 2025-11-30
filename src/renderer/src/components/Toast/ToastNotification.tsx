@@ -26,6 +26,13 @@ export function ToastNotification() {
 function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   const Icon = ICON_MAP[toast.type]
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onClose()
+    }
+  }
+
   return (
     <div className={`toast toast-${toast.type}`}>
       <div className="toast-icon">
@@ -35,7 +42,13 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
         <div className="toast-title">{toast.title}</div>
         <div className="toast-message">{toast.message}</div>
       </div>
-      <button className="toast-close" onClick={onClose} aria-label="Close">
+      <button
+        className="toast-close"
+        onClick={onClose}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+        aria-label="Close"
+      >
         <X size={16} strokeWidth={2} />
       </button>
     </div>

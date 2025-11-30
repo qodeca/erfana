@@ -90,9 +90,15 @@
   color: #858585;
   cursor: pointer;
   transition: all 0.2s;
+  pointer-events: auto;
 }
 
 .toast-close:hover {
   background-color: #3c3c3c;
   color: #cccccc;
+}
+
+.toast-close:focus {
+  outline: 2px solid #007acc;
+  outline-offset: 2px;
 }
