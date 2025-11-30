@@ -13,6 +13,25 @@
 
 :root {
   /* ============================================
+   * COLORS: Qodeca Brand Palette
+   * Primary brand identity colors
+   * ============================================ */
+  --color-brand-lime: #E3E829;           /* Primary brand - high energy */
+  --color-brand-violet: #A0A8FF;         /* Secondary brand - soft, elegant */
+  --color-brand-black: #161312;          /* Brand black - warm undertone */
+  --color-brand-white: #F8FAF8;          /* Brand white - off-white */
+
+  /* Lime variants for states */
+  --color-brand-lime-hover: #d6d925;     /* Slightly darker for hover */
+  --color-brand-lime-active: #c9cc21;    /* Darker for pressed */
+  --color-brand-lime-muted: rgba(227, 232, 41, 0.3); /* For backgrounds */
+
+  /* Violet variants for states */
+  --color-brand-violet-hover: #8b94ff;   /* Slightly brighter for hover */
+  --color-brand-violet-active: #7680ff;  /* Brighter for pressed */
+  --color-brand-violet-muted: rgba(160, 168, 255, 0.2); /* For backgrounds */
+
+  /* ============================================
    * COLORS: Neutral Scale
    * Gray scale from white to black
    * ============================================ */
@@ -27,7 +46,7 @@
   --color-gray-800: #3c3c3c;
   --color-gray-900: #2d2d30;
   --color-gray-950: #252526;
-  --color-gray-1000: #1e1e1e;
+  --color-gray-1000: var(--color-brand-black); /* Smoky Black - full brand adoption */
   --color-black: #000000;
 
   /* ============================================
@@ -42,7 +61,7 @@
   --color-bg-hover: rgba(255, 255, 255, 0.05);   /* Hover state (overlay) */
   --color-bg-hover-solid: #2a2d2e;               /* Hover state (solid, for menus) */
   --color-bg-active: rgba(255, 255, 255, 0.1);   /* Active/pressed state */
-  --color-bg-selected: #094771;                  /* Selected items */
+  --color-bg-selected: var(--color-brand-violet-muted); /* Selected items - brand violet */
 
   /* ============================================
    * COLORS: Semantic Text
@@ -61,32 +80,32 @@
    * ============================================ */
   --color-border-default: var(--color-gray-800); /* Standard borders */
   --color-border-subtle: var(--color-gray-700);  /* Subtle borders */
-  --color-border-focus: #007fd4;                 /* Focus indicators */
+  --color-border-focus: var(--color-brand-violet); /* Focus indicators - brand violet */
 
   /* ============================================
    * COLORS: Interactive / Accent
    * Use these for interactive elements
    * ============================================ */
-  --color-accent-primary: #007fd4;               /* Primary accent (VS Code blue) */
-  --color-accent-secondary: #4ec9b0;             /* Secondary accent (teal) */
-  --color-accent-tertiary: #4fc3f7;              /* Tertiary accent (light blue) */
-  --color-accent-drag: #4fc1ff;                  /* Drag-drop highlight (cyan) */
+  --color-accent-primary: var(--color-brand-violet); /* Primary accent - Qodeca Violet */
+  --color-accent-secondary: var(--color-brand-lime); /* Secondary accent - Qodeca Lime */
+  --color-accent-tertiary: var(--color-brand-violet); /* Tertiary accent - Qodeca Violet */
+  --color-accent-drag: var(--color-brand-violet);    /* Drag-drop highlight - Qodeca Violet */
 
   /* ============================================
    * COLORS: Links
    * Use these for anchor/link elements
    * ============================================ */
-  --color-link: var(--color-accent-primary);     /* Default link color */
-  --color-link-hover: var(--color-accent-tertiary); /* Link hover state */
+  --color-link: var(--color-brand-violet);       /* Default link color - Qodeca Violet */
+  --color-link-hover: var(--color-brand-violet-hover); /* Link hover state */
   --color-link-visited: #9d7dd2;                 /* Visited link (purple) */
 
   /* ============================================
    * COLORS: Button Variants
    * Specific colors for button states
    * ============================================ */
-  --color-btn-primary-bg: #0e639c;
-  --color-btn-primary-hover: #1177bb;
-  --color-btn-primary-active: #0d5689;
+  --color-btn-primary-bg: var(--color-brand-violet);
+  --color-btn-primary-hover: var(--color-brand-violet-hover);
+  --color-btn-primary-active: var(--color-brand-violet-active);
   --color-btn-secondary-bg: var(--color-gray-800);
   --color-btn-secondary-hover: #505050;
   --color-btn-danger-bg: #c72e0f;
@@ -96,12 +115,12 @@
    * COLORS: Status / Feedback
    * Use these for status indicators
    * ============================================ */
-  --color-success: #4ec9b0;
-  --color-warning: #cca700;
-  --color-warning-bright: #f59e0b;          /* Amber for sensitive files */
-  --color-error: #f48771;
-  --color-error-bright: #ff6b6b;
-  --color-info: #4fc3f7;
+  --color-success: var(--color-brand-lime);  /* Qodeca Lime - vibrant success */
+  --color-warning: #cca700;                  /* Amber - unchanged */
+  --color-warning-bright: #f59e0b;           /* Amber bright - unchanged */
+  --color-error: #f48771;                    /* Coral - unchanged */
+  --color-error-bright: #ff6b6b;             /* Coral bright - unchanged */
+  --color-info: var(--color-brand-violet);   /* Qodeca Violet - info */
 
   /* ============================================
    * COLORS: Error State (Extended Palette)
@@ -123,7 +142,7 @@
    * COLORS: Special Backgrounds
    * Component-specific backgrounds
    * ============================================ */
-  --color-bg-diagram: #f8f9fa;            /* Mermaid SVG background (light for readability) */
+  --color-bg-diagram: var(--color-brand-white); /* Mermaid SVG - Qodeca Powder White */
 
   /* ============================================
    * SPACING: 4px Base Grid
@@ -203,7 +222,7 @@
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
   --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.8);
-  --shadow-focus: 0 0 0 3px rgba(0, 127, 212, 0.15);
+  --shadow-focus: 0 0 0 3px rgba(160, 168, 255, 0.25); /* Qodeca Violet focus ring */
   /* Dialog shadow with subtle edge highlight */
   --shadow-dialog: 0 12px 48px rgba(0, 0, 0, 0.8),
                    0 0 0 1px rgba(255, 255, 255, 0.05);
