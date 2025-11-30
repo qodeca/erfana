@@ -71,8 +71,8 @@
 }
 
 .view-mode-btn.active {
-  background-color: #0e639c;
-  border-color: #0e639c;
+  background-color: var(--color-btn-primary-bg);
+  border-color: var(--color-btn-primary-bg);
   color: #ffffff;
 }
 
@@ -88,7 +88,7 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background-color: #0e639c;
+  background-color: var(--color-btn-primary-bg);
   border: none;
   color: #ffffff;
   cursor: pointer;
@@ -99,7 +99,7 @@
 }
 
 .save-btn:hover:not(:disabled) {
-  background-color: #1177bb;
+  background-color: var(--color-btn-primary-hover);
 }
 
 .save-btn:disabled {
@@ -150,8 +150,8 @@
 }
 
 .markdown-toolbar .view-mode-btn.active {
-  background-color: #0e639c;
-  border-color: #0e639c;
+  background-color: var(--color-btn-primary-bg);
+  border-color: var(--color-btn-primary-bg);
   color: #ffffff;
 }
 
@@ -176,7 +176,7 @@
 }
 
 .toolbar-btn:active {
-  background-color: #094771;
+  background-color: var(--color-bg-selected);
 }
 
 .editor-content {

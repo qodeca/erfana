@@ -9,8 +9,8 @@
   --dialog-text-primary: #e8e8e8;
   --dialog-text-secondary: #d4d4d4;
   --dialog-text-muted: #9d9d9d;
-  --dialog-btn-primary-bg: #0e639c;
-  --dialog-btn-primary-hover: #1177bb;
+  --dialog-btn-primary-bg: var(--color-btn-primary-bg);
+  --dialog-btn-primary-hover: var(--color-btn-primary-hover);
   --dialog-btn-danger-bg: #c72e0f;
   --dialog-btn-danger-hover: #e03e18;
   --dialog-btn-secondary-bg: #3c3c3c;
@@ -208,7 +208,7 @@
   outline: none;
   border-color: var(--dialog-btn-primary-bg);
   background-color: #252526;
-  box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.15);
+  box-shadow: var(--shadow-focus);
 }
 
 .dialog-input::placeholder {
@@ -352,7 +352,7 @@
 }
 
 .dialog-info-icon:focus-visible {
-  outline: 2px solid #007acc;
+  outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;
 }
 
@@ -480,7 +480,7 @@
   outline: none;
   border-color: var(--dialog-btn-primary-bg);
   background-color: #252526;
-  box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.15);
+  box-shadow: var(--shadow-focus);
 }
 
 .dialog-rename-input.error {
