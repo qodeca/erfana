@@ -52,12 +52,13 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // Project store for file opening functionality (issue #26)
   const dockviewApi = useProjectStore((state) => state.dockviewApi)
 
-  // Auto-recovery for Claude Code scroll anomalies (issue #12)
+  // Auto-recovery for Claude Code scroll anomalies (issue #12, #22)
   // Detects unexpected scroll-to-top during streaming and auto-recovers
+  // Issue #22: Uses fixed-interval queue approach - all anomalies are counted and recovered in batches
   const { wrapOnDataHandler } = useScrollAnomalyRecovery(xtermRef, terminalRef, {
     enabled: true,
-    onRecovery: () => {
-      console.debug('[ScrollRecovery] Auto-recovered from anomalous scroll-to-top')
+    onRecovery: (count) => {
+      console.debug(`[ScrollRecovery] Auto-recovered from ${count} anomalous scroll event(s)`)
     }
   })
 
