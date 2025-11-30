@@ -1,0 +1,258 @@
+/**
+ * ERFANA DESIGN TOKENS
+ * =====================
+ * VS Code-inspired dark theme design system
+ *
+ * IMPORTANT: Erfana is DARK MODE ONLY. Do not add light mode queries.
+ *
+ * This file is the single source of truth for all design values.
+ * Import this file in index.css and use these variables in all NEW CSS.
+ *
+ * See docs/ui-style-guide.md for comprehensive usage guidelines.
+ */
+
+:root {
+  /* ============================================
+   * COLORS: Neutral Scale
+   * Gray scale from white to black
+   * ============================================ */
+  --color-white: #ffffff;
+  --color-gray-100: #e8e8e8;
+  --color-gray-200: #d4d4d4;
+  --color-gray-300: #cccccc;
+  --color-gray-400: #b8b8b8;
+  --color-gray-500: #858585;
+  --color-gray-600: #6e6e6e;
+  --color-gray-700: #454545;
+  --color-gray-800: #3c3c3c;
+  --color-gray-900: #2d2d30;
+  --color-gray-950: #252526;
+  --color-gray-1000: #1e1e1e;
+  --color-black: #000000;
+
+  /* ============================================
+   * COLORS: Semantic Backgrounds
+   * Use these for component backgrounds
+   * ============================================ */
+  --color-bg-primary: var(--color-gray-1000);    /* Main app background */
+  --color-bg-secondary: var(--color-gray-900);   /* Panels, cards */
+  --color-bg-tertiary: var(--color-gray-950);    /* Sidebar, tree */
+  --color-bg-elevated: var(--color-gray-900);    /* Floating elements */
+  --color-bg-input: var(--color-gray-900);       /* Input fields */
+  --color-bg-hover: rgba(255, 255, 255, 0.05);   /* Hover state (overlay) */
+  --color-bg-hover-solid: #2a2d2e;               /* Hover state (solid, for menus) */
+  --color-bg-active: rgba(255, 255, 255, 0.1);   /* Active/pressed state */
+  --color-bg-selected: #094771;                  /* Selected items */
+
+  /* ============================================
+   * COLORS: Semantic Text
+   * Use these for text content
+   * ============================================ */
+  --color-text-primary: var(--color-gray-300);   /* Main text */
+  --color-text-secondary: var(--color-gray-500); /* Muted text */
+  --color-text-muted: var(--color-gray-600);     /* Very muted text */
+  --color-text-emphasis: var(--color-white);     /* Headings, emphasis */
+  --color-text-disabled: var(--color-gray-600);  /* Disabled text */
+  --color-text-placeholder: var(--color-gray-600); /* Placeholder text */
+
+  /* ============================================
+   * COLORS: Semantic Borders
+   * Use these for borders and dividers
+   * ============================================ */
+  --color-border-default: var(--color-gray-800); /* Standard borders */
+  --color-border-subtle: var(--color-gray-700);  /* Subtle borders */
+  --color-border-focus: #007fd4;                 /* Focus indicators */
+
+  /* ============================================
+   * COLORS: Interactive / Accent
+   * Use these for interactive elements
+   * ============================================ */
+  --color-accent-primary: #007fd4;               /* Primary accent (VS Code blue) */
+  --color-accent-secondary: #4ec9b0;             /* Secondary accent (teal) */
+  --color-accent-tertiary: #4fc3f7;              /* Tertiary accent (light blue) */
+
+  /* ============================================
+   * COLORS: Links
+   * Use these for anchor/link elements
+   * ============================================ */
+  --color-link: var(--color-accent-primary);     /* Default link color */
+  --color-link-hover: var(--color-accent-tertiary); /* Link hover state */
+  --color-link-visited: #9d7dd2;                 /* Visited link (purple) */
+
+  /* ============================================
+   * COLORS: Button Variants
+   * Specific colors for button states
+   * ============================================ */
+  --color-btn-primary-bg: #0e639c;
+  --color-btn-primary-hover: #1177bb;
+  --color-btn-primary-active: #0d5689;
+  --color-btn-secondary-bg: var(--color-gray-800);
+  --color-btn-secondary-hover: #505050;
+  --color-btn-danger-bg: #c72e0f;
+  --color-btn-danger-hover: #e03e18;
+
+  /* ============================================
+   * COLORS: Status / Feedback
+   * Use these for status indicators
+   * ============================================ */
+  --color-success: #4ec9b0;
+  --color-warning: #cca700;
+  --color-error: #f48771;
+  --color-error-bright: #ff6b6b;
+  --color-info: #4fc3f7;
+
+  /* ============================================
+   * SPACING: 4px Base Grid
+   * All spacing should use these values
+   *
+   * NAMING: Token number = pixel value / 2
+   * Example: --space-4 = 8px (not 4px)
+   * This follows Tailwind-style scale naming.
+   * ============================================ */
+  --space-0: 0;
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 10px;
+  --space-6: 12px;
+  --space-8: 16px;
+  --space-10: 20px;
+  --space-12: 24px;
+  --space-14: 28px;
+  --space-16: 32px;
+  --space-20: 40px;
+  --space-24: 48px;
+
+  /* ============================================
+   * TYPOGRAPHY: Font Stacks
+   * ============================================ */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+               'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
+               'Helvetica Neue', sans-serif;
+  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono',
+               Consolas, 'Courier New', monospace;
+  --font-serif: Charter, Georgia, Cambria, 'Times New Roman', serif;
+
+  /* ============================================
+   * TYPOGRAPHY: Font Sizes
+   * ============================================ */
+  --text-xs: 10px;    /* Tiny labels */
+  --text-sm: 11px;    /* Small labels, hints */
+  --text-base: 13px;  /* Default body text */
+  --text-md: 14px;    /* Slightly larger body */
+  --text-lg: 16px;    /* Subheadings */
+  --text-xl: 18px;    /* Headings */
+  --text-2xl: 20px;   /* Large headings */
+
+  /* ============================================
+   * TYPOGRAPHY: Font Weights
+   * ============================================ */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* ============================================
+   * TYPOGRAPHY: Line Heights
+   * ============================================ */
+  --leading-none: 1;
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.6;
+
+  /* ============================================
+   * BORDERS
+   * ============================================ */
+  --border-radius: 0;           /* Flat design - no rounded corners */
+  --border-radius-circle: 50%;  /* Exception for circular elements */
+  --border-width: 1px;
+  --border-width-thick: 2px;
+
+  /* ============================================
+   * SHADOWS
+   * Depth scale from subtle to dramatic
+   * ============================================ */
+  --shadow-none: none;
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.8);
+  --shadow-focus: 0 0 0 3px rgba(0, 127, 212, 0.15);
+  /* Dialog shadow with subtle edge highlight */
+  --shadow-dialog: 0 12px 48px rgba(0, 0, 0, 0.8),
+                   0 0 0 1px rgba(255, 255, 255, 0.05);
+
+  /* ============================================
+   * TRANSITIONS
+   * Standard animation timings
+   * ============================================ */
+  --transition-fast: 0.1s ease;
+  --transition-normal: 0.15s ease;
+  --transition-slow: 0.2s ease;
+  --transition-slower: 0.3s ease;
+
+  /* ============================================
+   * Z-INDEX SCALE
+   * Layer hierarchy for overlapping elements
+   * ============================================ */
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-fixed: 500;
+  --z-modal-backdrop: 900;
+  --z-modal: 1000;
+  --z-popover: 2000;
+  --z-tooltip: 3000;
+  --z-toast: 9000;
+  --z-blocker: 9999;
+  --z-dialog: 10000;
+  --z-context-menu: 100000;  /* Must appear above dialogs */
+
+  /* ============================================
+   * COMPONENT SIZES
+   * Standard dimensions for UI elements
+   * ============================================ */
+  --header-height: 41px;
+  --tab-height: 41px;
+  --sidebar-min-width: 200px;
+  --dialog-min-width: 400px;
+  --dialog-max-width: 800px;
+
+  /* Icon sizes */
+  --icon-size-xs: 12px;
+  --icon-size-sm: 16px;
+  --icon-size-md: 20px;
+  --icon-size-lg: 24px;
+  --icon-size-xl: 32px;
+
+  /* Button sizes */
+  --btn-height-sm: 24px;
+  --btn-height-md: 32px;
+  --btn-height-lg: 40px;
+
+  /* Input sizes */
+  --input-height-sm: 28px;
+  --input-height-md: 36px;
+  --input-height-lg: 44px;
+
+  /* ============================================
+   * INTERACTIVE STATES
+   * Opacity values for state overlays
+   * ============================================ */
+  --opacity-disabled: 0.4;
+  --opacity-hover-subtle: 0.05;
+  --opacity-hover-medium: 0.1;
+  --opacity-hover-strong: 0.15;
+  --opacity-active: 0.2;
+
+  /* ============================================
+   * SCROLLBAR
+   * Consistent scrollbar styling
+   * ============================================ */
+  --scrollbar-width: 10px;
+  --scrollbar-thumb: var(--color-gray-700);
+  --scrollbar-thumb-hover: #4e4e4e;
+  --scrollbar-track: var(--color-gray-1000);
+}
