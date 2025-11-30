@@ -19,6 +19,12 @@ export const GIT_STATUS_CAP = 10000
  * - File statuses (modified, untracked, deleted, staged, conflicted)
  * - Status counts for aggregation
  * - Efficient bulk operation using git.statusMatrix()
+ *
+ * Known Limitation:
+ * Global gitignore files (~/.gitignore_global, ~/.config/git/ignore) are NOT
+ * respected. This is a limitation of isomorphic-git which only reads local
+ * .gitignore files. Files ignored globally may appear as "untracked".
+ * See: https://github.com/isomorphic-git/isomorphic-git/issues/444
  */
 export class GitStatusService {
   /**
