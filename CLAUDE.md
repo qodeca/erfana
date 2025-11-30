@@ -116,6 +116,13 @@ See `docs/` for details (keep Claude's context focused):
 - [ ] Focus states are visible (accessibility)
 
 ## Recent Changes (v0.5.3)
+- **Complete Style Guide Compliance Audit** (Nov 30, 2025):
+  - Migrated all 23 CSS files to use design tokens (100% compliance)
+  - All hardcoded colors, spacing, typography, borders now use `var(--*)` tokens
+  - Dockview sash color changed to Qodeca Lime (`--color-accent-secondary`)
+  - Dockview sash width reduced from 8px to 4px (thinner, cleaner)
+  - Monaco syntax highlighting uses neutral grays for readability
+  - See [docs/ui-style-guide.md](docs/ui-style-guide.md) for complete token reference
 - **Fix: DiagramViewer Wrong Diagram on Expand** (Nov 29, 2025):
   - Fixed bug where expanding a Mermaid diagram in Preview sometimes opened a different diagram (issue #39)
   - Root cause: Position-based matching (20-line tolerance) caused false positives when diagrams <20 lines apart
