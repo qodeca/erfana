@@ -70,6 +70,7 @@
   --color-accent-primary: #007fd4;               /* Primary accent (VS Code blue) */
   --color-accent-secondary: #4ec9b0;             /* Secondary accent (teal) */
   --color-accent-tertiary: #4fc3f7;              /* Tertiary accent (light blue) */
+  --color-accent-drag: #4fc1ff;                  /* Drag-drop highlight (cyan) */
 
   /* ============================================
    * COLORS: Links
@@ -97,6 +98,7 @@
    * ============================================ */
   --color-success: #4ec9b0;
   --color-warning: #cca700;
+  --color-warning-bright: #f59e0b;          /* Amber for sensitive files */
   --color-error: #f48771;
   --color-error-bright: #ff6b6b;
   --color-info: #4fc3f7;
