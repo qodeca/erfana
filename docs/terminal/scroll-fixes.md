@@ -239,109 +239,101 @@ new Terminal({
 }
 ```
 
-## Auto-Recovery from Scroll Anomalies (v0.4.3)
+## Auto-Recovery from Scroll Anomalies (v0.4.3, Enhanced v0.5.3)
 
 ### Purpose
 
-Automatic detection and recovery from Claude Code's Ink library scroll-to-top anomalies during streaming output. Complements the manual "Scroll to Bottom" button with intelligent auto-recovery.
+Automatic detection and recovery from Claude Code's Ink library scroll-to-top anomalies during streaming output. Seamless auto-recovery without manual intervention.
 
-**Related Issue**: [#12](https://github.com/user/erfana/issues/12)
+**Related Issues**: [#12](https://github.com/user/erfana/issues/12), [#22](https://github.com/user/erfana/issues/22)
 
-### How It Works
+### Root Cause
 
-The system detects "anomalous" scroll events by correlating three signals:
+Claude Code's Ink library sends escape sequences (`\x1b[2J` clear screen, `\x1b[3J` clear scrollback) when output exceeds terminal height, wiping the scrollback buffer entirely. This cannot be prevented, only detected and recovered from quickly.
 
-1. **User Scroll Activity**: Tracks wheel/touch events on `.xterm-viewport` (300ms window)
-2. **Data Streaming Activity**: Tracks terminal data arrivals (500ms window)
-3. **Scroll Position Delta**: Detects large jumps (≥10 lines) to near-top (≤3 lines)
+### Detection Strategy (v0.5.3 Enhanced)
 
-```
-Anomaly = (DataStreaming within 500ms) AND
-          (NO UserScroll within 300ms) AND
-          (Jump ≥ 10 lines) AND
-          (Landed at viewportY ≤ 3) AND
-          (Was NOT already near top)
-```
+Multi-signal detection with defense-in-depth approach:
 
-When an anomaly is detected, the terminal auto-scrolls to bottom after 100ms debounce.
+| Signal | Detection | Trigger |
+|--------|-----------|---------|
+| **Escape Sequences** | `\x1b[2J`, `\x1b[3J` BEFORE write | Immediate recovery flag |
+| **Buffer Truncation** | baseY shrinks significantly (≥10 lines) | Queue anomaly |
+| **Position-Based** | Jump ≥10 lines to near-top (≤3 lines) | Queue anomaly |
+| **User Activity** | Wheel/touch/keyboard scroll events | Suppress recovery |
+
+### Recovery Mechanism
+
+**Fixed-Interval Queue Approach** (100ms):
+1. **Queue anomalies**: Every detected anomaly increments a counter (no immediate recovery)
+2. **100ms interval**: Check counter; if > 0, reset sync, scroll async via RAF
+3. **No anomaly lost**: Counter reset happens synchronously before async scroll
+4. **Smart recovery**: Restores user's reading position relative to bottom (not always scroll-to-bottom)
 
 ### Architecture
 
 ```
-scrollAnomalyDetector.ts     Pure detection logic (testable, no React)
-├── isAnomalousScroll()      Main detection algorithm
-├── wasUserScrollRecent()    Signal 1: user activity check
-├── wasDataStreamActive()    Signal 2: streaming check
-├── calculateJumpMagnitude() Signal 3: delta calculation
-└── isNearTop()              Position threshold check
+scrollAnomalyDetector.ts      Pure detection logic (testable, no React)
+├── isAnomalousScroll()       Position-based detection
+├── detectClearSequences()    Escape sequence detection (ED 2/3)
+├── hasDestructiveClearSequence()  Check for destructive sequences
+├── wasBufferTruncated()      Buffer shrinkage detection
+├── calculateRecoveryTarget() Smart recovery positioning
+└── isRapidRedraw()           Rapid redraw pattern detection
 
-useScrollAnomalyRecovery.ts  React hook integration
-├── wrapOnDataHandler()      Wraps terminal data handler
-├── User scroll listener     Attaches to .xterm-viewport
-└── Recovery with debounce   scrollToBottom() after 100ms
+useScrollAnomalyRecovery.ts   React hook integration
+├── wrapOnDataHandler()       Wraps terminal data handler
+├── performRecovery()         Smart recovery with position targeting
+├── resetQueue()              Clear anomaly queue (for scroll lock)
+├── resetAll()                Reset all state (terminal/project change)
+└── Fixed-interval check      100ms interval with RAF scroll
 ```
 
 ### Configuration
 
-Default values (tunable via hook options):
-
 ```typescript
 {
-  userScrollRecencyMs: 300,   // User scroll recency window
-  dataStreamRecencyMs: 500,   // Data streaming recency window
-  jumpThresholdLines: 10,     // Minimum lines for anomaly
-  nearTopThreshold: 3,        // Lines from top to be "near top"
-  recoveryDebounceMs: 100     // Debounce before recovery
+  userScrollRecencyMs: 300,      // User scroll recency window
+  dataStreamRecencyMs: 500,      // Data streaming recency window
+  jumpThresholdLines: 10,        // Minimum lines for position anomaly
+  nearTopThreshold: 3,           // Lines from top to be "near top"
+  recoveryIntervalMs: 100,       // Fixed interval for queue check
+  bufferTruncationThreshold: 10, // Minimum baseY shrinkage
+  immediateRecoveryOnClear: true // Immediate recovery on escape sequences
 }
-```
-
-### Usage in TerminalPanel
-
-```typescript
-const { wrapOnDataHandler } = useScrollAnomalyRecovery(xtermRef, terminalRef, {
-  enabled: true,
-  onRecovery: () => {
-    console.debug('[ScrollRecovery] Auto-recovered from anomalous scroll-to-top')
-  }
-})
-
-const wrappedHandler = wrapOnDataHandler((data) => {
-  if (data.terminalId === terminalId && xtermRef.current) {
-    xtermRef.current.write(data.data)
-  }
-})
-
-window.api.terminal.onData(wrappedHandler)
 ```
 
 ### Test Coverage
 
-- **Pure Logic Tests** (`scrollAnomalyDetector.test.ts`): 34 tests
-  - All detection functions with boundary conditions
-  - Positive, negative, and edge cases
+- **Pure Logic Tests** (`scrollAnomalyDetector.test.ts`): 76 tests
+  - Position-based detection with boundary conditions
+  - Escape sequence detection (ED 2/3, cursor home)
+  - Buffer truncation detection
+  - Smart recovery target calculation
   - Custom configuration scenarios
 
-- **Hook Tests** (`useScrollAnomalyRecovery.test.ts`): 10 tests
-  - Handler wrapping and API
-  - Anomaly detection and recovery
-  - User scroll prevention
-  - Debounce behavior
+- **Hook Tests** (`useScrollAnomalyRecovery.test.ts`): 18 tests
+  - Fixed-interval queue approach
+  - Batching behavior
+  - Keyboard scroll detection (PageUp/Down, arrows)
+  - RAF cancellation
   - Cleanup on unmount
 
 ### Implementation Files
 
 - `src/renderer/src/utils/scrollAnomalyDetector.ts` - Pure detection logic
 - `src/renderer/src/hooks/useScrollAnomalyRecovery.ts` - React hook
-- `src/renderer/src/utils/scrollAnomalyDetector.test.ts` - Pure logic tests
-- `src/renderer/src/hooks/useScrollAnomalyRecovery.test.ts` - Hook tests
+- `src/renderer/src/utils/scrollAnomalyDetector.test.ts` - 76 pure logic tests
+- `src/renderer/src/hooks/useScrollAnomalyRecovery.test.ts` - 18 hook tests
 
-### Why Three Signals?
+### Why Multi-Signal Detection?
 
-1. **User Scroll Check**: Prevents fighting against intentional user scrolling up to read history
-2. **Data Streaming Check**: Ink anomalies only occur during active streaming, not at rest
-3. **Jump Magnitude Check**: Normal scroll adjustments are small; Ink redraws cause large jumps to top
+1. **Escape Sequences**: Detects Ink's ED 2/3 sequences BEFORE write for fastest recovery
+2. **Buffer Truncation**: Catches buffer wipes that position-based detection might miss
+3. **Position-Based**: Fallback for anomalies without escape sequences
+4. **User Activity**: Prevents fighting against intentional user scrolling
 
-This multi-signal approach minimizes false positives while reliably detecting the Ink library's characteristic scroll behavior.
+This defense-in-depth approach ensures reliable detection across all Ink library behaviors.
 
 ## References
 
