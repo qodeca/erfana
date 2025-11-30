@@ -3,7 +3,7 @@
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
 - **Repository**: `qodeca/erfana` (GitHub)
-- **Version**: 0.5.2
+- **Version**: 0.5.3
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -53,7 +53,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (3128 tests, 109 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (3172 tests, 109 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -117,23 +117,25 @@ See `docs/` for details (keep Claude's context focused):
 - [ ] Focus states are visible (accessibility)
 
 ## Recent Changes (v0.5.3)
-- **Fix: Terminal Scroll Auto-Recovery Inconsistency** (Nov 30, 2025):
-  - Fixed issue #22: Terminal scroll auto-recovery only worked ~50% of the time during Claude Code streaming
-  - Root cause: "First wins" debounce pattern - only first anomaly in 100ms window triggered recovery
-  - Solution: Fixed-interval queue approach:
-    1. **Queue anomalies**: Every detected anomaly increments a counter (no immediate recovery)
-    2. **Fixed 500ms interval**: Check counter; if > 0, reset sync, scroll async via RAF
-    3. **No anomaly lost**: Counter reset happens synchronously before async scroll
-  - Added keyboard scroll detection (PageUp/Down, Arrow Up/Down, Home/End prevent recovery)
-  - Added RAF cancellation to prevent overlapping callbacks
-  - Config: Added `recoveryIntervalMs` (500ms), deprecated `recoveryDebounceMs`
-  - `onRecovery` callback now receives anomaly count for diagnostics
+- **Enhanced Terminal Scroll Anomaly Detection** (Dec 1, 2025):
+  - Fixed issue #22: Terminal scroll auto-recovery now reliably handles Claude Code's Ink library
+  - Root cause: Ink sends `\x1b[2J` (clear screen) and `\x1b[3J` (clear scrollback) when output exceeds terminal height
+  - Solution: Multi-signal detection with defense-in-depth approach:
+    1. **Escape sequence detection**: Detects ED 2/3 BEFORE write for fastest recovery
+    2. **Buffer truncation detection**: Detects when baseY shrinks significantly (≥10 lines)
+    3. **Position-based detection**: Fallback for anomalies without escape sequences
+    4. **Smart recovery target**: Restores user's reading position relative to bottom
+  - Fixed-interval queue (100ms): No anomaly lost, counter reset sync before async scroll
+  - Removed scroll lock UI (automatic detection is more reliable)
+  - Added `resetAll()` for terminal/project changes
+  - New pure functions: `detectClearSequences()`, `hasDestructiveClearSequence()`, `wasBufferTruncated()`, `calculateRecoveryTarget()`
   - Files changed:
-    - `src/renderer/src/utils/scrollAnomalyDetector.ts` - Added recoveryIntervalMs config
-    - `src/renderer/src/hooks/useScrollAnomalyRecovery.ts` - Fixed-interval queue implementation
-    - `src/renderer/src/components/Panels/TerminalPanel.tsx` - Updated onRecovery callback
-  - 6 new tests for queue approach and keyboard detection
-  - **Total: 3128 tests passing (109 test files)**
+    - `src/renderer/src/utils/scrollAnomalyDetector.ts` - Multi-signal detection logic
+    - `src/renderer/src/hooks/useScrollAnomalyRecovery.ts` - Enhanced hook with smart recovery
+    - `src/renderer/src/components/Panels/TerminalPanel.tsx` - Simplified (removed scroll lock UI)
+    - `src/renderer/src/components/Panels/TerminalPanel.css` - Removed scroll lock styles
+  - 94 new tests (76 pure logic + 18 hook tests)
+  - **Total: 3172 tests passing (109 test files)**
   - Closes #22
 - **Terminal Panel Requires Project** (Nov 30, 2025):
   - Terminal panel completely hidden when no project is loaded (issue #46)
