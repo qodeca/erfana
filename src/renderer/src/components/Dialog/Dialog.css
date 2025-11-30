@@ -1,26 +1,26 @@
 /* Unified Dialog Framework Styles */
 
-/* CSS Variables for theming */
+/* CSS Variables for theming - using design tokens */
 :root {
   --dialog-overlay-bg: rgba(0, 0, 0, 0.75);
-  --dialog-bg: #1e1e1e;
-  --dialog-border: #454545;
-  --dialog-base-zindex: 10000;
-  --dialog-text-primary: #e8e8e8;
-  --dialog-text-secondary: #d4d4d4;
-  --dialog-text-muted: #9d9d9d;
+  --dialog-bg: var(--color-bg-primary);
+  --dialog-border: var(--color-border-subtle);
+  --dialog-base-zindex: var(--z-dialog);
+  --dialog-text-primary: var(--color-text-emphasis);
+  --dialog-text-secondary: var(--color-gray-200);
+  --dialog-text-muted: var(--color-text-muted);
   --dialog-btn-primary-bg: var(--color-btn-primary-bg);
   --dialog-btn-primary-hover: var(--color-btn-primary-hover);
-  --dialog-btn-danger-bg: #c72e0f;
-  --dialog-btn-danger-hover: #e03e18;
-  --dialog-btn-secondary-bg: #3c3c3c;
-  --dialog-btn-secondary-hover: #505050;
-  --dialog-spacing-large: 24px;
+  --dialog-btn-danger-bg: var(--color-btn-danger-bg);
+  --dialog-btn-danger-hover: var(--color-btn-danger-hover);
+  --dialog-btn-secondary-bg: var(--color-btn-secondary-bg);
+  --dialog-btn-secondary-hover: var(--color-btn-secondary-hover);
+  --dialog-spacing-large: var(--space-12);
   --dialog-tooltip-min-width: 280px;
-  --dialog-icon-size: 32px;
-  --dialog-icon-gap: 12px;
-  --dialog-icon-radius: 0;
-  --dialog-header-margin: 16px;
+  --dialog-icon-size: var(--icon-size-xl);
+  --dialog-icon-gap: var(--space-6);
+  --dialog-icon-radius: var(--border-radius);
+  --dialog-header-margin: var(--space-8);
 }
 
 /* Overlay - Full screen backdrop */
@@ -34,9 +34,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: var(--space-10);
   backdrop-filter: blur(4px);
-  animation: dialogFadeIn 0.15s ease-out;
+  animation: dialogFadeIn var(--transition-normal);
 }
 
 @keyframes dialogFadeIn {
@@ -52,15 +52,14 @@
 .dialog-container {
   background-color: var(--dialog-bg);
   border: 1px solid var(--dialog-border);
-  border-radius: 0;
-  padding: 28px;
-  min-width: 400px;
-  max-width: 800px;
+  border-radius: var(--border-radius);
+  padding: var(--space-14);
+  min-width: var(--dialog-min-width);
+  max-width: var(--dialog-max-width);
   max-height: 85vh;
   overflow-y: auto;
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.8),
-              0 0 0 1px rgba(255, 255, 255, 0.05);
-  animation: dialogSlideUp 0.2s ease-out;
+  box-shadow: var(--shadow-dialog);
+  animation: dialogSlideUp var(--transition-slow);
 }
 
 @keyframes dialogSlideUp {
@@ -76,114 +75,114 @@
 
 /* Dialog header */
 .dialog-header {
-  margin: 0 0 16px 0;
+  margin: 0 0 var(--space-8) 0;
 }
 
 .dialog-title {
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
   color: var(--dialog-text-primary);
   letter-spacing: -0.2px;
 }
 
 /* Dialog body */
 .dialog-body {
-  margin: 0 0 24px 0;
+  margin: 0 0 var(--space-12) 0;
 }
 
 .dialog-message {
   margin: 0;
   color: var(--dialog-text-secondary);
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
 }
 
 /* Dialog actions (buttons) */
 .dialog-actions {
   display: flex;
-  gap: 12px;
+  gap: var(--space-6);
   justify-content: flex-end;
   align-items: center;
-  padding-top: 4px;
+  padding-top: var(--space-2);
 }
 
 /* Left side of actions row (info icon + char count) */
 .dialog-actions-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-6);
   margin-right: auto;
 }
 
 /* Button styles */
 .dialog-btn {
-  padding: 10px 24px;
+  padding: var(--space-5) var(--space-12);
   border: none;
-  border-radius: 0;
+  border-radius: var(--border-radius);
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.15s ease;
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  transition: all var(--transition-normal);
   letter-spacing: 0.2px;
 }
 
 .dialog-btn:focus {
   outline: 2px solid var(--dialog-btn-primary-bg);
-  outline-offset: 2px;
+  outline-offset: var(--space-1);
 }
 
 /* Primary button (confirm, submit) */
 .dialog-btn-primary {
   background-color: var(--dialog-btn-primary-bg);
-  color: #ffffff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  color: var(--color-white);
+  box-shadow: var(--shadow-sm);
 }
 
 .dialog-btn-primary:hover:not(:disabled) {
   background-color: var(--dialog-btn-primary-hover);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
 
 .dialog-btn-primary:active:not(:disabled) {
   transform: translateY(0);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-xs);
 }
 
 /* Danger button (delete, destructive actions) */
 .dialog-btn-danger {
   background-color: var(--dialog-btn-danger-bg);
-  color: #ffffff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  color: var(--color-white);
+  box-shadow: var(--shadow-sm);
 }
 
 .dialog-btn-danger:hover:not(:disabled) {
   background-color: var(--dialog-btn-danger-hover);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
 
 .dialog-btn-danger:active:not(:disabled) {
   transform: translateY(0);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-xs);
 }
 
 /* Secondary button (cancel) */
 .dialog-btn-secondary {
   background-color: transparent;
   color: var(--dialog-text-secondary);
-  border: 1px solid var(--dialog-border);
+  border: var(--border-width) solid var(--dialog-border);
 }
 
 .dialog-btn-secondary:hover {
   background-color: var(--dialog-btn-secondary-bg);
-  border-color: #555;
+  border-color: var(--color-gray-700);
 }
 
 /* Disabled state */
 .dialog-btn:disabled {
-  opacity: 0.4;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
   box-shadow: none;
 }
@@ -191,128 +190,128 @@
 /* Input field (for PromptDialog) */
 .dialog-input {
   width: 100%;
-  padding: 12px 14px;
-  background-color: #2d2d30;
-  border: 1px solid var(--dialog-border);
-  border-radius: 0;
+  padding: var(--space-6);
+  background-color: var(--color-bg-input);
+  border: var(--border-width) solid var(--dialog-border);
+  border-radius: var(--border-radius);
   color: var(--dialog-text-secondary);
-  font-size: 14px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  line-height: 1.6;
+  font-size: var(--text-md);
+  font-family: var(--font-sans);
+  line-height: var(--leading-relaxed);
   resize: vertical;
   min-height: 120px;
-  transition: all 0.2s ease;
+  transition: all var(--transition-slow);
 }
 
 .dialog-input:focus {
   outline: none;
   border-color: var(--dialog-btn-primary-bg);
-  background-color: #252526;
+  background-color: var(--color-bg-tertiary);
   box-shadow: var(--shadow-focus);
 }
 
 .dialog-input::placeholder {
-  color: #6c6c6c;
+  color: var(--color-text-placeholder);
   font-style: italic;
 }
 
 /* Input label */
 .dialog-input-label {
   display: block;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
   color: var(--dialog-text-secondary);
-  margin-bottom: 10px;
+  margin-bottom: var(--space-5);
   letter-spacing: 0.1px;
 }
 
 /* Validation error message */
 .dialog-validation-error {
-  color: #f48771;
-  font-size: 13px;
-  margin-top: 8px;
+  color: var(--color-error);
+  font-size: var(--text-base);
+  margin-top: var(--space-4);
 }
 
 /* Validation warning message (approaching limit) */
 .dialog-validation-warning {
-  color: #cca700;
-  font-size: 13px;
-  margin-top: 8px;
+  color: var(--color-warning);
+  font-size: var(--text-base);
+  margin-top: var(--space-4);
 }
 
 /* Validation hint message (too short) */
 .dialog-validation-hint {
-  color: #858585;
-  font-size: 13px;
-  margin-top: 8px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+  margin-top: var(--space-4);
 }
 
 /* Keyboard hint text */
 .dialog-keyboard-hint {
-  font-size: 12px;
-  color: #858585;
-  margin-top: 12px;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-6);
   text-align: center;
 }
 
 .dialog-keyboard-hint kbd {
-  padding: 2px 6px;
-  background: #1e1e1e;
-  border: 1px solid #454545;
-  border-radius: 0;
-  font-family: monospace;
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-bg-primary);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  font-family: var(--font-mono);
 }
 
 /* Selected text preview section (for PromptDialog) */
 .dialog-selected-text {
-  background-color: #2d2d30;
-  border-left: 3px solid #4ec9b0;
-  padding: 14px 16px;
-  border-radius: 0;
+  background-color: var(--color-bg-secondary);
+  border-left: 3px solid var(--color-accent-secondary);
+  padding: var(--space-6) var(--space-8);
+  border-radius: var(--border-radius);
   max-height: 200px;
   overflow-y: scroll;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-4);
   margin-bottom: var(--dialog-spacing-large);
 }
 
 /* Custom scrollbar for selected text (Webkit browsers only) */
 /* Firefox will use default scrollbar styling */
 .dialog-selected-text::-webkit-scrollbar {
-  width: 10px;
+  width: var(--scrollbar-width);
 }
 
 .dialog-selected-text::-webkit-scrollbar-track {
-  background: #1e1e1e;
+  background: var(--scrollbar-track);
 }
 
 .dialog-selected-text::-webkit-scrollbar-thumb {
-  background: #454545;
-  border: 2px solid #2d2d30;
+  background: var(--scrollbar-thumb);
+  border: var(--border-width-thick) solid var(--color-bg-secondary);
 }
 
 .dialog-selected-text::-webkit-scrollbar-thumb:hover {
-  background: #555555;
+  background: var(--scrollbar-thumb-hover);
 }
 
 .dialog-selected-text-label {
-  font-size: 11px;
-  color: #9d9d9d;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  font-weight: 600;
+  font-weight: var(--font-semibold);
   flex-shrink: 0;
 }
 
 .dialog-selected-text-content {
-  font-size: 13px;
-  color: #c8c8c8;
+  font-size: var(--text-base);
+  color: var(--color-gray-300);
   font-style: italic;
-  line-height: 1.6;
+  line-height: var(--leading-relaxed);
   word-break: break-word;
   white-space: pre-wrap;
-  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-family: var(--font-mono);
   overflow-wrap: break-word;
 }
 
@@ -320,7 +319,7 @@
 .dialog-input-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-5);
 }
 
 /* Info icon with tooltip (for PromptDialog) */
@@ -336,9 +335,9 @@
   justify-content: center;
   width: 18px;
   height: 18px;
-  color: #858585;
+  color: var(--color-text-secondary);
   cursor: help;
-  transition: color 0.2s ease;
+  transition: color var(--transition-slow);
   background: transparent;
   border: none;
   padding: 0;
@@ -347,30 +346,30 @@
 
 .dialog-info-icon:hover,
 .dialog-info-icon:focus {
-  color: #d4d4d4;
+  color: var(--color-gray-200);
   outline: none;
 }
 
 .dialog-info-icon:focus-visible {
   outline: 2px solid var(--color-border-focus);
-  outline-offset: 2px;
+  outline-offset: var(--space-1);
 }
 
 .dialog-tooltip {
   position: absolute;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% + var(--space-4));
   left: 0;
-  background-color: #252526;
-  border: 1px solid #454545;
-  border-radius: 0;
-  padding: 10px 12px;
+  background-color: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  padding: var(--space-5) var(--space-6);
   min-width: var(--dialog-tooltip-min-width);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-  z-index: 1000;
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-modal);
   pointer-events: none;
   opacity: 0;
   transform: translateY(4px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity var(--transition-slow), transform var(--transition-slow);
 }
 
 .dialog-tooltip.visible {
@@ -379,26 +378,26 @@
 }
 
 .dialog-tooltip-content {
-  font-size: 12px;
-  color: #d4d4d4;
-  line-height: 1.5;
+  font-size: var(--text-sm);
+  color: var(--color-gray-200);
+  line-height: var(--leading-normal);
 }
 
 .dialog-tooltip-content kbd {
   display: inline-block;
-  padding: 2px 6px;
-  background-color: #1e1e1e;
-  border: 1px solid #454545;
-  border-radius: 0;
-  font-size: 11px;
-  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
-  color: #d4d4d4;
-  font-weight: 500;
+  padding: var(--space-1) var(--space-3);
+  background-color: var(--color-bg-primary);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  color: var(--color-gray-200);
+  font-weight: var(--font-medium);
 }
 
 /* Scrollbar styling for dialog content */
 .dialog-container::-webkit-scrollbar {
-  width: 10px;
+  width: var(--scrollbar-width);
 }
 
 .dialog-container::-webkit-scrollbar-track {
@@ -407,11 +406,11 @@
 
 .dialog-container::-webkit-scrollbar-thumb {
   background: var(--dialog-border);
-  border: 2px solid var(--dialog-bg);
+  border: var(--border-width-thick) solid var(--dialog-bg);
 }
 
 .dialog-container::-webkit-scrollbar-thumb:hover {
-  background: #555555;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* Shared Dialog Header with Icon Styles */
@@ -450,9 +449,9 @@
 
 /* Parent path context */
 .dialog-rename-context {
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--dialog-text-muted);
-  margin-bottom: 20px;
+  margin-bottom: var(--space-10);
   font-style: italic;
 }
 
@@ -460,38 +459,38 @@
 .dialog-rename-input-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-4);
 }
 
 /* Input field */
 .dialog-rename-input {
   width: 100%;
-  padding: 10px 12px;
-  background-color: #2d2d30;
-  border: 1px solid var(--dialog-border);
-  border-radius: 0;
+  padding: var(--space-5) var(--space-6);
+  background-color: var(--color-bg-input);
+  border: var(--border-width) solid var(--dialog-border);
+  border-radius: var(--border-radius);
   color: var(--dialog-text-secondary);
-  font-size: 14px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  transition: all 0.2s ease;
+  font-size: var(--text-md);
+  font-family: var(--font-sans);
+  transition: all var(--transition-slow);
 }
 
 .dialog-rename-input:focus {
   outline: none;
   border-color: var(--dialog-btn-primary-bg);
-  background-color: #252526;
+  background-color: var(--color-bg-tertiary);
   box-shadow: var(--shadow-focus);
 }
 
 .dialog-rename-input.error {
-  color: #f48771;
+  color: var(--color-error);
 }
 
 /* Validation error */
 .dialog-rename-validation-error {
-  color: #f48771;
-  font-size: 12px;
-  margin-top: 4px;
+  color: var(--color-error);
+  font-size: var(--text-sm);
+  margin-top: var(--space-2);
 }
 
 /* Prompt Dialog Specific Styles */

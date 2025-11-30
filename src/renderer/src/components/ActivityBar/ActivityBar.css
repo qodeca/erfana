@@ -1,7 +1,7 @@
 /* Activity Bar Container */
 .activity-bar {
   width: 48px;
-  background: #333333;
+  background: var(--color-gray-800);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -9,11 +9,11 @@
 }
 
 .activity-bar-left {
-  border-right: 1px solid #1e1e1e;
+  border-right: var(--border-width) solid var(--color-bg-primary);
 }
 
 .activity-bar-right {
-  border-left: 1px solid #1e1e1e;
+  border-left: var(--border-width) solid var(--color-bg-primary);
 }
 
 /* Activity Bar Items Container */
@@ -33,13 +33,13 @@
   justify-content: center;
   cursor: pointer;
   position: relative;
-  color: #858585;
-  transition: color 0.1s ease;
+  color: var(--color-text-secondary);
+  transition: color var(--transition-fast);
   outline: none;
 }
 
 .activity-bar-item:hover {
-  color: #ffffff;
+  color: var(--color-white);
 }
 
 .activity-bar-item:focus-visible {
@@ -48,7 +48,7 @@
 }
 
 .activity-bar-item.active {
-  color: #ffffff;
+  color: var(--color-white);
 }
 
 /* Active indicator (left bar on left side, right bar on right side) */
@@ -59,7 +59,7 @@
   top: 0;
   bottom: 0;
   width: 2px;
-  background: var(--color-brand-violet);
+  background: var(--color-brand-lime);
 }
 
 .activity-bar-item-right.active::before {
@@ -69,7 +69,7 @@
   top: 0;
   bottom: 0;
   width: 2px;
-  background: var(--color-brand-violet);
+  background: var(--color-brand-lime);
 }
 
 /* Icon Container */
@@ -82,16 +82,16 @@
 /* Badge Styles */
 .activity-bar-badge {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
+  top: var(--space-4);
+  right: var(--space-4);
+  min-width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+  padding: 0 var(--space-2);
   background: var(--color-brand-violet);
-  color: #ffffff;
+  color: var(--color-white);
   font-size: 9px;
-  font-weight: 600;
-  border-radius: 0;
+  font-weight: var(--font-semibold);
+  border-radius: var(--border-radius);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -101,11 +101,11 @@
 
 /* Badge for left activity bar */
 .activity-bar-left .activity-bar-badge {
-  right: 6px;
+  right: var(--space-3);
 }
 
 /* Badge for right activity bar */
 .activity-bar-right .activity-bar-badge {
-  left: 6px;
+  left: var(--space-3);
   right: auto;
 }

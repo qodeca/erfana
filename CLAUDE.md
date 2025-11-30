@@ -52,7 +52,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (2976 tests, 104 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (3066 tests, 107 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -86,13 +86,14 @@ See `docs/` for details (keep Claude's context focused):
 ### Quick Reference - Common Tokens
 
 ```css
-/* Colors */
+/* Colors (Qodeca Brand) */
 --color-text-primary       /* #cccccc - main text */
 --color-text-secondary     /* #858585 - muted text */
---color-bg-primary         /* #1e1e1e - main background */
+--color-bg-primary         /* #161312 - Smoky Black (main background) */
 --color-bg-secondary       /* #2d2d30 - panels */
 --color-border-default     /* #3c3c3c - borders */
---color-accent-primary     /* #007fd4 - VS Code blue */
+--color-accent-primary     /* #A0A8FF - Qodeca Violet */
+--color-accent-secondary   /* #E3E829 - Qodeca Lime */
 
 /* Spacing (4px grid) */
 --space-4   /* 8px */
