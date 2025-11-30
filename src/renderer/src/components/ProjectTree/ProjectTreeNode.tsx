@@ -1,6 +1,8 @@
 import { ChevronRight, ChevronDown, File, FileText, AlertTriangle, Link as LinkIcon } from 'lucide-react'
 import type { FileNode } from '../../../../preload/index'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
+import type { GitDisplayStatus } from '../../../../shared/ipc/git-schema'
+import { GitStatusBadge } from './GitStatusBadge'
 import './ProjectTree.css'
 
 /**
@@ -68,6 +70,10 @@ interface ProjectTreeNodeProps {
   isDropInvalid?: boolean
   clipboardCut?: boolean
   dragDisabled?: boolean
+  // Git status props
+  gitStatus?: GitDisplayStatus
+  getFileStatus?: (path: string) => GitDisplayStatus | undefined
+  getFolderStatus?: (path: string) => GitDisplayStatus | undefined
 }
 
 export function ProjectTreeNode({
@@ -82,7 +88,10 @@ export function ProjectTreeNode({
   isDropTarget = false,
   isDropInvalid = false,
   clipboardCut = false,
-  dragDisabled = false
+  dragDisabled = false,
+  gitStatus,
+  getFileStatus,
+  getFolderStatus
 }: ProjectTreeNodeProps) {
   // Controlled component - check if this folder is expanded
   const isExpanded = expandedFolders.has(node.path)
@@ -143,6 +152,13 @@ export function ProjectTreeNode({
   const isHidden = node.name.startsWith('.')
   const isSymlink = node.isSymlink === true
 
+  // Determine git status for this node
+  const currentGitStatus = gitStatus || (
+    node.type === 'file'
+      ? getFileStatus?.(node.path)
+      : getFolderStatus?.(node.path)
+  )
+
   const renderIcon = () => {
     if (node.type === 'directory') {
       return isExpanded ? (
@@ -180,15 +196,19 @@ export function ProjectTreeNode({
         {...dragAttributes}
         {...dragListeners}
       >
-        <span className="file-icon">{renderIcon()}</span>
+        <span className={`file-icon ${isMarkdown ? 'markdown' : ''}`}>{renderIcon()}</span>
         <span
           className={`file-name ${isMarkdown ? 'markdown' : ''} ${isSensitive ? 'sensitive' : ''} ${isHidden ? 'hidden-file' : ''}`}
+          data-git-status={currentGitStatus}
           title={isSensitive ? 'Sensitive file - may contain credentials' : undefined}
         >
           {isSensitive && <AlertTriangle size={14} className="sensitive-icon" aria-label="Warning: sensitive file" />}
           {isSymlink && <LinkIcon size={12} style={{ marginRight: 4, opacity: 0.8 }} aria-label="Symlink" />}
           {node.name}
         </span>
+        {currentGitStatus && currentGitStatus !== 'unmodified' && (
+          <GitStatusBadge status={currentGitStatus} isFolder={node.type === 'directory'} />
+        )}
       </div>
       {node.type === 'directory' && isExpanded && node.children && (
         <div className="project-tree-children">
@@ -203,6 +223,8 @@ export function ProjectTreeNode({
               expandedFolders={expandedFolders}
               onToggleFolder={onToggleFolder}
               dragDisabled={dragDisabled}
+              getFileStatus={getFileStatus}
+              getFolderStatus={getFolderStatus}
             />
           ))}
         </div>

@@ -116,6 +116,9 @@ describe('Main Process - Window Creation', () => {
     vi.doMock('./ipc/import-handlers', () => ({
       registerImportHandlers: vi.fn()
     }))
+    vi.doMock('./ipc/git-handlers', () => ({
+      registerGitHandlers: vi.fn()
+    }))
 
     // Mock safe console
     vi.doMock('./utils/safe-console', () => ({

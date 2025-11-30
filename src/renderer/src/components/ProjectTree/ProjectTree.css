@@ -146,14 +146,20 @@
   height: var(--icon-size-sm);
 }
 
+/* Markdown file icon - brand violet */
+.file-icon.markdown {
+  color: var(--color-brand-violet);
+}
+
 .file-name {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--color-text-emphasis);
 }
 
 .file-name.markdown {
-  color: var(--color-text-primary);
+  color: var(--color-text-emphasis);
   font-weight: var(--font-medium);
 }
 
@@ -387,4 +393,201 @@
   width: 1px;
   height: 1px;
   overflow: hidden;
+}
+
+/* ===================================================================
+   Git Status Indicators
+   =================================================================== */
+
+/* Git status badge - letter indicator for files */
+.git-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--space-7);
+  height: var(--space-7);
+  padding: 0 var(--space-1);
+  margin-left: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  border-radius: var(--border-radius);
+  flex-shrink: 0;
+}
+
+/* Git status dot - colored indicator for folders */
+/* Must match badge dimensions for horizontal alignment */
+.git-status-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--space-7);
+  height: var(--space-7);
+  margin-left: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* The actual dot - centered within the container */
+.git-status-dot::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: var(--border-radius-circle);
+}
+
+/* Status color variants - badge background and text */
+.git-status-badge[data-git-status="modified"] {
+  background-color: var(--color-git-modified);
+  color: var(--color-bg-primary);
+}
+
+.git-status-badge[data-git-status="untracked"] {
+  background-color: var(--color-git-untracked);
+  color: var(--color-bg-primary);
+}
+
+.git-status-badge[data-git-status="deleted"] {
+  background-color: var(--color-git-deleted);
+  color: var(--color-bg-primary);
+}
+
+.git-status-badge[data-git-status="staged"] {
+  background-color: var(--color-git-staged);
+  color: var(--color-bg-primary);
+}
+
+.git-status-badge[data-git-status="renamed"] {
+  background-color: var(--color-git-renamed);
+  color: var(--color-bg-primary);
+}
+
+.git-status-badge[data-git-status="conflicted"] {
+  background-color: var(--color-git-conflicted);
+  color: var(--color-bg-primary);
+}
+
+/* Status color variants - dot background (via ::before pseudo-element) */
+.git-status-dot[data-git-status="modified"]::before {
+  background-color: var(--color-git-modified);
+}
+
+.git-status-dot[data-git-status="untracked"]::before {
+  background-color: var(--color-git-untracked);
+}
+
+.git-status-dot[data-git-status="deleted"]::before {
+  background-color: var(--color-git-deleted);
+}
+
+.git-status-dot[data-git-status="staged"]::before {
+  background-color: var(--color-git-staged);
+}
+
+.git-status-dot[data-git-status="renamed"]::before {
+  background-color: var(--color-git-renamed);
+}
+
+.git-status-dot[data-git-status="conflicted"]::before {
+  background-color: var(--color-git-conflicted);
+}
+
+/* File name color override for git status */
+.file-name[data-git-status="modified"] {
+  color: var(--color-git-modified);
+}
+
+.file-name[data-git-status="untracked"] {
+  color: var(--color-git-untracked);
+}
+
+.file-name[data-git-status="deleted"] {
+  color: var(--color-git-deleted);
+}
+
+.file-name[data-git-status="staged"] {
+  color: var(--color-git-staged);
+}
+
+.file-name[data-git-status="renamed"] {
+  color: var(--color-git-renamed);
+}
+
+.file-name[data-git-status="conflicted"] {
+  color: var(--color-git-conflicted);
+}
+
+/* ===================================================================
+   Git Status Bar (Footer)
+   =================================================================== */
+
+.git-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  height: var(--header-height);
+  box-sizing: border-box;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-tertiary);
+  border-top: var(--border-width) solid var(--color-border-default);
+}
+
+/* Branch section (left) */
+.git-branch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--font-medium);
+  flex: 1 1 auto;
+}
+
+/* Counts section (right) */
+.git-counts {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+.git-count-item {
+  font-weight: var(--font-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Count item colors - match git status colors */
+.git-count-item[data-git-status="modified"] {
+  color: var(--color-git-modified);
+}
+
+.git-count-item[data-git-status="untracked"] {
+  color: var(--color-git-untracked);
+}
+
+.git-count-item[data-git-status="deleted"] {
+  color: var(--color-git-deleted);
+}
+
+.git-count-item[data-git-status="staged"] {
+  color: var(--color-git-staged);
+}
+
+.git-count-item[data-git-status="conflicted"] {
+  color: var(--color-git-conflicted);
+}
+
+.git-count-clean {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.git-truncated-warning {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-warning);
+}
+
+/* Refresh button (right) */
+.git-refresh {
+  flex: 0 0 auto;
 }
