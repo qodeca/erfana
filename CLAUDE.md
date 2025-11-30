@@ -53,7 +53,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (3069 tests, 107 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (3122 tests, 109 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -117,6 +117,23 @@ See `docs/` for details (keep Claude's context focused):
 - [ ] Focus states are visible (accessibility)
 
 ## Recent Changes (v0.5.3)
+- **Terminal Panel Requires Project** (Nov 30, 2025):
+  - Terminal panel completely hidden when no project is loaded (issue #46)
+  - ActivityBar config extended with `requiresProject?: boolean` field
+  - Terminal config: `requiresProject: true` hides button on Welcome screen
+  - Right activity bar returns `null` (hidden) when no panels to show
+  - Terminal panel dynamically added/removed from SplitviewReact based on projectPath
+  - Sash (resize handle) hidden when terminal panel is removed
+  - Keyboard shortcut (Cmd+J) silently ignored when no project
+  - `isSplitviewReady` state ensures terminal panel added after API ready (initial load fix)
+  - Resize listener properly disposed on panel removal (memory leak prevention)
+  - Files changed:
+    - `src/renderer/src/components/ActivityBar/activityBarConfig.ts` - Added requiresProject field
+    - `src/renderer/src/components/ActivityBar/ActivityBar.tsx` - Filter panels, return null when empty
+    - `src/renderer/src/components/DockLayout/AppDockLayout.tsx` - Dynamic panel add/remove with proper cleanup
+  - 46 new tests for ActivityBar filtering logic
+  - **Total: 3122 tests passing (109 test files)**
+  - Closes #46
 - **Fix: Terminal AutoExecute Regression & Infinite Loop** (Nov 30, 2025):
   - Fixed issue #41: AutoExecute regression in context menu actions (Elaborate, Modify, Ask)
   - Root cause #1: Atomic write pattern didn't work reliably with PTY buffering
