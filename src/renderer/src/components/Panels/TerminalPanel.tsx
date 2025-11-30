@@ -53,10 +53,12 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const dockviewApi = useProjectStore((state) => state.dockviewApi)
 
   // Auto-recovery for Claude Code scroll anomalies (issue #12, #22)
-  // Detects unexpected scroll-to-top during streaming and auto-recovers
-  // Issue #22: Uses fixed-interval queue approach - all anomalies are counted and recovered in batches
-  const { wrapOnDataHandler } = useScrollAnomalyRecovery(xtermRef, terminalRef, {
-    enabled: true,
+  // Issue #22 Enhanced: Multiple detection signals for faster, smarter recovery
+  // - Escape sequence detection: Detects \x1b[2J, \x1b[3J BEFORE write
+  // - Buffer truncation detection: Detects when baseY shrinks significantly
+  // - Fast recovery interval: 100ms instead of 500ms
+  // - Smart recovery target: Restore reading position, not just scroll to bottom
+  const { wrapOnDataHandler, resetAll } = useScrollAnomalyRecovery(xtermRef, terminalRef, {
     onRecovery: (count) => {
       console.debug(`[ScrollRecovery] Auto-recovered from ${count} anomalous scroll event(s)`)
     }
@@ -461,9 +463,12 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   useEffect(() => {
     if (!terminalId) return
 
-    // Wrap data handler with scroll anomaly detection (issue #12)
-    // This detects Claude Code's Ink library scroll-to-top anomalies and auto-recovers
-    const wrappedDataHandler = wrapOnDataHandler((data: { terminalId: string; data: string }) => {
+    // Issue #22 Enhanced: Single handler with automatic anomaly detection
+    // The wrapOnDataHandler adds all detection signals:
+    // - Escape sequence detection (ED 2, ED 3) BEFORE write
+    // - Buffer truncation detection AFTER write
+    // - Smart recovery targeting user's reading position
+    const dataHandler = wrapOnDataHandler((data: { terminalId: string; data: string }) => {
       if (data.terminalId === terminalId && xtermRef.current) {
         // Write data to terminal
         xtermRef.current.write(data.data)
@@ -475,7 +480,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }
     })
 
-    const unsubscribeData = window.api.terminal.onData(wrappedDataHandler)
+    const unsubscribeData = window.api.terminal.onData(dataHandler)
 
     const unsubscribeExit = window.api.terminal.onExit((data) => {
       if (data.terminalId === terminalId) {
@@ -550,6 +555,11 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
     return () => resizeObserver.disconnect()
   }, [terminalId])
+
+  // Issue #22 Enhanced: Reset scroll recovery state on terminal change (project switch)
+  useEffect(() => {
+    resetAll()
+  }, [terminalId, resetAll])
 
   // Subscribe to portal refit requests (for DiagramViewer integration)
   useEffect(() => {
@@ -712,14 +722,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                 <button
                   className="icon-btn"
                   onClick={handleScrollToBottom}
-                  title="Scroll to Bottom"
+                  title="Scroll to bottom"
                 >
                   <ArrowDownToLine size={14} />
                 </button>
                 <button
                   className="icon-btn"
                   onClick={handleRestartTerminal}
-                  title="Restart Terminal"
+                  title="Restart terminal"
                 >
                   <RotateCw size={14} />
                 </button>
