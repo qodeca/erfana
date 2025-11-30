@@ -4,8 +4,12 @@ import { join } from 'path'
 import { stat } from 'fs/promises'
 import type { GitStatusResponse, GitDisplayStatus, GitFileEntry, GitStatusCounts } from '../../shared/ipc/git-schema'
 
-// Cap file entries at 10,000 to prevent performance issues
-const GIT_STATUS_CAP = 10000
+/**
+ * Cap file entries to prevent performance issues with large repositories.
+ * 10,000 files × ~80 bytes per entry ≈ 800KB memory footprint.
+ * Users with larger repos will see truncation warning in UI.
+ */
+export const GIT_STATUS_CAP = 10000
 
 /**
  * GitStatusService - Git status detection using isomorphic-git
@@ -201,5 +205,15 @@ export class GitStatusService {
   }
 }
 
-// Singleton instance
-export const gitStatusService = new GitStatusService()
+/**
+ * Factory function to create a GitStatusService instance.
+ * Enables dependency injection for testing.
+ *
+ * @returns New GitStatusService instance
+ */
+export function createGitStatusService(): GitStatusService {
+  return new GitStatusService()
+}
+
+// Default singleton instance for production use
+export const gitStatusService = createGitStatusService()

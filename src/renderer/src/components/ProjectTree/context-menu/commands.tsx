@@ -127,6 +127,7 @@ export class PasteIntoDirectoryCommand extends CommandBase {
       })
 
       if (result.success) {
+        this.ctx.onGitRefresh?.()
         if (result.isSymlink) {
           const op = clipboard.getOperation() === 'cut' ? 'Moved' : 'Copied'
           this.ctx.toast({
@@ -194,6 +195,7 @@ abstract class RenameCommandBase<T extends FileNodeFile | FileNodeDirectory> ext
         await this.ctx.api.rename(node.path, newName)
         await this.ctx.refreshProjectTree()
       })
+      this.ctx.onGitRefresh?.()
       this.ctx.toast({
         type: 'success',
         title: 'Success',
@@ -250,6 +252,7 @@ abstract class DeleteCommandBase<T extends FileNodeFile | FileNodeDirectory> ext
         await this.doDelete(node)
         await this.ctx.refreshProjectTree()
       })
+      this.ctx.onGitRefresh?.()
     } catch (err) {
       const msg = this.ctx.formatFileOperationError(err, 'delete')
       this.ctx.toast({ type: 'error', title: 'Error', message: msg })
@@ -318,6 +321,7 @@ export class NewFileInDirectoryCommand extends CommandBase {
         await this.ctx.api.createFile(parentPath, name)
         await this.ctx.refreshProjectTree()
       })
+      this.ctx.onGitRefresh?.()
     } catch (err) {
       const msg = this.ctx.formatFileOperationError(err, 'create')
       this.ctx.toast({ type: 'error', title: 'Error', message: msg })
@@ -356,6 +360,7 @@ export class NewFolderInDirectoryCommand extends CommandBase {
         await this.ctx.api.createFolder(parentPath, name)
         await this.ctx.refreshProjectTree()
       })
+      this.ctx.onGitRefresh?.()
     } catch (err) {
       const msg = this.ctx.formatFileOperationError(err, 'create')
       this.ctx.toast({ type: 'error', title: 'Error', message: msg })

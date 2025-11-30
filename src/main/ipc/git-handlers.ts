@@ -1,11 +1,14 @@
 import { ipcMain } from 'electron'
-import { gitStatusService } from '../services/GitStatusService'
+import { gitStatusService, createGitStatusService, GitStatusService } from '../services/GitStatusService'
 import { validateProjectPath } from '../utils/pathSecurity'
 
 /**
  * Register git-related IPC handlers
+ *
+ * @param gitService - Optional GitStatusService instance for dependency injection (testing).
+ *                     Defaults to the singleton gitStatusService.
  */
-export function registerGitHandlers(): void {
+export function registerGitHandlers(gitService: GitStatusService = gitStatusService): void {
   // Get git status for a project directory
   ipcMain.handle('git:getStatus', async (_event, projectPath: string) => {
     try {
@@ -23,10 +26,13 @@ export function registerGitHandlers(): void {
       // Security validation: prevent path traversal and system directory access
       await validateProjectPath(trimmedPath)
 
-      return await gitStatusService.getStatus(trimmedPath)
+      return await gitService.getStatus(trimmedPath)
     } catch (error) {
       console.error('🔀 Error in git:getStatus handler:', error)
       throw error
     }
   })
 }
+
+// Re-export factory for tests
+export { createGitStatusService }
