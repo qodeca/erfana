@@ -64,6 +64,56 @@ See `docs/` for details (keep Claude's context focused):
 - CSS modules for component styling
 - Lucide React for icons
 
+## UI Style Guide (MANDATORY)
+
+**Before implementing ANY UI changes, you MUST:**
+
+1. **Read the style guide**: [docs/ui-style-guide.md](docs/ui-style-guide.md)
+2. **Use design tokens**: All CSS values come from `src/renderer/src/styles/design-tokens.css`
+
+### Rules (Non-Negotiable)
+
+| Category | Rule | Example |
+|----------|------|---------|
+| Colors | Use `var(--color-*)` tokens | `color: var(--color-text-primary)` |
+| Spacing | Use `var(--space-*)` tokens | `padding: var(--space-6)` (12px) |
+| Typography | Use `var(--text-*)` and `var(--font-*)` | `font-size: var(--text-base)` (13px) |
+| Borders | `border-radius: 0` always | Exception: `50%` for circles only |
+| Transitions | Use `var(--transition-normal)` | `transition: var(--transition-normal)` (0.15s) |
+| Z-Index | Use `var(--z-*)` tokens | `z-index: var(--z-modal)` |
+| Shadows | Use `var(--shadow-*)` tokens | `box-shadow: var(--shadow-md)` |
+
+### Quick Reference - Common Tokens
+
+```css
+/* Colors */
+--color-text-primary       /* #cccccc - main text */
+--color-text-secondary     /* #858585 - muted text */
+--color-bg-primary         /* #1e1e1e - main background */
+--color-bg-secondary       /* #2d2d30 - panels */
+--color-border-default     /* #3c3c3c - borders */
+--color-accent-primary     /* #007fd4 - VS Code blue */
+
+/* Spacing (4px grid) */
+--space-4   /* 8px */
+--space-6   /* 12px */
+--space-8   /* 16px */
+--space-12  /* 24px */
+
+/* Typography */
+--text-base /* 13px - default */
+--text-sm   /* 11px - small */
+```
+
+### Checklist Before Committing UI Changes
+
+- [ ] All colors use design tokens (no hardcoded hex values)
+- [ ] All spacing uses design tokens (no arbitrary px values)
+- [ ] All fonts use design tokens
+- [ ] No rounded corners (border-radius: 0)
+- [ ] Transitions use tokens
+- [ ] Focus states are visible (accessibility)
+
 ## Recent Changes (v0.5.3)
 - **Fix: DiagramViewer Wrong Diagram on Expand** (Nov 29, 2025):
   - Fixed bug where expanding a Mermaid diagram in Preview sometimes opened a different diagram (issue #39)
