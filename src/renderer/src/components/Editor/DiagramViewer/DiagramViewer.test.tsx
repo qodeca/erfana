@@ -4,7 +4,7 @@
  * Tests for DiagramViewer component:
  * - Rendering behavior (reads from useDiagramViewerStore)
  * - SVG content display
- * - Closing mechanisms (button, Escape, backdrop)
+ * - Closing mechanisms (button, backdrop) - Note: Escape intentionally removed
  * - Toolbar elements
  * - Accessibility attributes
  * - Focus management
@@ -14,7 +14,7 @@
  * UPDATED: DiagramViewer now reads state from useDiagramViewerStore instead of props.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { DiagramViewer } from './DiagramViewer'
 import { useDiagramViewerStore } from '../../../stores/useDiagramViewerStore'
@@ -153,11 +153,12 @@ describe('DiagramViewer', () => {
   })
 
   describe('closing mechanisms', () => {
-    it('calls closeViewer when close button is clicked', async () => {
+    it('calls closeViewer when floating close button is clicked (issue #37)', async () => {
       setupStore({ isOpen: true, svgContent: mockSvgContent })
       render(<DiagramViewer />)
 
-      const closeButton = screen.getByRole('button', { name: /close viewer/i })
+      // Floating close button has aria-label "Close diagram viewer"
+      const closeButton = screen.getByRole('button', { name: /close diagram viewer/i })
       fireEvent.click(closeButton)
 
       // Store should be updated
@@ -166,15 +167,15 @@ describe('DiagramViewer', () => {
       })
     })
 
-    it('calls closeViewer when Escape key is pressed', async () => {
+    it('does NOT close viewer when Escape key is pressed (floating close button only)', () => {
       setupStore({ isOpen: true, svgContent: mockSvgContent })
       render(<DiagramViewer />)
 
       fireEvent.keyDown(document, { key: 'Escape' })
 
-      await waitFor(() => {
-        expect(useDiagramViewerStore.getState().isOpen).toBe(false)
-      })
+      // Escape should NOT close the viewer - use X button instead
+      expect(useDiagramViewerStore.getState().isOpen).toBe(true)
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
     it('calls closeViewer when backdrop is clicked', async () => {
@@ -194,41 +195,43 @@ describe('DiagramViewer', () => {
       setupStore({ isOpen: true, svgContent: mockSvgContent })
       render(<DiagramViewer />)
 
-      // Click on the zoom in button (inside the viewer)
-      const zoomInButton = screen.getByRole('button', { name: /zoom in/i })
-      fireEvent.click(zoomInButton)
+      // Click on the floating close button (which is inside the viewer but should close)
+      // Instead test by clicking on the SVG container area
+      const svgElement = document.querySelector('.diagram-viewer-content')
+      expect(svgElement).toBeInTheDocument()
 
-      // Viewer should still be open
+      if (svgElement) {
+        fireEvent.click(svgElement)
+      }
+
+      // Viewer should still be open (clicking content doesn't close)
       expect(useDiagramViewerStore.getState().isOpen).toBe(true)
     })
   })
 
-  describe('toolbar elements', () => {
-    it('displays toolbar with all control buttons', () => {
+  describe('floating close button (issue #37)', () => {
+    it('displays floating close button', () => {
       setupStore({ isOpen: true, svgContent: mockSvgContent })
       render(<DiagramViewer />)
 
-      expect(screen.getByRole('button', { name: /zoom in/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /zoom out/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /fit to screen/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /reset view/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /close viewer/i })).toBeInTheDocument()
+      // Floating close button (toolbar removed in #37)
+      expect(screen.getByRole('button', { name: /close diagram viewer/i })).toBeInTheDocument()
     })
 
-    it('displays default title', () => {
+    it('floating close button has correct styling class', () => {
       setupStore({ isOpen: true, svgContent: mockSvgContent })
       render(<DiagramViewer />)
 
-      expect(screen.getByText('Mermaid Diagram')).toBeInTheDocument()
+      const closeButton = screen.getByRole('button', { name: /close diagram viewer/i })
+      expect(closeButton).toHaveClass('diagram-viewer-close-floating')
     })
 
-    it('displays zoom indicator', () => {
-      setupStore({ isOpen: true, svgContent: mockSvgContent })
+    it('FAB button is visible when filePath is present', () => {
+      setupStore({ isOpen: true, svgContent: mockSvgContent, filePath: '/test/file.md' })
       render(<DiagramViewer />)
 
-      // Default zoom is 100% (or fit-to-view calculated)
-      const zoomIndicator = screen.getByText(/%/)
-      expect(zoomIndicator).toBeInTheDocument()
+      // FAB button for opening the control panel
+      expect(screen.getByRole('button', { name: /open panel/i })).toBeInTheDocument()
     })
   })
 
@@ -242,44 +245,37 @@ describe('DiagramViewer', () => {
       expect(dialog).toHaveAttribute('aria-label', 'Mermaid Diagram')
     })
 
-    it('has correct toolbar attributes', () => {
+    it('floating close button has accessible label', () => {
       setupStore({ isOpen: true, svgContent: mockSvgContent })
       render(<DiagramViewer />)
 
-      const toolbar = screen.getByRole('toolbar')
-      expect(toolbar).toHaveAttribute('aria-label', 'Diagram viewer controls')
-    })
-
-    it('has accessible zoom indicator', () => {
-      setupStore({ isOpen: true, svgContent: mockSvgContent })
-      render(<DiagramViewer />)
-
-      const zoomIndicator = screen.getByText(/%/)
-      expect(zoomIndicator).toHaveAttribute('aria-live', 'polite')
+      const closeButton = screen.getByRole('button', { name: /close diagram viewer/i })
+      expect(closeButton).toHaveAttribute('aria-label', 'Close diagram viewer')
     })
   })
 
   describe('keyboard shortcuts', () => {
-    it('zooms in with + key', () => {
+    it('zooms in with + key (viewer stays open)', () => {
       setupStore({ isOpen: true, svgContent: mockSvgContent })
       render(<DiagramViewer />)
 
       fireEvent.keyDown(document, { key: '+' })
 
-      // Zoom should change (zoom indicator updates)
-      expect(screen.getByText(/%/)).toBeInTheDocument()
+      // Viewer should still be open after zoom
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
-    it('zooms out with - key', () => {
+    it('zooms out with - key (viewer stays open)', () => {
       setupStore({ isOpen: true, svgContent: mockSvgContent })
       render(<DiagramViewer />)
 
       fireEvent.keyDown(document, { key: '-' })
 
-      expect(screen.getByText(/%/)).toBeInTheDocument()
+      // Viewer should still be open after zoom
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
-    it('resets view with 0 key', () => {
+    it('resets view with 0 key (viewer stays open)', () => {
       setupStore({ isOpen: true, svgContent: mockSvgContent })
       render(<DiagramViewer />)
 
@@ -290,58 +286,76 @@ describe('DiagramViewer', () => {
       // Then reset
       fireEvent.keyDown(document, { key: '0' })
 
-      expect(screen.getByText('100%')).toBeInTheDocument()
-    })
-  })
-
-  describe('zoom controls', () => {
-    it('zooms in when zoom in button is clicked', () => {
-      setupStore({ isOpen: true, svgContent: mockSvgContent })
-      render(<DiagramViewer />)
-
-      const zoomInButton = screen.getByRole('button', { name: /zoom in/i })
-      fireEvent.click(zoomInButton)
-
-      // Viewer should still be open after zooming
+      // Viewer should still be open after reset
       expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
-    it('zooms out when zoom out button is clicked', () => {
+    it('fits to view with f key (viewer stays open)', () => {
       setupStore({ isOpen: true, svgContent: mockSvgContent })
       render(<DiagramViewer />)
 
-      const zoomOutButton = screen.getByRole('button', { name: /zoom out/i })
-      fireEvent.click(zoomOutButton)
+      fireEvent.keyDown(document, { key: 'f' })
 
+      // Viewer should still be open after fit
       expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
 
-    it('resets view when reset button is clicked', () => {
-      setupStore({ isOpen: true, svgContent: mockSvgContent })
+    it('does not intercept keyboard shortcuts when typing in textarea', async () => {
+      setupStore({
+        isOpen: true,
+        svgContent: mockSvgContent,
+        mermaidCode: 'flowchart TD\n  A-->B',
+        filePath: '/test/file.md'
+      })
       render(<DiagramViewer />)
 
-      // First zoom in
-      const zoomInButton = screen.getByRole('button', { name: /zoom in/i })
-      fireEvent.click(zoomInButton)
+      // Open the chat panel
+      const openButton = screen.getByRole('button', { name: /open panel/i })
+      fireEvent.click(openButton)
 
-      // Then reset
-      const resetButton = screen.getByRole('button', { name: /reset view/i })
-      fireEvent.click(resetButton)
+      // Wait for textarea to appear
+      const textarea = await screen.findByPlaceholderText('Describe changes to this diagram...')
+      expect(textarea).toBeInTheDocument()
 
-      expect(screen.getByText('100%')).toBeInTheDocument()
+      // Focus the textarea
+      textarea.focus()
+
+      // Simulate typing keys that would normally trigger zoom
+      fireEvent.keyDown(textarea, { key: '+', target: textarea })
+      fireEvent.keyDown(textarea, { key: '-', target: textarea })
+      fireEvent.keyDown(textarea, { key: '0', target: textarea })
+      fireEvent.keyDown(textarea, { key: 'f', target: textarea })
+
+      // Viewer should still be open (shortcuts should be ignored when textarea is focused)
+      expect(screen.getByRole('dialog', { name: 'Mermaid Diagram' })).toBeInTheDocument()
+      // Textarea should still be there
+      expect(textarea).toBeInTheDocument()
     })
 
-    it('fits to screen when fit button is clicked', () => {
+    it('does not intercept keyboard shortcuts when typing in input', () => {
       setupStore({ isOpen: true, svgContent: mockSvgContent })
       render(<DiagramViewer />)
 
-      const fitButton = screen.getByRole('button', { name: /fit to screen/i })
-      fireEvent.click(fitButton)
+      // Create a mock input element inside the viewer
+      const input = document.createElement('input')
+      input.type = 'text'
+      document.body.appendChild(input)
+      input.focus()
+
+      // Simulate typing keys that would normally trigger zoom
+      fireEvent.keyDown(input, { key: '+', target: input })
+      fireEvent.keyDown(input, { key: '-', target: input })
 
       // Viewer should still be open
       expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+      // Cleanup
+      document.body.removeChild(input)
     })
   })
+
+  // Note: Zoom control buttons are now in ChatBubble header (issue #37)
+  // These tests are covered in ChatBubble.test.tsx
 
   describe('edge cases', () => {
     it('handles empty SVG content gracefully', () => {
@@ -376,7 +390,7 @@ describe('DiagramViewer', () => {
       // Should render without chat bubble (filePath required)
       expect(screen.getByRole('dialog')).toBeInTheDocument()
       // ChatBubble shouldn't render without filePath
-      expect(screen.queryByRole('button', { name: /open chat/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /open panel/i })).not.toBeInTheDocument()
     })
   })
 
@@ -393,7 +407,7 @@ describe('DiagramViewer', () => {
       render(<DiagramViewer />)
 
       // ChatBubble should be visible (collapsed state shows FAB button)
-      expect(screen.getByRole('button', { name: /open chat/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /open panel/i })).toBeInTheDocument()
     })
 
     it('does not render ChatBubble when mermaidCode is empty', () => {
@@ -405,28 +419,33 @@ describe('DiagramViewer', () => {
       })
       render(<DiagramViewer />)
 
-      expect(screen.queryByRole('button', { name: /open chat/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /open panel/i })).not.toBeInTheDocument()
     })
   })
 
   describe('live update scenario (file edit while viewer open)', () => {
     it('should display updated content when store is updated', async () => {
-      // Initial diagram
+      // Initial diagram - include filePath since we now match by filePath
       setupStore({
         isOpen: true,
         svgContent: '<svg><circle cx="50" cy="50" r="40"/></svg>',
-        mermaidCode: 'flowchart TD\n  A-->B'
+        mermaidCode: 'flowchart TD\n  A-->B',
+        filePath: '/test/file.md',
+        startLine: 10,
+        endLine: 20
       })
       render(<DiagramViewer />)
 
       expect(document.querySelector('circle')).toBeInTheDocument()
 
       // Simulate file edit - MermaidDiagram would call updateDiagram
-      useDiagramViewerStore.getState().updateDiagram(
-        '/test/file.md:10-20',
-        'flowchart TD\n  A-->B-->C',
-        '<svg><rect width="50" height="50"/></svg>'
-      )
+      useDiagramViewerStore.getState().updateDiagram({
+        filePath: '/test/file.md',
+        mermaidCode: 'flowchart TD\n  A-->B-->C',
+        svgContent: '<svg><rect width="50" height="50"/></svg>',
+        startLine: 10,
+        endLine: 20
+      })
 
       // New content should be visible
       await waitFor(() => {

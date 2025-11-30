@@ -1,44 +1,5 @@
 /* DiagramViewer.css - Full-screen Mermaid diagram viewer */
 
-/* Theme CSS Custom Properties - Dark Mode
- * TEMPORARY: Always dark mode until Settings UI is implemented.
- * Light mode variables are defined but commented out for future use.
- */
-.diagram-viewer-overlay {
-  --viewer-bg: rgba(0, 0, 0, 0.9);
-  --viewer-toolbar-bg: #252526;
-  --viewer-content-bg: #1e1e1e;
-  --viewer-svg-bg: #f8f9fa;
-  --viewer-border: #3c3c3c;
-  --viewer-text-primary: #cccccc;
-  --viewer-text-secondary: #888888;
-  --viewer-btn-bg: transparent;
-  --viewer-btn-hover: rgba(255, 255, 255, 0.1);
-  --viewer-btn-active: rgba(255, 255, 255, 0.15);
-  --viewer-btn-disabled-opacity: 0.4;
-  --viewer-zoom-indicator-bg: #3c3c3c;
-  --viewer-focus-border: #007fd4;
-}
-
-/* Light Mode Theme Overrides - DISABLED until Settings UI is implemented
- * Uncomment when theme switching via Settings is available.
- *
- * @media (prefers-color-scheme: light) {
- *   .diagram-viewer-overlay {
- *     --viewer-bg: rgba(255, 255, 255, 0.95);
- *     --viewer-toolbar-bg: #f5f5f5;
- *     --viewer-content-bg: #ffffff;
- *     --viewer-svg-bg: #ffffff;
- *     --viewer-border: #e0e0e0;
- *     --viewer-text-primary: #333333;
- *     --viewer-text-secondary: #666666;
- *     --viewer-btn-hover: rgba(0, 0, 0, 0.08);
- *     --viewer-btn-active: rgba(0, 0, 0, 0.12);
- *     --viewer-zoom-indicator-bg: #e0e0e0;
- *   }
- * }
- */
-
 /* Full-screen overlay */
 .diagram-viewer-overlay {
   position: fixed;
@@ -46,11 +7,11 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--viewer-bg);
+  background: rgba(0, 0, 0, 0.9);
   display: flex;
   flex-direction: column;
-  animation: viewerFadeIn 0.15s ease-out;
-  z-index: 1000;
+  animation: viewerFadeIn var(--transition-normal);
+  z-index: var(--z-modal);
 }
 
 @keyframes viewerFadeIn {
@@ -58,101 +19,52 @@
   to { opacity: 1; }
 }
 
-/* Toolbar */
-.diagram-viewer-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
-  background: var(--viewer-toolbar-bg);
-  border-bottom: 1px solid var(--viewer-border);
-  height: 48px;
-  flex-shrink: 0;
-}
-
-.diagram-viewer-toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.diagram-viewer-title {
-  color: var(--viewer-text-primary);
-  font-size: 13px;
-  font-weight: 500;
-  margin-right: 16px;
-}
-
-.diagram-viewer-toolbar-center {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.diagram-viewer-toolbar-right {
-  display: flex;
-  align-items: center;
-}
-
-/* Buttons */
-.diagram-viewer-btn {
+/* Floating close button (issue #37) */
+.diagram-viewer-close-floating {
+  position: fixed;
+  top: var(--space-8);
+  right: var(--space-8);
   display: flex;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 28px;
-  background: var(--viewer-btn-bg);
-  border: none;
-  border-radius: 4px;
-  color: var(--viewer-text-primary);
+  background: rgba(45, 45, 48, 0.9);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  color: var(--color-text-secondary);
   cursor: pointer;
-  transition: background-color 0.1s ease;
+  z-index: var(--z-fixed);
+  transition: background-color var(--transition-fast),
+              color var(--transition-fast);
 }
 
-.diagram-viewer-btn:hover:not(:disabled) {
-  background: var(--viewer-btn-hover);
+.diagram-viewer-close-floating:hover {
+  background: rgba(60, 60, 64, 0.95);
+  color: var(--color-text-primary);
 }
 
-.diagram-viewer-btn:active:not(:disabled) {
-  background: var(--viewer-btn-active);
+.diagram-viewer-close-floating:focus-visible {
+  outline: var(--border-width) solid var(--color-border-focus);
+  outline-offset: var(--border-width);
 }
 
-.diagram-viewer-btn:disabled {
-  opacity: var(--viewer-btn-disabled-opacity);
-  cursor: not-allowed;
-}
 
-.diagram-viewer-btn:focus-visible {
-  outline: 1px solid var(--viewer-focus-border);
-  outline-offset: 1px;
-}
-
-.diagram-viewer-btn-close {
-  width: 32px;
-  height: 32px;
-}
-
-/* Zoom indicator */
-.diagram-viewer-zoom-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 52px;
-  padding: 4px 8px;
-  background: var(--viewer-zoom-indicator-bg);
-  border-radius: 4px;
-  color: var(--viewer-text-primary);
-  font-size: 12px;
-  font-family: monospace;
+/* Content wrapper - full width, contains diagram and chat bubble */
+.diagram-viewer-content-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
 }
 
 /* Content area */
 .diagram-viewer-content {
-  flex: 1;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--viewer-content-bg);
+  background: var(--color-bg-primary);
   overflow: hidden;
   cursor: grab;
 }
@@ -169,36 +81,30 @@
 }
 
 .diagram-viewer-svg-container svg {
-  background: var(--viewer-svg-bg);
-  border-radius: 8px;
+  background: var(--color-bg-diagram);
+  border-radius: var(--border-radius);
 }
 
-/* Separator in toolbar */
-.diagram-viewer-separator {
-  width: 1px;
-  height: 20px;
-  background: var(--viewer-border);
-  margin: 0 8px;
-}
 
 /* Expand button on MermaidDiagram */
 .mermaid-expand-btn {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: var(--space-4);
+  right: var(--space-4);
   display: flex;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 28px;
   background: rgba(45, 45, 48, 0.9);
-  border: 1px solid #454545;
-  border-radius: 4px;
-  color: #cccccc;
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s ease, background-color 0.1s ease;
-  z-index: 10;
+  transition: opacity var(--transition-normal),
+              background-color var(--transition-fast);
+  z-index: var(--z-dropdown);
 }
 
 .mermaid-container:hover .mermaid-expand-btn,
@@ -211,8 +117,8 @@
 }
 
 .mermaid-expand-btn:focus-visible {
-  outline: 1px solid #007fd4;
-  outline-offset: 1px;
+  outline: var(--border-width) solid var(--color-border-focus);
+  outline-offset: var(--border-width);
   opacity: 1;
 }
 
@@ -225,7 +131,7 @@
 
 /* Keyboard shortcuts hint */
 .diagram-viewer-shortcuts-hint {
-  color: var(--viewer-text-secondary);
-  font-size: 11px;
-  margin-left: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  margin-left: var(--space-6);
 }

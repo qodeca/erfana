@@ -9,7 +9,7 @@ import { MermaidToolbar } from './MermaidToolbar'
 
 // Mock panelUtils
 vi.mock('../../../utils/panelUtils', () => ({
-  executePromptTemplate: vi.fn().mockResolvedValue(true)
+  executePromptTemplate: vi.fn().mockResolvedValue({ success: true })
 }))
 
 import { executePromptTemplate } from '../../../utils/panelUtils'

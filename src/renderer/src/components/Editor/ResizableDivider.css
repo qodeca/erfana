@@ -1,19 +1,19 @@
 .resizable-divider {
   position: relative;
-  width: 8px;
-  background-color: #3c3c3c;
+  width: var(--space-4);
+  background-color: var(--color-border-default);
   cursor: col-resize;
   flex-shrink: 0;
-  transition: background-color 0.15s;
-  z-index: 10;
+  transition: background-color var(--transition-normal);
+  z-index: var(--z-dropdown);
 }
 
 .resizable-divider:hover {
-  background-color: #4ec9b0;
+  background-color: var(--color-accent-secondary);
 }
 
 .resizable-divider.dragging {
-  background-color: #4ec9b0;
+  background-color: var(--color-accent-secondary);
 }
 
 .divider-handle {
@@ -23,11 +23,11 @@
   transform: translate(-50%, -50%);
   width: 3px;
   height: 40px;
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: var(--color-bg-hover);
   border-radius: 0;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity var(--transition-normal);
 }
 
 .resizable-divider:hover .divider-handle,
@@ -38,7 +38,7 @@
 /* Horizontal orientation styles */
 .resizable-divider.horizontal {
   width: 100%;
-  height: 8px;
+  height: var(--space-4);
   cursor: row-resize;
   flex-shrink: 0;
 }

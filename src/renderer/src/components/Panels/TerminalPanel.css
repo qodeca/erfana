@@ -1,34 +1,43 @@
+/* Shell container for portal - fills parent and holds portaled content */
+.terminal-portal-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
 .terminal-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--background-color, #000000);
+  width: 100%;
+  background: var(--color-black);
 }
 
 /* Header styling - matches Project panel */
 .terminal-panel .sidebar-panel-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  height: 41px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: #252525;
+  gap: var(--space-4);
+  padding: 0 var(--space-6);
+  height: var(--header-height);
+  border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.1);
+  background: var(--color-gray-950);
   flex-shrink: 0;
 }
 
 .terminal-panel .sidebar-panel-title {
   flex: 1;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #cccccc;
+  color: var(--color-text-primary);
 }
 
 .terminal-panel .panel-header-icon {
   opacity: 0.8;
-  color: #cccccc;
+  color: var(--color-text-primary);
 }
 
 .terminal-panel .sidebar-panel-content {
@@ -44,7 +53,7 @@
   width: 100%;
   height: 100%;
   padding: 0;
-  background: #000000;
+  background: var(--color-black);
   overflow: hidden;
   position: relative;
 }
@@ -58,19 +67,19 @@
 /* Ensure xterm terminal fills the container */
 .terminal-container .xterm {
   height: 100% !important;
-  padding: 8px;
+  padding: var(--space-4);
 }
 
 /* FIX: Changed from 'scroll' to 'auto' to let xterm.js handle scroll behavior
  * The !important on overflow-y: scroll was forcing scrollbars and interfering
  * with xterm's internal viewport management, contributing to scroll jump issues */
 .terminal-container .xterm-viewport {
-  background: #000000 !important;
+  background: var(--color-black) !important;
   overflow-y: auto;
 }
 
 .terminal-container .xterm-screen {
-  background: #000000 !important;
+  background: var(--color-black) !important;
 }
 
 /* Status messages (checking, error) */
@@ -80,23 +89,23 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  padding: 32px 24px;
+  padding: var(--space-16) var(--space-12);
   text-align: center;
-  gap: 16px;
+  gap: var(--space-8);
 }
 
 .terminal-status h3 {
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #cccccc;
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
 }
 
 .terminal-status p {
   margin: 0;
-  font-size: 13px;
-  color: #858585;
-  line-height: 1.5;
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-normal);
 }
 
 .terminal-error-icon {
@@ -106,13 +115,13 @@
 
 .error-details {
   background: rgba(244, 135, 113, 0.1);
-  border: 1px solid rgba(244, 135, 113, 0.3);
-  color: #f48771;
-  padding: 8px 12px;
-  border-radius: 0;
-  font-size: 12px;
-  margin-top: 8px !important;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace;
+  border: var(--border-width) solid rgba(244, 135, 113, 0.3);
+  color: var(--color-error);
+  padding: var(--space-4) var(--space-6);
+  border-radius: var(--border-radius);
+  font-size: var(--text-sm);
+  margin-top: var(--space-4) !important;
+  font-family: var(--font-mono);
 }
 
 /* Hide the helper textarea completely */
@@ -129,35 +138,35 @@
 
 /* Cursor styling - keep consistent when focused/unfocused */
 .terminal-container .xterm-cursor {
-  background-color: #4fc1ff !important;
-  color: #000000 !important;
-  border-radius: 0 !important;
+  background-color: var(--color-cursor) !important;
+  color: var(--color-black) !important;
+  border-radius: var(--border-radius) !important;
   border: none !important;
 }
 
 /* Ensure cursor stays the same when terminal is focused */
 .terminal-container .xterm.focus .xterm-cursor {
-  background-color: #4fc1ff !important;
-  color: #000000 !important;
-  border-radius: 0 !important;
+  background-color: var(--color-cursor) !important;
+  color: var(--color-black) !important;
+  border-radius: var(--border-radius) !important;
   border: none !important;
 }
 
 /* Custom scrollbar for terminal (highly visible) */
 .terminal-container .xterm-viewport::-webkit-scrollbar {
-  width: 16px;
+  width: var(--space-8);
 }
 
 .terminal-container .xterm-viewport::-webkit-scrollbar-track {
-  background: #1e1e1e;
+  background: var(--color-bg-primary);
 }
 
 .terminal-container .xterm-viewport::-webkit-scrollbar-thumb {
-  background: #555555;
-  border-radius: 0;
-  border: 3px solid #1e1e1e;
+  background: var(--color-gray-700);
+  border-radius: var(--border-radius);
+  border: 3px solid var(--color-bg-primary);
 }
 
 .terminal-container .xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background: #707070;
+  background: var(--color-gray-600);
 }

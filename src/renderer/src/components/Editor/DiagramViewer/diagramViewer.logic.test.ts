@@ -93,13 +93,13 @@ describe('diagramViewer.logic', () => {
       })
     })
 
-    describe('close shortcuts', () => {
-      it('returns close for Escape key', () => {
-        expect(getKeyboardAction(createEvent('Escape'))).toBe('close')
+    describe('escape key (no longer closes)', () => {
+      it('returns none for Escape key (use X button to close)', () => {
+        expect(getKeyboardAction(createEvent('Escape'))).toBe('none')
       })
 
-      it('returns close for Escape with shift', () => {
-        expect(getKeyboardAction(createEvent('Escape', { shiftKey: true }))).toBe('close')
+      it('returns none for Escape with shift', () => {
+        expect(getKeyboardAction(createEvent('Escape', { shiftKey: true }))).toBe('none')
       })
     })
 

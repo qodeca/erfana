@@ -1,9 +1,11 @@
-import { ReactNode } from 'react'
-import { Maximize2, Minimize2, RefreshCw, Sparkles, Copy, Edit3, HelpCircle } from 'lucide-react'
+import { Copy } from 'lucide-react'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
 import { useDialog } from '../Dialog'
 import { executePromptTemplate } from '../../utils/panelUtils'
 import { PROMPT_REGISTRY, getPromptsForArea } from '../../prompts/registry'
+import { formatLineRange } from '../../prompts/helpers'
+import { renderIcon, DEFAULT_ICON_PROPS } from '../../utils/iconRegistry'
+import { TEXT_INPUT_LIMITS } from '../../../../shared/constants'
 import type { PromptVariables, PromptConfig } from '../../prompts/types'
 
 interface PreviewContextMenuProps {
@@ -17,31 +19,6 @@ interface PreviewContextMenuProps {
   onClose: () => void
 }
 
-/**
- * Map icon name strings to Lucide React components
- * @param iconName - The icon identifier from prompt config
- * @returns React component for the icon
- */
-function getIconComponent(iconName: string): ReactNode {
-  const iconProps = { size: 14, strokeWidth: 2 }
-
-  switch (iconName) {
-    case 'maximize2':
-      return <Maximize2 {...iconProps} />
-    case 'minimize2':
-      return <Minimize2 {...iconProps} />
-    case 'refresh':
-      return <RefreshCw {...iconProps} />
-    case 'sparkles':
-      return <Sparkles {...iconProps} />
-    case 'edit-3':
-      return <Edit3 {...iconProps} />
-    case 'help-circle':
-      return <HelpCircle {...iconProps} />
-    default:
-      return <Sparkles {...iconProps} />
-  }
-}
 
 /**
  * Read specific lines from source markdown file
@@ -110,8 +87,8 @@ export function PreviewContextMenu({
         selectedText: sourceText,
         inputLabel: 'Your input:',
         inputPlaceholder: config.inputPlaceholder || 'Enter your instructions or question here...',
-        minLength: 3,
-        maxLength: 2000
+        minLength: TEXT_INPUT_LIMITS.MIN_LENGTH,
+        maxLength: TEXT_INPUT_LIMITS.MAX_LENGTH
       })
 
       // If user canceled or input is empty, return
@@ -142,12 +119,7 @@ export function PreviewContextMenu({
     }
 
     // Prepare variables for template rendering
-    const lineRange =
-      startLine !== undefined && endLine !== undefined
-        ? startLine === endLine
-          ? `line ${startLine}`
-          : `lines ${startLine}-${endLine}`
-        : undefined
+    const lineRange = formatLineRange(startLine, endLine) || undefined
 
     const fileRef =
       startLine !== undefined && endLine !== undefined
@@ -183,13 +155,13 @@ export function PreviewContextMenu({
   const items: ContextMenuItem[] = [
     ...getPromptsForArea('markdown-preview', 'context-menu').map((prompt) => ({
       label: prompt.label,
-      icon: getIconComponent(prompt.icon),
+      icon: renderIcon(prompt.icon),
       action: () => handleAction(prompt.id)
     })),
     { separator: true } as ContextMenuItem,
     {
       label: 'Copy Selection',
-      icon: <Copy size={14} strokeWidth={2} />,
+      icon: <Copy {...DEFAULT_ICON_PROPS} />,
       action: handleCopySelection
     }
   ]

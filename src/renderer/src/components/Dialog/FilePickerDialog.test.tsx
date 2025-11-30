@@ -43,6 +43,16 @@ describe('FilePickerDialog', () => {
       portalRoot.id = 'portal-root'
       document.body.appendChild(portalRoot)
     }
+
+    // Mock clipboard API
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: vi.fn().mockResolvedValue(undefined),
+        readText: vi.fn().mockResolvedValue('')
+      },
+      writable: true,
+      configurable: true
+    })
   })
 
   describe('rendering', () => {
@@ -260,6 +270,97 @@ describe('FilePickerDialog', () => {
       render(<FilePickerDialog {...defaultProps} />)
       const listbox = screen.getByRole('listbox')
       expect(listbox).toHaveAttribute('aria-activedescendant', 'file-item-0')
+    })
+  })
+
+  describe('clipboard copy', () => {
+    it('should copy selected file path with Cmd+C', () => {
+      render(<FilePickerDialog {...defaultProps} />)
+
+      const dialog = screen.getByRole('dialog')
+      const content = dialog.querySelector('.dialog-content')!
+
+      fireEvent.keyDown(content, { key: 'c', metaKey: true })
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('/project/src/components/Button.tsx')
+    })
+
+    it('should copy selected file path with Ctrl+C', () => {
+      render(<FilePickerDialog {...defaultProps} />)
+
+      const dialog = screen.getByRole('dialog')
+      const content = dialog.querySelector('.dialog-content')!
+
+      fireEvent.keyDown(content, { key: 'c', ctrlKey: true })
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('/project/src/components/Button.tsx')
+    })
+
+    it('should copy without showing toast notification', () => {
+      render(<FilePickerDialog {...defaultProps} />)
+
+      const dialog = screen.getByRole('dialog')
+      const content = dialog.querySelector('.dialog-content')!
+
+      fireEvent.keyDown(content, { key: 'c', metaKey: true })
+
+      // Just verify clipboard was called - no toast assertion
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('/project/src/components/Button.tsx')
+    })
+
+    it('should copy the currently selected item path', () => {
+      render(<FilePickerDialog {...defaultProps} />)
+
+      const dialog = screen.getByRole('dialog')
+      const content = dialog.querySelector('.dialog-content')!
+
+      // Move to second item
+      fireEvent.keyDown(content, { key: 'ArrowDown' })
+
+      // Copy
+      fireEvent.keyDown(content, { key: 'c', metaKey: true })
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('/project/src/ui/Button.tsx')
+    })
+
+    it('should copy the item path after mouse hover selection', () => {
+      render(<FilePickerDialog {...defaultProps} />)
+
+      const listbox = screen.getByRole('listbox')
+      const items = within(listbox).getAllByRole('option')
+
+      // Hover over third item
+      fireEvent.mouseEnter(items[2])
+
+      const dialog = screen.getByRole('dialog')
+      const content = dialog.querySelector('.dialog-content')!
+
+      // Copy
+      fireEvent.keyDown(content, { key: 'c', metaKey: true })
+
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('/project/legacy/Button.tsx')
+    })
+
+    it('should not interfere with other keyboard shortcuts', () => {
+      const onSelect = vi.fn()
+      render(<FilePickerDialog {...defaultProps} onSelect={onSelect} />)
+
+      const dialog = screen.getByRole('dialog')
+      const content = dialog.querySelector('.dialog-content')!
+
+      // Press Enter (should still select)
+      fireEvent.keyDown(content, { key: 'Enter' })
+
+      expect(onSelect).toHaveBeenCalledWith('/project/src/components/Button.tsx')
+    })
+
+    it('should handle copy when candidates list is empty', () => {
+      const { container } = render(
+        <FilePickerDialog {...defaultProps} candidates={[]} />
+      )
+
+      // Component returns null for empty candidates, so no keydown to test
+      expect(container.firstChild).toBeNull()
     })
   })
 })

@@ -35,13 +35,34 @@ export function dirname(path?: string | number): string {
 
 /**
  * Format a line range into a human-readable string
+ * Includes boundary validation for line numbers.
+ *
  * Usage: {{formatLineRange startLine endLine}}
+ *
+ * Validation:
+ * - Line numbers < 1 are treated as invalid (returns empty string)
+ * - If start > end, they are swapped automatically
+ * - If only start is provided and valid, returns "line X"
  */
 export function formatLineRange(start?: string | number, end?: string | number): string {
-  const startNum = typeof start === 'number' ? start : Number(start)
-  const endNum = typeof end === 'number' ? end : Number(end)
+  let startNum = typeof start === 'number' ? start : Number(start)
+  let endNum = typeof end === 'number' ? end : Number(end)
 
-  if (!startNum) return ''
+  // Validate start line (must be >= 1)
+  if (!startNum || startNum < 1) return ''
+
+  // Validate end line
+  if (endNum && endNum < 1) {
+    endNum = startNum // Treat invalid end as single line
+  }
+
+  // Swap if start > end
+  if (endNum && startNum > endNum) {
+    const temp = startNum
+    startNum = endNum
+    endNum = temp
+  }
+
   if (!endNum || startNum === endNum) return `line ${startNum}`
   return `lines ${startNum}-${endNum}`
 }

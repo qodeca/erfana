@@ -6,10 +6,12 @@ import type { ITerminalOperations } from '../interfaces/ITerminalOperations'
  * Comprehensive test suite for sendToTerminal autoExecute functionality
  *
  * Tests the complete flow from context menu → sendToTerminal → terminal write
- * Covers error handling, write ordering, and 200ms delay for rendering
+ * Covers error handling and 200ms delay pattern
  *
  * v0.3.4 - Simplified fire-and-forget approach (no initialization polling)
  * v0.3.6 - Updated to use dependency injection for ISP compliance
+ * v0.5.3 - 200ms delay pattern: text written, then 200ms wait, then Enter
+ *          This is REQUIRED - atomic writes don't work reliably with PTY
  */
 
 // Mock terminal operations
@@ -34,22 +36,38 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
     // Reset all mocks
     vi.clearAllMocks()
 
+    // Use fake timers for 200ms delay testing
+    vi.useFakeTimers()
+
     // Default mock implementation - write succeeds
     mockWrite.mockResolvedValue({ success: true })
   })
 
-  it('should send Enter key after text when autoExecute is true', async () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('should send text then Enter with 200ms delay when autoExecute is true', async () => {
     // Setup
     useTerminalStore.setState({ activeTerminalId: 'term1' })
 
     // Execute
-    const result = await useTerminalStore.getState().sendToTerminal('echo hello', true)
+    const promise = useTerminalStore.getState().sendToTerminal('echo hello', true)
 
-    // Verify
-    expect(result).toBe(true)
+    // First write (text) happens immediately
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockWrite).toHaveBeenCalledTimes(1)
+    expect(mockWrite).toHaveBeenCalledWith('term1', 'echo hello')
+
+    // Wait 200ms for Enter
+    await vi.advanceTimersByTimeAsync(200)
+
+    // Second write (Enter) after delay
     expect(mockWrite).toHaveBeenCalledTimes(2)
-    expect(mockWrite).toHaveBeenNthCalledWith(1, 'term1', 'echo hello')
-    expect(mockWrite).toHaveBeenNthCalledWith(2, 'term1', '\r')
+    expect(mockWrite).toHaveBeenLastCalledWith('term1', '\r')
+
+    const result = await promise
+    expect(result).toBe(true)
   })
 
   it('should NOT send Enter key when autoExecute is false', async () => {
@@ -59,7 +77,7 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
     // Execute
     const result = await useTerminalStore.getState().sendToTerminal('echo hello', false)
 
-    // Verify
+    // Verify - only text, no Enter
     expect(result).toBe(true)
     expect(mockWrite).toHaveBeenCalledTimes(1)
     expect(mockWrite).toHaveBeenCalledWith('term1', 'echo hello')
@@ -85,22 +103,28 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
     // Execute
     const result = await useTerminalStore.getState().sendToTerminal('test', true)
 
-    // Verify
+    // Verify - fails on first write, doesn't attempt Enter
     expect(result).toBe(false)
-    expect(mockWrite).toHaveBeenCalledTimes(1) // Only text write, no Enter
+    expect(mockWrite).toHaveBeenCalledTimes(1)
   })
 
   it('should return false if Enter write fails', async () => {
     // Setup
     useTerminalStore.setState({ activeTerminalId: 'term1' })
+    // First write succeeds, second (Enter) fails
     mockWrite
-      .mockResolvedValueOnce({ success: true }) // Text write succeeds
-      .mockResolvedValueOnce({ success: false, error: 'Enter failed' }) // Enter fails
+      .mockResolvedValueOnce({ success: true })
+      .mockResolvedValueOnce({ success: false, error: 'Enter failed' })
 
     // Execute
-    const result = await useTerminalStore.getState().sendToTerminal('test', true)
+    const promise = useTerminalStore.getState().sendToTerminal('test', true)
 
-    // Verify
+    // Advance past the 200ms delay
+    await vi.advanceTimersByTimeAsync(200)
+
+    const result = await promise
+
+    // Verify - both writes attempted, but returns false due to Enter failure
     expect(result).toBe(false)
     expect(mockWrite).toHaveBeenCalledTimes(2)
   })
@@ -111,9 +135,14 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
     const longText = 'x'.repeat(10000)
 
     // Execute
-    const result = await useTerminalStore.getState().sendToTerminal(longText, true)
+    const promise = useTerminalStore.getState().sendToTerminal(longText, true)
 
-    // Verify
+    // Advance timers
+    await vi.advanceTimersByTimeAsync(200)
+
+    const result = await promise
+
+    // Verify - two separate writes
     expect(result).toBe(true)
     expect(mockWrite).toHaveBeenCalledTimes(2)
     expect(mockWrite).toHaveBeenNthCalledWith(1, 'term1', longText)
@@ -123,48 +152,31 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
   it('should handle multiple concurrent calls correctly', async () => {
     // Setup
     useTerminalStore.setState({ activeTerminalId: 'term1' })
-    const writeOrder: string[] = []
+    const writeCalls: string[] = []
 
     mockWrite.mockImplementation(async (_id: string, data: string) => {
-      writeOrder.push(data)
+      writeCalls.push(data)
       return { success: true }
     })
 
-    // Execute - rapid consecutive calls (will run in parallel)
+    // Execute - rapid consecutive calls
     const promises = [
       useTerminalStore.getState().sendToTerminal('first', true),
       useTerminalStore.getState().sendToTerminal('second', true),
       useTerminalStore.getState().sendToTerminal('third', true)
     ]
 
+    // Advance timers for all delays
+    await vi.advanceTimersByTimeAsync(200)
+
     await Promise.all(promises)
 
-    // Verify - all writes completed (parallel calls will interleave)
-    expect(writeOrder.length).toBe(6) // 3 texts + 3 enters
-    expect(writeOrder.filter(w => w === 'first').length).toBe(1)
-    expect(writeOrder.filter(w => w === 'second').length).toBe(1)
-    expect(writeOrder.filter(w => w === 'third').length).toBe(1)
-    expect(writeOrder.filter(w => w === '\r').length).toBe(3)
-  })
-
-  it('should wait 200ms between text write and Enter key', async () => {
-    // Setup
-    useTerminalStore.setState({ activeTerminalId: 'term1' })
-    const timestamps: number[] = []
-
-    mockWrite.mockImplementation(async () => {
-      timestamps.push(Date.now())
-      return { success: true }
-    })
-
-    // Execute
-    await useTerminalStore.getState().sendToTerminal('test', true)
-
-    // Verify - approximately 200ms between writes (allow 5ms tolerance for timing variations)
-    expect(timestamps.length).toBe(2)
-    const timeDiff = timestamps[1] - timestamps[0]
-    expect(timeDiff).toBeGreaterThanOrEqual(195) // 5ms tolerance for setTimeout precision
-    expect(timeDiff).toBeLessThan(300) // Reasonable upper bound
+    // Verify - 6 writes total (3 text + 3 Enter)
+    expect(writeCalls.length).toBe(6)
+    expect(writeCalls).toContain('first')
+    expect(writeCalls).toContain('second')
+    expect(writeCalls).toContain('third')
+    expect(writeCalls.filter(c => c === '\r').length).toBe(3)
   })
 
   it('should handle unexpected errors gracefully', async () => {
@@ -177,7 +189,7 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
 
     // Verify - should return false and log error
     expect(result).toBe(false)
-    expect(mockWrite).toHaveBeenCalledTimes(1) // Only attempted text write
+    expect(mockWrite).toHaveBeenCalledTimes(1)
   })
 
   it('should use getActiveTerminalId getter', () => {
@@ -189,5 +201,80 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
 
     // Verify
     expect(id).toBe('term123')
+  })
+
+  it('should handle multi-line text with autoExecute', async () => {
+    // Setup
+    useTerminalStore.setState({ activeTerminalId: 'term1' })
+    const multiLineText = 'Line 1\nLine 2\nLine 3'
+
+    // Execute
+    const promise = useTerminalStore.getState().sendToTerminal(multiLineText, true)
+
+    // Advance timers
+    await vi.advanceTimersByTimeAsync(200)
+
+    const result = await promise
+
+    // Verify - text and Enter as separate writes
+    expect(result).toBe(true)
+    expect(mockWrite).toHaveBeenCalledTimes(2)
+    expect(mockWrite).toHaveBeenNthCalledWith(1, 'term1', multiLineText)
+    expect(mockWrite).toHaveBeenNthCalledWith(2, 'term1', '\r')
+  })
+
+  it('should handle multi-line text without autoExecute', async () => {
+    // Setup
+    useTerminalStore.setState({ activeTerminalId: 'term1' })
+    const multiLineText = 'Line 1\nLine 2\nLine 3'
+
+    // Execute
+    const result = await useTerminalStore.getState().sendToTerminal(multiLineText, false)
+
+    // Verify - text only, no Enter
+    expect(result).toBe(true)
+    expect(mockWrite).toHaveBeenCalledTimes(1)
+    expect(mockWrite).toHaveBeenCalledWith('term1', multiLineText)
+  })
+
+  it('should handle empty string with autoExecute', async () => {
+    // Setup
+    useTerminalStore.setState({ activeTerminalId: 'term1' })
+
+    // Execute
+    const promise = useTerminalStore.getState().sendToTerminal('', true)
+
+    // Advance timers
+    await vi.advanceTimersByTimeAsync(200)
+
+    const result = await promise
+
+    // Verify - empty text, then Enter
+    expect(result).toBe(true)
+    expect(mockWrite).toHaveBeenCalledTimes(2)
+    expect(mockWrite).toHaveBeenNthCalledWith(1, 'term1', '')
+    expect(mockWrite).toHaveBeenNthCalledWith(2, 'term1', '\r')
+  })
+
+  it('should wait exactly 200ms before sending Enter', async () => {
+    // Setup
+    useTerminalStore.setState({ activeTerminalId: 'term1' })
+
+    // Execute
+    const promise = useTerminalStore.getState().sendToTerminal('test', true)
+
+    // First write happens immediately
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mockWrite).toHaveBeenCalledTimes(1)
+
+    // At 199ms, Enter should NOT have been sent yet
+    await vi.advanceTimersByTimeAsync(199)
+    expect(mockWrite).toHaveBeenCalledTimes(1)
+
+    // At 200ms, Enter should be sent
+    await vi.advanceTimersByTimeAsync(1)
+    expect(mockWrite).toHaveBeenCalledTimes(2)
+
+    await promise
   })
 })

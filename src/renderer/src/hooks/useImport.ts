@@ -137,9 +137,9 @@ function getErrorMessage(errorCode?: string, fallbackError?: string): string {
   }
 
   // Check if it's a known ErrorCode and get message from ERROR_MESSAGES
-  const code = errorCode as ErrorCode
-  if (code in ErrorCode) {
-    const message = ERROR_MESSAGES[code]
+  // Use Object.values() instead of 'in' operator which doesn't work correctly with enums
+  if (Object.values(ErrorCode).includes(errorCode as ErrorCode)) {
+    const message = ERROR_MESSAGES[errorCode as ErrorCode]
     if (message) {
       return message
     }
@@ -162,9 +162,9 @@ async function triggerOrganizePrompt(importedFilePath: string): Promise<void> {
   }
 
   try {
-    const success = await executePromptTemplate('organize-import', variables)
-    if (!success) {
-      // Template may not exist yet, which is fine - just log it
+    const result = await executePromptTemplate('organize-import', variables)
+    if (!result.success && import.meta.env.DEV) {
+      // Template may not exist yet, which is fine - log in dev only
       console.log('organize-import prompt not executed (template may not be registered)')
     }
   } catch (error) {

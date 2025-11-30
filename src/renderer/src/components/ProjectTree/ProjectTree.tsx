@@ -510,6 +510,16 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   // Keyboard shortcuts for cut/copy/paste
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip when user is typing in text inputs (issue #37)
+      const activeElement = document.activeElement as HTMLElement
+      if (
+        activeElement?.tagName === 'INPUT' ||
+        activeElement?.tagName === 'TEXTAREA' ||
+        activeElement?.contentEditable === 'true'
+      ) {
+        return // Let native text handling work
+      }
+
       // Check for Ctrl/Cmd + X/C/V
       if ((e.ctrlKey || e.metaKey) && selectedFolder) {
         const node = flattenedItems.find(item => item.path === selectedFolder)
