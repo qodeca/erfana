@@ -23,17 +23,12 @@ describe('ToastNotification', () => {
   })
 
   describe('Close Button Functionality', () => {
-    beforeEach(() => {
-      vi.useFakeTimers()
-    })
-
     afterEach(() => {
       vi.restoreAllMocks()
-      vi.useRealTimers()
     })
 
     it('dismisses toast when close button is clicked', async () => {
-      const user = userEvent.setup({ delay: null })
+      const user = userEvent.setup()
 
       render(
         <ToastProvider>
@@ -41,8 +36,8 @@ describe('ToastNotification', () => {
         </ToastProvider>
       )
 
-      // Show a toast
-      showGlobalToast({ title: 'Test', message: 'Click to close', type: 'info', duration: 5000 })
+      // Show a toast with long duration to prevent auto-dismiss
+      showGlobalToast({ title: 'Test', message: 'Click to close', type: 'info', duration: 60000 })
 
       // Wait for toast to appear
       await waitFor(() => {
@@ -60,7 +55,7 @@ describe('ToastNotification', () => {
     })
 
     it('dismisses toast when Enter key is pressed on close button', async () => {
-      const user = userEvent.setup({ delay: null })
+      const user = userEvent.setup()
 
       render(
         <ToastProvider>
@@ -68,7 +63,7 @@ describe('ToastNotification', () => {
         </ToastProvider>
       )
 
-      showGlobalToast({ title: 'Test', message: 'Press Enter', type: 'info', duration: 5000 })
+      showGlobalToast({ title: 'Test', message: 'Press Enter', type: 'info', duration: 60000 })
 
       await waitFor(() => {
         expect(screen.getByText('Test')).toBeInTheDocument()
@@ -84,7 +79,7 @@ describe('ToastNotification', () => {
     })
 
     it('dismisses toast when Space key is pressed on close button', async () => {
-      const user = userEvent.setup({ delay: null })
+      const user = userEvent.setup()
 
       render(
         <ToastProvider>
@@ -92,7 +87,7 @@ describe('ToastNotification', () => {
         </ToastProvider>
       )
 
-      showGlobalToast({ title: 'Test', message: 'Press Space', type: 'info', duration: 5000 })
+      showGlobalToast({ title: 'Test', message: 'Press Space', type: 'info', duration: 60000 })
 
       await waitFor(() => {
         expect(screen.getByText('Test')).toBeInTheDocument()
@@ -100,7 +95,7 @@ describe('ToastNotification', () => {
 
       const closeButton = screen.getByRole('button', { name: 'Close' })
       closeButton.focus()
-      await user.keyboard('{ }')
+      await user.keyboard(' ')
 
       await waitFor(() => {
         expect(screen.queryByText('Test')).not.toBeInTheDocument()
@@ -114,7 +109,7 @@ describe('ToastNotification', () => {
         </ToastProvider>
       )
 
-      showGlobalToast({ title: 'Test', message: 'Tab to focus', type: 'info', duration: 5000 })
+      showGlobalToast({ title: 'Test', message: 'Tab to focus', type: 'info', duration: 60000 })
 
       await waitFor(() => {
         expect(screen.getByText('Test')).toBeInTheDocument()
@@ -125,6 +120,8 @@ describe('ToastNotification', () => {
     })
 
     it('toast auto-dismisses after timeout if not manually closed', async () => {
+      vi.useFakeTimers()
+
       render(
         <ToastProvider>
           <ToastNotification />
@@ -133,16 +130,19 @@ describe('ToastNotification', () => {
 
       showGlobalToast({ title: 'Test', message: 'Auto dismiss', type: 'info', duration: 1000 })
 
-      await waitFor(() => {
+      // Wait for toast to appear (use act for state updates with fake timers)
+      await vi.waitFor(() => {
         expect(screen.getByText('Test')).toBeInTheDocument()
       })
 
       // Fast-forward time to trigger auto-dismiss
-      vi.advanceTimersByTime(1000)
+      await vi.advanceTimersByTimeAsync(1000)
 
-      await waitFor(() => {
+      await vi.waitFor(() => {
         expect(screen.queryByText('Test')).not.toBeInTheDocument()
       })
+
+      vi.useRealTimers()
     })
 
     it('close button has aria-label for screen readers', async () => {
@@ -152,7 +152,7 @@ describe('ToastNotification', () => {
         </ToastProvider>
       )
 
-      showGlobalToast({ title: 'Test', message: 'ARIA test', type: 'info', duration: 5000 })
+      showGlobalToast({ title: 'Test', message: 'ARIA test', type: 'info', duration: 60000 })
 
       await waitFor(() => {
         expect(screen.getByText('Test')).toBeInTheDocument()
@@ -163,7 +163,7 @@ describe('ToastNotification', () => {
     })
 
     it('can close multiple toasts individually', async () => {
-      const user = userEvent.setup({ delay: null })
+      const user = userEvent.setup()
 
       render(
         <ToastProvider>
@@ -171,9 +171,9 @@ describe('ToastNotification', () => {
         </ToastProvider>
       )
 
-      // Show two toasts
-      showGlobalToast({ title: 'Toast 1', message: 'Message 1', type: 'info', duration: 5000 })
-      showGlobalToast({ title: 'Toast 2', message: 'Message 2', type: 'success', duration: 5000 })
+      // Show two toasts with long duration
+      showGlobalToast({ title: 'Toast 1', message: 'Message 1', type: 'info', duration: 60000 })
+      showGlobalToast({ title: 'Toast 2', message: 'Message 2', type: 'success', duration: 60000 })
 
       await waitFor(() => {
         expect(screen.getByText('Toast 1')).toBeInTheDocument()
