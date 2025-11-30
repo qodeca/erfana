@@ -1,8 +1,8 @@
 # Erfana UI Style Guide
 
-> **Version**: 1.0
+> **Version**: 2.0
 > **Last Updated**: November 2025
-> **Design System**: VS Code-inspired dark theme
+> **Design System**: Qodeca brand with dark theme
 
 This style guide documents all design decisions for the Erfana application. All new UI code **must** follow these guidelines and use the design tokens defined in `src/renderer/src/styles/design-tokens.css`.
 
@@ -26,13 +26,14 @@ This style guide documents all design decisions for the Erfana application. All 
 
 ## Design Philosophy
 
-Erfana follows a **VS Code-inspired flat design** with these core principles:
+Erfana follows a **Qodeca-branded flat design** with these core principles:
 
-1. **Sharp Corners** - No border-radius (except circles). Clean, professional aesthetic.
-2. **Subtle Depth** - Use shadows sparingly to create hierarchy without being dramatic.
-3. **Dark First** - Optimized for dark mode. Reduces eye strain during extended use.
-4. **Consistency** - Same patterns everywhere. If unsure, check existing components.
-5. **Accessibility** - Sufficient contrast, focus indicators, keyboard navigation.
+1. **Brand Identity** - Qodeca Violet (#A0A8FF) as primary, Lime (#E3E829) as secondary accent.
+2. **Sharp Corners** - No border-radius (except circles). Clean, professional aesthetic.
+3. **Subtle Depth** - Use shadows sparingly to create hierarchy without being dramatic.
+4. **Dark First** - Optimized for dark mode with Smoky Black (#161312) background.
+5. **Consistency** - Same patterns everywhere. If unsure, check existing components.
+6. **Accessibility** - Sufficient contrast (WCAG AA), focus indicators, keyboard navigation.
 
 ### Not Supported
 
@@ -43,6 +44,31 @@ Erfana follows a **VS Code-inspired flat design** with these core principles:
 ---
 
 ## Color System
+
+### Qodeca Brand Palette
+
+The primary brand colors that define Erfana's visual identity.
+
+| Token | Hex | Usage |
+|-------|-----|-------|
+| `--color-brand-violet` | `#A0A8FF` | **Primary accent** - Buttons, links, focus |
+| `--color-brand-lime` | `#E3E829` | **Secondary accent** - Success, highlights, markdown files |
+| `--color-brand-black` | `#161312` | **Brand black** - Main background (Smoky Black) |
+| `--color-brand-white` | `#F8FAF8` | **Brand white** - Diagram backgrounds (Powder White) |
+
+**Brand Variants (for interactive states):**
+
+```css
+/* Violet variants */
+--color-brand-violet-hover: #8b94ff;   /* Hover state */
+--color-brand-violet-active: #7680ff;  /* Pressed state */
+--color-brand-violet-muted: rgba(160, 168, 255, 0.2);  /* Backgrounds */
+
+/* Lime variants */
+--color-brand-lime-hover: #d6d925;     /* Hover state */
+--color-brand-lime-active: #c9cc21;    /* Pressed state */
+--color-brand-lime-muted: rgba(227, 232, 41, 0.3);    /* Backgrounds */
+```
 
 ### Neutral Scale
 
@@ -61,18 +87,18 @@ The grayscale is the foundation of the UI. Use semantic tokens, not raw hex valu
 | `--color-gray-800` | `#3c3c3c` | **Default borders** |
 | `--color-gray-900` | `#2d2d30` | Panel backgrounds |
 | `--color-gray-950` | `#252526` | Sidebar, tree backgrounds |
-| `--color-gray-1000` | `#1e1e1e` | **Main app background** |
+| `--color-gray-1000` | `#161312` | **Main app background** (Smoky Black) |
 | `--color-black` | `#000000` | Overlays, deep shadows |
 
 ### Semantic Backgrounds
 
 ```css
 /* Use these instead of raw colors */
-background: var(--color-bg-primary);    /* Main content areas */
+background: var(--color-bg-primary);    /* Main content areas (Smoky Black) */
 background: var(--color-bg-secondary);  /* Panels, cards, inputs */
 background: var(--color-bg-tertiary);   /* Sidebar, project tree */
 background: var(--color-bg-elevated);   /* Floating elements */
-background: var(--color-bg-selected);   /* Selected items (#094771) */
+background: var(--color-bg-selected);   /* Selected items (violet-tinted) */
 ```
 
 ### Semantic Text
@@ -84,46 +110,48 @@ color: var(--color-text-muted);      /* Very subtle text */
 color: var(--color-text-emphasis);   /* Headings, important text */
 ```
 
-### Interactive Colors
+### Interactive Colors (Brand)
 
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `--color-accent-primary` | `#007fd4` | Focus rings, active tabs |
-| `--color-accent-secondary` | `#4ec9b0` | Success indicators, teal highlights |
-| `--color-accent-tertiary` | `#4fc3f7` | Light blue accents |
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--color-accent-primary` | Violet (#A0A8FF) | **Primary** - Focus rings, buttons, CTAs |
+| `--color-accent-secondary` | Lime (#E3E829) | **Secondary** - Success, highlights, markdown files |
+| `--color-accent-tertiary` | Violet (#A0A8FF) | Tertiary accents |
+| `--color-accent-drag` | Violet (#A0A8FF) | Drag-drop highlights |
 
-### Link Colors
+### Link Colors (Brand)
 
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `--color-link` | `#007fd4` | Default link color |
-| `--color-link-hover` | `#4fc3f7` | Link hover state |
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--color-link` | Violet (#A0A8FF) | Default link color |
+| `--color-link-hover` | Violet hover (#8b94ff) | Link hover state |
 | `--color-link-visited` | `#9d7dd2` | Visited links (purple) |
 
-### Button Colors
+### Button Colors (Brand)
 
 ```css
-/* Primary button (blue) */
-background: var(--color-btn-primary-bg);      /* #0e639c */
-background: var(--color-btn-primary-hover);   /* #1177bb */
+/* Primary button (Violet) */
+background: var(--color-btn-primary-bg);      /* Qodeca Violet */
+background: var(--color-btn-primary-hover);   /* Violet hover */
+background: var(--color-btn-primary-active);  /* Violet active */
 
 /* Secondary button (gray) */
 background: var(--color-btn-secondary-bg);    /* #3c3c3c */
 background: var(--color-btn-secondary-hover); /* #505050 */
 
-/* Danger button (red) */
+/* Danger button (red - unchanged) */
 background: var(--color-btn-danger-bg);       /* #c72e0f */
 background: var(--color-btn-danger-hover);    /* #e03e18 */
 ```
 
-### Status Colors
+### Status Colors (Brand + Unchanged)
 
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `--color-success` | `#4ec9b0` | Success messages, valid states |
-| `--color-warning` | `#cca700` | Warnings, approaching limits |
-| `--color-error` | `#f48771` | Errors, validation failures |
-| `--color-info` | `#4fc3f7` | Informational messages |
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--color-success` | Lime (#E3E829) | Success messages, valid states |
+| `--color-warning` | `#cca700` | Warnings (unchanged) |
+| `--color-error` | `#f48771` | Errors (unchanged) |
+| `--color-info` | Violet (#A0A8FF) | Informational messages |
 
 ---
 
