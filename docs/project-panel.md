@@ -103,6 +103,35 @@ const filterTree = useMemo(() => {
 
 ## Visual Indicators
 
+### Git Status Indicators (v0.5.3)
+
+VS Code-style git status badges on files and folders.
+
+**File Badges**: Letter badges showing status
+- **M** (Amber `#d97706`) - Modified
+- **U** (Lime `#84cc16`) - Untracked
+- **D** (Coral `#f87171`) - Deleted
+- **A** (Violet `#a78bfa`) - Staged/Added
+- **R** (Indigo `#818cf8`) - Renamed
+- **!** (Magenta `#e879f9`) - Conflicted
+
+**Folder Dots**: Colored dots showing child status (propagates from files)
+
+**Status Bar**: Footer showing branch name + colored status counts
+
+**Architecture**:
+- `GitStatusService.ts` - isomorphic-git statusMatrix()
+- `useGitStatus.ts` - Hook with 1s debounce, 2s cooldown
+- `useGitStore.ts` - Zustand store for git state
+- `GitStatusBadge.tsx` - File/folder badge component
+- `GitStatusBar.tsx` - Branch + counts footer
+
+**Auto-refresh**: On file changes, pauses when tab unfocused
+
+**Known Limitation**: Global `.gitignore` not supported (isomorphic-git limitation)
+
+See: [Known Issues](./known-issues.md#git-status-global-gitignore-not-supported)
+
 ### Sensitive Files
 
 **5 Categories**:

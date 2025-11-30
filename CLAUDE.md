@@ -157,6 +157,17 @@ See `docs/` for details (keep Claude's context focused):
     - `src/renderer/src/components/ProjectTree/GitStatusBar.tsx`: Status bar component
   - **Total: 3352 tests passing (117 test files)**
   - Closes #29
+- **Fix: Git Status Not Updating After File Operations** (Nov 30, 2025):
+  - Fixed multiple bugs where git status badges/counts wouldn't update after file operations
+  - Root cause #1: Race condition in `withWatcherPause` - flag reset after watcher resumed
+  - Root cause #2: Context menu commands didn't call git refresh (only toolbar did)
+  - Root cause #3: Cooldown logic dropped rapid refresh requests instead of rescheduling
+  - Solutions:
+    - Reset `isInternalOperationRef` BEFORE resuming watcher
+    - Add `onGitRefresh` callback to `MenuContext` and call in all mutating commands
+    - Cooldown now always reschedules (latest request wins)
+  - Known limitation: Global `.gitignore` files not supported (isomorphic-git limitation)
+  - See: [Known Issues - Git Status](docs/known-issues.md#git-status-global-gitignore-not-supported)
 - **Terminal Panel Requires Project** (Nov 30, 2025):
   - Terminal panel completely hidden when no project is loaded (issue #46)
   - ActivityBar config extended with `requiresProject?: boolean` field
@@ -186,7 +197,6 @@ See `docs/` for details (keep Claude's context focused):
     - `src/renderer/src/context/TerminalPortalContext.tsx` - Ref-only approach
     - `src/renderer/src/utils/panelUtils.ts` - Debug logging
   - 3 new tests for autoExecute timing verification
-  - **Total: 3069 tests passing (107 test files)**
   - Closes #41
 - **Complete Style Guide Compliance Audit** (Nov 30, 2025):
   - Migrated all 23 CSS files to use design tokens (100% compliance)

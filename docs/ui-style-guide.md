@@ -473,39 +473,7 @@ Before committing any UI changes, verify:
 
 ## Quick Reference
 
-### Most Used Tokens
+**Token Source**: `src/renderer/src/styles/design-tokens.css`
 
-```css
-/* Colors */
---color-text-primary      /* Main text */
---color-text-secondary    /* Muted text */
---color-bg-primary        /* Main background (Smoky Black) */
---color-bg-secondary      /* Panel background */
---color-border-default    /* Standard borders */
---color-accent-primary    /* Qodeca Violet */
---color-accent-secondary  /* Qodeca Lime (highlights, success) */
-
-/* Spacing */
---space-4                 /* 8px - small */
---space-6                 /* 12px - medium */
---space-8                 /* 16px - large */
---space-12                /* 24px - section */
-
-/* Typography */
---text-base               /* 13px - default */
---text-sm                 /* 11px - small */
---font-medium             /* 500 */
---font-semibold           /* 600 */
-
-/* Effects */
---transition-normal       /* 0.15s ease */
---shadow-md               /* Standard shadow */
---border-radius           /* 0 */
-```
-
----
-
-## Additional Resources
-
-For detailed component patterns, z-index scale, transitions, and migration guide, see:
+**Additional Resources**: Component patterns, z-index scale, transitions, migration guide:
 **[UI Style Guide Reference](./ui-style-guide-reference.md)**
