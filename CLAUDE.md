@@ -3,7 +3,7 @@
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
 - **Repository**: `qodeca/erfana` (GitHub)
-- **Version**: 0.5.3
+- **Version**: 0.5.4
 - **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+
@@ -53,7 +53,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (3352 tests, 117 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (3426 tests, 118 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -116,26 +116,39 @@ See `docs/` for details (keep Claude's context focused):
 - [ ] Transitions use tokens
 - [ ] Focus states are visible (accessibility)
 
-## Recent Changes (v0.5.3)
-- **Enhanced Terminal Scroll Anomaly Detection** (Dec 1, 2025):
-  - Fixed issue #22: Terminal scroll auto-recovery now reliably handles Claude Code's Ink library
-  - Root cause: Ink sends `\x1b[2J` (clear screen) and `\x1b[3J` (clear scrollback) when output exceeds terminal height
-  - Solution: Multi-signal detection with defense-in-depth approach:
-    1. **Escape sequence detection**: Detects ED 2/3 BEFORE write for fastest recovery
-    2. **Buffer truncation detection**: Detects when baseY shrinks significantly (≥10 lines)
-    3. **Position-based detection**: Fallback for anomalies without escape sequences
-    4. **Smart recovery target**: Restores user's reading position relative to bottom
-  - Fixed-interval queue (100ms): No anomaly lost, counter reset sync before async scroll
-  - Removed scroll lock UI (automatic detection is more reliable)
-  - Added `resetAll()` for terminal/project changes
-  - New pure functions: `detectClearSequences()`, `hasDestructiveClearSequence()`, `wasBufferTruncated()`, `calculateRecoveryTarget()`
+## Recent Changes (v0.5.4)
+- **Flicker-Free Terminal Scroll Recovery** (Dec 1, 2025):
+  - Eliminated visible flicker using xterm.js parser hooks for same-frame scroll restoration
+  - **Before**: Recovery happened AFTER scroll jump was visible (flicker)
+  - **After**: Parser intercepts ED 2/3 sequences BEFORE execution, restores via `queueMicrotask()` (no flicker)
+  - Two-layer defense architecture:
+    1. **Primary**: Parser hooks intercept CSI ED sequences, restore in same frame
+    2. **Fallback**: Multi-signal detection (50ms interval, down from 100ms) for edge cases
+  - Coordination mechanism prevents double-recovery when both layers trigger
+  - New files:
+    - `src/renderer/src/hooks/useTerminalParserHooks.ts` - xterm.js parser integration (271 lines)
+    - `src/renderer/src/hooks/useTerminalParserHooks.test.ts` - 24 pure logic tests
+  - Updated files:
+    - `src/renderer/src/hooks/useScrollAnomalyRecovery.ts` - Added coordination via parserHandledRef
+    - `src/renderer/src/utils/scrollAnomalyDetector.ts` - 50ms interval (was 100ms)
+    - `src/renderer/src/components/Panels/TerminalPanel.tsx` - Parser hooks integration
+    - Test mocks updated with `parser.registerCsiHandler()`
+  - **Total: 3426 tests passing** (118 test files, 24 new parser hook tests)
+  - Addresses Claude Code issues #826, #10769
+  - See [docs/terminal/scroll-fixes.md](docs/terminal/scroll-fixes.md)
+- **Git Status Light Colors** (Dec 1, 2025):
+  - Added lighter, pastel-like color variants for git status indicators (40-50% lighter)
+  - Context-specific usage strategy:
+    - **Light variants**: File badges, file names, status bar counts (better readability)
+    - **Original vibrant colors**: Folder dots (strong visual hierarchy)
+  - Special Indigo fix: 100% lighter (#3F3FBA → #8F8FE5) to improve contrast for Renamed status
+  - All light variants meet WCAG AA accessibility standard (4.5:1), most achieve AAA (7:1)
   - Files changed:
-    - `src/renderer/src/utils/scrollAnomalyDetector.ts` - Multi-signal detection logic
-    - `src/renderer/src/hooks/useScrollAnomalyRecovery.ts` - Enhanced hook with smart recovery
-    - `src/renderer/src/components/Panels/TerminalPanel.tsx` - Simplified (removed scroll lock UI)
-    - `src/renderer/src/components/Panels/TerminalPanel.css` - Removed scroll lock styles
-  - 94 new tests (76 pure logic + 18 hook tests)
-  - Closes #22
+    - `src/renderer/src/styles/design-tokens.css` - Added 6 light variant tokens
+    - `src/renderer/src/components/ProjectTree/ProjectTree.css` - Updated badges, file names, status bar
+    - `docs/ui-style-guide.md` - Documented color strategy and usage contexts
+  - No test changes needed (styling only, all 3426 tests passing)
+  - See [docs/ui-style-guide.md](docs/ui-style-guide.md#git-status-colors)
 - **Git Status Indicators in Project Tree** (Nov 30, 2025):
   - VS Code-style git status indicators showing file/folder modification state (issue #29)
   - Read-only visual badges: Modified (M/Amber), Untracked (U/Lime), Deleted (D/Coral), Staged (A/Violet), Conflicted (!/Magenta)
