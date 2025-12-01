@@ -53,6 +53,11 @@ export interface UseScrollAnomalyRecoveryOptions {
   config?: Partial<ScrollAnomalyConfig>
   /** Callback when recovery occurs (for telemetry/debugging), receives anomaly count */
   onRecovery?: (count: number) => void
+  /**
+   * Parser handled ref - when true, skip interval recovery this frame.
+   * Used to coordinate with useTerminalParserHooks to avoid double-recovery.
+   */
+  parserHandledRef?: React.MutableRefObject<boolean>
 }
 
 export interface UseScrollAnomalyRecoveryReturn {
@@ -75,6 +80,12 @@ export interface UseScrollAnomalyRecoveryReturn {
    * Reset all tracking state (call on terminal/project change)
    */
   resetAll: () => void
+
+  /**
+   * Last user scroll timestamp ref - exposed for coordination with parser hooks.
+   * Parser hooks use this to avoid restoring position when user recently scrolled.
+   */
+  lastUserScrollTsRef: React.MutableRefObject<number>
 }
 
 /**
@@ -112,7 +123,7 @@ export function useScrollAnomalyRecovery(
   terminalRef: React.RefObject<HTMLDivElement | null>,
   options: UseScrollAnomalyRecoveryOptions = {}
 ): UseScrollAnomalyRecoveryReturn {
-  const { enabled = true, config: configOverrides, onRecovery } = options
+  const { enabled = true, config: configOverrides, onRecovery, parserHandledRef } = options
 
   // Merge config with defaults
   const config = useMemo<ScrollAnomalyConfig>(
@@ -225,6 +236,8 @@ export function useScrollAnomalyRecovery(
 
   // Issue #22 Enhanced: Fixed-interval recovery check + immediate recovery
   // Every recoveryIntervalMs, check if anomalies were queued and recover
+  // Parser hooks (when present) handle same-frame recovery via microtask;
+  // this interval acts as a fallback for edge cases parser hooks miss
   useEffect(() => {
     if (!enabled) return
 
@@ -232,6 +245,15 @@ export function useScrollAnomalyRecovery(
     let intervalRafId: number | null = null
 
     intervalIdRef.current = setInterval(() => {
+      // Skip if parser hook already handled scroll recovery this frame
+      // This prevents double-recovery which could cause scroll position fights
+      if (parserHandledRef?.current) {
+        // Reset anomaly count since parser already handled it
+        anomalyCountRef.current = 0
+        immediateRecoveryRef.current = false
+        return
+      }
+
       // Check for immediate recovery flag (set when clear sequences detected)
       const needsImmediateRecovery = immediateRecoveryRef.current
       immediateRecoveryRef.current = false
@@ -411,5 +433,5 @@ export function useScrollAnomalyRecovery(
     lastDataTsRef.current = 0
   }, [])
 
-  return { wrapOnDataHandler, resetQueue, resetAll }
+  return { wrapOnDataHandler, resetQueue, resetAll, lastUserScrollTsRef }
 }

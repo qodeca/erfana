@@ -18,6 +18,7 @@ import { useTerminalStore } from '../../stores/useTerminalStore'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { showWarningToast } from '../../utils/toastHelpers'
 import { useScrollAnomalyRecovery } from '../../hooks/useScrollAnomalyRecovery'
+import { useTerminalParserHooks } from '../../hooks/useTerminalParserHooks'
 import { useTerminalClipboard } from '../../hooks/useTerminalClipboard'
 import { useTerminalFileLinks } from '../../hooks/useTerminalFileLinks'
 import { useFilePicker } from '../../hooks/useFilePicker'
@@ -44,6 +45,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const visibilityObserverRef = useRef<ResizeObserver | null>(null)
   const warmupUntilRef = useRef<number>(0)
   const contextMenuHandlerRef = useRef<((e: MouseEvent) => void) | null>(null)
+  const parserDisposablesRef = useRef<{ dispose: () => void }[]>([])
   const [projectPath, setProjectPath] = useState<string | null>(null)
 
   // Terminal store for cross-component communication
@@ -52,17 +54,33 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // Project store for file opening functionality (issue #26)
   const dockviewApi = useProjectStore((state) => state.dockviewApi)
 
+  // Parser hooks for same-frame scroll preservation (primary recovery mechanism)
+  // Intercepts ED 2/3 sequences BEFORE they affect viewport, restores via microtask
+  // Must be declared first to get parserHandledRef for scroll recovery coordination
+  const { registerHooks, parserHandledRef } = useTerminalParserHooks({
+    enabled: true,
+    onIntercept: (type) => {
+      console.debug(`[ParserHooks] Intercepted ${type}, restoring scroll position`)
+    }
+  })
+
   // Auto-recovery for Claude Code scroll anomalies (issue #12, #22)
   // Issue #22 Enhanced: Multiple detection signals for faster, smarter recovery
   // - Escape sequence detection: Detects \x1b[2J, \x1b[3J BEFORE write
   // - Buffer truncation detection: Detects when baseY shrinks significantly
-  // - Fast recovery interval: 100ms instead of 500ms
+  // - Fast recovery interval: 50ms (reduced from 100ms for faster fallback)
   // - Smart recovery target: Restore reading position, not just scroll to bottom
-  const { wrapOnDataHandler, resetAll } = useScrollAnomalyRecovery(xtermRef, terminalRef, {
-    onRecovery: (count) => {
-      console.debug(`[ScrollRecovery] Auto-recovered from ${count} anomalous scroll event(s)`)
+  // Parser hooks handle primary recovery; this interval is now a fallback
+  const { wrapOnDataHandler, resetAll } = useScrollAnomalyRecovery(
+    xtermRef,
+    terminalRef,
+    {
+      onRecovery: (count) => {
+        console.debug(`[ScrollRecovery] Fallback recovery from ${count} anomalous scroll event(s)`)
+      },
+      parserHandledRef // Coordinate with parser hooks to avoid double-recovery
     }
-  })
+  )
 
   // Clipboard support for copy/paste operations (issue #28)
   const { hasSelection, copy, paste, handleKeyEvent } = useTerminalClipboard(xtermRef, {
@@ -278,6 +296,11 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // Open terminal in DOM
       xterm.open(terminalRef.current!)
 
+      // Register parser hooks for same-frame scroll preservation
+      // Must be after open() when parser API is available
+      const parserDisposables = registerHooks(xterm)
+      parserDisposablesRef.current = parserDisposables
+
       // Attach clipboard key handler (issue #28)
       xterm.attachCustomKeyEventHandler(handleKeyEvent)
 
@@ -413,6 +436,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         window.api.terminal.kill(terminalIdRef.current)
         setActiveTerminalId(null)
       }
+      // Cleanup parser hooks before disposing xterm
+      parserDisposablesRef.current.forEach((d) => d.dispose())
+      parserDisposablesRef.current = []
       // Cleanup context menu handler before disposing xterm
       if (xtermRef.current?.element && contextMenuHandlerRef.current) {
         xtermRef.current.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
@@ -438,6 +464,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         await window.api.terminal.kill(terminalIdRef.current)
         setActiveTerminalId(null)
       }
+      // Cleanup parser hooks before disposing xterm
+      parserDisposablesRef.current.forEach((d) => d.dispose())
+      parserDisposablesRef.current = []
       // Cleanup context menu handler before disposing xterm
       if (xtermRef.current?.element && contextMenuHandlerRef.current) {
         xtermRef.current.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
