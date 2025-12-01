@@ -97,7 +97,7 @@ export const DEFAULT_SCROLL_ANOMALY_CONFIG: ScrollAnomalyConfig = {
   jumpThresholdLines: 10,
   nearTopThreshold: 3,
   recoveryDebounceMs: 100, // @deprecated - kept for backwards compatibility
-  recoveryIntervalMs: 100, // Issue #22: Reduced from 500ms to 100ms for faster recovery
+  recoveryIntervalMs: 50, // Issue #22 + parser hooks: Reduced from 100ms to 50ms for faster fallback recovery
   bufferTruncationThreshold: 10, // Issue #22: Detect buffer clears
   immediateRecoveryOnClear: true // Issue #22: Recover immediately on ED 2/3
 }

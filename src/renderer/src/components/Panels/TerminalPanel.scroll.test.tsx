@@ -29,6 +29,9 @@ const mockXtermInstance = {
       baseY: 0
     }
   },
+  parser: {
+    registerCsiHandler: vi.fn().mockReturnValue({ dispose: vi.fn() })
+  },
   constructor: vi.fn(),
   open: vi.fn(),
   loadAddon: vi.fn(),
