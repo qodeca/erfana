@@ -7,6 +7,8 @@ import { formatLineRange } from '../../prompts/helpers'
 import { renderIcon, DEFAULT_ICON_PROPS } from '../../utils/iconRegistry'
 import { TEXT_INPUT_LIMITS } from '../../../../shared/constants'
 import type { PromptVariables, PromptConfig } from '../../prompts/types'
+import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
+import { scheduleScrollIfNeeded } from '../../utils/promptScrollScheduler.logic'
 
 interface PreviewContextMenuProps {
   x: number
@@ -57,6 +59,10 @@ export function PreviewContextMenu({
 }: PreviewContextMenuProps) {
   // New unified dialog system
   const { showPrompt } = useDialog()
+
+  // Terminal portal context for scroll scheduling (issue #52)
+  const terminalPortal = useTerminalPortalOptional()
+
   const handleAction = async (promptId: string) => {
     // Get prompt configuration
     const config = PROMPT_REGISTRY[promptId]
@@ -140,7 +146,20 @@ export function PreviewContextMenu({
     }
 
     // Execute prompt template using centralized function
-    await executePromptTemplate(config.id, variables)
+    const result = await executePromptTemplate(config.id, variables)
+
+    // Schedule scroll-to-bottom after prompt execution (issue #52)
+    if (result.success && result.completionTs && terminalPortal?.lastUserScrollTsRef) {
+      scheduleScrollIfNeeded({
+        completionTs: result.completionTs,
+        terminalPortal: {
+          terminalControls: terminalPortal.terminalControls,
+          isTerminalReady: terminalPortal.isTerminalReady
+        },
+        lastUserScrollTsRef: terminalPortal.lastUserScrollTsRef,
+        delayMs: 1000
+      })
+    }
 
     onClose()
   }

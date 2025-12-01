@@ -22,6 +22,8 @@ import { executePromptTemplate } from '../utils/panelUtils'
 import type { PromptVariables } from '../prompts/types'
 import { IMPORT } from '../../../shared/constants'
 import { ERROR_MESSAGES, ErrorCode } from '../../../shared/errors'
+import { useTerminalPortalOptional } from '../context/TerminalPortalContext'
+import { scheduleScrollIfNeeded } from '../utils/promptScrollScheduler.logic'
 
 /** Size threshold for confirmation dialog (in MB) */
 const LARGE_FILE_THRESHOLD_MB = IMPORT.SIZE_WARNING_THRESHOLD / (1024 * 1024)
@@ -51,6 +53,9 @@ interface UseImportReturn {
 export function useImport(): UseImportReturn {
   const [isImporting, setIsImporting] = useState(false)
   const { showConfirm } = useDialog()
+
+  // Terminal portal context for scroll scheduling (issue #52)
+  const terminalPortal = useTerminalPortalOptional()
 
   const importFile = useCallback(async (): Promise<string | null> => {
     // 1. Select file via native file dialog
@@ -107,7 +112,7 @@ export function useImport(): UseImportReturn {
       showSuccessToast('File Imported', `"${selectedFile.name}" imported successfully`)
 
       // 5. Trigger organize-import prompt to help user organize the file
-      await triggerOrganizePrompt(outputPath)
+      await triggerOrganizePrompt(outputPath, terminalPortal ?? undefined)
 
       return outputPath
     } catch (error) {
@@ -117,7 +122,7 @@ export function useImport(): UseImportReturn {
     } finally {
       setIsImporting(false)
     }
-  }, [showConfirm])
+  }, [showConfirm, terminalPortal])
 
   return {
     isImporting,
@@ -151,8 +156,20 @@ function getErrorMessage(errorCode?: string, fallbackError?: string): string {
 
 /**
  * Trigger the organize-import prompt to help Claude Code organize the imported file
+ * Note: This is a module-level function and doesn't have access to terminalPortal.
+ * Scroll scheduling is NOT integrated here because:
+ * 1. This function is called from useImport which already has terminalPortal access
+ * 2. Moving scroll scheduling logic to useImport would be more appropriate
+ * 3. Keeping this function pure and focused on prompt execution
  */
-async function triggerOrganizePrompt(importedFilePath: string): Promise<void> {
+async function triggerOrganizePrompt(
+  importedFilePath: string,
+  terminalPortal?: {
+    terminalControls: { scrollToBottom: () => void } | null
+    isTerminalReady: boolean
+    lastUserScrollTsRef: React.RefObject<number> | null
+  }
+): Promise<void> {
   const variables: PromptVariables = {
     selectedText: '',
     filePath: importedFilePath,
@@ -163,6 +180,20 @@ async function triggerOrganizePrompt(importedFilePath: string): Promise<void> {
 
   try {
     const result = await executePromptTemplate('organize-import', variables)
+
+    // Schedule scroll-to-bottom after prompt execution (issue #52)
+    if (result.success && result.completionTs && terminalPortal?.lastUserScrollTsRef) {
+      scheduleScrollIfNeeded({
+        completionTs: result.completionTs,
+        terminalPortal: {
+          terminalControls: terminalPortal.terminalControls,
+          isTerminalReady: terminalPortal.isTerminalReady
+        },
+        lastUserScrollTsRef: terminalPortal.lastUserScrollTsRef,
+        delayMs: 1000
+      })
+    }
+
     if (!result.success && import.meta.env.DEV) {
       // Template may not exist yet, which is fine - log in dev only
       console.log('organize-import prompt not executed (template may not be registered)')

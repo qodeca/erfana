@@ -28,6 +28,11 @@ import type { ITerminalManager, PanelManagers } from './panelManager.types'
 export interface PromptResult {
   success: boolean
   error?: AppError
+  /**
+   * Timestamp when sendToTerminal() completed (includes autoExecute delay).
+   * Used to schedule forced scroll-to-bottom after prompt execution.
+   */
+  completionTs?: number
 }
 
 interface SendToPanelOptions {
@@ -159,7 +164,10 @@ export async function openPanelAndSendContent({
       return { success: false, error }
     }
 
-    return { success: true }
+    // Capture completion timestamp for scroll scheduling (issue #52)
+    const completionTs = Date.now()
+
+    return { success: true, completionTs }
   }
 
   return { success: false }
