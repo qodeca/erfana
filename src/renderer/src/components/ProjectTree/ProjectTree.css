@@ -436,32 +436,32 @@
 
 /* Status color variants - badge background and text */
 .git-status-badge[data-git-status="modified"] {
-  background-color: var(--color-git-modified);
+  background-color: var(--color-git-modified-light);
   color: var(--color-bg-primary);
 }
 
 .git-status-badge[data-git-status="untracked"] {
-  background-color: var(--color-git-untracked);
+  background-color: var(--color-git-untracked-light);
   color: var(--color-bg-primary);
 }
 
 .git-status-badge[data-git-status="deleted"] {
-  background-color: var(--color-git-deleted);
+  background-color: var(--color-git-deleted-light);
   color: var(--color-bg-primary);
 }
 
 .git-status-badge[data-git-status="staged"] {
-  background-color: var(--color-git-staged);
+  background-color: var(--color-git-staged-light);
   color: var(--color-bg-primary);
 }
 
 .git-status-badge[data-git-status="renamed"] {
-  background-color: var(--color-git-renamed);
+  background-color: var(--color-git-renamed-light);
   color: var(--color-bg-primary);
 }
 
 .git-status-badge[data-git-status="conflicted"] {
-  background-color: var(--color-git-conflicted);
+  background-color: var(--color-git-conflicted-light);
   color: var(--color-bg-primary);
 }
 
@@ -492,27 +492,27 @@
 
 /* File name color override for git status */
 .file-name[data-git-status="modified"] {
-  color: var(--color-git-modified);
+  color: var(--color-git-modified-light);
 }
 
 .file-name[data-git-status="untracked"] {
-  color: var(--color-git-untracked);
+  color: var(--color-git-untracked-light);
 }
 
 .file-name[data-git-status="deleted"] {
-  color: var(--color-git-deleted);
+  color: var(--color-git-deleted-light);
 }
 
 .file-name[data-git-status="staged"] {
-  color: var(--color-git-staged);
+  color: var(--color-git-staged-light);
 }
 
 .file-name[data-git-status="renamed"] {
-  color: var(--color-git-renamed);
+  color: var(--color-git-renamed-light);
 }
 
 .file-name[data-git-status="conflicted"] {
-  color: var(--color-git-conflicted);
+  color: var(--color-git-conflicted-light);
 }
 
 /* ===================================================================
@@ -557,23 +557,23 @@
 
 /* Count item colors - match git status colors */
 .git-count-item[data-git-status="modified"] {
-  color: var(--color-git-modified);
+  color: var(--color-git-modified-light);
 }
 
 .git-count-item[data-git-status="untracked"] {
-  color: var(--color-git-untracked);
+  color: var(--color-git-untracked-light);
 }
 
 .git-count-item[data-git-status="deleted"] {
-  color: var(--color-git-deleted);
+  color: var(--color-git-deleted-light);
 }
 
 .git-count-item[data-git-status="staged"] {
-  color: var(--color-git-staged);
+  color: var(--color-git-staged-light);
 }
 
 .git-count-item[data-git-status="conflicted"] {
-  color: var(--color-git-conflicted);
+  color: var(--color-git-conflicted-light);
 }
 
 .git-count-clean {

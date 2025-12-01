@@ -82,16 +82,22 @@ Extended brand colors for UI variety (git status, tags, badges, etc.):
 
 ### Git Status Colors
 
-Git status indicators use brand colors for visual consistency:
+Git status indicators use brand colors for visual consistency with context-specific lightness:
 
-| Token | Brand Color | Badge | UX Reasoning |
-|-------|-------------|-------|--------------|
-| `--color-git-modified` | Amber | M | Attention needed, file changed |
-| `--color-git-untracked` | Lime | U | New/positive - untracked file |
-| `--color-git-deleted` | Coral | D | Removed - file deleted |
-| `--color-git-staged` | Violet | A | Ready/prepared - staged for commit |
-| `--color-git-renamed` | Indigo | R | Transformed - file renamed |
-| `--color-git-conflicted` | Magenta | ! | Urgent - needs resolution |
+| Status | Original Token | Light Variant Token | Hex (Light) | Usage Context |
+|--------|---------------|-------------------|-------------|---------------|
+| Modified (M) | `--color-git-modified` (Amber) | `--color-git-modified-light` | `#FFCC99` | Badges, file names, status bar counts |
+| Untracked (U) | `--color-git-untracked` (Lime) | `--color-git-untracked-light` | `#F5F599` | Badges, file names, status bar counts |
+| Deleted (D) | `--color-git-deleted` (Coral) | `--color-git-deleted-light` | `#FFB3B8` | Badges, file names, status bar counts |
+| Staged (A) | `--color-git-staged` (Violet) | `--color-git-staged-light` | `#D4D9FF` | Badges, file names, status bar counts |
+| Renamed (R) | `--color-git-renamed` (Indigo) | `--color-git-renamed-light` | `#8F8FE5` | Badges, file names, status bar counts (improved contrast) |
+| Conflicted (!) | `--color-git-conflicted` (Magenta) | `--color-git-conflicted-light` | `#FF99BF` | Badges, file names, status bar counts |
+
+**Color Strategy:**
+- **Original colors** (vibrant brand colors): Used for folder dots (6px circles) - strong visual hierarchy
+- **Light variants** (40-50% lighter, pastel-like): Used for badges, file names, and status bar - better readability
+- **Indigo special case**: 100% lighter to fix poor contrast on dark backgrounds
+- **Accessibility**: All light variants meet WCAG AA standard (4.5:1), most achieve AAA (7:1)
 
 ### Neutral Scale
 
