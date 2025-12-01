@@ -53,7 +53,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (3512 tests, 119 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (3469 tests, 119 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI for issues
 
@@ -132,7 +132,7 @@ See `docs/` for details (keep Claude's context focused):
     - `src/renderer/src/context/TerminalPortalContext.tsx` - Registered `lastUserScrollTsRef` with ref-only pattern
     - `src/renderer/src/components/Panels/TerminalPanel.tsx` - Extracted and registered scroll timestamp ref
     - 6 integration points: PreviewContextMenu, ChatBubble (2 call sites), MermaidToolbar, MermaidDiagram, useImport
-  - **Total: 3512 tests passing** (119 test files, +66 tests for scroll scheduler, +4 for completionTs)
+  - **Total: 3469 tests passing** (119 test files, +43 tests for scroll scheduler, +4 for completionTs)
   - Closes #52
 - **Mermaid Toolbar Restructuring** (Dec 1, 2025):
   - Unified MermaidToolbar design with expand button integrated into direction container (issue #53)
