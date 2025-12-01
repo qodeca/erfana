@@ -272,7 +272,10 @@ describe('MermaidToolbar', () => {
         />
       )
 
-      expect(screen.queryByRole('group', { name: /layout direction/i })).not.toBeInTheDocument()
+      // Group exists (contains expand button), but no direction buttons
+      expect(screen.getByRole('group', { name: /layout direction/i })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /top to bottom/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /left to right/i })).not.toBeInTheDocument()
     })
 
     it('should NOT show direction buttons for pie chart', () => {
@@ -285,7 +288,10 @@ describe('MermaidToolbar', () => {
         />
       )
 
-      expect(screen.queryByRole('group', { name: /layout direction/i })).not.toBeInTheDocument()
+      // Group exists (contains expand button), but no direction buttons
+      expect(screen.getByRole('group', { name: /layout direction/i })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /top to bottom/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /left to right/i })).not.toBeInTheDocument()
     })
 
     it('should NOT show direction buttons for gantt', () => {
@@ -298,7 +304,10 @@ describe('MermaidToolbar', () => {
         />
       )
 
-      expect(screen.queryByRole('group', { name: /layout direction/i })).not.toBeInTheDocument()
+      // Group exists (contains expand button), but no direction buttons
+      expect(screen.getByRole('group', { name: /layout direction/i })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /top to bottom/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /left to right/i })).not.toBeInTheDocument()
     })
   })
 

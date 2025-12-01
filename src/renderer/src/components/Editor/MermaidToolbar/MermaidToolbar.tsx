@@ -86,38 +86,40 @@ export function MermaidToolbar({
 
   return (
     <div className="mermaid-toolbar" role="toolbar" aria-label="Mermaid diagram toolbar">
-      {showDirectionButtons && (
-        <div className="mermaid-toolbar-directions" role="group" aria-label="Layout direction">
-          {availableDirections.map((direction) => {
-            const disabled = isDirectionDisabled(direction, currentDirection, chartType)
-            const active = isDirectionActive(direction, currentDirection, chartType)
+      <div className="mermaid-toolbar-directions" role="group" aria-label="Layout direction">
+        {showDirectionButtons && (
+          <>
+            {availableDirections.map((direction) => {
+              const disabled = isDirectionDisabled(direction, currentDirection, chartType)
+              const active = isDirectionActive(direction, currentDirection, chartType)
 
-            return (
-              <button
-                key={direction}
-                className={`mermaid-direction-btn ${active ? 'mermaid-direction-btn--active' : ''}`}
-                onClick={() => handleDirectionClick(direction)}
-                disabled={disabled}
-                title={getDirectionTooltip(direction)}
-                aria-label={`Change layout to ${getDirectionTooltip(direction)}`}
-                aria-pressed={active}
-              >
-                {direction}
-              </button>
-            )
-          })}
-        </div>
-      )}
+              return (
+                <button
+                  key={direction}
+                  className={`mermaid-direction-btn ${active ? 'mermaid-direction-btn--active' : ''}`}
+                  onClick={() => handleDirectionClick(direction)}
+                  disabled={disabled}
+                  title={getDirectionTooltip(direction)}
+                  aria-label={`Change layout to ${getDirectionTooltip(direction)}`}
+                  aria-pressed={active}
+                >
+                  {direction}
+                </button>
+              )
+            })}
+          </>
+        )}
 
-      <button
-        className="mermaid-toolbar-expand-btn"
-        onClick={onExpand}
-        disabled={!hasSvgContent}
-        title="View fullscreen"
-        aria-label="Open diagram in fullscreen"
-      >
-        <Maximize2 size={14} />
-      </button>
+        <button
+          className="mermaid-toolbar-expand-btn"
+          onClick={onExpand}
+          disabled={!hasSvgContent}
+          title="View fullscreen"
+          aria-label="Open diagram in fullscreen"
+        >
+          <Maximize2 size={14} />
+        </button>
+      </div>
     </div>
   )
 }
