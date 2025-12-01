@@ -62,7 +62,9 @@ export function useGitStatus({
     lastRefreshTime,
     // Subscribe to Maps to trigger re-renders when status changes
     // Without this, getFileStatus/getFolderStatus are stable refs and won't trigger updates
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     fileStatuses: _fileStatuses,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     folderStatuses: _folderStatuses,
   } = useGitStore()
 
@@ -193,7 +195,6 @@ export function useGitStatus({
     // Note: executeRefresh is intentionally omitted from deps to prevent re-creation loop.
     // This is safe because executeRefresh's identity changes only when its deps change,
     // but we only want to trigger on projectPath/enabled changes, not on every refresh.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     executeRefresh(true)
   }, [projectPath, enabled, clear])
 
