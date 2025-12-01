@@ -117,6 +117,18 @@ See `docs/` for details (keep Claude's context focused):
 - [ ] Focus states are visible (accessibility)
 
 ## Recent Changes (v0.5.4)
+- **Mermaid Toolbar Restructuring** (Dec 1, 2025):
+  - Unified MermaidToolbar design with expand button integrated into direction container (issue #53)
+  - **Structure**: Expand button now inside `.mermaid-toolbar-directions` container (rightmost position)
+  - **Sizing**: Expand button resized from 28×28px to 24px height (matches direction buttons)
+  - **Hover**: Unified lime hover (`--color-brand-lime`) for ALL buttons (direction + expand)
+  - **Disabled state**: Active/disabled buttons protected from hover (violet background preserved)
+  - Files changed:
+    - `src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.tsx` - Container restructure
+    - `src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.css` - Sizing and hover unification
+    - `src/renderer/src/components/Editor/MermaidToolbar/MermaidToolbar.test.tsx` - Updated 3 tests
+  - All 3426 tests passing (26 MermaidToolbar tests)
+  - Closes #53
 - **Flicker-Free Terminal Scroll Recovery** (Dec 1, 2025):
   - Eliminated visible flicker using xterm.js parser hooks for same-frame scroll restoration
   - **Before**: Recovery happened AFTER scroll jump was visible (flicker)
