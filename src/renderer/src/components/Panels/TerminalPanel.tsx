@@ -71,7 +71,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // - Fast recovery interval: 50ms (reduced from 100ms for faster fallback)
   // - Smart recovery target: Restore reading position, not just scroll to bottom
   // Parser hooks handle primary recovery; this interval is now a fallback
-  const { wrapOnDataHandler, resetAll } = useScrollAnomalyRecovery(
+  const { wrapOnDataHandler, resetAll, lastUserScrollTsRef } = useScrollAnomalyRecovery(
     xtermRef,
     terminalRef,
     {
@@ -704,6 +704,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // but these individual callbacks are stable (wrapped in useCallback with empty deps)
   const registerTerminalControls = portalContext?.registerTerminalControls
   const unregisterTerminalControls = portalContext?.unregisterTerminalControls
+  const registerLastUserScrollTsRef = portalContext?.registerLastUserScrollTsRef
+  const unregisterLastUserScrollTsRef = portalContext?.unregisterLastUserScrollTsRef
   const closeTerminalContextMenu = portalContext?.closeTerminalContextMenu
 
   // Register terminal controls with portal context (issue #37)
@@ -725,6 +727,18 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       unregisterTerminalControls()
     }
   }, [registerTerminalControls, unregisterTerminalControls, terminalId, handleScrollToBottom, handleRestartTerminal, copy, paste])
+
+  // Register lastUserScrollTsRef with portal context (issue #52)
+  // Allows components to check if user scrolled during prompt execution delay
+  useEffect(() => {
+    if (!registerLastUserScrollTsRef || !unregisterLastUserScrollTsRef) return
+
+    registerLastUserScrollTsRef(lastUserScrollTsRef)
+
+    return () => {
+      unregisterLastUserScrollTsRef()
+    }
+  }, [registerLastUserScrollTsRef, unregisterLastUserScrollTsRef, lastUserScrollTsRef])
 
   // Context menu close handler - uses stable callback ref
   const handleCloseContextMenu = useCallback(() => {

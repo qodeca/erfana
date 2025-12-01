@@ -36,6 +36,7 @@ import {
 import { formatZoomLevel } from './diagramViewer.logic'
 import { TextareaContextMenu } from '../../ContextMenu/TextareaContextMenu'
 import { CharacterCount } from '../../shared'
+import { scheduleScrollIfNeeded } from '../../../utils/promptScrollScheduler.logic'
 import './ChatBubble.css'
 
 interface Transform {
@@ -217,7 +218,7 @@ export function ChatBubble({
     const lineRange = formatLineRangeChat(startLine, endLine)
 
     try {
-      const success = await executePromptTemplate('diagram-chat', {
+      const result = await executePromptTemplate('diagram-chat', {
         selectedText: '',
         filePath,
         fullDocument: '',
@@ -229,14 +230,27 @@ export function ChatBubble({
         userInstruction: trimmedMessage
       })
 
+      // Schedule scroll-to-bottom after prompt execution (issue #52)
+      if (result.success && result.completionTs && portalContext?.lastUserScrollTsRef) {
+        scheduleScrollIfNeeded({
+          completionTs: result.completionTs,
+          terminalPortal: {
+            terminalControls: portalContext.terminalControls,
+            isTerminalReady: portalContext.isTerminalReady
+          },
+          lastUserScrollTsRef: portalContext.lastUserScrollTsRef,
+          delayMs: 1000
+        })
+      }
+
       // Only clear message on successful submit
-      if (success) {
+      if (result.success) {
         setMessage('')
       }
     } catch (err) {
       console.error('Failed to send chat message:', err)
     }
-  }, [message, validation.canSubmit, filePath, startLine, endLine, mermaidCode])
+  }, [message, validation.canSubmit, filePath, startLine, endLine, mermaidCode, portalContext])
 
   // Direction button click handler (issue #37 - moved from MermaidToolbar)
   const handleDirectionClick = useCallback(
@@ -248,7 +262,7 @@ export function ChatBubble({
           startLine && endLine ? `@${filePath}:${startLine}-${endLine}` : `@${filePath}`
         const lineRange = formatLineRange(startLine, endLine) || undefined
 
-        await executePromptTemplate('change-mermaid-direction', {
+        const result = await executePromptTemplate('change-mermaid-direction', {
           selectedText: '',
           filePath,
           fullDocument: '',
@@ -260,11 +274,24 @@ export function ChatBubble({
           targetDirection: direction,
           directionLabel: DIRECTION_LABELS[direction] || direction
         })
+
+        // Schedule scroll-to-bottom after prompt execution (issue #52)
+        if (result.success && result.completionTs && portalContext?.lastUserScrollTsRef) {
+          scheduleScrollIfNeeded({
+            completionTs: result.completionTs,
+            terminalPortal: {
+              terminalControls: portalContext.terminalControls,
+              isTerminalReady: portalContext.isTerminalReady
+            },
+            lastUserScrollTsRef: portalContext.lastUserScrollTsRef,
+            delayMs: 1000
+          })
+        }
       } catch (err) {
         console.error('Failed to execute direction change prompt:', err)
       }
     },
-    [filePath, startLine, endLine, mermaidCode]
+    [filePath, startLine, endLine, mermaidCode, portalContext]
   )
 
   // Terminal control handlers (issue #37)

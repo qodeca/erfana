@@ -6,6 +6,8 @@ import { formatLineRange } from '../../prompts/helpers'
 import { MermaidToolbar } from './MermaidToolbar'
 import { getMermaidConfig } from '../../utils/mermaidThemes'
 import { useDiagramViewerStore, buildDiagramId, hashDiagramContent } from '../../stores/useDiagramViewerStore'
+import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
+import { scheduleScrollIfNeeded } from '../../utils/promptScrollScheduler.logic'
 
 interface MermaidDiagramProps {
   code: string
@@ -34,6 +36,9 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
 
   // Generate unique ID for this diagram
   const currentDiagramId = buildDiagramId(filePath, startLine, endLine)
+
+  // Terminal portal context for scroll scheduling (issue #52)
+  const terminalPortal = useTerminalPortalOptional()
 
   // Reduced tolerance - only for tie-breaking when content changes
   const LINE_DRIFT_TOLERANCE = 10
@@ -76,7 +81,7 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
       const lineRange = formatLineRange(startLine, endLine) || undefined
 
       // Execute prompt template using centralized function
-      await executePromptTemplate('mermaid-bug-report', {
+      const result = await executePromptTemplate('mermaid-bug-report', {
         selectedText: '',
         filePath,
         fullDocument: '',
@@ -87,6 +92,19 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
         mermaidError: error,
         mermaidCode: code
       })
+
+      // Schedule scroll-to-bottom after prompt execution (issue #52)
+      if (result.success && result.completionTs && terminalPortal?.lastUserScrollTsRef) {
+        scheduleScrollIfNeeded({
+          completionTs: result.completionTs,
+          terminalPortal: {
+            terminalControls: terminalPortal.terminalControls,
+            isTerminalReady: terminalPortal.isTerminalReady
+          },
+          lastUserScrollTsRef: terminalPortal.lastUserScrollTsRef,
+          delayMs: 1000
+        })
+      }
     } catch (err) {
       console.error('Failed to send bug report:', err)
     }

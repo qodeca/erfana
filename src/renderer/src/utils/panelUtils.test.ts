@@ -398,6 +398,82 @@ describe('panelUtils.ts', () => {
     })
   })
 
+  describe('openPanelAndSendContent - completionTs', () => {
+    it('sets completionTs when sendToTerminal succeeds', async () => {
+      const managers = createMockManagers()
+
+      const result = await openPanelAndSendContent({
+        panel: 'terminal',
+        location: 'right',
+        content: 'npm install',
+        managers,
+        showToast: false
+      })
+
+      expect(result.success).toBe(true)
+      expect(result.completionTs).toBeDefined()
+      expect(typeof result.completionTs).toBe('number')
+      expect(result.completionTs).toBeGreaterThan(0)
+    })
+
+    it('does not set completionTs when sendToTerminal fails', async () => {
+      const managers = createMockManagers()
+      managers.terminalManager.sendToTerminal.mockResolvedValue(false)
+
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      const result = await openPanelAndSendContent({
+        panel: 'terminal',
+        location: 'right',
+        content: 'bad command',
+        managers,
+        showToast: false
+      })
+
+      expect(result.success).toBe(false)
+      expect(result.completionTs).toBeUndefined()
+    })
+
+    it('does not set completionTs when terminal timeout occurs', async () => {
+      const managers = createMockManagers()
+      managers.terminalManager.isReady.mockReturnValue(false)
+
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const result = await openPanelAndSendContent({
+        panel: 'terminal',
+        location: 'right',
+        content: 'test',
+        managers,
+        terminalTimeout: 100,
+        showToast: false
+      })
+
+      expect(result.success).toBe(false)
+      expect(result.completionTs).toBeUndefined()
+    })
+
+    it('completionTs reflects timing when command is sent', async () => {
+      const managers = createMockManagers()
+      const beforeTs = Date.now()
+
+      const result = await openPanelAndSendContent({
+        panel: 'terminal',
+        location: 'right',
+        content: 'echo hello',
+        managers,
+        showToast: false
+      })
+
+      const afterTs = Date.now()
+
+      expect(result.completionTs).toBeDefined()
+      expect(result.completionTs!).toBeGreaterThanOrEqual(beforeTs)
+      expect(result.completionTs!).toBeLessThanOrEqual(afterTs)
+    })
+  })
+
   describe('edge cases', () => {
     it('should handle empty content', async () => {
       const managers = createMockManagers()

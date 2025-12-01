@@ -74,6 +74,22 @@ interface TerminalPortalContextValue {
 
   /** Close terminal context menu */
   closeTerminalContextMenu: () => void
+
+  /**
+   * Last user scroll timestamp ref (from useScrollAnomalyRecovery).
+   * Used by prompt scroll scheduler to check if user scrolled during delay.
+   */
+  lastUserScrollTsRef: React.RefObject<number> | null
+
+  /**
+   * Register lastUserScrollTsRef (called by TerminalPanel)
+   */
+  registerLastUserScrollTsRef: (ref: React.MutableRefObject<number>) => void
+
+  /**
+   * Unregister lastUserScrollTsRef (called on TerminalPanel unmount)
+   */
+  unregisterLastUserScrollTsRef: () => void
 }
 
 const TerminalPortalContext = createContext<TerminalPortalContextValue | null>(null)
@@ -139,6 +155,9 @@ export function TerminalPortalProvider({ children }: TerminalPortalProviderProps
   // Using refs avoids ALL state updates from terminal control registration
   const terminalControlsRef = useRef<TerminalControls | null>(null)
 
+  // Same ref-only pattern for lastUserScrollTsRef (issue #52)
+  const lastUserScrollTsRef = useRef<React.MutableRefObject<number> | null>(null)
+
   const registerTerminalControls = useCallback((controls: TerminalControls) => {
     // Only store in ref - NO state update
     terminalControlsRef.current = controls
@@ -156,6 +175,15 @@ export function TerminalPortalProvider({ children }: TerminalPortalProviderProps
 
   const closeTerminalContextMenu = useCallback(() => {
     setTerminalContextMenuPosition(null)
+  }, [])
+
+  // Scroll ref registration (issue #52)
+  const registerLastUserScrollTsRef = useCallback((ref: React.MutableRefObject<number>) => {
+    lastUserScrollTsRef.current = ref
+  }, [])
+
+  const unregisterLastUserScrollTsRef = useCallback(() => {
+    lastUserScrollTsRef.current = null
   }, [])
 
   // Memoize the context value to prevent unnecessary re-renders
@@ -182,7 +210,13 @@ export function TerminalPortalProvider({ children }: TerminalPortalProviderProps
       },
       terminalContextMenuPosition,
       openTerminalContextMenu,
-      closeTerminalContextMenu
+      closeTerminalContextMenu,
+      // Getter for lastUserScrollTsRef - always fresh, no re-renders
+      get lastUserScrollTsRef() {
+        return lastUserScrollTsRef.current
+      },
+      registerLastUserScrollTsRef,
+      unregisterLastUserScrollTsRef
     }),
     [
       portalTarget,
@@ -195,7 +229,9 @@ export function TerminalPortalProvider({ children }: TerminalPortalProviderProps
       registerTerminalControls,
       unregisterTerminalControls,
       openTerminalContextMenu,
-      closeTerminalContextMenu
+      closeTerminalContextMenu,
+      registerLastUserScrollTsRef,
+      unregisterLastUserScrollTsRef
     ]
   )
 

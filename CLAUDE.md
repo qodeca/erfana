@@ -117,6 +117,23 @@ See `docs/` for details (keep Claude's context focused):
 - [ ] Focus states are visible (accessibility)
 
 ## Recent Changes (v0.5.4)
+- **Forced Scroll-to-Bottom After Prompt Execution** (Dec 1, 2025):
+  - Automatically scrolls terminal to bottom 1 second after prompt template execution (issue #52)
+  - **User Intent Respect**: Skips scroll if user manually scrolled during the 1-second delay window
+  - **Integration**: Works with all prompt templates (Elaborate, Modify, Ask, diagram chat, Mermaid direction changes, import organization)
+  - **Architecture**: Pure logic module (`promptScrollScheduler.logic.ts`) with zero React dependencies
+  - **Coordination**: Uses `lastUserScrollTsRef` from `useScrollAnomalyRecovery` for user scroll detection
+  - **Edge Cases Handled**: Terminal not ready, controls unavailable, panel closed, rapid execution
+  - New files:
+    - `src/renderer/src/utils/promptScrollScheduler.logic.ts` - Pure scheduling logic (141 lines)
+    - `src/renderer/src/utils/promptScrollScheduler.logic.test.ts` - 66 comprehensive tests (872 lines)
+  - Updated files:
+    - `src/renderer/src/utils/panelUtils.ts` - Added `completionTs` to PromptResult
+    - `src/renderer/src/context/TerminalPortalContext.tsx` - Registered `lastUserScrollTsRef` with ref-only pattern
+    - `src/renderer/src/components/Panels/TerminalPanel.tsx` - Extracted and registered scroll timestamp ref
+    - 6 integration points: PreviewContextMenu, ChatBubble (2 call sites), MermaidToolbar, MermaidDiagram, useImport
+  - **Total: 3512 tests passing** (119 test files, +66 tests for scroll scheduler, +4 for completionTs)
+  - Closes #52
 - **Mermaid Toolbar Restructuring** (Dec 1, 2025):
   - Unified MermaidToolbar design with expand button integrated into direction container (issue #53)
   - **Structure**: Expand button now inside `.mermaid-toolbar-directions` container (rightmost position)

@@ -16,6 +16,8 @@ import {
   getDirectionTooltip,
   DIRECTION_LABELS
 } from '../../../utils/mermaidDirections'
+import { useTerminalPortalOptional } from '../../../context/TerminalPortalContext'
+import { scheduleScrollIfNeeded } from '../../../utils/promptScrollScheduler.logic'
 import './MermaidToolbar.css'
 
 export interface MermaidToolbarProps {
@@ -49,6 +51,9 @@ export function MermaidToolbar({
   const availableDirections = getAvailableDirections(chartType)
   const currentDirection = detectCurrentDirection(code, chartType)
 
+  // Terminal portal context for scroll scheduling (issue #52)
+  const terminalPortal = useTerminalPortalOptional()
+
   const handleDirectionClick = async (direction: string) => {
     if (!filePath) {
       return
@@ -63,7 +68,7 @@ export function MermaidToolbar({
       const lineRange = formatLineRange(startLine, endLine) || undefined
 
       // Execute prompt template
-      await executePromptTemplate('change-mermaid-direction', {
+      const result = await executePromptTemplate('change-mermaid-direction', {
         selectedText: '',
         filePath,
         fullDocument: '',
@@ -75,6 +80,19 @@ export function MermaidToolbar({
         targetDirection: direction,
         directionLabel: DIRECTION_LABELS[direction] || direction
       })
+
+      // Schedule scroll-to-bottom after prompt execution (issue #52)
+      if (result.success && result.completionTs && terminalPortal?.lastUserScrollTsRef) {
+        scheduleScrollIfNeeded({
+          completionTs: result.completionTs,
+          terminalPortal: {
+            terminalControls: terminalPortal.terminalControls,
+            isTerminalReady: terminalPortal.isTerminalReady
+          },
+          lastUserScrollTsRef: terminalPortal.lastUserScrollTsRef,
+          delayMs: 1000
+        })
+      }
     } catch (err) {
       console.error('Failed to execute direction change prompt:', err)
     }
