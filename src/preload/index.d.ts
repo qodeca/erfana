@@ -60,6 +60,11 @@ declare global {
           callback: (data: { dirPath: string; error: string }) => void
         ) => () => void
       }
+      gitIndexWatch: {
+        start: (projectPath: string) => Promise<{ success: boolean; error?: string }>
+        stop: () => Promise<{ success: boolean; error?: string }>
+        onIndexChanged: (callback: (data: { projectPath: string }) => void) => () => void
+      }
       // Copilot removed
       settings: {
         getProjectFilterMode: () => Promise<{ success: boolean; mode?: string; error?: string }>

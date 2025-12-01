@@ -62,12 +62,14 @@ export const GIT_STATUS = {
   /**
    * Debounce delay in ms for git status refresh.
    * Waits for rapid file changes to settle before refreshing.
+   * Tuned for responsiveness (500ms vs original 1000ms).
    */
-  DEBOUNCE_DELAY: 1_000,
+  DEBOUNCE_DELAY: 500,
 
   /**
    * Cooldown duration in ms between git status refreshes.
    * Prevents excessive refreshes during continuous file activity.
+   * Tuned for responsiveness (1500ms vs original 2000ms).
    */
-  COOLDOWN_DURATION: 2_000
+  COOLDOWN_DURATION: 1_500
 } as const

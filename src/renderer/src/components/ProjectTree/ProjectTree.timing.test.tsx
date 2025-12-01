@@ -57,6 +57,21 @@ describe('ProjectTree project switching timing', () => {
         onDirectoryChanged: () => () => {},
         onProjectDeleted: () => () => {},
         onDirectoryError: () => () => {}
+      },
+      gitIndexWatch: {
+        start: vi.fn(async () => ({ success: true })),
+        stop: vi.fn(async () => ({ success: true })),
+        onIndexChanged: () => () => {}
+      },
+      git: {
+        getStatus: vi.fn(async () => ({
+          isGitRepo: false,
+          branch: null,
+          isDetached: false,
+          files: [],
+          counts: { modified: 0, untracked: 0, deleted: 0, staged: 0, conflicted: 0 },
+          truncated: false
+        }))
       }
     }
 
@@ -111,6 +126,21 @@ describe('ProjectTree project switching timing', () => {
         onDirectoryChanged: () => () => {},
         onProjectDeleted: () => () => {},
         onDirectoryError: () => () => {}
+      },
+      gitIndexWatch: {
+        start: vi.fn(async () => ({ success: true })),
+        stop: vi.fn(async () => ({ success: true })),
+        onIndexChanged: () => () => {}
+      },
+      git: {
+        getStatus: vi.fn(async () => ({
+          isGitRepo: false,
+          branch: null,
+          isDetached: false,
+          files: [],
+          counts: { modified: 0, untracked: 0, deleted: 0, staged: 0, conflicted: 0 },
+          truncated: false
+        }))
       }
     }
 
