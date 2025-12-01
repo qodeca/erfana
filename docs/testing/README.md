@@ -11,7 +11,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
   - `npm run test:renderer` — renderer tests
   - `npm run test:main` — main process tests
   - `npm run test:preload` — preload tests
-- **3352 tests passing** across 117 test files (v0.5.3)
+- **3426 tests passing** across 118 test files (v0.5.4)
 
 #### Renderer tips
 - When testing TerminalPanel in jsdom, mock xterm and addons to avoid canvas errors:

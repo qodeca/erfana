@@ -239,101 +239,160 @@ new Terminal({
 }
 ```
 
-## Auto-Recovery from Scroll Anomalies (v0.4.3, Enhanced v0.5.3)
+## Flicker-Free Scroll Recovery (v0.5.4) 🎉
 
-### Purpose
+### Problem Solved
 
-Automatic detection and recovery from Claude Code's Ink library scroll-to-top anomalies during streaming output. Seamless auto-recovery without manual intervention.
+**Before**: Terminal scroll recovery was visible as flicker - scroll jumps to top, brief pause, then recovers.
+**After**: **No visible flicker** - scroll position restored in same frame via xterm.js parser hooks.
 
-**Related Issues**: [#12](https://github.com/user/erfana/issues/12), [#22](https://github.com/user/erfana/issues/22)
+**Related Issues**:
+- [Claude Code #826](https://github.com/anthropics/claude-code/issues/826) (183+ upvotes)
+- [Claude Code #10769](https://github.com/anthropics/claude-code/issues/10769)
+- [Internal #12](https://github.com/user/erfana/issues/12), [#22](https://github.com/user/erfana/issues/22)
 
 ### Root Cause
 
-Claude Code's Ink library sends escape sequences (`\x1b[2J` clear screen, `\x1b[3J` clear scrollback) when output exceeds terminal height, wiping the scrollback buffer entirely. This cannot be prevented, only detected and recovered from quickly.
+Claude Code's Ink library sends `\x1b[2J` (ED 2 - clear screen) and `\x1b[3J` (ED 3 - clear scrollback) when output exceeds terminal height. Previous approach detected these AFTER execution, causing visible scroll jump before recovery.
 
-### Detection Strategy (v0.5.3 Enhanced)
+### Solution: Two-Layer Defense
 
-Multi-signal detection with defense-in-depth approach:
+#### Layer 1: Parser Hooks (Primary - No Flicker)
 
-| Signal | Detection | Trigger |
+xterm.js parser API intercepts ED sequences **BEFORE** they execute:
+
+```
+PTY Data → Parser Hook → Save Position → Let Execute → Restore (microtask)
+                ↑                                          ↑
+            SYNCHRONOUS                              SAME FRAME
+```
+
+**Key Features**:
+- Intercepts CSI ED 2/3 sequences before viewport updates
+- Saves `viewportY` and `baseY` synchronously
+- Restores position via `queueMicrotask()` in same frame
+- 16ms debouncing for rapid ED2+ED3 sequences
+- 300ms user scroll cooldown (respects manual scrolling)
+
+#### Layer 2: Fallback Recovery (50ms interval)
+
+Multi-signal detection catches edge cases parser hooks miss:
+
+| Signal | Detection | Purpose |
 |--------|-----------|---------|
-| **Escape Sequences** | `\x1b[2J`, `\x1b[3J` BEFORE write | Immediate recovery flag |
-| **Buffer Truncation** | baseY shrinks significantly (≥10 lines) | Queue anomaly |
-| **Position-Based** | Jump ≥10 lines to near-top (≤3 lines) | Queue anomaly |
-| **User Activity** | Wheel/touch/keyboard scroll events | Suppress recovery |
-
-### Recovery Mechanism
-
-**Fixed-Interval Queue Approach** (100ms):
-1. **Queue anomalies**: Every detected anomaly increments a counter (no immediate recovery)
-2. **100ms interval**: Check counter; if > 0, reset sync, scroll async via RAF
-3. **No anomaly lost**: Counter reset happens synchronously before async scroll
-4. **Smart recovery**: Restores user's reading position relative to bottom (not always scroll-to-bottom)
+| **Escape Sequences** | `\x1b[2J`, `\x1b[3J` via regex | Backup detection |
+| **Buffer Truncation** | baseY shrinks ≥10 lines | Catches buffer wipes |
+| **Position-Based** | Jump ≥10 lines to near-top | Fallback for anomalies |
+| **User Activity** | Wheel/touch/keyboard scroll | Suppresses recovery |
 
 ### Architecture
 
 ```
-scrollAnomalyDetector.ts      Pure detection logic (testable, no React)
+useTerminalParserHooks.ts     xterm.js parser integration
+├── registerHooks()           Register CSI handler for 'J' (ED)
+├── scheduleRestore()         Debounce + queueMicrotask restoration
+├── isScrollAffectingED()     Check if ED param is 2 or 3
+├── calculateRestoredPosition() Smart recovery positioning
+└── shouldSkipRestoration()   User scroll cooldown check
+
+scrollAnomalyDetector.ts      Pure detection logic (fallback)
 ├── isAnomalousScroll()       Position-based detection
 ├── detectClearSequences()    Escape sequence detection (ED 2/3)
 ├── hasDestructiveClearSequence()  Check for destructive sequences
 ├── wasBufferTruncated()      Buffer shrinkage detection
-├── calculateRecoveryTarget() Smart recovery positioning
-└── isRapidRedraw()           Rapid redraw pattern detection
+└── calculateRecoveryTarget() Smart recovery positioning
 
-useScrollAnomalyRecovery.ts   React hook integration
+useScrollAnomalyRecovery.ts   React hook (fallback)
 ├── wrapOnDataHandler()       Wraps terminal data handler
 ├── performRecovery()         Smart recovery with position targeting
-├── resetQueue()              Clear anomaly queue (for scroll lock)
-├── resetAll()                Reset all state (terminal/project change)
-└── Fixed-interval check      100ms interval with RAF scroll
+├── Coordination              Skips if parserHandledRef is true
+└── Fixed-interval check      50ms interval (down from 100ms)
+```
+
+### Coordination Mechanism
+
+Prevents double-recovery when both layers trigger:
+
+```typescript
+// Parser hooks set flag when handling
+parserHandledRef.current = true
+
+// Fallback checks flag before recovering
+if (parserHandledRef?.current) {
+  anomalyCountRef.current = 0  // Reset, parser already handled
+  return
+}
 ```
 
 ### Configuration
 
+**Parser Hooks** (Primary):
 ```typescript
 {
-  userScrollRecencyMs: 300,      // User scroll recency window
-  dataStreamRecencyMs: 500,      // Data streaming recency window
-  jumpThresholdLines: 10,        // Minimum lines for position anomaly
-  nearTopThreshold: 3,           // Lines from top to be "near top"
-  recoveryIntervalMs: 100,       // Fixed interval for queue check
-  bufferTruncationThreshold: 10, // Minimum baseY shrinkage
-  immediateRecoveryOnClear: true // Immediate recovery on escape sequences
+  enabled: true,
+  lastUserScrollTsRef: ref,   // Shared user scroll tracking
+  onIntercept: (type) => {}   // Debug callback
+}
+```
+
+**Fallback Recovery**:
+```typescript
+{
+  userScrollRecencyMs: 300,      // User scroll cooldown
+  dataStreamRecencyMs: 500,      // Data streaming window
+  jumpThresholdLines: 10,        // Min lines for anomaly
+  nearTopThreshold: 3,           // Lines from top = "near top"
+  recoveryIntervalMs: 50,        // 50ms fallback (was 100ms)
+  bufferTruncationThreshold: 10, // Min baseY shrinkage
+  parserHandledRef: ref          // Coordination flag
 }
 ```
 
 ### Test Coverage
 
-- **Pure Logic Tests** (`scrollAnomalyDetector.test.ts`): 76 tests
+**Total: 3426 tests passing** (118 test files)
+
+- **Parser Hooks** (`useTerminalParserHooks.test.ts`): 24 tests
+  - ED 2/3 detection (scroll-affecting vs non-affecting)
+  - Position restoration calculations
+  - User scroll cooldown logic
+  - Integration scenarios (Ink ED2+ED3 sequence)
+
+- **Fallback Detection** (`scrollAnomalyDetector.test.ts`): 76 tests
   - Position-based detection with boundary conditions
   - Escape sequence detection (ED 2/3, cursor home)
   - Buffer truncation detection
   - Smart recovery target calculation
-  - Custom configuration scenarios
 
-- **Hook Tests** (`useScrollAnomalyRecovery.test.ts`): 18 tests
+- **Fallback Hook** (`useScrollAnomalyRecovery.test.ts`): 18 tests
   - Fixed-interval queue approach
-  - Batching behavior
-  - Keyboard scroll detection (PageUp/Down, arrows)
+  - Coordination with parser hooks
+  - Keyboard scroll detection
   - RAF cancellation
-  - Cleanup on unmount
 
 ### Implementation Files
 
+**Parser Hooks (Primary)**:
+- `src/renderer/src/hooks/useTerminalParserHooks.ts` - CSI handler registration
+- `src/renderer/src/hooks/useTerminalParserHooks.test.ts` - 24 pure logic tests
+
+**Fallback System**:
 - `src/renderer/src/utils/scrollAnomalyDetector.ts` - Pure detection logic
-- `src/renderer/src/hooks/useScrollAnomalyRecovery.ts` - React hook
-- `src/renderer/src/utils/scrollAnomalyDetector.test.ts` - 76 pure logic tests
-- `src/renderer/src/hooks/useScrollAnomalyRecovery.test.ts` - 18 hook tests
+- `src/renderer/src/hooks/useScrollAnomalyRecovery.ts` - React hook with coordination
+- `src/renderer/src/components/Panels/TerminalPanel.tsx` - Integration
 
-### Why Multi-Signal Detection?
+### Why Two Layers?
 
-1. **Escape Sequences**: Detects Ink's ED 2/3 sequences BEFORE write for fastest recovery
-2. **Buffer Truncation**: Catches buffer wipes that position-based detection might miss
-3. **Position-Based**: Fallback for anomalies without escape sequences
-4. **User Activity**: Prevents fighting against intentional user scrolling
+1. **Parser Hooks**: Eliminates flicker entirely (same-frame restoration)
+2. **Fallback**: Defense-in-depth for edge cases (split sequences, timing issues)
+3. **Coordination**: Prevents double-recovery when both trigger
+4. **Faster Fallback**: 50ms interval (down from 100ms) for quicker edge case handling
 
-This defense-in-depth approach ensures reliable detection across all Ink library behaviors.
+### Technical References
+
+- [xterm.js Parser Hooks Guide](https://xtermjs.org/docs/guides/hooks/)
+- [xterm.js IParser API](https://xtermjs.org/docs/api/terminal/interfaces/iparser/)
+- [ED Sequence Behavior Issue](https://github.com/xtermjs/xterm.js/issues/1727)
 
 ## References
 
