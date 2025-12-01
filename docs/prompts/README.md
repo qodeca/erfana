@@ -82,6 +82,7 @@ Text: {{selectedText}}
 All templates target Terminal panel:
 - `sendDirectly: false` - User can edit before running
 - `autoExecute: true` - Auto-press Enter after paste (v0.3.4: simplified fire-and-forget with 200ms delay)
+- **Auto-scroll (v0.5.4)** - Terminal scrolls to bottom 1 second after execution completes (respects user scroll intent)
 
 ## Implementation Files
 
