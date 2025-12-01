@@ -21,6 +21,14 @@ asarUnpack:
   - resources/**
   - node_modules/isomorphic-git/**
   - node_modules/sha.js/**
+  - node_modules/to-buffer/**
+  - node_modules/typed-array-buffer/**
+  - node_modules/call-bound/**
+  - node_modules/get-intrinsic/**
+  - node_modules/get-proto/**
+  - node_modules/dunder-proto/**
+  - node_modules/call-bind-apply-helpers/**
+  - node_modules/call-bind/**
 win:
   executableName: Erfana
   target:
