@@ -18,7 +18,6 @@ files:
   - '!tsconfig.test.json'
   - '!*.md'
 asarUnpack:
-  - resources/**
   - node_modules/isomorphic-git/**
   - node_modules/sha.js/**
   - node_modules/to-buffer/**
@@ -29,6 +28,9 @@ asarUnpack:
   - node_modules/dunder-proto/**
   - node_modules/call-bind-apply-helpers/**
   - node_modules/call-bind/**
+  - node_modules/es-errors/**
+  - node_modules/function-bind/**
+  - node_modules/gopd/**
 win:
   executableName: Erfana
   target:
