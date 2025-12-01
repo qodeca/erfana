@@ -207,11 +207,14 @@ export function isAnomalousScroll(
 export function detectClearSequences(data: string): EscapeSequenceSignals {
   return {
     // ED 2: Clear entire screen - erases all content in visible area
+    // eslint-disable-next-line no-control-regex
     hasScreenClear: /\x1b\[2J/.test(data),
     // ED 3: Clear scrollback buffer - THIS is the main culprit that wipes history
+    // eslint-disable-next-line no-control-regex
     hasScrollbackClear: /\x1b\[3J/.test(data),
     // Cursor home - moves cursor to position 1,1 (usually follows clear)
     // Matches \x1b[H and \x1b[;H (both are valid cursor home sequences)
+    // eslint-disable-next-line no-control-regex
     hasCursorHome: /\x1b\[(?:;)?H/.test(data)
   }
 }
