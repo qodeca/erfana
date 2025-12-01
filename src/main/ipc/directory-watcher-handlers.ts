@@ -102,5 +102,35 @@ export function registerDirectoryWatcherHandlers(): void {
     }
   })
 
+  // Start watching .git/index file for external git operations
+  ipcMain.handle('git-index-watch:start', async (event, projectPath: string) => {
+    try {
+      if (!projectPath || typeof projectPath !== 'string') {
+        return { success: false, error: 'Invalid project path' }
+      }
+
+      const webContents = event.sender as WebContents
+      await directoryWatcherService.startGitIndexWatcher(projectPath, webContents)
+
+      return { success: true }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.error('Error starting git index watch:', error)
+      return { success: false, error: errorMessage }
+    }
+  })
+
+  // Stop watching .git/index file
+  ipcMain.handle('git-index-watch:stop', async () => {
+    try {
+      await directoryWatcherService.stopGitIndexWatcher()
+      return { success: true }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.error('Error stopping git index watch:', error)
+      return { success: false, error: errorMessage }
+    }
+  })
+
   console.log('✅ Directory watcher IPC handlers registered')
 }

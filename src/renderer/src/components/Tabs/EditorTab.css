@@ -17,33 +17,33 @@
   height: 41px;
   min-width: 80px;
   max-width: 300px;
-  padding: 0 4px 0 12px;
+  padding: 0 var(--space-2) 0 var(--space-6);
   box-sizing: border-box;
   cursor: pointer;
   user-select: none;
-  gap: 4px;
+  gap: var(--space-2);
   /* Allow flex growth/shrink for Chrome-style sizing */
   flex: 1 1 0;
   overflow: hidden;
   /* Hover indication */
-  transition: background-color 0.1s ease;
+  transition: background-color var(--transition-fast);
 }
 
 /* Hover indication - subtle background change */
 .editor-tab:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--color-bg-hover);
 }
 
 /* Active tab hover - slightly brighter */
 .dv-active-tab .editor-tab:hover {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: var(--color-bg-hover-solid);
 }
 
 /* Label container - holds dirty indicator and filename */
 .editor-tab-label {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-3);
   min-width: 0;
   flex: 1;
   overflow: hidden;
@@ -51,17 +51,17 @@
 
 /* Dirty indicator (filled circle) */
 .editor-tab-dirty-indicator {
-  width: 8px;
-  height: 8px;
-  min-width: 8px;
-  border-radius: 50%;
-  background-color: #cccccc;
+  width: var(--space-4);
+  height: var(--space-4);
+  min-width: var(--space-4);
+  border-radius: var(--border-radius-circle);
+  background-color: var(--color-text-primary);
   flex-shrink: 0;
 }
 
 /* Active tab dirty indicator - brighter */
 .dv-active-tab .editor-tab-dirty-indicator {
-  background-color: #ffffff;
+  background-color: var(--color-white);
 }
 
 /* Filename with truncation */
@@ -69,13 +69,13 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 13px;
-  color: #cccccc;
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
 }
 
 /* Active tab filename - brighter */
 .dv-active-tab .editor-tab-filename {
-  color: #ffffff;
+  color: var(--color-white);
 }
 
 /* Close button - hidden by default, visible on hover */
@@ -83,17 +83,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  min-width: 20px;
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
+  min-width: var(--icon-size-md);
   padding: 0;
   border: none;
-  border-radius: 3px;
+  border-radius: 0;
   background: transparent;
-  color: #858585;
+  color: var(--color-text-secondary);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.1s ease, background-color 0.1s ease, color 0.1s ease;
+  transition: opacity var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
   flex-shrink: 0;
 }
 
@@ -109,18 +109,18 @@
 
 /* Close button hover state */
 .editor-tab-close:hover {
-  background-color: #3c3c3c;
-  color: #cccccc;
+  background-color: var(--color-border-default);
+  color: var(--color-text-primary);
 }
 
 /* Close button active state */
 .editor-tab-close:active {
-  background-color: #505050;
+  background-color: var(--color-gray-600);
 }
 
 /* Close button focus state */
 .editor-tab-close:focus-visible {
-  outline: 1px solid #007acc;
+  outline: 1px solid var(--color-border-focus);
   outline-offset: -1px;
 }
 
@@ -205,6 +205,6 @@
 
 /* Focus state for entire tab (keyboard navigation) */
 .editor-tab:focus-visible {
-  outline: 1px solid #007acc;
+  outline: 1px solid var(--color-border-focus);
   outline-offset: -1px;
 }

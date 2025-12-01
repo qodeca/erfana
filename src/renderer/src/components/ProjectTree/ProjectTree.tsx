@@ -31,6 +31,9 @@ import { useDirectoryWatcher } from '../../hooks/useDirectoryWatcher'
 import { useProjectManagementContext, useProjectChangedEffect } from '../../context/ProjectManagementContext'
 import { useFileOperations } from '../../hooks/useFileOperations'
 import { useImport } from '../../hooks/useImport'
+import { useGitStatus } from '../../hooks/useGitStatus'
+import { GitStatusBar } from './GitStatusBar'
+import { GitErrorBoundary } from './GitErrorBoundary'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -69,6 +72,19 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_fileOperationLoading, setFileOperationLoading] = useState<boolean>(false)
 
+  // Git status hook (auto-refreshes on file changes)
+  // Must be called before useFileOperations so refreshGitStatus is available
+  const {
+    isGitRepo,
+    branch,
+    isDetached,
+    counts,
+    truncated,
+    getFileStatus,
+    getFolderStatus,
+    refresh: refreshGitStatus,
+  } = useGitStatus({ projectPath })
+
   // File operation handlers via hook (only toolbar actions; context menu uses commands)
   const {
     handleNewFile,
@@ -81,7 +97,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     onFileSelect,
     refreshProjectTree: refreshFiles,
     isInternalOperationRef: isInternalOperation,
-    setFileOperationLoading
+    setFileOperationLoading,
+    onGitRefresh: refreshGitStatus
   })
 
   // Context menu state
@@ -482,6 +499,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         return moveResult
       })
 
+      // Refresh git status after successful move (outside watcher pause)
+      refreshGitStatus()
+
       // Show success message with symlink warning if applicable
       if (result.isSymlink) {
         showGlobalToast({
@@ -669,6 +689,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     withWatcherPause: <T,>(op: () => Promise<T>) =>
       withWatcherPause(projectPath, isInternalOperation, setFileOperationLoading, op),
     refreshProjectTree: refreshFiles,
+    onGitRefresh: refreshGitStatus,
     formatFileOperationError,
     getSiblingNames: (nodePath: string, currentName: string) => {
       const parentPath = nodePath.substring(0, nodePath.lastIndexOf('/'))
@@ -808,6 +829,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
               isDragging={activeId === rootFolderNode.path}
               isDropTarget={overId === rootFolderNode.path}
               clipboardCut={clipboard.itemPath === rootFolderNode.path && clipboard.operation === 'cut'}
+              getFileStatus={getFileStatus}
+              getFolderStatus={getFolderStatus}
             />
           ) : (
             <div className="project-tree-empty">
@@ -834,6 +857,17 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
           onClose={handleCloseContextMenu}
         />
       )}
+
+      {/* Git Status Bar (footer) - wrapped in error boundary for resilience */}
+      <GitErrorBoundary>
+        <GitStatusBar
+          isGitRepo={isGitRepo}
+          branch={branch}
+          isDetached={isDetached}
+          counts={counts}
+          truncated={truncated}
+        />
+      </GitErrorBoundary>
 
     </div>
   )

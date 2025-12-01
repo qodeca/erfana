@@ -6,10 +6,20 @@ interface ActivityBarProps {
   side: 'left' | 'right'
   activePanel: string | null
   onPanelClick: (panelId: string) => void
+  projectPath: string | null
 }
 
-export function ActivityBar({ side, activePanel, onPanelClick }: ActivityBarProps) {
-  const panels = getPanelsBySide(side)
+export function ActivityBar({ side, activePanel, onPanelClick, projectPath }: ActivityBarProps) {
+  // Filter panels: hide those requiring a project when no project is loaded
+  const panels = getPanelsBySide(side).filter((panel) => {
+    if (panel.requiresProject && !projectPath) return false
+    return true
+  })
+
+  // Hide entire activity bar if no panels to show
+  if (panels.length === 0) {
+    return null
+  }
 
   return (
     <div className={`activity-bar activity-bar-${side}`}>

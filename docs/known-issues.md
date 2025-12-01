@@ -170,6 +170,22 @@ See: [EPIPE Error Handling Documentation](./epipe-error-handling.md)
 
 ## Active Issues
 
+### Git Status: Global .gitignore Not Supported
+
+**Issue**: Files ignored via global gitignore (`~/.gitignore_global` or `~/.config/git/ignore`) may appear as "untracked" in the Project Tree git status indicators.
+
+**Root Cause**: isomorphic-git only reads local `.gitignore` files. It does not support global gitignore configuration. This is a known limitation of the library.
+
+**Impact**: Low. Most ignore patterns are in the local `.gitignore`. Only users with global patterns will see unexpected "untracked" badges.
+
+**Workaround**: Add patterns to the project's local `.gitignore` file instead of global config.
+
+**Tracking**: https://github.com/isomorphic-git/isomorphic-git/issues/444
+
+**Files**: `src/main/services/GitStatusService.ts`
+
+---
+
 ### node-pty Build Failure
 
 **Issue**: Fails to build on Python 3.13 (missing `distutils`)

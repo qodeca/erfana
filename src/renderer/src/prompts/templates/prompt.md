@@ -4,7 +4,7 @@ subArea: context-menu
 name: Prompt
 icon: sparkles
 targetPanel: terminal
-autoExecute: false
+autoExecute: true
 requiresInput: true
 inputLabel: Enter your prompt
 inputPlaceholder: e.g., summarize in bullet points, translate to Spanish, explain like I'm 5...

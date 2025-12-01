@@ -29,3 +29,10 @@ export function showSuccessToast(title: string, message: string, duration = TOAS
 export function showWarningToast(title: string, message: string, duration = TOAST_DURATION.WARNING): void {
   showGlobalToast({ title, message, type: 'warning', duration })
 }
+
+/**
+ * Show an info toast notification
+ */
+export function showInfoToast(title: string, message: string, duration = TOAST_DURATION.INFO): void {
+  showGlobalToast({ title, message, type: 'info', duration })
+}

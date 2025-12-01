@@ -7,6 +7,7 @@
  * Features:
  * - Keyboard navigation (Arrow Up/Down)
  * - Enter to select, Escape to cancel
+ * - Cmd/Ctrl+C to copy selected file path
  * - Click to select
  * - Shows relative path from project root
  * - VS Code-style design
@@ -71,9 +72,28 @@ export function FilePickerDialog({
     }
   }, [selectedIndex, isOpen])
 
+  // Copy selected file path to clipboard
+  const handleCopyPath = useCallback(async () => {
+    if (candidates[selectedIndex]) {
+      const path = candidates[selectedIndex].path
+      try {
+        await navigator.clipboard.writeText(path)
+      } catch {
+        // Silently fail
+      }
+    }
+  }, [candidates, selectedIndex])
+
   // Keyboard navigation
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // Copy path with Cmd/Ctrl+C
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+        e.preventDefault()
+        handleCopyPath()
+        return
+      }
+
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault()
@@ -95,7 +115,7 @@ export function FilePickerDialog({
           break
       }
     },
-    [candidates, selectedIndex, onSelect, onClose]
+    [candidates, selectedIndex, onSelect, onClose, handleCopyPath]
   )
 
   // Handle item click
