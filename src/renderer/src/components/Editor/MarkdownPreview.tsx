@@ -892,6 +892,32 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       setContextMenu(null)
     }
 
+    // Keyboard shortcut for copy (Cmd/Ctrl+C)
+    useEffect(() => {
+      const handleKeyDown = async (e: KeyboardEvent) => {
+        // Check for Cmd/Ctrl+C
+        if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+          // Only handle if selection exists and is within the preview
+          const sel = window.getSelection()
+          if (sel && sel.toString().trim().length > 0 && previewRef.current) {
+            // Check if selection is within the preview element
+            const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null
+            if (range && previewRef.current.contains(range.commonAncestorContainer)) {
+              e.preventDefault()
+              try {
+                await navigator.clipboard.writeText(sel.toString())
+              } catch {
+                // Silently fail
+              }
+            }
+          }
+        }
+      }
+
+      document.addEventListener('keydown', handleKeyDown)
+      return () => document.removeEventListener('keydown', handleKeyDown)
+    }, [])
+
     return (
       <div className={`markdown-preview ${className}`} ref={previewRef}>
         <div

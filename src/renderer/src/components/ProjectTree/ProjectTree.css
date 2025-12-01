@@ -1,25 +1,27 @@
+/* ProjectTree.css - File explorer sidebar component */
+
 .project-tree {
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: #252526;
-  color: #cccccc;
-  font-size: 13px;
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
 }
 
 .project-tree-path {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px;
-  height: 41px;
+  padding: var(--space-4);
+  height: var(--header-height);
   box-sizing: border-box;
-  font-size: 11px;
-  color: #858585;
-  border-bottom: 1px solid #3c3c3c;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  font-weight: var(--font-semibold);
   text-transform: uppercase;
 }
 
@@ -27,11 +29,9 @@
   flex: 1;
 }
 
-/* .watch-depth removed */
-
 .project-tree-actions {
   display: flex;
-  gap: 4px;
+  gap: var(--space-2);
 }
 
 .icon-btn {
@@ -42,24 +42,24 @@
   border: none;
   cursor: pointer;
   padding: 0;
-  width: 24px;
-  height: 24px;
-  border-radius: 0;
-  color: #858585;
-  transition: all 0.15s ease;
+  width: var(--icon-size-lg);
+  height: var(--icon-size-lg);
+  border-radius: var(--border-radius);
+  color: var(--color-text-secondary);
+  transition: all var(--transition-normal);
 }
 
 .icon-btn:hover:not(:disabled) {
-  color: #cccccc;
-  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
 }
 
 .icon-btn:active:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-hover-solid);
 }
 
 .icon-btn:disabled {
-  opacity: 0.5;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 
@@ -77,26 +77,26 @@
 }
 
 .project-tree-error {
-  padding: 8px;
-  background-color: #5a1d1d;
-  color: #f48771;
-  font-size: 12px;
-  margin: 8px;
-  border-radius: 0;
+  padding: var(--space-4);
+  background-color: var(--color-error-bg);
+  color: var(--color-error);
+  font-size: var(--text-sm);
+  margin: var(--space-4);
+  border-radius: var(--border-radius);
 }
 
 .project-tree-content {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 10px;
+  padding: var(--space-5);
 }
 
 .project-tree-empty {
-  padding: 20px;
+  padding: var(--space-10);
   text-align: center;
-  color: #858585;
-  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
 }
 
 .project-tree-node {
@@ -106,7 +106,7 @@
 .project-tree-item {
   display: flex;
   align-items: center;
-  padding: 4px 8px;
+  padding: var(--space-2) var(--space-4);
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -114,7 +114,7 @@
 }
 
 .project-tree-item:hover {
-  background-color: #2a2d2e;
+  background-color: var(--color-bg-hover-solid);
 }
 
 .project-tree-item.file {
@@ -122,50 +122,56 @@
 }
 
 .project-tree-item.directory {
-  font-weight: 500;
+  font-weight: var(--font-medium);
 }
 
 .project-tree-item.selected {
-  background-color: #094771;
-  border-left: 2px solid #0e639c;
+  background-color: var(--color-bg-selected);
+  border-left: var(--border-width-thick) solid var(--color-brand-lime);
 }
 
 .file-icon {
-  margin-right: 6px;
+  margin-right: var(--space-3);
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #cccccc;
+  color: var(--color-text-primary);
 }
 
 .file-icon svg {
-  width: 16px;
-  height: 16px;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+}
+
+/* Markdown file icon - brand violet */
+.file-icon.markdown {
+  color: var(--color-brand-violet);
 }
 
 .file-name {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--color-text-emphasis);
 }
 
 .file-name.markdown {
-  color: #4ec9b0;
-  font-weight: 500;
+  color: var(--color-text-emphasis);
+  font-weight: var(--font-medium);
 }
 
 /* Sensitive files - amber color with warning */
 .file-name.sensitive {
-  color: #f59e0b;
-  font-weight: 500;
+  color: var(--color-warning-bright);
+  font-weight: var(--font-medium);
 }
 
 .sensitive-icon {
-  color: #f59e0b;
-  margin-right: 4px;
+  color: var(--color-warning-bright);
+  margin-right: var(--space-2);
   vertical-align: middle;
   display: inline-flex;
   align-items: center;
@@ -193,32 +199,32 @@
 
 /* Scrollbar styling */
 .project-tree-content::-webkit-scrollbar {
-  width: 10px;
+  width: var(--scrollbar-width);
 }
 
 .project-tree-content::-webkit-scrollbar-track {
-  background: #1e1e1e;
+  background: var(--scrollbar-track);
 }
 
 .project-tree-content::-webkit-scrollbar-thumb {
-  background: #424242;
-  border-radius: 0;
+  background: var(--scrollbar-thumb);
+  border-radius: var(--border-radius);
 }
 
 .project-tree-content::-webkit-scrollbar-thumb:hover {
-  background: #4e4e4e;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* Project Control Panel */
 .project-control-panel {
-  background: #252525;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  background: var(--color-bg-tertiary);
+  border-bottom: var(--border-width) solid var(--color-bg-active);
+  font-family: var(--font-sans);
 }
 
 .control-panel-content {
-  padding: 16px 16px 16px 16px;
-  animation: slideDown 0.2s ease;
+  padding: var(--space-8);
+  animation: slideDown var(--transition-slow);
 }
 
 @keyframes slideDown {
@@ -235,20 +241,20 @@
 .control-panel-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-4);
 }
 
 .control-panel-label {
-  font-size: 10px;
-  font-weight: 600;
-  color: #858585;
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .filter-options {
   display: flex;
-  gap: 8px;
+  gap: var(--space-4);
 }
 
 .filter-option {
@@ -256,32 +262,32 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 0;
-  color: #cccccc;
-  font-size: 11px;
-  font-weight: 500;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  background: var(--color-bg-hover);
+  border: var(--border-width) solid var(--color-bg-active);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--transition-normal);
 }
 
 .filter-option:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--color-bg-hover-solid);
+  border-color: var(--color-bg-active);
 }
 
 .filter-option.active {
-  background: rgba(79, 193, 255, 0.15);
-  border-color: rgba(79, 193, 255, 0.3);
-  color: #4fc1ff;
+  background: var(--color-accent-drag-bg);
+  border-color: var(--color-accent-drag-border);
+  color: var(--color-accent-drag);
 }
 
 .filter-option.active:hover {
-  background: rgba(79, 193, 255, 0.25);
-  border-color: rgba(79, 193, 255, 0.4);
+  background: var(--color-brand-violet-muted);
+  border-color: var(--color-accent-drag);
 }
 
 /* ===================================================================
@@ -290,7 +296,7 @@
 
 /* Dragging state - dim the original item */
 .project-tree-item[data-dragging="true"] {
-  opacity: 0.4;
+  opacity: var(--opacity-disabled);
   cursor: grabbing !important;
 }
 
@@ -306,22 +312,22 @@
 /* VS Code-style folder highlighting during drag */
 /* Highlight the folder row when it's a drop target */
 .project-tree-item[data-drop-target="true"].directory {
-  background-color: rgba(79, 193, 255, 0.2);
-  border-radius: 4px;
+  background-color: var(--color-accent-drag-bg);
+  border-radius: var(--border-radius);
   position: relative;
 }
 
 /* Folder highlighting during drag (auto-expand countdown) */
 .project-tree-node[data-drop-highlight="true"] > .project-tree-item.directory {
-  background-color: rgba(79, 193, 255, 0.2);
-  border-radius: 4px;
+  background-color: var(--color-accent-drag-bg);
+  border-radius: var(--border-radius);
 }
 
 /* Highlight the children area for expanded folders */
 .project-tree-node[data-drop-highlight="true"] > .project-tree-children {
   position: relative;
-  background-color: rgba(79, 193, 255, 0.05);
-  border-radius: 0 0 4px 0;
+  background-color: var(--color-accent-drag-bg-subtle);
+  border-radius: var(--border-radius);
 }
 
 /* Visual left border using pseudo-element (no layout shift) */
@@ -331,14 +337,14 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 2px;
-  background-color: rgba(79, 193, 255, 0.3);
+  width: var(--border-width-thick);
+  background-color: var(--color-accent-drag-border);
 }
 
 /* Invalid drop target (e.g., trying to move folder into itself) */
 .project-tree-item[data-drop-invalid="true"] {
-  background-color: rgba(244, 135, 113, 0.2);
-  border-radius: 4px;
+  background-color: var(--color-error-bg);
+  border-radius: var(--border-radius);
   cursor: not-allowed;
 }
 
@@ -354,11 +360,11 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: 1px;
+  height: var(--border-width);
   background: repeating-linear-gradient(
     90deg,
-    #858585,
-    #858585 4px,
+    var(--color-text-secondary),
+    var(--color-text-secondary) 4px,
     transparent 4px,
     transparent 8px
   );
@@ -366,18 +372,18 @@
 
 /* Drag overlay (ghost element) */
 .drag-overlay {
-  background: #252526;
-  border: 1px solid #4fc1ff;
-  border-radius: 4px;
-  padding: 4px 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  background: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-accent-drag);
+  border-radius: var(--border-radius);
+  padding: var(--space-2) var(--space-4);
+  box-shadow: var(--shadow-md);
   cursor: grabbing;
   opacity: 0.95;
 }
 
 .drag-overlay .file-name {
-  color: #cccccc;
-  font-weight: 500;
+  color: var(--color-text-primary);
+  font-weight: var(--font-medium);
 }
 
 /* ARIA live region for drag announcements */
@@ -387,4 +393,201 @@
   width: 1px;
   height: 1px;
   overflow: hidden;
+}
+
+/* ===================================================================
+   Git Status Indicators
+   =================================================================== */
+
+/* Git status badge - letter indicator for files */
+.git-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--space-7);
+  height: var(--space-7);
+  padding: 0 var(--space-1);
+  margin-left: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  border-radius: var(--border-radius);
+  flex-shrink: 0;
+}
+
+/* Git status dot - colored indicator for folders */
+/* Must match badge dimensions for horizontal alignment */
+.git-status-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--space-7);
+  height: var(--space-7);
+  margin-left: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* The actual dot - centered within the container */
+.git-status-dot::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: var(--border-radius-circle);
+}
+
+/* Status color variants - badge background and text */
+.git-status-badge[data-git-status="modified"] {
+  background-color: var(--color-git-modified-light);
+  color: var(--color-bg-primary);
+}
+
+.git-status-badge[data-git-status="untracked"] {
+  background-color: var(--color-git-untracked-light);
+  color: var(--color-bg-primary);
+}
+
+.git-status-badge[data-git-status="deleted"] {
+  background-color: var(--color-git-deleted-light);
+  color: var(--color-bg-primary);
+}
+
+.git-status-badge[data-git-status="staged"] {
+  background-color: var(--color-git-staged-light);
+  color: var(--color-bg-primary);
+}
+
+.git-status-badge[data-git-status="renamed"] {
+  background-color: var(--color-git-renamed-light);
+  color: var(--color-bg-primary);
+}
+
+.git-status-badge[data-git-status="conflicted"] {
+  background-color: var(--color-git-conflicted-light);
+  color: var(--color-bg-primary);
+}
+
+/* Status color variants - dot background (via ::before pseudo-element) */
+.git-status-dot[data-git-status="modified"]::before {
+  background-color: var(--color-git-modified);
+}
+
+.git-status-dot[data-git-status="untracked"]::before {
+  background-color: var(--color-git-untracked);
+}
+
+.git-status-dot[data-git-status="deleted"]::before {
+  background-color: var(--color-git-deleted);
+}
+
+.git-status-dot[data-git-status="staged"]::before {
+  background-color: var(--color-git-staged);
+}
+
+.git-status-dot[data-git-status="renamed"]::before {
+  background-color: var(--color-git-renamed);
+}
+
+.git-status-dot[data-git-status="conflicted"]::before {
+  background-color: var(--color-git-conflicted);
+}
+
+/* File name color override for git status */
+.file-name[data-git-status="modified"] {
+  color: var(--color-git-modified-light);
+}
+
+.file-name[data-git-status="untracked"] {
+  color: var(--color-git-untracked-light);
+}
+
+.file-name[data-git-status="deleted"] {
+  color: var(--color-git-deleted-light);
+}
+
+.file-name[data-git-status="staged"] {
+  color: var(--color-git-staged-light);
+}
+
+.file-name[data-git-status="renamed"] {
+  color: var(--color-git-renamed-light);
+}
+
+.file-name[data-git-status="conflicted"] {
+  color: var(--color-git-conflicted-light);
+}
+
+/* ===================================================================
+   Git Status Bar (Footer)
+   =================================================================== */
+
+.git-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  height: var(--header-height);
+  box-sizing: border-box;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-tertiary);
+  border-top: var(--border-width) solid var(--color-border-default);
+}
+
+/* Branch section (left) */
+.git-branch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--font-medium);
+  flex: 1 1 auto;
+}
+
+/* Counts section (right) */
+.git-counts {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+.git-count-item {
+  font-weight: var(--font-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Count item colors - match git status colors */
+.git-count-item[data-git-status="modified"] {
+  color: var(--color-git-modified-light);
+}
+
+.git-count-item[data-git-status="untracked"] {
+  color: var(--color-git-untracked-light);
+}
+
+.git-count-item[data-git-status="deleted"] {
+  color: var(--color-git-deleted-light);
+}
+
+.git-count-item[data-git-status="staged"] {
+  color: var(--color-git-staged-light);
+}
+
+.git-count-item[data-git-status="conflicted"] {
+  color: var(--color-git-conflicted-light);
+}
+
+.git-count-clean {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.git-truncated-warning {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-warning);
+}
+
+/* Refresh button (right) */
+.git-refresh {
+  flex: 0 0 auto;
 }

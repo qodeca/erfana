@@ -99,6 +99,8 @@ export interface MenuContext {
   api: IProjectTreeApi['file']
   withWatcherPause: <T>(op: () => Promise<T>) => Promise<T>
   refreshProjectTree: () => Promise<void>
+  /** Callback to refresh git status after file operations */
+  onGitRefresh?: () => void
   formatFileOperationError: (
     error: unknown,
     op: 'rename' | 'paste' | 'move' | 'delete' | 'create'

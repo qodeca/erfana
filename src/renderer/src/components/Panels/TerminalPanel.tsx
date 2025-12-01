@@ -16,8 +16,9 @@ import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import { useProjectStore } from '../../stores/useProjectStore'
-import { showGlobalToast } from '../Toast/toastService'
+import { showWarningToast } from '../../utils/toastHelpers'
 import { useScrollAnomalyRecovery } from '../../hooks/useScrollAnomalyRecovery'
+import { useTerminalParserHooks } from '../../hooks/useTerminalParserHooks'
 import { useTerminalClipboard } from '../../hooks/useTerminalClipboard'
 import { useTerminalFileLinks } from '../../hooks/useTerminalFileLinks'
 import { useFilePicker } from '../../hooks/useFilePicker'
@@ -44,6 +45,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const visibilityObserverRef = useRef<ResizeObserver | null>(null)
   const warmupUntilRef = useRef<number>(0)
   const contextMenuHandlerRef = useRef<((e: MouseEvent) => void) | null>(null)
+  const parserDisposablesRef = useRef<{ dispose: () => void }[]>([])
   const [projectPath, setProjectPath] = useState<string | null>(null)
 
   // Terminal store for cross-component communication
@@ -52,23 +54,38 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // Project store for file opening functionality (issue #26)
   const dockviewApi = useProjectStore((state) => state.dockviewApi)
 
-  // Auto-recovery for Claude Code scroll anomalies (issue #12)
-  // Detects unexpected scroll-to-top during streaming and auto-recovers
-  const { wrapOnDataHandler } = useScrollAnomalyRecovery(xtermRef, terminalRef, {
+  // Parser hooks for same-frame scroll preservation (primary recovery mechanism)
+  // Intercepts ED 2/3 sequences BEFORE they affect viewport, restores via microtask
+  // Must be declared first to get parserHandledRef for scroll recovery coordination
+  const { registerHooks, parserHandledRef } = useTerminalParserHooks({
     enabled: true,
-    onRecovery: () => {
-      console.debug('[ScrollRecovery] Auto-recovered from anomalous scroll-to-top')
+    onIntercept: (type) => {
+      console.debug(`[ParserHooks] Intercepted ${type}, restoring scroll position`)
     }
   })
 
+  // Auto-recovery for Claude Code scroll anomalies (issue #12, #22)
+  // Issue #22 Enhanced: Multiple detection signals for faster, smarter recovery
+  // - Escape sequence detection: Detects \x1b[2J, \x1b[3J BEFORE write
+  // - Buffer truncation detection: Detects when baseY shrinks significantly
+  // - Fast recovery interval: 50ms (reduced from 100ms for faster fallback)
+  // - Smart recovery target: Restore reading position, not just scroll to bottom
+  // Parser hooks handle primary recovery; this interval is now a fallback
+  const { wrapOnDataHandler, resetAll } = useScrollAnomalyRecovery(
+    xtermRef,
+    terminalRef,
+    {
+      onRecovery: (count) => {
+        console.debug(`[ScrollRecovery] Fallback recovery from ${count} anomalous scroll event(s)`)
+      },
+      parserHandledRef // Coordinate with parser hooks to avoid double-recovery
+    }
+  )
+
   // Clipboard support for copy/paste operations (issue #28)
   const { hasSelection, copy, paste, handleKeyEvent } = useTerminalClipboard(xtermRef, {
-    onCopy: () => {
-      showGlobalToast({ type: 'info', title: 'Copied', message: 'Text copied to clipboard' })
-    },
     onError: (error) => {
       console.warn('Clipboard operation failed:', error)
-      showGlobalToast({ type: 'warning', title: 'Clipboard Error', message: error.message })
     }
   })
 
@@ -91,11 +108,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const handleFileOpen = useCallback((filePath: string, line?: number, column?: number) => {
     if (!dockviewApi) {
       console.warn('Cannot open file: dockviewApi not available')
-      showGlobalToast({
-        type: 'warning',
-        title: 'Editor Not Ready',
-        message: 'Cannot open file - editor not available'
-      })
+      showWarningToast('Editor not ready', 'Cannot open file - editor not available')
       return
     }
 
@@ -196,10 +209,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     const cmd = 'npm rebuild node-pty --build-from-source'
     try {
       await navigator.clipboard.writeText(cmd)
-      showGlobalToast({ type: 'info', title: 'Copied', message: 'Fix command copied to clipboard.' })
     } catch (e) {
       console.warn('Clipboard write failed:', e)
-      showGlobalToast({ type: 'warning', title: 'Copy Failed', message: cmd })
     }
   }
 
@@ -284,6 +295,11 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
       // Open terminal in DOM
       xterm.open(terminalRef.current!)
+
+      // Register parser hooks for same-frame scroll preservation
+      // Must be after open() when parser API is available
+      const parserDisposables = registerHooks(xterm)
+      parserDisposablesRef.current = parserDisposables
 
       // Attach clipboard key handler (issue #28)
       xterm.attachCustomKeyEventHandler(handleKeyEvent)
@@ -420,6 +436,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         window.api.terminal.kill(terminalIdRef.current)
         setActiveTerminalId(null)
       }
+      // Cleanup parser hooks before disposing xterm
+      parserDisposablesRef.current.forEach((d) => d.dispose())
+      parserDisposablesRef.current = []
       // Cleanup context menu handler before disposing xterm
       if (xtermRef.current?.element && contextMenuHandlerRef.current) {
         xtermRef.current.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
@@ -445,6 +464,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         await window.api.terminal.kill(terminalIdRef.current)
         setActiveTerminalId(null)
       }
+      // Cleanup parser hooks before disposing xterm
+      parserDisposablesRef.current.forEach((d) => d.dispose())
+      parserDisposablesRef.current = []
       // Cleanup context menu handler before disposing xterm
       if (xtermRef.current?.element && contextMenuHandlerRef.current) {
         xtermRef.current.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
@@ -470,9 +492,12 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   useEffect(() => {
     if (!terminalId) return
 
-    // Wrap data handler with scroll anomaly detection (issue #12)
-    // This detects Claude Code's Ink library scroll-to-top anomalies and auto-recovers
-    const wrappedDataHandler = wrapOnDataHandler((data: { terminalId: string; data: string }) => {
+    // Issue #22 Enhanced: Single handler with automatic anomaly detection
+    // The wrapOnDataHandler adds all detection signals:
+    // - Escape sequence detection (ED 2, ED 3) BEFORE write
+    // - Buffer truncation detection AFTER write
+    // - Smart recovery targeting user's reading position
+    const dataHandler = wrapOnDataHandler((data: { terminalId: string; data: string }) => {
       if (data.terminalId === terminalId && xtermRef.current) {
         // Write data to terminal
         xtermRef.current.write(data.data)
@@ -484,7 +509,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }
     })
 
-    const unsubscribeData = window.api.terminal.onData(wrappedDataHandler)
+    const unsubscribeData = window.api.terminal.onData(dataHandler)
 
     const unsubscribeExit = window.api.terminal.onExit((data) => {
       if (data.terminalId === terminalId) {
@@ -559,6 +584,11 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
     return () => resizeObserver.disconnect()
   }, [terminalId])
+
+  // Issue #22 Enhanced: Reset scroll recovery state on terminal change (project switch)
+  useEffect(() => {
+    resetAll()
+  }, [terminalId, resetAll])
 
   // Subscribe to portal refit requests (for DiagramViewer integration)
   useEffect(() => {
@@ -662,28 +692,44 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }, [])
 
+  // Ref to track hasSelection for use in callbacks without causing re-renders
+  // This prevents infinite loop: hasSelection state change → effect re-run → registerTerminalControls → context update → re-render
+  const hasSelectionRef = useRef(hasSelection)
+  useEffect(() => {
+    hasSelectionRef.current = hasSelection
+  }, [hasSelection])
+
+  // Extract stable callback functions from context to avoid infinite loop
+  // When terminalControls state changes in provider, portalContext object gets new reference,
+  // but these individual callbacks are stable (wrapped in useCallback with empty deps)
+  const registerTerminalControls = portalContext?.registerTerminalControls
+  const unregisterTerminalControls = portalContext?.unregisterTerminalControls
+  const closeTerminalContextMenu = portalContext?.closeTerminalContextMenu
+
   // Register terminal controls with portal context (issue #37)
   // Allows ChatBubble to access scroll/restart functions
+  // CRITICAL: Use stable callback refs, NOT portalContext object, to avoid infinite loop
+  // See: https://stackoverflow.com/questions/57853288/react-warning-maximum-update-depth-exceeded
   useEffect(() => {
-    if (!portalContext || !terminalId) return
+    if (!registerTerminalControls || !unregisterTerminalControls || !terminalId) return
 
-    portalContext.registerTerminalControls({
+    registerTerminalControls({
       scrollToBottom: handleScrollToBottom,
       restart: handleRestartTerminal,
       copy,
       paste,
-      hasSelection: () => hasSelection
+      hasSelection: () => hasSelectionRef.current  // Use ref to avoid re-registration on selection change
     })
 
     return () => {
-      portalContext.unregisterTerminalControls()
+      unregisterTerminalControls()
     }
-  }, [portalContext, terminalId, handleScrollToBottom, handleRestartTerminal, copy, paste, hasSelection])
+  }, [registerTerminalControls, unregisterTerminalControls, terminalId, handleScrollToBottom, handleRestartTerminal, copy, paste])
 
-  // Context menu close handler - uses portal context for global support
+  // Context menu close handler - uses stable callback ref
   const handleCloseContextMenu = useCallback(() => {
-    portalContext?.closeTerminalContextMenu()
-  }, [portalContext])
+    closeTerminalContextMenu?.()
+  }, [closeTerminalContextMenu])
 
   // Render terminal panel inside mainContainer shell
   // The useLayoutEffect above will move terminalPanelRef.current between containers
@@ -705,14 +751,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                 <button
                   className="icon-btn"
                   onClick={handleScrollToBottom}
-                  title="Scroll to Bottom"
+                  title="Scroll to bottom"
                 >
                   <ArrowDownToLine size={14} />
                 </button>
                 <button
                   className="icon-btn"
                   onClick={handleRestartTerminal}
-                  title="Restart Terminal"
+                  title="Restart terminal"
                 >
                   <RotateCw size={14} />
                 </button>

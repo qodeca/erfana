@@ -71,12 +71,11 @@ describe('Existing Commands - Regression Tests', () => {
       expect(modify?.requiresInput).toBe(true)
     })
 
-    it('should have autoExecute disabled (security: user input)', () => {
-      // Security fix: autoExecute disabled for templates with user input
-      // to prevent command injection (e.g., "make concise; rm -rf ~/")
+    it('should have autoExecute enabled', () => {
+      // autoExecute enabled for all prompts (v0.5.3+)
       const modify = getPrompt('modify')
 
-      expect(modify?.autoExecute).toBe(false)
+      expect(modify?.autoExecute).toBe(true)
     })
 
     it('should have correct inputLabel about modification', () => {
@@ -129,11 +128,11 @@ describe('Existing Commands - Regression Tests', () => {
       expect(ask?.requiresInput).toBe(true)
     })
 
-    it('should have autoExecute disabled (security: user input)', () => {
-      // Security fix: autoExecute disabled for templates with user input
+    it('should have autoExecute enabled', () => {
+      // autoExecute enabled for all prompts (v0.5.3+)
       const ask = getPrompt('ask')
 
-      expect(ask?.autoExecute).toBe(false)
+      expect(ask?.autoExecute).toBe(true)
     })
 
     it('should have correct inputLabel about asking questions', () => {
@@ -258,19 +257,13 @@ describe('Existing Commands - Regression Tests', () => {
     })
   })
 
-  describe('AutoExecute Behavior - Security', () => {
-    it('should have autoExecute=true only for prompts without user input', () => {
+  describe('AutoExecute Behavior', () => {
+    it('should have autoExecute=true for all prompts (v0.5.3+)', () => {
       const prompts = getPromptsForArea('markdown-preview', 'context-menu')
 
-      // Security fix: Only prompts without user input have autoExecute=true
-      // Elaborate: no user input → autoExecute=true
-      // Modify, Ask, Prompt: have user input → autoExecute=false
+      // v0.5.3+: autoExecute enabled for all prompts
       prompts.forEach((prompt) => {
-        if (prompt.requiresInput) {
-          expect(prompt.autoExecute).toBe(false)
-        } else {
-          expect(prompt.autoExecute).toBe(true)
-        }
+        expect(prompt.autoExecute).toBe(true)
       })
     })
 

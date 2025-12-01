@@ -61,6 +61,12 @@ export interface IUseFileOperationsOptions {
    * Loading state setter for file operations
    */
   setFileOperationLoading: (loading: boolean) => void
+
+  /**
+   * Optional callback to refresh git status after file operations
+   * Triggers git status update to show badges on new/modified files
+   */
+  onGitRefresh?: () => void
 }
 
 /**

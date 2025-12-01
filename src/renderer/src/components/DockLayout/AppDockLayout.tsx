@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import {
   DockviewReact,
   DockviewReadyEvent,
@@ -22,6 +22,7 @@ import { ActivityBar } from '../ActivityBar/ActivityBar'
 import { useActivityBarStore } from '../../stores/useActivityBarStore'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { getPanelById } from '../ActivityBar/activityBarConfig'
+import { useProjectManagementContext } from '../../context/ProjectManagementContext'
 
 // ============================================================================
 // LEFT SIDEBAR PANEL - Project Panel
@@ -104,6 +105,10 @@ const MIN_SIZES = {
 export function AppDockLayout() {
   const splitviewApiRef = useRef<SplitviewApi | null>(null)
   const dockviewApiRef = useRef<DockviewApi | null>(null)
+  const terminalResizeDisposeRef = useRef<(() => void) | null>(null)
+
+  // Track when splitview API is ready to trigger terminal panel effect
+  const [isSplitviewReady, setIsSplitviewReady] = useState(false)
 
   // Use Zustand store for activity bar state
   const {
@@ -115,6 +120,9 @@ export function AppDockLayout() {
     setSidebarWidth,
     setActivePanel
   } = useActivityBarStore()
+
+  // Get project path from context to control terminal availability
+  const { projectPath } = useProjectManagementContext()
 
   const onSplitviewReady = (event: SplitviewReadyEvent) => {
     splitviewApiRef.current = event.api
@@ -151,25 +159,16 @@ export function AppDockLayout() {
       }
     })
 
-    // RIGHT PANEL - Terminal
-    const terminalPanel = event.api.addPanel({
-      id: 'terminal-panel',
-      component: 'terminalPanel',
-      minimumSize: MIN_SIZES.rightSidebar,
-      maximumSize: 1200
-    })
+    // RIGHT PANEL - Terminal (only added when project is loaded)
+    // Panel is dynamically added/removed based on projectPath in useEffect below
 
     // Set initial sizes
     leftPanel.api.setSize({ size: leftWidth })
-    terminalPanel.api.setSize({ size: rightWidth })
 
-    // Set initial visibility based on rightActivePanel
+    // Set initial visibility based on leftActivePanel
     if (leftActivePanel === null) {
       leftPanel.api.setVisible(false)
     }
-
-    // Only show the active right panel
-    terminalPanel.api.setVisible(rightActivePanel === 'terminal')
 
     // Listen to resize events
     const disposeLeft = leftPanel.api.onDidSizeChange(() => {
@@ -178,67 +177,99 @@ export function AppDockLayout() {
       setSidebarWidth(newWidth, 'left')
     })
 
-    const disposeTerminal = terminalPanel.api.onDidSizeChange(() => {
-      const newWidth = terminalPanel.api.width
-      console.log(`📏 Terminal panel resized: ${newWidth}px`)
-      setSidebarWidth(newWidth, 'right')
-    })
-
-    // Copilot panel removed
-
     // Cleanup
     return () => {
       disposeLeft.dispose()
-      disposeTerminal.dispose()
     }
+  }
+
+  // Signal that splitview API is ready (triggers terminal panel effect)
+  const handleSplitviewReady = (event: SplitviewReadyEvent) => {
+    onSplitviewReady(event)
+    setIsSplitviewReady(true)
   }
 
   // Handle activity bar panel clicks
-  const handleActivityBarClick = (panelId: string, side: 'left' | 'right') => {
-    if (!splitviewApiRef.current) {
-      console.warn('SplitView API not ready')
-      return
-    }
+  const handleActivityBarClick = useCallback(
+    (panelId: string, side: 'left' | 'right') => {
+      if (!splitviewApiRef.current) {
+        console.warn('SplitView API not ready')
+        return
+      }
 
-    const panelConfig = getPanelById(panelId)
-    if (!panelConfig) return
+      const panelConfig = getPanelById(panelId)
+      if (!panelConfig) return
 
-    if (side === 'left') {
-      // Left sidebar: simple toggle
-      const panel = splitviewApiRef.current.getPanel('left-sidebar')
-      if (!panel) return
+      if (side === 'left') {
+        // Left sidebar: simple toggle
+        const panel = splitviewApiRef.current.getPanel('left-sidebar')
+        if (!panel) return
 
-      const shouldShow = leftActivePanel !== panelId
-      panel.api.setVisible(shouldShow)
-      togglePanel(panelId, side)
-    } else {
-      // Right sidebar: only Terminal panel remains
-      const terminalPanel = splitviewApiRef.current.getPanel('terminal-panel')
-      if (!terminalPanel) return
-
-      const currentActive = rightActivePanel
-      if (currentActive === panelId) {
-        terminalPanel.api.setVisible(false)
+        const shouldShow = leftActivePanel !== panelId
+        panel.api.setVisible(shouldShow)
         togglePanel(panelId, side)
       } else {
-        terminalPanel.api.setVisible(false)
-        if (panelId === 'terminal') {
-          terminalPanel.api.setVisible(true)
+        // Right sidebar: only Terminal panel remains
+        const terminalPanel = splitviewApiRef.current.getPanel('terminal-panel')
+        if (!terminalPanel) return
+
+        const currentActive = rightActivePanel
+        if (currentActive === panelId) {
+          terminalPanel.api.setVisible(false)
+          togglePanel(panelId, side)
+        } else {
+          terminalPanel.api.setVisible(false)
+          if (panelId === 'terminal') {
+            terminalPanel.api.setVisible(true)
+          }
+          togglePanel(panelId, side)
         }
-        togglePanel(panelId, side)
+      }
+    },
+    [leftActivePanel, rightActivePanel, togglePanel]
+  )
+
+  // Dynamically add/remove terminal panel based on projectPath
+  // This ensures the sash (resize handle) is also hidden when no project is loaded
+  useEffect(() => {
+    if (!isSplitviewReady || !splitviewApiRef.current) return
+
+    const existingPanel = splitviewApiRef.current.getPanel('terminal-panel')
+
+    if (projectPath) {
+      // Add terminal panel if project is loaded and panel doesn't exist
+      if (!existingPanel) {
+        const terminalPanel = splitviewApiRef.current.addPanel({
+          id: 'terminal-panel',
+          component: 'terminalPanel',
+          minimumSize: MIN_SIZES.rightSidebar,
+          maximumSize: 1200
+        })
+        terminalPanel.api.setSize({ size: rightWidth })
+        terminalPanel.api.setVisible(rightActivePanel === 'terminal')
+
+        // Listen to resize events for the new panel
+        // Store dispose function for cleanup
+        const dispose = terminalPanel.api.onDidSizeChange(() => {
+          const newWidth = terminalPanel.api.width
+          console.log(`📏 Terminal panel resized: ${newWidth}px`)
+          setSidebarWidth(newWidth, 'right')
+        })
+        terminalResizeDisposeRef.current = dispose.dispose
+      } else {
+        // Panel exists, just update visibility
+        existingPanel.api.setVisible(rightActivePanel === 'terminal')
+      }
+    } else {
+      // Remove terminal panel if no project loaded
+      if (existingPanel) {
+        // Dispose resize listener before removing panel
+        terminalResizeDisposeRef.current?.()
+        terminalResizeDisposeRef.current = null
+        splitviewApiRef.current.removePanel(existingPanel)
       }
     }
-  }
-
-  // Watch for programmatic panel changes (e.g., from context menu)
-  useEffect(() => {
-    if (!splitviewApiRef.current) return
-
-    const terminalPanel = splitviewApiRef.current.getPanel('terminal-panel')
-    if (!terminalPanel) return
-    // Update visibility based on rightActivePanel
-    terminalPanel.api.setVisible(rightActivePanel === 'terminal')
-  }, [rightActivePanel])
+  }, [isSplitviewReady, projectPath, rightActivePanel, rightWidth, setSidebarWidth])
 
   // Sanitize persisted state: remove legacy 'git'/'claude' active panel if present
   useEffect(() => {
@@ -269,9 +300,10 @@ export function AppDockLayout() {
         handleActivityBarClick('project', 'left')
       }
 
-      // Cmd/Ctrl + J - Toggle Terminal
+      // Cmd/Ctrl + J - Toggle Terminal (only when project is loaded)
       if (modKey && e.key === 'j' && !e.shiftKey && !e.altKey) {
         e.preventDefault()
+        if (!projectPath) return // Terminal requires a project
         handleActivityBarClick('terminal', 'right')
       }
 
@@ -280,7 +312,7 @@ export function AppDockLayout() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [leftActivePanel, rightActivePanel])
+  }, [handleActivityBarClick, projectPath])
 
   // Splitview components registry
   const splitviewComponents = {
@@ -295,11 +327,12 @@ export function AppDockLayout() {
         side="left"
         activePanel={leftActivePanel}
         onPanelClick={(panelId) => handleActivityBarClick(panelId, 'left')}
+        projectPath={projectPath}
       />
       <div className="app-dock-content">
         <SplitviewReact
           components={splitviewComponents}
-          onReady={onSplitviewReady}
+          onReady={handleSplitviewReady}
           className="dockview-theme-dark"
           orientation={Orientation.HORIZONTAL}
         />
@@ -308,6 +341,7 @@ export function AppDockLayout() {
         side="right"
         activePanel={rightActivePanel}
         onPanelClick={(panelId) => handleActivityBarClick(panelId, 'right')}
+        projectPath={projectPath}
       />
     </div>
   )

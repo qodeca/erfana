@@ -1,6 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Info, MessageSquare } from 'lucide-react'
 import { BaseDialog } from './BaseDialog'
+import { TextareaContextMenu } from '../ContextMenu/TextareaContextMenu'
+import { CharacterCount } from '../shared'
+import { validateTextInput } from '../../utils/textInputValidation'
+import { TEXT_INPUT_LIMITS } from '../../../../shared/constants'
 import type { PromptDialogConfig } from './types'
 
 interface PromptDialogProps {
@@ -45,14 +49,16 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
     inputLabel = 'Your input:',
     inputPlaceholder = '',
     defaultValue = '',
-    maxLength = 2000,
-    minLength = 3,
+    maxLength = TEXT_INPUT_LIMITS.MAX_LENGTH,
+    minLength = TEXT_INPUT_LIMITS.MIN_LENGTH,
     validation
   } = config
 
   const [inputValue, setInputValue] = useState(defaultValue)
   const [validationError, setValidationError] = useState<string | null>(null)
   const [showTooltip, setShowTooltip] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const [hasSelection, setHasSelection] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Generate unique IDs for ARIA attributes
@@ -66,35 +72,28 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
     }
   }, [])
 
-  // Validate input - wrapped in useCallback for stable reference
+  // Memoized validation result using shared validation utility
+  const validationResult = useMemo(() => {
+    return validateTextInput(inputValue, {
+      minLength,
+      maxLength,
+      warningThreshold: TEXT_INPUT_LIMITS.WARNING_THRESHOLD,
+      customValidation: validation
+    })
+  }, [inputValue, minLength, maxLength, validation])
+
+  // Validate input for submit - updates validation error state
   const validateInput = useCallback((value: string): boolean => {
-    const trimmed = value.trim()
+    const result = validateTextInput(value, {
+      minLength,
+      maxLength,
+      warningThreshold: TEXT_INPUT_LIMITS.WARNING_THRESHOLD,
+      customValidation: validation
+    })
 
-    // Check min length
-    if (trimmed.length < minLength) {
-      setValidationError(`Minimum ${minLength} characters required`)
+    if (!result.canSubmit) {
+      setValidationError(result.message)
       return false
-    }
-
-    // Check max length
-    if (trimmed.length > maxLength) {
-      setValidationError(`Maximum ${maxLength} characters allowed`)
-      return false
-    }
-
-    // Custom validation
-    if (validation) {
-      const result = validation(trimmed)
-      if (result === true) {
-        setValidationError(null)
-        return true
-      } else if (typeof result === 'string') {
-        setValidationError(result)
-        return false
-      } else {
-        setValidationError('Invalid input')
-        return false
-      }
     }
 
     setValidationError(null)
@@ -140,8 +139,92 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
     }
   }
 
-  const trimmedLength = inputValue.trim().length
-  const isValid = trimmedLength >= minLength && trimmedLength <= maxLength
+  // Track selection changes for context menu state
+  const handleSelect = useCallback(() => {
+    if (textareaRef.current) {
+      const { selectionStart, selectionEnd } = textareaRef.current
+      setHasSelection(selectionStart !== selectionEnd)
+    }
+  }, [])
+
+  // Context menu handlers
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY })
+    handleSelect()
+  }, [handleSelect])
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null)
+  }, [])
+
+  // Clipboard operations
+  const handleCut = useCallback(async () => {
+    if (!textareaRef.current) return
+    const textarea = textareaRef.current
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selectedText = textarea.value.substring(start, end)
+
+    if (selectedText) {
+      try {
+        await navigator.clipboard.writeText(selectedText)
+        const newValue = textarea.value.substring(0, start) + textarea.value.substring(end)
+        setInputValue(newValue)
+
+        // Restore cursor position
+        requestAnimationFrame(() => {
+          textarea.focus()
+          textarea.setSelectionRange(start, start)
+        })
+      } catch {
+        // Silently fail
+      }
+    }
+  }, [])
+
+  const handleCopy = useCallback(async () => {
+    if (!textareaRef.current) return
+    const textarea = textareaRef.current
+    const selectedText = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd)
+
+    if (selectedText) {
+      try {
+        await navigator.clipboard.writeText(selectedText)
+      } catch {
+        // Silently fail
+      }
+    }
+  }, [])
+
+  const handlePaste = useCallback(async () => {
+    if (!textareaRef.current) return
+    const textarea = textareaRef.current
+
+    try {
+      const clipboardText = await navigator.clipboard.readText()
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      const newValue = textarea.value.substring(0, start) + clipboardText + textarea.value.substring(end)
+
+      // Respect maxLength - silently reject if exceeds
+      if (newValue.length <= maxLength) {
+        setInputValue(newValue)
+
+        // Position cursor after pasted text
+        requestAnimationFrame(() => {
+          textarea.focus()
+          const newCursorPos = start + clipboardText.length
+          textarea.setSelectionRange(newCursorPos, newCursorPos)
+        })
+      }
+    } catch {
+      // Silently fail
+    }
+  }, [maxLength])
+
+  // Use validation result for UI state
+  const { charCount, canSubmit, state: validationState } = validationResult
 
   // Truncate very long selectedText to prevent performance issues
   // Max 10,000 characters for display (still scrollable up to this limit)
@@ -156,6 +239,7 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
       zIndex={zIndex}
       closeOnBackdrop={false}
       closeOnEscape={true}
+      className="dialog-prompt"
       ariaLabelledBy={titleId}
       ariaDescribedBy={messageId}
     >
@@ -195,15 +279,14 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
               value={inputValue}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
+              onContextMenu={handleContextMenu}
+              onSelect={handleSelect}
               placeholder={inputPlaceholder}
               rows={6}
               maxLength={maxLength}
             />
 
-            <div className="dialog-char-count">
-              {trimmedLength}/{maxLength} characters
-            </div>
-
+            {/* Error message (exceeds limit or custom validation) */}
             {validationError && (
               <div className="dialog-validation-error">
                 {validationError}
@@ -214,29 +297,36 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
 
         <div className="dialog-actions">
           {/* Info icon with tooltip - keyboard accessible */}
-          <div className="dialog-info-wrapper">
-            <button
-              type="button"
-              className="dialog-info-icon"
-              aria-label="View keyboard shortcuts"
-              onFocus={() => setShowTooltip(true)}
-              onBlur={() => setShowTooltip(false)}
-              onMouseEnter={() => setShowTooltip(true)}
-              onMouseLeave={() => setShowTooltip(false)}
-            >
-              <Info size={16} strokeWidth={2} />
-            </button>
-            <div
-              className={`dialog-tooltip ${showTooltip ? 'visible' : ''}`}
-              role="tooltip"
-              aria-hidden={!showTooltip}
-            >
-              <div className="dialog-tooltip-content">
-                <kbd>Cmd/Ctrl+Enter</kbd> to submit
-                <br />
-                <kbd>Esc</kbd> to cancel
+          <div className="dialog-actions-left">
+            <div className="dialog-info-wrapper">
+              <button
+                type="button"
+                className="dialog-info-icon"
+                aria-label="View keyboard shortcuts"
+                onFocus={() => setShowTooltip(true)}
+                onBlur={() => setShowTooltip(false)}
+                onMouseEnter={() => setShowTooltip(true)}
+                onMouseLeave={() => setShowTooltip(false)}
+              >
+                <Info size={16} strokeWidth={2} />
+              </button>
+              <div
+                className={`dialog-tooltip ${showTooltip ? 'visible' : ''}`}
+                role="tooltip"
+                aria-hidden={!showTooltip}
+              >
+                <div className="dialog-tooltip-content">
+                  <kbd>Cmd/Ctrl+Enter</kbd> to submit
+                  <br />
+                  <kbd>Esc</kbd> to cancel
+                </div>
               </div>
             </div>
+            <CharacterCount
+              charCount={charCount}
+              maxLength={maxLength}
+              validationState={validationState}
+            />
           </div>
           <button className="dialog-btn dialog-btn-secondary" onClick={handleCancel}>
             Cancel
@@ -244,12 +334,25 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
           <button
             className="dialog-btn dialog-btn-primary"
             onClick={handleSubmit}
-            disabled={!isValid}
+            disabled={!canSubmit}
           >
             Submit
           </button>
         </div>
       </div>
+
+      {/* Context menu for textarea clipboard operations */}
+      {contextMenu && (
+        <TextareaContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          hasSelection={hasSelection}
+          onCut={handleCut}
+          onCopy={handleCopy}
+          onPaste={handlePaste}
+          onClose={handleCloseContextMenu}
+        />
+      )}
     </BaseDialog>
   )
 }

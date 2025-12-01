@@ -32,11 +32,14 @@ export async function withWatcherPause<T>(
     // Execute the operation
     const result = await operation()
 
+    // Reset flag BEFORE resuming watcher to avoid race condition
+    // where events fire between resume and flag reset
+    isInternalOperationRef.current = false
+
     // Resume watcher after success
     if (projectPath) {
       await window.api.directoryWatch.resume(projectPath)
     }
-    isInternalOperationRef.current = false
 
     return result
   } catch (error) {

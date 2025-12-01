@@ -1,5 +1,6 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import { FileNode, FileStats } from './index'
+import type { GitStatusResponse } from '../shared/ipc/git-schema'
 
 declare global {
   interface Window {
@@ -58,6 +59,11 @@ declare global {
         onDirectoryError: (
           callback: (data: { dirPath: string; error: string }) => void
         ) => () => void
+      }
+      gitIndexWatch: {
+        start: (projectPath: string) => Promise<{ success: boolean; error?: string }>
+        stop: () => Promise<{ success: boolean; error?: string }>
+        onIndexChanged: (callback: (data: { projectPath: string }) => void) => () => void
       }
       // Copilot removed
       settings: {
@@ -121,6 +127,9 @@ declare global {
         }>
         getSupportedExtensions: () => Promise<string[]>
         isSupported: (extension: string) => Promise<boolean>
+      }
+      git: {
+        getStatus: (projectPath: string) => Promise<GitStatusResponse>
       }
     }
   }

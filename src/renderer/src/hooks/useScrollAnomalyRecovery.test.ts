@@ -3,6 +3,8 @@
  *
  * Tests for the scroll anomaly detection and recovery hook.
  * Uses renderHook for isolated hook testing.
+ *
+ * Issue #22: Updated tests for fixed-interval queue approach
  */
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
@@ -44,6 +46,7 @@ describe('useScrollAnomalyRecovery', () => {
     vi.useFakeTimers()
     // Mock requestAnimationFrame to execute synchronously
     vi.stubGlobal('requestAnimationFrame', mockRAF)
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
   })
 
   afterEach(() => {
@@ -61,6 +64,18 @@ describe('useScrollAnomalyRecovery', () => {
 
     expect(result.current.wrapOnDataHandler).toBeDefined()
     expect(typeof result.current.wrapOnDataHandler).toBe('function')
+  })
+
+  it('returns resetQueue function', () => {
+    const xtermRef = { current: createMockXterm() }
+    const terminalRef = createMockTerminalRef()
+
+    const { result } = renderHook(() =>
+      useScrollAnomalyRecovery(xtermRef, terminalRef)
+    )
+
+    expect(result.current.resetQueue).toBeDefined()
+    expect(typeof result.current.resetQueue).toBe('function')
   })
 
   it('calls original handler when disabled', () => {
@@ -116,51 +131,277 @@ describe('useScrollAnomalyRecovery', () => {
     expect(originalHandler).toHaveBeenCalledWith(testData)
   })
 
-  it('detects anomaly and triggers recovery after debounce', async () => {
-    const mockXterm = createMockXterm(100, 100) // Start at bottom
-    const xtermRef = { current: mockXterm }
-    const terminalRef = createMockTerminalRef()
-    const onRecovery = vi.fn()
-    const originalHandler = vi.fn().mockImplementation(() => {
-      // Simulate scroll jump during write
-      mockXterm.buffer.active.viewportY = 0
+  describe('Issue #22: Fixed-interval queue approach', () => {
+    it('queues anomalies and recovers after interval', async () => {
+      const mockXterm = createMockXterm(100, 100) // Start at bottom
+      const xtermRef = { current: mockXterm }
+      const terminalRef = createMockTerminalRef()
+      const onRecovery = vi.fn()
+
+      // Only trigger anomaly on specific calls
+      let triggerAnomaly = false
+      const originalHandler = vi.fn().mockImplementation(() => {
+        if (triggerAnomaly) {
+          mockXterm.buffer.active.viewportY = 0
+        }
+      })
+
+      const { result } = renderHook(() =>
+        useScrollAnomalyRecovery(xtermRef, terminalRef, { onRecovery })
+      )
+
+      const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
+
+      // First call to establish lastDataTs (no anomaly)
+      wrappedHandler({ terminalId: 'test', data: 'first' })
+
+      // Enable anomaly for subsequent calls
+      triggerAnomaly = true
+      mockXterm.buffer.active.viewportY = 100
+
+      // Second call triggers anomaly detection
+      wrappedHandler({ terminalId: 'test', data: 'second' })
+
+      // Run RAF to detect anomaly
+      await act(async () => {
+        vi.advanceTimersByTime(0)
+        await Promise.resolve()
+      })
+
+      // Recovery should NOT have happened yet (no immediate debounce)
+      expect(mockScrollToBottom).not.toHaveBeenCalled()
+
+      // Run interval (500ms default)
+      await act(async () => {
+        vi.advanceTimersByTime(500)
+      })
+
+      // Now recovery should have happened
+      expect(mockScrollToBottom).toHaveBeenCalled()
+      expect(onRecovery).toHaveBeenCalledWith(1) // 1 anomaly detected
     })
 
-    const { result } = renderHook(() =>
-      useScrollAnomalyRecovery(xtermRef, terminalRef, { onRecovery })
-    )
+    it('batches multiple anomalies into single recovery', async () => {
+      const mockXterm = createMockXterm(100, 100)
+      const xtermRef = { current: mockXterm }
+      const terminalRef = createMockTerminalRef()
+      const onRecovery = vi.fn()
 
-    const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
+      // Only trigger anomaly after init
+      let triggerAnomaly = false
+      const originalHandler = vi.fn().mockImplementation(() => {
+        if (triggerAnomaly) {
+          mockXterm.buffer.active.viewportY = 0
+        }
+      })
 
-    // First call to establish lastDataTs
-    wrappedHandler({ terminalId: 'test', data: 'first' })
+      // Use explicit config with 500ms interval so all 5 anomalies batch together
+      const { result } = renderHook(() =>
+        useScrollAnomalyRecovery(xtermRef, terminalRef, {
+          onRecovery,
+          config: { recoveryIntervalMs: 500 }
+        })
+      )
 
-    // Reset for second call
-    mockXterm.buffer.active.viewportY = 100
+      const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
 
-    // Second call triggers anomaly detection
-    wrappedHandler({ terminalId: 'test', data: 'second' })
+      // First call to establish lastDataTs (no anomaly)
+      wrappedHandler({ terminalId: 'test', data: 'init' })
+      triggerAnomaly = true
 
-    // Run RAF
-    await act(async () => {
-      vi.advanceTimersByTime(0)
-      await Promise.resolve() // Allow RAF to process
+      // Trigger 5 rapid anomalies (each at 50ms apart = 250ms total, before 500ms interval)
+      for (let i = 0; i < 5; i++) {
+        mockXterm.buffer.active.viewportY = 100
+        wrappedHandler({ terminalId: 'test', data: `data-${i}` })
+        await act(async () => {
+          vi.advanceTimersByTime(50) // Less than interval
+        })
+      }
+
+      // Run full interval
+      await act(async () => {
+        vi.advanceTimersByTime(500)
+      })
+
+      // Should only call recovery once with count of all anomalies
+      expect(mockScrollToBottom).toHaveBeenCalledTimes(1)
+      expect(onRecovery).toHaveBeenCalledTimes(1)
+      expect(onRecovery).toHaveBeenCalledWith(5) // All 5 anomalies batched
     })
 
-    // Run debounce timeout
-    await act(async () => {
-      vi.advanceTimersByTime(150)
+    it('does not lose anomalies during async scroll', async () => {
+      const mockXterm = createMockXterm(100, 100)
+      const xtermRef = { current: mockXterm }
+      const terminalRef = createMockTerminalRef()
+      const onRecovery = vi.fn()
+
+      // Track when scrollToBottom is called to simulate timing
+      let scrollCallCount = 0
+      mockScrollToBottom.mockImplementation(() => {
+        scrollCallCount++
+      })
+
+      // Only trigger anomaly after init
+      let triggerAnomaly = false
+      const originalHandler = vi.fn().mockImplementation(() => {
+        if (triggerAnomaly) {
+          mockXterm.buffer.active.viewportY = 0
+        }
+      })
+
+      const { result } = renderHook(() =>
+        useScrollAnomalyRecovery(xtermRef, terminalRef, { onRecovery })
+      )
+
+      const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
+
+      // First call to establish lastDataTs (no anomaly)
+      wrappedHandler({ terminalId: 'test', data: 'init' })
+      triggerAnomaly = true
+
+      // Trigger anomaly
+      mockXterm.buffer.active.viewportY = 100
+      wrappedHandler({ terminalId: 'test', data: 'data-1' })
+
+      // First interval fires
+      await act(async () => {
+        vi.advanceTimersByTime(500)
+      })
+
+      expect(scrollCallCount).toBe(1)
+      expect(onRecovery).toHaveBeenCalledWith(1)
+
+      // Trigger another anomaly right after (simulating anomaly during scroll)
+      mockXterm.buffer.active.viewportY = 100
+      wrappedHandler({ terminalId: 'test', data: 'data-2' })
+
+      // Second interval fires
+      await act(async () => {
+        vi.advanceTimersByTime(500)
+      })
+
+      // Second anomaly should also be recovered
+      expect(scrollCallCount).toBe(2)
+      expect(onRecovery).toHaveBeenLastCalledWith(1)
     })
 
-    expect(mockScrollToBottom).toHaveBeenCalled()
-    expect(onRecovery).toHaveBeenCalled()
+    it('respects custom recoveryIntervalMs', async () => {
+      const mockXterm = createMockXterm(100, 100)
+      const xtermRef = { current: mockXterm }
+      const terminalRef = createMockTerminalRef()
+      const onRecovery = vi.fn()
+      const originalHandler = vi.fn().mockImplementation(() => {
+        mockXterm.buffer.active.viewportY = 0
+      })
+
+      const { result } = renderHook(() =>
+        useScrollAnomalyRecovery(xtermRef, terminalRef, {
+          onRecovery,
+          config: {
+            recoveryIntervalMs: 1000 // Longer interval
+          }
+        })
+      )
+
+      const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
+
+      wrappedHandler({ terminalId: 'test', data: 'first' })
+      mockXterm.buffer.active.viewportY = 100
+      wrappedHandler({ terminalId: 'test', data: 'second' })
+
+      // After 500ms (default), should NOT have recovered yet
+      await act(async () => {
+        vi.advanceTimersByTime(500)
+      })
+      expect(mockScrollToBottom).not.toHaveBeenCalled()
+
+      // After 1000ms, should have recovered
+      await act(async () => {
+        vi.advanceTimersByTime(500)
+      })
+      expect(mockScrollToBottom).toHaveBeenCalled()
+    })
+
+    it('does nothing when no anomalies detected', async () => {
+      const mockXterm = createMockXterm(100, 100)
+      const xtermRef = { current: mockXterm }
+      const terminalRef = createMockTerminalRef()
+      const onRecovery = vi.fn()
+      const originalHandler = vi.fn() // No jump simulation
+
+      const { result } = renderHook(() =>
+        useScrollAnomalyRecovery(xtermRef, terminalRef, { onRecovery })
+      )
+
+      const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
+
+      wrappedHandler({ terminalId: 'test', data: 'first' })
+      wrappedHandler({ terminalId: 'test', data: 'second' })
+
+      // Run multiple intervals
+      await act(async () => {
+        vi.advanceTimersByTime(2000)
+      })
+
+      // No recovery should have happened
+      expect(mockScrollToBottom).not.toHaveBeenCalled()
+      expect(onRecovery).not.toHaveBeenCalled()
+    })
+
+    it('resetQueue clears pending anomalies (issue #22)', async () => {
+      const mockXterm = createMockXterm(100, 100)
+      const xtermRef = { current: mockXterm }
+      const terminalRef = createMockTerminalRef()
+      const onRecovery = vi.fn()
+
+      let triggerAnomaly = false
+      const originalHandler = vi.fn().mockImplementation(() => {
+        if (triggerAnomaly) {
+          mockXterm.buffer.active.viewportY = 0
+        }
+      })
+
+      // Use explicit config with longer interval so anomalies queue up before reset
+      const { result } = renderHook(() =>
+        useScrollAnomalyRecovery(xtermRef, terminalRef, {
+          onRecovery,
+          config: { recoveryIntervalMs: 500 }
+        })
+      )
+
+      const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
+
+      // First call to establish lastDataTs (no anomaly)
+      wrappedHandler({ terminalId: 'test', data: 'init' })
+      triggerAnomaly = true
+
+      // Trigger 3 anomalies (all within 150ms, before 500ms interval)
+      for (let i = 0; i < 3; i++) {
+        mockXterm.buffer.active.viewportY = 100
+        wrappedHandler({ terminalId: 'test', data: `data-${i}` })
+        await act(async () => {
+          vi.advanceTimersByTime(50) // Less than interval
+        })
+      }
+
+      // Reset the queue before interval fires (we're at 150ms, interval is 500ms)
+      act(() => {
+        result.current.resetQueue()
+      })
+
+      // Run interval
+      await act(async () => {
+        vi.advanceTimersByTime(500)
+      })
+
+      // Should NOT have recovered because queue was cleared
+      expect(mockScrollToBottom).not.toHaveBeenCalled()
+      expect(onRecovery).not.toHaveBeenCalled()
+    })
   })
 
   it('does NOT trigger recovery when user recently scrolled', async () => {
     // This test verifies that user scroll events prevent auto-recovery
-    // The pure logic for this is tested in scrollAnomalyDetector.test.ts
-    // Here we verify the viewport listener integration
-
     const mockXterm = createMockXterm(100, 100)
     const xtermRef = { current: mockXterm }
     const terminalRef = createMockTerminalRef()
@@ -195,9 +436,9 @@ describe('useScrollAnomalyRecovery', () => {
     mockXterm.buffer.active.viewportY = 100 // Reset before capture
     wrappedHandler({ terminalId: 'test', data: 'second' })
 
-    // Run debounce
+    // Run interval
     await act(async () => {
-      vi.advanceTimersByTime(200)
+      vi.advanceTimersByTime(600)
     })
 
     // Should NOT recover because user scroll timestamp is recent
@@ -207,6 +448,143 @@ describe('useScrollAnomalyRecovery', () => {
 
     // Cleanup
     document.body.removeChild(terminalRef.current)
+  })
+
+  describe('Issue #22: Keyboard scroll detection', () => {
+    it('detects Page Up as user scroll', async () => {
+      const mockXterm = createMockXterm(100, 100)
+      const xtermRef = { current: mockXterm }
+      const terminalRef = createMockTerminalRef()
+
+      document.body.appendChild(terminalRef.current)
+
+      const onRecovery = vi.fn()
+
+      // Only trigger anomaly after keyboard event
+      let triggerAnomaly = false
+      const originalHandler = vi.fn().mockImplementation(() => {
+        if (triggerAnomaly) {
+          mockXterm.buffer.active.viewportY = 0
+        }
+      })
+
+      const { result } = renderHook(() =>
+        useScrollAnomalyRecovery(xtermRef, terminalRef, { onRecovery })
+      )
+
+      const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
+
+      // Establish lastDataTs (no anomaly)
+      wrappedHandler({ terminalId: 'test', data: 'first' })
+
+      // Simulate Page Up keypress - dispatch directly on viewport
+      const viewport = terminalRef.current.querySelector('.xterm-viewport')!
+      // Make viewport focusable and focus it
+      ;(viewport as HTMLElement).tabIndex = 0
+      ;(viewport as HTMLElement).focus()
+      viewport.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageUp', bubbles: true }))
+
+      // Now enable anomaly
+      triggerAnomaly = true
+      mockXterm.buffer.active.viewportY = 100
+      wrappedHandler({ terminalId: 'test', data: 'second' })
+
+      // Run interval
+      await act(async () => {
+        vi.advanceTimersByTime(600)
+      })
+
+      // Should NOT recover because Page Up counts as user scroll
+      expect(mockScrollToBottom).not.toHaveBeenCalled()
+
+      document.body.removeChild(terminalRef.current)
+    })
+
+    it('detects Arrow Down as user scroll', async () => {
+      const mockXterm = createMockXterm(100, 100)
+      const xtermRef = { current: mockXterm }
+      const terminalRef = createMockTerminalRef()
+
+      document.body.appendChild(terminalRef.current)
+
+      const onRecovery = vi.fn()
+
+      let triggerAnomaly = false
+      const originalHandler = vi.fn().mockImplementation(() => {
+        if (triggerAnomaly) {
+          mockXterm.buffer.active.viewportY = 0
+        }
+      })
+
+      const { result } = renderHook(() =>
+        useScrollAnomalyRecovery(xtermRef, terminalRef, { onRecovery })
+      )
+
+      const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
+
+      wrappedHandler({ terminalId: 'test', data: 'first' })
+
+      const viewport = terminalRef.current.querySelector('.xterm-viewport')!
+      ;(viewport as HTMLElement).tabIndex = 0
+      ;(viewport as HTMLElement).focus()
+      viewport.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+
+      triggerAnomaly = true
+      mockXterm.buffer.active.viewportY = 100
+      wrappedHandler({ terminalId: 'test', data: 'second' })
+
+      await act(async () => {
+        vi.advanceTimersByTime(600)
+      })
+
+      expect(mockScrollToBottom).not.toHaveBeenCalled()
+
+      document.body.removeChild(terminalRef.current)
+    })
+
+    it('ignores non-scroll keys', async () => {
+      const mockXterm = createMockXterm(100, 100)
+      const xtermRef = { current: mockXterm }
+      const terminalRef = createMockTerminalRef()
+
+      document.body.appendChild(terminalRef.current)
+
+      const onRecovery = vi.fn()
+
+      let triggerAnomaly = false
+      const originalHandler = vi.fn().mockImplementation(() => {
+        if (triggerAnomaly) {
+          mockXterm.buffer.active.viewportY = 0
+        }
+      })
+
+      const { result } = renderHook(() =>
+        useScrollAnomalyRecovery(xtermRef, terminalRef, { onRecovery })
+      )
+
+      const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
+
+      wrappedHandler({ terminalId: 'test', data: 'first' })
+
+      // Simulate regular key (not a scroll key)
+      const viewport = terminalRef.current.querySelector('.xterm-viewport')!
+      ;(viewport as HTMLElement).tabIndex = 0
+      ;(viewport as HTMLElement).focus()
+      viewport.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }))
+
+      triggerAnomaly = true
+      mockXterm.buffer.active.viewportY = 100
+      wrappedHandler({ terminalId: 'test', data: 'second' })
+
+      await act(async () => {
+        vi.advanceTimersByTime(600)
+      })
+
+      // SHOULD recover because 'a' is not a scroll key
+      expect(mockScrollToBottom).toHaveBeenCalled()
+
+      document.body.removeChild(terminalRef.current)
+    })
   })
 
   it('does NOT trigger recovery for small jumps', async () => {
@@ -229,88 +607,14 @@ describe('useScrollAnomalyRecovery', () => {
     wrappedHandler({ terminalId: 'test', data: 'second' })
 
     await act(async () => {
-      vi.advanceTimersByTime(200)
+      vi.advanceTimersByTime(600)
     })
 
     expect(mockScrollToBottom).not.toHaveBeenCalled()
     expect(onRecovery).not.toHaveBeenCalled()
   })
 
-  it('respects custom config', async () => {
-    const mockXterm = createMockXterm(100, 100)
-    const xtermRef = { current: mockXterm }
-    const terminalRef = createMockTerminalRef()
-    const onRecovery = vi.fn()
-    const originalHandler = vi.fn().mockImplementation(() => {
-      mockXterm.buffer.active.viewportY = 0
-    })
-
-    const { result } = renderHook(() =>
-      useScrollAnomalyRecovery(xtermRef, terminalRef, {
-        onRecovery,
-        config: {
-          recoveryDebounceMs: 500 // Longer debounce
-        }
-      })
-    )
-
-    const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
-
-    wrappedHandler({ terminalId: 'test', data: 'first' })
-    mockXterm.buffer.active.viewportY = 100
-    wrappedHandler({ terminalId: 'test', data: 'second' })
-
-    // After 100ms (default), should NOT have recovered yet
-    await act(async () => {
-      vi.advanceTimersByTime(100)
-    })
-    expect(mockScrollToBottom).not.toHaveBeenCalled()
-
-    // After 500ms, should have recovered
-    await act(async () => {
-      vi.advanceTimersByTime(400)
-    })
-    expect(mockScrollToBottom).toHaveBeenCalled()
-  })
-
-  it('debounces multiple rapid anomalies', async () => {
-    const mockXterm = createMockXterm(100, 100)
-    const xtermRef = { current: mockXterm }
-    const terminalRef = createMockTerminalRef()
-    const onRecovery = vi.fn()
-    const originalHandler = vi.fn().mockImplementation(() => {
-      mockXterm.buffer.active.viewportY = 0
-    })
-
-    const { result } = renderHook(() =>
-      useScrollAnomalyRecovery(xtermRef, terminalRef, { onRecovery })
-    )
-
-    const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
-
-    // First call to establish lastDataTs
-    wrappedHandler({ terminalId: 'test', data: 'init' })
-
-    // Trigger 5 rapid anomalies
-    for (let i = 0; i < 5; i++) {
-      mockXterm.buffer.active.viewportY = 100
-      wrappedHandler({ terminalId: 'test', data: `data-${i}` })
-      await act(async () => {
-        vi.advanceTimersByTime(20) // Less than debounce
-      })
-    }
-
-    // Run full debounce
-    await act(async () => {
-      vi.advanceTimersByTime(200)
-    })
-
-    // Should only call once due to debounce
-    expect(mockScrollToBottom).toHaveBeenCalledTimes(1)
-    expect(onRecovery).toHaveBeenCalledTimes(1)
-  })
-
-  it('cleans up timeout on unmount', () => {
+  it('cleans up interval on unmount', () => {
     const mockXterm = createMockXterm(100, 100)
     const xtermRef = { current: mockXterm }
     const terminalRef = createMockTerminalRef()
@@ -324,20 +628,44 @@ describe('useScrollAnomalyRecovery', () => {
 
     const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
 
-    // Trigger anomaly to start timeout
+    // Trigger anomaly
     wrappedHandler({ terminalId: 'test', data: 'first' })
     mockXterm.buffer.active.viewportY = 100
     wrappedHandler({ terminalId: 'test', data: 'second' })
 
-    // Unmount before timeout completes
+    // Unmount before interval completes
     unmount()
 
     // Run timers - should not throw
     act(() => {
-      vi.advanceTimersByTime(200)
+      vi.advanceTimersByTime(1000)
     })
 
     // scrollToBottom should not be called after unmount
-    // (the ref check in timeout should handle this)
+  })
+
+  it('cancels previous RAF when new data arrives rapidly', async () => {
+    const cancelAnimationFrame = vi.fn()
+    vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrame)
+
+    const mockXterm = createMockXterm(100, 100)
+    const xtermRef = { current: mockXterm }
+    const terminalRef = createMockTerminalRef()
+    const originalHandler = vi.fn()
+
+    const { result } = renderHook(() =>
+      useScrollAnomalyRecovery(xtermRef, terminalRef)
+    )
+
+    const wrappedHandler = result.current.wrapOnDataHandler(originalHandler)
+
+    // First data event
+    wrappedHandler({ terminalId: 'test', data: 'first' })
+
+    // Second data event (should cancel first RAF)
+    wrappedHandler({ terminalId: 'test', data: 'second' })
+
+    // cancelAnimationFrame should have been called
+    expect(cancelAnimationFrame).toHaveBeenCalled()
   })
 })

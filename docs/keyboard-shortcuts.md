@@ -43,6 +43,11 @@ Right-click selected text:
 - **Simplify** - Make clearer → Terminal
 - **Rewrite** - Rephrase → Terminal
 - **Send to Terminal** - Paste selection
+- **Copy Selection** - Copy text to clipboard
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl+C` | Copy selected text to clipboard |
 
 See: [Prompt Templates](./prompts/README.md)
 
@@ -75,13 +80,18 @@ Standard terminal shortcuts when focused:
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+C` | Interrupt (SIGINT) |
+| `Ctrl+C` | Interrupt (SIGINT) / Copy if text selected |
 | `Ctrl+D` | EOF (exit) |
 | `Ctrl+L` | Clear screen |
 | `Ctrl+A/E` | Start/end of line |
 | `Ctrl+U/K` | Clear before/after cursor |
 | `↑/↓` | History |
 | `Tab` | Auto-complete |
+| `Cmd/Ctrl+C` | Copy selected text (macOS: Cmd, Windows/Linux: Ctrl) |
+| `Cmd/Ctrl+V` | Paste from clipboard |
+| `Ctrl+Shift+C/V` | Explicit copy/paste (all platforms) |
+
+**Context Menu**: Right-click → Copy, Paste
 
 Shell-specific (zsh): See zsh docs
 
@@ -101,6 +111,40 @@ All dialogs (Tool Approval, Confirm, File Creation, Settings):
 | `Esc` | Cancel/Close |
 | `Tab` | Navigate fields |
 | `Space` | Toggle checkboxes |
+
+### Text Input Dialogs (PromptDialog, FileSystemDialog)
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl+C` | Copy selected text |
+| `Cmd/Ctrl+X` | Cut selected text |
+| `Cmd/Ctrl+V` | Paste from clipboard |
+| `Cmd/Ctrl+Enter` | Submit (PromptDialog only) |
+
+**Context Menu**: Right-click → Cut, Copy, Paste
+
+### ChatBubble (DiagramViewer)
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl+C` | Copy selected text (native) |
+| `Cmd/Ctrl+X` | Cut selected text (native) |
+| `Cmd/Ctrl+V` | Paste from clipboard (native) |
+| `Cmd/Ctrl+Enter` | Send message |
+| `Esc` | Collapse panel |
+
+**Context Menu**: Right-click → Cut, Copy, Paste
+
+Note: Clipboard shortcuts use native browser behavior for better undo/redo integration.
+
+### FilePickerDialog
+
+| Shortcut | Action |
+|----------|--------|
+| `↑/↓` | Navigate files |
+| `Enter` | Select file |
+| `Esc` | Cancel |
+| `Cmd/Ctrl+C` | Copy selected file path |
 
 ## Platform
 

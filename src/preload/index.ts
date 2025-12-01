@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { ProjectChanged } from '../shared/ipc/schema'
+import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import { electronAPI } from '@electron-toolkit/preload'
 
 export interface FileNode {
@@ -138,6 +139,21 @@ const api = {
       const listener = (_event: unknown, data: { dirPath: string; error: string }) => callback(data)
       ipcRenderer.on('directory-watch:error', listener)
       return () => ipcRenderer.removeListener('directory-watch:error', listener)
+    }
+  },
+
+  // Git index watching (for external git operations: git add, checkout, reset, etc.)
+  gitIndexWatch: {
+    start: (projectPath: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('git-index-watch:start', projectPath),
+    stop: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('git-index-watch:stop'),
+
+    // Event listener for git index changes
+    onIndexChanged: (callback: (data: { projectPath: string }) => void) => {
+      const listener = (_event: unknown, data: { projectPath: string }) => callback(data)
+      ipcRenderer.on('git:index-changed', listener)
+      return () => ipcRenderer.removeListener('git:index-changed', listener)
     }
   },
 
@@ -288,6 +304,16 @@ const api = {
      */
     isSupported: (extension: string): Promise<boolean> =>
       ipcRenderer.invoke('import:isSupported', extension)
+  },
+
+  // Git operations
+  git: {
+    /**
+     * Get git status for a project directory
+     * Returns branch name, file statuses, and status counts
+     */
+    getStatus: (projectPath: string): Promise<GitStatusResponse> =>
+      ipcRenderer.invoke('git:getStatus', projectPath)
   }
 }
 

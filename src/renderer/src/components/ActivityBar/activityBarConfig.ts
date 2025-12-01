@@ -10,6 +10,7 @@ export interface ActivityBarPanel {
   order: number
   keyboardShortcut?: string
   enabled?: boolean
+  requiresProject?: boolean // Panel hidden when no project is loaded
   badge?: () => number | string | null
 }
 
@@ -62,6 +63,7 @@ export const activityBarPanels: ActivityBarPanel[] = [
     order: 1,
     keyboardShortcut: 'mod+j',
     enabled: true,
+    requiresProject: true, // Hide when no project loaded
     badge: getTerminalActiveIndicator
   }
 ]

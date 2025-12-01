@@ -57,7 +57,8 @@ export function useFileOperations(
     onFileSelect,
     refreshProjectTree,
     isInternalOperationRef,
-    setFileOperationLoading
+    setFileOperationLoading,
+    onGitRefresh
   } = options
 
   const { showConfirm, showRename, showNewFile, showNewFolder } = useDialog()
@@ -93,6 +94,7 @@ export function useFileOperations(
 
       onFileSelect(createdFilePath)
       setSelectedFolder(null)
+      onGitRefresh?.() // Refresh git status to show badge on new file
     } catch (err) {
       const errorMessage = formatCreateFileError(err)
       showGlobalToast({ type: 'error', title: 'Operation Failed', message: errorMessage })
@@ -129,6 +131,7 @@ export function useFileOperations(
       )
 
       setSelectedFolder(null)
+      onGitRefresh?.() // Refresh git status
     } catch (err) {
       const errorMessage = formatCreateFolderError(err)
       showGlobalToast({ type: 'error', title: 'Operation Failed', message: errorMessage })
@@ -179,6 +182,7 @@ export function useFileOperations(
           await refreshProjectTree()
         }
       )
+      onGitRefresh?.() // Refresh git status to remove badge
     } catch (err) {
       const message = formatDeleteError(err, 'file')
       showGlobalToast({ type: 'error', title: 'Delete Failed', message })
@@ -209,6 +213,7 @@ export function useFileOperations(
           await refreshProjectTree()
         }
       )
+      onGitRefresh?.() // Refresh git status to remove badges
     } catch (err) {
       const message = formatDeleteError(err, 'folder')
       showGlobalToast({ type: 'error', title: 'Delete Failed', message })
@@ -260,6 +265,7 @@ export function useFileOperations(
         message: createRenameSuccessMessage(),
         type: 'success'
       })
+      onGitRefresh?.() // Refresh git status after rename
     } catch (err) {
       const errorMessage = formatFileOperationError(err, 'rename')
       showGlobalToast({

@@ -13,7 +13,8 @@ export const MAX_RECENT_PROJECTS = 5
 export const TOAST_DURATION = {
   ERROR: 5000,
   SUCCESS: 3000,
-  WARNING: 3000
+  WARNING: 3000,
+  INFO: 3000
 } as const
 
 /** Time constants in milliseconds */
@@ -41,4 +42,14 @@ export const IMPORT = {
   SIZE_WARNING_THRESHOLD: 50 * 1024 * 1024,
   /** Maximum number of auto-numbered copies before rejecting */
   MAX_COPY_ATTEMPTS: 1000
+} as const
+
+/** Text input character limits for AI prompts (PromptDialog, ChatBubble) */
+export const TEXT_INPUT_LIMITS = {
+  /** Minimum characters required (uses trimmed length) */
+  MIN_LENGTH: 3,
+  /** Character count at which warning appears */
+  WARNING_THRESHOLD: 1000,
+  /** Maximum characters allowed (uses raw length to match HTML maxLength) */
+  MAX_LENGTH: 2000
 } as const

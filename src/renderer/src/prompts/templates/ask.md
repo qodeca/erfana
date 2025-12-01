@@ -4,7 +4,7 @@ subArea: context-menu
 name: Ask
 icon: help-circle
 targetPanel: terminal
-autoExecute: false
+autoExecute: true
 requiresInput: true
 inputLabel: What would you like to know about this text?
 inputPlaceholder: e.g., What does this mean? Why is this important? How does this relate to...?
