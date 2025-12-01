@@ -170,6 +170,18 @@
   --color-git-conflicted: var(--color-brand-magenta); /* Magenta - conflicted files (urgent) */
 
   /* ============================================
+   * COLORS: Git Status - Light Variants
+   * Lighter versions for better visibility on dark backgrounds
+   * Used for badges and file names (folders keep original)
+   * ============================================ */
+  --color-git-modified-light: #FFCC99;    /* Amber +45% lighter - soft peach */
+  --color-git-untracked-light: #F5F599;   /* Lime +50% lighter - pale yellow */
+  --color-git-deleted-light: #FFB3B8;     /* Coral +45% lighter - soft pink */
+  --color-git-staged-light: #D4D9FF;      /* Violet +40% lighter - pale lavender */
+  --color-git-renamed-light: #8F8FE5;     /* Indigo +100% lighter - much brighter purple */
+  --color-git-conflicted-light: #FF99BF;  /* Magenta +45% lighter - soft rose */
+
+  /* ============================================
    * COLORS: Special Backgrounds
    * Component-specific backgrounds
    * ============================================ */
