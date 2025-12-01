@@ -19,6 +19,7 @@ files:
   - '!*.md'
 asarUnpack:
   - resources/**
+  - node_modules/**/call-bind-apply-helpers/**
 win:
   executableName: Erfana
   target:
