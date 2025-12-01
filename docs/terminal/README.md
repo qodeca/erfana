@@ -77,6 +77,40 @@ Clickable file path links in terminal output with intelligent path resolution.
 **Files**:
 - `src/renderer/src/components/Panels/Terminal/FileLinks/`
 
+### Forced Scroll-to-Bottom After Prompt Execution (v0.5.4)
+
+Automatic scroll to bottom 1 second after executing prompt templates, respecting user scroll intent.
+
+**Behavior**:
+- Terminal scrolls to bottom 1 second after prompt execution completes
+- Skips scroll if user manually scrolled during the 1-second delay window
+- Works with all prompt templates: Elaborate, Modify, Ask, diagram chat, Mermaid directions, import organization
+
+**Architecture** (Pure Logic Extraction):
+- `promptScrollScheduler.logic.ts`: Timestamp-based scheduling with user scroll detection
+- `didUserScrollRecently()`: Checks if user scrolled within delay window
+- `scheduleScrollIfNeeded()`: Coordinates scroll with terminal readiness and user intent
+- Integrates with `useScrollAnomalyRecovery` via `lastUserScrollTsRef`
+
+**Edge Cases Handled**:
+- Terminal not ready → Graceful skip
+- Controls unavailable → Graceful skip
+- User scrolls during delay → Scroll cancelled
+- Rapid execution → Independent scheduling
+
+**Files**:
+- `src/renderer/src/utils/promptScrollScheduler.logic.ts` (141 lines)
+- `src/renderer/src/utils/promptScrollScheduler.logic.test.ts` (871 lines, 66 tests)
+
+**Integration Points** (6 call sites):
+- PreviewContextMenu (Elaborate, Modify, Ask)
+- ChatBubble (diagram chat + direction changes)
+- MermaidToolbar (direction buttons)
+- MermaidDiagram (bug report)
+- useImport (organize-import)
+
+See [Scroll Fixes](./scroll-fixes.md) for related scroll preservation features.
+
 ### Core Capabilities
 
 - **Native Shell**: Spawns real PTY process (zsh on macOS, bash on Linux)
