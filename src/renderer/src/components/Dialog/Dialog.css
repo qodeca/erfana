@@ -2,7 +2,7 @@
 
 /* CSS Variables for theming - using design tokens */
 :root {
-  --dialog-overlay-bg: rgba(0, 0, 0, 0.75);
+  --dialog-overlay-bg: var(--color-overlay-dialog);
   --dialog-bg: var(--color-bg-primary);
   --dialog-border: var(--color-border-subtle);
   --dialog-base-zindex: var(--z-dialog);
@@ -16,7 +16,7 @@
   --dialog-btn-secondary-bg: var(--color-btn-secondary-bg);
   --dialog-btn-secondary-hover: var(--color-btn-secondary-hover);
   --dialog-spacing-large: var(--space-12);
-  --dialog-tooltip-min-width: 280px;
+  --dialog-tooltip-min-width: 100px;
   --dialog-icon-size: var(--icon-size-xl);
   --dialog-icon-gap: var(--space-6);
   --dialog-icon-radius: var(--border-radius);
@@ -359,17 +359,18 @@
   position: absolute;
   bottom: calc(100% + var(--space-4));
   left: 0;
-  background-color: var(--color-bg-tertiary);
-  border: var(--border-width) solid var(--color-border-subtle);
-  border-radius: var(--border-radius);
-  padding: var(--space-5) var(--space-6);
+  background-color: var(--color-bg-secondary);
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: 0;
+  padding: var(--space-4) var(--space-6);
   min-width: var(--dialog-tooltip-min-width);
-  box-shadow: var(--shadow-lg);
-  z-index: var(--z-modal);
+  box-shadow: var(--shadow-md);
+  z-index: var(--z-tooltip);
   pointer-events: none;
   opacity: 0;
   transform: translateY(4px);
-  transition: opacity var(--transition-slow), transform var(--transition-slow);
+  transition: opacity var(--transition-normal), transform var(--transition-normal);
+  white-space: nowrap;
 }
 
 .dialog-tooltip.visible {
@@ -431,7 +432,7 @@
   width: var(--dialog-icon-size);
   height: var(--dialog-icon-size);
   border-radius: var(--dialog-icon-radius);
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--color-bg-hover);
   color: var(--dialog-text-secondary);
 }
 
@@ -443,13 +444,13 @@
 
 /* Compact rename dialog */
 .dialog-rename .dialog-container {
-  min-width: 400px;
-  max-width: 500px;
+  min-width: 600px;
+  max-width: 700px;
 }
 
 /* Parent path context */
 .dialog-rename-context {
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   color: var(--dialog-text-muted);
   margin-bottom: var(--space-10);
   font-style: italic;

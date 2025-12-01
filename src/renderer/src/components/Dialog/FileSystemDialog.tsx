@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, ReactNode } from 'react'
 import { Info } from 'lucide-react'
 import { BaseDialog } from './BaseDialog'
+import { CharacterCount } from '../shared'
 import { TextareaContextMenu } from '../ContextMenu/TextareaContextMenu'
 import { validateFileSystemName, ValidationErrorCode } from '../../utils/fileValidation'
 
@@ -279,37 +280,38 @@ export function FileSystemDialog({
               maxLength={255}
             />
 
-            <div className="dialog-char-count">{trimmedLength}/255 characters</div>
-
             {validationError && <div className="dialog-rename-validation-error">{validationError}</div>}
           </div>
         </div>
 
         <div className="dialog-actions">
           {/* Info icon with tooltip - keyboard accessible */}
-          <div className="dialog-info-wrapper">
-            <button
-              type="button"
-              className="dialog-info-icon"
-              aria-label="View keyboard shortcuts"
-              onFocus={() => setShowTooltip(true)}
-              onBlur={() => setShowTooltip(false)}
-              onMouseEnter={() => setShowTooltip(true)}
-              onMouseLeave={() => setShowTooltip(false)}
-            >
-              <Info size={16} strokeWidth={2} />
-            </button>
-            <div
-              className={`dialog-tooltip ${showTooltip ? 'visible' : ''}`}
-              role="tooltip"
-              aria-hidden={!showTooltip}
-            >
-              <div className="dialog-tooltip-content">
-                <kbd>Enter</kbd> to {tooltipAction}
-                <br />
-                <kbd>Esc</kbd> to cancel
+          <div className="dialog-actions-left">
+            <div className="dialog-info-wrapper">
+              <button
+                type="button"
+                className="dialog-info-icon"
+                aria-label="View keyboard shortcuts"
+                onFocus={() => setShowTooltip(true)}
+                onBlur={() => setShowTooltip(false)}
+                onMouseEnter={() => setShowTooltip(true)}
+                onMouseLeave={() => setShowTooltip(false)}
+              >
+                <Info size={16} strokeWidth={2} />
+              </button>
+              <div
+                className={`dialog-tooltip ${showTooltip ? 'visible' : ''}`}
+                role="tooltip"
+                aria-hidden={!showTooltip}
+              >
+                <div className="dialog-tooltip-content">
+                  <kbd>Enter</kbd> to {tooltipAction}
+                  <br />
+                  <kbd>Esc</kbd> to cancel
+                </div>
               </div>
             </div>
+            <CharacterCount charCount={trimmedLength} maxLength={255} />
           </div>
           <button className="dialog-btn dialog-btn-secondary" onClick={handleCancel}>
             Cancel

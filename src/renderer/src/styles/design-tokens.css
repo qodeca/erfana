@@ -190,6 +190,7 @@
   --color-bg-warning: rgba(204, 167, 0, 0.12);  /* Warning notification background */
   --color-bg-tertiary-translucent: rgba(45, 45, 48, 0.9); /* Semi-transparent tertiary bg */
   --color-bg-primary-translucent: rgba(255, 255, 255, 0.95); /* Light mode translucent */
+  --color-overlay-dialog: rgba(0, 0, 0, 0.75);               /* Dialog backdrop overlay */
 
   /* ============================================
    * COLORS: Warning States (Extended Palette)
@@ -318,7 +319,7 @@
   --header-height: 41px;
   --tab-height: 41px;
   --sidebar-min-width: 200px;
-  --dialog-min-width: 400px;
+  --dialog-min-width: 500px;
   --dialog-max-width: 800px;
 
   /* Icon sizes */
