@@ -19,11 +19,8 @@ files:
   - '!*.md'
 asarUnpack:
   - resources/**
-  - node_modules/**/call-bind-apply-helpers/**
-  - node_modules/dunder-proto/**
-  - node_modules/get-proto/**
-  - node_modules/get-intrinsic/**
-  - node_modules/call-bound/**
+  - node_modules/isomorphic-git/**
+  - node_modules/sha.js/**
 win:
   executableName: Erfana
   target:
