@@ -142,6 +142,21 @@ const api = {
     }
   },
 
+  // Git index watching (for external git operations: git add, checkout, reset, etc.)
+  gitIndexWatch: {
+    start: (projectPath: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('git-index-watch:start', projectPath),
+    stop: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('git-index-watch:stop'),
+
+    // Event listener for git index changes
+    onIndexChanged: (callback: (data: { projectPath: string }) => void) => {
+      const listener = (_event: unknown, data: { projectPath: string }) => callback(data)
+      ipcRenderer.on('git:index-changed', listener)
+      return () => ipcRenderer.removeListener('git:index-changed', listener)
+    }
+  },
+
   // Settings operations
   settings: {
     getProjectFilterMode: (): Promise<{ success: boolean; mode?: string; error?: string }> =>

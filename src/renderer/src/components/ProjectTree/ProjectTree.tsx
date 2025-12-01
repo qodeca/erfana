@@ -499,6 +499,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         return moveResult
       })
 
+      // Refresh git status after successful move (outside watcher pause)
+      refreshGitStatus()
+
       // Show success message with symlink warning if applicable
       if (result.isSymlink) {
         showGlobalToast({

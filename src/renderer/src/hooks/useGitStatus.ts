@@ -223,6 +223,33 @@ export function useGitStatus({
     }
   }, [projectPath, enabled, debouncedRefresh])
 
+  // Subscribe to .git/index changes for external git operations (git add, checkout, reset, etc.)
+  useEffect(() => {
+    if (!projectPath || !enabled) return
+
+    // Start watching .git/index file
+    window.api.gitIndexWatch.start(projectPath).catch(err => {
+      console.warn('[useGitStatus] Failed to start git index watcher:', err)
+    })
+
+    // Listen for git index changes
+    const unsubscribe = window.api.gitIndexWatch.onIndexChanged((data) => {
+      // Only refresh if this is still the current project
+      if (data.projectPath === projectPath && isWindowVisibleRef.current) {
+        console.log('[useGitStatus] Git index changed, triggering refresh')
+        debouncedRefresh()
+      }
+    })
+
+    return () => {
+      unsubscribe()
+      // Stop watching .git/index file
+      window.api.gitIndexWatch.stop().catch(err => {
+        console.warn('[useGitStatus] Failed to stop git index watcher:', err)
+      })
+    }
+  }, [projectPath, enabled, debouncedRefresh])
+
   // Window visibility handling - pause refreshes when window hidden
   useEffect(() => {
     const handleVisibilityChange = () => {

@@ -386,7 +386,11 @@ export class ImportCommand extends CommandBase {
   }
 
   async execute(): Promise<void> {
-    await this.importFile()
+    const result = await this.importFile()
+    // Refresh git status if import was successful (result contains the output path)
+    if (result) {
+      this.ctx.onGitRefresh?.()
+    }
   }
 }
 
