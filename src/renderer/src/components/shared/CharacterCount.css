@@ -3,7 +3,7 @@
  */
 
 .char-count {
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
   display: flex;
