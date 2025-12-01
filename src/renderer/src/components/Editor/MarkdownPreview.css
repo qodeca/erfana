@@ -117,22 +117,22 @@
 
 /* Internal links - navigable project files */
 .markdown-preview a.internal-link {
-  color: var(--color-accent-secondary);
+  color: var(--color-accent-primary);
   cursor: pointer;
 }
 
 .markdown-preview a.internal-link:hover,
 .markdown-preview a.internal-link:focus-visible {
-  border-bottom-color: var(--color-accent-secondary);
+  border-bottom-color: var(--color-accent-primary);
 }
 
 .markdown-preview a.internal-link:focus-visible {
-  outline-color: var(--color-accent-secondary);
+  outline-color: var(--color-accent-primary);
 }
 
 /* Broken links - file not found */
 .markdown-preview a.broken-link {
-  color: var(--color-error);
+  color: var(--color-accent-primary);
   text-decoration: line-through;
   cursor: not-allowed;
   opacity: 0.8;
@@ -144,7 +144,7 @@
 }
 
 .markdown-preview a.broken-link:focus-visible {
-  outline: var(--border-width-thick) solid var(--color-error);
+  outline: var(--border-width-thick) solid var(--color-accent-primary);
   outline-offset: var(--space-1);
   border-radius: var(--border-radius);
 }
