@@ -20,8 +20,9 @@ import { installSafeConsole } from './utils/safe-console'
 // Must be called before any other code that uses console.log
 installSafeConsole()
 
-// WebGL Command Line Switches for Electron 33+
+// WebGL Command Line Switches (originally added for Electron 33+)
 // Fixes WebGL context creation issues and terminal flickering in production builds
+// TODO: Test if still needed with Electron 39+ (Chromium 142)
 app.commandLine.appendSwitch('enable-webgl')
 app.commandLine.appendSwitch('enable-webgl2-compute-context')
 app.commandLine.appendSwitch('ignore-gpu-blocklist')
