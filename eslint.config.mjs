@@ -42,5 +42,22 @@ export default [
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/ban-ts-comment': 'off'
     }
+  },
+  // Build scripts: CommonJS Node.js environment
+  {
+    files: ['scripts/**/*.js', 'scripts/**/*.cjs'],
+    languageOptions: {
+      globals: {
+        require: 'readonly',
+        module: 'readonly',
+        console: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly',
+        process: 'readonly'
+      }
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off'
+    }
   }
 ]
