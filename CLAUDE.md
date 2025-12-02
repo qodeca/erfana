@@ -3,10 +3,10 @@
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
 - **Repository**: `qodeca/erfana` (GitHub)
-- **Version**: 0.5.4
-- **Tech Stack**: Electron 33, React 18, TypeScript 5.7, Monaco Editor, xterm.js
+- **Version**: 0.6.0
+- **Tech Stack**: Electron 39, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
-- **Node Version**: 18+
+- **Node Version**: 22+
 
 ## Key Commands
 ```bash
@@ -116,7 +116,30 @@ See `docs/` for details (keep Claude's context focused):
 - [ ] Transitions use tokens
 - [ ] Focus states are visible (accessibility)
 
-## Recent Changes (v0.5.4)
+## Recent Changes (v0.6.0)
+- **Electron 39 Upgrade** (Dec 2, 2025):
+  - Major version upgrade from Electron 33.2.1 to 39.2.4
+  - **Breaking changes navigated**:
+    - Chromium: 130.0.6723.44 → 142.0.7444.177 (12 version jump)
+    - Node.js: 20.18.0 → 22.20.0 (major version jump with new ABI)
+    - V8: 13.0 → 14.2
+    - macOS minimum now 12+ (Big Sur removed in Electron 38)
+  - **Dependencies upgraded**:
+    - electron-builder: 25.1.8 → 26.0.12
+    - node-pty: Successfully rebuilt for Node 22 ABI
+  - **Code changes**:
+    - Updated WebGL command-line switch comments (retained for testing)
+    - TODO added to test if switches still needed with Chromium 142
+  - **Testing results**:
+    - ✅ All 3469 tests passing (119 test files)
+    - ✅ TypeScript compilation successful
+    - ✅ Development mode fully functional
+    - ✅ Production build successful (DMG + ZIP for universal macOS)
+    - ✅ ASAR unpacking verified (isomorphic-git + node-pty)
+  - No code changes required - excellent compatibility!
+  - Files modified: `package.json`, `src/main/index.ts`, `CLAUDE.md`
+
+## Changes in v0.5.4
 - **Forced Scroll-to-Bottom After Prompt Execution** (Dec 1, 2025):
   - Automatically scrolls terminal to bottom 1 second after prompt template execution (issue #52)
   - **User Intent Respect**: Skips scroll if user manually scrolled during the 1-second delay window
