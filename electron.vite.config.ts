@@ -12,7 +12,14 @@ export default defineConfig({
     }
   },
   preload: {
-    plugins: [externalizeDepsPlugin()]
+    // No externalizeDepsPlugin - bundle all dependencies for sandbox compatibility
+    build: {
+      rollupOptions: {
+        output: {
+          format: 'cjs'
+        }
+      }
+    }
   },
   renderer: {
     resolve: {

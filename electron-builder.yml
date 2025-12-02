@@ -1,5 +1,6 @@
 appId: com.erfana.app
 productName: Erfana
+afterPack: ./scripts/fuses.js
 directories:
   buildResources: resources
   output: release/${version}
@@ -17,20 +18,11 @@ files:
   - '!vitest.*.ts'
   - '!tsconfig.test.json'
   - '!*.md'
-asarUnpack:
-  - node_modules/isomorphic-git/**
-  - node_modules/sha.js/**
-  - node_modules/to-buffer/**
-  - node_modules/typed-array-buffer/**
-  - node_modules/call-bound/**
-  - node_modules/get-intrinsic/**
-  - node_modules/get-proto/**
-  - node_modules/dunder-proto/**
-  - node_modules/call-bind-apply-helpers/**
-  - node_modules/call-bind/**
-  - node_modules/es-errors/**
-  - node_modules/function-bind/**
-  - node_modules/gopd/**
+  - '!node_modules/jsdom/**'
+  - '!node_modules/canvas/**'
+  - '!node_modules/@mapbox/node-pre-gyp/**'
+asar: false
+npmRebuild: false
 win:
   executableName: Erfana
   target:
@@ -50,11 +42,15 @@ mac:
   notarize: false
   target:
     - target: dmg
-      arch: universal
+      arch:
+        - x64
+        - arm64
     - target: zip
-      arch: universal
+      arch:
+        - x64
+        - arm64
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: ${name}-${version}-${arch}.${ext}
 linux:
   target:
     - AppImage
@@ -64,7 +60,6 @@ linux:
   category: Utility
 appImage:
   artifactName: ${name}-${version}.${ext}
-npmRebuild: false
 publish:
   provider: generic
   url: https://example.com/auto-updates

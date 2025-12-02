@@ -42,11 +42,12 @@ function createWindow(): BrowserWindow {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
+      // sandbox: true is the default since Electron 20 (2022)
+      // Renderer process is sandboxed for security, preload scripts work correctly
       contextIsolation: true,
       nodeIntegration: false,
-      webgl: true,
-      experimentalFeatures: true
+      webgl: true
+      // experimentalFeatures removed - not needed for current functionality
     }
   })
 

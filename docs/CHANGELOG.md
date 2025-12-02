@@ -1,195 +1,269 @@
 # Erfana Changelog
 
-Historical changelog entries. For recent changes (v0.4.0+), see [CLAUDE.md](../CLAUDE.md).
+Historical changelog entries for versions prior to current. For the latest changes, see [CLAUDE.md](../CLAUDE.md).
+
+## Changes in v0.5.4
+- **Forced Scroll-to-Bottom After Prompt Execution** (Dec 1, 2025):
+  - Automatically scrolls terminal to bottom 1 second after prompt template execution (issue #52)
+  - **User Intent Respect**: Skips scroll if user manually scrolled during delay window
+  - **Integration**: Works with all prompt templates
+  - **Architecture**: Pure logic module (`promptScrollScheduler.logic.ts`)
+  - New files: promptScrollScheduler.logic.ts + tests (66 tests)
+  - **Total: 3469 tests passing** (119 test files)
+  - Closes #52
+- **Mermaid Toolbar Restructuring** (Dec 1, 2025):
+  - Unified toolbar design with expand button integrated into direction container
+  - **Sizing**: Expand button resized to 24px height (matches direction buttons)
+  - **Hover**: Unified lime hover for all buttons
+  - Closes #53
+- **Flicker-Free Terminal Scroll Recovery** (Dec 1, 2025):
+  - Eliminated visible flicker using xterm.js parser hooks for same-frame scroll restoration
+  - Two-layer defense: parser hooks (primary) + multi-signal detection (fallback)
+  - New files: useTerminalParserHooks.ts + tests (24 tests)
+  - Addresses Claude Code issues #826, #10769
+- **Git Status Light Colors** (Dec 1, 2025):
+  - Added lighter color variants for git status indicators (40-50% lighter)
+  - Context-specific: light for badges/text, vibrant for folder dots
+  - WCAG AA compliance
+- **Git Status Indicators in Project Tree** (Nov 30, 2025):
+  - VS Code-style git status indicators (M/U/D/A/! badges)
+  - Folder status propagation with colored dots
+  - Git status bar: branch name + colored counts
+  - Auto-refresh: 1s debounce, 2s cooldown
+  - isomorphic-git library (no git CLI dependency)
+  - **Total: 3352 tests passing** (117 test files)
+  - Closes #29
+- **Fix: Git Status Not Updating After File Operations** (Nov 30, 2025):
+  - Fixed race conditions and cooldown logic
+  - Known limitation: Global `.gitignore` not supported
+- **Terminal Panel Requires Project** (Nov 30, 2025):
+  - Terminal panel hidden when no project loaded
+  - Dynamic panel add/remove from SplitviewReact
+  - 46 new tests
+  - Closes #46
+- **Fix: Terminal AutoExecute Regression & Infinite Loop** (Nov 30, 2025):
+  - 200ms delay pattern for PTY buffering
+  - Ref-only approach to prevent re-render cycle
+  - Closes #41
+- **Complete Style Guide Compliance Audit** (Nov 30, 2025):
+  - Migrated all 23 CSS files to design tokens (100% compliance)
+- **Fix: DiagramViewer Wrong Diagram on Expand** (Nov 29, 2025):
+  - Content-first identity with position tie-breaking
+  - Content hash for stable identity
+  - **Total: 3003 tests passing** (105 test files)
+  - Closes #39
+- **Consolidate DiagramViewer Controls into Chat Panel** (Nov 29, 2025):
+  - Removed 48px toolbar, added floating close button
+  - Chat panel header with 3 control groups
+  - Closes #37
+- **Fix: DiagramViewer Refresh on Code Edit** (Nov 29, 2025):
+  - Fixed line number drift matching issue
+  - Two-part matching strategy with originalStartLine
+  - **Total: 2941 tests passing** (104 test files)
+  - Closes #38
+- **AI Chat Bubble in DiagramViewer** (Nov 28, 2025):
+  - Floating chat bubble for AI-assisted diagram modifications
+  - Auto-includes diagram context
+  - Cmd/Ctrl+Enter to send
+  - Character limit: 1000 warning, 2000 max
+  - 66 new tests
+  - **Total: 2684 tests passing** (94 test files)
+  - Closes #34
+
+## Changes in v0.5.2
+- **Mermaid Diagram Layout Direction Buttons** (Nov 28, 2025):
+  - Layout direction controls in diagram hover toolbar
+  - 7 Mermaid diagram types supported
+  - Prompt template with diagram context
+  - 151 new tests
+  - Closes #32
+
+## Changes in v0.5.1
+- **Mermaid Diagram Theming with Dark/Light Mode** (Nov 28, 2025):
+  - System preference detection
+  - Theme registry pattern
+  - 43 new tests
+  - Closes #33
+- **Fix: DiagramViewer Zoom Pixelation** (Nov 28, 2025):
+  - Scale SVG width/height directly (no CSS transform)
+  - 51 new tests
+  - Closes #31
+- **Full-Screen Mermaid Diagram Viewer** (Nov 27, 2025):
+  - Expand diagrams to full-screen overlay
+  - Zoom, pan, fit-to-screen controls
+  - Keyboard shortcuts: +, -, 0, F, Escape
+  - Accessibility: ARIA labels, focus management
+  - 168 tests
+  - Closes #30
+
+## Changes in v0.5.0 (was v0.4.8)
+- **Smart Terminal File Links** (Nov 27, 2025):
+  - Clickable file paths with line:column support
+  - Smart resolution with filename fallback
+  - FilePickerDialog for disambiguation
+  - Paths with spaces support (VS Code-style)
+  - 157 new tests
+  - Closes #26
+
+## Changes in v0.4.7
+- **Terminal Clipboard Support** (Nov 27, 2025):
+  - Copy/paste via keyboard shortcuts and context menu
+  - Smart Ctrl/Cmd+C (copy when selected, SIGINT when not)
+  - Platform-specific shortcuts
+  - 103 new tests
+  - Closes #28
+
+## Changes in v0.4.6
+- **VS Code-Inspired Watcher Performance** (Nov 25, 2025):
+  - EventCoalescer, ThrottledWorker, AtomicSaveDetector, WatcherMetrics
+  - 57 new tests
+
+## Changes in v0.4.5
+- **File Watcher Selective Blacklist** (Nov 23, 2025):
+  - VS Code-style function-based ignore
+  - Watches: `.claude/`, `.github/`, `.vscode/`
+  - Ignores: `node_modules/`, `.venv/`, `.git/objects/`
+  - Closes #21
+- **Unified Import System with Strategy Pattern** (Nov 23, 2025):
+  - Strategy, Registry, Factory patterns
+  - PDF and text file support
+  - 296 new tests
+  - **Total: 1923 tests passing** (80 test files)
+
+## Changes in v0.4.4
+- **PDF Import with AI-Assisted Organization** (Nov 22, 2025):
+  - PDF to Markdown conversion (@opendocsg/pdf2md)
+  - Output to `{project}/import/` directory
+  - AI prompt auto-executes
+  - Error handling: encrypted, empty, corrupted, large files
+  - Closes #19
+- **Organize-Import Prompt Enhancements** (Nov 22, 2025):
+  - 7-step workflow
+  - 3-5 file name suggestions
+  - 2-3 location suggestions
+  - Cleanup option
+  - Closes #20
+
+## Changes in v0.4.3
+- **Terminal Scroll Auto-Recovery** (Nov 22, 2025):
+  - Automatic detection/recovery from Claude Code Ink scroll anomalies
+  - Three-signal correlation
+  - Pure logic extraction pattern
+  - 44 new tests
+  - Closes #12
+
+## Changes in v0.4.2
+- **Chrome-style Dynamic Tabs** (Nov 22, 2025):
+  - Dynamic sizing (min 80px, max 300px)
+  - Dirty indicator, close button, middle-click
+  - Context menu: Close, Close Others, Close All
+  - 62 new tests
+- **ContextMenu Disabled State** (Nov 22, 2025):
+  - Added `disabled` property to ContextMenuItem
+- **implementing-issues skill** (Nov 22, 2025):
+  - 11-phase workflow
+  - 3 complexity tiers
+  - Located in `.claude/skills/implementing-issues/`
+
+## Changes in v0.4.0-0.4.1
+- **ProjectManagementContext Singleton** (Nov 22, 2025):
+  - Fixed duplicate toast issue
+  - ISP-compliant hooks
+- **Claude Code Skills** (Nov 22, 2025):
+  - Added `managing-skills` and `creating-issues` skills
+  - Located in `.claude/skills/`
 
 ## Changes in v0.3.9
 - **Auto-refresh Recent Projects** (Nov 21, 2025):
   - WelcomePanel subscribes to `project:changed` IPC event
-  - Recent projects list updates automatically when opening/closing projects
-  - No manual refresh needed
 - **React 18 StrictMode Bug Fix** (Nov 21, 2025):
-  - Fixed `isMounted` ref not resetting after StrictMode double-mount
-  - Root cause: useRef values persist across unmount/remount
-  - Fix: Reset `isMounted.current = true` in mount effect
+  - Fixed `isMounted` ref not resetting
 - **Error Handling System** (Nov 21, 2025):
-  - Created `src/shared/errors.ts` with `ErrorCode` enum (12 codes), `AppError` class
-  - Utilities: `isProjectNotFoundError()`, `getUserFriendlyMessage()`, `ERROR_MESSAGES` map
-  - Updated pathSecurity.ts and ProjectService.ts to use AppError
+  - Created `src/shared/errors.ts`
+  - `ErrorCode` enum, `AppError` class
 - **Shared Utilities** (Nov 21, 2025):
-  - `src/shared/constants.ts`: MAX_RECENT_PROJECTS, TIME constants, TOAST_DURATION
-  - `src/renderer/src/utils/toastHelpers.ts`: showErrorToast, showSuccessToast, showWarningToast
-  - `src/renderer/src/utils/timeFormatting.ts`: formatRelativeTime utility
-- **UIBlocker Refactoring** (Nov 21, 2025):
-  - Split into UIBlockerBase (props-based) + UIBlocker (store-based)
-  - Added fade-in animation (0.15s ease-out)
+  - `src/shared/constants.ts`
+  - Toast helpers, time formatting
 - **Test Coverage Improvements** (Nov 21, 2025):
-  - pathSecurity.test.ts: 79 tests for security validation
-  - SettingsService.recentProjects.test.ts: 39 tests
-  - WelcomePanel.test.tsx: 34 tests + 11 integration tests
-  - UIBlocker.test.tsx: 25 tests
-  - file-handlers.openProjectByPath.test.ts: 34 tests
-  - **Total: 1330 tests passing (62 test files)**
+  - **Total: 1330 tests passing** (62 test files)
 
 ## Changes in v0.3.8
 - **Markdown Link Security & Features** (Nov 2, 2025):
-  - Fixed email links treated as internal links, changed color from teal to blue
-  - Added dangerous protocol blocking (javascript:, data:, vbscript:, file://)
-  - Fixed anchor-only links (#section) with smooth scrolling
-  - Fixed heading slug generation (GitHub-compatible with unicode support)
-  - Fixed email/tel tooltip cleanup (removes query parameters)
-  - Created linkProtocols.ts utility for protocol validation
-  - Added 55 new tests (96.7% coverage for link features)
+  - Fixed email links, dangerous protocol blocking
+  - Anchor-only links with smooth scrolling
+  - 55 new tests
 - **Version Display in Title Bar** (Nov 2, 2025):
-  - Production builds show "ERFANA v{version}" in system title bar
-  - Development builds show "ERFANA" (no version)
-  - Uses Electron's app.getVersion() API
-  - See [src/main/index.ts](../src/main/index.ts:28) and [src/main/index.test.ts](../src/main/index.test.ts)
+  - Production builds show version in title bar
 
 ## Changes in v0.3.7
 - **Electron Builder Optimization** (Nov 2, 2025):
-  - Fixed critical recursive packaging bug (3.6GB → 231MB DMG)
-  - Added exclusions: !release/**, !coverage/**, !tests/**, !vitest.*.ts, !*.md
-  - Normal size for universal Electron app with Monaco + Mermaid
-  - See [docs/build/build-optimization.md](build/build-optimization.md)
+  - Fixed recursive packaging bug (3.6GB → 231MB)
 - **ProjectTree.tsx Modularization** (Nov 1, 2025):
-  - Reduced complexity by 38.4% (1,338 → 824 lines)
-  - Applied SOLID principles + design patterns (Strategy, Command, Factory)
-  - Created custom hooks: useProjectManagement, useFileOperations, useDirectoryWatcher
-  - Context menu redesign: 11 command classes, node-type strategies, factory selection
-  - New modules: switchHelpers, withWatcherPause, constants
-  - See [docs/architecture.md](architecture.md#projecttree-modularization)
+  - Reduced complexity by 38.4%
+  - SOLID principles + design patterns
 - **Comprehensive Test Coverage** (Nov 1, 2025):
-  - Added 320 new tests using "Extract Pure Logic" pattern
-  - Phase 1-2: 147 P0 tests (context menu, switchHelpers, withWatcherPause)
-  - Phase 3: 173 P1 tests (57 pure functions extracted from 3 hooks)
-  - **Total: 964 tests passing (50 test files)**
-  - Pattern: Extract pure logic → test independently → refactor hooks
-  - Benefits: Fast (173 tests in ~24ms), deterministic, portable, maintainable
-  - See [docs/testing/README.md](testing/README.md#projecttree-refactoring)
+  - Added 320 new tests
+  - **Total: 964 tests passing** (50 test files)
 - **Replace Confirmation Dialog** (Nov 1, 2025):
-  - Added confirmation when cut+paste would overwrite existing files
-  - New checkConflict detection before paste operations
-  - replaceExisting parameter for moveItem operations
+  - Confirmation when cut+paste would overwrite
 
 ## Changes in v0.3.6
 - **Drag-Drop CSS Layout Fix** (Nov 1, 2025):
-  - Fixed layout shift issue (18px) when dragging items over folders
-  - Replaced layout-affecting CSS with pseudo-element approach
-  - Visual feedback preserved, zero layout shifts
-  - See [docs/drag-drop/visual-feedback.md](drag-drop/visual-feedback.md#css-layout-shift-fix)
+  - Fixed 18px layout shift issue
 - **Comprehensive Drag-Drop UX Improvements** (Nov 1, 2025):
-  - Complete rewrite with VS Code-style behavior
-  - Root folder node (project root as first tree item)
-  - Auto-scroll (50px threshold, 60fps), Auto-expand (1s delay)
-  - Smooth dragging (no jumping/shifting), custom collision detection
-  - Keyboard shortcuts (Ctrl+X/C/V), context menu integration
-  - SOLID refactoring: IFileService, PauseController, SymlinkDetector, RollbackHandler
-  - 896 lines of new tests, architecture score 60→100
-  - See [docs/drag-drop/README.md](drag-drop/README.md)
-- **Unified Dialog System**: Complete rewrite of dialog framework
-  - Replaced old ConfirmDialog and UserInputDialog with new unified system
-  - Created Dialog/ folder with BaseDialog, DialogContext, DialogManager, dialogService
-  - Promise-based API via useDialog() hook (85% code reduction per usage)
-  - Added AlertDialog (simple notifications), ConfirmDialog (yes/no with danger mode), PromptDialog (text input)
-  - Z-index stacking for multiple dialogs, portal rendering (#portal-root)
-  - Accessibility: ARIA labels, keyboard shortcuts (Enter/Esc), focus management
-  - See [docs/architecture.md](architecture.md#dialog-system)
-- **SOLID Refactoring of File System Dialogs**: Applied SOLID principles to file/folder operations
-  - Created fileValidation.ts with shared validation utilities (6 error codes)
-  - Created FileSystemDialog.tsx as base component (consolidates common logic)
-  - Created thin wrappers: NewFileDialog, NewFolderDialog, RenameDialog (~50 lines each)
-  - Single Responsibility: Separated validation, base component, wrappers
-  - Open/Closed: Base component configurable via props, closed for modification
-  - Dependency Inversion: Validation abstracted from UI
-  - Cross-platform validation: case-insensitive duplicates, Windows reserved names (CON, PRN, etc.)
-  - Dotfile edge cases: `.CON` is valid, `CON` without dot is reserved
-  - Features: Character counter (255 limit), inline validation, auto-focus, keyboard shortcuts
-- **Comprehensive Test Coverage**: Added 129 new tests
-  - fileValidation.test.ts: 80 tests covering all validation scenarios
-  - FileSystemDialog.test.tsx: 49 tests covering component behavior (focus, input, validation, keyboard, ARIA)
-  - WrapperDialogs.test.tsx: Integration tests for wrapper components
-  - **Total: 549 tests passing (35 test files)**
-  - All typecheck, lint, and tests passing
-  - See [docs/testing/README.md](testing/README.md#dialog-system)
+  - VS Code-style behavior
+  - Auto-scroll, auto-expand
+  - 896 lines of new tests
+- **Unified Dialog System**:
+  - Promise-based API via useDialog() hook
+  - BaseDialog, DialogContext, DialogManager
+- **SOLID Refactoring of File System Dialogs**:
+  - fileValidation.ts with shared utilities
+  - FileSystemDialog.tsx as base component
+- **Comprehensive Test Coverage**:
+  - **Total: 549 tests passing** (35 test files)
 
 ## Changes in v0.3.5
-- **Comprehensive Test Coverage for Prompt System**: Added 319 new automated tests
-  - Core System Tests (177 tests): parser, renderer, helpers, schema, registry
-  - UI Component Tests (75 tests): UserInputDialog, PreviewContextMenu, MarkdownPreview
-  - Regression Tests (67 tests): prompt command validation, existing commands preservation
-  - Total: 395 tests passing (32 test files)
-  - Coverage: 98.59% statements, 96.59% branches, 100% functions, 98.59% lines
-- **Test Infrastructure**: Created comprehensive test utilities
-  - fixtures.ts: Factory functions for mock data (mockPromptVariables, mockPromptConfig, TEST_TEMPLATES)
-  - mocks.ts: Mock utilities (createMockWindowApi, installMockWindowApi, resetStores)
-  - Consistent test patterns across all test suites
-- **Code Quality Improvements**:
-  - Fixed 6 TypeScript errors in test utilities (Map initialization, ActivityBarStore state)
-  - Fixed 19 ESLint errors (unused variables, explicit any types, unused imports)
-  - All tests passing, typecheck clean, lint clean
-- **Testing Documentation**: Updated docs/testing/README.md with comprehensive prompt system testing information
-- **Test Fixes**: Fixed userEvent.type() issues in coverage runs by switching to userEvent.paste()
+- **Comprehensive Test Coverage for Prompt System**:
+  - 319 new automated tests
+  - **Total: 395 tests passing** (32 test files)
+  - Coverage: 98.59% statements
 
 ## Changes in v0.3.4
-- **AutoExecute Simplification**: Reverted to fire-and-forget approach (v0.3.3 was over-engineered)
-  - Removed Promise-based writes with callbacks (caused IPC hangs)
-  - Removed initialization polling (overkill - 100+ lines removed)
-  - Kept 200ms delay (industry standard: VSCode, Hyper, iTerm2)
-  - Write ordering guaranteed by TCP FIFO semantics
-  - Research: node-pty callback only indicates socket flush, NOT render completion
-  - Result: -80 net lines, +10% reliability, simpler maintainability
-  - 10 comprehensive tests in useTerminalStore.autoExecute.test.ts (95.77% coverage)
-  - Total: 76 tests across 22 files
-  - See [docs/prompts/](prompts/) for split documentation (autoexecute-overview, technical, testing, reference)
+- **AutoExecute Simplification**:
+  - Reverted to fire-and-forget approach
+  - Removed Promise-based writes
+  - 200ms delay (industry standard)
+  - 10 comprehensive tests
 - **Documentation Token Efficiency Improvements**:
-  - Moved unimplemented graph-engine docs to docs/future/ (~145,800 tokens saved, 73% reduction)
-  - Split docs/prompts/implementation.md (689 lines → 4 files ≤500 lines each)
-  - All docs/ files now ≤500 lines for optimal Claude Code context loading
+  - Moved graph-engine docs to docs/future/
+  - Split docs/prompts/implementation.md
 
 ## Changes in v0.3.3
-- **AutoExecute Race Condition Fix**: Fixed inconsistent behavior in "Elaborate", "Modify", and "Ask" context menu actions
-  - Changed terminal writes from fire-and-forget to Promise-based with completion callbacks
-  - Added terminal initialization polling (5s max, 50ms intervals) to prevent race conditions
-  - Enhanced error handling: autoExecute fails fast, manual writes proceed with warning
-  - Increased delay from 100ms to 200ms for reliability
-  - Promise-based IPC pattern (terminal:write changed from ipcMain.on to ipcMain.handle)
-  - 13 comprehensive tests in useTerminalStore.autoExecute.test.ts
-  - Total: 79 tests across 22 files (was 66 tests in v0.3.2)
-  - See [docs/prompts/implementation.md](prompts/implementation.md) for implementation details
+- **AutoExecute Race Condition Fix**:
+  - Promise-based writes with completion callbacks
+  - Terminal initialization polling
+  - 13 comprehensive tests
 
 ## Changes in v0.3.2
-- **Terminal Flickering Prevention**: Fixed terminal rendering flicker in production builds
-  - Added Electron WebGL command line switches for Electron 33 compatibility
-  - Enhanced WebGL context recovery with automatic retry after loss
-  - Integer dimension enforcement (Math.floor) to prevent fractional oscillation
-  - Dimension change threshold (≥2 cols OR ≥1 row) to filter devicePixelRatio noise
-  - 6 comprehensive tests in TerminalPanel.flickering.test.tsx
-  - Related: xterm.js #4922, Electron 33 WebGL context management
-- **Scroll to Bottom Button**: Added manual workaround for Claude Code scroll jumping
-  - New button (icon) in terminal header
-  - Quick recovery from scroll position loss
-  - Uses xterm.js scrollToBottom() API
-- **Documentation Restructuring**: Split oversized documentation files
-  - terminal.md split into terminal/ subfolder (5 focused files)
-  - All files now comply with 500-line limit for Claude Code efficiency
+- **Terminal Flickering Prevention**:
+  - WebGL command line switches
+  - 6 comprehensive tests
+- **Scroll to Bottom Button**:
+  - Manual workaround for scroll jumping
+- **Documentation Restructuring**:
+  - terminal.md split into subfolder
 
 ## Changes in v0.3.1
-- **Terminal Scroll Fix**: Fixed terminal jumping to top during Claude CLI streaming output
-  - Scroll position tracking using Buffer API (viewportY vs baseY)
-  - Terminal options: scrollOnUserInput: false, smoothScrollDuration: 0
-  - CSS fix: overflow-y: auto instead of forced scrollbars
-  - 6 comprehensive tests in TerminalPanel.scroll.test.tsx
-  - Related issues: GitHub #826, #1413, #1426
+- **Terminal Scroll Fix**:
+  - Scroll position tracking
+  - 6 comprehensive tests
 
 ## Changes in v0.3.0
-- **Terminal Bootstrap Pattern**: Eliminated initialization artifacts using non-interactive `-c` script + exec
-  - Zero visible commands (cd, pwd, echo marker)
-  - Three-flag gating system (hasReceivedMarker, initializationComplete, isClearing)
-  - Bypass channel for deterministic clear handshake
-  - Environment variable filtering (excludes dev vars)
-  - 18 comprehensive tests, 46% coverage
-- Symlink indicators in Project Tree (watchers do not follow symlinks)
-- Watcher depth setting (config-only; not exposed in UI)
+- **Terminal Bootstrap Pattern**:
+  - Zero visible initialization commands
+  - 18 comprehensive tests
+- Symlink indicators in Project Tree
+- Watcher depth setting
 - Improved editor/preview scroll sync
-- Fixed EPIPE errors during shutdown
-- Watchers: recoverable ENOENT (stopAll) + session token guards
+- Fixed EPIPE errors

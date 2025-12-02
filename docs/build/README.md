@@ -1,0 +1,156 @@
+# Build Documentation
+
+**Last Updated**: December 2025 (v0.6.0)
+
+This directory contains detailed documentation for Erfana's production build configuration.
+
+---
+
+## Quick Start
+
+**TL;DR** - Build command:
+```bash
+# Prerequisites: macOS 12+, Node.js 18+, Python 3.12, npm install completed
+
+# Build both x64 and arm64 (workaround runs automatically via prebuild script)
+npm run build:mac
+```
+
+**Output**: `release/0.6.0/erfana-0.6.0-{x64,arm64}.dmg` + ZIP files
+
+**Duration**: ~2-3 minutes on modern Mac
+
+**Note**: The aproba workaround now runs automatically via the `prebuild` npm script.
+
+---
+
+## Prerequisites
+
+### System Requirements
+
+**Operating System**:
+- macOS 12+ (Big Sur or newer) - Required for building macOS apps
+- Linux or Windows can build for those platforms, but not for macOS
+
+**Development Tools**:
+- Node.js 18+ (Electron 39 requires Node 18 or newer)
+- npm 9+ or compatible package manager
+- Xcode Command Line Tools (macOS only):
+  ```bash
+  xcode-select --install
+  ```
+
+**Python** (for node-pty native compilation):
+- Python 3.12 or earlier (NOT 3.13 - node-pty fails to build)
+- Check version: `python3 --version`
+- If using Python 3.13, downgrade to 3.12
+
+### Install Dependencies
+
+```bash
+# Install all dependencies
+npm install
+
+# This will:
+# - Install production dependencies (node_modules/)
+# - Install devDependencies (electron-builder, vitest, etc.)
+# - Rebuild native modules (node-pty) for current platform
+```
+
+**Important**: The `postinstall` script automatically runs `electron-builder install-app-deps` to rebuild native modules for Electron's Node.js version.
+
+### Clean State (Recommended)
+
+For reliable builds, start with clean state:
+
+```bash
+# Clean previous builds
+rm -rf release/
+
+# Clean compiled code
+rm -rf out/
+
+# Optional: Clean node_modules (if dependencies changed)
+rm -rf node_modules/
+npm install
+```
+
+---
+
+## Build Process Overview
+
+1. **prebuild**: Create aproba workaround (automatic)
+2. **Typecheck**: Verify TypeScript compilation
+3. **Vite Build**: Bundle application code
+   - Main process: 144.97 kB (externalized dependencies)
+   - Preload script: 12.08 kB (bundled dependencies)
+   - Renderer: 10.5 MB (Monaco, Mermaid, xterm.js included)
+4. **electron-builder Package**: Create platform packages
+5. **afterPack Hook**: Apply Electron fuses
+6. **DMG/ZIP Creation**: Package for distribution
+
+**Build Output**:
+```
+release/0.6.0/
+├── erfana-0.6.0-x64.dmg             (179 MB)
+├── erfana-0.6.0-arm64.dmg           (172 MB)
+├── Erfana-0.6.0-mac.zip             (179 MB)
+├── Erfana-0.6.0-arm64-mac.zip       (173 MB)
+├── *.blockmap                        (for updates)
+└── mac/ and mac-arm64/              (build directories)
+```
+
+---
+
+## Detailed Documentation
+
+For detailed information on specific build aspects, see:
+
+- **[Electron Builder Configuration](./electron-builder.md)** - Version info, aproba workaround
+- **[ASAR Packaging](./asar.md)** - Why ASAR is disabled, security implications
+- **[Preload Bundling](./preload.md)** - Sandbox compatibility requirements
+- **[Architecture Builds](./architectures.md)** - x64/arm64 vs universal binary decision
+- **[Electron Fuses](./fuses.md)** - Security fuses configuration
+- **[Dependencies](./dependencies.md)** - Exclusions and devDependencies
+- **[Troubleshooting](./troubleshooting.md)** - Common build errors and solutions
+
+---
+
+## Testing the Build
+
+### Pre-Installation
+
+1. **Check build artifacts exist**:
+   ```bash
+   ls -lh release/0.6.0/*.dmg
+   ```
+
+2. **Verify file sizes** (approximately):
+   - x64 DMG: ~179 MB
+   - arm64 DMG: ~172 MB
+
+### Post-Installation Verification
+
+- [ ] Terminal spawns and executes commands
+- [ ] File tree loads and refreshes
+- [ ] Monaco editor loads and syntax highlights
+- [ ] Markdown preview renders correctly
+- [ ] Mermaid diagrams render
+- [ ] Git status indicators show
+- [ ] Project switching works
+- [ ] Settings persist across restarts
+- [ ] No keychain prompts (cookie encryption disabled)
+- [ ] App launches without errors (bundled preload works)
+
+---
+
+## References
+
+- [electron-builder Documentation](https://www.electron.build/)
+- [Electron Fuses](https://www.electronjs.org/docs/latest/tutorial/fuses)
+- [Electron Process Sandboxing](https://www.electronjs.org/docs/latest/tutorial/sandbox)
+- [electron-vite Documentation](https://electron-vite.org/)
+
+---
+
+See also: [Security Guidelines](../security.md) | [Architecture](../architecture.md) | [Known Issues](../known-issues.md)
