@@ -194,8 +194,14 @@ export class FileWatcherService {
   }
 
   /**
-   * Stop watching all files for a specific webContentsId
-   * Used when webContents is destroyed (no longer have the WebContents object) - issue #59
+   * Cleanup file watchers owned by a specific webContents.
+   * Called when webContents is destroyed (window close or dev refresh).
+   *
+   * @param webContentsId - The ID of the destroyed webContents
+   * @remarks
+   * - Increments session version to invalidate pending events (race guard)
+   * - Fire-and-forget safe - errors are logged but don't propagate
+   * @see Issue #59 - App enters broken state after window close
    */
   async cleanupForWebContentsId(webContentsId: number): Promise<void> {
     // Bump session version FIRST to invalidate pending events before cleanup (issue #59)

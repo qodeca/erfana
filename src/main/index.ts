@@ -75,7 +75,9 @@ function createWindow(): BrowserWindow {
     fileWatcherService.setProjectPath('')
     directoryWatcherService.setProjectPath('')
 
-    // Cleanup watcher services (async but fire-and-forget)
+    // Cleanup watcher services asynchronously
+    // Pattern: Fire-and-forget with error logging - cleanup must not block the destroyed event
+    // Errors are logged but don't halt further cleanup operations
     fileWatcherService.cleanupForWebContentsId(webContentsId).catch((err) => {
       console.error('Error cleaning up file watchers:', err)
     })

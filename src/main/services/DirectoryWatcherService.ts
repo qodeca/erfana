@@ -323,8 +323,15 @@ export class DirectoryWatcherService {
   }
 
   /**
-   * Stop watching all directories for a specific webContentsId
-   * Used when webContents is destroyed (no longer have the WebContents object) - issue #59
+   * Cleanup directory watchers owned by a specific webContents.
+   * Called when webContents is destroyed (window close or dev refresh).
+   *
+   * @param webContentsId - The ID of the destroyed webContents
+   * @remarks
+   * - Increments session version to invalidate pending events (race guard)
+   * - Fire-and-forget safe - errors are logged but don't propagate
+   * - Also stops git index watcher (shared resource)
+   * @see Issue #59 - App enters broken state after window close
    */
   async cleanupForWebContentsId(webContentsId: number): Promise<void> {
     // Bump session version FIRST to invalidate pending events before cleanup (issue #59)
@@ -355,7 +362,8 @@ export class DirectoryWatcherService {
       }
     }
 
-    // Stop git index watcher (single-window app model)
+    // Stop git index watcher for this webContents
+    // Note: Git index watcher is shared - stopping here affects all windows watching this project
     await this.stopGitIndexWatcher()
 
     this.metrics.setActiveWatchers(this.watchedDirectories.size)

@@ -200,7 +200,10 @@ export class TerminalService extends EventEmitter {
         initializationComplete: false, // Will be set to true after cwd verification
         isClearing: false, // Will be set to true during terminal clear phase
         hasReceivedMarker: false, // Will be set to true when marker is detected
-        webContentsId: webContentsId ?? -1 // Track owning webContents for cleanup
+        // Track owning webContents for cleanup on window close (issue #59)
+        // Sentinel value -1 means "no owner" - terminals with -1 won't be cleaned up
+        // during window destruction (used in tests and manual terminal creation)
+        webContentsId: webContentsId ?? -1
       }
 
       this.terminals.set(terminalId, terminal)
@@ -464,8 +467,14 @@ export class TerminalService extends EventEmitter {
   }
 
   /**
-   * Cleanup all terminals owned by a specific webContents
-   * Called when window closes or renderer reloads (issue #59)
+   * Cleanup all terminals owned by a specific webContents.
+   * Called when webContents is destroyed (window close or dev refresh).
+   *
+   * @param webContentsId - The ID of the destroyed webContents
+   * @remarks
+   * - Terminals with webContentsId=-1 (no owner) are not affected
+   * - Synchronous operation - safe to call from event handlers
+   * @see Issue #59 - App enters broken state after window close
    */
   cleanupForWebContentsId(webContentsId: number): void {
     console.log(`🧹 Cleaning up terminals for webContents ${webContentsId}`)
