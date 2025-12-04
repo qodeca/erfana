@@ -2,11 +2,15 @@
 
 Architectural quality review for implemented code changes.
 
+**Reference:** `reference/code-review-standards-2025.md` Section 6 (SOLID Principles)
+
 ---
 
 ## Purpose
 
 Evaluate the architectural quality of implementation against SOLID principles, design patterns, and software engineering best practices. This agent reviews the *actual code* produced, not just whether it matches the plan.
+
+**MANDATORY:** This review is required for all Tier 2 implementations.
 
 ---
 
@@ -47,7 +51,9 @@ Build mental model of:
 - Dependencies between files
 - Public interfaces exposed
 
-### Step 2: Analyze Single Responsibility Principle
+### Step 2: Analyze Single Responsibility Principle (SRP)
+
+**Reference:** `reference/code-review-standards-2025.md` Section 6.1
 
 For each component/class/module:
 
@@ -57,68 +63,319 @@ For each component/class/module:
 - Can you describe its responsibility in one sentence without "and"?
 
 **Detection patterns:**
-```
-Grep(pattern="class|function|const.*=.*=>|export default", path="<file>")
+```bash
+# Count lines per file
+wc -l <file>
+→ >300 lines = HIGH violation
+→ >500 lines = CRITICAL violation
+
+# Check for mixed concerns
+Grep(pattern="import.*from.*(api|store|service)", path="<component>")
+→ Flag if component imports from multiple architectural layers
+
+# Count exports
+Grep(pattern="export (const|function|class|interface|type)", path="<file>")
+→ >10 exports = MEDIUM violation
 ```
 
-**Red flags:**
-- Components > 300 lines
-- Multiple unrelated imports (UI + API + Storage)
-- Methods that don't use `this` / component state
-- "Manager", "Handler", "Processor" in names (often do too much)
+**Red flags and severity:**
+| Indicator | Threshold | Severity |
+|-----------|-----------|----------|
+| Component lines | >300 | HIGH |
+| Component lines | >500 | CRITICAL |
+| Unrelated imports | UI + API + Storage | MEDIUM |
+| Methods not using state | >3 methods | LOW |
+| "Manager/Handler/Processor" names | Any | MEDIUM |
+| Multiple exports | >10 | MEDIUM |
 
-### Step 3: Analyze Open/Closed Principle
+**SRP violation example:**
+```typescript
+// ❌ BAD: Multiple responsibilities
+class UserService {
+  fetchUser() { }         // Data fetching
+  validateEmail() { }     // Validation
+  formatUserName() { }    // Formatting
+  sendWelcomeEmail() { }  // Side effects
+  logUserActivity() { }   // Logging
+}
+
+// ✅ GOOD: Single responsibility each
+class UserRepository { fetchUser() { } }
+class EmailValidator { validate() { } }
+class UserFormatter { formatName() { } }
+```
+
+### Step 3: Analyze Open/Closed Principle (OCP)
+
+**Reference:** `reference/code-review-standards-2025.md` Section 6.2
 
 **Check for:**
 - Can new behavior be added without modifying existing code?
 - Are there switch statements on type/kind that grow with features?
 
-**Red flags:**
-```
-Grep(pattern="switch.*type|if.*typeof|instanceof", path="<file>")
+**Detection patterns:**
+```bash
+# Growing switch statements
+Grep(pattern="switch\\s*\\([^)]*type|kind|status|action", path="<file>")
+→ Flag as MEDIUM if >3 cases
+
+# Type discrimination chains
+Grep(pattern="if.*typeof.*===|instanceof", path="<file>")
+→ Flag if multiple consecutive checks
+
+# Hardcoded type arrays
+Grep(pattern="\\[(\"[^\"]+\",\\s*){3,}", path="<file>")
+→ Flag hardcoded lists that likely grow
 ```
 
-- Multiple `if/else if` chains on type discrimination
-- Hardcoded lists that grow with features
-- No extension points (no interfaces, no composition)
+**Red flags and severity:**
+| Indicator | Threshold | Severity |
+|-----------|-----------|----------|
+| Switch on type/kind | >5 cases | HIGH |
+| Switch on type/kind | >3 cases | MEDIUM |
+| if/else typeof chain | >3 branches | MEDIUM |
+| No extension points | Critical path | HIGH |
 
-### Step 4: Analyze Liskov Substitution Principle
+**OCP violation example:**
+```typescript
+// ❌ BAD: Must modify to add new type
+function getIcon(type: string) {
+  switch(type) {
+    case 'file': return FileIcon;
+    case 'folder': return FolderIcon;
+    case 'image': return ImageIcon;
+    // Adding new type requires modifying this function
+  }
+}
+
+// ✅ GOOD: Open for extension
+const iconRegistry: Record<string, IconComponent> = {
+  file: FileIcon,
+  folder: FolderIcon,
+  image: ImageIcon,
+};
+// New types can be registered without modifying function
+iconRegistry['video'] = VideoIcon;
+
+function getIcon(type: string) {
+  return iconRegistry[type] ?? DefaultIcon;
+}
+```
+
+### Step 4: Analyze Liskov Substitution Principle (LSP)
+
+**Reference:** `reference/code-review-standards-2025.md` Section 6.3
 
 **Check for:**
 - Do subclasses/implementations behave consistently with their base?
 - Any type narrowing or `instanceof` checks?
+- Preconditions not strengthened in subtypes?
+- Postconditions not weakened in subtypes?
 
-**Red flags:**
-- Methods that throw "not implemented"
-- Overridden methods with different side effects
-- Type guards immediately after interface usage
+**Detection patterns:**
+```bash
+# Methods throwing "not implemented"
+Grep(pattern="throw.*not implemented|throw.*NotImplemented", path="<file>")
+→ HIGH violation
 
-### Step 5: Analyze Interface Segregation Principle
+# Type guards after interface usage
+Grep(pattern="instanceof\\s+[A-Z]", path="<file>")
+→ Review context, may indicate LSP issue
+
+# Empty method bodies in implementations
+Grep(pattern="\\{\\s*\\}", path="<file>")
+→ Check if these are interface implementations
+```
+
+**Red flags and severity:**
+| Indicator | Threshold | Severity |
+|-----------|-----------|----------|
+| "Not implemented" throws | Any | HIGH |
+| instanceof after base type | In core logic | MEDIUM |
+| Empty override methods | Any | HIGH |
+| Override changes behavior | Side effects differ | CRITICAL |
+
+**LSP violation example:**
+```typescript
+// ❌ BAD: Violates LSP
+interface Bird {
+  fly(): void;
+}
+
+class Penguin implements Bird {
+  fly(): void {
+    throw new Error('Penguins cannot fly'); // LSP violation!
+  }
+}
+
+// ✅ GOOD: Proper abstraction
+interface Bird {
+  move(): void;
+}
+
+interface FlyingBird extends Bird {
+  fly(): void;
+}
+
+class Penguin implements Bird {
+  move(): void { /* swim */ }
+}
+
+class Eagle implements FlyingBird {
+  move(): void { /* fly */ }
+  fly(): void { /* fly implementation */ }
+}
+```
+
+### Step 5: Analyze Interface Segregation Principle (ISP)
+
+**Reference:** `reference/code-review-standards-2025.md` Section 6.4
 
 **Check for:**
 - Are interfaces focused and minimal?
 - Do consumers use all methods of interfaces they depend on?
+- Are there "fat" interfaces forcing implementations to stub methods?
 
-**Red flags:**
-- Interfaces with > 7 methods
-- Optional methods in interfaces (?)
-- Implementations with empty method bodies
+**Detection patterns:**
+```bash
+# Large interfaces
+Grep(pattern="interface\\s+[A-Z]", path="<file>")
+→ Count methods in each interface
+→ >7 methods = MEDIUM violation
+→ >10 methods = HIGH violation
 
-### Step 6: Analyze Dependency Inversion Principle
+# Optional methods in interfaces
+Grep(pattern="\\?\\s*:", path="<file>")
+→ Review if these indicate ISP issue
+
+# Find interface implementations
+Grep(pattern="implements\\s+[A-Z]", path="<file>")
+→ Check if implementation uses all methods
+```
+
+**Red flags and severity:**
+| Indicator | Threshold | Severity |
+|-----------|-----------|----------|
+| Interface methods | >10 | HIGH |
+| Interface methods | >7 | MEDIUM |
+| Optional methods | >3 in one interface | MEDIUM |
+| Empty implementations | Any | HIGH |
+
+**ISP violation example:**
+```typescript
+// ❌ BAD: Fat interface
+interface Worker {
+  work(): void;
+  eat(): void;
+  sleep(): void;
+  attendMeeting(): void;
+  writeCode(): void;
+  designSystem(): void;
+  managePeople(): void;
+}
+
+// Robot can't eat or sleep!
+class Robot implements Worker {
+  work(): void { /* works */ }
+  eat(): void { /* empty - violation! */ }
+  sleep(): void { /* empty - violation! */ }
+  // ...more empty methods
+}
+
+// ✅ GOOD: Segregated interfaces
+interface Workable { work(): void; }
+interface Eatable { eat(): void; }
+interface Sleepable { sleep(): void; }
+interface Codeable { writeCode(): void; }
+
+class Robot implements Workable, Codeable {
+  work(): void { /* works */ }
+  writeCode(): void { /* codes */ }
+}
+
+class Human implements Workable, Eatable, Sleepable, Codeable {
+  work(): void { /* works */ }
+  eat(): void { /* eats */ }
+  sleep(): void { /* sleeps */ }
+  writeCode(): void { /* codes */ }
+}
+```
+
+### Step 6: Analyze Dependency Inversion Principle (DIP)
+
+**Reference:** `reference/code-review-standards-2025.md` Section 6.5
 
 **Check for:**
 - Do high-level modules depend on abstractions?
 - Are dependencies injected rather than created?
+- Do low-level details depend on high-level policies?
 
-**Detection:**
-```
-Grep(pattern="new [A-Z]|import.*from.*\\.\\./", path="<file>")
+**Detection patterns:**
+```bash
+# Direct instantiation
+Grep(pattern="new [A-Z][a-zA-Z]+(Service|Repository|Manager|Handler)", path="<file>")
+→ MEDIUM violation each
+
+# Concrete imports crossing layers
+Grep(pattern="import.*from.*\\.\\./(services|repositories|stores)", path="src/renderer/components/")
+→ Components should not import concrete services
+
+# Singleton usage
+Grep(pattern="\\.getInstance\\(\\)|singleton", path="<file>")
+→ Review if this creates tight coupling
 ```
 
-**Red flags:**
-- Direct instantiation of dependencies (`new ConcreteClass()`)
-- Imports crossing architectural boundaries
-- Global singletons used directly
+**Red flags and severity:**
+| Indicator | Threshold | Severity |
+|-----------|-----------|----------|
+| Direct `new Service()` | Any | MEDIUM |
+| Import concrete across layers | Any | HIGH |
+| Global singleton access | In component | MEDIUM |
+| No injection mechanism | Critical path | HIGH |
+
+**DIP violation example:**
+```typescript
+// ❌ BAD: Direct dependency creation
+class UserController {
+  private userService = new UserService();      // Tight coupling!
+  private emailService = new EmailService();    // Can't mock in tests!
+  private logger = Logger.getInstance();        // Global singleton!
+
+  async createUser(data: UserData) {
+    const user = await this.userService.create(data);
+    await this.emailService.sendWelcome(user);
+    this.logger.info('User created');
+    return user;
+  }
+}
+
+// ✅ GOOD: Dependency injection
+interface IUserService { create(data: UserData): Promise<User>; }
+interface IEmailService { sendWelcome(user: User): Promise<void>; }
+interface ILogger { info(message: string): void; }
+
+class UserController {
+  constructor(
+    private userService: IUserService,    // Injected abstraction
+    private emailService: IEmailService,  // Injected abstraction
+    private logger: ILogger               // Injected abstraction
+  ) {}
+
+  async createUser(data: UserData) {
+    const user = await this.userService.create(data);
+    await this.emailService.sendWelcome(user);
+    this.logger.info('User created');
+    return user;
+  }
+}
+
+// Easy to test with mocks!
+const controller = new UserController(
+  mockUserService,
+  mockEmailService,
+  mockLogger
+);
+```
 
 ### Step 7: Evaluate Coupling
 

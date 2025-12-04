@@ -323,6 +323,46 @@ export class DirectoryWatcherService {
   }
 
   /**
+   * Stop watching all directories for a specific webContentsId
+   * Used when webContents is destroyed (no longer have the WebContents object) - issue #59
+   */
+  async cleanupForWebContentsId(webContentsId: number): Promise<void> {
+    // Bump session version FIRST to invalidate pending events before cleanup (issue #59)
+    this.switchVersion++
+
+    const directoriesToCleanup: string[] = []
+
+    // Find all directories watched by this webContentsId
+    for (const [dirPath, watched] of this.watchedDirectories.entries()) {
+      if (watched.webContentsIds.has(webContentsId)) {
+        watched.webContentsIds.delete(webContentsId)
+
+        // If no more watchers, schedule for full cleanup
+        if (watched.webContentsIds.size === 0) {
+          directoriesToCleanup.push(dirPath)
+        }
+      }
+    }
+
+    // Cleanup directories with no remaining watchers
+    for (const dirPath of directoriesToCleanup) {
+      const watched = this.watchedDirectories.get(dirPath)
+      if (watched) {
+        watched.throttledWorker.dispose()
+        watched.atomicSaveDetector.dispose()
+        await watched.watcher.close()
+        this.watchedDirectories.delete(dirPath)
+      }
+    }
+
+    // Stop git index watcher (single-window app model)
+    await this.stopGitIndexWatcher()
+
+    this.metrics.setActiveWatchers(this.watchedDirectories.size)
+    this.safeLog(`👁️  Cleaned up directory watches for webContentsId ${webContentsId}`)
+  }
+
+  /**
    * Pause watching (during internal operations to prevent race conditions)
    * Uses reference counting to support nested pause/resume operations
    */
@@ -538,6 +578,8 @@ export class DirectoryWatcherService {
     // Stop existing watcher if any
     await this.stopGitIndexWatcher()
 
+    // Store webContentsId instead of webContents object to prevent stale reference (issue #59)
+    const webContentsId = webContents.id
     const gitIndexPath = `${projectPath}/.git/index`
 
     // Check if .git/index exists (not a git repo if missing)
@@ -579,9 +621,9 @@ export class DirectoryWatcherService {
         this.gitIndexDebounceTimer = null
         this.safeLog(`🔄 Git index changed: ${gitIndexPath}`)
 
-        // Notify renderer about git index change
+        // Notify renderer about git index change (use stored ID, not potentially stale reference)
         const windows = BrowserWindow.getAllWindows()
-        const window = windows.find(w => w.webContents.id === webContents.id)
+        const window = windows.find(w => w.webContents.id === webContentsId)
         if (window && !window.isDestroyed()) {
           try {
             window.webContents.send('git:index-changed', { projectPath })

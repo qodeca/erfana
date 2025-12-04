@@ -194,6 +194,43 @@ export class FileWatcherService {
   }
 
   /**
+   * Stop watching all files for a specific webContentsId
+   * Used when webContents is destroyed (no longer have the WebContents object) - issue #59
+   */
+  async cleanupForWebContentsId(webContentsId: number): Promise<void> {
+    // Bump session version FIRST to invalidate pending events before cleanup (issue #59)
+    this.switchVersion++
+
+    const filesToCleanup: string[] = []
+
+    // Find all files watched by this webContentsId
+    for (const [filePath, watched] of this.watchedFiles.entries()) {
+      if (watched.webContentsIds.has(webContentsId)) {
+        watched.webContentsIds.delete(webContentsId)
+
+        // If no more watchers, schedule for full cleanup
+        if (watched.webContentsIds.size === 0) {
+          filesToCleanup.push(filePath)
+        }
+      }
+    }
+
+    // Cleanup files with no remaining watchers
+    for (const filePath of filesToCleanup) {
+      const watched = this.watchedFiles.get(filePath)
+      if (watched) {
+        if (watched.debounceTimer) {
+          clearTimeout(watched.debounceTimer)
+        }
+        await watched.watcher.close()
+        this.watchedFiles.delete(filePath)
+      }
+    }
+
+    this.safeLog(`👁️  Cleaned up file watches for webContentsId ${webContentsId}`)
+  }
+
+  /**
    * Pause watching a file (during save operations to prevent race conditions)
    */
   pauseWatch(filePath: string): void {

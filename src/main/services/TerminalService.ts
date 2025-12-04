@@ -42,6 +42,7 @@ interface TerminalInstance {
   isClearing: boolean // Track clearing phase to prevent forwarding clear sequence
   clearFallbackTimeout?: NodeJS.Timeout // Safety timeout for clear confirmation
   hasReceivedMarker: boolean // Track if marker was detected (prevents late data forwarding)
+  webContentsId: number // Track owning webContents for cleanup on window close
 }
 
 /**
@@ -108,8 +109,10 @@ export class TerminalService extends EventEmitter {
 
   /**
    * Create a new terminal instance
+   * @param config - Terminal configuration
+   * @param webContentsId - ID of the webContents that owns this terminal (for cleanup on window close)
    */
-  async createTerminal(config: TerminalConfig = {}): Promise<string | null> {
+  async createTerminal(config: TerminalConfig = {}, webContentsId?: number): Promise<string | null> {
     if (!pty) {
       try {
         pty = await import('node-pty')
@@ -196,7 +199,8 @@ export class TerminalService extends EventEmitter {
         title: `Terminal ${this.terminalCounter}`,
         initializationComplete: false, // Will be set to true after cwd verification
         isClearing: false, // Will be set to true during terminal clear phase
-        hasReceivedMarker: false // Will be set to true when marker is detected
+        hasReceivedMarker: false, // Will be set to true when marker is detected
+        webContentsId: webContentsId ?? -1 // Track owning webContents for cleanup
       }
 
       this.terminals.set(terminalId, terminal)
@@ -375,6 +379,17 @@ export class TerminalService extends EventEmitter {
       return false
     }
 
+    // Clear fallback timeout to prevent timer leak (issue #59)
+    try {
+      if (terminal.clearFallbackTimeout) {
+        clearTimeout(terminal.clearFallbackTimeout)
+        terminal.clearFallbackTimeout = undefined
+      }
+    } catch (error) {
+      console.warn(`⚠️  Failed to clear fallback timeout for terminal ${terminalId}:`, error)
+      // Continue with kill anyway - don't let timeout error prevent cleanup
+    }
+
     try {
       terminal.ptyProcess.kill()
       this.terminals.delete(terminalId)
@@ -446,6 +461,31 @@ export class TerminalService extends EventEmitter {
 
     this.terminals.clear()
     console.log('✅ TerminalService disposed')
+  }
+
+  /**
+   * Cleanup all terminals owned by a specific webContents
+   * Called when window closes or renderer reloads (issue #59)
+   */
+  cleanupForWebContentsId(webContentsId: number): void {
+    console.log(`🧹 Cleaning up terminals for webContents ${webContentsId}`)
+    const terminalsToKill: string[] = []
+
+    for (const [terminalId, terminal] of this.terminals.entries()) {
+      if (terminal.webContentsId === webContentsId) {
+        terminalsToKill.push(terminalId)
+      }
+    }
+
+    for (const terminalId of terminalsToKill) {
+      // Check if terminal still exists - it may have exited naturally between collection and kill
+      if (!this.terminals.has(terminalId)) {
+        continue
+      }
+      this.killTerminal(terminalId)
+    }
+
+    console.log(`✅ Cleaned up ${terminalsToKill.length} terminals for webContents ${webContentsId}`)
   }
 
   /**

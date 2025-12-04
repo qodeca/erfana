@@ -9,6 +9,7 @@
 
 **STOP if ANY condition is unchecked. Do not proceed.**
 
+- [ ] **Current branch is `develop`** (BLOCKING - no workaround, no retry)
 - [ ] Git repository exists in current directory
 - [ ] `gh` CLI installed and authenticated
 - [ ] Issue number provided by user
@@ -18,7 +19,32 @@
 
 ## Execution Steps
 
-### Step 1: Validate Issue
+### Step 1: Validate source branch
+
+**BLOCKING - This step MUST pass before ANY other step. NO retry allowed.**
+
+```bash
+current_branch=$(git branch --show-current)
+if [ "$current_branch" != "develop" ]; then
+  echo "ERROR: Must be on 'develop' branch to start implementation"
+  echo "Current branch: $current_branch"
+  exit 1
+fi
+```
+
+**On Failure:**
+
+| Action | Description |
+|--------|-------------|
+| STOP immediately | Do not proceed to any other step |
+| Inform user | "Implementation can ONLY start from 'develop' branch" |
+| Provide fix | `git checkout develop && git pull origin develop` |
+
+**Why no retry?** This is a prerequisite, not a transient failure. User must manually switch branches.
+
+---
+
+### Step 2: Validate issue
 
 ```bash
 gh issue view <number> --json state,title,labels,body
@@ -29,7 +55,7 @@ gh issue view <number> --json state,title,labels,body
 - State is OPEN (not closed, not draft)
 - No `blocked` label
 
-### Step 2: Validate Working Directory
+### Step 3: Validate working directory
 
 ```bash
 git status --porcelain
@@ -39,7 +65,7 @@ git status --porcelain
 - No uncommitted changes
 - No untracked files in src/
 
-### Step 3: Run Baseline Tests
+### Step 4: Run baseline tests
 
 ```bash
 npm run test
@@ -50,14 +76,14 @@ npm run typecheck
 - All tests pass
 - No type errors
 
-### Step 4: Determine Complexity Tier
+### Step 5: Determine complexity tier
 
 | Labels | Tier |
 |--------|------|
 | `good first issue`, `documentation`, `typo`, `chore` | Tier 1 (Trivial) |
 | `bug`, `enhancement`, `breaking-change`, `security`, unlabeled | Tier 2 (Standard) |
 
-### Step 5: Create Feature Branch
+### Step 6: Create feature branch
 
 ```bash
 git checkout -b <type>/<number>-<short-description>
@@ -103,6 +129,7 @@ git checkout -b <type>/<number>-<short-description>
 
 | Criterion | Check |
 |-----------|-------|
+| **Source branch** | **Started from `develop` (BLOCKING)** |
 | Issue valid | OPEN state, no `blocked` label |
 | Clean state | No uncommitted changes |
 | Tests pass | `npm test` exits 0 |
@@ -124,6 +151,7 @@ git checkout -b <type>/<number>-<short-description>
 
 | Failure | Resolution |
 |---------|------------|
+| **Wrong source branch** | **STOP (no retry) - switch to develop first** |
 | Issue closed | Abort - cannot implement closed issue |
 | Issue blocked | Abort - resolve blocker first |
 | Tests failing | Fix baseline before starting new work |

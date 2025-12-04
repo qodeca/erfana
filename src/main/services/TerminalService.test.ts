@@ -536,6 +536,208 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
     })
   })
 
+  // ===========================================================================
+  // Issue #59: WebContents Cleanup Tests
+  // ===========================================================================
+
+  describe('Issue #59 - WebContents Cleanup', () => {
+    it('cleanupForWebContentsId kills only terminals with matching webContentsId', async () => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+
+      const { terminalService } = await import('./TerminalService')
+
+      // Create terminals with different webContentsIds
+      const tid1 = await terminalService.createTerminal({ cwd: '/tmp' }, 1)
+      const tid2 = await terminalService.createTerminal({ cwd: '/tmp' }, 2)
+      const tid3 = await terminalService.createTerminal({ cwd: '/tmp' }, 1)
+
+      expect(tid1).toBeTruthy()
+      expect(tid2).toBeTruthy()
+      expect(tid3).toBeTruthy()
+
+      // Cleanup webContentsId 1
+      terminalService.cleanupForWebContentsId(1)
+
+      // tid1 and tid3 should be killed, tid2 should remain
+      expect(terminalService.getTerminalInfo(tid1!)).toBeNull()
+      expect(terminalService.getTerminalInfo(tid2!)).not.toBeNull()
+      expect(terminalService.getTerminalInfo(tid3!)).toBeNull()
+    })
+
+    it('cleanupForWebContentsId ignores terminals with different webContentsId', async () => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+
+      const { terminalService } = await import('./TerminalService')
+
+      // Create terminals with webContentsId 1 and 2
+      const tid1 = await terminalService.createTerminal({ cwd: '/tmp' }, 1)
+      const tid2 = await terminalService.createTerminal({ cwd: '/tmp' }, 2)
+
+      // Cleanup webContentsId 999 (doesn't exist)
+      terminalService.cleanupForWebContentsId(999)
+
+      // Both terminals should still exist
+      expect(terminalService.getTerminalInfo(tid1!)).not.toBeNull()
+      expect(terminalService.getTerminalInfo(tid2!)).not.toBeNull()
+    })
+
+    it('cleanupForWebContentsId handles double cleanup gracefully', async () => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+
+      const { terminalService } = await import('./TerminalService')
+
+      const tid = await terminalService.createTerminal({ cwd: '/tmp' }, 1)
+      expect(tid).toBeTruthy()
+
+      // First cleanup
+      terminalService.cleanupForWebContentsId(1)
+      expect(terminalService.getTerminalInfo(tid!)).toBeNull()
+
+      // Second cleanup - should not throw
+      expect(() => terminalService.cleanupForWebContentsId(1)).not.toThrow()
+    })
+
+    it('cleanupForWebContentsId handles terminal that exits naturally between collection and kill', async () => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+
+      const { terminalService } = await import('./TerminalService')
+
+      const tid = await terminalService.createTerminal({ cwd: '/tmp' }, 1)
+      expect(tid).toBeTruthy()
+
+      // Simulate natural exit before cleanup runs
+      const { pty } = spawnedPTYs[0]
+      pty.emit('exit', { exitCode: 0 })
+
+      // Cleanup should handle missing terminal gracefully
+      expect(() => terminalService.cleanupForWebContentsId(1)).not.toThrow()
+      expect(terminalService.getTerminalInfo(tid!)).toBeNull()
+    })
+
+    it('killTerminal clears clearFallbackTimeout to prevent timer leak', async () => {
+      vi.useFakeTimers()
+
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+
+      const { terminalService } = await import('./TerminalService')
+
+      const tid = await terminalService.createTerminal({ cwd: '/tmp' })
+      const { pty } = spawnedPTYs[0]
+
+      // Extract marker and emit it (triggers fallback timeout)
+      const { args } = spawnedPTYs[0]
+      const script = args[args.indexOf('-c') + 1]
+      const marker = script.match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+      pty.emit('data', `/tmp\n${marker}\n`)
+
+      // Don't call markInitializationComplete - fallback timeout should be active
+
+      // Kill terminal immediately - should clear timeout
+      terminalService.killTerminal(tid!)
+
+      // Fast-forward past timeout period
+      vi.advanceTimersByTime(3000)
+
+      // Terminal should not exist (killed, not enabled by fallback)
+      expect(terminalService.getTerminalInfo(tid!)).toBeNull()
+
+      vi.useRealTimers()
+    })
+
+    it('terminals created without webContentsId (default -1) are not cleaned up', async () => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+
+      const { terminalService } = await import('./TerminalService')
+
+      // Create terminal without webContentsId (default -1)
+      const tid = await terminalService.createTerminal({ cwd: '/tmp' })
+      expect(tid).toBeTruthy()
+
+      // Cleanup arbitrary webContentsId
+      terminalService.cleanupForWebContentsId(1)
+      terminalService.cleanupForWebContentsId(99)
+
+      // Terminal should still exist (webContentsId = -1 should not match)
+      expect(terminalService.getTerminalInfo(tid!)).not.toBeNull()
+    })
+
+    it('cleanupForWebContentsId clears clearFallbackTimeout during cleanup', async () => {
+      vi.useFakeTimers()
+
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+
+      const { terminalService } = await import('./TerminalService')
+
+      const tid = await terminalService.createTerminal({ cwd: '/tmp' }, 1)
+      const { pty } = spawnedPTYs[0]
+
+      // Extract marker and emit it (triggers fallback timeout)
+      const { args } = spawnedPTYs[0]
+      const script = args[args.indexOf('-c') + 1]
+      const marker = script.match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+      pty.emit('data', `/tmp\n${marker}\n`)
+
+      // Don't call markInitializationComplete - fallback timeout should be active
+
+      // Cleanup webContentsId - should clear timeout
+      terminalService.cleanupForWebContentsId(1)
+
+      // Fast-forward past timeout period
+      vi.advanceTimersByTime(3000)
+
+      // Terminal should not exist (killed by cleanup, not enabled by fallback)
+      expect(terminalService.getTerminalInfo(tid!)).toBeNull()
+
+      vi.useRealTimers()
+    })
+
+    it('cleanupForWebContentsId logs count of cleaned terminals', async () => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+
+      const { terminalService } = await import('./TerminalService')
+
+      // Spy on console.log
+      const consoleSpy = vi.spyOn(console, 'log')
+
+      // Create multiple terminals with same webContentsId
+      await terminalService.createTerminal({ cwd: '/tmp' }, 5)
+      await terminalService.createTerminal({ cwd: '/tmp' }, 5)
+      await terminalService.createTerminal({ cwd: '/tmp' }, 5)
+
+      // Cleanup webContentsId 5
+      terminalService.cleanupForWebContentsId(5)
+
+      // Should log cleanup message with count
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Cleaned up 3 terminals for webContents 5')
+      )
+    })
+  })
+
   afterEach(() => {
     vi.clearAllMocks()
   })
