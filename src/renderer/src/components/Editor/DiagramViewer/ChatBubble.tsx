@@ -8,11 +8,14 @@ import {
   Maximize,
   RotateCcw,
   ArrowDownToLine,
-  RotateCw
+  RotateCw,
+  LockKeyhole,
+  LockKeyholeOpen
 } from 'lucide-react'
 import { executePromptTemplate } from '../../../utils/panelUtils'
 import { useTerminalPortalOptional } from '../../../context/TerminalPortalContext'
 import { useDiagramViewerStore } from '../../../stores/useDiagramViewerStore'
+import { useTerminalStore } from '../../../stores/useTerminalStore'
 import { formatLineRange } from '../../../prompts/helpers'
 import {
   detectChartType,
@@ -104,6 +107,11 @@ export function ChatBubble({
 
   // Portal context for terminal integration and controls
   const portalContext = useTerminalPortalOptional()
+
+  // Subscribe to scroll lock state for UI updates (issue #60)
+  // We need to subscribe directly because terminalControls is stored in a ref (not state)
+  // and changes to it don't trigger re-renders in ChatBubble
+  const scrollLocked = useTerminalStore((state) => state.scrollLocked)
 
   // Direction button state for supported diagrams
   const chartType = detectChartType(mermaidCode)
@@ -301,6 +309,10 @@ export function ChatBubble({
 
   const handleRestartTerminal = useCallback(async () => {
     await portalContext?.terminalControls?.restart()
+  }, [portalContext])
+
+  const handleToggleScrollLock = useCallback(() => {
+    portalContext?.terminalControls?.toggleScrollLock()
   }, [portalContext])
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -529,6 +541,20 @@ export function ChatBubble({
                 aria-label="Restart terminal"
               >
                 <RotateCw size={14} />
+              </button>
+              <button
+                className={`chat-header-btn${scrollLocked ? ' chat-header-btn--active' : ''}`}
+                onClick={handleToggleScrollLock}
+                disabled={!portalContext?.isTerminalReady}
+                title={scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom'}
+                aria-label={scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom'}
+                aria-pressed={scrollLocked}
+              >
+                {scrollLocked ? (
+                  <LockKeyhole size={14} />
+                ) : (
+                  <LockKeyholeOpen size={14} />
+                )}
               </button>
             </div>
           </div>

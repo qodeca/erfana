@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { ISplitviewPanelProps } from 'dockview'
-import { Terminal as TerminalIcon, RotateCw, ArrowDownToLine } from 'lucide-react'
+import { Terminal as TerminalIcon, RotateCw, ArrowDownToLine, LockKeyhole, LockKeyholeOpen } from 'lucide-react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
@@ -20,6 +20,7 @@ import { showWarningToast } from '../../utils/toastHelpers'
 import { useScrollAnomalyRecovery } from '../../hooks/useScrollAnomalyRecovery'
 import { useTerminalParserHooks } from '../../hooks/useTerminalParserHooks'
 import { useTerminalClipboard } from '../../hooks/useTerminalClipboard'
+import { useScrollLock } from '../../hooks/useScrollLock'
 import { useTerminalFileLinks } from '../../hooks/useTerminalFileLinks'
 import { useFilePicker } from '../../hooks/useFilePicker'
 import { useProjectManagementContextSafe } from '../../context/ProjectManagementContext'
@@ -88,6 +89,17 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       console.warn('Clipboard operation failed:', error)
     }
   })
+
+  // Scroll lock for proactive scroll protection (issue #60)
+  const scrollLocked = useTerminalStore((state) => state.scrollLocked)
+  const setScrollLocked = useTerminalStore((state) => state.setScrollLocked)
+
+  const { handleWheelEvent, wrapKeyHandler, startPollingWatcher } = useScrollLock(
+    xtermRef,
+    {
+      onLockEngage: resetAll // Clear anomaly recovery queue when lock engages
+    }
+  )
 
   // Get project files for smart path resolution (issue #26 enhancement)
   // Use safe version to gracefully degrade in tests without provider
@@ -301,8 +313,12 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       const parserDisposables = registerHooks(xterm)
       parserDisposablesRef.current = parserDisposables
 
-      // Attach clipboard key handler (issue #28)
-      xterm.attachCustomKeyEventHandler(handleKeyEvent)
+      // Attach clipboard key handler wrapped with scroll lock (issue #60)
+      const wrappedKeyHandler = wrapKeyHandler(handleKeyEvent)
+      xterm.attachCustomKeyEventHandler(wrappedKeyHandler)
+
+      // Attach wheel event handler for scroll lock (issue #60)
+      xterm.attachCustomWheelEventHandler(handleWheelEvent)
 
       // Attach native context menu handler to xterm.element (issue #37)
       // Must be on xterm.element, not parent container, because xterm captures events internally
@@ -655,6 +671,16 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }, [portalTarget, portalContext?.diagramViewerContainerRef, terminalId])
 
+  // Polling watcher for scroll lock (catches scrollbar drag) - issue #60
+  useEffect(() => {
+    if (!scrollLocked || !xtermRef.current) return
+
+    // Force scroll to bottom when lock engages
+    xtermRef.current.scrollToBottom()
+
+    return startPollingWatcher()
+  }, [scrollLocked, startPollingWatcher])
+
   const handleRestartTerminal = useCallback(async () => {
     // Kill current terminal session
     if (terminalIdRef.current) {
@@ -692,6 +718,16 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }, [])
 
+  const handleToggleScrollLock = useCallback(() => {
+    const newState = !scrollLocked
+    setScrollLocked(newState)
+    if (newState && xtermRef.current) {
+      // When enabling lock, immediately scroll to bottom and reset recovery
+      resetAll()
+      xtermRef.current.scrollToBottom()
+    }
+  }, [scrollLocked, setScrollLocked, resetAll])
+
   // Ref to track hasSelection for use in callbacks without causing re-renders
   // This prevents infinite loop: hasSelection state change → effect re-run → registerTerminalControls → context update → re-render
   const hasSelectionRef = useRef(hasSelection)
@@ -720,13 +756,15 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       restart: handleRestartTerminal,
       copy,
       paste,
-      hasSelection: () => hasSelectionRef.current  // Use ref to avoid re-registration on selection change
+      hasSelection: () => hasSelectionRef.current,  // Use ref to avoid re-registration on selection change
+      isScrollLocked: () => useTerminalStore.getState().scrollLocked,
+      toggleScrollLock: handleToggleScrollLock
     })
 
     return () => {
       unregisterTerminalControls()
     }
-  }, [registerTerminalControls, unregisterTerminalControls, terminalId, handleScrollToBottom, handleRestartTerminal, copy, paste])
+  }, [registerTerminalControls, unregisterTerminalControls, terminalId, handleScrollToBottom, handleRestartTerminal, handleToggleScrollLock, copy, paste])
 
   // Register lastUserScrollTsRef with portal context (issue #52)
   // Allows components to check if user scrolled during prompt execution delay
@@ -775,6 +813,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                   title="Restart terminal"
                 >
                   <RotateCw size={14} />
+                </button>
+                <button
+                  className={`icon-btn${scrollLocked ? ' icon-btn--active' : ''}`}
+                  onClick={handleToggleScrollLock}
+                  title={scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom'}
+                  aria-pressed={scrollLocked}
+                >
+                  {scrollLocked ? <LockKeyhole size={14} /> : <LockKeyholeOpen size={14} />}
                 </button>
               </>
             )}

@@ -14,10 +14,18 @@
  * UPDATED: DiagramViewer now reads state from useDiagramViewerStore instead of props.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { DiagramViewer } from './DiagramViewer'
 import { useDiagramViewerStore } from '../../../stores/useDiagramViewerStore'
+
+// Mock useTerminalStore (issue #60 - ChatBubble uses this for scroll lock)
+vi.mock('../../../stores/useTerminalStore', () => ({
+  useTerminalStore: vi.fn((selector) => {
+    const state = { scrollLocked: false }
+    return selector ? selector(state) : state
+  })
+}))
 
 // Helper to set up store state before rendering
 function setupStore(options: {

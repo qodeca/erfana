@@ -17,6 +17,10 @@ interface TerminalStore {
   markUserInput: (id: string) => void
   hasUserInteracted: () => boolean
   sendToTerminal: (text: string, autoExecute?: boolean) => Promise<boolean>
+
+  // Scroll lock state (global - affects all terminals)
+  scrollLocked: boolean
+  setScrollLocked: (locked: boolean) => void
 }
 
 /**
@@ -122,6 +126,14 @@ export function createTerminalStore(
       console.error('❌ sendToTerminal: Unexpected error:', error)
       return false
     }
+  },
+
+  // Scroll lock state - ephemeral, resets on app restart
+  scrollLocked: false,
+
+  setScrollLocked: (locked: boolean) => {
+    console.log(`🔒 Scroll lock: ${locked ? 'ON' : 'OFF'}`)
+    set({ scrollLocked: locked })
   }
   }))
 }

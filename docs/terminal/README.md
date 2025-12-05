@@ -16,6 +16,7 @@ The Terminal Panel provides a full-featured terminal emulator using:
 - **Activity Bar**: Terminal icon in right sidebar (bottom)
 - **Keyboard**: `Cmd/Ctrl+J` - Toggle terminal panel
 - **Scroll to Bottom**: ⬇️ button in panel header - Jump to latest output
+- **Scroll Lock**: 🔒 button in panel header - Lock scroll to always stay at bottom
 - **Restart**: 🔄 button in panel header - Kill and restart terminal session
 
 ## Features
@@ -76,6 +77,44 @@ Clickable file path links in terminal output with intelligent path resolution.
 
 **Files**:
 - `src/renderer/src/components/Panels/Terminal/FileLinks/`
+
+### Scroll Lock Toggle (v0.6.0)
+
+Proactive scroll protection via a toggle button that locks terminal to always stay at bottom.
+
+**Behavior**:
+- Toggle button in terminal toolbar (also available in ChatBubble header)
+- When ON: Blocks all scroll-up attempts (mouse wheel, PageUp/Home/ArrowUp, scrollbar drag)
+- When OFF: Normal scroll behavior restored
+- Default: OFF (user enables when needed)
+- Ephemeral: State resets on app restart (not saved to settings)
+
+**Icons**:
+- 🔓 `LockKeyholeOpen` - Unlocked (scroll lock disabled)
+- 🔒 `LockKeyhole` - Locked (scroll lock enabled, with accent color highlight)
+
+**Implementation**:
+Three complementary mechanisms ensure scroll lock works reliably:
+1. **Wheel event handler**: Intercepts `WheelEvent`, blocks `deltaY < 0` (scroll up)
+2. **Keyboard handler wrapper**: Blocks PageUp/Home/ArrowUp keys when locked
+3. **Polling watcher**: 100ms interval detects scrollbar drag, snaps back to bottom
+
+**Architecture** (Pure Logic Extraction):
+- `useScrollLock.ts`: Hook encapsulating all three blocking mechanisms
+- `useTerminalStore.scrollLocked`: Global boolean state (single terminal architecture)
+- `TerminalPortalContext.TerminalControls`: `isScrollLocked()`, `toggleScrollLock()` for ChatBubble access
+
+**Coordination**:
+- When lock engages, calls `resetAll()` from `useScrollAnomalyRecovery` to clear recovery queue
+- Prevents conflict between proactive lock and reactive recovery mechanisms
+
+**Files**:
+- `src/renderer/src/hooks/useScrollLock.ts` (130 lines)
+- `src/renderer/src/hooks/useScrollLock.test.ts` (22 tests)
+
+**Related issues**:
+- #60 - Add scroll-lock button to terminal toolbar
+- #12, #22, #52 - Previous reactive scroll recovery (now complemented by proactive lock)
 
 ### Forced Scroll-to-Bottom After Prompt Execution (v0.5.4)
 

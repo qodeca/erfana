@@ -171,3 +171,14 @@
   background: var(--color-gray-600);
 }
 
+/* Active state for toggle buttons (scroll lock) - issue #60 */
+.terminal-panel .icon-btn--active {
+  background: var(--color-bg-active);
+  color: var(--color-accent-primary);
+}
+
+.terminal-panel .icon-btn--active:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-accent-primary);
+}
+
