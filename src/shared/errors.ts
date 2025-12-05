@@ -23,6 +23,11 @@ export enum ErrorCode {
   PROJECT_NOT_DIRECTORY = 'PROJECT_NOT_DIRECTORY',
   PROJECT_OPEN_FAILED = 'PROJECT_OPEN_FAILED',
 
+  // Project settings errors
+  PROJECT_SETTINGS_READ_FAILED = 'PROJECT_SETTINGS_READ_FAILED',
+  PROJECT_SETTINGS_INVALID_JSON = 'PROJECT_SETTINGS_INVALID_JSON',
+  PROJECT_SETTINGS_VALIDATION_FAILED = 'PROJECT_SETTINGS_VALIDATION_FAILED',
+
   // PDF import errors (legacy - prefer IMPORT_* for new code)
   PDF_ENCRYPTED = 'PDF_ENCRYPTED',
   PDF_EMPTY = 'PDF_EMPTY',
@@ -124,6 +129,11 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.PROJECT_NOT_FOUND]: 'This project no longer exists',
   [ErrorCode.PROJECT_NOT_DIRECTORY]: 'Selected path is not a directory',
   [ErrorCode.PROJECT_OPEN_FAILED]: 'Failed to open project',
+
+  // Project settings errors
+  [ErrorCode.PROJECT_SETTINGS_READ_FAILED]: 'Failed to read project settings file',
+  [ErrorCode.PROJECT_SETTINGS_INVALID_JSON]: 'Project settings file contains invalid JSON',
+  [ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED]: 'Project settings file has invalid structure',
 
   // PDF import errors (legacy)
   [ErrorCode.PDF_ENCRYPTED]: 'This PDF is password protected',

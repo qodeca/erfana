@@ -97,4 +97,14 @@ export interface IFileService {
    * Check if a name conflicts with existing items in target directory
    */
   checkNameConflict(targetParentPath: string, itemName: string): Promise<boolean>
+
+  /**
+   * Set custom hidden patterns (called by ProjectService after loading settings)
+   */
+  setHiddenPatterns(patterns: string[]): void
+
+  /**
+   * Get current hidden patterns
+   */
+  getHiddenPatterns(): string[]
 }

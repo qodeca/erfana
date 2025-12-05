@@ -53,3 +53,59 @@ export const TEXT_INPUT_LIMITS = {
   /** Maximum characters allowed (uses raw length to match HTML maxLength) */
   MAX_LENGTH: 2000
 } as const
+
+/**
+ * Default watcher ignore patterns (performance optimization)
+ * These directories cause chokidar performance issues (50K+ files)
+ *
+ * @see DirectoryWatcherService.ts - uses these patterns
+ * @see Issue #63 - project-level settings
+ */
+export const DEFAULT_WATCHER_IGNORE_PATTERNS = [
+  // Package manager directories (can have 50,000+ files)
+  'node_modules',
+  '.pnpm',
+  '.yarn/cache',
+  '.yarn/unplugged',
+  'bower_components',
+  // Python virtual environments (can have 30,000+ files)
+  '.venv',
+  'venv',
+  '.virtualenv',
+  'virtualenv',
+  '.conda',
+  // Git internals (keeps .git/HEAD, .git/config, .git/refs watched)
+  '.git/objects',
+  '.git/subtree-cache',
+  '.git/lfs',
+  // Build outputs
+  'dist',
+  'build',
+  'out',
+  '.output',
+  // Framework-specific caches
+  '.next',
+  '.nuxt',
+  '.cache',
+  '.parcel-cache',
+  '.turbo',
+  '.vite',
+  // Test coverage
+  'coverage',
+  // Miscellaneous caches
+  '__pycache__',
+  '.pytest_cache',
+  'target'
+] as const
+
+/**
+ * Default tree hidden patterns (UI cleanliness)
+ * These are hidden in the project tree by default
+ *
+ * @see FileService.ts - uses these patterns in readDirectory()
+ * @see Issue #63 - project-level settings
+ */
+export const DEFAULT_TREE_HIDDEN_PATTERNS = [
+  'node_modules',
+  '.git'
+] as const

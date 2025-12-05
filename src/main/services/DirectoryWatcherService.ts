@@ -11,6 +11,7 @@ import {
   getPlatformDiagnostics,
   type FileChangeEvent
 } from './watcher'
+import { DEFAULT_WATCHER_IGNORE_PATTERNS } from '../../shared/constants'
 
 interface WatchedDirectory {
   dirPath: string
@@ -32,74 +33,6 @@ interface DirectoryChangeEvent {
   type: 'add' | 'addDir' | 'unlink' | 'unlinkDir'
   path: string
 }
-
-/**
- * Directories that cause performance issues when watched (50K+ files).
- * Using function-based ignore (VS Code approach) instead of regex patterns
- * because chokidar regex patterns have known bugs.
- *
- * What IS watched (solves issue #21):
- * - .claude/, .github/, .vscode/, .idea/ - AI agent & editor configs
- * - .env, .gitignore, .npmrc - Config dotfiles
- * - .git/HEAD, .git/config, .git/refs - Git state
- * - out/, dist/, build/ - Build outputs
- *
- * What is NOT watched (performance):
- * - node_modules/ - npm dependencies (50K+ files)
- * - .git/objects/ - Git blob storage
- * - .pnpm/, .yarn/cache - Package manager caches
- */
-const PERFORMANCE_IGNORE_LIST = [
-  // Package manager directories (can have 50,000+ files)
-  'node_modules',
-  '.pnpm',
-  '.yarn/cache',
-  '.yarn/unplugged',
-  'bower_components',
-  // Python virtual environments (can have 30,000+ files)
-  '.venv',
-  'venv',
-  '.virtualenv',
-  'virtualenv',
-  '.conda',
-  // Git internals (keeps .git/HEAD, .git/config, .git/refs watched)
-  '.git/objects',
-  '.git/subtree-cache',
-  '.git/lfs',
-  // Build outputs
-  'dist',
-  'build',
-  'out',
-  '.output',
-  // Framework-specific caches
-  '.next',
-  '.nuxt',
-  '.cache',
-  '.parcel-cache',
-  '.turbo',
-  '.vite',
-  // Test coverage
-  'coverage',
-  // Miscellaneous caches
-  '__pycache__',
-  '.pytest_cache',
-  'target' // Rust/Java build output
-]
-
-/**
- * Fast ignore function - called for every path by chokidar.
- * Uses string includes for performance (faster than regex).
- */
-const shouldIgnorePath = (filePath: string): boolean => {
-  for (const pattern of PERFORMANCE_IGNORE_LIST) {
-    // Check both Unix and Windows path separators
-    if (filePath.includes(`/${pattern}`) || filePath.includes(`\\${pattern}`)) {
-      return true
-    }
-  }
-  return false
-}
-
 export class DirectoryWatcherService {
   private watchedDirectories: Map<string, WatchedDirectory> = new Map()
   private projectPath: string | null = null
@@ -118,6 +51,37 @@ export class DirectoryWatcherService {
 
   // Platform configuration
   private readonly platformConfig = getPlatformConfig()
+
+  // Dynamic ignore patterns (configurable per-project via .erfana/settings.json)
+  private ignorePatterns: string[] = [...DEFAULT_WATCHER_IGNORE_PATTERNS]
+
+  /**
+   * Set custom ignore patterns (called by ProjectService after loading settings)
+   */
+  setIgnorePatterns(patterns: string[]): void {
+    this.ignorePatterns = patterns
+  }
+
+  /**
+   * Get current ignore patterns
+   */
+  getIgnorePatterns(): string[] {
+    return [...this.ignorePatterns]
+  }
+
+  /**
+   * Fast ignore function - called for every path by chokidar.
+   * Uses string includes for performance (faster than regex).
+   */
+  private shouldIgnorePath = (filePath: string): boolean => {
+    for (const pattern of this.ignorePatterns) {
+      // Check both Unix and Windows path separators
+      if (filePath.includes(`/${pattern}`) || filePath.includes(`\\${pattern}`)) {
+        return true
+      }
+    }
+    return false
+  }
 
   setProjectPath(path: string): void {
     this.projectPath = path
@@ -199,7 +163,7 @@ export class DirectoryWatcherService {
     const watcher = chokidar.watch(dirPath, {
       persistent: true,
       ignoreInitial: true, // Don't fire events for existing files
-      ignored: shouldIgnorePath, // Function-based ignore (more reliable than regex)
+      ignored: (path) => this.shouldIgnorePath(path), // Function-based ignore (more reliable than regex)
       usePolling: false, // Use native fs events (faster)
       awaitWriteFinish: false, // Not needed for directory operations
       depth, // Optional cap for performance

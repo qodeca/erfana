@@ -28,7 +28,7 @@ npm run test:cov     # Coverage (v8) per project
 ```
 src/
 ├── main/           # Electron main process
-│   ├── services/   # FileService, TerminalService, SettingsService, import/, GitStatusService
+│   ├── services/   # FileService, TerminalService, SettingsService, ProjectSettingsService, import/
 │   └── ipc/        # IPC handlers
 ├── preload/        # Context bridge API
 ├── shared/         # Shared code (errors.ts, constants.ts, ipc schemas)
@@ -44,6 +44,7 @@ src/
 2. **Project Tree** - File explorer with drag-drop reorganization, markdown filtering, context menu, git status indicators
 3. **Terminal** - xterm.js with PTY backend, clipboard support, file links, scroll recovery
 4. **Prompt Templates** - AI text operations via context menu (Elaborate, Modify, Ask, diagram chat)
+5. **Project Settings** - Per-project configuration via `.erfana/settings.json` (watcher ignore, tree visibility)
 
 ## Documentation
 See `docs/` for details (keep Claude's context focused):
@@ -199,7 +200,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 3469 tests passing (119 test files)
+- **Current**: 3526 tests passing (121 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)
@@ -210,6 +211,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
   - Clears on exit and after Ctrl+C if quiet
 - Terminal initialization defers until panel is visible
 - Watchers increment session tokens on switch; stale events dropped
+- Project settings loaded and validated before project opens (invalid settings block load)
 
 ## IPC Contracts
 - Shared schemas/types: `src/shared/ipc/*.ts` (zod schemas)
