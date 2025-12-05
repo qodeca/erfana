@@ -11,6 +11,7 @@ import {
   getPlatformDiagnostics,
   type FileChangeEvent
 } from './watcher'
+import { DEFAULT_WATCHER_IGNORE_PATTERNS } from '../../shared/constants'
 
 interface WatchedDirectory {
   dirPath: string
@@ -32,74 +33,6 @@ interface DirectoryChangeEvent {
   type: 'add' | 'addDir' | 'unlink' | 'unlinkDir'
   path: string
 }
-
-/**
- * Directories that cause performance issues when watched (50K+ files).
- * Using function-based ignore (VS Code approach) instead of regex patterns
- * because chokidar regex patterns have known bugs.
- *
- * What IS watched (solves issue #21):
- * - .claude/, .github/, .vscode/, .idea/ - AI agent & editor configs
- * - .env, .gitignore, .npmrc - Config dotfiles
- * - .git/HEAD, .git/config, .git/refs - Git state
- * - out/, dist/, build/ - Build outputs
- *
- * What is NOT watched (performance):
- * - node_modules/ - npm dependencies (50K+ files)
- * - .git/objects/ - Git blob storage
- * - .pnpm/, .yarn/cache - Package manager caches
- */
-const PERFORMANCE_IGNORE_LIST = [
-  // Package manager directories (can have 50,000+ files)
-  'node_modules',
-  '.pnpm',
-  '.yarn/cache',
-  '.yarn/unplugged',
-  'bower_components',
-  // Python virtual environments (can have 30,000+ files)
-  '.venv',
-  'venv',
-  '.virtualenv',
-  'virtualenv',
-  '.conda',
-  // Git internals (keeps .git/HEAD, .git/config, .git/refs watched)
-  '.git/objects',
-  '.git/subtree-cache',
-  '.git/lfs',
-  // Build outputs
-  'dist',
-  'build',
-  'out',
-  '.output',
-  // Framework-specific caches
-  '.next',
-  '.nuxt',
-  '.cache',
-  '.parcel-cache',
-  '.turbo',
-  '.vite',
-  // Test coverage
-  'coverage',
-  // Miscellaneous caches
-  '__pycache__',
-  '.pytest_cache',
-  'target' // Rust/Java build output
-]
-
-/**
- * Fast ignore function - called for every path by chokidar.
- * Uses string includes for performance (faster than regex).
- */
-const shouldIgnorePath = (filePath: string): boolean => {
-  for (const pattern of PERFORMANCE_IGNORE_LIST) {
-    // Check both Unix and Windows path separators
-    if (filePath.includes(`/${pattern}`) || filePath.includes(`\\${pattern}`)) {
-      return true
-    }
-  }
-  return false
-}
-
 export class DirectoryWatcherService {
   private watchedDirectories: Map<string, WatchedDirectory> = new Map()
   private projectPath: string | null = null
@@ -118,6 +51,37 @@ export class DirectoryWatcherService {
 
   // Platform configuration
   private readonly platformConfig = getPlatformConfig()
+
+  // Dynamic ignore patterns (configurable per-project via .erfana/settings.json)
+  private ignorePatterns: string[] = [...DEFAULT_WATCHER_IGNORE_PATTERNS]
+
+  /**
+   * Set custom ignore patterns (called by ProjectService after loading settings)
+   */
+  setIgnorePatterns(patterns: string[]): void {
+    this.ignorePatterns = patterns
+  }
+
+  /**
+   * Get current ignore patterns
+   */
+  getIgnorePatterns(): string[] {
+    return [...this.ignorePatterns]
+  }
+
+  /**
+   * Fast ignore function - called for every path by chokidar.
+   * Uses string includes for performance (faster than regex).
+   */
+  private shouldIgnorePath = (filePath: string): boolean => {
+    for (const pattern of this.ignorePatterns) {
+      // Check both Unix and Windows path separators
+      if (filePath.includes(`/${pattern}`) || filePath.includes(`\\${pattern}`)) {
+        return true
+      }
+    }
+    return false
+  }
 
   setProjectPath(path: string): void {
     this.projectPath = path
@@ -199,7 +163,7 @@ export class DirectoryWatcherService {
     const watcher = chokidar.watch(dirPath, {
       persistent: true,
       ignoreInitial: true, // Don't fire events for existing files
-      ignored: shouldIgnorePath, // Function-based ignore (more reliable than regex)
+      ignored: (path) => this.shouldIgnorePath(path), // Function-based ignore (more reliable than regex)
       usePolling: false, // Use native fs events (faster)
       awaitWriteFinish: false, // Not needed for directory operations
       depth, // Optional cap for performance
@@ -320,6 +284,54 @@ export class DirectoryWatcherService {
     }
 
     this.safeLog(`👁️  Cleaned up directory watches for webContents ${webContentsId}`)
+  }
+
+  /**
+   * Cleanup directory watchers owned by a specific webContents.
+   * Called when webContents is destroyed (window close or dev refresh).
+   *
+   * @param webContentsId - The ID of the destroyed webContents
+   * @remarks
+   * - Increments session version to invalidate pending events (race guard)
+   * - Fire-and-forget safe - errors are logged but don't propagate
+   * - Also stops git index watcher (shared resource)
+   * @see Issue #59 - App enters broken state after window close
+   */
+  async cleanupForWebContentsId(webContentsId: number): Promise<void> {
+    // Bump session version FIRST to invalidate pending events before cleanup (issue #59)
+    this.switchVersion++
+
+    const directoriesToCleanup: string[] = []
+
+    // Find all directories watched by this webContentsId
+    for (const [dirPath, watched] of this.watchedDirectories.entries()) {
+      if (watched.webContentsIds.has(webContentsId)) {
+        watched.webContentsIds.delete(webContentsId)
+
+        // If no more watchers, schedule for full cleanup
+        if (watched.webContentsIds.size === 0) {
+          directoriesToCleanup.push(dirPath)
+        }
+      }
+    }
+
+    // Cleanup directories with no remaining watchers
+    for (const dirPath of directoriesToCleanup) {
+      const watched = this.watchedDirectories.get(dirPath)
+      if (watched) {
+        watched.throttledWorker.dispose()
+        watched.atomicSaveDetector.dispose()
+        await watched.watcher.close()
+        this.watchedDirectories.delete(dirPath)
+      }
+    }
+
+    // Stop git index watcher for this webContents
+    // Note: Git index watcher is shared - stopping here affects all windows watching this project
+    await this.stopGitIndexWatcher()
+
+    this.metrics.setActiveWatchers(this.watchedDirectories.size)
+    this.safeLog(`👁️  Cleaned up directory watches for webContentsId ${webContentsId}`)
   }
 
   /**
@@ -538,6 +550,8 @@ export class DirectoryWatcherService {
     // Stop existing watcher if any
     await this.stopGitIndexWatcher()
 
+    // Store webContentsId instead of webContents object to prevent stale reference (issue #59)
+    const webContentsId = webContents.id
     const gitIndexPath = `${projectPath}/.git/index`
 
     // Check if .git/index exists (not a git repo if missing)
@@ -579,9 +593,9 @@ export class DirectoryWatcherService {
         this.gitIndexDebounceTimer = null
         this.safeLog(`🔄 Git index changed: ${gitIndexPath}`)
 
-        // Notify renderer about git index change
+        // Notify renderer about git index change (use stored ID, not potentially stale reference)
         const windows = BrowserWindow.getAllWindows()
-        const window = windows.find(w => w.webContents.id === webContents.id)
+        const window = windows.find(w => w.webContents.id === webContentsId)
         if (window && !window.isDestroyed()) {
           try {
             window.webContents.send('git:index-changed', { projectPath })

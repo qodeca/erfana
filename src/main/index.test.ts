@@ -24,7 +24,9 @@ describe('Main Process - Window Creation', () => {
       loadURL: vi.fn(),
       loadFile: vi.fn(),
       webContents: {
-        setWindowOpenHandler: vi.fn()
+        id: 1,
+        setWindowOpenHandler: vi.fn(),
+        on: vi.fn() // Required for destroyed event handler (issue #59)
       }
     }
 
@@ -82,14 +84,30 @@ describe('Main Process - Window Creation', () => {
     }))
 
     // Mock service modules
+    vi.doMock('./services/FileService', () => ({
+      fileService: {
+        setProjectPath: vi.fn() // issue #59: clear project state on destroy
+      }
+    }))
     vi.doMock('./services/FileWatcherService', () => ({
-      fileWatcherService: { dispose: vi.fn() }
+      fileWatcherService: {
+        dispose: vi.fn(),
+        setProjectPath: vi.fn(), // issue #59: clear project state on destroy
+        cleanupForWebContentsId: vi.fn(() => Promise.resolve()) // issue #59
+      }
     }))
     vi.doMock('./services/DirectoryWatcherService', () => ({
-      directoryWatcherService: { dispose: vi.fn() }
+      directoryWatcherService: {
+        dispose: vi.fn(),
+        setProjectPath: vi.fn(), // issue #59: clear project state on destroy
+        cleanupForWebContentsId: vi.fn(() => Promise.resolve()) // issue #59
+      }
     }))
     vi.doMock('./services/TerminalService', () => ({
-      terminalService: { dispose: vi.fn() }
+      terminalService: {
+        dispose: vi.fn(),
+        cleanupForWebContentsId: vi.fn() // issue #59
+      }
     }))
     vi.doMock('./services/SettingsService', () => ({
       settingsService: {

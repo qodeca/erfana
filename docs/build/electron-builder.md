@@ -19,11 +19,7 @@ This document explains the electron-builder version choice and the aproba workar
 - Latest version with newest features and security fixes
 - Full support for Electron 39.2.4
 - Correctly applies fuses via `afterPack` hook
-- Workaround is simple and reliable
-
-**Alternative Considered**:
-- Downgrade to electron-builder 25.1.8 (works without workaround)
-- **Rejected**: We want to stay current with latest tooling
+- Automated workaround for aproba bug (via `prebuild` script)
 
 ---
 

@@ -1,6 +1,6 @@
 # Terminal Flickering Prevention (v0.3.2)
 
-Hardware-accelerated rendering stability fixes for Electron 33 and production builds.
+Hardware-accelerated rendering stability fixes for Electron 39 and production builds.
 
 ## Problem
 
@@ -14,13 +14,13 @@ Terminal rendering flickering in production builds, especially during Claude Cod
 
 ## Root Causes
 
-### 1. Electron 33 WebGL Context Issues
+### 1. Electron 39 WebGL Context Issues
 
 **Problem**: Missing command line switches prevent proper WebGL initialization
 
 **Impact**: WebGL context creation fails, forcing fallback to canvas renderer with worse performance
 
-**Evidence**: Electron 33 changed WebGL initialization requirements
+**Evidence**: Electron 39 (and earlier versions since Electron 33) require explicit WebGL initialization
 
 ### 2. Dimension Oscillation
 
@@ -51,7 +51,7 @@ const width = Math.round(cols * charWidth * devicePixelRatio)
 **File**: `src/main/index.ts:19-23`
 
 ```typescript
-// WebGL Command Line Switches for Electron 33+
+// WebGL Command Line Switches for Electron 39
 // Fixes WebGL context creation issues and terminal flickering in production builds
 app.commandLine.appendSwitch('enable-webgl')
 app.commandLine.appendSwitch('enable-webgl2-compute-context')
@@ -63,7 +63,7 @@ app.commandLine.appendSwitch('ignore-gpu-blocklist')
 - `enable-webgl2-compute-context`: Enable WebGL 2 compute capabilities
 - `ignore-gpu-blocklist`: Bypass GPU driver blocklist (safe for Electron apps)
 
-**Why Needed**: Electron 33 doesn't enable these by default in production builds
+**Why Needed**: Electron 39 doesn't enable these by default in production builds
 
 **Also Updated BrowserWindow**:
 ```typescript
@@ -292,7 +292,7 @@ it('should handle row changes that meet threshold', async () => {
 - [#3945: WebGL renderer flickering](https://github.com/xtermjs/xterm.js/issues/3945)
 
 ### Electron Issues
-- [Electron 33 Release Notes](https://www.electronjs.org/blog/electron-33-0)
+- [Electron 39 Release Notes](https://www.electronjs.org/blog/electron-39-0)
 - [WebGL in Electron](https://www.electronjs.org/docs/latest/tutorial/offscreen-rendering)
 
 ### VS Code Terminal

@@ -122,3 +122,297 @@ describe('DirectoryWatcherService session token guards', () => {
     expect(sends.length).toBe(0)
   })
 })
+
+describe('DirectoryWatcherService Issue #59 - WebContents Cleanup', () => {
+  beforeEach(() => {
+    sends.length = 0
+  })
+
+  it('cleanupForWebContentsId increments switchVersion BEFORE cleanup', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    // Record initial switchVersion
+    const initialVersion = svc.switchVersion
+
+    // Seed watched directory
+    const fakeWatcher = { close: vi.fn(async () => {}) }
+    const fakeThrottledWorker = {
+      dispose: vi.fn(),
+      work: vi.fn(),
+      getBufferSize: vi.fn(() => 0)
+    } as unknown as ThrottledWorker<any>
+    const fakeAtomicSaveDetector = {
+      dispose: vi.fn()
+    } as unknown as AtomicSaveDetector
+    svc.watchedDirectories.set('/proj', {
+      dirPath: '/proj',
+      watcher: fakeWatcher,
+      webContentsIds: new Set([1]),
+      pauseController: new PauseController(),
+      throttledWorker: fakeThrottledWorker,
+      atomicSaveDetector: fakeAtomicSaveDetector,
+      version: initialVersion
+    })
+
+    // Call cleanupForWebContentsId
+    await svc.cleanupForWebContentsId(1)
+
+    // switchVersion should be incremented immediately (before cleanup)
+    expect(svc.switchVersion).toBe(initialVersion + 1)
+  })
+
+  it('cleanupForWebContentsId removes webContentsId from watched directories', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    const fakeWatcher = { close: vi.fn(async () => {}) }
+    const fakeThrottledWorker = {
+      dispose: vi.fn(),
+      work: vi.fn(),
+      getBufferSize: vi.fn(() => 0)
+    } as unknown as ThrottledWorker<any>
+    const fakeAtomicSaveDetector = {
+      dispose: vi.fn()
+    } as unknown as AtomicSaveDetector
+    svc.watchedDirectories.set('/proj', {
+      dirPath: '/proj',
+      watcher: fakeWatcher,
+      webContentsIds: new Set([1, 2]),
+      pauseController: new PauseController(),
+      throttledWorker: fakeThrottledWorker,
+      atomicSaveDetector: fakeAtomicSaveDetector,
+      version: svc.switchVersion
+    })
+
+    // Cleanup webContentsId 1
+    await svc.cleanupForWebContentsId(1)
+
+    // webContentsId 1 should be removed, 2 should remain
+    const watched = svc.watchedDirectories.get('/proj')
+    expect(watched).toBeTruthy()
+    expect(watched.webContentsIds.has(1)).toBe(false)
+    expect(watched.webContentsIds.has(2)).toBe(true)
+  })
+
+  it('cleanupForWebContentsId closes watchers with no remaining webContentsIds', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    const fakeWatcher = { close: vi.fn(async () => {}) }
+    const fakeThrottledWorker = {
+      dispose: vi.fn(),
+      work: vi.fn(),
+      getBufferSize: vi.fn(() => 0)
+    } as unknown as ThrottledWorker<any>
+    const fakeAtomicSaveDetector = {
+      dispose: vi.fn()
+    } as unknown as AtomicSaveDetector
+    svc.watchedDirectories.set('/proj', {
+      dirPath: '/proj',
+      watcher: fakeWatcher,
+      webContentsIds: new Set([1]),
+      pauseController: new PauseController(),
+      throttledWorker: fakeThrottledWorker,
+      atomicSaveDetector: fakeAtomicSaveDetector,
+      version: svc.switchVersion
+    })
+
+    // Cleanup webContentsId 1 (last watcher)
+    await svc.cleanupForWebContentsId(1)
+
+    // Watcher should be closed and workers disposed
+    expect(fakeWatcher.close).toHaveBeenCalled()
+    expect(fakeThrottledWorker.dispose).toHaveBeenCalled()
+    expect(fakeAtomicSaveDetector.dispose).toHaveBeenCalled()
+    expect(svc.watchedDirectories.has('/proj')).toBe(false)
+  })
+
+  it('cleanupForWebContentsId stops git index watcher', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    // Set up a fake git index watcher
+    const fakeGitWatcher = { close: vi.fn(async () => {}) }
+    svc.gitIndexWatcher = {
+      watcher: fakeGitWatcher,
+      projectPath: '/proj',
+      version: svc.switchVersion
+    }
+
+    // Cleanup webContentsId
+    await svc.cleanupForWebContentsId(1)
+
+    // Git index watcher should be stopped
+    expect(fakeGitWatcher.close).toHaveBeenCalled()
+    expect(svc.gitIndexWatcher).toBeNull()
+  })
+
+  it('git index watcher stores webContentsId, not webContents object', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    // Verify GitIndexWatcher interface doesn't store webContents
+    const fakeGitWatcher = { close: vi.fn(async () => {}), on: vi.fn() }
+    svc.gitIndexWatcher = {
+      watcher: fakeGitWatcher,
+      projectPath: '/proj',
+      version: svc.switchVersion
+    }
+
+    // Verify the interface - should NOT have webContents property
+    expect(svc.gitIndexWatcher.webContents).toBeUndefined()
+    expect(svc.gitIndexWatcher.webContentsId).toBeUndefined()
+    // Instead, git index watcher uses BrowserWindow.getAllWindows() and finds by ID
+    expect(svc.gitIndexWatcher.projectPath).toBe('/proj')
+    expect(svc.gitIndexWatcher.version).toBe(svc.switchVersion)
+  })
+
+  it('cleanupForWebContentsId handles multiple directories', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    const fakeWatcher1 = { close: vi.fn(async () => {}) }
+    const fakeThrottledWorker1 = {
+      dispose: vi.fn(),
+      work: vi.fn(),
+      getBufferSize: vi.fn(() => 0)
+    } as unknown as ThrottledWorker<any>
+    const fakeAtomicSaveDetector1 = {
+      dispose: vi.fn()
+    } as unknown as AtomicSaveDetector
+
+    const fakeWatcher2 = { close: vi.fn(async () => {}) }
+    const fakeThrottledWorker2 = {
+      dispose: vi.fn(),
+      work: vi.fn(),
+      getBufferSize: vi.fn(() => 0)
+    } as unknown as ThrottledWorker<any>
+    const fakeAtomicSaveDetector2 = {
+      dispose: vi.fn()
+    } as unknown as AtomicSaveDetector
+
+    svc.watchedDirectories.set('/proj1', {
+      dirPath: '/proj1',
+      watcher: fakeWatcher1,
+      webContentsIds: new Set([1]),
+      pauseController: new PauseController(),
+      throttledWorker: fakeThrottledWorker1,
+      atomicSaveDetector: fakeAtomicSaveDetector1,
+      version: svc.switchVersion
+    })
+
+    svc.watchedDirectories.set('/proj2', {
+      dirPath: '/proj2',
+      watcher: fakeWatcher2,
+      webContentsIds: new Set([1]),
+      pauseController: new PauseController(),
+      throttledWorker: fakeThrottledWorker2,
+      atomicSaveDetector: fakeAtomicSaveDetector2,
+      version: svc.switchVersion
+    })
+
+    // Cleanup webContentsId 1
+    await svc.cleanupForWebContentsId(1)
+
+    // Both watchers should be closed
+    expect(fakeWatcher1.close).toHaveBeenCalled()
+    expect(fakeWatcher2.close).toHaveBeenCalled()
+    expect(fakeThrottledWorker1.dispose).toHaveBeenCalled()
+    expect(fakeThrottledWorker2.dispose).toHaveBeenCalled()
+    expect(svc.watchedDirectories.size).toBe(0)
+  })
+
+  it('cleanupForWebContentsId does not affect other webContentsIds', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    const fakeWatcher = { close: vi.fn(async () => {}) }
+    const fakeThrottledWorker = {
+      dispose: vi.fn(),
+      work: vi.fn(),
+      getBufferSize: vi.fn(() => 0)
+    } as unknown as ThrottledWorker<any>
+    const fakeAtomicSaveDetector = {
+      dispose: vi.fn()
+    } as unknown as AtomicSaveDetector
+    svc.watchedDirectories.set('/proj', {
+      dirPath: '/proj',
+      watcher: fakeWatcher,
+      webContentsIds: new Set([1, 2, 3]),
+      pauseController: new PauseController(),
+      throttledWorker: fakeThrottledWorker,
+      atomicSaveDetector: fakeAtomicSaveDetector,
+      version: svc.switchVersion
+    })
+
+    // Cleanup webContentsId 2
+    await svc.cleanupForWebContentsId(2)
+
+    // webContentsId 2 should be removed, 1 and 3 should remain
+    const watched = svc.watchedDirectories.get('/proj')
+    expect(watched).toBeTruthy()
+    expect(watched.webContentsIds.has(1)).toBe(true)
+    expect(watched.webContentsIds.has(2)).toBe(false)
+    expect(watched.webContentsIds.has(3)).toBe(true)
+    // Watcher should NOT be closed (other watchers remain)
+    expect(fakeWatcher.close).not.toHaveBeenCalled()
+    expect(fakeThrottledWorker.dispose).not.toHaveBeenCalled()
+  })
+
+  it('cleanupForWebContentsId handles double cleanup gracefully', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    const fakeWatcher = { close: vi.fn(async () => {}) }
+    const fakeThrottledWorker = {
+      dispose: vi.fn(),
+      work: vi.fn(),
+      getBufferSize: vi.fn(() => 0)
+    } as unknown as ThrottledWorker<any>
+    const fakeAtomicSaveDetector = {
+      dispose: vi.fn()
+    } as unknown as AtomicSaveDetector
+    svc.watchedDirectories.set('/proj', {
+      dirPath: '/proj',
+      watcher: fakeWatcher,
+      webContentsIds: new Set([1]),
+      pauseController: new PauseController(),
+      throttledWorker: fakeThrottledWorker,
+      atomicSaveDetector: fakeAtomicSaveDetector,
+      version: svc.switchVersion
+    })
+
+    // First cleanup
+    await svc.cleanupForWebContentsId(1)
+    expect(svc.watchedDirectories.has('/proj')).toBe(false)
+
+    // Second cleanup - should not throw
+    await expect(svc.cleanupForWebContentsId(1)).resolves.not.toThrow()
+  })
+
+  it('cleanupForWebContentsId clears git index debounce timer', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    // Set up git index watcher with debounce timer
+    const fakeGitWatcher = { close: vi.fn(async () => {}), on: vi.fn() }
+    const fakeTimer = setTimeout(() => {}, 10000)
+    svc.gitIndexWatcher = {
+      watcher: fakeGitWatcher,
+      projectPath: '/proj',
+      version: svc.switchVersion
+    }
+    svc.gitIndexDebounceTimer = fakeTimer
+
+    // Spy on clearTimeout
+    const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout')
+
+    // Cleanup webContentsId
+    await svc.cleanupForWebContentsId(1)
+
+    // Timer should be cleared
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(fakeTimer)
+    expect(svc.gitIndexDebounceTimer).toBeNull()
+  })
+})

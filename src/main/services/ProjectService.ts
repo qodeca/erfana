@@ -16,27 +16,11 @@ import { BrowserWindow } from 'electron'
 import { validatePath } from '../utils/pathSecurity'
 import { AppError, ErrorCode } from '../../shared/errors'
 import type { ProjectChanged } from '../../shared/ipc/schema'
-
-// Use interface types for dependency injection
-interface IFileService {
-  getProjectPath(): string | null
-  setProjectPath(path: string): void
-}
-
-interface IFileWatcherService {
-  stopAll(): Promise<void>
-  setProjectPath(path: string): void
-}
-
-interface IDirectoryWatcherService {
-  stopAll(): Promise<void>
-  setProjectPath(path: string): void
-}
-
-interface ISettingsService {
-  setLastProjectPath(path: string): Promise<void>
-  addRecentProject(path: string, name: string): Promise<void>
-}
+import type { IFileService } from '../interfaces/IFileService'
+import type { IFileWatcherService } from '../interfaces/IFileWatcherService'
+import type { IDirectoryWatcherService } from '../interfaces/IDirectoryWatcherService'
+import type { ISettingsService } from '../interfaces/ISettingsService'
+import type { IProjectSettingsService } from '../interfaces/IProjectSettingsService'
 
 export interface ProjectSwitchResult {
   success: boolean
@@ -98,7 +82,8 @@ export class ProjectService {
     private fileService: IFileService,
     private fileWatcherService: IFileWatcherService,
     private directoryWatcherService: IDirectoryWatcherService,
-    private settingsService: ISettingsService
+    private settingsService: ISettingsService,
+    private projectSettingsService: IProjectSettingsService
   ) {}
 
   /**
@@ -157,6 +142,7 @@ export class ProjectService {
       this.fileService.setProjectPath(oldPath || '')
       this.fileWatcherService.setProjectPath(oldPath || '')
       this.directoryWatcherService.setProjectPath(oldPath || '')
+      this.projectSettingsService.clearSettings()
     } catch (e) {
       // Best-effort rollback
       console.warn('Rollback failed after openProject error:', e)
@@ -230,8 +216,29 @@ export class ProjectService {
       // 4. Stop all existing watchers before switching
       await this.stopAllWatchers()
 
+      // 4.5. Load and validate project settings
+      let projectSettings
+      try {
+        projectSettings = await this.projectSettingsService.loadSettings(newProjectPath)
+      } catch (error) {
+        // Settings validation failed - block project open
+        if (error instanceof AppError) {
+          return {
+            success: false,
+            path: oldProjectPath || '',
+            action: 'noop',
+            error: error.message
+          }
+        }
+        throw error
+      }
+
       // 5. Update project path across services
       this.updateServices(newProjectPath)
+
+      // 5.5. Apply project settings to services
+      this.fileService.setHiddenPatterns(projectSettings.treeHiddenPatterns)
+      this.directoryWatcherService.setIgnorePatterns(projectSettings.watcherIgnorePatterns)
 
       // 6. Persist project change
       await this.persistProjectChange(newProjectPath)

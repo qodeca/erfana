@@ -10,6 +10,7 @@ import { registerTerminalHandlers } from './ipc/terminal-handlers'
 import { registerImportHandlers } from './ipc/import-handlers'
 import { registerGitHandlers } from './ipc/git-handlers'
 import { createApplicationMenu } from './menu'
+import { fileService } from './services/FileService'
 import { fileWatcherService } from './services/FileWatcherService'
 import { directoryWatcherService } from './services/DirectoryWatcherService'
 import { terminalService } from './services/TerminalService'
@@ -58,6 +59,41 @@ function createWindow(): BrowserWindow {
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
+  })
+
+  // Cleanup services when webContents is destroyed (window close or dev refresh - issue #59)
+  // This prevents stale watchers and terminal processes from accumulating
+  // CRITICAL: Must also clear project state so new window can re-open the same project
+  const webContentsId = mainWindow.webContents.id
+  mainWindow.webContents.on('destroyed', () => {
+    console.log(`🧹 WebContents ${webContentsId} destroyed, cleaning up services...`)
+
+    // CRITICAL FIX (issue #59): Clear project state in services
+    // Without this, ProjectService.isSameProject() returns true and does 'noop'
+    // when user clicks same project in new window, causing empty file tree
+    fileService.setProjectPath('')
+    fileWatcherService.setProjectPath('')
+    directoryWatcherService.setProjectPath('')
+
+    // Cleanup watcher services asynchronously
+    // Pattern: Fire-and-forget with error logging - cleanup must not block the destroyed event
+    // Errors are logged but don't halt further cleanup operations
+    fileWatcherService.cleanupForWebContentsId(webContentsId).catch((err) => {
+      console.error('Error cleaning up file watchers:', err)
+    })
+
+    directoryWatcherService.cleanupForWebContentsId(webContentsId).catch((err) => {
+      console.error('Error cleaning up directory watchers:', err)
+    })
+
+    // Cleanup terminals owned by this webContents (synchronous)
+    try {
+      terminalService.cleanupForWebContentsId(webContentsId)
+    } catch (err) {
+      console.error('Error cleaning up terminals:', err)
+    }
+
+    console.log(`✅ Service cleanup initiated for webContents ${webContentsId}`)
   })
 
   // HMR for renderer base on electron-vite cli.

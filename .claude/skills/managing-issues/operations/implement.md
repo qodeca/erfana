@@ -15,6 +15,34 @@ Implement GitHub issues through strictly enforced phases with mandatory quality 
 5. **OUTPUT CONDITIONS REQUIRED** - Phase CANNOT complete if any output condition unchecked
 6. **3-RETRY LIMIT** - Max 3 retries per phase, then ESCALATE to user
 7. **STOP ON FAIL** - If Quality Gate = FAIL after 3 retries, STOP workflow
+8. **SOURCE BRANCH REQUIRED** - Implementation MUST start from `develop` branch (no override, no retry)
+9. **CODE REVIEW MANDATORY** - ALL file modifications MUST pass comprehensive review (Phase 7)
+
+---
+
+## CODE REVIEW ENFORCEMENT (Rule 9)
+
+**Reference:** `reference/code-review-standards-2025.md`
+
+**ALL file-modifying operations MUST complete Phase 7 (Quality Review) using:**
+- `review-comprehensive` agent (primary)
+- `review-architecture` agent (Tier 2)
+- `review-code` agent (legacy support)
+
+**Review Dimensions (MANDATORY):**
+| Dimension | Tier 1 | Tier 2 | Blocking |
+|-----------|:------:|:------:|:--------:|
+| Electron Security | ✅ | ✅ | YES |
+| General Security | ✅ | ✅ | YES |
+| TypeScript Safety | ✅ | ✅ | YES |
+| SOLID Principles | Basic | Full | Tier 2 |
+| Code Smells | Critical | All | Tier 2 |
+| Complexity | <20 | <15 | YES |
+| Test Coverage | ≥70% | ≥80% | YES |
+
+**NO file can be committed without passing Phase 7 review.**
+
+**CRITICAL issues block all progress. No override allowed.**
 
 ---
 

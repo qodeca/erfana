@@ -42,6 +42,7 @@ interface TerminalInstance {
   isClearing: boolean // Track clearing phase to prevent forwarding clear sequence
   clearFallbackTimeout?: NodeJS.Timeout // Safety timeout for clear confirmation
   hasReceivedMarker: boolean // Track if marker was detected (prevents late data forwarding)
+  webContentsId: number // Track owning webContents for cleanup on window close
 }
 
 /**
@@ -108,8 +109,10 @@ export class TerminalService extends EventEmitter {
 
   /**
    * Create a new terminal instance
+   * @param config - Terminal configuration
+   * @param webContentsId - ID of the webContents that owns this terminal (for cleanup on window close)
    */
-  async createTerminal(config: TerminalConfig = {}): Promise<string | null> {
+  async createTerminal(config: TerminalConfig = {}, webContentsId?: number): Promise<string | null> {
     if (!pty) {
       try {
         pty = await import('node-pty')
@@ -196,7 +199,11 @@ export class TerminalService extends EventEmitter {
         title: `Terminal ${this.terminalCounter}`,
         initializationComplete: false, // Will be set to true after cwd verification
         isClearing: false, // Will be set to true during terminal clear phase
-        hasReceivedMarker: false // Will be set to true when marker is detected
+        hasReceivedMarker: false, // Will be set to true when marker is detected
+        // Track owning webContents for cleanup on window close (issue #59)
+        // Sentinel value -1 means "no owner" - terminals with -1 won't be cleaned up
+        // during window destruction (used in tests and manual terminal creation)
+        webContentsId: webContentsId ?? -1
       }
 
       this.terminals.set(terminalId, terminal)
@@ -375,6 +382,17 @@ export class TerminalService extends EventEmitter {
       return false
     }
 
+    // Clear fallback timeout to prevent timer leak (issue #59)
+    try {
+      if (terminal.clearFallbackTimeout) {
+        clearTimeout(terminal.clearFallbackTimeout)
+        terminal.clearFallbackTimeout = undefined
+      }
+    } catch (error) {
+      console.warn(`⚠️  Failed to clear fallback timeout for terminal ${terminalId}:`, error)
+      // Continue with kill anyway - don't let timeout error prevent cleanup
+    }
+
     try {
       terminal.ptyProcess.kill()
       this.terminals.delete(terminalId)
@@ -446,6 +464,37 @@ export class TerminalService extends EventEmitter {
 
     this.terminals.clear()
     console.log('✅ TerminalService disposed')
+  }
+
+  /**
+   * Cleanup all terminals owned by a specific webContents.
+   * Called when webContents is destroyed (window close or dev refresh).
+   *
+   * @param webContentsId - The ID of the destroyed webContents
+   * @remarks
+   * - Terminals with webContentsId=-1 (no owner) are not affected
+   * - Synchronous operation - safe to call from event handlers
+   * @see Issue #59 - App enters broken state after window close
+   */
+  cleanupForWebContentsId(webContentsId: number): void {
+    console.log(`🧹 Cleaning up terminals for webContents ${webContentsId}`)
+    const terminalsToKill: string[] = []
+
+    for (const [terminalId, terminal] of this.terminals.entries()) {
+      if (terminal.webContentsId === webContentsId) {
+        terminalsToKill.push(terminalId)
+      }
+    }
+
+    for (const terminalId of terminalsToKill) {
+      // Check if terminal still exists - it may have exited naturally between collection and kill
+      if (!this.terminals.has(terminalId)) {
+        continue
+      }
+      this.killTerminal(terminalId)
+    }
+
+    console.log(`✅ Cleaned up ${terminalsToKill.length} terminals for webContents ${webContentsId}`)
   }
 
   /**

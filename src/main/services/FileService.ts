@@ -3,6 +3,7 @@ import { join, extname, basename, relative } from 'path'
 import type { IFileService } from '../interfaces/IFileService'
 import { SymlinkDetector } from '../utils/SymlinkDetector'
 import { RollbackHandler } from '../utils/RollbackHandler'
+import { DEFAULT_TREE_HIDDEN_PATTERNS } from '../../shared/constants'
 
 export interface FileNode {
   name: string
@@ -21,6 +22,23 @@ export class FileService implements IFileService {
   private symlinkDetector = new SymlinkDetector()
   private rollbackHandler = new RollbackHandler()
 
+  // Dynamic hidden patterns (configurable per-project via .erfana/settings.json)
+  private hiddenPatterns: string[] = [...DEFAULT_TREE_HIDDEN_PATTERNS]
+
+  /**
+   * Set custom hidden patterns (called by ProjectService after loading settings)
+   */
+  setHiddenPatterns(patterns: string[]): void {
+    this.hiddenPatterns = patterns
+  }
+
+  /**
+   * Get current hidden patterns
+   */
+  getHiddenPatterns(): string[] {
+    return [...this.hiddenPatterns]
+  }
+
   setProjectPath(path: string): void {
     this.projectPath = path
   }
@@ -34,8 +52,8 @@ export class FileService implements IFileService {
     const nodes: FileNode[] = []
 
     for (const entry of entries) {
-      // Skip node_modules for performance (can contain thousands of files)
-      if (entry.name === 'node_modules') {
+      // Skip hidden directories (configurable via .erfana/settings.json)
+      if (this.hiddenPatterns.includes(entry.name)) {
         continue
       }
 

@@ -5,6 +5,7 @@ import { fileService } from '../services/FileService'
 import { fileWatcherService } from '../services/FileWatcherService'
 import { directoryWatcherService } from '../services/DirectoryWatcherService'
 import { settingsService } from '../services/SettingsService'
+import { projectSettingsService } from '../services/ProjectSettingsService'
 import type { ProjectChanged } from '../../shared/ipc/schema'
 
 /**
@@ -30,7 +31,8 @@ const projectService = new ProjectService(
   fileService,
   fileWatcherService,
   directoryWatcherService,
-  settingsService
+  settingsService,
+  projectSettingsService
 )
 
 /**
