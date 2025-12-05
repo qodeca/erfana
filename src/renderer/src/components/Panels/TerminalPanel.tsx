@@ -8,7 +8,7 @@
  * When DiagramViewer is open, the terminal UI portals into its split view.
  */
 
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import { ISplitviewPanelProps } from 'dockview'
 import { Terminal as TerminalIcon, RotateCw, ArrowDownToLine, LockKeyhole, LockKeyholeOpen } from 'lucide-react'
 import { Terminal } from '@xterm/xterm'
@@ -20,7 +20,7 @@ import { showWarningToast } from '../../utils/toastHelpers'
 import { useScrollAnomalyRecovery } from '../../hooks/useScrollAnomalyRecovery'
 import { useTerminalParserHooks } from '../../hooks/useTerminalParserHooks'
 import { useTerminalClipboard } from '../../hooks/useTerminalClipboard'
-import { useScrollLock } from '../../hooks/useScrollLock'
+import { useScrollLock, ScrollLockStateAccessor } from '../../hooks/useScrollLock'
 import { useTerminalFileLinks } from '../../hooks/useTerminalFileLinks'
 import { useFilePicker } from '../../hooks/useFilePicker'
 import { useProjectManagementContextSafe } from '../../context/ProjectManagementContext'
@@ -94,8 +94,15 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const scrollLocked = useTerminalStore((state) => state.scrollLocked)
   const setScrollLocked = useTerminalStore((state) => state.setScrollLocked)
 
+  // DIP: Inject state accessor instead of coupling hook to store (SOLID compliance)
+  // Memoized to avoid recreating closure on every render (stable reference for hook dependencies)
+  const scrollLockStateAccessor = useMemo<ScrollLockStateAccessor>(() => ({
+    getScrollLocked: () => useTerminalStore.getState().scrollLocked
+  }), [])
+
   const { handleWheelEvent, wrapKeyHandler, startPollingWatcher } = useScrollLock(
     xtermRef,
+    scrollLockStateAccessor,
     {
       onLockEngage: resetAll // Clear anomaly recovery queue when lock engages
     }

@@ -109,9 +109,15 @@ export function ChatBubble({
   const portalContext = useTerminalPortalOptional()
 
   // Subscribe to scroll lock state for UI updates (issue #60)
-  // We need to subscribe directly because terminalControls is stored in a ref (not state)
-  // and changes to it don't trigger re-renders in ChatBubble
+  // Using Zustand directly for both state and action consolidates access (SOLID: no Inappropriate Intimacy)
+  // - State subscription for reactivity (needed because terminalControls is a ref, not state)
+  // - Action via setScrollLocked for consistency (avoids dual path through context)
+  //
+  // NOTE: This differs from TerminalPanel which uses useScrollLock hook with a state accessor.
+  // TerminalPanel needs the hook's blocking mechanisms (wheel, keyboard, polling).
+  // ChatBubble only needs toggle UI - no scroll enforcement, so direct store access is simpler.
   const scrollLocked = useTerminalStore((state) => state.scrollLocked)
+  const setScrollLocked = useTerminalStore((state) => state.setScrollLocked)
 
   // Direction button state for supported diagrams
   const chartType = detectChartType(mermaidCode)
@@ -312,8 +318,10 @@ export function ChatBubble({
   }, [portalContext])
 
   const handleToggleScrollLock = useCallback(() => {
-    portalContext?.terminalControls?.toggleScrollLock()
-  }, [portalContext])
+    // Consolidated access: use Zustand directly instead of going through portalContext
+    // This fixes Inappropriate Intimacy code smell (accessing same concept via two paths)
+    setScrollLocked(!scrollLocked)
+  }, [scrollLocked, setScrollLocked])
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value
