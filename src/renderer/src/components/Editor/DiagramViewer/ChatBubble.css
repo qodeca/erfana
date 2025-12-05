@@ -144,6 +144,17 @@
   outline-offset: var(--border-width);
 }
 
+/* Active state for toggle buttons (scroll lock) - issue #60 */
+.chat-header-btn--active {
+  background: var(--color-bg-active);
+  color: var(--color-accent-primary);
+}
+
+.chat-header-btn--active:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-accent-primary);
+}
+
 /* Zoom indicator */
 .chat-zoom-indicator {
   min-width: 44px;

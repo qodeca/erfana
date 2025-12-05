@@ -36,3 +36,49 @@ describe('useTerminalStore activity tracking', () => {
     expect(useTerminalStore.getState().hasUserInteracted()).toBe(true)
   })
 })
+
+describe('useTerminalStore scrollLocked', () => {
+  it('scrollLocked should default to false', () => {
+    // Create a fresh store instance for this test
+    const freshStore = createTerminalStore(mockTerminalOps)
+    const state = freshStore.getState()
+
+    expect(state.scrollLocked).toBe(false)
+  })
+
+  it('setScrollLocked(true) should set scrollLocked to true', () => {
+    const store = useTerminalStore.getState()
+
+    store.setScrollLocked(true)
+
+    expect(useTerminalStore.getState().scrollLocked).toBe(true)
+  })
+
+  it('setScrollLocked(false) should set scrollLocked to false', () => {
+    const store = useTerminalStore.getState()
+
+    // First set to true
+    store.setScrollLocked(true)
+    expect(useTerminalStore.getState().scrollLocked).toBe(true)
+
+    // Then set back to false
+    store.setScrollLocked(false)
+    expect(useTerminalStore.getState().scrollLocked).toBe(false)
+  })
+
+  it('can toggle scrollLocked state multiple times', () => {
+    const store = useTerminalStore.getState()
+
+    // Toggle sequence: false -> true -> false -> true
+    expect(useTerminalStore.getState().scrollLocked).toBe(false)
+
+    store.setScrollLocked(true)
+    expect(useTerminalStore.getState().scrollLocked).toBe(true)
+
+    store.setScrollLocked(false)
+    expect(useTerminalStore.getState().scrollLocked).toBe(false)
+
+    store.setScrollLocked(true)
+    expect(useTerminalStore.getState().scrollLocked).toBe(true)
+  })
+})

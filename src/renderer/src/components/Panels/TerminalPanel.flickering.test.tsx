@@ -39,6 +39,7 @@ const mockXtermInstance = {
   clear: vi.fn(),
   onData: vi.fn().mockReturnValue({ dispose: vi.fn() }),
   attachCustomKeyEventHandler: vi.fn(),
+  attachCustomWheelEventHandler: vi.fn(),
   hasSelection: vi.fn().mockReturnValue(false),
   getSelection: vi.fn().mockReturnValue(''),
   clearSelection: vi.fn(),

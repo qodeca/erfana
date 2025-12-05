@@ -8,11 +8,14 @@ import {
   Maximize,
   RotateCcw,
   ArrowDownToLine,
-  RotateCw
+  RotateCw,
+  LockKeyhole,
+  LockKeyholeOpen
 } from 'lucide-react'
 import { executePromptTemplate } from '../../../utils/panelUtils'
 import { useTerminalPortalOptional } from '../../../context/TerminalPortalContext'
 import { useDiagramViewerStore } from '../../../stores/useDiagramViewerStore'
+import { useTerminalStore } from '../../../stores/useTerminalStore'
 import { formatLineRange } from '../../../prompts/helpers'
 import {
   detectChartType,
@@ -104,6 +107,17 @@ export function ChatBubble({
 
   // Portal context for terminal integration and controls
   const portalContext = useTerminalPortalOptional()
+
+  // Subscribe to scroll lock state for UI updates (issue #60)
+  // Using Zustand directly for both state and action consolidates access (SOLID: no Inappropriate Intimacy)
+  // - State subscription for reactivity (needed because terminalControls is a ref, not state)
+  // - Action via setScrollLocked for consistency (avoids dual path through context)
+  //
+  // NOTE: This differs from TerminalPanel which uses useScrollLock hook with a state accessor.
+  // TerminalPanel needs the hook's blocking mechanisms (wheel, keyboard, polling).
+  // ChatBubble only needs toggle UI - no scroll enforcement, so direct store access is simpler.
+  const scrollLocked = useTerminalStore((state) => state.scrollLocked)
+  const setScrollLocked = useTerminalStore((state) => state.setScrollLocked)
 
   // Direction button state for supported diagrams
   const chartType = detectChartType(mermaidCode)
@@ -302,6 +316,12 @@ export function ChatBubble({
   const handleRestartTerminal = useCallback(async () => {
     await portalContext?.terminalControls?.restart()
   }, [portalContext])
+
+  const handleToggleScrollLock = useCallback(() => {
+    // Consolidated access: use Zustand directly instead of going through portalContext
+    // This fixes Inappropriate Intimacy code smell (accessing same concept via two paths)
+    setScrollLocked(!scrollLocked)
+  }, [scrollLocked, setScrollLocked])
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value
@@ -529,6 +549,20 @@ export function ChatBubble({
                 aria-label="Restart terminal"
               >
                 <RotateCw size={14} />
+              </button>
+              <button
+                className={`chat-header-btn${scrollLocked ? ' chat-header-btn--active' : ''}`}
+                onClick={handleToggleScrollLock}
+                disabled={!portalContext?.isTerminalReady}
+                title={scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom'}
+                aria-label={scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom'}
+                aria-pressed={scrollLocked}
+              >
+                {scrollLocked ? (
+                  <LockKeyhole size={14} />
+                ) : (
+                  <LockKeyholeOpen size={14} />
+                )}
               </button>
             </div>
           </div>

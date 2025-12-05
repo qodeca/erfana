@@ -26,6 +26,10 @@ interface TerminalControls {
   paste: () => Promise<void>
   /** Check if terminal has text selection */
   hasSelection: () => boolean
+  /** Check if scroll lock is enabled (global state) */
+  isScrollLocked: () => boolean
+  /** Toggle scroll lock state */
+  toggleScrollLock: () => void
 }
 
 interface TerminalPortalContextValue {

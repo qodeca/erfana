@@ -24,6 +24,14 @@ vi.mock('../../../utils/panelUtils', () => ({
   executePromptTemplate: vi.fn().mockResolvedValue({ success: true })
 }))
 
+// Mock useTerminalStore (issue #60 - scroll lock uses this store)
+vi.mock('../../../stores/useTerminalStore', () => ({
+  useTerminalStore: vi.fn((selector) => {
+    const state = { scrollLocked: false }
+    return selector ? selector(state) : state
+  })
+}))
+
 // Import after mock to get the mocked version
 import { executePromptTemplate } from '../../../utils/panelUtils'
 
