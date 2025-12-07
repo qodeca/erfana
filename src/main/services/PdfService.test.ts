@@ -1,15 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ErrorCode } from '../../shared/errors'
+import { PDF_EXPORT } from '../../shared/constants'
 
 // Mock electron
 const mockPrintToPdf = vi.fn()
-const mockLoadUrl = vi.fn()
+const mockLoadFile = vi.fn()
 const mockClose = vi.fn()
 const mockIsDestroyed = vi.fn(() => false)
 const mockExecuteJavaScript = vi.fn()
 
 const mockBrowserWindow = vi.fn(() => ({
-  loadURL: mockLoadUrl,
+  loadFile: mockLoadFile,
   close: mockClose,
   isDestroyed: mockIsDestroyed,
   webContents: {
@@ -29,9 +30,40 @@ vi.mock('electron', () => ({
 
 // Mock fs/promises
 const mockWriteFile = vi.fn()
+const mockUnlink = vi.fn()
+const mockMkdtemp = vi.fn()
+const mockRmdir = vi.fn()
 vi.mock('fs/promises', () => ({
-  writeFile: mockWriteFile
+  writeFile: mockWriteFile,
+  unlink: mockUnlink,
+  mkdtemp: mockMkdtemp,
+  rmdir: mockRmdir
 }))
+
+// ============================================================================
+// Test Helpers
+// ============================================================================
+
+/**
+ * Setup mocks for a successful PDF export
+ */
+function setupSuccessfulExport(filePath = '/tmp/test.pdf'): void {
+  mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath })
+  mockMkdtemp.mockResolvedValue('/tmp/erfana-pdf-xyz123')
+  mockWriteFile.mockResolvedValue(undefined)
+  mockLoadFile.mockResolvedValue(undefined)
+  mockExecuteJavaScript.mockResolvedValue(true) // Content ready
+  mockPrintToPdf.mockResolvedValue(Buffer.from('PDF content'))
+  mockUnlink.mockResolvedValue(undefined)
+  mockRmdir.mockResolvedValue(undefined)
+}
+
+/**
+ * Setup mocks for a cancelled export (user cancels save dialog)
+ */
+function setupCancelledExport(): void {
+  mockShowSaveDialog.mockResolvedValue({ canceled: true, filePath: undefined })
+}
 
 describe('PdfService', () => {
   let pdfService: any
@@ -51,7 +83,10 @@ describe('PdfService', () => {
     }))
 
     vi.doMock('fs/promises', () => ({
-      writeFile: mockWriteFile
+      writeFile: mockWriteFile,
+      unlink: mockUnlink,
+      mkdtemp: mockMkdtemp,
+      rmdir: mockRmdir
     }))
 
     // Import fresh instance
@@ -99,19 +134,15 @@ describe('PdfService', () => {
     })
 
     it('should create hidden BrowserWindow with correct configuration', async () => {
-      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-      mockLoadUrl.mockResolvedValue(undefined)
-      mockExecuteJavaScript.mockResolvedValue(true) // Content ready
-      mockPrintToPdf.mockResolvedValue(Buffer.from('PDF content'))
-      mockWriteFile.mockResolvedValue(undefined)
+      setupSuccessfulExport()
 
       await pdfService.exportToPdf('<p>Test</p>', 'test')
 
       expect(mockBrowserWindow).toHaveBeenCalledWith(
         expect.objectContaining({
           show: false,
-          width: 794,
-          height: 1123,
+          width: PDF_EXPORT.WINDOW_WIDTH,
+          height: PDF_EXPORT.WINDOW_HEIGHT,
           webPreferences: expect.objectContaining({
             nodeIntegration: false,
             contextIsolation: true,
@@ -121,26 +152,24 @@ describe('PdfService', () => {
       )
     })
 
-    it('should load HTML content via data URL', async () => {
-      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-      mockLoadUrl.mockResolvedValue(undefined)
-      mockExecuteJavaScript.mockResolvedValue(true)
-      mockPrintToPdf.mockResolvedValue(Buffer.from('PDF content'))
-      mockWriteFile.mockResolvedValue(undefined)
+    it('should load HTML content via temp file', async () => {
+      setupSuccessfulExport()
 
       await pdfService.exportToPdf('<p>Hello World</p>', 'test')
 
-      expect(mockLoadUrl).toHaveBeenCalledWith(
-        expect.stringMatching(/^data:text\/html;charset=utf-8,/)
+      // Should create temp directory and write HTML file
+      expect(mockMkdtemp).toHaveBeenCalled()
+      expect(mockWriteFile).toHaveBeenCalledWith(
+        '/tmp/erfana-pdf-xyz123/export.html',
+        expect.stringContaining('<p>Hello World</p>'),
+        'utf-8'
       )
+      // Should load from temp file (not data URL)
+      expect(mockLoadFile).toHaveBeenCalledWith('/tmp/erfana-pdf-xyz123/export.html')
     })
 
     it('should call printToPDF with A4 page size', async () => {
-      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-      mockLoadUrl.mockResolvedValue(undefined)
-      mockExecuteJavaScript.mockResolvedValue(true)
-      mockPrintToPdf.mockResolvedValue(Buffer.from('PDF content'))
-      mockWriteFile.mockResolvedValue(undefined)
+      setupSuccessfulExport()
 
       await pdfService.exportToPdf('<p>Test</p>', 'test')
 
@@ -154,11 +183,8 @@ describe('PdfService', () => {
 
     it('should write PDF buffer to file', async () => {
       const pdfBuffer = Buffer.from('PDF content')
-      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-      mockLoadUrl.mockResolvedValue(undefined)
-      mockExecuteJavaScript.mockResolvedValue(true)
+      setupSuccessfulExport()
       mockPrintToPdf.mockResolvedValue(pdfBuffer)
-      mockWriteFile.mockResolvedValue(undefined)
 
       await pdfService.exportToPdf('<p>Test</p>', 'test')
 
@@ -166,11 +192,7 @@ describe('PdfService', () => {
     })
 
     it('should return success with file path on successful export', async () => {
-      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/exported.pdf' })
-      mockLoadUrl.mockResolvedValue(undefined)
-      mockExecuteJavaScript.mockResolvedValue(true)
-      mockPrintToPdf.mockResolvedValue(Buffer.from('PDF content'))
-      mockWriteFile.mockResolvedValue(undefined)
+      setupSuccessfulExport('/tmp/exported.pdf')
 
       const result = await pdfService.exportToPdf('<p>Test</p>', 'test')
 
@@ -179,11 +201,7 @@ describe('PdfService', () => {
     })
 
     it('should close hidden window after successful export', async () => {
-      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-      mockLoadUrl.mockResolvedValue(undefined)
-      mockExecuteJavaScript.mockResolvedValue(true)
-      mockPrintToPdf.mockResolvedValue(Buffer.from('PDF content'))
-      mockWriteFile.mockResolvedValue(undefined)
+      setupSuccessfulExport()
 
       await pdfService.exportToPdf('<p>Test</p>', 'test')
 
@@ -192,8 +210,12 @@ describe('PdfService', () => {
 
     it('should close hidden window on error', async () => {
       mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-      mockLoadUrl.mockRejectedValue(new Error('Load failed'))
+      mockMkdtemp.mockResolvedValue('/tmp/erfana-pdf-xyz123')
+      mockWriteFile.mockResolvedValue(undefined)
+      mockLoadFile.mockRejectedValue(new Error('Load failed'))
       mockIsDestroyed.mockReturnValue(false)
+      mockUnlink.mockResolvedValue(undefined)
+      mockRmdir.mockResolvedValue(undefined)
 
       await pdfService.exportToPdf('<p>Test</p>', 'test')
 
@@ -202,8 +224,12 @@ describe('PdfService', () => {
 
     it('should not close window if already destroyed', async () => {
       mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-      mockLoadUrl.mockRejectedValue(new Error('Load failed'))
+      mockMkdtemp.mockResolvedValue('/tmp/erfana-pdf-xyz123')
+      mockWriteFile.mockResolvedValue(undefined)
+      mockLoadFile.mockRejectedValue(new Error('Load failed'))
       mockIsDestroyed.mockReturnValue(true)
+      mockUnlink.mockResolvedValue(undefined)
+      mockRmdir.mockResolvedValue(undefined)
 
       await pdfService.exportToPdf('<p>Test</p>', 'test')
 
@@ -212,9 +238,13 @@ describe('PdfService', () => {
 
     it('should return error on printToPDF failure', async () => {
       mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-      mockLoadUrl.mockResolvedValue(undefined)
+      mockMkdtemp.mockResolvedValue('/tmp/erfana-pdf-xyz123')
+      mockWriteFile.mockResolvedValue(undefined)
+      mockLoadFile.mockResolvedValue(undefined)
       mockExecuteJavaScript.mockResolvedValue(true)
       mockPrintToPdf.mockRejectedValue(new Error('Print failed'))
+      mockUnlink.mockResolvedValue(undefined)
+      mockRmdir.mockResolvedValue(undefined)
 
       const result = await pdfService.exportToPdf('<p>Test</p>', 'test')
 
@@ -225,10 +255,15 @@ describe('PdfService', () => {
 
     it('should return error on file write failure', async () => {
       mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-      mockLoadUrl.mockResolvedValue(undefined)
+      mockMkdtemp.mockResolvedValue('/tmp/erfana-pdf-xyz123')
+      // First writeFile call for temp HTML succeeds, second for PDF fails
+      mockWriteFile.mockResolvedValueOnce(undefined)
+      mockLoadFile.mockResolvedValue(undefined)
       mockExecuteJavaScript.mockResolvedValue(true)
       mockPrintToPdf.mockResolvedValue(Buffer.from('PDF content'))
       mockWriteFile.mockRejectedValue(new Error('Permission denied'))
+      mockUnlink.mockResolvedValue(undefined)
+      mockRmdir.mockResolvedValue(undefined)
 
       const result = await pdfService.exportToPdf('<p>Test</p>', 'test')
 
@@ -238,11 +273,7 @@ describe('PdfService', () => {
     })
 
     it('should append .pdf extension if not present', async () => {
-      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/document' })
-      mockLoadUrl.mockResolvedValue(undefined)
-      mockExecuteJavaScript.mockResolvedValue(true)
-      mockPrintToPdf.mockResolvedValue(Buffer.from('PDF content'))
-      mockWriteFile.mockResolvedValue(undefined)
+      setupSuccessfulExport('/tmp/document')
 
       const result = await pdfService.exportToPdf('<p>Test</p>', 'test')
 
@@ -252,11 +283,7 @@ describe('PdfService', () => {
     })
 
     it('should not duplicate .pdf extension', async () => {
-      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/document.pdf' })
-      mockLoadUrl.mockResolvedValue(undefined)
-      mockExecuteJavaScript.mockResolvedValue(true)
-      mockPrintToPdf.mockResolvedValue(Buffer.from('PDF content'))
-      mockWriteFile.mockResolvedValue(undefined)
+      setupSuccessfulExport('/tmp/document.pdf')
 
       const result = await pdfService.exportToPdf('<p>Test</p>', 'test')
 
@@ -264,7 +291,7 @@ describe('PdfService', () => {
     })
 
     it('should suggest correct filename in save dialog', async () => {
-      mockShowSaveDialog.mockResolvedValue({ canceled: true })
+      setupCancelledExport()
 
       await pdfService.exportToPdf('<p>Test</p>', 'my-document')
 
@@ -278,7 +305,9 @@ describe('PdfService', () => {
 
     it('should wait for content ready before generating PDF', async () => {
       mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-      mockLoadUrl.mockResolvedValue(undefined)
+      mockMkdtemp.mockResolvedValue('/tmp/erfana-pdf-xyz123')
+      mockWriteFile.mockResolvedValue(undefined)
+      mockLoadFile.mockResolvedValue(undefined)
 
       // First call returns false, second returns true (simulating async content ready)
       mockExecuteJavaScript
@@ -287,7 +316,8 @@ describe('PdfService', () => {
         .mockResolvedValueOnce(true)
 
       mockPrintToPdf.mockResolvedValue(Buffer.from('PDF content'))
-      mockWriteFile.mockResolvedValue(undefined)
+      mockUnlink.mockResolvedValue(undefined)
+      mockRmdir.mockResolvedValue(undefined)
 
       const result = await pdfService.exportToPdf('<p>Test</p>', 'test')
 
@@ -298,7 +328,7 @@ describe('PdfService', () => {
 
   describe('save dialog configuration', () => {
     it('should use correct dialog title', async () => {
-      mockShowSaveDialog.mockResolvedValue({ canceled: true })
+      setupCancelledExport()
 
       await pdfService.exportToPdf('<p>Test</p>', 'test')
 
@@ -337,12 +367,13 @@ describe('PdfService', () => {
       })
 
       it('should allow new export after previous completes', async () => {
-        mockShowSaveDialog.mockResolvedValue({ canceled: true })
+        setupCancelledExport()
 
         // First export
         await pdfService.exportToPdf('<p>First</p>', 'first')
 
         // Second export should work
+        setupCancelledExport()
         const result = await pdfService.exportToPdf('<p>Second</p>', 'second')
         expect(result.errorCode).toBe('PDF_EXPORT_CANCELLED')
       })
@@ -353,33 +384,22 @@ describe('PdfService', () => {
         await pdfService.exportToPdf('<p>First</p>', 'first')
 
         // Second export should work
-        mockShowSaveDialog.mockResolvedValue({ canceled: true })
+        setupCancelledExport()
         const result = await pdfService.exportToPdf('<p>Second</p>', 'second')
         expect(result.errorCode).toBe('PDF_EXPORT_CANCELLED')
-      })
-    })
-
-    describe('data URL size limit', () => {
-      it('should reject content that would exceed data URL limit', async () => {
-        // Mock save dialog to return a path (size check happens after dialog)
-        mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/large.pdf' })
-
-        // Create very large HTML (>30MB when encoded)
-        const largeHtml = '<p>' + 'x'.repeat(35_000_000) + '</p>'
-
-        const result = await pdfService.exportToPdf(largeHtml, 'large')
-
-        expect(result.success).toBe(false)
-        expect(result.error).toContain('too large')
       })
     })
 
     describe('empty PDF buffer validation', () => {
       it('should reject empty PDF buffer', async () => {
         mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-        mockLoadUrl.mockResolvedValue(undefined)
+        mockMkdtemp.mockResolvedValue('/tmp/erfana-pdf-xyz123')
+        mockWriteFile.mockResolvedValue(undefined)
+        mockLoadFile.mockResolvedValue(undefined)
         mockExecuteJavaScript.mockResolvedValue(true)
         mockPrintToPdf.mockResolvedValue(Buffer.from('')) // Empty buffer
+        mockUnlink.mockResolvedValue(undefined)
+        mockRmdir.mockResolvedValue(undefined)
 
         const result = await pdfService.exportToPdf('<p>Test</p>', 'test')
 
@@ -390,7 +410,7 @@ describe('PdfService', () => {
 
     describe('filename sanitization', () => {
       it('should truncate very long filenames', async () => {
-        mockShowSaveDialog.mockResolvedValue({ canceled: true })
+        setupCancelledExport()
 
         const longName = 'a'.repeat(300)
         await pdfService.exportToPdf('<p>Test</p>', longName)
@@ -401,6 +421,33 @@ describe('PdfService', () => {
             defaultPath: expect.stringMatching(/^a{200}\.pdf$/)
           })
         )
+      })
+    })
+
+    describe('temp file cleanup', () => {
+      it('should clean up temp files after successful export', async () => {
+        setupSuccessfulExport()
+
+        await pdfService.exportToPdf('<p>Test</p>', 'test')
+
+        // Temp file and directory should be cleaned up
+        expect(mockUnlink).toHaveBeenCalledWith('/tmp/erfana-pdf-xyz123/export.html')
+        expect(mockRmdir).toHaveBeenCalledWith('/tmp/erfana-pdf-xyz123')
+      })
+
+      it('should clean up temp files even on error', async () => {
+        mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
+        mockMkdtemp.mockResolvedValue('/tmp/erfana-pdf-xyz123')
+        mockWriteFile.mockResolvedValue(undefined)
+        mockLoadFile.mockRejectedValue(new Error('Load failed'))
+        mockUnlink.mockResolvedValue(undefined)
+        mockRmdir.mockResolvedValue(undefined)
+
+        await pdfService.exportToPdf('<p>Test</p>', 'test')
+
+        // Temp file and directory should be cleaned up even on error
+        expect(mockUnlink).toHaveBeenCalledWith('/tmp/erfana-pdf-xyz123/export.html')
+        expect(mockRmdir).toHaveBeenCalledWith('/tmp/erfana-pdf-xyz123')
       })
     })
   })

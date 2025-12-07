@@ -804,7 +804,7 @@ export function MarkdownEditorPanel(
       return
     }
 
-    // Check if we have content to export
+    // Check if we have preview element and current file
     const previewElement = previewHandleRef.current?.element
     if (!previewElement || !currentFile) {
       showToast({
@@ -819,16 +819,6 @@ export function MarkdownEditorPanel(
     // Get the inner content (the rendered markdown)
     const contentElement = previewElement.querySelector('.markdown-preview-content')
     const html = contentElement?.innerHTML || previewElement.innerHTML
-
-    if (!html || html.trim().length === 0) {
-      showToast({
-        title: 'Export failed',
-        message: 'No content to export',
-        type: 'error',
-        duration: 3000
-      })
-      return
-    }
 
     // Get filename from current file path (without .md extension)
     const fileName = currentFile.path.split('/').pop()?.replace(/\.md$/i, '') || 'document'

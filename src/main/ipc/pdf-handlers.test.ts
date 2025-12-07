@@ -54,7 +54,7 @@ describe('PDF IPC Handlers', () => {
       const result = await handler({}, { fileName: 'test' })
 
       expect(result.success).toBe(false)
-      expect(result.errorCode).toBe(ErrorCode.PDF_EXPORT_NO_CONTENT)
+      expect(result.errorCode).toBe(ErrorCode.PDF_EXPORT_INVALID_REQUEST)
     })
 
     it('should validate request schema - reject missing fileName', async () => {
@@ -62,7 +62,7 @@ describe('PDF IPC Handlers', () => {
       const result = await handler({}, { html: '<p>Test</p>' })
 
       expect(result.success).toBe(false)
-      expect(result.errorCode).toBe(ErrorCode.PDF_EXPORT_NO_CONTENT)
+      expect(result.errorCode).toBe(ErrorCode.PDF_EXPORT_INVALID_REQUEST)
     })
 
     it('should validate request schema - reject empty html', async () => {
@@ -70,7 +70,7 @@ describe('PDF IPC Handlers', () => {
       const result = await handler({}, { html: '', fileName: 'test' })
 
       expect(result.success).toBe(false)
-      expect(result.errorCode).toBe(ErrorCode.PDF_EXPORT_NO_CONTENT)
+      expect(result.errorCode).toBe(ErrorCode.PDF_EXPORT_INVALID_REQUEST)
     })
 
     it('should validate request schema - reject empty fileName', async () => {
@@ -78,7 +78,7 @@ describe('PDF IPC Handlers', () => {
       const result = await handler({}, { html: '<p>Test</p>', fileName: '' })
 
       expect(result.success).toBe(false)
-      expect(result.errorCode).toBe(ErrorCode.PDF_EXPORT_NO_CONTENT)
+      expect(result.errorCode).toBe(ErrorCode.PDF_EXPORT_INVALID_REQUEST)
     })
 
     it('should call pdfService.exportToPdf with valid request', async () => {
@@ -174,7 +174,7 @@ describe('PDF IPC Handlers', () => {
       const result = await handler({}, 'invalid')
 
       expect(result.success).toBe(false)
-      expect(result.errorCode).toBe(ErrorCode.PDF_EXPORT_NO_CONTENT)
+      expect(result.errorCode).toBe(ErrorCode.PDF_EXPORT_INVALID_REQUEST)
     })
 
     it('should reject null request', async () => {
@@ -182,7 +182,7 @@ describe('PDF IPC Handlers', () => {
       const result = await handler({}, null)
 
       expect(result.success).toBe(false)
-      expect(result.errorCode).toBe(ErrorCode.PDF_EXPORT_NO_CONTENT)
+      expect(result.errorCode).toBe(ErrorCode.PDF_EXPORT_INVALID_REQUEST)
     })
   })
 })

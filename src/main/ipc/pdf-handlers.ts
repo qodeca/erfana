@@ -31,7 +31,7 @@ export function registerPdfHandlers(): void {
         return {
           success: false,
           error: 'Invalid request: ' + parseResult.error.issues[0]?.message,
-          errorCode: ErrorCode.PDF_EXPORT_NO_CONTENT
+          errorCode: ErrorCode.PDF_EXPORT_INVALID_REQUEST
         }
       }
 

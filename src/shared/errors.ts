@@ -58,6 +58,7 @@ export enum ErrorCode {
   PDF_EXPORT_CANCELLED = 'PDF_EXPORT_CANCELLED',
   PDF_EXPORT_FAILED = 'PDF_EXPORT_FAILED',
   PDF_EXPORT_NO_CONTENT = 'PDF_EXPORT_NO_CONTENT',
+  PDF_EXPORT_INVALID_REQUEST = 'PDF_EXPORT_INVALID_REQUEST',
 
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
@@ -170,6 +171,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.PDF_EXPORT_CANCELLED]: 'PDF export was cancelled',
   [ErrorCode.PDF_EXPORT_FAILED]: 'Failed to generate PDF',
   [ErrorCode.PDF_EXPORT_NO_CONTENT]: 'No content to export',
+  [ErrorCode.PDF_EXPORT_INVALID_REQUEST]: 'Invalid PDF export request',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'
