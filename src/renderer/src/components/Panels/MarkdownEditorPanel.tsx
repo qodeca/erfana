@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { FileEdit, Columns2, Rows2, Eye, Bold, Italic, Code, Link, Image, Heading1, List, ListOrdered, Strikethrough } from 'lucide-react'
+import { FileEdit, Columns2, Rows2, Eye, Bold, Italic, Code, Link, Image, Heading1, List, ListOrdered, Strikethrough, FileDown } from 'lucide-react'
 import { IDockviewPanelProps } from 'dockview'
 import * as monaco from 'monaco-editor'
 import { MonacoMarkdownEditor, MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
@@ -142,6 +142,9 @@ export function MarkdownEditorPanel(
   const scrollMapRef = useRef<ScrollMapEntry[]>([])
   const isSyncingRef = useRef(false)
   const [isEditorReady, setIsEditorReady] = useState(false)
+
+  // PDF export state (issue #58 edge case: prevent rapid clicks)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
 
   // Unified helper: detect any split mode (vertical or horizontal)
   // Used consistently across all scroll sync effects to avoid code duplication
@@ -788,6 +791,83 @@ export function MarkdownEditorPanel(
   }
 
   /**
+   * Export markdown preview to PDF
+   *
+   * Gets rendered HTML from preview and sends to main process for PDF generation.
+   * Shows success/error toast notification.
+   *
+   * @see Issue #58 - markdown-to-PDF export
+   */
+  const handleExportPdf = async () => {
+    // HIGH: Prevent rapid clicks (edge case from issue #58)
+    if (isExportingPdf) {
+      return
+    }
+
+    // Check if we have content to export
+    const previewElement = previewHandleRef.current?.element
+    if (!previewElement || !currentFile) {
+      showToast({
+        title: 'Export failed',
+        message: 'No content to export',
+        type: 'error',
+        duration: 3000
+      })
+      return
+    }
+
+    // Get the inner content (the rendered markdown)
+    const contentElement = previewElement.querySelector('.markdown-preview-content')
+    const html = contentElement?.innerHTML || previewElement.innerHTML
+
+    if (!html || html.trim().length === 0) {
+      showToast({
+        title: 'Export failed',
+        message: 'No content to export',
+        type: 'error',
+        duration: 3000
+      })
+      return
+    }
+
+    // Get filename from current file path (without .md extension)
+    const fileName = currentFile.path.split('/').pop()?.replace(/\.md$/i, '') || 'document'
+
+    setIsExportingPdf(true)
+    try {
+      const result = await window.api.pdf.exportToPdf({ html, fileName })
+
+      if (result.success && result.filePath) {
+        // Show success with just the filename
+        const savedFileName = result.filePath.split('/').pop() || 'PDF'
+        showToast({
+          title: 'PDF exported',
+          message: `Saved as ${savedFileName}`,
+          type: 'success',
+          duration: 3000
+        })
+      } else if (result.errorCode !== 'PDF_EXPORT_CANCELLED') {
+        // Show error (but not for cancelled exports)
+        showToast({
+          title: 'Export failed',
+          message: result.error || 'Unknown error',
+          type: 'error',
+          duration: 5000
+        })
+      }
+    } catch (error) {
+      showToast({
+        title: 'Export failed',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        type: 'error',
+        duration: 5000
+      })
+    } finally {
+      setIsExportingPdf(false)
+    }
+  }
+
+  /**
    * Build scroll map: line → pixel positions
    * Maps editor line numbers to preview element positions
    *
@@ -1047,6 +1127,17 @@ export function MarkdownEditorPanel(
             title="Preview Only"
           >
             <Eye size={16} strokeWidth={2} />
+          </button>
+
+          <div className="toolbar-separator" />
+
+          <button
+            className="toolbar-btn"
+            onClick={handleExportPdf}
+            disabled={!currentFile || isExportingPdf || viewMode === 'editor'}
+            title={viewMode === 'editor' ? 'Export to PDF (switch to preview or split mode)' : 'Export to PDF'}
+          >
+            <FileDown size={16} strokeWidth={2} />
           </button>
         </div>
 

@@ -54,6 +54,11 @@ export enum ErrorCode {
   PROMPT_TERMINAL_TIMEOUT = 'PROMPT_TERMINAL_TIMEOUT',
   PROMPT_SEND_FAILED = 'PROMPT_SEND_FAILED',
 
+  // PDF export errors
+  PDF_EXPORT_CANCELLED = 'PDF_EXPORT_CANCELLED',
+  PDF_EXPORT_FAILED = 'PDF_EXPORT_FAILED',
+  PDF_EXPORT_NO_CONTENT = 'PDF_EXPORT_NO_CONTENT',
+
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
 }
@@ -160,6 +165,11 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.PROMPT_VALIDATION_FAILED]: 'Missing required information for this prompt',
   [ErrorCode.PROMPT_TERMINAL_TIMEOUT]: 'Terminal took too long to initialize',
   [ErrorCode.PROMPT_SEND_FAILED]: 'Failed to send prompt to terminal',
+
+  // PDF export errors
+  [ErrorCode.PDF_EXPORT_CANCELLED]: 'PDF export was cancelled',
+  [ErrorCode.PDF_EXPORT_FAILED]: 'Failed to generate PDF',
+  [ErrorCode.PDF_EXPORT_NO_CONTENT]: 'No content to export',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'

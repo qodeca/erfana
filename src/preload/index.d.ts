@@ -1,6 +1,7 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import { FileNode, FileStats } from './index'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
+import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
 
 declare global {
   interface Window {
@@ -130,6 +131,9 @@ declare global {
       }
       git: {
         getStatus: (projectPath: string) => Promise<GitStatusResponse>
+      }
+      pdf: {
+        exportToPdf: (request: PdfExportRequest) => Promise<PdfExportResponse>
       }
     }
   }
