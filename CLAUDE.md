@@ -45,6 +45,7 @@ src/
 3. **Terminal** - xterm.js with PTY backend, clipboard support, file links, scroll recovery
 4. **Prompt Templates** - AI text operations via context menu (Elaborate, Modify, Ask, diagram chat)
 5. **Project Settings** - Per-project configuration via `.erfana/settings.json` (watcher ignore, tree visibility)
+6. **PDF Export** - Export markdown to print-optimized PDF with vector Mermaid diagrams, A4 page size, print-friendly styling
 
 ## Documentation
 See `docs/` for details (keep Claude's context focused):
@@ -165,7 +166,7 @@ Comprehensive security upgrade following 2025 Electron best practices:
 - Documented ASAR disabled trade-offs and rationale
 - Documented electron-builder 26 workaround
 
-**Testing**: All 3469 tests passing, dev + production builds verified
+**Testing**: All 3593 tests passing, dev + production builds verified
 
 **References**:
 - [Electron Fuses](https://www.electronjs.org/docs/latest/tutorial/fuses)
@@ -200,7 +201,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 3526 tests passing (121 test files)
+- **Current**: 3593 tests passing (124 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)

@@ -109,3 +109,22 @@ export const DEFAULT_TREE_HIDDEN_PATTERNS = [
   'node_modules',
   '.git'
 ] as const
+
+/**
+ * PDF Export constants
+ * Used by PdfService for markdown-to-PDF export
+ *
+ * @see PdfService.ts
+ * @see Issue #58 - markdown-to-PDF export
+ */
+export const PDF_EXPORT = {
+  /** Timeout for content to be ready (Mermaid diagrams, images) in ms */
+  CONTENT_READY_TIMEOUT: 5000,
+  /** Polling interval for readiness check in ms */
+  READY_CHECK_INTERVAL: 100,
+  /** Hidden window dimensions (A4 at 96 DPI) */
+  WINDOW_WIDTH: 794,
+  WINDOW_HEIGHT: 1123,
+  /** Default filename when no file is open */
+  DEFAULT_FILENAME: 'document'
+} as const

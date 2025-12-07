@@ -137,6 +137,9 @@ describe('Main Process - Window Creation', () => {
     vi.doMock('./ipc/git-handlers', () => ({
       registerGitHandlers: vi.fn()
     }))
+    vi.doMock('./ipc/pdf-handlers', () => ({
+      registerPdfHandlers: vi.fn()
+    }))
 
     // Mock safe console
     vi.doMock('./utils/safe-console', () => ({

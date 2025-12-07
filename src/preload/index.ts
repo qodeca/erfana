@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { ProjectChanged } from '../shared/ipc/schema'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
+import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
 import { electronAPI } from '@electron-toolkit/preload'
 
 export interface FileNode {
@@ -314,6 +315,19 @@ const api = {
      */
     getStatus: (projectPath: string): Promise<GitStatusResponse> =>
       ipcRenderer.invoke('git:getStatus', projectPath)
+  },
+
+  // PDF export operations
+  pdf: {
+    /**
+     * Export HTML content to PDF
+     *
+     * Shows native save dialog, renders in hidden window, writes PDF file.
+     * @param request - { html: string, fileName: string }
+     * @returns Export result with file path or error
+     */
+    exportToPdf: (request: PdfExportRequest): Promise<PdfExportResponse> =>
+      ipcRenderer.invoke('pdf:exportToPdf', request)
   }
 }
 
