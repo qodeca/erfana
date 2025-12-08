@@ -441,6 +441,189 @@ describe('GitStatusService', () => {
     })
   })
 
+  describe('operation queue (concurrency control)', () => {
+    beforeEach(() => {
+      mockedStat.mockResolvedValue({
+        isDirectory: () => true,
+        isFile: () => false,
+      } as any)
+      mockedCurrentBranch.mockResolvedValue('main')
+    })
+
+    it('should serialize concurrent getStatus calls for the same project', async () => {
+      const callOrder: number[] = []
+      let resolveFirst: () => void
+      let resolveSecond: () => void
+      let resolveThird: () => void
+
+      // First call starts immediately but waits
+      const firstPromise = new Promise<void>((resolve) => {
+        resolveFirst = resolve
+      })
+      // Second call should wait for first
+      const secondPromise = new Promise<void>((resolve) => {
+        resolveSecond = resolve
+      })
+      // Third call should wait for second
+      const thirdPromise = new Promise<void>((resolve) => {
+        resolveThird = resolve
+      })
+
+      mockedStatusMatrix
+        .mockImplementationOnce(async () => {
+          callOrder.push(1)
+          await firstPromise
+          return [['file1.ts', 1, 2, 1]]
+        })
+        .mockImplementationOnce(async () => {
+          callOrder.push(2)
+          await secondPromise
+          return [['file2.ts', 1, 2, 1]]
+        })
+        .mockImplementationOnce(async () => {
+          callOrder.push(3)
+          await thirdPromise
+          return [['file3.ts', 1, 2, 1]]
+        })
+
+      // Start all calls concurrently
+      const result1Promise = service.getStatus('/project')
+      const result2Promise = service.getStatus('/project')
+      const result3Promise = service.getStatus('/project')
+
+      // Give time for all to queue
+      await new Promise((resolve) => setTimeout(resolve, 10))
+
+      // Only first call should have started
+      expect(callOrder).toEqual([1])
+
+      // Resolve first, second should start
+      resolveFirst!()
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      expect(callOrder).toEqual([1, 2])
+
+      // Resolve second, third should start
+      resolveSecond!()
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      expect(callOrder).toEqual([1, 2, 3])
+
+      // Resolve third
+      resolveThird!()
+
+      // All should complete
+      const [result1, result2, result3] = await Promise.all([result1Promise, result2Promise, result3Promise])
+
+      expect(result1.files[0].path).toContain('file1.ts')
+      expect(result2.files[0].path).toContain('file2.ts')
+      expect(result3.files[0].path).toContain('file3.ts')
+    })
+
+    it('should allow parallel getStatus calls for different projects', async () => {
+      const callOrder: string[] = []
+      let resolveProjectA: () => void
+      let resolveProjectB: () => void
+
+      const projectAPromise = new Promise<void>((resolve) => {
+        resolveProjectA = resolve
+      })
+      const projectBPromise = new Promise<void>((resolve) => {
+        resolveProjectB = resolve
+      })
+
+      mockedStatusMatrix.mockImplementation(async (options: { dir: string }) => {
+        const project = options.dir.includes('projectA') ? 'A' : 'B'
+        callOrder.push(`start-${project}`)
+
+        if (project === 'A') {
+          await projectAPromise
+        } else {
+          await projectBPromise
+        }
+
+        callOrder.push(`end-${project}`)
+        return [[`file-${project}.ts`, 1, 2, 1]]
+      })
+
+      // Start calls to different projects
+      const resultA = service.getStatus('/projectA')
+      const resultB = service.getStatus('/projectB')
+
+      // Give time for both to start
+      await new Promise((resolve) => setTimeout(resolve, 10))
+
+      // Both should have started (parallel execution)
+      expect(callOrder).toContain('start-A')
+      expect(callOrder).toContain('start-B')
+
+      // Resolve both
+      resolveProjectA!()
+      resolveProjectB!()
+
+      const [a, b] = await Promise.all([resultA, resultB])
+      expect(a.files[0].path).toContain('file-A.ts')
+      expect(b.files[0].path).toContain('file-B.ts')
+    })
+
+    it('should continue queue after operation failure', async () => {
+      mockedStatusMatrix
+        .mockRejectedValueOnce(new Error('First operation failed'))
+        .mockResolvedValueOnce([['file.ts', 1, 2, 1]])
+
+      // First call fails
+      const result1 = await service.getStatus('/project')
+      expect(result1.error).toBe('First operation failed')
+
+      // Second call should still work
+      const result2 = await service.getStatus('/project')
+      expect(result2.error).toBeUndefined()
+      expect(result2.files).toHaveLength(1)
+    })
+
+    it('should not block queue when previous call fails during concurrent requests', async () => {
+      let resolveSecond: () => void
+      const secondPromise = new Promise<void>((resolve) => {
+        resolveSecond = resolve
+      })
+
+      mockedStatusMatrix
+        .mockRejectedValueOnce(new Error('First operation failed'))
+        .mockImplementationOnce(async () => {
+          await secondPromise
+          return [['file.ts', 1, 2, 1]]
+        })
+
+      // Start both calls
+      const result1Promise = service.getStatus('/project')
+      const result2Promise = service.getStatus('/project')
+
+      // Wait for first to fail and second to start
+      await result1Promise
+      await new Promise((resolve) => setTimeout(resolve, 10))
+
+      // Resolve second
+      resolveSecond!()
+
+      const [result1, result2] = await Promise.all([result1Promise, result2Promise])
+
+      expect(result1.error).toBe('First operation failed')
+      expect(result2.error).toBeUndefined()
+      expect(result2.files).toHaveLength(1)
+    })
+
+    it('should clean up queue after operation completes', async () => {
+      mockedStatusMatrix.mockResolvedValue([])
+
+      // First call
+      await service.getStatus('/project')
+
+      // Access private operationQueues via type assertion for testing
+      const serviceWithPrivates = service as unknown as { operationQueues: Map<string, Promise<unknown>> }
+
+      // Queue should be cleaned up
+      expect(serviceWithPrivates.operationQueues.has('/project')).toBe(false)
+    })
+  })
+
   describe('complete scenarios', () => {
     beforeEach(() => {
       mockedStat.mockResolvedValue({

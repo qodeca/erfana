@@ -20,6 +20,11 @@ export const GIT_STATUS_CAP = 10000
  * - Status counts for aggregation
  * - Efficient bulk operation using git.statusMatrix()
  *
+ * Concurrency Control:
+ * Uses per-project operation queues to prevent concurrent isomorphic-git calls.
+ * This prevents index.lock file conflicts that block external git operations.
+ * See: https://github.com/qodeca/erfana/issues/67
+ *
  * Known Limitation:
  * Global gitignore files (~/.gitignore_global, ~/.config/git/ignore) are NOT
  * respected. This is a limitation of isomorphic-git which only reads local
@@ -28,12 +33,50 @@ export const GIT_STATUS_CAP = 10000
  */
 export class GitStatusService {
   /**
+   * Per-project operation queues - prevents concurrent git operations on same project.
+   * Different projects can query in parallel without blocking each other.
+   */
+  private operationQueues: Map<string, Promise<GitStatusResponse>> = new Map()
+
+  /**
    * Get git status for a project directory
+   *
+   * Operations are queued per-project to prevent concurrent isomorphic-git calls
+   * that would create conflicting index.lock files.
    *
    * @param projectPath - Absolute path to project directory
    * @returns Git status response with branch, files, and counts
    */
   async getStatus(projectPath: string): Promise<GitStatusResponse> {
+    // Get current queue for this project (or resolved empty promise if none)
+    const currentQueue = this.operationQueues.get(projectPath) ?? Promise.resolve(this.createEmptyResponse())
+
+    // Chain this operation onto the queue
+    // Previous failures don't block subsequent operations
+    const operation = currentQueue
+      .catch(() => this.createEmptyResponse())
+      .then(() => this.executeGetStatus(projectPath))
+
+    // Update queue reference
+    this.operationQueues.set(projectPath, operation)
+
+    // Clean up queue reference after completion to prevent memory leak
+    operation.finally(() => {
+      if (this.operationQueues.get(projectPath) === operation) {
+        this.operationQueues.delete(projectPath)
+      }
+    })
+
+    return operation
+  }
+
+  /**
+   * Execute the actual git status retrieval
+   *
+   * @param projectPath - Absolute path to project directory
+   * @returns Git status response with branch, files, and counts
+   */
+  private async executeGetStatus(projectPath: string): Promise<GitStatusResponse> {
     try {
       // Check if .git directory exists
       const gitDir = join(projectPath, '.git')
