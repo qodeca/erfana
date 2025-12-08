@@ -291,21 +291,28 @@ export async function convertMermaidDiagramsToImages(
     img.width = conversion.width
     img.height = conversion.height
 
-    // Centering styles (inline for reliability with DOCX library)
-    // NOTE: Do NOT add max-width/height:auto here - they conflict with explicit dimensions
-    // and cause the DOCX library to render diagrams with incorrect proportions
-    img.style.display = 'block'
-    img.style.marginLeft = 'auto'
-    img.style.marginRight = 'auto'
-
     // Add data attribute for the main process to recognize
     img.setAttribute('data-mermaid-diagram', 'true')
+
+    // Wrap in a borderless centered table for reliable DOCX centering
+    // Paragraph-level text-align doesn't work reliably for images in DOCX converters,
+    // Using a fixed-width table with margin: 0 auto centers the table itself on the page
+    const table = document.createElement('table')
+    table.setAttribute('style', `width: ${conversion.width}px; border: none; border-collapse: collapse; margin: 1em auto;`)
+
+    const tr = document.createElement('tr')
+    const td = document.createElement('td')
+    td.setAttribute('style', 'border: none; padding: 0;')
+
+    td.appendChild(img)
+    tr.appendChild(td)
+    table.appendChild(tr)
 
     // Mark as replaced before replacing
     replaced.add(clonedContainer)
 
-    // Replace the Mermaid container with the image
-    clonedContainer.replaceWith(img)
+    // Replace the Mermaid container with the centered table
+    clonedContainer.replaceWith(table)
   })
 
   console.log(`[convertMermaidDiagrams] Replaced ${replaced.size} containers with images`)
