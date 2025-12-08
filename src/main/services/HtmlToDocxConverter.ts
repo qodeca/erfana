@@ -205,12 +205,6 @@ ${html}
 
     /* Images */
     img { page-break-inside: avoid; }
-
-    /* Mermaid diagrams - sizing handled in PNG generation, just need centering */
-    img[data-mermaid-diagram="true"] {
-      display: block;
-      margin: 0 auto;
-    }
     `
   }
 }
