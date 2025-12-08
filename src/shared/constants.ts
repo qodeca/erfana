@@ -159,5 +159,14 @@ export const DOCX_EXPORT = {
   /** Default filename when no file is open */
   DEFAULT_FILENAME: 'document',
   /** Maximum HTML input size in bytes (10 MB) - security limit */
-  MAX_HTML_SIZE: 10 * 1024 * 1024
+  MAX_HTML_SIZE: 10 * 1024 * 1024,
+  /** Timeout for DOCX conversion in ms (60 seconds) - prevents hung exports */
+  CONVERSION_TIMEOUT_MS: 60_000,
+  /**
+   * Resolution scale for PNG diagrams (determines output DPI at 96 base)
+   * - 2.0 = 192 DPI (good for screen)
+   * - 2.5 = 240 DPI (balanced quality/size, default)
+   * - 3.0 = 288 DPI (near print quality, larger files)
+   */
+  PNG_RESOLUTION_SCALE: 2.5
 } as const

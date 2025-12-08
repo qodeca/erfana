@@ -21,28 +21,11 @@ export class HtmlToDocxConverter {
    * @returns Buffer ready to be written to file
    */
   async convert(html: string): Promise<Buffer> {
-    // Debug logging
-    const imgMatches = html.match(/<img/gi) || []
-    const mermaidMatches = html.match(/data-mermaid-diagram/gi) || []
-    const dataUrlMatches = html.match(/src="data:image\//gi) || []
-
-    console.log(`[HtmlToDocxConverter] Converting HTML to DOCX`)
-    console.log(`[HtmlToDocxConverter] Total <img> tags: ${imgMatches.length}`)
-    console.log(`[HtmlToDocxConverter] Mermaid diagram images: ${mermaidMatches.length}`)
-    console.log(`[HtmlToDocxConverter] Data URL images: ${dataUrlMatches.length}`)
-
-    // Log first data URL info if present
-    const firstDataUrl = html.match(/src="(data:image\/[^"]+)"/i)
-    if (firstDataUrl) {
-      console.log(`[HtmlToDocxConverter] First data URL length: ${firstDataUrl[1].length}`)
-      console.log(`[HtmlToDocxConverter] First data URL prefix: ${firstDataUrl[1].substring(0, 50)}...`)
-    }
-
     // Wrap in proper HTML structure for the library
     const wrappedHtml = this.wrapInHtmlDocument(html)
 
-    // Convert to DOCX using @turbodocx/html-to-docx
-    const result = await HTMLtoDOCX(
+    // Convert to DOCX using @turbodocx/html-to-docx with timeout protection
+    const conversionPromise = HTMLtoDOCX(
       wrappedHtml,
       null, // No header
       {
@@ -78,33 +61,30 @@ export class HtmlToDocxConverter {
             cantSplit: true
           },
           addSpacingAfter: false
-        },
-        // Image processing - use native SVG embedding for best quality
-        // Data URL images (PNG from Mermaid conversion) should work directly
-        imageProcessing: {
-          verboseLogging: true, // Enable for debugging
-          maxImageSize: DOCX_EXPORT.MAX_HTML_SIZE, // Use same limit as HTML
-          svgHandling: 'native', // Embed SVG natively (Office 2019+)
-          suppressSharpWarning: true // Don't warn about missing sharp
         }
       },
       null // No footer
     )
 
+    // Apply timeout to prevent hung exports on complex/malformed HTML
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(
+        () => reject(new Error(`DOCX conversion timed out after ${DOCX_EXPORT.CONVERSION_TIMEOUT_MS / 1000} seconds`)),
+        DOCX_EXPORT.CONVERSION_TIMEOUT_MS
+      )
+    })
+
+    const result = await Promise.race([conversionPromise, timeoutPromise])
+
     // Convert result to Buffer
     if (Buffer.isBuffer(result)) {
-      console.log(`[HtmlToDocxConverter] Result is Buffer, size: ${result.length}`)
       return result
     } else if (result instanceof ArrayBuffer) {
-      const buffer = Buffer.from(result)
-      console.log(`[HtmlToDocxConverter] Converted ArrayBuffer to Buffer, size: ${buffer.length}`)
-      return buffer
+      return Buffer.from(result)
     } else if (result instanceof Blob) {
-      // Handle Blob (shouldn't happen in Node.js environment)
+      // Handle Blob (defensive - @turbodocx/html-to-docx typically returns Buffer in Node.js)
       const arrayBuffer = await result.arrayBuffer()
-      const buffer = Buffer.from(arrayBuffer)
-      console.log(`[HtmlToDocxConverter] Converted Blob to Buffer, size: ${buffer.length}`)
-      return buffer
+      return Buffer.from(arrayBuffer)
     }
 
     throw new Error('Unexpected result type from HTMLtoDOCX')

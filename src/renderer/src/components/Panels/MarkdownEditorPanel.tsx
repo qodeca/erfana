@@ -906,9 +906,22 @@ export function MarkdownEditorPanel(
     try {
       // Convert Mermaid diagrams to PNG images before sending to main process
       // This avoids jsdom/canvas dependency issues in the main process
-      const html = await convertMermaidDiagramsToImages(contentElement)
+      const conversionResult = await convertMermaidDiagramsToImages(contentElement)
 
-      const result = await window.api.docx.exportToDocx({ html, fileName })
+      // Warn user if some diagrams failed to convert
+      if (conversionResult.failedDiagrams > 0) {
+        showToast({
+          title: 'Diagram conversion warning',
+          message: `${conversionResult.failedDiagrams} of ${conversionResult.totalDiagrams} diagram(s) could not be converted`,
+          type: 'warning',
+          duration: 5000
+        })
+      }
+
+      const result = await window.api.docx.exportToDocx({
+        html: conversionResult.html,
+        fileName
+      })
 
       if (result.success && result.filePath) {
         // Show success with just the filename
