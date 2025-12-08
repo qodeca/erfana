@@ -1,0 +1,52 @@
+import { ipcMain } from 'electron'
+import { docxService } from '../services/DocxService'
+import { DocxExportRequestSchema, type DocxExportResponse } from '../../shared/ipc/docx-schema'
+import { ErrorCode } from '../../shared/errors'
+
+/**
+ * Register DOCX export IPC handlers
+ *
+ * Channels:
+ * - docx:exportToDocx - Export HTML content to DOCX file
+ *
+ * @see Issue #65 - DOCX export with Mermaid diagram support
+ */
+export function registerDocxHandlers(): void {
+  /**
+   * Export HTML content to DOCX
+   *
+   * Shows native save dialog, parses HTML, generates DOCX file.
+   *
+   * @param request - { html: string, fileName: string }
+   * @returns Export result with file path or error
+   */
+  ipcMain.handle(
+    'docx:exportToDocx',
+    async (_event, request: unknown): Promise<DocxExportResponse> => {
+      // Validate request schema
+      const parseResult = DocxExportRequestSchema.safeParse(request)
+
+      if (!parseResult.success) {
+        console.error('DOCX export validation error:', parseResult.error.issues)
+        return {
+          success: false,
+          error: 'Invalid request: ' + parseResult.error.issues[0]?.message,
+          errorCode: ErrorCode.DOCX_EXPORT_INVALID_REQUEST
+        }
+      }
+
+      const { html, fileName } = parseResult.data
+
+      try {
+        return await docxService.exportToDocx(html, fileName)
+      } catch (error) {
+        console.error('DOCX export handler error:', error)
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          errorCode: ErrorCode.DOCX_EXPORT_FAILED
+        }
+      }
+    }
+  )
+}

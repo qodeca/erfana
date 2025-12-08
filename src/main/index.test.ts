@@ -140,6 +140,9 @@ describe('Main Process - Window Creation', () => {
     vi.doMock('./ipc/pdf-handlers', () => ({
       registerPdfHandlers: vi.fn()
     }))
+    vi.doMock('./ipc/docx-handlers', () => ({
+      registerDocxHandlers: vi.fn()
+    }))
 
     // Mock safe console
     vi.doMock('./utils/safe-console', () => ({

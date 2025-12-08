@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { ProjectChanged } from '../shared/ipc/schema'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
+import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-schema'
 import { electronAPI } from '@electron-toolkit/preload'
 
 export interface FileNode {
@@ -328,6 +329,20 @@ const api = {
      */
     exportToPdf: (request: PdfExportRequest): Promise<PdfExportResponse> =>
       ipcRenderer.invoke('pdf:exportToPdf', request)
+  },
+
+  // DOCX export operations
+  docx: {
+    /**
+     * Export HTML content to DOCX (Word)
+     *
+     * Shows native save dialog, parses HTML, generates DOCX file.
+     * @param request - { html: string, fileName: string }
+     * @returns Export result with file path or error
+     * @see Issue #65 - DOCX export with Mermaid diagram support
+     */
+    exportToDocx: (request: DocxExportRequest): Promise<DocxExportResponse> =>
+      ipcRenderer.invoke('docx:exportToDocx', request)
   }
 }
 

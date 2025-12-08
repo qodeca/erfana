@@ -128,3 +128,36 @@ export const PDF_EXPORT = {
   /** Default filename when no file is open */
   DEFAULT_FILENAME: 'document'
 } as const
+
+/**
+ * DOCX Export constants
+ * Used by DocxService for markdown-to-DOCX export
+ *
+ * @see DocxService.ts
+ * @see Issue #65 - DOCX export with Mermaid diagram support
+ */
+export const DOCX_EXPORT = {
+  /** Max image width in points (Word uses 1 inch = 72 points) */
+  MAX_IMAGE_WIDTH: 468, // 6.5 inches (A4 width minus 1 inch margins)
+  /** Max image height in points */
+  MAX_IMAGE_HEIGHT: 600,
+  /**
+   * Max diagram width in pixels (96 DPI) - 100% of A4 work area
+   * A4 width: 8.27" - margins (0.75" × 2) = 6.77" × 96 DPI = 650px
+   */
+  MAX_DIAGRAM_WIDTH_PX: 650,
+  /**
+   * Max diagram height in pixels (96 DPI) - 80% of A4 work area
+   * A4 height: 11.69" - margins (1" × 2) = 9.69" × 96 DPI × 80% = 744px
+   */
+  MAX_DIAGRAM_HEIGHT_PX: 744,
+  /** Hidden window dimensions for SVG capture */
+  CAPTURE_WINDOW_WIDTH: 1200,
+  CAPTURE_WINDOW_HEIGHT: 800,
+  /** Timeout for SVG render in ms */
+  SVG_RENDER_TIMEOUT: 3000,
+  /** Default filename when no file is open */
+  DEFAULT_FILENAME: 'document',
+  /** Maximum HTML input size in bytes (10 MB) - security limit */
+  MAX_HTML_SIZE: 10 * 1024 * 1024
+} as const

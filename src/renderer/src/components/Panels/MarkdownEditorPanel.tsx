@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { FileEdit, Columns2, Rows2, Eye, Bold, Italic, Code, Link, Image, Heading1, List, ListOrdered, Strikethrough, FileDown } from 'lucide-react'
+import { FileEdit, Columns2, Rows2, Eye, Bold, Italic, Code, Link, Image, Heading1, List, ListOrdered, Strikethrough, FileDown, FileText } from 'lucide-react'
 import { IDockviewPanelProps } from 'dockview'
 import * as monaco from 'monaco-editor'
 import { MonacoMarkdownEditor, MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
@@ -10,6 +10,7 @@ import { useToast } from '../Toast/ToastContext'
 import { FileConflictNotification } from '../FileConflictNotification/FileConflictNotification'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { sanitizeFilePath } from '../../utils/fileUtils'
+import { convertMermaidDiagramsToImages } from '../../utils/svgToImage'
 import './MarkdownEditorPanel.css'
 
 interface EditorFile {
@@ -145,6 +146,9 @@ export function MarkdownEditorPanel(
 
   // PDF export state (issue #58 edge case: prevent rapid clicks)
   const [isExportingPdf, setIsExportingPdf] = useState(false)
+
+  // DOCX export state (issue #65: prevent rapid clicks)
+  const [isExportingDocx, setIsExportingDocx] = useState(false)
 
   // Unified helper: detect any split mode (vertical or horizontal)
   // Used consistently across all scroll sync effects to avoid code duplication
@@ -858,6 +862,85 @@ export function MarkdownEditorPanel(
   }
 
   /**
+   * Export to DOCX handler
+   *
+   * Extracts HTML from preview, calls DOCX export API.
+   * Shows success/error toast notification.
+   *
+   * @see Issue #65 - DOCX export with Mermaid diagram support
+   */
+  const handleExportDocx = async () => {
+    // Prevent rapid clicks (edge case from issue #65)
+    if (isExportingDocx) {
+      return
+    }
+
+    // Check if we have preview element and current file
+    const previewElement = previewHandleRef.current?.element
+    if (!previewElement || !currentFile) {
+      showToast({
+        title: 'Export failed',
+        message: 'No content to export',
+        type: 'error',
+        duration: 3000
+      })
+      return
+    }
+
+    // Get the inner content (the rendered markdown)
+    const contentElement = previewElement.querySelector('.markdown-preview-content')
+    if (!contentElement) {
+      showToast({
+        title: 'Export failed',
+        message: 'No preview content available',
+        type: 'error',
+        duration: 3000
+      })
+      return
+    }
+
+    // Get filename from current file path (without .md extension)
+    const fileName = currentFile.path.split('/').pop()?.replace(/\.md$/i, '') || 'document'
+
+    setIsExportingDocx(true)
+    try {
+      // Convert Mermaid diagrams to PNG images before sending to main process
+      // This avoids jsdom/canvas dependency issues in the main process
+      const html = await convertMermaidDiagramsToImages(contentElement)
+
+      const result = await window.api.docx.exportToDocx({ html, fileName })
+
+      if (result.success && result.filePath) {
+        // Show success with just the filename
+        const savedFileName = result.filePath.split('/').pop() || 'DOCX'
+        showToast({
+          title: 'DOCX exported',
+          message: `Saved as ${savedFileName}`,
+          type: 'success',
+          duration: 3000
+        })
+      } else if (result.errorCode !== 'DOCX_EXPORT_CANCELLED') {
+        // Show error (but not for cancelled exports)
+        showToast({
+          title: 'Export failed',
+          message: result.error || 'Unknown error',
+          type: 'error',
+          duration: 5000
+        })
+      }
+    } catch (error) {
+      showToast({
+        title: 'Export failed',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        type: 'error',
+        duration: 5000
+      })
+    } finally {
+      setIsExportingDocx(false)
+    }
+  }
+
+  /**
    * Build scroll map: line → pixel positions
    * Maps editor line numbers to preview element positions
    *
@@ -1128,6 +1211,14 @@ export function MarkdownEditorPanel(
             title={viewMode === 'editor' ? 'Export to PDF (switch to preview or split mode)' : 'Export to PDF'}
           >
             <FileDown size={16} strokeWidth={2} />
+          </button>
+          <button
+            className="toolbar-btn"
+            onClick={handleExportDocx}
+            disabled={!currentFile || isExportingDocx || viewMode === 'editor'}
+            title={viewMode === 'editor' ? 'Export to Word (switch to preview or split mode)' : 'Export to Word'}
+          >
+            <FileText size={16} strokeWidth={2} />
           </button>
         </div>
 

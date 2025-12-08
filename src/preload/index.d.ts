@@ -2,6 +2,7 @@ import { ElectronAPI } from '@electron-toolkit/preload'
 import { FileNode, FileStats } from './index'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
+import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-schema'
 
 declare global {
   interface Window {
@@ -134,6 +135,9 @@ declare global {
       }
       pdf: {
         exportToPdf: (request: PdfExportRequest) => Promise<PdfExportResponse>
+      }
+      docx: {
+        exportToDocx: (request: DocxExportRequest) => Promise<DocxExportResponse>
       }
     }
   }

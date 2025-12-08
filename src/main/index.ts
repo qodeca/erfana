@@ -10,6 +10,7 @@ import { registerTerminalHandlers } from './ipc/terminal-handlers'
 import { registerImportHandlers } from './ipc/import-handlers'
 import { registerGitHandlers } from './ipc/git-handlers'
 import { registerPdfHandlers } from './ipc/pdf-handlers'
+import { registerDocxHandlers } from './ipc/docx-handlers'
 import { createApplicationMenu } from './menu'
 import { fileService } from './services/FileService'
 import { fileWatcherService } from './services/FileWatcherService'
@@ -138,6 +139,7 @@ app.whenReady().then(() => {
   registerImportHandlers()
   registerGitHandlers()
   registerPdfHandlers()
+  registerDocxHandlers()
 
   // RELIABILITY FIX (todo012): Clean up stale projects on startup
   // This runs asynchronously but doesn't block window creation
