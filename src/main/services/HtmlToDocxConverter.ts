@@ -67,27 +67,32 @@ export class HtmlToDocxConverter {
     )
 
     // Apply timeout to prevent hung exports on complex/malformed HTML
+    let timeoutId: NodeJS.Timeout
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(
+      timeoutId = setTimeout(
         () => reject(new Error(`DOCX conversion timed out after ${DOCX_EXPORT.CONVERSION_TIMEOUT_MS / 1000} seconds`)),
         DOCX_EXPORT.CONVERSION_TIMEOUT_MS
       )
     })
 
-    const result = await Promise.race([conversionPromise, timeoutPromise])
+    try {
+      const result = await Promise.race([conversionPromise, timeoutPromise])
 
-    // Convert result to Buffer
-    if (Buffer.isBuffer(result)) {
-      return result
-    } else if (result instanceof ArrayBuffer) {
-      return Buffer.from(result)
-    } else if (result instanceof Blob) {
-      // Handle Blob (defensive - @turbodocx/html-to-docx typically returns Buffer in Node.js)
-      const arrayBuffer = await result.arrayBuffer()
-      return Buffer.from(arrayBuffer)
+      // Convert result to Buffer
+      if (Buffer.isBuffer(result)) {
+        return result
+      } else if (result instanceof ArrayBuffer) {
+        return Buffer.from(result)
+      } else if (result instanceof Blob) {
+        // Handle Blob (defensive - @turbodocx/html-to-docx typically returns Buffer in Node.js)
+        const arrayBuffer = await result.arrayBuffer()
+        return Buffer.from(arrayBuffer)
+      }
+
+      throw new Error('Unexpected result type from HTMLtoDOCX')
+    } finally {
+      clearTimeout(timeoutId!)
     }
-
-    throw new Error('Unexpected result type from HTMLtoDOCX')
   }
 
   /**

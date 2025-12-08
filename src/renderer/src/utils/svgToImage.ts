@@ -122,35 +122,37 @@ async function svgToPng(svgElement: SVGSVGElement, resolutionScale = DOCX_EXPORT
   canvas.width = width * resolutionScale
   canvas.height = height * resolutionScale
 
-  const ctx = canvas.getContext('2d')
-  if (!ctx) {
-    throw new Error('Failed to get canvas 2D context')
+  try {
+    const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      throw new Error('Failed to get canvas 2D context')
+    }
+
+    // Disable image smoothing to preserve sharp SVG vector edges
+    // SVG is internally rendered at high quality by the browser;
+    // additional smoothing during canvas draw can blur sharp edges
+    ctx.imageSmoothingEnabled = false
+
+    // Fill with white background
+    ctx.fillStyle = 'white'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    // Draw the image scaled to final dimensions
+    // Source: full SVG image, Destination: scaled canvas
+    ctx.drawImage(img, 0, 0, rect.width, rect.height, 0, 0, canvas.width, canvas.height)
+
+    // Export as PNG
+    const pngDataUrl = canvas.toDataURL('image/png')
+
+    return { dataUrl: pngDataUrl, width, height }
+  } finally {
+    // Cleanup to prevent memory leaks in long-running renderer process
+    // Release image data URL reference
+    img.src = ''
+    // Release canvas memory by setting dimensions to 0
+    canvas.width = 0
+    canvas.height = 0
   }
-
-  // Disable image smoothing to preserve sharp SVG vector edges
-  // SVG is internally rendered at high quality by the browser;
-  // additional smoothing during canvas draw can blur sharp edges
-  ctx.imageSmoothingEnabled = false
-
-  // Fill with white background
-  ctx.fillStyle = 'white'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-  // Draw the image scaled to final dimensions
-  // Source: full SVG image, Destination: scaled canvas
-  ctx.drawImage(img, 0, 0, rect.width, rect.height, 0, 0, canvas.width, canvas.height)
-
-  // Export as PNG
-  const pngDataUrl = canvas.toDataURL('image/png')
-
-  // Cleanup to prevent memory leaks in long-running renderer process
-  // Release image data URL reference
-  img.src = ''
-  // Release canvas memory by setting dimensions to 0
-  canvas.width = 0
-  canvas.height = 0
-
-  return { dataUrl: pngDataUrl, width, height }
 }
 
 /**
