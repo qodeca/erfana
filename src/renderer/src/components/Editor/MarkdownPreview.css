@@ -466,3 +466,230 @@
 .mermaid-bug-btn:active {
   background-color: rgba(255, 255, 255, var(--opacity-hover-strong));
 }
+
+/* Frontmatter Table */
+.frontmatter-wrapper {
+  margin: 0 0 var(--space-12) 0;
+  background-color: var(--color-bg-secondary);
+  border: var(--border-width) solid var(--color-border-default);
+  border-left: 3px solid var(--color-accent-secondary);
+  border-radius: 0;
+}
+
+.frontmatter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-8);
+  background-color: var(--color-bg-tertiary);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+}
+
+.frontmatter-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-secondary);
+}
+
+.frontmatter-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-muted);
+}
+
+.frontmatter-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-lg); /* Match preview font size (~15-16px) */
+}
+
+.frontmatter-row {
+  transition: background-color var(--transition-normal);
+}
+
+.frontmatter-row:hover {
+  background-color: var(--color-bg-hover-solid);
+}
+
+.frontmatter-row:not(:last-child) {
+  border-bottom: var(--border-width) solid var(--color-border-default);
+}
+
+.frontmatter-key {
+  padding: var(--space-4) var(--space-8);
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  width: 1%;
+  vertical-align: top;
+}
+
+.frontmatter-value {
+  padding: var(--space-4) var(--space-8);
+  color: var(--color-text-primary);
+  word-break: break-word;
+}
+
+.frontmatter-null {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.frontmatter-boolean {
+  color: var(--color-syntax-keyword);
+  font-family: var(--font-mono);
+}
+
+.frontmatter-number {
+  color: var(--color-syntax-number);
+  font-family: var(--font-mono);
+}
+
+/* Inline tags for simple arrays */
+.frontmatter-array-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.frontmatter-tag {
+  display: inline-flex;
+  padding: var(--space-1) var(--space-3);
+  background-color: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: 0;
+  font-size: var(--text-md);
+}
+
+/* Complex arrays (with nested objects) */
+.frontmatter-array-complex {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.frontmatter-array-item-complex {
+  display: flex;
+  gap: var(--space-4);
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--color-border-default);
+}
+
+.frontmatter-array-index {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+/* Nested objects */
+.frontmatter-nested {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--color-border-default);
+}
+
+.frontmatter-nested-row {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.frontmatter-nested-key {
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.frontmatter-nested-value {
+  color: var(--color-text-primary);
+}
+
+/* Empty and truncated indicators */
+.frontmatter-empty {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+}
+
+.frontmatter-truncated {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  font-style: italic;
+}
+
+/* Expand/collapse button */
+.frontmatter-expand-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-4) var(--space-8);
+  background-color: transparent;
+  border: none;
+  border-top: var(--border-width) solid var(--color-border-default);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  cursor: pointer;
+  transition: background-color var(--transition-normal), color var(--transition-normal);
+}
+
+.frontmatter-expand-btn:hover {
+  background-color: var(--color-bg-hover-solid);
+  color: var(--color-text-primary);
+}
+
+.frontmatter-expand-btn:focus-visible {
+  outline: var(--border-width-thick) solid var(--color-accent-primary);
+  outline-offset: -2px;
+}
+
+/* Frontmatter Error (Invalid YAML) */
+.frontmatter-error-wrapper {
+  margin: 0 0 var(--space-12) 0;
+  background-color: var(--color-error-bg);
+  border: var(--border-width) solid var(--color-error-border);
+  border-left: 3px solid var(--color-error);
+  border-radius: 0;
+}
+
+.frontmatter-error-header {
+  display: flex;
+  align-items: center;
+  padding: var(--space-4) var(--space-8);
+  background-color: var(--color-error-bg-dark);
+  border-bottom: var(--border-width) solid var(--color-error-border);
+}
+
+.frontmatter-error-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-error);
+}
+
+.frontmatter-error-code {
+  margin: 0;
+  padding: var(--space-6) var(--space-8);
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  color: var(--color-error-text-light);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-x: auto;
+}

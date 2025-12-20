@@ -40,7 +40,7 @@ src/
 ```
 
 ## Core Features
-1. **Markdown Editor** - Monaco with live preview, scroll sync, Mermaid diagrams (zoom, pan, full-screen viewer)
+1. **Markdown Editor** - Monaco with live preview, scroll sync, Mermaid diagrams (zoom, pan, full-screen viewer), YAML frontmatter rendering
 2. **Project Tree** - File explorer with drag-drop reorganization, markdown filtering, context menu, git status indicators
 3. **Terminal** - xterm.js with PTY backend, clipboard support, file links, scroll recovery
 4. **Prompt Templates** - AI text operations via context menu (Elaborate, Modify, Ask, diagram chat)
@@ -58,7 +58,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync, Mermaid diagrams
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (3892 tests, 130 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (3941 tests, 132 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.5.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
@@ -167,7 +167,7 @@ Comprehensive security upgrade following 2025 Electron best practices:
 - Documented ASAR disabled trade-offs and rationale
 - Documented electron-builder 26 workaround
 
-**Testing**: All 3892 tests passing, dev + production builds verified
+**Testing**: All 3941 tests passing, dev + production builds verified
 
 **References**:
 - [Electron Fuses](https://www.electronjs.org/docs/latest/tutorial/fuses)
@@ -202,7 +202,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 3892 tests passing (130 test files)
+- **Current**: 3941 tests passing (132 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)

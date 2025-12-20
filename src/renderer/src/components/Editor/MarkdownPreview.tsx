@@ -9,6 +9,8 @@ import { defaultSchema } from 'hast-util-sanitize'
 import { PreviewContextMenu } from '../ContextMenu/PreviewContextMenu'
 import { MermaidDiagram } from './MermaidDiagram'
 import { DiagramViewer } from './DiagramViewer'
+import { FrontmatterTable, FrontmatterCodeBlock } from './FrontmatterTable'
+import { extractFrontmatter } from '../../utils/frontmatterParser'
 import { useDiagramViewerStore } from '../../stores/useDiagramViewerStore'
 import { useToast } from '../Toast/ToastContext'
 import { resolveMarkdownLink, getLinkTooltip, type ResolvedLink } from '../../utils/markdownLinkResolver'
@@ -809,6 +811,13 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       [filePath, handleInternalLink, resolvedLinks]
     )
 
+    // Extract frontmatter from content (memoized)
+    // Separates YAML frontmatter from markdown body for separate rendering
+    const { frontmatter, body, frontmatterLineCount, parseError, rawFrontmatter } = useMemo(
+      () => extractFrontmatter(content),
+      [content]
+    )
+
     // Memoize ReactMarkdown rendering to prevent re-renders when selection state changes
     // Only re-render when content or components actually change
     //
@@ -824,10 +833,10 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
           rehypePlugins={rehypePlugins}
           components={markdownComponents}
         >
-          {content}
+          {body}
         </ReactMarkdown>
       ),
-      [content, markdownComponents]
+      [body, markdownComponents]
     )
 
     const handleMouseUp = (e: React.MouseEvent) => {
@@ -925,6 +934,21 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
           onMouseUp={handleMouseUp}
           onContextMenu={handleContextMenu}
         >
+          {/* Render frontmatter as styled table or error code block */}
+          {parseError && rawFrontmatter && (
+            <FrontmatterCodeBlock
+              rawYaml={rawFrontmatter}
+              lineStart={1}
+              lineEnd={frontmatterLineCount}
+            />
+          )}
+          {frontmatter && !parseError && (
+            <FrontmatterTable
+              data={frontmatter}
+              lineStart={1}
+              lineEnd={frontmatterLineCount}
+            />
+          )}
           {renderedMarkdown}
         </div>
 
