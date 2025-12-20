@@ -31,3 +31,6 @@ release/
 # Temporary files
 temp/
 coverage/
+
+# Auto Claude data directory
+.auto-claude/
