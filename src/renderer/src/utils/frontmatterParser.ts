@@ -39,6 +39,9 @@ export interface ExtractedFrontmatter {
  */
 const FRONTMATTER_REGEX = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)([\s\S]*)$/
 
+/** Maximum frontmatter size in bytes (100KB) to prevent DoS via large YAML */
+const MAX_FRONTMATTER_SIZE = 100_000
+
 /**
  * Extracts YAML frontmatter from markdown content.
  *
@@ -71,6 +74,18 @@ export function extractFrontmatter(content: string): ExtractedFrontmatter {
   // Count lines in frontmatter block (including --- delimiters)
   const frontmatterLineCount = frontmatterYaml.split(/\r?\n/).length + 2
 
+  // Prevent DoS via extremely large YAML
+  if (frontmatterYaml.length > MAX_FRONTMATTER_SIZE) {
+    console.warn('[frontmatterParser] Frontmatter exceeds size limit:', frontmatterYaml.length, 'bytes')
+    return {
+      frontmatter: null,
+      body,
+      frontmatterLineCount,
+      parseError: true,
+      rawFrontmatter: frontmatterYaml.slice(0, 1000) + '\n... (truncated, exceeds 100KB limit)'
+    }
+  }
+
   try {
     const data = yaml.load(frontmatterYaml, {
       schema: yaml.JSON_SCHEMA
@@ -94,8 +109,9 @@ export function extractFrontmatter(content: string): ExtractedFrontmatter {
       parseError: false,
       rawFrontmatter: frontmatterYaml
     }
-  } catch {
-    // Invalid YAML - return raw for fallback rendering
+  } catch (error) {
+    // Invalid YAML - log for debugging and return raw for fallback rendering
+    console.warn('[frontmatterParser] Failed to parse YAML:', error)
     return {
       frontmatter: null,
       body,

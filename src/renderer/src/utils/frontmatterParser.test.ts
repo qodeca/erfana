@@ -21,7 +21,7 @@ date: 2025-12-20
       })
       expect(result.body).toBe('\n# Main Content')
       expect(result.parseError).toBe(false)
-      expect(result.frontmatterLineCount).toBe(5) // 4 content lines + opening delimiter (closing delimiter not counted in content)
+      expect(result.frontmatterLineCount).toBe(5) // 3 YAML lines + 2 delimiters (--- lines)
     })
 
     it('should handle arrays in frontmatter', () => {
@@ -257,6 +257,24 @@ Content`
       const result = extractFrontmatter(content)
 
       expect(result.frontmatter?.description).toBe('This is a long\nmultiline description\n')
+    })
+
+    it('should reject frontmatter exceeding size limit (100KB)', () => {
+      // Create frontmatter larger than 100KB
+      const largeValue = 'x'.repeat(101_000)
+      const content = `---
+large: ${largeValue}
+---
+
+Content`
+
+      const result = extractFrontmatter(content)
+
+      expect(result.frontmatter).toBeNull()
+      expect(result.parseError).toBe(true)
+      expect(result.rawFrontmatter).toContain('truncated')
+      expect(result.rawFrontmatter).toContain('exceeds 100KB limit')
+      expect(result.body).toBe('\nContent')
     })
   })
 
