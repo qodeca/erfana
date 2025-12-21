@@ -14,6 +14,8 @@
  * })
  */
 
+import { logger } from '../../utils/logger'
+
 export async function withWatcherPause<T>(
   projectPath: string | null,
   isInternalOperationRef: React.MutableRefObject<boolean>,
@@ -48,7 +50,7 @@ export async function withWatcherPause<T>(
       try {
         await window.api.directoryWatch.resume(projectPath)
       } catch (resumeErr) {
-        console.error('Failed to resume directory watcher:', resumeErr)
+        logger.error('Failed to resume directory watcher', resumeErr instanceof Error ? resumeErr : undefined)
       }
     }
     isInternalOperationRef.current = false

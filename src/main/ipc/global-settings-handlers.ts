@@ -10,6 +10,7 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import { globalSettingsService } from '../services/GlobalSettingsService'
 import type { GlobalSettings, GlobalSettingsChanged } from '../../shared/ipc/global-settings-schema'
+import { logger } from '../services/LoggingService'
 
 /**
  * Register all global settings IPC handlers
@@ -21,7 +22,7 @@ export function registerGlobalSettingsHandlers(): void {
       const settings = globalSettingsService.getSettings()
       return { success: true, settings }
     } catch (error) {
-      console.error('❌ Error getting global settings:', error)
+      logger.error('Error getting global settings', error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       return { success: false, error: message }
     }
@@ -33,7 +34,7 @@ export function registerGlobalSettingsHandlers(): void {
       await globalSettingsService.setSetting(payload.key, payload.value as GlobalSettings[typeof payload.key])
       return { success: true }
     } catch (error) {
-      console.error('❌ Error setting global setting:', error)
+      logger.error('Error setting global setting', error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       return { success: false, error: message }
     }
@@ -45,7 +46,7 @@ export function registerGlobalSettingsHandlers(): void {
       await globalSettingsService.resetSettings()
       return { success: true }
     } catch (error) {
-      console.error('❌ Error resetting global settings:', error)
+      logger.error('Error resetting global settings', error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       return { success: false, error: message }
     }
@@ -61,5 +62,5 @@ export function registerGlobalSettingsHandlers(): void {
     }
   })
 
-  console.log('✅ Global settings IPC handlers registered')
+  logger.info('Global settings IPC handlers registered')
 }

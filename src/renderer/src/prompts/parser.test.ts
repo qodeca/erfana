@@ -7,6 +7,19 @@ import {
   TEST_TEMPLATES
 } from './__test-utils__/fixtures'
 
+const { mockLogger } = vi.hoisted(() => ({
+  mockLogger: {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn()
+  }
+}))
+
+vi.mock('../utils/logger', () => ({ logger: mockLogger }))
+
 describe('Template Parser', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -231,7 +244,7 @@ describe('Template Parser', () => {
     })
 
     it('should continue on individual template errors', () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockLogger.error.mockClear()
 
       const templates = [
         { raw: mockMinimalTemplate('Valid 1'), filename: 'valid1.md' },
@@ -244,16 +257,14 @@ describe('Template Parser', () => {
       expect(results).toHaveLength(2)
       expect(results[0].id).toBe('valid-1')
       expect(results[1].id).toBe('valid-2')
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Skipping invalid template invalid.md'),
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Skipping invalid template invalid.md:',
         expect.any(Error)
       )
-
-      consoleErrorSpy.mockRestore()
     })
 
     it('should log errors for invalid templates', () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockLogger.error.mockClear()
 
       const templates = [
         { raw: 'Invalid', filename: 'invalid.md' }
@@ -261,17 +272,15 @@ describe('Template Parser', () => {
 
       parseTemplates(templates)
 
-      expect(consoleErrorSpy).toHaveBeenCalled()
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('⚠️  Skipping invalid template'),
+      expect(mockLogger.error).toHaveBeenCalled()
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Skipping invalid template'),
         expect.anything()
       )
-
-      consoleErrorSpy.mockRestore()
     })
 
     it('should return empty array when all templates are invalid', () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockLogger.error.mockClear()
 
       const templates = [
         { raw: 'Invalid 1', filename: 'invalid1.md' },
@@ -281,9 +290,7 @@ describe('Template Parser', () => {
       const results = parseTemplates(templates)
 
       expect(results).toHaveLength(0)
-      expect(consoleErrorSpy).toHaveBeenCalledTimes(2)
-
-      consoleErrorSpy.mockRestore()
+      expect(mockLogger.error).toHaveBeenCalledTimes(2)
     })
 
     it('should return empty array when given empty array', () => {

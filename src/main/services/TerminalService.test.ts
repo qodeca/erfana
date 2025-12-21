@@ -46,6 +46,19 @@ const mockNodePty = {
 ;(globalThis as any).__ERFANA_TEST_PTY__ = mockNodePty
 vi.mock('node-pty', () => (globalThis as any).__ERFANA_TEST_PTY__)
 
+// Mock LoggingService
+const mockLogger = {
+  trace: vi.fn(),
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  fatal: vi.fn()
+}
+vi.mock('./LoggingService', () => ({
+  logger: mockLogger
+}))
+
 // Skip tests in renderer environment
 const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
 
@@ -720,8 +733,8 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
 
       const { terminalService } = await import('./TerminalService')
 
-      // Spy on console.log
-      const consoleSpy = vi.spyOn(console, 'log')
+      // Clear logger mocks
+      mockLogger.info.mockClear()
 
       // Create multiple terminals with same webContentsId
       await terminalService.createTerminal({ cwd: '/tmp' }, 5)
@@ -731,8 +744,8 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       // Cleanup webContentsId 5
       terminalService.cleanupForWebContentsId(5)
 
-      // Should log cleanup message with count
-      expect(consoleSpy).toHaveBeenCalledWith(
+      // Should log cleanup message with count via logger
+      expect(mockLogger.info).toHaveBeenCalledWith(
         expect.stringContaining('Cleaned up 3 terminals for webContents 5')
       )
     })

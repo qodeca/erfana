@@ -1,5 +1,6 @@
 import yaml from 'js-yaml'
 import { safeParseFrontmatter, type PromptFrontmatter } from './schema'
+import { logger } from '../utils/logger'
 
 /**
  * Parsed template with validated frontmatter and content
@@ -56,7 +57,10 @@ export function parseTemplate(raw: string, filename: string): ParsedTemplate {
   const result = safeParseFrontmatter(data)
 
   if (!result.success) {
-    console.error(`❌ Invalid frontmatter in ${filename}:`, result.error.format())
+    const errorMessage = `Invalid frontmatter in ${filename}: ${result.error.issues
+      .map((e) => `${e.path.join('.')}: ${e.message}`)
+      .join(', ')}`
+    logger.error(errorMessage)
     throw new Error(
       `Invalid template frontmatter in ${filename}: ${result.error.issues
         .map((e) => `${e.path.join('.')}: ${e.message}`)
@@ -108,7 +112,7 @@ export function parseTemplates(
     try {
       parsed.push(parseTemplate(raw, filename))
     } catch (error) {
-      console.error(`⚠️  Skipping invalid template ${filename}:`, error)
+      logger.error(`Skipping invalid template ${filename}:`, error instanceof Error ? error : undefined)
       // Continue parsing other templates
     }
   }

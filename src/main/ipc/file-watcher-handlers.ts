@@ -1,5 +1,6 @@
 import { ipcMain, WebContents } from 'electron'
 import { fileWatcherService } from '../services/FileWatcherService'
+import { logger } from '../services/LoggingService'
 
 export function registerFileWatcherHandlers(): void {
   const getErrorMessage = (error: unknown): string =>
@@ -19,7 +20,7 @@ export function registerFileWatcherHandlers(): void {
 
       return { success: true }
     } catch (error) {
-      console.error('Error starting file watch:', error)
+      logger.error('Error starting file watch', error instanceof Error ? error : undefined)
       return { success: false, error: getErrorMessage(error) }
     }
   })
@@ -39,7 +40,7 @@ export function registerFileWatcherHandlers(): void {
 
       return { success: true }
     } catch (error) {
-      console.error('Error stopping file watch:', error)
+      logger.error('Error stopping file watch', error instanceof Error ? error : undefined)
       return { success: false, error: getErrorMessage(error) }
     }
   })
@@ -54,7 +55,7 @@ export function registerFileWatcherHandlers(): void {
 
       return { success: true }
     } catch (error) {
-      console.error('Error stopping all file watches:', error)
+      logger.error('Error stopping all file watches', error instanceof Error ? error : undefined)
       return { success: false, error: getErrorMessage(error) }
     }
   })
@@ -73,7 +74,7 @@ export function registerFileWatcherHandlers(): void {
 
       return { success: true }
     } catch (error) {
-      console.error('Error pausing file watch:', error)
+      logger.error('Error pausing file watch', error instanceof Error ? error : undefined)
       return { success: false, error: getErrorMessage(error) }
     }
   })
@@ -92,7 +93,7 @@ export function registerFileWatcherHandlers(): void {
 
       return { success: true }
     } catch (error) {
-      console.error('Error resuming file watch:', error)
+      logger.error('Error resuming file watch', error instanceof Error ? error : undefined)
       return { success: false, error: getErrorMessage(error) }
     }
   })
@@ -105,10 +106,10 @@ export function registerFileWatcherHandlers(): void {
       const stats = fileWatcherService.getStats()
       return { success: true, stats }
     } catch (error) {
-      console.error('Error getting watch stats:', error)
+      logger.error('Error getting watch stats', error instanceof Error ? error : undefined)
       return { success: false, error: getErrorMessage(error) }
     }
   })
 
-  console.log('✅ File watcher IPC handlers registered')
+  logger.info('✅ File watcher IPC handlers registered')
 }

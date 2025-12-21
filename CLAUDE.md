@@ -28,7 +28,7 @@ npm run test:cov     # Coverage (v8) per project
 ```
 src/
 ├── main/           # Electron main process
-│   ├── services/   # FileService, TerminalService, SettingsService, ProjectSettingsService, GlobalSettingsService, import/
+│   ├── services/   # FileService, TerminalService, SettingsService, ProjectSettingsService, GlobalSettingsService, LoggingService, import/
 │   └── ipc/        # IPC handlers
 ├── preload/        # Context bridge API
 ├── shared/         # Shared code (errors.ts, constants.ts, ipc schemas)
@@ -59,7 +59,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync, Mermaid diagrams
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (4044 tests, 134 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (4226 tests, 141 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.5.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
@@ -236,6 +236,37 @@ Added "Visualize" prompt to Preview context menu for AI-powered Mermaid diagram 
 - `src/renderer/src/components/ContextMenu/PreviewContextMenu.tsx` - Added Visualize action
 - Closes #57
 
+### Logging Layer (Dec 21, 2025)
+Implemented comprehensive logging system with file-based persistence and configurable log levels:
+
+**Features**:
+- Unified logging facades: `MainLogger` (main process) and `RendererLogger` (renderer process)
+- File-based logging to `~/.erfana/logs/` directory
+- Auto-rolling log files: 10MB size limit + daily rotation with 7-day retention
+- 6 log levels: trace, debug, info, warn, error, fatal
+- IPC integration: renderer logs sent to main process for centralized file storage
+- Global settings integration: dynamic log level control via `logging.level` setting
+- Console fallback: safe console wrapper for error scenarios
+
+**Implementation**:
+- Zod schema for log level validation in shared layer
+- `LoggingService` singleton with winston-based file transport
+- IPC handler for renderer-to-main log forwarding
+- TypeScript facades (`MainLogger`, `RendererLogger`) with method-level typing
+- Safe console wrapper (`safeConsole`) for critical error scenarios
+
+**Testing**: 182 new tests added
+
+**Files Modified**:
+- `src/shared/ipc/logging-schema.ts` (NEW) - Zod schema for log levels and IPC payloads
+- `src/main/services/LoggingService.ts` (NEW) - Winston-based logging service singleton
+- `src/main/ipc/logging-handlers.ts` (NEW) - IPC handler for renderer logs
+- `src/renderer/src/utils/logger.ts` (NEW) - RendererLogger facade with IPC integration
+- `src/main/utils/safe-console.ts` (NEW) - Safe console wrapper for error scenarios
+- `src/main/index.ts` - Initialize LoggingService on app ready
+- `src/preload/index.ts` - Expose logging IPC to renderer
+- Closes #49
+
 ### Global Settings Service (Dec 21, 2025)
 Implemented application-wide settings service for global configuration management:
 
@@ -282,7 +313,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 4044 tests passing (134 test files)
+- **Current**: 4226 tests passing (141 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)

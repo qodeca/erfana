@@ -1,5 +1,6 @@
 import type { PromptVariables } from './types'
 import * as helpers from './helpers'
+import { logger } from '../utils/logger'
 
 /**
  * Simple CSP-safe template renderer (no eval required)
@@ -35,7 +36,7 @@ class PromptRenderer {
 
       return result.trim()
     } catch (error) {
-      console.error('Failed to render prompt template:', error)
+      logger.error('Failed to render prompt template', error instanceof Error ? error : undefined)
       return template
     }
   }
@@ -70,7 +71,7 @@ class PromptRenderer {
           try {
             return String(helper(val1, val2))
           } catch (error) {
-            console.warn(`Helper ${helperName} failed:`, error)
+            logger.warn(`Helper ${helperName} failed`, { error })
             return match
           }
         }

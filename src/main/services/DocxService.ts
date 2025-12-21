@@ -4,6 +4,7 @@ import { DOCX_EXPORT } from '../../shared/constants'
 import { ErrorCode } from '../../shared/errors'
 import type { DocxExportResponse } from '../../shared/ipc/docx-schema'
 import { htmlToDocxConverter } from './HtmlToDocxConverter'
+import { logger } from './LoggingService'
 
 // ============================================================================
 // Value Objects
@@ -135,7 +136,7 @@ class DocxService implements IDocxService {
         filePath: savePath
       }
     } catch (error) {
-      console.error('DOCX export failed:', error)
+      logger.error('DOCX export failed', error instanceof Error ? error : undefined)
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

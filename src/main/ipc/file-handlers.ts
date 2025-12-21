@@ -7,6 +7,7 @@ import { directoryWatcherService } from '../services/DirectoryWatcherService'
 import { settingsService } from '../services/SettingsService'
 import { projectSettingsService } from '../services/ProjectSettingsService'
 import type { ProjectChanged } from '../../shared/ipc/schema'
+import { logger } from '../services/LoggingService'
 
 /**
  * Broadcast project change to all renderer processes
@@ -100,12 +101,12 @@ export function registerFileHandlers(): void {
         try {
           fileWatcherService.setProjectPath(lastPath)
         } catch (e) {
-          console.warn('Failed to set FileWatcherService projectPath on restore:', e)
+          logger.warn('Failed to set FileWatcherService projectPath on restore', e instanceof Error ? { error: e.message } : undefined)
         }
         try {
           directoryWatcherService.setProjectPath(lastPath)
         } catch (e) {
-          console.warn('Failed to set DirectoryWatcherService projectPath on restore:', e)
+          logger.warn('Failed to set DirectoryWatcherService projectPath on restore', e instanceof Error ? { error: e.message } : undefined)
         }
         // NOTE: Do NOT call addRecentProject here!
         // It's only called in openProjectByPath() to avoid duplicate writes
@@ -125,7 +126,7 @@ export function registerFileHandlers(): void {
     try {
       return await fileService.readDirectory(dirPath)
     } catch (error) {
-      console.error('Error reading directory:', error)
+      logger.error('Error reading directory', error instanceof Error ? error : undefined)
       throw error
     }
   })
@@ -135,7 +136,7 @@ export function registerFileHandlers(): void {
     try {
       return await fileService.readFile(filePath)
     } catch (error) {
-      console.error('Error reading file:', error)
+      logger.error('Error reading file', error instanceof Error ? error : undefined)
       throw error
     }
   })
@@ -146,7 +147,7 @@ export function registerFileHandlers(): void {
       await fileService.writeFile(filePath, content)
       return true
     } catch (error) {
-      console.error('Error writing file:', error)
+      logger.error('Error writing file', error instanceof Error ? error : undefined)
       throw error
     }
   })
@@ -161,7 +162,7 @@ export function registerFileHandlers(): void {
         created: stats.birthtime
       }
     } catch (error) {
-      console.error('Error getting file stats:', error)
+      logger.error('Error getting file stats', error instanceof Error ? error : undefined)
       throw error
     }
   })
@@ -219,7 +220,7 @@ export function registerFileHandlers(): void {
       const createdFilePath = await fileService.createFile(dirPath, sanitizedFileName)
       return createdFilePath
     } catch (error) {
-      console.error('Error creating file:', error)
+      logger.error('Error creating file', error instanceof Error ? error : undefined)
       throw error
     }
   })
@@ -244,7 +245,7 @@ export function registerFileHandlers(): void {
       const createdFolderPath = await fileService.createFolder(dirPath, sanitizedFolderName)
       return createdFolderPath
     } catch (error) {
-      console.error('Error creating folder:', error)
+      logger.error('Error creating folder', error instanceof Error ? error : undefined)
       throw error
     }
   })
@@ -260,7 +261,7 @@ export function registerFileHandlers(): void {
       await fileService.deleteFile(filePath)
       return true
     } catch (error) {
-      console.error('Error deleting file:', error)
+      logger.error('Error deleting file', error instanceof Error ? error : undefined)
       throw error
     }
   })
@@ -276,7 +277,7 @@ export function registerFileHandlers(): void {
       await fileService.deleteFolder(folderPath)
       return true
     } catch (error) {
-      console.error('Error deleting folder:', error)
+      logger.error('Error deleting folder', error instanceof Error ? error : undefined)
       throw error
     }
   })
@@ -301,7 +302,7 @@ export function registerFileHandlers(): void {
       const newPath = await fileService.rename(oldPath, sanitizedName)
       return newPath
     } catch (error) {
-      console.error('Error renaming:', error)
+      logger.error('Error renaming', error instanceof Error ? error : undefined)
       throw error
     }
   })
@@ -335,7 +336,7 @@ export function registerFileHandlers(): void {
       const newPath = await fileService.moveItem(sourcePath, targetParentPath, sanitizedNewName, replaceExisting)
       return newPath
     } catch (error) {
-      console.error('Error moving item:', error)
+      logger.error('Error moving item', error instanceof Error ? error : undefined)
       throw error
     }
   })
@@ -366,7 +367,7 @@ export function registerFileHandlers(): void {
       const newPath = await fileService.copyItem(sourcePath, targetParentPath, sanitizedNewName)
       return newPath
     } catch (error) {
-      console.error('Error copying item:', error)
+      logger.error('Error copying item', error instanceof Error ? error : undefined)
       throw error
     }
   })
@@ -385,7 +386,7 @@ export function registerFileHandlers(): void {
       const hasConflict = await fileService.checkNameConflict(targetParentPath, itemName)
       return hasConflict
     } catch (error) {
-      console.error('Error checking conflict:', error)
+      logger.error('Error checking conflict', error instanceof Error ? error : undefined)
       throw error
     }
   })

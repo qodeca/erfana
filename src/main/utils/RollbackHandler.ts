@@ -1,4 +1,5 @@
 import { rm } from 'fs/promises'
+import { logger } from '../services/LoggingService'
 
 /**
  * RollbackHandler manages transaction rollback for file operations
@@ -22,13 +23,16 @@ export class RollbackHandler {
     targetPath: string,
     deleteError: unknown
   ): Promise<void> {
-    console.error('Failed to delete source during move, rolling back:', deleteError)
+    logger.error('Failed to delete source during move, rolling back',
+      deleteError instanceof Error ? deleteError : undefined,
+      { targetPath }
+    )
 
     try {
       await rm(targetPath, { recursive: true, force: true })
-      console.log('Rollback successful: Deleted copied item at', targetPath)
+      logger.info('Rollback successful: Deleted copied item', { path: targetPath })
     } catch (rollbackError) {
-      console.error('Rollback failed:', rollbackError)
+      logger.error('Rollback failed', rollbackError instanceof Error ? rollbackError : undefined)
       // Log but don't throw - we want to throw the original error message
     }
 
@@ -43,13 +47,13 @@ export class RollbackHandler {
    * @param operationDescription - Description of the failed operation (for logging)
    */
   async rollbackDelete(path: string, operationDescription: string): Promise<void> {
-    console.error(`${operationDescription} failed, rolling back...`)
+    logger.error(`${operationDescription} failed, rolling back`, undefined, { path })
 
     try {
       await rm(path, { recursive: true, force: true })
-      console.log('Rollback successful: Deleted', path)
+      logger.info('Rollback successful: Deleted', { path })
     } catch (rollbackError) {
-      console.error('Rollback failed:', rollbackError)
+      logger.error('Rollback failed', rollbackError instanceof Error ? rollbackError : undefined)
       throw new Error(
         `${operationDescription} failed and rollback also failed. System may be in inconsistent state.`
       )

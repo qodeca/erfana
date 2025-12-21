@@ -32,6 +32,7 @@ import {
   type ScrollState,
   type ReadingPosition
 } from '../utils/scrollAnomalyDetector'
+import { logger } from '../utils/logger'
 
 // xterm.js internal class name - may change in future versions
 const XTERM_VIEWPORT_SELECTOR = '.xterm-viewport'
@@ -220,11 +221,11 @@ export function useScrollAnomalyRecovery(
     if (targetY !== null) {
       // Smart recovery: restore to approximate reading position
       xterm.scrollToLine(targetY)
-      console.debug(`[ScrollRecovery] Smart recovery to line ${targetY} (count: ${count})`)
+      logger.debug(`[ScrollRecovery] Smart recovery to line ${targetY} (count: ${count})`)
     } else {
       // Fallback: scroll to bottom
       xterm.scrollToBottom()
-      console.debug(`[ScrollRecovery] Bottom recovery (count: ${count})`)
+      logger.debug(`[ScrollRecovery] Bottom recovery (count: ${count})`)
     }
 
     // Clear reading position after recovery
@@ -353,14 +354,14 @@ export function useScrollAnomalyRecovery(
         try {
           originalHandler(data)
         } catch (err) {
-          console.error('[ScrollRecovery] Handler error:', err)
+          logger.error('[ScrollRecovery] Handler error:', err instanceof Error ? err : undefined)
           return // Skip anomaly detection on error
         }
 
         // Issue #22 Enhanced: Trigger immediate recovery for clear sequences
         if (hasDestructiveSequence && currentConfig.immediateRecoveryOnClear) {
           immediateRecoveryRef.current = true
-          console.debug('[ScrollRecovery] Clear sequence detected, scheduling immediate recovery')
+          logger.debug('[ScrollRecovery] Clear sequence detected, scheduling immediate recovery')
         }
 
         // Cancel previous RAF if still pending (prevents overlapping callbacks)
@@ -389,7 +390,7 @@ export function useScrollAnomalyRecovery(
           )
 
           if (bufferWasTruncated) {
-            console.debug(`[ScrollRecovery] Buffer truncated: ${baseYBefore} -> ${baseYAfter}`)
+            logger.debug(`[ScrollRecovery] Buffer truncated: ${baseYBefore} -> ${baseYAfter}`)
             // Buffer was cleared - trigger recovery
             anomalyCountRef.current++
             return

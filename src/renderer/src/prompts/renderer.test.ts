@@ -2,6 +2,19 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { promptRenderer } from './renderer'
 import { mockPromptVariables, TEST_VARIABLES } from './__test-utils__/fixtures'
 
+const { mockLogger } = vi.hoisted(() => ({
+  mockLogger: {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn()
+  }
+}))
+
+vi.mock('../utils/logger', () => ({ logger: mockLogger }))
+
 describe('Template Renderer', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -159,7 +172,7 @@ End of reference{{/if}}`
     })
 
     it('should handle helper errors gracefully', () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      mockLogger.warn.mockClear()
 
       // basename helper will fail with undefined
       const template = '{{basename filePath}}'
@@ -168,8 +181,6 @@ End of reference{{/if}}`
 
       // Should return the original match when helper fails
       expect(result).toBe('')
-
-      consoleWarnSpy.mockRestore()
     })
 
     it('should resolve helper arguments from variables', () => {
@@ -255,7 +266,7 @@ End of reference{{/if}}`
     })
 
     it('should catch and log rendering errors', () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockLogger.error.mockClear()
 
       // Force an error by making processConditionals throw
       const originalProcessConditionals = (promptRenderer as any).processConditionals
@@ -269,14 +280,13 @@ End of reference{{/if}}`
 
       // Should return original template on error
       expect(result).toBe(template)
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to render prompt template:',
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Failed to render prompt template',
         expect.any(Error)
       )
 
       // Restore
       ;(promptRenderer as any).processConditionals = originalProcessConditionals
-      consoleErrorSpy.mockRestore()
     })
 
     it('should handle special regex characters in variables', () => {

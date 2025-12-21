@@ -4,6 +4,19 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+const { mockLogger } = vi.hoisted(() => ({
+  mockLogger: {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn()
+  }
+}))
+
+vi.mock('./logger', () => ({ logger: mockLogger }))
+
 // Create mock state that can be modified during tests
 const mockState = {
   activeTerminalId: null as string | null,
@@ -163,15 +176,14 @@ describe('panelManager.factory', () => {
 
       it('should timeout if terminal never becomes ready', async () => {
         mockState.activeTerminalId = null
-        const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        mockLogger.warn.mockClear()
 
         const manager = createTerminalManager()
 
         const result = await manager.waitForReady!(100)
 
         expect(result).toBe(false)
-        expect(consoleSpy).toHaveBeenCalledWith('⚠️ Terminal readiness timeout after', 100, 'ms')
-        consoleSpy.mockRestore()
+        expect(mockLogger.warn).toHaveBeenCalledWith('Terminal readiness timeout after 100 ms')
       })
 
       it('should use default timeout of 5000ms', async () => {

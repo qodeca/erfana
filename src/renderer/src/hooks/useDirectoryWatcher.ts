@@ -26,6 +26,7 @@ import {
   createWatcherErrorMessage,
   createDirectoryErrorMessage
 } from './useDirectoryWatcher.logic'
+import { logger } from '../utils/logger'
 
 interface UseDirectoryWatcherOptions {
   projectPath: string | null
@@ -52,14 +53,14 @@ export function useDirectoryWatcher({
 
     // Start watching the project directory
     window.api.directoryWatch.start(projectPath as string).catch((err) => {
-      console.error(createWatcherErrorMessage(), err)
+      logger.error(createWatcherErrorMessage(), err instanceof Error ? err : undefined)
     })
 
     // Listen for directory changes
     const unsubscribeChanged = window.api.directoryWatch.onDirectoryChanged((data) => {
       // Only refresh if not during our own internal operations
       if (shouldHandleDirectoryChange(isInternalOperationRef.current)) {
-        console.log(createDirectoryChangeMessage(data.eventCount))
+        logger.info(createDirectoryChangeMessage(data.eventCount))
         onRefresh()
       }
     })
@@ -71,7 +72,7 @@ export function useDirectoryWatcher({
 
     // Listen for errors
     const unsubscribeError = window.api.directoryWatch.onDirectoryError((data) => {
-      console.error(createDirectoryErrorMessage(), data.error)
+      logger.error(createDirectoryErrorMessage(), undefined, { error: data.error })
       onError(data.error)
     })
 

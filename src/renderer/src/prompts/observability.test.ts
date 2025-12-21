@@ -19,6 +19,19 @@ import {
 } from './observability'
 import { ErrorCode } from '../../../shared/errors'
 
+const { mockLogger } = vi.hoisted(() => ({
+  mockLogger: {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn()
+  }
+}))
+
+vi.mock('../utils/logger', () => ({ logger: mockLogger }))
+
 describe('observability', () => {
   beforeEach(() => {
     clearTraceHistory()
@@ -51,10 +64,9 @@ describe('observability', () => {
     })
 
     it('should log when enabling tracing', () => {
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      mockLogger.info.mockClear()
       setTracingEnabled(true)
-      expect(consoleSpy).toHaveBeenCalledWith('📊 Prompt execution tracing enabled')
-      consoleSpy.mockRestore()
+      expect(mockLogger.info).toHaveBeenCalledWith('Prompt execution tracing enabled')
     })
   })
 
@@ -109,39 +121,34 @@ describe('observability', () => {
 
     it('should log when tracing is enabled', () => {
       setTracingEnabled(true)
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      mockLogger.info.mockClear()
 
       const trace = startTrace('elaborate')
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Starting execution: elaborate'))
+      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Starting execution: elaborate'))
 
       trace.success()
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Execution succeeded: elaborate'))
-
-      consoleSpy.mockRestore()
+      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Execution succeeded: elaborate'))
     })
 
     it('should log failures when tracing is enabled', () => {
       setTracingEnabled(true)
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      mockLogger.info.mockClear()
 
       const trace = startTrace('modify')
       trace.failure({ message: 'Failed!' })
 
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Execution failed: modify'))
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Failed!'))
-
-      consoleSpy.mockRestore()
+      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Execution failed: modify'))
+      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Failed!'))
     })
 
     it('should not log when tracing is disabled', () => {
       setTracingEnabled(false)
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      mockLogger.info.mockClear()
 
       const trace = startTrace('elaborate')
       trace.success()
 
-      expect(consoleSpy).not.toHaveBeenCalled()
-      consoleSpy.mockRestore()
+      expect(mockLogger.info).not.toHaveBeenCalled()
     })
   })
 
@@ -321,12 +328,11 @@ describe('observability', () => {
 
     it('should log when tracing is enabled', () => {
       setTracingEnabled(true)
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      mockLogger.info.mockClear()
 
       clearTraceHistory()
 
-      expect(consoleSpy).toHaveBeenCalledWith('📊 Trace history cleared')
-      consoleSpy.mockRestore()
+      expect(mockLogger.info).toHaveBeenCalledWith('Trace history cleared')
     })
   })
 
@@ -432,14 +438,13 @@ describe('observability', () => {
       mockTime += 2 * 60 * 60 * 1000
 
       setTracingEnabled(true)
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      mockLogger.info.mockClear()
 
       Date.now = () => mockTime
       cleanupOldTraces()
       Date.now = originalNow
 
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Cleaned up 1 old traces'))
-      consoleSpy.mockRestore()
+      expect(mockLogger.info).toHaveBeenCalledWith('Cleaned up 1 old traces')
     })
 
     it('should respect custom max age setting', () => {

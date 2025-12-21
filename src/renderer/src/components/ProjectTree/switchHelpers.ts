@@ -17,6 +17,7 @@
 
 import type { MutableRefObject } from 'react'
 import { TERMINAL } from './constants'
+import { logger } from '../../utils/logger'
 
 /**
  * Type for confirmation dialog function
@@ -134,7 +135,7 @@ export async function interruptActiveTerminalIfAny(): Promise<void> {
       useTerminalStore.getState().clearActivity(tid)
     }
   } catch (e) {
-    console.warn('Failed to signal terminal:', e)
+    logger.warn('Failed to signal terminal', { error: e })
   }
 }
 

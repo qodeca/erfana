@@ -4,6 +4,7 @@ import { basename } from 'path'
 import { importService, converterRegistry } from '../services/import'
 import { fileService } from '../services/FileService'
 import type { ValidationResult, ImportResult } from '../services/import'
+import { logger } from '../services/LoggingService'
 
 /**
  * File selection result from the native dialog
@@ -72,7 +73,7 @@ export function registerImportHandlers(): void {
         extension
       }
     } catch (error) {
-      console.error('Error getting file stats:', error)
+      logger.error('Error getting file stats', error instanceof Error ? error : undefined)
       throw new Error('Failed to read selected file')
     }
   })
@@ -97,7 +98,7 @@ export function registerImportHandlers(): void {
     try {
       return await importService.validate(trimmedPath)
     } catch (error) {
-      console.error('Error validating file:', error)
+      logger.error('Error validating file', error instanceof Error ? error : undefined)
       throw error
     }
   })
@@ -133,7 +134,7 @@ export function registerImportHandlers(): void {
     try {
       return await importService.importFile(trimmedPath, projectPath)
     } catch (error) {
-      console.error('Error importing file:', error)
+      logger.error('Error importing file', error instanceof Error ? error : undefined)
       throw error
     }
   })

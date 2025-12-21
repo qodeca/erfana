@@ -21,6 +21,7 @@ import type { IUseProjectManagementOptions, IUseProjectManagementReturn } from '
 import { useDialog } from '../components/Dialog'
 import { showGlobalToast } from '../components/Toast/toastService'
 import { TERMINAL } from '../components/ProjectTree/constants'
+import { logger } from '../utils/logger'
 import {
   checkHasDirtyEditors,
   checkTerminalBusy,
@@ -80,13 +81,13 @@ export function useProjectManagement(
   // Listen for external project changes (e.g., from menu bar, shortcuts)
   useEffect(() => {
     const unsubscribe = api.file.onProjectChanged(async (data) => {
-      console.log(createProjectChangedLogMessage(data))
+      logger.info(createProjectChangedLogMessage(data))
 
       // Notify consumer to reset UI state
       try {
         options?.onProjectChanged?.(data.newPath ?? null)
       } catch (cbErr) {
-        console.warn(createCallbackWarningMessage(cbErr))
+        logger.warn(createCallbackWarningMessage(cbErr))
       }
 
       setError(null)
@@ -110,7 +111,7 @@ export function useProjectManagement(
             message: createProjectOpenedMessage(data.newPath!)
           })
         } catch (err) {
-          console.error(createNewProjectTreeErrorLog(), err)
+          logger.error(createNewProjectTreeErrorLog(), err instanceof Error ? err : undefined)
           setError(createLoadErrorMessage(err))
           showGlobalToast({
             type: 'error',
@@ -174,7 +175,7 @@ export function useProjectManagement(
       await openProjectWithTokenGuard(switchTokenRef, setProjectPath)
     } catch (err) {
       setError(formatErrorForState(err))
-      console.error(createOpenProjectErrorLog(), err)
+      logger.error(createOpenProjectErrorLog(), err instanceof Error ? err : undefined)
       showGlobalToast({
         type: 'error',
         title: 'Open Project Failed',
@@ -225,7 +226,7 @@ export function useProjectManagement(
       }
     } catch (err) {
       setError(formatErrorForState(err))
-      console.error(createCloseProjectErrorLog(), err)
+      logger.error(createCloseProjectErrorLog(), err instanceof Error ? err : undefined)
       showGlobalToast({
         type: 'error',
         title: 'Close Project Failed',
@@ -276,7 +277,7 @@ export function useProjectManagement(
       return true
     } catch (err) {
       setError(formatErrorForState(err))
-      console.error(createOpenProjectErrorLog(), err)
+      logger.error(createOpenProjectErrorLog(), err instanceof Error ? err : undefined)
       // Re-throw to allow caller-specific handling (e.g., stale project removal)
       throw err
     } finally {
@@ -295,7 +296,7 @@ export function useProjectManagement(
       const fileTree = await api.file.readDirectory(projectPath!)
       setFiles(fileTree)
     } catch (err) {
-      console.error(createRefreshErrorLog(), err)
+      logger.error(createRefreshErrorLog(), err instanceof Error ? err : undefined)
     }
   }
 

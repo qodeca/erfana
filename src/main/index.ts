@@ -12,6 +12,7 @@ import { registerGitHandlers } from './ipc/git-handlers'
 import { registerPdfHandlers } from './ipc/pdf-handlers'
 import { registerDocxHandlers } from './ipc/docx-handlers'
 import { registerGlobalSettingsHandlers } from './ipc/global-settings-handlers'
+import { registerLoggingHandlers } from './ipc/logging-handlers'
 import { createApplicationMenu } from './menu'
 import { fileService } from './services/FileService'
 import { fileWatcherService } from './services/FileWatcherService'
@@ -19,6 +20,7 @@ import { directoryWatcherService } from './services/DirectoryWatcherService'
 import { terminalService } from './services/TerminalService'
 import { settingsService } from './services/SettingsService'
 import { globalSettingsService } from './services/GlobalSettingsService'
+import { loggingService, logger } from './services/LoggingService'
 import { installSafeConsole } from './utils/safe-console'
 
 // Install safe console logging to prevent EPIPE crashes
@@ -70,7 +72,7 @@ function createWindow(): BrowserWindow {
   // CRITICAL: Must also clear project state so new window can re-open the same project
   const webContentsId = mainWindow.webContents.id
   mainWindow.webContents.on('destroyed', () => {
-    console.log(`🧹 WebContents ${webContentsId} destroyed, cleaning up services...`)
+    logger.info('WebContents destroyed, cleaning up services', { webContentsId })
 
     // CRITICAL FIX (issue #59): Clear project state in services
     // Without this, ProjectService.isSameProject() returns true and does 'noop'
@@ -83,21 +85,21 @@ function createWindow(): BrowserWindow {
     // Pattern: Fire-and-forget with error logging - cleanup must not block the destroyed event
     // Errors are logged but don't halt further cleanup operations
     fileWatcherService.cleanupForWebContentsId(webContentsId).catch((err) => {
-      console.error('Error cleaning up file watchers:', err)
+      logger.error('Error cleaning up file watchers', err instanceof Error ? err : undefined)
     })
 
     directoryWatcherService.cleanupForWebContentsId(webContentsId).catch((err) => {
-      console.error('Error cleaning up directory watchers:', err)
+      logger.error('Error cleaning up directory watchers', err instanceof Error ? err : undefined)
     })
 
     // Cleanup terminals owned by this webContents (synchronous)
     try {
       terminalService.cleanupForWebContentsId(webContentsId)
     } catch (err) {
-      console.error('Error cleaning up terminals:', err)
+      logger.error('Error cleaning up terminals', err instanceof Error ? err : undefined)
     }
 
-    console.log(`✅ Service cleanup initiated for webContents ${webContentsId}`)
+    logger.info('Service cleanup initiated for webContents', { webContentsId })
   })
 
   // HMR for renderer base on electron-vite cli.
@@ -135,6 +137,9 @@ app.whenReady().then(async () => {
   // Initialize global settings service (creates ~/.erfana/settings.json if needed)
   await globalSettingsService.initialize()
 
+  // Initialize logging service (after global settings so level is loaded)
+  await loggingService.initialize()
+
   // Register IPC handlers
   registerFileHandlers()
   registerFileWatcherHandlers()
@@ -146,11 +151,17 @@ app.whenReady().then(async () => {
   registerPdfHandlers()
   registerDocxHandlers()
   registerGlobalSettingsHandlers()
+  registerLoggingHandlers()
 
   // RELIABILITY FIX (todo012): Clean up stale projects on startup
   // This runs asynchronously but doesn't block window creation
   settingsService.cleanupStaleProjects().catch((error) => {
-    console.error('Failed to cleanup stale projects on startup:', error)
+    logger.error('Failed to cleanup stale projects on startup', error instanceof Error ? error : undefined)
+  })
+
+  // Cleanup old logs (fire-and-forget, 7-day retention)
+  loggingService.cleanupOldLogs().catch((error) => {
+    logger.error('Failed to cleanup old logs', error instanceof Error ? error : undefined)
   })
 
   // Create main window
@@ -174,7 +185,7 @@ app.on('window-all-closed', () => {
 
 // Cleanup file watchers, directory watchers, and terminals before app quits
 app.on('before-quit', async () => {
-  console.log('🛑 App quitting, cleaning up services...')
+  logger.info('App quitting, cleaning up services')
   await fileWatcherService.dispose()
   await directoryWatcherService.dispose()
   await terminalService.dispose()

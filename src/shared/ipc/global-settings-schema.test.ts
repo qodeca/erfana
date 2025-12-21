@@ -14,15 +14,18 @@ import {
 
 describe('LoggingLevelSchema', () => {
   it('validates valid logging levels', () => {
+    // 6 levels: trace, debug, info, warn, error, fatal (Issue #49)
+    expect(LoggingLevelSchema.parse('trace')).toBe('trace')
     expect(LoggingLevelSchema.parse('debug')).toBe('debug')
     expect(LoggingLevelSchema.parse('info')).toBe('info')
     expect(LoggingLevelSchema.parse('warn')).toBe('warn')
     expect(LoggingLevelSchema.parse('error')).toBe('error')
+    expect(LoggingLevelSchema.parse('fatal')).toBe('fatal')
   })
 
   it('rejects invalid logging levels', () => {
     expect(() => LoggingLevelSchema.parse('invalid')).toThrow()
-    expect(() => LoggingLevelSchema.parse('trace')).toThrow()
+    expect(() => LoggingLevelSchema.parse('verbose')).toThrow()
     expect(() => LoggingLevelSchema.parse('')).toThrow()
   })
 })

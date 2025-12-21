@@ -8,6 +8,7 @@
 import { EventEmitter } from 'events'
 import { homedir, platform as osPlatform } from 'os'
 import type { IPty } from 'node-pty'
+import { logger } from './LoggingService'
 
 // Dynamic import for node-pty (optional dependency)
 type NodePtyModule = typeof import('node-pty')
@@ -27,7 +28,7 @@ void import('node-pty')
     pty = mod
   })
   .catch((error) => {
-    console.error('⚠️ node-pty not available:', error)
+    logger.error('⚠️ node-pty not available', error instanceof Error ? error : undefined)
   })
 
 /**
@@ -117,7 +118,7 @@ export class TerminalService extends EventEmitter {
       try {
         pty = await import('node-pty')
       } catch (e) {
-        console.error('❌ Cannot create terminal: node-pty not available', e)
+        logger.error('❌ Cannot create terminal: node-pty not available', e instanceof Error ? e : undefined)
         return null
       }
     }
@@ -130,10 +131,10 @@ export class TerminalService extends EventEmitter {
     const cols = config.cols || 80
     const rows = config.rows || 24
 
-    console.log(`🔵 Creating terminal: ${terminalId}`)
-    console.log(`🔵 Shell: ${shell}`)
-    console.log(`🔵 CWD: ${cwd}`)
-    console.log(`🔵 Size: ${cols}x${rows}`)
+    logger.info(`🔵 Creating terminal: ${terminalId}`)
+    logger.info(`🔵 Shell: ${shell}`)
+    logger.info(`🔵 CWD: ${cwd}`)
+    logger.info(`🔵 Size: ${cols}x${rows}`)
 
     try {
       // Generate unique marker for CWD verification
@@ -229,10 +230,10 @@ export class TerminalService extends EventEmitter {
           }
 
           // Trigger clear handshake
-          console.log(`[MARKER DETECTED] Terminal ${terminalId} - emitting clearTerminal event`)
+          logger.info(`[MARKER DETECTED] Terminal ${terminalId} - emitting clearTerminal event`)
           const term = this.terminals.get(terminalId)
           if (term) {
-            console.log(`[MARKER DETECTED] Setting hasReceivedMarker=true, isClearing=true`)
+            logger.info(`[MARKER DETECTED] Setting hasReceivedMarker=true, isClearing=true`)
             term.hasReceivedMarker = true
             term.isClearing = true
 
@@ -242,7 +243,7 @@ export class TerminalService extends EventEmitter {
             term.clearFallbackTimeout = setTimeout(() => {
               const t = this.terminals.get(terminalId)
               if (t && t.isClearing) {
-                console.warn(`⚠️ Terminal ${terminalId} clear confirmation timeout, forcing enable`)
+                logger.warn(`⚠️ Terminal ${terminalId} clear confirmation timeout, forcing enable`)
                 t.isClearing = false
                 t.initializationComplete = true
                 t.clearFallbackTimeout = undefined
@@ -256,31 +257,31 @@ export class TerminalService extends EventEmitter {
       // Forward PTY output to renderer (only after initialization)
       ptyProcess.onData((data: string) => {
         const term = this.terminals.get(terminalId)
-        console.log(`[PRIMARY onData] term=${!!term}, init=${term?.initializationComplete}, clearing=${term?.isClearing}, marker=${term?.hasReceivedMarker}, dataPreview=${data.substring(0, 50).replace(/\n/g, '\\n')}`)
+        logger.info(`[PRIMARY onData] term=${!!term}, init=${term?.initializationComplete}, clearing=${term?.isClearing}, marker=${term?.hasReceivedMarker}, dataPreview=${data.substring(0, 50).replace(/\n/g, '\\n')}`)
 
         // STRICT BLOCKING: Only forward if:
         // 1. Initialization complete (clear confirmed by renderer)
         // 2. NOT currently clearing
         // 3. Marker has been received (ensures no pre-marker data leaks through)
         if (term && term.initializationComplete && !term.isClearing && term.hasReceivedMarker) {
-          console.log(`[PRIMARY onData] FORWARDING data`)
+          logger.info(`[PRIMARY onData] FORWARDING data`)
           this.emit('data', { terminalId, data })
         } else {
-          console.log(`[PRIMARY onData] BLOCKING data`)
+          logger.info(`[PRIMARY onData] BLOCKING data`)
         }
       })
 
       // Handle PTY exit
       ptyProcess.onExit((event: { exitCode: number; signal?: number }) => {
-        console.log(`🏁 Terminal ${terminalId} exited:`, event)
+        logger.info(`🏁 Terminal ${terminalId} exited`, event)
         this.emit('exit', { terminalId, exitCode: event.exitCode, signal: event.signal })
         this.terminals.delete(terminalId)
       })
 
-      console.log(`✅ Terminal ${terminalId} created (bootstrap pattern - no interactive echo)`)
+      logger.info(`✅ Terminal ${terminalId} created (bootstrap pattern - no interactive echo)`)
       return terminalId
     } catch (error) {
-      console.error(`❌ Failed to create terminal:`, error)
+      logger.error(`❌ Failed to create terminal`, error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       this.emit('error', { terminalId, error: message })
       return null
@@ -295,7 +296,7 @@ export class TerminalService extends EventEmitter {
   markInitializationComplete(terminalId: string): void {
     const terminal = this.terminals.get(terminalId)
     if (terminal) {
-      console.log(`✅ Terminal ${terminalId} initialization complete (clear confirmed)`)
+      logger.info(`✅ Terminal ${terminalId} initialization complete (clear confirmed)`)
 
       // Clear safety fallback timeout
       if (terminal.clearFallbackTimeout) {
@@ -321,7 +322,7 @@ export class TerminalService extends EventEmitter {
     const terminal = this.terminals.get(terminalId)
 
     if (!terminal) {
-      console.error(`❌ Terminal ${terminalId} not found`)
+      logger.error(`❌ Terminal ${terminalId} not found`)
       return false
     }
 
@@ -334,14 +335,14 @@ export class TerminalService extends EventEmitter {
       // Suppress EPIPE errors - terminal may have closed
       const code = (error as { code?: unknown }).code
       if (code === 'EPIPE') {
-        console.log(`ℹ️ Terminal ${terminalId} PTY closed (terminal likely exited)`)
+        logger.info(`ℹ️ Terminal ${terminalId} PTY closed (terminal likely exited)`)
         // Clean up the closed terminal
         this.terminals.delete(terminalId)
         this.emit('exit', { terminalId, exitCode: 0 })
         return false
       }
 
-      console.error(`❌ Failed to write to terminal ${terminalId}:`, error)
+      logger.error(`❌ Failed to write to terminal ${terminalId}`, error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       this.emit('error', { terminalId, error: message })
       return false
@@ -355,16 +356,16 @@ export class TerminalService extends EventEmitter {
     const terminal = this.terminals.get(terminalId)
 
     if (!terminal) {
-      console.error(`❌ Terminal ${terminalId} not found`)
+      logger.error(`❌ Terminal ${terminalId} not found`)
       return false
     }
 
     try {
       terminal.ptyProcess.resize(cols, rows)
-      console.log(`📏 Terminal ${terminalId} resized to ${cols}x${rows}`)
+      logger.info(`📏 Terminal ${terminalId} resized to ${cols}x${rows}`)
       return true
     } catch (error) {
-      console.error(`❌ Failed to resize terminal ${terminalId}:`, error)
+      logger.error(`❌ Failed to resize terminal ${terminalId}`, error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       this.emit('error', { terminalId, error: message })
       return false
@@ -378,7 +379,7 @@ export class TerminalService extends EventEmitter {
     const terminal = this.terminals.get(terminalId)
 
     if (!terminal) {
-      console.error(`❌ Terminal ${terminalId} not found`)
+      logger.error(`❌ Terminal ${terminalId} not found`)
       return false
     }
 
@@ -389,25 +390,25 @@ export class TerminalService extends EventEmitter {
         terminal.clearFallbackTimeout = undefined
       }
     } catch (error) {
-      console.warn(`⚠️  Failed to clear fallback timeout for terminal ${terminalId}:`, error)
+      logger.warn(`⚠️  Failed to clear fallback timeout for terminal ${terminalId}`, error instanceof Error ? { error: error.message } : undefined)
       // Continue with kill anyway - don't let timeout error prevent cleanup
     }
 
     try {
       terminal.ptyProcess.kill()
       this.terminals.delete(terminalId)
-      console.log(`🛑 Terminal ${terminalId} killed`)
+      logger.info(`🛑 Terminal ${terminalId} killed`)
       return true
     } catch (error) {
       // Suppress EPIPE and ESRCH errors - process may already be dead
       const code = (error as { code?: unknown }).code
       if (code === 'EPIPE' || code === 'ESRCH') {
-        console.log(`ℹ️ Terminal ${terminalId} process already terminated`)
+        logger.info(`ℹ️ Terminal ${terminalId} process already terminated`)
         this.terminals.delete(terminalId)
         return true
       }
 
-      console.error(`❌ Failed to kill terminal ${terminalId}:`, error)
+      logger.error(`❌ Failed to kill terminal ${terminalId}`, error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       this.emit('error', { terminalId, error: message })
       return false
@@ -445,25 +446,25 @@ export class TerminalService extends EventEmitter {
    * Cleanup all terminals
    */
   async dispose(): Promise<void> {
-    console.log('🛑 Disposing TerminalService...')
+    logger.info('🛑 Disposing TerminalService...')
 
     for (const [terminalId, terminal] of this.terminals.entries()) {
       try {
         terminal.ptyProcess.kill()
-        console.log(`✅ Terminal ${terminalId} cleaned up`)
+        logger.info(`✅ Terminal ${terminalId} cleaned up`)
       } catch (error) {
         // Suppress EPIPE and ESRCH errors during cleanup
         const code = (error as { code?: unknown }).code
         if (code === 'EPIPE' || code === 'ESRCH') {
-          console.log(`ℹ️ Terminal ${terminalId} already terminated`)
+          logger.info(`ℹ️ Terminal ${terminalId} already terminated`)
         } else {
-          console.error(`❌ Failed to cleanup terminal ${terminalId}:`, error)
+          logger.error(`❌ Failed to cleanup terminal ${terminalId}`, error instanceof Error ? error : undefined)
         }
       }
     }
 
     this.terminals.clear()
-    console.log('✅ TerminalService disposed')
+    logger.info('✅ TerminalService disposed')
   }
 
   /**
@@ -477,7 +478,7 @@ export class TerminalService extends EventEmitter {
    * @see Issue #59 - App enters broken state after window close
    */
   cleanupForWebContentsId(webContentsId: number): void {
-    console.log(`🧹 Cleaning up terminals for webContents ${webContentsId}`)
+    logger.info(`🧹 Cleaning up terminals for webContents ${webContentsId}`)
     const terminalsToKill: string[] = []
 
     for (const [terminalId, terminal] of this.terminals.entries()) {
@@ -494,7 +495,7 @@ export class TerminalService extends EventEmitter {
       this.killTerminal(terminalId)
     }
 
-    console.log(`✅ Cleaned up ${terminalsToKill.length} terminals for webContents ${webContentsId}`)
+    logger.info(`✅ Cleaned up ${terminalsToKill.length} terminals for webContents ${webContentsId}`)
   }
 
   /**

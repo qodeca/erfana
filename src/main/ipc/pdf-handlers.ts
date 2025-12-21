@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { pdfService } from '../services/PdfService'
 import { PdfExportRequestSchema, type PdfExportResponse } from '../../shared/ipc/pdf-schema'
 import { ErrorCode } from '../../shared/errors'
+import { logger } from '../services/LoggingService'
 
 /**
  * Register PDF export IPC handlers
@@ -27,7 +28,7 @@ export function registerPdfHandlers(): void {
       const parseResult = PdfExportRequestSchema.safeParse(request)
 
       if (!parseResult.success) {
-        console.error('PDF export validation error:', parseResult.error.issues)
+        logger.error('PDF export validation error', parseResult.error)
         return {
           success: false,
           error: 'Invalid request: ' + parseResult.error.issues[0]?.message,
@@ -40,7 +41,7 @@ export function registerPdfHandlers(): void {
       try {
         return await pdfService.exportToPdf(html, fileName)
       } catch (error) {
-        console.error('PDF export handler error:', error)
+        logger.error('PDF export handler error', error instanceof Error ? error : undefined)
         return {
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error',

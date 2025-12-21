@@ -72,6 +72,11 @@ export enum ErrorCode {
   DOCX_EXPORT_NO_CONTENT = 'DOCX_EXPORT_NO_CONTENT',
   DOCX_EXPORT_INVALID_REQUEST = 'DOCX_EXPORT_INVALID_REQUEST',
 
+  // Logging errors
+  LOGGING_INIT_FAILED = 'LOGGING_INIT_FAILED',
+  LOGGING_WRITE_FAILED = 'LOGGING_WRITE_FAILED',
+  LOGGING_CLEANUP_FAILED = 'LOGGING_CLEANUP_FAILED',
+
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
 }
@@ -196,6 +201,11 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.DOCX_EXPORT_FAILED]: 'Failed to generate DOCX',
   [ErrorCode.DOCX_EXPORT_NO_CONTENT]: 'No content to export',
   [ErrorCode.DOCX_EXPORT_INVALID_REQUEST]: 'Invalid DOCX export request',
+
+  // Logging errors
+  [ErrorCode.LOGGING_INIT_FAILED]: 'Failed to initialize logging system',
+  [ErrorCode.LOGGING_WRITE_FAILED]: 'Failed to write to log file',
+  [ErrorCode.LOGGING_CLEANUP_FAILED]: 'Failed to cleanup old log files',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'

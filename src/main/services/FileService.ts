@@ -4,6 +4,7 @@ import type { IFileService } from '../interfaces/IFileService'
 import { SymlinkDetector } from '../utils/SymlinkDetector'
 import { RollbackHandler } from '../utils/RollbackHandler'
 import { DEFAULT_TREE_HIDDEN_PATTERNS } from '../../shared/constants'
+import { logger } from './LoggingService'
 
 export interface FileNode {
   name: string
@@ -77,7 +78,9 @@ export class FileService implements IFileService {
         try {
           node.children = await this.readDirectory(fullPath)
         } catch (error) {
-          console.error(`Error reading directory ${fullPath}:`, error)
+          logger.error('Error reading directory', error instanceof Error ? error : undefined, {
+            path: fullPath
+          })
           node.children = []
         }
       }
@@ -326,7 +329,7 @@ export class FileService implements IFileService {
             await rm(existingItemPath)
           }
 
-          console.log(`Replaced existing item: ${existingItemPath}`)
+          logger.info('Replaced existing item', { path: existingItemPath })
         } catch (deleteError) {
           const message = deleteError instanceof Error ? deleteError.message : String(deleteError)
           throw new Error(`Failed to replace existing item: ${message}`)

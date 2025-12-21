@@ -1,6 +1,7 @@
 import chokidar, { FSWatcher } from 'chokidar'
 import { BrowserWindow, WebContents } from 'electron'
 import { stat } from 'fs/promises'
+import { logger } from './LoggingService'
 
 interface WatchedFile {
   filePath: string
@@ -51,7 +52,7 @@ export class FileWatcherService {
   private safeLog(message: string): void {
     if (this.isDisposing) return // Don't log during disposal
     try {
-      console.log(message)
+      logger.info(message)
     } catch (error) {
       // Suppress EPIPE errors during shutdown
       if (error instanceof Error && !error.message.includes('EPIPE')) {
@@ -132,7 +133,7 @@ export class FileWatcherService {
       const errorMessage = error instanceof Error ? error.message : String(error)
 
       try {
-        console.error(`File watcher error for ${filePath}:`, error)
+        logger.error(`File watcher error for ${filePath}`, error instanceof Error ? error : undefined)
       } catch {
         // Suppress EPIPE errors
       }

@@ -21,6 +21,7 @@ import { showErrorToast } from './toastHelpers'
 import { AppError, ErrorCode, ERROR_MESSAGES } from '../../../shared/errors'
 import type { PromptVariables } from '../prompts/types'
 import type { ITerminalManager, PanelManagers } from './panelManager.types'
+import { logger } from './logger'
 
 /**
  * Result of a prompt execution
@@ -92,7 +93,7 @@ export async function waitForTerminalReady(
     await new Promise(resolve => setTimeout(resolve, intervalMs))
   }
 
-  console.warn('⚠️ Terminal readiness timeout after', timeoutMs, 'ms')
+  logger.warn(`Terminal readiness timeout after ${timeoutMs} ms`)
   return false
 }
 
@@ -142,7 +143,7 @@ export async function openPanelAndSendContent({
         'Terminal failed to initialize within timeout',
         ErrorCode.PROMPT_TERMINAL_TIMEOUT
       )
-      console.error('❌', error.message)
+      logger.error(error.message)
       if (showToast) {
         showErrorToast('Terminal Error', ERROR_MESSAGES[ErrorCode.PROMPT_TERMINAL_TIMEOUT])
       }
@@ -150,14 +151,14 @@ export async function openPanelAndSendContent({
     }
 
     // Debug logging for issue #41
-    console.log(`📋 openPanelAndSendContent: calling sendToTerminal with autoExecute=${autoExecute}`)
+    logger.info(`openPanelAndSendContent: calling sendToTerminal with autoExecute=${autoExecute}`)
     const sent = await terminalManager.sendToTerminal(content, autoExecute)
     if (!sent) {
       const error = new AppError(
         'Failed to send content to terminal',
         ErrorCode.PROMPT_SEND_FAILED
       )
-      console.error('❌', error.message)
+      logger.error(error.message)
       if (showToast) {
         showErrorToast('Terminal Error', ERROR_MESSAGES[ErrorCode.PROMPT_SEND_FAILED])
       }
@@ -216,7 +217,7 @@ export async function executePromptTemplate(
       `Prompt template not found: ${promptId}`,
       ErrorCode.PROMPT_NOT_FOUND
     )
-    console.error('❌', error.message)
+    logger.error(error.message)
     if (showToast) {
       showErrorToast('Prompt Error', ERROR_MESSAGES[ErrorCode.PROMPT_NOT_FOUND])
     }
@@ -230,7 +231,7 @@ export async function executePromptTemplate(
       validationResult.errorMessage || 'Validation failed',
       ErrorCode.PROMPT_VALIDATION_FAILED
     )
-    console.error('❌', error.message)
+    logger.error(error.message)
     if (showToast) {
       showErrorToast('Prompt Error', validationResult.errorMessage || ERROR_MESSAGES[ErrorCode.PROMPT_VALIDATION_FAILED])
     }
@@ -244,7 +245,7 @@ export async function executePromptTemplate(
   const targetPanel = 'terminal' as const
 
   // Debug logging for issue #41
-  console.log(`📋 executePromptTemplate: promptId=${promptId}, config.autoExecute=${config.autoExecute}, typeof=${typeof config.autoExecute}`)
+  logger.info(`executePromptTemplate: promptId=${promptId}, config.autoExecute=${config.autoExecute}, typeof=${typeof config.autoExecute}`)
 
   // Execute prompt by sending to target panel
   return await openPanelAndSendContent({

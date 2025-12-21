@@ -1,5 +1,6 @@
 import { create, type StoreApi, type UseBoundStore } from 'zustand'
 import type { ITerminalOperations } from '../interfaces/ITerminalOperations'
+import { logger } from '../utils/logger'
 
 interface TerminalStore {
   // Active terminal ID (null if no terminal is active)
@@ -36,7 +37,7 @@ export function createTerminalStore(
   userInputById: new Map<string, number>(),
 
   setActiveTerminalId: (id) => {
-    console.log(`📝 Terminal store: Setting active terminal ID to ${id}`)
+    logger.info(`Terminal store: Setting active terminal ID to ${id}`)
     set({ activeTerminalId: id })
   },
 
@@ -86,10 +87,10 @@ export function createTerminalStore(
     const terminalId = get().activeTerminalId
 
     // Debug logging for issue #41
-    console.log(`📤 sendToTerminal: autoExecute=${autoExecute}, terminalId=${terminalId}, textLength=${text.length}`)
+    logger.info(`sendToTerminal: autoExecute=${autoExecute}, terminalId=${terminalId}, textLength=${text.length}`)
 
     if (!terminalId) {
-      console.warn('❌ sendToTerminal: No active terminal available')
+      logger.warn('sendToTerminal: No active terminal available')
       return false
     }
 
@@ -98,7 +99,7 @@ export function createTerminalStore(
       const writeResult = await terminalOps.write(terminalId, text)
 
       if (!writeResult.success) {
-        console.error(`❌ sendToTerminal: Write failed: ${writeResult.error}`)
+        logger.error(`sendToTerminal: Write failed: ${writeResult.error}`)
         return false
       }
 
@@ -107,23 +108,23 @@ export function createTerminalStore(
       // This accounts for: PTY buffering + shell line discipline processing + rendering
       // See: https://xtermjs.org/docs/guides/flowcontrol/
       if (autoExecute) {
-        console.log(`📤 sendToTerminal: autoExecute=true, waiting 200ms before sending Enter`)
+        logger.info(`sendToTerminal: autoExecute=true, waiting 200ms before sending Enter`)
         await new Promise(resolve => setTimeout(resolve, 200))
 
         // Send Enter key (carriage return)
         const enterResult = await terminalOps.write(terminalId, '\r')
 
         if (!enterResult.success) {
-          console.error(`❌ sendToTerminal: Failed to send Enter: ${enterResult.error}`)
+          logger.error(`sendToTerminal: Failed to send Enter: ${enterResult.error}`)
           return false
         }
-        console.log(`✅ sendToTerminal: Enter sent successfully`)
+        logger.info(`sendToTerminal: Enter sent successfully`)
       }
 
-      console.log(`✅ sendToTerminal: Write successful`)
+      logger.info(`sendToTerminal: Write successful`)
       return true
     } catch (error) {
-      console.error('❌ sendToTerminal: Unexpected error:', error)
+      logger.error('sendToTerminal: Unexpected error', error instanceof Error ? error : undefined)
       return false
     }
   },
@@ -132,7 +133,7 @@ export function createTerminalStore(
   scrollLocked: false,
 
   setScrollLocked: (locked: boolean) => {
-    console.log(`🔒 Scroll lock: ${locked ? 'ON' : 'OFF'}`)
+    logger.info(`Scroll lock: ${locked ? 'ON' : 'OFF'}`)
     set({ scrollLocked: locked })
   }
   }))

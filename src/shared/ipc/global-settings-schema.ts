@@ -9,7 +9,7 @@ import { z } from 'zod'
 /**
  * Logging level enum
  */
-export const LoggingLevelSchema = z.enum(['debug', 'info', 'warn', 'error'])
+export const LoggingLevelSchema = z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal'])
 export type LoggingLevel = z.infer<typeof LoggingLevelSchema>
 
 /**

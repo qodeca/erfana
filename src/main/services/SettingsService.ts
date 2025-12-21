@@ -11,6 +11,7 @@ import { MonotonicTimestampGenerator } from './MonotonicTimestampGenerator'
 import { RecentProjectsDeduplicator } from './RecentProjectsDeduplicator'
 import { RecentProjectsRepository } from './RecentProjectsRepository'
 import { MAX_RECENT_PROJECTS } from '../../shared/constants'
+import { logger } from './LoggingService'
 
 export interface RecentProject {
   path: string
@@ -120,7 +121,7 @@ export class SettingsService {
       const store = await this.ensureStore()
       return store.get('lastProjectPath') || null
     } catch (error) {
-      console.error('Failed to get last project path:', error)
+      logger.error('Failed to get last project path', error instanceof Error ? error : undefined)
       throw new SettingsServiceError(
         'Failed to retrieve last project path from settings',
         'getLastProjectPath',
@@ -134,7 +135,7 @@ export class SettingsService {
       const store = await this.ensureStore()
       store.set('lastProjectPath', path)
     } catch (error) {
-      console.error('Failed to set last project path:', error)
+      logger.error('Failed to set last project path', error instanceof Error ? error : undefined)
       throw new SettingsServiceError(
         'Failed to save last project path to settings',
         'setLastProjectPath',
@@ -148,7 +149,7 @@ export class SettingsService {
       const store = await this.ensureStore()
       store.delete('lastProjectPath')
     } catch (error) {
-      console.error('Failed to clear last project path:', error)
+      logger.error('Failed to clear last project path', error instanceof Error ? error : undefined)
       throw new SettingsServiceError(
         'Failed to clear last project path from settings',
         'clearLastProjectPath',
@@ -167,7 +168,7 @@ export class SettingsService {
       // Default to 'all' mode
       return store.get('projectFilterMode') || 'all'
     } catch (error) {
-      console.error('Failed to get project filter mode:', error)
+      logger.error('Failed to get project filter mode', error instanceof Error ? error : undefined)
       throw new SettingsServiceError(
         'Failed to retrieve project filter mode from settings',
         'getProjectFilterMode',
@@ -181,7 +182,7 @@ export class SettingsService {
       const store = await this.ensureStore()
       store.set('projectFilterMode', mode)
     } catch (error) {
-      console.error('Failed to set project filter mode:', error)
+      logger.error('Failed to set project filter mode', error instanceof Error ? error : undefined)
       throw new SettingsServiceError(
         'Failed to save project filter mode to settings',
         'setProjectFilterMode',
@@ -199,7 +200,7 @@ export class SettingsService {
       if (typeof v === 'number' && v >= 0) return v
       return undefined
     } catch (error) {
-      console.error('Failed to get directory watch depth:', error)
+      logger.error('Failed to get directory watch depth', error instanceof Error ? error : undefined)
       throw new SettingsServiceError(
         'Failed to retrieve directory watch depth from settings',
         'getDirectoryWatchDepth',
@@ -214,7 +215,7 @@ export class SettingsService {
       // null clears to undefined behavior (chokidar unlimited)
       store.set('directoryWatchDepth', depth === null ? null : Math.max(0, Math.floor(depth)))
     } catch (error) {
-      console.error('Failed to set directory watch depth:', error)
+      logger.error('Failed to set directory watch depth', error instanceof Error ? error : undefined)
       throw new SettingsServiceError(
         'Failed to save directory watch depth to settings',
         'setDirectoryWatchDepth',
@@ -230,7 +231,7 @@ export class SettingsService {
       const repository = await this.ensureRepository()
       return repository.getAll()
     } catch (error) {
-      console.error('Failed to get recent projects:', error)
+      logger.error('Failed to get recent projects', error instanceof Error ? error : undefined)
       throw new SettingsServiceError(
         'Failed to retrieve recent projects from settings',
         'getRecentProjects',
@@ -267,7 +268,7 @@ export class SettingsService {
 
       repository.save(updatedProjects)
     } catch (error) {
-      console.error('Failed to add recent project:', error)
+      logger.error('Failed to add recent project', error instanceof Error ? error : undefined)
       throw new SettingsServiceError(
         'Failed to save recent project to settings',
         'addRecentProject',
@@ -291,7 +292,7 @@ export class SettingsService {
       // REFACTORING (todo016): Use repository for persistence
       repository.save(filteredProjects)
     } catch (error) {
-      console.error('Failed to remove recent project:', error)
+      logger.error('Failed to remove recent project', error instanceof Error ? error : undefined)
       throw new SettingsServiceError(
         'Failed to remove recent project from settings',
         'removeRecentProject',
@@ -326,10 +327,10 @@ export class SettingsService {
       if (validProjects.length !== projects.length) {
         repository.save(validProjects)
         const removedCount = projects.length - validProjects.length
-        console.log(`Cleaned up ${removedCount} stale project(s) from recent list`)
+        logger.info('Cleaned up stale projects from recent list', { removedCount })
       }
     } catch (error) {
-      console.error('Failed to cleanup stale projects:', error)
+      logger.error('Failed to cleanup stale projects', error instanceof Error ? error : undefined)
       throw new SettingsServiceError(
         'Failed to cleanup stale projects from settings',
         'cleanupStaleProjects',
@@ -347,7 +348,7 @@ export class SettingsService {
       const repository = await this.ensureRepository()
       repository.clear()
     } catch (error) {
-      console.error('Failed to clear recent projects:', error)
+      logger.error('Failed to clear recent projects', error instanceof Error ? error : undefined)
       throw new SettingsServiceError(
         'Failed to clear recent projects from settings',
         'clearRecentProjects',

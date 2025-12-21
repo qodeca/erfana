@@ -7,6 +7,19 @@ import { TerminalPanelHandler, createTerminalPanelHandler } from './terminalPane
 import type { PanelManagers } from './panelManager.types'
 import { ErrorCode } from '../../../shared/errors'
 
+const { mockLogger } = vi.hoisted(() => ({
+  mockLogger: {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn()
+  }
+}))
+
+vi.mock('./logger', () => ({ logger: mockLogger }))
+
 // Mock toast helpers
 vi.mock('./toastHelpers', () => ({
   showErrorToast: vi.fn()
@@ -102,13 +115,12 @@ describe('TerminalPanelHandler', () => {
     it('should return false on timeout', async () => {
       mockManagers.terminalManager.isReady = vi.fn(() => false)
       const handler = new TerminalPanelHandler(mockManagers)
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      mockLogger.warn.mockClear()
 
       const result = await handler.waitForReady(100)
 
       expect(result).toBe(false)
-      expect(consoleSpy).toHaveBeenCalledWith('⚠️ Terminal readiness timeout after', 100, 'ms')
-      consoleSpy.mockRestore()
+      expect(mockLogger.warn).toHaveBeenCalledWith('Terminal readiness timeout after 100 ms')
     })
   })
 
@@ -142,7 +154,7 @@ describe('TerminalPanelHandler', () => {
     it('should return error when terminal times out', async () => {
       mockManagers.terminalManager.isReady = vi.fn(() => false)
       const handler = new TerminalPanelHandler(mockManagers)
-      vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockLogger.error.mockClear()
 
       const result = await handler.send({
         content: 'npm install',
@@ -159,7 +171,7 @@ describe('TerminalPanelHandler', () => {
     it('should return error when send fails', async () => {
       mockManagers.terminalManager.sendToTerminal = vi.fn(() => Promise.resolve(false))
       const handler = new TerminalPanelHandler(mockManagers)
-      vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockLogger.error.mockClear()
 
       const result = await handler.send({
         content: 'npm install',
@@ -176,7 +188,7 @@ describe('TerminalPanelHandler', () => {
       const { showErrorToast } = await import('./toastHelpers')
       mockManagers.terminalManager.isReady = vi.fn(() => false)
       const handler = new TerminalPanelHandler(mockManagers)
-      vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockLogger.error.mockClear()
 
       await handler.send({
         content: 'npm install',
@@ -191,7 +203,7 @@ describe('TerminalPanelHandler', () => {
       const { showErrorToast } = await import('./toastHelpers')
       mockManagers.terminalManager.isReady = vi.fn(() => false)
       const handler = new TerminalPanelHandler(mockManagers)
-      vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockLogger.error.mockClear()
 
       await handler.send({
         content: 'npm install',

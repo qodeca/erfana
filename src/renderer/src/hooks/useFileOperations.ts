@@ -20,6 +20,7 @@ import { useDialog } from '../components/Dialog'
 import { showGlobalToast } from '../components/Toast/toastService'
 import { withWatcherPause } from '../components/ProjectTree/withWatcherPause'
 import { formatFileOperationError } from '../utils/errorUtils'
+import { logger } from '../utils/logger'
 import {
   getTargetPath,
   isValidTargetPath,
@@ -98,7 +99,7 @@ export function useFileOperations(
     } catch (err) {
       const errorMessage = formatCreateFileError(err)
       showGlobalToast({ type: 'error', title: 'Operation Failed', message: errorMessage })
-      console.error(createFileCreationErrorLog(), err)
+      logger.error(createFileCreationErrorLog(), err instanceof Error ? err : undefined)
     }
   }
 
@@ -135,7 +136,7 @@ export function useFileOperations(
     } catch (err) {
       const errorMessage = formatCreateFolderError(err)
       showGlobalToast({ type: 'error', title: 'Operation Failed', message: errorMessage })
-      console.error(createFolderCreationErrorLog(), err)
+      logger.error(createFolderCreationErrorLog(), err instanceof Error ? err : undefined)
     }
   }
 
@@ -186,7 +187,7 @@ export function useFileOperations(
     } catch (err) {
       const message = formatDeleteError(err, 'file')
       showGlobalToast({ type: 'error', title: 'Delete Failed', message })
-      console.error(createFileDeletionErrorLog(), err)
+      logger.error(createFileDeletionErrorLog(), err instanceof Error ? err : undefined)
     }
   }
 
@@ -217,7 +218,7 @@ export function useFileOperations(
     } catch (err) {
       const message = formatDeleteError(err, 'folder')
       showGlobalToast({ type: 'error', title: 'Delete Failed', message })
-      console.error(createFolderDeletionErrorLog(), err)
+      logger.error(createFolderDeletionErrorLog(), err instanceof Error ? err : undefined)
     }
   }
 
@@ -273,7 +274,7 @@ export function useFileOperations(
         message: errorMessage,
         type: 'error'
       })
-      console.error(createRenameErrorLog(), err)
+      logger.error(createRenameErrorLog(), err instanceof Error ? err : undefined)
     }
   }
 

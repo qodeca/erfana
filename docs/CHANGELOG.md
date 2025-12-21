@@ -2,6 +2,37 @@
 
 Historical changelog entries for versions prior to current. For the latest changes, see [CLAUDE.md](../CLAUDE.md).
 
+## Changes in v0.6.0
+- **Logging Layer** (Dec 21, 2025):
+  - Unified logging facades: MainLogger (main process) and RendererLogger (renderer process)
+  - File-based logging to `~/.erfana/logs/` directory
+  - Auto-rolling log files: 10MB size limit + daily rotation with 7-day retention
+  - 6 log levels: trace, debug, info, warn, error, fatal
+  - IPC integration: renderer logs sent to main process for centralized file storage
+  - Global settings integration: dynamic log level control via `logging.level` setting
+  - 182 new tests
+  - **Total: 4226 tests passing** (139 test files)
+  - Closes #49
+- **Global Settings Service** (Dec 21, 2025):
+  - Application-wide settings service with Zod schema validation
+  - Settings persisted to `~/.erfana/settings.json`
+  - Corruption handling: backup to `.bak`, reset to defaults
+  - 71 new tests
+  - Closes #50
+- **Visualize Prompt** (Dec 21, 2025):
+  - Added "Visualize" prompt to Preview context menu for AI-powered Mermaid diagram generation
+  - Dialog with dropdown for 22 Mermaid diagram types
+  - 4 new tests
+  - Closes #57
+- **Settings Overlay** (Dec 21, 2025):
+  - Full-screen settings overlay with keyboard navigation and focus management
+  - 26 new tests
+  - Closes #48
+- **2025 Security Hardening** (Dec 2, 2025):
+  - Electron 33.2.1 → 39.2.4 (Chromium 142, Node.js 22.20.0, V8 14.2)
+  - Process sandboxing enabled, Electron fuses implemented (3 of 6)
+  - electron-builder 26.0.0 with automated workarounds
+
 ## Changes in v0.5.4
 - **Forced Scroll-to-Bottom After Prompt Execution** (Dec 1, 2025):
   - Automatically scrolls terminal to bottom 1 second after prompt template execution (issue #52)

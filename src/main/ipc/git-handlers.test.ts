@@ -10,6 +10,21 @@ import { registerGitHandlers } from './git-handlers'
 import { gitStatusService } from '../services/GitStatusService'
 import type { GitStatusResponse } from '../../shared/ipc/git-schema'
 
+// Mock LoggingService - use vi.hoisted to create mock before vi.mock hoisting
+const { mockLogger } = vi.hoisted(() => ({
+  mockLogger: {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn()
+  }
+}))
+vi.mock('../services/LoggingService', () => ({
+  logger: mockLogger
+}))
+
 // Mock electron
 vi.mock('electron', () => ({
   ipcMain: {
@@ -227,8 +242,8 @@ describe('git-handlers', () => {
         await expect(handler({}, '/path/to/project')).rejects.toThrow('Not a git repository')
       })
 
-      it('should log errors to console', async () => {
-        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      it('should log errors to logger', async () => {
+        mockLogger.error.mockClear()
         const error = new Error('Test error')
         mockedGetStatus.mockRejectedValue(error)
 
@@ -238,12 +253,10 @@ describe('git-handlers', () => {
           // Expected to throw
         }
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          '🔀 Error in git:getStatus handler:',
+        expect(mockLogger.error).toHaveBeenCalledWith(
+          '🔀 Error in git:getStatus handler',
           error
         )
-
-        consoleErrorSpy.mockRestore()
       })
     })
 

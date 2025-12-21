@@ -6,6 +6,7 @@
 
 import { ipcMain, BrowserWindow } from 'electron'
 import { terminalService } from '../services/TerminalService'
+import { logger } from '../services/LoggingService'
 
 type TerminalCreateConfig = {
   shell?: string
@@ -21,14 +22,14 @@ type TerminalEventListener = (...args: unknown[]) => void
 const registeredListeners = new Map<string, TerminalEventListener>()
 
 export function registerTerminalHandlers() {
-  console.log('📝 Registering Terminal IPC handlers...')
+  logger.info('📝 Registering Terminal IPC handlers...')
 
   // Remove any existing listeners first (handles HMR reload case - issue #59)
   // Safety check: only cleanup if no terminals are actively initializing to prevent
   // race condition where clearTerminal event is lost, leaving terminal stuck (issue #59)
   const activeTerminals = terminalService.listTerminals()
   if (activeTerminals.length > 0) {
-    console.warn('⚠️  Terminals still active during handler registration, preserving listeners')
+    logger.warn('⚠️  Terminals still active during handler registration, preserving listeners')
     // Note: This means HMR may accumulate listeners, but that's safer than losing events
     // Proper cleanup happens in webContents 'destroyed' handler
   } else {
@@ -44,7 +45,7 @@ export function registerTerminalHandlers() {
    */
   ipcMain.handle('terminal:isAvailable', (_event, terminalId?: string) => {
     const result = terminalService.isAvailable(terminalId)
-    console.log(`🔍 Terminal available: ${result.available}, initialized: ${result.initialized ?? 'N/A'}`)
+    logger.info(`🔍 Terminal available: ${result.available}, initialized: ${result.initialized ?? 'N/A'}`)
     return { success: true, ...result }
   })
 
@@ -53,7 +54,7 @@ export function registerTerminalHandlers() {
    * Passes webContentsId to TerminalService for cleanup on window close (issue #59)
    */
   ipcMain.handle('terminal:create', async (event, config?: TerminalCreateConfig) => {
-    console.log('🚀 Creating terminal with config:', config)
+    logger.info('🚀 Creating terminal', config)
 
     try {
       const webContentsId = event.sender.id
@@ -65,7 +66,7 @@ export function registerTerminalHandlers() {
 
       return { success: true, terminalId }
     } catch (error) {
-      console.error('❌ Failed to create terminal:', error)
+      logger.error('❌ Failed to create terminal', error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       return { success: false, error: message }
     }
@@ -79,7 +80,7 @@ export function registerTerminalHandlers() {
       const success = terminalService.write(terminalId, data)
       return { success }
     } catch (error) {
-      console.error('❌ Failed to write to terminal:', error)
+      logger.error('❌ Failed to write to terminal', error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       return { success: false, error: message }
     }
@@ -100,7 +101,7 @@ export function registerTerminalHandlers() {
       const success = terminalService.killTerminal(terminalId)
       return { success }
     } catch (error) {
-      console.error('❌ Failed to kill terminal:', error)
+      logger.error('❌ Failed to kill terminal', error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       return { success: false, error: message }
     }
@@ -119,7 +120,7 @@ export function registerTerminalHandlers() {
 
       return { success: true, info }
     } catch (error) {
-      console.error('❌ Failed to get terminal info:', error)
+      logger.error('❌ Failed to get terminal info', error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       return { success: false, error: message }
     }
@@ -133,7 +134,7 @@ export function registerTerminalHandlers() {
       const terminals = terminalService.listTerminals()
       return { success: true, terminals }
     } catch (error) {
-      console.error('❌ Failed to list terminals:', error)
+      logger.error('❌ Failed to list terminals', error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       return { success: false, error: message }
     }
@@ -190,5 +191,5 @@ export function registerTerminalHandlers() {
     terminalService.markInitializationComplete(terminalId)
   })
 
-  console.log('✅ Terminal IPC handlers registered')
+  logger.info('✅ Terminal IPC handlers registered')
 }

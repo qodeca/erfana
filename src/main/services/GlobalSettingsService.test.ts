@@ -3,7 +3,7 @@
  *
  * @see Issue #50 - global settings service
  */
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { GlobalSettingsService } from './GlobalSettingsService'
 import { ErrorCode } from '../../shared/errors'
 
@@ -22,20 +22,27 @@ vi.mock('os', () => ({
   homedir: vi.fn(() => '/mock-home')
 }))
 
+// Mock LoggingService
+vi.mock('./LoggingService', () => ({
+  logger: {
+    warn: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+    trace: vi.fn(),
+    fatal: vi.fn()
+  }
+}))
+
 import { readFile, writeFile, mkdir, access, copyFile } from 'fs/promises'
+import { logger } from './LoggingService'
 
 describe('GlobalSettingsService', () => {
   let service: GlobalSettingsService
-  let consoleWarnSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
     vi.clearAllMocks()
-    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     service = new GlobalSettingsService()
-  })
-
-  afterEach(() => {
-    consoleWarnSpy.mockRestore()
   })
 
   describe('constructor', () => {
@@ -112,8 +119,12 @@ describe('GlobalSettingsService', () => {
         '/mock-home/.erfana/settings.json',
         '/mock-home/.erfana/settings.json.bak'
       )
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('corrupted (Invalid JSON)')
+      expect(logger.warn).toHaveBeenCalledWith(
+        'Global settings file corrupted',
+        expect.objectContaining({
+          reason: 'Invalid JSON',
+          action: 'reset to defaults'
+        })
       )
 
       const settings = service.getSettings()
@@ -134,8 +145,12 @@ describe('GlobalSettingsService', () => {
       await service.initialize()
 
       expect(copyFile).toHaveBeenCalled()
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('corrupted (Validation failed)')
+      expect(logger.warn).toHaveBeenCalledWith(
+        'Global settings file corrupted',
+        expect.objectContaining({
+          reason: 'Validation failed',
+          action: 'reset to defaults'
+        })
       )
 
       const settings = service.getSettings()
@@ -257,8 +272,9 @@ describe('GlobalSettingsService', () => {
     })
 
     it('rejects invalid values with AppError', async () => {
+      // 'verbose' is not a valid level (valid: trace, debug, info, warn, error, fatal)
       await expect(
-        service.setSetting('logging', { level: 'trace' } as any)
+        service.setSetting('logging', { level: 'verbose' } as any)
       ).rejects.toMatchObject({
         code: ErrorCode.GLOBAL_SETTINGS_VALIDATION_FAILED,
         message: expect.stringContaining('Invalid settings value')
@@ -362,8 +378,9 @@ describe('GlobalSettingsService', () => {
 
       await expect(service.resetSettings()).resolves.toBeUndefined()
 
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to backup settings')
+      expect(logger.warn).toHaveBeenCalledWith(
+        'Failed to backup settings',
+        expect.objectContaining({ error: 'Backup failed' })
       )
       expect(writeFile).toHaveBeenCalled() // Should still write defaults
     })
@@ -409,7 +426,6 @@ describe('GlobalSettingsService', () => {
     })
 
     it('catches and logs errors in listeners', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       vi.mocked(writeFile).mockResolvedValue(undefined)
 
       const throwingListener = vi.fn(() => {
@@ -422,13 +438,11 @@ describe('GlobalSettingsService', () => {
 
       await service.setSetting('logging', { level: 'debug' })
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error in settings change listener:',
+      expect(logger.error).toHaveBeenCalledWith(
+        'Error in settings change listener',
         expect.any(Error)
       )
       expect(normalListener).toHaveBeenCalled() // Should still be called
-
-      consoleErrorSpy.mockRestore()
     })
   })
 })

@@ -4,6 +4,7 @@ import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
 import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-schema'
 import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global-settings-schema'
+import type { LogEntry } from '../shared/ipc/logging-schema'
 
 declare global {
   interface Window {
@@ -145,6 +146,10 @@ declare global {
         set: (key: string, value: unknown) => Promise<{ success: boolean; error?: string }>
         reset: () => Promise<{ success: boolean; error?: string }>
         onSettingsChanged: (callback: (data: GlobalSettingsChanged) => void) => () => void
+      }
+      logging: {
+        log: (entry: LogEntry) => void
+        getLevel: () => Promise<string>
       }
     }
   }

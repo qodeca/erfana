@@ -22,6 +22,7 @@ import {
   getDefaultGlobalSettings
 } from '../../shared/ipc/global-settings-schema'
 import { AppError, ErrorCode } from '../../shared/errors'
+import { logger } from './LoggingService'
 
 /** Global settings directory */
 const SETTINGS_DIR = '.erfana'
@@ -251,9 +252,11 @@ export class GlobalSettingsService {
    * 4. Log warning
    */
   private async handleCorruption(reason: string): Promise<void> {
-    console.warn(
-      `Global settings file corrupted (${reason}). Backing up to ${this.backupPath} and resetting to defaults.`
-    )
+    logger.warn('Global settings file corrupted', {
+      reason,
+      backupPath: this.backupPath,
+      action: 'reset to defaults'
+    })
 
     // Backup corrupted file
     await this.backupSettings()
@@ -276,9 +279,9 @@ export class GlobalSettingsService {
       }
     } catch (error) {
       // Log but don't fail - backup is best-effort
-      console.warn(
-        `Failed to backup settings: ${error instanceof Error ? error.message : String(error)}`
-      )
+      logger.warn('Failed to backup settings', {
+        error: error instanceof Error ? error.message : String(error)
+      })
     }
   }
 
@@ -302,7 +305,7 @@ export class GlobalSettingsService {
       try {
         listener(event)
       } catch (error) {
-        console.error('Error in settings change listener:', error)
+        logger.error('Error in settings change listener', error instanceof Error ? error : undefined)
       }
     }
   }

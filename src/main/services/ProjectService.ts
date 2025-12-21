@@ -21,6 +21,7 @@ import type { IFileWatcherService } from '../interfaces/IFileWatcherService'
 import type { IDirectoryWatcherService } from '../interfaces/IDirectoryWatcherService'
 import type { ISettingsService } from '../interfaces/ISettingsService'
 import type { IProjectSettingsService } from '../interfaces/IProjectSettingsService'
+import { logger } from './LoggingService'
 
 export interface ProjectSwitchResult {
   success: boolean
@@ -108,7 +109,9 @@ export class ProjectService {
       await this.directoryWatcherService.stopAll()
     } catch (e) {
       // Non-fatal: proceed with switch, guards prevent stale events
-      console.warn('Stopping watchers failed (continuing):', e)
+      logger.warn('Stopping watchers failed (continuing)', {
+        error: e instanceof Error ? e.message : String(e)
+      })
     }
   }
 
@@ -145,7 +148,9 @@ export class ProjectService {
       this.projectSettingsService.clearSettings()
     } catch (e) {
       // Best-effort rollback
-      console.warn('Rollback failed after openProject error:', e)
+      logger.warn('Rollback failed after openProject error', {
+        error: e instanceof Error ? e.message : String(e)
+      })
     }
   }
 
@@ -260,7 +265,9 @@ export class ProjectService {
       this.rollbackServices(oldProjectPath)
 
       const message = error instanceof Error ? error.message : String(error)
-      console.error('Open project failed:', message)
+      logger.error('Open project failed', error instanceof Error ? error : undefined, {
+        path: newProjectPath
+      })
 
       return {
         success: false,

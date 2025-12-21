@@ -1,4 +1,5 @@
 import yaml from 'js-yaml'
+import { logger } from './logger'
 
 /**
  * Represents parsed YAML frontmatter data.
@@ -76,7 +77,7 @@ export function extractFrontmatter(content: string): ExtractedFrontmatter {
 
   // Prevent DoS via extremely large YAML
   if (frontmatterYaml.length > MAX_FRONTMATTER_SIZE) {
-    console.warn('[frontmatterParser] Frontmatter exceeds size limit:', frontmatterYaml.length, 'bytes')
+    logger.warn('[frontmatterParser] Frontmatter exceeds size limit: ' + frontmatterYaml.length + ' bytes')
     return {
       frontmatter: null,
       body,
@@ -111,7 +112,7 @@ export function extractFrontmatter(content: string): ExtractedFrontmatter {
     }
   } catch (error) {
     // Invalid YAML - log for debugging and return raw for fallback rendering
-    console.warn('[frontmatterParser] Failed to parse YAML:', error)
+    logger.warn('[frontmatterParser] Failed to parse YAML', { error })
     return {
       frontmatter: null,
       body,

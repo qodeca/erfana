@@ -5,6 +5,7 @@ import { join } from 'path'
 import { PDF_EXPORT } from '../../shared/constants'
 import { ErrorCode } from '../../shared/errors'
 import type { PdfExportResponse } from '../../shared/ipc/pdf-schema'
+import { logger } from './LoggingService'
 
 /**
  * Print stylesheet for PDF export
@@ -553,7 +554,7 @@ class ContentReadinessPoller {
     }
 
     // Timeout reached - proceed anyway (best effort)
-    console.warn('PDF export: Content ready timeout reached, proceeding with current state')
+    logger.warn('PDF export: Content ready timeout reached, proceeding with current state')
   }
 
   /**
@@ -689,7 +690,7 @@ class PdfService implements IPdfService {
         filePath: savePath
       }
     } catch (error) {
-      console.error('PDF export error:', error)
+      logger.error('PDF export error', error instanceof Error ? error : undefined)
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

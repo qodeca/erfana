@@ -13,6 +13,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { withWatcherPause } from './withWatcherPause'
 
+const { mockLogger } = vi.hoisted(() => ({
+  mockLogger: {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn()
+  }
+}))
+
+vi.mock('../../utils/logger', () => ({ logger: mockLogger }))
+
 // Mock window.api
 const mockWindowApi = {
   directoryWatch: {
@@ -110,15 +123,13 @@ describe('withWatcherPause', () => {
       const operation = vi.fn().mockRejectedValue(new Error('Operation failed'))
       mockWindowApi.directoryWatch.resume.mockRejectedValueOnce(new Error('Resume failed'))
 
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockLogger.error.mockClear()
 
       await expect(
         withWatcherPause('/test/project', isInternalOperationRef, setLoading, operation)
       ).rejects.toThrow('Operation failed')
 
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to resume directory watcher:', expect.any(Error))
-
-      consoleSpy.mockRestore()
+      expect(mockLogger.error).toHaveBeenCalledWith('Failed to resume directory watcher', expect.any(Error))
     })
   })
 

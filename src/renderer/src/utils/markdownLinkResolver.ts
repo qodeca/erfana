@@ -13,6 +13,7 @@
 
 import path from 'path-browserify'
 import { isDangerousProtocol, isExternalProtocol } from './linkProtocols'
+import { logger } from './logger'
 
 export interface ResolvedLink {
   /** Absolute file path */
@@ -77,7 +78,7 @@ async function checkFileExists(filePath: string): Promise<boolean> {
       }
     }
     // Log unexpected errors but don't throw to avoid breaking the UI
-    console.error('[MarkdownLinkResolver] Unexpected error checking file existence:', error)
+    logger.error('[MarkdownLinkResolver] Unexpected error checking file existence', error instanceof Error ? error : undefined)
     return false
   }
 }
@@ -146,7 +147,7 @@ export async function resolveMarkdownLink(
 ): Promise<ResolvedLink | null> {
   // Security: Block dangerous protocols
   if (isDangerousProtocol(linkHref)) {
-    console.warn('[MarkdownLinkResolver] Blocked dangerous protocol:', linkHref.split(':')[0])
+    logger.warn('[MarkdownLinkResolver] Blocked dangerous protocol: ' + linkHref.split(':')[0])
     return null
   }
 
@@ -200,7 +201,7 @@ export async function resolveMarkdownLink(
   if (!isPathWithinProject(resolvedPath, normalizedProjectRoot)) {
     // Log relative path only to avoid exposing full filesystem structure
     const relativePath = path.relative(normalizedProjectRoot, resolvedPath)
-    console.warn('[MarkdownLinkResolver] Link points outside project:', relativePath)
+    logger.warn('[MarkdownLinkResolver] Link points outside project: ' + relativePath)
     return null
   }
 

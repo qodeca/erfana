@@ -150,8 +150,37 @@ describe('Main Process - Window Creation', () => {
     // Mock GlobalSettingsService
     vi.doMock('./services/GlobalSettingsService', () => ({
       globalSettingsService: {
-        initialize: vi.fn(() => Promise.resolve())
+        initialize: vi.fn(() => Promise.resolve()),
+        getSettings: vi.fn(() => ({ logging: { level: 'info', console: true } })),
+        getSetting: vi.fn((key: string) => {
+          if (key === 'logging') return { level: 'info', console: true }
+          return undefined
+        }),
+        onSettingsChanged: vi.fn()
       }
+    }))
+
+    // Mock LoggingService
+    vi.doMock('./services/LoggingService', () => ({
+      loggingService: {
+        initialize: vi.fn(() => Promise.resolve()),
+        cleanupOldLogs: vi.fn(() => Promise.resolve()),
+        info: vi.fn(),
+        debug: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn()
+      },
+      logger: {
+        info: vi.fn(),
+        debug: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn()
+      }
+    }))
+
+    // Mock logging handlers
+    vi.doMock('./ipc/logging-handlers', () => ({
+      registerLoggingHandlers: vi.fn()
     }))
 
     // Mock safe console

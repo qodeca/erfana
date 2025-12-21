@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { docxService } from '../services/DocxService'
 import { DocxExportRequestSchema, type DocxExportResponse } from '../../shared/ipc/docx-schema'
 import { ErrorCode } from '../../shared/errors'
+import { logger } from '../services/LoggingService'
 
 /**
  * Register DOCX export IPC handlers
@@ -27,7 +28,7 @@ export function registerDocxHandlers(): void {
       const parseResult = DocxExportRequestSchema.safeParse(request)
 
       if (!parseResult.success) {
-        console.error('DOCX export validation error:', parseResult.error.issues)
+        logger.error('DOCX export validation error', parseResult.error)
         return {
           success: false,
           error: 'Invalid request: ' + parseResult.error.issues[0]?.message,
@@ -40,7 +41,7 @@ export function registerDocxHandlers(): void {
       try {
         return await docxService.exportToDocx(html, fileName)
       } catch (error) {
-        console.error('DOCX export handler error:', error)
+        logger.error('DOCX export handler error', error instanceof Error ? error : undefined)
         return {
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error',

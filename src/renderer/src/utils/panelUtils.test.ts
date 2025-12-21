@@ -13,6 +13,19 @@ import {
 import type { IPanelManager, ITerminalManager } from './panelManager.types'
 import { ErrorCode } from '../../../shared/errors'
 
+const { mockLogger } = vi.hoisted(() => ({
+  mockLogger: {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn()
+  }
+}))
+
+vi.mock('./logger', () => ({ logger: mockLogger }))
+
 // Mock the toast helpers to prevent actual toast notifications
 vi.mock('./toastHelpers', () => ({
   showErrorToast: vi.fn()
@@ -122,15 +135,11 @@ describe('panelUtils.ts', () => {
         sendToTerminal: vi.fn()
       }
 
-      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      mockLogger.warn.mockClear()
       const result = await waitForTerminalReady(terminalManager, 100, 20)
 
       expect(result).toBe(false)
-      expect(consoleWarn).toHaveBeenCalledWith(
-        '⚠️ Terminal readiness timeout after',
-        100,
-        'ms'
-      )
+      expect(mockLogger.warn).toHaveBeenCalledWith('Terminal readiness timeout after 100 ms')
     })
 
     it('should respect custom timeout', async () => {
@@ -139,7 +148,7 @@ describe('panelUtils.ts', () => {
         sendToTerminal: vi.fn()
       }
 
-      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      mockLogger.warn.mockClear()
       const start = Date.now()
       await waitForTerminalReady(terminalManager, 150, 20)
       const elapsed = Date.now() - start
@@ -158,7 +167,7 @@ describe('panelUtils.ts', () => {
         sendToTerminal: vi.fn()
       }
 
-      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      mockLogger.warn.mockClear()
       await waitForTerminalReady(terminalManager, 100, 30)
 
       // With 100ms timeout and 30ms interval, should poll ~3-4 times
@@ -204,8 +213,8 @@ describe('panelUtils.ts', () => {
       const managers = createMockManagers()
       managers.terminalManager.isReady.mockReturnValue(false)
 
-      vi.spyOn(console, 'error').mockImplementation(() => {})
-      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      mockLogger.error.mockClear()
+      mockLogger.warn.mockClear()
 
       const result = await openPanelAndSendContent({
         panel: 'terminal',
@@ -225,8 +234,8 @@ describe('panelUtils.ts', () => {
       const managers = createMockManagers()
       managers.terminalManager.isReady.mockReturnValue(false)
 
-      vi.spyOn(console, 'error').mockImplementation(() => {})
-      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      mockLogger.error.mockClear()
+      mockLogger.warn.mockClear()
 
       await openPanelAndSendContent({
         panel: 'terminal',
@@ -245,7 +254,7 @@ describe('panelUtils.ts', () => {
       const managers = createMockManagers()
       managers.terminalManager.sendToTerminal.mockResolvedValue(false)
 
-      vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockLogger.error.mockClear()
 
       const result = await openPanelAndSendContent({
         panel: 'terminal',
@@ -298,7 +307,7 @@ describe('panelUtils.ts', () => {
 
     it('should return error result for unknown prompt ID', async () => {
       const managers = createMockManagers()
-      vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockLogger.error.mockClear()
 
       const result = await executePromptTemplate(
         'unknown-prompt',
@@ -313,7 +322,7 @@ describe('panelUtils.ts', () => {
 
     it('should return error result when required variables are missing', async () => {
       const managers = createMockManagers()
-      vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockLogger.error.mockClear()
 
       const result = await executePromptTemplate(
         'modify',
@@ -372,8 +381,8 @@ describe('panelUtils.ts', () => {
       const managers = createMockManagers()
       managers.terminalManager.isReady.mockReturnValue(false)
 
-      vi.spyOn(console, 'error').mockImplementation(() => {})
-      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      mockLogger.error.mockClear()
+      mockLogger.warn.mockClear()
 
       const result = await executePromptTemplate(
         'elaborate',
@@ -420,7 +429,7 @@ describe('panelUtils.ts', () => {
       const managers = createMockManagers()
       managers.terminalManager.sendToTerminal.mockResolvedValue(false)
 
-      vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockLogger.error.mockClear()
 
       const result = await openPanelAndSendContent({
         panel: 'terminal',
@@ -438,8 +447,8 @@ describe('panelUtils.ts', () => {
       const managers = createMockManagers()
       managers.terminalManager.isReady.mockReturnValue(false)
 
-      vi.spyOn(console, 'error').mockImplementation(() => {})
-      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      mockLogger.error.mockClear()
+      mockLogger.warn.mockClear()
 
       const result = await openPanelAndSendContent({
         panel: 'terminal',

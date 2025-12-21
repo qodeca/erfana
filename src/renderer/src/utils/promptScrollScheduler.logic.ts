@@ -11,6 +11,8 @@
  * Issue #52: Forced scroll-to-bottom after prompt execution
  */
 
+import { logger } from './logger'
+
 export enum SkipReason {
   USER_SCROLLED = 'user_scrolled',
   TERMINAL_NOT_READY = 'terminal_not_ready',
@@ -106,13 +108,13 @@ export function scheduleScrollIfNeeded(
     // Check 1: Terminal controls available?
     if (!terminalPortal.terminalControls) {
       onSkip?.(SkipReason.CONTROLS_NOT_AVAILABLE)
-      console.debug('[PromptScroll] Skipped: controls not available')
+      logger.debug('[PromptScroll] Skipped: controls not available')
       return
     }
 
     if (!terminalPortal.isTerminalReady) {
       onSkip?.(SkipReason.TERMINAL_NOT_READY)
-      console.debug('[PromptScroll] Skipped: terminal not ready')
+      logger.debug('[PromptScroll] Skipped: terminal not ready')
       return
     }
 
@@ -121,20 +123,20 @@ export function scheduleScrollIfNeeded(
     const lastScrollTs = lastUserScrollTsRef.current ?? 0
     if (didUserScrollRecently(lastScrollTs, completionTs, delayMs)) {
       onSkip?.(SkipReason.USER_SCROLLED)
-      console.debug('[PromptScroll] Skipped: user scrolled during delay')
+      logger.debug('[PromptScroll] Skipped: user scrolled during delay')
       return
     }
 
     // All checks passed - execute scroll
     terminalPortal.terminalControls.scrollToBottom()
     onScroll?.()
-    console.debug('[PromptScroll] Executed: forced scroll to bottom')
+    logger.debug('[PromptScroll] Executed: forced scroll to bottom')
   }, delayMs)
 
   return {
     cancel: () => {
       clearTimeout(timeoutId)
-      console.debug('[PromptScroll] Canceled: cleanup called')
+      logger.debug('[PromptScroll] Canceled: cleanup called')
     }
   }
 }

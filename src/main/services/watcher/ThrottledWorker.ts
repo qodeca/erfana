@@ -16,6 +16,8 @@
  * - collectionDelay: 75ms
  */
 
+import { logger } from '../LoggingService'
+
 export interface ThrottledWorkerOptions {
   /**
    * Maximum items to process in one chunk
@@ -190,7 +192,7 @@ export class ThrottledWorker<T> {
     try {
       this.callbacks.onWork(chunk)
     } catch (error) {
-      console.error('ThrottledWorker: Error processing chunk:', error)
+      logger.error('ThrottledWorker: Error processing chunk', error instanceof Error ? error : undefined)
     }
 
     // If more work, schedule next chunk after throttle delay

@@ -7,6 +7,7 @@
 
 import { ipcMain } from 'electron'
 import { settingsService } from '../services/SettingsService'
+import { logger } from '../services/LoggingService'
 
 /**
  * Register all settings-related IPC handlers
@@ -20,7 +21,7 @@ export function registerSettingsHandlers(): void {
       const mode = await settingsService.getProjectFilterMode()
       return { success: true, mode }
     } catch (error) {
-      console.error('❌ Error getting project filter mode:', error)
+      logger.error('❌ Error getting project filter mode', error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       return { success: false, error: message }
     }
@@ -32,7 +33,7 @@ export function registerSettingsHandlers(): void {
       await settingsService.setProjectFilterMode(mode)
       return { success: true }
     } catch (error) {
-      console.error('❌ Error setting project filter mode:', error)
+      logger.error('❌ Error setting project filter mode', error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       return { success: false, error: message }
     }
@@ -44,7 +45,7 @@ export function registerSettingsHandlers(): void {
       const depth = await settingsService.getDirectoryWatchDepth()
       return { success: true, depth }
     } catch (error) {
-      console.error('❌ Error getting directory watch depth:', error)
+      logger.error('❌ Error getting directory watch depth', error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       return { success: false, error: message }
     }
@@ -56,7 +57,7 @@ export function registerSettingsHandlers(): void {
       await settingsService.setDirectoryWatchDepth(depth)
       return { success: true }
     } catch (error) {
-      console.error('❌ Error setting directory watch depth:', error)
+      logger.error('❌ Error setting directory watch depth', error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       return { success: false, error: message }
     }
@@ -68,7 +69,7 @@ export function registerSettingsHandlers(): void {
       const projects = await settingsService.getRecentProjects()
       return { success: true, projects }
     } catch (error) {
-      console.error('❌ Error getting recent projects:', error)
+      logger.error('❌ Error getting recent projects', error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       return { success: false, error: message }
     }
@@ -80,7 +81,7 @@ export function registerSettingsHandlers(): void {
       await settingsService.addRecentProject(path, name)
       return { success: true }
     } catch (error) {
-      console.error('❌ Error adding recent project:', error)
+      logger.error('❌ Error adding recent project', error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       return { success: false, error: message }
     }
@@ -92,11 +93,11 @@ export function registerSettingsHandlers(): void {
       await settingsService.removeRecentProject(path)
       return { success: true }
     } catch (error) {
-      console.error('❌ Error removing recent project:', error)
+      logger.error('❌ Error removing recent project', error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
       return { success: false, error: message }
     }
   })
 
-  console.log('✅ Settings IPC handlers registered')
+  logger.info('✅ Settings IPC handlers registered')
 }

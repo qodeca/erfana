@@ -1,5 +1,6 @@
 import type { PromptConfig } from './types'
 import { parseTemplates } from './parser'
+import { logger } from '../utils/logger'
 
 /**
  * Auto-discover all template files using Vite's import.meta.glob
@@ -36,8 +37,8 @@ const parsedTemplates = parseTemplates(templateInputs)
 
 // Debug logging only in development mode
 if (import.meta.env.DEV) {
-  console.log('📝 Loaded prompt templates:', parsedTemplates.length)
-  console.log('📝 Template IDs:', parsedTemplates.map(t => t.id))
+  logger.info('Loaded prompt templates: ' + parsedTemplates.length)
+  logger.info('Template IDs: ' + parsedTemplates.map(t => t.id).join(', '))
 }
 
 /**

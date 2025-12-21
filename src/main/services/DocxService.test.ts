@@ -41,6 +41,19 @@ vi.mock('./HtmlToDocxConverter', () => ({
   }
 }))
 
+// Mock LoggingService
+const mockLogger = {
+  trace: vi.fn(),
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  fatal: vi.fn()
+}
+vi.mock('./LoggingService', () => ({
+  logger: mockLogger
+}))
+
 // ============================================================================
 // Test Helpers
 // ============================================================================
@@ -714,19 +727,17 @@ describe('DocxService', () => {
       expect(result.error).toBe('Unknown error')
     })
 
-    it('should log errors to console', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    it('should log errors to logger', async () => {
+      mockLogger.error.mockClear()
       mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.docx' })
       mockConvert.mockRejectedValue(new Error('Test error'))
 
       await docxService.exportToDocx('<p>Test</p>', 'test')
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'DOCX export failed:',
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'DOCX export failed',
         expect.any(Error)
       )
-
-      consoleSpy.mockRestore()
     })
   })
 

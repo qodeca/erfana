@@ -3,6 +3,7 @@ import fs from 'fs'
 import { join } from 'path'
 import { stat } from 'fs/promises'
 import type { GitStatusResponse, GitDisplayStatus, GitFileEntry, GitStatusCounts } from '../../shared/ipc/git-schema'
+import { logger } from './LoggingService'
 
 /**
  * Cap file entries to prevent performance issues with large repositories.
@@ -120,7 +121,7 @@ export class GitStatusService {
           branch = currentBranchName
         }
       } catch (error) {
-        console.error('🔀 Error getting branch name:', error)
+        logger.error('Error getting branch name', error instanceof Error ? error : undefined)
         // Continue without branch info
       }
 
@@ -214,7 +215,13 @@ export class GitStatusService {
         })
       }
 
-      console.log(`🔀 Git status: ${files.length} files (${counts.modified}M ${counts.untracked}U ${counts.deleted}D ${counts.staged}A)`)
+      logger.debug('Git status retrieved', {
+        fileCount: files.length,
+        modified: counts.modified,
+        untracked: counts.untracked,
+        deleted: counts.deleted,
+        staged: counts.staged
+      })
 
       return {
         isGitRepo: true,
@@ -225,7 +232,7 @@ export class GitStatusService {
         truncated
       }
     } catch (error) {
-      console.error('🔀 Error getting git status:', error)
+      logger.error('Error getting git status', error instanceof Error ? error : undefined)
       return {
         ...this.createEmptyResponse(),
         error: error instanceof Error ? error.message : 'Unknown error'

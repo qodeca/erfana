@@ -25,6 +25,19 @@ import {
 } from './switchHelpers'
 import { TERMINAL } from './constants'
 
+const { mockLogger } = vi.hoisted(() => ({
+  mockLogger: {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn()
+  }
+}))
+
+vi.mock('../../utils/logger', () => ({ logger: mockLogger }))
+
 // Mock stores with dynamic imports
 vi.mock('../../stores/useProjectStore', async () => {
   const state = {
@@ -338,15 +351,13 @@ describe('switchHelpers', () => {
       vi.mocked(state.getActiveTerminalId).mockReturnValue('term-1')
       mockWindowApi.terminal.write.mockRejectedValueOnce(new Error('Write failed'))
 
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      mockLogger.warn.mockClear()
 
       const promise = interruptActiveTerminalIfAny()
       await vi.runAllTimersAsync()
       await promise
 
-      expect(consoleSpy).toHaveBeenCalledWith('Failed to signal terminal:', expect.any(Error))
-
-      consoleSpy.mockRestore()
+      expect(mockLogger.warn).toHaveBeenCalledWith('Failed to signal terminal', { error: expect.any(Error) })
     })
   })
 

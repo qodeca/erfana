@@ -11,6 +11,7 @@ import type { IPanelManager, ITerminalManager, PanelManagers } from './panelMana
 import { createDefaultManagers } from './panelManager.factory'
 import { showErrorToast } from './toastHelpers'
 import { AppError, ErrorCode, ERROR_MESSAGES } from '../../../shared/errors'
+import { logger } from './logger'
 
 /**
  * Terminal panel handler implementation
@@ -59,7 +60,7 @@ export class TerminalPanelHandler implements IPanelHandler {
       await new Promise(resolve => setTimeout(resolve, intervalMs))
     }
 
-    console.warn('⚠️ Terminal readiness timeout after', timeoutMs, 'ms')
+    logger.warn('Terminal readiness timeout after ' + timeoutMs + ' ms')
     return false
   }
 
@@ -83,7 +84,7 @@ export class TerminalPanelHandler implements IPanelHandler {
         'Terminal failed to initialize within timeout',
         ErrorCode.PROMPT_TERMINAL_TIMEOUT
       )
-      console.error('❌', error.message)
+      logger.error(error.message, error)
       if (showToast) {
         showErrorToast('Terminal Error', ERROR_MESSAGES[ErrorCode.PROMPT_TERMINAL_TIMEOUT])
       }
@@ -97,7 +98,7 @@ export class TerminalPanelHandler implements IPanelHandler {
         'Failed to send content to terminal',
         ErrorCode.PROMPT_SEND_FAILED
       )
-      console.error('❌', error.message)
+      logger.error(error.message, error)
       if (showToast) {
         showErrorToast('Terminal Error', ERROR_MESSAGES[ErrorCode.PROMPT_SEND_FAILED])
       }

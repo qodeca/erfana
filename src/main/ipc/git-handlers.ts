@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import { gitStatusService, createGitStatusService, GitStatusService } from '../services/GitStatusService'
 import { validateProjectPath } from '../utils/pathSecurity'
+import { logger } from '../services/LoggingService'
 
 /**
  * Register git-related IPC handlers
@@ -28,7 +29,7 @@ export function registerGitHandlers(gitService: GitStatusService = gitStatusServ
 
       return await gitService.getStatus(trimmedPath)
     } catch (error) {
-      console.error('🔀 Error in git:getStatus handler:', error)
+      logger.error('🔀 Error in git:getStatus handler', error instanceof Error ? error : undefined)
       throw error
     }
   })

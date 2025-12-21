@@ -1,5 +1,6 @@
 import { ipcMain, WebContents } from 'electron'
 import { directoryWatcherService } from '../services/DirectoryWatcherService'
+import { logger } from '../services/LoggingService'
 
 /**
  * Register all directory watcher IPC handlers
@@ -19,7 +20,7 @@ export function registerDirectoryWatcherHandlers(): void {
       return { success: true }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error('Error starting directory watch:', error)
+      logger.error('Error starting directory watch', error instanceof Error ? error : undefined)
       return { success: false, error: errorMessage }
     }
   })
@@ -37,7 +38,7 @@ export function registerDirectoryWatcherHandlers(): void {
       return { success: true }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error('Error stopping directory watch:', error)
+      logger.error('Error stopping directory watch', error instanceof Error ? error : undefined)
       return { success: false, error: errorMessage }
     }
   })
@@ -51,7 +52,7 @@ export function registerDirectoryWatcherHandlers(): void {
       return { success: true }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error('Error stopping all directory watches:', error)
+      logger.error('Error stopping all directory watches', error instanceof Error ? error : undefined)
       return { success: false, error: errorMessage }
     }
   })
@@ -68,7 +69,7 @@ export function registerDirectoryWatcherHandlers(): void {
       return { success: true }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error('Error pausing directory watch:', error)
+      logger.error('Error pausing directory watch', error instanceof Error ? error : undefined)
       return { success: false, error: errorMessage }
     }
   })
@@ -85,7 +86,7 @@ export function registerDirectoryWatcherHandlers(): void {
       return { success: true }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error('Error resuming directory watch:', error)
+      logger.error('Error resuming directory watch', error instanceof Error ? error : undefined)
       return { success: false, error: errorMessage }
     }
   })
@@ -97,7 +98,7 @@ export function registerDirectoryWatcherHandlers(): void {
       return { success: true, stats }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error('Error getting directory watch stats:', error)
+      logger.error('Error getting directory watch stats', error instanceof Error ? error : undefined)
       return { success: false, error: errorMessage }
     }
   })
@@ -115,7 +116,7 @@ export function registerDirectoryWatcherHandlers(): void {
       return { success: true }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error('Error starting git index watch:', error)
+      logger.error('Error starting git index watch', error instanceof Error ? error : undefined)
       return { success: false, error: errorMessage }
     }
   })
@@ -127,10 +128,10 @@ export function registerDirectoryWatcherHandlers(): void {
       return { success: true }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      console.error('Error stopping git index watch:', error)
+      logger.error('Error stopping git index watch', error instanceof Error ? error : undefined)
       return { success: false, error: errorMessage }
     }
   })
 
-  console.log('✅ Directory watcher IPC handlers registered')
+  logger.info('✅ Directory watcher IPC handlers registered')
 }

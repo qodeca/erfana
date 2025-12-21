@@ -22,6 +22,7 @@
  */
 
 import { ErrorCode } from '../../../shared/errors'
+import { logger } from '../utils/logger'
 
 /**
  * Execution trace data
@@ -97,7 +98,7 @@ function generateTraceId(): string {
 export function setTracingEnabled(enabled: boolean): void {
   tracingEnabled = enabled
   if (enabled) {
-    console.log('📊 Prompt execution tracing enabled')
+    logger.info('Prompt execution tracing enabled')
   }
 }
 
@@ -153,7 +154,7 @@ export function cleanupOldTraces(): number {
   }
 
   if (tracingEnabled && removeCount > 0) {
-    console.log(`📊 Cleaned up ${removeCount} old traces`)
+    logger.info(`Cleaned up ${removeCount} old traces`)
   }
 
   return originalLength - traceHistory.length
@@ -181,7 +182,7 @@ export function startTrace(
   }
 
   if (tracingEnabled) {
-    console.log(`📊 [${trace.id}] Starting execution: ${promptId}`)
+    logger.info(`[${trace.id}] Starting execution: ${promptId}`)
   }
 
   return {
@@ -195,7 +196,7 @@ export function startTrace(
       }
 
       if (tracingEnabled) {
-        console.log(`📊 [${trace.id}] Execution succeeded: ${promptId} (${trace.duration}ms)`)
+        logger.info(`[${trace.id}] Execution succeeded: ${promptId} (${trace.duration}ms)`)
       }
 
       // Add to history
@@ -215,7 +216,7 @@ export function startTrace(
       }
 
       if (tracingEnabled) {
-        console.log(`📊 [${trace.id}] Execution failed: ${promptId} (${trace.duration}ms) - ${trace.errorMessage}`)
+        logger.info(`[${trace.id}] Execution failed: ${promptId} (${trace.duration}ms) - ${trace.errorMessage}`)
       }
 
       // Add to history
@@ -316,7 +317,7 @@ export function getExecutionMetrics(): ExecutionMetrics {
 export function clearTraceHistory(): void {
   traceHistory.length = 0
   if (tracingEnabled) {
-    console.log('📊 Trace history cleared')
+    logger.info('Trace history cleared')
   }
 }
 

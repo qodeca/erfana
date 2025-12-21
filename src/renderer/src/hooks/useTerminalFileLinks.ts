@@ -33,6 +33,7 @@ import {
   type SmartResolutionResult
 } from '../utils/smartPathResolver.logic'
 import type { PathScore } from '../utils/pathScoring'
+import { logger } from '../utils/logger'
 
 // Create a module-level cache shared across hook instances
 // This ensures cache hits across terminal restarts and multiple terminals
@@ -164,7 +165,8 @@ export function useTerminalFileLinks(
         return result.info.cwd
       }
     } catch (e) {
-      console.warn('[FileLinks] Failed to get terminal CWD:', e)
+      const errorMsg = e instanceof Error ? e.message : String(e)
+      logger.warn(`[FileLinks] Failed to get terminal CWD: ${errorMsg}`)
     }
 
     return cwdRef.current
@@ -197,7 +199,8 @@ export function useTerminalFileLinks(
           absolutePath: result.absolutePath
         }
       } catch (e) {
-        console.warn('[FileLinks] Path validation error:', e)
+        const errorMsg = e instanceof Error ? e.message : String(e)
+        logger.warn(`[FileLinks] Path validation error: ${errorMsg}`)
         return { exists: false }
       }
     },
@@ -326,7 +329,7 @@ export function useTerminalFileLinks(
 
           callback(links.length > 0 ? links : undefined)
         } catch (e) {
-          console.error('[FileLinks] Error providing file links:', e)
+          logger.error('[FileLinks] Error providing file links:', e instanceof Error ? e : undefined)
           onError?.(e instanceof Error ? e : new Error(String(e)))
           callback(undefined)
         }
@@ -340,7 +343,7 @@ export function useTerminalFileLinks(
 
     // Guard: Check if registerLinkProvider exists (may not exist in mocked terminals)
     if (typeof terminal.registerLinkProvider !== 'function') {
-      console.warn('[FileLinks] Terminal does not support registerLinkProvider')
+      logger.warn('[FileLinks] Terminal does not support registerLinkProvider')
       return
     }
 

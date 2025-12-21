@@ -4,6 +4,7 @@ import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
 import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-schema'
 import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global-settings-schema'
+import type { LogEntry } from '../shared/ipc/logging-schema'
 import { electronAPI } from '@electron-toolkit/preload'
 
 export interface FileNode {
@@ -378,6 +379,20 @@ const api = {
       ipcRenderer.on('globalSettings:changed', listener)
       return () => ipcRenderer.removeListener('globalSettings:changed', listener)
     }
+  },
+
+  // Logging operations
+  logging: {
+    /**
+     * Send log entry to main process
+     * One-way channel for performance
+     */
+    log: (entry: LogEntry): void => ipcRenderer.send('logging:log', entry),
+
+    /**
+     * Get current log level from main process
+     */
+    getLevel: (): Promise<string> => ipcRenderer.invoke('logging:getLevel')
   }
 }
 

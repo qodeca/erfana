@@ -12,6 +12,7 @@ import {
   type FileChangeEvent
 } from './watcher'
 import { DEFAULT_WATCHER_IGNORE_PATTERNS } from '../../shared/constants'
+import { logger } from './LoggingService'
 
 interface WatchedDirectory {
   dirPath: string
@@ -118,7 +119,7 @@ export class DirectoryWatcherService {
   private safeLog(message: string): void {
     if (this.isDisposing) return // Don't log during disposal
     try {
-      console.log(message)
+      logger.info(message)
     } catch (error) {
       // Suppress EPIPE errors during shutdown
       if (error instanceof Error && !error.message.includes('EPIPE')) {
@@ -221,7 +222,7 @@ export class DirectoryWatcherService {
       const errorMessage = error instanceof Error ? error.message : String(error)
 
       try {
-        console.error(`Directory watcher error for ${dirPath}:`, error)
+        logger.error(`Directory watcher error for ${dirPath}`, error instanceof Error ? error : undefined)
       } catch {
         // Suppress EPIPE errors
       }

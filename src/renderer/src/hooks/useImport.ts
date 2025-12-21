@@ -24,6 +24,7 @@ import { IMPORT } from '../../../shared/constants'
 import { ERROR_MESSAGES, ErrorCode } from '../../../shared/errors'
 import { useTerminalPortalOptional } from '../context/TerminalPortalContext'
 import { scheduleScrollIfNeeded } from '../utils/promptScrollScheduler.logic'
+import { logger } from '../utils/logger'
 
 /** Size threshold for confirmation dialog (in MB) */
 const LARGE_FILE_THRESHOLD_MB = IMPORT.SIZE_WARNING_THRESHOLD / (1024 * 1024)
@@ -63,7 +64,7 @@ export function useImport(): UseImportReturn {
     try {
       selectedFile = await window.api.import.selectFile()
     } catch (error) {
-      console.error('Failed to open file dialog:', error)
+      logger.error('Failed to open file dialog:', error instanceof Error ? error : undefined)
       showErrorToast('File Selection Failed', 'Could not open file selection dialog')
       return null
     }
@@ -116,7 +117,7 @@ export function useImport(): UseImportReturn {
 
       return outputPath
     } catch (error) {
-      console.error('Import error:', error)
+      logger.error('Import error:', error instanceof Error ? error : undefined)
       showErrorToast('Import Failed', 'An unexpected error occurred during import')
       return null
     } finally {
@@ -196,10 +197,11 @@ async function triggerOrganizePrompt(
 
     if (!result.success && import.meta.env.DEV) {
       // Template may not exist yet, which is fine - log in dev only
-      console.log('organize-import prompt not executed (template may not be registered)')
+      logger.info('organize-import prompt not executed (template may not be registered)')
     }
   } catch (error) {
     // Non-fatal - the import succeeded, just the prompt didn't run
-    console.warn('Failed to trigger organize-import prompt:', error)
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    logger.warn(`Failed to trigger organize-import prompt: ${errorMsg}`)
   }
 }

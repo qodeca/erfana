@@ -6,6 +6,7 @@
 import { useActivityBarStore } from '../stores/useActivityBarStore'
 import { useTerminalStore } from '../stores/useTerminalStore'
 import type { IPanelManager, ITerminalManager, PanelManagers } from './panelManager.types'
+import { logger } from './logger'
 
 /**
  * Create a panel manager using the ActivityBarStore
@@ -52,7 +53,7 @@ export function createTerminalManager(): ITerminalManager {
           if (resolved) return
           resolved = true
           unsubscribe()
-          console.warn('⚠️ Terminal readiness timeout after', timeoutMs, 'ms')
+          logger.warn('Terminal readiness timeout after ' + timeoutMs + ' ms')
           resolve(false)
         }, timeoutMs)
 

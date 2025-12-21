@@ -1,5 +1,6 @@
 import { create, type StoreApi, type UseBoundStore } from 'zustand'
 import type { IFileOperations } from '../interfaces/IFileOperations'
+import { logger } from '../utils/logger'
 
 type ClipboardOperation = 'cut' | 'copy'
 
@@ -35,7 +36,7 @@ export function createClipboardStore(
 
   // Cut operation - stores path and marks as 'cut' for visual dimming
   cut: (path: string, name: string, type: 'file' | 'directory') => {
-    console.log('📋 Clipboard: Cut', { path, name, type })
+    logger.info('Clipboard: Cut', { path, name, type })
     set({
       itemPath: path,
       operation: 'cut',
@@ -46,7 +47,7 @@ export function createClipboardStore(
 
   // Copy operation - stores path without visual changes
   copy: (path: string, name: string, type: 'file' | 'directory') => {
-    console.log('📋 Clipboard: Copy', { path, name, type })
+    logger.info('Clipboard: Copy', { path, name, type })
     set({
       itemPath: path,
       operation: 'copy',
@@ -66,7 +67,7 @@ export function createClipboardStore(
       }
     }
 
-    console.log('📋 Clipboard: Paste', {
+    logger.info('Clipboard: Paste', {
       operation: state.operation,
       from: state.itemPath,
       to: targetPath,
@@ -79,7 +80,7 @@ export function createClipboardStore(
       if (state.operation === 'cut') {
         // Move item using injected file operations
         result = await fileOps.moveItem(state.itemPath, targetPath, undefined, replaceExisting)
-        console.log('✅ Clipboard: Move completed', { path: result.path })
+        logger.info('Clipboard: Move completed', { path: result.path })
 
         // Clear clipboard after successful cut
         set({
@@ -91,7 +92,7 @@ export function createClipboardStore(
       } else {
         // Copy item using injected file operations
         result = await fileOps.copyItem(state.itemPath, targetPath)
-        console.log('✅ Clipboard: Copy completed', { path: result.path })
+        logger.info('Clipboard: Copy completed', { path: result.path })
 
         // Keep clipboard for multiple paste operations (standard behavior)
       }
@@ -99,7 +100,7 @@ export function createClipboardStore(
       return { success: true, newPath: result.path, isSymlink: result.isSymlink }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      console.error('❌ Clipboard: Paste failed', error)
+      logger.error('Clipboard: Paste failed', error instanceof Error ? error : undefined)
 
       return {
         success: false,
@@ -110,7 +111,7 @@ export function createClipboardStore(
 
   // Clear clipboard
   clear: () => {
-    console.log('📋 Clipboard: Clear')
+    logger.info('Clipboard: Clear')
     set({
       itemPath: null,
       operation: null,

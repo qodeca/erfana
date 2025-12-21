@@ -8,6 +8,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useGitStore } from '../stores/useGitStore'
 import { GIT_STATUS } from '../components/ProjectTree/constants'
 import type { GitStatusCounts, GitDisplayStatus } from '../../../shared/ipc/git-schema'
+import { logger } from '../utils/logger'
 
 // Use centralized constants
 const { DEBOUNCE_DELAY, COOLDOWN_DURATION } = GIT_STATUS
@@ -127,7 +128,7 @@ export function useGitStatus({
 
         // CRITICAL: Ignore response if project changed during request
         if (currentProjectRef.current !== requestProjectPath) {
-          console.log('[useGitStatus] Ignoring stale response for:', requestProjectPath)
+          logger.info('[useGitStatus] Ignoring stale response for: ' + requestProjectPath)
           return
         }
 
@@ -136,7 +137,7 @@ export function useGitStatus({
         // Only set error if still current project
         if (currentProjectRef.current !== requestProjectPath) return
 
-        console.error('[useGitStatus] Refresh error:', err)
+        logger.error('[useGitStatus] Refresh error', err instanceof Error ? err : undefined)
         setStatus({
           isGitRepo: false,
           branch: null,
@@ -230,14 +231,14 @@ export function useGitStatus({
 
     // Start watching .git/index file
     window.api.gitIndexWatch.start(projectPath).catch(err => {
-      console.warn('[useGitStatus] Failed to start git index watcher:', err)
+      logger.warn('[useGitStatus] Failed to start git index watcher', { error: err })
     })
 
     // Listen for git index changes
     const unsubscribe = window.api.gitIndexWatch.onIndexChanged((data) => {
       // Only refresh if this is still the current project
       if (data.projectPath === projectPath && isWindowVisibleRef.current) {
-        console.log('[useGitStatus] Git index changed, triggering refresh')
+        logger.info('[useGitStatus] Git index changed, triggering refresh')
         debouncedRefresh()
       }
     })
@@ -246,7 +247,7 @@ export function useGitStatus({
       unsubscribe()
       // Stop watching .git/index file
       window.api.gitIndexWatch.stop().catch(err => {
-        console.warn('[useGitStatus] Failed to stop git index watcher:', err)
+        logger.warn('[useGitStatus] Failed to stop git index watcher', { error: err })
       })
     }
   }, [projectPath, enabled, debouncedRefresh])

@@ -46,6 +46,19 @@ vi.mock('../services/TerminalService', () => ({
   terminalService: mockTerminalService
 }))
 
+// Mock LoggingService
+const mockLogger = {
+  trace: vi.fn(),
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  fatal: vi.fn()
+}
+vi.mock('../services/LoggingService', () => ({
+  logger: mockLogger
+}))
+
 // Skip tests in renderer environment
 const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
 
@@ -82,10 +95,10 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       // Listeners should accumulate (not be cleaned up) when terminals are active
       expect(listenersAfterSecond).toBeGreaterThanOrEqual(listenersAfterFirst)
 
-      // Console warning should be logged
-      const consoleWarnSpy = vi.spyOn(console, 'warn')
+      // Logger warning should be logged
+      mockLogger.warn.mockClear()
       registerTerminalHandlers()
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect(mockLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining('Terminals still active during handler registration')
       )
     })
@@ -184,15 +197,15 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
     it('logs registration message on each call', async () => {
       mockTerminalService.listTerminals.mockReturnValue([])
 
-      const consoleLogSpy = vi.spyOn(console, 'log')
+      mockLogger.info.mockClear()
       const { registerTerminalHandlers } = await import('./terminal-handlers')
 
       registerTerminalHandlers()
 
-      expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect(mockLogger.info).toHaveBeenCalledWith(
         expect.stringContaining('Registering Terminal IPC handlers')
       )
-      expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect(mockLogger.info).toHaveBeenCalledWith(
         expect.stringContaining('Terminal IPC handlers registered')
       )
     })
