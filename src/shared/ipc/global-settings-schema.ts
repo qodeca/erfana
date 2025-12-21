@@ -21,13 +21,24 @@ export const LoggingSettingsSchema = z.object({
 export type LoggingSettings = z.infer<typeof LoggingSettingsSchema>
 
 /**
+ * Editor configuration
+ */
+export const EditorSettingsSchema = z.object({
+  /** Preserve single line breaks in preview (converts to <br> tags) */
+  preserveLineBreaks: z.boolean().default(false)
+})
+export type EditorSettings = z.infer<typeof EditorSettingsSchema>
+
+/**
  * Root schema for ~/.erfana/settings.json
  */
 export const GlobalSettingsSchema = z.object({
   /** JSON Schema reference (ignored, for IDE support) */
   $schema: z.string().optional(),
   /** Logging configuration */
-  logging: LoggingSettingsSchema.default(() => ({ level: 'info' as const }))
+  logging: LoggingSettingsSchema.default(() => ({ level: 'info' as const })),
+  /** Editor configuration */
+  editor: EditorSettingsSchema.default(() => ({ preserveLineBreaks: false }))
 })
 export type GlobalSettings = z.infer<typeof GlobalSettingsSchema>
 

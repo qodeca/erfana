@@ -40,7 +40,7 @@ src/
 ```
 
 ## Core Features
-1. **Markdown Editor** - Monaco with live preview, scroll sync, Mermaid diagrams (zoom, pan, full-screen viewer), YAML frontmatter rendering
+1. **Markdown Editor** - Monaco with live preview, scroll sync, Mermaid diagrams (zoom, pan, full-screen viewer), YAML frontmatter rendering, preserve line breaks option
 2. **Project Tree** - File explorer with drag-drop reorganization, markdown filtering, context menu, git status indicators
 3. **Terminal** - xterm.js with PTY backend, clipboard support, file links, scroll recovery
 4. **Prompt Templates** - AI text operations via context menu (Elaborate, Modify, Ask, Visualize, diagram chat); Visualize generates Mermaid diagrams from selected text with dropdown for 22 diagram types
@@ -60,7 +60,7 @@ See `docs/` for details (keep Claude's context focused):
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (4264 tests, 141 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (4292 tests, 142 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.6.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
@@ -125,6 +125,16 @@ See `docs/` for details (keep Claude's context focused):
 - [ ] Focus states are visible (accessibility)
 
 ## Recent Changes (v0.6.x)
+
+### Preserve Line Breaks Option (Dec 21, 2025)
+Added global setting to preserve single line breaks in markdown preview:
+- New `editor.preserveLineBreaks` setting (default: false, CommonMark compliant)
+- When enabled, single newlines render as `<br>` tags (uses `remark-breaks` plugin)
+- Toggle in Settings overlay under "Editor" section
+- Setting changes apply immediately without reload
+- Closes #69
+
+**Files**: `global-settings-schema.ts`, `MarkdownPreview.tsx`, `SettingsOverlay.tsx`, `useGlobalSettingsStore.ts`
 
 ### PDF and DOCX Export (Dec 21, 2025)
 Added document export capabilities:

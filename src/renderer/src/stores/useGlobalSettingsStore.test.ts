@@ -255,6 +255,88 @@ describe('useGlobalSettingsStore', () => {
     })
   })
 
+  describe('updatePreserveLineBreaks()', () => {
+    beforeEach(() => {
+      // Initialize with settings
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false }
+        },
+        isInitialized: true
+      })
+    })
+
+    it('optimistically updates state', async () => {
+      mockGlobalSettingsAPI.set.mockResolvedValue({ success: true })
+
+      const { updatePreserveLineBreaks } = useGlobalSettingsStore.getState()
+      const promise = updatePreserveLineBreaks(true)
+
+      // Check optimistic update (before IPC completes)
+      const stateBeforeIPC = useGlobalSettingsStore.getState()
+      expect(stateBeforeIPC.settings?.editor.preserveLineBreaks).toBe(true)
+
+      await promise
+    })
+
+    it('sends correct IPC call', async () => {
+      mockGlobalSettingsAPI.set.mockResolvedValue({ success: true })
+
+      const { updatePreserveLineBreaks } = useGlobalSettingsStore.getState()
+      await updatePreserveLineBreaks(true)
+
+      expect(mockGlobalSettingsAPI.set).toHaveBeenCalledWith('editor', {
+        preserveLineBreaks: true
+      })
+    })
+
+    it('rolls back on IPC failure (error result)', async () => {
+      mockGlobalSettingsAPI.set.mockResolvedValue({
+        success: false,
+        error: 'Write failed'
+      })
+
+      const { updatePreserveLineBreaks } = useGlobalSettingsStore.getState()
+      await updatePreserveLineBreaks(true)
+
+      const state = useGlobalSettingsStore.getState()
+      expect(state.settings?.editor.preserveLineBreaks).toBe(false) // Rolled back
+      expect(state.error).toBe('Write failed')
+    })
+
+    it('rolls back on IPC exception', async () => {
+      const testError = new Error('IPC timeout')
+      mockGlobalSettingsAPI.set.mockRejectedValue(testError)
+
+      const { updatePreserveLineBreaks } = useGlobalSettingsStore.getState()
+      await updatePreserveLineBreaks(true)
+
+      const state = useGlobalSettingsStore.getState()
+      expect(state.settings?.editor.preserveLineBreaks).toBe(false) // Rolled back
+      expect(state.error).toBe('IPC timeout')
+    })
+
+    it('handles non-Error exceptions', async () => {
+      mockGlobalSettingsAPI.set.mockRejectedValue('String error')
+
+      const { updatePreserveLineBreaks } = useGlobalSettingsStore.getState()
+      await updatePreserveLineBreaks(true)
+
+      const state = useGlobalSettingsStore.getState()
+      expect(state.error).toBe('Unknown error')
+    })
+
+    it('does nothing if settings not loaded', async () => {
+      useGlobalSettingsStore.setState({ settings: null })
+
+      const { updatePreserveLineBreaks } = useGlobalSettingsStore.getState()
+      await updatePreserveLineBreaks(true)
+
+      expect(mockGlobalSettingsAPI.set).not.toHaveBeenCalled()
+    })
+  })
+
   describe('resetSettings()', () => {
     it('triggers IPC call', async () => {
       mockGlobalSettingsAPI.reset.mockResolvedValue({ success: true })

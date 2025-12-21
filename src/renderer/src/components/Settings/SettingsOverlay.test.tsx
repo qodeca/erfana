@@ -336,13 +336,14 @@ describe('SettingsOverlay', () => {
 
     it('renders logging section with section title', () => {
       useGlobalSettingsStore.setState({
-        settings: { logging: { level: 'info' } },
+        settings: { logging: { level: 'info' }, editor: { preserveLineBreaks: false } },
         isLoading: false,
         error: null,
         isInitialized: true,
         wasCorruptionRecovered: false,
         loadSettings: vi.fn(),
         updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn()
@@ -356,7 +357,7 @@ describe('SettingsOverlay', () => {
     })
 
     it('renders log level dropdown with current value', () => {
-      const mockSettings: GlobalSettings = { logging: { level: 'debug' } }
+      const mockSettings: GlobalSettings = { logging: { level: 'debug' }, editor: { preserveLineBreaks: false } }
       useGlobalSettingsStore.setState({
         settings: mockSettings,
         isLoading: false,
@@ -365,6 +366,7 @@ describe('SettingsOverlay', () => {
         wasCorruptionRecovered: false,
         loadSettings: vi.fn(),
         updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn()
@@ -379,13 +381,14 @@ describe('SettingsOverlay', () => {
 
     it('dropdown displays all 6 log levels', () => {
       useGlobalSettingsStore.setState({
-        settings: { logging: { level: 'info' } },
+        settings: { logging: { level: 'info' }, editor: { preserveLineBreaks: false } },
         isLoading: false,
         error: null,
         isInitialized: true,
         wasCorruptionRecovered: false,
         loadSettings: vi.fn(),
         updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn()
@@ -414,13 +417,14 @@ describe('SettingsOverlay', () => {
     it('changing dropdown calls updateLoggingLevel', () => {
       const mockUpdateLoggingLevel = vi.fn()
       useGlobalSettingsStore.setState({
-        settings: { logging: { level: 'info' } },
+        settings: { logging: { level: 'info' }, editor: { preserveLineBreaks: false } },
         isLoading: false,
         error: null,
         isInitialized: true,
         wasCorruptionRecovered: false,
         loadSettings: vi.fn(),
         updateLoggingLevel: mockUpdateLoggingLevel,
+        updatePreserveLineBreaks: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn()
@@ -444,6 +448,7 @@ describe('SettingsOverlay', () => {
         wasCorruptionRecovered: false,
         loadSettings: vi.fn(),
         updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn()
@@ -464,6 +469,7 @@ describe('SettingsOverlay', () => {
         wasCorruptionRecovered: false,
         loadSettings: vi.fn(),
         updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn()
@@ -473,6 +479,124 @@ describe('SettingsOverlay', () => {
 
       const dropdown = screen.getByRole('combobox', { name: 'Log level' })
       expect(dropdown).toHaveValue('info')
+    })
+  })
+
+  describe('Editor section', () => {
+    beforeEach(() => {
+      useSettingsStore.setState({ isOpen: true })
+    })
+
+    it('renders editor section with section title', () => {
+      useGlobalSettingsStore.setState({
+        settings: { logging: { level: 'info' }, editor: { preserveLineBreaks: false } },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const heading = screen.getByRole('heading', { name: 'Editor' })
+      expect(heading).toBeInTheDocument()
+      expect(heading).toHaveClass('settings-section-title')
+    })
+
+    it('renders preserve line breaks checkbox with current value (unchecked)', () => {
+      useGlobalSettingsStore.setState({
+        settings: { logging: { level: 'info' }, editor: { preserveLineBreaks: false } },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Preserve line breaks' })
+      expect(checkbox).toBeInTheDocument()
+      expect(checkbox).not.toBeChecked()
+    })
+
+    it('renders preserve line breaks checkbox with current value (checked)', () => {
+      useGlobalSettingsStore.setState({
+        settings: { logging: { level: 'info' }, editor: { preserveLineBreaks: true } },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Preserve line breaks' })
+      expect(checkbox).toBeInTheDocument()
+      expect(checkbox).toBeChecked()
+    })
+
+    it('changing checkbox calls updatePreserveLineBreaks', async () => {
+      const mockUpdatePreserveLineBreaks = vi.fn()
+      useGlobalSettingsStore.setState({
+        settings: { logging: { level: 'info' }, editor: { preserveLineBreaks: false } },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: mockUpdatePreserveLineBreaks,
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Preserve line breaks' })
+      fireEvent.click(checkbox)
+
+      expect(mockUpdatePreserveLineBreaks).toHaveBeenCalledTimes(1)
+      expect(mockUpdatePreserveLineBreaks).toHaveBeenCalledWith(true)
+    })
+
+    it('checkbox is disabled when settings is null', () => {
+      useGlobalSettingsStore.setState({
+        settings: null,
+        isLoading: false,
+        error: null,
+        isInitialized: false,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Preserve line breaks' })
+      expect(checkbox).toBeDisabled()
     })
   })
 })

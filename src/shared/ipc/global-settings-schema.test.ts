@@ -37,6 +37,9 @@ describe('GlobalSettingsSchema', () => {
         $schema: 'https://erfana.dev/schemas/global-settings.json',
         logging: {
           level: 'debug' as const
+        },
+        editor: {
+          preserveLineBreaks: true
         }
       }
 
@@ -48,6 +51,9 @@ describe('GlobalSettingsSchema', () => {
       const settings = {
         logging: {
           level: 'warn' as const
+        },
+        editor: {
+          preserveLineBreaks: false
         }
       }
 
@@ -59,6 +65,8 @@ describe('GlobalSettingsSchema', () => {
       const result = GlobalSettingsSchema.parse({})
       expect(result.logging).toBeDefined()
       expect(result.logging.level).toBe('info')
+      expect(result.editor).toBeDefined()
+      expect(result.editor.preserveLineBreaks).toBe(false)
     })
 
     it('applies defaults for partial logging config', () => {
@@ -95,6 +103,9 @@ describe('GlobalSettingsSchema', () => {
       const settings: GlobalSettings = {
         logging: {
           level: 'debug'
+        },
+        editor: {
+          preserveLineBreaks: false
         }
       }
 
@@ -106,7 +117,8 @@ describe('GlobalSettingsSchema', () => {
     it('enforces valid logging levels at type level', () => {
       // This should compile
       const validSettings: GlobalSettings = {
-        logging: { level: 'info' }
+        logging: { level: 'info' },
+        editor: { preserveLineBreaks: false }
       }
       expect(validSettings.logging.level).toBe('info')
     })
@@ -119,11 +131,18 @@ describe('getDefaultGlobalSettings', () => {
 
     expect(defaults).toHaveProperty('logging')
     expect(defaults.logging).toHaveProperty('level')
+    expect(defaults).toHaveProperty('editor')
+    expect(defaults.editor).toHaveProperty('preserveLineBreaks')
   })
 
   it('returns info level by default', () => {
     const defaults = getDefaultGlobalSettings()
     expect(defaults.logging.level).toBe('info')
+  })
+
+  it('returns preserveLineBreaks as false by default', () => {
+    const defaults = getDefaultGlobalSettings()
+    expect(defaults.editor.preserveLineBreaks).toBe(false)
   })
 
   it('returns object that passes schema validation', () => {

@@ -14,6 +14,7 @@ interface GlobalSettingsState {
   // Actions
   loadSettings: () => Promise<void>
   updateLoggingLevel: (level: LoggingLevel) => Promise<void>
+  updatePreserveLineBreaks: (enabled: boolean) => Promise<void>
   resetSettings: () => Promise<void>
   clearCorruptionFlag: () => void
 
@@ -63,6 +64,36 @@ export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => 
       const result = await window.api.globalSettings.set('logging', {
         ...currentSettings.logging,
         level
+      })
+      if (!result.success) {
+        // Rollback on failure
+        set({ settings: previousSettings, error: result.error })
+      }
+    } catch (error) {
+      set({
+        settings: previousSettings,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
+    }
+  },
+
+  updatePreserveLineBreaks: async (enabled: boolean) => {
+    const currentSettings = get().settings
+    if (!currentSettings) return
+
+    // Optimistic update
+    const previousSettings = currentSettings
+    set({
+      settings: {
+        ...currentSettings,
+        editor: { ...currentSettings.editor, preserveLineBreaks: enabled }
+      }
+    })
+
+    try {
+      const result = await window.api.globalSettings.set('editor', {
+        ...currentSettings.editor,
+        preserveLineBreaks: enabled
       })
       if (!result.success) {
         // Rollback on failure

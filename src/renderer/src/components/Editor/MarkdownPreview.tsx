@@ -2,6 +2,7 @@ import { useState, useRef, forwardRef, useMemo, useImperativeHandle, useCallback
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkBreaks from 'remark-breaks'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize from 'rehype-sanitize'
 import type { PluggableList } from 'unified'
@@ -12,6 +13,7 @@ import { DiagramViewer } from './DiagramViewer'
 import { FrontmatterTable, FrontmatterCodeBlock } from './FrontmatterTable'
 import { extractFrontmatter } from '../../utils/frontmatterParser'
 import { useDiagramViewerStore } from '../../stores/useDiagramViewerStore'
+import { useGlobalSettingsStore } from '../../stores/useGlobalSettingsStore'
 import { useToast } from '../Toast/ToastContext'
 import { resolveMarkdownLink, getLinkTooltip, type ResolvedLink } from '../../utils/markdownLinkResolver'
 import {
@@ -130,10 +132,16 @@ function withLineRange<T extends keyof JSX.IntrinsicElements>(
 }
 
 /**
- * Stable remark plugins array
+ * Stable remark plugins array (base version without breaks)
  * Defined at module level to maintain referential equality across renders
  */
-const remarkPlugins = [remarkGfm]
+const remarkPluginsBase = [remarkGfm]
+
+/**
+ * Remark plugins array with breaks enabled
+ * Defined at module level to maintain referential equality across renders
+ */
+const remarkPluginsWithBreaks = [remarkGfm, remarkBreaks]
 
 /**
  * Stable rehype plugins array for HTML rendering and sanitization
@@ -597,6 +605,13 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     // DiagramViewer state from store (persists across MermaidDiagram remounts)
     const isViewerOpen = useDiagramViewerStore(state => state.isOpen)
 
+    // Get preserveLineBreaks setting from global settings store
+    const preserveLineBreaks = useGlobalSettingsStore(state => state.settings?.editor.preserveLineBreaks ?? false)
+
+    // Select remark plugins based on preserveLineBreaks setting
+    // Uses pre-defined arrays to maintain referential equality
+    const remarkPlugins = preserveLineBreaks ? remarkPluginsWithBreaks : remarkPluginsBase
+
     // Use refs to avoid recreating handleInternalLink when props change
     const filePathRef = useRef(filePath)
     const onOpenFileRef = useRef(onOpenFile)
@@ -837,7 +852,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
           {body}
         </ReactMarkdown>
       ),
-      [body, markdownComponents]
+      [body, markdownComponents, remarkPlugins]
     )
 
     const handleMouseUp = (e: React.MouseEvent) => {

@@ -32,7 +32,7 @@ const LOG_LEVEL_OPTIONS: { value: LoggingLevel; label: string }[] = [
  */
 export function SettingsOverlay() {
   const { isOpen, closeSettings } = useSettingsStore()
-  const { settings, updateLoggingLevel } = useGlobalSettingsStore()
+  const { settings, updateLoggingLevel, updatePreserveLineBreaks } = useGlobalSettingsStore()
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const previousActiveElement = useRef<HTMLElement | null>(null)
 
@@ -109,6 +109,28 @@ export function SettingsOverlay() {
         </div>
         <div className="settings-content">
           <div className="settings-body">
+            <section className="settings-section">
+              <h2 className="settings-section-title">Editor</h2>
+              <div className="settings-row">
+                <div className="settings-field">
+                  <label htmlFor="preserve-line-breaks" className="settings-label">
+                    Preserve line breaks
+                  </label>
+                  <p className="settings-description">
+                    Show single line breaks in preview (converts to &lt;br&gt; tags)
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  id="preserve-line-breaks"
+                  className="settings-checkbox"
+                  checked={settings?.editor.preserveLineBreaks ?? false}
+                  onChange={(e) => updatePreserveLineBreaks(e.target.checked)}
+                  disabled={!settings}
+                />
+              </div>
+            </section>
+
             <section className="settings-section">
               <h2 className="settings-section-title">Logging</h2>
               <div className="settings-row">
