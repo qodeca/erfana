@@ -152,6 +152,31 @@ If the watched project folder is deleted or becomes unavailable mid‑session (E
 
 This avoids a non‑recoverable state after disruptive filesystem events.
 
+### Auto-Restart on Transient Errors (v0.6.x)
+
+The DirectoryWatcherService automatically recovers from transient filesystem errors using exponential backoff:
+
+**Transient Errors (auto-restart):**
+- `ENOENT` - File/directory temporarily unavailable
+- `EMFILE` - Too many open files (system limit)
+- `EACCES` - Temporary permission issue
+- `ESTALE` - Stale file handle (NFS)
+
+**Permanent Errors (no restart):**
+- `ENOSPC` - No space left on device
+- `EPERM` - Operation not permitted
+- Other unrecoverable errors
+
+**Backoff Strategy:**
+- Initial delay: 800ms
+- Multiplier: 2x per attempt
+- Sequence: 800ms → 1600ms → 3200ms
+- Max attempts: 3
+
+After 3 failed restart attempts, the service notifies the user and stops retrying. Restart statistics are tracked in `WatcherMetrics` for debugging.
+
+**Implementation:** `DirectoryWatcherService.ts`, `WatcherMetrics.ts`
+
 ---
 
 ## VS Code-Inspired Performance Optimizations (v0.4.6)
