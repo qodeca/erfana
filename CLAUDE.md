@@ -47,6 +47,7 @@ src/
 5. **Project Settings** - Per-project configuration via `.erfana/settings.json` (watcher ignore, tree visibility)
 6. **PDF Export** - Export markdown to print-optimized PDF with vector Mermaid diagrams, A4 page size, print-friendly styling
 7. **DOCX Export** - Export markdown to Word format with Mermaid diagrams as high-resolution PNG images
+8. **Settings Overlay** - Full-screen settings UI accessed via gear icon in activity bar, with focus trapping and keyboard navigation (Escape to close)
 
 ## Documentation
 See `docs/` for details (keep Claude's context focused):
@@ -58,7 +59,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync, Mermaid diagrams
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (3941 tests, 132 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (3972 tests, 134 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.5.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
@@ -167,7 +168,7 @@ Comprehensive security upgrade following 2025 Electron best practices:
 - Documented ASAR disabled trade-offs and rationale
 - Documented electron-builder 26 workaround
 
-**Testing**: All 3941 tests passing, dev + production builds verified
+**Testing**: All 3972 tests passing, dev + production builds verified
 
 **References**:
 - [Electron Fuses](https://www.electronjs.org/docs/latest/tutorial/fuses)
@@ -183,6 +184,32 @@ Comprehensive security upgrade following 2025 Electron best practices:
 - `docs/security.md` (NEW) - Comprehensive security documentation
 - `docs/build/` (NEW) - Split build configuration documentation (8 files)
 - `CLAUDE.md` - Condensed changelog, v0.4.x-v0.5.x moved to docs/CHANGELOG.md
+
+### Settings Overlay (Dec 21, 2025)
+Added full-screen settings overlay with keyboard navigation and focus management:
+
+**Features**:
+- Accessed via gear icon at bottom of left activity bar
+- Full-screen overlay with header, close button, and placeholder content
+- Escape key and close button dismiss overlay
+- Focus trapping (prevents focus escaping overlay) with restoration on close
+- Zustand store (`useSettingsStore`) for state management
+
+**Implementation**:
+- Created `SettingsOverlay` component with focus trap and keyboard handling
+- Added `useSettingsStore` with `isOpen`, `openSettings()`, `closeSettings()`
+- Integrated overlay into `App.tsx` root component
+- Added gear icon to `ActivityBar` bottom section
+
+**Testing**: 26 new tests added (3972 tests total, 134 test files)
+
+**Files Modified**:
+- `src/renderer/src/components/Settings/SettingsOverlay.tsx` (NEW) - Settings overlay component
+- `src/renderer/src/components/Settings/SettingsOverlay.css` (NEW) - Overlay styling
+- `src/renderer/src/stores/useSettingsStore.ts` (NEW) - Settings state management
+- `src/renderer/src/App.tsx` - Integrated overlay
+- `src/renderer/src/components/ActivityBar/ActivityBar.tsx` - Added gear icon
+- Closes #48
 
 ### Visualize Prompt (Dec 21, 2025)
 Added "Visualize" prompt to Preview context menu for AI-powered Mermaid diagram generation:
@@ -227,7 +254,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 3946 tests passing (132 test files)
+- **Current**: 3972 tests passing (134 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)

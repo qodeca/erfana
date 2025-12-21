@@ -1,5 +1,7 @@
+import { Settings } from 'lucide-react'
 import { getPanelsBySide } from './activityBarConfig'
 import { ActivityBarItem } from './ActivityBarItem'
+import { useSettingsStore } from '../../stores/useSettingsStore'
 import './ActivityBar.css'
 
 interface ActivityBarProps {
@@ -10,6 +12,8 @@ interface ActivityBarProps {
 }
 
 export function ActivityBar({ side, activePanel, onPanelClick, projectPath }: ActivityBarProps) {
+  const { openSettings } = useSettingsStore()
+
   // Filter panels: hide those requiring a project when no project is loaded
   const panels = getPanelsBySide(side).filter((panel) => {
     if (panel.requiresProject && !projectPath) return false
@@ -37,6 +41,23 @@ export function ActivityBar({ side, activePanel, onPanelClick, projectPath }: Ac
           />
         ))}
       </div>
+      {side === 'left' && (
+        <div
+          className="activity-bar-settings-btn"
+          onClick={openSettings}
+          title="Settings"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              openSettings()
+            }
+          }}
+        >
+          <Settings size={24} strokeWidth={1.5} />
+        </div>
+      )}
     </div>
   )
 }
