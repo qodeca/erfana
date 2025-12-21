@@ -1,5 +1,5 @@
 import chokidar, { FSWatcher } from 'chokidar'
-import { BrowserWindow, WebContents } from 'electron'
+import { BrowserWindow, WebContents, webContents } from 'electron'
 import { settingsService } from './SettingsService'
 import { PauseController } from '../utils/PauseController'
 import {
@@ -53,6 +53,12 @@ export class DirectoryWatcherService {
   // Platform configuration
   private readonly platformConfig = getPlatformConfig()
 
+  // Auto-restart with exponential backoff
+  private restartAttempts: Map<string, number> = new Map()
+  private pendingRestarts: Map<string, NodeJS.Timeout> = new Map()
+  private readonly MAX_RESTART_ATTEMPTS = 3
+  private readonly RESTART_BASE_DELAY = 800
+
   // Dynamic ignore patterns (configurable per-project via .erfana/settings.json)
   private ignorePatterns: string[] = [...DEFAULT_WATCHER_IGNORE_PATTERNS]
 
@@ -94,6 +100,14 @@ export class DirectoryWatcherService {
    */
   async stopAll(): Promise<void> {
     this.safeLog('👁️  Stopping all directory watchers...')
+
+    // Clear pending restarts
+    for (const timeout of this.pendingRestarts.values()) {
+      clearTimeout(timeout)
+    }
+    this.pendingRestarts.clear()
+    this.restartAttempts.clear()
+
     for (const [, watched] of this.watchedDirectories.entries()) {
       watched.throttledWorker.dispose()
       watched.atomicSaveDetector.dispose()
@@ -528,6 +542,13 @@ export class DirectoryWatcherService {
     this.safeLog('👁️  Disposing all directory watchers...')
     this.safeLog(this.metrics.getFormattedStats()) // Log final metrics
 
+    // Clear pending restart timers
+    for (const timeout of this.pendingRestarts.values()) {
+      clearTimeout(timeout)
+    }
+    this.pendingRestarts.clear()
+    this.restartAttempts.clear()
+
     for (const [, watched] of this.watchedDirectories.entries()) {
       watched.throttledWorker.dispose()
       watched.atomicSaveDetector.dispose()
@@ -648,7 +669,20 @@ export class DirectoryWatcherService {
     const errorType = this.classifyError(errorMessage)
     this.metrics.recordError(errorType)
 
-    // If project root was deleted, notify and cleanup in a recoverable way
+    // Get webContentsIds before potentially removing the watched directory
+    const watched = this.watchedDirectories.get(dirPath)
+    const webContentsIds = watched ? new Set(watched.webContentsIds) : new Set<number>()
+
+    // Check if this is a transient error that we should retry
+    if (this.isTransientError(errorType)) {
+      const attempts = this.restartAttempts.get(dirPath) ?? 0
+      if (attempts < this.MAX_RESTART_ATTEMPTS) {
+        this.scheduleRestart(dirPath, webContentsIds)
+        return
+      }
+    }
+
+    // If project root was deleted (ENOENT) and max retries exceeded, or permanent error
     if (errorType === 'ENOENT') {
       this.notifyWebContents(dirPath, 'directory-watch:project-deleted', { dirPath })
       // Use stopAll instead of dispose to keep service reusable without setting isDisposing
@@ -656,7 +690,7 @@ export class DirectoryWatcherService {
       return
     }
 
-    // Generic error path
+    // Generic error path for permanent errors
     this.notifyWebContents(dirPath, 'directory-watch:error', {
       dirPath,
       error: errorMessage,
@@ -673,8 +707,102 @@ export class DirectoryWatcherService {
     if (msg.includes('emfile') || msg.includes('too many')) return 'EMFILE'
     if (msg.includes('enospc') || msg.includes('no space')) return 'ENOSPC'
     if (msg.includes('eperm') || msg.includes('permission')) return 'EPERM'
+    if (msg.includes('eacces') || msg.includes('access denied')) return 'EACCES'
     if (msg.includes('estale') || msg.includes('stale')) return 'ESTALE'
     return 'UNKNOWN'
+  }
+
+  /**
+   * Check if an error type is transient and can be recovered with a restart
+   */
+  private isTransientError(errorType: string): boolean {
+    return ['ENOENT', 'EMFILE', 'EACCES', 'ESTALE'].includes(errorType)
+  }
+
+  /**
+   * Schedule a watcher restart with exponential backoff
+   */
+  private scheduleRestart(dirPath: string, webContentsIds: Set<number>): void {
+    const attempts = this.restartAttempts.get(dirPath) ?? 0
+    const delay = this.RESTART_BASE_DELAY * Math.pow(2, attempts)
+
+    logger.info(`Scheduling watcher restart for ${dirPath} in ${delay}ms (attempt ${attempts + 1}/${this.MAX_RESTART_ATTEMPTS})`)
+
+    // Clear any existing pending restart
+    const existingTimeout = this.pendingRestarts.get(dirPath)
+    if (existingTimeout) {
+      clearTimeout(existingTimeout)
+    }
+
+    const timeout = setTimeout(async () => {
+      this.pendingRestarts.delete(dirPath)
+      await this.restartWatcher(dirPath, webContentsIds)
+    }, delay)
+
+    this.pendingRestarts.set(dirPath, timeout)
+    this.metrics.recordRestartScheduled()
+  }
+
+  /**
+   * Attempt to restart a watcher after failure
+   */
+  private async restartWatcher(dirPath: string, webContentsIds: Set<number>): Promise<void> {
+    const attempts = (this.restartAttempts.get(dirPath) ?? 0) + 1
+    this.restartAttempts.set(dirPath, attempts)
+
+    logger.info(`Attempting watcher restart for ${dirPath} (attempt ${attempts}/${this.MAX_RESTART_ATTEMPTS})`)
+
+    try {
+      // Stop existing watcher if any
+      const existing = this.watchedDirectories.get(dirPath)
+      if (existing) {
+        existing.throttledWorker.dispose()
+        existing.atomicSaveDetector.dispose()
+        await existing.watcher.close()
+        this.watchedDirectories.delete(dirPath)
+      }
+
+      // Try to restart for each webContents that was watching
+      for (const webContentsId of webContentsIds) {
+        const webContents = this.getWebContentsById(webContentsId)
+        if (webContents && !webContents.isDestroyed()) {
+          await this.watchDirectory(dirPath, webContents)
+        }
+      }
+
+      // Success - reset attempts and notify
+      this.restartAttempts.delete(dirPath)
+      logger.info(`Watcher restart successful for ${dirPath}`)
+      this.metrics.recordRestartSuccess()
+
+      // Emit recovery event
+      this.notifyWebContents(dirPath, 'directory-watch:recovered', { dirPath })
+
+    } catch (error) {
+      logger.error(`Watcher restart failed for ${dirPath}`, error instanceof Error ? error : undefined)
+      this.metrics.recordRestartFailure()
+
+      if (attempts < this.MAX_RESTART_ATTEMPTS) {
+        // Schedule another attempt
+        this.scheduleRestart(dirPath, webContentsIds)
+      } else {
+        // Max attempts reached - notify user
+        logger.warn(`Max restart attempts (${this.MAX_RESTART_ATTEMPTS}) reached for ${dirPath}`)
+        this.restartAttempts.delete(dirPath)
+        this.notifyWebContents(dirPath, 'directory-watch:restart-failed', {
+          dirPath,
+          attempts: this.MAX_RESTART_ATTEMPTS,
+          message: 'File watcher could not recover. Please reload the project.'
+        })
+      }
+    }
+  }
+
+  /**
+   * Get webContents by ID
+   */
+  private getWebContentsById(id: number): WebContents | undefined {
+    return webContents.getAllWebContents().find((wc) => wc.id === id)
   }
 }
 

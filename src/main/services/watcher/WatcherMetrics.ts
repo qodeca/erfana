@@ -36,6 +36,11 @@ export interface WatcherMetricsSnapshot {
   // Active watchers
   activeWatchers: number
 
+  // Restart tracking
+  restartScheduled: number
+  restartSuccess: number
+  restartFailure: number
+
   // Uptime
   uptimeMs: number
   lastResetTime: number
@@ -73,6 +78,11 @@ export class WatcherMetrics {
 
   // Active watchers
   private activeWatcherCount = 0
+
+  // Restart tracking
+  private restartScheduled = 0
+  private restartSuccess = 0
+  private restartFailure = 0
 
   // Start time
   private startTime = Date.now()
@@ -161,6 +171,27 @@ export class WatcherMetrics {
   }
 
   /**
+   * Record a scheduled watcher restart
+   */
+  recordRestartScheduled(): void {
+    this.restartScheduled++
+  }
+
+  /**
+   * Record a successful watcher restart
+   */
+  recordRestartSuccess(): void {
+    this.restartSuccess++
+  }
+
+  /**
+   * Record a failed watcher restart
+   */
+  recordRestartFailure(): void {
+    this.restartFailure++
+  }
+
+  /**
    * Update buffer size directly (for sync with actual buffer)
    */
   setBufferSize(size: number): void {
@@ -217,6 +248,10 @@ export class WatcherMetrics {
 
       activeWatchers: this.activeWatcherCount,
 
+      restartScheduled: this.restartScheduled,
+      restartSuccess: this.restartSuccess,
+      restartFailure: this.restartFailure,
+
       uptimeMs: now - this.startTime,
       lastResetTime: this.lastResetTime
     }
@@ -234,6 +269,7 @@ export class WatcherMetrics {
 ├── Buffer: ${s.currentBufferSize}/${s.maxBufferSize} (overflows: ${s.bufferOverflows})
 ├── Latency: avg=${s.avgEventLatencyMs}ms, max=${s.maxEventLatencyMs}ms
 ├── Active watchers: ${s.activeWatchers}
+├── Restarts: scheduled=${s.restartScheduled}, success=${s.restartSuccess}, failure=${s.restartFailure}
 ├── Errors: ${JSON.stringify(s.errorCounts)}
 └── Uptime: ${Math.round(s.uptimeMs / 1000)}s`
   }
@@ -251,6 +287,9 @@ export class WatcherMetrics {
     this.recentEventTimestamps = []
     this.peakEventsPerSecond = 0
     this.errorCounts.clear()
+    this.restartScheduled = 0
+    this.restartSuccess = 0
+    this.restartFailure = 0
     this.lastResetTime = Date.now()
   }
 

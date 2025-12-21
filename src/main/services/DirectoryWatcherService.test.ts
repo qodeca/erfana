@@ -22,9 +22,16 @@ describe('DirectoryWatcherService ENOENT handling', () => {
     sends.length = 0
   })
 
-  it('sends project-deleted and remains recoverable (stopAll instead of dispose)', async () => {
+  it('sends project-deleted and remains recoverable (stopAll instead of dispose) after max restart attempts', async () => {
     const mod = await import('./DirectoryWatcherService')
     const svc: any = mod.directoryWatcherService
+
+    // Clear any pending restarts from previous tests
+    for (const timeout of svc.pendingRestarts.values()) {
+      clearTimeout(timeout)
+    }
+    svc.pendingRestarts.clear()
+    svc.restartAttempts.clear()
 
     // Seed a fake watched directory so notifyWebContents has a target
     const fakeWatcher = { close: vi.fn(async () => {}) }
@@ -46,10 +53,13 @@ describe('DirectoryWatcherService ENOENT handling', () => {
       version: svc.switchVersion
     })
 
+    // Set restart attempts to max to skip the auto-restart logic
+    svc.restartAttempts.set('/proj', svc.MAX_RESTART_ATTEMPTS)
+
     // Simulate ENOENT error
     svc.handleWatcherError('/proj', 'ENOENT: no such file or directory')
 
-    // Should notify project-deleted
+    // Should notify project-deleted (max attempts reached)
     expect(sends.some(s => s.channel === 'directory-watch:project-deleted')).toBe(true)
     // stopAll clears watchedDirectories without setting isDisposing
     await new Promise((r) => setTimeout(r, 0))
@@ -57,9 +67,17 @@ describe('DirectoryWatcherService ENOENT handling', () => {
     expect(svc.isDisposing).toBe(false)
   })
 
-  it('sends generic error for non-ENOENT', async () => {
+  it('schedules restart on first transient error (ENOENT)', async () => {
     const mod = await import('./DirectoryWatcherService')
     const svc: any = mod.directoryWatcherService
+
+    // Clear any pending restarts from previous tests
+    for (const timeout of svc.pendingRestarts.values()) {
+      clearTimeout(timeout)
+    }
+    svc.pendingRestarts.clear()
+    svc.restartAttempts.clear()
+
     const fakeWatcher = { close: vi.fn(async () => {}) }
     const fakeThrottledWorker = {
       dispose: vi.fn(),
@@ -79,8 +97,96 @@ describe('DirectoryWatcherService ENOENT handling', () => {
       version: svc.switchVersion
     })
 
-    svc.handleWatcherError('/proj', 'EACCES: permission denied')
+    // Simulate ENOENT error on first attempt
+    svc.handleWatcherError('/proj', 'ENOENT: no such file or directory')
+
+    // Should schedule restart, not immediately notify project-deleted
+    expect(svc.pendingRestarts.has('/proj')).toBe(true)
+    expect(sends.some(s => s.channel === 'directory-watch:project-deleted')).toBe(false)
+
+    // Cleanup
+    for (const timeout of svc.pendingRestarts.values()) {
+      clearTimeout(timeout)
+    }
+    svc.pendingRestarts.clear()
+  })
+
+  it('sends generic error for non-transient errors (ENOSPC)', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    // Clear any pending restarts from previous tests
+    for (const timeout of svc.pendingRestarts.values()) {
+      clearTimeout(timeout)
+    }
+    svc.pendingRestarts.clear()
+    svc.restartAttempts.clear()
+
+    const fakeWatcher = { close: vi.fn(async () => {}) }
+    const fakeThrottledWorker = {
+      dispose: vi.fn(),
+      work: vi.fn(),
+      getBufferSize: vi.fn(() => 0)
+    } as unknown as ThrottledWorker<any>
+    const fakeAtomicSaveDetector = {
+      dispose: vi.fn()
+    } as unknown as AtomicSaveDetector
+    svc.watchedDirectories.set('/proj', {
+      dirPath: '/proj',
+      watcher: fakeWatcher,
+      webContentsIds: new Set([1]),
+      pauseController: new PauseController(),
+      throttledWorker: fakeThrottledWorker,
+      atomicSaveDetector: fakeAtomicSaveDetector,
+      version: svc.switchVersion
+    })
+
+    // ENOSPC is not a transient error, should send generic error immediately
+    svc.handleWatcherError('/proj', 'ENOSPC: no space left on device')
     expect(sends.some(s => s.channel === 'directory-watch:error')).toBe(true)
+    expect(svc.pendingRestarts.has('/proj')).toBe(false)
+  })
+
+  it('schedules restart on transient error (EACCES)', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    // Clear any pending restarts from previous tests
+    for (const timeout of svc.pendingRestarts.values()) {
+      clearTimeout(timeout)
+    }
+    svc.pendingRestarts.clear()
+    svc.restartAttempts.clear()
+
+    const fakeWatcher = { close: vi.fn(async () => {}) }
+    const fakeThrottledWorker = {
+      dispose: vi.fn(),
+      work: vi.fn(),
+      getBufferSize: vi.fn(() => 0)
+    } as unknown as ThrottledWorker<any>
+    const fakeAtomicSaveDetector = {
+      dispose: vi.fn()
+    } as unknown as AtomicSaveDetector
+    svc.watchedDirectories.set('/proj', {
+      dirPath: '/proj',
+      watcher: fakeWatcher,
+      webContentsIds: new Set([1]),
+      pauseController: new PauseController(),
+      throttledWorker: fakeThrottledWorker,
+      atomicSaveDetector: fakeAtomicSaveDetector,
+      version: svc.switchVersion
+    })
+
+    // EACCES is a transient error, should schedule restart
+    svc.handleWatcherError('/proj', 'EACCES: access denied to file')
+    expect(svc.pendingRestarts.has('/proj')).toBe(true)
+    expect(sends.some(s => s.channel === 'directory-watch:error')).toBe(false)
+
+    // Cleanup
+    for (const timeout of svc.pendingRestarts.values()) {
+      clearTimeout(timeout)
+    }
+    svc.pendingRestarts.clear()
   })
 })
 

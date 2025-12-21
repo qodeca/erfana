@@ -171,4 +171,58 @@ describe('WatcherMetrics', () => {
       expect(snapshot.lastResetTime).toBeLessThanOrEqual(after)
     })
   })
+
+  describe('restart tracking', () => {
+    it('should increment restartScheduled counter', () => {
+      metrics.recordRestartScheduled()
+      metrics.recordRestartScheduled()
+      metrics.recordRestartScheduled()
+
+      const snapshot = metrics.getSnapshot()
+      expect(snapshot.restartScheduled).toBe(3)
+    })
+
+    it('should increment restartSuccess counter', () => {
+      metrics.recordRestartSuccess()
+      metrics.recordRestartSuccess()
+
+      const snapshot = metrics.getSnapshot()
+      expect(snapshot.restartSuccess).toBe(2)
+    })
+
+    it('should increment restartFailure counter', () => {
+      metrics.recordRestartFailure()
+      metrics.recordRestartFailure()
+      metrics.recordRestartFailure()
+      metrics.recordRestartFailure()
+
+      const snapshot = metrics.getSnapshot()
+      expect(snapshot.restartFailure).toBe(4)
+    })
+
+    it('should include restart stats in snapshot', () => {
+      metrics.recordRestartScheduled()
+      metrics.recordRestartSuccess()
+      metrics.recordRestartFailure()
+
+      const snapshot = metrics.getSnapshot()
+      expect(snapshot.restartScheduled).toBe(1)
+      expect(snapshot.restartSuccess).toBe(1)
+      expect(snapshot.restartFailure).toBe(1)
+    })
+
+    it('should reset restart stats on reset', () => {
+      metrics.recordRestartScheduled()
+      metrics.recordRestartScheduled()
+      metrics.recordRestartSuccess()
+      metrics.recordRestartFailure()
+
+      metrics.reset()
+
+      const snapshot = metrics.getSnapshot()
+      expect(snapshot.restartScheduled).toBe(0)
+      expect(snapshot.restartSuccess).toBe(0)
+      expect(snapshot.restartFailure).toBe(0)
+    })
+  })
 })

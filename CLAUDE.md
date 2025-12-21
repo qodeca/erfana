@@ -60,7 +60,7 @@ See `docs/` for details (keep Claude's context focused):
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (4292 tests, 142 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (4299 tests, 142 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.6.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
@@ -125,6 +125,16 @@ See `docs/` for details (keep Claude's context focused):
 - [ ] Focus states are visible (accessibility)
 
 ## Recent Changes (v0.6.x)
+
+### Watcher Auto-Restart with Exponential Backoff (Dec 21, 2025)
+Added automatic recovery for file watchers on transient errors:
+- Auto-restart with exponential backoff (800ms, 1600ms, 3200ms)
+- Classifies errors as transient (ENOENT, EMFILE, EACCES, ESTALE) vs permanent
+- Max 3 restart attempts before notifying user
+- Restart statistics tracked in WatcherMetrics
+- Closes #25
+
+**Files**: `DirectoryWatcherService.ts`, `WatcherMetrics.ts`
 
 ### Preserve Line Breaks Option (Dec 21, 2025)
 Added global setting to preserve single line breaks in markdown preview:
