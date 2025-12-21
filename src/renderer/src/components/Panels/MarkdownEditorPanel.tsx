@@ -12,50 +12,31 @@ import { useProjectStore } from '../../stores/useProjectStore'
 import { sanitizeFilePath } from '../../utils/fileUtils'
 import { convertMermaidDiagramsToImages } from '../../utils/svgToImage'
 import { logger } from '../../utils/logger'
+import { useAutoSave } from '../../hooks/useAutoSave'
+import { useFileWatcher, createFileSaveGuard } from '../../hooks/useFileWatcher'
+import {
+  type ScrollMapEntry,
+  calculateStats,
+  processElementForScrollMap,
+  aggregateLineOffsets,
+  buildScrollMapEntries,
+  enforceMonotonicPreviewOffsets,
+  interpolateScrollPosition,
+  isSplitMode,
+  extractFileName,
+  extractBaseFileName,
+  formatTabTitle,
+  getDefaultViewMode
+} from './markdownEditorPanel.logic'
 import './MarkdownEditorPanel.css'
+
+/** Duration to show auto-save indicator in milliseconds */
+const INDICATOR_DURATION_MS = 1000
 
 interface EditorFile {
   path: string
   content: string
   modified: boolean
-}
-
-interface DocumentStats {
-  words: number
-  characters: number
-  charactersNoSpaces: number
-  lines: number
-  readingTimeMinutes: number
-}
-
-interface ScrollMapEntry {
-  line: number
-  editorOffset: number
-  previewOffset: number
-}
-
-// Calculate document statistics
-const calculateStats = (content: string): DocumentStats => {
-  const lines = content.split('\n').length
-  const characters = content.length
-  const charactersNoSpaces = content.replace(/\s/g, '').length
-
-  // Count words (split by whitespace and filter empty strings)
-  const words = content
-    .trim()
-    .split(/\s+/)
-    .filter(word => word.length > 0).length
-
-  // Estimate reading time (average 200 words per minute)
-  const readingTimeMinutes = Math.ceil(words / 200)
-
-  return {
-    words,
-    characters,
-    charactersNoSpaces,
-    lines,
-    readingTimeMinutes
-  }
 }
 
 export function MarkdownEditorPanel(
@@ -64,7 +45,6 @@ export function MarkdownEditorPanel(
   const [currentFile, setCurrentFile] = useState<EditorFile | null>(null)
   const [viewMode, setViewMode] = useState<'split' | 'split-horizontal' | 'editor' | 'preview'>('preview')
   const [selectedText, setSelectedText] = useState<string>('')
-  const [isAutoSaving, setIsAutoSaving] = useState(false)
 
   // New unified dialog system
   const { showConfirm } = useDialog()
@@ -86,7 +66,7 @@ export function MarkdownEditorPanel(
       return
     }
 
-    const fileName = targetFilePath.split('/').pop() || 'Editor'
+    const fileName = extractFileName(targetFilePath)
     const panelId = `editor-${sanitizeFilePath(targetFilePath)}`
 
     // Check if already open
@@ -128,17 +108,11 @@ export function MarkdownEditorPanel(
     return saved ? parseFloat(saved) : 50
   })
 
-  // File watching state
-  const [externalChangeDetected, setExternalChangeDetected] = useState(false)
-  const [isFileDeleted, setIsFileDeleted] = useState(false)
-  const [isReloading, setIsReloading] = useState(false)
   const panelIdRef = useRef<string | undefined>(props.params?.panelId)
 
   const editorRef = useRef<MonacoEditorHandle>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const previewHandleRef = useRef<MarkdownPreviewHandle>(null)
-  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const isSavingRef = useRef(false) // Track save operations to prevent race conditions
 
   // Scroll synchronization state
   const scrollMapRef = useRef<ScrollMapEntry[]>([])
@@ -152,8 +126,56 @@ export function MarkdownEditorPanel(
   const [isExportingDocx, setIsExportingDocx] = useState(false)
 
   // Unified helper: detect any split mode (vertical or horizontal)
-  // Used consistently across all scroll sync effects to avoid code duplication
-  const isAnySplitMode = viewMode === 'split' || viewMode === 'split-horizontal'
+  // Uses extracted pure function for consistency
+  const isAnySplitMode = isSplitMode(viewMode)
+
+  // =========================================================================
+  // File Watcher Hook Integration
+  // Handles external file changes, deletions, and conflict resolution
+  // =========================================================================
+  const {
+    externalChangeDetected,
+    isFileDeleted,
+    isReloading,
+    reloadFromDisk: handleReloadFromDisk,
+    keepLocal: handleKeepLocal,
+    dismissConflict,
+    clearDeletedState,
+    markSaving,
+    unmarkSaving
+  } = useFileWatcher({
+    filePath: currentFile?.path ?? null,
+    hasLocalChanges: currentFile?.modified ?? false,
+    onContentUpdate: (content) => {
+      if (currentFile) {
+        setCurrentFile({
+          ...currentFile,
+          content,
+          modified: false
+        })
+      }
+    }
+  })
+
+  // Create file save guard for pausing/resuming file watching during save
+  const saveGuardRef = useRef<ReturnType<typeof createFileSaveGuard> | null>(null)
+  useEffect(() => {
+    if (currentFile?.path) {
+      saveGuardRef.current = createFileSaveGuard(currentFile.path)
+    } else {
+      saveGuardRef.current = null
+    }
+  }, [currentFile?.path])
+
+  // =========================================================================
+  // Auto-Save Hook Integration
+  // Debounced auto-save after 2 seconds of inactivity
+  // =========================================================================
+  const { isAutoSaving, setIsAutoSaving } = useAutoSave(
+    currentFile?.modified ?? false,
+    () => handleSave(true),
+    { delay: 2000, enabled: true }
+  )
 
   // Sync previewRef with previewHandleRef.element for DOM operations
   useEffect(() => {
@@ -198,55 +220,13 @@ export function MarkdownEditorPanel(
   // Update tab title when modified state changes
   useEffect(() => {
     if (!currentFile) return
-    const fileName = currentFile.path.split('/').pop() || 'Editor'
-    let title = currentFile.modified ? `● ${fileName}` : fileName
-    if (isFileDeleted) {
-      title = `${fileName} (deleted)`
-    }
+    const fileName = extractFileName(currentFile.path)
+    const title = formatTabTitle(fileName, currentFile.modified, isFileDeleted)
     props.api.setTitle(title)
   }, [currentFile?.modified, currentFile?.path, isFileDeleted])
 
-  // Start watching file for external changes
-  useEffect(() => {
-    if (!currentFile?.path) return
-
-    logger.info('Starting watch for file', { filePath: currentFile.path })
-
-    // Start watching
-    window.api.fileWatch.start(currentFile.path).then((result) => {
-      if (!result.success) {
-        logger.error('Failed to start watching file', undefined, { error: result.error })
-      }
-    })
-
-    // Set up event listeners
-    const unsubscribeChanged = window.api.fileWatch.onFileChanged((data) => {
-      if (data.filePath === currentFile.path) {
-        handleExternalChange()
-      }
-    })
-
-    const unsubscribeDeleted = window.api.fileWatch.onFileDeleted((data) => {
-      if (data.filePath === currentFile.path) {
-        handleFileDeleted()
-      }
-    })
-
-    const unsubscribeError = window.api.fileWatch.onFileError((data) => {
-      if (data.filePath === currentFile.path) {
-        logger.error('File watch error', undefined, { error: data.error })
-      }
-    })
-
-    // Cleanup on unmount or file change
-    return () => {
-      logger.info('Stopping watch for file', { filePath: currentFile.path })
-      window.api.fileWatch.stop(currentFile.path)
-      unsubscribeChanged()
-      unsubscribeDeleted()
-      unsubscribeError()
-    }
-  }, [currentFile?.path])
+  // NOTE: File watching is now handled by useFileWatcher hook
+  // See "File Watcher Hook Integration" section above
 
   // Reset editor state when view mode changes - force rebuild on next effect
   useEffect(() => {
@@ -533,27 +513,8 @@ export function MarkdownEditorPanel(
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [currentFile])
 
-  // Auto-save: debounced save 2 seconds after last edit
-  useEffect(() => {
-    // Clear existing timer
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current)
-    }
-
-    // Only auto-save if file is modified
-    if (currentFile?.modified) {
-      autoSaveTimerRef.current = setTimeout(() => {
-        handleSave(true) // Auto-save
-      }, 2000)
-    }
-
-    // Cleanup timer on unmount
-    return () => {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current)
-      }
-    }
-  }, [currentFile?.content, currentFile?.modified])
+  // NOTE: Auto-save is now handled by useAutoSave hook
+  // See "Auto-Save Hook Integration" section above
 
   // Attach scroll listeners - simplified approach without polling
   useEffect(() => {
@@ -632,10 +593,8 @@ export function MarkdownEditorPanel(
         modified: false
       })
 
-      // Set view mode based on file type
-      const extension = filePath.toLowerCase().split('.').pop()
-      const isMarkdown = extension === 'md' || extension === 'markdown'
-      setViewMode(isMarkdown ? 'preview' : 'editor')
+      // Set view mode based on file type using extracted logic
+      setViewMode(getDefaultViewMode(filePath))
     } catch (error) {
       logger.error('Error loading file', error instanceof Error ? error : undefined)
     }
@@ -651,17 +610,16 @@ export function MarkdownEditorPanel(
     })
     // Mark panel as dirty in global store (if panel id known)
     if (panelIdRef.current) {
-      import('../../stores/useProjectStore').then(({ useProjectStore }) => {
-        useProjectStore.getState().setEditorDirty(panelIdRef.current!, true)
-      })
+      // Use already-imported store directly (no dynamic import needed)
+      useProjectStore.getState().setEditorDirty(panelIdRef.current, true)
     }
   }
 
   const handleSave = async (isAutoSave: boolean = false) => {
     if (!currentFile) return
 
-    // Set saving flag to prevent race conditions with file watcher
-    isSavingRef.current = true
+    // Mark saving via hook to prevent race conditions with file watcher
+    markSaving()
 
     try {
       if (isAutoSave) {
@@ -669,7 +627,7 @@ export function MarkdownEditorPanel(
       }
 
       // Pause file watching during save to prevent race condition
-      await window.api.fileWatch.pause(currentFile.path)
+      await saveGuardRef.current?.pauseWatch()
 
       await window.api.file.writeFile(currentFile.path, currentFile.content)
       setCurrentFile({
@@ -677,26 +635,25 @@ export function MarkdownEditorPanel(
         modified: false
       })
       if (panelIdRef.current) {
-        import('../../stores/useProjectStore').then(({ useProjectStore }) => {
-          useProjectStore.getState().setEditorDirty(panelIdRef.current!, false)
-        })
+        // Use already-imported store directly (no dynamic import needed)
+        useProjectStore.getState().setEditorDirty(panelIdRef.current, false)
       }
 
-      // Clear any external change detection since we just saved
-      setExternalChangeDetected(false)
-      setIsFileDeleted(false)
+      // Clear any external change detection since we just saved (via hook)
+      dismissConflict()
+      clearDeletedState()
 
       if (isAutoSave) {
         // Show auto-save indicator briefly
-        setTimeout(() => setIsAutoSaving(false), 1000)
+        setTimeout(() => setIsAutoSaving(false), INDICATOR_DURATION_MS)
       }
     } catch (error) {
       logger.error('Error saving file', error instanceof Error ? error : undefined)
       setIsAutoSaving(false)
     } finally {
       // Resume file watching after save completes
-      await window.api.fileWatch.resume(currentFile.path)
-      isSavingRef.current = false
+      await saveGuardRef.current?.resumeWatch()
+      unmarkSaving()
     }
   }
 
@@ -704,78 +661,18 @@ export function MarkdownEditorPanel(
   useEffect(() => {
     return () => {
       if (panelIdRef.current) {
-        import('../../stores/useProjectStore').then(({ useProjectStore }) => {
-          useProjectStore.getState().setEditorDirty(panelIdRef.current!, false)
-        })
+        // Use already-imported store directly (no dynamic import needed)
+        useProjectStore.getState().setEditorDirty(panelIdRef.current, false)
       }
     }
   }, [])
 
-  /**
-   * Handle external file changes
-   */
-  const handleExternalChange = async () => {
-    logger.info('External change detected for file', { filePath: currentFile?.path })
-
-    // Ignore if we're currently saving (race condition prevention)
-    if (isSavingRef.current) {
-      logger.debug('Ignoring external change (save in progress)')
-      return
-    }
-
-    // Check if file has unsaved changes
-    if (!currentFile?.modified) {
-      // Safe to auto-reload
-      logger.info('No local changes, auto-reloading')
-      await reloadFromDisk()
-    } else {
-      // Has unsaved changes - show conflict notification
-      logger.warn('Local changes detected, showing conflict notification')
-      setExternalChangeDetected(true)
-    }
-  }
-
-  /**
-   * Reload file from disk
-   */
-  const reloadFromDisk = async () => {
-    if (!currentFile) return
-
-    setIsReloading(true)
-    try {
-      const content = await window.api.file.readFile(currentFile.path)
-      setCurrentFile({
-        ...currentFile,
-        content,
-        modified: false
-      })
-      setExternalChangeDetected(false)
-      logger.info('File reloaded successfully')
-
-      // Show reload indicator briefly (like auto-save)
-      setTimeout(() => setIsReloading(false), 1000)
-    } catch (error) {
-      logger.error('Error reloading file', error instanceof Error ? error : undefined)
-      setIsReloading(false)
-    }
-  }
-
-  /**
-   * Handle file deletion
-   */
-  const handleFileDeleted = () => {
-    logger.warn('File deleted externally', { filePath: currentFile?.path })
-    setIsFileDeleted(true)
-    setExternalChangeDetected(false) // Clear conflict notification if shown
-  }
-
-  /**
-   * Handle conflict resolution: Keep local version
-   */
-  const handleKeepLocal = () => {
-    logger.info('User chose to keep local version')
-    setExternalChangeDetected(false)
-  }
+  // NOTE: handleExternalChange, reloadFromDisk, handleFileDeleted, and handleKeepLocal
+  // are now provided by the useFileWatcher hook. See "File Watcher Hook Integration" section.
+  // - handleReloadFromDisk (renamed from reloadFromDisk)
+  // - handleKeepLocal
+  // - dismissConflict
+  // - clearDeletedState
 
   const handleDividerResize = (newPosition: number) => {
     setDividerPosition(newPosition)
@@ -825,7 +722,7 @@ export function MarkdownEditorPanel(
     const html = contentElement?.innerHTML || previewElement.innerHTML
 
     // Get filename from current file path (without .md extension)
-    const fileName = currentFile.path.split('/').pop()?.replace(/\.md$/i, '') || 'document'
+    const fileName = extractBaseFileName(currentFile.path)
 
     setIsExportingPdf(true)
     try {
@@ -833,7 +730,7 @@ export function MarkdownEditorPanel(
 
       if (result.success && result.filePath) {
         // Show success with just the filename
-        const savedFileName = result.filePath.split('/').pop() || 'PDF'
+        const savedFileName = extractFileName(result.filePath)
         showToast({
           title: 'PDF exported',
           message: `Saved as ${savedFileName}`,
@@ -900,7 +797,7 @@ export function MarkdownEditorPanel(
     }
 
     // Get filename from current file path (without .md extension)
-    const fileName = currentFile.path.split('/').pop()?.replace(/\.md$/i, '') || 'document'
+    const fileName = extractBaseFileName(currentFile.path)
 
     setIsExportingDocx(true)
     try {
@@ -925,7 +822,7 @@ export function MarkdownEditorPanel(
 
       if (result.success && result.filePath) {
         // Show success with just the filename
-        const savedFileName = result.filePath.split('/').pop() || 'DOCX'
+        const savedFileName = extractFileName(result.filePath)
         showToast({
           title: 'DOCX exported',
           message: `Saved as ${savedFileName}`,
@@ -954,12 +851,14 @@ export function MarkdownEditorPanel(
   }
 
   /**
-   * Build scroll map: line → pixel positions
+   * Build scroll map: line -> pixel positions
    * Maps editor line numbers to preview element positions
    *
-   * CRITICAL FIX: Uses getBoundingClientRect() for accurate positioning
-   * relative to the scrollable container, accounting for padding and margins.
-   * Previously used offsetTop which didn't account for container padding.
+   * Uses extracted pure functions for scroll map building:
+   * - processElementForScrollMap: Processes DOM elements
+   * - aggregateLineOffsets: Deduplicates line entries
+   * - buildScrollMapEntries: Creates scroll map entries
+   * - enforceMonotonicPreviewOffsets: Ensures smooth scrolling
    */
   const buildScrollMap = (): ScrollMapEntry[] => {
     logger.debug('buildScrollMap() called')
@@ -983,123 +882,24 @@ export function MarkdownEditorPanel(
     const nodeList = container.querySelectorAll('[data-line-start]')
     logger.debug(`Found ${nodeList.length} elements with data-line-start attribute`)
 
-    // Use a map of line -> { previewOffset: number }
-    // We'll emit a single mapping per line to keep source keys monotonic
-    const lineToPreviewOffset = new Map<number, number>()
+    // Process each element using extracted logic
+    const config = { containerRect, containerScrollTop }
+    const elementsData = Array.from(nodeList)
+      .map((el) => processElementForScrollMap(el, config))
+      .filter((data): data is NonNullable<typeof data> => data !== null)
 
-    nodeList.forEach((el) => {
-      const startAttr = el.getAttribute('data-line-start')
-      const endAttr = el.getAttribute('data-line-end')
-      if (!startAttr) return
-
-      const startLine = parseInt(startAttr, 10)
-      const endLine = endAttr ? parseInt(endAttr, 10) : startLine
-      if (isNaN(startLine)) return
-
-      const rect = (el as HTMLElement).getBoundingClientRect()
-      const topOffset = rect.top - containerRect.top + containerScrollTop
-      const bottomOffset = rect.bottom - containerRect.top + containerScrollTop
-
-      // For the start line of a block, prefer the smallest (top-most) offset
-      const existingStart = lineToPreviewOffset.get(startLine)
-      if (existingStart == null || topOffset < existingStart) {
-        lineToPreviewOffset.set(startLine, topOffset)
-      }
-
-      // If the block spans multiple lines, add an entry for the end line using the bottom
-      if (!isNaN(endLine) && endLine !== startLine) {
-        const existingEnd = lineToPreviewOffset.get(endLine)
-        // For the end line, prefer the largest (bottom-most) offset
-        if (existingEnd == null || bottomOffset > existingEnd) {
-          lineToPreviewOffset.set(endLine, bottomOffset)
-        }
-      }
-    })
-
-    // Build scroll map entries from the deduplicated lines
-    const map: ScrollMapEntry[] = []
-    for (const [line, previewOffset] of lineToPreviewOffset.entries()) {
-      const editorOffset = editor.getTopForLineNumber(line)
-      map.push({ line, editorOffset, previewOffset })
-    }
-
-    // Sort by line number to ensure source monotonicity
-    map.sort((a, b) => a.line - b.line)
-
-    // Enforce monotonic non-decreasing preview offsets to avoid jitter
-    for (let i = 1; i < map.length; i++) {
-      if (map[i].previewOffset < map[i - 1].previewOffset) {
-        map[i].previewOffset = map[i - 1].previewOffset + 0.1 // epsilon
-      }
-    }
+    // Aggregate and build map using extracted functions
+    const lineToOffset = aggregateLineOffsets(elementsData)
+    const getEditorOffset = (line: number) => editor.getTopForLineNumber(line)
+    const entries = buildScrollMapEntries(lineToOffset, getEditorOffset)
+    const map = enforceMonotonicPreviewOffsets(entries)
 
     logger.debug(`buildScrollMap completed: ${map.length} entries`)
     return map
   }
 
-  /**
-   * Interpolate scroll position between known mapping points
-   * Uses linear interpolation for smooth scrolling
-   * CRITICAL: Handles end-of-document scrolling by calculating proportional offset
-   */
-  const interpolateScrollPosition = (
-    scrollTop: number,
-    map: ScrollMapEntry[],
-    sourceType: 'editor' | 'preview'
-  ): number => {
-    if (map.length === 0) return scrollTop
-    if (map.length === 1)
-      return map[0][sourceType === 'editor' ? 'previewOffset' : 'editorOffset']
-
-    const sourceKey = sourceType === 'editor' ? 'editorOffset' : 'previewOffset'
-    const targetKey = sourceType === 'editor' ? 'previewOffset' : 'editorOffset'
-
-    // Binary search for closest entries
-    let left = 0,
-      right = map.length - 1
-    while (left < right) {
-      const mid = Math.floor((left + right) / 2)
-      if (map[mid][sourceKey] < scrollTop) left = mid + 1
-      else right = mid
-    }
-
-    // Handle edge cases
-    if (left === 0) {
-      // Before first entry: extrapolate using line through first two points (y = m x + b)
-      const p1 = map[0]
-      const p2 = map[1]
-      const dx = p2[sourceKey] - p1[sourceKey]
-      if (dx === 0) return p1[targetKey]
-      const dy = p2[targetKey] - p1[targetKey]
-      const m = dy / dx
-      const b = p1[targetKey] - m * p1[sourceKey]
-      return m * scrollTop + b
-    }
-
-    if (left >= map.length) {
-      // After last entry: extrapolate using line through last two points (y = m x + b)
-      const p2 = map[map.length - 1]
-      const p1 = map[map.length - 2]
-      const dx = p2[sourceKey] - p1[sourceKey]
-      if (dx === 0) return p2[targetKey]
-      const dy = p2[targetKey] - p1[targetKey]
-      const m = dy / dx
-      const b = p1[targetKey] - m * p1[sourceKey]
-      return m * scrollTop + b
-    }
-
-    // Linear interpolation between two points
-    const before = map[left - 1]
-    const after = map[left]
-
-    const sourceRange = after[sourceKey] - before[sourceKey]
-    if (sourceRange === 0) return before[targetKey]
-
-    const ratio = (scrollTop - before[sourceKey]) / sourceRange
-    const targetRange = after[targetKey] - before[targetKey]
-
-    return before[targetKey] + ratio * targetRange
-  }
+  // Note: interpolateScrollPosition is now imported from markdownEditorPanel.logic.ts
+  // and used directly in handleEditorScroll and handlePreviewScroll
 
   return (
     <div className="markdown-editor-panel" tabIndex={0}>
@@ -1239,9 +1039,9 @@ export function MarkdownEditorPanel(
         {externalChangeDetected && currentFile && (
           <FileConflictNotification
             fileName={currentFile.path.split('/').pop() || 'File'}
-            onReload={reloadFromDisk}
+            onReload={handleReloadFromDisk}
             onKeepLocal={handleKeepLocal}
-            onDismiss={() => setExternalChangeDetected(false)}
+            onDismiss={dismissConflict}
           />
         )}
 

@@ -266,7 +266,7 @@ describe('useQuitHandler', () => {
 
       try {
         await checkQuitBlocked()
-      } catch (error) {
+      } catch {
         // On error, fail-safe to proceed
         window.api.quit.sendQuitResponse(true)
       }
