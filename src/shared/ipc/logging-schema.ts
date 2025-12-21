@@ -66,3 +66,23 @@ export type LogEntry = z.infer<typeof LogEntrySchema>
 export function shouldLog(level: LogLevel, minimumLevel: LogLevel): boolean {
   return LOG_LEVEL_PRIORITY[level] >= LOG_LEVEL_PRIORITY[minimumLevel]
 }
+
+/**
+ * Validate and sanitize log level
+ *
+ * @param level - Potentially unsafe log level value
+ * @returns Valid LogLevel, defaults to 'info' on validation failure
+ *
+ * @example
+ * validateLogLevel('debug') // 'debug'
+ * validateLogLevel('invalid') // 'info' (default)
+ * validateLogLevel(null) // 'info' (default)
+ */
+export function validateLogLevel(level: unknown): LogLevel {
+  const result = LogLevelSchema.safeParse(level)
+  if (!result.success) {
+    console.error('[LoggingService] Invalid log level, defaulting to info:', level)
+    return 'info'
+  }
+  return result.data
+}

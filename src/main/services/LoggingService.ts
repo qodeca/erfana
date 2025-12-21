@@ -6,37 +6,44 @@
  * Features:
  * - Singleton pattern for consistent logging state
  * - 6 log levels: trace, debug, info, warn, error, fatal
- * - Two log files: combined.log (all logs) and main-only.log (error/fatal from main)
+ * - Three log files: combined.log (all logs), main.log (main process), renderer.log (renderer process)
  * - 10MB file size rotation with daily rotation
  * - 7-day retention policy
  * - Dynamic log level from GlobalSettingsService
  * - IPC integration for renderer process logs
  *
  * File locations:
- * - combined.log: ~/.erfana/logs/combined.log
- * - main-only.log: ~/.erfana/logs/main-only.log
+ * - combined.log: ~/.erfana/logs/combined.log (all logs from both processes)
+ * - main.log: ~/.erfana/logs/main.log (main process only)
+ * - renderer.log: ~/.erfana/logs/renderer.log (renderer process only)
  *
  * @see Issue #49 - logging layer implementation
  */
 import log from 'electron-log'
+import type Logger from 'electron-log'
 import { homedir } from 'os'
-import { readdir, stat, unlink } from 'fs/promises'
-import { join } from 'path'
+import { readdir, stat, unlink, statfs } from 'fs/promises'
+import { join, dirname, basename, extname } from 'path'
+import { unlinkSync, renameSync, lstatSync } from 'fs'
 import { globalSettingsService } from './GlobalSettingsService'
 import { AppError, ErrorCode } from '../../shared/errors'
-import { type LogLevel, type LogEntry, shouldLog } from '../../shared/ipc/logging-schema'
+import { type LogLevel, type LogEntry, shouldLog, validateLogLevel } from '../../shared/ipc/logging-schema'
 import type { LoggingLevel } from '../../shared/ipc/global-settings-schema'
 
 /** Logs directory */
 const LOGS_DIR = '.erfana/logs'
 /** Combined log file (all logs from both processes) */
 const COMBINED_LOG = 'combined.log'
-/** Main-only log file (error/fatal from main process only) */
-const MAIN_ONLY_LOG = 'main-only.log'
+/** Main process log file */
+const MAIN_LOG = 'main.log'
+/** Renderer process log file */
+const RENDERER_LOG = 'renderer.log'
 /** Log retention period in days */
 const RETENTION_DAYS = 7
 /** Maximum log file size before rotation (10MB) */
 const MAX_SIZE = 10 * 1024 * 1024
+/** Maximum number of rotated files (100 files: main.1.log through main.100.log) */
+const MAX_ROTATED_FILES = 100
 
 /**
  * Map our log levels to electron-log levels
@@ -62,15 +69,81 @@ function mapToElectronLogLevel(level: LogLevel): ElectronLogLevel {
 }
 
 /**
+ * Archive log file using logrotate-style reverse numbering
+ * - main.log -> main.1.log (most recent)
+ * - main.1.log -> main.2.log
+ * - ...
+ * - main.99.log -> main.100.log
+ * - main.100.log is deleted (oldest)
+ *
+ * This function must be synchronous per electron-log requirement
+ *
+ * Fixed: Shifts files BEFORE deleting oldest to prevent data loss if crash mid-rotation
+ * Fixed: Uses try-catch on operations instead of TOCTOU-vulnerable existsSync checks
+ */
+function archiveLog(oldLogFile: Logger.LogFile): void {
+  const logPath = oldLogFile.path
+  const dir = dirname(logPath)
+  const ext = extname(logPath)
+  const base = basename(logPath, ext)
+
+  try {
+    // 1. Shift files down FIRST (reverse order for safety)
+    // Work from highest to lowest to avoid clobbering files
+    for (let i = MAX_ROTATED_FILES - 1; i >= 1; i--) {
+      const currentPath = join(dir, `${base}.${i}${ext}`)
+      const nextPath = join(dir, `${base}.${i + 1}${ext}`)
+      try {
+        renameSync(currentPath, nextPath)
+      } catch (err) {
+        // Ignore ENOENT (file doesn't exist is fine)
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+          console.error(`[LoggingService] Failed to shift ${currentPath}:`, err)
+        }
+      }
+    }
+
+    // 2. Move current log to .1 (most recent rotated)
+    try {
+      renameSync(logPath, join(dir, `${base}.1${ext}`))
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        console.error(`[LoggingService] Failed to rotate ${logPath}:`, err)
+      }
+    }
+
+    // 3. Delete oldest file AFTER rotation succeeds
+    const oldestPath = join(dir, `${base}.${MAX_ROTATED_FILES}${ext}`)
+    try {
+      unlinkSync(oldestPath)
+    } catch (err) {
+      // Ignore ENOENT (file already gone is fine)
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        console.error(`[LoggingService] Failed to delete oldest log ${oldestPath}:`, err)
+      }
+    }
+  } catch (error) {
+    // Fallback error handler - log to stderr
+    console.error(`[LoggingService] archiveLog failed for ${logPath}:`, error)
+  }
+}
+
+/**
  * Logging service implementation
  */
 export class LoggingService {
   private currentLevel: LogLevel = 'info'
   private unsubscribeSettings: (() => void) | null = null
+  private isProcessingSettingsChange = false
+
+  // Three independent logger instances
+  private combinedLogger = log.create({ logId: 'combined' })
+  private mainLogger = log.create({ logId: 'main' })
+  private rendererLogger = log.create({ logId: 'renderer' })
 
   /**
    * Initialize logging service
-   * - Configure electron-log transports
+   * - Configure electron-log transports for all three loggers
    * - Subscribe to global settings changes
    * - Set initial log level
    */
@@ -78,30 +151,34 @@ export class LoggingService {
     try {
       const logsDir = this.getLogsDir()
 
-      // Configure file transport for combined.log
-      log.transports.file.resolvePathFn = () => join(logsDir, COMBINED_LOG)
-      log.transports.file.maxSize = MAX_SIZE
-      log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}'
-
-      // Disable console transport in production (we have our own safe-console)
-      // Keep it enabled in development for immediate feedback
-      if (!process.env.ELECTRON_RENDERER_URL) {
-        log.transports.console.level = false
-      }
+      // Validate logs directory is not a symlink (security)
+      this.validateLogsDir(logsDir)
 
       // Get initial level from global settings
       const settings = globalSettingsService.getSettings()
-      this.currentLevel = settings.logging.level as LogLevel
+      this.currentLevel = validateLogLevel(settings.logging.level)
 
-      // Set electron-log level (map to electron-log's levels)
-      log.transports.file.level = mapToElectronLogLevel(this.currentLevel)
+      // Configure all three loggers
+      this.configureLogger(this.combinedLogger, join(logsDir, COMBINED_LOG))
+      this.configureLogger(this.mainLogger, join(logsDir, MAIN_LOG))
+      this.configureLogger(this.rendererLogger, join(logsDir, RENDERER_LOG))
 
-      // Subscribe to settings changes
+      // Subscribe to settings changes with recursion guard
       this.unsubscribeSettings = globalSettingsService.onSettingsChanged((event) => {
+        if (this.isProcessingSettingsChange) return
+
         if (event.changedKey === 'logging' || event.changedKey === 'reset') {
-          const newLevel = event.settings.logging.level as LogLevel
-          this.setLevel(newLevel)
-          this.info('Log level changed', { from: this.currentLevel, to: newLevel })
+          this.isProcessingSettingsChange = true
+          try {
+            const newLevel = validateLogLevel(event.settings.logging.level)
+            const oldLevel = this.currentLevel
+            this.setLevel(newLevel)
+            if (oldLevel !== newLevel) {
+              this.info('Log level changed', { from: oldLevel, to: newLevel })
+            }
+          } finally {
+            this.isProcessingSettingsChange = false
+          }
         }
       })
 
@@ -116,12 +193,34 @@ export class LoggingService {
   }
 
   /**
+   * Configure a logger instance
+   */
+  private configureLogger(logger: Logger.MainLogger, filePath: string): void {
+    // Configure file transport
+    logger.transports.file.resolvePathFn = () => filePath
+    logger.transports.file.maxSize = MAX_SIZE
+    logger.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}'
+    logger.transports.file.level = mapToElectronLogLevel(this.currentLevel)
+    logger.transports.file.archiveLogFn = archiveLog
+
+    // Disable console transport in production (we have our own safe-console)
+    // Keep it enabled in development for immediate feedback
+    if (!process.env.ELECTRON_RENDERER_URL) {
+      logger.transports.console.level = false
+    }
+  }
+
+  /**
    * Set current log level
-   * Updates both internal state and electron-log configuration
+   * Updates both internal state and electron-log configuration for all loggers
    */
   setLevel(level: LoggingLevel): void {
     this.currentLevel = level as LogLevel
-    log.transports.file.level = mapToElectronLogLevel(this.currentLevel)
+    const electronLogLevel = mapToElectronLogLevel(this.currentLevel)
+
+    this.combinedLogger.transports.file.level = electronLogLevel
+    this.mainLogger.transports.file.level = electronLogLevel
+    this.rendererLogger.transports.file.level = electronLogLevel
   }
 
   /**
@@ -137,7 +236,9 @@ export class LoggingService {
   trace(message: string, context?: Record<string, unknown>): void {
     if (!shouldLog('trace', this.currentLevel)) return
     const formattedMessage = this.formatMessage(message, context)
-    log.verbose(formattedMessage) // electron-log uses 'verbose' for trace
+    // Write to both combined and main logs
+    this.combinedLogger.verbose(formattedMessage)
+    this.mainLogger.verbose(formattedMessage)
   }
 
   /**
@@ -146,7 +247,9 @@ export class LoggingService {
   debug(message: string, context?: Record<string, unknown>): void {
     if (!shouldLog('debug', this.currentLevel)) return
     const formattedMessage = this.formatMessage(message, context)
-    log.debug(formattedMessage)
+    // Write to both combined and main logs
+    this.combinedLogger.debug(formattedMessage)
+    this.mainLogger.debug(formattedMessage)
   }
 
   /**
@@ -155,7 +258,9 @@ export class LoggingService {
   info(message: string, context?: Record<string, unknown>): void {
     if (!shouldLog('info', this.currentLevel)) return
     const formattedMessage = this.formatMessage(message, context)
-    log.info(formattedMessage)
+    // Write to both combined and main logs
+    this.combinedLogger.info(formattedMessage)
+    this.mainLogger.info(formattedMessage)
   }
 
   /**
@@ -164,7 +269,9 @@ export class LoggingService {
   warn(message: string, context?: Record<string, unknown>): void {
     if (!shouldLog('warn', this.currentLevel)) return
     const formattedMessage = this.formatMessage(message, context)
-    log.warn(formattedMessage)
+    // Write to both combined and main logs
+    this.combinedLogger.warn(formattedMessage)
+    this.mainLogger.warn(formattedMessage)
   }
 
   /**
@@ -173,10 +280,9 @@ export class LoggingService {
   error(message: string, error?: Error, context?: Record<string, unknown>): void {
     if (!shouldLog('error', this.currentLevel)) return
     const formattedMessage = this.formatErrorMessage(message, error, context)
-    log.error(formattedMessage)
-
-    // Also write to main-only.log
-    this.writeToMainOnly('error', formattedMessage)
+    // Write to both combined and main logs
+    this.combinedLogger.error(formattedMessage)
+    this.mainLogger.error(formattedMessage)
   }
 
   /**
@@ -185,10 +291,9 @@ export class LoggingService {
   fatal(message: string, error?: Error, context?: Record<string, unknown>): void {
     if (!shouldLog('fatal', this.currentLevel)) return
     const formattedMessage = this.formatErrorMessage(message, error, context)
-    log.error(formattedMessage) // electron-log doesn't have fatal, use error
-
-    // Also write to main-only.log
-    this.writeToMainOnly('fatal', formattedMessage)
+    // Write to both combined and main logs (electron-log doesn't have fatal, use error)
+    this.combinedLogger.error(formattedMessage)
+    this.mainLogger.error(formattedMessage)
   }
 
   /**
@@ -199,43 +304,67 @@ export class LoggingService {
 
     const message = this.formatRendererMessage(entry)
 
-    // Map log level to electron-log method
+    // Write to both combined and renderer logs
     switch (entry.level) {
       case 'trace':
-        log.verbose(message)
+        this.combinedLogger.verbose(message)
+        this.rendererLogger.verbose(message)
         break
       case 'debug':
-        log.debug(message)
+        this.combinedLogger.debug(message)
+        this.rendererLogger.debug(message)
         break
       case 'info':
-        log.info(message)
+        this.combinedLogger.info(message)
+        this.rendererLogger.info(message)
         break
       case 'warn':
-        log.warn(message)
+        this.combinedLogger.warn(message)
+        this.rendererLogger.warn(message)
         break
       case 'error':
-        log.error(message)
+        this.combinedLogger.error(message)
+        this.rendererLogger.error(message)
         break
       case 'fatal':
-        log.error(message)
+        this.combinedLogger.error(message)
+        this.rendererLogger.error(message)
         break
     }
   }
 
   /**
    * Cleanup old log files (older than RETENTION_DAYS)
+   * Includes both active logs (.log) and rotated logs (.N.log)
    * Fire-and-forget - errors are logged but don't throw
    */
   async cleanupOldLogs(): Promise<void> {
     try {
       const logsDir = this.getLogsDir()
+
+      // Check disk space before cleanup (prevent cleanup on low disk space)
+      try {
+        const stats = await statfs(logsDir)
+        const availableMB = (stats.bavail * stats.bsize) / (1024 * 1024)
+        if (availableMB < 100) {
+          // Less than 100MB free
+          this.warn('Low disk space, skipping log cleanup', {
+            availableMB: Math.round(availableMB)
+          })
+          return
+        }
+      } catch {
+        // Ignore disk space check errors, proceed with cleanup
+      }
+
       const files = await readdir(logsDir)
       const now = Date.now()
       const maxAge = RETENTION_DAYS * 24 * 60 * 60 * 1000
 
       for (const file of files) {
-        // Only cleanup .log files (not .log.1, .log.2 - electron-log manages those)
-        if (!file.endsWith('.log')) continue
+        // Match both .log files and numbered rotated files (.1.log, .2.log, etc.)
+        const isLogFile = file.endsWith('.log') || /\.\d+\.log$/.test(file)
+        if (!isLogFile) continue
 
         try {
           const filePath = join(logsDir, file)
@@ -244,7 +373,10 @@ export class LoggingService {
 
           if (age > maxAge) {
             await unlink(filePath)
-            this.debug('Deleted old log file', { file, ageInDays: Math.floor(age / (24 * 60 * 60 * 1000)) })
+            this.debug('Deleted old log file', {
+              file,
+              ageInDays: Math.floor(age / (24 * 60 * 60 * 1000))
+            })
           }
         } catch (error) {
           // Log but continue with other files
@@ -272,6 +404,24 @@ export class LoggingService {
    */
   private getLogsDir(): string {
     return join(homedir(), LOGS_DIR)
+  }
+
+  /**
+   * Validate logs directory is not a symlink (security risk)
+   * Throws if directory is a symlink
+   */
+  private validateLogsDir(logsDir: string): void {
+    try {
+      const stats = lstatSync(logsDir)
+      if (stats.isSymbolicLink()) {
+        throw new Error('Logs directory is a symlink (security risk)')
+      }
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw err
+      }
+      // Directory doesn't exist yet - will be created by electron-log
+    }
   }
 
   /**
@@ -326,39 +476,6 @@ export class LoggingService {
     }
 
     return parts.join(' | ')
-  }
-
-  /**
-   * Write to main-only.log for error/fatal from main process
-   * Uses synchronous fs to ensure write completes
-   */
-  private writeToMainOnly(level: 'error' | 'fatal', message: string): void {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const fs = require('fs')
-      const logsDir = this.getLogsDir()
-      const mainOnlyPath = join(logsDir, MAIN_ONLY_LOG)
-      const timestamp = new Date().toISOString()
-      const logLine = `[${timestamp}] [${level.toUpperCase()}] ${message}\n`
-
-      // Ensure directory exists
-      if (!fs.existsSync(logsDir)) {
-        fs.mkdirSync(logsDir, { recursive: true })
-      }
-
-      // Append to file
-      fs.appendFileSync(mainOnlyPath, logLine, 'utf-8')
-
-      // Check file size and rotate if needed
-      const stats = fs.statSync(mainOnlyPath)
-      if (stats.size > MAX_SIZE) {
-        const rotatedPath = `${mainOnlyPath}.${Date.now()}`
-        fs.renameSync(mainOnlyPath, rotatedPath)
-      }
-    } catch (error) {
-      // Last resort - log to console (safe-console will handle EPIPE)
-      console.error(`Failed to write to main-only.log: ${error}`)
-    }
   }
 }
 

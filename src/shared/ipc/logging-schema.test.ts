@@ -5,12 +5,13 @@
  *
  * @see Issue #49 - logging layer implementation
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   LogLevelSchema,
   LOG_LEVEL_PRIORITY,
   LogEntrySchema,
   shouldLog,
+  validateLogLevel,
   type LogLevel,
   type LogEntry
 } from './logging-schema'
@@ -480,6 +481,98 @@ describe('shouldLog()', () => {
 
           expect(result).toBe(expectedResult)
         }
+      }
+    })
+  })
+})
+
+describe('validateLogLevel()', () => {
+  describe('valid log levels', () => {
+    it('returns valid log level unchanged', () => {
+      expect(validateLogLevel('trace')).toBe('trace')
+      expect(validateLogLevel('debug')).toBe('debug')
+      expect(validateLogLevel('info')).toBe('info')
+      expect(validateLogLevel('warn')).toBe('warn')
+      expect(validateLogLevel('error')).toBe('error')
+      expect(validateLogLevel('fatal')).toBe('fatal')
+    })
+  })
+
+  describe('invalid log levels', () => {
+    it('returns "info" for invalid string values', () => {
+      expect(validateLogLevel('invalid')).toBe('info')
+      expect(validateLogLevel('verbose')).toBe('info')
+      expect(validateLogLevel('silly')).toBe('info')
+      expect(validateLogLevel('')).toBe('info')
+    })
+
+    it('returns "info" for null and undefined', () => {
+      expect(validateLogLevel(null)).toBe('info')
+      expect(validateLogLevel(undefined)).toBe('info')
+    })
+
+    it('returns "info" for numeric values', () => {
+      expect(validateLogLevel(0)).toBe('info')
+      expect(validateLogLevel(1)).toBe('info')
+      expect(validateLogLevel(42)).toBe('info')
+    })
+
+    it('returns "info" for objects', () => {
+      expect(validateLogLevel({})).toBe('info')
+      expect(validateLogLevel({ level: 'info' })).toBe('info')
+    })
+
+    it('returns "info" for arrays', () => {
+      expect(validateLogLevel([])).toBe('info')
+      expect(validateLogLevel(['info'])).toBe('info')
+    })
+
+    it('returns "info" for case-sensitive mismatch', () => {
+      expect(validateLogLevel('INFO')).toBe('info')
+      expect(validateLogLevel('Error')).toBe('info')
+      expect(validateLogLevel('DEBUG')).toBe('info')
+    })
+  })
+
+  describe('console error logging', () => {
+    it('logs to console.error when validation fails', () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      validateLogLevel('invalid')
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid log level'),
+        'invalid'
+      )
+
+      consoleErrorSpy.mockRestore()
+    })
+
+    it('does not log when validation succeeds', () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      validateLogLevel('info')
+
+      expect(consoleErrorSpy).not.toHaveBeenCalled()
+
+      consoleErrorSpy.mockRestore()
+    })
+  })
+
+  describe('type safety', () => {
+    it('returns LogLevel type', () => {
+      const result = validateLogLevel('debug')
+      const _typeCheck: LogLevel = result
+      expect(_typeCheck).toBe('debug')
+    })
+
+    it('always returns a valid LogLevel', () => {
+      const validLevels: LogLevel[] = ['trace', 'debug', 'info', 'warn', 'error', 'fatal']
+      const invalidInputs = ['invalid', null, undefined, 123, {}, []]
+
+      for (const input of invalidInputs) {
+        const result = validateLogLevel(input)
+        expect(validLevels).toContain(result)
       }
     })
   })
