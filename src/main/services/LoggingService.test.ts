@@ -95,7 +95,6 @@ import log from 'electron-log'
 import { globalSettingsService } from './GlobalSettingsService'
 import { readdir, stat, unlink, statfs } from 'fs/promises'
 import { existsSync, unlinkSync, renameSync, lstatSync } from 'fs'
-import { validateLogLevel } from '../../shared/ipc/logging-schema'
 
 // Get references to mocked modules
 const mockGlobalSettingsService = globalSettingsService as any

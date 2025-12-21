@@ -272,7 +272,11 @@ Changes are applied immediately (no restart required).
 
 **Via settings UI:**
 
-(Coming soon - settings overlay will include logging level selector)
+1. Click the gear icon in the bottom of the activity bar
+2. In the Settings overlay, find the "Logging" section
+3. Select the desired log level from the dropdown
+
+Changes are applied immediately.
 
 **Programmatically:**
 

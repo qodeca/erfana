@@ -6,7 +6,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--color-bg-primary);
+  background: var(--color-bg-secondary);
   display: flex;
   z-index: var(--z-modal);
   animation: fadeIn var(--transition-normal);
@@ -25,7 +25,7 @@
 .settings-container {
   width: 100%;
   height: 100%;
-  background: var(--color-bg-primary);
+  background: var(--color-bg-secondary);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -40,7 +40,7 @@
   min-height: var(--header-height);
   padding: 0 var(--space-8);
   border-bottom: var(--border-width) solid var(--color-border-default);
-  background: var(--color-bg-secondary);
+  background: var(--color-bg-tertiary);
 }
 
 /* Settings Title */
@@ -85,16 +85,110 @@
 /* Settings Content - Main content area */
 .settings-content {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   padding: var(--space-12);
   overflow-y: auto;
 }
 
-/* Empty State Placeholder */
-.settings-placeholder {
+/* Settings Body - Max-width container */
+.settings-body {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* Settings Section - Section wrapper */
+.settings-section {
+  margin-bottom: var(--space-16);
+}
+
+/* Settings Section Title - Section header with border */
+.settings-section-title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-emphasis);
+  margin: 0 0 var(--space-8) 0;
+  padding-bottom: var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+}
+
+/* Settings Row - Flexbox row for label + control */
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-6) 0;
+}
+
+/* Settings Field - Label + description container */
+.settings-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Settings Label - Label styling */
+.settings-label {
   font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+/* Settings Description - Description text */
+.settings-description {
+  font-size: var(--text-sm);
   color: var(--color-text-secondary);
   margin: 0;
+  line-height: var(--leading-normal);
+}
+
+/* Settings Select - Dropdown styling */
+.settings-select {
+  min-width: 200px;
+  padding: var(--space-4) var(--space-6);
+  padding-right: var(--space-12); /* Extra space for custom arrow */
+  background-color: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: 0; /* UI Style Guide: no rounded corners */
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: border-color var(--transition-normal), background-color var(--transition-normal), box-shadow var(--transition-normal);
+
+  /* Remove default browser styling */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  /* Custom dropdown arrow using CSS */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23858585' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-6) center;
+  background-size: 12px;
+}
+
+.settings-select:hover:not(:disabled) {
+  border-color: var(--color-border-subtle);
+  background-color: var(--color-bg-tertiary);
+}
+
+.settings-select:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  background-color: var(--color-bg-tertiary);
+  box-shadow: var(--shadow-focus);
+}
+
+.settings-select:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+/* Settings Select Options */
+.settings-select option {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  padding: var(--space-4);
 }

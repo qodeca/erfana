@@ -9,13 +9,19 @@
  * - Close behavior (2 tests)
  * - Accessibility (3 tests)
  * - Focus management (2 tests)
+ * - Portal fallback (1 test)
+ * - Keyboard event handling (2 tests)
+ * - Store integration (2 tests)
+ * - Logging section (6 tests)
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SettingsOverlay } from './SettingsOverlay'
 import { useSettingsStore } from '../../stores/useSettingsStore'
+import { useGlobalSettingsStore } from '../../stores/useGlobalSettingsStore'
+import type { GlobalSettings } from '../../../../shared/ipc/global-settings-schema'
 
 // Mock logger
 const { mockLogger } = vi.hoisted(() => ({
@@ -104,10 +110,12 @@ describe('SettingsOverlay', () => {
       expect(closeButton).toHaveClass('settings-close-btn')
     })
 
-    it('has empty state placeholder text', () => {
+    it('has settings content section', () => {
       render(<SettingsOverlay />)
 
-      expect(screen.getByText('Settings coming soon')).toBeInTheDocument()
+      const portalRoot = document.getElementById('portal-root')
+      const settingsContent = portalRoot?.querySelector('.settings-content')
+      expect(settingsContent).toBeTruthy()
     })
 
     it('has settings-container element', () => {
@@ -318,6 +326,153 @@ describe('SettingsOverlay', () => {
       await waitFor(() => {
         expect(useSettingsStore.getState().isOpen).toBe(false)
       })
+    })
+  })
+
+  describe('Logging section', () => {
+    beforeEach(() => {
+      useSettingsStore.setState({ isOpen: true })
+    })
+
+    it('renders logging section with section title', () => {
+      useGlobalSettingsStore.setState({
+        settings: { logging: { level: 'info' } },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const heading = screen.getByRole('heading', { name: 'Logging' })
+      expect(heading).toBeInTheDocument()
+      expect(heading).toHaveClass('settings-section-title')
+    })
+
+    it('renders log level dropdown with current value', () => {
+      const mockSettings: GlobalSettings = { logging: { level: 'debug' } }
+      useGlobalSettingsStore.setState({
+        settings: mockSettings,
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const dropdown = screen.getByRole('combobox', { name: 'Log level' })
+      expect(dropdown).toBeInTheDocument()
+      expect(dropdown).toHaveValue('debug')
+    })
+
+    it('dropdown displays all 6 log levels', () => {
+      useGlobalSettingsStore.setState({
+        settings: { logging: { level: 'info' } },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const dropdown = screen.getByRole('combobox', { name: 'Log level' })
+      const options = Array.from(dropdown.querySelectorAll('option'))
+
+      expect(options).toHaveLength(6)
+      expect(options[0]).toHaveTextContent('Trace')
+      expect(options[0]).toHaveValue('trace')
+      expect(options[1]).toHaveTextContent('Debug')
+      expect(options[1]).toHaveValue('debug')
+      expect(options[2]).toHaveTextContent('Info')
+      expect(options[2]).toHaveValue('info')
+      expect(options[3]).toHaveTextContent('Warn')
+      expect(options[3]).toHaveValue('warn')
+      expect(options[4]).toHaveTextContent('Error')
+      expect(options[4]).toHaveValue('error')
+      expect(options[5]).toHaveTextContent('Fatal')
+      expect(options[5]).toHaveValue('fatal')
+    })
+
+    it('changing dropdown calls updateLoggingLevel', () => {
+      const mockUpdateLoggingLevel = vi.fn()
+      useGlobalSettingsStore.setState({
+        settings: { logging: { level: 'info' } },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: mockUpdateLoggingLevel,
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const dropdown = screen.getByRole('combobox', { name: 'Log level' })
+      fireEvent.change(dropdown, { target: { value: 'debug' } })
+
+      expect(mockUpdateLoggingLevel).toHaveBeenCalledTimes(1)
+      expect(mockUpdateLoggingLevel).toHaveBeenCalledWith('debug')
+    })
+
+    it('dropdown is disabled when settings is null', () => {
+      useGlobalSettingsStore.setState({
+        settings: null,
+        isLoading: false,
+        error: null,
+        isInitialized: false,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const dropdown = screen.getByRole('combobox', { name: 'Log level' })
+      expect(dropdown).toBeDisabled()
+    })
+
+    it('dropdown defaults to "info" when settings is null', () => {
+      useGlobalSettingsStore.setState({
+        settings: null,
+        isLoading: false,
+        error: null,
+        isInitialized: false,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const dropdown = screen.getByRole('combobox', { name: 'Log level' })
+      expect(dropdown).toHaveValue('info')
     })
   })
 })
