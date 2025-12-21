@@ -1,0 +1,27 @@
+{
+  "sequence": {
+    "current": 1,
+    "next": 2
+  },
+  "registry": [
+    {
+      "id": 1,
+      "slug": "unified-search",
+      "name": "Unified search",
+      "description": "Cross-view search functionality for editor, preview, and future views",
+      "tier": "T3",
+      "status": "active",
+      "scope": "feature",
+      "created": "2025-12-21T00:00:00.000Z",
+      "path": "001-unified-search",
+      "last_modified": "2025-12-21T00:00:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 13
+    }
+  ],
+  "metadata": {
+    "schema_version": "1.0.0",
+    "created": "2025-12-21T00:00:00.000Z",
+    "last_updated": "2025-12-21T00:00:00.000Z"
+  }
+}
