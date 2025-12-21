@@ -8,8 +8,12 @@ import { SettingsOverlay } from './components/Settings/SettingsOverlay'
 import { UIBlocker } from './components/UIBlocker/UIBlocker'
 import { ProjectManagementProvider } from './context/ProjectManagementContext'
 import { TerminalPortalProvider } from './context/TerminalPortalContext'
+import { useGlobalSettingsInit } from './hooks/useGlobalSettingsInit'
 
 function App() {
+  // Initialize global settings
+  useGlobalSettingsInit()
+
   return (
     <DialogProvider>
       <ProjectManagementProvider>

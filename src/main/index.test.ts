@@ -143,6 +143,16 @@ describe('Main Process - Window Creation', () => {
     vi.doMock('./ipc/docx-handlers', () => ({
       registerDocxHandlers: vi.fn()
     }))
+    vi.doMock('./ipc/global-settings-handlers', () => ({
+      registerGlobalSettingsHandlers: vi.fn()
+    }))
+
+    // Mock GlobalSettingsService
+    vi.doMock('./services/GlobalSettingsService', () => ({
+      globalSettingsService: {
+        initialize: vi.fn(() => Promise.resolve())
+      }
+    }))
 
     // Mock safe console
     vi.doMock('./utils/safe-console', () => ({

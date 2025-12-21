@@ -3,6 +3,7 @@ import type { ProjectChanged } from '../shared/ipc/schema'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
 import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-schema'
+import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global-settings-schema'
 import { electronAPI } from '@electron-toolkit/preload'
 
 export interface FileNode {
@@ -343,6 +344,40 @@ const api = {
      */
     exportToDocx: (request: DocxExportRequest): Promise<DocxExportResponse> =>
       ipcRenderer.invoke('docx:exportToDocx', request)
+  },
+
+  // Global settings operations
+  globalSettings: {
+    /**
+     * Get all global settings from ~/.erfana/settings.json
+     */
+    get: (): Promise<{ success: boolean; settings?: GlobalSettings; error?: string }> =>
+      ipcRenderer.invoke('globalSettings:get'),
+
+    /**
+     * Set a specific global setting
+     * @param key - Setting key to update
+     * @param value - New value for the setting
+     */
+    set: (key: string, value: unknown): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('globalSettings:set', { key, value }),
+
+    /**
+     * Reset all global settings to defaults
+     */
+    reset: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('globalSettings:reset'),
+
+    /**
+     * Subscribe to global settings changes
+     * @param callback - Called when any global setting changes
+     * @returns Cleanup function to remove listener
+     */
+    onSettingsChanged: (callback: (data: GlobalSettingsChanged) => void): (() => void) => {
+      const listener = (_event: unknown, data: GlobalSettingsChanged): void => callback(data)
+      ipcRenderer.on('globalSettings:changed', listener)
+      return () => ipcRenderer.removeListener('globalSettings:changed', listener)
+    }
   }
 }
 

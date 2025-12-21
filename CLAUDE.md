@@ -28,7 +28,7 @@ npm run test:cov     # Coverage (v8) per project
 ```
 src/
 ├── main/           # Electron main process
-│   ├── services/   # FileService, TerminalService, SettingsService, ProjectSettingsService, import/
+│   ├── services/   # FileService, TerminalService, SettingsService, ProjectSettingsService, GlobalSettingsService, import/
 │   └── ipc/        # IPC handlers
 ├── preload/        # Context bridge API
 ├── shared/         # Shared code (errors.ts, constants.ts, ipc schemas)
@@ -59,7 +59,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync, Mermaid diagrams
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (3972 tests, 134 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (4044 tests, 134 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.5.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
@@ -168,7 +168,7 @@ Comprehensive security upgrade following 2025 Electron best practices:
 - Documented ASAR disabled trade-offs and rationale
 - Documented electron-builder 26 workaround
 
-**Testing**: All 3972 tests passing, dev + production builds verified
+**Testing**: All tests passing, dev + production builds verified
 
 **References**:
 - [Electron Fuses](https://www.electronjs.org/docs/latest/tutorial/fuses)
@@ -201,7 +201,7 @@ Added full-screen settings overlay with keyboard navigation and focus management
 - Integrated overlay into `App.tsx` root component
 - Added gear icon to `ActivityBar` bottom section
 
-**Testing**: 26 new tests added (3972 tests total, 134 test files)
+**Testing**: 26 new tests added
 
 **Files Modified**:
 - `src/renderer/src/components/Settings/SettingsOverlay.tsx` (NEW) - Settings overlay component
@@ -227,7 +227,7 @@ Added "Visualize" prompt to Preview context menu for AI-powered Mermaid diagram 
 - Updated `PreviewContextMenu` to handle dropdown values
 - Added `diagramType` to `PromptVariables` interface
 
-**Testing**: 4 new tests added (3946 tests total)
+**Testing**: 4 new tests added
 
 **Files Modified**:
 - `src/renderer/src/components/Dialog/PromptDialog.tsx` - Added dropdown support
@@ -235,6 +235,34 @@ Added "Visualize" prompt to Preview context menu for AI-powered Mermaid diagram 
 - `src/renderer/src/prompts/visualize.md` (NEW) - Visualize prompt template
 - `src/renderer/src/components/ContextMenu/PreviewContextMenu.tsx` - Added Visualize action
 - Closes #57
+
+### Global Settings Service (Dec 21, 2025)
+Implemented application-wide settings service for global configuration management:
+
+**Features**:
+- `GlobalSettingsService` in main process with Zod schema validation
+- Settings persisted to `~/.erfana/settings.json`
+- Corruption handling: backup to `.bak`, reset to defaults, warning logged
+- Reactive updates via IPC broadcast to renderer
+- `useGlobalSettingsStore` Zustand store with optimistic updates
+- First setting: `logging.level` (ready for #49 integration)
+
+**Implementation**:
+- Created Zod schema with default values in shared layer
+- Singleton service pattern with atomic read/write operations
+- IPC handlers for get/update/reset operations
+- Renderer store with automatic sync on project changes
+- Initialization hook (`useGlobalSettingsInit`) for app-level setup
+
+**Testing**: 71 new tests added
+
+**Files Modified**:
+- `src/shared/ipc/global-settings-schema.ts` (NEW) - Zod schema with defaults
+- `src/main/services/GlobalSettingsService.ts` (NEW) - Main service singleton
+- `src/main/ipc/global-settings-handlers.ts` (NEW) - IPC handlers
+- `src/renderer/src/stores/useGlobalSettingsStore.ts` (NEW) - Zustand store
+- `src/renderer/src/hooks/useGlobalSettingsInit.ts` (NEW) - Initialization hook
+- Closes #50
 
 ## Historical Changes
 
@@ -254,7 +282,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 3972 tests passing (134 test files)
+- **Current**: 4044 tests passing (134 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)

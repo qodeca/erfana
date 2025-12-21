@@ -3,6 +3,7 @@ import { FileNode, FileStats } from './index'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
 import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-schema'
+import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global-settings-schema'
 
 declare global {
   interface Window {
@@ -138,6 +139,12 @@ declare global {
       }
       docx: {
         exportToDocx: (request: DocxExportRequest) => Promise<DocxExportResponse>
+      }
+      globalSettings: {
+        get: () => Promise<{ success: boolean; settings?: GlobalSettings; error?: string }>
+        set: (key: string, value: unknown) => Promise<{ success: boolean; error?: string }>
+        reset: () => Promise<{ success: boolean; error?: string }>
+        onSettingsChanged: (callback: (data: GlobalSettingsChanged) => void) => () => void
       }
     }
   }

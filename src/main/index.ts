@@ -11,12 +11,14 @@ import { registerImportHandlers } from './ipc/import-handlers'
 import { registerGitHandlers } from './ipc/git-handlers'
 import { registerPdfHandlers } from './ipc/pdf-handlers'
 import { registerDocxHandlers } from './ipc/docx-handlers'
+import { registerGlobalSettingsHandlers } from './ipc/global-settings-handlers'
 import { createApplicationMenu } from './menu'
 import { fileService } from './services/FileService'
 import { fileWatcherService } from './services/FileWatcherService'
 import { directoryWatcherService } from './services/DirectoryWatcherService'
 import { terminalService } from './services/TerminalService'
 import { settingsService } from './services/SettingsService'
+import { globalSettingsService } from './services/GlobalSettingsService'
 import { installSafeConsole } from './utils/safe-console'
 
 // Install safe console logging to prevent EPIPE crashes
@@ -112,7 +114,7 @@ function createWindow(): BrowserWindow {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Set application name (shows in macOS menu bar)
   app.setName('ERFANA')
 
@@ -130,6 +132,9 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  // Initialize global settings service (creates ~/.erfana/settings.json if needed)
+  await globalSettingsService.initialize()
+
   // Register IPC handlers
   registerFileHandlers()
   registerFileWatcherHandlers()
@@ -140,6 +145,7 @@ app.whenReady().then(() => {
   registerGitHandlers()
   registerPdfHandlers()
   registerDocxHandlers()
+  registerGlobalSettingsHandlers()
 
   // RELIABILITY FIX (todo012): Clean up stale projects on startup
   // This runs asynchronously but doesn't block window creation

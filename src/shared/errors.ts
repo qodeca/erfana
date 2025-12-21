@@ -28,6 +28,12 @@ export enum ErrorCode {
   PROJECT_SETTINGS_INVALID_JSON = 'PROJECT_SETTINGS_INVALID_JSON',
   PROJECT_SETTINGS_VALIDATION_FAILED = 'PROJECT_SETTINGS_VALIDATION_FAILED',
 
+  // Global settings errors
+  GLOBAL_SETTINGS_READ_FAILED = 'GLOBAL_SETTINGS_READ_FAILED',
+  GLOBAL_SETTINGS_WRITE_FAILED = 'GLOBAL_SETTINGS_WRITE_FAILED',
+  GLOBAL_SETTINGS_VALIDATION_FAILED = 'GLOBAL_SETTINGS_VALIDATION_FAILED',
+  GLOBAL_SETTINGS_DIR_CREATE_FAILED = 'GLOBAL_SETTINGS_DIR_CREATE_FAILED',
+
   // PDF import errors (legacy - prefer IMPORT_* for new code)
   PDF_ENCRYPTED = 'PDF_ENCRYPTED',
   PDF_EMPTY = 'PDF_EMPTY',
@@ -146,6 +152,12 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.PROJECT_SETTINGS_READ_FAILED]: 'Failed to read project settings file',
   [ErrorCode.PROJECT_SETTINGS_INVALID_JSON]: 'Project settings file contains invalid JSON',
   [ErrorCode.PROJECT_SETTINGS_VALIDATION_FAILED]: 'Project settings file has invalid structure',
+
+  // Global settings errors
+  [ErrorCode.GLOBAL_SETTINGS_READ_FAILED]: 'Failed to read global settings',
+  [ErrorCode.GLOBAL_SETTINGS_WRITE_FAILED]: 'Failed to save global settings',
+  [ErrorCode.GLOBAL_SETTINGS_VALIDATION_FAILED]: 'Global settings file has invalid structure',
+  [ErrorCode.GLOBAL_SETTINGS_DIR_CREATE_FAILED]: 'Failed to create settings directory',
 
   // PDF import errors (legacy)
   [ErrorCode.PDF_ENCRYPTED]: 'This PDF is password protected',
