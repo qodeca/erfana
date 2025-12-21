@@ -58,6 +58,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Terminal](docs/terminal/README.md) — Bootstrap pattern, flickering prevention, scroll fixes, clipboard
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync, Mermaid diagrams
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
+- [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
 - [Testing](docs/testing/README.md) — Workspace, coverage (4226 tests, 141 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
@@ -242,7 +243,7 @@ Implemented comprehensive logging system with file-based persistence and configu
 **Features**:
 - Unified logging facades: `MainLogger` (main process) and `RendererLogger` (renderer process)
 - File-based logging to `~/.erfana/logs/` directory
-- Auto-rolling log files: 10MB size limit + daily rotation with 7-day retention
+- Auto-rolling log files: 10MB size limit with 100-file rotation and 7-day retention
 - 6 log levels: trace, debug, info, warn, error, fatal
 - IPC integration: renderer logs sent to main process for centralized file storage
 - Global settings integration: dynamic log level control via `logging.level` setting
@@ -250,7 +251,7 @@ Implemented comprehensive logging system with file-based persistence and configu
 
 **Implementation**:
 - Zod schema for log level validation in shared layer
-- `LoggingService` singleton with winston-based file transport
+- `LoggingService` singleton with electron-log file transport
 - IPC handler for renderer-to-main log forwarding
 - TypeScript facades (`MainLogger`, `RendererLogger`) with method-level typing
 - Safe console wrapper (`safeConsole`) for critical error scenarios
@@ -259,7 +260,7 @@ Implemented comprehensive logging system with file-based persistence and configu
 
 **Files Modified**:
 - `src/shared/ipc/logging-schema.ts` (NEW) - Zod schema for log levels and IPC payloads
-- `src/main/services/LoggingService.ts` (NEW) - Winston-based logging service singleton
+- `src/main/services/LoggingService.ts` (NEW) - electron-log based logging service singleton
 - `src/main/ipc/logging-handlers.ts` (NEW) - IPC handler for renderer logs
 - `src/renderer/src/utils/logger.ts` (NEW) - RendererLogger facade with IPC integration
 - `src/main/utils/safe-console.ts` (NEW) - Safe console wrapper for error scenarios
