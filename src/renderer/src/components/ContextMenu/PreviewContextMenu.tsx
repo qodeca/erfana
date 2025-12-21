@@ -10,6 +10,7 @@ import type { PromptVariables, PromptConfig } from '../../prompts/types'
 import type { PromptDialogResult } from '../Dialog/PromptDialog'
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { scheduleScrollIfNeeded } from '../../utils/promptScrollScheduler.logic'
+import { logger } from '../../utils/logger'
 
 interface PreviewContextMenuProps {
   x: number
@@ -43,7 +44,7 @@ async function readSourceLines(
     const selectedLines = lines.slice(startLine - 1, endLine)
     return selectedLines.join('\n')
   } catch (error) {
-    console.error('Failed to read source lines from file:', error)
+    logger.error('Failed to read source lines from file:', error instanceof Error ? error : undefined)
     return null
   }
 }
@@ -69,7 +70,7 @@ export function PreviewContextMenu({
     const config = PROMPT_REGISTRY[promptId]
 
     if (!config) {
-      console.error(`Prompt not found: ${promptId}`)
+      logger.error(`Prompt not found: ${promptId}`)
       return
     }
 
@@ -130,7 +131,7 @@ export function PreviewContextMenu({
       try {
         await executePrompt(config, userInput, diagramType)
       } catch (error) {
-        console.error(`❌ Failed to execute prompt:`, error)
+        logger.error(`❌ Failed to execute prompt:`, error instanceof Error ? error : undefined)
       }
 
       return

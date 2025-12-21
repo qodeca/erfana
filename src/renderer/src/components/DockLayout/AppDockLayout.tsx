@@ -23,6 +23,7 @@ import { useActivityBarStore } from '../../stores/useActivityBarStore'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { getPanelById } from '../ActivityBar/activityBarConfig'
 import { useProjectManagementContext } from '../../context/ProjectManagementContext'
+import { logger } from '../../utils/logger'
 
 // ============================================================================
 // LEFT SIDEBAR PANEL - Project Panel
@@ -34,7 +35,7 @@ import { useProjectManagementContext } from '../../context/ProjectManagementCont
 // ============================================================================
 const EditorAreaSplitPanel = (props: ISplitviewPanelProps) => {
   const onEditorReady = (event: DockviewReadyEvent) => {
-    console.log('📝 Editor DockView ready')
+    logger.info('📝 Editor DockView ready')
 
     // Create the welcome/home panel
     const welcomePanel = event.api.addPanel({
@@ -127,7 +128,7 @@ export function AppDockLayout() {
   const onSplitviewReady = (event: SplitviewReadyEvent) => {
     splitviewApiRef.current = event.api
 
-    console.log('🔧 Initializing SplitviewReact with 3-column layout')
+    logger.info('🔧 Initializing SplitviewReact with 3-column layout')
 
     // LEFT PANEL - Project Panel
     const leftPanel = event.api.addPanel({
@@ -173,7 +174,7 @@ export function AppDockLayout() {
     // Listen to resize events
     const disposeLeft = leftPanel.api.onDidSizeChange(() => {
       const newWidth = leftPanel.api.width
-      console.log(`📏 Project panel resized: ${newWidth}px`)
+      logger.info(`📏 Project panel resized: ${newWidth}px`)
       setSidebarWidth(newWidth, 'left')
     })
 
@@ -193,7 +194,7 @@ export function AppDockLayout() {
   const handleActivityBarClick = useCallback(
     (panelId: string, side: 'left' | 'right') => {
       if (!splitviewApiRef.current) {
-        console.warn('SplitView API not ready')
+        logger.warn('SplitView API not ready')
         return
       }
 
@@ -252,7 +253,7 @@ export function AppDockLayout() {
         // Store dispose function for cleanup
         const dispose = terminalPanel.api.onDidSizeChange(() => {
           const newWidth = terminalPanel.api.width
-          console.log(`📏 Terminal panel resized: ${newWidth}px`)
+          logger.info(`📏 Terminal panel resized: ${newWidth}px`)
           setSidebarWidth(newWidth, 'right')
         })
         terminalResizeDisposeRef.current = dispose.dispose

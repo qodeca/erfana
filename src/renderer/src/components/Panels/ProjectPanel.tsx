@@ -13,6 +13,7 @@ import type { FilterMode } from '../../types/filters'
 import { sanitizeFilePath } from '../../utils/fileUtils'
 import './ProjectPanel.css'
 import { useProjectStore } from '../../stores/useProjectStore'
+import { logger } from '../../utils/logger'
 
 /**
  * Runtime type guard for FilterMode
@@ -35,12 +36,12 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
           if (isValidFilterMode(result.mode)) {
             setFilterMode(result.mode)
           } else {
-            console.warn(`Invalid filter mode "${result.mode}" in settings, using default "all"`)
+            logger.warn(`Invalid filter mode "${result.mode}" in settings, using default "all"`)
             setFilterMode('all')
           }
         }
       } catch (err) {
-        console.error('Error loading filter mode:', err)
+        logger.error('Error loading filter mode:', err instanceof Error ? err : undefined)
         // Fail silently, use default 'all' mode
       }
     }
@@ -55,7 +56,7 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
     try {
       await window.api.settings.setProjectFilterMode(mode)
     } catch (err) {
-      console.error('Error saving filter mode:', err)
+      logger.error('Error saving filter mode:', err instanceof Error ? err : undefined)
       // Continue anyway - the filter still works for the current session
     }
   }, [])
@@ -65,7 +66,7 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
     const dockviewApi = props.params?.dockviewApi as DockviewApi | undefined
 
     if (!dockviewApi) {
-      console.warn('DockView API not ready')
+      logger.warn('DockView API not ready')
       return
     }
 

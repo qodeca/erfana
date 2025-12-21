@@ -1,5 +1,6 @@
 import { useEffect, useRef, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { logger } from '../../utils/logger'
 import './Dialog.css'
 
 // Small delay to ensure dialog is fully rendered before focusing
@@ -109,7 +110,7 @@ export function BaseDialog({
 
   const portalRoot = document.getElementById('portal-root')
   if (!portalRoot) {
-    console.error('BaseDialog: #portal-root element not found')
+    logger.error('BaseDialog: #portal-root element not found')
     return null
   }
 

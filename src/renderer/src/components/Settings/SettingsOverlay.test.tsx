@@ -17,6 +17,19 @@ import userEvent from '@testing-library/user-event'
 import { SettingsOverlay } from './SettingsOverlay'
 import { useSettingsStore } from '../../stores/useSettingsStore'
 
+// Mock logger
+const { mockLogger } = vi.hoisted(() => ({
+  mockLogger: {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn()
+  }
+}))
+vi.mock('../../utils/logger', () => ({ logger: mockLogger }))
+
 describe('SettingsOverlay', () => {
   beforeEach(() => {
     // Create portal-root div for portal rendering
@@ -27,8 +40,8 @@ describe('SettingsOverlay', () => {
     // Reset store state
     useSettingsStore.setState({ isOpen: false })
 
-    // Mock console.error to suppress error from missing portal-root in some tests
-    vi.spyOn(console, 'error').mockImplementation(() => {})
+    // Clear logger mocks
+    vi.clearAllMocks()
   })
 
   afterEach(() => {
@@ -227,12 +240,12 @@ describe('SettingsOverlay', () => {
         document.body.removeChild(portalRoot)
       }
 
-      const consoleError = vi.spyOn(console, 'error')
+      mockLogger.error.mockClear()
       useSettingsStore.setState({ isOpen: true })
 
       render(<SettingsOverlay />)
 
-      expect(consoleError).toHaveBeenCalledWith(
+      expect(mockLogger.error).toHaveBeenCalledWith(
         'SettingsOverlay: #portal-root element not found'
       )
 

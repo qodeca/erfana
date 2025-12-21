@@ -27,6 +27,7 @@ import { useClipboardStore } from '../../stores/useClipboardStore'
 import { formatFileOperationError } from '../../utils/errorUtils'
 import { DRAG_DROP, AUTO_SCROLL, AUTO_EXPAND } from './constants'
 import { withWatcherPause } from './withWatcherPause'
+import { logger } from '../../utils/logger'
 import { useDirectoryWatcher } from '../../hooks/useDirectoryWatcher'
 import { useProjectManagementContext, useProjectChangedEffect } from '../../context/ProjectManagementContext'
 import { useFileOperations } from '../../hooks/useFileOperations'
@@ -195,12 +196,12 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       })
       // Close project via API (hook will update state via onProjectChanged listener)
       window.api.file.closeProject().catch(err => {
-        console.error('Error closing deleted project:', err)
+        logger.error('Error closing deleted project', err instanceof Error ? err : undefined)
       })
       setExpandedFolders(new Set())
     },
     onError: (error) => {
-      console.error('Directory watch error:', error)
+      logger.error('Directory watch error', undefined, { error })
     }
   })
 
@@ -358,7 +359,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
     // Set new timer for auto-expand
     autoExpandTimeoutRef.current = setTimeout(() => {
-      console.log('🔓 Auto-expanding folder:', folderId)
+      logger.info('Auto-expanding folder', { folderId })
       setExpandedFolders(prev => new Set([...prev, folderId]))
       autoExpandTimeoutRef.current = null
     }, AUTO_EXPAND.HOVER_DELAY)
@@ -374,7 +375,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   // Drag-drop handlers
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string)
-    console.log('🔵 Drag start:', event.active.id)
+    logger.info('Drag start', { activeId: event.active.id })
   }
 
   const handleDragOver = (event: DragOverEvent) => {
@@ -428,14 +429,14 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     setOverId(null)
 
     if (!over || active.id === over.id) {
-      console.log('🔵 Drag cancelled - no valid drop target')
+      logger.info('Drag cancelled - no valid drop target')
       return
     }
 
     const sourcePath = active.id as string
     const targetPath = over.id as string
 
-    console.log('🔵 Drag end:', { sourcePath, targetPath })
+    logger.info('Drag end', { sourcePath, targetPath })
 
     // Simple validation: prevent moving folder into its own descendant
     if (isDescendant(targetPath, sourcePath)) {
@@ -491,7 +492,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       const result = await withWatcherPause(projectPath, isInternalOperation, setFileOperationLoading, async () => {
         // Execute move
         const moveResult = await window.api.file.moveItem(sourcePath, targetParent)
-        console.log('✅ Move completed:', moveResult.path)
+        logger.info('Move completed', { path: moveResult.path })
 
         // Refresh tree
         await refreshProjectTree()
@@ -523,7 +524,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         message: errorMessage,
         type: 'error'
       })
-      console.error('Error moving item:', err)
+      logger.error('Error moving item', err instanceof Error ? err : undefined)
     }
   }
 
@@ -549,7 +550,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
           // Cut
           e.preventDefault()
           clipboard.cut(node.path, node.name, node.type)
-          console.log('✂️ Cut:', node.name)
+          logger.info('Cut', { nodeName: node.name })
           showGlobalToast({
             title: 'Cut',
             message: `"${node.name}" ready to move`,
@@ -559,7 +560,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
           // Copy
           e.preventDefault()
           clipboard.copy(node.path, node.name, node.type)
-          console.log('📋 Copy:', node.name)
+          logger.info('Copy', { nodeName: node.name })
           showGlobalToast({
             title: 'Copied',
             message: `"${node.name}" ready to paste`,
@@ -616,7 +617,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
           return
         }
       } catch (error) {
-        console.error('Error checking conflict:', error)
+        logger.error('Error checking conflict', error instanceof Error ? error : undefined)
         // Fall through to normal paste (backend will handle error)
       }
     }
@@ -671,7 +672,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         message: errorMessage,
         type: 'error'
       })
-      console.error('Error pasting:', err)
+      logger.error('Error pasting', err instanceof Error ? err : undefined)
     }
   }
 

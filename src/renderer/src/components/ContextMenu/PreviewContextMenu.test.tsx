@@ -6,6 +6,19 @@ import { DialogProvider } from '../Dialog'
 import * as panelUtils from '../../utils/panelUtils'
 import * as DialogModule from '../Dialog'
 
+// Mock logger
+const { mockLogger } = vi.hoisted(() => ({
+  mockLogger: {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn()
+  }
+}))
+vi.mock('../../utils/logger', () => ({ logger: mockLogger }))
+
 /**
  * PreviewContextMenu Component Tests
  *
@@ -394,7 +407,7 @@ describe('PreviewContextMenu Component', () => {
   describe('Error Handling', () => {
     it('should handle prompt execution failure gracefully', async () => {
       const user = userEvent.setup()
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockLogger.error.mockClear()
 
       // Mock execution failure
       vi.spyOn(panelUtils, 'executePromptTemplate').mockRejectedValue(new Error('Execution failed'))
@@ -414,17 +427,15 @@ describe('PreviewContextMenu Component', () => {
 
       // Should log error when execution fails
       await waitFor(() => {
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect(mockLogger.error).toHaveBeenCalledWith(
           expect.stringContaining('Failed to execute prompt'),
           expect.any(Error)
         )
       })
-
-      consoleErrorSpy.mockRestore()
     })
 
     it('should log error when prompt config not found', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockLogger.error.mockClear()
 
       // Temporarily modify PROMPT_REGISTRY to remove a prompt
       const { PROMPT_REGISTRY } = await import('../../prompts/registry')
@@ -439,7 +450,6 @@ describe('PreviewContextMenu Component', () => {
 
       // Restore
       ;(PROMPT_REGISTRY as any)['elaborate'] = originalElaborate
-      consoleErrorSpy.mockRestore()
     })
   })
 })

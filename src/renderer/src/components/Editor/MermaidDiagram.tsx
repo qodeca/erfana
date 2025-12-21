@@ -8,6 +8,7 @@ import { getMermaidConfig } from '../../utils/mermaidThemes'
 import { useDiagramViewerStore, buildDiagramId, hashDiagramContent } from '../../stores/useDiagramViewerStore'
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { scheduleScrollIfNeeded } from '../../utils/promptScrollScheduler.logic'
+import { logger } from '../../utils/logger'
 
 interface MermaidDiagramProps {
   code: string
@@ -106,7 +107,7 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
         })
       }
     } catch (err) {
-      console.error('Failed to send bug report:', err)
+      logger.error('Failed to send bug report', err instanceof Error ? err : undefined)
     }
   }
 
@@ -169,7 +170,7 @@ export function MermaidDiagram({ code, className = '', filePath, startLine, endL
           target.dispatchEvent(event)
         }
       } catch (err) {
-        console.error('Mermaid rendering error:', err)
+        logger.error('Mermaid rendering error', err instanceof Error ? err : undefined)
         const errorMessage = err instanceof Error ? err.message : 'Failed to render diagram'
         // Clean up error message - remove technical details
         const cleanMessage = errorMessage

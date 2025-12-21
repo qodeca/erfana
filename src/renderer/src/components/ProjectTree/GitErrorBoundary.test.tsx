@@ -8,6 +8,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { GitErrorBoundary } from './GitErrorBoundary'
 
+// Mock logger
+const { mockLogger } = vi.hoisted(() => ({
+  mockLogger: {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn()
+  }
+}))
+vi.mock('../../utils/logger', () => ({ logger: mockLogger }))
+
 // Component that throws an error for testing
 const ThrowingComponent = ({ shouldThrow = true }: { shouldThrow?: boolean }) => {
   if (shouldThrow) {
@@ -77,15 +90,23 @@ describe('GitErrorBoundary', () => {
       expect(screen.getByText('Fallback content')).toBeInTheDocument()
     })
 
-    it('should log error to console when child throws', () => {
+    it('should log error to logger when child throws', () => {
+      mockLogger.error.mockClear()
+
       render(
         <GitErrorBoundary>
           <ThrowingComponent />
         </GitErrorBoundary>
       )
 
-      // Check that console.error was called with our error
-      expect(console.error).toHaveBeenCalled()
+      // Check that logger.error was called with our error
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        '[GitErrorBoundary] Git component error',
+        expect.any(Error),
+        expect.objectContaining({
+          componentStack: expect.any(String)
+        })
+      )
     })
 
     it('should catch errors from nested children', () => {
@@ -137,7 +158,7 @@ describe('GitErrorBoundary', () => {
     })
 
     it('should capture the error object', () => {
-      const consoleSpy = vi.spyOn(console, 'error')
+      mockLogger.error.mockClear()
 
       render(
         <GitErrorBoundary>
@@ -145,11 +166,13 @@ describe('GitErrorBoundary', () => {
         </GitErrorBoundary>
       )
 
-      // Error should be passed to componentDidCatch
-      expect(consoleSpy).toHaveBeenCalledWith(
+      // Error should be passed to componentDidCatch and logged
+      expect(mockLogger.error).toHaveBeenCalledWith(
         expect.stringContaining('[GitErrorBoundary]'),
         expect.any(Error),
-        expect.any(String)
+        expect.objectContaining({
+          componentStack: expect.any(String)
+        })
       )
     })
   })

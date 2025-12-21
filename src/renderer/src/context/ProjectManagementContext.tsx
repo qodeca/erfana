@@ -20,6 +20,7 @@
 import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react'
 import { useProjectManagement } from '../hooks/useProjectManagement'
 import type { IUseProjectManagementReturn } from '../interfaces/IProjectManagement'
+import { logger } from '../utils/logger'
 
 const ProjectManagementContext = createContext<IUseProjectManagementReturn | null>(null)
 
@@ -54,7 +55,7 @@ export function ProjectManagementProvider({ children }: ProjectManagementProvide
         try {
           callback(newPath)
         } catch (err) {
-          console.warn('ProjectManagementContext: callback error', err)
+          logger.warn('ProjectManagementContext: callback error', { error: err instanceof Error ? err.message : String(err) })
         }
       })
     }

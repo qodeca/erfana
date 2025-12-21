@@ -28,6 +28,7 @@ import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { TerminalContextMenu } from '../ContextMenu/TerminalContextMenu'
 import { FilePickerDialog } from '../Dialog/FilePickerDialog'
 import { sanitizeFilePath } from '../../utils/fileUtils'
+import { logger } from '../../utils/logger'
 import '@xterm/xterm/css/xterm.css'
 import './TerminalPanel.css'
 import { isElementVisible } from '../../utils/domUtils'
@@ -61,7 +62,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const { registerHooks, parserHandledRef } = useTerminalParserHooks({
     enabled: true,
     onIntercept: (type) => {
-      console.debug(`[ParserHooks] Intercepted ${type}, restoring scroll position`)
+      logger.debug(`[ParserHooks] Intercepted ${type}, restoring scroll position`)
     }
   })
 
@@ -77,7 +78,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     terminalRef,
     {
       onRecovery: (count) => {
-        console.debug(`[ScrollRecovery] Fallback recovery from ${count} anomalous scroll event(s)`)
+        logger.debug(`[ScrollRecovery] Fallback recovery from ${count} anomalous scroll event(s)`)
       },
       parserHandledRef // Coordinate with parser hooks to avoid double-recovery
     }
@@ -86,7 +87,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // Clipboard support for copy/paste operations (issue #28)
   const { hasSelection, copy, paste, handleKeyEvent } = useTerminalClipboard(xtermRef, {
     onError: (error) => {
-      console.warn('Clipboard operation failed:', error)
+      logger.warn('Clipboard operation failed', error instanceof Error ? { error: error.message, stack: error.stack } : { error: String(error) })
     }
   })
 
@@ -126,7 +127,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // Handler to open files from terminal links
   const handleFileOpen = useCallback((filePath: string, line?: number, column?: number) => {
     if (!dockviewApi) {
-      console.warn('Cannot open file: dockviewApi not available')
+      logger.warn('Cannot open file: dockviewApi not available')
       showWarningToast('Editor not ready', 'Cannot open file - editor not available')
       return
     }
@@ -140,7 +141,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       existingPanel.api.setActive()
       // TODO: Set cursor position after panel is active (requires editor API enhancement)
       // For now, just activate the existing panel
-      console.log(`Activated existing panel for ${filePath}`, { line, column })
+      logger.info(`Activated existing panel for ${filePath}`, { line, column })
       return
     }
 
@@ -164,7 +165,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     editorPanel.api.setActive()
     editorPanel.group.focus()
 
-    console.log(`Opened new panel for ${filePath}`, { line, column })
+    logger.info(`Opened new panel for ${filePath}`, { line, column })
   }, [dockviewApi])
 
   // Terminal file links hook - enables clickable file paths with smart resolution
@@ -176,7 +177,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     onFileOpen: handleFileOpen,
     onShowPicker: showPicker,
     onError: (error) => {
-      console.warn('Terminal file link error:', error)
+      logger.warn('Terminal file link error', error instanceof Error ? { error: error.message, stack: error.stack } : { error: String(error) })
     }
   })
 
@@ -207,7 +208,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       const result = await window.api.terminal.isAvailable()
       setIsAvailable(result.available)
     } catch (err) {
-      console.error('Failed to check terminal availability:', err)
+      logger.error('Failed to check terminal availability', err instanceof Error ? err : undefined)
       setIsAvailable(false)
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
@@ -229,7 +230,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     try {
       await navigator.clipboard.writeText(cmd)
     } catch (e) {
-      console.warn('Clipboard write failed:', e)
+      logger.warn('Clipboard write failed', e instanceof Error ? { error: e.message, stack: e.stack } : { error: String(e) })
     }
   }
 
@@ -239,19 +240,19 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     // Check if container is visible before initializing xterm
     // xterm.js cannot render properly if opened on hidden element (display:none or 0 dimensions)
     if (!isElementVisible(terminalRef.current)) {
-      console.warn('Terminal container not visible, waiting for visibility...')
+      logger.warn('Terminal container not visible, waiting for visibility...')
       pendingInitRef.current = true
       // Set up a ResizeObserver to detect when the panel becomes visible
       if (visibilityObserverRef.current) {
         try { visibilityObserverRef.current.disconnect() } catch (e) {
-          console.warn('Failed to disconnect visibility observer:', e)
+          logger.warn('Failed to disconnect visibility observer', e instanceof Error ? { error: e.message, stack: e.stack } : { error: String(e) })
         }
       }
       visibilityObserverRef.current = new ResizeObserver(() => {
         if (terminalRef.current && pendingInitRef.current && isElementVisible(terminalRef.current)) {
           // Now visible: stop observing and initialize
           try { visibilityObserverRef.current?.disconnect() } catch (e) {
-            console.warn('Failed to disconnect visibility observer (callback):', e)
+            logger.warn('Failed to disconnect visibility observer (callback)', e instanceof Error ? { error: e.message, stack: e.stack } : { error: String(e) })
           }
           visibilityObserverRef.current = null
           pendingInitRef.current = false
@@ -261,7 +262,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       try {
         visibilityObserverRef.current.observe(terminalRef.current)
       } catch (e) {
-        console.warn('Failed to observe terminal visibility:', e)
+        logger.warn('Failed to observe terminal visibility', e instanceof Error ? { error: e.message, stack: e.stack } : { error: String(e) })
       }
       return
     }
@@ -352,7 +353,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         const webglAddon = new WebglAddon()
 
         webglAddon.onContextLoss(() => {
-          console.warn('WebGL context lost, attempting recovery')
+          logger.warn('WebGL context lost, attempting recovery')
           webglAddon.dispose()
 
           // Attempt one recovery after brief delay to let GPU stabilize
@@ -360,20 +361,20 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
             try {
               const recoveryAddon = new WebglAddon()
               recoveryAddon.onContextLoss(() => {
-                console.warn('Second WebGL context loss, staying with canvas renderer')
+                logger.warn('Second WebGL context loss, staying with canvas renderer')
                 recoveryAddon.dispose()
               })
               xterm.loadAddon(recoveryAddon)
-              console.info('✅ WebGL context recovered successfully')
+              logger.info('WebGL context recovered successfully')
             } catch (err) {
-              console.warn('WebGL recovery failed, canvas renderer active:', err)
+              logger.warn('WebGL recovery failed, canvas renderer active', err instanceof Error ? { error: err.message, stack: err.stack } : { error: String(err) })
             }
           }, 100)
         })
 
         xterm.loadAddon(webglAddon)
       } catch (error) {
-        console.warn('WebGL renderer failed, falling back to canvas:', error)
+        logger.warn('WebGL renderer failed, falling back to canvas', error instanceof Error ? { error: error.message, stack: error.stack } : { error: String(error) })
         // Continue with canvas renderer if WebGL fails
       }
 
@@ -393,10 +394,10 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // The PTY immediately starts marker detection, so we must subscribe first
       let clearUnsubscribe: (() => void) | null = null
       const handleClearForInit = (data: { terminalId: string }) => {
-        console.log(`[INIT] Received clear event for terminal ${data.terminalId}`)
+        logger.info(`[INIT] Received clear event for terminal ${data.terminalId}`)
         // Write clear sequence with callback for deterministic confirmation
         xterm.write('\x1b[2J\x1b[3J\x1b[H', () => {
-          console.log(`[INIT] Clear sequence complete, calling markClearComplete`)
+          logger.info(`[INIT] Clear sequence complete, calling markClearComplete`)
           window.api.terminal.markClearComplete(data.terminalId)
 
           // Cleanup this one-time handler
@@ -436,7 +437,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         }
       })
     } catch (err) {
-      console.error('Failed to initialize terminal:', err)
+      logger.error('Failed to initialize terminal', err instanceof Error ? err : undefined)
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
     }
@@ -472,7 +473,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }
       if (visibilityObserverRef.current) {
         try { visibilityObserverRef.current.disconnect() } catch (e) {
-          console.warn('Failed to disconnect visibility observer on cleanup:', e)
+          logger.warn('Failed to disconnect visibility observer on cleanup', e instanceof Error ? { error: e.message, stack: e.stack } : { error: String(e) })
         }
         visibilityObserverRef.current = null
       }
@@ -536,7 +537,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
     const unsubscribeExit = window.api.terminal.onExit((data) => {
       if (data.terminalId === terminalId) {
-        console.log(`Terminal exited with code ${data.exitCode}`)
+        logger.info(`Terminal exited with code ${data.exitCode}`)
         useTerminalStore.getState().clearActivity(terminalId)
         // Optionally restart or show exit message
       }
@@ -544,7 +545,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
     const unsubscribeError = window.api.terminal.onError((data) => {
       if (data.terminalId === terminalId) {
-        console.error('Terminal error:', data.error)
+        logger.error('Terminal error', undefined, { error: data.error })
         setError(data.error)
       }
     })
@@ -589,7 +590,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           }
         }
       } catch (error) {
-        console.error('Failed to resize terminal:', error)
+        logger.error('Failed to resize terminal', error instanceof Error ? error : undefined)
       }
     }
 

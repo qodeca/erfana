@@ -5,6 +5,7 @@ import { AlertDialog } from './AlertDialog'
 import { RenameDialog } from './RenameDialog'
 import { NewFileDialog } from './NewFileDialog'
 import { NewFolderDialog } from './NewFolderDialog'
+import { logger } from '../../utils/logger'
 import type {
   DialogType,
   ConfirmDialogConfig,
@@ -89,7 +90,7 @@ export function DialogManager() {
         const DialogComponent = DIALOG_COMPONENTS[dialog.type]
 
         if (!DialogComponent) {
-          console.warn(`No component registered for dialog type: ${dialog.type}`)
+          logger.warn(`No component registered for dialog type: ${dialog.type}`)
           return null
         }
 

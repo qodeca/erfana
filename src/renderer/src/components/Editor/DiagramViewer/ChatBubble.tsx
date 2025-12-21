@@ -40,6 +40,7 @@ import { formatZoomLevel } from './diagramViewer.logic'
 import { TextareaContextMenu } from '../../ContextMenu/TextareaContextMenu'
 import { CharacterCount } from '../../shared'
 import { scheduleScrollIfNeeded } from '../../../utils/promptScrollScheduler.logic'
+import { logger } from '../../../utils/logger'
 import './ChatBubble.css'
 
 interface Transform {
@@ -262,7 +263,7 @@ export function ChatBubble({
         setMessage('')
       }
     } catch (err) {
-      console.error('Failed to send chat message:', err)
+      logger.error('Failed to send chat message', err instanceof Error ? err : undefined)
     }
   }, [message, validation.canSubmit, filePath, startLine, endLine, mermaidCode, portalContext])
 
@@ -302,7 +303,7 @@ export function ChatBubble({
           })
         }
       } catch (err) {
-        console.error('Failed to execute direction change prompt:', err)
+        logger.error('Failed to execute direction change prompt', err instanceof Error ? err : undefined)
       }
     },
     [filePath, startLine, endLine, mermaidCode, portalContext]

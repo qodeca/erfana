@@ -7,6 +7,7 @@ import { isProjectNotFoundError, getUserFriendlyMessage } from '../../../../shar
 import { showErrorToast, showSuccessToast, showWarningToast } from '../../utils/toastHelpers'
 import { formatRelativeTime } from '../../utils/timeFormatting'
 import { useImport } from '../../hooks/useImport'
+import { logger } from '../../utils/logger'
 
 interface RecentProject {
   path: string
@@ -61,7 +62,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
         showErrorToast('Failed to Load Recent Projects', result.error)
       }
     } catch (error) {
-      console.error('Failed to load recent projects:', error)
+      logger.error('Failed to load recent projects:', error instanceof Error ? error : undefined)
       showErrorToast('Failed to Load Recent Projects', getUserFriendlyMessage(error))
     } finally {
       if (isMounted.current) {
@@ -101,7 +102,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
       // The project:changed event will trigger UI updates automatically
       // Recent projects timestamp is updated in the IPC handler
     } catch (error) {
-      console.error('Failed to open project:', error)
+      logger.error('Failed to open project:', error instanceof Error ? error : undefined)
 
       const isNotFound = isProjectNotFoundError(error)
       const userMessage = getUserFriendlyMessage(error)
@@ -117,7 +118,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
           await window.api.settings.removeRecentProject(projectPath)
           loadRecentProjects()
         } catch (removeError) {
-          console.error('Failed to remove stale project:', removeError)
+          logger.error('Failed to remove stale project:', removeError instanceof Error ? removeError : undefined)
         }
       }
     } finally {
@@ -145,7 +146,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
         showErrorToast('Failed to Remove Project', result.error)
       }
     } catch (error) {
-      console.error('Failed to remove project from recent list:', error)
+      logger.error('Failed to remove project from recent list:', error instanceof Error ? error : undefined)
       showErrorToast('Failed to Remove Project', getUserFriendlyMessage(error))
     } finally {
       if (isMounted.current) {

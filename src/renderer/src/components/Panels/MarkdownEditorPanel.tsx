@@ -11,6 +11,7 @@ import { FileConflictNotification } from '../FileConflictNotification/FileConfli
 import { useProjectStore } from '../../stores/useProjectStore'
 import { sanitizeFilePath } from '../../utils/fileUtils'
 import { convertMermaidDiagramsToImages } from '../../utils/svgToImage'
+import { logger } from '../../utils/logger'
 import './MarkdownEditorPanel.css'
 
 interface EditorFile {
@@ -162,7 +163,7 @@ export function MarkdownEditorPanel(
   }, [viewMode, currentFile])
 
   // Debug logging
-  console.log('MarkdownEditorPanel render:', {
+  logger.debug('MarkdownEditorPanel render', {
     hasCurrentFile: !!currentFile,
     filePath: currentFile?.path,
     contentLength: currentFile?.content?.length,
@@ -191,7 +192,7 @@ export function MarkdownEditorPanel(
 
     // Use setPositionAndReveal to jump to the specified location
     editorRef.current.setPositionAndReveal(initialLine, initialColumn)
-    console.log(`📍 Positioned editor at line ${initialLine}${initialColumn ? `:${initialColumn}` : ''}`)
+    logger.info(`Positioned editor at line ${initialLine}${initialColumn ? `:${initialColumn}` : ''}`)
   }, [isEditorReady, props.params?.initialLine, props.params?.initialColumn])
 
   // Update tab title when modified state changes
@@ -209,12 +210,12 @@ export function MarkdownEditorPanel(
   useEffect(() => {
     if (!currentFile?.path) return
 
-    console.log('👁️  Starting watch for:', currentFile.path)
+    logger.info('Starting watch for file', { filePath: currentFile.path })
 
     // Start watching
     window.api.fileWatch.start(currentFile.path).then((result) => {
       if (!result.success) {
-        console.error('Failed to start watching file:', result.error)
+        logger.error('Failed to start watching file', undefined, { error: result.error })
       }
     })
 
@@ -233,13 +234,13 @@ export function MarkdownEditorPanel(
 
     const unsubscribeError = window.api.fileWatch.onFileError((data) => {
       if (data.filePath === currentFile.path) {
-        console.error('File watch error:', data.error)
+        logger.error('File watch error', undefined, { error: data.error })
       }
     })
 
     // Cleanup on unmount or file change
     return () => {
-      console.log('👁️  Stopping watch for:', currentFile.path)
+      logger.info('Stopping watch for file', { filePath: currentFile.path })
       window.api.fileWatch.stop(currentFile.path)
       unsubscribeChanged()
       unsubscribeDeleted()
@@ -250,7 +251,7 @@ export function MarkdownEditorPanel(
   // Reset editor state when view mode changes - force rebuild on next effect
   useEffect(() => {
     setIsEditorReady(false) // Trigger rebuild cycle
-    console.log('🔄 Resetting editor state due to view mode change:', viewMode)
+    logger.debug('Resetting editor state due to view mode change', { viewMode })
   }, [viewMode])
 
   // Notify Monaco of layout changes (no state coordination needed)
@@ -260,7 +261,7 @@ export function MarkdownEditorPanel(
     const editor = editorRef.current?.getEditor()
     if (editor) {
       requestAnimationFrame(() => {
-        console.log('📐 Notifying Monaco Editor of layout change')
+        logger.debug('Notifying Monaco Editor of layout change')
         editor.layout()
       })
     }
@@ -297,29 +298,29 @@ export function MarkdownEditorPanel(
 
   // Rebuild scroll map when content or view changes (imperative, no state coordination)
   const rebuildScrollMap = useCallback(() => {
-    console.log('🔨 rebuildScrollMap called, checking conditions...', {
+    logger.debug('rebuildScrollMap called, checking conditions', {
       hasEditor: !!editorRef.current,
       hasPreview: !!previewRef.current,
       isAnySplitMode
     })
 
     if (!editorRef.current || !previewRef.current || !isAnySplitMode) {
-      console.log('⏭️  Skipping scroll map rebuild: preconditions not met')
+      logger.debug('Skipping scroll map rebuild: preconditions not met')
       return
     }
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         try {
-          console.log('🏗️  Building scroll map...')
+          logger.debug('Building scroll map')
           const map = buildScrollMap()
           scrollMapRef.current = map
-          console.log(`📍 Scroll map rebuilt: ${map.length} entries`)
+          logger.debug(`Scroll map rebuilt: ${map.length} entries`)
           if (map.length > 0) {
-            console.log('✅ First few entries:', map.slice(0, 3))
+            logger.debug('First few entries', { entries: map.slice(0, 3) })
           }
         } catch (error) {
-          console.error('Error rebuilding scroll map:', error)
+          logger.error('Error rebuilding scroll map', error instanceof Error ? error : undefined)
           scrollMapRef.current = []
         }
       })
@@ -328,7 +329,7 @@ export function MarkdownEditorPanel(
 
   // Trigger scroll map rebuild when content or file changes
   useEffect(() => {
-    console.log('🔔 Rebuild trigger effect fired:', {
+    logger.debug('Rebuild trigger effect fired', {
       isAnySplitMode,
       isEditorReady,
       hasContent: !!currentFile?.content,
@@ -336,7 +337,7 @@ export function MarkdownEditorPanel(
     })
 
     if (!isAnySplitMode || !isEditorReady) {
-      console.log('⏭️  Skipping rebuild trigger: preconditions not met')
+      logger.debug('Skipping rebuild trigger: preconditions not met')
       return
     }
 
@@ -386,10 +387,10 @@ export function MarkdownEditorPanel(
     let cancelled = false
 
     ;(async () => {
-      console.log('⏳ Waiting for preview content readiness...')
+      logger.debug('Waiting for preview content readiness')
       await waitForPreviewReady()
       if (cancelled) return
-      console.log('🔔 Content ready. Rebuilding scroll map...')
+      logger.debug('Content ready. Rebuilding scroll map')
       rebuildScrollMap()
     })()
 
@@ -463,7 +464,7 @@ export function MarkdownEditorPanel(
         })
       })
     } catch (error) {
-      console.error('Error in handleEditorScroll:', error)
+      logger.error('Error in handleEditorScroll', error instanceof Error ? error : undefined)
       isSyncingRef.current = false
     }
   }, [])
@@ -491,7 +492,7 @@ export function MarkdownEditorPanel(
         })
       })
     } catch (error) {
-      console.error('Error in handlePreviewScroll:', error)
+      logger.error('Error in handlePreviewScroll', error instanceof Error ? error : undefined)
       isSyncingRef.current = false
     }
   }, [])
@@ -557,7 +558,7 @@ export function MarkdownEditorPanel(
   // Attach scroll listeners - simplified approach without polling
   useEffect(() => {
     if (!isAnySplitMode || !isEditorReady || !previewRef.current) {
-      console.log('⏭️  Skipping listener attachment:', {
+      logger.debug('Skipping listener attachment', {
         isAnySplitMode,
         isEditorReady,
         hasPreviewRef: !!previewRef.current
@@ -567,11 +568,11 @@ export function MarkdownEditorPanel(
 
     const editor = editorRef.current?.getEditor()
     if (!editor) {
-      console.log('⏭️  Skipping listener attachment: no editor')
+      logger.debug('Skipping listener attachment: no editor')
       return
     }
 
-    console.log('🔄 Attaching scroll listeners directly...')
+    logger.debug('Attaching scroll listeners directly')
 
     // Attach listeners immediately - scroll map should be built by now
     try {
@@ -579,35 +580,34 @@ export function MarkdownEditorPanel(
       const previewElement = previewRef.current!
       previewElement.addEventListener('scroll', handlePreviewScroll)
 
-      console.log('🔗 Scroll listeners attached successfully')
-      console.log('📊 Current scroll map size:', scrollMapRef.current.length)
+      logger.debug('Scroll listeners attached successfully', { scrollMapSize: scrollMapRef.current.length })
 
       return () => {
-        console.log('🧹 Removing scroll listeners')
+        logger.debug('Removing scroll listeners')
         editorDisposable.dispose()
         previewElement.removeEventListener('scroll', handlePreviewScroll)
       }
     } catch (error) {
-      console.error('❌ Error attaching scroll listeners:', error)
+      logger.error('Error attaching scroll listeners', error instanceof Error ? error : undefined)
       return undefined
     }
   }, [viewMode, currentFile?.path, isEditorReady, handleEditorScroll, handlePreviewScroll])
 
   const handleEditorMount = (_editor: monaco.editor.IStandaloneCodeEditor) => {
-    console.log('✅ Editor mounted and ready, in mode:', viewMode)
+    logger.info('Editor mounted and ready', { viewMode })
 
     // Immediately build scroll map if in split mode
     if (viewMode === 'split' || viewMode === 'split-horizontal') {
-      console.log('🔨 Triggering immediate scroll map build after editor mount in', viewMode)
+      logger.debug('Triggering immediate scroll map build after editor mount', { viewMode })
       // Schedule it for next frame to ensure Monaco is fully ready
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           try {
             const map = buildScrollMap()
             scrollMapRef.current = map
-            console.log(`📍 Scroll map built immediately after mount: ${map.length} entries`)
+            logger.debug(`Scroll map built immediately after mount: ${map.length} entries`)
           } catch (error) {
-            console.error('Error building scroll map immediately after mount:', error)
+            logger.error('Error building scroll map immediately after mount', error instanceof Error ? error : undefined)
           }
         })
       })
@@ -617,11 +617,11 @@ export function MarkdownEditorPanel(
   }
 
   const loadFile = async (filePath: string) => {
-    console.log('Loading file:', filePath)
+    logger.info('Loading file', { filePath })
     setIsEditorReady(false) // Reset editor ready state when loading new file
     try {
       const content = await window.api.file.readFile(filePath)
-      console.log('File loaded successfully:', {
+      logger.info('File loaded successfully', {
         filePath,
         contentLength: content.length,
         contentPreview: content.substring(0, 100)
@@ -637,7 +637,7 @@ export function MarkdownEditorPanel(
       const isMarkdown = extension === 'md' || extension === 'markdown'
       setViewMode(isMarkdown ? 'preview' : 'editor')
     } catch (error) {
-      console.error('Error loading file:', error)
+      logger.error('Error loading file', error instanceof Error ? error : undefined)
     }
   }
 
@@ -691,7 +691,7 @@ export function MarkdownEditorPanel(
         setTimeout(() => setIsAutoSaving(false), 1000)
       }
     } catch (error) {
-      console.error('Error saving file:', error)
+      logger.error('Error saving file', error instanceof Error ? error : undefined)
       setIsAutoSaving(false)
     } finally {
       // Resume file watching after save completes
@@ -715,22 +715,22 @@ export function MarkdownEditorPanel(
    * Handle external file changes
    */
   const handleExternalChange = async () => {
-    console.log('📝 External change detected for:', currentFile?.path)
+    logger.info('External change detected for file', { filePath: currentFile?.path })
 
     // Ignore if we're currently saving (race condition prevention)
     if (isSavingRef.current) {
-      console.log('⏸️  Ignoring external change (save in progress)')
+      logger.debug('Ignoring external change (save in progress)')
       return
     }
 
     // Check if file has unsaved changes
     if (!currentFile?.modified) {
       // Safe to auto-reload
-      console.log('✅ No local changes, auto-reloading...')
+      logger.info('No local changes, auto-reloading')
       await reloadFromDisk()
     } else {
       // Has unsaved changes - show conflict notification
-      console.log('⚠️  Local changes detected, showing conflict notification')
+      logger.warn('Local changes detected, showing conflict notification')
       setExternalChangeDetected(true)
     }
   }
@@ -750,12 +750,12 @@ export function MarkdownEditorPanel(
         modified: false
       })
       setExternalChangeDetected(false)
-      console.log('✅ File reloaded successfully')
+      logger.info('File reloaded successfully')
 
       // Show reload indicator briefly (like auto-save)
       setTimeout(() => setIsReloading(false), 1000)
     } catch (error) {
-      console.error('Error reloading file:', error)
+      logger.error('Error reloading file', error instanceof Error ? error : undefined)
       setIsReloading(false)
     }
   }
@@ -764,7 +764,7 @@ export function MarkdownEditorPanel(
    * Handle file deletion
    */
   const handleFileDeleted = () => {
-    console.log('🗑️  File deleted externally:', currentFile?.path)
+    logger.warn('File deleted externally', { filePath: currentFile?.path })
     setIsFileDeleted(true)
     setExternalChangeDetected(false) // Clear conflict notification if shown
   }
@@ -773,7 +773,7 @@ export function MarkdownEditorPanel(
    * Handle conflict resolution: Keep local version
    */
   const handleKeepLocal = () => {
-    console.log('✅ User chose to keep local version')
+    logger.info('User chose to keep local version')
     setExternalChangeDetected(false)
   }
 
@@ -962,16 +962,16 @@ export function MarkdownEditorPanel(
    * Previously used offsetTop which didn't account for container padding.
    */
   const buildScrollMap = (): ScrollMapEntry[] => {
-    console.log('🗺️  buildScrollMap() called')
+    logger.debug('buildScrollMap() called')
 
     if (!editorRef.current || !previewRef.current) {
-      console.log('⏭️  Skipping buildScrollMap: missing refs')
+      logger.debug('Skipping buildScrollMap: missing refs')
       return []
     }
 
     const editor = editorRef.current.getEditor()
     if (!editor) {
-      console.log('⏭️  Skipping buildScrollMap: no editor')
+      logger.debug('Skipping buildScrollMap: no editor')
       return []
     }
 
@@ -981,7 +981,7 @@ export function MarkdownEditorPanel(
 
     // Collect candidates using start/end ranges
     const nodeList = container.querySelectorAll('[data-line-start]')
-    console.log(`🔍 Found ${nodeList.length} elements with data-line-start attribute`)
+    logger.debug(`Found ${nodeList.length} elements with data-line-start attribute`)
 
     // Use a map of line -> { previewOffset: number }
     // We'll emit a single mapping per line to keep source keys monotonic
@@ -1033,7 +1033,7 @@ export function MarkdownEditorPanel(
       }
     }
 
-    console.log(`✅ buildScrollMap completed: ${map.length} entries`)
+    logger.debug(`buildScrollMap completed: ${map.length} entries`)
     return map
   }
 

@@ -18,6 +18,19 @@ import {
   registerProjectChangedCallback
 } from './ProjectManagementContext'
 
+// Mock logger
+const { mockLogger } = vi.hoisted(() => ({
+  mockLogger: {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    fatal: vi.fn()
+  }
+}))
+vi.mock('../utils/logger', () => ({ logger: mockLogger }))
+
 // Mock the useProjectManagement hook
 const mockProjectManagement = {
   projectPath: '/test/project',
@@ -331,8 +344,8 @@ describe('ProjectManagementContext', () => {
       })
       const normalCallback = vi.fn()
 
-      // Suppress console.warn for expected warning
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      // Clear logger mocks
+      mockLogger.warn.mockClear()
 
       function TestComponent1() {
         useProjectChangedEffect(errorCallback)
@@ -361,9 +374,12 @@ describe('ProjectManagementContext', () => {
       // Normal callback should still be called
       expect(normalCallback).toHaveBeenCalledWith('/path')
       // Warning should be logged
-      expect(warnSpy).toHaveBeenCalled()
-
-      warnSpy.mockRestore()
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'ProjectManagementContext: callback error',
+        expect.objectContaining({
+          error: 'Callback error'
+        })
+      )
     })
   })
 })

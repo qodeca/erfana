@@ -18,6 +18,7 @@ import {
 } from '../../../utils/mermaidDirections'
 import { useTerminalPortalOptional } from '../../../context/TerminalPortalContext'
 import { scheduleScrollIfNeeded } from '../../../utils/promptScrollScheduler.logic'
+import { logger } from '../../../utils/logger'
 import './MermaidToolbar.css'
 
 export interface MermaidToolbarProps {
@@ -94,7 +95,7 @@ export function MermaidToolbar({
         })
       }
     } catch (err) {
-      console.error('Failed to execute direction change prompt:', err)
+      logger.error('Failed to execute direction change prompt', err instanceof Error ? err : undefined)
     }
   }
 

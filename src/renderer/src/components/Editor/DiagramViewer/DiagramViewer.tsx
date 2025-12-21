@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 import { getKeyboardAction, getZoomButtonStates, ZOOM_CONFIG } from './diagramViewer.logic'
 import { ChatBubble } from './ChatBubble'
 import { useDiagramViewerStore } from '../../../stores/useDiagramViewerStore'
+import { logger } from '../../../utils/logger'
 import './DiagramViewer.css'
 
 interface Transform {
@@ -340,7 +341,7 @@ export function DiagramViewer() {
 
   const portalRoot = document.getElementById('portal-root')
   if (!portalRoot) {
-    console.error('DiagramViewer: portal-root not found!')
+    logger.error('DiagramViewer: portal-root not found!')
     return null
   }
 

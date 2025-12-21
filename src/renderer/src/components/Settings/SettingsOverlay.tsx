@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useSettingsStore } from '../../stores/useSettingsStore'
+import { logger } from '../../utils/logger'
 import './SettingsOverlay.css'
 
 // Small delay to ensure overlay is fully rendered before focusing
@@ -72,7 +73,7 @@ export function SettingsOverlay() {
 
   const portalRoot = document.getElementById('portal-root')
   if (!portalRoot) {
-    console.error('SettingsOverlay: #portal-root element not found')
+    logger.error('SettingsOverlay: #portal-root element not found')
     return null
   }
 

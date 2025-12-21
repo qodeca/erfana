@@ -21,6 +21,7 @@ import {
   cleanMailtoLink,
   cleanTelLink
 } from '../../utils/linkProtocols'
+import { logger } from '../../utils/logger'
 import './MarkdownPreview.css'
 
 // Anchor scroll configuration
@@ -348,7 +349,7 @@ function createMarkdownComponents(
 
     // Security: Block dangerous protocols
     if (href && isDangerousProtocol(href)) {
-      console.warn('[MarkdownPreview] Blocked dangerous protocol in link:', href.split(':')[0])
+      logger.warn('Blocked dangerous protocol in link', { protocol: href.split(':')[0] })
       return (
         <span className="blocked-link" title="⚠️ This link has been blocked for security reasons">
           {children}
@@ -402,7 +403,7 @@ function createMarkdownComponents(
         if (targetElement) {
           targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
         } else {
-          console.warn('[MarkdownPreview] Anchor not found:', anchorId)
+          logger.warn('Anchor not found', { anchorId })
         }
         return
       }
@@ -413,7 +414,7 @@ function createMarkdownComponents(
           // @ts-expect-error - shell is available but not typed in ElectronAPI
           await window.electron.shell.openExternal(href)
         } catch (error) {
-          console.error('[MarkdownPreview] Failed to open external link:', error)
+          logger.error('Failed to open external link', error instanceof Error ? error : undefined, { href })
         }
         return
       }
@@ -423,7 +424,7 @@ function createMarkdownComponents(
         try {
           await handleInternalLink(href)
         } catch (error) {
-          console.error('[MarkdownPreview] Failed to navigate to internal link:', error)
+          logger.error('Failed to navigate to internal link', error instanceof Error ? error : undefined, { href })
         }
       }
     }
@@ -660,7 +661,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
               const resolved = await resolveMarkdownLink(href, filePath, projectRoot)
               return [href, resolved] as [string, ResolvedLink | null]
             } catch (error) {
-              console.error(`[MarkdownPreview] Failed to resolve link ${href}:`, error)
+              logger.error('Failed to resolve link', error instanceof Error ? error : undefined, { href })
               return [href, null] as [string, ResolvedLink | null]
             }
           })
@@ -786,7 +787,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
           observer.disconnect()
 
           if (Date.now() - startTime > timeout) {
-            console.warn('[MarkdownPreview] Anchor not found after timeout:', anchorId)
+            logger.warn('Anchor not found after timeout', { anchorId })
           }
         }
       }, retryInterval)

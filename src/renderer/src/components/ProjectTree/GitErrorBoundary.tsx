@@ -8,6 +8,7 @@
  */
 
 import { Component, type ReactNode, type ErrorInfo } from 'react'
+import { logger } from '../../utils/logger'
 
 interface GitErrorBoundaryProps {
   children: ReactNode
@@ -36,7 +37,7 @@ export class GitErrorBoundary extends Component<GitErrorBoundaryProps, GitErrorB
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     // Log error for debugging but don't crash the app
-    console.error('[GitErrorBoundary] Git component error:', error, errorInfo.componentStack)
+    logger.error('[GitErrorBoundary] Git component error', error, { componentStack: errorInfo.componentStack })
   }
 
   render(): ReactNode {

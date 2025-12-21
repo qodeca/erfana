@@ -1,6 +1,7 @@
 import { useRef, useImperativeHandle, forwardRef } from 'react'
 import Editor, { OnMount, loader } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
+import { logger } from '../../utils/logger'
 import './MonacoMarkdownEditor.css'
 
 // Configure Monaco to use local files instead of CDN
@@ -49,14 +50,14 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
 
     // Debug logging
-    console.log('MonacoMarkdownEditor render:', {
+    logger.debug('MonacoMarkdownEditor render', {
       valueLength: value?.length,
       filePath,
       hasValue: !!value
     })
 
     const handleEditorDidMount: OnMount = (editor, monaco) => {
-      console.log('Monaco mounted, setting value:', value?.substring(0, 50))
+      logger.debug('Monaco mounted, setting value', { valuePreview: value?.substring(0, 50) })
       editorRef.current = editor
 
       // Configure markdown-specific options
