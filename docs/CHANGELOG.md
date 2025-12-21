@@ -2,6 +2,36 @@
 
 Historical changelog entries for versions prior to current. For the latest changes, see [CLAUDE.md](../CLAUDE.md).
 
+## Changes in v0.6.3
+- **Logging Improvements** (Dec 21, 2025):
+  - Separate log files: `main.log`, `renderer.log`, `combined.log`
+  - 100-file rotation (increased from daily rotation)
+  - Settings log level dropdown in Settings overlay
+  - **Total: 4264 tests passing** (141 test files)
+  - Closes #70
+
+## Changes in v0.6.2
+- **DOCX Export** (Dec 21, 2025):
+  - Export markdown to Word format
+  - Mermaid diagrams as high-resolution PNG images
+  - HTML to DOCX conversion via `docx` library
+  - 69 new tests
+  - Closes #65
+- **PDF Export** (Dec 21, 2025):
+  - Export markdown to print-optimized PDF
+  - Vector Mermaid diagrams (not rasterized)
+  - A4 page size with print-friendly styling
+  - 35 new tests
+  - Closes #58
+- **YAML Frontmatter Rendering** (Dec 21, 2025):
+  - Styled key-value table in markdown preview
+  - Security-hardened parsing with size limits
+  - 18 new tests
+- **Git Operation Queue** (Dec 21, 2025):
+  - Prevents index.lock conflicts during concurrent git operations
+  - Sequential queue in GitStatusService
+  - Closes race conditions
+
 ## Changes in v0.6.0
 - **Logging Layer** (Dec 21, 2025):
   - Unified logging facades: MainLogger (main process) and RendererLogger (renderer process)

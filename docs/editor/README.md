@@ -16,6 +16,14 @@ The ERFANA editor subsystem provides a comprehensive markdown editing experience
 - **Split View** (⚡) - Side-by-side with synchronized scrolling
 - **Preview Only** (👁️) - Presentation mode
 
+### Export
+- **PDF Export** - Print-optimized PDF with vector Mermaid diagrams, A4 page size
+- **DOCX Export** - Word format with Mermaid diagrams as high-resolution PNG
+
+### YAML Frontmatter
+- Renders frontmatter as styled key-value table in preview
+- Security-hardened parsing with size limits
+
 ### Multi-File Support
 - Unique panel per file
 - Tab management with unsaved changes detection
@@ -37,8 +45,11 @@ Real-time metrics in bottom status bar:
 ## Implementation Files
 - `MonacoMarkdownEditor.tsx` - Core editor component
 - `MarkdownPreview.tsx` - Preview rendering
-- `MarkdownEditorPanel.tsx` - Panel orchestration
+- `MarkdownEditorPanel.tsx` - Panel orchestration (includes export)
 - `MermaidDiagram.tsx` - Diagram rendering
+- `FrontmatterTable.tsx` - YAML frontmatter display
+- `PdfService.ts` - PDF generation (main process)
+- `DocxService.ts` - DOCX generation (main process)
 
 ## Related Documentation
 - [Prompt Templates](../prompts/README.md) - AI text operations

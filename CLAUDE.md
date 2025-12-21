@@ -3,7 +3,7 @@
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
 - **Repository**: `qodeca/erfana` (GitHub)
-- **Version**: 0.6.0
+- **Version**: 0.6.3
 - **Tech Stack**: Electron 39, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+ (Electron 39 bundles Node.js 22.20.0)
@@ -60,9 +60,9 @@ See `docs/` for details (keep Claude's context focused):
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (4226 tests, 141 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (4264 tests, 141 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
-- [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.5.x)
+- [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.6.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
 
 ## Code Style & Conventions
@@ -124,7 +124,34 @@ See `docs/` for details (keep Claude's context focused):
 - [ ] Transitions use tokens
 - [ ] Focus states are visible (accessibility)
 
-## Recent Changes (v0.6.0)
+## Recent Changes (v0.6.x)
+
+### PDF and DOCX Export (Dec 21, 2025)
+Added document export capabilities:
+
+**PDF Export**:
+- Export markdown to print-optimized PDF
+- Vector Mermaid diagrams (not rasterized)
+- A4 page size with print-friendly styling
+- Uses Electron's `webContents.printToPDF()`
+
+**DOCX Export**:
+- Export markdown to Word format
+- Mermaid diagrams as high-resolution PNG
+- Uses `docx` npm package with `HtmlToDocxConverter`
+
+**Files**: `PdfService.ts`, `DocxService.ts`, `HtmlToDocxConverter.ts`, `svgToImage.ts`
+
+### YAML Frontmatter Rendering (Dec 21, 2025)
+Added styled frontmatter display in markdown preview:
+- Renders YAML frontmatter as key-value table
+- Security-hardened parsing with size limits
+- `FrontmatterTable.tsx` component
+
+### Git Operation Queue (Dec 21, 2025)
+Prevents index.lock conflicts during concurrent git operations:
+- Sequential queue in `GitStatusService`
+- Fixes race conditions when multiple git commands run simultaneously
 
 ### 2025 Security Hardening (Dec 2, 2025)
 Comprehensive security upgrade following 2025 Electron best practices:
@@ -160,7 +187,7 @@ Comprehensive security upgrade following 2025 Electron best practices:
 - Workaround: `prebuild` npm script creates aproba stub automatically
 - Changed from universal to separate x64/arm64 binaries (fuses cause signature incompatibility)
 - Build command: `npm run build:mac` (all prerequisites automated)
-- Artifacts: erfana-0.6.0-{x64,arm64}.dmg + ZIP files
+- Artifacts: erfana-{version}-{x64,arm64}.dmg + ZIP files
 
 **Documentation**:
 - Complete rewrite: `docs/security.md` with 2025 best practices
@@ -314,7 +341,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 4226 tests passing (141 test files)
+- **Current**: 4264 tests passing (141 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)

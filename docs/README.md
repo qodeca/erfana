@@ -28,14 +28,14 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
   - [AutoExecute Technical](./prompts/autoexecute-technical.md) - Write pipeline and 200ms delay rationale
   - [AutoExecute Testing](./prompts/autoexecute-testing.md) - Test coverage and mocking strategy
   - [AutoExecute Reference](./prompts/autoexecute-reference.md) - Implementation files and error handling
+- [Logging](./logging.md) - Logging layer, log levels, file rotation, settings
 - [Keyboard Shortcuts](./keyboard-shortcuts.md) - Application keyboard shortcuts
 - [UI Components](./ui-components.md) - React component architecture
 
 ### Development
 - [Development Tasks](./development-tasks.md) - Build, test, and deployment
-- [Build Optimization](./build/build-optimization.md) - electron-builder configuration and size optimization
+- [Build](./build/README.md) - electron-builder, ASAR, fuses, troubleshooting
 - [Testing](./testing/README.md) - Testing strategies and scenarios
-  - [Automated Testing Plan](./testing/automated-testing-plan.md) - Phased rollout and setup
   - [Quick Checks](./testing/quick-checks.md) - Minimal Terminal/Watcher smoke checks
 - [EPIPE Error Handling](./epipe-error-handling.md) - Console output error prevention
 
@@ -67,7 +67,7 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 2. Review [Troubleshooting](./troubleshooting.md)
 3. See [EPIPE Error Handling](./epipe-error-handling.md) for console issues
 
-## Future Features
+## Archive
 
-Documentation for planned but not yet implemented features is located in [`./future/`](./future/):
-- [Graph Engine](./future/graph-engine.md) - Planned SQLite-based knowledge graph with hybrid search (not yet implemented)
+Archived specifications are located in [`./archive/`](./archive/):
+- [Graph Engine Spec 2025](./archive/graph-engine-spec-2025/) - SQLite-based knowledge graph specification (not implemented)

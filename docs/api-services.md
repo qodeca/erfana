@@ -424,9 +424,111 @@ const mode = await settingsService.getProjectFilterMode()
 await settingsService.setProjectFilterMode('all')
 ```
 
+## GlobalSettingsService
+
+**File:** `src/main/services/GlobalSettingsService.ts`
+
+Application-wide settings with Zod schema validation.
+
+### Key Features
+- Settings persisted to `~/.erfana/settings.json`
+- Corruption handling: backup to `.bak`, reset to defaults
+- Reactive updates via IPC broadcast to renderer
+
+### Public Methods
+
+#### `get(): GlobalSettings`
+Get current settings.
+
+#### `update(partial: Partial<GlobalSettings>): GlobalSettings`
+Update settings (partial merge).
+
+#### `reset(): GlobalSettings`
+Reset to defaults.
+
+---
+
+## LoggingService
+
+**File:** `src/main/services/LoggingService.ts`
+
+Centralized logging with file persistence.
+
+### Key Features
+- File-based logging to `~/.erfana/logs/`
+- Separate files: `main.log`, `renderer.log`, `combined.log`
+- Auto-rolling: 10MB size limit, 100-file rotation, 7-day retention
+- 6 log levels: trace, debug, info, warn, error, fatal
+
+### Usage
+```typescript
+import { MainLogger } from './services/LoggingService'
+
+MainLogger.info('Application started')
+MainLogger.error('Operation failed', error)
+```
+
+See [Logging Documentation](./logging.md) for details.
+
+---
+
+## PdfService
+
+**File:** `src/main/services/PdfService.ts`
+
+PDF generation from HTML content.
+
+### Key Features
+- Print-optimized PDF with A4 page size
+- Vector Mermaid diagrams (not rasterized)
+- Uses Electron's `webContents.printToPDF()`
+
+### Public Methods
+
+#### `generatePdf(html: string, outputPath: string): Promise<void>`
+Generate PDF from HTML content.
+
+---
+
+## DocxService
+
+**File:** `src/main/services/DocxService.ts`
+
+DOCX generation from HTML content.
+
+### Key Features
+- Word format export
+- Mermaid diagrams as high-resolution PNG
+- Uses `docx` npm package
+
+### Public Methods
+
+#### `generateDocx(html: string, images: ImageData[], outputPath: string): Promise<void>`
+Generate DOCX from HTML with embedded images.
+
+---
+
+## GitStatusService
+
+**File:** `src/main/services/GitStatusService.ts`
+
+Git status tracking with isomorphic-git.
+
+### Key Features
+- VS Code-style status indicators (M/U/D/A/!)
+- Folder status propagation
+- Operation queue to prevent index.lock conflicts
+- Auto-refresh with debounce and cooldown
+
+### Known Limitations
+- Global `.gitignore` not supported (isomorphic-git limitation)
+
+---
+
 ## See Also
 
 - [Architecture](./architecture.md) - Service class overview
 - [IPC Patterns](./ipc-patterns.md) - IPC handler integration
-- [Terminal](./terminal.md) - Terminal panel implementation
-- [File Watching](./file-watching.md) - Auto-refresh implementation
+- [Terminal](./terminal/README.md) - Terminal panel implementation
+- [File Watching](./file-watching/README.md) - Auto-refresh implementation
+- [Logging](./logging.md) - Logging layer documentation

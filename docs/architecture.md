@@ -72,11 +72,17 @@ src/
 │   │   ├── FileWatcherService.ts    # File content auto-refresh
 │   │   ├── DirectoryWatcherService.ts  # Directory tree auto-refresh
 │   │   ├── SettingsService.ts   # Persistent settings (electron-store)
+│   │   ├── GlobalSettingsService.ts  # App-wide settings (~/.erfana/)
+│   │   ├── LoggingService.ts    # File-based logging with rotation
+│   │   ├── GitStatusService.ts  # Git status with operation queue
+│   │   ├── PdfService.ts        # PDF export
+│   │   ├── DocxService.ts       # DOCX export
 │   │   └── TerminalService.ts   # PTY management with node-pty
 │   └── ipc/
 │       ├── file-handlers.ts     # IPC handlers
 │       ├── file-watcher-handlers.ts  # File watching IPC
 │       ├── directory-watcher-handlers.ts  # Directory watching IPC
+│       ├── logging-handlers.ts  # Logging IPC
 │       └── terminal-handlers.ts # Terminal emulator IPC
 ├── preload/
 │   ├── index.ts              # contextBridge setup
@@ -92,7 +98,8 @@ src/
         │   ├── Tabs/            # EditorTab, WelcomeTab (Chrome-style tabs)
         │   ├── Dialog/          # Unified dialog system (Context + Provider + Hook)
         │   ├── ContextMenu/     # Right-click context menu
-        │   └── Toast/           # Toast notification system
+        │   ├── Toast/           # Toast notification system
+        │   └── Settings/        # Settings overlay
         ├── prompts/             # Prompt template system
         │   ├── templates/       # Markdown templates with YAML frontmatter
         │   ├── parser.ts        # CSP-safe YAML parser
@@ -101,7 +108,7 @@ src/
         │   ├── registry.ts      # Dynamic template loading
         │   ├── helpers.ts       # Template helper functions
         │   └── types.ts         # TypeScript interfaces
-        ├── stores/              # Zustand stores (useActivityBarStore)
+        ├── stores/              # Zustand stores (ActivityBar, Settings, GlobalSettings)
         ├── context/             # React contexts (ProjectManagementContext)
         ├── hooks/               # React hooks
         ├── types/               # Shared TypeScript types (filters.ts)
