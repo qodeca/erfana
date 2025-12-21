@@ -22,7 +22,7 @@ import { terminalService } from './services/TerminalService'
 import { settingsService } from './services/SettingsService'
 import { globalSettingsService } from './services/GlobalSettingsService'
 import { loggingService, logger } from './services/LoggingService'
-import { installSafeConsole } from './utils/safe-console'
+import { installSafeConsole } from './utils/safeConsole'
 
 // Install safe console logging to prevent EPIPE crashes
 // Must be called before any other code that uses console.log

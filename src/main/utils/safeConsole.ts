@@ -63,5 +63,5 @@ export function installSafeConsole(): void {
   console.debug = safeConsole.debug
 
   // Log installation (using safe method)
-  safeConsole.log('✅ Safe console installed - EPIPE errors will be suppressed')
+  safeConsole.log('Safe console installed - EPIPE errors will be suppressed')
 }

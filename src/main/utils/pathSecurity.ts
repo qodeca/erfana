@@ -6,7 +6,7 @@ import { AppError, ErrorCode } from '../../shared/errors'
 /**
  * Path Security Utilities
  *
- * todo021: Uses standardized AppError with ErrorCode enum
+ * Uses standardized AppError with ErrorCode enum
  *
  * Validates project paths to prevent:
  * - Path traversal attacks (../, ../../, etc.)
@@ -54,7 +54,7 @@ function getSensitiveUserDirectories(): string[] {
 /**
  * Check if a path points to a system or sensitive directory
  *
- * SECURITY FIX (todo010): Use platform-specific path separator instead of hardcoded '/'
+ * SECURITY FIX: Use platform-specific path separator instead of hardcoded '/'
  */
 export function isSystemDirectory(path: string): boolean {
   const normalized = normalize(path)
@@ -86,7 +86,7 @@ export function isSystemDirectory(path: string): boolean {
  * - Path is not a system or sensitive directory
  * - Path is accessible (exists and readable)
  *
- * SECURITY NOTE: TOCTOU Limitation (todo011)
+ * SECURITY NOTE: TOCTOU Limitation
  *
  * This validation checks path accessibility at validation time, but permissions
  * could change between check (validation) and actual use (file operations).
@@ -165,7 +165,7 @@ export async function validateSymlink(projectPath: string): Promise<boolean> {
   // It's a symlink - validate the target
   try {
     const target = await readlink(projectPath)
-    // SECURITY FIX (todo009): Explicitly handle absolute vs relative symlink targets
+    // SECURITY FIX: Explicitly handle absolute vs relative symlink targets
     // readlink() can return either absolute or relative paths
     const resolvedTarget = isAbsolute(target)
       ? normalize(target) // Absolute symlink target

@@ -193,7 +193,7 @@ describe('Main Process - Window Creation', () => {
     }))
 
     // Mock safe console
-    vi.doMock('./utils/safe-console', () => ({
+    vi.doMock('./utils/safeConsole', () => ({
       installSafeConsole: vi.fn()
     }))
   })
