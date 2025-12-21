@@ -87,10 +87,11 @@ describe('PreviewContextMenu Component', () => {
     it('should render context menu with all prompt items', () => {
       renderWithProvider(<PreviewContextMenu {...defaultProps} />)
 
-      // Should include all 4 context-menu prompts
+      // Should include all 5 context-menu prompts
       expect(screen.getByText('Elaborate')).toBeInTheDocument()
       expect(screen.getByText('Modify')).toBeInTheDocument()
       expect(screen.getByText('Ask')).toBeInTheDocument()
+      expect(screen.getByText('Visualize')).toBeInTheDocument()
       expect(screen.getByText('Prompt')).toBeInTheDocument()
     })
 
@@ -113,8 +114,9 @@ describe('PreviewContextMenu Component', () => {
       expect(labels[0]).toBe('Elaborate')
       expect(labels[1]).toBe('Modify')
       expect(labels[2]).toBe('Ask')
-      expect(labels[3]).toBe('Prompt')
-      expect(labels[4]).toBe('Copy Selection')
+      expect(labels[3]).toBe('Visualize')
+      expect(labels[4]).toBe('Prompt')
+      expect(labels[5]).toBe('Copy Selection')
     })
 
     it('should render icons for each menu item', () => {
@@ -126,7 +128,7 @@ describe('PreviewContextMenu Component', () => {
 
       // Each menu item should have an icon (svg element)
       const svgElements = portalRoot!.querySelectorAll('svg')
-      expect(svgElements.length).toBeGreaterThanOrEqual(5) // 4 prompts + Copy
+      expect(svgElements.length).toBeGreaterThanOrEqual(6) // 5 prompts + Copy
     })
   })
 

@@ -47,7 +47,7 @@ if (import.meta.env.DEV) {
  */
 export const PROMPT_REGISTRY: Record<string, PromptConfig> = parsedTemplates.reduce(
   (acc, parsed) => {
-    const config = {
+    const config: PromptConfig = {
       id: parsed.id,
       label: parsed.frontmatter.name,
       icon: parsed.frontmatter.icon,
@@ -62,7 +62,12 @@ export const PROMPT_REGISTRY: Record<string, PromptConfig> = parsedTemplates.red
       enabled: parsed.frontmatter.enabled !== false,
       requiresInput: parsed.frontmatter.requiresInput || false,
       inputLabel: parsed.frontmatter.inputLabel,
-      inputPlaceholder: parsed.frontmatter.inputPlaceholder
+      inputPlaceholder: parsed.frontmatter.inputPlaceholder,
+      // Dropdown configuration from frontmatter
+      dropdownOptions: parsed.frontmatter.dropdown?.options,
+      dropdownLabel: parsed.frontmatter.dropdown?.label,
+      defaultDropdownValue: parsed.frontmatter.dropdown?.defaultValue,
+      textareaOptional: parsed.frontmatter.textareaOptional || false
     }
     acc[parsed.id] = config
     return acc

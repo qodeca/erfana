@@ -1,4 +1,14 @@
 /**
+ * Dropdown option for prompt configuration
+ */
+export interface DropdownOption {
+  /** Internal value used in template variables */
+  value: string
+  /** Display label shown to user */
+  label: string
+}
+
+/**
  * Variables available for use in prompt templates
  * These are passed to Handlebars for interpolation
  */
@@ -47,6 +57,9 @@ export interface PromptVariables {
 
   /** User's free-form instruction for AI (e.g., for diagram chat) */
   userInstruction?: string
+
+  /** Selected diagram type from dropdown (e.g., "flowchart", "sequenceDiagram") */
+  diagramType?: string
 }
 
 /**
@@ -94,4 +107,16 @@ export interface PromptConfig {
 
   /** Placeholder text for the input field */
   inputPlaceholder?: string
+
+  /** Dropdown options for selection-based prompts */
+  dropdownOptions?: DropdownOption[]
+
+  /** Label for dropdown field */
+  dropdownLabel?: string
+
+  /** Default selected dropdown value */
+  defaultDropdownValue?: string
+
+  /** Whether textarea is optional (allows submission with empty text when dropdown is present) */
+  textareaOptional?: boolean
 }

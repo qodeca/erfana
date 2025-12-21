@@ -21,6 +21,8 @@ function createValidVariables(templateId: string): Partial<PromptVariables> {
     case 'ask':
     case 'prompt':
       return { selectedText: 'Some text', filePath: '/path/file.md', userInput: 'Do something' }
+    case 'visualize':
+      return { selectedText: 'Some text', filePath: '/path/file.md', diagramType: 'flowchart' }
     case 'diagram-chat':
       return { mermaidCode: 'graph TD; A-->B', userInstruction: 'Add a node' }
     case 'change-mermaid-direction':
@@ -41,6 +43,7 @@ describe('validation.ts', () => {
         'elaborate',
         'modify',
         'ask',
+        'visualize',
         'prompt',
         'diagram-chat',
         'change-mermaid-direction',
@@ -71,7 +74,8 @@ describe('validation.ts', () => {
         'importedFilePath',
         'targetDirection',
         'directionLabel',
-        'userInstruction'
+        'userInstruction',
+        'diagramType'
       ]
 
       Object.values(PROMPT_REQUIREMENTS).forEach((requirements) => {

@@ -217,40 +217,43 @@ describe('Existing Commands - Regression Tests', () => {
       expect(ids[0]).toBe('elaborate')
       expect(ids[1]).toBe('modify')
       expect(ids[2]).toBe('ask')
-      expect(ids[3]).toBe('prompt')
+      expect(ids[3]).toBe('visualize')
+      expect(ids[4]).toBe('prompt')
     })
 
-    it('should still have 4 context menu commands', () => {
+    it('should still have 5 context menu commands', () => {
       const prompts = getPromptsForArea('markdown-preview', 'context-menu')
 
-      expect(prompts.length).toBe(4)
+      expect(prompts.length).toBe(5)
     })
 
-    it('should maintain order values: 0, 1, 2, 3', () => {
+    it('should maintain order values: 0, 1, 2, 2.5, 3', () => {
       const prompts = getPromptsForArea('markdown-preview', 'context-menu')
 
       expect(prompts[0].order || 0).toBe(0)
       expect(prompts[1].order).toBe(1)
       expect(prompts[2].order).toBe(2)
-      expect(prompts[3].order).toBe(3)
+      expect(prompts[3].order).toBe(2.5)
+      expect(prompts[4].order).toBe(3)
     })
   })
 
   describe('Total Template Count - No Regression', () => {
-    it('should have exactly 6 templates total', () => {
+    it('should have exactly 7 templates total', () => {
       const prompts = getPromptsForArea('markdown-preview')
 
-      // 4 context-menu + 1 mermaid-error + 1 mermaid-direction
-      expect(prompts.length).toBe(6)
+      // 5 context-menu + 1 mermaid-error + 1 mermaid-direction
+      expect(prompts.length).toBe(7)
     })
 
-    it('should include all original templates plus new Prompt and direction change', () => {
+    it('should include all original templates plus Visualize, Prompt, and direction change', () => {
       const prompts = getPromptsForArea('markdown-preview')
       const ids = prompts.map((p) => p.id)
 
       expect(ids).toContain('elaborate')
       expect(ids).toContain('modify')
       expect(ids).toContain('ask')
+      expect(ids).toContain('visualize')
       expect(ids).toContain('prompt')
       expect(ids).toContain('mermaid-bug-report')
       expect(ids).toContain('change-mermaid-direction')
@@ -281,25 +284,27 @@ describe('Existing Commands - Regression Tests', () => {
       const elaborate = getPrompt('elaborate')
       const modify = getPrompt('modify')
       const ask = getPrompt('ask')
+      const visualize = getPrompt('visualize')
       const prompt = getPrompt('prompt')
 
       expect(elaborate?.requiresInput).toBe(false) // Direct execution
       expect(modify?.requiresInput).toBe(true)     // Needs modification instruction
       expect(ask?.requiresInput).toBe(true)        // Needs question
+      expect(visualize?.requiresInput).toBe(true)  // Needs diagram type selection
       expect(prompt?.requiresInput).toBe(true)     // Needs custom prompt
     })
 
-    it('should have 3 commands requiring input (was 2, now 3)', () => {
+    it('should have 4 commands requiring input (was 2, now 4 with visualize)', () => {
       const prompts = getPromptsForArea('markdown-preview', 'context-menu')
       const requireInputCount = prompts.filter((p) => p.requiresInput).length
 
-      expect(requireInputCount).toBe(3)
+      expect(requireInputCount).toBe(4)
     })
   })
 
   describe('Template Variable Support - No Regression', () => {
     it('should still support all common variables across commands', () => {
-      const commands = ['elaborate', 'modify', 'ask', 'prompt']
+      const commands = ['elaborate', 'modify', 'ask', 'visualize', 'prompt']
 
       commands.forEach((cmdId) => {
         const cmd = getPrompt(cmdId)

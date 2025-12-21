@@ -11,15 +11,16 @@ describe('Template Registry', () => {
   // The registry is built at module load time, so we test the actual registry
 
   describe('Registry Initialization', () => {
-    it('should load all 8 templates (elaborate, modify, ask, prompt, mermaid-bug-report, change-mermaid-direction, diagram-chat, organize-import)', () => {
+    it('should load all 9 templates (elaborate, modify, ask, visualize, prompt, mermaid-bug-report, change-mermaid-direction, diagram-chat, organize-import)', () => {
       const allPrompts = getAllPrompts()
 
-      expect(allPrompts.length).toBe(8)
+      expect(allPrompts.length).toBe(9)
 
       const ids = getAllPromptIds()
       expect(ids).toContain('elaborate')
       expect(ids).toContain('modify')
       expect(ids).toContain('ask')
+      expect(ids).toContain('visualize')
       expect(ids).toContain('prompt')
       expect(ids).toContain('mermaid-bug-report')
       expect(ids).toContain('change-mermaid-direction')
@@ -30,7 +31,7 @@ describe('Template Registry', () => {
     it('should build PROMPT_REGISTRY with correct structure', () => {
       expect(PROMPT_REGISTRY).toBeDefined()
       expect(typeof PROMPT_REGISTRY).toBe('object')
-      expect(Object.keys(PROMPT_REGISTRY).length).toBe(8)
+      expect(Object.keys(PROMPT_REGISTRY).length).toBe(9)
     })
 
     it('should log correct count to console on module load', () => {
@@ -38,7 +39,7 @@ describe('Template Registry', () => {
       // The actual log happens when the module first loads, so we just verify
       // the registry matches the expected count
       const count = getAllPrompts().length
-      expect(count).toBe(8)
+      expect(count).toBe(9)
     })
   })
 
@@ -94,7 +95,7 @@ describe('Template Registry', () => {
       const prompts = getAllPrompts()
 
       expect(Array.isArray(prompts)).toBe(true)
-      expect(prompts.length).toBe(8)
+      expect(prompts.length).toBe(9)
     })
 
     it('should return configs with correct structure', () => {
@@ -118,7 +119,7 @@ describe('Template Registry', () => {
       const ids = getAllPromptIds()
 
       expect(Array.isArray(ids)).toBe(true)
-      expect(ids.length).toBe(8)
+      expect(ids.length).toBe(9)
 
       ids.forEach((id) => {
         expect(typeof id).toBe('string')
@@ -131,6 +132,7 @@ describe('Template Registry', () => {
       expect(ids).toContain('elaborate')
       expect(ids).toContain('modify')
       expect(ids).toContain('ask')
+      expect(ids).toContain('visualize')
       expect(ids).toContain('prompt')
       expect(ids).toContain('mermaid-bug-report')
       expect(ids).toContain('change-mermaid-direction')
@@ -160,11 +162,12 @@ describe('Template Registry', () => {
         expect(prompt.subArea).toBe('context-menu')
       })
 
-      // Should include elaborate, modify, ask, prompt
+      // Should include elaborate, modify, ask, visualize, prompt
       const ids = prompts.map((p) => p.id)
       expect(ids).toContain('elaborate')
       expect(ids).toContain('modify')
       expect(ids).toContain('ask')
+      expect(ids).toContain('visualize')
       expect(ids).toContain('prompt')
     })
 
@@ -261,6 +264,7 @@ describe('Template Registry', () => {
       expect(iconMap['elaborate']).toBe('maximize2')
       expect(iconMap['modify']).toBe('edit-3')
       expect(iconMap['ask']).toBe('help-circle')
+      expect(iconMap['visualize']).toBe('layout-grid')
       expect(iconMap['prompt']).toBe('sparkles')
     })
   })
@@ -287,6 +291,47 @@ describe('Template Registry', () => {
         // All context menu prompts should handle file references
         expect(prompt.template).toContain('{{selectedText}}')
       })
+    })
+
+    it('should have "Visualize" template with dropdown configuration', () => {
+      const prompt = getPrompt('visualize')
+
+      expect(prompt).not.toBeNull()
+      expect(prompt?.id).toBe('visualize')
+      expect(prompt?.label).toBe('Visualize')
+      expect(prompt?.icon).toBe('layout-grid')
+      expect(prompt?.area).toBe('markdown-preview')
+      expect(prompt?.subArea).toBe('context-menu')
+      expect(prompt?.requiresInput).toBe(true)
+      expect(prompt?.textareaOptional).toBe(true)
+      expect(prompt?.autoExecute).toBe(true)
+      expect(prompt?.order).toBe(2.5)
+    })
+
+    it('should have "Visualize" template with 22 Mermaid diagram types', () => {
+      const prompt = getPrompt('visualize')
+
+      expect(prompt?.dropdownOptions).toBeDefined()
+      expect(prompt?.dropdownOptions?.length).toBe(22)
+      expect(prompt?.dropdownLabel).toBe('Diagram type')
+      expect(prompt?.defaultDropdownValue).toBe('flowchart')
+
+      // Verify some key diagram types are present
+      const values = prompt?.dropdownOptions?.map((o) => o.value) || []
+      expect(values).toContain('flowchart')
+      expect(values).toContain('sequenceDiagram')
+      expect(values).toContain('classDiagram')
+      expect(values).toContain('erDiagram')
+      expect(values).toContain('mindmap')
+      expect(values).toContain('gantt')
+    })
+
+    it('should have "Visualize" template with diagramType variable', () => {
+      const prompt = getPrompt('visualize')
+
+      expect(prompt?.template).toContain('{{diagramType}}')
+      expect(prompt?.template).toContain('{{selectedText}}')
+      expect(prompt?.template).toContain('{{userInput}}')
     })
   })
 })

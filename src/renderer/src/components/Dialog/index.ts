@@ -10,6 +10,7 @@ export { RenameDialog } from './RenameDialog'
 export { NewFileDialog } from './NewFileDialog'
 export { NewFolderDialog } from './NewFolderDialog'
 export { showGlobalDialog, subscribeGlobalDialogs } from './dialogService'
+export type { PromptDialogResult } from './PromptDialog'
 
 // Re-export validation utilities for convenience
 export { ValidationErrorCode } from '../../utils/fileValidation'
@@ -27,5 +28,6 @@ export type {
   NewFolderDialogConfig,
   DialogConfig,
   Dialog,
-  DialogContextType
+  DialogContextType,
+  DropdownOption
 } from './types'

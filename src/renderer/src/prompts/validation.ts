@@ -14,6 +14,7 @@ export const PROMPT_REQUIREMENTS: Record<string, (keyof PromptVariables)[]> = {
   'elaborate': ['selectedText', 'filePath'],
   'modify': ['selectedText', 'filePath', 'userInput'],
   'ask': ['selectedText', 'filePath', 'userInput'],
+  'visualize': ['selectedText', 'filePath', 'diagramType'],
   'prompt': ['selectedText', 'filePath', 'userInput'],
 
   // Mermaid diagram prompts

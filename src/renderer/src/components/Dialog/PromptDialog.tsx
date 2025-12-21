@@ -7,6 +7,17 @@ import { validateTextInput } from '../../utils/textInputValidation'
 import { TEXT_INPUT_LIMITS } from '../../../../shared/constants'
 import type { PromptDialogConfig } from './types'
 
+/**
+ * Composite result returned when dropdown is present
+ * Allows PreviewContextMenu to extract both values
+ */
+export interface PromptDialogResult {
+  /** User's text input (may be empty if textareaOptional) */
+  text: string
+  /** Selected dropdown value (only present when dropdown is configured) */
+  dropdown?: string
+}
+
 interface PromptDialogProps {
   config: PromptDialogConfig
   zIndex: number
@@ -51,15 +62,27 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
     defaultValue = '',
     maxLength = TEXT_INPUT_LIMITS.MAX_LENGTH,
     minLength = TEXT_INPUT_LIMITS.MIN_LENGTH,
-    validation
+    validation,
+    dropdownOptions,
+    dropdownLabel,
+    defaultDropdownValue,
+    textareaOptional = false
   } = config
 
+  // Determine initial dropdown value: use provided default, or first option if available
+  const initialDropdownValue = defaultDropdownValue
+    || (dropdownOptions && dropdownOptions.length > 0 ? dropdownOptions[0].value : '')
+
   const [inputValue, setInputValue] = useState(defaultValue)
+  const [dropdownValue, setDropdownValue] = useState(initialDropdownValue)
   const [validationError, setValidationError] = useState<string | null>(null)
   const [showTooltip, setShowTooltip] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [hasSelection, setHasSelection] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Whether this dialog has a dropdown configured
+  const hasDropdown = dropdownOptions && dropdownOptions.length > 0
 
   // Generate unique IDs for ARIA attributes
   const titleId = `dialog-title-${id}`
@@ -72,20 +95,23 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
     }
   }, [])
 
+  // Effective minimum length: 0 when textarea is optional, otherwise use configured minLength
+  const effectiveMinLength = textareaOptional ? 0 : minLength
+
   // Memoized validation result using shared validation utility
   const validationResult = useMemo(() => {
     return validateTextInput(inputValue, {
-      minLength,
+      minLength: effectiveMinLength,
       maxLength,
       warningThreshold: TEXT_INPUT_LIMITS.WARNING_THRESHOLD,
       customValidation: validation
     })
-  }, [inputValue, minLength, maxLength, validation])
+  }, [inputValue, effectiveMinLength, maxLength, validation])
 
   // Validate input for submit - updates validation error state
   const validateInput = useCallback((value: string): boolean => {
     const result = validateTextInput(value, {
-      minLength,
+      minLength: effectiveMinLength,
       maxLength,
       warningThreshold: TEXT_INPUT_LIMITS.WARNING_THRESHOLD,
       customValidation: validation
@@ -98,7 +124,7 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
 
     setValidationError(null)
     return true
-  }, [minLength, maxLength, validation])
+  }, [effectiveMinLength, maxLength, validation])
 
   // Validate default value on mount if provided
   useEffect(() => {
@@ -110,7 +136,18 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
   const handleSubmit = () => {
     const trimmed = inputValue.trim()
     if (validateInput(trimmed)) {
-      onSubmit(trimmed)
+      // When dropdown is present, return JSON with both values
+      // This allows PreviewContextMenu to extract dropdown and text separately
+      if (hasDropdown) {
+        const result: PromptDialogResult = {
+          text: trimmed,
+          dropdown: dropdownValue
+        }
+        onSubmit(JSON.stringify(result))
+      } else {
+        // Backward compatibility: return plain text for non-dropdown prompts
+        onSubmit(trimmed)
+      }
     }
   }
 
@@ -271,8 +308,40 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
             </div>
           )}
 
+          {/* Dropdown section (when configured) */}
+          {hasDropdown && (
+            <div className="dialog-dropdown-section">
+              <label
+                htmlFor={`dialog-dropdown-${id}`}
+                className="dialog-dropdown-label"
+              >
+                {dropdownLabel || 'Select an option:'}
+              </label>
+              <select
+                id={`dialog-dropdown-${id}`}
+                className="dialog-select"
+                value={dropdownValue}
+                onChange={(e) => setDropdownValue(e.target.value)}
+                aria-label={dropdownLabel || 'Select an option'}
+              >
+                {dropdownOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="dialog-input-section">
-            <label className="dialog-input-label">{inputLabel}</label>
+            <label className="dialog-input-label">
+              {inputLabel}
+              {textareaOptional && (
+                <span style={{ fontWeight: 'normal', color: 'var(--color-text-muted)' }}>
+                  {' '}(optional)
+                </span>
+              )}
+            </label>
             <textarea
               ref={textareaRef}
               className="dialog-input"

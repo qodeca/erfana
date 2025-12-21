@@ -250,7 +250,7 @@ describe('Prompt Command - New Feature Tests', () => {
   })
 
   describe('Comparison with Other Commands', () => {
-    it('should be the only context menu command requiring input besides Modify and Ask', () => {
+    it('should be the only context menu command requiring input besides Modify, Ask, and Visualize', () => {
       const prompts = getPromptsForArea('markdown-preview', 'context-menu')
 
       const requireInputPrompts = prompts.filter((p) => p.requiresInput)
@@ -258,8 +258,9 @@ describe('Prompt Command - New Feature Tests', () => {
 
       expect(ids).toContain('modify')
       expect(ids).toContain('ask')
+      expect(ids).toContain('visualize')
       expect(ids).toContain('prompt')
-      expect(ids.length).toBe(3)
+      expect(ids.length).toBe(4)
     })
 
     it('should have autoExecute=true for all prompts (v0.5.3+)', () => {

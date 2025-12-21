@@ -1,6 +1,28 @@
 import { z } from 'zod'
 
 /**
+ * Schema for dropdown option in prompt frontmatter
+ */
+const DropdownOptionSchema = z.object({
+  /** Internal value used in template variables */
+  value: z.string().min(1),
+  /** Display label shown to user */
+  label: z.string().min(1)
+})
+
+/**
+ * Schema for dropdown configuration in prompt frontmatter
+ */
+const DropdownSchema = z.object({
+  /** Label displayed above the dropdown */
+  label: z.string().min(1),
+  /** Array of options (at least one required) */
+  options: z.array(DropdownOptionSchema).min(1),
+  /** Default selected value (optional, defaults to first option) */
+  defaultValue: z.string().optional()
+})
+
+/**
  * Zod schema for prompt template frontmatter validation
  * This ensures all templates have required metadata in correct format
  */
@@ -26,8 +48,8 @@ export const PromptFrontmatterSchema = z.object({
   /** Whether to automatically execute (send Enter) after pasting to terminal */
   autoExecute: z.boolean().optional().default(false),
 
-  /** Order for sorting in menus (lower numbers appear first) */
-  order: z.number().int().min(0).optional().default(0),
+  /** Order for sorting in menus (lower numbers appear first, supports decimals for insertion) */
+  order: z.number().min(0).optional().default(0),
 
   /** Whether this prompt is enabled (can be toggled off) */
   enabled: z.boolean().optional().default(true),
@@ -39,7 +61,13 @@ export const PromptFrontmatterSchema = z.object({
   inputLabel: z.string().optional(),
 
   /** Placeholder text for the input field */
-  inputPlaceholder: z.string().optional()
+  inputPlaceholder: z.string().optional(),
+
+  /** Dropdown configuration for selection-based prompts */
+  dropdown: DropdownSchema.optional(),
+
+  /** Whether textarea is optional (allows submission with empty text when dropdown is present) */
+  textareaOptional: z.boolean().optional()
 })
 
 /**

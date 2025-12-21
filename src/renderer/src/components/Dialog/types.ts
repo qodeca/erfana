@@ -38,6 +38,16 @@ export interface ConfirmDialogConfig extends BaseDialogConfig {
 }
 
 /**
+ * Dropdown option for prompt dialogs with selection
+ */
+export interface DropdownOption {
+  /** Internal value used in template variables */
+  value: string
+  /** Display label shown to user */
+  label: string
+}
+
+/**
  * Prompt dialog configuration (replaces UserInputDialog)
  * Used for collecting text input from users
  */
@@ -60,6 +70,14 @@ export interface PromptDialogConfig extends BaseDialogConfig {
   onSubmit?: (value: string) => void | Promise<void>
   /** Optional callback when cancelled (deprecated: use Promise return value instead) */
   onCancel?: () => void
+  /** Dropdown options for selection (if provided, renders dropdown before textarea) */
+  dropdownOptions?: DropdownOption[]
+  /** Default selected dropdown value */
+  defaultDropdownValue?: string
+  /** Label for dropdown field */
+  dropdownLabel?: string
+  /** Make textarea optional when dropdown is present (allows empty text submission) */
+  textareaOptional?: boolean
 }
 
 /**

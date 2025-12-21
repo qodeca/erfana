@@ -502,3 +502,63 @@
   min-width: 600px;
   max-width: 600px;
 }
+
+/* Dropdown select for PromptDialog */
+.dialog-select {
+  width: 100%;
+  padding: var(--space-5) var(--space-6);
+  padding-right: var(--space-12); /* Extra space for custom arrow */
+  background-color: var(--color-bg-input);
+  border: var(--border-width) solid var(--dialog-border);
+  border-radius: 0; /* UI Style Guide: no rounded corners */
+  color: var(--color-text-primary);
+  font-size: var(--text-md);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: all var(--transition-slow);
+
+  /* Remove default browser styling */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  /* Custom dropdown arrow using CSS */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23858585' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-6) center;
+  background-size: 12px;
+}
+
+.dialog-select:hover {
+  border-color: var(--color-border-subtle);
+  background-color: var(--color-bg-tertiary);
+}
+
+.dialog-select:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  background-color: var(--color-bg-tertiary);
+  box-shadow: var(--shadow-focus);
+}
+
+/* Style dropdown options */
+.dialog-select option {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  padding: var(--space-4);
+}
+
+/* Dropdown section with label */
+.dialog-dropdown-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.dialog-dropdown-label {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--dialog-text-secondary);
+  letter-spacing: 0.1px;
+}

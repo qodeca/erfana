@@ -7,6 +7,7 @@ import { formatLineRange } from '../../prompts/helpers'
 import { renderIcon, DEFAULT_ICON_PROPS } from '../../utils/iconRegistry'
 import { TEXT_INPUT_LIMITS } from '../../../../shared/constants'
 import type { PromptVariables, PromptConfig } from '../../prompts/types'
+import type { PromptDialogResult } from '../Dialog/PromptDialog'
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { scheduleScrollIfNeeded } from '../../utils/promptScrollScheduler.logic'
 
@@ -87,22 +88,47 @@ export function PreviewContextMenu({
       onClose()
 
       // Show prompt dialog using new unified system
-      const userInput = await showPrompt({
+      // Pass dropdown configuration if present
+      const dialogResult = await showPrompt({
         title: config.inputLabel || 'What would you like to do?',
         message: '',
         selectedText: sourceText,
         inputLabel: 'Your input:',
         inputPlaceholder: config.inputPlaceholder || 'Enter your instructions or question here...',
         minLength: TEXT_INPUT_LIMITS.MIN_LENGTH,
-        maxLength: TEXT_INPUT_LIMITS.MAX_LENGTH
+        maxLength: TEXT_INPUT_LIMITS.MAX_LENGTH,
+        // Dropdown configuration from prompt config
+        dropdownOptions: config.dropdownOptions,
+        dropdownLabel: config.dropdownLabel,
+        defaultDropdownValue: config.defaultDropdownValue,
+        textareaOptional: config.textareaOptional
       })
 
-      // If user canceled or input is empty, return
-      if (!userInput) return
+      // If user canceled, return
+      if (!dialogResult) return
 
-      // Execute prompt with user input
+      // Parse the result based on whether dropdown was present
+      let userInput: string | undefined
+      let diagramType: string | undefined
+
+      if (config.dropdownOptions && config.dropdownOptions.length > 0) {
+        // Dialog returns JSON when dropdown is present
+        try {
+          const parsed = JSON.parse(dialogResult) as PromptDialogResult
+          userInput = parsed.text || undefined
+          diagramType = parsed.dropdown
+        } catch {
+          // Fallback: treat as plain text if JSON parsing fails
+          userInput = dialogResult
+        }
+      } else {
+        // No dropdown: plain text result
+        userInput = dialogResult
+      }
+
+      // Execute prompt with user input and optional diagram type
       try {
-        await executePrompt(config, userInput)
+        await executePrompt(config, userInput, diagramType)
       } catch (error) {
         console.error(`❌ Failed to execute prompt:`, error)
       }
@@ -111,10 +137,10 @@ export function PreviewContextMenu({
     }
 
     // Execute immediately for non-input prompts
-    await executePrompt(config, undefined)
+    await executePrompt(config, undefined, undefined)
   }
 
-  const executePrompt = async (config: PromptConfig, userInput?: string) => {
+  const executePrompt = async (config: PromptConfig, userInput?: string, diagramType?: string) => {
     // Try to read source lines from file, fall back to selectedText if unavailable
     let textToUse = selectedText
     if (startLine !== undefined && endLine !== undefined) {
@@ -142,7 +168,8 @@ export function PreviewContextMenu({
       endLine,
       lineRange,
       fileRef,
-      userInput // Add user input if provided
+      userInput, // Add user input if provided
+      diagramType // Add diagram type from dropdown if provided
     }
 
     // Execute prompt template using centralized function

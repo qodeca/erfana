@@ -43,7 +43,7 @@ src/
 1. **Markdown Editor** - Monaco with live preview, scroll sync, Mermaid diagrams (zoom, pan, full-screen viewer), YAML frontmatter rendering
 2. **Project Tree** - File explorer with drag-drop reorganization, markdown filtering, context menu, git status indicators
 3. **Terminal** - xterm.js with PTY backend, clipboard support, file links, scroll recovery
-4. **Prompt Templates** - AI text operations via context menu (Elaborate, Modify, Ask, diagram chat)
+4. **Prompt Templates** - AI text operations via context menu (Elaborate, Modify, Ask, Visualize, diagram chat); Visualize generates Mermaid diagrams from selected text with dropdown for 22 diagram types
 5. **Project Settings** - Per-project configuration via `.erfana/settings.json` (watcher ignore, tree visibility)
 6. **PDF Export** - Export markdown to print-optimized PDF with vector Mermaid diagrams, A4 page size, print-friendly styling
 7. **DOCX Export** - Export markdown to Word format with Mermaid diagrams as high-resolution PNG images
@@ -184,6 +184,31 @@ Comprehensive security upgrade following 2025 Electron best practices:
 - `docs/build/` (NEW) - Split build configuration documentation (8 files)
 - `CLAUDE.md` - Condensed changelog, v0.4.x-v0.5.x moved to docs/CHANGELOG.md
 
+### Visualize Prompt (Dec 21, 2025)
+Added "Visualize" prompt to Preview context menu for AI-powered Mermaid diagram generation:
+
+**Features**:
+- Dialog with dropdown for 22 Mermaid diagram types (flowchart, sequence, class, state, ER, etc.)
+- Optional textarea for additional instructions
+- Generates Mermaid diagrams from selected text
+- Extended PromptDialog component to support dropdown configuration
+
+**Implementation**:
+- Extended `PromptDialog` to accept dropdown configuration
+- Added dropdown schema validation in `prompts/schema.ts`
+- Created `visualize.md` template with diagram type variable
+- Updated `PreviewContextMenu` to handle dropdown values
+- Added `diagramType` to `PromptVariables` interface
+
+**Testing**: 4 new tests added (3946 tests total)
+
+**Files Modified**:
+- `src/renderer/src/components/Dialog/PromptDialog.tsx` - Added dropdown support
+- `src/renderer/src/prompts/schema.ts` - Added dropdown schema validation
+- `src/renderer/src/prompts/visualize.md` (NEW) - Visualize prompt template
+- `src/renderer/src/components/ContextMenu/PreviewContextMenu.tsx` - Added Visualize action
+- Closes #57
+
 ## Historical Changes
 
 For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
@@ -202,7 +227,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 3941 tests passing (132 test files)
+- **Current**: 3946 tests passing (132 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)

@@ -266,19 +266,18 @@ describe('Prompt Frontmatter Schema', () => {
       }
     })
 
-    it('should reject non-integer for order field', () => {
+    it('should accept decimal values for order field (for insertion between existing items)', () => {
       const data = {
         area: 'markdown-preview',
         name: 'Test',
         icon: 'sparkles',
-        order: 1.5 // Float instead of integer
+        order: 2.5 // Float allowed for flexible ordering
       }
 
       const result = safeParseFrontmatter(data)
-      expect(result.success).toBe(false)
-      if (!result.success) {
-        const error = result.error.issues.find((e) => e.path.includes('order'))
-        expect(error).toBeDefined()
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.order).toBe(2.5)
       }
     })
 
