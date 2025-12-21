@@ -141,7 +141,7 @@ at /Users/.../erfana/out/main/index.js:2379:13
 
 **Solution**: Implemented comprehensive EPIPE error handling:
 
-1. **Global Console Safety** (`src/main/utils/safe-console.ts`):
+1. **Global Console Safety** (`src/main/utils/safeConsole.ts`):
    - Wraps all console methods with try-catch
    - Silently suppresses EPIPE errors during shutdown
    - Installed early in main process initialization
@@ -159,7 +159,7 @@ at /Users/.../erfana/out/main/index.js:2379:13
 **Status**: ✅ Application now shuts down cleanly without crashes. EPIPE errors are suppressed and logged informatively.
 
 **Files Modified**:
-- `src/main/utils/safe-console.ts` (new)
+- `src/main/utils/safeConsole.ts` (new)
 - `src/main/index.ts` (installSafeConsole)
  
 - `src/main/services/TerminalService.ts` (write, killTerminal, dispose)

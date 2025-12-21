@@ -31,7 +31,7 @@ at console.log (node:internal/console/constructor:378:26)
 
 ## Solution Architecture
 
-### 1. Global Console Safety (`src/main/utils/safe-console.ts`)
+### 1. Global Console Safety (`src/main/utils/safeConsole.ts`)
 
 **Purpose**: Prevent EPIPE crashes from console.log operations app-wide
 
@@ -57,7 +57,7 @@ function safeConsoleWrite(method: ConsoleMethod, ...args: any[]): void {
 
 **Installation**: Called early in `src/main/index.ts` before any other code
 ```typescript
-import { installSafeConsole } from './utils/safe-console'
+import { installSafeConsole } from './utils/safeConsole'
 installSafeConsole()
 ```
 

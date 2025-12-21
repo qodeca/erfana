@@ -326,7 +326,7 @@ Implemented comprehensive logging system with file-based persistence and configu
 - `src/main/services/LoggingService.ts` (NEW) - electron-log based logging service singleton
 - `src/main/ipc/logging-handlers.ts` (NEW) - IPC handler for renderer logs
 - `src/renderer/src/utils/logger.ts` (NEW) - RendererLogger facade with IPC integration
-- `src/main/utils/safe-console.ts` (NEW) - Safe console wrapper for error scenarios
+- `src/main/utils/safeConsole.ts` (NEW) - Safe console wrapper for error scenarios
 - `src/main/index.ts` - Initialize LoggingService on app ready
 - `src/preload/index.ts` - Expose logging IPC to renderer
 - Closes #49

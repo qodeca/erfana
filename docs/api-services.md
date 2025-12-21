@@ -14,7 +14,7 @@ This document covers supporting services.
 
 Manages terminal emulator instances with xterm.js + node-pty.
 
-**EPIPE Error Handling:** Uses `safe-console` utility to prevent EPIPE crashes during terminal cleanup. See [EPIPE Error Handling](./epipe-error-handling.md) for details.
+**EPIPE Error Handling:** Uses `safeConsole` utility to prevent EPIPE crashes during terminal cleanup. See [EPIPE Error Handling](./epipe-error-handling.md) for details.
 
 ### Public Methods
 

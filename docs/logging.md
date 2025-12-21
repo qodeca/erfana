@@ -481,7 +481,7 @@ window.addEventListener('error', (event) => {
 The `safeConsole` utility prevents EPIPE errors during app shutdown:
 
 ```typescript
-import { safeConsole, installSafeConsole } from '../utils/safe-console'
+import { safeConsole, installSafeConsole } from '../utils/safeConsole'
 
 // Install globally (called on app startup)
 installSafeConsole()
