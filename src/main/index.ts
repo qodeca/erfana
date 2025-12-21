@@ -13,6 +13,7 @@ import { registerPdfHandlers } from './ipc/pdf-handlers'
 import { registerDocxHandlers } from './ipc/docx-handlers'
 import { registerGlobalSettingsHandlers } from './ipc/global-settings-handlers'
 import { registerLoggingHandlers } from './ipc/logging-handlers'
+import { registerQuitHandlers } from './ipc/quit-handlers'
 import { createApplicationMenu } from './menu'
 import { fileService } from './services/FileService'
 import { fileWatcherService } from './services/FileWatcherService'
@@ -26,6 +27,10 @@ import { installSafeConsole } from './utils/safe-console'
 // Install safe console logging to prevent EPIPE crashes
 // Must be called before any other code that uses console.log
 installSafeConsole()
+
+// Quit confirmation state
+let isQuitting = false
+let mainWindowRef: BrowserWindow | null = null
 
 // WebGL Command Line Switches (originally added for Electron 33+)
 // Fixes WebGL context creation issues and terminal flickering in production builds
@@ -60,6 +65,14 @@ function createWindow(): BrowserWindow {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+  })
+
+  // Handle window close with confirmation
+  mainWindow.on('close', (event) => {
+    if (isQuitting) return
+    event.preventDefault()
+    isQuitting = true
+    mainWindow.webContents.send('quit:requested', { reason: 'close' })
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -109,6 +122,9 @@ function createWindow(): BrowserWindow {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  // Store reference for quit handling
+  mainWindowRef = mainWindow
 
   return mainWindow
 }
@@ -167,6 +183,21 @@ app.whenReady().then(async () => {
   // Create main window
   createWindow()
 
+  // Register quit confirmation handler
+  registerQuitHandlers((proceed) => {
+    try {
+      if (proceed && mainWindowRef && !mainWindowRef.isDestroyed()) {
+        mainWindowRef.destroy()
+        app.quit()
+      } else {
+        isQuitting = false
+      }
+    } catch (error) {
+      logger.error('Error during quit', error instanceof Error ? error : undefined)
+      isQuitting = false // Reset flag to allow retry
+    }
+  })
+
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
@@ -174,13 +205,11 @@ app.whenReady().then(async () => {
   })
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+// Quit when all windows are closed
+// Note: On macOS, apps typically stay active but we want consistent quit behavior
+// since confirmation already happened via close handler
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
+  app.quit()
 })
 
 // Cleanup file watchers, directory watchers, and terminals before app quits

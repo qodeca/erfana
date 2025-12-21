@@ -151,6 +151,10 @@ declare global {
         log: (entry: LogEntry) => void
         getLevel: () => Promise<string>
       }
+      quit: {
+        onQuitRequested: (callback: (data: { reason?: string }) => void) => () => void
+        sendQuitResponse: (proceed: boolean) => void
+      }
     }
   }
 }

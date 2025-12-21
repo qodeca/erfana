@@ -59,6 +59,10 @@ describe('Main Process - Window Creation', () => {
       Menu: {
         buildFromTemplate: vi.fn(() => ({})),
         setApplicationMenu: vi.fn()
+      },
+      ipcMain: {
+        on: vi.fn(),
+        handle: vi.fn()
       }
     }))
 
@@ -183,6 +187,11 @@ describe('Main Process - Window Creation', () => {
       registerLoggingHandlers: vi.fn()
     }))
 
+    // Mock quit handlers
+    vi.doMock('./ipc/quit-handlers', () => ({
+      registerQuitHandlers: vi.fn()
+    }))
+
     // Mock safe console
     vi.doMock('./utils/safe-console', () => ({
       installSafeConsole: vi.fn()
@@ -272,6 +281,10 @@ describe('Main Process - Window Creation', () => {
           Menu: {
             buildFromTemplate: vi.fn(() => ({})),
             setApplicationMenu: vi.fn()
+          },
+          ipcMain: {
+            on: vi.fn(),
+            handle: vi.fn()
           }
         }))
 

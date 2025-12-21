@@ -126,6 +126,22 @@ See `docs/` for details (keep Claude's context focused):
 
 ## Recent Changes (v0.6.x)
 
+### Quit Confirmation on Close (Dec 21, 2025)
+App now quits fully on close with confirmation dialog for unsaved changes:
+- All close methods (window [x], Cmd+Q, Cmd+W, dock menu) trigger full app quit
+- macOS: Overrides default dock behavior to quit fully instead of staying in dock
+- Combined confirmation dialog for unsaved changes AND/OR terminal activity
+- Dialog buttons: "Quit" / "Cancel" (no Save option)
+- Fail-safe: On error, proceeds with quit to prevent user being stuck
+- IPC-based: Main process coordinates with renderer via `quit:requested`/`quit:confirmResponse` channels
+- Closes #64
+
+**Files Created**: `src/shared/ipc/quit-schema.ts`, `src/renderer/src/utils/quitHelpers.ts`, `src/renderer/src/hooks/useQuitHandler.ts`, `src/main/ipc/quit-handlers.ts`
+
+**Files Modified**: `src/preload/index.ts`, `src/renderer/src/App.tsx`, `src/main/index.ts`
+
+**Testing**: 54 new tests added
+
 ### Watcher Auto-Restart with Exponential Backoff (Dec 21, 2025)
 Added automatic recovery for file watchers on transient errors:
 - Auto-restart with exponential backoff (800ms, 1600ms, 3200ms)
@@ -361,7 +377,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 4264 tests passing (141 test files)
+- **Current**: 4353 tests passing (144 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)

@@ -393,6 +393,32 @@ const api = {
      * Get current log level from main process
      */
     getLevel: (): Promise<string> => ipcRenderer.invoke('logging:getLevel')
+  },
+
+  // Quit confirmation operations
+  quit: {
+    /**
+     * Listen for quit request from main process
+     * Main sends this when user tries to close window or quit app
+     *
+     * @param callback - Called when quit is requested
+     * @returns Cleanup function to remove listener
+     */
+    onQuitRequested: (callback: (data: { reason?: string }) => void): (() => void) => {
+      const listener = (_event: unknown, data: { reason?: string }): void => callback(data)
+      ipcRenderer.on('quit:requested', listener)
+      return () => ipcRenderer.removeListener('quit:requested', listener)
+    },
+
+    /**
+     * Send quit response to main process
+     * Tells main whether to proceed with quit or cancel it
+     *
+     * @param proceed - true to quit, false to cancel
+     */
+    sendQuitResponse: (proceed: boolean): void => {
+      ipcRenderer.send('quit:confirmResponse', { proceed })
+    }
   }
 }
 

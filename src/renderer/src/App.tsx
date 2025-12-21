@@ -10,14 +10,23 @@ import { UIBlocker } from './components/UIBlocker/UIBlocker'
 import { ProjectManagementProvider } from './context/ProjectManagementContext'
 import { TerminalPortalProvider } from './context/TerminalPortalContext'
 import { useGlobalSettingsInit } from './hooks/useGlobalSettingsInit'
+import { useQuitHandler } from './hooks/useQuitHandler'
 import { useGlobalSettingsStore } from './stores/useGlobalSettingsStore'
 import { initializeLogger, logger } from './utils/logger'
 
-function App() {
+/**
+ * Inner app content that requires DialogProvider context.
+ * Separated from App to ensure useQuitHandler() is called
+ * inside DialogProvider (it needs useDialog() from that context).
+ */
+function AppContent() {
   const loggingLevel = useGlobalSettingsStore((state) => state.settings?.logging.level)
 
   // Initialize global settings
   useGlobalSettingsInit()
+
+  // Handle quit confirmation (must be within DialogProvider - hence in AppContent)
+  useQuitHandler()
 
   // Initialize logger on mount
   useEffect(() => {
@@ -34,20 +43,26 @@ function App() {
   }, [loggingLevel])
 
   return (
+    <ProjectManagementProvider>
+      <TerminalPortalProvider>
+        <ToastProvider>
+          <div className="app">
+            <AppDockLayout />
+            <ToastNotification />
+            <DialogManager />
+            <SettingsOverlay />
+            <UIBlocker />
+          </div>
+        </ToastProvider>
+      </TerminalPortalProvider>
+    </ProjectManagementProvider>
+  )
+}
+
+function App() {
+  return (
     <DialogProvider>
-      <ProjectManagementProvider>
-        <TerminalPortalProvider>
-          <ToastProvider>
-            <div className="app">
-              <AppDockLayout />
-              <ToastNotification />
-              <DialogManager />
-              <SettingsOverlay />
-              <UIBlocker />
-            </div>
-          </ToastProvider>
-        </TerminalPortalProvider>
-      </ProjectManagementProvider>
+      <AppContent />
     </DialogProvider>
   )
 }
