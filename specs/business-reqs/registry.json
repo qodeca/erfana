@@ -186,7 +186,7 @@
       "description": "Extend import system to support audio/video files via transcription. Configurable backends (OpenAI API, local Whisper), markdown output with metadata, per-import language selection, progress reporting.",
       "created": "2025-12-22T21:45:00.000Z",
       "path": "brs009-media-import-transcription",
-      "last_modified": "2025-12-22T21:45:00.000Z",
+      "last_modified": "2025-12-22T23:15:00.000Z",
       "sections_count": 5,
       "requirements_count": 51,
       "documents": {
@@ -194,13 +194,13 @@
         "solution_adrs": [],
         "solution_specs": [],
         "designs": [],
-        "issues": []
+        "issues": ["#75"]
       }
     }
   ],
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2025-12-22T21:45:00.000Z"
+    "last_updated": "2025-12-22T23:15:00.000Z"
   }
 }
