@@ -179,6 +179,133 @@ After 3 failed restart attempts, the service notifies the user and stops retryin
 
 ---
 
+## GitWatcherService (Git State Watching) - v0.6.3
+
+Monitors git repository state files for real-time status updates in the Project Tree.
+
+### Architecture
+
+- **Library**: Chokidar (native fs events)
+- **Multi-path Watching**: Watches all git state files that affect status
+- **Event Coalescing**: 150ms window to prevent refresh storms
+- **Auto-recovery**: Exponential backoff (800ms, 1600ms, 3200ms)
+- **Session Tokens**: Guards against stale events during project switches
+
+### Watched Git Paths
+
+| Path | Purpose |
+|------|---------|
+| `.git/index` | Staged changes (git add/reset) |
+| `.git/HEAD` | Branch switches, detached HEAD |
+| `.git/refs/heads/` | New branches, branch commits |
+| `.git/FETCH_HEAD` | git fetch/pull operations |
+| `.git/stash` | Stash push/pop operations |
+
+### Use Cases
+
+| Scenario | Behavior |
+|----------|----------|
+| git add/reset | Index change detected, status refreshed within ~750ms |
+| git checkout branch | HEAD change detected, tree updates |
+| External git CLI operations | Detected via index/refs changes |
+| Rapid git operations | Coalesced to single refresh (150ms window) |
+| Network/cloud drives | Falls back to GitPollingService |
+
+### IPC Channels
+
+| Channel | Direction | Purpose |
+|---------|-----------|---------|
+| `git-watcher:start` | Renderer → Main | Start watching git state files |
+| `git-watcher:stop` | Renderer → Main | Stop git watching |
+| `git-watcher:git-state-changed` | Main → Renderer | Event: Git state changed |
+
+### Implementation Location
+
+- **Service**: `src/main/services/GitWatcherService.ts`
+- **Interface**: `src/main/interfaces/IGitWatcherService.ts`
+- **IPC Handlers**: `src/main/ipc/git-watcher-handlers.ts`
+- **Schema**: `src/shared/ipc/git-watcher-schema.ts`
+- **Integration**: `src/renderer/src/hooks/useGitStatus.ts`
+
+---
+
+## GitPollingService (Hybrid Polling Fallback) - v0.6.3
+
+Provides polling-based git status detection as fallback for unreliable file system events.
+
+### Architecture
+
+- **Purpose**: Fallback for network drives, cloud sync, VMs
+- **Default Interval**: 5 seconds (user-configurable 3-10s)
+- **Coordination**: Skips if GitWatcherService active within 2 seconds
+- **Index Hash**: Detects changes by hashing `.git/index` file
+
+### Polling Strategy
+
+**Hybrid Coordination**:
+```
+If GitWatcherService triggered within 2s → skip this poll
+Otherwise → hash .git/index → compare → emit if changed
+```
+
+This prevents duplicate refreshes when file watching works, while ensuring detection on systems where it doesn't.
+
+### Use Cases
+
+| Scenario | Behavior |
+|----------|----------|
+| File watching works | Polling skips (coordinator reports recent activity) |
+| Network/cloud drive | Polling detects changes every 5s |
+| VM shared folders | Polling handles missing fsevents |
+| User disables polling | Only file watching active |
+
+### Configuration
+
+Users can configure polling via Settings overlay:
+
+| Setting | Default | Range |
+|---------|---------|-------|
+| `gitStatus.pollingEnabled` | `true` | boolean |
+| `gitStatus.pollingInterval` | `5000` | 3000-10000ms |
+
+### IPC Channels
+
+| Channel | Direction | Purpose |
+|---------|-----------|---------|
+| `git-polling:start` | Renderer → Main | Start polling |
+| `git-polling:stop` | Renderer → Main | Stop polling |
+| `git-polling:set-enabled` | Renderer → Main | Enable/disable at runtime |
+| `git-polling:git-poll-triggered` | Main → Renderer | Event: Poll detected changes |
+
+### Implementation Location
+
+- **Service**: `src/main/services/GitPollingService.ts`
+- **IPC Handlers**: `src/main/ipc/git-watcher-handlers.ts`
+- **Settings Schema**: `src/shared/ipc/global-settings-schema.ts`
+- **Settings UI**: `src/renderer/src/components/Settings/SettingsOverlay.tsx`
+
+---
+
+## GitEventCoalescer (Git Event Coalescing) - v0.6.3
+
+Specialized event coalescer for git state changes.
+
+### Purpose
+
+Git operations often touch multiple files rapidly (e.g., `git checkout` modifies index, HEAD, and refs). The GitEventCoalescer merges these into a single status refresh.
+
+### Configuration
+
+- **Window**: 150ms (`DEFAULT_COALESCE_WINDOW_MS`)
+- **Deduplication**: Multiple events within window → single refresh
+
+### Implementation
+
+- **File**: `src/main/services/watcher/GitEventCoalescer.ts`
+- **Tests**: `src/main/services/watcher/GitEventCoalescer.test.ts`
+
+---
+
 ## VS Code-Inspired Performance Optimizations (v0.4.6)
 
 The DirectoryWatcherService includes performance optimizations inspired by VS Code's file watching implementation.
