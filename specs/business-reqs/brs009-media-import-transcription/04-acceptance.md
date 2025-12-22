@@ -16,7 +16,7 @@
 | ID | Description | Steps | Expected Result | Traces To |
 |----|-------------|-------|-----------------|-----------|
 | AC-005 | OpenAI backend uses correct API endpoint | 1. Set backend to "openai"<br>2. Configure valid API key<br>3. Import audio file<br>4. Monitor network requests | API calls made to OpenAI transcription endpoint (GPT-4o-transcribe or Whisper-1), proper authentication header included | FR-005, FR-021 |
-| AC-006 | Local Whisper backend works offline | 1. Set backend to "local"<br>2. Download whisper model<br>3. Disconnect network<br>4. Import audio file | Transcription completes successfully without network, using local whisper.cpp | FR-006, FR-022 |
+| AC-006 | Local Whisper backend works offline | 1. Set backend to "local"<br>2. Download whisper model<br>3. Disconnect network (or use network request interceptor/mock to simulate offline)<br>4. Import audio file | Transcription completes successfully without network, using local whisper.cpp | FR-006, FR-022 |
 
 ### Large File Handling
 

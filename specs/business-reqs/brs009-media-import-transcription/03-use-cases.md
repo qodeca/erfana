@@ -111,7 +111,7 @@ FR-002, FR-003, FR-004, FR-006, FR-009, FR-012
 
 ### Alternative Flows
 - **6a. User clicks Cancel**: Import cancelled, partial transcript discarded, temp files cleaned
-- **7a. Retry fails 3 times**: System displays final error with suggestion to check connection
+- **7a. Retry fails 3 times**: System displays error dialog: "Network unavailable after 3 retry attempts. Please check your internet connection and try again."
 
 ### Postconditions
 - On success: Transcript completed as normal

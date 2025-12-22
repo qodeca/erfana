@@ -42,7 +42,7 @@
 | ID | Title | Description | Priority | Traces To |
 |----|-------|-------------|----------|-----------|
 | FR-016 | API rate limit handling | System SHALL handle API rate limits with automatic retry using exponential backoff | Must | UC-003, AC-008 |
-| FR-017 | Network failure handling | System SHALL handle network failures gracefully with retry option | Must | UC-003, AC-011 |
+| FR-017 | Network failure handling | System SHALL handle network failures by displaying error dialog with Retry/Cancel options within 3 seconds of detection | Must | UC-003, AC-011 |
 | FR-018 | Media format validation | System SHALL validate media format before attempting transcription | Must | AC-011 |
 | FR-019 | Clear error messages | System SHALL report clear, actionable error messages for all failure scenarios | Must | AC-011 |
 
@@ -62,9 +62,9 @@
 
 | ID | Title | Description | Priority | Traces To |
 |----|-------|-------------|----------|-----------|
-| NFR-001 | Import dialog responsiveness | Import dialog SHALL open within 200ms of user action | Must | - |
+| NFR-001 | Import dialog responsiveness | Import dialog SHALL open within 200ms of user action (measured from click event to dialog visible render using performance.now()) | Must | AC-015 |
 | NFR-002 | Non-blocking progress updates | Progress updates SHALL be smooth without blocking UI thread | Must | AC-015 |
-| NFR-003 | Seamless chunk concatenation | Chunking SHALL not create visible gaps or discontinuities in final transcript | Should | AC-007 |
+| NFR-003 | Seamless chunk concatenation | Chunking SHALL produce continuous text without word truncation at chunk boundaries; transcript review shows complete sentences | Should | AC-007 |
 
 ### Reliability
 

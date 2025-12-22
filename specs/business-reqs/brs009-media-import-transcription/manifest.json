@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "status": "draft",
   "created": "2025-12-22T18:27:45Z",
-  "updated": "2025-12-22T18:27:45Z",
+  "updated": "2025-12-22T18:40:44Z",
   "application": {
     "name": "Media import with transcription",
     "domain": "import",
@@ -107,7 +107,20 @@
     "AC": 15,
     "CA": 0
   },
-  "cross_references": [],
+  "cross_references": [
+    {
+      "from": "BRS-009",
+      "to": "BRS-004",
+      "type": "future-integration",
+      "description": "Transcript indexing via graph engine foundation"
+    },
+    {
+      "from": "BRS-009",
+      "to": "BRS-005",
+      "type": "future-integration",
+      "description": "Semantic search of transcribed content via vector embeddings"
+    }
+  ],
   "statistics": {
     "total_sections": 5,
     "total_requirements": 51,
@@ -125,6 +138,13 @@
       "operation": "INIT",
       "target": "manifest",
       "description": "BRS initialized as T4 with 5 sections",
+      "by": "system"
+    },
+    {
+      "date": "2025-12-22T18:40:44Z",
+      "operation": "UPDATE",
+      "target": "multiple",
+      "description": "Applied 6 validation fixes: FR-017, NFR-001, NFR-003 clarity; UC-003 error message; AC-006 testability; cross-references added",
       "by": "system"
     }
   ]
