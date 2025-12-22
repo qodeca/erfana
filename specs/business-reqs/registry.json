@@ -1,0 +1,38 @@
+{
+  "sequence": {
+    "current": 1,
+    "next": 2
+  },
+  "registry": [
+    {
+      "id": 1,
+      "slug": "unified-search",
+      "name": "Unified in-file search",
+      "title": "Unified in-file search",
+      "tier": "T3",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Custom unified search overlay working across Editor and all preview types (Markdown Preview, future HTML/SVG previews). Identical visual appearance and keyboard shortcuts regardless of view mode. Extensible architecture for future preview types.",
+      "created": "2025-12-22T00:00:00.000Z",
+      "created_at": "2025-12-22T00:00:00.000Z",
+      "path": "brs001-unified-search",
+      "last_modified": "2025-12-22T16:30:00Z",
+      "sections_count": 3,
+      "requirements_count": 43,
+      "documents": {
+        "technical_adrs": [
+          "docs/architecture/adrs/adr-brs001-001-unified-search.md"
+        ],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": ["#71"]
+      }
+    }
+  ],
+  "metadata": {
+    "schema_version": "2.0.0",
+    "created": "2025-12-22T00:00:00.000Z",
+    "last_updated": "2025-12-22T14:29:00Z"
+  }
+}
