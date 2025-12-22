@@ -24,6 +24,13 @@ The ERFANA editor subsystem provides a comprehensive markdown editing experience
 - Renders frontmatter as styled key-value table in preview
 - Security-hardened parsing with size limits
 
+### Preserve Line Breaks (v0.6.0)
+Global setting to preserve single line breaks in markdown preview:
+- Setting: `editor.preserveLineBreaks` (default: false, CommonMark compliant)
+- When enabled, single newlines render as `<br>` tags (uses `remark-breaks` plugin)
+- Toggle in Settings overlay under "Editor" section
+- Changes apply immediately without reload
+
 ### In-File Search (v0.6.3)
 Unified search overlay activated via `Cmd/Ctrl+F` in editor or preview panes.
 

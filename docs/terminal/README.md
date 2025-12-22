@@ -21,6 +21,24 @@ The Terminal Panel provides a full-featured terminal emulator using:
 
 ## Features
 
+### Auto-Open on Project Load (v0.6.3)
+
+Terminal panel automatically opens when a project loads, providing immediate shell access.
+
+**Behavior**:
+- Opens automatically on Recent Projects selection or File > Open
+- Tracks user intent: if user closes terminal, it stays closed until next project load
+- Ephemeral state (`terminalUserClosed`) resets on project change
+
+**Implementation**:
+- Hook: `useAutoOpenTerminal` integrates with `useProjectChangedEffect`
+- Store: `useActivityBarStore.terminalUserClosed` tracks manual closes
+- Reset: `resetTerminalUserClosed()` called on project change
+
+**Files**:
+- `src/renderer/src/hooks/useAutoOpenTerminal.ts`
+- `src/renderer/src/stores/useActivityBarStore.ts`
+
 ### Clipboard Support (v0.4.7)
 
 Full copy/paste operations with keyboard shortcuts and context menu.
