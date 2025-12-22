@@ -442,7 +442,8 @@ See: [Drag-Drop Implementation](./drag-drop.md) | [IPC Patterns](./ipc-patterns.
 - **Helper Functions**: switchHelpers (terminal activity tracking), withWatcherPause (race prevention), constants
 - **Pure Logic**: 57 functions extracted to `.logic.ts` files for fast, deterministic testing
 
-**Pure Logic Pattern Examples** (v0.5.4):
+**Pure Logic Pattern Examples** (v0.6.3):
+- `markdownEditorPanel.logic.ts` - Stats calculation, scroll sync algorithms, utilities (591 lines, 83 tests)
 - `promptScrollScheduler.logic.ts` - Timestamp-based scroll scheduling with user intent detection (141 lines, 66 tests)
 - `chatBubble.logic.ts` - Validation helpers for diagram chat (testable without React)
 - `diagramViewer.logic.ts` - Zoom/pan calculations (pure transformations)

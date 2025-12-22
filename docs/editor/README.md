@@ -45,11 +45,16 @@ Real-time metrics in bottom status bar:
 ## Implementation Files
 - `MonacoMarkdownEditor.tsx` - Core editor component
 - `MarkdownPreview.tsx` - Preview rendering
-- `MarkdownEditorPanel.tsx` - Panel orchestration (includes export)
+- `MarkdownEditorPanel.tsx` - Panel orchestration (~900 lines after v0.6.3 refactoring)
+- `markdownEditorPanel.logic.ts` - Pure logic (stats, scroll sync, utilities) - 591 lines, 83 tests
 - `MermaidDiagram.tsx` - Diagram rendering
 - `FrontmatterTable.tsx` - YAML frontmatter display
 - `PdfService.ts` - PDF generation (main process)
 - `DocxService.ts` - DOCX generation (main process)
+
+## Related Hooks
+- `useAutoSave.ts` - Debounced auto-save with React state management
+- `useFileWatcher.ts` - File change detection with race condition protection
 
 ## Related Documentation
 - [Prompt Templates](../prompts/README.md) - AI text operations

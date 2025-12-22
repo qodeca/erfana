@@ -60,7 +60,7 @@ See `docs/` for details (keep Claude's context focused):
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (4299 tests, 142 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (4463 tests, 148 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.6.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
@@ -125,6 +125,23 @@ See `docs/` for details (keep Claude's context focused):
 - [ ] Focus states are visible (accessibility)
 
 ## Recent Changes (v0.6.x)
+
+### MarkdownEditorPanel Refactoring (Dec 22, 2025)
+Major refactoring of MarkdownEditorPanel.tsx (1365 → ~900 lines) following SOLID principles:
+
+**Pure Logic Extraction** (`markdownEditorPanel.logic.ts`, 591 lines):
+- `calculateStats` - document statistics
+- `buildScrollMapEntries`, `interpolateScrollPosition` - scroll sync algorithms
+- `extractFileName`, `formatTabTitle`, `isSplitMode`, `getDefaultViewMode` - utilities
+- 83 comprehensive tests
+
+**New Hooks**:
+- `useAutoSave.ts` - debounced auto-save with proper React state
+- `useFileWatcher.ts` - file change detection with race condition protection
+
+**Files Created**: `markdownEditorPanel.logic.ts`, `useAutoSave.ts`, `useFileWatcher.ts` + tests
+
+**Testing**: 110 new tests added (total: 4463 tests, 148 files)
 
 ### Quit Confirmation on Close (Dec 21, 2025)
 App now quits fully on close with confirmation dialog for unsaved changes:
@@ -377,7 +394,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 4353 tests passing (144 test files)
+- **Current**: 4463 tests passing (148 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)
