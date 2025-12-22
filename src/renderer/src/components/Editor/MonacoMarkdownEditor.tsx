@@ -1,6 +1,7 @@
 import { useRef, useImperativeHandle, forwardRef } from 'react'
 import Editor, { OnMount, loader } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
+import { useSearchStore } from '../../stores/useSearchStore'
 import { logger } from '../../utils/logger'
 import './MonacoMarkdownEditor.css'
 
@@ -95,6 +96,25 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, () => {
         insertLink()
       })
+
+      // Override Cmd/Ctrl+F to prevent Monaco's built-in search
+      // Let window-level capture handler (useSearchKeyboard) take over
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => {
+        // No-op - let window-level capture handler take over
+      })
+
+      // Override Cmd/Ctrl+G (find next) to use our search
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyG, () => {
+        useSearchStore.getState().nextMatch()
+      })
+
+      // Override Cmd/Ctrl+Shift+G (find previous)
+      editor.addCommand(
+        monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyG,
+        () => {
+          useSearchStore.getState().previousMatch()
+        }
+      )
 
       // Notify parent component that editor is mounted and ready
       if (onEditorMount) {

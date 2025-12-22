@@ -34,3 +34,13 @@
   /* Code */
   color: var(--color-syntax-string);
 }
+
+/* Monaco search decoration classes */
+.search-match-decoration {
+  background-color: var(--color-brand-lime-muted);
+}
+
+.search-match-current-decoration {
+  background-color: var(--color-brand-lime);
+  color: var(--color-brand-black);
+}

@@ -693,3 +693,24 @@
   word-wrap: break-word;
   overflow-x: auto;
 }
+
+/* CSS Custom Highlight API styling for search */
+::highlight(search-results) {
+  background-color: var(--color-brand-lime-muted);
+  color: var(--color-text-primary);
+}
+
+::highlight(search-current) {
+  background-color: var(--color-brand-lime);
+  color: var(--color-brand-black);
+}
+
+/* Fallback highlighting for browsers without CSS Highlight API */
+.search-highlight-fallback {
+  background-color: var(--color-brand-lime-muted);
+}
+
+.search-highlight-current-fallback {
+  background-color: var(--color-brand-lime);
+  color: var(--color-brand-black);
+}

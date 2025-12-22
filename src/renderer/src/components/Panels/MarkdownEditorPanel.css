@@ -225,6 +225,11 @@
   width: 100%;
 }
 
+.editor-pane,
+.preview-pane {
+  position: relative;  /* Establish positioning context for SearchBar */
+}
+
 .editor-pane {
   height: 100%;
   overflow: hidden;

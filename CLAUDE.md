@@ -60,7 +60,7 @@ See `docs/` for details (keep Claude's context focused):
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (4463 tests, 148 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (4643 tests, 153 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.6.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
@@ -125,6 +125,42 @@ See `docs/` for details (keep Claude's context focused):
 - [ ] Focus states are visible (accessibility)
 
 ## Recent Changes (v0.6.x)
+
+### Unified In-File Search (Dec 22, 2025)
+Added unified search overlay (Cmd/Ctrl+F) for editor and preview panes with provider pattern:
+
+**Features**:
+- Unified search overlay activated via Cmd/Ctrl+F in editor or preview
+- Provider pattern: `MonacoSearchProvider` (editor), `PreviewSearchProvider` (preview)
+- SearchBar component with debounced search, case sensitivity toggle, whole word toggle
+- Keyboard navigation: Enter/Shift+Enter for next/prev match, Escape to close
+- Split mode support with per-pane search state
+- CSS Highlight API with class-based fallback for preview highlighting
+
+**Implementation**:
+- Created `useSearchStore` Zustand store for search state management
+- Implemented `SearchProvider` interface with Monaco and Preview implementations
+- SearchBar component with match count display and navigation buttons
+- Keyboard shortcut hook (`useSearchKeyboard`) for Cmd/Ctrl+F handling
+- Monaco keybinding overrides to intercept native find dialog
+
+**Files Created**:
+- `src/renderer/src/stores/useSearchStore.ts` - Zustand search state
+- `src/renderer/src/providers/search/SearchProvider.ts` - Provider interface
+- `src/renderer/src/providers/search/MonacoSearchProvider.ts` - Editor search
+- `src/renderer/src/providers/search/PreviewSearchProvider.ts` - Preview search
+- `src/renderer/src/components/Search/SearchBar.tsx` - Search UI component
+- `src/renderer/src/components/Search/SearchBar.css` - Search styling
+- `src/renderer/src/hooks/useSearchKeyboard.ts` - Keyboard shortcut hook
+
+**Files Modified**:
+- `src/renderer/src/components/Editor/MarkdownEditorPanel.tsx` - Added SearchBar, provider integration
+- `src/renderer/src/components/Editor/MonacoMarkdownEditor.tsx` - Keybinding overrides for Cmd+F
+- CSS files for decoration/highlight styles
+
+**Testing**: 163 new tests added (total: 4643 tests, 153 files)
+
+Closes #71
 
 ### MarkdownEditorPanel Refactoring (Dec 22, 2025)
 Major refactoring of MarkdownEditorPanel.tsx (1365 → ~900 lines) following SOLID principles:
@@ -394,7 +430,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 4463 tests passing (148 test files)
+- **Current**: 4643 tests passing (153 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)

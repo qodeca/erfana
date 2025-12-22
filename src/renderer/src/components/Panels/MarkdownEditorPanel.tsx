@@ -1,19 +1,24 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { FileEdit, Columns2, Rows2, Eye, Bold, Italic, Code, Link, Image, Heading1, List, ListOrdered, Strikethrough, FileDown, FileText } from 'lucide-react'
+import { FileEdit, Columns2, Rows2, Eye, Bold, Italic, Code, Link, Image, Heading1, List, ListOrdered, Strikethrough, FileDown, FileText, Search } from 'lucide-react'
 import { IDockviewPanelProps } from 'dockview'
 import * as monaco from 'monaco-editor'
 import { MonacoMarkdownEditor, MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
 import { MarkdownPreview, MarkdownPreviewHandle } from '../Editor/MarkdownPreview'
 import { ResizableDivider } from '../Editor/ResizableDivider'
+import { SearchBar } from '../Search'
 import { useDialog } from '../Dialog'
 import { useToast } from '../Toast/ToastContext'
 import { FileConflictNotification } from '../FileConflictNotification/FileConflictNotification'
 import { useProjectStore } from '../../stores/useProjectStore'
+import { useSearchStore } from '../../stores/useSearchStore'
 import { sanitizeFilePath } from '../../utils/fileUtils'
+import { getSelectedText } from '../../utils/selectionHelpers'
 import { convertMermaidDiagramsToImages } from '../../utils/svgToImage'
 import { logger } from '../../utils/logger'
 import { useAutoSave } from '../../hooks/useAutoSave'
 import { useFileWatcher, createFileSaveGuard } from '../../hooks/useFileWatcher'
+import { useSearchKeyboard } from '../../hooks/useSearchKeyboard'
+import { MonacoSearchProvider, PreviewSearchProvider } from '../../providers/search'
 import {
   type ScrollMapEntry,
   calculateStats,
@@ -45,6 +50,7 @@ export function MarkdownEditorPanel(
   const [currentFile, setCurrentFile] = useState<EditorFile | null>(null)
   const [viewMode, setViewMode] = useState<'split' | 'split-horizontal' | 'editor' | 'preview'>('preview')
   const [selectedText, setSelectedText] = useState<string>('')
+  const [activePaneId, setActivePaneId] = useState<'editor' | 'preview'>('editor')
 
   // New unified dialog system
   const { showConfirm } = useDialog()
@@ -128,6 +134,34 @@ export function MarkdownEditorPanel(
   // Unified helper: detect any split mode (vertical or horizontal)
   // Uses extracted pure function for consistency
   const isAnySplitMode = isSplitMode(viewMode)
+
+  // =========================================================================
+  // Search Integration
+  // Provides unified search experience across editor and preview panes
+  // =========================================================================
+
+  // Create search provider instances (memoized to avoid recreation)
+  const monacoProvider = useMemo(() => new MonacoSearchProvider(editorRef), [])
+  const previewProvider = useMemo(() => new PreviewSearchProvider(previewRef), [])
+
+  // Global keyboard shortcuts for search (Cmd/Ctrl+F)
+  // Pass editorRef to populate search with selected text
+  useSearchKeyboard({ editorRef })
+
+  // Reset search when file changes (FR-013)
+  useEffect(() => {
+    useSearchStore.getState().resetSearch()
+    monacoProvider.clearHighlights()
+    previewProvider.clearHighlights()
+  }, [currentFile?.path, monacoProvider, previewProvider])
+
+  // Cleanup providers on unmount
+  useEffect(() => {
+    return () => {
+      monacoProvider.dispose()
+      previewProvider.dispose()
+    }
+  }, [monacoProvider, previewProvider])
 
   // =========================================================================
   // File Watcher Hook Integration
@@ -977,7 +1011,34 @@ export function MarkdownEditorPanel(
               >
                 <ListOrdered size={16} strokeWidth={2} />
               </button>
+
+              <div className="toolbar-separator" />
+
+              <button
+                className="toolbar-btn"
+                onClick={() => {
+                  const selectedText = getSelectedText(editorRef)
+                  useSearchStore.getState().openSearch(selectedText)
+                }}
+                title="Find (Cmd/Ctrl+F)"
+              >
+                <Search size={16} strokeWidth={2} />
+              </button>
             </>
+          )}
+
+          {/* Search button - visible in preview/split-horizontal modes (editor/split modes have it in formatting toolbar) */}
+          {(viewMode === 'preview' || viewMode === 'split-horizontal') && (
+            <button
+              className="toolbar-btn"
+              onClick={() => {
+                const selectedText = getSelectedText(editorRef)
+                useSearchStore.getState().openSearch(selectedText)
+              }}
+              title="Find (Cmd/Ctrl+F)"
+            >
+              <Search size={16} strokeWidth={2} />
+            </button>
           )}
 
           <div className="toolbar-spacer" />
@@ -1062,13 +1123,20 @@ export function MarkdownEditorPanel(
               <div
                 className="preview-pane"
                 style={{ height: `${dividerPositionHorizontal}%` }}
+                onClick={() => setActivePaneId('preview')}
+                onFocus={() => setActivePaneId('preview')}
               >
                 <MarkdownPreview key={`preview-${viewMode}`} ref={previewHandleRef} content={currentFile.content} filePath={currentFile.path} onOpenFile={handleOpenFile} />
+                {activePaneId === 'preview' && (
+                  <SearchBar provider={previewProvider} />
+                )}
               </div>
               <ResizableDivider orientation="horizontal" onResize={handleDividerResizeHorizontal} onResizeEnd={handleDividerResizeEnd} />
               <div
                 className="editor-pane"
                 style={{ height: `${100 - dividerPositionHorizontal}%` }}
+                onClick={() => setActivePaneId('editor')}
+                onFocus={() => setActivePaneId('editor')}
               >
                 <MonacoMarkdownEditor
                   key={`editor-${viewMode}`}
@@ -1079,6 +1147,9 @@ export function MarkdownEditorPanel(
                   onSelectionChange={setSelectedText}
                   onEditorMount={handleEditorMount}
                 />
+                {activePaneId === 'editor' && (
+                  <SearchBar provider={monacoProvider} />
+                )}
               </div>
             </>
           )}
@@ -1090,6 +1161,8 @@ export function MarkdownEditorPanel(
                 <div
                   className="editor-pane"
                   style={viewMode === 'split' ? { width: `${dividerPosition}%` } : undefined}
+                  onClick={() => setActivePaneId('editor')}
+                  onFocus={() => setActivePaneId('editor')}
                 >
                   <MonacoMarkdownEditor
                     key={`editor-${viewMode}`}
@@ -1100,6 +1173,9 @@ export function MarkdownEditorPanel(
                     onSelectionChange={setSelectedText}
                     onEditorMount={handleEditorMount}
                   />
+                  {(viewMode === 'editor' || activePaneId === 'editor') && (
+                    <SearchBar provider={monacoProvider} />
+                  )}
                 </div>
               )}
               {viewMode === 'split' && (
@@ -1109,8 +1185,13 @@ export function MarkdownEditorPanel(
                 <div
                   className="preview-pane"
                   style={viewMode === 'split' ? { width: `${100 - dividerPosition}%` } : undefined}
+                  onClick={() => setActivePaneId('preview')}
+                  onFocus={() => setActivePaneId('preview')}
                 >
                   <MarkdownPreview key={`preview-${viewMode}`} ref={previewHandleRef} content={currentFile.content} filePath={currentFile.path} onOpenFile={handleOpenFile} />
+                  {(viewMode === 'preview' || activePaneId === 'preview') && (
+                    <SearchBar provider={previewProvider} />
+                  )}
                 </div>
               )}
             </>
