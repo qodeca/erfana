@@ -1,7 +1,7 @@
 {
   "sequence": {
-    "current": 8,
-    "next": 9
+    "current": 9,
+    "next": 10
   },
   "registry": [
     {
@@ -175,11 +175,32 @@
         "designs": [],
         "issues": []
       }
+    },
+    {
+      "id": 9,
+      "slug": "media-import-transcription",
+      "name": "Media import with transcription",
+      "tier": "T4",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Extend import system to support audio/video files via transcription. Configurable backends (OpenAI API, local Whisper), markdown output with metadata, per-import language selection, progress reporting.",
+      "created": "2025-12-22T21:45:00.000Z",
+      "path": "brs009-media-import-transcription",
+      "last_modified": "2025-12-22T21:45:00.000Z",
+      "sections_count": 5,
+      "requirements_count": 51,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": []
+      }
     }
   ],
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2025-12-22T18:15:00.000Z"
+    "last_updated": "2025-12-22T21:45:00.000Z"
   }
 }

@@ -79,6 +79,7 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 | BRS-006 | Knowledge graph & entities | T3 | draft | `specs/business-reqs/brs006-knowledge-graph/` |
 | BRS-007 | Temporal queries & timeline | T3 | draft | `specs/business-reqs/brs007-temporal-queries/` |
 | BRS-008 | Graph engine polish & maintenance | T3 | draft | `specs/business-reqs/brs008-graph-polish/` |
+| BRS-009 | Media import with transcription | T4 | draft | `specs/business-reqs/brs009-media-import-transcription/` |
 
 **Registry**: `specs/business-reqs/registry.json`
 
