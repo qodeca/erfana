@@ -1,7 +1,7 @@
 {
   "sequence": {
-    "current": 1,
-    "next": 2
+    "current": 2,
+    "next": 3
   },
   "registry": [
     {
@@ -28,11 +28,32 @@
         "designs": [],
         "issues": ["#71"]
       }
+    },
+    {
+      "id": 2,
+      "slug": "editor-context-menu",
+      "name": "Editor context menu with prompts",
+      "tier": "T3",
+      "status": "active",
+      "scope": "feature",
+      "description": "Add context menu with AI prompts to Monaco editor triggered on text selection. Mirrors existing preview context menu UX and shares prompt execution infrastructure, but with editor-specific prompt set.",
+      "created": "2025-12-22T17:00:00.000Z",
+      "path": "brs002-editor-context-menu",
+      "last_modified": "2025-12-22T17:45:00Z",
+      "sections_count": 3,
+      "requirements_count": 26,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": ["#73"]
+      }
     }
   ],
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2025-12-22T14:29:00Z"
+    "last_updated": "2025-12-22T18:00:00Z"
   }
 }

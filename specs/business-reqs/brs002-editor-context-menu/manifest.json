@@ -1,0 +1,105 @@
+{
+  "brs_id": 2,
+  "brs_slug": "editor-context-menu",
+  "tier": "T3",
+  "version": "0.1.0",
+  "created": "2025-12-22T16:33:00Z",
+  "updated": "2025-12-22T17:45:00Z",
+  "application": {
+    "name": "Editor context menu with prompts",
+    "domain": null,
+    "tech_stack": []
+  },
+  "scope": {
+    "type": "feature",
+    "name": "Editor context menu with prompts"
+  },
+  "sections": [
+    {
+      "id": "01",
+      "file": "01-overview.md",
+      "title": "Overview",
+      "word_count": 254
+    },
+    {
+      "id": "02",
+      "file": "02-requirements.md",
+      "title": "Requirements",
+      "word_count": 624
+    },
+    {
+      "id": "03",
+      "file": "03-acceptance.md",
+      "title": "Acceptance",
+      "word_count": 626
+    }
+  ],
+  "requirements_index": {
+    "FR-001": { "section": "02-requirements", "status": "active" },
+    "FR-002": { "section": "02-requirements", "status": "active" },
+    "FR-003": { "section": "02-requirements", "status": "active" },
+    "FR-004": { "section": "02-requirements", "status": "active" },
+    "FR-005": { "section": "02-requirements", "status": "active" },
+    "FR-006": { "section": "02-requirements", "status": "active" },
+    "FR-007": { "section": "02-requirements", "status": "active" },
+    "FR-008": { "section": "02-requirements", "status": "active" },
+    "FR-009": { "section": "02-requirements", "status": "active" },
+    "FR-010": { "section": "02-requirements", "status": "active" },
+    "NFR-001": { "section": "02-requirements", "status": "active" },
+    "NFR-002": { "section": "02-requirements", "status": "active" },
+    "NFR-003": { "section": "02-requirements", "status": "active" },
+    "NFR-004": { "section": "02-requirements", "status": "active" },
+    "NFR-005": { "section": "02-requirements", "status": "active" },
+    "NFR-006": { "section": "02-requirements", "status": "active" },
+    "TC-001": { "section": "03-acceptance", "status": "active" },
+    "TC-002": { "section": "03-acceptance", "status": "active" },
+    "TC-003": { "section": "03-acceptance", "status": "active" },
+    "TC-004": { "section": "03-acceptance", "status": "active" },
+    "TC-005": { "section": "03-acceptance", "status": "active" },
+    "TC-006": { "section": "03-acceptance", "status": "active" },
+    "TC-007": { "section": "03-acceptance", "status": "active" },
+    "TC-008": { "section": "03-acceptance", "status": "active" },
+    "TC-009": { "section": "03-acceptance", "status": "active" },
+    "TC-010": { "section": "03-acceptance", "status": "active" }
+  },
+  "requirement_sequences": {
+    "FR": 10,
+    "NFR": 6,
+    "TC": 10
+  },
+  "cross_references": [],
+  "statistics": {
+    "total_sections": 3,
+    "total_requirements": 26,
+    "total_words": 1504
+  },
+  "validation": {
+    "overall_score": null,
+    "passed": false,
+    "last_validated": null,
+    "threshold": 50
+  },
+  "change_history": [
+    {
+      "date": "2025-12-22T16:33:00Z",
+      "operation": "INIT",
+      "target": "manifest",
+      "description": "BRS initialized as T3 with 3 sections",
+      "by": "system"
+    },
+    {
+      "date": "2025-12-22T18:00:00Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 2 issues: renamed AC-* to TC-* in requirements_index to match file content, updated requirement_sequences",
+      "by": "system",
+      "details": {
+        "word_count_updated": false,
+        "indexes_rebuilt": true,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": true
+      }
+    }
+  ]
+}
