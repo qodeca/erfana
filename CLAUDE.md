@@ -60,7 +60,7 @@ See `docs/` for details (keep Claude's context focused):
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (4643 tests, 153 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (4723 tests, 156 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.6.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
@@ -139,6 +139,21 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 - [ ] Focus states are visible (accessibility)
 
 ## Recent Changes (v0.6.x)
+
+### Auto-Open Terminal on Project Load (Dec 22, 2025)
+Terminal panel now automatically opens when a project loads:
+- Auto-opens on Recent Projects selection or File > Open
+- Ephemeral `terminalUserClosed` state tracks manual closes
+- If user closes terminal, it stays closed until next project load
+- `useAutoOpenTerminal` hook integrates with `useProjectChangedEffect`
+
+**Files Created**: `src/renderer/src/hooks/useAutoOpenTerminal.ts`
+
+**Files Modified**: `src/renderer/src/stores/useActivityBarStore.ts`, `src/renderer/src/components/DockLayout/AppDockLayout.tsx`
+
+**Testing**: 41 new tests added (total: 4723 tests, 156 files)
+
+Closes #55
 
 ### Unified In-File Search (Dec 22, 2025)
 Added unified search overlay (Cmd/Ctrl+F) for editor and preview panes with provider pattern:
@@ -444,7 +459,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 4643 tests passing (153 test files)
+- **Current**: 4723 tests passing (156 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)

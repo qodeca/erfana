@@ -23,6 +23,7 @@ import { useActivityBarStore } from '../../stores/useActivityBarStore'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { getPanelById } from '../ActivityBar/activityBarConfig'
 import { useProjectManagementContext } from '../../context/ProjectManagementContext'
+import { useAutoOpenTerminal } from '../../hooks/useAutoOpenTerminal'
 import { logger } from '../../utils/logger'
 
 // ============================================================================
@@ -110,6 +111,9 @@ export function AppDockLayout() {
 
   // Track when splitview API is ready to trigger terminal panel effect
   const [isSplitviewReady, setIsSplitviewReady] = useState(false)
+
+  // Auto-open terminal when project loads (Issue #55)
+  useAutoOpenTerminal()
 
   // Use Zustand store for activity bar state
   const {

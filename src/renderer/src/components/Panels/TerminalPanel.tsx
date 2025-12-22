@@ -568,6 +568,10 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     let lastCols = 0
     let lastRows = 0
 
+    // Track pending timeouts for cleanup (issue #55: prevents stale resize calls
+    // when terminal is killed during project switching for auto-open feature)
+    const pendingTimeouts: ReturnType<typeof setTimeout>[] = []
+
     const handleResize = () => {
       try {
         fitAddonRef.current?.fit()
@@ -595,18 +599,22 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
 
     // Fit on mount
-    setTimeout(handleResize, 100)
+    pendingTimeouts.push(setTimeout(handleResize, 100))
 
     // Use ResizeObserver to detect container size changes
     // This handles panel drag, window resize, and show/hide
     const resizeObserver = new ResizeObserver(() => {
       // Debounce slightly to avoid excessive resize calls
-      setTimeout(handleResize, 10)
+      pendingTimeouts.push(setTimeout(handleResize, 10))
     })
 
     resizeObserver.observe(terminalRef.current)
 
-    return () => resizeObserver.disconnect()
+    return () => {
+      // Clear all pending timeouts to prevent stale resize calls after terminal is killed
+      pendingTimeouts.forEach(clearTimeout)
+      resizeObserver.disconnect()
+    }
   }, [terminalId])
 
   // Issue #22 Enhanced: Reset scroll recovery state on terminal change (project switch)
@@ -618,9 +626,13 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   useEffect(() => {
     if (!portalContext?.onRefitRequest || !fitAddonRef.current) return
 
+    // Track pending timeout for cleanup (issue #55: prevents stale resize calls
+    // when terminal is killed during project switching for auto-open feature)
+    let pendingTimeout: ReturnType<typeof setTimeout> | null = null
+
     const unsubscribe = portalContext.onRefitRequest(() => {
       // Refit terminal after portal move
-      setTimeout(() => {
+      pendingTimeout = setTimeout(() => {
         fitAddonRef.current?.fit()
 
         // Also notify PTY of new size
@@ -634,7 +646,10 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }, 50)
     })
 
-    return unsubscribe
+    return () => {
+      if (pendingTimeout) clearTimeout(pendingTimeout)
+      unsubscribe()
+    }
   }, [portalContext, terminalId])
 
   // DOM-based portal: physically move terminal panel between containers
