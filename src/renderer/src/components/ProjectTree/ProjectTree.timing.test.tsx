@@ -58,10 +58,16 @@ describe('ProjectTree project switching timing', () => {
         onProjectDeleted: () => () => {},
         onDirectoryError: () => () => {}
       },
-      gitIndexWatch: {
+      // Git index watching migrated to GitWatcherService (Issue #74)
+      gitWatcher: {
         start: vi.fn(async () => ({ success: true })),
         stop: vi.fn(async () => ({ success: true })),
-        onIndexChanged: () => () => {}
+        onStateChanged: () => () => {}
+      },
+      gitPolling: {
+        start: vi.fn(async () => ({ success: true })),
+        stop: vi.fn(async () => ({ success: true })),
+        onPollTriggered: () => () => {}
       },
       git: {
         getStatus: vi.fn(async () => ({
@@ -72,6 +78,9 @@ describe('ProjectTree project switching timing', () => {
           counts: { modified: 0, untracked: 0, deleted: 0, staged: 0, conflicted: 0 },
           truncated: false
         }))
+      },
+      logging: {
+        log: vi.fn()
       }
     }
 
@@ -127,10 +136,16 @@ describe('ProjectTree project switching timing', () => {
         onProjectDeleted: () => () => {},
         onDirectoryError: () => () => {}
       },
-      gitIndexWatch: {
+      // Git index watching migrated to GitWatcherService (Issue #74)
+      gitWatcher: {
         start: vi.fn(async () => ({ success: true })),
         stop: vi.fn(async () => ({ success: true })),
-        onIndexChanged: () => () => {}
+        onStateChanged: () => () => {}
+      },
+      gitPolling: {
+        start: vi.fn(async () => ({ success: true })),
+        stop: vi.fn(async () => ({ success: true })),
+        onPollTriggered: () => () => {}
       },
       git: {
         getStatus: vi.fn(async () => ({
@@ -141,6 +156,9 @@ describe('ProjectTree project switching timing', () => {
           counts: { modified: 0, untracked: 0, deleted: 0, staged: 0, conflicted: 0 },
           truncated: false
         }))
+      },
+      logging: {
+        log: vi.fn()
       }
     }
 

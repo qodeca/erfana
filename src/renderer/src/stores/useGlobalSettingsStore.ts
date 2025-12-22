@@ -15,6 +15,8 @@ interface GlobalSettingsState {
   loadSettings: () => Promise<void>
   updateLoggingLevel: (level: LoggingLevel) => Promise<void>
   updatePreserveLineBreaks: (enabled: boolean) => Promise<void>
+  updateGitStatusPollingEnabled: (enabled: boolean) => Promise<void>
+  updateGitStatusPollingInterval: (interval: number) => Promise<void>
   resetSettings: () => Promise<void>
   clearCorruptionFlag: () => void
 
@@ -94,6 +96,66 @@ export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => 
       const result = await window.api.globalSettings.set('editor', {
         ...currentSettings.editor,
         preserveLineBreaks: enabled
+      })
+      if (!result.success) {
+        // Rollback on failure
+        set({ settings: previousSettings, error: result.error })
+      }
+    } catch (error) {
+      set({
+        settings: previousSettings,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
+    }
+  },
+
+  updateGitStatusPollingEnabled: async (enabled: boolean) => {
+    const currentSettings = get().settings
+    if (!currentSettings) return
+
+    // Optimistic update
+    const previousSettings = currentSettings
+    set({
+      settings: {
+        ...currentSettings,
+        gitStatus: { ...currentSettings.gitStatus, pollingEnabled: enabled }
+      }
+    })
+
+    try {
+      const result = await window.api.globalSettings.set('gitStatus', {
+        ...currentSettings.gitStatus,
+        pollingEnabled: enabled
+      })
+      if (!result.success) {
+        // Rollback on failure
+        set({ settings: previousSettings, error: result.error })
+      }
+    } catch (error) {
+      set({
+        settings: previousSettings,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
+    }
+  },
+
+  updateGitStatusPollingInterval: async (interval: number) => {
+    const currentSettings = get().settings
+    if (!currentSettings) return
+
+    // Optimistic update
+    const previousSettings = currentSettings
+    set({
+      settings: {
+        ...currentSettings,
+        gitStatus: { ...currentSettings.gitStatus, pollingInterval: interval }
+      }
+    })
+
+    try {
+      const result = await window.api.globalSettings.set('gitStatus', {
+        ...currentSettings.gitStatus,
+        pollingInterval: interval
       })
       if (!result.success) {
         // Rollback on failure

@@ -1,13 +1,25 @@
 /**
  * Git Status Hook
  * ================
- * Manages git status refresh with debouncing, cooldown, and window focus handling
+ * Manages git status refresh with debouncing, cooldown, and window focus handling.
+ *
+ * Uses unified git watcher API (gitWatcher) for real-time monitoring of:
+ * - .git/index (staging area changes)
+ * - .git/HEAD (branch switches, commits)
+ * - .git/refs/ (branches, tags, remote updates)
+ * - .git/refs/stash (stash operations)
+ *
+ * Also subscribes to git polling as a fallback for missed file watcher events.
+ *
+ * @see Issue #74 - real-time git status refresh
  */
 
 import { useEffect, useRef, useCallback } from 'react'
 import { useGitStore } from '../stores/useGitStore'
+import { useGlobalSettingsStore } from '../stores/useGlobalSettingsStore'
 import { GIT_STATUS } from '../components/ProjectTree/constants'
 import type { GitStatusCounts, GitDisplayStatus } from '../../../shared/ipc/git-schema'
+import type { GitStateChangeEvent, GitPollTriggeredEvent } from '../../../shared/ipc/git-watcher-schema'
 import { logger } from '../utils/logger'
 
 // Use centralized constants
@@ -225,32 +237,102 @@ export function useGitStatus({
     }
   }, [projectPath, enabled, debouncedRefresh])
 
-  // Subscribe to .git/index changes for external git operations (git add, checkout, reset, etc.)
+  // Subscribe to git state changes (index, HEAD, refs, fetch, stash)
+  // Uses unified gitWatcher API for comprehensive git event monitoring
   useEffect(() => {
     if (!projectPath || !enabled) return
 
-    // Start watching .git/index file
-    window.api.gitIndexWatch.start(projectPath).catch(err => {
-      logger.warn('[useGitStatus] Failed to start git index watcher', { error: err })
+    // Start watching .git directory for all git-related changes
+    window.api.gitWatcher.start(projectPath).catch(err => {
+      logger.warn('[useGitStatus] Failed to start git watcher', { error: err })
     })
 
-    // Listen for git index changes
-    const unsubscribe = window.api.gitIndexWatch.onIndexChanged((data) => {
-      // Only refresh if this is still the current project
-      if (data.projectPath === projectPath && isWindowVisibleRef.current) {
-        logger.info('[useGitStatus] Git index changed, triggering refresh')
+    // Listen for git state changes
+    const unsubscribeWatcher = window.api.gitWatcher.onStateChanged((event: GitStateChangeEvent) => {
+      // Only refresh if window is visible to avoid unnecessary work
+      if (isWindowVisibleRef.current) {
+        logger.info(`[useGitStatus] Git state changed: ${event.eventTypes.join(', ')}`, {
+          projectPath: event.projectPath
+        })
         debouncedRefresh()
       }
     })
 
     return () => {
-      unsubscribe()
-      // Stop watching .git/index file
-      window.api.gitIndexWatch.stop().catch(err => {
-        logger.warn('[useGitStatus] Failed to stop git index watcher', { error: err })
+      unsubscribeWatcher()
+      // Stop watching .git directory
+      window.api.gitWatcher.stop().catch(err => {
+        logger.warn('[useGitStatus] Failed to stop git watcher', { error: err })
       })
     }
   }, [projectPath, enabled, debouncedRefresh])
+
+  // Subscribe to git polling as fallback for missed file watcher events
+  // Polling catches changes that file watchers may miss (e.g., network-mounted repos)
+  useEffect(() => {
+    if (!projectPath || !enabled) return
+
+    // Start polling for git status updates
+    window.api.gitPolling.start(projectPath).catch(err => {
+      logger.warn('[useGitStatus] Failed to start git polling', { error: err })
+    })
+
+    // Listen for poll-triggered events
+    const unsubscribePolling = window.api.gitPolling.onPollTriggered((event: GitPollTriggeredEvent) => {
+      // Only refresh if window is visible
+      if (isWindowVisibleRef.current) {
+        logger.debug(`[useGitStatus] Git poll triggered at ${event.timestamp}`)
+        debouncedRefresh()
+      }
+    })
+
+    return () => {
+      unsubscribePolling()
+      // Stop polling
+      window.api.gitPolling.stop().catch(err => {
+        logger.warn('[useGitStatus] Failed to stop git polling', { error: err })
+      })
+    }
+  }, [projectPath, enabled, debouncedRefresh])
+
+  // Apply global settings changes to polling service
+  // When user changes polling settings in the UI, apply them to the running service
+  useEffect(() => {
+    if (!projectPath || !enabled) return
+
+    // Track previous gitStatus to detect changes
+    let prevPollingEnabled: boolean | undefined
+    let prevPollingInterval: number | undefined
+
+    // Subscribe to settings store for gitStatus changes
+    const unsubscribe = useGlobalSettingsStore.subscribe((state) => {
+      const gitStatus = state.settings?.gitStatus
+      if (!gitStatus) return
+
+      // Check if relevant settings have changed
+      const pollingEnabledChanged = prevPollingEnabled !== undefined && prevPollingEnabled !== gitStatus.pollingEnabled
+      const pollingIntervalChanged = prevPollingInterval !== undefined && prevPollingInterval !== gitStatus.pollingInterval
+
+      // Update previous values
+      prevPollingEnabled = gitStatus.pollingEnabled
+      prevPollingInterval = gitStatus.pollingInterval
+
+      // Apply changes to polling service
+      if (pollingEnabledChanged) {
+        window.api.gitPolling.setEnabled(gitStatus.pollingEnabled).catch((err) => {
+          logger.warn('[useGitStatus] Failed to update polling enabled state', { error: err })
+        })
+      }
+
+      if (pollingIntervalChanged) {
+        window.api.gitPolling.setInterval(gitStatus.pollingInterval).catch((err) => {
+          logger.warn('[useGitStatus] Failed to update polling interval', { error: err })
+        })
+      }
+    })
+
+    return unsubscribe
+  }, [projectPath, enabled])
 
   // Window visibility handling - pause refreshes when window hidden
   useEffect(() => {

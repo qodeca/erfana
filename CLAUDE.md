@@ -60,7 +60,7 @@ See `docs/` for details (keep Claude's context focused):
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (4742 tests, 156 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (4923 tests, 160 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.6.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
@@ -144,6 +144,39 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 - [ ] Focus states are visible (accessibility)
 
 ## Recent Changes (v0.6.x)
+
+### Real-time Git Status Refresh with Polling Fallback (Dec 22, 2025)
+Implemented comprehensive git status monitoring with multi-path file watching and hybrid polling fallback:
+
+**Features:**
+- Watch all git state files: `.git/index`, `.git/HEAD`, `.git/refs/heads/`, `.git/FETCH_HEAD`, `.git/stash`
+- Hybrid polling fallback (5-second default) for reliable detection on network/cloud drives
+- Event coalescing (150ms window) to prevent refresh storms
+- Latency reduced from ~2s to ~750ms (debounce 500->250ms, cooldown 1500->500ms)
+- Auto-recovery with exponential backoff (800ms, 1600ms, 3200ms)
+- User-configurable polling in Settings overlay (enable/disable, 3-10s interval)
+
+**New Files:**
+- `src/main/services/GitWatcherService.ts` - Multi-path git state watching
+- `src/main/services/GitPollingService.ts` - Hybrid polling fallback
+- `src/main/services/watcher/GitEventCoalescer.ts` - Event coalescing logic
+- `src/main/interfaces/IGitWatcherService.ts` - Service interface
+- `src/main/utils/ipcBroadcast.ts` - Centralized IPC broadcast utility
+- `src/shared/ipc/git-watcher-schema.ts` - Zod schemas for IPC events
+- `src/main/ipc/git-watcher-handlers.ts` - IPC handlers with path security
+
+**Modified Files:**
+- `src/shared/ipc/global-settings-schema.ts` - Added gitStatus settings section
+- `src/renderer/src/stores/useGlobalSettingsStore.ts` - Added gitStatus methods
+- `src/renderer/src/components/Settings/SettingsOverlay.tsx` - Added Git status settings UI
+- `src/renderer/src/components/ProjectTree/constants.ts` - Reduced timing constants
+- `src/renderer/src/hooks/useGitStatus.ts` - Switched to new gitWatcher API
+- `src/preload/index.ts` - Added gitWatcher and gitPolling APIs
+- `src/main/services/watcher/WatcherMetrics.ts` - Added polling stats
+
+**Testing:** 151 new tests added (total: 4923 tests, 160 files)
+
+Closes #74
 
 ### Prompt Template Optimization for Claude Code (Dec 22, 2025)
 All 9 prompt templates transformed to XML-structured format for improved Claude Code compatibility:
@@ -476,7 +509,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 4742 tests passing (156 test files)
+- **Current**: 4923 tests passing (160 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)

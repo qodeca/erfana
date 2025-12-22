@@ -41,6 +41,14 @@ export interface WatcherMetricsSnapshot {
   restartSuccess: number
   restartFailure: number
 
+  // Polling stats
+  pollingRefreshCount: number
+  pollingSkippedCount: number
+  pollingEfficiency: number // Percentage of polls that triggered refresh (0-100)
+  gitWatcherEventCount: number
+  lastPollingRefresh: number | null
+  lastGitWatcherEvent: number | null
+
   // Uptime
   uptimeMs: number
   lastResetTime: number
@@ -83,6 +91,13 @@ export class WatcherMetrics {
   private restartScheduled = 0
   private restartSuccess = 0
   private restartFailure = 0
+
+  // Polling stats
+  private pollingRefreshCount = 0
+  private pollingSkippedCount = 0
+  private gitWatcherEventCount = 0
+  private lastPollingRefresh: number | null = null
+  private lastGitWatcherEvent: number | null = null
 
   // Start time
   private startTime = Date.now()
@@ -192,6 +207,43 @@ export class WatcherMetrics {
   }
 
   /**
+   * Record a polling refresh (git status was refreshed)
+   */
+  recordPollingRefresh(): void {
+    this.pollingRefreshCount++
+    this.lastPollingRefresh = Date.now()
+  }
+
+  /**
+   * Record a skipped polling cycle (no refresh needed)
+   */
+  recordPollingSkipped(): void {
+    this.pollingSkippedCount++
+  }
+
+  /**
+   * Record a git watcher event (file change detected by watcher)
+   */
+  recordGitWatcherEvent(): void {
+    this.gitWatcherEventCount++
+    this.lastGitWatcherEvent = Date.now()
+  }
+
+  /**
+   * Get polling statistics
+   */
+  getPollingStats(): { refreshCount: number; skippedCount: number; efficiency: number } {
+    const total = this.pollingRefreshCount + this.pollingSkippedCount
+    const efficiency = total > 0 ? Math.round((this.pollingRefreshCount / total) * 100) : 0
+
+    return {
+      refreshCount: this.pollingRefreshCount,
+      skippedCount: this.pollingSkippedCount,
+      efficiency
+    }
+  }
+
+  /**
    * Update buffer size directly (for sync with actual buffer)
    */
   setBufferSize(size: number): void {
@@ -252,6 +304,13 @@ export class WatcherMetrics {
       restartSuccess: this.restartSuccess,
       restartFailure: this.restartFailure,
 
+      pollingRefreshCount: this.pollingRefreshCount,
+      pollingSkippedCount: this.pollingSkippedCount,
+      pollingEfficiency: this.getPollingStats().efficiency,
+      gitWatcherEventCount: this.gitWatcherEventCount,
+      lastPollingRefresh: this.lastPollingRefresh,
+      lastGitWatcherEvent: this.lastGitWatcherEvent,
+
       uptimeMs: now - this.startTime,
       lastResetTime: this.lastResetTime
     }
@@ -270,6 +329,8 @@ export class WatcherMetrics {
 ├── Latency: avg=${s.avgEventLatencyMs}ms, max=${s.maxEventLatencyMs}ms
 ├── Active watchers: ${s.activeWatchers}
 ├── Restarts: scheduled=${s.restartScheduled}, success=${s.restartSuccess}, failure=${s.restartFailure}
+├── Polling: refresh=${s.pollingRefreshCount}, skipped=${s.pollingSkippedCount}, efficiency=${s.pollingEfficiency}%
+├── Git watcher events: ${s.gitWatcherEventCount}
 ├── Errors: ${JSON.stringify(s.errorCounts)}
 └── Uptime: ${Math.round(s.uptimeMs / 1000)}s`
   }
@@ -290,6 +351,11 @@ export class WatcherMetrics {
     this.restartScheduled = 0
     this.restartSuccess = 0
     this.restartFailure = 0
+    this.pollingRefreshCount = 0
+    this.pollingSkippedCount = 0
+    this.gitWatcherEventCount = 0
+    this.lastPollingRefresh = null
+    this.lastGitWatcherEvent = null
     this.lastResetTime = Date.now()
   }
 

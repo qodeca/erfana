@@ -30,6 +30,18 @@ export const EditorSettingsSchema = z.object({
 export type EditorSettings = z.infer<typeof EditorSettingsSchema>
 
 /**
+ * Git status configuration
+ * @see Issue #74 - real-time git status refresh
+ */
+export const GitStatusSettingsSchema = z.object({
+  /** Enable polling for git status updates */
+  pollingEnabled: z.boolean().default(true),
+  /** Polling interval in milliseconds (3000-10000ms, default 5000ms) */
+  pollingInterval: z.number().min(3000).max(10000).default(5000)
+})
+export type GitStatusSettings = z.infer<typeof GitStatusSettingsSchema>
+
+/**
  * Root schema for ~/.erfana/settings.json
  */
 export const GlobalSettingsSchema = z.object({
@@ -38,7 +50,9 @@ export const GlobalSettingsSchema = z.object({
   /** Logging configuration */
   logging: LoggingSettingsSchema.default(() => ({ level: 'info' as const })),
   /** Editor configuration */
-  editor: EditorSettingsSchema.default(() => ({ preserveLineBreaks: false }))
+  editor: EditorSettingsSchema.default(() => ({ preserveLineBreaks: false })),
+  /** Git status configuration */
+  gitStatus: GitStatusSettingsSchema.default(() => ({ pollingEnabled: true, pollingInterval: 5000 }))
 })
 export type GlobalSettings = z.infer<typeof GlobalSettingsSchema>
 

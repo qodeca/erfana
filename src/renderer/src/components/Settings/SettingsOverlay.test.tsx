@@ -13,6 +13,8 @@
  * - Keyboard event handling (2 tests)
  * - Store integration (2 tests)
  * - Logging section (6 tests)
+ * - Editor section (5 tests)
+ * - Git status section (11 tests)
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -336,7 +338,11 @@ describe('SettingsOverlay', () => {
 
     it('renders logging section with section title', () => {
       useGlobalSettingsStore.setState({
-        settings: { logging: { level: 'info' }, editor: { preserveLineBreaks: false } },
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+        },
         isLoading: false,
         error: null,
         isInitialized: true,
@@ -344,6 +350,8 @@ describe('SettingsOverlay', () => {
         loadSettings: vi.fn(),
         updateLoggingLevel: vi.fn(),
         updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn()
@@ -357,7 +365,11 @@ describe('SettingsOverlay', () => {
     })
 
     it('renders log level dropdown with current value', () => {
-      const mockSettings: GlobalSettings = { logging: { level: 'debug' }, editor: { preserveLineBreaks: false } }
+      const mockSettings: GlobalSettings = {
+        logging: { level: 'debug' },
+        editor: { preserveLineBreaks: false },
+        gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+      }
       useGlobalSettingsStore.setState({
         settings: mockSettings,
         isLoading: false,
@@ -367,6 +379,8 @@ describe('SettingsOverlay', () => {
         loadSettings: vi.fn(),
         updateLoggingLevel: vi.fn(),
         updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn()
@@ -381,7 +395,11 @@ describe('SettingsOverlay', () => {
 
     it('dropdown displays all 6 log levels', () => {
       useGlobalSettingsStore.setState({
-        settings: { logging: { level: 'info' }, editor: { preserveLineBreaks: false } },
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+        },
         isLoading: false,
         error: null,
         isInitialized: true,
@@ -389,6 +407,8 @@ describe('SettingsOverlay', () => {
         loadSettings: vi.fn(),
         updateLoggingLevel: vi.fn(),
         updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn()
@@ -417,7 +437,11 @@ describe('SettingsOverlay', () => {
     it('changing dropdown calls updateLoggingLevel', () => {
       const mockUpdateLoggingLevel = vi.fn()
       useGlobalSettingsStore.setState({
-        settings: { logging: { level: 'info' }, editor: { preserveLineBreaks: false } },
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+        },
         isLoading: false,
         error: null,
         isInitialized: true,
@@ -425,6 +449,8 @@ describe('SettingsOverlay', () => {
         loadSettings: vi.fn(),
         updateLoggingLevel: mockUpdateLoggingLevel,
         updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn()
@@ -449,6 +475,8 @@ describe('SettingsOverlay', () => {
         loadSettings: vi.fn(),
         updateLoggingLevel: vi.fn(),
         updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn()
@@ -470,6 +498,8 @@ describe('SettingsOverlay', () => {
         loadSettings: vi.fn(),
         updateLoggingLevel: vi.fn(),
         updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn()
@@ -489,7 +519,11 @@ describe('SettingsOverlay', () => {
 
     it('renders editor section with section title', () => {
       useGlobalSettingsStore.setState({
-        settings: { logging: { level: 'info' }, editor: { preserveLineBreaks: false } },
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+        },
         isLoading: false,
         error: null,
         isInitialized: true,
@@ -497,6 +531,8 @@ describe('SettingsOverlay', () => {
         loadSettings: vi.fn(),
         updateLoggingLevel: vi.fn(),
         updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn()
@@ -511,7 +547,11 @@ describe('SettingsOverlay', () => {
 
     it('renders preserve line breaks checkbox with current value (unchecked)', () => {
       useGlobalSettingsStore.setState({
-        settings: { logging: { level: 'info' }, editor: { preserveLineBreaks: false } },
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+        },
         isLoading: false,
         error: null,
         isInitialized: true,
@@ -519,6 +559,8 @@ describe('SettingsOverlay', () => {
         loadSettings: vi.fn(),
         updateLoggingLevel: vi.fn(),
         updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn()
@@ -533,7 +575,11 @@ describe('SettingsOverlay', () => {
 
     it('renders preserve line breaks checkbox with current value (checked)', () => {
       useGlobalSettingsStore.setState({
-        settings: { logging: { level: 'info' }, editor: { preserveLineBreaks: true } },
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: true },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+        },
         isLoading: false,
         error: null,
         isInitialized: true,
@@ -541,6 +587,8 @@ describe('SettingsOverlay', () => {
         loadSettings: vi.fn(),
         updateLoggingLevel: vi.fn(),
         updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn()
@@ -556,7 +604,11 @@ describe('SettingsOverlay', () => {
     it('changing checkbox calls updatePreserveLineBreaks', async () => {
       const mockUpdatePreserveLineBreaks = vi.fn()
       useGlobalSettingsStore.setState({
-        settings: { logging: { level: 'info' }, editor: { preserveLineBreaks: false } },
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+        },
         isLoading: false,
         error: null,
         isInitialized: true,
@@ -564,6 +616,8 @@ describe('SettingsOverlay', () => {
         loadSettings: vi.fn(),
         updateLoggingLevel: vi.fn(),
         updatePreserveLineBreaks: mockUpdatePreserveLineBreaks,
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn()
@@ -588,6 +642,8 @@ describe('SettingsOverlay', () => {
         loadSettings: vi.fn(),
         updateLoggingLevel: vi.fn(),
         updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn()
@@ -597,6 +653,323 @@ describe('SettingsOverlay', () => {
 
       const checkbox = screen.getByRole('checkbox', { name: 'Preserve line breaks' })
       expect(checkbox).toBeDisabled()
+    })
+  })
+
+  describe('Git status section', () => {
+    beforeEach(() => {
+      useSettingsStore.setState({ isOpen: true })
+    })
+
+    it('renders git status section with section title', () => {
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const heading = screen.getByRole('heading', { name: 'Git status' })
+      expect(heading).toBeInTheDocument()
+      expect(heading).toHaveClass('settings-section-title')
+    })
+
+    it('renders polling enabled checkbox with current value (checked)', () => {
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Enable polling fallback' })
+      expect(checkbox).toBeInTheDocument()
+      expect(checkbox).toBeChecked()
+    })
+
+    it('renders polling enabled checkbox with current value (unchecked)', () => {
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: false, pollingInterval: 5000 }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Enable polling fallback' })
+      expect(checkbox).toBeInTheDocument()
+      expect(checkbox).not.toBeChecked()
+    })
+
+    it('changing checkbox calls updateGitStatusPollingEnabled', () => {
+      const mockUpdateGitStatusPollingEnabled = vi.fn()
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: false, pollingInterval: 5000 }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: mockUpdateGitStatusPollingEnabled,
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Enable polling fallback' })
+      fireEvent.click(checkbox)
+
+      expect(mockUpdateGitStatusPollingEnabled).toHaveBeenCalledTimes(1)
+      expect(mockUpdateGitStatusPollingEnabled).toHaveBeenCalledWith(true)
+    })
+
+    it('renders polling interval dropdown with current value', () => {
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 7000 }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const dropdown = screen.getByRole('combobox', { name: 'Polling interval' })
+      expect(dropdown).toBeInTheDocument()
+      expect(dropdown).toHaveValue('7000')
+    })
+
+    it('polling interval dropdown displays all 4 options', () => {
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const dropdown = screen.getByRole('combobox', { name: 'Polling interval' })
+      const options = Array.from(dropdown.querySelectorAll('option'))
+
+      expect(options).toHaveLength(4)
+      expect(options[0]).toHaveTextContent('3s')
+      expect(options[0]).toHaveValue('3000')
+      expect(options[1]).toHaveTextContent('5s')
+      expect(options[1]).toHaveValue('5000')
+      expect(options[2]).toHaveTextContent('7s')
+      expect(options[2]).toHaveValue('7000')
+      expect(options[3]).toHaveTextContent('10s')
+      expect(options[3]).toHaveValue('10000')
+    })
+
+    it('changing dropdown calls updateGitStatusPollingInterval', () => {
+      const mockUpdateGitStatusPollingInterval = vi.fn()
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: mockUpdateGitStatusPollingInterval,
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const dropdown = screen.getByRole('combobox', { name: 'Polling interval' })
+      fireEvent.change(dropdown, { target: { value: '10000' } })
+
+      expect(mockUpdateGitStatusPollingInterval).toHaveBeenCalledTimes(1)
+      expect(mockUpdateGitStatusPollingInterval).toHaveBeenCalledWith(10000)
+    })
+
+    it('polling interval dropdown is disabled when polling is disabled', () => {
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: false, pollingInterval: 5000 }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const dropdown = screen.getByRole('combobox', { name: 'Polling interval' })
+      expect(dropdown).toBeDisabled()
+    })
+
+    it('polling interval dropdown is enabled when polling is enabled', () => {
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const dropdown = screen.getByRole('combobox', { name: 'Polling interval' })
+      expect(dropdown).not.toBeDisabled()
+    })
+
+    it('polling enabled checkbox is disabled when settings is null', () => {
+      useGlobalSettingsStore.setState({
+        settings: null,
+        isLoading: false,
+        error: null,
+        isInitialized: false,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Enable polling fallback' })
+      expect(checkbox).toBeDisabled()
+    })
+
+    it('polling interval dropdown defaults to 5000 when settings is null', () => {
+      useGlobalSettingsStore.setState({
+        settings: null,
+        isLoading: false,
+        error: null,
+        isInitialized: false,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const dropdown = screen.getByRole('combobox', { name: 'Polling interval' })
+      expect(dropdown).toHaveValue('5000')
     })
   })
 })

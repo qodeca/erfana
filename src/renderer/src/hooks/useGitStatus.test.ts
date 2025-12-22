@@ -13,14 +13,14 @@ import { GIT_STATUS } from '../components/ProjectTree/constants'
 
 // Test the constants that control timing behavior
 describe('useGitStatus constants', () => {
-  it('should have DEBOUNCE_DELAY set to 500ms (tuned for responsiveness)', () => {
-    // Reduced from 1000ms for faster git status refresh
-    expect(GIT_STATUS.DEBOUNCE_DELAY).toBe(500)
+  it('should have DEBOUNCE_DELAY set to 250ms (Issue #74)', () => {
+    // Reduced from 500ms for faster git status latency (Issue #74)
+    expect(GIT_STATUS.DEBOUNCE_DELAY).toBe(250)
   })
 
-  it('should have COOLDOWN_DURATION set to 1500ms (tuned for responsiveness)', () => {
-    // Reduced from 2000ms for faster git status refresh
-    expect(GIT_STATUS.COOLDOWN_DURATION).toBe(1500)
+  it('should have COOLDOWN_DURATION set to 500ms (Issue #74)', () => {
+    // Reduced from 1500ms for faster git status latency (Issue #74)
+    expect(GIT_STATUS.COOLDOWN_DURATION).toBe(500)
   })
 
   it('should have constants as readonly', () => {
@@ -79,14 +79,14 @@ describe('useGitStatus interface', () => {
 // Test the hook's integration without full React rendering
 describe('useGitStatus behavior', () => {
   describe('configuration', () => {
-    it('should use 500ms debounce delay (tuned for responsiveness)', () => {
-      // Debounce delay tuned for faster git status refresh (500ms vs original 1000ms)
-      expect(GIT_STATUS.DEBOUNCE_DELAY).toBe(500)
+    it('should use 250ms debounce delay (Issue #74)', () => {
+      // Debounce delay reduced for faster git status latency (Issue #74)
+      expect(GIT_STATUS.DEBOUNCE_DELAY).toBe(250)
     })
 
-    it('should use 1.5 second cooldown duration (tuned for responsiveness)', () => {
-      // Cooldown tuned for faster git status refresh (1500ms vs original 2000ms)
-      expect(GIT_STATUS.COOLDOWN_DURATION).toBe(1500)
+    it('should use 500ms cooldown duration (Issue #74)', () => {
+      // Cooldown reduced for faster git status latency (Issue #74)
+      expect(GIT_STATUS.COOLDOWN_DURATION).toBe(500)
     })
 
     it('should have cooldown longer than debounce', () => {

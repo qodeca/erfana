@@ -9,6 +9,7 @@ import { registerSettingsHandlers } from './ipc/settings-handlers'
 import { registerTerminalHandlers } from './ipc/terminal-handlers'
 import { registerImportHandlers } from './ipc/import-handlers'
 import { registerGitHandlers } from './ipc/git-handlers'
+import { registerGitWatcherHandlers } from './ipc/git-watcher-handlers'
 import { registerPdfHandlers } from './ipc/pdf-handlers'
 import { registerDocxHandlers } from './ipc/docx-handlers'
 import { registerGlobalSettingsHandlers } from './ipc/global-settings-handlers'
@@ -22,6 +23,8 @@ import { terminalService } from './services/TerminalService'
 import { settingsService } from './services/SettingsService'
 import { globalSettingsService } from './services/GlobalSettingsService'
 import { loggingService, logger } from './services/LoggingService'
+import { gitWatcherService } from './services/GitWatcherService'
+import { gitPollingService } from './services/GitPollingService'
 import { installSafeConsole } from './utils/safeConsole'
 
 // Install safe console logging to prevent EPIPE crashes
@@ -156,6 +159,12 @@ app.whenReady().then(async () => {
   // Initialize logging service (after global settings so level is loaded)
   await loggingService.initialize()
 
+  // Wire up git polling service coordination with watcher service (DIP pattern)
+  gitPollingService.setWatcherCoordination(
+    () => gitWatcherService.getLastEventTimestamp(),
+    () => gitWatcherService.isWatching()
+  )
+
   // Register IPC handlers
   registerFileHandlers()
   registerFileWatcherHandlers()
@@ -164,6 +173,7 @@ app.whenReady().then(async () => {
   registerTerminalHandlers()
   registerImportHandlers()
   registerGitHandlers()
+  registerGitWatcherHandlers()
   registerPdfHandlers()
   registerDocxHandlers()
   registerGlobalSettingsHandlers()
@@ -212,12 +222,14 @@ app.on('window-all-closed', () => {
   app.quit()
 })
 
-// Cleanup file watchers, directory watchers, and terminals before app quits
+// Cleanup file watchers, directory watchers, terminals, and git watchers before app quits
 app.on('before-quit', async () => {
   logger.info('App quitting, cleaning up services')
   await fileWatcherService.dispose()
   await directoryWatcherService.dispose()
   await terminalService.dispose()
+  await gitWatcherService.dispose()
+  gitPollingService.dispose()
 })
 
 // In this file you can include the rest of your app's specific main process

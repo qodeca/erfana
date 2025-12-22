@@ -24,11 +24,7 @@ interface WatchedDirectory {
   version: number
 }
 
-interface GitIndexWatcher {
-  watcher: FSWatcher
-  projectPath: string
-  version: number
-}
+// Git index watching migrated to GitWatcherService (Issue #74)
 
 interface DirectoryChangeEvent {
   type: 'add' | 'addDir' | 'unlink' | 'unlinkDir'
@@ -40,12 +36,6 @@ export class DirectoryWatcherService {
   private isDisposing: boolean = false // Flag to prevent operations during cleanup
   // Session token to guard against late/stale events during project switches
   private switchVersion = 0
-
-  // Git index watcher for detecting external git operations (git add, checkout, reset)
-  private gitIndexWatcher: GitIndexWatcher | null = null
-  // Debounce timer for git index changes (prevents spam during rapid git operations)
-  private gitIndexDebounceTimer: NodeJS.Timeout | null = null
-  private readonly GIT_INDEX_DEBOUNCE_MS = 300 // Debounce git index changes
 
   // Performance metrics (VS Code pattern)
   private readonly metrics = new WatcherMetrics()
@@ -119,9 +109,6 @@ export class DirectoryWatcherService {
     }
     this.watchedDirectories.clear()
     this.metrics.setActiveWatchers(0)
-
-    // Stop git index watcher
-    await this.stopGitIndexWatcher()
 
     // Increment session to ignore late events from the previous watchers
     this.switchVersion++
@@ -309,7 +296,6 @@ export class DirectoryWatcherService {
    * @remarks
    * - Increments session version to invalidate pending events (race guard)
    * - Fire-and-forget safe - errors are logged but don't propagate
-   * - Also stops git index watcher (shared resource)
    * @see Issue #59 - App enters broken state after window close
    */
   async cleanupForWebContentsId(webContentsId: number): Promise<void> {
@@ -340,10 +326,6 @@ export class DirectoryWatcherService {
         this.watchedDirectories.delete(dirPath)
       }
     }
-
-    // Stop git index watcher for this webContents
-    // Note: Git index watcher is shared - stopping here affects all windows watching this project
-    await this.stopGitIndexWatcher()
 
     this.metrics.setActiveWatchers(this.watchedDirectories.size)
     this.safeLog(`👁️  Cleaned up directory watches for webContentsId ${webContentsId}`)
@@ -559,106 +541,6 @@ export class DirectoryWatcherService {
       }
     }
     this.watchedDirectories.clear()
-
-    // Stop git index watcher
-    await this.stopGitIndexWatcher()
-  }
-
-  /**
-   * Start watching .git/index file for external git operations
-   * Triggers git:index-changed event when git add, checkout, reset, etc. occur
-   */
-  async startGitIndexWatcher(projectPath: string, webContents: WebContents): Promise<void> {
-    // Stop existing watcher if any
-    await this.stopGitIndexWatcher()
-
-    // Store webContentsId instead of webContents object to prevent stale reference (issue #59)
-    const webContentsId = webContents.id
-    const gitIndexPath = `${projectPath}/.git/index`
-
-    // Check if .git/index exists (not a git repo if missing)
-    try {
-      const fs = await import('fs/promises')
-      await fs.access(gitIndexPath)
-    } catch {
-      this.safeLog(`👁️  No .git/index found at: ${projectPath} (not a git repo or bare repo)`)
-      return
-    }
-
-    this.safeLog(`👁️  Starting git index watcher for: ${gitIndexPath}`)
-
-    const watcher = chokidar.watch(gitIndexPath, {
-      persistent: true,
-      ignoreInitial: true,
-      usePolling: false,
-      awaitWriteFinish: false,
-      followSymlinks: false
-    })
-
-    this.gitIndexWatcher = {
-      watcher,
-      projectPath,
-      version: this.switchVersion
-    }
-
-    // Watch for changes to .git/index (modified during git add, checkout, reset, etc.)
-    watcher.on('change', () => {
-      if (this.isDisposing) return
-      if (!this.gitIndexWatcher || this.gitIndexWatcher.version !== this.switchVersion) return
-
-      // Debounce rapid changes (e.g., git add multiple files)
-      if (this.gitIndexDebounceTimer) {
-        clearTimeout(this.gitIndexDebounceTimer)
-      }
-
-      this.gitIndexDebounceTimer = setTimeout(() => {
-        this.gitIndexDebounceTimer = null
-        this.safeLog(`🔄 Git index changed: ${gitIndexPath}`)
-
-        // Notify renderer about git index change (use stored ID, not potentially stale reference)
-        const windows = BrowserWindow.getAllWindows()
-        const window = windows.find(w => w.webContents.id === webContentsId)
-        if (window && !window.isDestroyed()) {
-          try {
-            window.webContents.send('git:index-changed', { projectPath })
-          } catch (error) {
-            if (error instanceof Error && !error.message.includes('destroyed')) {
-              this.safeLog(`⚠️  Error sending git:index-changed: ${error.message}`)
-            }
-          }
-        }
-      }, this.GIT_INDEX_DEBOUNCE_MS)
-    })
-
-    watcher.on('error', (error: unknown) => {
-      if (this.isDisposing) return
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      this.safeLog(`⚠️  Git index watcher error: ${errorMessage}`)
-    })
-
-    watcher.on('ready', () => {
-      this.safeLog(`✅ Git index watcher ready for: ${gitIndexPath}`)
-    })
-  }
-
-  /**
-   * Stop the git index watcher
-   */
-  async stopGitIndexWatcher(): Promise<void> {
-    if (this.gitIndexDebounceTimer) {
-      clearTimeout(this.gitIndexDebounceTimer)
-      this.gitIndexDebounceTimer = null
-    }
-
-    if (this.gitIndexWatcher) {
-      try {
-        await this.gitIndexWatcher.watcher.close()
-      } catch {
-        // Ignore errors during cleanup
-      }
-      this.gitIndexWatcher = null
-      this.safeLog('👁️  Git index watcher stopped')
-    }
   }
 
   /**

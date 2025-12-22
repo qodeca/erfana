@@ -1,10 +1,11 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
 import type { ProjectChanged } from '../shared/ipc/schema'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
 import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-schema'
 import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global-settings-schema'
 import type { LogEntry } from '../shared/ipc/logging-schema'
+import type { GitStateChangeEvent, GitWatcherStatus, GitPollTriggeredEvent } from '../shared/ipc/git-watcher-schema'
 import { electronAPI } from '@electron-toolkit/preload'
 
 export interface FileNode {
@@ -146,7 +147,11 @@ const api = {
     }
   },
 
-  // Git index watching (for external git operations: git add, checkout, reset, etc.)
+  /**
+   * Git index watching (for external git operations: git add, checkout, reset, etc.)
+   * @deprecated Use gitWatcher API instead. This API will be removed in a future version.
+   * @see gitWatcher - New unified git watcher API with broader coverage (index, HEAD, refs, fetch, stash)
+   */
   gitIndexWatch: {
     start: (projectPath: string): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('git-index-watch:start', projectPath),
@@ -158,6 +163,88 @@ const api = {
       const listener = (_event: unknown, data: { projectPath: string }) => callback(data)
       ipcRenderer.on('git:index-changed', listener)
       return () => ipcRenderer.removeListener('git:index-changed', listener)
+    }
+  },
+
+  /**
+   * Git watcher - monitors .git directory for state changes
+   * Watches: index, HEAD, refs, fetch, stash
+   * @see Issue #74 - real-time git status refresh
+   */
+  gitWatcher: {
+    /**
+     * Start watching git directory for a project
+     * @param projectPath - Root path of the git repository
+     */
+    start: (projectPath: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('git-watcher:start', projectPath),
+
+    /**
+     * Stop the current git watcher
+     */
+    stop: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('git-watcher:stop'),
+
+    /**
+     * Get current watcher status for debugging/monitoring
+     */
+    getStatus: (): Promise<GitWatcherStatus> =>
+      ipcRenderer.invoke('git-watcher:status'),
+
+    /**
+     * Subscribe to git state change events
+     * @param callback - Called when git state changes (index, HEAD, refs, etc.)
+     * @returns Cleanup function to remove listener
+     */
+    onStateChanged: (callback: (event: GitStateChangeEvent) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: GitStateChangeEvent): void => callback(data)
+      ipcRenderer.on('git:state-changed', handler)
+      return () => ipcRenderer.removeListener('git:state-changed', handler)
+    }
+  },
+
+  /**
+   * Git polling - fallback timer-based status refresh
+   * Complements gitWatcher for cases where file watching misses changes
+   * @see Issue #74 - real-time git status refresh
+   */
+  gitPolling: {
+    /**
+     * Start polling for git status updates
+     * @param projectPath - Root path of the git repository
+     */
+    start: (projectPath: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('git-polling:start', projectPath),
+
+    /**
+     * Stop polling
+     */
+    stop: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('git-polling:stop'),
+
+    /**
+     * Set polling interval
+     * @param ms - Interval in milliseconds
+     */
+    setInterval: (ms: number): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('git-polling:set-interval', ms),
+
+    /**
+     * Enable or disable polling
+     * @param enabled - Whether polling should be active
+     */
+    setEnabled: (enabled: boolean): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('git-polling:set-enabled', enabled),
+
+    /**
+     * Subscribe to poll triggered events
+     * @param callback - Called when polling interval fires
+     * @returns Cleanup function to remove listener
+     */
+    onPollTriggered: (callback: (event: GitPollTriggeredEvent) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, data: GitPollTriggeredEvent): void => callback(data)
+      ipcRenderer.on('git:poll-triggered', handler)
+      return () => ipcRenderer.removeListener('git:poll-triggered', handler)
     }
   },
 

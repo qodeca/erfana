@@ -40,3 +40,10 @@ export {
   isWindowsLongPath,
   type PlatformWatcherConfig
 } from './PlatformConfig'
+
+// Git-specific coalescer
+export {
+  GitEventCoalescer,
+  type GitEventType,
+  type GitEventCallback
+} from './GitEventCoalescer'

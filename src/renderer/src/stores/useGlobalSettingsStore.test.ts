@@ -337,6 +337,174 @@ describe('useGlobalSettingsStore', () => {
     })
   })
 
+  describe('updateGitStatusPollingEnabled()', () => {
+    beforeEach(() => {
+      // Initialize with settings including gitStatus
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 30000 }
+        },
+        isInitialized: true
+      })
+    })
+
+    it('optimistically updates state', async () => {
+      mockGlobalSettingsAPI.set.mockResolvedValue({ success: true })
+
+      const { updateGitStatusPollingEnabled } = useGlobalSettingsStore.getState()
+      const promise = updateGitStatusPollingEnabled(false)
+
+      // Check optimistic update (before IPC completes)
+      const stateBeforeIPC = useGlobalSettingsStore.getState()
+      expect(stateBeforeIPC.settings?.gitStatus.pollingEnabled).toBe(false)
+
+      await promise
+    })
+
+    it('sends correct IPC call', async () => {
+      mockGlobalSettingsAPI.set.mockResolvedValue({ success: true })
+
+      const { updateGitStatusPollingEnabled } = useGlobalSettingsStore.getState()
+      await updateGitStatusPollingEnabled(false)
+
+      expect(mockGlobalSettingsAPI.set).toHaveBeenCalledWith('gitStatus', {
+        pollingEnabled: false,
+        pollingInterval: 30000
+      })
+    })
+
+    it('rolls back on IPC failure (error result)', async () => {
+      mockGlobalSettingsAPI.set.mockResolvedValue({
+        success: false,
+        error: 'Write failed'
+      })
+
+      const { updateGitStatusPollingEnabled } = useGlobalSettingsStore.getState()
+      await updateGitStatusPollingEnabled(false)
+
+      const state = useGlobalSettingsStore.getState()
+      expect(state.settings?.gitStatus.pollingEnabled).toBe(true) // Rolled back
+      expect(state.error).toBe('Write failed')
+    })
+
+    it('rolls back on IPC exception', async () => {
+      const testError = new Error('IPC timeout')
+      mockGlobalSettingsAPI.set.mockRejectedValue(testError)
+
+      const { updateGitStatusPollingEnabled } = useGlobalSettingsStore.getState()
+      await updateGitStatusPollingEnabled(false)
+
+      const state = useGlobalSettingsStore.getState()
+      expect(state.settings?.gitStatus.pollingEnabled).toBe(true) // Rolled back
+      expect(state.error).toBe('IPC timeout')
+    })
+
+    it('handles non-Error exceptions', async () => {
+      mockGlobalSettingsAPI.set.mockRejectedValue('String error')
+
+      const { updateGitStatusPollingEnabled } = useGlobalSettingsStore.getState()
+      await updateGitStatusPollingEnabled(false)
+
+      const state = useGlobalSettingsStore.getState()
+      expect(state.error).toBe('Unknown error')
+    })
+
+    it('does nothing if settings not loaded', async () => {
+      useGlobalSettingsStore.setState({ settings: null })
+
+      const { updateGitStatusPollingEnabled } = useGlobalSettingsStore.getState()
+      await updateGitStatusPollingEnabled(false)
+
+      expect(mockGlobalSettingsAPI.set).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('updateGitStatusPollingInterval()', () => {
+    beforeEach(() => {
+      // Initialize with settings including gitStatus
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 30000 }
+        },
+        isInitialized: true
+      })
+    })
+
+    it('optimistically updates state', async () => {
+      mockGlobalSettingsAPI.set.mockResolvedValue({ success: true })
+
+      const { updateGitStatusPollingInterval } = useGlobalSettingsStore.getState()
+      const promise = updateGitStatusPollingInterval(60000)
+
+      // Check optimistic update (before IPC completes)
+      const stateBeforeIPC = useGlobalSettingsStore.getState()
+      expect(stateBeforeIPC.settings?.gitStatus.pollingInterval).toBe(60000)
+
+      await promise
+    })
+
+    it('sends correct IPC call', async () => {
+      mockGlobalSettingsAPI.set.mockResolvedValue({ success: true })
+
+      const { updateGitStatusPollingInterval } = useGlobalSettingsStore.getState()
+      await updateGitStatusPollingInterval(60000)
+
+      expect(mockGlobalSettingsAPI.set).toHaveBeenCalledWith('gitStatus', {
+        pollingEnabled: true,
+        pollingInterval: 60000
+      })
+    })
+
+    it('rolls back on IPC failure (error result)', async () => {
+      mockGlobalSettingsAPI.set.mockResolvedValue({
+        success: false,
+        error: 'Write failed'
+      })
+
+      const { updateGitStatusPollingInterval } = useGlobalSettingsStore.getState()
+      await updateGitStatusPollingInterval(60000)
+
+      const state = useGlobalSettingsStore.getState()
+      expect(state.settings?.gitStatus.pollingInterval).toBe(30000) // Rolled back
+      expect(state.error).toBe('Write failed')
+    })
+
+    it('rolls back on IPC exception', async () => {
+      const testError = new Error('IPC timeout')
+      mockGlobalSettingsAPI.set.mockRejectedValue(testError)
+
+      const { updateGitStatusPollingInterval } = useGlobalSettingsStore.getState()
+      await updateGitStatusPollingInterval(60000)
+
+      const state = useGlobalSettingsStore.getState()
+      expect(state.settings?.gitStatus.pollingInterval).toBe(30000) // Rolled back
+      expect(state.error).toBe('IPC timeout')
+    })
+
+    it('handles non-Error exceptions', async () => {
+      mockGlobalSettingsAPI.set.mockRejectedValue('String error')
+
+      const { updateGitStatusPollingInterval } = useGlobalSettingsStore.getState()
+      await updateGitStatusPollingInterval(60000)
+
+      const state = useGlobalSettingsStore.getState()
+      expect(state.error).toBe('Unknown error')
+    })
+
+    it('does nothing if settings not loaded', async () => {
+      useGlobalSettingsStore.setState({ settings: null })
+
+      const { updateGitStatusPollingInterval } = useGlobalSettingsStore.getState()
+      await updateGitStatusPollingInterval(60000)
+
+      expect(mockGlobalSettingsAPI.set).not.toHaveBeenCalled()
+    })
+  })
+
   describe('resetSettings()', () => {
     it('triggers IPC call', async () => {
       mockGlobalSettingsAPI.reset.mockResolvedValue({ success: true })

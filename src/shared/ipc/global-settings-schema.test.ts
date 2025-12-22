@@ -7,9 +7,11 @@ import { describe, it, expect } from 'vitest'
 import {
   GlobalSettingsSchema,
   LoggingLevelSchema,
+  GitStatusSettingsSchema,
   getDefaultGlobalSettings,
   type GlobalSettings,
-  type LoggingLevel
+  type LoggingLevel,
+  type GitStatusSettings
 } from './global-settings-schema'
 
 describe('LoggingLevelSchema', () => {
@@ -30,6 +32,59 @@ describe('LoggingLevelSchema', () => {
   })
 })
 
+describe('GitStatusSettingsSchema', () => {
+  it('validates valid git status settings', () => {
+    const settings = {
+      pollingEnabled: true,
+      pollingInterval: 5000
+    }
+    const result = GitStatusSettingsSchema.parse(settings)
+    expect(result).toEqual(settings)
+  })
+
+  it('applies defaults for empty object', () => {
+    const result = GitStatusSettingsSchema.parse({})
+    expect(result.pollingEnabled).toBe(true)
+    expect(result.pollingInterval).toBe(5000)
+  })
+
+  it('accepts minimum polling interval (3000ms)', () => {
+    const result = GitStatusSettingsSchema.parse({ pollingInterval: 3000 })
+    expect(result.pollingInterval).toBe(3000)
+  })
+
+  it('accepts maximum polling interval (10000ms)', () => {
+    const result = GitStatusSettingsSchema.parse({ pollingInterval: 10000 })
+    expect(result.pollingInterval).toBe(10000)
+  })
+
+  it('rejects polling interval below minimum', () => {
+    expect(() =>
+      GitStatusSettingsSchema.parse({ pollingInterval: 2999 })
+    ).toThrow()
+  })
+
+  it('rejects polling interval above maximum', () => {
+    expect(() =>
+      GitStatusSettingsSchema.parse({ pollingInterval: 10001 })
+    ).toThrow()
+  })
+
+  it('allows pollingEnabled to be false', () => {
+    const result = GitStatusSettingsSchema.parse({ pollingEnabled: false })
+    expect(result.pollingEnabled).toBe(false)
+  })
+
+  it('infers correct type', () => {
+    const settings: GitStatusSettings = {
+      pollingEnabled: true,
+      pollingInterval: 5000
+    }
+    expect(settings.pollingEnabled).toBe(true)
+    expect(settings.pollingInterval).toBe(5000)
+  })
+})
+
 describe('GlobalSettingsSchema', () => {
   describe('validation', () => {
     it('validates complete valid settings', () => {
@@ -40,6 +95,10 @@ describe('GlobalSettingsSchema', () => {
         },
         editor: {
           preserveLineBreaks: true
+        },
+        gitStatus: {
+          pollingEnabled: true,
+          pollingInterval: 5000
         }
       }
 
@@ -54,6 +113,10 @@ describe('GlobalSettingsSchema', () => {
         },
         editor: {
           preserveLineBreaks: false
+        },
+        gitStatus: {
+          pollingEnabled: false,
+          pollingInterval: 3000
         }
       }
 
@@ -67,6 +130,9 @@ describe('GlobalSettingsSchema', () => {
       expect(result.logging.level).toBe('info')
       expect(result.editor).toBeDefined()
       expect(result.editor.preserveLineBreaks).toBe(false)
+      expect(result.gitStatus).toBeDefined()
+      expect(result.gitStatus.pollingEnabled).toBe(true)
+      expect(result.gitStatus.pollingInterval).toBe(5000)
     })
 
     it('applies defaults for partial logging config', () => {
@@ -106,6 +172,10 @@ describe('GlobalSettingsSchema', () => {
         },
         editor: {
           preserveLineBreaks: false
+        },
+        gitStatus: {
+          pollingEnabled: true,
+          pollingInterval: 5000
         }
       }
 
@@ -118,7 +188,8 @@ describe('GlobalSettingsSchema', () => {
       // This should compile
       const validSettings: GlobalSettings = {
         logging: { level: 'info' },
-        editor: { preserveLineBreaks: false }
+        editor: { preserveLineBreaks: false },
+        gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
       }
       expect(validSettings.logging.level).toBe('info')
     })
@@ -133,6 +204,9 @@ describe('getDefaultGlobalSettings', () => {
     expect(defaults.logging).toHaveProperty('level')
     expect(defaults).toHaveProperty('editor')
     expect(defaults.editor).toHaveProperty('preserveLineBreaks')
+    expect(defaults).toHaveProperty('gitStatus')
+    expect(defaults.gitStatus).toHaveProperty('pollingEnabled')
+    expect(defaults.gitStatus).toHaveProperty('pollingInterval')
   })
 
   it('returns info level by default', () => {
@@ -143,6 +217,16 @@ describe('getDefaultGlobalSettings', () => {
   it('returns preserveLineBreaks as false by default', () => {
     const defaults = getDefaultGlobalSettings()
     expect(defaults.editor.preserveLineBreaks).toBe(false)
+  })
+
+  it('returns gitStatus with pollingEnabled true by default', () => {
+    const defaults = getDefaultGlobalSettings()
+    expect(defaults.gitStatus.pollingEnabled).toBe(true)
+  })
+
+  it('returns gitStatus with pollingInterval 5000ms by default', () => {
+    const defaults = getDefaultGlobalSettings()
+    expect(defaults.gitStatus.pollingInterval).toBe(5000)
   })
 
   it('returns object that passes schema validation', () => {

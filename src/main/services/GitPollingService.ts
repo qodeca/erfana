@@ -1,0 +1,383 @@
+/**
+ * GitPollingService - Hybrid polling fallback for git status refresh
+ *
+ * Provides a fallback polling mechanism that complements the file watcher.
+ * Uses hybrid mode to avoid redundant refreshes when the watcher is active.
+ *
+ * Features:
+ * - Configurable polling interval (default 5 seconds)
+ * - Hybrid mode: Skip refresh if watcher triggered in last 2 seconds
+ * - Differential check: Compare .git/index mtime+size before full refresh
+ * - Integration with GlobalSettingsService for interval/enabled settings
+ * - IPC broadcast 'git:poll-triggered' when refresh needed
+ * - Metrics tracking: pollingRefreshCount, pollingSkippedCount
+ *
+ * Design:
+ * - Singleton pattern for centralized state
+ * - Coordinates with GitWatcherService for hybrid behavior
+ *
+ * @see Issue #74 - Real-time git status refresh
+ * @see BRS-003 - Real-time git status refresh specification
+ */
+
+import { stat } from 'fs/promises'
+import { join } from 'path'
+import { logger } from './LoggingService'
+import { broadcastToAllWindows } from '../utils/ipcBroadcast'
+import type { GitPollTriggeredEvent } from '../../shared/ipc/git-watcher-schema'
+
+/**
+ * Provider for the last watcher event timestamp.
+ * Returns null if no events have occurred.
+ */
+type TimestampProvider = () => number | null
+
+/**
+ * Provider for watcher active status.
+ * Returns true if the watcher is currently active.
+ */
+type WatchingStatusProvider = () => boolean
+
+/** Default polling interval in milliseconds */
+const DEFAULT_POLLING_INTERVAL_MS = 5000
+
+/** Minimum polling interval allowed (1 second) */
+const MIN_POLLING_INTERVAL_MS = 1000
+
+/** Maximum polling interval allowed (60 seconds) */
+const MAX_POLLING_INTERVAL_MS = 60000
+
+/** Threshold for considering watcher as active (ms) */
+const WATCHER_ACTIVE_THRESHOLD_MS = 2000
+
+/**
+ * Metrics for polling service
+ */
+export interface GitPollingMetrics {
+  /** Number of times polling triggered a refresh */
+  pollingRefreshCount: number
+  /** Number of times polling was skipped (watcher active or no index change) */
+  pollingSkippedCount: number
+  /** Timestamp of last poll */
+  lastPollTimestamp: number
+  /** Timestamp of last refresh */
+  lastRefreshTimestamp: number
+}
+
+/**
+ * GitPollingService
+ *
+ * Singleton service for polling git status as a fallback.
+ * Use `gitPollingService.start(projectPath)` to begin polling.
+ */
+export class GitPollingService {
+  /** Current project path being polled */
+  private projectPath: string | null = null
+
+  /** Polling timer handle */
+  private pollingTimer: NodeJS.Timeout | null = null
+
+  /** Current polling interval in milliseconds */
+  private pollingIntervalMs: number = DEFAULT_POLLING_INTERVAL_MS
+
+  /** Whether polling is enabled */
+  private enabled: boolean = true
+
+  /** Last known .git/index mtime */
+  private lastIndexMtime: number = 0
+
+  /** Last known .git/index size */
+  private lastIndexSize: number = 0
+
+  /** Metrics tracking */
+  private metrics: GitPollingMetrics = {
+    pollingRefreshCount: 0,
+    pollingSkippedCount: 0,
+    lastPollTimestamp: 0,
+    lastRefreshTimestamp: 0
+  }
+
+  /** Disposal flag to prevent operations during cleanup */
+  private isDisposing: boolean = false
+
+  /** Provider for last watcher event timestamp (injected) */
+  private getLastWatcherEventTimestamp: TimestampProvider = () => null
+
+  /** Provider for watcher active status (injected) */
+  private isWatcherActive: WatchingStatusProvider = () => false
+
+  /**
+   * Set watcher coordination providers (Dependency Injection).
+   *
+   * This decouples GitPollingService from GitWatcherService,
+   * following the Dependency Inversion Principle.
+   *
+   * @param timestampProvider - Function that returns last watcher event timestamp
+   * @param watchingProvider - Function that returns whether watcher is active
+   */
+  setWatcherCoordination(
+    timestampProvider: TimestampProvider,
+    watchingProvider: WatchingStatusProvider
+  ): void {
+    this.getLastWatcherEventTimestamp = timestampProvider
+    this.isWatcherActive = watchingProvider
+
+    logger.debug('GitPollingService: Watcher coordination configured')
+  }
+
+  /**
+   * Start polling for a project
+   *
+   * Automatically stops any existing polling before starting.
+   *
+   * @param projectPath - Absolute path to project root
+   */
+  start(projectPath: string): void {
+    // Stop existing polling
+    this.stop()
+
+    this.projectPath = projectPath
+    this.isDisposing = false
+
+    // Reset index tracking
+    this.lastIndexMtime = 0
+    this.lastIndexSize = 0
+
+    // Reset metrics
+    this.metrics = {
+      pollingRefreshCount: 0,
+      pollingSkippedCount: 0,
+      lastPollTimestamp: 0,
+      lastRefreshTimestamp: 0
+    }
+
+    if (!this.enabled) {
+      logger.debug('GitPollingService: Polling disabled, not starting', { projectPath })
+      return
+    }
+
+    this.scheduleNextPoll()
+
+    logger.info('GitPollingService: Started polling', {
+      projectPath,
+      intervalMs: this.pollingIntervalMs
+    })
+  }
+
+  /**
+   * Stop polling
+   *
+   * Safe to call even if not currently polling.
+   */
+  stop(): void {
+    if (this.pollingTimer) {
+      clearTimeout(this.pollingTimer)
+      this.pollingTimer = null
+    }
+
+    if (this.projectPath) {
+      logger.info('GitPollingService: Stopped polling', {
+        projectPath: this.projectPath,
+        refreshCount: this.metrics.pollingRefreshCount,
+        skippedCount: this.metrics.pollingSkippedCount
+      })
+    }
+
+    this.projectPath = null
+    this.lastIndexMtime = 0
+    this.lastIndexSize = 0
+  }
+
+  /**
+   * Check if currently polling
+   */
+  isPolling(): boolean {
+    return this.pollingTimer !== null && this.projectPath !== null
+  }
+
+  /**
+   * Set the polling interval
+   *
+   * @param ms - Interval in milliseconds (clamped to 1-60 seconds)
+   */
+  setInterval(ms: number): void {
+    // Clamp to valid range
+    const clamped = Math.max(MIN_POLLING_INTERVAL_MS, Math.min(MAX_POLLING_INTERVAL_MS, ms))
+
+    if (clamped !== ms) {
+      logger.warn('GitPollingService: Interval clamped to valid range', {
+        requested: ms,
+        actual: clamped
+      })
+    }
+
+    this.pollingIntervalMs = clamped
+
+    logger.debug('GitPollingService: Interval updated', { intervalMs: clamped })
+
+    // If currently polling, restart with new interval
+    // Note: Rapid consecutive setInterval() calls could theoretically cause issues,
+    // but this is mitigated by the Settings UI's debounced save behavior.
+    if (this.isPolling() && this.projectPath) {
+      const projectPath = this.projectPath
+      this.stop()
+      this.start(projectPath)
+    }
+  }
+
+  /**
+   * Enable or disable polling
+   *
+   * @param enabled - Whether polling should be enabled
+   */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled
+
+    logger.debug('GitPollingService: Enabled state updated', { enabled })
+
+    if (!enabled && this.isPolling()) {
+      this.stop()
+    } else if (enabled && this.projectPath && !this.isPolling()) {
+      this.scheduleNextPoll()
+    }
+  }
+
+  /**
+   * Get the current polling interval
+   */
+  getInterval(): number {
+    return this.pollingIntervalMs
+  }
+
+  /**
+   * Check if polling is enabled
+   */
+  isEnabled(): boolean {
+    return this.enabled
+  }
+
+  /**
+   * Get current polling metrics (snapshot).
+   * Returns a copy to prevent external mutation.
+   *
+   * @returns Metrics object with refresh/skip counts and timestamps
+   */
+  getMetrics(): GitPollingMetrics {
+    return { ...this.metrics }
+  }
+
+  /**
+   * Dispose the service (call on app shutdown)
+   */
+  dispose(): void {
+    this.isDisposing = true
+    this.stop()
+  }
+
+  /**
+   * Schedule the next poll
+   */
+  private scheduleNextPoll(): void {
+    if (this.isDisposing || !this.enabled || !this.projectPath) {
+      return
+    }
+
+    this.pollingTimer = setTimeout(async () => {
+      await this.poll()
+      this.scheduleNextPoll()
+    }, this.pollingIntervalMs)
+  }
+
+  /**
+   * Perform a single poll
+   */
+  private async poll(): Promise<void> {
+    if (this.isDisposing || !this.projectPath) {
+      return
+    }
+
+    this.metrics.lastPollTimestamp = Date.now()
+
+    // Check if watcher is active (triggered recently)
+    if (this.shouldSkip()) {
+      this.metrics.pollingSkippedCount++
+      logger.debug('GitPollingService: Skipping poll, watcher active')
+      return
+    }
+
+    // Check if .git/index has changed
+    const indexChanged = await this.hasIndexChanged()
+    if (!indexChanged) {
+      this.metrics.pollingSkippedCount++
+      logger.debug('GitPollingService: Skipping poll, index unchanged')
+      return
+    }
+
+    // Trigger refresh
+    this.metrics.pollingRefreshCount++
+    this.metrics.lastRefreshTimestamp = Date.now()
+
+    const reason = this.isWatcherActive() ? 'index_changed' : 'no_watcher'
+
+    logger.info('GitPollingService: Poll triggered refresh', {
+      projectPath: this.projectPath,
+      reason,
+      refreshCount: this.metrics.pollingRefreshCount
+    })
+
+    this.broadcastEvent({
+      projectPath: this.projectPath,
+      timestamp: Date.now(),
+      reason
+    })
+  }
+
+  /**
+   * Check if poll should be skipped because watcher is active
+   */
+  private shouldSkip(): boolean {
+    const lastWatcherEvent = this.getLastWatcherEventTimestamp()
+
+    if (lastWatcherEvent !== null && Date.now() - lastWatcherEvent < WATCHER_ACTIVE_THRESHOLD_MS) {
+      return true // Skip, watcher is active
+    }
+
+    return false
+  }
+
+  /**
+   * Check if .git/index has changed since last poll
+   */
+  private async hasIndexChanged(): Promise<boolean> {
+    if (!this.projectPath) {
+      return false
+    }
+
+    const indexPath = join(this.projectPath, '.git', 'index')
+
+    try {
+      const indexStat = await stat(indexPath)
+
+      if (indexStat.mtimeMs !== this.lastIndexMtime || indexStat.size !== this.lastIndexSize) {
+        this.lastIndexMtime = indexStat.mtimeMs
+        this.lastIndexSize = indexStat.size
+        return true
+      }
+
+      return false
+    } catch {
+      // File doesn't exist or error - don't trigger refresh
+      return false
+    }
+  }
+
+  /**
+   * Broadcast poll triggered event to all renderer windows
+   */
+  private broadcastEvent(payload: GitPollTriggeredEvent): void {
+    broadcastToAllWindows('git:poll-triggered', payload)
+  }
+}
+
+/** Singleton instance */
+export const gitPollingService = new GitPollingService()

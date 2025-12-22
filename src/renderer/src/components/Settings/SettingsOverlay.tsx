@@ -20,6 +20,14 @@ const LOG_LEVEL_OPTIONS: { value: LoggingLevel; label: string }[] = [
   { value: 'fatal', label: 'Fatal' }
 ]
 
+// Git status polling interval options (milliseconds)
+const POLLING_INTERVAL_OPTIONS: { value: number; label: string }[] = [
+  { value: 3000, label: '3s' },
+  { value: 5000, label: '5s' },
+  { value: 7000, label: '7s' },
+  { value: 10000, label: '10s' }
+]
+
 /**
  * SettingsOverlay - Full-screen settings dialog
  *
@@ -32,7 +40,13 @@ const LOG_LEVEL_OPTIONS: { value: LoggingLevel; label: string }[] = [
  */
 export function SettingsOverlay() {
   const { isOpen, closeSettings } = useSettingsStore()
-  const { settings, updateLoggingLevel, updatePreserveLineBreaks } = useGlobalSettingsStore()
+  const {
+    settings,
+    updateLoggingLevel,
+    updatePreserveLineBreaks,
+    updateGitStatusPollingEnabled,
+    updateGitStatusPollingInterval
+  } = useGlobalSettingsStore()
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const previousActiveElement = useRef<HTMLElement | null>(null)
 
@@ -128,6 +142,51 @@ export function SettingsOverlay() {
                   onChange={(e) => updatePreserveLineBreaks(e.target.checked)}
                   disabled={!settings}
                 />
+              </div>
+            </section>
+
+            <section className="settings-section">
+              <h2 className="settings-section-title">Git status</h2>
+              <div className="settings-row">
+                <div className="settings-field">
+                  <label htmlFor="git-polling-enabled" className="settings-label">
+                    Enable polling fallback
+                  </label>
+                  <p className="settings-description">
+                    Periodically check for git changes when file watchers may be unreliable
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  id="git-polling-enabled"
+                  className="settings-checkbox"
+                  checked={settings?.gitStatus.pollingEnabled ?? true}
+                  onChange={(e) => updateGitStatusPollingEnabled(e.target.checked)}
+                  disabled={!settings}
+                />
+              </div>
+              <div className="settings-row">
+                <div className="settings-field">
+                  <label htmlFor="git-polling-interval" className="settings-label">
+                    Polling interval
+                  </label>
+                  <p className="settings-description">
+                    How often to check for changes (lower = more responsive, higher = less CPU)
+                  </p>
+                </div>
+                <select
+                  id="git-polling-interval"
+                  className="settings-select"
+                  value={settings?.gitStatus.pollingInterval ?? 5000}
+                  onChange={(e) => updateGitStatusPollingInterval(Number(e.target.value))}
+                  disabled={!settings || !settings.gitStatus.pollingEnabled}
+                >
+                  {POLLING_INTERVAL_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </section>
 

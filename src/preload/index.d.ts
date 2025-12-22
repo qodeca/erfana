@@ -1,6 +1,7 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import { FileNode, FileStats } from './index'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
+import type { GitStateChangeEvent, GitWatcherStatus, GitPollTriggeredEvent } from '../shared/ipc/git-watcher-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
 import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-schema'
 import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global-settings-schema'
@@ -64,10 +65,46 @@ declare global {
           callback: (data: { dirPath: string; error: string }) => void
         ) => () => void
       }
+      /**
+       * @deprecated Use gitWatcher API instead. This API will be removed in a future version.
+       * @see gitWatcher - New unified git watcher API with broader coverage
+       */
       gitIndexWatch: {
         start: (projectPath: string) => Promise<{ success: boolean; error?: string }>
         stop: () => Promise<{ success: boolean; error?: string }>
         onIndexChanged: (callback: (data: { projectPath: string }) => void) => () => void
+      }
+      /**
+       * Unified git watcher - monitors .git directory for state changes
+       * Covers: index, HEAD, refs, fetch, stash
+       * @see Issue #74 - real-time git status refresh
+       */
+      gitWatcher: {
+        /** Start watching git directory for a project */
+        start: (projectPath: string) => Promise<{ success: boolean; error?: string }>
+        /** Stop the current git watcher */
+        stop: () => Promise<{ success: boolean; error?: string }>
+        /** Get current watcher status for debugging/monitoring */
+        getStatus: () => Promise<GitWatcherStatus>
+        /** Subscribe to git state changes */
+        onStateChanged: (callback: (event: GitStateChangeEvent) => void) => () => void
+      }
+      /**
+       * Git polling - fallback timer-based status refresh
+       * Complements gitWatcher for cases where file watching misses changes
+       * @see Issue #74 - real-time git status refresh
+       */
+      gitPolling: {
+        /** Start polling for git status updates */
+        start: (projectPath: string) => Promise<{ success: boolean; error?: string }>
+        /** Stop polling */
+        stop: () => Promise<{ success: boolean; error?: string }>
+        /** Set polling interval in milliseconds */
+        setInterval: (ms: number) => Promise<{ success: boolean; error?: string }>
+        /** Enable or disable polling */
+        setEnabled: (enabled: boolean) => Promise<{ success: boolean; error?: string }>
+        /** Subscribe to poll-triggered events */
+        onPollTriggered: (callback: (event: GitPollTriggeredEvent) => void) => () => void
       }
       // Copilot removed
       settings: {

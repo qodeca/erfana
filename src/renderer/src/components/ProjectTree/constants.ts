@@ -57,19 +57,22 @@ export const AUTO_EXPAND = {
 
 /**
  * Git Status Configuration
+ *
+ * Issue #74: Reduced timing constants for faster git status latency.
+ * End-to-end latency reduced from ~2 seconds to ~750ms.
  */
 export const GIT_STATUS = {
   /**
-   * Debounce delay in ms for git status refresh.
+   * Debounce delay in ms for git status refresh (250ms).
    * Waits for rapid file changes to settle before refreshing.
-   * Tuned for responsiveness (500ms vs original 1000ms).
+   * Reduced from 500ms per Issue #74 to improve latency.
    */
-  DEBOUNCE_DELAY: 500,
+  DEBOUNCE_DELAY: 250,
 
   /**
    * Cooldown duration in ms between git status refreshes.
    * Prevents excessive refreshes during continuous file activity.
-   * Tuned for responsiveness (1500ms vs original 2000ms).
+   * (500ms - reduced from 1500ms per Issue #74)
    */
-  COOLDOWN_DURATION: 1_500
+  COOLDOWN_DURATION: 500
 } as const

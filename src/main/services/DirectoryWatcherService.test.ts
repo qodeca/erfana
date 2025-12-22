@@ -334,45 +334,7 @@ describe('DirectoryWatcherService Issue #59 - WebContents Cleanup', () => {
     expect(svc.watchedDirectories.has('/proj')).toBe(false)
   })
 
-  it('cleanupForWebContentsId stops git index watcher', async () => {
-    const mod = await import('./DirectoryWatcherService')
-    const svc: any = mod.directoryWatcherService
-
-    // Set up a fake git index watcher
-    const fakeGitWatcher = { close: vi.fn(async () => {}) }
-    svc.gitIndexWatcher = {
-      watcher: fakeGitWatcher,
-      projectPath: '/proj',
-      version: svc.switchVersion
-    }
-
-    // Cleanup webContentsId
-    await svc.cleanupForWebContentsId(1)
-
-    // Git index watcher should be stopped
-    expect(fakeGitWatcher.close).toHaveBeenCalled()
-    expect(svc.gitIndexWatcher).toBeNull()
-  })
-
-  it('git index watcher stores webContentsId, not webContents object', async () => {
-    const mod = await import('./DirectoryWatcherService')
-    const svc: any = mod.directoryWatcherService
-
-    // Verify GitIndexWatcher interface doesn't store webContents
-    const fakeGitWatcher = { close: vi.fn(async () => {}), on: vi.fn() }
-    svc.gitIndexWatcher = {
-      watcher: fakeGitWatcher,
-      projectPath: '/proj',
-      version: svc.switchVersion
-    }
-
-    // Verify the interface - should NOT have webContents property
-    expect(svc.gitIndexWatcher.webContents).toBeUndefined()
-    expect(svc.gitIndexWatcher.webContentsId).toBeUndefined()
-    // Instead, git index watcher uses BrowserWindow.getAllWindows() and finds by ID
-    expect(svc.gitIndexWatcher.projectPath).toBe('/proj')
-    expect(svc.gitIndexWatcher.version).toBe(svc.switchVersion)
-  })
+  // Git index watching tests removed - migrated to GitWatcherService (Issue #74)
 
   it('cleanupForWebContentsId handles multiple directories', async () => {
     const mod = await import('./DirectoryWatcherService')
@@ -495,30 +457,5 @@ describe('DirectoryWatcherService Issue #59 - WebContents Cleanup', () => {
 
     // Second cleanup - should not throw
     await expect(svc.cleanupForWebContentsId(1)).resolves.not.toThrow()
-  })
-
-  it('cleanupForWebContentsId clears git index debounce timer', async () => {
-    const mod = await import('./DirectoryWatcherService')
-    const svc: any = mod.directoryWatcherService
-
-    // Set up git index watcher with debounce timer
-    const fakeGitWatcher = { close: vi.fn(async () => {}), on: vi.fn() }
-    const fakeTimer = setTimeout(() => {}, 10000)
-    svc.gitIndexWatcher = {
-      watcher: fakeGitWatcher,
-      projectPath: '/proj',
-      version: svc.switchVersion
-    }
-    svc.gitIndexDebounceTimer = fakeTimer
-
-    // Spy on clearTimeout
-    const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout')
-
-    // Cleanup webContentsId
-    await svc.cleanupForWebContentsId(1)
-
-    // Timer should be cleared
-    expect(clearTimeoutSpy).toHaveBeenCalledWith(fakeTimer)
-    expect(svc.gitIndexDebounceTimer).toBeNull()
   })
 })
