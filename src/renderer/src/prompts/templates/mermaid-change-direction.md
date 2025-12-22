@@ -6,12 +6,29 @@ icon: arrow-right
 targetPanel: terminal
 autoExecute: true
 ---
+<context>
 {{#if fileRef}}{{fileRef}}
+{{/if}}
+Target direction: {{targetDirection}} ({{directionLabel}})
+</context>
 
-{{/if}}Change this Mermaid diagram to **{{targetDirection}}** ({{directionLabel}}) layout:
-
+<input>
 ```mermaid
 {{mermaidCode}}
 ```
+</input>
 
-Update the direction declaration to `{{targetDirection}}`.
+<task>
+Update the diagram direction to {{targetDirection}}.
+</task>
+
+<constraints>
+- Return only the complete diagram with new direction
+- No explanations
+</constraints>
+
+<output_format>
+```mermaid
+... diagram with {{targetDirection}} direction ...
+```
+</output_format>

@@ -281,7 +281,8 @@ describe('Template Registry', () => {
       const prompt = getPrompt('elaborate')
 
       expect(prompt?.template).toContain('{{selectedText}}')
-      expect(prompt?.template).toContain('Elaborate')
+      // Template uses XML structure with "elaborate" task
+      expect(prompt?.template).toContain('elaborate')
     })
 
     it('should have all templates with file context handling', () => {

@@ -40,7 +40,8 @@ describe('Existing Commands - Regression Tests', () => {
       const result = promptRenderer.render(elaborate!.template, variables)
 
       expect(result).toContain('Test content to elaborate')
-      expect(result).toContain('Elaborate')
+      // Template uses XML structure with "elaborate" task
+      expect(result).toContain('elaborate')
     })
 
     it('should maintain maximize2 icon', () => {
@@ -317,7 +318,8 @@ describe('Existing Commands - Regression Tests', () => {
       const modify = getPrompt('modify')
 
       expect(elaborate?.template).toContain('{{#if fileRef}}')
-      expect(modify?.template).toContain('{{filePath}}')
+      // Templates now use basename helper for displaying file path
+      expect(modify?.template).toContain('{{basename filePath}}')
     })
   })
 })

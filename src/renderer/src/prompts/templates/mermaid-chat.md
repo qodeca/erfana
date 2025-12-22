@@ -6,17 +6,29 @@ icon: message-circle
 targetPanel: terminal
 autoExecute: true
 ---
+<context>
 {{#if fileRef}}{{fileRef}}
+{{/if}}
+Location: {{lineRange}}
+</context>
 
-{{/if}}**Mermaid Diagram Context:**
-- Location: {{lineRange}}
-- Current code:
-
+<input>
 ```mermaid
 {{mermaidCode}}
 ```
+</input>
 
-**User Request:**
-{{userInstruction}}
+<task>
+Modify the diagram according to this request: {{userInstruction}}
+</task>
 
-Please modify the diagram according to the user's request.
+<constraints>
+- Return only the complete modified Mermaid code
+- No explanations or commentary
+</constraints>
+
+<output_format>
+```mermaid
+... modified diagram ...
+```
+</output_format>

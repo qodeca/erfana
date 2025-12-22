@@ -6,17 +6,32 @@ icon: maximize2
 targetPanel: terminal
 autoExecute: true
 ---
+<context>
 {{#if fileRef}}{{fileRef}}
+Source: {{basename filePath}} ({{formatLineRange startLine endLine}})
+{{/if}}
+</context>
 
-From {{filePath}} ({{formatLineRange startLine endLine}}):
-
-{{/if}}Selected text:
----
+<input>
 {{selectedText}}
----
+</input>
 
-Elaborate on this text in 2-3 focused paragraphs (200-300 words max).
+<task>
+Think about the content, then elaborate on it in 2-3 focused paragraphs.
+</task>
 
-Cover relevant aspects such as: background/context, supporting details, examples if helpful, connections to related concepts, or practical implications.
+<instructions>
+- Cover relevant aspects: background, supporting details, examples, connections to related concepts, or practical implications
+- Adapt elaboration style to the content type
+- Reference surrounding context only if the selection is unclear
+</instructions>
 
-Adapt your elaboration to the content type. Be clear and concise. Reference surrounding context in {{basename filePath}} only if the selection is unclear.
+<constraints>
+- 200-300 words maximum
+- Clear and concise language
+- No preamble or meta-commentary
+</constraints>
+
+<output_format>
+Direct elaboration text. No headings or formatting unless content requires it.
+</output_format>

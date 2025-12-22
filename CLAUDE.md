@@ -140,6 +140,18 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 
 ## Recent Changes (v0.6.x)
 
+### Prompt Template Optimization for Claude Code (Dec 22, 2025)
+All 9 prompt templates transformed to XML-structured format for improved Claude Code compatibility:
+- Added semantic XML tags: `<context>`, `<input>`, `<task>`, `<instructions>`, `<constraints>`, `<output_format>`
+- Thinking triggers: "think" in elaborate.md and ask.md, "think hard" in visualize.md
+- Terminal UX optimizations: character limits, no preamble instructions, bullet point formatting
+
+**Templates Updated**: `elaborate.md`, `modify.md`, `ask.md`, `visualize.md`, `prompt.md`, `mermaid-chat.md`, `mermaid-bug-report.md`, `mermaid-change-direction.md`, `organize-import.md`
+
+**Files Modified**: `src/renderer/src/prompts/templates/` (9 files)
+
+Closes #72
+
 ### Auto-Open Terminal on Project Load (Dec 22, 2025)
 Terminal panel now automatically opens when a project loads:
 - Auto-opens on Recent Projects selection or File > Open

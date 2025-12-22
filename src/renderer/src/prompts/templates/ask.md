@@ -10,15 +10,32 @@ inputLabel: What would you like to know about this text?
 inputPlaceholder: e.g., What does this mean? Why is this important? How does this relate to...?
 order: 2
 ---
+<context>
 {{#if fileRef}}{{fileRef}}
+Source: {{basename filePath}} ({{formatLineRange startLine endLine}})
+{{/if}}
+</context>
 
-From {{filePath}} ({{formatLineRange startLine endLine}}):
-
-{{/if}}Selected text:
----
+<input>
 {{selectedText}}
----
+</input>
 
-Question: {{userInput}}
+<task>
+Think about the question, then answer: {{userInput}}
+</task>
 
-Please answer this question in relation to the selected text above. Provide a clear, focused response (200-300 words max). Reference surrounding context in {{basename filePath}} if helpful for answering the question.
+<instructions>
+- Answer in relation to the input text above
+- Reference surrounding context if helpful for answering
+- Provide clear, focused response
+</instructions>
+
+<constraints>
+- 200-300 words maximum
+- Direct answer without preamble
+- No meta-commentary
+</constraints>
+
+<output_format>
+Direct answer to the question.
+</output_format>

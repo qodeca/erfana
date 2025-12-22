@@ -5,7 +5,7 @@ import { mockPromptVariables } from './__test-utils__/fixtures'
 
 /**
  * Tests for the organize-import prompt template
- * Verifies the 5-phase workflow structure and key features from issue #20
+ * Verifies the 5-phase workflow structure with AskUserQuestion integration
  */
 describe('Organize Import Prompt', () => {
   describe('Registry and Metadata', () => {
@@ -106,17 +106,17 @@ describe('Organize Import Prompt', () => {
     })
   })
 
-  describe('Phase 1: Analysis Sub-sections', () => {
-    it('should contain file analysis section', () => {
+  describe('Phase 1: Analysis Content', () => {
+    it('should contain file content analysis step', () => {
       const prompt = getPrompt('organize-import')
 
-      expect(prompt?.template).toContain('Analyze the Imported File')
+      expect(prompt?.template).toContain('Read the imported file content')
     })
 
-    it('should contain project structure analysis section', () => {
+    it('should contain project structure analysis step', () => {
       const prompt = getPrompt('organize-import')
 
-      expect(prompt?.template).toContain('Analyze Project Structure')
+      expect(prompt?.template).toContain('Examine project folder organization')
     })
 
     it('should mention naming conventions analysis', () => {
@@ -126,61 +126,63 @@ describe('Organize Import Prompt', () => {
     })
   })
 
-  describe('Phase 2: Location Suggestions', () => {
-    it('should have primary recommendation section', () => {
+  describe('Phase 2: Location Decision with AskUserQuestion', () => {
+    it('should instruct to use AskUserQuestion', () => {
       const prompt = getPrompt('organize-import')
 
-      expect(prompt?.template).toContain('Primary Recommendation')
+      expect(prompt?.template).toContain('use AskUserQuestion')
     })
 
-    it('should have alternatives section', () => {
+    it('should specify header for location question', () => {
       const prompt = getPrompt('organize-import')
 
-      expect(prompt?.template).toContain('Alternatives')
+      expect(prompt?.template).toContain('Header: "File location"')
     })
 
-    it('should mention up to 2 alternative locations', () => {
+    it('should mention primary recommendation', () => {
+      const prompt = getPrompt('organize-import')
+
+      expect(prompt?.template).toMatch(/primary recommendation/i)
+    })
+
+    it('should mention up to 2 alternatives', () => {
       const prompt = getPrompt('organize-import')
 
       expect(prompt?.template).toMatch(/up to 2 alternatives/i)
     })
 
-    it('should ask user for location decision', () => {
+    it('should wait for user response', () => {
       const prompt = getPrompt('organize-import')
 
-      expect(prompt?.template).toContain('Which location would you like')
-    })
-
-    it('should have STOP instruction after location question', () => {
-      const prompt = getPrompt('organize-import')
-
-      expect(prompt?.template).toMatch(/STOP.*Wait for my response.*file naming/is)
+      expect(prompt?.template).toContain('Wait for user response')
     })
   })
 
-  describe('Phase 3: File Name Suggestions', () => {
-    it('should have recommended name section', () => {
+  describe('Phase 3: File Name Decision with AskUserQuestion', () => {
+    it('should instruct to use AskUserQuestion for naming', () => {
       const prompt = getPrompt('organize-import')
 
-      expect(prompt?.template).toContain('Recommended name')
+      // Should have multiple AskUserQuestion mentions (location and naming)
+      const matches = prompt?.template.match(/use AskUserQuestion/gi) || []
+      expect(matches.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('should specify header for name question', () => {
+      const prompt = getPrompt('organize-import')
+
+      expect(prompt?.template).toContain('Header: "File name"')
+    })
+
+    it('should mention recommended name matching conventions', () => {
+      const prompt = getPrompt('organize-import')
+
+      expect(prompt?.template).toMatch(/recommended name.*conventions/i)
     })
 
     it('should mention 2 alternative names', () => {
       const prompt = getPrompt('organize-import')
 
       expect(prompt?.template).toMatch(/2 alternative names/i)
-    })
-
-    it('should ask user for name decision', () => {
-      const prompt = getPrompt('organize-import')
-
-      expect(prompt?.template).toContain('Which name would you like')
-    })
-
-    it('should have STOP instruction after name question', () => {
-      const prompt = getPrompt('organize-import')
-
-      expect(prompt?.template).toMatch(/STOP.*Wait for my response.*moving the file/is)
     })
   })
 
@@ -198,23 +200,23 @@ describe('Organize Import Prompt', () => {
     })
   })
 
-  describe('Phase 5: Cleanup Option', () => {
+  describe('Phase 5: Cleanup with AskUserQuestion', () => {
+    it('should use AskUserQuestion for cleanup decision', () => {
+      const prompt = getPrompt('organize-import')
+
+      expect(prompt?.template).toContain('Header: "Cleanup"')
+    })
+
     it('should ask about deleting original file', () => {
       const prompt = getPrompt('organize-import')
 
-      expect(prompt?.template).toMatch(/delete the original file/i)
+      expect(prompt?.template).toMatch(/delete.*original.*file/i)
     })
 
-    it('should mention keeping import folder clean', () => {
+    it('should provide yes/no options', () => {
       const prompt = getPrompt('organize-import')
 
-      expect(prompt?.template).toMatch(/keep it clean/i)
-    })
-
-    it('should provide Yes/No options', () => {
-      const prompt = getPrompt('organize-import')
-
-      expect(prompt?.template).toContain('Yes/No')
+      expect(prompt?.template).toMatch(/Yes.*delete.*No.*keep/i)
     })
   })
 
@@ -225,11 +227,68 @@ describe('Organize Import Prompt', () => {
       expect(prompt?.template).toMatch(/step-by-step conversation/i)
     })
 
-    it('should have multiple STOP points for user interaction', () => {
+    it('should use AskUserQuestion for all decision points', () => {
       const prompt = getPrompt('organize-import')
-      const stopCount = (prompt?.template.match(/STOP HERE/g) || []).length
+      const askCount = (prompt?.template.match(/use AskUserQuestion/gi) || []).length
 
-      expect(stopCount).toBeGreaterThanOrEqual(2)
+      // Location, Name, and Cleanup decisions
+      expect(askCount).toBeGreaterThanOrEqual(3)
+    })
+  })
+
+  describe('XML Structure', () => {
+    it('should have context tag', () => {
+      const prompt = getPrompt('organize-import')
+
+      expect(prompt?.template).toContain('<context>')
+      expect(prompt?.template).toContain('</context>')
+    })
+
+    it('should have task tag', () => {
+      const prompt = getPrompt('organize-import')
+
+      expect(prompt?.template).toContain('<task>')
+      expect(prompt?.template).toContain('</task>')
+    })
+
+    it('should have instructions tag', () => {
+      const prompt = getPrompt('organize-import')
+
+      expect(prompt?.template).toContain('<instructions>')
+      expect(prompt?.template).toContain('</instructions>')
+    })
+
+    it('should have constraints tag', () => {
+      const prompt = getPrompt('organize-import')
+
+      expect(prompt?.template).toContain('<constraints>')
+      expect(prompt?.template).toContain('</constraints>')
+    })
+  })
+
+  describe('Constraints', () => {
+    it('should require analysis before asking', () => {
+      const prompt = getPrompt('organize-import')
+
+      expect(prompt?.template).toMatch(/analyze before asking/i)
+    })
+
+    it('should require AskUserQuestion for decisions', () => {
+      const prompt = getPrompt('organize-import')
+
+      expect(prompt?.template).toContain('Always use AskUserQuestion tool for decisions')
+    })
+
+    it('should require clear reasoning', () => {
+      const prompt = getPrompt('organize-import')
+
+      expect(prompt?.template).toMatch(/clear reasoning/i)
+    })
+
+    it('should require matching project naming conventions', () => {
+      const prompt = getPrompt('organize-import')
+
+      expect(prompt?.template).toContain('Match project naming conventions')
     })
   })
 })

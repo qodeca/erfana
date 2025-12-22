@@ -6,20 +6,35 @@ icon: bug
 targetPanel: terminal
 autoExecute: true
 ---
+<context>
 {{#if fileRef}}{{fileRef}}
+Location: {{lineRange}}
+{{/if}}
+</context>
 
-In {{filePath}} ({{lineRange}}):
-
-{{/if}}I'm getting a Mermaid diagram rendering error.
-
-**Error Message:**
-```
+<input name="error">
 {{mermaidError}}
-```
+</input>
 
-**Diagram Code:**
+<input name="code">
 ```mermaid
 {{mermaidCode}}
 ```
+</input>
 
-Please help me fix this Mermaid diagram syntax error.
+<task>
+Fix the Mermaid diagram syntax error.
+</task>
+
+<constraints>
+- Brief explanation of the issue (1-2 sentences)
+- Provide corrected diagram code
+</constraints>
+
+<output_format>
+**Issue**: [Brief explanation]
+
+```mermaid
+... corrected diagram ...
+```
+</output_format>

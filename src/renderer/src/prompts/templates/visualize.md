@@ -59,30 +59,40 @@ dropdown:
     - value: xychart-beta
       label: XY Charts
 ---
+<context>
 {{#if fileRef}}{{fileRef}}
+Source: {{basename filePath}} ({{formatLineRange startLine endLine}})
+{{/if}}
+Diagram type: {{diagramType}}
+</context>
 
-From {{filePath}} ({{formatLineRange startLine endLine}}):
-
-{{/if}}Content to visualize:
----
+<input>
 {{selectedText}}
----
+</input>
 
-Create a Mermaid {{diagramType}} diagram that visualizes the content above.
+<task>
+Think hard about how to best represent this content visually, then create a Mermaid {{diagramType}} diagram.
 {{#if userInput}}
 
 Additional instructions: {{userInput}}
 {{/if}}
+</task>
 
-Requirements:
-1. Use valid Mermaid syntax for {{diagramType}} diagram type
-2. Keep the diagram clear and readable
-3. Focus on the key concepts and relationships
-4. Use meaningful labels and descriptions
-5. Return ONLY the Mermaid code block (no explanations)
+<instructions>
+- Use valid Mermaid syntax for {{diagramType}} diagram type
+- Keep the diagram clear and readable
+- Focus on key concepts and relationships
+- Use meaningful labels and descriptions
+</instructions>
 
-Format your response as:
+<constraints>
+- Return ONLY the Mermaid code block
+- No explanations or commentary
+</constraints>
+
+<output_format>
 ```mermaid
 {{diagramType}}
     ... diagram content ...
 ```
+</output_format>

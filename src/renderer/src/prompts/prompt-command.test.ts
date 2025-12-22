@@ -117,10 +117,11 @@ describe('Prompt Command - New Feature Tests', () => {
       expect(prompt?.template).toContain('{{/if}}')
     })
 
-    it('should include {{filePath}} variable for context', () => {
+    it('should include file path variable for context', () => {
       const prompt = getPrompt('prompt')
 
-      expect(prompt?.template).toContain('{{filePath}}')
+      // Uses basename helper for displaying file path
+      expect(prompt?.template).toContain('{{basename filePath}}')
     })
 
     it('should use formatLineRange helper for line numbers', () => {
@@ -162,7 +163,8 @@ describe('Prompt Command - New Feature Tests', () => {
       const result = promptRenderer.render(prompt!.template, variables)
 
       expect(result).toContain('@/test/file.md:10-15')
-      expect(result).toContain('From /test/file.md')
+      expect(result).toContain('Source:')
+      expect(result).toContain('file.md')
       expect(result).toContain('lines 10-15')
       expect(result).toContain('Selected content')
       expect(result).toContain('Explain this')
@@ -276,8 +278,8 @@ describe('Prompt Command - New Feature Tests', () => {
       const elaborate = getPrompt('elaborate')
       const prompt = getPrompt('prompt')
 
-      // Elaborate has fixed instruction in template
-      expect(elaborate?.template).toContain('Elaborate')
+      // Elaborate has fixed instruction in template (XML-structured with "elaborate" task)
+      expect(elaborate?.template).toContain('elaborate')
       expect(elaborate?.requiresInput).toBe(false)
 
       // Prompt uses user's custom instruction

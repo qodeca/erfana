@@ -10,15 +10,31 @@ inputLabel: How should this be modified?
 inputPlaceholder: e.g., make more concise, add examples, use simpler language...
 order: 1
 ---
+<context>
 {{#if fileRef}}{{fileRef}}
+Source: {{basename filePath}} ({{formatLineRange startLine endLine}})
+{{/if}}
+</context>
 
-From {{filePath}} ({{formatLineRange startLine endLine}}):
-
-{{/if}}Original text:
----
+<input>
 {{selectedText}}
----
+</input>
 
-Modification requested: {{userInput}}
+<task>
+Apply the following modification: {{userInput}}
+</task>
 
-Apply the requested modification to the text above. Maintain the same format and style unless the modification specifically requests otherwise. Keep response focused (200-300 words max). Reference surrounding context in {{basename filePath}} only if the selection is unclear.
+<instructions>
+- Maintain the same format and style unless modification specifically requests otherwise
+- Reference surrounding context only if the selection is unclear
+</instructions>
+
+<constraints>
+- 200-300 words maximum
+- Preserve original meaning unless change is requested
+- No preamble or explanation
+</constraints>
+
+<output_format>
+Modified text only. No commentary or meta-text.
+</output_format>
