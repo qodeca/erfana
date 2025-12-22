@@ -1,7 +1,7 @@
 {
   "sequence": {
-    "current": 2,
-    "next": 3
+    "current": 3,
+    "next": 4
   },
   "registry": [
     {
@@ -49,11 +49,32 @@
         "designs": [],
         "issues": ["#73"]
       }
+    },
+    {
+      "id": 3,
+      "slug": "realtime-git-status",
+      "name": "Real-time git status refresh",
+      "tier": "T3",
+      "status": "active",
+      "scope": "feature",
+      "description": "Bullet-proof, real-time git status refresh mechanism for Project panel that detects all change scenarios (internal edits, external git CLI, external file changes, network/cloud sync) within <1 second latency, with polling fallback for guaranteed reliability.",
+      "created": "2025-12-22T19:30:00.000Z",
+      "path": "brs003-realtime-git-status",
+      "last_modified": "2025-12-22T16:00:00Z",
+      "sections_count": 3,
+      "requirements_count": 30,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": ["#74"]
+      }
     }
   ],
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2025-12-22T18:00:00Z"
+    "last_updated": "2025-12-22T16:00:00Z"
   }
 }

@@ -65,6 +65,20 @@ See `docs/` for details (keep Claude's context focused):
 - [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.6.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
 
+## Business Requirements Specifications (BRS)
+
+Feature specifications live in `specs/business-reqs/`. Check registry before implementing new features.
+
+| ID | Name | Tier | Status | Path |
+|----|------|------|--------|------|
+| BRS-001 | Unified in-file search | T3 | draft | `specs/business-reqs/brs001-unified-search/` |
+| BRS-002 | Editor context menu with prompts | T3 | active | `specs/business-reqs/brs002-editor-context-menu/` |
+| BRS-003 | Real-time git status refresh | T3 | active | `specs/business-reqs/brs003-realtime-git-status/` |
+
+**Registry**: `specs/business-reqs/registry.json`
+
+**Before implementing a feature**: Read the BRS overview (01-overview.md), requirements (02-requirements.md), and acceptance criteria (03-acceptance.md).
+
 ## Code Style & Conventions
 - TypeScript strict mode enabled
 - React functional components with hooks

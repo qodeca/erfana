@@ -11,7 +11,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
   - `npm run test:renderer` — renderer tests
   - `npm run test:main` — main process tests
   - `npm run test:preload` — preload tests
-- **4463 tests passing** across 148 test files (v0.6.3)
+- **4643 tests passing** across 153 test files (v0.6.3)
 
 #### Renderer tips
 - When testing TerminalPanel in jsdom, mock xterm and addons to avoid canvas errors:
@@ -141,7 +141,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
   - Open/Closed: Base component configurable via props, closed for modification
   - Dependency Inversion: Validation abstracted from UI components
 
-- **Total Tests**: 4463 tests passing (148 test files)
+- **Total Tests**: 4643 tests passing (153 test files)
 - Tests validate SOLID refactoring of file system dialogs with comprehensive validation logic
 - See [Architecture - Dialog System](../architecture.md#dialog-system) for implementation details
 

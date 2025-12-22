@@ -24,6 +24,26 @@ The ERFANA editor subsystem provides a comprehensive markdown editing experience
 - Renders frontmatter as styled key-value table in preview
 - Security-hardened parsing with size limits
 
+### In-File Search (v0.6.3)
+Unified search overlay activated via `Cmd/Ctrl+F` in editor or preview panes.
+
+**Features**:
+- Provider pattern: `MonacoSearchProvider` (editor), `PreviewSearchProvider` (preview)
+- SearchBar with debounced search, case sensitivity toggle, whole word toggle
+- Keyboard navigation: `Enter`/`Shift+Enter` for next/prev match, `Escape` to close
+- Split mode support with per-pane search state
+- CSS Highlight API with class-based fallback for preview highlighting
+
+**Implementation files**:
+- `src/renderer/src/stores/useSearchStore.ts` - Zustand search state
+- `src/renderer/src/providers/search/` - Provider implementations
+- `src/renderer/src/components/Search/SearchBar.tsx` - Search UI
+- `src/renderer/src/hooks/useSearchKeyboard.ts` - Keyboard shortcuts
+
+**Related ADRs**:
+- [ADR-BRS001-001: Unified search architecture](../architecture/adrs/adr-brs001-001-unified-search.md)
+- [ADR-BRS001-002: Search selection population](../architecture/adrs/adr-brs001-002-search-selection-population.md)
+
 ### Multi-File Support
 - Unique panel per file
 - Tab management with unsaved changes detection
