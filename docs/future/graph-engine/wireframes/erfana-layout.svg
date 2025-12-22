@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 12px;">
+  <!-- Window frame -->
+  <rect x="10" y="10" width="1380" height="880" fill="#1e1e1e" stroke="black" stroke-width="2"/>
+
+  <!-- Title bar -->
+  <rect x="10" y="10" width="1380" height="35" fill="#323233" stroke="black" stroke-width="2"/>
+  <circle cx="25" cy="27" r="6" fill="#ff5f56"/>
+  <circle cx="45" cy="27" r="6" fill="#ffbd2e"/>
+  <circle cx="65" cy="27" r="6" fill="#27c93f"/>
+  <text x="650" y="32" fill="#ccc" font-weight="bold">ERFANA - Documentation IDE</text>
+
+  <!-- Main container -->
+  <line x1="10" y1="45" x2="1390" y2="45" stroke="black" stroke-width="2"/>
+
+  <!-- LEFT: Project Panel -->
+  <rect x="10" y="45" width="280" height="835" fill="#252526" stroke="black" stroke-width="2"/>
+
+  <!-- Project panel header -->
+  <rect x="10" y="45" width="280" height="40" fill="#2d2d30" stroke="#3e3e42" stroke-width="1"/>
+  <text x="20" y="70" fill="#ccc" font-size="11" font-weight="bold">PROJECT</text>
+  <text x="240" y="70" fill="#888">◂</text>
+
+  <!-- Project name -->
+  <text x="20" y="100" fill="#ccc" font-size="11" font-weight="bold">PUREGYM ARABIA</text>
+
+  <!-- File tree -->
+  <text x="25" y="130" fill="#ccc" font-size="10">▸ .claude</text>
+  <text x="25" y="150" fill="#ccc" font-size="10">▸ .git</text>
+  <text x="25" y="170" fill="#ccc" font-size="10">▸ 01-knowledge-base</text>
+  <text x="25" y="190" fill="#ccc" font-size="10">▸ 02-strategic-planning</text>
+  <text x="25" y="210" fill="#ccc" font-size="10">▾ 03-current-analysis</text>
+  <text x="35" y="230" fill="#ccc" font-size="10">▾ business-impact</text>
+  <text x="45" y="250" fill="#888" font-size="9">📄 analysis-booking.md</text>
+  <text x="45" y="270" fill="#888" font-size="9">📄 analysis-payment.md</text>
+  <text x="35" y="290" fill="#888" font-size="10">▸ technical-assessments</text>
+  <text x="35" y="310" fill="#888" font-size="10">📄 README-OBSOLETE.md</text>
+  <text x="35" y="330" fill="#ccc" font-size="10">📄 README.md</text>
+  <text x="25" y="350" fill="#ccc" font-size="10">▸ 04-implementation</text>
+
+  <!-- Graph Engine Indicator (NEW) -->
+  <rect x="15" y="750" width="270" height="120" fill="#1e1e1e" stroke="#0066cc" stroke-width="2" rx="4"/>
+  <text x="25" y="770" fill="#0066cc" font-size="11" font-weight="bold">📊 Graph Engine</text>
+  <circle cx="230" cy="767" r="5" fill="#00ff00"/>
+  <text x="25" y="790" fill="#888" font-size="9">Status: Ready</text>
+  <text x="25" y="810" fill="#888" font-size="9">Indexed: 1,247 sections</text>
+  <text x="25" y="830" fill="#888" font-size="9">Last sync: 2 min ago</text>
+  <rect x="25" y="840" width="240" height="22" fill="#2d2d30" stroke="#444" stroke-width="1" rx="2"/>
+  <text x="85" y="856" fill="#ccc" font-size="9">[Show Related]</text>
+
+  <!-- CENTER: Editor Area -->
+  <rect x="290" y="45" width="700" height="835" fill="#1e1e1e" stroke="black" stroke-width="2"/>
+
+  <!-- Tab bar -->
+  <rect x="290" y="45" width="700" height="35" fill="#2d2d30" stroke="#3e3e42" stroke-width="1"/>
+  <rect x="300" y="50" width="220" height="25" fill="#1e1e1e" stroke="#0066cc" stroke-width="1" rx="3"/>
+  <text x="310" y="68" fill="#ccc" font-size="10">🏠 README-OBSOLETE-NOTICE.md</text>
+  <text x="505" y="68" fill="#888" font-size="12">×</text>
+
+  <!-- Editor toolbar -->
+  <rect x="820" y="50" width="160" height="25" fill="#2d2d30" stroke="none"/>
+  <text x="830" y="68" fill="#888" font-size="11">📋 ◧ 👁 ⚙</text>
+
+  <!-- Editor content area -->
+  <rect x="300" y="85" width="680" height="785" fill="#1e1e1e" stroke="none"/>
+
+  <!-- Markdown preview -->
+  <text x="310" y="120" fill="#ccc" font-size="16" font-weight="bold"># Current Analysis Folder Status</text>
+  <text x="310" y="150" fill="#ccc" font-size="14">October 2025</text>
+
+  <text x="310" y="190" fill="#ffcc00" font-size="13">⚠ OBSOLESCENCE NOTICE</text>
+
+  <text x="310" y="220" fill="#aaa" font-size="11">Strategic Pivot Impact: Following the</text>
+  <text x="310" y="240" fill="#aaa" font-size="11">September 2025 strategic pivot to hybrid</text>
+  <text x="310" y="260" fill="#aaa" font-size="11">architecture (WordPress Join Journey +</text>
+  <text x="310" y="280" fill="#aaa" font-size="11">myFitApp + Exerp), much of the analysis</text>
+
+  <!-- Related Sidebar Overlay (NEW - shown as collapsed) -->
+  <rect x="860" y="120" width="110" height="740" fill="#252526" stroke="#0066cc" stroke-width="2" rx="4"/>
+  <text x="870" y="140" fill="#0066cc" font-size="10" font-weight="bold">Related ▸</text>
+  <text x="870" y="165" fill="#888" font-size="8">(Click to expand)</text>
+
+  <!-- Preview of related items when collapsed -->
+  <rect x="865" y="180" width="100" height="35" fill="#1e1e1e" stroke="#444" stroke-width="1" rx="2"/>
+  <text x="870" y="195" fill="#888" font-size="8">📄 database.md</text>
+  <text x="870" y="207" fill="#0066cc" font-size="7">Score: 0.92</text>
+
+  <rect x="865" y="220" width="100" height="35" fill="#1e1e1e" stroke="#444" stroke-width="1" rx="2"/>
+  <text x="870" y="235" fill="#888" font-size="8">📄 tech-stack</text>
+  <text x="870" y="247" fill="#0066cc" font-size="7">Score: 0.87</text>
+
+  <text x="870" y="270" fill="#666" font-size="7">+8 more</text>
+
+  <!-- RIGHT: Terminal Panel -->
+  <rect x="990" y="45" width="400" height="835" fill="#1a1a1a" stroke="black" stroke-width="2"/>
+
+  <!-- Terminal header -->
+  <rect x="990" y="45" width="400" height="40" fill="#2d2d30" stroke="#3e3e42" stroke-width="1"/>
+  <text x="1000" y="70" fill="#ccc" font-size="11" font-weight="bold">TERMINAL</text>
+  <text x="1340" y="70" fill="#888">⟳ ▸</text>
+
+  <!-- Terminal content -->
+  <text x="1000" y="110" fill="#00ff00" font-family="Monaco, monospace" font-size="10">marcinobel@MacBookPro PureGym_Arabia % codex</text>
+  <text x="1000" y="135" fill="#00ff00" font-family="Monaco, monospace" font-size="10">➤ OpenAI Codex (v0.46.0)</text>
+  <text x="1000" y="170" fill="#888" font-family="Monaco, monospace" font-size="9">model:      gpt-5 medium</text>
+  <text x="1000" y="190" fill="#888" font-family="Monaco, monospace" font-size="9">directory:  ~/Projects/PureGym_Arabia</text>
+
+  <text x="1000" y="230" fill="#ccc" font-family="Monaco, monospace" font-size="9">To get started, describe a task or try one</text>
+  <text x="1000" y="250" fill="#ccc" font-family="Monaco, monospace" font-size="9">of these commands:</text>
+
+  <text x="1000" y="280" fill="#0066cc" font-family="Monaco, monospace" font-size="9">/init</text>
+  <text x="1050" y="280" fill="#888" font-family="Monaco, monospace" font-size="8">- create AGENTS.md file</text>
+
+  <text x="1000" y="310" fill="#0066cc" font-family="Monaco, monospace" font-size="9">/status</text>
+  <text x="1050" y="310" fill="#888" font-family="Monaco, monospace" font-size="8">- show session config</text>
+
+  <!-- MCP Tools Indicator (NEW) -->
+  <rect x="1000" y="400" width="370" height="60" fill="#252526" stroke="#0066cc" stroke-width="1" rx="3"/>
+  <text x="1010" y="420" fill="#0066cc" font-size="9" font-weight="bold">🔌 MCP: erfana-graph-engine</text>
+  <text x="1010" y="438" fill="#888" font-size="8">Tools: search, related, entities,</text>
+  <text x="1010" y="453" fill="#888" font-size="8">backlinks, timeline</text>
+
+  <!-- Status Bar -->
+  <line x1="10" y1="880" x2="1390" y2="880" stroke="black" stroke-width="1"/>
+  <rect x="10" y="880" width="1380" height="20" fill="#007acc" stroke="black" stroke-width="1"/>
+  <circle cx="25" cy="890" r="4" fill="#00ff00"/>
+  <text x="35" y="894" fill="white" font-size="9">Graph Ready</text>
+  <text x="150" y="894" fill="white" font-size="9">README-OBSOLETE-NOTICE.md</text>
+  <text x="1200" y="894" fill="white" font-size="9">Line 50  UTF-8  Markdown</text>
+</svg>
