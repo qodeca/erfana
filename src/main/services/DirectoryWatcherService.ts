@@ -1,5 +1,6 @@
 import chokidar, { FSWatcher } from 'chokidar'
 import { BrowserWindow, WebContents, webContents } from 'electron'
+import { normalize, sep } from 'path'
 import { settingsService } from './SettingsService'
 import { PauseController } from '../utils/PauseController'
 import {
@@ -13,6 +14,8 @@ import {
 } from './watcher'
 import { DEFAULT_WATCHER_IGNORE_PATTERNS } from '../../shared/constants'
 import { logger } from './LoggingService'
+import { isSystemDirectory } from '../utils/pathSecurity'
+import { AppError, ErrorCode } from '../../shared/errors'
 
 interface WatchedDirectory {
   dirPath: string
@@ -132,11 +135,30 @@ export class DirectoryWatcherService {
 
   /**
    * Start watching a directory for structural changes
+   *
+   * Security: Uses normalized path comparison and checks for system directories
+   * (Issue #74 review fix - aligned with validateProjectPath pattern)
    */
   async watchDirectory(dirPath: string, webContents: WebContents): Promise<void> {
+    // Security: Normalize paths to prevent traversal attacks (Issue #74 review fix)
+    const normalizedDirPath = normalize(dirPath)
+    const normalizedProjectPath = this.projectPath ? normalize(this.projectPath) : null
+
+    // Security: Check if path is a system directory
+    if (isSystemDirectory(normalizedDirPath)) {
+      throw new AppError(
+        'Cannot watch system or sensitive directories',
+        ErrorCode.PATH_SYSTEM_DIR
+      )
+    }
+
     // Security: Prevent watching directories outside project
-    if (this.projectPath && !dirPath.startsWith(this.projectPath)) {
-      throw new Error('Cannot watch directories outside the project directory')
+    // Uses normalized paths with separator check to prevent bypasses like /project/../sensitive
+    if (normalizedProjectPath && !normalizedDirPath.startsWith(normalizedProjectPath + sep) && normalizedDirPath !== normalizedProjectPath) {
+      throw new AppError(
+        'Cannot watch directories outside the project directory',
+        ErrorCode.PATH_OUTSIDE_PROJECT
+      )
     }
 
     const webContentsId = webContents.id

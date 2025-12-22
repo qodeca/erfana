@@ -147,24 +147,8 @@ const api = {
     }
   },
 
-  /**
-   * Git index watching (for external git operations: git add, checkout, reset, etc.)
-   * @deprecated Use gitWatcher API instead. This API will be removed in a future version.
-   * @see gitWatcher - New unified git watcher API with broader coverage (index, HEAD, refs, fetch, stash)
-   */
-  gitIndexWatch: {
-    start: (projectPath: string): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('git-index-watch:start', projectPath),
-    stop: (): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('git-index-watch:stop'),
-
-    // Event listener for git index changes
-    onIndexChanged: (callback: (data: { projectPath: string }) => void) => {
-      const listener = (_event: unknown, data: { projectPath: string }) => callback(data)
-      ipcRenderer.on('git:index-changed', listener)
-      return () => ipcRenderer.removeListener('git:index-changed', listener)
-    }
-  },
+  // gitIndexWatch API removed (Issue #74 review fix)
+  // Replaced by gitWatcher API which provides broader coverage
 
   /**
    * Git watcher - monitors .git directory for state changes

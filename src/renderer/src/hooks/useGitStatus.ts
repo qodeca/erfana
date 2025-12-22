@@ -72,7 +72,7 @@ export function useGitStatus({
     getFileStatus,
     getFolderStatus,
     clear,
-    lastRefreshTime,
+    // Note: lastRefreshTime accessed via getState() in executeRefresh (Issue #74 review fix)
     // Subscribe to Maps to trigger re-renders when status changes
     // Without this, getFileStatus/getFolderStatus are stable refs and won't trigger updates
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -88,6 +88,10 @@ export function useGitStatus({
   const currentProjectRef = useRef<string | null>(null)
   // Track if a refresh is pending (blocked by cooldown)
   const pendingRefreshRef = useRef(false)
+  // Stable ref for executeRefresh to avoid stale closure issues (Issue #74 review fix)
+  const executeRefreshRef = useRef<(bypassCooldown?: boolean) => Promise<void>>()
+  // Track previous polling settings to detect changes (Issue #74 review fix)
+  const prevPollingSettingsRef = useRef<{ enabled?: boolean; interval?: number }>({})
 
   /**
    * Core refresh function - calls IPC and updates store
@@ -102,8 +106,10 @@ export function useGitStatus({
       currentProjectRef.current = projectPath
 
       // Cooldown check (prevent excessive refreshes)
+      // Use getState() to avoid stale closure capturing lastRefreshTime (Issue #74 review fix)
       if (!bypassCooldown) {
-        const timeSinceLastRefresh = Date.now() - lastRefreshTime
+        const currentLastRefresh = useGitStore.getState().lastRefreshTime
+        const timeSinceLastRefresh = Date.now() - currentLastRefresh
         if (timeSinceLastRefresh < COOLDOWN_DURATION) {
           const remainingCooldown = COOLDOWN_DURATION - timeSinceLastRefresh
 
@@ -113,13 +119,14 @@ export function useGitStatus({
           }
 
           // Schedule new refresh after cooldown expires
+          // Use ref to avoid stale closure (Issue #74 review fix)
           pendingRefreshRef.current = true
           cooldownTimerRef.current = setTimeout(() => {
             cooldownTimerRef.current = null
             pendingRefreshRef.current = false
             // Re-check if still current project before executing
             if (currentProjectRef.current === projectPath) {
-              executeRefresh(true) // Bypass cooldown for scheduled refresh
+              executeRefreshRef.current?.(true) // Bypass cooldown for scheduled refresh
             }
           }, remainingCooldown)
 
@@ -166,8 +173,12 @@ export function useGitStatus({
         }
       }
     },
-    [projectPath, enabled, lastRefreshTime, setRefreshing, setStatus]
+    // Note: lastRefreshTime removed - now using getState() inside callback (Issue #74 review fix)
+    [projectPath, enabled, setRefreshing, setStatus]
   )
+
+  // Keep ref updated with latest executeRefresh (Issue #74 review fix)
+  executeRefreshRef.current = executeRefresh
 
   /**
    * Debounced refresh for file watcher events
@@ -205,10 +216,8 @@ export function useGitStatus({
     clear()
 
     // Initial load - bypass cooldown
-    // Note: executeRefresh is intentionally omitted from deps to prevent re-creation loop.
-    // This is safe because executeRefresh's identity changes only when its deps change,
-    // but we only want to trigger on projectPath/enabled changes, not on every refresh.
-    executeRefresh(true)
+    // Use ref to get latest executeRefresh without adding to deps (Issue #74 review fix)
+    executeRefreshRef.current?.(true)
   }, [projectPath, enabled, clear])
 
   // Subscribe to directory changes for auto-refresh
@@ -297,25 +306,26 @@ export function useGitStatus({
 
   // Apply global settings changes to polling service
   // When user changes polling settings in the UI, apply them to the running service
+  // Uses ref instead of closure variables to avoid React StrictMode issues (Issue #74 review fix)
   useEffect(() => {
     if (!projectPath || !enabled) return
-
-    // Track previous gitStatus to detect changes
-    let prevPollingEnabled: boolean | undefined
-    let prevPollingInterval: number | undefined
 
     // Subscribe to settings store for gitStatus changes
     const unsubscribe = useGlobalSettingsStore.subscribe((state) => {
       const gitStatus = state.settings?.gitStatus
       if (!gitStatus) return
 
-      // Check if relevant settings have changed
-      const pollingEnabledChanged = prevPollingEnabled !== undefined && prevPollingEnabled !== gitStatus.pollingEnabled
-      const pollingIntervalChanged = prevPollingInterval !== undefined && prevPollingInterval !== gitStatus.pollingInterval
+      const prev = prevPollingSettingsRef.current
 
-      // Update previous values
-      prevPollingEnabled = gitStatus.pollingEnabled
-      prevPollingInterval = gitStatus.pollingInterval
+      // Check if relevant settings have changed
+      const pollingEnabledChanged = prev.enabled !== undefined && prev.enabled !== gitStatus.pollingEnabled
+      const pollingIntervalChanged = prev.interval !== undefined && prev.interval !== gitStatus.pollingInterval
+
+      // Update ref with current values
+      prevPollingSettingsRef.current = {
+        enabled: gitStatus.pollingEnabled,
+        interval: gitStatus.pollingInterval,
+      }
 
       // Apply changes to polling service
       if (pollingEnabledChanged) {
@@ -331,7 +341,11 @@ export function useGitStatus({
       }
     })
 
-    return unsubscribe
+    return () => {
+      unsubscribe()
+      // Reset ref on cleanup to avoid stale state on re-mount
+      prevPollingSettingsRef.current = {}
+    }
   }, [projectPath, enabled])
 
   // Window visibility handling - pause refreshes when window hidden

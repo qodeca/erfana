@@ -25,8 +25,13 @@
  * @see BRS-003 - Real-time git status refresh specification
  */
 
+import { logger } from '../LoggingService'
+
 /** Default event coalescing window in milliseconds */
 const DEFAULT_COALESCE_WINDOW_MS = 150
+
+/** Max consecutive callback errors before circuit breaker trips (Issue #74 review fix) */
+const MAX_CALLBACK_ERRORS = 5
 
 /** Git event types that can trigger state changes */
 export type GitEventType = 'index' | 'head' | 'refs' | 'fetch' | 'stash'
@@ -55,6 +60,9 @@ export class GitEventCoalescer {
 
   /** Whether the coalescer is disposed */
   private isDisposed = false
+
+  /** Consecutive callback error count for circuit breaker (Issue #74 review fix) */
+  private callbackErrorCount = 0
 
   /**
    * Create a new GitEventCoalescer
@@ -125,10 +133,23 @@ export class GitEventCoalescer {
 
       try {
         this.callback(eventTypes)
+        // Reset error count on success (Issue #74 review fix)
+        this.callbackErrorCount = 0
       } catch (error) {
-        // Suppress errors to prevent breaking coalescer, but log for debugging
-        if (typeof console !== 'undefined') {
-          console.debug('GitEventCoalescer: Callback error suppressed', error)
+        // Increment error count and log properly (Issue #74 review fix)
+        this.callbackErrorCount++
+        logger.error(
+          'GitEventCoalescer: Callback error',
+          error instanceof Error ? error : new Error(String(error)),
+          { errorCount: this.callbackErrorCount, eventTypes }
+        )
+
+        // Circuit breaker: auto-dispose if too many consecutive errors
+        if (this.callbackErrorCount >= MAX_CALLBACK_ERRORS) {
+          logger.error('GitEventCoalescer: Circuit breaker tripped - too many consecutive errors, disposing', undefined, {
+            errorCount: this.callbackErrorCount
+          })
+          this.dispose()
         }
       }
     }

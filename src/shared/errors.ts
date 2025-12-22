@@ -12,6 +12,7 @@ export enum ErrorCode {
   PATH_SYSTEM_DIR = 'PATH_SYSTEM_DIR',
   PATH_NOT_ACCESSIBLE = 'PATH_NOT_ACCESSIBLE',
   PATH_TRAVERSAL = 'PATH_TRAVERSAL',
+  PATH_OUTSIDE_PROJECT = 'PATH_OUTSIDE_PROJECT',
   SYMLINK_ATTACK = 'SYMLINK_ATTACK',
 
   // Settings/persistence errors
@@ -142,6 +143,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.PATH_SYSTEM_DIR]: 'System directories cannot be opened as projects',
   [ErrorCode.PATH_NOT_ACCESSIBLE]: 'Cannot access the selected directory. Please check permissions.',
   [ErrorCode.PATH_TRAVERSAL]: 'Invalid path: path traversal detected',
+  [ErrorCode.PATH_OUTSIDE_PROJECT]: 'Cannot access directories outside the project',
   [ErrorCode.SYMLINK_ATTACK]: 'This directory link points to a protected location',
 
   // Settings/persistence errors
@@ -212,22 +214,28 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
 }
 
 /**
- * Get user-friendly error message
+ * Get user-friendly error message (sanitized for IPC)
+ *
+ * Returns sanitized messages that don't expose internal details:
+ * - AppError: Returns mapped message from ERROR_MESSAGES
+ * - Plain Error: Returns generic message (Issue #74 review fix - security)
+ * - Non-Error: Returns generic message
+ *
+ * This prevents leaking internal error details, stack traces, or sensitive
+ * information to the renderer process.
  *
  * Usage:
  *   const message = getUserFriendlyMessage(error)
- *   // Returns friendly message if AppError, technical message otherwise
+ *   return { success: false, error: message }  // Safe for IPC
  */
 export function getUserFriendlyMessage(error: unknown): string {
   if (error instanceof AppError) {
-    return ERROR_MESSAGES[error.code] || error.message
+    return ERROR_MESSAGES[error.code] || ERROR_MESSAGES[ErrorCode.UNKNOWN_ERROR]
   }
 
-  if (error instanceof Error) {
-    return error.message
-  }
-
-  return String(error)
+  // Security: Don't expose raw error messages - return generic message
+  // Internal details are logged separately, not sent to renderer
+  return ERROR_MESSAGES[ErrorCode.UNKNOWN_ERROR]
 }
 
 /**

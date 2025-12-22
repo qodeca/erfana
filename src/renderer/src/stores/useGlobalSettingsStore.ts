@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import type { GlobalSettings, LoggingLevel } from '../../../shared/ipc/global-settings-schema'
 
+/**
+ * Helper type for setting section keys
+ * (Issue #74 review fix - reduces repetition in update methods)
+ */
+type SettingSection = keyof GlobalSettings
+
 interface GlobalSettingsState {
   // State
   settings: GlobalSettings | null
@@ -22,6 +28,11 @@ interface GlobalSettingsState {
 
   // Internal - called by IPC listener
   _handleSettingsChanged: (settings: GlobalSettings) => void
+  // Internal - generic update helper (Issue #74 review fix)
+  _updateSection: <S extends SettingSection>(
+    section: S,
+    updater: (current: GlobalSettings[S]) => GlobalSettings[S]
+  ) => Promise<void>
 }
 
 export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => ({
@@ -49,124 +60,21 @@ export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => 
     }
   },
 
+  // Update methods refactored to use _updateSection helper (Issue #74 review fix)
   updateLoggingLevel: async (level: LoggingLevel) => {
-    const currentSettings = get().settings
-    if (!currentSettings) return
-
-    // Optimistic update
-    const previousSettings = currentSettings
-    set({
-      settings: {
-        ...currentSettings,
-        logging: { ...currentSettings.logging, level }
-      }
-    })
-
-    try {
-      const result = await window.api.globalSettings.set('logging', {
-        ...currentSettings.logging,
-        level
-      })
-      if (!result.success) {
-        // Rollback on failure
-        set({ settings: previousSettings, error: result.error })
-      }
-    } catch (error) {
-      set({
-        settings: previousSettings,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      })
-    }
+    await get()._updateSection('logging', (current) => ({ ...current, level }))
   },
 
   updatePreserveLineBreaks: async (enabled: boolean) => {
-    const currentSettings = get().settings
-    if (!currentSettings) return
-
-    // Optimistic update
-    const previousSettings = currentSettings
-    set({
-      settings: {
-        ...currentSettings,
-        editor: { ...currentSettings.editor, preserveLineBreaks: enabled }
-      }
-    })
-
-    try {
-      const result = await window.api.globalSettings.set('editor', {
-        ...currentSettings.editor,
-        preserveLineBreaks: enabled
-      })
-      if (!result.success) {
-        // Rollback on failure
-        set({ settings: previousSettings, error: result.error })
-      }
-    } catch (error) {
-      set({
-        settings: previousSettings,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      })
-    }
+    await get()._updateSection('editor', (current) => ({ ...current, preserveLineBreaks: enabled }))
   },
 
   updateGitStatusPollingEnabled: async (enabled: boolean) => {
-    const currentSettings = get().settings
-    if (!currentSettings) return
-
-    // Optimistic update
-    const previousSettings = currentSettings
-    set({
-      settings: {
-        ...currentSettings,
-        gitStatus: { ...currentSettings.gitStatus, pollingEnabled: enabled }
-      }
-    })
-
-    try {
-      const result = await window.api.globalSettings.set('gitStatus', {
-        ...currentSettings.gitStatus,
-        pollingEnabled: enabled
-      })
-      if (!result.success) {
-        // Rollback on failure
-        set({ settings: previousSettings, error: result.error })
-      }
-    } catch (error) {
-      set({
-        settings: previousSettings,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      })
-    }
+    await get()._updateSection('gitStatus', (current) => ({ ...current, pollingEnabled: enabled }))
   },
 
   updateGitStatusPollingInterval: async (interval: number) => {
-    const currentSettings = get().settings
-    if (!currentSettings) return
-
-    // Optimistic update
-    const previousSettings = currentSettings
-    set({
-      settings: {
-        ...currentSettings,
-        gitStatus: { ...currentSettings.gitStatus, pollingInterval: interval }
-      }
-    })
-
-    try {
-      const result = await window.api.globalSettings.set('gitStatus', {
-        ...currentSettings.gitStatus,
-        pollingInterval: interval
-      })
-      if (!result.success) {
-        // Rollback on failure
-        set({ settings: previousSettings, error: result.error })
-      }
-    } catch (error) {
-      set({
-        settings: previousSettings,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      })
-    }
+    await get()._updateSection('gitStatus', (current) => ({ ...current, pollingInterval: interval }))
   },
 
   resetSettings: async () => {
@@ -190,5 +98,42 @@ export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => 
 
   _handleSettingsChanged: (settings: GlobalSettings) => {
     set({ settings, error: null })
+  },
+
+  /**
+   * Generic helper for optimistic settings updates with rollback
+   * (Issue #74 review fix - reduces code duplication in update methods)
+   */
+  _updateSection: async <S extends SettingSection>(
+    section: S,
+    updater: (current: GlobalSettings[S]) => GlobalSettings[S]
+  ): Promise<void> => {
+    const currentSettings = get().settings
+    if (!currentSettings) return
+
+    // Compute new section value
+    const newSectionValue = updater(currentSettings[section])
+
+    // Optimistic update
+    const previousSettings = currentSettings
+    set({
+      settings: {
+        ...currentSettings,
+        [section]: newSectionValue
+      }
+    })
+
+    try {
+      const result = await window.api.globalSettings.set(section, newSectionValue)
+      if (!result.success) {
+        // Rollback on failure
+        set({ settings: previousSettings, error: result.error })
+      }
+    } catch (error) {
+      set({
+        settings: previousSettings,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      })
+    }
   }
 }))

@@ -100,6 +100,9 @@ export class GitPollingService {
   /** Disposal flag to prevent operations during cleanup */
   private isDisposing: boolean = false
 
+  /** Mutex to prevent concurrent interval changes (Issue #74 review fix) */
+  private intervalChangeInProgress: boolean = false
+
   /** Provider for last watcher event timestamp (injected) */
   private getLastWatcherEventTimestamp: TimestampProvider = () => null
 
@@ -201,6 +204,12 @@ export class GitPollingService {
    * @param ms - Interval in milliseconds (clamped to 1-60 seconds)
    */
   setInterval(ms: number): void {
+    // Mutex: Prevent concurrent interval changes (Issue #74 review fix)
+    if (this.intervalChangeInProgress) {
+      logger.debug('GitPollingService: Interval change already in progress, skipping')
+      return
+    }
+
     // Clamp to valid range
     const clamped = Math.max(MIN_POLLING_INTERVAL_MS, Math.min(MAX_POLLING_INTERVAL_MS, ms))
 
@@ -216,12 +225,15 @@ export class GitPollingService {
     logger.debug('GitPollingService: Interval updated', { intervalMs: clamped })
 
     // If currently polling, restart with new interval
-    // Note: Rapid consecutive setInterval() calls could theoretically cause issues,
-    // but this is mitigated by the Settings UI's debounced save behavior.
     if (this.isPolling() && this.projectPath) {
-      const projectPath = this.projectPath
-      this.stop()
-      this.start(projectPath)
+      this.intervalChangeInProgress = true
+      try {
+        const projectPath = this.projectPath
+        this.stop()
+        this.start(projectPath)
+      } finally {
+        this.intervalChangeInProgress = false
+      }
     }
   }
 

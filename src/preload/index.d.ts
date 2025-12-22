@@ -65,15 +65,8 @@ declare global {
           callback: (data: { dirPath: string; error: string }) => void
         ) => () => void
       }
-      /**
-       * @deprecated Use gitWatcher API instead. This API will be removed in a future version.
-       * @see gitWatcher - New unified git watcher API with broader coverage
-       */
-      gitIndexWatch: {
-        start: (projectPath: string) => Promise<{ success: boolean; error?: string }>
-        stop: () => Promise<{ success: boolean; error?: string }>
-        onIndexChanged: (callback: (data: { projectPath: string }) => void) => () => void
-      }
+      // gitIndexWatch API removed (Issue #74 review fix)
+      // Replaced by gitWatcher API which provides broader coverage
       /**
        * Unified git watcher - monitors .git directory for state changes
        * Covers: index, HEAD, refs, fetch, stash

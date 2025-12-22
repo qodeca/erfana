@@ -109,7 +109,7 @@ describe('git-watcher:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Path traversal attack detected'
+        error: 'Invalid path: path traversal detected'
       })
       expect(mockValidateProjectPath).toHaveBeenCalledWith('../../etc/passwd')
       expect(mockGitWatcherServiceStart).not.toHaveBeenCalled()
@@ -124,7 +124,7 @@ describe('git-watcher:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Path traversal attack detected'
+        error: 'Invalid path: path traversal detected'
       })
       expect(mockGitWatcherServiceStart).not.toHaveBeenCalled()
     })
@@ -141,7 +141,7 @@ describe('git-watcher:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Project path must be absolute. Relative paths are not allowed for security reasons.'
+        error: 'Please select an absolute path'
       })
       expect(mockGitWatcherServiceStart).not.toHaveBeenCalled()
     })
@@ -155,7 +155,7 @@ describe('git-watcher:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Path traversal attack detected'
+        error: 'Invalid path: path traversal detected'
       })
       expect(mockGitWatcherServiceStart).not.toHaveBeenCalled()
     })
@@ -171,7 +171,7 @@ describe('git-watcher:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Cannot open system or sensitive directories as projects'
+        error: 'System directories cannot be opened as projects'
       })
       expect(mockValidateProjectPath).toHaveBeenCalledWith('/etc')
       expect(mockGitWatcherServiceStart).not.toHaveBeenCalled()
@@ -186,7 +186,7 @@ describe('git-watcher:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Cannot open system or sensitive directories as projects'
+        error: 'System directories cannot be opened as projects'
       })
       expect(mockGitWatcherServiceStart).not.toHaveBeenCalled()
     })
@@ -200,7 +200,7 @@ describe('git-watcher:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Cannot open system or sensitive directories as projects'
+        error: 'System directories cannot be opened as projects'
       })
       expect(mockGitWatcherServiceStart).not.toHaveBeenCalled()
     })
@@ -214,7 +214,7 @@ describe('git-watcher:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Cannot open system or sensitive directories as projects'
+        error: 'System directories cannot be opened as projects'
       })
       expect(mockGitWatcherServiceStart).not.toHaveBeenCalled()
     })
@@ -228,7 +228,7 @@ describe('git-watcher:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Cannot open system or sensitive directories as projects'
+        error: 'System directories cannot be opened as projects'
       })
       expect(mockGitWatcherServiceStart).not.toHaveBeenCalled()
     })
@@ -242,7 +242,7 @@ describe('git-watcher:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Cannot open system or sensitive directories as projects'
+        error: 'System directories cannot be opened as projects'
       })
       expect(mockGitWatcherServiceStart).not.toHaveBeenCalled()
     })
@@ -258,7 +258,7 @@ describe('git-watcher:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Cannot open system or sensitive directories as projects'
+        error: 'System directories cannot be opened as projects'
       })
       expect(mockGitWatcherServiceStart).not.toHaveBeenCalled()
     })
@@ -272,7 +272,7 @@ describe('git-watcher:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Cannot open system or sensitive directories as projects'
+        error: 'System directories cannot be opened as projects'
       })
       expect(mockGitWatcherServiceStart).not.toHaveBeenCalled()
     })
@@ -286,7 +286,7 @@ describe('git-watcher:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Cannot open system or sensitive directories as projects'
+        error: 'System directories cannot be opened as projects'
       })
       expect(mockGitWatcherServiceStart).not.toHaveBeenCalled()
     })
@@ -300,7 +300,7 @@ describe('git-watcher:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Cannot open system or sensitive directories as projects'
+        error: 'System directories cannot be opened as projects'
       })
       expect(mockGitWatcherServiceStart).not.toHaveBeenCalled()
     })
@@ -430,7 +430,10 @@ describe('git-watcher:start security', () => {
   })
 
   describe('error propagation', () => {
-    it('should propagate validation error message', async () => {
+    // Note: All error messages are sanitized for security (Issue #74 review fix)
+    // Internal error details are never exposed to the renderer
+
+    it('should return sanitized error for validation failures', async () => {
       mockValidateProjectPath.mockRejectedValue(
         new AppError('Custom validation error', ErrorCode.PATH_INVALID)
       )
@@ -439,24 +442,26 @@ describe('git-watcher:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Custom validation error'
+        // Sanitized message for PATH_INVALID
+        error: 'The selected path is invalid'
       })
       expect(mockGitWatcherServiceStart).not.toHaveBeenCalled()
     })
 
-    it('should handle non-Error validation failures', async () => {
+    it('should return sanitized error for non-Error validation failures', async () => {
       mockValidateProjectPath.mockRejectedValue('String error')
 
       const result = await startHandler({}, '/test')
 
       expect(result).toEqual({
         success: false,
-        error: 'String error'
+        // Non-AppError thrown objects are mapped to generic message
+        error: 'An unexpected error occurred'
       })
       expect(mockGitWatcherServiceStart).not.toHaveBeenCalled()
     })
 
-    it('should handle service errors', async () => {
+    it('should return sanitized error for service failures', async () => {
       mockValidateProjectPath.mockResolvedValue(undefined)
       mockGitWatcherServiceStart.mockRejectedValue(new Error('Service error'))
 
@@ -464,11 +469,12 @@ describe('git-watcher:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Service error'
+        // Generic Error objects are mapped to generic message
+        error: 'An unexpected error occurred'
       })
     })
 
-    it('should handle non-Error service failures', async () => {
+    it('should return sanitized error for non-Error service failures', async () => {
       mockValidateProjectPath.mockResolvedValue(undefined)
       mockGitWatcherServiceStart.mockRejectedValue('Service string error')
 
@@ -476,7 +482,8 @@ describe('git-watcher:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Service string error'
+        // Non-Error thrown values are mapped to generic message
+        error: 'An unexpected error occurred'
       })
     })
   })
@@ -509,7 +516,7 @@ describe('git-polling:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Path traversal attack detected'
+        error: 'Invalid path: path traversal detected'
       })
       expect(mockValidateProjectPath).toHaveBeenCalledWith('../../etc/passwd')
       expect(mockGitPollingServiceStart).not.toHaveBeenCalled()
@@ -524,7 +531,7 @@ describe('git-polling:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Path traversal attack detected'
+        error: 'Invalid path: path traversal detected'
       })
       expect(mockGitPollingServiceStart).not.toHaveBeenCalled()
     })
@@ -540,7 +547,7 @@ describe('git-polling:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Cannot open system or sensitive directories as projects'
+        error: 'System directories cannot be opened as projects'
       })
       expect(mockGitPollingServiceStart).not.toHaveBeenCalled()
     })
@@ -554,7 +561,7 @@ describe('git-polling:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Cannot open system or sensitive directories as projects'
+        error: 'System directories cannot be opened as projects'
       })
       expect(mockGitPollingServiceStart).not.toHaveBeenCalled()
     })
@@ -568,7 +575,7 @@ describe('git-polling:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Cannot open system or sensitive directories as projects'
+        error: 'System directories cannot be opened as projects'
       })
       expect(mockGitPollingServiceStart).not.toHaveBeenCalled()
     })
@@ -584,12 +591,13 @@ describe('git-polling:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Cannot open system or sensitive directories as projects'
+        error: 'System directories cannot be opened as projects'
       })
       expect(mockGitPollingServiceStart).not.toHaveBeenCalled()
     })
 
     it('should reject ~/.aws', async () => {
+      // Note: Internal error messages are sanitized for security (Issue #74 review fix)
       mockValidateProjectPath.mockRejectedValue(
         new AppError('Cannot open system or sensitive directories as projects', ErrorCode.PATH_SYSTEM_DIR)
       )
@@ -598,7 +606,8 @@ describe('git-polling:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Cannot open system or sensitive directories as projects'
+        // Sanitized message for PATH_SYSTEM_DIR
+        error: 'System directories cannot be opened as projects'
       })
       expect(mockGitPollingServiceStart).not.toHaveBeenCalled()
     })
@@ -684,7 +693,8 @@ describe('git-polling:start security', () => {
   })
 
   describe('error propagation', () => {
-    it('should propagate validation error message', async () => {
+    it('should return sanitized error for validation failures', async () => {
+      // Note: Internal error messages are sanitized for security (Issue #74 review fix)
       mockValidateProjectPath.mockRejectedValue(
         new AppError('Custom validation error', ErrorCode.PATH_INVALID)
       )
@@ -693,12 +703,14 @@ describe('git-polling:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Custom validation error'
+        // Sanitized message for PATH_INVALID - no internal details exposed
+        error: 'The selected path is invalid'
       })
       expect(mockGitPollingServiceStart).not.toHaveBeenCalled()
     })
 
-    it('should handle service errors', async () => {
+    it('should return sanitized error for service failures', async () => {
+      // Note: Internal error messages are sanitized for security (Issue #74 review fix)
       mockValidateProjectPath.mockResolvedValue(undefined)
       mockGitPollingServiceStart.mockImplementation(() => {
         throw new Error('Polling service error')
@@ -708,7 +720,8 @@ describe('git-polling:start security', () => {
 
       expect(result).toEqual({
         success: false,
-        error: 'Polling service error'
+        // Generic errors are mapped to user-friendly messages
+        error: 'An unexpected error occurred'
       })
     })
   })

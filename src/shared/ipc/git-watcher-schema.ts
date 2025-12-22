@@ -37,9 +37,13 @@ export type GitStateChangeEvent = z.infer<typeof GitStateChangeEventSchema>
  * Git watcher state machine states
  *
  * - 'stopped': Watcher is not running
- * - 'starting': Watcher is initializing
+ * - 'starting': Watcher is initializing (reserved for future use)
  * - 'watching': Watcher is actively monitoring .git directory
- * - 'error': Watcher encountered an error
+ * - 'error': Watcher encountered an error (reserved for future use)
+ *
+ * Note: Currently only 'stopped' and 'watching' are used.
+ * 'starting' and 'error' are reserved for future state machine enhancements.
+ * (Issue #74 review - documented unused states)
  */
 export const GitWatcherStateSchema = z.enum(['stopped', 'starting', 'watching', 'error'])
 export type GitWatcherState = z.infer<typeof GitWatcherStateSchema>

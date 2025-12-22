@@ -23,6 +23,7 @@ import { gitPollingService } from '../services/GitPollingService'
 import { logger } from '../services/LoggingService'
 import { GitWatcherStatusSchema, type GitWatcherStatus } from '../../shared/ipc/git-watcher-schema'
 import { validateProjectPath } from '../utils/pathSecurity'
+import { getUserFriendlyMessage } from '../../shared/errors'
 
 /**
  * Register all git watcher IPC handlers
@@ -54,9 +55,11 @@ export function registerGitWatcherHandlers(): void {
       try {
         await validateProjectPath(trimmedPath)
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        logger.warn('Git watcher start rejected - invalid path', { projectPath: trimmedPath, error: errorMessage })
-        return { success: false, error: errorMessage }
+        // Use user-friendly message to avoid path disclosure (Issue #74 review fix)
+        const userMessage = getUserFriendlyMessage(error)
+        const logMessage = error instanceof Error ? error.message : String(error)
+        logger.warn('Git watcher start rejected - invalid path', { projectPath: trimmedPath, error: logMessage })
+        return { success: false, error: userMessage }
       }
 
       const result = await gitWatcherService.start(trimmedPath)
@@ -67,9 +70,10 @@ export function registerGitWatcherHandlers(): void {
 
       return result
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
+      // Use sanitized message to avoid internal error exposure (Issue #74 review fix)
+      const userMessage = getUserFriendlyMessage(error)
       logger.error('Error in git-watcher:start handler', error instanceof Error ? error : undefined)
-      return { success: false, error: errorMessage }
+      return { success: false, error: userMessage }
     }
   })
 
@@ -88,9 +92,10 @@ export function registerGitWatcherHandlers(): void {
 
       return result
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
+      // Use sanitized message to avoid internal error exposure (Issue #74 review fix)
+      const userMessage = getUserFriendlyMessage(error)
       logger.error('Error in git-watcher:stop handler', error instanceof Error ? error : undefined)
-      return { success: false, error: errorMessage }
+      return { success: false, error: userMessage }
     }
   })
 
@@ -117,9 +122,10 @@ export function registerGitWatcherHandlers(): void {
 
       return { success: true, status: validated }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
+      // Use sanitized message to avoid internal error exposure (Issue #74 review fix)
+      const userMessage = getUserFriendlyMessage(error)
       logger.error('Error in git-watcher:status handler', error instanceof Error ? error : undefined)
-      return { success: false, error: errorMessage }
+      return { success: false, error: userMessage }
     }
   })
 
@@ -149,9 +155,11 @@ export function registerGitWatcherHandlers(): void {
       try {
         await validateProjectPath(trimmedPath)
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        logger.warn('Git polling start rejected - invalid path', { projectPath: trimmedPath, error: errorMessage })
-        return { success: false, error: errorMessage }
+        // Use user-friendly message to avoid path disclosure (Issue #74 review fix)
+        const userMessage = getUserFriendlyMessage(error)
+        const logMessage = error instanceof Error ? error.message : String(error)
+        logger.warn('Git polling start rejected - invalid path', { projectPath: trimmedPath, error: logMessage })
+        return { success: false, error: userMessage }
       }
 
       gitPollingService.start(trimmedPath)
@@ -160,9 +168,10 @@ export function registerGitWatcherHandlers(): void {
 
       return { success: true }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
+      // Use sanitized message to avoid internal error exposure (Issue #74 review fix)
+      const userMessage = getUserFriendlyMessage(error)
       logger.error('Error in git-polling:start handler', error instanceof Error ? error : undefined)
-      return { success: false, error: errorMessage }
+      return { success: false, error: userMessage }
     }
   })
 
@@ -179,9 +188,10 @@ export function registerGitWatcherHandlers(): void {
 
       return { success: true }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
+      // Use sanitized message to avoid internal error exposure (Issue #74 review fix)
+      const userMessage = getUserFriendlyMessage(error)
       logger.error('Error in git-polling:stop handler', error instanceof Error ? error : undefined)
-      return { success: false, error: errorMessage }
+      return { success: false, error: userMessage }
     }
   })
 
@@ -210,9 +220,10 @@ export function registerGitWatcherHandlers(): void {
 
       return { success: true, interval: gitPollingService.getInterval() }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
+      // Use sanitized message to avoid internal error exposure (Issue #74 review fix)
+      const userMessage = getUserFriendlyMessage(error)
       logger.error('Error in git-polling:set-interval handler', error instanceof Error ? error : undefined)
-      return { success: false, error: errorMessage }
+      return { success: false, error: userMessage }
     }
   })
 
@@ -235,9 +246,10 @@ export function registerGitWatcherHandlers(): void {
 
       return { success: true, enabled: gitPollingService.isEnabled() }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
+      // Use sanitized message to avoid internal error exposure (Issue #74 review fix)
+      const userMessage = getUserFriendlyMessage(error)
       logger.error('Error in git-polling:set-enabled handler', error instanceof Error ? error : undefined)
-      return { success: false, error: errorMessage }
+      return { success: false, error: userMessage }
     }
   })
 

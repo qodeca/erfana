@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useSettingsStore } from '../../stores/useSettingsStore'
 import { useGlobalSettingsStore } from '../../stores/useGlobalSettingsStore'
-import type { LoggingLevel } from '../../../../shared/ipc/global-settings-schema'
+import { LoggingLevelSchema, type LoggingLevel } from '../../../../shared/ipc/global-settings-schema'
 import { logger } from '../../utils/logger'
 import './SettingsOverlay.css'
 
@@ -203,7 +203,15 @@ export function SettingsOverlay() {
                   id="log-level"
                   className="settings-select"
                   value={settings?.logging.level ?? 'info'}
-                  onChange={(e) => updateLoggingLevel(e.target.value as LoggingLevel)}
+                  onChange={(e) => {
+                    // Validate with Zod instead of type assertion (Issue #74 review fix)
+                    const result = LoggingLevelSchema.safeParse(e.target.value)
+                    if (result.success) {
+                      updateLoggingLevel(result.data)
+                    } else {
+                      logger.warn('Invalid log level selected', { value: e.target.value })
+                    }
+                  }}
                   disabled={!settings}
                 >
                   {LOG_LEVEL_OPTIONS.map((option) => (

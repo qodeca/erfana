@@ -125,7 +125,9 @@ export class GitWatcherService implements IGitWatcherService {
       return await this.createWatcher(projectPath)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      logger.error('GitWatcherService: Failed to start watcher', error instanceof Error ? error : undefined, {
+      // Always pass an Error object to logger (Issue #74 review fix)
+      const logError = error instanceof Error ? error : new Error(String(error))
+      logger.error('GitWatcherService: Failed to start watcher', logError, {
         projectPath
       })
       return { success: false, error: errorMessage }
