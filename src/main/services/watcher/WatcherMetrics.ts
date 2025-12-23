@@ -381,3 +381,10 @@ export class WatcherMetrics {
     this.recentEventTimestamps = this.recentEventTimestamps.filter((ts) => ts > cutoff)
   }
 }
+
+/**
+ * Shared singleton instance for git status monitoring
+ * Used by GitWatcherService, GitPollingService, and health logging
+ * @see ADR-BRS003-002 - Git status logging strategy
+ */
+export const watcherMetrics = new WatcherMetrics()

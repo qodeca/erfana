@@ -64,6 +64,7 @@ vi.mock('../services/GitPollingService', () => ({
 // Mock LoggingService
 vi.mock('../services/LoggingService', () => ({
   logger: {
+    trace: vi.fn(),
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),

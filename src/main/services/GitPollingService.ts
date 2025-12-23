@@ -24,6 +24,7 @@ import { stat } from 'fs/promises'
 import { join } from 'path'
 import { logger } from './LoggingService'
 import { broadcastToAllWindows } from '../utils/ipcBroadcast'
+import { watcherMetrics } from './watcher/WatcherMetrics'
 import type { GitPollTriggeredEvent } from '../../shared/ipc/git-watcher-schema'
 
 /**
@@ -313,7 +314,12 @@ export class GitPollingService {
     // Check if watcher is active (triggered recently)
     if (this.shouldSkip()) {
       this.metrics.pollingSkippedCount++
-      logger.debug('GitPollingService: Skipping poll, watcher active')
+      watcherMetrics.recordPollingSkipped() // Record to shared metrics (ADR-BRS003-002)
+      const lastWatcherEvent = this.getLastWatcherEventTimestamp()
+      // Trace log with context for debugging (ADR-BRS003-002)
+      logger.trace('GitPolling: Skipped (watcher active)', {
+        lastWatcherEventMs: lastWatcherEvent ? Date.now() - lastWatcherEvent : null
+      })
       return
     }
 
@@ -321,13 +327,18 @@ export class GitPollingService {
     const indexChanged = await this.hasIndexChanged()
     if (!indexChanged) {
       this.metrics.pollingSkippedCount++
-      logger.debug('GitPollingService: Skipping poll, index unchanged')
+      watcherMetrics.recordPollingSkipped() // Record to shared metrics (ADR-BRS003-002)
+      // Trace log with context for debugging (ADR-BRS003-002)
+      logger.trace('GitPolling: Skipped (index unchanged)', {
+        indexMtime: this.lastIndexMtime
+      })
       return
     }
 
     // Trigger refresh
     this.metrics.pollingRefreshCount++
     this.metrics.lastRefreshTimestamp = Date.now()
+    watcherMetrics.recordPollingRefresh() // Record to shared metrics (ADR-BRS003-002)
 
     const reason = this.isWatcherActive() ? 'index_changed' : 'no_watcher'
 

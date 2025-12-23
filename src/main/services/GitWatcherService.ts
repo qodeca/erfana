@@ -29,6 +29,7 @@ import { join } from 'path'
 import { GitEventCoalescer, classifyGitPath, type GitEventType } from './watcher/GitEventCoalescer'
 import { logger } from './LoggingService'
 import { broadcastToAllWindows } from '../utils/ipcBroadcast'
+import { watcherMetrics } from './watcher/WatcherMetrics'
 import type { IGitWatcherService } from '../interfaces/IGitWatcherService'
 import type { GitStateChangeEvent } from '../../shared/ipc/git-watcher-schema'
 
@@ -40,6 +41,12 @@ const MAX_RESTART_ATTEMPTS = 3
 
 /** Base delay for exponential backoff (ms) */
 const RESTART_BASE_DELAY_MS = 800
+
+/** Health logger interval (5 minutes) - ADR-BRS003-002 */
+const HEALTH_LOG_INTERVAL_MS = 5 * 60 * 1000
+
+/** Polling efficiency threshold for degraded state warning (%) - ADR-BRS003-002 */
+const HIGH_POLLING_DEPENDENCY_THRESHOLD = 80
 
 /** Git paths to watch (relative to project root) */
 const GIT_WATCH_PATHS = [
@@ -88,6 +95,9 @@ export class GitWatcherService implements IGitWatcherService {
 
   /** Timestamp of last emitted event (for polling coordination) */
   private lastEventTimestamp: number | null = null
+
+  /** Health logger interval timer - ADR-BRS003-002 */
+  private healthLogInterval: NodeJS.Timeout | null = null
 
   /**
    * Start watching git state for a project
@@ -140,6 +150,9 @@ export class GitWatcherService implements IGitWatcherService {
    * Safe to call even if not currently watching.
    */
   async stop(): Promise<{ success: boolean; error?: string }> {
+    // Stop health logger (ADR-BRS003-002)
+    this.stopHealthLogger()
+
     // Clear pending restart
     if (this.pendingRestart) {
       clearTimeout(this.pendingRestart)
@@ -275,6 +288,8 @@ export class GitWatcherService implements IGitWatcherService {
           projectPath,
           paths: existingPaths.length
         })
+        // Start health logger when watcher is ready (ADR-BRS003-002)
+        this.startHealthLogger()
         resolve({ success: true })
       })
 
@@ -339,17 +354,25 @@ export class GitWatcherService implements IGitWatcherService {
     const timestamp = Date.now()
     this.lastEventTimestamp = timestamp
 
+    // Generate correlation ID for tracing (ADR-BRS003-002)
+    const correlationId = this.generateCorrelationId()
+
     logger.info('GitWatcherService: Git state changed', {
       projectPath,
       eventTypes,
-      count: eventTypes.length
+      count: eventTypes.length,
+      correlationId
     })
+
+    // Record metrics (ADR-BRS003-002)
+    watcherMetrics.recordGitWatcherEvent()
 
     // Broadcast to all windows
     const payload: GitStateChangeEvent = {
       projectPath,
       eventTypes,
-      timestamp
+      timestamp,
+      correlationId
     }
 
     broadcastToAllWindows('git:state-changed', payload)
@@ -443,6 +466,59 @@ export class GitWatcherService implements IGitWatcherService {
         }
       }
     }, delay)
+  }
+
+  /**
+   * Generate a unique correlation ID for tracing refreshes across components
+   * Format: git-{timestamp}-{random}
+   * @see ADR-BRS003-002 - Git status logging strategy
+   */
+  private generateCorrelationId(): string {
+    return `git-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  }
+
+  /**
+   * Start the health logger (5-minute interval)
+   * Logs periodic health summaries and degraded state warnings
+   * @see ADR-BRS003-002 - Git status logging strategy
+   */
+  private startHealthLogger(): void {
+    // Clear any existing interval
+    this.stopHealthLogger()
+
+    this.healthLogInterval = setInterval(() => {
+      const snapshot = watcherMetrics.getSnapshot()
+
+      logger.info('GitStatus: Health summary', {
+        uptimeMinutes: Math.round(snapshot.uptimeMs / 60000),
+        watcherEvents: snapshot.gitWatcherEventCount,
+        pollingRefreshes: snapshot.pollingRefreshCount,
+        pollingSkipped: snapshot.pollingSkippedCount,
+        pollingEfficiency: `${snapshot.pollingEfficiency}%`,
+        restarts: snapshot.restartScheduled,
+        errors: Object.keys(snapshot.errorCounts).length > 0
+          ? snapshot.errorCounts
+          : 'none'
+      })
+
+      // Degraded state warnings
+      if (snapshot.pollingEfficiency > HIGH_POLLING_DEPENDENCY_THRESHOLD) {
+        logger.warn('GitStatus: High polling dependency - watcher may be missing events', {
+          pollingEfficiency: snapshot.pollingEfficiency,
+          threshold: HIGH_POLLING_DEPENDENCY_THRESHOLD
+        })
+      }
+    }, HEALTH_LOG_INTERVAL_MS)
+  }
+
+  /**
+   * Stop the health logger
+   */
+  private stopHealthLogger(): void {
+    if (this.healthLogInterval) {
+      clearInterval(this.healthLogInterval)
+      this.healthLogInterval = null
+    }
   }
 }
 

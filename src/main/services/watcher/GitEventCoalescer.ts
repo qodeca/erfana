@@ -64,6 +64,9 @@ export class GitEventCoalescer {
   /** Consecutive callback error count for circuit breaker (Issue #74 review fix) */
   private callbackErrorCount = 0
 
+  /** Window start time for timing measurement (ADR-BRS003-002) */
+  private windowStartTime: number | null = null
+
   /**
    * Create a new GitEventCoalescer
    *
@@ -86,8 +89,19 @@ export class GitEventCoalescer {
   queueEvent(eventType: GitEventType): void {
     if (this.isDisposed) return
 
+    // Start timing window on first event (ADR-BRS003-002)
+    if (this.pendingEvents.size === 0) {
+      this.windowStartTime = Date.now()
+    }
+
     // Add to pending set (automatically deduplicates)
     this.pendingEvents.add(eventType)
+
+    // Trace log for debugging event flow (ADR-BRS003-002)
+    logger.trace('GitCoalescer: Event queued', {
+      eventType,
+      pendingCount: this.pendingEvents.size
+    })
 
     // Reset debounce timer
     if (this.debounceTimer) {
@@ -129,7 +143,16 @@ export class GitEventCoalescer {
     // If we have events, invoke callback
     if (this.pendingEvents.size > 0) {
       const eventTypes = Array.from(this.pendingEvents)
+      const windowMs = this.windowStartTime ? Date.now() - this.windowStartTime : 0
       this.pendingEvents.clear()
+      this.windowStartTime = null
+
+      // Debug log for coalesce completion (ADR-BRS003-002)
+      logger.debug('GitCoalescer: Flushed', {
+        eventTypes,
+        count: eventTypes.length,
+        windowMs
+      })
 
       try {
         this.callback(eventTypes)

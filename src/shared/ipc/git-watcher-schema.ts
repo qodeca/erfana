@@ -29,7 +29,14 @@ export const GitStateChangeEventSchema = z.object({
   /** Types of git state that changed (coalesced from multiple events) */
   eventTypes: z.array(GitEventTypeSchema),
   /** Unix timestamp (ms) when the event was detected */
-  timestamp: z.number()
+  timestamp: z.number(),
+  /**
+   * Correlation ID for tracing a refresh cycle across components
+   * Format: git-{timestamp}-{random} (e.g., git-1703270400000-abc123)
+   * Optional for backward compatibility
+   * @see ADR-BRS003-002 - Git status logging strategy
+   */
+  correlationId: z.string().optional()
 })
 export type GitStateChangeEvent = z.infer<typeof GitStateChangeEventSchema>
 

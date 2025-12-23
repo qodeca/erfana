@@ -40,6 +40,7 @@ export function registerGitWatcherHandlers(): void {
    * @returns { success: boolean, error?: string }
    */
   ipcMain.handle('git-watcher:start', async (_event, projectPath: string) => {
+    const startTime = Date.now() // Timing (ADR-BRS003-002)
     try {
       // Validate input
       if (!projectPath || typeof projectPath !== 'string') {
@@ -50,6 +51,9 @@ export function registerGitWatcherHandlers(): void {
       if (!trimmedPath) {
         return { success: false, error: 'Project path is empty' }
       }
+
+      // Trace log for handler entry (ADR-BRS003-002)
+      logger.trace('git-watcher:start invoked', { projectPath: trimmedPath })
 
       // Validate path security (prevent path traversal and system directory access)
       try {
@@ -65,7 +69,10 @@ export function registerGitWatcherHandlers(): void {
       const result = await gitWatcherService.start(trimmedPath)
 
       if (result.success) {
-        logger.debug('git-watcher:start handler completed', { projectPath: trimmedPath })
+        logger.debug('git-watcher:start completed', {
+          projectPath: trimmedPath,
+          latencyMs: Date.now() - startTime
+        })
       }
 
       return result
@@ -83,11 +90,15 @@ export function registerGitWatcherHandlers(): void {
    * @returns { success: boolean, error?: string }
    */
   ipcMain.handle('git-watcher:stop', async () => {
+    const startTime = Date.now() // Timing (ADR-BRS003-002)
+    logger.trace('git-watcher:stop invoked')
     try {
       const result = await gitWatcherService.stop()
 
       if (result.success) {
-        logger.debug('git-watcher:stop handler completed')
+        logger.debug('git-watcher:stop completed', {
+          latencyMs: Date.now() - startTime
+        })
       }
 
       return result
@@ -105,6 +116,8 @@ export function registerGitWatcherHandlers(): void {
    * @returns GitWatcherStatus - Current state, watched path, last event, error
    */
   ipcMain.handle('git-watcher:status', async () => {
+    const startTime = Date.now() // Timing (ADR-BRS003-002)
+    logger.trace('git-watcher:status invoked')
     try {
       const isWatching = gitWatcherService.isWatching()
       const watchedPath = gitWatcherService.getWatchedPath()
@@ -119,6 +132,11 @@ export function registerGitWatcherHandlers(): void {
 
       // Validate against schema
       const validated = GitWatcherStatusSchema.parse(status)
+
+      logger.debug('git-watcher:status completed', {
+        state: validated.state,
+        latencyMs: Date.now() - startTime
+      })
 
       return { success: true, status: validated }
     } catch (error) {
@@ -140,6 +158,7 @@ export function registerGitWatcherHandlers(): void {
    * @returns { success: boolean, error?: string }
    */
   ipcMain.handle('git-polling:start', async (_event, projectPath: string) => {
+    const startTime = Date.now() // Timing (ADR-BRS003-002)
     try {
       // Validate input
       if (!projectPath || typeof projectPath !== 'string') {
@@ -150,6 +169,9 @@ export function registerGitWatcherHandlers(): void {
       if (!trimmedPath) {
         return { success: false, error: 'Project path is empty' }
       }
+
+      // Trace log for handler entry (ADR-BRS003-002)
+      logger.trace('git-polling:start invoked', { projectPath: trimmedPath })
 
       // Validate path security (prevent path traversal and system directory access)
       try {
@@ -164,7 +186,10 @@ export function registerGitWatcherHandlers(): void {
 
       gitPollingService.start(trimmedPath)
 
-      logger.debug('git-polling:start handler completed', { projectPath: trimmedPath })
+      logger.debug('git-polling:start completed', {
+        projectPath: trimmedPath,
+        latencyMs: Date.now() - startTime
+      })
 
       return { success: true }
     } catch (error) {
@@ -181,10 +206,14 @@ export function registerGitWatcherHandlers(): void {
    * @returns { success: boolean, error?: string }
    */
   ipcMain.handle('git-polling:stop', async () => {
+    const startTime = Date.now() // Timing (ADR-BRS003-002)
+    logger.trace('git-polling:stop invoked')
     try {
       gitPollingService.stop()
 
-      logger.debug('git-polling:stop handler completed')
+      logger.debug('git-polling:stop completed', {
+        latencyMs: Date.now() - startTime
+      })
 
       return { success: true }
     } catch (error) {
@@ -202,6 +231,8 @@ export function registerGitWatcherHandlers(): void {
    * @returns { success: boolean, error?: string }
    */
   ipcMain.handle('git-polling:set-interval', async (_event, intervalMs: number) => {
+    const startTime = Date.now() // Timing (ADR-BRS003-002)
+    logger.trace('git-polling:set-interval invoked', { requestedIntervalMs: intervalMs })
     try {
       // Validate input
       if (typeof intervalMs !== 'number' || !Number.isFinite(intervalMs)) {
@@ -214,8 +245,9 @@ export function registerGitWatcherHandlers(): void {
 
       gitPollingService.setInterval(intervalMs)
 
-      logger.debug('git-polling:set-interval handler completed', {
-        intervalMs: gitPollingService.getInterval()
+      logger.debug('git-polling:set-interval completed', {
+        intervalMs: gitPollingService.getInterval(),
+        latencyMs: Date.now() - startTime
       })
 
       return { success: true, interval: gitPollingService.getInterval() }
@@ -234,6 +266,8 @@ export function registerGitWatcherHandlers(): void {
    * @returns { success: boolean, error?: string }
    */
   ipcMain.handle('git-polling:set-enabled', async (_event, enabled: boolean) => {
+    const startTime = Date.now() // Timing (ADR-BRS003-002)
+    logger.trace('git-polling:set-enabled invoked', { enabled })
     try {
       // Validate input
       if (typeof enabled !== 'boolean') {
@@ -242,7 +276,10 @@ export function registerGitWatcherHandlers(): void {
 
       gitPollingService.setEnabled(enabled)
 
-      logger.debug('git-polling:set-enabled handler completed', { enabled })
+      logger.debug('git-polling:set-enabled completed', {
+        enabled: gitPollingService.isEnabled(),
+        latencyMs: Date.now() - startTime
+      })
 
       return { success: true, enabled: gitPollingService.isEnabled() }
     } catch (error) {

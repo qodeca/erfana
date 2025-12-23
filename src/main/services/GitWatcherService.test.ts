@@ -8,6 +8,7 @@ const mockChokidar = {
 const mockBrowserWindows: any[] = []
 
 const mockLogger = {
+  trace: vi.fn(),
   debug: vi.fn(),
   info: vi.fn(),
   warn: vi.fn(),
@@ -26,6 +27,21 @@ vi.mock('electron', () => ({
 
 vi.mock('./LoggingService', () => ({
   logger: mockLogger
+}))
+
+vi.mock('./watcher/WatcherMetrics', () => ({
+  watcherMetrics: {
+    recordGitWatcherEvent: vi.fn(),
+    getSnapshot: vi.fn(() => ({
+      uptimeMs: 0,
+      gitWatcherEventCount: 0,
+      pollingRefreshCount: 0,
+      pollingSkippedCount: 0,
+      pollingEfficiency: 0,
+      restartScheduled: 0,
+      errorCounts: {}
+    }))
+  }
 }))
 
 vi.mock('fs/promises', () => ({
@@ -83,7 +99,10 @@ describe('GitWatcherService', () => {
     } as any)
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Stop service to clear health logger interval
+    await service.stop()
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 

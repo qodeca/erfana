@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 const mockBrowserWindows: any[] = []
 
 const mockLogger = {
+  trace: vi.fn(),
   debug: vi.fn(),
   info: vi.fn(),
   warn: vi.fn(),
@@ -29,6 +30,13 @@ vi.mock('./GitWatcherService', () => ({
   gitWatcherService: mockGitWatcherService
 }))
 
+vi.mock('./watcher/WatcherMetrics', () => ({
+  watcherMetrics: {
+    recordPollingRefresh: vi.fn(),
+    recordPollingSkipped: vi.fn()
+  }
+}))
+
 vi.mock('fs/promises', () => ({
   stat: vi.fn()
 }))
@@ -44,6 +52,7 @@ describe('GitPollingService', () => {
     mockBrowserWindows.length = 0
 
     // Clear logger mocks (not fs.stat)
+    mockLogger.trace.mockClear()
     mockLogger.debug.mockClear()
     mockLogger.info.mockClear()
     mockLogger.warn.mockClear()
@@ -295,8 +304,9 @@ describe('GitPollingService', () => {
       await vi.advanceTimersByTimeAsync(5000)
 
       expect(service.metrics.pollingSkippedCount).toBe(1)
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('Skipping poll, watcher active')
+      expect(mockLogger.trace).toHaveBeenCalledWith(
+        expect.stringContaining('Skipped (watcher active)'),
+        expect.any(Object)
       )
     })
 
@@ -334,8 +344,9 @@ describe('GitPollingService', () => {
       await vi.advanceTimersByTimeAsync(5000)
 
       expect(service.metrics.pollingSkippedCount).toBe(1)
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('Skipping poll, index unchanged')
+      expect(mockLogger.trace).toHaveBeenCalledWith(
+        expect.stringContaining('Skipped (index unchanged)'),
+        expect.any(Object)
       )
     })
 
