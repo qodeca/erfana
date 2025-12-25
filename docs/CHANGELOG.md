@@ -3,6 +3,13 @@
 Historical changelog entries for versions prior to current. For the latest changes, see [CLAUDE.md](../CLAUDE.md).
 
 ## Changes in v0.6.4-beta
+- **Editor Context Menu with AI Prompts** (Dec 25, 2025):
+  - Right-click with text selected shows context menu in Monaco editor
+  - 5 new editor-specific prompts: Elaborate, Modify, Ask, Visualize, Prompt
+  - Prompts filtered by `area: code-editor`, `subArea: context-menu`
+  - Menu dismisses on Escape, click outside, or action execution
+  - 8 new tests
+  - Closes #73
 - **Real-time Git Status Refresh** (Dec 25, 2025):
   - Multi-path git state watching (.git/index, HEAD, refs/heads, FETCH_HEAD, stash)
   - Hybrid polling fallback for network/cloud drives
@@ -30,7 +37,7 @@ Historical changelog entries for versions prior to current. For the latest chang
   - Prompts before quitting with unsaved changes or active terminals
   - 54 new tests
   - Closes #64
-- **Total: 5014 tests passing** (161 test files)
+- **Total: 5049 tests passing** (162 test files)
 
 ## Changes in v0.6.3
 - **Logging Improvements** (Dec 21, 2025):

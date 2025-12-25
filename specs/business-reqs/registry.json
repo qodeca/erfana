@@ -1,7 +1,7 @@
 {
   "sequence": {
-    "current": 9,
-    "next": 10
+    "current": 10,
+    "next": 11
   },
   "registry": [
     {
@@ -196,11 +196,32 @@
         "designs": [],
         "issues": ["#75"]
       }
+    },
+    {
+      "id": 10,
+      "slug": "multi-instance",
+      "name": "Multiple independent instances",
+      "tier": "T4",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Support multiple independent Erfana instances for working on different projects simultaneously. When attempting to open an already-open project, Erfana focuses the existing window instead of showing an error, matching VS Code's multi-instance behavior.",
+      "created": "2025-12-25T17:12:00.000Z",
+      "path": "brs010-multi-instance",
+      "last_modified": "2025-12-25T17:12:00.000Z",
+      "sections_count": 5,
+      "requirements_count": 116,
+      "documents": {
+        "technical_adrs": ["docs/architecture/adrs/adr-brs010-001-multi-instance-architecture.md"],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": ["#27"]
+      }
     }
   ],
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2025-12-22T23:15:00.000Z"
+    "last_updated": "2025-12-25T17:12:00.000Z"
   }
 }

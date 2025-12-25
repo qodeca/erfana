@@ -31,6 +31,29 @@ Global setting to preserve single line breaks in markdown preview:
 - Toggle in Settings overlay under "Editor" section
 - Changes apply immediately without reload
 
+### Context Menu with AI Prompts (v0.6.4-beta)
+Right-click with text selected in Monaco editor shows context menu with AI prompt actions.
+
+**Features:**
+- Prompts filtered by `area: code-editor`, `subArea: context-menu`
+- Actions: Elaborate (direct), Modify/Ask (with input dialog), Visualize (with dropdown)
+- "Copy selection" copies text to clipboard
+- Menu dismisses on Escape, click outside, or action execution
+
+**Templates** (5 editor-specific):
+- `editor-elaborate.md` - Expand on selected code/text
+- `editor-modify.md` - Apply modifications
+- `editor-ask.md` - Answer questions
+- `editor-visualize.md` - Generate diagrams
+- `editor-prompt.md` - Generic prompt
+
+**Implementation files:**
+- `src/renderer/src/components/ContextMenu/EditorContextMenu.tsx`
+- `src/renderer/src/prompts/templates/editor-*.md` (5 files)
+
+**Related:**
+- [Prompt Templates](../prompts/README.md#editor-context-menu-area-code-editor---v064-beta)
+
 ### In-File Search (v0.6.3)
 Unified search overlay activated via `Cmd/Ctrl+F` in editor or preview panes.
 

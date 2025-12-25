@@ -30,7 +30,7 @@ The template system enables AI-powered text operations through right-click conte
 
 ```
 prompts/
-├── templates/       # Template markdown files (9 templates)
+├── templates/       # Template markdown files (14 templates)
 ├── parser.ts        # YAML frontmatter parser
 ├── renderer.ts      # CSP-safe renderer
 ├── schema.ts        # Zod validation
@@ -103,6 +103,8 @@ Templates can include thinking triggers for Claude Code to enable deeper analysi
 
 ## Available Templates
 
+### Preview context menu (area: markdown-preview)
+
 | Template | Purpose | Input Required |
 |----------|---------|----------------|
 | `elaborate.md` | Expand on selected text | No |
@@ -114,6 +116,16 @@ Templates can include thinking triggers for Claude Code to enable deeper analysi
 | `mermaid-bug-report.md` | Fix syntax errors | No |
 | `mermaid-change-direction.md` | Change diagram direction | No |
 | `organize-import.md` | Organize imported files | No |
+
+### Editor context menu (area: code-editor) - v0.6.4-beta
+
+| Template | Purpose | Input Required |
+|----------|---------|----------------|
+| `editor-elaborate.md` | Expand on selected code/text | No |
+| `editor-modify.md` | Apply modifications to code | Yes (instruction) |
+| `editor-ask.md` | Answer questions about code | Yes (question) |
+| `editor-visualize.md` | Generate diagrams from code | Yes (diagram type dropdown) |
+| `editor-prompt.md` | Generic code prompt | Yes (instruction) |
 
 ### organize-import with AskUserQuestion (v0.6.3)
 

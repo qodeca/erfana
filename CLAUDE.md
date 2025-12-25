@@ -61,7 +61,7 @@ See `docs/` for details (keep Claude's context focused):
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (5041 tests, 162 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (5049 tests, 162 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.6.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
@@ -81,6 +81,7 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 | BRS-007 | Temporal queries & timeline | T3 | draft | `specs/business-reqs/brs007-temporal-queries/` |
 | BRS-008 | Graph engine polish & maintenance | T3 | draft | `specs/business-reqs/brs008-graph-polish/` |
 | BRS-009 | Media import with transcription | T4 | draft | `specs/business-reqs/brs009-media-import-transcription/` |
+| BRS-010 | Multiple independent instances | T4 | draft | `specs/business-reqs/brs010-multi-instance/` |
 
 **Registry**: `specs/business-reqs/registry.json`
 
@@ -169,7 +170,7 @@ Added context menu to Monaco editor with AI prompt actions, mirroring preview pa
 
 **BRS**: `specs/business-reqs/brs002-editor-context-menu/`
 
-**Testing**: 27 new tests added (total: 5041 tests, 162 files)
+**Testing**: 27 new tests added (total: 5049 tests, 162 files)
 
 Closes #73
 
@@ -537,7 +538,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 5041 tests passing (162 test files)
+- **Current**: 5049 tests passing (162 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)
