@@ -61,7 +61,7 @@ See `docs/` for details (keep Claude's context focused):
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (5214 tests, 162 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (5255 tests, 163 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.6.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
@@ -177,7 +177,7 @@ Added support for multiple independent Erfana instances with file-based project 
 
 **BRS**: `specs/business-reqs/brs010-multi-instance/`
 
-**Testing**: 165 new tests added (total: 5214 tests)
+**Testing**: 206 new tests added (total: 5255 tests)
 
 Closes #27
 
@@ -571,7 +571,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 5214 tests passing (162 test files)
+- **Current**: 5255 tests passing (163 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)
