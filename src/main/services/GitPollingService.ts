@@ -25,7 +25,7 @@ import { join } from 'path'
 import { logger } from './LoggingService'
 import { broadcastToAllWindows } from '../utils/ipcBroadcast'
 import { watcherMetrics } from './watcher/WatcherMetrics'
-import type { GitPollTriggeredEvent } from '../../shared/ipc/git-watcher-schema'
+import type { GitPollTriggeredEvent, GitPollingMetrics } from '../../shared/ipc/git-watcher-schema'
 
 /**
  * Provider for the last watcher event timestamp.
@@ -51,19 +51,8 @@ const MAX_POLLING_INTERVAL_MS = 60000
 /** Threshold for considering watcher as active (ms) */
 const WATCHER_ACTIVE_THRESHOLD_MS = 2000
 
-/**
- * Metrics for polling service
- */
-export interface GitPollingMetrics {
-  /** Number of times polling triggered a refresh */
-  pollingRefreshCount: number
-  /** Number of times polling was skipped (watcher active or no index change) */
-  pollingSkippedCount: number
-  /** Timestamp of last poll */
-  lastPollTimestamp: number
-  /** Timestamp of last refresh */
-  lastRefreshTimestamp: number
-}
+// Re-export GitPollingMetrics for backward compatibility
+export type { GitPollingMetrics } from '../../shared/ipc/git-watcher-schema'
 
 /**
  * GitPollingService
@@ -226,10 +215,12 @@ export class GitPollingService {
     logger.debug('GitPollingService: Interval updated', { intervalMs: clamped })
 
     // If currently polling, restart with new interval
-    if (this.isPolling() && this.projectPath) {
+    // Capture projectPath BEFORE condition check to prevent race condition
+    // where this.projectPath becomes null between check and use
+    const projectPath = this.projectPath
+    if (this.isPolling() && projectPath) {
       this.intervalChangeInProgress = true
       try {
-        const projectPath = this.projectPath
         this.stop()
         this.start(projectPath)
       } finally {

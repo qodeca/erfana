@@ -202,11 +202,16 @@ export class GitEventCoalescer {
 /**
  * Convenience function to determine git event type from file path
  *
+ * Cross-platform: Handles both Unix (/path/.git/index) and Windows (C:\path\.git\index) paths.
+ * Windows drive letters are preserved after backslash normalization (C:/path/.git/index).
+ *
  * @param filePath - Full path to git file that changed
  * @returns GitEventType or null if not a recognized git state file
  */
 export function classifyGitPath(filePath: string): GitEventType | null {
-  // Normalize path separators for cross-platform compatibility
+  // Normalize backslashes to forward slashes for cross-platform compatibility
+  // Examples: C:\project\.git\index → C:/project/.git/index
+  //           /Users/dev/project/.git/HEAD → /Users/dev/project/.git/HEAD (unchanged)
   const normalizedPath = filePath.replace(/\\/g, '/')
 
   // Check each pattern in order of specificity

@@ -228,7 +228,7 @@ export function registerGitWatcherHandlers(): void {
    * Update polling interval
    *
    * @param intervalMs - Interval in milliseconds (clamped to 1-60 seconds)
-   * @returns { success: boolean, error?: string }
+   * @returns { success: boolean, interval?: number, clamped?: boolean, error?: string }
    */
   ipcMain.handle('git-polling:set-interval', async (_event, intervalMs: number) => {
     const startTime = Date.now() // Timing (ADR-BRS003-002)
@@ -245,12 +245,17 @@ export function registerGitWatcherHandlers(): void {
 
       gitPollingService.setInterval(intervalMs)
 
+      const actualInterval = gitPollingService.getInterval()
+      const wasClamped = actualInterval !== intervalMs
+
       logger.debug('git-polling:set-interval completed', {
-        intervalMs: gitPollingService.getInterval(),
+        requestedMs: intervalMs,
+        actualMs: actualInterval,
+        clamped: wasClamped,
         latencyMs: Date.now() - startTime
       })
 
-      return { success: true, interval: gitPollingService.getInterval() }
+      return { success: true, interval: actualInterval, clamped: wasClamped }
     } catch (error) {
       // Use sanitized message to avoid internal error exposure (Issue #74 review fix)
       const userMessage = getUserFriendlyMessage(error)

@@ -399,13 +399,24 @@ export class GitWatcherService implements IGitWatcherService {
 
   /**
    * Classify error message into error type
+   *
+   * Matches Node.js error codes (uppercase) directly, with fallback to
+   * lowercase matching for descriptive phrases in case error format varies.
    */
   private classifyError(errorMessage: string): string {
-    const msg = errorMessage.toLowerCase()
-    if (msg.includes('enoent') || msg.includes('no such file')) return 'ENOENT'
-    if (msg.includes('emfile') || msg.includes('too many')) return 'EMFILE'
-    if (msg.includes('eacces') || msg.includes('access denied')) return 'EACCES'
-    if (msg.includes('estale') || msg.includes('stale')) return 'ESTALE'
+    // First try direct uppercase error code match (Node.js standard format)
+    if (errorMessage.includes('ENOENT')) return 'ENOENT'
+    if (errorMessage.includes('EMFILE')) return 'EMFILE'
+    if (errorMessage.includes('EACCES')) return 'EACCES'
+    if (errorMessage.includes('ESTALE')) return 'ESTALE'
+
+    // Fallback: case-insensitive match for descriptive phrases
+    const msgLower = errorMessage.toLowerCase()
+    if (msgLower.includes('no such file')) return 'ENOENT'
+    if (msgLower.includes('too many')) return 'EMFILE'
+    if (msgLower.includes('access denied')) return 'EACCES'
+    if (msgLower.includes('stale')) return 'ESTALE'
+
     return 'UNKNOWN'
   }
 
@@ -483,8 +494,11 @@ export class GitWatcherService implements IGitWatcherService {
    * @see ADR-BRS003-002 - Git status logging strategy
    */
   private startHealthLogger(): void {
-    // Clear any existing interval
-    this.stopHealthLogger()
+    // Guard: Prevent duplicate intervals from rapid start() calls
+    // This can happen if start() is called again before 'ready' fires
+    if (this.healthLogInterval !== null) {
+      return
+    }
 
     this.healthLogInterval = setInterval(() => {
       const snapshot = watcherMetrics.getSnapshot()

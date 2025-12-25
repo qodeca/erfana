@@ -33,7 +33,11 @@ export const GitStateChangeEventSchema = z.object({
   /**
    * Correlation ID for tracing a refresh cycle across components
    * Format: git-{timestamp}-{random} (e.g., git-1703270400000-abc123)
-   * Optional for backward compatibility
+   *
+   * Uses .optional() (not .nullable()) because the field may be absent entirely
+   * in older payloads, rather than being present with a null value.
+   * This differs from fields like watchedPath which are always present but may be null.
+   *
    * @see ADR-BRS003-002 - Git status logging strategy
    */
   correlationId: z.string().optional()
@@ -84,3 +88,20 @@ export const GitPollTriggeredEventSchema = z.object({
   reason: z.enum(['index_changed', 'no_watcher'])
 })
 export type GitPollTriggeredEvent = z.infer<typeof GitPollTriggeredEventSchema>
+
+/**
+ * Metrics for git polling service
+ *
+ * Moved to shared schema to avoid circular dependency between
+ * IGitPollingService interface and GitPollingService implementation.
+ */
+export interface GitPollingMetrics {
+  /** Number of times polling triggered a refresh */
+  pollingRefreshCount: number
+  /** Number of times polling was skipped (watcher active or no index change) */
+  pollingSkippedCount: number
+  /** Timestamp of last poll */
+  lastPollTimestamp: number
+  /** Timestamp of last refresh */
+  lastRefreshTimestamp: number
+}
