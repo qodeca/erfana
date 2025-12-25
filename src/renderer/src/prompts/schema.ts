@@ -33,6 +33,9 @@ export const PromptFrontmatterSchema = z.object({
   /** Optional sub-area for more specific placement */
   subArea: z.enum(['context-menu', 'toolbar', 'command-palette', 'mermaid-error', 'mermaid-direction', 'chat']).optional(),
 
+  /** Optional unique identifier. If not provided, ID is generated from name */
+  id: z.string().min(1).optional(),
+
   /** Display name shown in the UI */
   name: z.string().min(1, 'Name is required'),
 

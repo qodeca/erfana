@@ -16,12 +16,17 @@ import type { PromptVariables } from './types'
 function createValidVariables(templateId: string): Partial<PromptVariables> {
   switch (templateId) {
     case 'elaborate':
+    case 'editor-elaborate':
       return { selectedText: 'Some text', filePath: '/path/file.md' }
     case 'modify':
     case 'ask':
     case 'prompt':
+    case 'editor-modify':
+    case 'editor-ask':
+    case 'editor-prompt':
       return { selectedText: 'Some text', filePath: '/path/file.md', userInput: 'Do something' }
     case 'visualize':
+    case 'editor-visualize':
       return { selectedText: 'Some text', filePath: '/path/file.md', diagramType: 'flowchart' }
     case 'diagram-chat':
       return { mermaidCode: 'graph TD; A-->B', userInstruction: 'Add a node' }

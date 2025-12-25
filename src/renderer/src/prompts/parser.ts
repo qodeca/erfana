@@ -68,8 +68,8 @@ export function parseTemplate(raw: string, filename: string): ParsedTemplate {
     )
   }
 
-  // Generate ID from name
-  const id = slugify(result.data.name)
+  // Use custom ID from frontmatter if provided, otherwise generate from name
+  const id = result.data.id || slugify(result.data.name)
 
   return {
     id,

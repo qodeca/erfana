@@ -11,12 +11,13 @@ describe('Template Registry', () => {
   // The registry is built at module load time, so we test the actual registry
 
   describe('Registry Initialization', () => {
-    it('should load all 9 templates (elaborate, modify, ask, visualize, prompt, mermaid-bug-report, change-mermaid-direction, diagram-chat, organize-import)', () => {
+    it('should load all 14 templates (markdown-preview + editor prompts)', () => {
       const allPrompts = getAllPrompts()
 
-      expect(allPrompts.length).toBe(9)
+      expect(allPrompts.length).toBe(14)
 
       const ids = getAllPromptIds()
+      // Markdown-preview prompts
       expect(ids).toContain('elaborate')
       expect(ids).toContain('modify')
       expect(ids).toContain('ask')
@@ -26,12 +27,18 @@ describe('Template Registry', () => {
       expect(ids).toContain('change-mermaid-direction')
       expect(ids).toContain('diagram-chat')
       expect(ids).toContain('organize-import')
+      // Editor prompts
+      expect(ids).toContain('editor-elaborate')
+      expect(ids).toContain('editor-modify')
+      expect(ids).toContain('editor-ask')
+      expect(ids).toContain('editor-visualize')
+      expect(ids).toContain('editor-prompt')
     })
 
     it('should build PROMPT_REGISTRY with correct structure', () => {
       expect(PROMPT_REGISTRY).toBeDefined()
       expect(typeof PROMPT_REGISTRY).toBe('object')
-      expect(Object.keys(PROMPT_REGISTRY).length).toBe(9)
+      expect(Object.keys(PROMPT_REGISTRY).length).toBe(14)
     })
 
     it('should log correct count to console on module load', () => {
@@ -39,7 +46,7 @@ describe('Template Registry', () => {
       // The actual log happens when the module first loads, so we just verify
       // the registry matches the expected count
       const count = getAllPrompts().length
-      expect(count).toBe(9)
+      expect(count).toBe(14)
     })
   })
 
@@ -95,7 +102,7 @@ describe('Template Registry', () => {
       const prompts = getAllPrompts()
 
       expect(Array.isArray(prompts)).toBe(true)
-      expect(prompts.length).toBe(9)
+      expect(prompts.length).toBe(14)
     })
 
     it('should return configs with correct structure', () => {
@@ -119,7 +126,7 @@ describe('Template Registry', () => {
       const ids = getAllPromptIds()
 
       expect(Array.isArray(ids)).toBe(true)
-      expect(ids.length).toBe(9)
+      expect(ids.length).toBe(14)
 
       ids.forEach((id) => {
         expect(typeof id).toBe('string')
@@ -129,6 +136,7 @@ describe('Template Registry', () => {
     it('should include all expected IDs', () => {
       const ids = getAllPromptIds()
 
+      // Markdown-preview prompts
       expect(ids).toContain('elaborate')
       expect(ids).toContain('modify')
       expect(ids).toContain('ask')
@@ -138,6 +146,13 @@ describe('Template Registry', () => {
       expect(ids).toContain('change-mermaid-direction')
       expect(ids).toContain('diagram-chat')
       expect(ids).toContain('organize-import')
+
+      // Editor prompts
+      expect(ids).toContain('editor-elaborate')
+      expect(ids).toContain('editor-modify')
+      expect(ids).toContain('editor-ask')
+      expect(ids).toContain('editor-visualize')
+      expect(ids).toContain('editor-prompt')
     })
   })
 

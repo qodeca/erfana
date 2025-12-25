@@ -3,7 +3,9 @@ import { FileEdit, Columns2, Rows2, Eye, Bold, Italic, Code, Link, Image, Headin
 import { IDockviewPanelProps } from 'dockview'
 import * as monaco from 'monaco-editor'
 import { MonacoMarkdownEditor, MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
+import type { EditorContextMenuEvent } from '../Editor/MonacoMarkdownEditor'
 import { MarkdownPreview, MarkdownPreviewHandle } from '../Editor/MarkdownPreview'
+import { EditorContextMenu } from '../ContextMenu/EditorContextMenu'
 import { ResizableDivider } from '../Editor/ResizableDivider'
 import { SearchBar } from '../Search'
 import { useDialog } from '../Dialog'
@@ -51,6 +53,15 @@ export function MarkdownEditorPanel(
   const [viewMode, setViewMode] = useState<'split' | 'split-horizontal' | 'editor' | 'preview'>('preview')
   const [selectedText, setSelectedText] = useState<string>('')
   const [activePaneId, setActivePaneId] = useState<'editor' | 'preview'>('editor')
+
+  // Editor context menu state
+  const [editorContextMenu, setEditorContextMenu] = useState<{
+    x: number
+    y: number
+    selectedText: string
+    startLine: number
+    endLine: number
+  } | null>(null)
 
   // New unified dialog system
   const { showConfirm } = useDialog()
@@ -162,6 +173,13 @@ export function MarkdownEditorPanel(
       previewProvider.dispose()
     }
   }, [monacoProvider, previewProvider])
+
+  // Cleanup context menu state on unmount (prevents memory leaks)
+  useEffect(() => {
+    return () => {
+      setEditorContextMenu(null)
+    }
+  }, [])
 
   // =========================================================================
   // File Watcher Hook Integration
@@ -885,6 +903,68 @@ export function MarkdownEditorPanel(
   }
 
   /**
+   * Handle editor context menu open event from Monaco editor.
+   * Stores position and selected text for EditorContextMenu component.
+   */
+  const handleEditorContextMenu = useCallback((event: EditorContextMenuEvent) => {
+    setEditorContextMenu({
+      x: event.x,
+      y: event.y,
+      selectedText: event.selectedText,
+      startLine: event.startLine,
+      endLine: event.endLine
+    })
+  }, [])
+
+  /**
+   * Close editor context menu
+   */
+  const handleCloseEditorContextMenu = useCallback(() => {
+    setEditorContextMenu(null)
+  }, [])
+
+  /**
+   * Handle cut action from editor context menu.
+   * Deletes the current selection (clipboard copy already done by EditorContextMenu).
+   */
+  const handleEditorCut = useCallback(() => {
+    const editor = editorRef.current?.getEditor()
+    if (!editor) return
+
+    const selection = editor.getSelection()
+    if (!selection || selection.isEmpty()) return
+
+    // Delete selected text by replacing with empty string
+    editor.executeEdits('context-menu-cut', [
+      { range: selection, text: '' }
+    ])
+  }, [])
+
+  /**
+   * Handle paste action from editor context menu.
+   * Reads clipboard and inserts at current cursor/selection.
+   */
+  const handleEditorPaste = useCallback(async () => {
+    const editor = editorRef.current?.getEditor()
+    if (!editor) return
+
+    try {
+      const clipboardText = await navigator.clipboard.readText()
+      if (!clipboardText) return
+
+      const selection = editor.getSelection()
+      if (!selection) return
+
+      // Replace selection (or insert at cursor) with clipboard content
+      editor.executeEdits('context-menu-paste', [
+        { range: selection, text: clipboardText }
+      ])
+    } catch (error) {
+      logger.error('Failed to paste from clipboard', error instanceof Error ? error : undefined)
+    }
+  }, [])
+
+  /**
    * Build scroll map: line -> pixel positions
    * Maps editor line numbers to preview element positions
    *
@@ -1146,6 +1226,7 @@ export function MarkdownEditorPanel(
                   filePath={currentFile.path}
                   onSelectionChange={setSelectedText}
                   onEditorMount={handleEditorMount}
+                  onContextMenu={handleEditorContextMenu}
                 />
                 {activePaneId === 'editor' && (
                   <SearchBar provider={monacoProvider} />
@@ -1172,6 +1253,7 @@ export function MarkdownEditorPanel(
                     filePath={currentFile.path}
                     onSelectionChange={setSelectedText}
                     onEditorMount={handleEditorMount}
+                    onContextMenu={handleEditorContextMenu}
                   />
                   {(viewMode === 'editor' || activePaneId === 'editor') && (
                     <SearchBar provider={monacoProvider} />
@@ -1241,6 +1323,21 @@ export function MarkdownEditorPanel(
         </div>
       )}
 
+      {/* Editor context menu */}
+      {editorContextMenu && currentFile?.path && (
+        <EditorContextMenu
+          x={editorContextMenu.x}
+          y={editorContextMenu.y}
+          selectedText={editorContextMenu.selectedText}
+          filePath={currentFile.path}
+          fullDocument={currentFile.content}
+          startLine={editorContextMenu.startLine}
+          endLine={editorContextMenu.endLine}
+          onClose={handleCloseEditorContextMenu}
+          onCut={handleEditorCut}
+          onPaste={handleEditorPaste}
+        />
+      )}
     </div>
   )
 }

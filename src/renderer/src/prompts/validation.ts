@@ -17,6 +17,13 @@ export const PROMPT_REQUIREMENTS: Record<string, (keyof PromptVariables)[]> = {
   'visualize': ['selectedText', 'filePath', 'diagramType'],
   'prompt': ['selectedText', 'filePath', 'userInput'],
 
+  // Context menu prompts (code-editor area)
+  'editor-elaborate': ['selectedText', 'filePath'],
+  'editor-modify': ['selectedText', 'filePath', 'userInput'],
+  'editor-ask': ['selectedText', 'filePath', 'userInput'],
+  'editor-visualize': ['selectedText', 'filePath', 'diagramType'],
+  'editor-prompt': ['selectedText', 'filePath', 'userInput'],
+
   // Mermaid diagram prompts
   'diagram-chat': ['mermaidCode', 'userInstruction'],
   'change-mermaid-direction': ['mermaidCode', 'targetDirection', 'directionLabel'],

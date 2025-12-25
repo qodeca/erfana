@@ -40,7 +40,7 @@ src/
 ```
 
 ## Core Features
-1. **Markdown Editor** - Monaco with live preview, scroll sync, Mermaid diagrams (zoom, pan, full-screen viewer), YAML frontmatter rendering, preserve line breaks option, unified in-file search (Cmd/Ctrl+F)
+1. **Markdown Editor** - Monaco with live preview, scroll sync, Mermaid diagrams (zoom, pan, full-screen viewer), YAML frontmatter rendering, preserve line breaks option, unified in-file search (Cmd/Ctrl+F), context menu with AI prompts
 2. **Project Tree** - File explorer with drag-drop reorganization, markdown filtering, context menu, real-time git status indicators with polling fallback
 3. **Terminal** - xterm.js with PTY backend, clipboard support, file links, scroll recovery, auto-opens on project load
 4. **Prompt Templates** - AI text operations via context menu (Elaborate, Modify, Ask, Visualize, diagram chat); Visualize generates Mermaid diagrams from selected text with dropdown for 22 diagram types
@@ -61,7 +61,7 @@ See `docs/` for details (keep Claude's context focused):
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (5014 tests, 161 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (5041 tests, 162 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.6.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
@@ -146,6 +146,32 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 - [ ] Focus states are visible (accessibility)
 
 ## Recent Changes (v0.6.x)
+
+### Editor Context Menu with AI Prompts (Dec 25, 2025)
+Added context menu to Monaco editor with AI prompt actions, mirroring preview panel UX:
+
+**Features**:
+- Right-click with text selected shows custom context menu
+- Prompts filtered by `area: code-editor`, `subArea: context-menu`
+- "Elaborate" executes directly, "Modify" and "Ask" show input dialog
+- "Copy selection" action copies text to clipboard
+- Menu dismisses on Escape, click outside, or action execution
+
+**Files Created**:
+- `src/renderer/src/components/ContextMenu/EditorContextMenu.tsx` - Context menu component
+- `src/renderer/src/prompts/templates/code-elaborate.md` - Elaborate prompt for code editor
+- `src/renderer/src/prompts/templates/code-modify.md` - Modify prompt for code editor
+- `src/renderer/src/prompts/templates/code-ask.md` - Ask prompt for code editor
+
+**Files Modified**:
+- `src/renderer/src/components/Editor/MonacoMarkdownEditor.tsx` - onContextMenu handler
+- `src/renderer/src/components/Editor/MarkdownEditorPanel.tsx` - State management for context menu
+
+**BRS**: `specs/business-reqs/brs002-editor-context-menu/`
+
+**Testing**: 27 new tests added (total: 5041 tests, 162 files)
+
+Closes #73
 
 ### Real-time Git Status Refresh with Polling Fallback (Dec 22, 2025)
 Implemented comprehensive git status monitoring with multi-path file watching and hybrid polling fallback:
@@ -511,7 +537,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 5014 tests passing (161 test files)
+- **Current**: 5041 tests passing (162 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)

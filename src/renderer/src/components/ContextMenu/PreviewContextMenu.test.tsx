@@ -108,10 +108,10 @@ describe('PreviewContextMenu Component', () => {
       expect(screen.getByText('Prompt')).toBeInTheDocument()
     })
 
-    it('should render Copy Selection item', () => {
+    it('should render Copy selection item', () => {
       renderWithProvider(<PreviewContextMenu {...defaultProps} />)
 
-      expect(screen.getByText('Copy Selection')).toBeInTheDocument()
+      expect(screen.getByText('Copy selection')).toBeInTheDocument()
     })
 
     it('should render menu items in correct order', () => {
@@ -129,7 +129,7 @@ describe('PreviewContextMenu Component', () => {
       expect(labels[2]).toBe('Ask')
       expect(labels[3]).toBe('Visualize')
       expect(labels[4]).toBe('Prompt')
-      expect(labels[5]).toBe('Copy Selection')
+      expect(labels[5]).toBe('Copy selection')
     })
 
     it('should render icons for each menu item', () => {
@@ -375,11 +375,11 @@ describe('PreviewContextMenu Component', () => {
     })
   })
 
-  describe('Copy Selection', () => {
+  describe('Copy selection', () => {
     it('should copy selected text to clipboard', async () => {
       renderWithProvider(<PreviewContextMenu {...defaultProps} selectedText="Text to copy" />)
 
-      const copyBtn = screen.getByText('Copy Selection').closest('.context-menu-item')
+      const copyBtn = screen.getByText('Copy selection').closest('.context-menu-item')
       expect(copyBtn).toBeTruthy()
 
       // Use fireEvent for direct event triggering
@@ -396,7 +396,7 @@ describe('PreviewContextMenu Component', () => {
 
       renderWithProvider(<PreviewContextMenu {...defaultProps} onClose={onClose} />)
 
-      const copyBtn = screen.getByText('Copy Selection')
+      const copyBtn = screen.getByText('Copy selection')
       await user.click(copyBtn)
 
       // Should be called at least once (might be called on blur/click events too)

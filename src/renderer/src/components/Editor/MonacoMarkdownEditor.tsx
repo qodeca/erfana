@@ -9,12 +9,30 @@ import './MonacoMarkdownEditor.css'
 // This prevents CSP violations in Electron
 loader.config({ monaco })
 
+/**
+ * Context menu event payload for editor right-click handling.
+ */
+export interface EditorContextMenuEvent {
+  /** X coordinate of the click in viewport pixels */
+  x: number
+  /** Y coordinate of the click in viewport pixels */
+  y: number
+  /** The selected text content */
+  selectedText: string
+  /** 1-based line number where selection starts */
+  startLine: number
+  /** 1-based line number where selection ends */
+  endLine: number
+}
+
 interface MonacoMarkdownEditorProps {
   value: string
   onChange: (value: string) => void
   filePath?: string
   onSelectionChange?: (selection: string) => void
   onEditorMount?: (editor: monaco.editor.IStandaloneCodeEditor) => void
+  /** Callback when user right-clicks with a text selection */
+  onContextMenu?: (event: EditorContextMenuEvent) => void
 }
 
 export interface MonacoEditorHandle {
@@ -47,7 +65,7 @@ export interface MonacoEditorHandle {
 }
 
 export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdownEditorProps>(
-  ({ value, onChange, filePath, onSelectionChange, onEditorMount }, ref) => {
+  ({ value, onChange, filePath, onSelectionChange, onEditorMount, onContextMenu }, ref) => {
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
 
     // Debug logging
@@ -73,7 +91,9 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
         scrollBeyondLastLine: false,
         renderWhitespace: 'selection',
         rulers: [], // Removed vertical ruler lines
-        bracketPairColorization: { enabled: true }
+        bracketPairColorization: { enabled: true },
+        contextmenu: false, // Disable Monaco's built-in context menu (use our custom EditorContextMenu)
+        occurrencesHighlight: 'off' // Disable word highlighting on click
       })
 
       // Handle selection changes
@@ -115,6 +135,35 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
           useSearchStore.getState().previousMatch()
         }
       )
+
+      // Handle right-click context menu (always show our menu for Paste support)
+      editor.onContextMenu((e: monaco.editor.IEditorMouseEvent) => {
+        // Prevent Monaco's default context menu (disabled, but belt-and-suspenders)
+        e.event.preventDefault()
+        e.event.stopPropagation()
+
+        const model = editor.getModel()
+        if (!model) return
+
+        const selection = editor.getSelection()
+        const hasSelection = selection && !selection.isEmpty()
+        const selectedText = hasSelection ? model.getValueInRange(selection) : ''
+
+        // Get cursor position for context (used even without selection)
+        const position = editor.getPosition()
+        const cursorLine = position?.lineNumber ?? 1
+
+        // Notify parent component
+        if (onContextMenu) {
+          onContextMenu({
+            x: e.event.posx,
+            y: e.event.posy,
+            selectedText,
+            startLine: hasSelection ? selection!.startLineNumber : cursorLine,
+            endLine: hasSelection ? selection!.endLineNumber : cursorLine
+          })
+        }
+      })
 
       // Notify parent component that editor is mounted and ready
       if (onEditorMount) {

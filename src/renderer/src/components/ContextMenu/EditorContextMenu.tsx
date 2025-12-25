@@ -1,9 +1,10 @@
-import { Copy } from 'lucide-react'
+import { Copy, Scissors, ClipboardPaste } from 'lucide-react'
 import { ContextMenu, ContextMenuItem } from './ContextMenu'
 import { useDialog } from '../Dialog'
 import { executePromptTemplate } from '../../utils/panelUtils'
 import { PROMPT_REGISTRY, getPromptsForArea } from '../../prompts/registry'
 import { formatLineRange } from '../../prompts/helpers'
+import { validateVariables } from '../../prompts/validation'
 import { renderIcon, DEFAULT_ICON_PROPS } from '../../utils/iconRegistry'
 import { TEXT_INPUT_LIMITS } from '../../../../shared/constants'
 import type { PromptVariables, PromptConfig } from '../../prompts/types'
@@ -12,44 +13,57 @@ import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { scheduleScrollIfNeeded } from '../../utils/promptScrollScheduler.logic'
 import { logger } from '../../utils/logger'
 
-interface PreviewContextMenuProps {
+/**
+ * Props for the EditorContextMenu component.
+ */
+interface EditorContextMenuProps {
+  /** X coordinate for menu positioning */
   x: number
+  /** Y coordinate for menu positioning */
   y: number
+  /** Currently selected text in the editor */
   selectedText: string
+  /** Path to the file being edited */
   filePath: string
+  /** Full content of the document */
   fullDocument: string
-  startLine?: number
-  endLine?: number
+  /** Starting line number of selection (1-indexed) */
+  startLine: number
+  /** Ending line number of selection (1-indexed, inclusive) */
+  endLine: number
+  /** Callback invoked when menu should close */
   onClose: () => void
+  /** Callback to cut selection (copies to clipboard and deletes from editor) */
+  onCut?: () => void
+  /** Callback to paste from clipboard (inserts at current cursor/selection) */
+  onPaste?: () => void
 }
-
 
 /**
- * Read specific lines from source markdown file
- * Returns the original markdown source (not rendered text from preview)
- * @param filePath - Path to the source file
- * @param startLine - Starting line number (1-indexed)
- * @param endLine - Ending line number (1-indexed, inclusive)
- * @returns Original source text or null if read fails
+ * Context menu for the Monaco code editor.
+ *
+ * Displays prompt actions from the registry filtered for 'code-editor' area
+ * and a copy selection action. Supports prompts that require user input
+ * via dialog and executes prompt templates to terminal.
+ *
+ * @param props - Component props
+ * @returns Rendered context menu
+ *
+ * @example
+ * ```tsx
+ * <EditorContextMenu
+ *   x={100}
+ *   y={200}
+ *   selectedText="const foo = 'bar'"
+ *   filePath="/path/to/file.md"
+ *   fullDocument="# Full document content..."
+ *   startLine={5}
+ *   endLine={10}
+ *   onClose={() => setMenuVisible(false)}
+ * />
+ * ```
  */
-async function readSourceLines(
-  filePath: string,
-  startLine: number,
-  endLine: number
-): Promise<string | null> {
-  try {
-    const content = await window.api.file.readFile(filePath)
-    const lines = content.split('\n')
-    // Line numbers are 1-indexed in markdown AST, but arrays are 0-indexed
-    const selectedLines = lines.slice(startLine - 1, endLine)
-    return selectedLines.join('\n')
-  } catch (error) {
-    logger.error('Failed to read source lines from file:', error instanceof Error ? error : undefined)
-    return null
-  }
-}
-
-export function PreviewContextMenu({
+export function EditorContextMenu({
   x,
   y,
   selectedText,
@@ -57,16 +71,25 @@ export function PreviewContextMenu({
   fullDocument,
   startLine,
   endLine,
-  onClose
-}: PreviewContextMenuProps) {
-  // New unified dialog system
+  onClose,
+  onCut,
+  onPaste
+}: EditorContextMenuProps) {
+  // Unified dialog system for prompts requiring user input
   const { showPrompt } = useDialog()
 
   // Terminal portal context for scroll scheduling (issue #52)
   const terminalPortal = useTerminalPortalOptional()
 
+  /**
+   * Handles action selection from the context menu.
+   * If the prompt requires input, shows a dialog first.
+   * Otherwise, executes the prompt immediately.
+   *
+   * @param promptId - ID of the prompt to execute
+   */
   const handleAction = async (promptId: string) => {
-    // Get prompt configuration
+    // Get prompt configuration from registry
     const config = PROMPT_REGISTRY[promptId]
 
     if (!config) {
@@ -76,24 +99,15 @@ export function PreviewContextMenu({
 
     // Check if prompt requires user input
     if (config.requiresInput) {
-      // Read source text from file (not rendered preview text)
-      let sourceText = selectedText
-      if (startLine !== undefined && endLine !== undefined) {
-        const readSource = await readSourceLines(filePath, startLine, endLine)
-        if (readSource !== null) {
-          sourceText = readSource
-        }
-      }
-
-      // Close context menu first
+      // Close context menu first to prevent UI overlap
       onClose()
 
-      // Show prompt dialog using new unified system
+      // Show prompt dialog using unified dialog system
       // Pass dropdown configuration if present
       const dialogResult = await showPrompt({
         title: config.inputLabel || 'What would you like to do?',
         message: '',
-        selectedText: sourceText,
+        selectedText,
         inputLabel: 'Your input:',
         inputPlaceholder: config.inputPlaceholder || 'Enter your instructions or question here...',
         minLength: TEXT_INPUT_LIMITS.MIN_LENGTH,
@@ -135,7 +149,7 @@ export function PreviewContextMenu({
       try {
         await executePrompt(config, userInput, diagramType)
       } catch (error) {
-        logger.error(`❌ Failed to execute prompt:`, error instanceof Error ? error : undefined)
+        logger.error(`Failed to execute prompt:`, error instanceof Error ? error : undefined)
       }
 
       return
@@ -145,36 +159,41 @@ export function PreviewContextMenu({
     await executePrompt(config, undefined, undefined)
   }
 
+  /**
+   * Executes a prompt template with the provided configuration and variables.
+   * Builds the full variable context and sends to terminal.
+   *
+   * @param config - Prompt configuration from registry
+   * @param userInput - Optional user input from dialog
+   * @param diagramType - Optional diagram type from dropdown
+   */
   const executePrompt = async (config: PromptConfig, userInput?: string, diagramType?: string) => {
-    // Try to read source lines from file, fall back to selectedText if unavailable
-    let textToUse = selectedText
-    if (startLine !== undefined && endLine !== undefined) {
-      const sourceText = await readSourceLines(filePath, startLine, endLine)
-      if (sourceText !== null) {
-        textToUse = sourceText
-      }
-    }
-
-    // Prepare variables for template rendering
+    // Prepare line range for template (e.g., "5-10" or "5")
     const lineRange = formatLineRange(startLine, endLine) || undefined
 
+    // Build file reference for prompts (e.g., "@/path/to/file.md:5-10")
     const fileRef =
-      startLine !== undefined && endLine !== undefined
-        ? startLine === endLine
-          ? `@${filePath}:${startLine}`
-          : `@${filePath}:${startLine}-${endLine}`
-        : undefined
+      startLine === endLine ? `@${filePath}:${startLine}` : `@${filePath}:${startLine}-${endLine}`
 
+    // Build variables for template rendering
     const variables: PromptVariables = {
-      selectedText: textToUse,
+      selectedText,
       filePath,
       fullDocument,
       startLine,
       endLine,
       lineRange,
       fileRef,
-      userInput, // Add user input if provided
-      diagramType // Add diagram type from dropdown if provided
+      userInput,
+      diagramType
+    }
+
+    // Validate required variables before execution
+    const validation = validateVariables(config.id, variables)
+    if (!validation.valid) {
+      logger.error(validation.errorMessage ?? 'Prompt validation failed')
+      onClose()
+      return
     }
 
     // Execute prompt template using centralized function
@@ -196,7 +215,24 @@ export function PreviewContextMenu({
     onClose()
   }
 
-  const handleCopySelection = async () => {
+  /**
+   * Cuts the selected text (copy to clipboard + delete from editor).
+   */
+  const handleCut = async () => {
+    try {
+      await navigator.clipboard.writeText(selectedText)
+      onCut?.()
+    } catch (error) {
+      logger.error('Failed to cut text to clipboard', error instanceof Error ? error : undefined)
+    } finally {
+      onClose()
+    }
+  }
+
+  /**
+   * Copies the selected text to clipboard.
+   */
+  const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(selectedText)
     } catch (error) {
@@ -206,19 +242,44 @@ export function PreviewContextMenu({
     }
   }
 
+  /**
+   * Pastes text from clipboard at current cursor position.
+   */
+  const handlePaste = async () => {
+    onPaste?.()
+    onClose()
+  }
+
+  // Check if there's a meaningful selection (for disabling selection-dependent items)
+  const hasSelection = selectedText.trim().length > 0
+
   // Build context menu items from prompt registry
-  // Filter to only show prompts for markdown-preview context-menu area
+  // Filter to only show prompts for code-editor context-menu area
   const items: ContextMenuItem[] = [
-    ...getPromptsForArea('markdown-preview', 'context-menu').map((prompt) => ({
+    ...getPromptsForArea('code-editor', 'context-menu').map((prompt) => ({
       label: prompt.label,
       icon: renderIcon(prompt.icon),
-      action: () => handleAction(prompt.id)
+      action: () => handleAction(prompt.id),
+      disabled: !hasSelection // AI prompts require selection
     })),
     { separator: true } as ContextMenuItem,
     {
-      label: 'Copy selection',
+      label: 'Cut',
+      icon: <Scissors {...DEFAULT_ICON_PROPS} />,
+      action: handleCut,
+      disabled: !hasSelection // Cut requires selection
+    },
+    {
+      label: 'Copy',
       icon: <Copy {...DEFAULT_ICON_PROPS} />,
-      action: handleCopySelection
+      action: handleCopy,
+      disabled: !hasSelection // Copy requires selection
+    },
+    {
+      label: 'Paste',
+      icon: <ClipboardPaste {...DEFAULT_ICON_PROPS} />,
+      action: handlePaste
+      // Paste is always enabled
     }
   ]
 
