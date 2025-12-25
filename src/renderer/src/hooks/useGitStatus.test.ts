@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
-import { renderHook, act, waitFor, cleanup } from '@testing-library/react'
+import { renderHook, act, cleanup } from '@testing-library/react'
 import { GIT_STATUS } from '../components/ProjectTree/constants'
 import { useGitStatus } from './useGitStatus'
 import { useGitStore } from '../stores/useGitStore'
