@@ -21,7 +21,7 @@ import type { IFileWatcherService } from '../interfaces/IFileWatcherService'
 import type { IDirectoryWatcherService } from '../interfaces/IDirectoryWatcherService'
 import type { ISettingsService } from '../interfaces/ISettingsService'
 import type { IProjectSettingsService } from '../interfaces/IProjectSettingsService'
-import { projectLockService } from './ProjectLockService'
+import type { IProjectLockService } from '../interfaces/IProjectLockService'
 import { logger } from './LoggingService'
 
 export interface ProjectSwitchResult {
@@ -85,7 +85,8 @@ export class ProjectService {
     private fileWatcherService: IFileWatcherService,
     private directoryWatcherService: IDirectoryWatcherService,
     private settingsService: ISettingsService,
-    private projectSettingsService: IProjectSettingsService
+    private projectSettingsService: IProjectSettingsService,
+    private projectLockService: IProjectLockService
   ) {}
 
   /**
@@ -206,10 +207,10 @@ export class ProjectService {
     }
 
     // 3. Try to acquire project lock (multi-instance support)
-    const lockResult = await projectLockService.acquireLock(newProjectPath)
+    const lockResult = await this.projectLockService.acquireLock(newProjectPath)
     if (lockResult.status === 'already_locked') {
       // Focus existing window and exit silently
-      await projectLockService.requestFocus(newProjectPath)
+      await this.projectLockService.requestFocus(newProjectPath)
       logger.info('Project already locked, focused existing instance', {
         projectPath: newProjectPath,
         holderPid: lockResult.holderPid,
@@ -257,6 +258,17 @@ export class ProjectService {
         projectSettings = await this.projectSettingsService.loadSettings(newProjectPath)
       } catch (error) {
         // Settings validation failed - block project open
+        // Rollback services (including clearing settings)
+        this.rollbackServices(oldProjectPath)
+
+        // Release the lock we just acquired (fire-and-forget)
+        this.projectLockService.releaseLock(newProjectPath).catch((e) => {
+          logger.warn('Failed to release lock after settings validation failure', {
+            projectPath: newProjectPath,
+            error: e instanceof Error ? e.message : String(e)
+          })
+        })
+
         if (error instanceof AppError) {
           return {
             success: false,
@@ -288,7 +300,7 @@ export class ProjectService {
       // 11. Release old project lock AFTER successful switch
       // This ensures we don't lose lock on old project if switch fails
       if (oldProjectPath) {
-        projectLockService.releaseLock(oldProjectPath).catch((e) => {
+        this.projectLockService.releaseLock(oldProjectPath).catch((e) => {
           logger.warn('Failed to release old project lock', {
             projectPath: oldProjectPath,
             error: e instanceof Error ? e.message : String(e)
@@ -307,7 +319,7 @@ export class ProjectService {
       this.rollbackServices(oldProjectPath)
 
       // Release the lock we just acquired (fire-and-forget)
-      projectLockService.releaseLock(newProjectPath).catch((e) => {
+      this.projectLockService.releaseLock(newProjectPath).catch((e) => {
         logger.warn('Failed to release lock during rollback', {
           projectPath: newProjectPath,
           error: e instanceof Error ? e.message : String(e)

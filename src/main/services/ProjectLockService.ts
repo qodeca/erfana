@@ -23,11 +23,13 @@
  */
 
 import { createHash, randomUUID } from 'node:crypto'
-import { readFile, readdir, mkdir, lstat } from 'node:fs/promises'
-import { join, normalize, sep } from 'node:path'
+import { readFile, readdir, mkdir, lstat, open } from 'node:fs/promises'
+import { join, normalize, sep, isAbsolute } from 'node:path'
 import { realpath } from 'node:fs/promises'
 import { app } from 'electron'
 import { hostname } from 'node:os'
+
+import { AppError, ErrorCode } from '../../shared/errors'
 
 import { broadcastToAllWindows } from '../utils/ipcBroadcast'
 
@@ -51,8 +53,8 @@ const POLL_INTERVAL_MS = 500
 /** Stale lock timeout for cross-host detection (60 minutes) */
 const STALE_TIMEOUT_MS = 60 * 60 * 1000
 
-/** Clock skew buffer for cross-host timestamp comparison (5 minutes) */
-const CLOCK_SKEW_BUFFER_MS = 5 * 60 * 1000
+/** Clock skew buffer for cross-host timestamp comparison (15 minutes - robust for VMs and cloud) */
+const CLOCK_SKEW_BUFFER_MS = 15 * 60 * 1000
 
 /** Lock file extension */
 const LOCK_EXTENSION = '.lock'
@@ -110,17 +112,24 @@ export class ProjectLockService implements IProjectLockService {
    * Acquires a lock for the specified project path.
    * Creates lock file in ~/.erfana/locks/{hash}.lock
    *
+   * Uses atomic exclusive create (O_EXCL) to prevent TOCTOU race conditions.
+   *
    * @param projectPath - Absolute path to the project directory
    * @returns LockResult indicating success, already locked, or error
    */
   async acquireLock(projectPath: string): Promise<LockResult> {
+    const startTime = Date.now()
+
     if (this.isDisposing) {
       return { status: 'error', message: 'Service is disposing' }
     }
 
+    let hash: string
+    let lockPath: string
+
     try {
-      const hash = await this.computeLockHash(projectPath)
-      const lockPath = this.getLockPath(hash)
+      hash = await this.computeLockHash(projectPath)
+      lockPath = this.getLockPath(hash)
 
       // Check if we already hold this lock
       if (this.activeLocks.has(projectPath)) {
@@ -131,36 +140,7 @@ export class ProjectLockService implements IProjectLockService {
       // Ensure locks directory exists
       await mkdir(this.locksDir, { recursive: true, mode: 0o700 })
 
-      // Try to read existing lock
-      const existingLock = await this.readLockFile(lockPath)
-
-      if (existingLock) {
-        // Check if the lock is stale
-        const stale = await this.isLockStale(existingLock)
-
-        if (stale) {
-          logger.info('ProjectLockService: Removing stale lock', {
-            projectPath,
-            holderPid: existingLock.pid,
-            holderHostname: existingLock.hostname
-          })
-          await removeIfExists(lockPath)
-        } else {
-          // Lock is held by another active instance
-          logger.info('ProjectLockService: Project already locked', {
-            projectPath,
-            holderPid: existingLock.pid,
-            holderHostname: existingLock.hostname
-          })
-          return {
-            status: 'already_locked',
-            holderPid: existingLock.pid,
-            holderHostname: existingLock.hostname
-          }
-        }
-      }
-
-      // Create new lock
+      // Create new lock info
       const lockInfo: LockInfo = {
         instanceId: this.instanceId,
         pid: process.pid,
@@ -170,16 +150,76 @@ export class ProjectLockService implements IProjectLockService {
         focus_request: false
       }
 
-      await atomicWriteJSON(lockPath, lockInfo)
+      try {
+        // Attempt exclusive create (atomic, fails if exists)
+        const handle = await open(lockPath, 'wx', 0o600)
+        try {
+          await handle.writeFile(JSON.stringify(lockInfo, null, 2))
+        } finally {
+          await handle.close()
+        }
 
-      // Track the lock and start focus polling
-      this.activeLocks.set(projectPath, {
-        hash,
-        pollTimer: this.startFocusPolling(projectPath, hash)
-      })
+        // Success - we created the lock
+        const pollTimer = this.startFocusPolling(projectPath, hash)
+        this.activeLocks.set(projectPath, { hash, pollTimer })
 
-      logger.info('ProjectLockService: Lock acquired', { projectPath, lockPath })
-      return { status: 'acquired', lockPath }
+        const result: LockResult = { status: 'acquired', lockPath }
+        logger.info('ProjectLockService: Lock acquired', { projectPath, lockPath })
+        logger.debug('Lock operation completed', {
+          operation: 'acquire',
+          projectPath,
+          status: result.status,
+          latencyMs: Date.now() - startTime
+        })
+        return result
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+          // Lock exists - read and check if stale
+          const existingLock = await this.readLockFile(lockPath)
+
+          if (!existingLock) {
+            // Lock file is corrupt/invalid or disappeared - remove and retry
+            logger.info('ProjectLockService: Removing corrupt/invalid lock file', { projectPath })
+            await removeIfExists(lockPath)
+            return this.acquireLockRetry(projectPath, lockInfo, hash, lockPath, startTime)
+          }
+
+          // Check if the lock is stale
+          const stale = await this.isLockStale(existingLock)
+
+          if (stale) {
+            logger.info('ProjectLockService: Removing stale lock', {
+              projectPath,
+              holderPid: existingLock.pid,
+              holderHostname: existingLock.hostname
+            })
+            await removeIfExists(lockPath)
+
+            // Retry with exclusive create
+            return this.acquireLockRetry(projectPath, lockInfo, hash, lockPath, startTime)
+          }
+
+          // Lock is held by another active instance
+          logger.info('ProjectLockService: Project already locked', {
+            projectPath,
+            holderPid: existingLock.pid,
+            holderHostname: existingLock.hostname
+          })
+          const result: LockResult = {
+            status: 'already_locked',
+            holderPid: existingLock.pid,
+            holderHostname: existingLock.hostname
+          }
+          logger.debug('Lock operation completed', {
+            operation: 'acquire',
+            projectPath,
+            status: result.status,
+            latencyMs: Date.now() - startTime
+          })
+          return result
+        }
+        throw error
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       logger.error(
@@ -187,7 +227,67 @@ export class ProjectLockService implements IProjectLockService {
         error instanceof Error ? error : new Error(message),
         { projectPath }
       )
+      logger.debug('Lock operation completed', {
+        operation: 'acquire',
+        projectPath,
+        status: 'error',
+        latencyMs: Date.now() - startTime
+      })
       return { status: 'error', message }
+    }
+  }
+
+  /**
+   * Retry acquiring lock after stale lock removal.
+   * Helper for acquireLock to avoid code duplication.
+   */
+  private async acquireLockRetry(
+    projectPath: string,
+    lockInfo: LockInfo,
+    hash: string,
+    lockPath: string,
+    startTime: number
+  ): Promise<LockResult> {
+    try {
+      const handle = await open(lockPath, 'wx', 0o600)
+      try {
+        await handle.writeFile(JSON.stringify(lockInfo, null, 2))
+      } finally {
+        await handle.close()
+      }
+
+      const pollTimer = this.startFocusPolling(projectPath, hash)
+      this.activeLocks.set(projectPath, { hash, pollTimer })
+
+      const result: LockResult = { status: 'acquired', lockPath }
+      logger.info('ProjectLockService: Lock acquired after retry', { projectPath, lockPath })
+      logger.debug('Lock operation completed', {
+        operation: 'acquire',
+        projectPath,
+        status: result.status,
+        latencyMs: Date.now() - startTime
+      })
+      return result
+    } catch (retryError) {
+      if ((retryError as NodeJS.ErrnoException).code === 'EEXIST') {
+        // Another instance grabbed the lock - check who
+        const existingLock = await this.readLockFile(lockPath)
+        if (existingLock) {
+          const result: LockResult = {
+            status: 'already_locked',
+            holderPid: existingLock.pid,
+            holderHostname: existingLock.hostname
+          }
+          logger.debug('Lock operation completed', {
+            operation: 'acquire',
+            projectPath,
+            status: result.status,
+            latencyMs: Date.now() - startTime
+          })
+          return result
+        }
+      }
+      throw retryError
     }
   }
 
@@ -200,6 +300,7 @@ export class ProjectLockService implements IProjectLockService {
    * @param projectPath - Absolute path to the project directory
    */
   async releaseLock(projectPath: string): Promise<void> {
+    const startTime = Date.now()
     const activeLock = this.activeLocks.get(projectPath)
 
     if (!activeLock) {
@@ -231,6 +332,13 @@ export class ProjectLockService implements IProjectLockService {
 
     // Remove from tracking
     this.activeLocks.delete(projectPath)
+
+    logger.debug('Lock operation completed', {
+      operation: 'release',
+      projectPath,
+      status: 'success',
+      latencyMs: Date.now() - startTime
+    })
   }
 
   /**
@@ -240,6 +348,12 @@ export class ProjectLockService implements IProjectLockService {
    * @returns LockStatus indicating unlocked, locked_by_self, locked_by_other, or error
    */
   async checkLock(projectPath: string): Promise<LockStatus> {
+    const startTime = Date.now()
+
+    if (this.isDisposing) {
+      return { status: 'error', message: 'Service is disposing' }
+    }
+
     try {
       const hash = await this.computeLockHash(projectPath)
       const lockPath = this.getLockPath(hash)
@@ -247,26 +361,54 @@ export class ProjectLockService implements IProjectLockService {
       const lockInfo = await this.readLockFile(lockPath)
 
       if (!lockInfo) {
-        return { status: 'unlocked' }
+        const result: LockStatus = { status: 'unlocked' }
+        logger.debug('Lock operation completed', {
+          operation: 'check',
+          projectPath,
+          status: result.status,
+          latencyMs: Date.now() - startTime
+        })
+        return result
       }
 
       // Check if we hold this lock
       if (lockInfo.instanceId === this.instanceId) {
-        return { status: 'locked_by_self', lockPath }
+        const result: LockStatus = { status: 'locked_by_self', lockPath }
+        logger.debug('Lock operation completed', {
+          operation: 'check',
+          projectPath,
+          status: result.status,
+          latencyMs: Date.now() - startTime
+        })
+        return result
       }
 
       // Check if lock is stale
       const stale = await this.isLockStale(lockInfo)
 
       if (stale) {
-        return { status: 'unlocked' }
+        const result: LockStatus = { status: 'unlocked' }
+        logger.debug('Lock operation completed', {
+          operation: 'check',
+          projectPath,
+          status: result.status,
+          latencyMs: Date.now() - startTime
+        })
+        return result
       }
 
-      return {
+      const result: LockStatus = {
         status: 'locked_by_other',
         holderPid: lockInfo.pid,
         holderHostname: lockInfo.hostname
       }
+      logger.debug('Lock operation completed', {
+        operation: 'check',
+        projectPath,
+        status: result.status,
+        latencyMs: Date.now() - startTime
+      })
+      return result
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       logger.error(
@@ -274,6 +416,12 @@ export class ProjectLockService implements IProjectLockService {
         error instanceof Error ? error : new Error(message),
         { projectPath }
       )
+      logger.debug('Lock operation completed', {
+        operation: 'check',
+        projectPath,
+        status: 'error',
+        latencyMs: Date.now() - startTime
+      })
       return { status: 'error', message }
     }
   }
@@ -287,6 +435,10 @@ export class ProjectLockService implements IProjectLockService {
    * @returns Number of stale locks that were cleaned up
    */
   async cleanupStaleLocks(): Promise<number> {
+    if (this.isDisposing) {
+      return 0
+    }
+
     let cleanedCount = 0
 
     try {
@@ -363,6 +515,10 @@ export class ProjectLockService implements IProjectLockService {
    * @returns true if focus request was written, false otherwise
    */
   async requestFocus(projectPath: string): Promise<boolean> {
+    if (this.isDisposing) {
+      return false
+    }
+
     try {
       const hash = await this.computeLockHash(projectPath)
       const lockPath = this.getLockPath(hash)
@@ -424,8 +580,17 @@ export class ProjectLockService implements IProjectLockService {
    *
    * @param projectPath - Absolute path to the project directory
    * @returns Hex-encoded hash string (32 chars, truncated SHA-256)
+   * @throws AppError if path is invalid or not absolute
    */
   async computeLockHash(projectPath: string): Promise<string> {
+    // Validate input is non-empty absolute path
+    if (!projectPath || typeof projectPath !== 'string') {
+      throw new AppError('Invalid path for lock hash: path is required', ErrorCode.PATH_INVALID)
+    }
+    if (!isAbsolute(projectPath)) {
+      throw new AppError('Invalid path for lock hash: must be absolute path', ErrorCode.PATH_INVALID)
+    }
+
     let canonicalPath: string
 
     try {
@@ -458,15 +623,30 @@ export class ProjectLockService implements IProjectLockService {
   /**
    * Disposes of the service, releasing all locks and stopping polling.
    * Called on app shutdown.
+   *
+   * Stops all timers first (guaranteed cleanup), then attempts lock releases (best-effort).
    */
   async dispose(): Promise<void> {
     this.isDisposing = true
 
     logger.info('ProjectLockService: Disposing', { activeLocksCount: this.activeLocks.size })
 
-    // Release all locks
+    // Stop all timers first (guaranteed cleanup)
+    for (const lock of this.activeLocks.values()) {
+      if (lock.pollTimer) {
+        clearInterval(lock.pollTimer)
+        lock.pollTimer = null
+      }
+    }
+
+    // Then attempt lock releases (best-effort)
     const releasePromises = Array.from(this.activeLocks.keys()).map((projectPath) =>
-      this.releaseLock(projectPath)
+      this.releaseLock(projectPath).catch((e) => {
+        logger.warn('Disposal release failed', {
+          projectPath,
+          error: e instanceof Error ? e.message : String(e)
+        })
+      })
     )
 
     await Promise.all(releasePromises)
@@ -600,6 +780,9 @@ export class ProjectLockService implements IProjectLockService {
    * When a focus request is detected, focuses the main window and clears
    * the request.
    *
+   * Also validates lock ownership on each poll - stops polling if lock was
+   * deleted or stolen by another instance.
+   *
    * @param projectPath - The project path being locked
    * @param hash - The lock hash
    * @returns The interval timer (for cleanup)
@@ -607,7 +790,7 @@ export class ProjectLockService implements IProjectLockService {
   private startFocusPolling(projectPath: string, hash: string): NodeJS.Timeout {
     const lockPath = this.getLockPath(hash)
 
-    return setInterval(async () => {
+    const timer = setInterval(async () => {
       if (this.isDisposing) {
         return
       }
@@ -615,13 +798,35 @@ export class ProjectLockService implements IProjectLockService {
       try {
         const lockInfo = await this.readLockFile(lockPath)
 
-        if (lockInfo && lockInfo.focus_request) {
+        if (!lockInfo) {
+          // Lock was deleted - stop polling
+          logger.warn('Lock file deleted, stopping polling', { projectPath })
+          clearInterval(timer)
+          this.activeLocks.delete(projectPath)
+          return
+        }
+
+        if (lockInfo.instanceId !== this.instanceId) {
+          // Lock stolen by another instance - stop polling
+          logger.warn('Lock ownership lost', {
+            projectPath,
+            currentInstance: this.instanceId,
+            lockInstance: lockInfo.instanceId
+          })
+          clearInterval(timer)
+          this.activeLocks.delete(projectPath)
+          return
+        }
+
+        if (lockInfo.focus_request) {
           await this.handleFocusRequest(lockInfo, lockPath, projectPath)
         }
       } catch {
         // Ignore polling errors - lock file may be temporarily unavailable
       }
     }, POLL_INTERVAL_MS)
+
+    return timer
   }
 
   /**

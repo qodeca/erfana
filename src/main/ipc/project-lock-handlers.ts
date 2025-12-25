@@ -22,7 +22,7 @@ import {
   ReleaseLockPayloadSchema,
   CheckLockPayloadSchema
 } from '../../shared/ipc/project-lock-schema'
-import { validateProjectPath } from '../utils/pathSecurity'
+import { validatePath } from '../utils/pathSecurity'
 import { getUserFriendlyMessage } from '../../shared/errors'
 import { logger } from '../services/LoggingService'
 
@@ -52,9 +52,9 @@ export function registerProjectLockHandlers(): void {
 
     logger.trace('project-lock:acquire invoked', { projectPath })
 
-    // Validate path security (prevent path traversal and system directory access)
+    // Validate path security (prevent path traversal, system directory access, and symlink attacks)
     try {
-      await validateProjectPath(projectPath)
+      await validatePath(projectPath)
     } catch (error) {
       const userMessage = getUserFriendlyMessage(error)
       const logMessage = error instanceof Error ? error.message : String(error)
@@ -104,9 +104,9 @@ export function registerProjectLockHandlers(): void {
 
     logger.trace('project-lock:release invoked', { projectPath })
 
-    // Validate path security (defense-in-depth)
+    // Validate path security (defense-in-depth, includes symlink validation)
     try {
-      await validateProjectPath(projectPath)
+      await validatePath(projectPath)
     } catch (error) {
       const userMessage = getUserFriendlyMessage(error)
       logger.warn('project-lock:release rejected - invalid path', { projectPath })
@@ -151,9 +151,9 @@ export function registerProjectLockHandlers(): void {
 
     logger.trace('project-lock:check invoked', { projectPath })
 
-    // Validate path security (defense-in-depth)
+    // Validate path security (defense-in-depth, includes symlink validation)
     try {
-      await validateProjectPath(projectPath)
+      await validatePath(projectPath)
     } catch (error) {
       const userMessage = getUserFriendlyMessage(error)
       logger.warn('project-lock:check rejected - invalid path', { projectPath })
@@ -201,9 +201,9 @@ export function registerProjectLockHandlers(): void {
 
     logger.trace('project-lock:requestFocus invoked', { projectPath })
 
-    // Validate path security (defense-in-depth)
+    // Validate path security (defense-in-depth, includes symlink validation)
     try {
-      await validateProjectPath(projectPath)
+      await validatePath(projectPath)
     } catch (error) {
       const userMessage = getUserFriendlyMessage(error)
       logger.warn('project-lock:requestFocus rejected - invalid path', { projectPath })

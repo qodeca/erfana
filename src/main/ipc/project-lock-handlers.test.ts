@@ -41,7 +41,7 @@ vi.mock('../services/ProjectLockService', () => ({
 
 // Mock path security
 vi.mock('../utils/pathSecurity', () => ({
-  validateProjectPath: vi.fn()
+  validatePath: vi.fn()
 }))
 
 // Mock error utilities
@@ -66,7 +66,7 @@ vi.mock('../services/LoggingService', () => ({
 // Import after mocking
 import { ipcMain } from 'electron'
 import { projectLockService } from '../services/ProjectLockService'
-import { validateProjectPath } from '../utils/pathSecurity'
+import { validatePath } from '../utils/pathSecurity'
 import { getUserFriendlyMessage } from '../../shared/errors'
 
 const mockedAcquireLock = vi.mocked(projectLockService.acquireLock)
@@ -74,7 +74,7 @@ const mockedReleaseLock = vi.mocked(projectLockService.releaseLock)
 const mockedCheckLock = vi.mocked(projectLockService.checkLock)
 const mockedRequestFocus = vi.mocked(projectLockService.requestFocus)
 const mockedCleanupStaleLocks = vi.mocked(projectLockService.cleanupStaleLocks)
-const mockedValidateProjectPath = vi.mocked(validateProjectPath)
+const mockedValidatePath = vi.mocked(validatePath)
 
 // Helper to invoke IPC handler
 async function invokeHandler(channel: string, payload?: unknown): Promise<any> {
@@ -91,7 +91,7 @@ describe('project-lock-handlers', () => {
     mockHandlers.clear()
 
     // Default: path validation succeeds
-    mockedValidateProjectPath.mockResolvedValue(undefined)
+    mockedValidatePath.mockResolvedValue(undefined)
 
     // Register handlers
     registerProjectLockHandlers()
@@ -167,7 +167,7 @@ describe('project-lock-handlers', () => {
 
       await invokeHandler('project-lock:acquire', payload)
 
-      expect(mockedValidateProjectPath).toHaveBeenCalledWith('/Users/test/projects/my-project')
+      expect(mockedValidatePath).toHaveBeenCalledWith('/Users/test/projects/my-project')
     })
 
     it('rejects invalid paths (path traversal)', async () => {
@@ -175,7 +175,7 @@ describe('project-lock-handlers', () => {
         projectPath: '/Users/test/../../../etc/passwd'
       }
 
-      mockedValidateProjectPath.mockRejectedValue(new Error('Invalid path'))
+      mockedValidatePath.mockRejectedValue(new Error('Invalid path'))
 
       const result = await invokeHandler('project-lock:acquire', payload)
 
@@ -189,7 +189,7 @@ describe('project-lock-handlers', () => {
         projectPath: '/System/Library'
       }
 
-      mockedValidateProjectPath.mockRejectedValue(new Error('System directory access denied'))
+      mockedValidatePath.mockRejectedValue(new Error('System directory access denied'))
 
       const result = await invokeHandler('project-lock:acquire', payload)
 

@@ -34,7 +34,8 @@ const projectService = new ProjectService(
   fileWatcherService,
   directoryWatcherService,
   settingsService,
-  projectSettingsService
+  projectSettingsService,
+  projectLockService
 )
 
 /**
