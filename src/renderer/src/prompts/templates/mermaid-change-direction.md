@@ -19,16 +19,17 @@ Target direction: {{targetDirection}} ({{directionLabel}})
 </input>
 
 <task>
-Update the diagram direction to {{targetDirection}}.
+Edit the source file to change the Mermaid diagram direction to {{targetDirection}}.
 </task>
 
-<constraints>
-- Return only the complete diagram with new direction
-- No explanations
-</constraints>
+<instructions>
+1. Use the Edit tool to modify the file at the provided file reference
+2. Replace only the direction keyword (TD, TB, LR, RL, BT) with {{targetDirection}}
+3. Keep all other diagram content unchanged
+</instructions>
 
-<output_format>
-```mermaid
-... diagram with {{targetDirection}} direction ...
-```
-</output_format>
+<constraints>
+- Edit the file directly using the Edit tool
+- Change only the direction keyword, preserve all other content
+- No explanations or commentary
+</constraints>
