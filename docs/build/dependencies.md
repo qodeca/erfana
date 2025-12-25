@@ -51,7 +51,7 @@ files:
    - Only used during `npm test`
 
 2. **Test coverage unaffected**:
-   - All 3469 tests still pass in development
+   - All tests still pass in development
    - Tests run before build, not during build
 
 3. **App functionality unaffected**:

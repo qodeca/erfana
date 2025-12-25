@@ -2,6 +2,36 @@
 
 Historical changelog entries for versions prior to current. For the latest changes, see [CLAUDE.md](../CLAUDE.md).
 
+## Changes in v0.6.4-beta
+- **Real-time Git Status Refresh** (Dec 25, 2025):
+  - Multi-path git state watching (.git/index, HEAD, refs/heads, FETCH_HEAD, stash)
+  - Hybrid polling fallback for network/cloud drives
+  - Event coalescing (150ms window) to prevent refresh storms
+  - Latency reduced from ~2s to ~750ms
+  - Auto-recovery with exponential backoff
+  - User-configurable polling in Settings overlay
+  - 151 new tests
+  - Closes #74
+- **Unified In-File Search** (Dec 22, 2025):
+  - Cmd/Ctrl+F search in editor and preview panes
+  - Case sensitivity and whole word toggles
+  - Match highlighting with CSS Highlight API
+  - 163 new tests
+  - Closes #71
+- **Auto-Open Terminal** (Dec 22, 2025):
+  - Terminal panel auto-opens when project loads
+  - Remembers user close preference until next project
+  - 41 new tests
+  - Closes #55
+- **Preserve Line Breaks Option** (Dec 21, 2025):
+  - New setting to render single newlines as `<br>` tags
+  - Closes #69
+- **Quit Confirmation** (Dec 21, 2025):
+  - Prompts before quitting with unsaved changes or active terminals
+  - 54 new tests
+  - Closes #64
+- **Total: 5014 tests passing** (161 test files)
+
 ## Changes in v0.6.3
 - **Logging Improvements** (Dec 21, 2025):
   - Separate log files: `main.log`, `renderer.log`, `combined.log`

@@ -1,40 +1,21 @@
 # Documentation Archive
 
-This directory contains historical or future specification documents that are not part of active development.
+This directory contains historical specification documents that are not part of active development.
 
 ## Contents
 
-### graph-engine-spec-2025/
-**Archived**: December 2025
-**Status**: Draft specification (October 2025)
-**Reason**: Speculative future feature marked as "NOT READY FOR DEVELOPMENT"
-
-Complete specification for a local-first knowledge graph system with hybrid search capabilities (BM25 + vector similarity). Includes:
-- Architecture and data model
-- Embedding pipeline and vector search
-- MCP server integration
-- Production readiness checklist
-- Implementation guide (M1-M5 milestones)
-
-**Total**: ~7,330 lines of detailed technical specifications
-
-**Why Archived**:
-- Marked as work-in-progress with no development timeline
-- Consumed 33% of documentation tokens without immediate value
-- Full specifications preserved in git history
-- Can be restored if/when feature development begins
+Currently empty. Archived documents are preserved in git history.
 
 ## Restoring Archived Documentation
 
-To restore archived documentation to active docs:
+To restore archived documentation, use git to retrieve from history:
 ```bash
-# Example: Restore graph-engine specs
-mv docs/archive/graph-engine-spec-2025 docs/future/graph-engine
+git log --all -- docs/archive/
+git checkout <commit-hash> -- docs/archive/<folder>
 ```
 
-## Git History
+## Previously Archived
 
-All archived documents remain in git history. Use `git log` to view changes:
-```bash
-git log --all -- docs/archive/graph-engine-spec-2025/
-```
+### graph-engine-spec-2025 (Removed Dec 2025)
+- **Reason**: Duplicate of `docs/future/graph-engine/`
+- **Status**: Content preserved in `docs/future/graph-engine/`

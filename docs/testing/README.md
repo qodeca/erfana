@@ -141,13 +141,13 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
   - Open/Closed: Base component configurable via props, closed for modification
   - Dependency Inversion: Validation abstracted from UI components
 
-- **Total Tests**: 4923 tests passing (160 test files)
+- **Total Tests**: 5014 tests passing (161 test files)
 - Tests validate SOLID refactoring of file system dialogs with comprehensive validation logic
 - See [Architecture - Dialog System](../architecture.md#dialog-system) for implementation details
 
 **ProjectTree Refactoring** (`src/renderer/src/hooks/*.logic.ts`, `src/renderer/src/components/ProjectTree/`) **v0.3.7**
 - **320 comprehensive tests** covering ProjectTree modularization using "Extract Pure Logic" pattern
-- **Total Repository Tests**: 4923 tests passing (160 test files)
+- **Total Repository Tests**: 5014 tests passing (161 test files)
 - **Test Organization**:
 
   *Phase 1-2: P0 Critical Tests (147 tests)*:

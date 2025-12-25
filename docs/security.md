@@ -402,7 +402,7 @@ If a security vulnerability is discovered:
 1. **Assess severity**: Critical, High, Medium, Low
 2. **Scope impact**: Which versions affected?
 3. **Develop patch**: Fix in `main` branch
-4. **Test thoroughly**: All 3469 tests must pass
+4. **Test thoroughly**: All tests must pass (run `npm run test`)
 5. **Release emergency patch**: Use semantic versioning (PATCH bump for security)
 6. **Notify users**: GitHub Security Advisory + release notes
 
