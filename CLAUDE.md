@@ -174,7 +174,7 @@ Implemented comprehensive git status monitoring with multi-path file watching an
 - `src/preload/index.ts` - Added gitWatcher and gitPolling APIs
 - `src/main/services/watcher/WatcherMetrics.ts` - Added polling stats
 
-**Testing:** 151 new tests added (total: 4923 tests, 160 files)
+**Testing:** 151 new tests added (total: 5014 tests, 161 files)
 
 Closes #74
 
@@ -509,7 +509,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 4923 tests passing (160 test files)
+- **Current**: 5014 tests passing (161 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)
