@@ -78,7 +78,8 @@ vi.mock('fs', () => ({
 
 // Mock os.homedir
 vi.mock('os', () => ({
-  homedir: vi.fn(() => '/mock-home')
+  homedir: vi.fn(() => '/mock-home'),
+  tmpdir: vi.fn(() => '/mock-tmp')
 }))
 
 // Mock GlobalSettingsService
@@ -165,13 +166,13 @@ describe('LoggingService', () => {
       await service.initialize()
 
       const combinedPathFn = mockCombinedLogger.transports.file.resolvePathFn
-      expect(combinedPathFn()).toBe('/mock-home/.erfana/logs/combined.log')
+      expect(combinedPathFn()).toBe('/mock-tmp/erfana-test-logs/combined.log')
 
       const mainPathFn = mockMainLogger.transports.file.resolvePathFn
-      expect(mainPathFn()).toBe('/mock-home/.erfana/logs/main.log')
+      expect(mainPathFn()).toBe('/mock-tmp/erfana-test-logs/main.log')
 
       const rendererPathFn = mockRendererLogger.transports.file.resolvePathFn
-      expect(rendererPathFn()).toBe('/mock-home/.erfana/logs/renderer.log')
+      expect(rendererPathFn()).toBe('/mock-tmp/erfana-test-logs/renderer.log')
     })
 
     it('sets archiveLogFn for all loggers', async () => {
@@ -821,13 +822,13 @@ describe('LoggingService', () => {
       // Setup: simulate having main.1.log, main.2.log, main.3.log already
       mockExistsSync.mockImplementation((path: string) => {
         // main.100.log doesn't exist (for deletion check)
-        if (path === '/mock-home/.erfana/logs/main.100.log') return false
+        if (path === '/mock-tmp/erfana-test-logs/main.100.log') return false
         // main.1.log, main.2.log, main.3.log exist
-        if (path === '/mock-home/.erfana/logs/main.1.log') return true
-        if (path === '/mock-home/.erfana/logs/main.2.log') return true
-        if (path === '/mock-home/.erfana/logs/main.3.log') return true
+        if (path === '/mock-tmp/erfana-test-logs/main.1.log') return true
+        if (path === '/mock-tmp/erfana-test-logs/main.2.log') return true
+        if (path === '/mock-tmp/erfana-test-logs/main.3.log') return true
         // main.log exists
-        if (path === '/mock-home/.erfana/logs/main.log') return true
+        if (path === '/mock-tmp/erfana-test-logs/main.log') return true
         // All other numbered files don't exist
         return false
       })
@@ -835,45 +836,45 @@ describe('LoggingService', () => {
       const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
 
       // Create a mock LogFile object
-      const mockLogFile = { path: '/mock-home/.erfana/logs/main.log' }
+      const mockLogFile = { path: '/mock-tmp/erfana-test-logs/main.log' }
 
       // Call archive function
       archiveLogFn(mockLogFile)
 
       // Should shift files down: 3->4, 2->3, 1->2
       expect(mockRenameSync).toHaveBeenCalledWith(
-        '/mock-home/.erfana/logs/main.3.log',
-        '/mock-home/.erfana/logs/main.4.log'
+        '/mock-tmp/erfana-test-logs/main.3.log',
+        '/mock-tmp/erfana-test-logs/main.4.log'
       )
       expect(mockRenameSync).toHaveBeenCalledWith(
-        '/mock-home/.erfana/logs/main.2.log',
-        '/mock-home/.erfana/logs/main.3.log'
+        '/mock-tmp/erfana-test-logs/main.2.log',
+        '/mock-tmp/erfana-test-logs/main.3.log'
       )
       expect(mockRenameSync).toHaveBeenCalledWith(
-        '/mock-home/.erfana/logs/main.1.log',
-        '/mock-home/.erfana/logs/main.2.log'
+        '/mock-tmp/erfana-test-logs/main.1.log',
+        '/mock-tmp/erfana-test-logs/main.2.log'
       )
 
       // Should move current log to .1
       expect(mockRenameSync).toHaveBeenCalledWith(
-        '/mock-home/.erfana/logs/main.log',
-        '/mock-home/.erfana/logs/main.1.log'
+        '/mock-tmp/erfana-test-logs/main.log',
+        '/mock-tmp/erfana-test-logs/main.1.log'
       )
     })
 
     it('deletes oldest file when at max rotation', async () => {
       // Setup: simulate having main.100.log (oldest)
       mockExistsSync.mockImplementation((path: string) => {
-        return path === '/mock-home/.erfana/logs/main.100.log' || path === '/mock-home/.erfana/logs/main.log'
+        return path === '/mock-tmp/erfana-test-logs/main.100.log' || path === '/mock-tmp/erfana-test-logs/main.log'
       })
 
       const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
-      const mockLogFile = { path: '/mock-home/.erfana/logs/main.log' }
+      const mockLogFile = { path: '/mock-tmp/erfana-test-logs/main.log' }
 
       archiveLogFn(mockLogFile)
 
       // Should delete the oldest file
-      expect(mockUnlinkSync).toHaveBeenCalledWith('/mock-home/.erfana/logs/main.100.log')
+      expect(mockUnlinkSync).toHaveBeenCalledWith('/mock-tmp/erfana-test-logs/main.100.log')
     })
 
     it('handles rotation when no previous rotated files exist', async () => {
@@ -896,7 +897,7 @@ describe('LoggingService', () => {
       })
 
       const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
-      const mockLogFile = { path: '/mock-home/.erfana/logs/main.log' }
+      const mockLogFile = { path: '/mock-tmp/erfana-test-logs/main.log' }
 
       archiveLogFn(mockLogFile)
 
@@ -907,25 +908,25 @@ describe('LoggingService', () => {
 
       // Verify the successful call
       expect(mockRenameSync).toHaveBeenCalledWith(
-        '/mock-home/.erfana/logs/main.log',
-        '/mock-home/.erfana/logs/main.1.log'
+        '/mock-tmp/erfana-test-logs/main.log',
+        '/mock-tmp/erfana-test-logs/main.1.log'
       )
     })
 
     it('works with different log file names', async () => {
       mockExistsSync.mockImplementation((path: string) => {
-        return path === '/mock-home/.erfana/logs/renderer.log'
+        return path === '/mock-tmp/erfana-test-logs/renderer.log'
       })
 
       const archiveLogFn = mockRendererLogger.transports.file.archiveLogFn
-      const mockLogFile = { path: '/mock-home/.erfana/logs/renderer.log' }
+      const mockLogFile = { path: '/mock-tmp/erfana-test-logs/renderer.log' }
 
       archiveLogFn(mockLogFile)
 
       // Should move renderer.log to renderer.1.log
       expect(mockRenameSync).toHaveBeenCalledWith(
-        '/mock-home/.erfana/logs/renderer.log',
-        '/mock-home/.erfana/logs/renderer.1.log'
+        '/mock-tmp/erfana-test-logs/renderer.log',
+        '/mock-tmp/erfana-test-logs/renderer.1.log'
       )
     })
   })
@@ -993,7 +994,7 @@ describe('LoggingService', () => {
       await service.cleanupOldLogs()
 
       // Should delete old file
-      expect(mockUnlink).toHaveBeenCalledWith('/mock-home/.erfana/logs/old.log')
+      expect(mockUnlink).toHaveBeenCalledWith('/mock-tmp/erfana-test-logs/old.log')
     })
 
     it('continues cleanup when statfs fails', async () => {
@@ -1010,7 +1011,7 @@ describe('LoggingService', () => {
       await service.cleanupOldLogs()
 
       // Should still delete old file (ignore statfs error)
-      expect(mockUnlink).toHaveBeenCalledWith('/mock-home/.erfana/logs/old.log')
+      expect(mockUnlink).toHaveBeenCalledWith('/mock-tmp/erfana-test-logs/old.log')
     })
 
     it('deletes log files older than 7 days', async () => {
@@ -1025,7 +1026,7 @@ describe('LoggingService', () => {
 
       await service.cleanupOldLogs()
 
-      expect(mockUnlink).toHaveBeenCalledWith('/mock-home/.erfana/logs/old.log')
+      expect(mockUnlink).toHaveBeenCalledWith('/mock-tmp/erfana-test-logs/old.log')
       expect(mockUnlink).toHaveBeenCalledTimes(1)
     })
 
@@ -1057,12 +1058,12 @@ describe('LoggingService', () => {
       await service.cleanupOldLogs()
 
       // Should check all log files including numbered ones
-      expect(mockStat).toHaveBeenCalledWith('/mock-home/.erfana/logs/combined.log')
-      expect(mockStat).toHaveBeenCalledWith('/mock-home/.erfana/logs/combined.1.log')
-      expect(mockStat).toHaveBeenCalledWith('/mock-home/.erfana/logs/main.log')
-      expect(mockStat).toHaveBeenCalledWith('/mock-home/.erfana/logs/main.2.log')
-      expect(mockStat).toHaveBeenCalledWith('/mock-home/.erfana/logs/renderer.log')
-      expect(mockStat).toHaveBeenCalledWith('/mock-home/.erfana/logs/renderer.99.log')
+      expect(mockStat).toHaveBeenCalledWith('/mock-tmp/erfana-test-logs/combined.log')
+      expect(mockStat).toHaveBeenCalledWith('/mock-tmp/erfana-test-logs/combined.1.log')
+      expect(mockStat).toHaveBeenCalledWith('/mock-tmp/erfana-test-logs/main.log')
+      expect(mockStat).toHaveBeenCalledWith('/mock-tmp/erfana-test-logs/main.2.log')
+      expect(mockStat).toHaveBeenCalledWith('/mock-tmp/erfana-test-logs/renderer.log')
+      expect(mockStat).toHaveBeenCalledWith('/mock-tmp/erfana-test-logs/renderer.99.log')
     })
 
     it('ignores non-log files', async () => {
@@ -1073,12 +1074,12 @@ describe('LoggingService', () => {
       await service.cleanupOldLogs()
 
       // Should only check log files
-      expect(mockStat).toHaveBeenCalledWith('/mock-home/.erfana/logs/combined.log')
-      expect(mockStat).toHaveBeenCalledWith('/mock-home/.erfana/logs/main.1.log')
+      expect(mockStat).toHaveBeenCalledWith('/mock-tmp/erfana-test-logs/combined.log')
+      expect(mockStat).toHaveBeenCalledWith('/mock-tmp/erfana-test-logs/main.1.log')
 
       // Should NOT check non-log files
-      expect(mockStat).not.toHaveBeenCalledWith('/mock-home/.erfana/logs/readme.txt')
-      expect(mockStat).not.toHaveBeenCalledWith('/mock-home/.erfana/logs/data.json')
+      expect(mockStat).not.toHaveBeenCalledWith('/mock-tmp/erfana-test-logs/readme.txt')
+      expect(mockStat).not.toHaveBeenCalledWith('/mock-tmp/erfana-test-logs/data.json')
     })
 
     it('logs deleted files at debug level', async () => {
@@ -1116,7 +1117,7 @@ describe('LoggingService', () => {
       expect(mockMainLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining('Failed to cleanup log file')
       )
-      expect(mockUnlink).toHaveBeenCalledWith('/mock-home/.erfana/logs/success.log')
+      expect(mockUnlink).toHaveBeenCalledWith('/mock-tmp/erfana-test-logs/success.log')
     })
 
     it('handles readdir errors gracefully', async () => {
@@ -1181,7 +1182,7 @@ describe('LoggingService', () => {
       })
 
       const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
-      const mockLogFile = { path: '/mock-home/.erfana/logs/main.log' }
+      const mockLogFile = { path: '/mock-tmp/erfana-test-logs/main.log' }
 
       // Should not throw despite ENOENT errors
       expect(() => archiveLogFn(mockLogFile)).not.toThrow()
@@ -1196,7 +1197,7 @@ describe('LoggingService', () => {
       })
 
       const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
-      const mockLogFile = { path: '/mock-home/.erfana/logs/main.log' }
+      const mockLogFile = { path: '/mock-tmp/erfana-test-logs/main.log' }
 
       archiveLogFn(mockLogFile)
 
@@ -1218,7 +1219,7 @@ describe('LoggingService', () => {
       })
 
       const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
-      const mockLogFile = { path: '/mock-home/.erfana/logs/main.log' }
+      const mockLogFile = { path: '/mock-tmp/erfana-test-logs/main.log' }
 
       expect(() => archiveLogFn(mockLogFile)).not.toThrow()
     })
@@ -1231,7 +1232,7 @@ describe('LoggingService', () => {
       })
 
       const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
-      const mockLogFile = { path: '/mock-home/.erfana/logs/main.log' }
+      const mockLogFile = { path: '/mock-tmp/erfana-test-logs/main.log' }
 
       expect(() => archiveLogFn(mockLogFile)).not.toThrow()
     })
@@ -1244,7 +1245,7 @@ describe('LoggingService', () => {
       })
 
       const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
-      const mockLogFile = { path: '/mock-home/.erfana/logs/main.log' }
+      const mockLogFile = { path: '/mock-tmp/erfana-test-logs/main.log' }
 
       archiveLogFn(mockLogFile)
 
@@ -1260,7 +1261,7 @@ describe('LoggingService', () => {
       })
 
       const archiveLogFn = mockMainLogger.transports.file.archiveLogFn
-      const mockLogFile = { path: '/mock-home/.erfana/logs/main.log' }
+      const mockLogFile = { path: '/mock-tmp/erfana-test-logs/main.log' }
 
       expect(() => archiveLogFn(mockLogFile)).not.toThrow()
 

@@ -21,7 +21,7 @@
  */
 import log from 'electron-log'
 import type Logger from 'electron-log'
-import { homedir } from 'os'
+import { homedir, tmpdir } from 'os'
 import { readdir, stat, unlink, statfs } from 'fs/promises'
 import { join, dirname, basename, extname } from 'path'
 import { unlinkSync, renameSync, lstatSync } from 'fs'
@@ -401,8 +401,12 @@ export class LoggingService {
 
   /**
    * Get logs directory path
+   * Uses temp directory during tests to avoid polluting production logs
    */
   private getLogsDir(): string {
+    if (process.env.VITEST) {
+      return join(tmpdir(), 'erfana-test-logs')
+    }
     return join(homedir(), LOGS_DIR)
   }
 

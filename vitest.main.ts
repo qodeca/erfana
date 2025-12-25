@@ -8,6 +8,7 @@ export default defineConfig({
     include: ['src/main/**/*.test.{ts,tsx}', 'src/shared/**/*.test.{ts,tsx}'],
     exclude: ['node_modules', 'dist', 'out', 'e2e', 'tests/fixtures'],
     globals: true,
+    setupFiles: ['tests/setup/setupTests.main.ts'],
     reporters: 'default',
   },
   coverage: {
