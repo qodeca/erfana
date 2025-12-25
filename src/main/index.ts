@@ -15,6 +15,7 @@ import { registerDocxHandlers } from './ipc/docx-handlers'
 import { registerGlobalSettingsHandlers } from './ipc/global-settings-handlers'
 import { registerLoggingHandlers } from './ipc/logging-handlers'
 import { registerQuitHandlers } from './ipc/quit-handlers'
+import { registerProjectLockHandlers } from './ipc/project-lock-handlers'
 import { createApplicationMenu } from './menu'
 import { fileService } from './services/FileService'
 import { fileWatcherService } from './services/FileWatcherService'
@@ -25,6 +26,7 @@ import { globalSettingsService } from './services/GlobalSettingsService'
 import { loggingService, logger } from './services/LoggingService'
 import { gitWatcherService } from './services/GitWatcherService'
 import { gitPollingService } from './services/GitPollingService'
+import { projectLockService } from './services/ProjectLockService'
 import { installSafeConsole } from './utils/safeConsole'
 
 // Install safe console logging to prevent EPIPE crashes
@@ -178,6 +180,7 @@ app.whenReady().then(async () => {
   registerDocxHandlers()
   registerGlobalSettingsHandlers()
   registerLoggingHandlers()
+  registerProjectLockHandlers()
 
   // RELIABILITY FIX (todo012): Clean up stale projects on startup
   // This runs asynchronously but doesn't block window creation
@@ -188,6 +191,11 @@ app.whenReady().then(async () => {
   // Cleanup old logs (fire-and-forget, 7-day retention)
   loggingService.cleanupOldLogs().catch((error) => {
     logger.error('Failed to cleanup old logs', error instanceof Error ? error : undefined)
+  })
+
+  // Fire-and-forget stale lock cleanup - doesn't block startup
+  projectLockService.cleanupStaleLocks().catch((error) => {
+    logger.error('Failed to cleanup stale locks', error instanceof Error ? error : undefined)
   })
 
   // Create main window
@@ -222,7 +230,9 @@ app.on('window-all-closed', () => {
   app.quit()
 })
 
-// Cleanup file watchers, directory watchers, terminals, and git watchers before app quits
+// Cleanup file watchers, directory watchers, terminals, git watchers, and project locks before app quits
+// NOTE: Electron's before-quit doesn't await async handlers, so cleanup is best-effort.
+// Lock files may remain stale on forced quit - they will be cleaned up on next startup.
 app.on('before-quit', async () => {
   logger.info('App quitting, cleaning up services')
   await fileWatcherService.dispose()
@@ -230,6 +240,7 @@ app.on('before-quit', async () => {
   await terminalService.dispose()
   await gitWatcherService.dispose()
   gitPollingService.dispose()
+  await projectLockService.dispose()
 })
 
 // In this file you can include the rest of your app's specific main process

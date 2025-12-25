@@ -33,6 +33,18 @@ vi.mock('../services/FileService', () => ({ fileService: { setProjectPath: setFi
 const getLastProjectPath = vi.fn(async () => '/fake/project')
 vi.mock('../services/SettingsService', () => ({ settingsService: { getLastProjectPath } }))
 
+// Mock ProjectLockService to avoid app.getPath dependency
+vi.mock('../services/ProjectLockService', () => ({
+  projectLockService: {
+    acquireLock: vi.fn(async () => ({ status: 'acquired' })),
+    releaseLock: vi.fn(async () => {}),
+    checkLock: vi.fn(async () => ({ status: 'unlocked' })),
+    requestFocus: vi.fn(async () => true),
+    cleanupStaleLocks: vi.fn(async () => 0),
+    dispose: vi.fn(async () => {})
+  }
+}))
+
 describe('file:getLastProjectPath sets watcher projectPath', () => {
   beforeEach(async () => {
     // Fresh import and register handlers with mocks

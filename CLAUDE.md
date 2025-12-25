@@ -61,7 +61,7 @@ See `docs/` for details (keep Claude's context focused):
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (5049 tests, 162 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (5214 tests, 162 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.6.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
@@ -147,6 +147,39 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 - [ ] Focus states are visible (accessibility)
 
 ## Recent Changes (v0.6.x)
+
+### Multi-Instance Support with Project Locking (Dec 25, 2025)
+Added support for multiple independent Erfana instances with file-based project locking:
+
+**Features**:
+- Multiple independent Erfana instances can run simultaneously
+- File-based project locking prevents duplicate project opens
+- Duplicate project attempts focus existing window (VS Code behavior)
+- Stale lock detection: PID check + 60-min timeout
+- 500ms focus polling for cross-instance coordination
+- Graceful degradation if lock acquisition fails
+
+**Files Created**:
+- `src/shared/ipc/project-lock-schema.ts` - Zod schemas for lock types
+- `src/main/interfaces/IProjectLockService.ts` - Service interface
+- `src/main/services/ProjectLockService.ts` - Core lock service
+- `src/main/ipc/project-lock-handlers.ts` - IPC handlers
+- `src/main/utils/atomicWrite.ts` - Crash-safe atomic file writes
+- `src/main/utils/focusWindow.ts` - Platform-adaptive window focusing
+
+**Files Modified**:
+- `src/main/index.ts` - Service lifecycle integration
+- `src/main/services/ProjectService.ts` - Lock acquisition in switchProject
+- `src/main/ipc/file-handlers.ts` - Lock release on close
+- `src/preload/index.ts` - projectLock API exposure
+
+**Lock Files Location**: `~/.erfana/locks/{sha256-hash}.lock`
+
+**BRS**: `specs/business-reqs/brs010-multi-instance/`
+
+**Testing**: 165 new tests added (total: 5214 tests)
+
+Closes #27
 
 ### Editor Context Menu with AI Prompts (Dec 25, 2025)
 Added context menu to Monaco editor with AI prompt actions, mirroring preview panel UX:
@@ -538,7 +571,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 5049 tests passing (162 test files)
+- **Current**: 5214 tests passing (162 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)

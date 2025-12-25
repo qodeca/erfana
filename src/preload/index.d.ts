@@ -6,6 +6,7 @@ import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-sche
 import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-schema'
 import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global-settings-schema'
 import type { LogEntry } from '../shared/ipc/logging-schema'
+import type { LockResult, LockStatus } from '../shared/ipc/project-lock-schema'
 
 declare global {
   interface Window {
@@ -184,6 +185,27 @@ declare global {
       quit: {
         onQuitRequested: (callback: (data: { reason?: string }) => void) => () => void
         sendQuitResponse: (proceed: boolean) => void
+      }
+      /**
+       * Project lock operations for multi-instance support
+       * @see Issue #27 - Multiple independent instances
+       * @see BRS-010 - Multi-instance support specification
+       */
+      projectLock: {
+        /** Acquire lock for a project path */
+        acquire: (projectPath: string) => Promise<LockResult>
+        /** Release lock for a project path */
+        release: (projectPath: string) => Promise<{ success: boolean; error?: string }>
+        /** Check lock status for a project path */
+        check: (projectPath: string) => Promise<LockStatus>
+        /** Request focus from the instance that holds the lock */
+        requestFocus: (projectPath: string) => Promise<{ success: boolean; error?: string }>
+        /** Cleanup stale locks at application startup */
+        cleanup: () => Promise<{ success: boolean; removedCount?: number; error?: string }>
+        /** Listen for focus requests from other instances */
+        onFocused: (
+          callback: (event: { projectPath: string; requesterPid: number }) => void
+        ) => () => void
       }
     }
   }

@@ -6,6 +6,7 @@ import { fileWatcherService } from '../services/FileWatcherService'
 import { directoryWatcherService } from '../services/DirectoryWatcherService'
 import { settingsService } from '../services/SettingsService'
 import { projectSettingsService } from '../services/ProjectSettingsService'
+import { projectLockService } from '../services/ProjectLockService'
 import type { ProjectChanged } from '../../shared/ipc/schema'
 import { logger } from '../services/LoggingService'
 
@@ -177,6 +178,9 @@ export function registerFileHandlers(): void {
     const oldProjectPath = fileService.getProjectPath()
 
     if (!oldProjectPath) return true
+
+    // Release project lock
+    await projectLockService.releaseLock(oldProjectPath)
 
     // Stop all watchers
     await fileWatcherService.stopAll()

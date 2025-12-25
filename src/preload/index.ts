@@ -6,6 +6,7 @@ import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-s
 import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global-settings-schema'
 import type { LogEntry } from '../shared/ipc/logging-schema'
 import type { GitStateChangeEvent, GitWatcherStatus, GitPollTriggeredEvent } from '../shared/ipc/git-watcher-schema'
+import type { LockResult, LockStatus } from '../shared/ipc/project-lock-schema'
 import { electronAPI } from '@electron-toolkit/preload'
 
 export interface FileNode {
@@ -489,6 +490,86 @@ const api = {
      */
     sendQuitResponse: (proceed: boolean): void => {
       ipcRenderer.send('quit:confirmResponse', { proceed })
+    }
+  },
+
+  /**
+   * Project lock operations for multi-instance support
+   *
+   * Prevents duplicate project opens across Erfana instances.
+   * Uses file-based locking with focus request support.
+   *
+   * @see Issue #27 - Multiple independent instances
+   * @see BRS-010 - Multi-instance support specification
+   */
+  projectLock: {
+    /**
+     * Acquire lock for a project path
+     *
+     * @param projectPath - Absolute path to the project directory
+     * @returns LockResult - 'acquired', 'already_locked', or 'error'
+     */
+    acquire: (projectPath: string): Promise<LockResult> =>
+      ipcRenderer.invoke('project-lock:acquire', { projectPath }),
+
+    /**
+     * Release lock for a project path
+     *
+     * @param projectPath - Absolute path to the project directory
+     * @returns { success: boolean, error?: string }
+     */
+    release: (projectPath: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('project-lock:release', { projectPath }),
+
+    /**
+     * Check lock status for a project path
+     *
+     * @param projectPath - Absolute path to the project directory
+     * @returns LockStatus - 'unlocked', 'locked_by_self', 'locked_by_other', or 'error'
+     */
+    check: (projectPath: string): Promise<LockStatus> =>
+      ipcRenderer.invoke('project-lock:check', { projectPath }),
+
+    /**
+     * Request focus from the instance that holds the lock
+     *
+     * Used when user attempts to open a project that's already open
+     * in another Erfana instance.
+     *
+     * @param projectPath - Absolute path to the project directory
+     * @returns { success: boolean, error?: string }
+     */
+    requestFocus: (projectPath: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('project-lock:requestFocus', { projectPath }),
+
+    /**
+     * Cleanup stale locks at application startup
+     *
+     * Removes locks from dead processes or timed-out network locks.
+     *
+     * @returns { success: boolean, removedCount?: number, error?: string }
+     */
+    cleanup: (): Promise<{ success: boolean; removedCount?: number; error?: string }> =>
+      ipcRenderer.invoke('project-lock:cleanup'),
+
+    /**
+     * Listen for focus requests from other instances
+     *
+     * When another instance tries to open a project locked by this instance,
+     * it can request focus. This callback is triggered when focus is requested.
+     *
+     * @param callback - Called when focus is requested
+     * @returns Cleanup function to remove listener
+     */
+    onFocused: (
+      callback: (event: { projectPath: string; requesterPid: number }) => void
+    ): (() => void) => {
+      const handler = (
+        _event: IpcRendererEvent,
+        data: { projectPath: string; requesterPid: number }
+      ): void => callback(data)
+      ipcRenderer.on('project-lock:focused', handler)
+      return () => ipcRenderer.removeListener('project-lock:focused', handler)
     }
   }
 }

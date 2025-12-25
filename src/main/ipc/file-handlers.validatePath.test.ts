@@ -77,6 +77,18 @@ vi.mock('fs/promises', () => ({
   stat: mockStat
 }))
 
+// Mock ProjectLockService to avoid app.getPath dependency
+vi.mock('../services/ProjectLockService', () => ({
+  projectLockService: {
+    acquireLock: vi.fn(async () => ({ status: 'acquired' })),
+    releaseLock: vi.fn(async () => {}),
+    checkLock: vi.fn(async () => ({ status: 'unlocked' })),
+    requestFocus: vi.fn(async () => true),
+    cleanupStaleLocks: vi.fn(async () => 0),
+    dispose: vi.fn(async () => {})
+  }
+}))
+
 // Import after mocks
 import { registerFileHandlers } from './file-handlers'
 

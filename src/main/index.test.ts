@@ -192,6 +192,45 @@ describe('Main Process - Window Creation', () => {
       registerQuitHandlers: vi.fn()
     }))
 
+    // Mock project lock handlers
+    vi.doMock('./ipc/project-lock-handlers', () => ({
+      registerProjectLockHandlers: vi.fn()
+    }))
+
+    // Mock ProjectLockService
+    vi.doMock('./services/ProjectLockService', () => ({
+      projectLockService: {
+        acquireLock: vi.fn(() => Promise.resolve({ status: 'acquired' })),
+        releaseLock: vi.fn(() => Promise.resolve()),
+        checkLock: vi.fn(() => Promise.resolve({ status: 'unlocked' })),
+        requestFocus: vi.fn(() => Promise.resolve(true)),
+        cleanupStaleLocks: vi.fn(() => Promise.resolve(0)),
+        dispose: vi.fn(() => Promise.resolve())
+      }
+    }))
+
+    // Mock GitWatcherService
+    vi.doMock('./services/GitWatcherService', () => ({
+      gitWatcherService: {
+        dispose: vi.fn(() => Promise.resolve()),
+        getLastEventTimestamp: vi.fn(() => 0),
+        isWatching: vi.fn(() => false)
+      }
+    }))
+
+    // Mock GitPollingService
+    vi.doMock('./services/GitPollingService', () => ({
+      gitPollingService: {
+        dispose: vi.fn(),
+        setWatcherCoordination: vi.fn()
+      }
+    }))
+
+    // Mock git-watcher-handlers
+    vi.doMock('./ipc/git-watcher-handlers', () => ({
+      registerGitWatcherHandlers: vi.fn()
+    }))
+
     // Mock safe console
     vi.doMock('./utils/safeConsole', () => ({
       installSafeConsole: vi.fn()

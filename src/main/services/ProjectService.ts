@@ -21,6 +21,7 @@ import type { IFileWatcherService } from '../interfaces/IFileWatcherService'
 import type { IDirectoryWatcherService } from '../interfaces/IDirectoryWatcherService'
 import type { ISettingsService } from '../interfaces/ISettingsService'
 import type { IProjectSettingsService } from '../interfaces/IProjectSettingsService'
+import { projectLockService } from './ProjectLockService'
 import { logger } from './LoggingService'
 
 export interface ProjectSwitchResult {
@@ -160,12 +161,16 @@ export class ProjectService {
    * Orchestrates the entire project switching flow:
    * 1. Security validation
    * 2. Check if same project (no-op)
-   * 3. Validate directory exists
-   * 4. Stop watchers
-   * 5. Update services
-   * 6. Persist settings
-   * 7. Broadcast change
-   * 8. Rollback on error
+   * 3. Acquire project lock (multi-instance support)
+   * 4. Validate directory exists
+   * 5. Stop watchers
+   * 6. Load and validate project settings
+   * 7. Update services
+   * 8. Apply project settings
+   * 9. Persist settings
+   * 10. Broadcast change
+   * 11. Release old project lock (after successful switch)
+   * 12. Rollback on error (keeps old lock, releases new lock)
    *
    * @throws Error if validation fails or operation fails
    */
@@ -200,8 +205,33 @@ export class ProjectService {
       }
     }
 
+    // 3. Try to acquire project lock (multi-instance support)
+    const lockResult = await projectLockService.acquireLock(newProjectPath)
+    if (lockResult.status === 'already_locked') {
+      // Focus existing window and exit silently
+      await projectLockService.requestFocus(newProjectPath)
+      logger.info('Project already locked, focused existing instance', {
+        projectPath: newProjectPath,
+        holderPid: lockResult.holderPid,
+        holderHostname: lockResult.holderHostname
+      })
+      return {
+        success: false,
+        path: oldProjectPath || '',
+        action: 'noop',
+        error: 'focused_existing'
+      }
+    }
+    if (lockResult.status === 'error') {
+      // Log warning but allow project to open (graceful degradation)
+      logger.warn('Lock acquisition failed, continuing with project open', {
+        projectPath: newProjectPath,
+        error: lockResult.message
+      })
+    }
+
     try {
-      // 3. Validate directory exists and is accessible
+      // 4. Validate directory exists and is accessible
       const stats = await stat(newProjectPath).catch((error) => {
         const originalError = error instanceof Error ? error : undefined
         throw new AppError(
@@ -218,10 +248,10 @@ export class ProjectService {
         )
       }
 
-      // 4. Stop all existing watchers before switching
+      // 5. Stop all existing watchers before switching
       await this.stopAllWatchers()
 
-      // 4.5. Load and validate project settings
+      // 6. Load and validate project settings
       let projectSettings
       try {
         projectSettings = await this.projectSettingsService.loadSettings(newProjectPath)
@@ -238,22 +268,33 @@ export class ProjectService {
         throw error
       }
 
-      // 5. Update project path across services
+      // 7. Update project path across services
       this.updateServices(newProjectPath)
 
-      // 5.5. Apply project settings to services
+      // 8. Apply project settings to services
       this.fileService.setHiddenPatterns(projectSettings.treeHiddenPatterns)
       this.directoryWatcherService.setIgnorePatterns(projectSettings.watcherIgnorePatterns)
 
-      // 6. Persist project change
+      // 9. Persist project change
       await this.persistProjectChange(newProjectPath)
 
-      // 7. Broadcast change to renderers
+      // 10. Broadcast change to renderers
       const payload: ProjectChanged = {
         oldPath: oldProjectPath,
         newPath: newProjectPath
       }
       broadcastProjectChanged(payload)
+
+      // 11. Release old project lock AFTER successful switch
+      // This ensures we don't lose lock on old project if switch fails
+      if (oldProjectPath) {
+        projectLockService.releaseLock(oldProjectPath).catch((e) => {
+          logger.warn('Failed to release old project lock', {
+            projectPath: oldProjectPath,
+            error: e instanceof Error ? e.message : String(e)
+          })
+        })
+      }
 
       return {
         success: true,
@@ -261,8 +302,17 @@ export class ProjectService {
         action: 'switched'
       }
     } catch (error) {
-      // 8. Rollback on error
+      // 12. Rollback on error (including releasing new lock if acquired)
+      // Note: Old project lock is NOT released here - we keep it if switch fails
       this.rollbackServices(oldProjectPath)
+
+      // Release the lock we just acquired (fire-and-forget)
+      projectLockService.releaseLock(newProjectPath).catch((e) => {
+        logger.warn('Failed to release lock during rollback', {
+          projectPath: newProjectPath,
+          error: e instanceof Error ? e.message : String(e)
+        })
+      })
 
       const message = error instanceof Error ? error.message : String(error)
       logger.error('Open project failed', error instanceof Error ? error : undefined, {

@@ -55,6 +55,18 @@ vi.mock('../services/DirectoryWatcherService', () => ({ directoryWatcherService:
 vi.mock('../services/FileService', () => ({ fileService: { getProjectPath: () => '/old/path', setProjectPath: setFileSvcPath } }))
 vi.mock('../services/SettingsService', () => ({ settingsService: { setLastProjectPath: vi.fn(async () => {}) } }))
 
+// Mock ProjectLockService to avoid app.getPath dependency
+vi.mock('../services/ProjectLockService', () => ({
+  projectLockService: {
+    acquireLock: vi.fn(async () => ({ status: 'acquired' })),
+    releaseLock: vi.fn(async () => {}),
+    checkLock: vi.fn(async () => ({ status: 'unlocked' })),
+    requestFocus: vi.fn(async () => true),
+    cleanupStaleLocks: vi.fn(async () => 0),
+    dispose: vi.fn(async () => {})
+  }
+}))
+
 describe('file:openProject error hardening', () => {
   beforeEach(async () => {
     sends.length = 0
