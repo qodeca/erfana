@@ -1,4 +1,5 @@
 import { Menu, app, MenuItemConstructorOptions } from 'electron'
+import { spawnNewInstance } from './utils/spawnNewInstance'
 
 /**
  * Creates the application menu with Edit roles for native clipboard support.
@@ -33,6 +34,25 @@ export function createApplicationMenu(): Menu {
           }
         ]
       : []),
+    // File menu
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'New Window',
+          accelerator: 'CmdOrCtrl+Shift+N',
+          click: (): void => {
+            spawnNewInstance()
+          }
+        },
+        ...(!isMac
+          ? [
+              { type: 'separator' as const },
+              { role: 'quit' as const }
+            ]
+          : [])
+      ]
+    },
     // Edit menu (CRITICAL for clipboard in standard HTML elements)
     {
       label: 'Edit',

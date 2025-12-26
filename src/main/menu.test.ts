@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+// Mock spawnNewInstance before importing menu
+vi.mock('./utils/spawnNewInstance', () => ({
+  spawnNewInstance: vi.fn()
+}))
+
 /**
  * Application Menu Tests
  *
@@ -121,8 +126,8 @@ describe('Application Menu Creation', () => {
         const menu = await importMenuWithPlatform('win32')
         const template = getTemplate(menu)
 
-        // First menu should be Edit, not app menu
-        expect(template[0].label).toBe('Edit')
+        // First menu should be File, not app menu
+        expect(template[0].label).toBe('File')
       })
 
       it('should have Window menu with close role on Windows', async () => {
@@ -141,8 +146,8 @@ describe('Application Menu Creation', () => {
         const menu = await importMenuWithPlatform('linux')
         const template = getTemplate(menu)
 
-        // First menu should be Edit, not app menu
-        expect(template[0].label).toBe('Edit')
+        // First menu should be File, not app menu
+        expect(template[0].label).toBe('File')
       })
 
       it('should have Window menu with close role on Linux', async () => {
@@ -186,18 +191,18 @@ describe('Application Menu Creation', () => {
       expect(windowMenu).toBeDefined()
     })
 
-    it('should have 4 menus on macOS (app, edit, view, window)', async () => {
+    it('should have 5 menus on macOS (app, file, edit, view, window)', async () => {
       const menu = await importMenuWithPlatform('darwin')
       const template = getTemplate(menu)
 
-      expect(template.length).toBe(4)
+      expect(template.length).toBe(5)
     })
 
-    it('should have 3 menus on Windows/Linux (edit, view, window)', async () => {
+    it('should have 4 menus on Windows/Linux (file, edit, view, window)', async () => {
       const menu = await importMenuWithPlatform('win32')
       const template = getTemplate(menu)
 
-      expect(template.length).toBe(3)
+      expect(template.length).toBe(4)
     })
   })
 

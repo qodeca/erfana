@@ -159,9 +159,10 @@ export class LoggingService {
       this.currentLevel = validateLogLevel(settings.logging.level)
 
       // Configure all three loggers
-      this.configureLogger(this.combinedLogger, join(logsDir, COMBINED_LOG))
-      this.configureLogger(this.mainLogger, join(logsDir, MAIN_LOG))
-      this.configureLogger(this.rendererLogger, join(logsDir, RENDERER_LOG))
+      // Only combinedLogger gets console output to avoid duplicate log lines
+      this.configureLogger(this.combinedLogger, join(logsDir, COMBINED_LOG), true)
+      this.configureLogger(this.mainLogger, join(logsDir, MAIN_LOG), false)
+      this.configureLogger(this.rendererLogger, join(logsDir, RENDERER_LOG), false)
 
       // Subscribe to settings changes with recursion guard
       this.unsubscribeSettings = globalSettingsService.onSettingsChanged((event) => {
@@ -194,8 +195,11 @@ export class LoggingService {
 
   /**
    * Configure a logger instance
+   * @param logger - The electron-log logger instance to configure
+   * @param filePath - Path to the log file
+   * @param enableConsole - Whether to enable console transport for this logger
    */
-  private configureLogger(logger: Logger.MainLogger, filePath: string): void {
+  private configureLogger(logger: Logger.MainLogger, filePath: string, enableConsole: boolean = false): void {
     // Configure file transport
     logger.transports.file.resolvePathFn = () => filePath
     logger.transports.file.maxSize = MAX_SIZE
@@ -203,9 +207,10 @@ export class LoggingService {
     logger.transports.file.level = mapToElectronLogLevel(this.currentLevel)
     logger.transports.file.archiveLogFn = archiveLog
 
-    // Disable console transport in production (we have our own safe-console)
-    // Keep it enabled in development for immediate feedback
-    if (!process.env.ELECTRON_RENDERER_URL) {
+    // Disable console transport unless explicitly enabled for this logger
+    // Only combinedLogger should have console enabled in dev mode to avoid duplicates
+    // (since each log call writes to both combinedLogger and mainLogger/rendererLogger)
+    if (!enableConsole || !process.env.ELECTRON_RENDERER_URL) {
       logger.transports.console.level = false
     }
   }

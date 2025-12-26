@@ -48,6 +48,11 @@ async function openProjectByPath(newProjectPath: string): Promise<string> {
   const result = await projectService.switchProject(newProjectPath)
 
   if (!result.success) {
+    // focused_existing is a success case - existing window was focused
+    // Don't throw an error, just return the path silently
+    if (result.error === 'focused_existing') {
+      return result.path
+    }
     throw new Error(result.error || 'Unknown error')
   }
 

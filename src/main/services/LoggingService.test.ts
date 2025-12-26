@@ -223,7 +223,7 @@ describe('LoggingService', () => {
       }
     })
 
-    it('keeps console transport in development for all loggers', async () => {
+    it('keeps console transport only for combinedLogger in development', async () => {
       const originalEnv = process.env.ELECTRON_RENDERER_URL
       process.env.ELECTRON_RENDERER_URL = 'http://localhost:3000'
 
@@ -233,9 +233,11 @@ describe('LoggingService', () => {
 
       await service.initialize()
 
+      // Only combinedLogger should have console enabled to avoid duplicate log lines
+      // (since each log call writes to both combinedLogger and mainLogger/rendererLogger)
       expect(mockCombinedLogger.transports.console.level).not.toBe(false)
-      expect(mockMainLogger.transports.console.level).not.toBe(false)
-      expect(mockRendererLogger.transports.console.level).not.toBe(false)
+      expect(mockMainLogger.transports.console.level).toBe(false)
+      expect(mockRendererLogger.transports.console.level).toBe(false)
 
       // Restore
       if (originalEnv !== undefined) {

@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, Menu } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { spawnNewInstance } from './utils/spawnNewInstance'
 import { registerFileHandlers } from './ipc/file-handlers'
 import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
@@ -32,6 +33,13 @@ import { installSafeConsole } from './utils/safeConsole'
 // Install safe console logging to prevent EPIPE crashes
 // Must be called before any other code that uses console.log
 installSafeConsole()
+
+// Strip --new-window flag to prevent infinite spawn loops
+// Must happen before any window creation
+const newWindowArgIndex = process.argv.indexOf('--new-window')
+if (newWindowArgIndex !== -1) {
+  process.argv.splice(newWindowArgIndex, 1)
+}
 
 // Quit confirmation state
 let isQuitting = false
@@ -215,6 +223,39 @@ app.whenReady().then(async () => {
       isQuitting = false // Reset flag to allow retry
     }
   })
+
+  // macOS dock menu with "New Window" option
+  if (process.platform === 'darwin') {
+    const dockMenu = Menu.buildFromTemplate([
+      {
+        label: 'New Window',
+        click: (): void => {
+          spawnNewInstance()
+        }
+      }
+    ])
+    app.dock?.setMenu(dockMenu)
+  }
+
+  // Windows taskbar jump list with "New Window" task
+  if (process.platform === 'win32') {
+    app.setJumpList([
+      {
+        type: 'tasks',
+        items: [
+          {
+            type: 'task',
+            title: 'New Window',
+            description: 'Open a new Erfana window',
+            program: process.execPath,
+            args: '--new-window',
+            iconPath: process.execPath,
+            iconIndex: 0
+          }
+        ]
+      }
+    ])
+  }
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
