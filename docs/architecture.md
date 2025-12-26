@@ -77,6 +77,8 @@ src/
 │   │   ├── GitStatusService.ts  # Git status with operation queue
 │   │   ├── GitWatcherService.ts # Git state file watching (v0.6.3)
 │   │   ├── GitPollingService.ts # Hybrid polling fallback (v0.6.3)
+│   │   ├── ProjectLockService.ts # Multi-instance project locking (v0.6.5)
+│   │   ├── ProjectService.ts    # Project switching orchestration
 │   │   ├── PdfService.ts        # PDF export
 │   │   ├── DocxService.ts       # DOCX export
 │   │   └── TerminalService.ts   # PTY management with node-pty
@@ -86,6 +88,7 @@ src/
 │       ├── directory-watcher-handlers.ts  # Directory watching IPC
 │       ├── logging-handlers.ts  # Logging IPC
 │       ├── git-watcher-handlers.ts # Git watching IPC (v0.6.3)
+│       ├── project-lock-handlers.ts # Project lock IPC (v0.6.5)
 │       └── terminal-handlers.ts # Terminal emulator IPC
 ├── preload/
 │   ├── index.ts              # contextBridge setup

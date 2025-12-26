@@ -133,6 +133,11 @@ if (!writeResult.success) {
 | `settings:setProjectFilterMode` | settings-handlers | Set project filter mode (all/markdown) |
 | `settings:getDirectoryWatchDepth` | settings-handlers | Get directory watcher depth (number or undefined) |
 | `settings:setDirectoryWatchDepth` | settings-handlers | Set directory watcher depth (number or null) |
+| `project-lock:acquire` | project-lock-handlers | Acquire lock for project path |
+| `project-lock:release` | project-lock-handlers | Release lock for project path |
+| `project-lock:check` | project-lock-handlers | Check lock status for project path |
+| `project-lock:requestFocus` | project-lock-handlers | Request focus from lock holder |
+| `project-lock:cleanup` | project-lock-handlers | Cleanup stale locks |
 
 ## Event-Based IPC Pattern
 

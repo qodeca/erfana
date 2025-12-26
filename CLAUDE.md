@@ -28,7 +28,7 @@ npm run test:cov     # Coverage (v8) per project
 ```
 src/
 ├── main/           # Electron main process
-│   ├── services/   # FileService, TerminalService, SettingsService, ProjectSettingsService, GlobalSettingsService, LoggingService, import/
+│   ├── services/   # FileService, TerminalService, SettingsService, ProjectSettingsService, GlobalSettingsService, LoggingService, ProjectLockService, import/
 │   └── ipc/        # IPC handlers
 ├── preload/        # Context bridge API
 ├── shared/         # Shared code (errors.ts, constants.ts, ipc schemas)
@@ -49,6 +49,7 @@ src/
 7. **DOCX Export** - Export markdown to Word format with Mermaid diagrams as high-resolution PNG images
 8. **Settings Overlay** - Full-screen settings UI accessed via gear icon in activity bar, with focus trapping and keyboard navigation (Escape to close)
 9. **Quit Confirmation** - Prompts before quitting with unsaved changes or active terminal sessions
+10. **Multi-Instance** - Multiple independent instances with file-based project locking, duplicate opens focus existing window
 
 ## Documentation
 See `docs/` for details (keep Claude's context focused):
@@ -81,7 +82,7 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 | BRS-007 | Temporal queries & timeline | T3 | draft | `specs/business-reqs/brs007-temporal-queries/` |
 | BRS-008 | Graph engine polish & maintenance | T3 | draft | `specs/business-reqs/brs008-graph-polish/` |
 | BRS-009 | Media import with transcription | T4 | draft | `specs/business-reqs/brs009-media-import-transcription/` |
-| BRS-010 | Multiple independent instances | T4 | draft | `specs/business-reqs/brs010-multi-instance/` |
+| BRS-010 | Multiple independent instances | T4 | active | `specs/business-reqs/brs010-multi-instance/` |
 
 **Registry**: `specs/business-reqs/registry.json`
 

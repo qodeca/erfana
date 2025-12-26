@@ -525,6 +525,65 @@ Git status tracking with isomorphic-git.
 
 ---
 
+## ProjectLockService
+
+**File:** `src/main/services/ProjectLockService.ts` (~885 lines)
+
+File-based project locking for multi-instance support.
+
+### Key Features
+- Multiple independent Erfana instances can run simultaneously
+- File-based locks in `~/.erfana/locks/` (SHA-256 hashed filenames)
+- Atomic lock creation with O_EXCL flag (prevents race conditions)
+- Hybrid stale detection: PID check (same host) + 60-min timeout (cross-host)
+- Focus request polling for cross-instance window coordination
+- Graceful degradation when lock acquisition fails
+
+### Public Methods
+
+#### `acquireLock(projectPath: string): Promise<LockResult>`
+Attempt to acquire lock for a project.
+
+**Returns:** `{ status: 'acquired' | 'already_locked' | 'error', holderPid?, holderHostname?, message? }`
+
+---
+
+#### `releaseLock(projectPath: string): Promise<void>`
+Release lock for a project.
+
+---
+
+#### `checkLock(projectPath: string): Promise<LockStatus>`
+Check lock status without acquiring.
+
+**Returns:** `{ status: 'unlocked' | 'locked_by_self' | 'locked_by_other' | 'error' }`
+
+---
+
+#### `requestFocus(projectPath: string): Promise<boolean>`
+Request focus from the lock holder (triggers window focus via polling).
+
+---
+
+#### `cleanupStaleLocks(): Promise<number>`
+Cleanup stale locks from dead processes or timed-out network locks.
+
+---
+
+### Lock File Format
+```json
+{
+  "projectPath": "/path/to/project",
+  "pid": 12345,
+  "hostname": "machine-name",
+  "instanceId": "uuid",
+  "createdAt": "2025-12-26T00:00:00.000Z",
+  "focusRequestedAt": null
+}
+```
+
+---
+
 ## See Also
 
 - [Architecture](./architecture.md) - Service class overview
