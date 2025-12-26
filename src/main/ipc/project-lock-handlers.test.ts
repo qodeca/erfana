@@ -67,7 +67,7 @@ vi.mock('../services/LoggingService', () => ({
 import { ipcMain } from 'electron'
 import { projectLockService } from '../services/ProjectLockService'
 import { validatePath } from '../utils/pathSecurity'
-import { getUserFriendlyMessage } from '../../shared/errors'
+// getUserFriendlyMessage is mocked via vi.mock
 
 const mockedAcquireLock = vi.mocked(projectLockService.acquireLock)
 const mockedReleaseLock = vi.mocked(projectLockService.releaseLock)

@@ -132,26 +132,31 @@ describe('LockInfoSchema', () => {
   })
 
   it('rejects missing instanceId', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { instanceId, ...lockWithoutInstanceId } = validLock
     expect(() => LockInfoSchema.parse(lockWithoutInstanceId)).toThrow()
   })
 
   it('rejects missing pid', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { pid, ...lockWithoutPid } = validLock
     expect(() => LockInfoSchema.parse(lockWithoutPid)).toThrow()
   })
 
   it('rejects missing timestamp', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { timestamp, ...lockWithoutTimestamp } = validLock
     expect(() => LockInfoSchema.parse(lockWithoutTimestamp)).toThrow()
   })
 
   it('rejects missing hostname', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { hostname, ...lockWithoutHostname } = validLock
     expect(() => LockInfoSchema.parse(lockWithoutHostname)).toThrow()
   })
 
   it('rejects missing path', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { path, ...lockWithoutPath } = validLock
     expect(() => LockInfoSchema.parse(lockWithoutPath)).toThrow()
   })
