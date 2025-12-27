@@ -6,11 +6,23 @@ import { PROMPT_REGISTRY, getPromptsForArea } from '../../prompts/registry'
 import { formatLineRange } from '../../prompts/helpers'
 import { renderIcon, DEFAULT_ICON_PROPS } from '../../utils/iconRegistry'
 import { TEXT_INPUT_LIMITS } from '../../../../shared/constants'
+import { TEST_IDS } from '../../constants/testids'
 import type { PromptVariables, PromptConfig } from '../../prompts/types'
 import type { PromptDialogResult } from '../Dialog/PromptDialog'
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { scheduleScrollIfNeeded } from '../../utils/promptScrollScheduler.logic'
 import { logger } from '../../utils/logger'
+
+/**
+ * Maps prompt IDs to their corresponding test IDs.
+ * Used for automated UI testing to identify context menu items.
+ */
+const PROMPT_TEST_ID_MAP: Record<string, string> = {
+  elaborate: TEST_IDS.CONTEXT_MENU_ITEM_ELABORATE,
+  modify: TEST_IDS.CONTEXT_MENU_ITEM_MODIFY,
+  ask: TEST_IDS.CONTEXT_MENU_ITEM_ASK,
+  visualize: TEST_IDS.CONTEXT_MENU_ITEM_VISUALIZE
+}
 
 interface PreviewContextMenuProps {
   x: number
@@ -212,15 +224,25 @@ export function PreviewContextMenu({
     ...getPromptsForArea('markdown-preview', 'context-menu').map((prompt) => ({
       label: prompt.label,
       icon: renderIcon(prompt.icon),
-      action: () => handleAction(prompt.id)
+      action: () => handleAction(prompt.id),
+      testId: PROMPT_TEST_ID_MAP[prompt.id]
     })),
     { separator: true } as ContextMenuItem,
     {
       label: 'Copy selection',
       icon: <Copy {...DEFAULT_ICON_PROPS} />,
-      action: handleCopySelection
+      action: handleCopySelection,
+      testId: TEST_IDS.CONTEXT_MENU_ITEM_COPY
     }
   ]
 
-  return <ContextMenu x={x} y={y} items={items} onClose={onClose} />
+  return (
+    <ContextMenu
+      x={x}
+      y={y}
+      items={items}
+      onClose={onClose}
+      containerTestId={TEST_IDS.CONTEXT_MENU_PREVIEW}
+    />
+  )
 }

@@ -41,6 +41,7 @@ import { TextareaContextMenu } from '../../ContextMenu/TextareaContextMenu'
 import { CharacterCount } from '../../shared'
 import { scheduleScrollIfNeeded } from '../../../utils/promptScrollScheduler.logic'
 import { logger } from '../../../utils/logger'
+import { TEST_IDS } from '../../../constants/testids'
 import './ChatBubble.css'
 
 interface Transform {
@@ -436,7 +437,7 @@ export function ChatBubble({
   if (!filePath) return null
 
   return (
-    <div className="chat-bubble-container">
+    <div className="chat-bubble-container" data-testid={TEST_IDS.CHAT_BUBBLE}>
       {/* Collapsed state: FAB button */}
       {!isExpanded && (
         <button
@@ -445,6 +446,7 @@ export function ChatBubble({
           title="Edit diagram"
           aria-label="Open panel to modify diagram"
           aria-expanded={false}
+          data-testid={TEST_IDS.CHAT_BUBBLE_BTN_OPEN}
         >
           <Pencil size={20} />
         </button>
@@ -459,6 +461,7 @@ export function ChatBubble({
           aria-modal="false"
           aria-label="Chat about diagram"
           style={{ height: chatPanelHeight }}
+          data-testid={TEST_IDS.CHAT_PANEL}
         >
           {/* Header - controls + resize handle (issue #37) */}
           <div
@@ -475,10 +478,11 @@ export function ChatBubble({
                 disabled={zoomOutDisabled}
                 title="Zoom out (-)"
                 aria-label="Zoom out"
+                data-testid={TEST_IDS.CHAT_BTN_ZOOM_OUT}
               >
                 <ZoomOut size={14} />
               </button>
-              <span className="chat-zoom-indicator" aria-live="polite">
+              <span className="chat-zoom-indicator" aria-live="polite" data-testid={TEST_IDS.CHAT_ZOOM_INDICATOR}>
                 {formatZoomLevel(transform.scale)}
               </span>
               <button
@@ -487,6 +491,7 @@ export function ChatBubble({
                 disabled={zoomInDisabled}
                 title="Zoom in (+)"
                 aria-label="Zoom in"
+                data-testid={TEST_IDS.CHAT_BTN_ZOOM_IN}
               >
                 <ZoomIn size={14} />
               </button>
@@ -495,6 +500,7 @@ export function ChatBubble({
                 onClick={onFitToView}
                 title="Fit to screen (F)"
                 aria-label="Fit to screen"
+                data-testid={TEST_IDS.CHAT_BTN_FIT}
               >
                 <Maximize size={14} />
               </button>
@@ -503,6 +509,7 @@ export function ChatBubble({
                 onClick={onReset}
                 title="Reset view (0)"
                 aria-label="Reset view"
+                data-testid={TEST_IDS.CHAT_BTN_RESET}
               >
                 <RotateCcw size={14} />
               </button>
@@ -523,6 +530,7 @@ export function ChatBubble({
                       title={getDirectionTooltip(direction)}
                       aria-label={`Change layout to ${getDirectionTooltip(direction)}`}
                       aria-pressed={active}
+                      data-testid={`${TEST_IDS.CHAT_DIRECTION_BTN}-${direction}`}
                     >
                       {direction}
                     </button>
@@ -539,6 +547,7 @@ export function ChatBubble({
                 disabled={!portalContext?.isTerminalReady}
                 title="Scroll to Bottom"
                 aria-label="Scroll terminal to bottom"
+                data-testid={TEST_IDS.CHAT_BTN_SCROLL_BOTTOM}
               >
                 <ArrowDownToLine size={14} />
               </button>
@@ -548,6 +557,7 @@ export function ChatBubble({
                 disabled={!portalContext?.isTerminalReady}
                 title="Restart Terminal"
                 aria-label="Restart terminal"
+                data-testid={TEST_IDS.CHAT_BTN_RESTART}
               >
                 <RotateCw size={14} />
               </button>
@@ -558,6 +568,7 @@ export function ChatBubble({
                 title={scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom'}
                 aria-label={scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom'}
                 aria-pressed={scrollLocked}
+                data-testid={TEST_IDS.CHAT_BTN_SCROLL_LOCK}
               >
                 {scrollLocked ? (
                   <LockKeyhole size={14} />
@@ -595,6 +606,7 @@ export function ChatBubble({
                 rows={3}
                 maxLength={CHAT_LIMITS.MAX_LENGTH}
                 aria-label="Your instruction for modifying the diagram"
+                data-testid={TEST_IDS.CHAT_TEXTAREA}
               />
 
               <div className="chat-panel-footer">
@@ -628,6 +640,7 @@ export function ChatBubble({
                   <CharacterCount
                     charCount={validation.charCount}
                     validationState={validation.state}
+                    data-testid={TEST_IDS.CHAT_CHARACTER_COUNT}
                   />
                   {validation.message && validation.state !== 'too-short' && (
                     <span className={`chat-validation-message chat-validation-${validation.state}`}>
@@ -643,6 +656,7 @@ export function ChatBubble({
                     disabled={!validation.canSubmit}
                     title="Send (Cmd/Ctrl+Enter)"
                     aria-label="Send message"
+                    data-testid={TEST_IDS.CHAT_BTN_SEND}
                   >
                     <Send size={16} />
                   </button>

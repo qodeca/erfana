@@ -1,6 +1,7 @@
 import { useEffect, useRef, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { logger } from '../../utils/logger'
+import { TEST_IDS } from '../../constants/testids'
 import './Dialog.css'
 
 // Small delay to ensure dialog is fully rendered before focusing
@@ -119,7 +120,7 @@ export function BaseDialog({
       className="dialog-overlay"
       style={{ zIndex }}
       onClick={handleBackdropClick}
-      data-testid="dialog-overlay"
+      data-testid={TEST_IDS.DIALOG_OVERLAY}
     >
       <div
         ref={dialogRef}
@@ -128,6 +129,7 @@ export function BaseDialog({
         aria-modal="true"
         aria-labelledby={ariaLabelledBy}
         aria-describedby={ariaDescribedBy}
+        data-testid={TEST_IDS.DIALOG_CONTAINER}
       >
         {children}
       </div>

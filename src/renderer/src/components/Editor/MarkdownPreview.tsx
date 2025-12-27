@@ -24,6 +24,7 @@ import {
   cleanTelLink
 } from '../../utils/linkProtocols'
 import { logger } from '../../utils/logger'
+import { TEST_IDS } from '../../constants/testids'
 import './MarkdownPreview.css'
 
 // Anchor scroll configuration
@@ -944,7 +945,7 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
     }, [])
 
     return (
-      <div className={`markdown-preview ${className}`} ref={previewRef}>
+      <div className={`markdown-preview ${className}`} ref={previewRef} data-testid={TEST_IDS.EDITOR_PREVIEW}>
         <div
           className="markdown-preview-content"
           onMouseUp={handleMouseUp}

@@ -16,7 +16,7 @@
  * @module MarkdownEditorPanel.integration.test
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 
 describe('MarkdownEditorPanel Integration', () => {
   describe('Component Orchestration', () => {
@@ -91,14 +91,6 @@ describe('MarkdownEditorPanel Integration', () => {
       )
       expect(EditorErrorBoundary).toBeDefined()
       expect(typeof EditorErrorBoundary).toBe('function')
-    })
-
-    // EditorContentLayout imports MonacoMarkdownEditor which causes vite resolution issues in tests
-    // Tested indirectly through panel integration
-    it.skip('EditorContentLayout component is imported correctly', async () => {
-      const { EditorContentLayout } = await import('./EditorContentLayout')
-      expect(EditorContentLayout).toBeDefined()
-      expect(typeof EditorContentLayout).toBe('function')
     })
 
     it('DocumentStatsBar component is imported correctly', async () => {
@@ -186,42 +178,6 @@ describe('MarkdownEditorPanel Integration', () => {
   })
 
   describe('Refactoring Validation', () => {
-    // Panel component imports cause Monaco resolution issues in test environment
-    // Individual hooks and components are tested separately
-    it.skip('panel component uses extracted hooks (smoke test)', async () => {
-      // This test verifies that all the extracted code is still accessible
-      // and that the refactoring didn't break any imports
-
-      const panelModule = await import('./MarkdownEditorPanel')
-      expect(panelModule.MarkdownEditorPanel).toBeDefined()
-
-      const hooksModules = await Promise.all([
-        import('../../hooks/useAutoSave'),
-        import('../../hooks/useFileWatcher'),
-        import('../Editor/MarkdownEditorPanel/hooks/useScrollSync'),
-        import('../Editor/MarkdownEditorPanel/hooks/useExportHandlers'),
-        import('../../hooks/useEditorContextMenu'),
-        import('../../hooks/useDividerPosition'),
-        import('../../hooks/useKeyboardShortcuts')
-      ])
-
-      hooksModules.forEach((module, index) => {
-        expect(module).toBeDefined()
-        expect(Object.keys(module).length).toBeGreaterThan(0)
-      })
-
-      const componentModules = await Promise.all([
-        import('../Editor/MarkdownEditorPanel/components'),
-        import('./EditorContentLayout'),
-        import('./DocumentStatsBar')
-      ])
-
-      componentModules.forEach((module) => {
-        expect(module).toBeDefined()
-        expect(Object.keys(module).length).toBeGreaterThan(0)
-      })
-    })
-
     it('all pure logic functions are accessible', async () => {
       const logic = await import('./markdownEditorPanel.logic')
 

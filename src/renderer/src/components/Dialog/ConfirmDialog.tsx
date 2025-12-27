@@ -1,5 +1,6 @@
 import { HelpCircle, AlertTriangle } from 'lucide-react'
 import { BaseDialog } from './BaseDialog'
+import { TEST_IDS } from '../../constants/testids'
 import type { ConfirmDialogConfig } from './types'
 
 interface ConfirmDialogProps {
@@ -69,7 +70,7 @@ export function ConfirmDialog({ config, zIndex, onConfirm, onCancel }: ConfirmDi
       ariaLabelledBy={titleId}
       ariaDescribedBy={messageId}
     >
-      <div onKeyDown={handleKeyDown}>
+      <div onKeyDown={handleKeyDown} data-testid={TEST_IDS.DIALOG_CONFIRM}>
         <div className="dialog-header-with-icon">
           <div className="dialog-icon">
             {danger ? (
@@ -78,21 +79,22 @@ export function ConfirmDialog({ config, zIndex, onConfirm, onCancel }: ConfirmDi
               <HelpCircle size={20} strokeWidth={2} />
             )}
           </div>
-          <h3 id={titleId} className="dialog-title">{title}</h3>
+          <h3 id={titleId} className="dialog-title" data-testid={TEST_IDS.DIALOG_TITLE}>{title}</h3>
         </div>
 
         <div className="dialog-body">
-          <p id={messageId} className="dialog-message">{message}</p>
+          <p id={messageId} className="dialog-message" data-testid={TEST_IDS.DIALOG_CONFIRM_MESSAGE}>{message}</p>
         </div>
 
         <div className="dialog-actions">
-          <button className="dialog-btn dialog-btn-secondary" onClick={handleCancel}>
+          <button className="dialog-btn dialog-btn-secondary" onClick={handleCancel} data-testid={TEST_IDS.DIALOG_BTN_CANCEL}>
             {cancelLabel}
           </button>
           <button
             className={`dialog-btn ${danger ? 'dialog-btn-danger' : 'dialog-btn-primary'}`}
             onClick={handleConfirm}
             autoFocus
+            data-testid={TEST_IDS.DIALOG_BTN_CONFIRM}
           >
             {confirmLabel}
           </button>

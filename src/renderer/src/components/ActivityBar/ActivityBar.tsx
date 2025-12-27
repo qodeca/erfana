@@ -2,6 +2,7 @@ import { Settings } from 'lucide-react'
 import { getPanelsBySide } from './activityBarConfig'
 import { ActivityBarItem } from './ActivityBarItem'
 import { useSettingsStore } from '../../stores/useSettingsStore'
+import { TEST_IDS } from '../../constants/testids'
 import './ActivityBar.css'
 
 interface ActivityBarProps {
@@ -26,11 +27,12 @@ export function ActivityBar({ side, activePanel, onPanelClick, projectPath }: Ac
   }
 
   return (
-    <div className={`activity-bar activity-bar-${side}`}>
+    <div className={`activity-bar activity-bar-${side}`} data-testid={TEST_IDS.ACTIVITY_BAR}>
       <div className="activity-bar-items">
         {panels.map((panel) => (
           <ActivityBarItem
             key={panel.id}
+            panelId={panel.id}
             icon={panel.icon}
             label={panel.label}
             tooltip={panel.tooltip}
@@ -54,6 +56,7 @@ export function ActivityBar({ side, activePanel, onPanelClick, projectPath }: Ac
               openSettings()
             }
           }}
+          data-testid={TEST_IDS.ACTIVITY_BAR_BTN_SETTINGS}
         >
           <Settings size={24} strokeWidth={1.5} />
         </div>

@@ -1,6 +1,7 @@
 import { Copy, ClipboardPaste } from 'lucide-react'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
 import { isMacOS } from '../../utils/terminalClipboard.logic'
+import { TEST_IDS } from '../../constants/testids'
 
 interface TerminalContextMenuProps {
   x: number
@@ -36,7 +37,8 @@ export function TerminalContextMenu({
         onCopy()
         onClose()
       },
-      disabled: !hasSelection
+      disabled: !hasSelection,
+      testId: TEST_IDS.CONTEXT_MENU_ITEM_COPY
     },
     {
       label: 'Paste',
@@ -45,9 +47,18 @@ export function TerminalContextMenu({
       action: () => {
         onPaste()
         onClose()
-      }
+      },
+      testId: TEST_IDS.CONTEXT_MENU_ITEM_PASTE
     }
   ]
 
-  return <ContextMenu x={x} y={y} items={items} onClose={onClose} />
+  return (
+    <ContextMenu
+      x={x}
+      y={y}
+      items={items}
+      onClose={onClose}
+      containerTestId={TEST_IDS.CONTEXT_MENU_TERMINAL}
+    />
+  )
 }

@@ -30,6 +30,7 @@ import type { MonacoEditorHandle } from '../../MonacoMarkdownEditor'
 import type { ViewMode, EditorFile } from '../types'
 import { useSearchStore } from '../../../../stores/useSearchStore'
 import { getSelectedText } from '../../../../utils/selectionHelpers'
+import { TEST_IDS } from '../../../../constants/testids'
 import './MarkdownToolbar.css'
 
 // Re-export types for convenience
@@ -123,7 +124,7 @@ export function MarkdownToolbar({
   const exportDisabled = viewMode === 'editor'
 
   return (
-    <div className="markdown-toolbar" data-testid="markdown-toolbar">
+    <div className="markdown-toolbar" data-testid={TEST_IDS.MARKDOWN_TOOLBAR}>
       {/* Formatting buttons - only shown when editor is visible */}
       {showFormattingButtons && (
         <>
@@ -131,7 +132,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.formatBold()}
             title="Bold (Cmd/Ctrl+B)"
-            data-testid="toolbar-btn-bold"
+            data-testid={TEST_IDS.TOOLBAR_BTN_BOLD}
           >
             <Bold size={16} strokeWidth={2} />
           </button>
@@ -139,7 +140,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.formatItalic()}
             title="Italic (Cmd/Ctrl+I)"
-            data-testid="toolbar-btn-italic"
+            data-testid={TEST_IDS.TOOLBAR_BTN_ITALIC}
           >
             <Italic size={16} strokeWidth={2} />
           </button>
@@ -147,7 +148,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.formatStrikethrough()}
             title="Strikethrough"
-            data-testid="toolbar-btn-strikethrough"
+            data-testid={TEST_IDS.TOOLBAR_BTN_STRIKETHROUGH}
           >
             <Strikethrough size={16} strokeWidth={2} />
           </button>
@@ -158,7 +159,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.formatCode()}
             title="Inline Code"
-            data-testid="toolbar-btn-code"
+            data-testid={TEST_IDS.TOOLBAR_BTN_CODE}
           >
             <Code size={16} strokeWidth={2} />
           </button>
@@ -166,7 +167,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.insertLink()}
             title="Insert Link (Cmd/Ctrl+K)"
-            data-testid="toolbar-btn-link"
+            data-testid={TEST_IDS.TOOLBAR_BTN_LINK}
           >
             <Link size={16} strokeWidth={2} />
           </button>
@@ -174,7 +175,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.insertImage()}
             title="Insert Image"
-            data-testid="toolbar-btn-image"
+            data-testid={TEST_IDS.TOOLBAR_BTN_IMAGE}
           >
             <Image size={16} strokeWidth={2} />
           </button>
@@ -185,7 +186,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.insertHeading(1)}
             title="Heading 1"
-            data-testid="toolbar-btn-heading"
+            data-testid={TEST_IDS.TOOLBAR_BTN_HEADING}
           >
             <Heading1 size={16} strokeWidth={2} />
           </button>
@@ -193,7 +194,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.insertList(false)}
             title="Bullet List"
-            data-testid="toolbar-btn-list"
+            data-testid={TEST_IDS.TOOLBAR_BTN_LIST}
           >
             <List size={16} strokeWidth={2} />
           </button>
@@ -201,7 +202,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.insertList(true)}
             title="Numbered List"
-            data-testid="toolbar-btn-list-ordered"
+            data-testid={TEST_IDS.TOOLBAR_BTN_LIST_ORDERED}
           >
             <ListOrdered size={16} strokeWidth={2} />
           </button>
@@ -212,7 +213,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={handleOpenSearch}
             title="Find (Cmd/Ctrl+F)"
-            data-testid="toolbar-btn-search"
+            data-testid={TEST_IDS.TOOLBAR_BTN_SEARCH}
           >
             <Search size={16} strokeWidth={2} />
           </button>
@@ -225,7 +226,7 @@ export function MarkdownToolbar({
           className="toolbar-btn"
           onClick={handleOpenSearch}
           title="Find (Cmd/Ctrl+F)"
-          data-testid="toolbar-btn-search"
+          data-testid={TEST_IDS.TOOLBAR_BTN_SEARCH}
         >
           <Search size={16} strokeWidth={2} />
         </button>
@@ -235,17 +236,17 @@ export function MarkdownToolbar({
 
       {/* File status indicators */}
       {currentFile?.modified && (
-        <span className="modified-indicator" data-testid="modified-indicator">
+        <span className="modified-indicator" data-testid={TEST_IDS.MODIFIED_INDICATOR}>
           ●
         </span>
       )}
       {isAutoSaving && (
-        <span className="file-status-indicator" data-testid="autosave-indicator">
+        <span className="file-status-indicator" data-testid={TEST_IDS.AUTOSAVE_INDICATOR}>
           Auto-saving...
         </span>
       )}
       {isReloading && (
-        <span className="file-status-indicator" data-testid="reload-indicator">
+        <span className="file-status-indicator" data-testid={TEST_IDS.RELOAD_INDICATOR}>
           Reloaded from disk
         </span>
       )}
@@ -255,7 +256,7 @@ export function MarkdownToolbar({
         className={`view-mode-btn ${viewMode === 'editor' ? 'active' : ''}`}
         onClick={() => onViewModeChange('editor')}
         title="Editor Only"
-        data-testid="view-mode-btn-editor"
+        data-testid={TEST_IDS.VIEW_MODE_BTN_EDITOR}
       >
         <FileEdit size={16} strokeWidth={2} />
       </button>
@@ -263,7 +264,7 @@ export function MarkdownToolbar({
         className={`view-mode-btn ${viewMode === 'split-horizontal' ? 'active' : ''}`}
         onClick={() => onViewModeChange('split-horizontal')}
         title="Split Horizontal (Preview Top)"
-        data-testid="view-mode-btn-split-horizontal"
+        data-testid={TEST_IDS.VIEW_MODE_BTN_SPLIT_HORIZONTAL}
       >
         <Rows2 size={16} strokeWidth={2} />
       </button>
@@ -271,7 +272,7 @@ export function MarkdownToolbar({
         className={`view-mode-btn ${viewMode === 'split' ? 'active' : ''}`}
         onClick={() => onViewModeChange('split')}
         title="Split Vertical (Side by Side)"
-        data-testid="view-mode-btn-split"
+        data-testid={TEST_IDS.VIEW_MODE_BTN_SPLIT}
       >
         <Columns2 size={16} strokeWidth={2} />
       </button>
@@ -279,7 +280,7 @@ export function MarkdownToolbar({
         className={`view-mode-btn ${viewMode === 'preview' ? 'active' : ''}`}
         onClick={() => onViewModeChange('preview')}
         title="Preview Only"
-        data-testid="view-mode-btn-preview"
+        data-testid={TEST_IDS.VIEW_MODE_BTN_PREVIEW}
       >
         <Eye size={16} strokeWidth={2} />
       </button>
@@ -296,7 +297,7 @@ export function MarkdownToolbar({
             ? 'Export to PDF (switch to preview or split mode)'
             : 'Export to PDF'
         }
-        data-testid="toolbar-btn-export-pdf"
+        data-testid={TEST_IDS.TOOLBAR_BTN_EXPORT_PDF}
       >
         <FileDown size={16} strokeWidth={2} />
       </button>
@@ -309,7 +310,7 @@ export function MarkdownToolbar({
             ? 'Export to Word (switch to preview or split mode)'
             : 'Export to Word'
         }
-        data-testid="toolbar-btn-export-docx"
+        data-testid={TEST_IDS.TOOLBAR_BTN_EXPORT_DOCX}
       >
         <FileText size={16} strokeWidth={2} />
       </button>

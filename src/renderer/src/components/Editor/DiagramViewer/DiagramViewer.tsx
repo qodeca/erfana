@@ -5,6 +5,7 @@ import { getKeyboardAction, getZoomButtonStates, ZOOM_CONFIG } from './diagramVi
 import { ChatBubble } from './ChatBubble'
 import { useDiagramViewerStore } from '../../../stores/useDiagramViewerStore'
 import { logger } from '../../../utils/logger'
+import { TEST_IDS } from '../../../constants/testids'
 import './DiagramViewer.css'
 
 interface Transform {
@@ -359,6 +360,7 @@ export function DiagramViewer() {
       aria-modal="true"
       aria-label="Mermaid Diagram"
       onClick={handleBackdropClick}
+      data-testid={TEST_IDS.DIAGRAM_VIEWER}
     >
       {/* Floating close button (issue #37) */}
       <button
@@ -367,12 +369,13 @@ export function DiagramViewer() {
         title="Close"
         aria-label="Close diagram viewer"
         autoFocus
+        data-testid={TEST_IDS.DIAGRAM_VIEWER_BTN_CLOSE}
       >
         <X size={16} />
       </button>
 
       {/* Full-width diagram content area */}
-      <div className="diagram-viewer-content-wrapper">
+      <div className="diagram-viewer-content-wrapper" data-testid={TEST_IDS.DIAGRAM_VIEWER_CONTENT}>
         {/* SVG Content with dimension-based zoom (fixes pixelation - issue #31) */}
         <div
           ref={containerRef}
@@ -385,6 +388,7 @@ export function DiagramViewer() {
             style={{
               transform: `translate(${transform.translateX}px, ${transform.translateY}px)`
             }}
+            data-testid={TEST_IDS.DIAGRAM_VIEWER_SVG}
           />
         </div>
 

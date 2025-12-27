@@ -19,6 +19,7 @@ import { useDialog } from '../Dialog'
 import { ContextMenu } from '../ContextMenu/ContextMenu'
 import { useTabContextMenu } from './useTabContextMenu'
 import { useProjectManagementContext } from '../../context/ProjectManagementContext'
+import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
 import './EditorTab.css'
 
 interface EditorTabParams {
@@ -142,9 +143,16 @@ export function EditorTab(props: IDockviewPanelHeaderProps<EditorTabParams>) {
         draggable={false}
         onDragStart={handleDragStart}
         onDrag={handleDragStart}
+        data-testid={getDynamicTestId(TEST_IDS.TAB_ITEM, filePath)}
       >
-        <span className="editor-tab-label">
-          {isDirty && <span className="editor-tab-dirty-indicator" aria-label="Unsaved changes" />}
+        <span className="editor-tab-label" data-testid={getDynamicTestId(TEST_IDS.TAB_LABEL, filePath)}>
+          {isDirty && (
+            <span
+              className="editor-tab-dirty-indicator"
+              aria-label="Unsaved changes"
+              data-testid={getDynamicTestId(TEST_IDS.TAB_DIRTY, filePath)}
+            />
+          )}
           <span className="editor-tab-filename">{fileName}</span>
         </span>
 
@@ -153,6 +161,7 @@ export function EditorTab(props: IDockviewPanelHeaderProps<EditorTabParams>) {
           onClick={handleClose}
           title="Close"
           aria-label={`Close ${fileName}`}
+          data-testid={getDynamicTestId(TEST_IDS.TAB_CLOSE, filePath)}
         >
           <X size={14} strokeWidth={2} />
         </button>

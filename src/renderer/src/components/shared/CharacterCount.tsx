@@ -18,6 +18,8 @@ interface CharacterCountProps {
   validationState?: TextInputValidationState
   /** Additional CSS class */
   className?: string
+  /** Test ID for automated testing */
+  'data-testid'?: string
 }
 
 /**
@@ -36,13 +38,15 @@ export function CharacterCount({
   charCount,
   maxLength = TEXT_INPUT_LIMITS.MAX_LENGTH,
   validationState = 'valid',
-  className = ''
+  className = '',
+  'data-testid': testId
 }: CharacterCountProps) {
   const stateClass = getValidationStateClass(validationState)
 
   return (
     <span
       className={`char-count ${stateClass ? `char-count--${stateClass}` : ''} ${className}`.trim()}
+      data-testid={testId}
     >
       {formatCharCount(charCount, maxLength)} characters
     </span>

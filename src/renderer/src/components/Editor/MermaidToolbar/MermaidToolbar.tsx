@@ -19,6 +19,7 @@ import {
 import { useTerminalPortalOptional } from '../../../context/TerminalPortalContext'
 import { scheduleScrollIfNeeded } from '../../../utils/promptScrollScheduler.logic'
 import { logger } from '../../../utils/logger'
+import { TEST_IDS } from '../../../constants/testids'
 import './MermaidToolbar.css'
 
 export interface MermaidToolbarProps {
@@ -104,8 +105,8 @@ export function MermaidToolbar({
   }
 
   return (
-    <div className="mermaid-toolbar" role="toolbar" aria-label="Mermaid diagram toolbar">
-      <div className="mermaid-toolbar-directions" role="group" aria-label="Layout direction">
+    <div className="mermaid-toolbar" role="toolbar" aria-label="Mermaid diagram toolbar" data-testid={TEST_IDS.MERMAID_TOOLBAR}>
+      <div className="mermaid-toolbar-directions" role="group" aria-label="Layout direction" data-testid={TEST_IDS.MERMAID_DIRECTIONS_GROUP}>
         {showDirectionButtons && (
           <>
             {availableDirections.map((direction) => {
@@ -121,6 +122,7 @@ export function MermaidToolbar({
                   title={getDirectionTooltip(direction)}
                   aria-label={`Change layout to ${getDirectionTooltip(direction)}`}
                   aria-pressed={active}
+                  data-testid={`${TEST_IDS.MERMAID_DIRECTION_BTN}-${direction}`}
                 >
                   {direction}
                 </button>
@@ -135,6 +137,7 @@ export function MermaidToolbar({
           disabled={!hasSvgContent}
           title="View fullscreen"
           aria-label="Open diagram in fullscreen"
+          data-testid={TEST_IDS.MERMAID_BTN_EXPAND}
         >
           <Maximize2 size={14} />
         </button>

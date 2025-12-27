@@ -35,6 +35,7 @@ import { useImport } from '../../hooks/useImport'
 import { useGitStatus } from '../../hooks/useGitStatus'
 import { GitStatusBar } from './GitStatusBar'
 import { GitErrorBoundary } from './GitErrorBoundary'
+import { TEST_IDS } from '../../constants/testids'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -722,7 +723,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   }
 
   return (
-    <div className="project-tree">
+    <div className="project-tree" data-testid={TEST_IDS.PROJECT_TREE}>
       {error && (
         <div className="project-tree-error">
           {error}
@@ -737,6 +738,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
             onClick={handleOpenProject}
             disabled={isSwitchingProject}
             title={projectPath ? 'Change project' : 'Open project'}
+            data-testid={TEST_IDS.PROJECT_TREE_BTN_OPEN}
           >
             {isSwitchingProject ? (
               <RotateCw size={14} strokeWidth={2} className="spin" />
@@ -752,6 +754,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
               onClick={handleCloseProject}
               disabled={isSwitchingProject}
               title="Close project"
+              data-testid={TEST_IDS.PROJECT_TREE_BTN_CLOSE}
             >
               <CloseIcon size={14} strokeWidth={2} />
             </button>
@@ -763,6 +766,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
                 onClick={handleNewFile}
                 disabled={loading}
                 title="Create new markdown file"
+                data-testid={TEST_IDS.PROJECT_TREE_BTN_NEW_FILE}
               >
                 <FilePlus size={14} strokeWidth={2} />
               </button>
@@ -771,6 +775,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
                 onClick={handleNewFolder}
                 disabled={loading}
                 title="Create new folder"
+                data-testid={TEST_IDS.PROJECT_TREE_BTN_NEW_FOLDER}
               >
                 <FolderPlus size={14} strokeWidth={2} />
               </button>
@@ -834,7 +839,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
               getFolderStatus={getFolderStatus}
             />
           ) : (
-            <div className="project-tree-empty">
+            <div className="project-tree-empty" data-testid={TEST_IDS.PROJECT_TREE_EMPTY}>
               {projectPath ? (filterMode === 'markdown' ? 'No markdown files found' : 'No files found') : 'Open a project to get started'}
             </div>
           )}

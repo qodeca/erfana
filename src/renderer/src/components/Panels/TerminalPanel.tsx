@@ -29,6 +29,7 @@ import { TerminalContextMenu } from '../ContextMenu/TerminalContextMenu'
 import { FilePickerDialog } from '../Dialog/FilePickerDialog'
 import { sanitizeFilePath } from '../../utils/fileUtils'
 import { logger } from '../../utils/logger'
+import { TEST_IDS } from '../../constants/testids'
 import '@xterm/xterm/css/xterm.css'
 import './TerminalPanel.css'
 import { isElementVisible } from '../../utils/domUtils'
@@ -815,7 +816,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   return (
     <div ref={mainContainerRef} className="terminal-portal-shell">
       {/* Terminal panel - rendered here initially, moved by useLayoutEffect */}
-      <div ref={terminalPanelRef} className="terminal-panel sidebar-panel">
+      <div ref={terminalPanelRef} className="terminal-panel sidebar-panel" data-testid={TEST_IDS.TERMINAL_PANEL}>
         {/* Hide header when portalled to DiagramViewer (issue #37) */}
         {portalTarget !== 'diagram-viewer' && (
           <div className="sidebar-panel-header">
@@ -827,6 +828,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                   className="icon-btn"
                   onClick={handleScrollToBottom}
                   title="Scroll to bottom"
+                  data-testid={TEST_IDS.TERMINAL_BTN_SCROLL}
                 >
                   <ArrowDownToLine size={14} />
                 </button>
@@ -834,6 +836,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                   className="icon-btn"
                   onClick={handleRestartTerminal}
                   title="Restart terminal"
+                  data-testid={TEST_IDS.TERMINAL_BTN_RESTART}
                 >
                   <RotateCw size={14} />
                 </button>
@@ -842,6 +845,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                   onClick={handleToggleScrollLock}
                   title={scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom'}
                   aria-pressed={scrollLocked}
+                  data-testid={TEST_IDS.TERMINAL_BTN_LOCK}
                 >
                   {scrollLocked ? <LockKeyhole size={14} /> : <LockKeyholeOpen size={14} />}
                 </button>
@@ -852,12 +856,12 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         <div className="sidebar-panel-content">
           {isAvailable === null ? (
             // Checking availability
-            <div className="terminal-status">
+            <div className="terminal-status" data-testid={TEST_IDS.TERMINAL_STATUS}>
               <p>Checking terminal availability...</p>
             </div>
           ) : !isAvailable ? (
             // Not available
-            <div className="terminal-status">
+            <div className="terminal-status" data-testid={TEST_IDS.TERMINAL_STATUS}>
               <div className="terminal-error-icon">⚠️</div>
               <h3>Terminal Not Available</h3>
               <p>
@@ -876,14 +880,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
             </div>
           ) : error ? (
             // Error occurred
-            <div className="terminal-status">
+            <div className="terminal-status" data-testid={TEST_IDS.TERMINAL_STATUS}>
               <div className="terminal-error-icon">❌</div>
               <h3>Terminal Error</h3>
               <p className="error-details">{error}</p>
             </div>
           ) : (
             // Terminal ready - context menu handled via native listener on xterm.element
-            <div ref={terminalRef} className="terminal-container" />
+            <div ref={terminalRef} className="terminal-container" data-testid={TEST_IDS.TERMINAL_INSTANCE} />
           )}
         </div>
         {portalContext?.terminalContextMenuPosition && (

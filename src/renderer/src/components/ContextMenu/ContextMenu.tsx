@@ -1,5 +1,6 @@
 import { useEffect, useRef, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { TEST_IDS } from '../../constants/testids'
 import './ContextMenu.css'
 
 export interface ContextMenuItem {
@@ -10,6 +11,8 @@ export interface ContextMenuItem {
   separator?: boolean
   disabled?: boolean
   shortcut?: string
+  /** Optional test ID for automated UI testing */
+  testId?: string
 }
 
 interface ContextMenuProps {
@@ -17,9 +20,11 @@ interface ContextMenuProps {
   y: number
   items: ContextMenuItem[]
   onClose: () => void
+  /** Optional test ID for the container element (overrides default) */
+  containerTestId?: string
 }
 
-export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
+export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
   const openTimeRef = useRef<number>(Date.now())
   const portalRoot = document.getElementById('portal-root')
@@ -114,6 +119,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
     <div
       ref={menuRef}
       className="context-menu"
+      data-testid={containerTestId ?? TEST_IDS.CONTEXT_MENU}
       style={{
         position: 'fixed',
         left: `${x}px`,
@@ -123,12 +129,17 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
     >
       {items.map((item, index) =>
         item.separator ? (
-          <div key={index} className="context-menu-separator" />
+          <div
+            key={index}
+            className="context-menu-separator"
+            data-testid={TEST_IDS.CONTEXT_MENU_SEPARATOR}
+          />
         ) : (
           <div
             key={index}
             className={`context-menu-item ${item.danger ? 'danger' : ''} ${item.disabled ? 'disabled' : ''}`}
             onClick={() => handleItemClick(item)}
+            data-testid={item.testId}
           >
             {item.icon && <span className="context-menu-icon">{item.icon}</span>}
             <span className="context-menu-label">{item.label}</span>

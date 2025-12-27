@@ -3,6 +3,7 @@ import Editor, { OnMount, loader } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
 import { useSearchStore } from '../../stores/useSearchStore'
 import { logger } from '../../utils/logger'
+import { TEST_IDS } from '../../constants/testids'
 import './MonacoMarkdownEditor.css'
 
 // Configure Monaco to use local files instead of CDN
@@ -386,7 +387,7 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
     }))
 
     return (
-      <div className="monaco-markdown-editor">
+      <div className="monaco-markdown-editor" data-testid={TEST_IDS.EDITOR_MONACO}>
         <Editor
           height="100%"
           language="markdown"

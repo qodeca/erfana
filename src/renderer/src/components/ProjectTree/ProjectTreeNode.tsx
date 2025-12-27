@@ -4,6 +4,7 @@ import { useDraggable, useDroppable } from '@dnd-kit/core'
 import type { GitDisplayStatus } from '../../../../shared/ipc/git-schema'
 import { GitStatusBadge } from './GitStatusBadge'
 import { GitErrorBoundary } from './GitErrorBoundary'
+import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
 import './ProjectTree.css'
 
 /**
@@ -184,6 +185,7 @@ export function ProjectTreeNode({
       ref={setRefs}
       data-dragging={actuallyDragging}
       data-drop-highlight={showDropHighlight}
+      data-testid={getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, node.path)}
     >
       <div
         className={`project-tree-item ${node.type} ${isSelected ? 'selected' : ''}`}
@@ -197,7 +199,12 @@ export function ProjectTreeNode({
         {...dragAttributes}
         {...dragListeners}
       >
-        <span className={`file-icon ${isMarkdown ? 'markdown' : ''}`}>{renderIcon()}</span>
+        <span
+          className={`file-icon ${isMarkdown ? 'markdown' : ''}`}
+          data-testid={node.type === 'directory' ? getDynamicTestId(TEST_IDS.PROJECT_TREE_TOGGLE, node.path) : undefined}
+        >
+          {renderIcon()}
+        </span>
         <span
           className={`file-name ${isMarkdown ? 'markdown' : ''} ${isSensitive ? 'sensitive' : ''} ${isHidden ? 'hidden-file' : ''}`}
           data-git-status={currentGitStatus}

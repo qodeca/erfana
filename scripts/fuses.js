@@ -6,6 +6,14 @@
  *
  * Security hardening following 2025 best practices.
  *
+ * Build Modes:
+ * - Production (default): All security fuses enabled, inspector disabled
+ * - Test build: Inspector enabled for Playwright E2E testing
+ *
+ * Usage:
+ *   Production build:  npm run build:mac
+ *   Test build:        ERFANA_TEST_BUILD=true npm run build:mac
+ *
  * References:
  * - https://www.electronjs.org/docs/latest/tutorial/fuses
  * - https://www.druva.com/blog/living-off-the-land-lotl-attack-due-to-electron-fuses-misconfiguration
@@ -13,6 +21,13 @@
 
 const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses');
 const path = require('path');
+
+/**
+ * Check if this is a test build.
+ * Test builds enable the Node CLI inspector for Playwright E2E testing.
+ * SECURITY NOTE: Test builds should NEVER be distributed to end users.
+ */
+const isTestBuild = process.env.ERFANA_TEST_BUILD === 'true';
 
 module.exports = async function afterPack(context) {
   // Determine the Electron binary path based on platform
@@ -27,7 +42,14 @@ module.exports = async function afterPack(context) {
     `${context.packager.appInfo.productFilename}${ext}`
   );
 
-  console.log(`🔒 Applying Electron fuses to: ${electronBinaryPath}`);
+  // Log build mode
+  if (isTestBuild) {
+    console.log('🧪 TEST BUILD: Inspector enabled for Playwright E2E testing');
+    console.log('   ⚠️  WARNING: Do NOT distribute test builds to end users!');
+  } else {
+    console.log('🔒 PRODUCTION BUILD: All security fuses enabled');
+  }
+  console.log(`   Applying fuses to: ${electronBinaryPath}`);
 
   await flipFuses(electronBinaryPath, {
     version: FuseVersion.V1,
@@ -50,9 +72,10 @@ module.exports = async function afterPack(context) {
     // Prevents command injection via environment
     [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
 
-    // Disable --inspect CLI arguments
-    // Prevents remote debugging access
-    [FuseV1Options.EnableNodeCliInspectArguments]: false,
+    // Disable --inspect CLI arguments (production) or enable (test builds)
+    // Production: Prevents remote debugging access
+    // Test builds: Required for Playwright E2E testing via CDP
+    [FuseV1Options.EnableNodeCliInspectArguments]: isTestBuild,
 
     // NOTE: ASAR integrity validation disabled because asar: false
     // When ASAR is disabled, these fuses cannot be used:
@@ -64,7 +87,7 @@ module.exports = async function afterPack(context) {
   console.log('   - RunAsNode: disabled');
   console.log('   - CookieEncryption: disabled (no keychain prompt)');
   console.log('   - NodeOptions: disabled');
-  console.log('   - NodeCliInspect: disabled');
+  console.log(`   - NodeCliInspect: ${isTestBuild ? 'ENABLED (test build)' : 'disabled'}`);
   console.log('   - AsarIntegrity: N/A (asar disabled)');
   console.log('   - OnlyLoadAppFromAsar: N/A (asar disabled)');
 };

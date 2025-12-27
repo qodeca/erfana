@@ -5,6 +5,7 @@ import { TextareaContextMenu } from '../ContextMenu/TextareaContextMenu'
 import { CharacterCount } from '../shared'
 import { validateTextInput } from '../../utils/textInputValidation'
 import { TEXT_INPUT_LIMITS } from '../../../../shared/constants'
+import { TEST_IDS } from '../../constants/testids'
 import type { PromptDialogConfig } from './types'
 
 /**
@@ -280,16 +281,16 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
       ariaLabelledBy={titleId}
       ariaDescribedBy={messageId}
     >
-      <div>
+      <div data-testid={TEST_IDS.DIALOG_PROMPT}>
         <div className="dialog-header-with-icon">
           <div className="dialog-icon">
             <MessageSquare size={20} strokeWidth={2} />
           </div>
-          <h3 id={titleId} className="dialog-title">{title}</h3>
+          <h3 id={titleId} className="dialog-title" data-testid={TEST_IDS.DIALOG_TITLE}>{title}</h3>
         </div>
 
         <div className="dialog-body">
-          {message && <p id={messageId} className="dialog-message">{message}</p>}
+          {message && <p id={messageId} className="dialog-message" data-testid={TEST_IDS.DIALOG_PROMPT_MESSAGE}>{message}</p>}
 
           {/* Selected text preview section */}
           {displayText && (
@@ -323,6 +324,7 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
                 value={dropdownValue}
                 onChange={(e) => setDropdownValue(e.target.value)}
                 aria-label={dropdownLabel || 'Select an option'}
+                data-testid={TEST_IDS.DIALOG_PROMPT_DROPDOWN}
               >
                 {dropdownOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -353,6 +355,7 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
               placeholder={inputPlaceholder}
               rows={6}
               maxLength={maxLength}
+              data-testid={TEST_IDS.DIALOG_PROMPT_INPUT}
             />
 
             {/* Error message (exceeds limit or custom validation) */}
@@ -397,13 +400,14 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
               validationState={validationState}
             />
           </div>
-          <button className="dialog-btn dialog-btn-secondary" onClick={handleCancel}>
+          <button className="dialog-btn dialog-btn-secondary" onClick={handleCancel} data-testid={TEST_IDS.DIALOG_BTN_CANCEL}>
             Cancel
           </button>
           <button
             className="dialog-btn dialog-btn-primary"
             onClick={handleSubmit}
             disabled={!canSubmit}
+            data-testid={TEST_IDS.DIALOG_BTN_CONFIRM}
           >
             Submit
           </button>

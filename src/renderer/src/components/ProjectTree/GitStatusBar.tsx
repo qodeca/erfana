@@ -8,6 +8,7 @@
 
 import { GitBranch, AlertTriangle } from 'lucide-react'
 import type { GitStatusCounts } from '../../../../shared/ipc/git-schema'
+import { TEST_IDS } from '../../constants/testids'
 
 interface GitStatusBarProps {
   isGitRepo: boolean
@@ -45,15 +46,15 @@ export function GitStatusBar({
   if (counts.conflicted > 0) countsItems.push({ label: `!${counts.conflicted}`, status: 'conflicted' })
 
   return (
-    <div className="git-status-bar">
+    <div className="git-status-bar" data-testid={TEST_IDS.GIT_STATUS_BAR}>
       {/* Branch name */}
-      <div className="git-branch">
+      <div className="git-branch" data-testid={TEST_IDS.GIT_BRANCH_NAME}>
         <GitBranch size={14} />
         <span>{branchDisplay}</span>
       </div>
 
       {/* Status counts */}
-      <div className="git-counts">
+      <div className="git-counts" data-testid={TEST_IDS.GIT_STATUS_COUNTS}>
         {countsItems.length > 0 ? (
           countsItems.map((item, index) => (
             <span key={index} className="git-count-item" data-git-status={item.status}>
@@ -64,7 +65,11 @@ export function GitStatusBar({
           <span className="git-count-clean">Clean</span>
         )}
         {truncated && (
-          <span className="git-truncated-warning" title="Too many changes - showing first 10,000 files">
+          <span
+            className="git-truncated-warning"
+            title="Too many changes - showing first 10,000 files"
+            data-testid={TEST_IDS.GIT_SYNC_INDICATOR}
+          >
             <AlertTriangle size={14} />
           </span>
         )}

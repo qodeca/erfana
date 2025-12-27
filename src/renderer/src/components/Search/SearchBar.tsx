@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { ChevronUp, ChevronDown, X } from 'lucide-react'
 import type { SearchProvider } from '../../providers/search'
 import { useSearchStore, type SearchOptions } from '../../stores/useSearchStore'
+import { TEST_IDS } from '../../constants/testids'
 import './SearchBar.css'
 
 /** Debounce delay for search execution in milliseconds */
@@ -186,11 +187,13 @@ export function SearchBar({ provider }: SearchBarProps) {
     (e: React.KeyboardEvent<HTMLButtonElement>, type: 'caseSensitive' | 'wholeWord') => {
       if (e.key === 'Enter') {
         e.preventDefault()
-        updateOptions({ [type]: !options[type] })
+        // Read current state directly from store to avoid stale closure
+        const currentOptions = useSearchStore.getState().options
+        updateOptions({ [type]: !currentOptions[type] })
       }
       // Space handled by native button click - do not duplicate
     },
-    [options, updateOptions]
+    [updateOptions]
   )
 
   if (!isOpen) return null
@@ -211,6 +214,7 @@ export function SearchBar({ provider }: SearchBarProps) {
       onKeyDown={handleContainerKeyDown}
       onClick={stopPropagation}
       onMouseDown={stopPropagation}
+      data-testid={TEST_IDS.SEARCH_BAR}
     >
       <input
         ref={inputRef}
@@ -224,6 +228,7 @@ export function SearchBar({ provider }: SearchBarProps) {
         placeholder="Search..."
         aria-label="Search in document"
         className="search-input"
+        data-testid={TEST_IDS.SEARCH_BAR_INPUT}
       />
 
       <div className="search-toggles">
@@ -234,6 +239,7 @@ export function SearchBar({ provider }: SearchBarProps) {
           onKeyDown={(e) => handleToggleKeyDown(e, 'caseSensitive')}
           aria-pressed={options.caseSensitive}
           title="Case sensitive (Alt+C)"
+          data-testid={TEST_IDS.SEARCH_BAR_TOGGLE_CASE}
         >
           Aa
         </button>
@@ -244,12 +250,13 @@ export function SearchBar({ provider }: SearchBarProps) {
           onKeyDown={(e) => handleToggleKeyDown(e, 'wholeWord')}
           aria-pressed={options.wholeWord}
           title="Whole word (Alt+W)"
+          data-testid={TEST_IDS.SEARCH_BAR_TOGGLE_WORD}
         >
           ab
         </button>
       </div>
 
-      <span className="search-match-count" aria-live="polite">
+      <span className="search-match-count" aria-live="polite" data-testid={TEST_IDS.SEARCH_BAR_COUNT}>
         {matchCountText}
       </span>
 
@@ -260,6 +267,7 @@ export function SearchBar({ provider }: SearchBarProps) {
           onClick={previousMatch}
           disabled={matches.length === 0}
           aria-label="Previous match (Shift+Enter)"
+          data-testid={TEST_IDS.SEARCH_BAR_BTN_PREV}
         >
           <ChevronUp size={16} />
         </button>
@@ -269,6 +277,7 @@ export function SearchBar({ provider }: SearchBarProps) {
           onClick={nextMatch}
           disabled={matches.length === 0}
           aria-label="Next match (Enter)"
+          data-testid={TEST_IDS.SEARCH_BAR_BTN_NEXT}
         >
           <ChevronDown size={16} />
         </button>
@@ -279,6 +288,7 @@ export function SearchBar({ provider }: SearchBarProps) {
         className="search-close-btn"
         onClick={handleClose}
         aria-label="Close search (Escape)"
+        data-testid={TEST_IDS.SEARCH_BAR_BTN_CLOSE}
       >
         <X size={16} />
       </button>

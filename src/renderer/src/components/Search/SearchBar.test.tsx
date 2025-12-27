@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SearchBar } from './SearchBar'
 import { useSearchStore } from '../../stores/useSearchStore'
@@ -404,18 +404,17 @@ describe('SearchBar', () => {
       )
     })
 
-    it('handles Enter key on toggle buttons', async () => {
-      const user = userEvent.setup()
+    it('handles Enter key on toggle buttons', () => {
       render(<SearchBar provider={mockProvider} />)
 
       const toggle = screen.getByTitle('Case sensitive (Alt+C)')
-      toggle.focus()
 
-      await user.keyboard('{Enter}')
+      // Use fireEvent.keyDown to directly test the keyboard handler
+      fireEvent.keyDown(toggle, { key: 'Enter' })
       expect(useSearchStore.getState().options.caseSensitive).toBe(true)
 
       // Toggle back with Enter
-      await user.keyboard('{Enter}')
+      fireEvent.keyDown(toggle, { key: 'Enter' })
       expect(useSearchStore.getState().options.caseSensitive).toBe(false)
     })
 

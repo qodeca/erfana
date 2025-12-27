@@ -62,7 +62,7 @@ See `docs/` for details (keep Claude's context focused):
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (5306 tests, 164 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage (5335 tests, 165 files)
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.6.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
@@ -149,6 +149,47 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 - [ ] Focus states are visible (accessibility)
 
 ## Recent Changes (v0.6.x)
+
+### UI Testing Compatibility (Dec 27, 2025)
+Added systematic data-testid attributes for automated UI testing (BRS-011):
+
+**Features**:
+- 138 testid constants in `src/renderer/src/constants/testids.ts`
+- djb2 hash helper for dynamic testids (file paths, tabs)
+- Naming convention: `{component}-{element}-{identifier?}` with `-btn-` for buttons
+- ~160 testids across all interactive components
+
+**Key exports from testids.ts**:
+- `TEST_IDS` - Static testid constants organized by component
+- `getPathHash(path)` - Generate 8-char hex hash for dynamic testids
+- `getDynamicTestId(prefix, path)` - Combine prefix with path hash
+- `TestId` type - Union type of all valid testid values
+
+**Components with testids**:
+- ActivityBar, ProjectTree, GitStatusBar
+- TerminalPanel, EditorContentLayout
+- MonacoMarkdownEditor, MarkdownPreview
+- All Dialogs (Confirm, Alert, Prompt, FilePicker)
+- All Context menus (Terminal, Editor, Preview)
+- DiagramViewer, ChatBubble, MermaidToolbar
+- EditorTab, SearchBar, Toast, Settings, DocumentStatsBar
+
+**Usage example**:
+```tsx
+import { TEST_IDS, getDynamicTestId } from '@/constants/testids'
+
+// Static testid
+<button data-testid={TEST_IDS.ACTIVITY_BAR_BTN_FILES}>Files</button>
+
+// Dynamic testid for file paths
+<div data-testid={getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, filePath)}>
+```
+
+**Testing**: 29 new tests for testid constants and hash function
+
+**BRS**: `specs/business-reqs/brs011-ui-test-compatibility/`
+
+Closes #79
 
 ### MarkdownEditorPanel Modular Refactoring (Dec 27, 2025)
 Extracted modular components from monolithic panel for better testability:
@@ -632,7 +673,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 5306 tests passing (164 test files)
+- **Current**: 5335 tests passing (165 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)

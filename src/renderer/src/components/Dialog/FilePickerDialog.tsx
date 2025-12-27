@@ -15,6 +15,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { BaseDialog } from './BaseDialog'
+import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
 import type { PathScore } from '../../utils/pathScoring'
 import { getRelativePath } from '../../utils/pathScoring'
 import './FilePickerDialog.css'
@@ -140,14 +141,14 @@ export function FilePickerDialog({
       className="file-picker-dialog"
       ariaLabelledBy="file-picker-title"
     >
-      <div className="dialog-content" onKeyDown={handleKeyDown} tabIndex={-1}>
-        <h2 id="file-picker-title" className="dialog-title">
+      <div className="dialog-content" onKeyDown={handleKeyDown} tabIndex={-1} data-testid={TEST_IDS.FILE_PICKER}>
+        <h2 id="file-picker-title" className="dialog-title" data-testid={TEST_IDS.DIALOG_TITLE}>
           Multiple files match &quot;{getFilename(query)}&quot;
         </h2>
 
         <p className="dialog-subtitle">Select the file you want to open:</p>
 
-        <ul ref={listRef} className="file-picker-list" role="listbox" aria-activedescendant={`file-item-${selectedIndex}`}>
+        <ul ref={listRef} className="file-picker-list" role="listbox" aria-activedescendant={`file-item-${selectedIndex}`} data-testid={TEST_IDS.FILE_PICKER_LIST}>
           {candidates.map((candidate, index) => {
             const filename = getFilename(candidate.path)
             const relativePath = projectRoot
@@ -164,6 +165,7 @@ export function FilePickerDialog({
                 aria-selected={isSelected}
                 onClick={() => handleItemClick(candidate.path)}
                 onMouseEnter={() => setSelectedIndex(index)}
+                data-testid={getDynamicTestId(TEST_IDS.FILE_PICKER_ITEM, candidate.path)}
               >
                 <span className="file-picker-filename">{filename}</span>
                 <span className="file-picker-path">{relativePath}</span>
@@ -173,7 +175,7 @@ export function FilePickerDialog({
         </ul>
 
         <div className="dialog-actions">
-          <button className="dialog-button dialog-button-secondary" onClick={onClose}>
+          <button className="dialog-button dialog-button-secondary" onClick={onClose} data-testid={TEST_IDS.FILE_PICKER_BTN_CANCEL}>
             Cancel
           </button>
         </div>

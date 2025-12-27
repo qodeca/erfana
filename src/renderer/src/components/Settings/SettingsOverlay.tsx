@@ -5,6 +5,7 @@ import { useSettingsStore } from '../../stores/useSettingsStore'
 import { useGlobalSettingsStore } from '../../stores/useGlobalSettingsStore'
 import { LoggingLevelSchema, type LoggingLevel } from '../../../../shared/ipc/global-settings-schema'
 import { logger } from '../../utils/logger'
+import { TEST_IDS } from '../../constants/testids'
 import './SettingsOverlay.css'
 
 // Small delay to ensure overlay is fully rendered before focusing
@@ -105,8 +106,14 @@ export function SettingsOverlay() {
   }
 
   const overlayContent = (
-    <div className="settings-overlay" data-testid="settings-overlay">
-      <div className="settings-container" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <div className="settings-overlay" data-testid={TEST_IDS.SETTINGS_OVERLAY}>
+      <div
+        className="settings-container"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+        data-testid={TEST_IDS.SETTINGS_CONTAINER}
+      >
         <div className="settings-header">
           <h1 id="settings-title" className="settings-title">
             Settings
@@ -117,13 +124,14 @@ export function SettingsOverlay() {
             onClick={closeSettings}
             aria-label="Close settings"
             title="Close settings"
+            data-testid={TEST_IDS.SETTINGS_BTN_CLOSE}
           >
             <X size={20} strokeWidth={1.5} />
           </button>
         </div>
         <div className="settings-content">
           <div className="settings-body">
-            <section className="settings-section">
+            <section className="settings-section" data-testid={TEST_IDS.SETTINGS_SECTION_EDITOR}>
               <h2 className="settings-section-title">Editor</h2>
               <div className="settings-row">
                 <div className="settings-field">
@@ -141,11 +149,12 @@ export function SettingsOverlay() {
                   checked={settings?.editor.preserveLineBreaks ?? false}
                   onChange={(e) => updatePreserveLineBreaks(e.target.checked)}
                   disabled={!settings}
+                  data-testid={TEST_IDS.SETTINGS_TOGGLE_LINE_BREAKS}
                 />
               </div>
             </section>
 
-            <section className="settings-section">
+            <section className="settings-section" data-testid={TEST_IDS.SETTINGS_SECTION_GIT}>
               <h2 className="settings-section-title">Git status</h2>
               <div className="settings-row">
                 <div className="settings-field">
@@ -163,6 +172,7 @@ export function SettingsOverlay() {
                   checked={settings?.gitStatus.pollingEnabled ?? true}
                   onChange={(e) => updateGitStatusPollingEnabled(e.target.checked)}
                   disabled={!settings}
+                  data-testid={TEST_IDS.SETTINGS_TOGGLE_POLLING}
                 />
               </div>
               <div className="settings-row">
@@ -180,6 +190,7 @@ export function SettingsOverlay() {
                   value={settings?.gitStatus.pollingInterval ?? 5000}
                   onChange={(e) => updateGitStatusPollingInterval(Number(e.target.value))}
                   disabled={!settings || !settings.gitStatus.pollingEnabled}
+                  data-testid={TEST_IDS.SETTINGS_SELECT_POLLING_INTERVAL}
                 >
                   {POLLING_INTERVAL_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -190,7 +201,7 @@ export function SettingsOverlay() {
               </div>
             </section>
 
-            <section className="settings-section">
+            <section className="settings-section" data-testid={TEST_IDS.SETTINGS_SECTION_LOGGING}>
               <h2 className="settings-section-title">Logging</h2>
               <div className="settings-row">
                 <div className="settings-field">
@@ -213,6 +224,7 @@ export function SettingsOverlay() {
                     }
                   }}
                   disabled={!settings}
+                  data-testid={TEST_IDS.SETTINGS_SELECT_LOG_LEVEL}
                 >
                   {LOG_LEVEL_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>

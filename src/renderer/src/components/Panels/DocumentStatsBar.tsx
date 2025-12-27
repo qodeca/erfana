@@ -7,6 +7,7 @@
  * @module components/Panels/DocumentStatsBar
  */
 
+import { TEST_IDS } from '../../constants/testids'
 import './DocumentStatsBar.css'
 
 /**
@@ -80,24 +81,24 @@ export function DocumentStatsBar({
   }
 
   return (
-    <div className="document-stats-bar">
+    <div className="document-stats-bar" data-testid={TEST_IDS.DOCUMENT_STATS_BAR}>
       <div className="stats-group">
-        <span className="stat-item">
+        <span className="stat-item" data-testid={TEST_IDS.STATS_WORDS}>
           <span className="stat-label">Words:</span>
           <span className="stat-value">{stats.words.toLocaleString()}</span>
         </span>
         <span className="stat-separator">•</span>
-        <span className="stat-item">
+        <span className="stat-item" data-testid={TEST_IDS.STATS_CHARACTERS}>
           <span className="stat-label">Characters:</span>
           <span className="stat-value">{stats.characters.toLocaleString()}</span>
         </span>
         <span className="stat-separator">•</span>
-        <span className="stat-item">
+        <span className="stat-item" data-testid={TEST_IDS.STATS_LINES}>
           <span className="stat-label">Lines:</span>
           <span className="stat-value">{stats.lines.toLocaleString()}</span>
         </span>
         <span className="stat-separator">•</span>
-        <span className="stat-item">
+        <span className="stat-item" data-testid={TEST_IDS.STATS_READING_TIME}>
           <span className="stat-label">Reading time:</span>
           <span className="stat-value">
             {stats.readingTimeMinutes} min
@@ -109,7 +110,7 @@ export function DocumentStatsBar({
       {selectedText && (
         <div className="stats-group selection-stats">
           <span className="stat-separator">|</span>
-          <span className="stat-item">
+          <span className="stat-item" data-testid={TEST_IDS.STATS_SELECTION}>
             <span className="stat-label">Selected:</span>
             <span className="stat-value">{selectedText.length} chars</span>
           </span>

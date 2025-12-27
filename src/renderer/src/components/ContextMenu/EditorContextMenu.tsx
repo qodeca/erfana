@@ -7,11 +7,22 @@ import { formatLineRange } from '../../prompts/helpers'
 import { validateVariables } from '../../prompts/validation'
 import { renderIcon, DEFAULT_ICON_PROPS } from '../../utils/iconRegistry'
 import { TEXT_INPUT_LIMITS } from '../../../../shared/constants'
+import { TEST_IDS } from '../../constants/testids'
 import type { PromptVariables, PromptConfig } from '../../prompts/types'
 import type { PromptDialogResult } from '../Dialog/PromptDialog'
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { scheduleScrollIfNeeded } from '../../utils/promptScrollScheduler.logic'
 import { logger } from '../../utils/logger'
+
+/**
+ * Maps prompt IDs to their corresponding test IDs.
+ * Used for automated UI testing to identify context menu items.
+ */
+const PROMPT_TEST_ID_MAP: Record<string, string> = {
+  'code-elaborate': TEST_IDS.CONTEXT_MENU_ITEM_ELABORATE,
+  'code-modify': TEST_IDS.CONTEXT_MENU_ITEM_MODIFY,
+  'code-ask': TEST_IDS.CONTEXT_MENU_ITEM_ASK
+}
 
 /**
  * Props for the EditorContextMenu component.
@@ -260,28 +271,40 @@ export function EditorContextMenu({
       label: prompt.label,
       icon: renderIcon(prompt.icon),
       action: () => handleAction(prompt.id),
-      disabled: !hasSelection // AI prompts require selection
+      disabled: !hasSelection, // AI prompts require selection
+      testId: PROMPT_TEST_ID_MAP[prompt.id]
     })),
     { separator: true } as ContextMenuItem,
     {
       label: 'Cut',
       icon: <Scissors {...DEFAULT_ICON_PROPS} />,
       action: handleCut,
-      disabled: !hasSelection // Cut requires selection
+      disabled: !hasSelection, // Cut requires selection
+      testId: TEST_IDS.CONTEXT_MENU_ITEM_CUT
     },
     {
       label: 'Copy',
       icon: <Copy {...DEFAULT_ICON_PROPS} />,
       action: handleCopy,
-      disabled: !hasSelection // Copy requires selection
+      disabled: !hasSelection, // Copy requires selection
+      testId: TEST_IDS.CONTEXT_MENU_ITEM_COPY
     },
     {
       label: 'Paste',
       icon: <ClipboardPaste {...DEFAULT_ICON_PROPS} />,
-      action: handlePaste
+      action: handlePaste,
       // Paste is always enabled
+      testId: TEST_IDS.CONTEXT_MENU_ITEM_PASTE
     }
   ]
 
-  return <ContextMenu x={x} y={y} items={items} onClose={onClose} />
+  return (
+    <ContextMenu
+      x={x}
+      y={y}
+      items={items}
+      onClose={onClose}
+      containerTestId={TEST_IDS.CONTEXT_MENU_EDITOR}
+    />
+  )
 }

@@ -1,5 +1,6 @@
 import { Info, AlertTriangle } from 'lucide-react'
 import { BaseDialog } from './BaseDialog'
+import { TEST_IDS } from '../../constants/testids'
 import type { AlertDialogConfig } from './types'
 
 interface AlertDialogProps {
@@ -70,7 +71,7 @@ export function AlertDialog({ config, zIndex, onConfirm }: AlertDialogProps) {
       ariaLabelledBy={titleId}
       ariaDescribedBy={messageId}
     >
-      <div onKeyDown={handleKeyDown}>
+      <div onKeyDown={handleKeyDown} data-testid={TEST_IDS.DIALOG_ALERT}>
         <div className="dialog-header-with-icon">
           <div className="dialog-icon">
             {danger ? (
@@ -79,11 +80,11 @@ export function AlertDialog({ config, zIndex, onConfirm }: AlertDialogProps) {
               <Info size={20} strokeWidth={2} />
             )}
           </div>
-          <h3 id={titleId} className="dialog-title">{title}</h3>
+          <h3 id={titleId} className="dialog-title" data-testid={TEST_IDS.DIALOG_TITLE}>{title}</h3>
         </div>
 
         <div className="dialog-body">
-          <p id={messageId} className="dialog-message">{message}</p>
+          <p id={messageId} className="dialog-message" data-testid={TEST_IDS.DIALOG_ALERT_MESSAGE}>{message}</p>
         </div>
 
         <div className="dialog-actions">
@@ -91,6 +92,7 @@ export function AlertDialog({ config, zIndex, onConfirm }: AlertDialogProps) {
             className={`dialog-btn ${danger ? 'dialog-btn-danger' : 'dialog-btn-primary'}`}
             onClick={handleConfirm}
             autoFocus
+            data-testid={TEST_IDS.DIALOG_BTN_OK}
           >
             {confirmLabel}
           </button>

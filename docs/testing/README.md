@@ -198,9 +198,16 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 ---
 
 ### E2E/UI (Playwright Electron)
-- Use `@playwright/test` to launch Electron and assert UI flows.
-- Suggested: add smoke spec + critical flows (project open/change, file open/save).
-- Configure trace/screenshots on failure for debugging.
+
+**[e2e-testing.md](./e2e-testing.md)** - Comprehensive E2E testing guide
+
+- Playwright setup and configuration for Electron
+- Testing patterns for third-party components (Monaco, xterm.js, Mermaid)
+- Complete selector catalog (120+ testids)
+- Test helper utilities documentation
+- Troubleshooting guide
+
+See [BRS-011](../../specs/business-reqs/brs011-ui-test-compatibility/) for the specification.
 
 ### Coverage
 - Generate per-project coverage reports: `npm run test:cov`
@@ -275,11 +282,14 @@ For MCP visual testing:
 
 ---
 
-## 🔗 See Also
+## See Also
 
+- [E2E Testing Guide](./e2e-testing.md) - Playwright E2E testing documentation
+- [Test Scenarios](./test-scenarios.md) - Visual/MCP test scenarios
 - [Development Tasks](../development-tasks.md) - Common development patterns
 - [Architecture](../architecture.md) - Application structure
 - [UI Components](../ui-components.md) - UI system details
+- [BRS-011](../../specs/business-reqs/brs011-ui-test-compatibility/) - UI testing compatibility specification
 
 ---
 

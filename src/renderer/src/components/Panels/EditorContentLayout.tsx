@@ -17,6 +17,7 @@ import { SearchBar } from '../Search'
 import type { MonacoSearchProvider } from '../../providers/search/MonacoSearchProvider'
 import type { PreviewSearchProvider } from '../../providers/search/PreviewSearchProvider'
 import type { ViewMode, EditorFile } from '../Editor/MarkdownEditorPanel/types'
+import { TEST_IDS } from '../../constants/testids'
 import './EditorContentLayout.css'
 
 // Re-export types for consumers who import from this module
@@ -133,7 +134,7 @@ export function EditorContentLayout({
   onSelectionChange
 }: EditorContentLayoutProps): JSX.Element {
   return (
-    <div className={`editor-content view-mode-${viewMode}`}>
+    <div className={`editor-content view-mode-${viewMode}`} data-testid={TEST_IDS.EDITOR_CONTENT}>
       {/* HORIZONTAL SPLIT: Preview on top, Editor on bottom */}
       {viewMode === 'split-horizontal' && (
         <>
@@ -142,6 +143,7 @@ export function EditorContentLayout({
             style={{ height: `${dividerPositionHorizontal}%` }}
             onClick={() => onActivePaneChange('preview')}
             onFocus={() => onActivePaneChange('preview')}
+            data-testid={TEST_IDS.PREVIEW_PANE}
           >
             <MarkdownPreview
               key={`preview-${viewMode}`}
@@ -164,6 +166,7 @@ export function EditorContentLayout({
             style={{ height: `${100 - dividerPositionHorizontal}%` }}
             onClick={() => onActivePaneChange('editor')}
             onFocus={() => onActivePaneChange('editor')}
+            data-testid={TEST_IDS.EDITOR_PANE}
           >
             <MonacoMarkdownEditor
               key={`editor-${viewMode}`}
@@ -191,6 +194,7 @@ export function EditorContentLayout({
               style={viewMode === 'split' ? { width: `${dividerPosition}%` } : undefined}
               onClick={() => onActivePaneChange('editor')}
               onFocus={() => onActivePaneChange('editor')}
+              data-testid={TEST_IDS.EDITOR_PANE}
             >
               <MonacoMarkdownEditor
                 key={`editor-${viewMode}`}
@@ -220,6 +224,7 @@ export function EditorContentLayout({
               style={viewMode === 'split' ? { width: `${100 - dividerPosition}%` } : undefined}
               onClick={() => onActivePaneChange('preview')}
               onFocus={() => onActivePaneChange('preview')}
+              data-testid={TEST_IDS.PREVIEW_PANE}
             >
               <MarkdownPreview
                 key={`preview-${viewMode}`}
