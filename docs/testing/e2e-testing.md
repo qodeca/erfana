@@ -68,7 +68,8 @@ export default defineConfig({
   timeout: 60000,
   retries: 1,
   use: {
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
   },
   projects: [
     {
@@ -940,7 +941,8 @@ Traces are automatically captured on test failures (configured in `playwright.co
 ```typescript
 export default defineConfig({
   use: {
-    trace: 'on-first-retry',  // Capture trace on retry
+    trace: 'retain-on-failure',  // Capture trace on failure
+    screenshot: 'only-on-failure',  // Capture screenshot on failure
   },
 })
 ```

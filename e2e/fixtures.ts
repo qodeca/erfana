@@ -12,19 +12,21 @@
  * @example Basic usage
  * ```typescript
  * import { test, expect } from './fixtures';
+ * import { TEST_IDS, byTestId } from './utils/helpers';
  *
  * test('activity bar is visible', async ({ window }) => {
- *   const activityBar = window.locator('[data-testid="activity-bar"]');
+ *   const activityBar = byTestId(window, TEST_IDS.ACTIVITY_BAR);
  *   await expect(activityBar).toBeVisible();
  * });
  * ```
  *
  * @example With project loaded
  * ```typescript
- * import { test, expect, projectPath } from './fixtures';
+ * import { test, expect } from './fixtures';
+ * import { TEST_IDS, byTestId } from './utils/helpers';
  *
  * test('opens project files', async ({ appWithProject, windowWithProject }) => {
- *   const projectTree = windowWithProject.locator('[data-testid="project-tree"]');
+ *   const projectTree = byTestId(windowWithProject, TEST_IDS.PROJECT_TREE);
  *   await expect(projectTree).toBeVisible();
  * });
  * ```
@@ -38,6 +40,7 @@ import {
   Page
 } from '@playwright/test'
 import path from 'path'
+import { TEST_IDS, byTestId } from './utils/helpers'
 
 /**
  * Path to the Erfana project root (for launching the app).
@@ -84,9 +87,10 @@ type TestFixtures = {
  * @example
  * ```typescript
  * import { test, expect } from './fixtures';
+ * import { TEST_IDS, byTestId } from './utils/helpers';
  *
  * test('shows activity bar', async ({ window }) => {
- *   const bar = window.locator('[data-testid="activity-bar"]');
+ *   const bar = byTestId(window, TEST_IDS.ACTIVITY_BAR);
  *   await expect(bar).toBeVisible();
  * });
  * ```
@@ -120,9 +124,7 @@ export const test = base.extend<TestFixtures>({
     await window.waitForLoadState('domcontentloaded')
 
     // Wait for the activity bar to be visible (app is ready)
-    await window
-      .locator('[data-testid="activity-bar"]')
-      .waitFor({ state: 'visible', timeout: 10000 })
+    await byTestId(window, TEST_IDS.ACTIVITY_BAR).waitFor({ state: 'visible', timeout: 10000 })
 
     await use(window)
   },
@@ -154,14 +156,10 @@ export const test = base.extend<TestFixtures>({
     await window.waitForLoadState('domcontentloaded')
 
     // Wait for activity bar (app is ready)
-    await window
-      .locator('[data-testid="activity-bar"]')
-      .waitFor({ state: 'visible', timeout: 10000 })
+    await byTestId(window, TEST_IDS.ACTIVITY_BAR).waitFor({ state: 'visible', timeout: 10000 })
 
     // Wait for project tree to be populated (project is loaded)
-    await window
-      .locator('[data-testid="project-tree"]')
-      .waitFor({ state: 'visible', timeout: 15000 })
+    await byTestId(window, TEST_IDS.PROJECT_TREE).waitFor({ state: 'visible', timeout: 15000 })
 
     await use(window)
   }
@@ -260,9 +258,7 @@ export const testMultiWindow = base.extend<TestFixtures>({
   window: async ({ app }, use) => {
     const window = await app.firstWindow()
     await window.waitForLoadState('domcontentloaded')
-    await window
-      .locator('[data-testid="activity-bar"]')
-      .waitFor({ state: 'visible', timeout: 10000 })
+    await byTestId(window, TEST_IDS.ACTIVITY_BAR).waitFor({ state: 'visible', timeout: 10000 })
 
     await use(window)
   },
@@ -284,9 +280,7 @@ export const testMultiWindow = base.extend<TestFixtures>({
   windowWithProject: async ({ appWithProject }, use) => {
     const window = await appWithProject.firstWindow()
     await window.waitForLoadState('domcontentloaded')
-    await window
-      .locator('[data-testid="activity-bar"]')
-      .waitFor({ state: 'visible', timeout: 10000 })
+    await byTestId(window, TEST_IDS.ACTIVITY_BAR).waitFor({ state: 'visible', timeout: 10000 })
 
     await use(window)
   }
@@ -315,12 +309,13 @@ export const skip = test.skip
  *
  * @example
  * ```typescript
- * import { withHooks } from './fixtures';
+ * import { withHooks, test } from './fixtures';
+ * import { TEST_IDS, byTestId } from './utils/helpers';
  *
  * withHooks({
  *   beforeEach: async ({ window }) => {
  *     // Open settings before each test
- *     await window.locator('[data-testid="activity-bar-btn-settings"]').click();
+ *     await byTestId(window, TEST_IDS.ACTIVITY_BAR_BTN_SETTINGS).click();
  *   },
  *   afterEach: async ({ window }) => {
  *     // Close settings after each test
@@ -329,7 +324,7 @@ export const skip = test.skip
  * })('settings tests', () => {
  *   test('shows editor section', async ({ window }) => {
  *     // Settings is already open
- *     await expect(window.locator('[data-testid="settings-section-editor"]')).toBeVisible();
+ *     await expect(byTestId(window, TEST_IDS.SETTINGS_SECTION_EDITOR)).toBeVisible();
  *   });
  * });
  * ```

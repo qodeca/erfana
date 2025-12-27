@@ -1,5 +1,6 @@
 import { test, expect, _electron as electron } from '@playwright/test'
 import path from 'path'
+import { TEST_IDS, byTestId } from './utils/helpers'
 
 test.describe('Erfana App Launch', () => {
   test('should launch and display main window with testids', async () => {
@@ -19,15 +20,15 @@ test.describe('Erfana App Launch', () => {
     await window.waitForLoadState('domcontentloaded')
 
     // Verify activity bar testid exists
-    const activityBar = window.locator('[data-testid="activity-bar"]')
+    const activityBar = byTestId(window, TEST_IDS.ACTIVITY_BAR)
     await expect(activityBar).toBeVisible({ timeout: 10000 })
 
     // Verify files button testid
-    const filesButton = window.locator('[data-testid="activity-bar-btn-files"]')
+    const filesButton = byTestId(window, TEST_IDS.ACTIVITY_BAR_BTN_FILES)
     await expect(filesButton).toBeVisible()
 
     // Verify settings button testid
-    const settingsButton = window.locator('[data-testid="activity-bar-btn-settings"]')
+    const settingsButton = byTestId(window, TEST_IDS.ACTIVITY_BAR_BTN_SETTINGS)
     await expect(settingsButton).toBeVisible()
 
     // Clean up

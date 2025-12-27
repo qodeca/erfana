@@ -17,6 +17,7 @@ import { test, expect, _electron as electron } from '@playwright/test'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
+import { TEST_IDS, byTestId } from './utils/helpers'
 
 // Helper: Create temporary test project with Mermaid diagram
 async function createTestProject(): Promise<string> {
@@ -60,7 +61,7 @@ test.describe('Third-Party Components E2E', () => {
     await window.waitForLoadState('domcontentloaded')
 
     // Wait for activity bar to be ready
-    const activityBar = window.locator('[data-testid="activity-bar"]')
+    const activityBar = byTestId(window, TEST_IDS.ACTIVITY_BAR)
     await expect(activityBar).toBeVisible({ timeout: 10000 })
 
     // Create and open test project
@@ -68,11 +69,11 @@ test.describe('Third-Party Components E2E', () => {
 
     try {
       // Click files button to open files panel
-      const filesButton = window.locator('[data-testid="activity-bar-btn-files"]')
+      const filesButton = byTestId(window, TEST_IDS.ACTIVITY_BAR_BTN_FILES)
       await filesButton.click()
 
       // Wait for project tree
-      const projectTree = window.locator('[data-testid="project-tree"]')
+      const projectTree = byTestId(window, TEST_IDS.PROJECT_TREE)
       await expect(projectTree).toBeVisible()
 
       // Open project via system evaluation (simulate opening a project)
@@ -86,7 +87,7 @@ test.describe('Third-Party Components E2E', () => {
       await window.waitForTimeout(1000) // Give time for project to load
 
       // Get the Monaco editor wrapper (third-party component)
-      const editorWrapper = window.locator('[data-testid="editor-monaco"]')
+      const editorWrapper = byTestId(window, TEST_IDS.EDITOR_MONACO)
       await expect(editorWrapper).toBeVisible({ timeout: 5000 })
 
       // Click editor to focus it
@@ -95,8 +96,9 @@ test.describe('Third-Party Components E2E', () => {
       // Wait a moment for focus to stabilize
       await window.waitForTimeout(100)
 
-      // Select all existing content
-      await window.keyboard.press('Meta+A') // macOS Cmd+A
+      // Select all existing content (platform-aware)
+      const modKey = process.platform === 'darwin' ? 'Meta' : 'Control'
+      await window.keyboard.press(`${modKey}+A`)
 
       // Type new content
       const newContent = '# Monaco Editor Test\n\nThis content was typed via keyboard!'
@@ -106,7 +108,7 @@ test.describe('Third-Party Components E2E', () => {
       await window.waitForTimeout(500)
 
       // Get preview pane to verify content appears
-      const previewPane = window.locator('[data-testid="editor-preview"]')
+      const previewPane = byTestId(window, TEST_IDS.EDITOR_PREVIEW)
 
       // Verify the heading appears in preview
       await expect(previewPane).toContainText('Monaco Editor Test', { timeout: 5000 })
@@ -133,15 +135,15 @@ test.describe('Third-Party Components E2E', () => {
     await window.waitForLoadState('domcontentloaded')
 
     // Wait for activity bar
-    const activityBar = window.locator('[data-testid="activity-bar"]')
+    const activityBar = byTestId(window, TEST_IDS.ACTIVITY_BAR)
     await expect(activityBar).toBeVisible({ timeout: 10000 })
 
     // Click terminal button to open terminal panel
-    const terminalButton = window.locator('[data-testid="activity-bar-btn-terminal"]')
+    const terminalButton = byTestId(window, TEST_IDS.ACTIVITY_BAR_BTN_TERMINAL)
     await terminalButton.click()
 
     // Get terminal instance wrapper (third-party component: xterm.js)
-    const terminalInstance = window.locator('[data-testid="terminal-instance"]')
+    const terminalInstance = byTestId(window, TEST_IDS.TERMINAL_INSTANCE)
     await expect(terminalInstance).toBeVisible({ timeout: 5000 })
 
     // Wait for terminal to initialize (PTY needs time to start)
@@ -178,7 +180,7 @@ test.describe('Third-Party Components E2E', () => {
     await window.waitForLoadState('domcontentloaded')
 
     // Wait for activity bar
-    const activityBar = window.locator('[data-testid="activity-bar"]')
+    const activityBar = byTestId(window, TEST_IDS.ACTIVITY_BAR)
     await expect(activityBar).toBeVisible({ timeout: 10000 })
 
     // Create and open test project with Mermaid diagram
@@ -195,7 +197,7 @@ test.describe('Third-Party Components E2E', () => {
       await window.waitForTimeout(1000)
 
       // Get preview pane (where Mermaid diagrams render)
-      const previewPane = window.locator('[data-testid="editor-preview"]')
+      const previewPane = byTestId(window, TEST_IDS.EDITOR_PREVIEW)
       await expect(previewPane).toBeVisible({ timeout: 5000 })
 
       // Wait for Mermaid diagram to render (it's async)
@@ -212,12 +214,12 @@ test.describe('Third-Party Components E2E', () => {
       await window.waitForTimeout(300)
 
       // Mermaid toolbar should be visible
-      const mermaidToolbar = window.locator('[data-testid="mermaid-toolbar"]')
+      const mermaidToolbar = byTestId(window, TEST_IDS.MERMAID_TOOLBAR)
       await expect(mermaidToolbar).toBeVisible({ timeout: 3000 })
 
       // Click a direction button (e.g., Left-to-Right)
       // Mermaid direction buttons have dynamic testids: mermaid-direction-btn-{TB|BT|LR|RL}
-      const directionButton = window.locator('[data-testid="mermaid-direction-btn-LR"]')
+      const directionButton = byTestId(window, `${TEST_IDS.MERMAID_DIRECTION_BTN}-LR`)
 
       // Check if button exists (it may not if diagram doesn't support direction change)
       const buttonCount = await directionButton.count()
@@ -233,14 +235,14 @@ test.describe('Third-Party Components E2E', () => {
         await expect(mermaidToolbar).toBeVisible()
       } else {
         // If direction button not available, test expand button instead
-        const expandButton = window.locator('[data-testid="mermaid-btn-expand"]')
+        const expandButton = byTestId(window, TEST_IDS.MERMAID_BTN_EXPAND)
         await expect(expandButton).toBeVisible()
 
         // Click expand to open fullscreen viewer
         await expandButton.click()
 
         // Diagram viewer should open
-        const diagramViewer = window.locator('[data-testid="diagram-viewer"]')
+        const diagramViewer = byTestId(window, TEST_IDS.DIAGRAM_VIEWER)
         await expect(diagramViewer).toBeVisible({ timeout: 3000 })
 
         // Close viewer with Escape

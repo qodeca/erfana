@@ -638,8 +638,8 @@ export const mermaid = {
    */
   async setDirection(page: Page, direction: 'TB' | 'BT' | 'LR' | 'RL'): Promise<void> {
     await byTestId(page, TEST_IDS.MERMAID_DIRECTION_BTN).click()
-    // The direction button in the toolbar uses dynamic testid
-    await page.locator(`[data-testid="mermaid-direction-btn-${direction}"]`).click()
+    // The direction button in the toolbar uses dynamic testid with direction suffix
+    await byTestId(page, `${TEST_IDS.MERMAID_DIRECTION_BTN}-${direction}`).click()
   },
 
   /**
