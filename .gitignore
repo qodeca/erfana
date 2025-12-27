@@ -34,3 +34,6 @@ coverage/
 
 # Auto Claude data directory
 .auto-claude/
+
+# TypeScript build info
+*.tsbuildinfo
