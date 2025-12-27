@@ -3,7 +3,7 @@
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
 - **Repository**: `qodeca/erfana` (GitHub)
-- **Version**: 0.6.4-gamma
+- **Version**: 0.6.4-zulu
 - **Tech Stack**: Electron 39, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+ (Electron 39 bundles Node.js 22.20.0)
@@ -149,6 +149,34 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 - [ ] Focus states are visible (accessibility)
 
 ## Recent Changes (v0.6.x)
+
+### MarkdownEditorPanel Modular Refactoring (Dec 27, 2025)
+Extracted modular components from monolithic panel for better testability:
+
+**New Structure** (`src/renderer/src/components/Editor/MarkdownEditorPanel/`):
+- `components/MarkdownToolbar.tsx` - Formatting buttons, view mode toggles, export
+- `components/EditorErrorBoundary.tsx` - Error handling wrapper
+- `hooks/useScrollSync.ts` - Bidirectional scroll sync
+- `hooks/useExportHandlers.ts` - PDF/DOCX export handlers
+
+**New Hooks** (`src/renderer/src/hooks/`):
+- `useDividerPosition.ts` - Resizable split pane position
+- `useEditorContextMenu.ts` - Context menu state
+- `useKeyboardShortcuts.ts` - Editor keyboard shortcuts
+
+**New Panel Components** (`src/renderer/src/components/Panels/`):
+- `DocumentStatsBar.tsx` - Real-time word/char/line counts
+- `EditorContentLayout.tsx` - Editor/preview layout with divider
+
+**Related**: See [Editor Documentation](docs/editor/README.md)
+
+### Logging Instance ID (Dec 26, 2025)
+Added instance ID to log entries for multi-instance isolation:
+- Each Erfana instance gets unique identifier in logs
+- Format: `[instance-{id}] message`
+- Helps debug multi-window scenarios
+
+**Files Modified**: `src/main/services/LoggingService.ts`
 
 ### Cross-Platform "New Window" Functionality (Dec 26, 2025)
 Added ability to spawn new independent Erfana instances across all platforms:

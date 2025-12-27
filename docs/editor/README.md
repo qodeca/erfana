@@ -93,18 +93,45 @@ Real-time metrics in bottom status bar:
 - Manual save with Cmd/Ctrl+S
 
 ## Implementation Files
-- `MonacoMarkdownEditor.tsx` - Core editor component
-- `MarkdownPreview.tsx` - Preview rendering
-- `MarkdownEditorPanel.tsx` - Panel orchestration (~900 lines after v0.6.3 refactoring)
-- `markdownEditorPanel.logic.ts` - Pure logic (stats, scroll sync, utilities) - 591 lines, 83 tests
-- `MermaidDiagram.tsx` - Diagram rendering
-- `FrontmatterTable.tsx` - YAML frontmatter display
-- `PdfService.ts` - PDF generation (main process)
-- `DocxService.ts` - DOCX generation (main process)
 
-## Related Hooks
+### Main Panel (`src/renderer/src/components/Panels/`)
+- `MarkdownEditorPanel.tsx` - Panel orchestration (~900 lines after v0.6.3 refactoring)
+- `DocumentStatsBar.tsx` - Real-time word/character/line counts
+- `EditorContentLayout.tsx` - Editor/preview layout with resizable divider
+
+### Modular Components (`src/renderer/src/components/Editor/MarkdownEditorPanel/`)
+*New in v0.6.4-zulu - extracted for better testability and separation of concerns*
+
+**Components:**
+- `MarkdownToolbar.tsx` - Formatting buttons, view mode toggles, export actions
+- `EditorErrorBoundary.tsx` - Error handling wrapper
+
+**Hooks:**
+- `useScrollSync.ts` - Bidirectional editor-preview scroll synchronization
+- `useExportHandlers.ts` - PDF/DOCX export handlers
+
+**Types:**
+- `types.ts` - Shared TypeScript interfaces
+
+### Core Components (`src/renderer/src/components/Editor/`)
+- `MonacoMarkdownEditor.tsx` - Core Monaco editor wrapper
+- `MarkdownPreview.tsx` - Markdown-to-HTML preview rendering
+- `MermaidDiagram.tsx` - Mermaid diagram rendering with zoom/pan
+- `FrontmatterTable.tsx` - YAML frontmatter display
+
+### Main Process Services (`src/main/services/`)
+- `PdfService.ts` - PDF generation via Electron's printToPDF
+- `DocxService.ts` - DOCX generation via `docx` library
+
+### Pure Logic (`src/renderer/src/components/Editor/`)
+- `markdownEditorPanel.logic.ts` - Pure functions (stats, scroll sync) - 591 lines, 83 tests
+
+## Related Hooks (`src/renderer/src/hooks/`)
 - `useAutoSave.ts` - Debounced auto-save with React state management
 - `useFileWatcher.ts` - File change detection with race condition protection
+- `useDividerPosition.ts` - Resizable split pane position management
+- `useEditorContextMenu.ts` - Context menu state and positioning
+- `useKeyboardShortcuts.ts` - Editor keyboard shortcut handling
 
 ## Related Documentation
 - [Prompt Templates](../prompts/README.md) - AI text operations

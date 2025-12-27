@@ -2,6 +2,44 @@
 
 Historical changelog entries for versions prior to current. For the latest changes, see [CLAUDE.md](../CLAUDE.md).
 
+## Changes in v0.6.4-zulu
+- **MarkdownEditorPanel Modular Refactoring** (Dec 27, 2025):
+  - Extracted modular components from monolithic panel
+  - New folder: `src/renderer/src/components/Editor/MarkdownEditorPanel/`
+  - Components: MarkdownToolbar, EditorErrorBoundary
+  - Hooks: useScrollSync, useExportHandlers
+  - New hooks: useDividerPosition, useEditorContextMenu, useKeyboardShortcuts
+  - DocumentStatsBar, EditorContentLayout components
+  - Improves testability and separation of concerns
+- **Logging Instance ID** (Dec 26, 2025):
+  - Added instance ID to log entries for multi-instance isolation
+  - Each Erfana instance gets unique identifier in logs
+  - Helps debug multi-window scenarios
+- **BRS-011: Automated UI Testing Compatibility** (Dec 27, 2025):
+  - New T3 BRS for Playwright/E2E testing infrastructure
+  - 42 requirements (26 FR + 6 NFR + 10 AC)
+  - Covers data-testid for all interactive elements
+  - TypeScript constants, portal-aware helpers
+  - GitHub issue #79 created
+- **Total: 5306 tests passing** (164 test files)
+
+## Changes in v0.6.4-gamma
+- **Multi-Instance Support with Project Locking** (Dec 25, 2025):
+  - Multiple independent Erfana instances can run simultaneously
+  - File-based project locking prevents duplicate project opens
+  - Duplicate project attempts focus existing window (VS Code behavior)
+  - Stale lock detection: PID check + 60-min timeout
+  - 500ms focus polling for cross-instance coordination
+  - 206 new tests
+  - Closes #27
+- **Cross-Platform New Window Functionality** (Dec 26, 2025):
+  - macOS: Dock right-click menu with "New Window" option
+  - Windows: Taskbar jump list with "New Window" option
+  - All platforms: File > New Window menu item (Cmd/Ctrl+Shift+N)
+  - 51 new tests
+  - Closes #77
+- **Total: 5255 tests passing** (163 test files)
+
 ## Changes in v0.6.4-beta
 - **Editor Context Menu with AI Prompts** (Dec 25, 2025):
   - Right-click with text selected shows context menu in Monaco editor
@@ -37,7 +75,7 @@ Historical changelog entries for versions prior to current. For the latest chang
   - Prompts before quitting with unsaved changes or active terminals
   - 54 new tests
   - Closes #64
-- **Total: 5049 tests passing** (162 test files)
+- **Total: 5049 tests passing** (162 test files) at release
 
 ## Changes in v0.6.3
 - **Logging Improvements** (Dec 21, 2025):
