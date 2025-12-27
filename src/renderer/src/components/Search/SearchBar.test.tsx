@@ -523,27 +523,45 @@ describe('SearchBar', () => {
       expect(preventDefaultSpy).toHaveBeenCalled()
     })
 
-    it('implements focus trap with Tab key', async () => {
+    it('implements focus trap with Tab key wrapping forward', async () => {
       const user = userEvent.setup()
+
       render(<SearchBar provider={mockProvider} />)
 
       const input = screen.getByPlaceholderText('Search...')
       const closeButton = screen.getByRole('button', { name: /close search/i })
 
-      input.focus()
-
-      // Tab through all focusable elements to the last one
-      await user.keyboard('{Tab}')
-      await user.keyboard('{Tab}')
-      await user.keyboard('{Tab}')
-      await user.keyboard('{Tab}')
-
+      // Focus the close button directly (last focusable element when nav buttons disabled)
+      closeButton.focus()
       expect(closeButton).toHaveFocus()
 
-      // Tab from last element should wrap to first
+      // Tab from last element should wrap to first (input)
       await user.keyboard('{Tab}')
-
       expect(input).toHaveFocus()
+    })
+
+    it('implements focus trap with Shift+Tab wrapping backward', () => {
+      render(<SearchBar provider={mockProvider} />)
+
+      const input = screen.getByPlaceholderText('Search...')
+      const closeButton = screen.getByRole('button', { name: /close search/i })
+      const container = screen.getByRole('search')
+
+      // Focus the input (first focusable element)
+      input.focus()
+      expect(input).toHaveFocus()
+
+      // Dispatch Shift+Tab keydown event on container (where the handler is attached)
+      const shiftTabEvent = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true
+      })
+      container.dispatchEvent(shiftTabEvent)
+
+      // Shift+Tab from first element should wrap to last (close button)
+      expect(closeButton).toHaveFocus()
     })
   })
 
