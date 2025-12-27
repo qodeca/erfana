@@ -83,6 +83,7 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 | BRS-008 | Graph engine polish & maintenance | T3 | draft | `specs/business-reqs/brs008-graph-polish/` |
 | BRS-009 | Media import with transcription | T4 | draft | `specs/business-reqs/brs009-media-import-transcription/` |
 | BRS-010 | Multiple independent instances | T4 | active | `specs/business-reqs/brs010-multi-instance/` |
+| BRS-011 | Automated UI testing compatibility | T3 | draft | `specs/business-reqs/brs011-ui-test-compatibility/` |
 
 **Registry**: `specs/business-reqs/registry.json`
 

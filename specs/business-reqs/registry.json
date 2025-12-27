@@ -1,7 +1,7 @@
 {
   "sequence": {
-    "current": 10,
-    "next": 11
+    "current": 11,
+    "next": 12
   },
   "registry": [
     {
@@ -217,11 +217,32 @@
         "designs": [],
         "issues": ["#27"]
       }
+    },
+    {
+      "id": 11,
+      "slug": "ui-test-compatibility",
+      "name": "Automated UI testing compatibility",
+      "tier": "T3",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Make Erfana compatible with automated UI testing tools by adding systematic data-testid attributes to all interactive elements and documenting testing patterns for Claude Code.",
+      "created": "2025-12-27T00:00:00.000Z",
+      "path": "brs011-ui-test-compatibility",
+      "last_modified": "2025-12-27T17:00:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 42,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": ["#79"]
+      }
     }
   ],
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2025-12-26T00:00:00.000Z"
+    "last_updated": "2025-12-27T17:00:00.000Z"
   }
 }

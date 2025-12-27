@@ -1,0 +1,139 @@
+{
+  "brs_id": 11,
+  "brs_slug": "ui-test-compatibility",
+  "tier": "T3",
+  "version": "0.2.0",
+  "created": "2025-12-27T15:30:00.000Z",
+  "updated": "2025-12-27T17:00:00.000Z",
+  "application": {
+    "name": "Erfana",
+    "domain": "markdown-ide",
+    "tech_stack": ["Electron 39", "React 18", "TypeScript 5.7", "Monaco Editor", "xterm.js"]
+  },
+  "scope": {
+    "type": "feature",
+    "name": "Automated UI testing compatibility"
+  },
+  "sections": [
+    {
+      "id": "01",
+      "file": "01-overview.md",
+      "title": "Overview",
+      "word_count": 425
+    },
+    {
+      "id": "02",
+      "file": "02-requirements.md",
+      "title": "Requirements",
+      "word_count": 2078
+    },
+    {
+      "id": "03",
+      "file": "03-acceptance.md",
+      "title": "Acceptance",
+      "word_count": 1096
+    }
+  ],
+  "requirements_index": {
+    "FR-001": { "section": "02-requirements", "status": "active" },
+    "FR-002": { "section": "02-requirements", "status": "active" },
+    "FR-003": { "section": "02-requirements", "status": "active" },
+    "FR-004": { "section": "02-requirements", "status": "active" },
+    "FR-005": { "section": "02-requirements", "status": "active" },
+    "FR-006": { "section": "02-requirements", "status": "active" },
+    "FR-007": { "section": "02-requirements", "status": "active" },
+    "FR-008": { "section": "02-requirements", "status": "active" },
+    "FR-009": { "section": "02-requirements", "status": "active" },
+    "FR-010": { "section": "02-requirements", "status": "active" },
+    "FR-011": { "section": "02-requirements", "status": "active" },
+    "FR-012": { "section": "02-requirements", "status": "active" },
+    "FR-013": { "section": "02-requirements", "status": "active" },
+    "FR-014": { "section": "02-requirements", "status": "active" },
+    "FR-015": { "section": "02-requirements", "status": "active" },
+    "FR-016": { "section": "02-requirements", "status": "active" },
+    "FR-017": { "section": "02-requirements", "status": "active" },
+    "FR-018": { "section": "02-requirements", "status": "active" },
+    "FR-019": { "section": "02-requirements", "status": "active" },
+    "FR-020": { "section": "02-requirements", "status": "active" },
+    "FR-021": { "section": "02-requirements", "status": "active" },
+    "FR-022": { "section": "02-requirements", "status": "active" },
+    "FR-023": { "section": "02-requirements", "status": "active" },
+    "FR-024": { "section": "02-requirements", "status": "active" },
+    "FR-025": { "section": "02-requirements", "status": "active" },
+    "FR-026": { "section": "02-requirements", "status": "active" },
+    "NFR-001": { "section": "02-requirements", "status": "active" },
+    "NFR-002": { "section": "02-requirements", "status": "active" },
+    "NFR-003": { "section": "02-requirements", "status": "active" },
+    "NFR-004": { "section": "02-requirements", "status": "active" },
+    "NFR-005": { "section": "02-requirements", "status": "active" },
+    "NFR-006": { "section": "02-requirements", "status": "active" },
+    "AC-001": { "section": "03-acceptance", "status": "active" },
+    "AC-002": { "section": "03-acceptance", "status": "active" },
+    "AC-003": { "section": "03-acceptance", "status": "active" },
+    "AC-004": { "section": "03-acceptance", "status": "active" },
+    "AC-005": { "section": "03-acceptance", "status": "active" },
+    "AC-006": { "section": "03-acceptance", "status": "active" },
+    "AC-007": { "section": "03-acceptance", "status": "active" },
+    "AC-008": { "section": "03-acceptance", "status": "active" },
+    "AC-009": { "section": "03-acceptance", "status": "active" },
+    "AC-010": { "section": "03-acceptance", "status": "active" }
+  },
+  "requirement_sequences": {
+    "FR": 26,
+    "NFR": 6,
+    "AC": 10
+  },
+  "cross_references": [],
+  "statistics": {
+    "total_sections": 3,
+    "total_requirements": 42,
+    "total_words": 3599
+  },
+  "validation": {
+    "overall_score": null,
+    "passed": false,
+    "last_validated": null,
+    "threshold": 50
+  },
+  "change_history": [
+    {
+      "date": "2025-12-27T15:30:00.000Z",
+      "operation": "INIT",
+      "target": "manifest",
+      "description": "BRS initialized as T3 with 3 sections",
+      "by": "system"
+    },
+    {
+      "date": "2025-12-27T17:00:00.000Z",
+      "operation": "AMEND",
+      "target": "manifest",
+      "description": "Added FR-019 to FR-026 (8 new FRs), AC-010, updated Definition of Done",
+      "by": "system",
+      "details": {
+        "requirements_added": ["FR-019", "FR-020", "FR-021", "FR-022", "FR-023", "FR-024", "FR-025", "FR-026", "AC-010"],
+        "word_count_changes": {
+          "02-requirements.md": { "old": 1403, "new": 2078 },
+          "03-acceptance.md": { "old": 849, "new": 1096 }
+        },
+        "statistics_changes": {
+          "total_requirements": { "old": 33, "new": 42 },
+          "total_words": { "old": 2677, "new": 3599 }
+        }
+      }
+    },
+    {
+      "date": "2025-12-27T17:00:00.000Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 9 issues: updated word counts, requirement_sequences, requirements_index, statistics",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": true,
+        "sections_synced": true,
+        "orphans_cleaned": 0,
+        "registry_synced": true
+      }
+    }
+  ]
+}
