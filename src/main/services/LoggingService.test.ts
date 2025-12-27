@@ -162,6 +162,22 @@ describe('LoggingService', () => {
       expect(mockRendererLogger.transports.file.format).toContain('[{level}]')
     })
 
+    it('includes instance ID in log format for all loggers', async () => {
+      const instanceId = service.getInstanceId()
+      await service.initialize()
+
+      // All loggers should include the instance ID in their format
+      expect(mockCombinedLogger.transports.file.format).toContain(`[${instanceId}]`)
+      expect(mockMainLogger.transports.file.format).toContain(`[${instanceId}]`)
+      expect(mockRendererLogger.transports.file.format).toContain(`[${instanceId}]`)
+
+      // Verify format order: [timestamp] [instanceId] [level] text
+      const format = mockCombinedLogger.transports.file.format
+      const instanceIdIndex = format.indexOf(`[${instanceId}]`)
+      const levelIndex = format.indexOf('[{level}]')
+      expect(instanceIdIndex).toBeLessThan(levelIndex)
+    })
+
     it('sets file paths to separate log files', async () => {
       await service.initialize()
 
@@ -247,14 +263,20 @@ describe('LoggingService', () => {
       }
     })
 
-    it('logs initialization message to both combined and main logs', async () => {
+    it('logs startup message with instance ID to both combined and main logs', async () => {
       await service.initialize()
 
       expect(mockCombinedLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('Logging service initialized')
+        expect.stringContaining('Instance started')
+      )
+      expect(mockCombinedLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('instanceId')
+      )
+      expect(mockCombinedLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('fullInstanceId')
       )
       expect(mockMainLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('Logging service initialized')
+        expect.stringContaining('Instance started')
       )
     })
 
@@ -376,6 +398,48 @@ describe('LoggingService', () => {
 
       service.setLevel('warn')
       expect(service.getLevel()).toBe('warn')
+    })
+  })
+
+  describe('getInstanceId()', () => {
+    it('returns 8-character instance ID', () => {
+      const instanceId = service.getInstanceId()
+
+      expect(instanceId).toBeDefined()
+      expect(typeof instanceId).toBe('string')
+      expect(instanceId.length).toBe(8)
+    })
+
+    it('returns same ID on repeated calls', () => {
+      const id1 = service.getInstanceId()
+      const id2 = service.getInstanceId()
+
+      expect(id1).toBe(id2)
+    })
+
+    it('returns different IDs for different service instances', () => {
+      const service2 = new LoggingService()
+
+      expect(service.getInstanceId()).not.toBe(service2.getInstanceId())
+    })
+  })
+
+  describe('getFullInstanceId()', () => {
+    it('returns full UUID format', () => {
+      const fullId = service.getFullInstanceId()
+
+      expect(fullId).toBeDefined()
+      expect(typeof fullId).toBe('string')
+      // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 chars with dashes)
+      expect(fullId.length).toBe(36)
+      expect(fullId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+    })
+
+    it('short instance ID is prefix of full ID', () => {
+      const shortId = service.getInstanceId()
+      const fullId = service.getFullInstanceId()
+
+      expect(fullId.startsWith(shortId)).toBe(true)
     })
   })
 

@@ -150,6 +150,10 @@ await loggingService.initialize()
 const level = loggingService.getLevel() // 'info'
 loggingService.setLevel('debug')
 
+// Get instance identifiers (for multi-instance debugging)
+const shortId = loggingService.getInstanceId()     // 'a1b2c3d4' (8 chars)
+const fullId = loggingService.getFullInstanceId()  // 'a1b2c3d4-e5f6-...' (full UUID)
+
 // Cleanup old log files (runs automatically, but can be triggered manually)
 await loggingService.cleanupOldLogs()
 
@@ -222,17 +226,40 @@ All log files are stored in:
 ### Log format
 
 ```
-[2025-12-21 14:32:15.123] [info] Application started {"version":"0.6.0"}
-[2025-12-21 14:32:15.456] [debug] [RENDERER] Component mounted {"component":"Editor"}
-[2025-12-21 14:32:16.789] [error] Failed to read file | Error: ENOENT | Stack: ... | {"path":"/missing.md"}
+[2025-12-21 14:32:15.123] [a1b2c3d4] [info] Instance started {"instanceId":"a1b2c3d4","fullInstanceId":"a1b2c3d4-..."}
+[2025-12-21 14:32:15.456] [a1b2c3d4] [info] Application started {"version":"0.6.0"}
+[2025-12-21 14:32:15.789] [a1b2c3d4] [debug] [RENDERER] Component mounted {"component":"Editor"}
+[2025-12-21 14:32:16.012] [a1b2c3d4] [error] Failed to read file | Error: ENOENT | Stack: ... | {"path":"/missing.md"}
 ```
 
-Format: `[timestamp] [level] message | Error: ... | Stack: ... | {context}`
+Format: `[timestamp] [instanceId] [level] message | Error: ... | Stack: ... | {context}`
 
+- **Instance ID**: 8-character unique identifier for each Erfana instance
 - Timestamp: ISO format with milliseconds
 - Renderer logs prefixed with `[RENDERER]`
 - Error messages include stack traces
 - Context serialized as JSON
+
+### Multi-instance support
+
+When running multiple Erfana instances (via "New Window"), each instance generates a unique 8-character ID at startup. This allows filtering logs by instance:
+
+```bash
+# View logs from specific instance
+grep '\[a1b2c3d4\]' ~/.erfana/logs/combined.log
+
+# Compare two instances
+grep '\[a1b2c3d4\]' ~/.erfana/logs/combined.log > instance1.log
+grep '\[b5c6d7e8\]' ~/.erfana/logs/combined.log > instance2.log
+
+# Find which instances have logged
+grep 'Instance started' ~/.erfana/logs/combined.log
+```
+
+The full UUID is logged at startup for correlation:
+```
+[2025-12-21 14:32:15.123] [a1b2c3d4] [info] Instance started {"instanceId":"a1b2c3d4","fullInstanceId":"a1b2c3d4-e5f6-7890-abcd-ef1234567890",...}
+```
 
 ## Configuration
 
@@ -364,7 +391,7 @@ To diagnose logging issues, enable trace level temporarily:
 
 2. Check initialization logs:
    ```bash
-   grep 'Logging service initialized' ~/.erfana/logs/main.log
+   grep 'Instance started' ~/.erfana/logs/main.log
    ```
 
 3. Look for level change logs:

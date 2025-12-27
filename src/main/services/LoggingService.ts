@@ -21,6 +21,7 @@
  */
 import log from 'electron-log'
 import type Logger from 'electron-log'
+import { randomUUID } from 'node:crypto'
 import { homedir, tmpdir } from 'os'
 import { readdir, stat, unlink, statfs } from 'fs/promises'
 import { join, dirname, basename, extname } from 'path'
@@ -136,6 +137,19 @@ export class LoggingService {
   private unsubscribeSettings: (() => void) | null = null
   private isProcessingSettingsChange = false
 
+  /**
+   * Unique instance identifier (8 characters)
+   * Used to distinguish log entries from different Erfana instances
+   * @see Issue #78 - logging instance isolation
+   */
+  private readonly instanceId: string
+  private readonly fullInstanceId: string
+
+  constructor() {
+    this.fullInstanceId = randomUUID()
+    this.instanceId = this.fullInstanceId.slice(0, 8)
+  }
+
   // Three independent logger instances
   private combinedLogger = log.create({ logId: 'combined' })
   private mainLogger = log.create({ logId: 'main' })
@@ -183,7 +197,12 @@ export class LoggingService {
         }
       })
 
-      this.info('Logging service initialized', { level: this.currentLevel, logsDir })
+      this.info('Instance started', {
+        instanceId: this.instanceId,
+        fullInstanceId: this.fullInstanceId,
+        level: this.currentLevel,
+        logsDir
+      })
     } catch (error) {
       throw new AppError(
         `Failed to initialize logging service: ${error instanceof Error ? error.message : String(error)}`,
@@ -203,7 +222,7 @@ export class LoggingService {
     // Configure file transport
     logger.transports.file.resolvePathFn = () => filePath
     logger.transports.file.maxSize = MAX_SIZE
-    logger.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}'
+    logger.transports.file.format = `[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [${this.instanceId}] [{level}] {text}`
     logger.transports.file.level = mapToElectronLogLevel(this.currentLevel)
     logger.transports.file.archiveLogFn = archiveLog
 
@@ -233,6 +252,22 @@ export class LoggingService {
    */
   getLevel(): LogLevel {
     return this.currentLevel
+  }
+
+  /**
+   * Get instance identifier (8 characters)
+   * Useful for correlating logs from this instance
+   */
+  getInstanceId(): string {
+    return this.instanceId
+  }
+
+  /**
+   * Get full instance identifier (UUID)
+   * Useful for unique identification across all instances
+   */
+  getFullInstanceId(): string {
+    return this.fullInstanceId
   }
 
   /**
