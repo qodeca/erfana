@@ -232,7 +232,7 @@
       "sections_count": 3,
       "requirements_count": 42,
       "documents": {
-        "technical_adrs": [],
+        "technical_adrs": ["docs/architecture/adrs/adr-brs011-001-ui-test-architecture.md"],
         "solution_adrs": [],
         "solution_specs": [],
         "designs": [],
