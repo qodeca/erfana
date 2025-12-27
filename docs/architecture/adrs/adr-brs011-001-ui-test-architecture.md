@@ -93,26 +93,17 @@ This option aligns with existing canonical testids while providing clarity and t
 3. **Buttons**: Use `-btn-` suffix (matches existing `toolbar-btn-bold`)
 4. **Inputs**: Use `-input` suffix (e.g., `search-bar-input`)
 5. **Containers**: Use component name only (e.g., `activity-bar`, `project-tree`)
-6. **Dynamic elements**: Append 8-character SHA256 hash of path (e.g., `tab-item-a1b2c3d4`)
+6. **Dynamic elements**: Append 8-character djb2 hash of path (e.g., `tab-item-a1b2c3d4`)
 7. **Context menu items**: Use `-item-{action}` pattern (e.g., `context-menu-item-elaborate`)
 8. **Toggles**: Use `-toggle-{name}` pattern (e.g., `search-bar-toggle-case`)
 
 ### Hash function implementation
 
 ```typescript
-// Browser-compatible SHA256 hash (Web Crypto API)
-export async function getPathHash(path: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(path)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-  return hashHex.slice(0, 8)
-}
-
-// Synchronous alternative using simple hash (for React render)
-export function getPathHashSync(path: string): string {
-  // djb2 hash - fast, good distribution for file paths
+// djb2 hash - synchronous, React-compatible
+export function getPathHash(path: string): string {
+  // djb2 hash algorithm: hash(i) = hash(i-1) * 33 + c
+  // Initial value 5381 chosen for good distribution properties
   let hash = 5381
   for (let i = 0; i < path.length; i++) {
     hash = ((hash << 5) + hash) + path.charCodeAt(i)
@@ -122,7 +113,14 @@ export function getPathHashSync(path: string): string {
 }
 ```
 
-**Rationale**: SHA256 prevents collisions between similar paths like `foo/bar.md` and `foo-bar.md`. Synchronous djb2 variant allows use in React render without async/await.
+**Rationale**: djb2 was chosen over SHA256 for several reasons:
+- **Synchronous execution** - can be used directly in React render without async/await
+- **Performance** - faster for typical file path strings
+- **Sufficient collision resistance** - 32 bits (8 hex chars) provides good distribution for project-scale file counts
+- **Browser compatibility** - no dependency on Web Crypto API
+- **Simplicity** - straightforward algorithm, easy to test and debug
+
+SHA256 was initially considered for cryptographic-strength collision resistance, but rejected because async hashing would require `useEffect` or similar patterns in React components, adding unnecessary complexity for a non-security use case.
 
 ## Architecture design
 

@@ -34,6 +34,10 @@
  * - Component prefix matches component name (kebab-case)
  * - Buttons use `-btn-` short form
  * - All values are lowercase with hyphens
+ *
+ * NOTE: Component counts in comments (e.g., "// Activity Bar (5)") are validated
+ * by automated tests in testids.test.ts. If a count comment becomes stale, the
+ * tests will fail and prompt an update.
  */
 export const TEST_IDS = {
   // =========================================================================
@@ -256,7 +260,10 @@ export const TEST_IDS = {
   CHAT_BTN_FIT: 'chat-btn-fit',
   /** Reset zoom button */
   CHAT_BTN_RESET: 'chat-btn-reset',
-  /** Direction change button */
+  /**
+   * Direction change button prefix - use with direction suffix.
+   * Pattern: `${CHAT_DIRECTION_BTN}-${direction}` (e.g., 'chat-direction-btn-TB', 'chat-direction-btn-LR')
+   */
   CHAT_DIRECTION_BTN: 'chat-direction-btn',
   /** Scroll to bottom button */
   CHAT_BTN_SCROLL_BOTTOM: 'chat-btn-scroll-bottom',
@@ -283,10 +290,10 @@ export const TEST_IDS = {
   MERMAID_DIRECTIONS_GROUP: 'mermaid-directions-group',
 
   // =========================================================================
-  // Editor Tabs (5)
+  // Editor Tabs (6)
   // =========================================================================
 
-  /** Tab bar container */
+  /** Tab bar container (Dockview-managed, may not be directly accessible) */
   TAB_BAR: 'tab-bar',
   /** Tab item - use with getDynamicTestId */
   TAB_ITEM: 'tab-item',
@@ -296,6 +303,8 @@ export const TEST_IDS = {
   TAB_LABEL: 'tab-label',
   /** Unsaved changes indicator - use with getDynamicTestId */
   TAB_DIRTY: 'tab-dirty',
+  /** Active tab marker - use with getDynamicTestId on active tab */
+  TAB_ACTIVE: 'tab-active',
 
   // =========================================================================
   // Search Bar (8)
@@ -492,6 +501,6 @@ export function getPathHash(path: string): string {
  * </div>
  * ```
  */
-export function getDynamicTestId(prefix: string, path: string): string {
+export function getDynamicTestId(prefix: TestId, path: string): string {
   return `${prefix}-${getPathHash(path)}`
 }

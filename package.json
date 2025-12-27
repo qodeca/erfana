@@ -26,6 +26,7 @@
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win",
     "build:mac": "npm run build && electron-builder --mac",
+    "build:mac:test": "npm run build && ERFANA_TEST_BUILD=true electron-builder --mac -c.directories.output=release/test/${npm_package_version}",
     "build:linux": "npm run build && electron-builder --linux",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed"

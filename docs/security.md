@@ -21,6 +21,7 @@ Erfana follows **2025 Electron security best practices** with comprehensive hard
 - ASAR is currently disabled due to runtime dependency loading issues with isomorphic-git (2 fuses unavailable)
 - Cookie encryption disabled to avoid macOS keychain prompts (settings stored in plaintext)
 - 3 critical fuses remain active: RunAsNode, NodeOptions, NodeCliInspect
+- Test builds (`ERFANA_TEST_BUILD=true`) enable NodeCliInspect for Playwright E2E testing - see [Test Builds](#test-builds-erfana_test_build)
 
 ---
 
@@ -127,6 +128,71 @@ Build logs show fuses applied during `npm run build:mac`:
 - [Electron Fuses Documentation](https://www.electronjs.org/docs/latest/tutorial/fuses)
 - [LOTL Attack Analysis (Druva, Jan 2025)](https://www.druva.com/blog/living-off-the-land-lotl-attack-due-to-electron-fuses-misconfiguration)
 - [CVE-2024-46992](https://nvd.nist.gov/vuln/detail/CVE-2024-46992) - ELECTRON_RUN_AS_NODE exploitation
+
+---
+
+## Test Builds (ERFANA_TEST_BUILD)
+
+**Status**: ⚠️ SECURITY-REDUCED BUILDS FOR TESTING ONLY
+
+Test builds have the `EnableNodeCliInspectArguments` fuse **enabled** to allow Playwright E2E testing via Chrome DevTools Protocol (CDP).
+
+### Why Test Builds Exist:
+
+Playwright requires the `--remote-debugging-port` flag to connect to Electron for E2E testing. This flag is blocked by the `EnableNodeCliInspectArguments` fuse in production builds. Test builds enable this fuse specifically for automated testing.
+
+### Security Implications:
+
+| Fuse | Production | Test Build |
+|------|------------|------------|
+| `RunAsNode` | ❌ disabled | ❌ disabled |
+| `EnableNodeOptionsEnvironmentVariable` | ❌ disabled | ❌ disabled |
+| `EnableNodeCliInspectArguments` | ❌ disabled | ⚠️ **ENABLED** |
+
+**WARNING**: The `--inspect` flag allows remote debugging access. An attacker with network access could:
+- Attach a debugger to the running application
+- Execute arbitrary JavaScript in the main process
+- Access all application data and permissions
+
+### How to Create Test Builds:
+
+```bash
+# Test build (inspector enabled, separate output directory)
+npm run build:mac:test
+
+# Production build (all fuses disabled)
+npm run build:mac
+```
+
+### Test Build Differentiation:
+
+To prevent accidental distribution, test builds are clearly marked:
+
+1. **App Name**: Includes "(TEST BUILD)" suffix (e.g., "Erfana (TEST BUILD).app")
+2. **Output Directory**: Placed in `release/test/{version}/` instead of `release/{version}/`
+3. **Build Logs**: Prominent warning banners displayed during build
+
+### Never Distribute Test Builds:
+
+**CRITICAL**: Test builds must NEVER be distributed to end users. They are intended only for:
+- Playwright E2E testing in CI/CD pipelines
+- Local automated testing during development
+- Debugging specific issues that require inspector access
+
+Always use production builds (`npm run build:mac`) for distribution.
+
+### Implementation:
+
+**File**: `scripts/fuses.js`
+
+The `ERFANA_TEST_BUILD` environment variable controls fuse configuration:
+
+```javascript
+const isTestBuild = process.env.ERFANA_TEST_BUILD === 'true';
+
+// In fuse configuration:
+[FuseV1Options.EnableNodeCliInspectArguments]: isTestBuild,
+```
 
 ---
 

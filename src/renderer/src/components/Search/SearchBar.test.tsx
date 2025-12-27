@@ -8,12 +8,14 @@
  * - Structure and elements (7 tests)
  * - Search execution (5 tests)
  * - Navigation controls (6 tests)
- * - Options toggles (6 tests)
+ * - Options toggles (7 tests) - includes regression test for stale closure fix
  * - Keyboard interactions (6 tests)
  * - Focus management (3 tests)
  * - Match count display (4 tests)
  * - Provider integration (4 tests)
  * - Accessibility (6 tests)
+ *
+ * Total: 53 tests
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
@@ -430,6 +432,28 @@ describe('SearchBar', () => {
 
       await user.click(toggle)
       expect(useSearchStore.getState().options.caseSensitive).toBe(false)
+    })
+
+    // Regression test: Stale closure fix in handleToggleKeyDown
+    // Prior to the fix, pressing Enter twice rapidly would read stale state
+    // from closure, causing toggle to set the same value twice (true → true)
+    // instead of toggling correctly (true → false)
+    it('handles rapid Enter key presses without stale closure issues', () => {
+      render(<SearchBar provider={mockProvider} />)
+
+      const toggle = screen.getByTitle('Case sensitive (Alt+C)')
+
+      // First Enter: false → true
+      fireEvent.keyDown(toggle, { key: 'Enter' })
+      expect(useSearchStore.getState().options.caseSensitive).toBe(true)
+
+      // Second Enter immediately after: true → false (not true → true with stale closure)
+      fireEvent.keyDown(toggle, { key: 'Enter' })
+      expect(useSearchStore.getState().options.caseSensitive).toBe(false)
+
+      // Third Enter: false → true (verify toggle still works)
+      fireEvent.keyDown(toggle, { key: 'Enter' })
+      expect(useSearchStore.getState().options.caseSensitive).toBe(true)
     })
   })
 

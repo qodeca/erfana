@@ -246,9 +246,9 @@ test('set editor content', async ({ window }) => {
   const editor = window.locator('[data-testid="editor-monaco"]')
   await editor.click()
 
-  // Clear existing content
-  await window.keyboard.press('Meta+A')  // macOS
-  // await window.keyboard.press('Control+A')  // Windows/Linux
+  // Clear existing content (platform-aware)
+  const modKey = process.platform === 'darwin' ? 'Meta' : 'Control'
+  await window.keyboard.press(`${modKey}+A`)
 
   // Type new content
   await window.keyboard.type('# New Document\n\nHello, world!')
@@ -267,7 +267,8 @@ test('search in editor', async ({ window }) => {
   await editor.click()
 
   // Open Erfana's search bar (overrides Monaco's native find)
-  await window.keyboard.press('Meta+F')
+  const modKey = process.platform === 'darwin' ? 'Meta' : 'Control'
+  await window.keyboard.press(`${modKey}+F`)
 
   // Search bar should appear
   const searchBar = window.locator('[data-testid="search-bar"]')
@@ -774,7 +775,10 @@ export const openProject = async (window: Page, projectPath: string) => {
 export const setEditorContent = async (window: Page, content: string) => {
   const editor = byTestId(window, TEST_IDS.EDITOR_MONACO)
   await editor.click()
-  await window.keyboard.press('Meta+A')  // Select all (macOS)
+
+  // Platform-aware modifier key
+  const modKey = process.platform === 'darwin' ? 'Meta' : 'Control'
+  await window.keyboard.press(`${modKey}+A`)  // Select all
   await window.keyboard.type(content)
 }
 
@@ -784,8 +788,11 @@ export const setEditorContent = async (window: Page, content: string) => {
 export const getEditorContent = async (window: Page): Promise<string> => {
   const editor = byTestId(window, TEST_IDS.EDITOR_MONACO)
   await editor.click()
-  await window.keyboard.press('Meta+A')  // Select all
-  await window.keyboard.press('Meta+C')  // Copy
+
+  // Platform-aware modifier key
+  const modKey = process.platform === 'darwin' ? 'Meta' : 'Control'
+  await window.keyboard.press(`${modKey}+A`)  // Select all
+  await window.keyboard.press(`${modKey}+C`)  // Copy
 
   // Read from clipboard
   return window.evaluate(() => navigator.clipboard.readText())
@@ -875,7 +882,10 @@ test('editor context menu', async ({ window }) => {
   // Select some text
   await editor.click()
   await window.keyboard.type('Hello World')
-  await window.keyboard.press('Meta+A')  // Select all
+
+  // Platform-aware modifier key
+  const modKey = process.platform === 'darwin' ? 'Meta' : 'Control'
+  await window.keyboard.press(`${modKey}+A`)  // Select all
 
   // Right-click to show context menu
   await editor.click({ button: 'right' })
@@ -890,6 +900,187 @@ test('editor context menu', async ({ window }) => {
   // Menu should dismiss
   await expect(menu).not.toBeVisible()
 })
+```
+
+---
+
+## Debugging and development
+
+### Playwright Inspector
+
+Debug tests step-by-step with the Playwright Inspector:
+
+```bash
+# Run tests with inspector
+PWDEBUG=1 npm run test:e2e
+
+# Or set environment variable
+export PWDEBUG=1
+npm run test:e2e
+```
+
+**Inspector features**:
+- Step through test execution line by line
+- Pause test and inspect DOM state
+- Pick locator by clicking elements
+- Explore page console logs
+- View screenshots at each step
+
+**Keyboard shortcuts** (in Inspector):
+- `F10` - Step over
+- `F11` - Step into
+- `Shift+F11` - Step out
+- `F5` - Resume
+- `F8` - Pause
+
+### Viewing traces
+
+Traces are automatically captured on test failures (configured in `playwright.config.ts`):
+
+```typescript
+export default defineConfig({
+  use: {
+    trace: 'on-first-retry',  // Capture trace on retry
+  },
+})
+```
+
+**View traces after test run**:
+
+```bash
+# Run tests (traces saved on failure)
+npm run test:e2e
+
+# Open trace viewer
+npx playwright show-trace trace.zip
+
+# Or specify path
+npx playwright show-trace test-results/.../trace.zip
+```
+
+**Trace viewer features**:
+- Timeline of all actions
+- DOM snapshot at each step
+- Network requests
+- Console logs
+- Screenshots and videos
+- Source code highlighting
+
+**Trace options**:
+- `'on'` - Always capture traces (slow, large files)
+- `'on-first-retry'` - Capture on retry (recommended)
+- `'off'` - Never capture traces
+- `'retain-on-failure'` - Keep only failed test traces
+
+### Headed mode for visual debugging
+
+Run tests with visible browser window:
+
+```bash
+npm run test:e2e:headed
+
+# Or with Playwright CLI
+npx playwright test --headed
+```
+
+**Use headed mode when**:
+- Debugging visual issues
+- Verifying animations and transitions
+- Understanding test failures
+- Developing new tests
+
+### CI/CD integration
+
+#### GitHub Actions example
+
+```yaml
+# .github/workflows/e2e-tests.yml
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+jobs:
+  test-e2e:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps
+
+      - name: Build Electron app
+        run: npm run build
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+      - name: Upload trace on failure
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-traces-${{ matrix.os }}
+          path: test-results/**/trace.zip
+          retention-days: 7
+
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-screenshots-${{ matrix.os }}
+          path: test-results/**/*.png
+          retention-days: 7
+```
+
+**CI best practices**:
+- Run on multiple OS (macOS, Windows, Linux) for cross-platform validation
+- Upload traces and screenshots as artifacts on failure
+- Use `npm ci` instead of `npm install` for consistent dependencies
+- Cache `node_modules` to speed up builds
+- Set reasonable timeouts (E2E tests may be slower in CI)
+
+#### Parallel test execution in CI
+
+```yaml
+# Run tests in parallel across multiple workers
+- name: Run E2E tests
+  run: npm run test:e2e -- --workers=4
+```
+
+**Worker recommendations**:
+- Local: `--workers=2` (don't overload development machine)
+- CI: `--workers=4` to `--workers=8` (depends on runner specs)
+- GitHub Actions runners: 2-core machines, use `--workers=2`
+
+#### Test sharding for large test suites
+
+```yaml
+# Split tests across multiple CI jobs
+jobs:
+  test-e2e:
+    strategy:
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - name: Run E2E tests (shard ${{ matrix.shard }})
+        run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
 ```
 
 ---
@@ -1006,6 +1197,26 @@ const firstTab = window.locator('[data-testid^="tab-item-"]').first()
 ---
 
 ## Platform-specific notes
+
+### Cross-platform testing
+
+When writing tests that work across all platforms, use platform-aware keyboard shortcuts:
+
+```typescript
+// ✅ Good: Platform-aware modifier key
+const modKey = process.platform === 'darwin' ? 'Meta' : 'Control'
+await window.keyboard.press(`${modKey}+A`)  // Select all
+await window.keyboard.press(`${modKey}+C`)  // Copy
+await window.keyboard.press(`${modKey}+V`)  // Paste
+
+// ❌ Bad: Hardcoded to macOS
+await window.keyboard.press('Meta+A')  // Fails on Windows/Linux
+```
+
+**Common shortcuts**:
+- `Cmd` (macOS) / `Ctrl` (Windows/Linux): Use `Meta` or `Control`
+- `Option` (macOS) / `Alt` (Windows/Linux): Use `Alt` on all platforms
+- `Enter`, `Escape`, `Tab`, `F1`-`F12`: Same on all platforms
 
 ### macOS
 
