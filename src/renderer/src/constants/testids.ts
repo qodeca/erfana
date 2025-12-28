@@ -75,6 +75,10 @@ export const TEST_IDS = {
   PROJECT_TREE_NODE: 'project-tree-node',
   /** Tree node expand/collapse toggle - use with getDynamicTestId */
   PROJECT_TREE_TOGGLE: 'project-tree-toggle',
+  /** File node - use with getDynamicTestId for specific file targeting */
+  PROJECT_TREE_NODE_FILE: 'project-tree-node-file',
+  /** Folder node - use with getDynamicTestId for specific folder targeting */
+  PROJECT_TREE_NODE_FOLDER: 'project-tree-node-folder',
 
   // =========================================================================
   // Git Status Bar (4)

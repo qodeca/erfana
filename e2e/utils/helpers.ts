@@ -30,7 +30,8 @@
  * ```
  */
 
-import { Page, expect, Locator } from '@playwright/test'
+import { Page, expect, Locator, ElectronApplication } from '@playwright/test'
+import { stubDialog } from 'electron-playwright-helpers'
 import { TEST_IDS, getPathHash } from '../../src/renderer/src/constants/testids'
 
 // Re-export TEST_IDS for convenience
@@ -478,13 +479,47 @@ export const terminal = {
   },
 
   /**
-   * Opens the terminal panel by clicking the activity bar button.
+   * Opens the terminal panel by clicking the terminal button in the activity bar.
+   * The terminal button is on the RIGHT activity bar and requires a project to be loaded.
    */
   async open(page: Page): Promise<void> {
-    await byTestId(page, TEST_IDS.ACTIVITY_BAR_BTN_TERMINAL).click()
-    await waitForTestId(page, TEST_IDS.TERMINAL_INSTANCE)
+    // Click the terminal button in the right activity bar
+    // Note: This button is only visible when a project is loaded (requiresProject: true)
+    // The button appears after projectPath propagates to ActivityBar context
+    const terminalBtn = byTestId(page, TEST_IDS.ACTIVITY_BAR_BTN_TERMINAL)
+    await expect(terminalBtn).toBeVisible({ timeout: 10000 })
+    await terminalBtn.click()
+
+    // Wait for terminal panel to become visible and the instance to be rendered
+    // The splitview panel needs time to expand and render
+    await page.waitForTimeout(1000) // Allow panel animation and splitview update
+
+    // The terminal-instance might be in DOM but initially hidden while splitview resizes
+    // Use a more lenient check - wait for it to be attached first
+    const terminalInstance = byTestId(page, TEST_IDS.TERMINAL_INSTANCE)
+    await expect(terminalInstance).toBeAttached({ timeout: 10000 })
+
+    // Poll for visibility with retry - splitview panels can take time to resize
+    let visible = false
+    for (let i = 0; i < 20; i++) {
+      try {
+        await expect(terminalInstance).toBeVisible({ timeout: 500 })
+        visible = true
+        break
+      } catch {
+        // Not visible yet, wait and retry
+        await page.waitForTimeout(250)
+      }
+    }
+
+    if (!visible) {
+      // Take a debug screenshot before failing
+      await page.screenshot({ path: 'debug-terminal-not-visible.png' })
+      throw new Error('Terminal instance not visible after 10 seconds of polling')
+    }
+
     // Wait for PTY initialization
-    await page.waitForTimeout(1000)
+    await page.waitForTimeout(1500)
   },
 
   /**
@@ -765,4 +800,107 @@ export async function clickFileInTree(page: Page, filePath: string): Promise<voi
 export async function toggleFolder(page: Page, folderPath: string): Promise<void> {
   const toggle = byDynamicTestId(page, TEST_IDS.PROJECT_TREE_TOGGLE, folderPath)
   await toggle.click()
+}
+
+// =============================================================================
+// Project management helpers
+// =============================================================================
+
+/**
+ * Opens a project using the IPC API directly.
+ *
+ * This bypasses the native file dialog and uses the `openProjectByPath` API
+ * which is more reliable for E2E testing as it doesn't require dialog stubbing.
+ *
+ * The flow is:
+ * 1. Clear localStorage for clean state
+ * 2. Reload page
+ * 3. Call the openProjectByPath API via page.evaluate
+ * 4. Wait for project tree and terminal button to appear
+ *
+ * @param electronApp - Playwright ElectronApplication instance (unused but kept for API compatibility)
+ * @param page - Playwright Page instance
+ * @param projectPath - The path to the project folder
+ *
+ * @example
+ * ```typescript
+ * await openProject(electronApp, window, '/path/to/test/project');
+ * await waitForTestId(window, TEST_IDS.PROJECT_TREE);
+ * ```
+ */
+export async function openProject(
+  _electronApp: ElectronApplication,
+  page: Page,
+  projectPath: string
+): Promise<void> {
+  // Clear persisted activity bar state to ensure clean slate
+  await page.evaluate(() => {
+    localStorage.removeItem('erfana-activity-bar-state')
+  })
+
+  // Reload the page to apply clean state
+  await page.reload()
+  await page.waitForLoadState('domcontentloaded')
+
+  // Handle potential dialogs that may appear on reload (unsaved changes, project switch, etc.)
+  // The confirm button has testid DIALOG_BTN_CONFIRM regardless of button label (Quit, Switch Anyway, etc.)
+  async function dismissDialogIfPresent(): Promise<void> {
+    const confirmBtn = page.locator(`[data-testid="${TEST_IDS.DIALOG_BTN_CONFIRM}"]`)
+    try {
+      await confirmBtn.waitFor({ state: 'visible', timeout: 1500 })
+      await confirmBtn.click()
+      await page.waitForTimeout(300)
+      // Check if another dialog appeared
+      await dismissDialogIfPresent()
+    } catch {
+      // No dialog present, continue
+    }
+  }
+  await dismissDialogIfPresent()
+
+  await waitForTestId(page, TEST_IDS.ACTIVITY_BAR, { timeout: 10000 })
+
+  // Now project tree should be visible by default (leftActivePanel: 'project')
+  const projectTree = byTestId(page, TEST_IDS.PROJECT_TREE)
+  await expect(projectTree).toBeVisible({ timeout: 10000 })
+
+  // Open the project using the API directly (bypasses dialog)
+  // This is more reliable than stubbing the dialog as it uses the same code path
+  // that Recent Projects uses to open projects
+  await page.evaluate(async (path: string) => {
+    await (window as any).api.file.openProjectByPath(path)
+  }, projectPath)
+
+  // Wait for project to load - file nodes should appear in the tree
+  // Using longer timeout as project loading involves IPC, file system, and React rendering
+  const fileNodes = page.locator(`[data-testid^="${TEST_IDS.PROJECT_TREE_NODE_FILE}-"]`)
+  await expect(fileNodes.first()).toBeVisible({ timeout: 15000 })
+
+  // Wait for terminal button to appear - this confirms projectPath has propagated to ActivityBar
+  // The terminal button has requiresProject: true, so it only renders when projectPath is set
+  const terminalBtn = byTestId(page, TEST_IDS.ACTIVITY_BAR_BTN_TERMINAL)
+  await expect(terminalBtn).toBeVisible({ timeout: 10000 })
+}
+
+/**
+ * Clicks a file in the project tree by its filename (for simpler tests).
+ * Uses the file-specific testid to avoid matching folder nodes.
+ *
+ * @param page - Playwright Page instance
+ * @param fileName - The file name to click (e.g., 'test.md')
+ */
+export async function clickFileByName(page: Page, fileName: string): Promise<void> {
+  // Use the file-specific testid (PROJECT_TREE_NODE_FILE) to match only files
+  const fileNode = page
+    .locator(`[data-testid^="${TEST_IDS.PROJECT_TREE_NODE_FILE}-"]`)
+    .filter({ hasText: fileName })
+
+  // Wait for the file node to be visible and stable before clicking
+  await expect(fileNode).toBeVisible({ timeout: 5000 })
+
+  // Click the file node to open it in the editor
+  await fileNode.click()
+
+  // Wait for the editor to open (file click triggers tab creation and editor mount)
+  await page.waitForTimeout(1000)
 }

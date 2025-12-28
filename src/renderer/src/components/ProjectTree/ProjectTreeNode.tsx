@@ -196,6 +196,10 @@ export function ProjectTreeNode({
         data-drop-target={isDropTarget || showDropHighlight}
         data-drop-invalid={isDropInvalid}
         data-clipboard-cut={clipboardCut}
+        data-testid={getDynamicTestId(
+          node.type === 'file' ? TEST_IDS.PROJECT_TREE_NODE_FILE : TEST_IDS.PROJECT_TREE_NODE_FOLDER,
+          node.path
+        )}
         {...dragAttributes}
         {...dragListeners}
       >

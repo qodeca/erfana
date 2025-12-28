@@ -38,3 +38,6 @@ coverage/
 # TypeScript build info
 *.tsbuildinfo
 test-results/
+
+# E2E test temp projects
+.e2e-temp/

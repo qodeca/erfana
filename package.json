@@ -28,8 +28,8 @@
     "build:mac": "npm run build && electron-builder --mac",
     "build:mac:test": "npm run build && ERFANA_TEST_BUILD=true electron-builder --mac -c.directories.output=release/test/${npm_package_version}",
     "build:linux": "npm run build && electron-builder --linux",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e": "electron-vite build && playwright test",
+    "test:e2e:headed": "electron-vite build && playwright test --headed"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -93,6 +93,7 @@
     "c8": "^10.1.3",
     "electron": "^39.2.4",
     "electron-builder": "^26.0.0",
+    "electron-playwright-helpers": "^2.0.1",
     "electron-vite": "^2.3.0",
     "eslint": "^9.16.0",
     "eslint-plugin-react": "^7.37.2",
