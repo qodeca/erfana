@@ -75,10 +75,10 @@ describe('TEST_IDS', () => {
       expect(activityBarIds).toHaveLength(5)
     })
 
-    it('should have 8 Project Tree IDs', async () => {
+    it('should have 10 Project Tree IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const projectTreeIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('PROJECT_TREE'))
-      expect(projectTreeIds).toHaveLength(8)
+      expect(projectTreeIds).toHaveLength(10)
     })
 
     it('should have 6 Terminal Panel IDs', async () => {

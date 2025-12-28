@@ -481,22 +481,33 @@ export const terminal = {
   /**
    * Opens the terminal panel by clicking the terminal button in the activity bar.
    * The terminal button is on the RIGHT activity bar and requires a project to be loaded.
+   *
+   * Note: Terminal auto-opens when a project loads (useAutoOpenTerminal hook).
+   * This function checks if terminal is already visible to avoid toggling it closed.
    */
   async open(page: Page): Promise<void> {
+    const terminalInstance = byTestId(page, TEST_IDS.TERMINAL_INSTANCE)
+
+    // Check if terminal is already visible (auto-opened on project load)
+    try {
+      await expect(terminalInstance).toBeVisible({ timeout: 2000 })
+      // Terminal is already open, just wait for PTY initialization
+      await page.waitForTimeout(1500)
+      return
+    } catch {
+      // Terminal not visible, need to open it
+    }
+
     // Click the terminal button in the right activity bar
     // Note: This button is only visible when a project is loaded (requiresProject: true)
-    // The button appears after projectPath propagates to ActivityBar context
     const terminalBtn = byTestId(page, TEST_IDS.ACTIVITY_BAR_BTN_TERMINAL)
     await expect(terminalBtn).toBeVisible({ timeout: 10000 })
     await terminalBtn.click()
 
     // Wait for terminal panel to become visible and the instance to be rendered
-    // The splitview panel needs time to expand and render
     await page.waitForTimeout(1000) // Allow panel animation and splitview update
 
-    // The terminal-instance might be in DOM but initially hidden while splitview resizes
-    // Use a more lenient check - wait for it to be attached first
-    const terminalInstance = byTestId(page, TEST_IDS.TERMINAL_INSTANCE)
+    // Wait for terminal instance to be attached and visible
     await expect(terminalInstance).toBeAttached({ timeout: 10000 })
 
     // Poll for visibility with retry - splitview panels can take time to resize
@@ -807,6 +818,60 @@ export async function toggleFolder(page: Page, folderPath: string): Promise<void
 // =============================================================================
 
 /**
+ * Dismisses application dialogs if present.
+ *
+ * Uses Playwright's auto-retrying assertions instead of arbitrary timeouts.
+ * Handles multiple dialogs appearing in sequence (e.g., unsaved changes
+ * followed by project switch confirmation).
+ *
+ * Note: This handles Erfana's custom React dialogs, not native OS dialogs.
+ * For native dialogs, use stubDialog from electron-playwright-helpers.
+ *
+ * @param page - Playwright Page instance
+ * @param options - Optional configuration
+ * @param options.timeout - Time to wait for each dialog check (default: 500ms)
+ * @param options.maxAttempts - Maximum number of dialogs to dismiss (default: 3)
+ *
+ * @example
+ * ```typescript
+ * // Dismiss any dialogs after page reload
+ * await page.reload();
+ * await dismissDialogIfPresent(page);
+ *
+ * // With custom timeout for slower environments
+ * await dismissDialogIfPresent(page, { timeout: 1000 });
+ * ```
+ */
+export async function dismissDialogIfPresent(
+  page: Page,
+  options: { timeout?: number; maxAttempts?: number } = {}
+): Promise<void> {
+  const { timeout = 500, maxAttempts = 3 } = options
+  let attempts = 0
+
+  while (attempts < maxAttempts) {
+    const confirmBtn = byTestId(page, TEST_IDS.DIALOG_BTN_CONFIRM)
+
+    try {
+      // Quick check if dialog is visible using short timeout
+      await expect(confirmBtn).toBeVisible({ timeout })
+
+      // Dialog found - click to dismiss
+      await confirmBtn.click()
+
+      // Wait for dialog to be dismissed before checking for next one
+      await expect(byTestId(page, TEST_IDS.DIALOG_OVERLAY)).not.toBeVisible({ timeout: 500 })
+
+      attempts++
+      // Continue loop to check for additional dialogs
+    } catch {
+      // No dialog visible within timeout - we're done
+      break
+    }
+  }
+}
+
+/**
  * Opens a project using the IPC API directly.
  *
  * This bypasses the native file dialog and uses the `openProjectByPath` API
@@ -843,20 +908,7 @@ export async function openProject(
   await page.waitForLoadState('domcontentloaded')
 
   // Handle potential dialogs that may appear on reload (unsaved changes, project switch, etc.)
-  // The confirm button has testid DIALOG_BTN_CONFIRM regardless of button label (Quit, Switch Anyway, etc.)
-  async function dismissDialogIfPresent(): Promise<void> {
-    const confirmBtn = page.locator(`[data-testid="${TEST_IDS.DIALOG_BTN_CONFIRM}"]`)
-    try {
-      await confirmBtn.waitFor({ state: 'visible', timeout: 1500 })
-      await confirmBtn.click()
-      await page.waitForTimeout(300)
-      // Check if another dialog appeared
-      await dismissDialogIfPresent()
-    } catch {
-      // No dialog present, continue
-    }
-  }
-  await dismissDialogIfPresent()
+  await dismissDialogIfPresent(page)
 
   await waitForTestId(page, TEST_IDS.ACTIVITY_BAR, { timeout: 10000 })
 
@@ -883,6 +935,59 @@ export async function openProject(
 }
 
 /**
+ * Opens a project using the UI flow with native dialog stubbed.
+ *
+ * Uses stubDialog to intercept the native file dialog and return the
+ * specified project path, allowing E2E tests to test the actual UI flow
+ * without manual interaction.
+ *
+ * Unlike openProject() which uses the API directly, this function tests
+ * the full user-facing flow: clicking the "Open Folder" button and
+ * handling the native file picker.
+ *
+ * @param electronApp - Playwright ElectronApplication instance
+ * @param page - Playwright Page instance
+ * @param projectPath - The path to return from the stubbed dialog
+ *
+ * @example
+ * ```typescript
+ * // Test the Open Folder button flow
+ * await openProjectViaUI(electronApp, window, '/path/to/test/project');
+ * await expect(byTestId(window, TEST_IDS.PROJECT_TREE)).toBeVisible();
+ * ```
+ */
+export async function openProjectViaUI(
+  electronApp: ElectronApplication,
+  page: Page,
+  projectPath: string
+): Promise<void> {
+  // Stub the native file dialog to return the test project path
+  await stubDialog(electronApp, 'showOpenDialog', {
+    filePaths: [projectPath],
+    canceled: false
+  })
+
+  // Wait for app to be ready
+  await waitForTestId(page, TEST_IDS.ACTIVITY_BAR, { timeout: 10000 })
+
+  // Click the Open Folder button in the project tree
+  const openBtn = byTestId(page, TEST_IDS.PROJECT_TREE_BTN_OPEN)
+  await expect(openBtn).toBeVisible({ timeout: 5000 })
+  await openBtn.click()
+
+  // Dismiss any app dialogs that may appear (unsaved changes, etc.)
+  await dismissDialogIfPresent(page)
+
+  // Wait for project to load - file nodes should appear in the tree
+  const fileNodes = page.locator(`[data-testid^="${TEST_IDS.PROJECT_TREE_NODE_FILE}-"]`)
+  await expect(fileNodes.first()).toBeVisible({ timeout: 15000 })
+
+  // Wait for terminal button to appear (confirms project is fully loaded)
+  const terminalBtn = byTestId(page, TEST_IDS.ACTIVITY_BAR_BTN_TERMINAL)
+  await expect(terminalBtn).toBeVisible({ timeout: 10000 })
+}
+
+/**
  * Clicks a file in the project tree by its filename (for simpler tests).
  * Uses the file-specific testid to avoid matching folder nodes.
  *
@@ -903,4 +1008,88 @@ export async function clickFileByName(page: Page, fileName: string): Promise<voi
 
   // Wait for the editor to open (file click triggers tab creation and editor mount)
   await page.waitForTimeout(1000)
+}
+
+/**
+ * Closes the Electron app gracefully, handling quit confirmation dialogs naturally.
+ *
+ * The app may show a quit confirmation dialog when:
+ * - There are unsaved changes in the editor
+ * - There is terminal activity
+ *
+ * This helper triggers quit via keyboard shortcut (Cmd+Q / Ctrl+Q) which goes
+ * through the app's natural quit flow. If a dialog appears, it clicks the
+ * confirm button to proceed with quit.
+ *
+ * **Why keyboard shortcut instead of electronApp.close()?**
+ * Calling electronApp.close() triggers the quit flow which may show a dialog,
+ * but by then we've already passed the point where we can interact with the page.
+ * The keyboard shortcut triggers quit from within the page context, allowing us
+ * to wait for and click any dialogs that appear.
+ *
+ * @param electronApp - Playwright ElectronApplication instance
+ * @param page - Playwright Page instance (may be undefined if test failed early)
+ *
+ * @example
+ * ```typescript
+ * // In test finally block
+ * } finally {
+ *   await closeApp(electronApp, window);
+ *   await cleanupTestProject(projectPath);
+ * }
+ * ```
+ */
+export async function closeApp(
+  electronApp: ElectronApplication,
+  page?: Page
+): Promise<void> {
+  if (!page) {
+    // No page available - just close directly
+    await electronApp.close()
+    return
+  }
+
+  // Trigger quit from within the page by calling window.close()
+  // This triggers the window's 'close' event which sends 'quit:requested' IPC to renderer
+  // The renderer then checks for blockers and may show a confirmation dialog
+  try {
+    await page.evaluate(() => window.close())
+  } catch {
+    // Page might already be closing - continue
+  }
+
+  // Wait for and handle quit confirmation dialog
+  // The dialog appears if there are unsaved changes or terminal activity
+  // Use multiple attempts with short waits to handle race conditions
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      // Check if quit dialog appeared
+      const confirmBtn = byTestId(page, TEST_IDS.DIALOG_BTN_CONFIRM)
+      await expect(confirmBtn).toBeVisible({ timeout: 1500 })
+
+      // Dialog appeared - click confirm ("Quit" button) to proceed
+      await confirmBtn.click()
+
+      // Wait for dialog to close (may fail if app closed)
+      try {
+        await page.waitForTimeout(300)
+      } catch {
+        // Page closed after clicking confirm - this is expected
+        break
+      }
+
+      // Check if another dialog appeared (e.g., terminal activity after unsaved changes)
+      continue
+    } catch {
+      // No dialog visible - either app is quitting or no blockers
+      break
+    }
+  }
+
+  // Fallback: ensure app is closed (may already be closed)
+  try {
+    await electronApp.close()
+  } catch {
+    // App already closed - this is fine
+  }
 }
