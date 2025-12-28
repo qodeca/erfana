@@ -8,8 +8,10 @@ Historical changelog entries for versions prior to current. For the latest chang
   - Added 11 lessons learned in e2e-lessons-learned.md
   - Robust dialog handling and native dialog mocking
   - Terminal visibility fix: Playwright auto-retry instead of manual polling
+  - Monaco keyboard input fix: Playwright auto-retry instead of fixed 500ms timeout
+  - New helpers: `getTextArea()`, `waitForCursor()` for Monaco focus verification
   - 138 testids across all interactive components
-  - Closes #79, #80, #81
+  - Closes #79, #80, #81, #83
 - **MarkdownEditorPanel Modular Refactoring** (Dec 27, 2025):
   - Extracted modular components from monolithic panel
   - New folder: `src/renderer/src/components/Editor/MarkdownEditorPanel/`
