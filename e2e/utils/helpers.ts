@@ -326,9 +326,13 @@ export const monaco = {
    * Focuses the Monaco editor by clicking on it.
    */
   async focus(page: Page): Promise<void> {
-    await this.getEditor(page).click()
-    // Small delay for focus to take effect
-    await page.waitForTimeout(100)
+    // Click directly on Monaco's editor area using force: true to handle overlapping elements
+    // Monaco renders complex overlapping layers (scrollable, view-lines, etc.) that can intercept clicks
+    const editor = this.getEditor(page).locator('.monaco-editor')
+    await editor.click({ force: true })
+    // Verify focus acquired by checking cursor visibility
+    const cursor = this.getEditor(page).locator('.monaco-editor .cursor')
+    await expect(cursor).toBeVisible({ timeout: 2000 })
   },
 
   /**
@@ -446,8 +450,26 @@ export const monaco = {
    */
   async waitForReady(page: Page): Promise<void> {
     await waitForTestId(page, TEST_IDS.EDITOR_MONACO)
-    // Additional wait for Monaco to initialize
-    await page.waitForTimeout(500)
+    // Wait for Monaco's internal editor container to be present
+    // This indicates Monaco has fully initialized and is ready for input
+    // Note: Monaco wraps its internals inside our testid wrapper div
+    const monacoContainer = this.getEditor(page).locator('.monaco-editor')
+    await expect(monacoContainer).toBeAttached({ timeout: 5000 })
+  },
+
+  /**
+   * Get Monaco's internal textarea locator (used for keyboard input)
+   */
+  getTextArea(page: Page): Locator {
+    return this.getEditor(page).locator('.monaco-editor textarea')
+  },
+
+  /**
+   * Wait for Monaco cursor to be visible (indicates editor is focused)
+   */
+  async waitForCursor(page: Page): Promise<void> {
+    const cursor = this.getEditor(page).locator('.monaco-editor .cursor')
+    await expect(cursor).toBeVisible({ timeout: 2000 })
   }
 }
 

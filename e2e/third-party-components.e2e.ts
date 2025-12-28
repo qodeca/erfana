@@ -24,6 +24,7 @@ import {
   openProject,
   clickFileByName,
   keyboard,
+  monaco,
   terminal,
   closeApp
 } from './utils/helpers'
@@ -115,16 +116,11 @@ test.describe('Third-Party Components E2E', () => {
       await expect(splitViewBtn).toBeVisible({ timeout: 5000 })
       await splitViewBtn.click()
 
-      // Wait for editor to mount after view mode change
-      await window.waitForTimeout(500)
+      // Wait for Monaco editor to be fully initialized
+      await monaco.waitForReady(window)
 
-      // Get the Monaco editor wrapper (third-party component)
-      const editorWrapper = byTestId(window, TEST_IDS.EDITOR_MONACO)
-      await expect(editorWrapper).toBeVisible({ timeout: 5000 })
-
-      // Click editor to focus it
-      await editorWrapper.click()
-      await window.waitForTimeout(100)
+      // Focus editor and verify cursor is visible
+      await monaco.focus(window)
 
       // Select all existing content
       await keyboard.selectAll(window)

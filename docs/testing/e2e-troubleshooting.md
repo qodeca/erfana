@@ -64,14 +64,33 @@ console.log('Element visible:', visible)
 
 ## Monaco editor not responding to keyboard
 
-Monaco needs focus before keyboard input:
+Monaco needs proper initialization and focus before keyboard input. Use the `monaco` helper which handles this reliably:
 
 ```typescript
-// Always click to focus first
-await window.locator('[data-testid="editor-monaco"]').click()
-await window.waitForTimeout(100)  // Brief delay for focus
-await window.keyboard.type('Hello')
+import { monaco } from './utils/helpers'
+
+// Wait for Monaco to be fully ready (Playwright auto-retry, no fixed timeout)
+await monaco.waitForReady(page)
+
+// Focus using force click and verify cursor visibility
+await monaco.focus(page)
+
+// Now keyboard input works reliably
+await page.keyboard.type('Hello')
+
+// Or use the combined helper
+await monaco.setContent(page, '# Hello World')
 ```
+
+**Why this works**:
+- `waitForReady()` uses Playwright's auto-retry to wait for `.monaco-editor` container
+- `focus()` clicks with `force: true` to handle Monaco's overlapping DOM layers
+- Focus is verified by checking cursor visibility before returning
+
+**Common mistakes**:
+- Using fixed `waitForTimeout()` instead of auto-retry assertions
+- Clicking without `force: true` (may hit wrong layer)
+- Not verifying focus was acquired before typing
 
 ---
 

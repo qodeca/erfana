@@ -31,11 +31,35 @@ await window.keyboard.press('Enter')
 // window.locator('.monaco-editor .view-line') // Fragile!
 ```
 
+### Monaco initialization and focus
+
+Monaco requires special handling for reliable E2E tests:
+
+1. **Wait for ready state** - Use `monaco.waitForReady()` which waits for `.monaco-editor` container to be attached (Playwright auto-retry, no fixed timeouts)
+2. **Force click for focus** - Use `monaco.focus()` which clicks with `force: true` to handle Monaco's overlapping layers
+3. **Verify focus acquired** - `focus()` confirms cursor visibility before returning
+
+```typescript
+import { monaco } from './utils/helpers'
+
+// Wait for Monaco to be fully initialized
+await monaco.waitForReady(page)
+
+// Focus editor (handles overlapping layers, verifies cursor)
+await monaco.focus(page)
+
+// Now keyboard input will work reliably
+await page.keyboard.type('# Hello World')
+```
+
 ### Monaco testing patterns
 
 | Action | Method |
 |--------|--------|
-| Set content | `keyboard.type()` after clicking editor |
+| Wait for ready | `monaco.waitForReady(page)` |
+| Focus editor | `monaco.focus(page)` |
+| Set content | `monaco.setContent(page, content)` |
+| Get content | `monaco.getContent(page)` |
 | Select all | `Cmd/Ctrl+A` |
 | Copy | `Cmd/Ctrl+C` |
 | Paste | `Cmd/Ctrl+V` |
@@ -47,16 +71,12 @@ await window.keyboard.press('Enter')
 ### Example: Setting editor content
 
 ```typescript
+import { monaco } from './utils/helpers'
+
 test('set editor content', async ({ window }) => {
-  const editor = window.locator('[data-testid="editor-monaco"]')
-  await editor.click()
-
-  // Clear existing content (platform-aware)
-  const modKey = process.platform === 'darwin' ? 'Meta' : 'Control'
-  await window.keyboard.press(`${modKey}+A`)
-
-  // Type new content
-  await window.keyboard.type('# New Document\n\nHello, world!')
+  // Wait for Monaco to be ready and set content
+  await monaco.waitForReady(window)
+  await monaco.setContent(window, '# New Document\n\nHello, world!')
 
   // Verify via preview (if in split mode)
   const preview = window.locator('[data-testid="editor-preview"]')

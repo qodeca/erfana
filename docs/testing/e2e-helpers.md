@@ -109,36 +109,50 @@ export const openProject = async (window: Page, projectPath: string) => {
 
 ### Editor helpers
 
+The `monaco` helper object provides reliable Monaco editor interactions:
+
 ```typescript
-/**
- * Set Monaco editor content via keyboard
- */
-export const setEditorContent = async (window: Page, content: string) => {
-  const editor = byTestId(window, TEST_IDS.EDITOR_MONACO)
-  await editor.click()
+import { monaco } from './utils/helpers'
 
-  // Platform-aware modifier key
-  const modKey = process.platform === 'darwin' ? 'Meta' : 'Control'
-  await window.keyboard.press(`${modKey}+A`)  // Select all
-  await window.keyboard.type(content)
-}
+// Wait for Monaco to be fully initialized (uses Playwright auto-retry)
+await monaco.waitForReady(page)
 
-/**
- * Get visible text from Monaco editor
- */
-export const getEditorContent = async (window: Page): Promise<string> => {
-  const editor = byTestId(window, TEST_IDS.EDITOR_MONACO)
-  await editor.click()
+// Focus editor (handles overlapping layers, verifies cursor visibility)
+await monaco.focus(page)
 
-  // Platform-aware modifier key
-  const modKey = process.platform === 'darwin' ? 'Meta' : 'Control'
-  await window.keyboard.press(`${modKey}+A`)  // Select all
-  await window.keyboard.press(`${modKey}+C`)  // Copy
+// Set content (clears existing, types new)
+await monaco.setContent(page, '# Hello World')
 
-  // Read from clipboard
-  return window.evaluate(() => navigator.clipboard.readText())
-}
+// Get content via clipboard
+const content = await monaco.getContent(page)
+
+// Get Monaco's internal textarea locator (for advanced use)
+const textarea = monaco.getTextArea(page)
+
+// Wait for cursor visibility (focus verification)
+await monaco.waitForCursor(page)
+
+// Search operations
+await monaco.openSearch(page)
+await monaco.search(page, 'query')
+await monaco.nextMatch(page)
+await monaco.prevMatch(page)
+await monaco.closeSearch(page)
+
+// Command palette
+await monaco.executeCommand(page, 'Format Document')
 ```
+
+**Key methods**:
+
+| Method | Description |
+|--------|-------------|
+| `waitForReady(page)` | Waits for `.monaco-editor` container to be attached |
+| `focus(page)` | Clicks with `force: true`, verifies cursor visibility |
+| `getTextArea(page)` | Returns Monaco's internal textarea locator |
+| `waitForCursor(page)` | Waits for cursor to be visible (focus verification) |
+| `setContent(page, content)` | Clears editor and types new content |
+| `getContent(page)` | Copies all content and reads from clipboard |
 
 ### Terminal helpers
 
