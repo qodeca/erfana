@@ -504,30 +504,14 @@ export const terminal = {
     await expect(terminalBtn).toBeVisible({ timeout: 10000 })
     await terminalBtn.click()
 
-    // Wait for terminal panel to become visible and the instance to be rendered
-    await page.waitForTimeout(1000) // Allow panel animation and splitview update
+    // Wait for splitview panel creation and animation
+    // The terminal panel is dynamically added via React useEffect when projectPath changes
+    await page.waitForTimeout(500)
 
-    // Wait for terminal instance to be attached and visible
-    await expect(terminalInstance).toBeAttached({ timeout: 10000 })
-
-    // Poll for visibility with retry - splitview panels can take time to resize
-    let visible = false
-    for (let i = 0; i < 20; i++) {
-      try {
-        await expect(terminalInstance).toBeVisible({ timeout: 500 })
-        visible = true
-        break
-      } catch {
-        // Not visible yet, wait and retry
-        await page.waitForTimeout(250)
-      }
-    }
-
-    if (!visible) {
-      // Take a debug screenshot before failing
-      await page.screenshot({ path: 'debug-terminal-not-visible.png' })
-      throw new Error('Terminal instance not visible after 10 seconds of polling')
-    }
+    // Use Playwright's built-in auto-retry for visibility check
+    // This handles the race condition where element is attached but has zero dimensions
+    // during splitview animation. 15s timeout provides margin for slow CI environments.
+    await expect(terminalInstance).toBeVisible({ timeout: 15000 })
 
     // Wait for PTY initialization
     await page.waitForTimeout(1500)

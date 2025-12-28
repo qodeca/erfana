@@ -117,3 +117,24 @@ The fix evolved through multiple iterations:
 5. Add retry loop → handled race conditions
 
 **Lesson**: Each iteration taught something. Don't expect to get it right the first time with complex async flows.
+
+---
+
+## 11. Playwright assertions beat manual state checks
+
+The `element.isVisible()` method returns a boolean immediately - it doesn't wait.
+During CSS animations, an element can have `display: block` (isVisible = true)
+but zero dimensions (not actually visible to user).
+
+**Anti-pattern**:
+```typescript
+if (await element.isVisible()) { return }  // Race condition!
+```
+
+**Correct pattern**:
+```typescript
+await expect(element).toBeVisible({ timeout: 2000 })  // Auto-retry until REALLY visible
+```
+
+**Lesson**: Use Playwright's assertion methods (`toBeVisible`, `toContainText`)
+instead of state query methods (`isVisible()`, `textContent()`) for waiting logic.
