@@ -925,6 +925,7 @@ export async function openProject(
   // This is more reliable than stubbing the dialog as it uses the same code path
   // that Recent Projects uses to open projects
   await page.evaluate(async (path: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (window as any).api.file.openProjectByPath(path)
   }, projectPath)
 
