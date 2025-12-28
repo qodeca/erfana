@@ -297,5 +297,5 @@ flowchart, sequenceDiagram, classDiagram, stateDiagram-v2, erDiagram, journey, g
 - [Known Issues](./known-issues.md) - Complete list of known issues and workarounds
 - [Architecture](./architecture.md) - System design and component overview
 - [Development Tasks](./development-tasks.md) - Common development patterns
-- [API Reference](./api-reference.md) - Service class API documentation
+- [API Services](./api-services.md) - Service class overview
  

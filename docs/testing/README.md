@@ -11,7 +11,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
   - `npm run test:renderer` — renderer tests
   - `npm run test:main` — main process tests
   - `npm run test:preload` — preload tests
-- **5612 tests passing** across 180 test files (v0.6.4-zulu)
+- Run `npm run test` for current test count
 
 #### Renderer tips
 - When testing TerminalPanel in jsdom, mock xterm and addons to avoid canvas errors:
@@ -146,7 +146,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 **ProjectTree Refactoring** (`src/renderer/src/hooks/*.logic.ts`, `src/renderer/src/components/ProjectTree/`) **v0.3.7**
 - **320 comprehensive tests** covering ProjectTree modularization using "Extract Pure Logic" pattern
-- **Total Repository Tests**: 5612 tests passing (180 test files)
+- Run `npm run test` for current test totals
 - **Test Organization**:
 
   *Phase 1-2: P0 Critical Tests (147 tests)*:

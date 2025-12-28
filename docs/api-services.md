@@ -10,7 +10,7 @@ This document covers supporting services.
 
 ## TerminalService
 
-**File:** `src/main/services/TerminalService.ts` (~260 lines)
+**File:** `src/main/services/TerminalService.ts`
 
 Manages terminal emulator instances with xterm.js + node-pty.
 
@@ -527,7 +527,7 @@ Git status tracking with isomorphic-git.
 
 ## ProjectLockService
 
-**File:** `src/main/services/ProjectLockService.ts` (~885 lines)
+**File:** `src/main/services/ProjectLockService.ts`
 
 File-based project locking for multi-instance support.
 

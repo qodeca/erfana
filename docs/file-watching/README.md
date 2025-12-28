@@ -45,8 +45,8 @@ Monitors open files for external content modifications.
 
 ### Implementation Location
 
-- **Service**: `src/main/services/FileWatcherService.ts` (259 lines)
-- **IPC Handlers**: `src/main/ipc/file-watcher-handlers.ts` (112 lines)
+- **Service**: `src/main/services/FileWatcherService.ts`
+- **IPC Handlers**: `src/main/ipc/file-watcher-handlers.ts`
 - **Integration**: `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx`
 - **UI Component**: `src/renderer/src/components/FileConflictNotification/`
 
@@ -133,8 +133,8 @@ Recommended:
 
 ### Implementation Location
 
-- **Service**: `src/main/services/DirectoryWatcherService.ts` (323 lines)
-- **IPC Handlers**: `src/main/ipc/directory-watcher-handlers.ts` (103 lines)
+- **Service**: `src/main/services/DirectoryWatcherService.ts`
+- **IPC Handlers**: `src/main/ipc/directory-watcher-handlers.ts`
 - **Integration**: `src/renderer/src/components/ProjectTree/ProjectTree.tsx`
 - **Component**: `src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx` (controlled pattern)
 
@@ -217,7 +217,7 @@ Monitors git repository state files for real-time status updates in the Project 
 |---------|-----------|---------|
 | `git-watcher:start` | Renderer → Main | Start watching git state files |
 | `git-watcher:stop` | Renderer → Main | Stop git watching |
-| `git-watcher:git-state-changed` | Main → Renderer | Event: Git state changed |
+| `git:state-changed` | Main → Renderer | Event: Git state changed |
 
 ### Implementation Location
 

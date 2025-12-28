@@ -141,7 +141,7 @@ src/
 - **Component Registry**: Splitview and Dockview use string-based component lookup
 - **Multi-model Editor**: Single Monaco instance, swap models per file
 - **Mermaid Integration**: Client-side diagram rendering (22 types) with dark theme
-- **Prompt Template System**: CSP-compliant markdown templates with Handlebars-style syntax for context menu AI prompts (see [Prompt Templates](./prompt-templates.md))
+- **Prompt Template System**: CSP-compliant markdown templates with Handlebars-style syntax for context menu AI prompts (see [Prompt Templates](./prompts/README.md))
 - **Line Range Tracking**: Enhanced markdown preview with `data-line-start/end` attributes for accurate source mapping
 - **Project Persistence**: Auto-loads last opened project on startup
 - **Shared Utilities**: `types/` for shared TypeScript types (FilterMode), `utils/` for shared functions (sanitizeFilePath, isMarkdownFile, panelUtils)

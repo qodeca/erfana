@@ -4,7 +4,7 @@ This directory contains historical specification documents that are not part of 
 
 ## Contents
 
-Currently empty. Archived documents are preserved in git history.
+- [resolved-issues.md](./resolved-issues.md) - Issues fixed in past versions
 
 ## Restoring Archived Documentation
 

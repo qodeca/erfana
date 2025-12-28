@@ -250,7 +250,43 @@ const { leftActivePanel, leftWidth } = useActivityBarStore()
 console.log('Visible:', leftActivePanel === 'project')
 ```
 
-## Related Documentation
+## Quit confirmation
+
+Prompts user before quitting when there are unsaved changes or active terminal sessions.
+
+### Trigger conditions
+
+| Condition | Dialog shown |
+|-----------|--------------|
+| Unsaved editor changes | "Unsaved changes" dialog |
+| Active terminal session | "Active terminal session" dialog |
+| Both conditions | "Unsaved changes and active terminal" dialog |
+| Neither | App quits immediately |
+
+### Dialog options
+
+- **Discard and quit**: Close app without saving
+- **Cancel**: Stay in app
+
+### Terminal activity detection
+
+Terminal is considered "active" when:
+- Input or output within last 20 seconds
+- 500ms warm-up period ignored after terminal opens
+- Activity clears after Ctrl+C if terminal goes quiet
+
+### Implementation
+
+| Component | Location |
+|-----------|----------|
+| Quit handler hook | `src/renderer/src/hooks/useQuitHandler.ts` |
+| Helper functions | `src/renderer/src/utils/quitHelpers.ts` |
+| IPC handlers | `src/main/ipc/quit-handlers.ts` |
+| Main process | `src/main/index.ts` (before-quit event) |
+
+---
+
+## Related documentation
 
 - [Architecture](./architecture.md) - Hybrid layout system
 - [Editor](./editor/README.md) - Editor features

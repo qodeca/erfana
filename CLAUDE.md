@@ -63,7 +63,7 @@ See `docs/` for details (keep Claude's context focused):
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
-- [Testing](docs/testing/README.md) — Workspace, coverage (5612 tests, 180 files)
+- [Testing](docs/testing/README.md) — Workspace, coverage
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.6.x)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
@@ -100,77 +100,13 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 
 ## UI Style Guide (MANDATORY)
 
-**Before implementing ANY UI changes, you MUST:**
+**Before implementing ANY UI changes**: Read [docs/ui-style-guide.md](docs/ui-style-guide.md) and use design tokens from `src/renderer/src/styles/design-tokens.css`.
 
-1. **Read the style guide**: [docs/ui-style-guide.md](docs/ui-style-guide.md)
-2. **Use design tokens**: All CSS values come from `src/renderer/src/styles/design-tokens.css`
+**Key rules**: Use `var(--color-*)`, `var(--space-*)`, `var(--text-*)` tokens. No hardcoded values. `border-radius: 0` always.
 
-### Rules (Non-Negotiable)
-
-| Category | Rule | Example |
-|----------|------|---------|
-| Colors | Use `var(--color-*)` tokens | `color: var(--color-text-primary)` |
-| Spacing | Use `var(--space-*)` tokens | `padding: var(--space-6)` (12px) |
-| Typography | Use `var(--text-*)` and `var(--font-*)` | `font-size: var(--text-base)` (13px) |
-| Borders | `border-radius: 0` always | Exception: `50%` for circles only |
-| Transitions | Use `var(--transition-normal)` | `transition: var(--transition-normal)` (0.15s) |
-| Z-Index | Use `var(--z-*)` tokens | `z-index: var(--z-modal)` |
-| Shadows | Use `var(--shadow-*)` tokens | `box-shadow: var(--shadow-md)` |
-
-### Quick Reference - Common Tokens
-
-```css
-/* Colors (Qodeca Brand) */
---color-text-primary       /* #cccccc - main text */
---color-text-secondary     /* #858585 - muted text */
---color-bg-primary         /* #161312 - Smoky Black (main background) */
---color-bg-secondary       /* #2d2d30 - panels */
---color-border-default     /* #3c3c3c - borders */
---color-accent-primary     /* #A0A8FF - Qodeca Violet */
---color-accent-secondary   /* #E3E829 - Qodeca Lime */
-
-/* Spacing (4px grid) */
---space-4   /* 8px */
---space-6   /* 12px */
---space-8   /* 16px */
---space-12  /* 24px */
-
-/* Typography */
---text-base /* 13px - default */
---text-sm   /* 11px - small */
-```
-
-### Checklist Before Committing UI Changes
-
-- [ ] All colors use design tokens (no hardcoded hex values)
-- [ ] All spacing uses design tokens (no arbitrary px values)
-- [ ] All fonts use design tokens
-- [ ] No rounded corners (border-radius: 0)
-- [ ] Transitions use tokens
-- [ ] Focus states are visible (accessibility)
-
-## Recent Changes
+## Changelog
 
 For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
-
-**v0.6.4-zulu highlights**:
-- E2E testing infrastructure with 138 testids, Playwright integration
-- MarkdownEditorPanel modular refactoring (SOLID principles)
-- Multi-instance support with project locking
-- Editor context menu with AI prompts
-- Real-time git status with polling fallback
-- Unified in-file search (Cmd/Ctrl+F)
-- PDF/DOCX export, settings overlay, logging layer
-
-## Historical Changes
-
-For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
-
-**Recent versions summary**:
-- v0.5.4 - Terminal scroll scheduler, flicker-free recovery, git status indicators, Mermaid toolbar
-- v0.5.0-0.5.2 - Mermaid diagram viewer (full-screen, zoom, theming, direction controls), terminal file links
-- v0.4.0-0.4.7 - Terminal clipboard, watcher performance, import system, tabs, scroll recovery
-- v0.3.x - Terminal bootstrap, drag-drop, dialog system, prompt templates, test coverage
 
 ## Working Areas
 - `src/renderer/src/components/` - UI components
@@ -181,7 +117,6 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - E2E: Playwright with Electron (see [docs/testing/e2e-testing.md](docs/testing/e2e-testing.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
-- **Current**: 5612 tests passing (180 test files)
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)

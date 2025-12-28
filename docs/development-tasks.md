@@ -286,7 +286,7 @@ Available variables:
 3. Verify new template appears in context menu
 4. Test prompt rendering with various selections
 
-See: [Prompt Templates](./prompt-templates.md) for detailed documentation
+See: [Prompt Templates](./prompts/README.md) for detailed documentation
 
 ## Executing Prompt Templates Programmatically
 
@@ -375,9 +375,9 @@ const allIds = getAllPromptIds()  // ['elaborate', 'modify', 'mermaid-bug-report
 const contextMenuPrompts = getPromptsForArea('markdown-preview', 'context-menu')
 ```
 
-**Implementation**: `panelUtils.ts:executePromptTemplate()` (lines 50-85)
+**Implementation**: `panelUtils.ts:executePromptTemplate()`
 
-See: [Prompt Templates](./prompt-templates.md#centralized-prompt-execution)
+See: [Prompt Templates](./prompts/README.md) for centralized prompt execution
 
 ## Testing with Circuit Electron MCP
 
