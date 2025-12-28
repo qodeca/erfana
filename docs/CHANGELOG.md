@@ -3,25 +3,27 @@
 Historical changelog entries for versions prior to current. For the latest changes, see [CLAUDE.md](../CLAUDE.md).
 
 ## Changes in v0.6.4-zulu
+- **E2E Testing Infrastructure** (Dec 27-28, 2025):
+  - Split e2e-testing.md into focused modules (7 files)
+  - Added 11 lessons learned in e2e-lessons-learned.md
+  - Robust dialog handling and native dialog mocking
+  - Terminal visibility fix: Playwright auto-retry instead of manual polling
+  - 138 testids across all interactive components
+  - Closes #79, #80, #81
 - **MarkdownEditorPanel Modular Refactoring** (Dec 27, 2025):
   - Extracted modular components from monolithic panel
   - New folder: `src/renderer/src/components/Editor/MarkdownEditorPanel/`
   - Components: MarkdownToolbar, EditorErrorBoundary
-  - Hooks: useScrollSync, useExportHandlers
-  - New hooks: useDividerPosition, useEditorContextMenu, useKeyboardShortcuts
+  - Hooks: useScrollSync, useExportHandlers, useDividerPosition, useEditorContextMenu, useKeyboardShortcuts
   - DocumentStatsBar, EditorContentLayout components
-  - Improves testability and separation of concerns
 - **Logging Instance ID** (Dec 26, 2025):
   - Added instance ID to log entries for multi-instance isolation
-  - Each Erfana instance gets unique identifier in logs
   - Helps debug multi-window scenarios
 - **BRS-011: Automated UI Testing Compatibility** (Dec 27, 2025):
   - New T3 BRS for Playwright/E2E testing infrastructure
   - 42 requirements (26 FR + 6 NFR + 10 AC)
-  - Covers data-testid for all interactive elements
   - TypeScript constants, portal-aware helpers
-  - GitHub issue #79 created
-- **Total: 5306 tests passing** (164 test files)
+- **Total: 5612 tests passing** (180 test files)
 
 ## Changes in v0.6.4-gamma
 - **Multi-Instance Support with Project Locking** (Dec 25, 2025):
