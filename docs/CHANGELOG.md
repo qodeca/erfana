@@ -2,7 +2,7 @@
 
 Historical changelog entries for versions prior to current. For the latest changes, see [CLAUDE.md](../CLAUDE.md).
 
-## Changes in v0.6.4-zulu
+## Changes in v0.6.4
 - **E2E Testing Infrastructure** (Dec 27-28, 2025):
   - Split e2e-testing.md into focused modules (7 files)
   - Added 11 lessons learned in e2e-lessons-learned.md

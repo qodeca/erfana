@@ -100,7 +100,7 @@ Real-time metrics in bottom status bar:
 - `EditorContentLayout.tsx` - Editor/preview layout with resizable divider
 
 ### Modular Components (`src/renderer/src/components/Editor/MarkdownEditorPanel/`)
-*New in v0.6.4-zulu - extracted for better testability and separation of concerns*
+*New in v0.6.4 - extracted for better testability and separation of concerns*
 
 **Components:**
 - `MarkdownToolbar.tsx` - Formatting buttons, view mode toggles, export actions
