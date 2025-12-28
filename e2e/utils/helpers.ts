@@ -882,12 +882,11 @@ export async function openProject(
   page: Page,
   projectPath: string
 ): Promise<void> {
-  // Clear persisted activity bar state to ensure clean slate
-  await page.evaluate(() => {
-    localStorage.removeItem('erfana-activity-bar-state')
-  })
+  // Note: localStorage cleanup is no longer needed here because tests now use
+  // isolated user data directories via --user-data-dir. Each worker gets a
+  // fresh directory, ensuring clean Zustand/localStorage state.
 
-  // Reload the page to apply clean state
+  // Reload the page to ensure clean state
   await page.reload()
   await page.waitForLoadState('domcontentloaded')
 
@@ -1029,6 +1028,8 @@ export async function closeApp(
 ): Promise<void> {
   if (!page) {
     // No page available - just close directly
+    // Small delay to let pending electron-log operations complete
+    await new Promise((resolve) => setTimeout(resolve, 100))
     await electronApp.close()
     return
   }
@@ -1071,7 +1072,9 @@ export async function closeApp(
   }
 
   // Fallback: ensure app is closed (may already be closed)
+  // Small delay to let pending electron-log operations complete
   try {
+    await new Promise((resolve) => setTimeout(resolve, 100))
     await electronApp.close()
   } catch {
     // App already closed - this is fine

@@ -39,7 +39,8 @@ import {
   ElectronApplication,
   Page
 } from '@playwright/test'
-import path from 'path'
+import * as fs from 'fs'
+import * as path from 'path'
 import { TEST_IDS, byTestId } from './utils/helpers'
 
 /**
@@ -52,6 +53,27 @@ const PROJECT_ROOT = path.join(__dirname, '..')
  * Can be overridden via environment variable: ERFANA_TEST_PROJECT
  */
 const DEFAULT_TEST_PROJECT = process.env.ERFANA_TEST_PROJECT || PROJECT_ROOT
+
+/**
+ * Worker-scoped fixtures type definitions.
+ *
+ * Worker fixtures are shared across all tests in a single worker process.
+ * This is more efficient than creating/destroying per test.
+ */
+type WorkerFixtures = {
+  /**
+   * Isolated user data directory for the Electron app.
+   *
+   * Each worker gets its own directory under `.e2e-temp/` to ensure:
+   * - No Zustand state pollution between test runs
+   * - No localStorage/IndexedDB conflicts
+   * - Clean slate for each parallel worker
+   *
+   * The directory is created before the first test and cleaned up
+   * after the last test in the worker.
+   */
+  userDataDir: string
+}
 
 /**
  * Test fixtures type definitions.
@@ -95,15 +117,44 @@ type TestFixtures = {
  * });
  * ```
  */
-export const test = base.extend<TestFixtures>({
+export const test = base.extend<TestFixtures, WorkerFixtures>({
+  /**
+   * Worker-scoped isolated user data directory.
+   *
+   * Creates a unique directory per worker under `.e2e-temp/` and cleans it
+   * up after all tests in the worker complete. This ensures:
+   * - No Zustand/localStorage state pollution between test runs
+   * - Parallel workers don't interfere with each other
+   * - Clean slate for each test run
+   */
+  userDataDir: [
+    // eslint-disable-next-line no-empty-pattern
+    async ({}, use, workerInfo) => {
+      // Create base temp directory
+      const e2eTempDir = path.join(__dirname, '..', '.e2e-temp')
+      await fs.promises.mkdir(e2eTempDir, { recursive: true })
+
+      // Create unique directory for this worker
+      const userDataDir = await fs.promises.mkdtemp(
+        path.join(e2eTempDir, `worker-${workerInfo.workerIndex}-`)
+      )
+
+      await use(userDataDir)
+
+      // Cleanup after worker completes
+      await fs.promises.rm(userDataDir, { recursive: true, force: true })
+    },
+    { scope: 'worker' }
+  ],
+
   /**
    * Launches the Electron app and provides it to the test.
    * Automatically closes the app after the test completes.
+   * Uses isolated user data directory to prevent state pollution.
    */
-  // eslint-disable-next-line no-empty-pattern
-  app: async ({}, use) => {
+  app: async ({ userDataDir }, use) => {
     const app = await electron.launch({
-      args: [PROJECT_ROOT],
+      args: [PROJECT_ROOT, `--user-data-dir=${userDataDir}`],
       env: {
         ...process.env,
         NODE_ENV: 'development'
@@ -113,6 +164,8 @@ export const test = base.extend<TestFixtures>({
     await use(app)
 
     // Cleanup: close app after test
+    // Small delay to let pending electron-log operations complete (prevents "Object has been destroyed" error)
+    await new Promise((resolve) => setTimeout(resolve, 100))
     await app.close()
   },
 
@@ -131,11 +184,11 @@ export const test = base.extend<TestFixtures>({
 
   /**
    * Launches the Electron app with a project path argument.
+   * Uses isolated user data directory to prevent state pollution.
    */
-  // eslint-disable-next-line no-empty-pattern
-  appWithProject: async ({}, use) => {
+  appWithProject: async ({ userDataDir }, use) => {
     const app = await electron.launch({
-      args: [PROJECT_ROOT, DEFAULT_TEST_PROJECT],
+      args: [PROJECT_ROOT, DEFAULT_TEST_PROJECT, `--user-data-dir=${userDataDir}`],
       env: {
         ...process.env,
         NODE_ENV: 'development'
@@ -145,6 +198,7 @@ export const test = base.extend<TestFixtures>({
     await use(app)
 
     // Cleanup
+    await new Promise((resolve) => setTimeout(resolve, 100))
     await app.close()
   },
 
@@ -186,6 +240,7 @@ export function getTestProjectPath(): string {
  * ```typescript
  * const launchWithProject = createAppLauncher({
  *   projectPath: '/path/to/test/project',
+ *   userDataDir: '/tmp/test-user-data',
  *   env: { DEBUG: 'true' }
  * });
  *
@@ -198,6 +253,7 @@ export function getTestProjectPath(): string {
  */
 export function createAppLauncher(options: {
   projectPath?: string
+  userDataDir?: string
   env?: Record<string, string>
   args?: string[]
 }) {
@@ -206,6 +262,10 @@ export function createAppLauncher(options: {
 
     if (options.projectPath) {
       args.push(options.projectPath)
+    }
+
+    if (options.userDataDir) {
+      args.push(`--user-data-dir=${options.userDataDir}`)
     }
 
     if (options.args) {
@@ -240,11 +300,30 @@ export function createAppLauncher(options: {
  * });
  * ```
  */
-export const testMultiWindow = base.extend<TestFixtures>({
-  // eslint-disable-next-line no-empty-pattern
-  app: async ({}, use) => {
+export const testMultiWindow = base.extend<TestFixtures, WorkerFixtures>({
+  /**
+   * Worker-scoped isolated user data directory for multi-window tests.
+   */
+  userDataDir: [
+    // eslint-disable-next-line no-empty-pattern
+    async ({}, use, workerInfo) => {
+      const e2eTempDir = path.join(__dirname, '..', '.e2e-temp')
+      await fs.promises.mkdir(e2eTempDir, { recursive: true })
+
+      const userDataDir = await fs.promises.mkdtemp(
+        path.join(e2eTempDir, `worker-multiwin-${workerInfo.workerIndex}-`)
+      )
+
+      await use(userDataDir)
+
+      await fs.promises.rm(userDataDir, { recursive: true, force: true })
+    },
+    { scope: 'worker' }
+  ],
+
+  app: async ({ userDataDir }, use) => {
     const app = await electron.launch({
-      args: [PROJECT_ROOT, '--enable-multi-window'],
+      args: [PROJECT_ROOT, '--enable-multi-window', `--user-data-dir=${userDataDir}`],
       env: {
         ...process.env,
         NODE_ENV: 'development'
@@ -252,6 +331,7 @@ export const testMultiWindow = base.extend<TestFixtures>({
     })
 
     await use(app)
+    await new Promise((resolve) => setTimeout(resolve, 100))
     await app.close()
   },
 
@@ -263,10 +343,9 @@ export const testMultiWindow = base.extend<TestFixtures>({
     await use(window)
   },
 
-  // eslint-disable-next-line no-empty-pattern
-  appWithProject: async ({}, use) => {
+  appWithProject: async ({ userDataDir }, use) => {
     const app = await electron.launch({
-      args: [PROJECT_ROOT, DEFAULT_TEST_PROJECT],
+      args: [PROJECT_ROOT, DEFAULT_TEST_PROJECT, `--user-data-dir=${userDataDir}`],
       env: {
         ...process.env,
         NODE_ENV: 'development'
@@ -274,6 +353,7 @@ export const testMultiWindow = base.extend<TestFixtures>({
     })
 
     await use(app)
+    await new Promise((resolve) => setTimeout(resolve, 100))
     await app.close()
   },
 

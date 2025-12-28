@@ -58,14 +58,32 @@ async function cleanupTestProject(projectPath: string): Promise<void> {
   await fs.promises.rm(projectPath, { recursive: true, force: true })
 }
 
+// Helper: Create temporary user data directory for test isolation
+async function createTempUserDataDir(
+  testName: string
+): Promise<{ userDataDir: string; cleanup: () => Promise<void> }> {
+  const e2eTempDir = path.join(__dirname, '..', '.e2e-temp')
+  await fs.promises.mkdir(e2eTempDir, { recursive: true })
+
+  const userDataDir = await fs.promises.mkdtemp(path.join(e2eTempDir, `third-party-${testName}-`))
+
+  return {
+    userDataDir,
+    cleanup: async () => {
+      await fs.promises.rm(userDataDir, { recursive: true, force: true })
+    }
+  }
+}
+
 test.describe('Third-Party Components E2E', () => {
   test('Monaco editor: Set content via keyboard and verify in preview', async () => {
-    // Create test project BEFORE launching app
+    // Create test project and user data directory BEFORE launching app
     const projectPath = await createTestProject()
+    const { userDataDir, cleanup: cleanupUserData } = await createTempUserDataDir('monaco')
 
-    // Launch Electron app
+    // Launch Electron app with isolated user data directory
     const electronApp = await electron.launch({
-      args: [path.join(__dirname, '..')],
+      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
       env: {
         ...process.env,
         NODE_ENV: 'development'
@@ -130,15 +148,17 @@ test.describe('Third-Party Components E2E', () => {
       // Cleanup - use closeApp to dismiss any quit dialogs
       await closeApp(electronApp, window)
       await cleanupTestProject(projectPath)
+      await cleanupUserData()
     }
   })
 
   test('xterm.js terminal: Type command and verify output', async () => {
-    // Create test project (terminal requires a project)
+    // Create test project (terminal requires a project) and user data directory
     const projectPath = await createTestProject()
+    const { userDataDir, cleanup: cleanupUserData } = await createTempUserDataDir('xterm')
 
     const electronApp = await electron.launch({
-      args: [path.join(__dirname, '..')],
+      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
       env: {
         ...process.env,
         NODE_ENV: 'development'
@@ -182,15 +202,17 @@ test.describe('Third-Party Components E2E', () => {
       // Cleanup - use closeApp to dismiss any quit dialogs
       await closeApp(electronApp, window)
       await cleanupTestProject(projectPath)
+      await cleanupUserData()
     }
   })
 
   test('Mermaid toolbar: Hover diagram, click direction button, toolbar stays visible', async () => {
-    // Create test project BEFORE launching app
+    // Create test project and user data directory BEFORE launching app
     const projectPath = await createTestProject()
+    const { userDataDir, cleanup: cleanupUserData } = await createTempUserDataDir('mermaid')
 
     const electronApp = await electron.launch({
-      args: [path.join(__dirname, '..')],
+      args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
       env: {
         ...process.env,
         NODE_ENV: 'development'
@@ -276,6 +298,7 @@ test.describe('Third-Party Components E2E', () => {
       // Cleanup - use closeApp to dismiss any quit dialogs
       await closeApp(electronApp, window)
       await cleanupTestProject(projectPath)
+      await cleanupUserData()
     }
   })
 })

@@ -138,3 +138,29 @@ await expect(element).toBeVisible({ timeout: 2000 })  // Auto-retry until REALLY
 
 **Lesson**: Use Playwright's assertion methods (`toBeVisible`, `toContainText`)
 instead of state query methods (`isVisible()`, `textContent()`) for waiting logic.
+
+---
+
+## 12. Isolate browser state with `--user-data-dir`
+
+Electron apps with Zustand persist middleware store state to localStorage. This causes test pollution - state from previous test runs bleeds into subsequent runs.
+
+**Anti-pattern**:
+```typescript
+// localStorage.removeItem() happens AFTER Zustand already hydrated
+await page.evaluate(() => localStorage.removeItem('erfana-activity-bar-state'))
+await page.reload()  // Too late - state was already loaded
+```
+
+**Correct pattern**:
+```typescript
+// Worker-scoped fixture creates isolated user data directory
+const userDataDir = await fs.promises.mkdtemp(path.join(e2eTempDir, `worker-${workerInfo.workerIndex}-`))
+
+// Pass to Electron launch - fresh localStorage before any code runs
+const app = await electron.launch({
+  args: [PROJECT_ROOT, `--user-data-dir=${userDataDir}`],
+})
+```
+
+**Lesson**: Process-level isolation (`--user-data-dir`) is more robust than runtime cleanup. Each Playwright worker gets a fresh Chromium profile with empty localStorage.
