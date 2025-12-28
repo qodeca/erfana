@@ -22,6 +22,7 @@ npm run test:renderer
 npm run test:main
 npm run test:preload
 npm run test:cov     # Coverage (v8) per project
+npm run test:e2e     # Playwright E2E tests
 ```
 
 ## Project Structure
@@ -178,6 +179,7 @@ For detailed changelog entries from v0.3.0 through v0.5.4, see [docs/CHANGELOG.m
 
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
+- E2E: Playwright with Electron (see [docs/testing/e2e-testing.md](docs/testing/e2e-testing.md))
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
 - **Current**: 5612 tests passing (180 test files)
 

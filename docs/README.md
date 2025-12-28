@@ -7,9 +7,11 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 
 ### Core Documentation
 - [Architecture](./architecture.md) - System architecture and design patterns
+- [Architecture ADRs](./architecture/adrs/) - Architecture Decision Records for BRS features
 - [API Services](./api-services.md) - Main process services and IPC handlers
 - [IPC Patterns](./ipc-patterns.md) - Inter-process communication patterns
 - [Security](./security.md) - Security considerations and implementations
+- [Technical Debt](./technical-debt.md) - Technical debt tracking and priorities
 
 ### Feature Documentation
 - [Editor](./editor/README.md) - Monaco editor, markdown preview, and scroll sync
@@ -29,13 +31,24 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
   - [AutoExecute Testing](./prompts/autoexecute-testing.md) - Test coverage and mocking strategy
   - [AutoExecute Reference](./prompts/autoexecute-reference.md) - Implementation files and error handling
 - [Logging](./logging.md) - Logging layer, log levels, file rotation, settings
-- [Keyboard Shortcuts](./keyboard-shortcuts.md) - Application keyboard shortcuts
+
+### UI/UX
+- [UI Style Guide](./ui-style-guide.md) - Design tokens, colors, typography (MANDATORY for UI changes)
+- [UI Style Guide Reference](./ui-style-guide-reference.md) - Quick reference for design tokens
 - [UI Components](./ui-components.md) - React component architecture
+- [Keyboard Shortcuts](./keyboard-shortcuts.md) - Application keyboard shortcuts
 
 ### Development
 - [Development Tasks](./development-tasks.md) - Build, test, and deployment
 - [Build](./build/README.md) - electron-builder, ASAR, fuses, troubleshooting
-- [Testing](./testing/README.md) - Testing strategies and scenarios
+- [Testing](./testing/README.md) - Testing strategies and coverage (5612 tests, 180 files)
+  - [E2E Testing](./testing/e2e-testing.md) - Playwright/Electron E2E guide
+  - [E2E Selectors](./testing/e2e-selectors.md) - 138 testids catalog
+  - [E2E Helpers](./testing/e2e-helpers.md) - Test utility functions
+  - [E2E Third-Party](./testing/e2e-third-party.md) - Monaco, xterm.js, Mermaid patterns
+  - [E2E Debugging](./testing/e2e-debugging.md) - Debugging and CI/CD
+  - [E2E Troubleshooting](./testing/e2e-troubleshooting.md) - Common issues and fixes
+  - [E2E Lessons Learned](./testing/e2e-lessons-learned.md) - Hard-won testing insights
   - [Quick Checks](./testing/quick-checks.md) - Minimal Terminal/Watcher smoke checks
 - [EPIPE Error Handling](./epipe-error-handling.md) - Console output error prevention
 
@@ -50,22 +63,30 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 ### Technical Details
 - [HTML Rendering](./rendering/README.md) - Markdown to HTML conversion architecture
 
+### Future Features (Planned)
+- [Graph Engine](./future/graph-engine.md) - SQLite + vec + FTS5 knowledge graph (not yet implemented)
+
 ## Quick Links
 
 ### For Development
 1. Start with [Architecture](./architecture.md)
 2. Review [Development Tasks](./development-tasks.md)
-3. Check [API Services](./api-services.md)
+3. Check [Testing](./testing/README.md) for test workflows
 
 ### For Feature Implementation
 1. See relevant feature documentation above
 2. Review [IPC Patterns](./ipc-patterns.md)
-3. Check [UI Components](./ui-components.md)
+3. Follow [UI Style Guide](./ui-style-guide.md) for UI changes
+
+### For Testing
+1. Unit/Integration: `npm run test` (Vitest)
+2. E2E: `npm run test:e2e` (Playwright)
+3. See [E2E Testing](./testing/e2e-testing.md) for patterns
 
 ### For Debugging
 1. Check [Known Issues](./known-issues.md)
 2. Review [Troubleshooting](./troubleshooting.md)
-3. See [EPIPE Error Handling](./epipe-error-handling.md) for console issues
+3. See [E2E Troubleshooting](./testing/e2e-troubleshooting.md) for test issues
 
 ## Archive
 
