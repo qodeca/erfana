@@ -11,7 +11,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
   - `npm run test:renderer` — renderer tests
   - `npm run test:main` — main process tests
   - `npm run test:preload` — preload tests
-- **5306 tests passing** across 164 test files (v0.6.4-zulu)
+- **5612 tests passing** across 180 test files (v0.6.4-zulu)
 
 #### Renderer tips
 - When testing TerminalPanel in jsdom, mock xterm and addons to avoid canvas errors:
@@ -146,7 +146,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 **ProjectTree Refactoring** (`src/renderer/src/hooks/*.logic.ts`, `src/renderer/src/components/ProjectTree/`) **v0.3.7**
 - **320 comprehensive tests** covering ProjectTree modularization using "Extract Pure Logic" pattern
-- **Total Repository Tests**: 5306 tests passing (164 test files)
+- **Total Repository Tests**: 5612 tests passing (180 test files)
 - **Test Organization**:
 
   *Phase 1-2: P0 Critical Tests (147 tests)*:
@@ -203,7 +203,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 - Playwright setup and configuration for Electron
 - Testing patterns for third-party components (Monaco, xterm.js, Mermaid)
-- Complete selector catalog (120+ testids)
+- Complete selector catalog (138 testids) - see [e2e-selectors.md](./e2e-selectors.md)
 - Test helper utilities documentation
 - Troubleshooting guide
 
@@ -242,19 +242,18 @@ See [BRS-011](../../specs/business-reqs/brs011-ui-test-compatibility/) for the s
 ## 🚀 Recommended Workflows
 
 ### After Making Code Changes
-1. Unit tests: `npm run test:ci`
-2. Run relevant scenarios from [ui-scenarios.md](./ui-scenarios.md) or [interaction-scenarios.md](./interaction-scenarios.md)
+1. Unit tests: `npm run test`
+2. Run relevant scenarios from [test-scenarios.md](./test-scenarios.md)
 3. Optionally: build `npm run build` for full-package checks
 
 ### Comprehensive Testing
 1. Run unit/integration tests (Vitest)
-2. Run all scenarios in [ui-scenarios.md](./ui-scenarios.md)
-3. Run all scenarios in [interaction-scenarios.md](./interaction-scenarios.md)
+2. Run E2E tests: `npm run test:e2e`
+3. Run visual scenarios in [test-scenarios.md](./test-scenarios.md)
 
 ### Learning Circuit Electron MCP
-1. Start with simple flows from [ui-scenarios.md](./ui-scenarios.md)
-2. Practice interaction flows from [interaction-scenarios.md](./interaction-scenarios.md)
-3. Use screenshots to debug visually
+1. Start with simple flows from [test-scenarios.md](./test-scenarios.md)
+2. Use screenshots to debug visually
 
 ---
 
@@ -301,4 +300,4 @@ For MCP visual testing:
 - Test utilities: `src/renderer/src/prompts/__test-utils__/` (fixtures, mocks)
 
 ### Visual/MCP Tests
-- Follow flows in [ui-scenarios.md](./ui-scenarios.md) and [interaction-scenarios.md](./interaction-scenarios.md)
+- Follow flows in [test-scenarios.md](./test-scenarios.md)
