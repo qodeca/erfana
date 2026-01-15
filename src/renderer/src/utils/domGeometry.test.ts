@@ -5,7 +5,7 @@
  * @see Issue #85 - Terminal drag-drop file path insertion
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { isPointInElement, isPointInRect, getElementCenter } from './domGeometry'
 
 describe('isPointInElement', () => {
