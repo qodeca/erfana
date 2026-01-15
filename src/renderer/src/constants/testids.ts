@@ -94,7 +94,7 @@ export const TEST_IDS = {
   GIT_SYNC_INDICATOR: 'git-sync-indicator',
 
   // =========================================================================
-  // Terminal Panel (6)
+  // Terminal Panel (7)
   // =========================================================================
 
   /** Terminal panel container */
@@ -109,6 +109,8 @@ export const TEST_IDS = {
   TERMINAL_BTN_LOCK: 'terminal-btn-lock',
   /** Terminal status indicator */
   TERMINAL_STATUS: 'terminal-status',
+  /** Terminal drop zone for drag-and-drop file path insertion */
+  TERMINAL_DROP_ZONE: 'terminal-drop-zone',
 
   // =========================================================================
   // Editor Content Layout (5)

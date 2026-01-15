@@ -2,6 +2,11 @@
 
 Historical changelog entries for versions prior to current. For the latest changes, see [CLAUDE.md](../CLAUDE.md).
 
+## [0.6.5] - 2026-01-15
+
+### Added
+- Terminal drag-drop: Insert quoted file paths by dropping files from project tree or Finder (#85)
+
 ## Changes in v0.6.4
 - **E2E Testing Infrastructure** (Dec 27-28, 2025):
   - Split e2e-testing.md into focused modules (7 files)

@@ -28,6 +28,7 @@ import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { TerminalContextMenu } from '../ContextMenu/TerminalContextMenu'
 import { FilePickerDialog } from '../Dialog/FilePickerDialog'
 import { sanitizeFilePath } from '../../utils/fileUtils'
+import { formatPathsForTerminal } from '../../utils/shellPathEscape'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
 import '@xterm/xterm/css/xterm.css'
@@ -50,6 +51,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const contextMenuHandlerRef = useRef<((e: MouseEvent) => void) | null>(null)
   const parserDisposablesRef = useRef<{ dispose: () => void }[]>([])
   const [projectPath, setProjectPath] = useState<string | null>(null)
+  const [isDropTarget, setIsDropTarget] = useState(false)
 
   // Terminal store for cross-component communication
   const setActiveTerminalId = useTerminalStore((state) => state.setActiveTerminalId)
@@ -742,6 +744,53 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }, [])
 
+  // Drag-and-drop handlers for file path insertion (issue #85)
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }, [])
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDropTarget(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    // Only hide if leaving the container (not entering a child)
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return
+    setIsDropTarget(false)
+  }, [])
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDropTarget(false)
+
+    // Use ref for consistency with other terminal operations in this component
+    if (!terminalIdRef.current) return
+
+    // Handle external drag (from Finder/file manager)
+    // Note: Internal drag from project tree is handled by @dnd-kit in ProjectTree.tsx
+    // Electron extends File with a `path` property for local files
+    if (e.dataTransfer.files.length === 0) return
+
+    const paths = Array.from(e.dataTransfer.files)
+      .map((f) => (f as File & { path?: string }).path)
+      .filter((p): p is string => Boolean(p))
+
+    if (paths.length === 0) return
+
+    const formattedPaths = formatPathsForTerminal(paths)
+    const success = await useTerminalStore.getState().sendToTerminal(formattedPaths, false)
+
+    if (!success) {
+      showWarningToast('Drop failed', 'Could not insert path into terminal')
+      return
+    }
+
+    // Focus terminal after drop
+    xtermRef.current?.focus()
+  }, [])
+
   const handleToggleScrollLock = useCallback(() => {
     const newState = !scrollLocked
     setScrollLocked(newState)
@@ -887,7 +936,18 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
             </div>
           ) : (
             // Terminal ready - context menu handled via native listener on xterm.element
-            <div ref={terminalRef} className="terminal-container" data-testid={TEST_IDS.TERMINAL_INSTANCE} />
+            <div
+              ref={terminalRef}
+              className="terminal-container"
+              data-testid={TEST_IDS.TERMINAL_INSTANCE}
+              data-drop-target={isDropTarget}
+              aria-dropeffect={isDropTarget ? 'copy' : 'none'}
+              aria-label={isDropTarget ? 'Drop files here to insert paths' : undefined}
+              onDragOver={handleDragOver}
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            />
           )}
         </div>
         {portalContext?.terminalContextMenuPosition && (

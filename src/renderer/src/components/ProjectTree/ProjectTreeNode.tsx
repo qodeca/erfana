@@ -200,6 +200,7 @@ export function ProjectTreeNode({
           node.type === 'file' ? TEST_IDS.PROJECT_TREE_NODE_FILE : TEST_IDS.PROJECT_TREE_NODE_FOLDER,
           node.path
         )}
+        // @dnd-kit handles drag - terminal drop is detected in ProjectTree's handleDragEnd
         {...dragAttributes}
         {...dragListeners}
       >

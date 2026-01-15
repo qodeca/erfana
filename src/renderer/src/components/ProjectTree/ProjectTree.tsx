@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { FilePlus, FolderPlus, FolderOpen, Replace, FileText, Files, RotateCw, X as CloseIcon } from 'lucide-react'
 import type { FileNode } from '../../../../preload/index'
 import type { FilterMode } from '../../types/filters'
@@ -28,6 +28,9 @@ import { formatFileOperationError } from '../../utils/errorUtils'
 import { DRAG_DROP, AUTO_SCROLL, AUTO_EXPAND } from './constants'
 import { withWatcherPause } from './withWatcherPause'
 import { logger } from '../../utils/logger'
+import { useTerminalStore } from '../../stores/useTerminalStore'
+import { formatPathsForTerminal } from '../../utils/shellPathEscape'
+import { TEST_IDS as TERMINAL_TEST_IDS } from '../../constants/testids'
 import { useDirectoryWatcher } from '../../hooks/useDirectoryWatcher'
 import { useProjectManagementContext, useProjectChangedEffect } from '../../context/ProjectManagementContext'
 import { useFileOperations } from '../../hooks/useFileOperations'
@@ -116,6 +119,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const autoExpandTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const autoScrollIntervalRef = useRef<number | null>(null)
   const treeContainerRef = useRef<HTMLDivElement | null>(null)
+  const lastMousePositionRef = useRef<{ x: number; y: number } | null>(null)
 
   // Drag-drop hooks
   const { flattenedItems, isDescendant } = useDragDropTree(files, projectPath)
@@ -373,9 +377,21 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
   }
 
+  // Track mouse position globally during drag (more reliable than @dnd-kit delta)
+  const handlePointerEvent = useCallback((e: PointerEvent | MouseEvent) => {
+    lastMousePositionRef.current = { x: e.clientX, y: e.clientY }
+    logger.info('Mouse position tracked', { x: e.clientX, y: e.clientY })
+  }, [])
+
   // Drag-drop handlers
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string)
+    // Track ALL pointer/mouse events globally for terminal drop detection
+    // Use capture phase to ensure we get events even with pointer capture
+    document.addEventListener('pointermove', handlePointerEvent, { capture: true })
+    document.addEventListener('mousemove', handlePointerEvent, { capture: true })
+    document.addEventListener('pointerup', handlePointerEvent, { capture: true, once: true })
+    document.addEventListener('mouseup', handlePointerEvent, { capture: true, once: true })
     logger.info('Drag start', { activeId: event.active.id })
   }
 
@@ -428,6 +444,67 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
     setActiveId(null)
     setOverId(null)
+
+    // Stop tracking mouse position
+    document.removeEventListener('pointermove', handlePointerEvent, { capture: true })
+    document.removeEventListener('mousemove', handlePointerEvent, { capture: true })
+
+    // Check if dragged to terminal (when no valid tree drop target)
+    // Use globally tracked mouse position (more reliable than delta calculation)
+    const lastPos = lastMousePositionRef.current
+    logger.info('handleDragEnd debug', {
+      hasOver: !!over,
+      overId: over?.id,
+      lastMousePosition: lastPos
+    })
+
+    if (!over && lastPos) {
+      // Find terminal by checking if coordinates fall within terminal panel bounds
+      // This is more reliable than elementFromPoint which can be blocked by overlays
+      const terminalPanel = document.querySelector(`[data-testid="${TERMINAL_TEST_IDS.TERMINAL_PANEL}"]`)
+      const terminalContainer = document.querySelector(`[data-testid="${TERMINAL_TEST_IDS.TERMINAL_INSTANCE}"]`)
+
+      let isOverTerminal = false
+      if (terminalPanel) {
+        const rect = terminalPanel.getBoundingClientRect()
+        isOverTerminal = (
+          lastPos.x >= rect.left &&
+          lastPos.x <= rect.right &&
+          lastPos.y >= rect.top &&
+          lastPos.y <= rect.bottom
+        )
+        logger.info('Terminal drop check', {
+          x: lastPos.x,
+          y: lastPos.y,
+          terminalRect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom },
+          isOverTerminal,
+          hasTerminalContainer: !!terminalContainer
+        })
+      } else {
+        logger.info('Terminal drop check - no terminal panel found')
+      }
+
+      if (isOverTerminal && terminalContainer) {
+        const sourcePath = active.id as string
+        logger.info('Drag to terminal SUCCESS', { sourcePath, x: lastPos.x, y: lastPos.y })
+
+        const formattedPath = formatPathsForTerminal([sourcePath])
+        const success = await useTerminalStore.getState().sendToTerminal(formattedPath, false)
+
+        if (!success) {
+          showGlobalToast({
+            title: 'Drop failed',
+            message: 'Could not insert path into terminal',
+            type: 'error'
+          })
+        }
+
+        lastMousePositionRef.current = null
+        return
+      }
+    }
+
+    lastMousePositionRef.current = null
 
     if (!over || active.id === over.id) {
       logger.info('Drag cancelled - no valid drop target')

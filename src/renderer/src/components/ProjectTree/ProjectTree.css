@@ -379,6 +379,8 @@
   box-shadow: var(--shadow-md);
   cursor: grabbing;
   opacity: 0.95;
+  /* Allow elementFromPoint() to see through overlay to elements underneath (issue #85) */
+  pointer-events: none;
 }
 
 .drag-overlay .file-name {
