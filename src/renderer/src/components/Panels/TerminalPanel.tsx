@@ -50,8 +50,28 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const warmupUntilRef = useRef<number>(0)
   const contextMenuHandlerRef = useRef<((e: MouseEvent) => void) | null>(null)
   const parserDisposablesRef = useRef<{ dispose: () => void }[]>([])
+  const dragHandlersRef = useRef<{
+    dragover: (e: DragEvent) => void
+    dragenter: (e: DragEvent) => void
+    dragleave: (e: DragEvent) => void
+    drop: (e: DragEvent) => void
+    dragend: () => void
+  } | null>(null)
   const [projectPath, setProjectPath] = useState<string | null>(null)
   const [isDropTarget, setIsDropTarget] = useState(false)
+
+  // Cleanup helper for drag handlers (issue #85 - DRY principle)
+  // Centralized cleanup to avoid duplication across unmount, project change, and restart
+  const cleanupDragHandlers = useCallback(() => {
+    if (dragHandlersRef.current) {
+      document.removeEventListener('dragover', dragHandlersRef.current.dragover, { capture: true })
+      document.removeEventListener('dragenter', dragHandlersRef.current.dragenter, { capture: true })
+      document.removeEventListener('dragleave', dragHandlersRef.current.dragleave, { capture: true })
+      document.removeEventListener('drop', dragHandlersRef.current.drop, { capture: true })
+      document.removeEventListener('dragend', dragHandlersRef.current.dragend, { capture: true })
+      dragHandlersRef.current = null
+    }
+  }, [])
 
   // Terminal store for cross-component communication
   const setActiveTerminalId = useTerminalStore((state) => state.setActiveTerminalId)
@@ -343,6 +363,112 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         }
         xterm.element.addEventListener('contextmenu', handleNativeContextMenu)
         contextMenuHandlerRef.current = handleNativeContextMenu
+
+        // Attach document-level drag handlers for external file drops (issue #85)
+        // Uses capture phase to intercept events before they reach xterm's DOM
+        // Checks if coordinates are over terminal panel using bounding rect
+        const terminalPanelRef = terminalRef.current?.closest('[data-testid="terminal-panel"]')
+
+        const isOverTerminalPanel = (e: DragEvent): boolean => {
+          if (!terminalPanelRef) return false
+          const rect = terminalPanelRef.getBoundingClientRect()
+          return (
+            e.clientX >= rect.left &&
+            e.clientX <= rect.right &&
+            e.clientY >= rect.top &&
+            e.clientY <= rect.bottom
+          )
+        }
+
+        const nativeDragOver = (e: DragEvent) => {
+          // Only handle if over terminal panel and has files (external drag)
+          if (!isOverTerminalPanel(e)) return
+          if (!e.dataTransfer?.types.includes('Files')) return
+
+          e.preventDefault()
+          if (e.dataTransfer) {
+            e.dataTransfer.dropEffect = 'copy'
+          }
+        }
+
+        const nativeDragEnter = (e: DragEvent) => {
+          if (!isOverTerminalPanel(e)) return
+          if (!e.dataTransfer?.types.includes('Files')) return
+
+          e.preventDefault()
+          setIsDropTarget(true)
+          logger.info('External drag entered terminal panel')
+        }
+
+        const nativeDragLeave = (e: DragEvent) => {
+          if (!e.dataTransfer?.types.includes('Files')) return
+
+          // Check if we're still over the terminal panel
+          if (isOverTerminalPanel(e)) return
+          setIsDropTarget(false)
+        }
+
+        const nativeDrop = async (e: DragEvent) => {
+          if (!isOverTerminalPanel(e)) return
+          if (!e.dataTransfer?.files.length) return
+
+          e.preventDefault()
+          setIsDropTarget(false)
+
+          if (!terminalIdRef.current) return
+
+          // Use webUtils.getPathForFile via preload API (File.path not available in sandbox)
+          const paths = Array.from(e.dataTransfer.files)
+            .map((f) => {
+              try {
+                return window.api.utils.getPathForFile(f)
+              } catch (err) {
+                logger.warn('Failed to get path for dropped file', {
+                  fileName: f.name,
+                  error: err instanceof Error ? err.message : String(err)
+                })
+                return null
+              }
+            })
+            .filter((p): p is string => Boolean(p))
+
+          if (paths.length === 0) {
+            logger.warn('External drop: no valid file paths found')
+            return
+          }
+
+          logger.info('External file drop on terminal', { pathCount: paths.length, paths })
+
+          const formattedPaths = formatPathsForTerminal(paths)
+          const success = await useTerminalStore.getState().sendToTerminal(formattedPaths, false)
+
+          if (!success) {
+            showWarningToast('Drop failed', 'Could not insert path into terminal')
+            return
+          }
+
+          xterm.focus()
+        }
+
+        // Cleanup drop target state when drag ends (e.g., cancelled outside panel)
+        const nativeDragEnd = () => {
+          setIsDropTarget(false)
+        }
+
+        // Use capture phase to intercept before any other handlers
+        document.addEventListener('dragover', nativeDragOver, { capture: true })
+        document.addEventListener('dragenter', nativeDragEnter, { capture: true })
+        document.addEventListener('dragleave', nativeDragLeave, { capture: true })
+        document.addEventListener('drop', nativeDrop, { capture: true })
+        document.addEventListener('dragend', nativeDragEnd, { capture: true })
+
+        dragHandlersRef.current = {
+          dragover: nativeDragOver,
+          dragenter: nativeDragEnter,
+          dragleave: nativeDragLeave,
+          drop: nativeDrop,
+          dragend: nativeDragEnd
+        }
       }
 
       // Clear terminal immediately and write clear sequences to ensure clean start
@@ -471,6 +597,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         xtermRef.current.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
         contextMenuHandlerRef.current = null
       }
+      // Cleanup drag handlers (attached to document, not xterm.element)
+      cleanupDragHandlers()
       if (xtermRef.current) {
         xtermRef.current.dispose()
       }
@@ -499,6 +627,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         xtermRef.current.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
         contextMenuHandlerRef.current = null
       }
+      // Cleanup drag handlers (attached to document, not xterm.element)
+      cleanupDragHandlers()
       // Dispose xterm
       if (xtermRef.current) {
         xtermRef.current.dispose()
@@ -719,6 +849,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       xtermRef.current.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
       contextMenuHandlerRef.current = null
     }
+    // Cleanup drag handlers (attached to document, not xterm.element)
+    cleanupDragHandlers()
     // Dispose xterm instance
     if (xtermRef.current) {
       xtermRef.current.dispose()
@@ -736,7 +868,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     if (terminalRef.current && isAvailable) {
       await initializeTerminal()
     }
-  }, [setActiveTerminalId, isAvailable])
+  }, [setActiveTerminalId, isAvailable, cleanupDragHandlers])
 
   const handleScrollToBottom = useCallback(() => {
     if (xtermRef.current) {
@@ -744,52 +876,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }, [])
 
-  // Drag-and-drop handlers for file path insertion (issue #85)
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'copy'
-  }, [])
-
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDropTarget(true)
-  }, [])
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    // Only hide if leaving the container (not entering a child)
-    if (e.currentTarget.contains(e.relatedTarget as Node)) return
-    setIsDropTarget(false)
-  }, [])
-
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDropTarget(false)
-
-    // Use ref for consistency with other terminal operations in this component
-    if (!terminalIdRef.current) return
-
-    // Handle external drag (from Finder/file manager)
-    // Note: Internal drag from project tree is handled by @dnd-kit in ProjectTree.tsx
-    // Electron extends File with a `path` property for local files
-    if (e.dataTransfer.files.length === 0) return
-
-    const paths = Array.from(e.dataTransfer.files)
-      .map((f) => (f as File & { path?: string }).path)
-      .filter((p): p is string => Boolean(p))
-
-    if (paths.length === 0) return
-
-    const formattedPaths = formatPathsForTerminal(paths)
-    const success = await useTerminalStore.getState().sendToTerminal(formattedPaths, false)
-
-    if (!success) {
-      showWarningToast('Drop failed', 'Could not insert path into terminal')
-      return
-    }
-
-    // Focus terminal after drop
-    xtermRef.current?.focus()
-  }, [])
+  // Note: Drag-and-drop for file path insertion (issue #85) is handled by
+  // native document-level event listeners attached in initializeTerminal().
+  // This approach is required because xterm.js DOM elements intercept drag events.
 
   const handleToggleScrollLock = useCallback(() => {
     const newState = !scrollLocked
@@ -943,10 +1032,6 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
               data-drop-target={isDropTarget}
               aria-dropeffect={isDropTarget ? 'copy' : 'none'}
               aria-label={isDropTarget ? 'Drop files here to insert paths' : undefined}
-              onDragOver={handleDragOver}
-              onDragEnter={handleDragEnter}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
             />
           )}
         </div>

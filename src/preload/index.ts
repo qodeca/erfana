@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
 import type { ProjectChanged } from '../shared/ipc/schema'
 import type { GitStatusResponse } from '../shared/ipc/git-schema'
 import type { PdfExportRequest, PdfExportResponse } from '../shared/ipc/pdf-schema'
@@ -571,6 +571,24 @@ const api = {
       ipcRenderer.on('project-lock:focused', handler)
       return () => ipcRenderer.removeListener('project-lock:focused', handler)
     }
+  },
+
+  /**
+   * Utility operations for web content
+   * Provides access to Electron's webUtils API
+   */
+  utils: {
+    /**
+     * Get the absolute file path for a dropped file
+     *
+     * Required because File.path is not available in sandboxed renderers.
+     * Uses Electron's webUtils.getPathForFile() API.
+     *
+     * @param file - File object from drag-and-drop DataTransfer
+     * @returns The absolute file path on the local filesystem
+     * @see Issue #85 - Terminal drag-and-drop file path insertion
+     */
+    getPathForFile: (file: File): string => webUtils.getPathForFile(file)
   }
 }
 

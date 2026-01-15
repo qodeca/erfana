@@ -96,6 +96,47 @@ Clickable file path links in terminal output with intelligent path resolution.
 **Files**:
 - `src/renderer/src/components/Panels/Terminal/FileLinks/`
 
+### Drag-Drop File Path Insertion (v0.6.5)
+
+Drag files or folders from project tree or Finder to insert shell-escaped paths into the terminal.
+
+**Supported Sources**:
+- **Internal drag** (project tree): Uses @dnd-kit with bounding rect detection
+- **External drag** (Finder/file manager): Uses native document-level event listeners with capture phase
+
+**Behavior**:
+- Single file/folder: Inserts quoted path at cursor position
+- Multiple items: Paths joined with newlines
+- Folders: Inserts folder path (not contents)
+- Visual feedback: Drop target indicator appears on terminal panel
+
+**Path Escaping** (POSIX shell-safe):
+- Single-quote wrapping for all paths
+- Null byte sanitization
+- Special characters properly escaped
+
+**Example**:
+```bash
+# Single file drag
+'/Users/demo/Projects/erfana/src/main/index.ts'
+
+# Multiple files drag
+'/Users/demo/file1.md'
+'/Users/demo/file2.md'
+```
+
+**Architecture**:
+- `useTerminalDrop.ts`: Hook combining @dnd-kit sensor and native event handling
+- `terminalDrop.logic.ts`: Path escaping and formatting logic
+- CSS class `.terminal-drop-active`: Visual drop indicator styling
+
+**Files**:
+- `src/renderer/src/components/Panels/Terminal/useTerminalDrop.ts`
+- `src/renderer/src/components/Panels/Terminal/terminalDrop.logic.ts`
+
+**Related issues**:
+- #85 - Terminal drag-drop file path insertion
+
 ### Scroll Lock Toggle (v0.6.0)
 
 Proactive scroll protection via a toggle button that locks terminal to always stay at bottom.

@@ -207,6 +207,17 @@ declare global {
           callback: (event: { projectPath: string; requesterPid: number }) => void
         ) => () => void
       }
+      /**
+       * Utility operations for web content
+       * @see Issue #85 - Terminal drag-and-drop file path insertion
+       */
+      utils: {
+        /**
+         * Get the absolute file path for a dropped file
+         * Required because File.path is not available in sandboxed renderers
+         */
+        getPathForFile: (file: File) => string
+      }
     }
   }
 }
