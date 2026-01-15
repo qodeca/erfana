@@ -7,6 +7,7 @@ import { ContextMenu, ContextMenuItem } from '../ContextMenu/ContextMenu'
 import { useDialog } from '../Dialog'
 import './ProjectTree.css'
 import { showGlobalToast } from '../Toast/toastService'
+import { isPointInElement } from '../../utils/domGeometry'
 import type { MenuContext } from './context-menu/types'
 import { ContextMenuFactory } from './context-menu/factory'
 import {
@@ -466,13 +467,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
       let isOverTerminal = false
       if (terminalPanel) {
+        isOverTerminal = isPointInElement(lastPos.x, lastPos.y, terminalPanel)
         const rect = terminalPanel.getBoundingClientRect()
-        isOverTerminal = (
-          lastPos.x >= rect.left &&
-          lastPos.x <= rect.right &&
-          lastPos.y >= rect.top &&
-          lastPos.y <= rect.bottom
-        )
         logger.info('Terminal drop check', {
           x: lastPos.x,
           y: lastPos.y,

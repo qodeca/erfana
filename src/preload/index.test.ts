@@ -24,6 +24,9 @@ vi.mock('electron', () => {
       __emit: (channel: string, data: any) => {
         for (const cb of listeners[channel] || []) cb({}, data)
       }
+    },
+    webUtils: {
+      getPathForFile: vi.fn((file: File) => `/mocked/path/${file.name}`)
     }
   }
 })
@@ -146,6 +149,72 @@ describe('preload api exposure', () => {
         undefined
       ])
     })
+  })
+})
+
+/**
+ * Tests for utils.getPathForFile API
+ *
+ * This API wraps Electron's webUtils.getPathForFile() to get absolute
+ * file paths from File objects in sandboxed renderers.
+ *
+ * @see Issue #85 - Terminal drag-and-drop file path insertion
+ */
+describe('utils.getPathForFile', () => {
+  it('should expose utils namespace on window.api', () => {
+    expect(window.api.utils).toBeDefined()
+    expect(typeof window.api.utils.getPathForFile).toBe('function')
+  })
+
+  it('should call webUtils.getPathForFile and return the path', async () => {
+    const { webUtils } = await import('electron')
+    const mockFile = new File(['content'], 'test-file.txt', { type: 'text/plain' })
+
+    const result = window.api.utils.getPathForFile(mockFile)
+
+    expect(webUtils.getPathForFile).toHaveBeenCalledWith(mockFile)
+    expect(result).toBe('/mocked/path/test-file.txt')
+  })
+
+  it('should handle files with spaces in name', async () => {
+    const { webUtils } = await import('electron')
+    const mockFile = new File([''], 'file with spaces.md', { type: 'text/markdown' })
+
+    const result = window.api.utils.getPathForFile(mockFile)
+
+    expect(webUtils.getPathForFile).toHaveBeenCalledWith(mockFile)
+    expect(result).toBe('/mocked/path/file with spaces.md')
+  })
+
+  it('should handle files with special characters in name', async () => {
+    const { webUtils } = await import('electron')
+    const mockFile = new File([''], "file'with\"quotes.txt", { type: 'text/plain' })
+
+    const result = window.api.utils.getPathForFile(mockFile)
+
+    expect(webUtils.getPathForFile).toHaveBeenCalledWith(mockFile)
+    expect(result).toBe("/mocked/path/file'with\"quotes.txt")
+  })
+
+  it('should handle files with unicode characters in name', async () => {
+    const { webUtils } = await import('electron')
+    const mockFile = new File([''], 'ファイル名.txt', { type: 'text/plain' })
+
+    const result = window.api.utils.getPathForFile(mockFile)
+
+    expect(webUtils.getPathForFile).toHaveBeenCalledWith(mockFile)
+    expect(result).toBe('/mocked/path/ファイル名.txt')
+  })
+
+  it('should handle files with long names', async () => {
+    const { webUtils } = await import('electron')
+    const longName = 'a'.repeat(200) + '.txt'
+    const mockFile = new File([''], longName, { type: 'text/plain' })
+
+    const result = window.api.utils.getPathForFile(mockFile)
+
+    expect(webUtils.getPathForFile).toHaveBeenCalledWith(mockFile)
+    expect(result).toBe(`/mocked/path/${longName}`)
   })
 })
 

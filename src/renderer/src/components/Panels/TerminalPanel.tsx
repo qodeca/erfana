@@ -34,6 +34,7 @@ import { TEST_IDS } from '../../constants/testids'
 import '@xterm/xterm/css/xterm.css'
 import './TerminalPanel.css'
 import { isElementVisible } from '../../utils/domUtils'
+import { isPointInElement } from '../../utils/domGeometry'
 
 export function TerminalPanel(_props: ISplitviewPanelProps) {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null)
@@ -370,14 +371,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         const terminalPanelRef = terminalRef.current?.closest('[data-testid="terminal-panel"]')
 
         const isOverTerminalPanel = (e: DragEvent): boolean => {
-          if (!terminalPanelRef) return false
-          const rect = terminalPanelRef.getBoundingClientRect()
-          return (
-            e.clientX >= rect.left &&
-            e.clientX <= rect.right &&
-            e.clientY >= rect.top &&
-            e.clientY <= rect.bottom
-          )
+          return isPointInElement(e.clientX, e.clientY, terminalPanelRef)
         }
 
         const nativeDragOver = (e: DragEvent) => {
