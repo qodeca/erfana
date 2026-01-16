@@ -9,6 +9,29 @@ import type { ScreenshotMode, ScreenshotCaptureResponse, DisplayInfo } from '../
 import { logger } from './LoggingService'
 
 /**
+ * Screenshot Service Interface
+ *
+ * Defines the public API for screenshot capture functionality.
+ * Follows the interface pattern established by PdfService and DocxService.
+ *
+ * @see Issue #86 - screenshot capture for terminal panel
+ */
+interface IScreenshotService {
+  /**
+   * Get all available displays for multi-monitor support
+   */
+  getDisplays(): DisplayInfo[]
+
+  /**
+   * Capture a screenshot using macOS screencapture
+   *
+   * @param mode - Capture mode: 'screen', 'window', or 'area'
+   * @param displayId - Optional display ID for 'screen' mode
+   */
+  capture(mode: ScreenshotMode, displayId?: number): Promise<ScreenshotCaptureResponse>
+}
+
+/**
  * Screenshot Service
  *
  * Handles screenshot capture using macOS screencapture command.
@@ -21,7 +44,7 @@ import { logger } from './LoggingService'
  *
  * @see Issue #86 - screenshot capture for terminal panel
  */
-class ScreenshotService {
+class ScreenshotService implements IScreenshotService {
   /**
    * Delay before checking if file exists (filesystem sync)
    */

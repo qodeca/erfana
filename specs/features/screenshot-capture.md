@@ -8,6 +8,8 @@ Add screenshot capture capability to Erfana's terminal panel toolbar, allowing u
 
 **Trigger:** Three toolbar buttons in terminal panel header.
 
+**Enhancement:** Multi-monitor support for full screen capture via display selection dialog.
+
 ---
 
 ## Requirements
@@ -30,7 +32,7 @@ Add screenshot capture capability to Erfana's terminal panel toolbar, allowing u
 | FR-12 | Disable all screenshot buttons while any capture operation is in progress | Must |
 | FR-13 | Show toast notification on successful capture displaying filename only (via `path.basename`) | Must |
 | FR-14 | Show error toast with actionable message on capture failure | Must |
-| FR-15 | Quote file path with double quotes when pasting to terminal | Must |
+| FR-15 | Quote file path with single quotes when pasting to terminal (shell-safe escaping) | Must |
 | FR-16 | Do not append newline after pasted path (user decides when to execute) | Must |
 | FR-17 | Handle macOS Screen Recording permission denial with guidance toast | Must |
 | FR-18 | If target terminal closes during capture, show error toast instead of pasting | Must |
@@ -90,10 +92,12 @@ The terminal that receives the pasted path is determined **at the moment the but
 
 ### Path Format
 
-Paths are quoted for shell safety:
+Paths are quoted with single quotes for shell safety (using `escapePathForShell` utility):
 ```
-"/var/folders/xx/xxxxx/T/erfana-screenshot-2026-01-15T19-30-45-123Z.png"
+'/var/folders/xx/xxxxx/T/erfana-screenshot-1737012345123.png'
 ```
+
+Internal single quotes are escaped as `'\''`. This is consistent with the drag-drop file path insertion.
 
 No trailing space or newline. User can type command before or after the path.
 
@@ -109,7 +113,7 @@ No trailing space or newline. User can type command before or after the path.
 | Window | `screencapture -w -x <path>` | Interactive window selection (works across all displays) |
 | Area | `screencapture -i -s -x <path>` | Interactive rectangular selection |
 
-**Note:** Full screen captures the **primary display only**. Multi-display capture is out of scope.
+**Note:** Full screen capture supports multi-monitor selection via dialog when multiple displays are connected. Uses `-D` flag with 1-based display index.
 
 **Note:** On Retina displays, screenshots are captured at native resolution (2x). This is automatic.
 
@@ -182,9 +186,11 @@ Screenshot files are **not automatically cleaned up** by Erfana. Rationale:
 ```typescript
 {
   mode: 'screen' | 'window' | 'area'
-  terminalId: string  // Terminal to paste result to
+  displayId?: number  // Optional display ID for 'screen' mode (multi-monitor support)
 }
 ```
+
+**Note:** `terminalId` is NOT included in the request. It is captured client-side at click time to ensure the correct terminal receives the path even if user switches terminals during interactive selection.
 
 **Response:**
 ```typescript
@@ -192,11 +198,22 @@ Screenshot files are **not automatically cleaned up** by Erfana. Rationale:
   success: boolean
   filePath?: string      // On success
   error?: string         // Human-readable error message
-  errorCode?: 'PERMISSION_DENIED' | 'TIMEOUT' | 'CANCELLED' | 'TERMINAL_CLOSED' | 'WRITE_FAILED' | 'UNKNOWN'
+  errorCode?: 'SCREENSHOT_PERMISSION_DENIED' | 'SCREENSHOT_TIMEOUT' | 'SCREENSHOT_CANCELLED' | 'SCREENSHOT_FAILED' | 'SCREENSHOT_NOT_SUPPORTED'
 }
 ```
 
-**Pattern deviation note:** This response structure differs from other IPC handlers that throw errors. The deviation is intentional because `CANCELLED` is a legitimate non-error outcome (user pressed Escape) that should not throw.
+**Channel:** `screenshot:getDisplays`
+
+**Request:** None
+
+**Response:**
+```typescript
+{
+  displays: DisplayInfo[]  // Array of available displays
+}
+```
+
+**Pattern deviation note:** The capture response structure differs from other IPC handlers that throw errors. The deviation is intentional because `SCREENSHOT_CANCELLED` is a legitimate non-error outcome (user pressed Escape) that should not throw.
 
 ### Zod Schema
 
@@ -207,37 +224,54 @@ import { z } from 'zod'
 export const ScreenshotModeSchema = z.enum(['screen', 'window', 'area'])
 export type ScreenshotMode = z.infer<typeof ScreenshotModeSchema>
 
-export const ScreenshotRequestSchema = z.object({
-  mode: ScreenshotModeSchema,
-  terminalId: z.string().min(1)
+// Display information for multi-monitor support
+export const DisplayBoundsSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  width: z.number(),
+  height: z.number()
 })
-export type ScreenshotRequest = z.infer<typeof ScreenshotRequestSchema>
 
-export const ScreenshotErrorCodeSchema = z.enum([
-  'PERMISSION_DENIED',
-  'TIMEOUT',
-  'CANCELLED',
-  'TERMINAL_CLOSED',
-  'WRITE_FAILED',
-  'UNKNOWN'
-])
-export type ScreenshotErrorCode = z.infer<typeof ScreenshotErrorCodeSchema>
+export const DisplayInfoSchema = z.object({
+  id: z.number(),
+  label: z.string(),
+  isPrimary: z.boolean(),
+  bounds: DisplayBoundsSchema
+})
+export type DisplayInfo = z.infer<typeof DisplayInfoSchema>
 
-export const ScreenshotResponseSchema = z.object({
+export const GetDisplaysResponseSchema = z.object({
+  displays: z.array(DisplayInfoSchema)
+})
+export type GetDisplaysResponse = z.infer<typeof GetDisplaysResponseSchema>
+
+// Capture request (terminalId captured client-side, not in IPC)
+export const ScreenshotCaptureRequestSchema = z.object({
+  mode: ScreenshotModeSchema,
+  displayId: z.number().optional()  // For multi-monitor screen capture
+})
+export type ScreenshotCaptureRequest = z.infer<typeof ScreenshotCaptureRequestSchema>
+
+// Capture response (uses success/error pattern instead of throwing)
+export const ScreenshotCaptureResponseSchema = z.object({
   success: z.boolean(),
   filePath: z.string().optional(),
   error: z.string().optional(),
-  errorCode: ScreenshotErrorCodeSchema.optional()
+  errorCode: z.string().optional()  // ErrorCode enum values
 })
-export type ScreenshotResponse = z.infer<typeof ScreenshotResponseSchema>
+export type ScreenshotCaptureResponse = z.infer<typeof ScreenshotCaptureResponseSchema>
 ```
 
 ### Preload API
 
 ```typescript
 window.api.screenshot: {
-  capture: (mode: 'screen' | 'window' | 'area', terminalId: string) => Promise<ScreenshotResponse>
-  isAvailable: () => boolean  // Returns true on macOS only (and binary exists)
+  getDisplays: () => Promise<GetDisplaysResponse>
+  capture: (request: ScreenshotCaptureRequest) => Promise<ScreenshotCaptureResponse>
+}
+
+window.api.utils: {
+  getPlatform: () => NodeJS.Platform  // Used to check for 'darwin'
 }
 ```
 
@@ -375,7 +409,6 @@ TERMINAL_BTN_SCREENSHOT_AREA: 'terminal-btn-screenshot-area'
 ## Out of Scope
 
 - Windows/Linux support (future enhancement)
-- Multi-display selection for full screen capture
 - Screenshot preview before pasting
 - Screenshot editing/annotation
 - Clipboard integration (copy image to clipboard)
@@ -384,22 +417,28 @@ TERMINAL_BTN_SCREENSHOT_AREA: 'terminal-btn-screenshot-area'
 - Automatic temp file cleanup
 - Auto-restore fullscreen after capture
 
+**Note:** Multi-display selection for full screen capture was originally out of scope but was implemented as an enhancement (issue #86).
+
 ---
 
 ## Files to Create/Modify
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/shared/ipc/screenshot-schema.ts` | Create | Zod schemas for request/response |
-| `src/main/services/ScreenshotService.ts` | Create | Service to spawn screencapture command |
-| `src/main/services/ScreenshotService.test.ts` | Create | Unit tests for service |
-| `src/main/ipc/screenshot-handlers.ts` | Create | IPC handlers for capture operations |
-| `src/main/ipc/screenshot-handlers.test.ts` | Create | Unit tests for handlers |
+| `src/shared/ipc/screenshot-schema.ts` | Create | Zod schemas for request/response/displays |
+| `src/main/services/ScreenshotService.ts` | Create | Service with IScreenshotService interface |
+| `src/main/services/ScreenshotService.test.ts` | Create | Unit tests for service (52 tests) |
+| `src/main/ipc/screenshot-handlers.ts` | Create | IPC handlers for capture and getDisplays |
 | `src/main/index.ts` | Modify | Register screenshot handlers (after LoggingService init) |
-| `src/preload/index.ts` | Modify | Expose screenshot API |
+| `src/preload/index.ts` | Modify | Expose screenshot API and utils.getPlatform |
 | `src/preload/index.d.ts` | Modify | Add TypeScript types |
+| `src/shared/constants.ts` | Modify | Add SCREENSHOT constants |
+| `src/shared/errors.ts` | Modify | Add SCREENSHOT_* error codes |
 | `src/renderer/src/components/Panels/TerminalPanel.tsx` | Modify | Add toolbar buttons with local state |
-| `src/renderer/src/constants/testids.ts` | Modify | Add 3 test IDs (update comment count 6→9) |
+| `src/renderer/src/components/Panels/TerminalPanel.css` | Modify | Add loading state styles |
+| `src/renderer/src/components/Dialog/ScreenSelectDialog.tsx` | Create | Multi-monitor selection dialog |
+| `src/renderer/src/components/Dialog/ScreenSelectDialog.css` | Create | Dialog styles using design tokens |
+| `src/renderer/src/constants/testids.ts` | Modify | Add TERMINAL_BTN_CAPTURE_* test IDs |
 
 ---
 

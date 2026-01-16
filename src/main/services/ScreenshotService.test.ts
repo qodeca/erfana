@@ -1051,6 +1051,23 @@ describe('ScreenshotService', () => {
       expect(args[2]).toBe('1')
     })
 
+    it('uses -D 1 for single display when explicitly requested', async () => {
+      // Edge case: single-display system where user explicitly requests the only display
+      mockGetAllDisplays.mockReturnValue([
+        { id: 101, label: 'Main Display', bounds: { x: 0, y: 0, width: 1920, height: 1080 } }
+      ])
+      mockGetPrimaryDisplay.mockReturnValue({ id: 101 })
+
+      const { screenshotService } = await import('./ScreenshotService')
+
+      await screenshotService.capture('screen', 101)
+
+      const args = mockExecFile.mock.calls[0][1] as string[]
+      expect(args).toContain('-D')
+      expect(args[args.indexOf('-D') + 1]).toBe('1')
+      expect(args[args.length - 1]).toMatch(/\.png$/)
+    })
+
     it('falls back to default screen capture when displayId not found', async () => {
       mockGetAllDisplays.mockReturnValue([
         { id: 101, label: 'Display 1', bounds: { x: 0, y: 0, width: 1920, height: 1080 } }

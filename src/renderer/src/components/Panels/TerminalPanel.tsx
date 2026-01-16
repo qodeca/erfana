@@ -242,7 +242,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     const isMac = platform === 'darwin'
     setIsMacOS(isMac)
 
-    // Fetch displays for multi-monitor selection (macOS only)
+    // Initial fetch of displays (macOS only)
     if (isMac) {
       window.api.screenshot.getDisplays().then((result) => {
         setDisplays(result.displays)
@@ -1049,42 +1049,40 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                 {/* Screenshot capture buttons - macOS only (issue #86) */}
                 {isMacOS && (
                   <>
-                    {/* Screen capture: dialog for multi-monitor, single button otherwise */}
-                    {displays.length > 1 ? (
-                      <>
-                        <button
-                          className={`icon-btn${capturingMode === 'screen' ? ' icon-btn--loading' : ''}`}
-                          onClick={() => setShowScreenSelectDialog(true)}
-                          title="Capture screen"
-                          aria-label="Capture full screen screenshot"
-                          disabled={!terminalId || capturingMode !== null}
-                          data-testid={TEST_IDS.TERMINAL_BTN_CAPTURE_SCREEN}
-                        >
-                          <Camera size={14} />
-                        </button>
-                        <ScreenSelectDialog
-                          isOpen={showScreenSelectDialog}
-                          displays={displays}
-                          zIndex={10000}
-                          onSelect={(displayId) => {
-                            setShowScreenSelectDialog(false)
-                            handleScreenshot('screen', displayId)
-                          }}
-                          onCancel={() => setShowScreenSelectDialog(false)}
-                        />
-                      </>
-                    ) : (
-                      <button
-                        className={`icon-btn${capturingMode === 'screen' ? ' icon-btn--loading' : ''}`}
-                        onClick={() => handleScreenshot('screen')}
-                        title="Capture screen"
-                        aria-label="Capture full screen screenshot"
-                        disabled={!terminalId || capturingMode !== null}
-                        data-testid={TEST_IDS.TERMINAL_BTN_CAPTURE_SCREEN}
-                      >
-                        <Camera size={14} />
-                      </button>
-                    )}
+                    {/* Screen capture: checks for multi-monitor at click time */}
+                    <button
+                      className={`icon-btn${capturingMode === 'screen' ? ' icon-btn--loading' : ''}`}
+                      onClick={async () => {
+                        // Refresh displays and check count at click time
+                        const result = await window.api.screenshot.getDisplays()
+                        const freshDisplays = result.displays
+                        setDisplays(freshDisplays)
+
+                        if (freshDisplays.length > 1) {
+                          // Multiple monitors - show selection dialog
+                          setShowScreenSelectDialog(true)
+                        } else {
+                          // Single monitor - capture directly
+                          handleScreenshot('screen')
+                        }
+                      }}
+                      title="Capture screen"
+                      aria-label="Capture full screen screenshot"
+                      disabled={!terminalId || capturingMode !== null}
+                      data-testid={TEST_IDS.TERMINAL_BTN_CAPTURE_SCREEN}
+                    >
+                      <Camera size={14} />
+                    </button>
+                    <ScreenSelectDialog
+                      isOpen={showScreenSelectDialog}
+                      displays={displays}
+                      zIndex={10000}
+                      onSelect={(displayId) => {
+                        setShowScreenSelectDialog(false)
+                        handleScreenshot('screen', displayId)
+                      }}
+                      onCancel={() => setShowScreenSelectDialog(false)}
+                    />
                     <button
                       className={`icon-btn${capturingMode === 'window' ? ' icon-btn--loading' : ''}`}
                       onClick={() => handleScreenshot('window')}
