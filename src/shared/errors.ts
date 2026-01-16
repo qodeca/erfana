@@ -73,6 +73,13 @@ export enum ErrorCode {
   DOCX_EXPORT_NO_CONTENT = 'DOCX_EXPORT_NO_CONTENT',
   DOCX_EXPORT_INVALID_REQUEST = 'DOCX_EXPORT_INVALID_REQUEST',
 
+  // Screenshot capture errors
+  SCREENSHOT_PERMISSION_DENIED = 'SCREENSHOT_PERMISSION_DENIED',
+  SCREENSHOT_TIMEOUT = 'SCREENSHOT_TIMEOUT',
+  SCREENSHOT_CANCELLED = 'SCREENSHOT_CANCELLED',
+  SCREENSHOT_FAILED = 'SCREENSHOT_FAILED',
+  SCREENSHOT_NOT_SUPPORTED = 'SCREENSHOT_NOT_SUPPORTED',
+
   // Logging errors
   LOGGING_INIT_FAILED = 'LOGGING_INIT_FAILED',
   LOGGING_WRITE_FAILED = 'LOGGING_WRITE_FAILED',
@@ -203,6 +210,13 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.DOCX_EXPORT_FAILED]: 'Failed to generate DOCX',
   [ErrorCode.DOCX_EXPORT_NO_CONTENT]: 'No content to export',
   [ErrorCode.DOCX_EXPORT_INVALID_REQUEST]: 'Invalid DOCX export request',
+
+  // Screenshot capture errors
+  [ErrorCode.SCREENSHOT_PERMISSION_DENIED]: 'Screen recording permission required. Grant access in System Settings > Privacy & Security.',
+  [ErrorCode.SCREENSHOT_TIMEOUT]: 'Screenshot capture timed out',
+  [ErrorCode.SCREENSHOT_CANCELLED]: 'Screenshot capture was cancelled',
+  [ErrorCode.SCREENSHOT_FAILED]: 'Failed to capture screenshot',
+  [ErrorCode.SCREENSHOT_NOT_SUPPORTED]: 'Screenshot capture is only available on macOS',
 
   // Logging errors
   [ErrorCode.LOGGING_INIT_FAILED]: 'Failed to initialize logging system',

@@ -116,6 +116,14 @@ describe('TerminalPanel flickering prevention', () => {
       file: {
         getProjectPath: vi.fn().mockResolvedValue('/test/project'),
         onProjectChanged: vi.fn().mockReturnValue(vi.fn())
+      },
+      utils: {
+        getPathForFile: vi.fn(),
+        getPlatform: vi.fn().mockReturnValue('darwin')
+      },
+      screenshot: {
+        getDisplays: vi.fn().mockResolvedValue({ displays: [] }),
+        capture: vi.fn().mockResolvedValue({ success: true, filePath: '/tmp/screenshot.png' })
       }
     }
   })

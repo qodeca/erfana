@@ -2,10 +2,17 @@
 
 Historical changelog entries for versions prior to current. For the latest changes, see [CLAUDE.md](../CLAUDE.md).
 
-## [0.6.5] - 2026-01-15
+## [0.6.5] - 2026-01-16
 
 ### Added
 - Terminal drag-drop: Insert quoted file paths by dropping files from project tree or Finder (#85)
+- Screenshot capture buttons in terminal panel (macOS only): Capture screen, window, or area selection with file path pasted to terminal (#86)
+  - Three toolbar buttons: Capture Screen, Capture Window (picker), Capture Area (crosshair)
+  - Multi-monitor support: display selection dialog for Capture Screen
+  - Screenshots saved to OS temp directory as PNG with timestamp
+  - 30-second timeout for interactive selections
+  - Unified shell-safe path quoting (single quotes) for screenshot and drag-drop
+  - 51 new tests
 
 ## Changes in v0.6.4
 - **E2E Testing Infrastructure** (Dec 27-28, 2025):

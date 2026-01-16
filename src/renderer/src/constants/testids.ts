@@ -94,7 +94,7 @@ export const TEST_IDS = {
   GIT_SYNC_INDICATOR: 'git-sync-indicator',
 
   // =========================================================================
-  // Terminal Panel (7)
+  // Terminal Panel (10)
   // =========================================================================
 
   /** Terminal panel container */
@@ -111,6 +111,12 @@ export const TEST_IDS = {
   TERMINAL_STATUS: 'terminal-status',
   /** Terminal drop zone for drag-and-drop file path insertion */
   TERMINAL_DROP_ZONE: 'terminal-drop-zone',
+  /** Capture full screen screenshot button (macOS only) */
+  TERMINAL_BTN_CAPTURE_SCREEN: 'terminal-btn-capture-screen',
+  /** Capture window screenshot button (macOS only) */
+  TERMINAL_BTN_CAPTURE_WINDOW: 'terminal-btn-capture-window',
+  /** Capture area screenshot button (macOS only) */
+  TERMINAL_BTN_CAPTURE_AREA: 'terminal-btn-capture-area',
 
   // =========================================================================
   // Editor Content Layout (5)

@@ -170,3 +170,21 @@ export const DOCX_EXPORT = {
    */
   PNG_RESOLUTION_SCALE: 2.5
 } as const
+
+/**
+ * Screenshot capture constants
+ * Used by ScreenshotService for macOS screencapture
+ *
+ * @see ScreenshotService.ts
+ * @see Issue #86 - screenshot capture for terminal panel
+ */
+export const SCREENSHOT = {
+  /** Timeout for screencapture command in ms */
+  TIMEOUT_MS: 30_000,
+  /** Prefix for temp file names */
+  TEMP_PREFIX: 'erfana-screenshot-',
+  /** File extension for screenshots */
+  FILE_EXTENSION: '.png',
+  /** Path to macOS screencapture binary */
+  BINARY_PATH: '/usr/sbin/screencapture'
+} as const

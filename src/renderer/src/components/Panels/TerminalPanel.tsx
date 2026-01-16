@@ -10,13 +10,14 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import { ISplitviewPanelProps } from 'dockview'
-import { Terminal as TerminalIcon, RotateCw, ArrowDownToLine, LockKeyhole, LockKeyholeOpen } from 'lucide-react'
+import { Terminal as TerminalIcon, RotateCw, ArrowDownToLine, LockKeyhole, LockKeyholeOpen, Camera, AppWindow, BoxSelect } from 'lucide-react'
+import type { DisplayInfo } from '../../../../shared/ipc/screenshot-schema'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import { useProjectStore } from '../../stores/useProjectStore'
-import { showWarningToast } from '../../utils/toastHelpers'
+import { showWarningToast, showErrorToast, showSuccessToast, showInfoToast } from '../../utils/toastHelpers'
 import { useScrollAnomalyRecovery } from '../../hooks/useScrollAnomalyRecovery'
 import { useTerminalParserHooks } from '../../hooks/useTerminalParserHooks'
 import { useTerminalClipboard } from '../../hooks/useTerminalClipboard'
@@ -27,8 +28,9 @@ import { useProjectManagementContextSafe } from '../../context/ProjectManagement
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { TerminalContextMenu } from '../ContextMenu/TerminalContextMenu'
 import { FilePickerDialog } from '../Dialog/FilePickerDialog'
+import { ScreenSelectDialog } from '../Dialog'
 import { sanitizeFilePath } from '../../utils/fileUtils'
-import { formatPathsForTerminal } from '../../utils/shellPathEscape'
+import { formatPathsForTerminal, escapePathForShell } from '../../utils/shellPathEscape'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
 import '@xterm/xterm/css/xterm.css'
@@ -60,6 +62,12 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   } | null>(null)
   const [projectPath, setProjectPath] = useState<string | null>(null)
   const [isDropTarget, setIsDropTarget] = useState(false)
+  // Screenshot capture state (issue #86)
+  const [capturingMode, setCapturingMode] = useState<'screen' | 'window' | 'area' | null>(null)
+  const [isMacOS, setIsMacOS] = useState(false)
+  // Multi-monitor display selection state (issue #86 enhancement)
+  const [displays, setDisplays] = useState<DisplayInfo[]>([])
+  const [showScreenSelectDialog, setShowScreenSelectDialog] = useState(false)
 
   // Cleanup helper for drag handlers (issue #85 - DRY principle)
   // Centralized cleanup to avoid duplication across unmount, project change, and restart
@@ -225,6 +233,21 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     })
 
     return unsubscribe
+  }, [])
+
+  // Check platform on mount for macOS-only features (issue #86)
+  // Also fetch available displays for multi-monitor support
+  useEffect(() => {
+    const platform = window.api.utils.getPlatform()
+    const isMac = platform === 'darwin'
+    setIsMacOS(isMac)
+
+    // Fetch displays for multi-monitor selection (macOS only)
+    if (isMac) {
+      window.api.screenshot.getDisplays().then((result) => {
+        setDisplays(result.displays)
+      })
+    }
   }, [])
 
   async function checkAvailability() {
@@ -831,6 +854,73 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     return startPollingWatcher()
   }, [scrollLocked, startPollingWatcher])
 
+
+  /**
+   * Handle screenshot capture (issue #86)
+   *
+   * Captures the terminal ID at click time, invokes the screenshot service,
+   * and pastes the resulting path to the terminal. Handles various error
+   * conditions including permission denial, timeout, and terminal closure.
+   *
+   * @param mode - Screenshot capture mode: 'screen', 'window', or 'area'
+   * @param displayId - Optional display ID for 'screen' mode (multi-monitor support)
+   */
+  const handleScreenshot = useCallback(async (mode: 'screen' | 'window' | 'area', displayId?: number) => {
+    // Capture terminal ID at click time to ensure we paste to the correct terminal
+    // even if user switches terminals during interactive window/area selection
+    const capturedTerminalId = terminalIdRef.current
+
+    if (!capturedTerminalId) {
+      showWarningToast('No terminal', 'Open a terminal first')
+      return
+    }
+
+    setCapturingMode(mode)
+
+    try {
+      const result = await window.api.screenshot.capture({ mode, displayId })
+
+      if (!result.success) {
+        if (result.errorCode === 'SCREENSHOT_CANCELLED') {
+          // Silent - user cancelled intentionally (pressed Escape)
+          return
+        } else if (result.errorCode === 'SCREENSHOT_TIMEOUT') {
+          showErrorToast('Timeout', 'Screenshot capture timed out after 30 seconds')
+        } else if (result.errorCode === 'SCREENSHOT_PERMISSION_DENIED') {
+          showErrorToast('Permission required', 'Grant screen recording permission in System Settings > Privacy & Security')
+        } else {
+          showErrorToast('Capture failed', result.error || 'Unknown error')
+        }
+        return
+      }
+
+      // Verify terminal still exists after capture completes
+      const currentTerminalId = terminalIdRef.current
+      if (!currentTerminalId) {
+        // Terminal closed during capture - show full path in toast for manual copy
+        showInfoToast('Terminal closed', `Screenshot saved to: ${result.filePath}`)
+        return
+      }
+
+      // Paste path to terminal with shell-safe escaping (single quotes)
+      // Uses same escaping as drag-drop for consistency
+      const quotedPath = escapePathForShell(result.filePath!)
+      await window.api.terminal.write(currentTerminalId, quotedPath)
+
+      // Show success toast with filename only (not full path)
+      const filename = result.filePath?.split('/').pop() || 'screenshot.png'
+      showSuccessToast('Screenshot captured', filename)
+
+      // Return focus to terminal after capture
+      xtermRef.current?.focus()
+    } catch (error) {
+      showErrorToast('Error', 'Screenshot capture failed unexpectedly')
+      logger.error('Screenshot capture error', error instanceof Error ? error : undefined)
+    } finally {
+      setCapturingMode(null)
+    }
+  }, [])
+
   const handleRestartTerminal = useCallback(async () => {
     // Kill current terminal session
     if (terminalIdRef.current) {
@@ -956,6 +1046,67 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
             <span className="sidebar-panel-title">Terminal</span>
             {terminalId && (
               <>
+                {/* Screenshot capture buttons - macOS only (issue #86) */}
+                {isMacOS && (
+                  <>
+                    {/* Screen capture: dialog for multi-monitor, single button otherwise */}
+                    {displays.length > 1 ? (
+                      <>
+                        <button
+                          className={`icon-btn${capturingMode === 'screen' ? ' icon-btn--loading' : ''}`}
+                          onClick={() => setShowScreenSelectDialog(true)}
+                          title="Capture screen"
+                          aria-label="Capture full screen screenshot"
+                          disabled={!terminalId || capturingMode !== null}
+                          data-testid={TEST_IDS.TERMINAL_BTN_CAPTURE_SCREEN}
+                        >
+                          <Camera size={14} />
+                        </button>
+                        <ScreenSelectDialog
+                          isOpen={showScreenSelectDialog}
+                          displays={displays}
+                          zIndex={10000}
+                          onSelect={(displayId) => {
+                            setShowScreenSelectDialog(false)
+                            handleScreenshot('screen', displayId)
+                          }}
+                          onCancel={() => setShowScreenSelectDialog(false)}
+                        />
+                      </>
+                    ) : (
+                      <button
+                        className={`icon-btn${capturingMode === 'screen' ? ' icon-btn--loading' : ''}`}
+                        onClick={() => handleScreenshot('screen')}
+                        title="Capture screen"
+                        aria-label="Capture full screen screenshot"
+                        disabled={!terminalId || capturingMode !== null}
+                        data-testid={TEST_IDS.TERMINAL_BTN_CAPTURE_SCREEN}
+                      >
+                        <Camera size={14} />
+                      </button>
+                    )}
+                    <button
+                      className={`icon-btn${capturingMode === 'window' ? ' icon-btn--loading' : ''}`}
+                      onClick={() => handleScreenshot('window')}
+                      title="Capture window"
+                      aria-label="Capture window screenshot"
+                      disabled={!terminalId || capturingMode !== null}
+                      data-testid={TEST_IDS.TERMINAL_BTN_CAPTURE_WINDOW}
+                    >
+                      <AppWindow size={14} />
+                    </button>
+                    <button
+                      className={`icon-btn${capturingMode === 'area' ? ' icon-btn--loading' : ''}`}
+                      onClick={() => handleScreenshot('area')}
+                      title="Capture area"
+                      aria-label="Capture area screenshot"
+                      disabled={!terminalId || capturingMode !== null}
+                      data-testid={TEST_IDS.TERMINAL_BTN_CAPTURE_AREA}
+                    >
+                      <BoxSelect size={14} />
+                    </button>
+                  </>
+                )}
                 <button
                   className="icon-btn"
                   onClick={handleScrollToBottom}

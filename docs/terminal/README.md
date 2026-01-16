@@ -137,6 +137,42 @@ Drag files or folders from project tree or Finder to insert shell-escaped paths 
 **Related issues**:
 - #85 - Terminal drag-drop file path insertion
 
+### Screenshot Capture (v0.6.5, macOS only)
+
+Capture screenshots directly from terminal toolbar with file paths automatically pasted to terminal.
+
+**Toolbar Buttons** (macOS only, hidden on other platforms):
+- **Capture Screen** (Camera icon): Captures primary display immediately
+- **Capture Window** (AppWindow icon): Opens macOS window picker
+- **Capture Area** (BoxSelect icon): Opens crosshair area selection tool
+
+**Behavior**:
+- Screenshots saved to OS temp directory as PNG (`erfana-screenshot-{timestamp}.png`)
+- File path automatically pasted to active terminal in double quotes
+- Success/error toasts provide user feedback
+- 30-second timeout for interactive selections (window picker, area selection)
+- Loading spinner displays during capture operations
+
+**Use Cases**:
+- Quick attachment of screenshots in chat/command workflows
+- Visual documentation of terminal output
+- Bug reporting with visual context
+
+**Architecture**:
+- `ScreenshotService.ts`: Main process service using macOS `screencapture` command
+- `screenshot-handlers.ts`: IPC handlers for renderer communication
+- `screenshot-schema.ts`: Zod schemas for IPC types
+- Platform detection via `utils.getPlatform()` in preload
+
+**Files**:
+- `src/main/services/ScreenshotService.ts`
+- `src/main/ipc/screenshot-handlers.ts`
+- `src/shared/ipc/screenshot-schema.ts`
+- `src/renderer/src/components/Panels/TerminalPanel.tsx` (UI buttons)
+
+**Related issues**:
+- #86 - Screenshot capture buttons for terminal panel
+
 ### Scroll Lock Toggle (v0.6.0)
 
 Proactive scroll protection via a toggle button that locks terminal to always stay at bottom.

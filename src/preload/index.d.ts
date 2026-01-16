@@ -7,6 +7,11 @@ import type { DocxExportRequest, DocxExportResponse } from '../shared/ipc/docx-s
 import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global-settings-schema'
 import type { LogEntry } from '../shared/ipc/logging-schema'
 import type { LockResult, LockStatus } from '../shared/ipc/project-lock-schema'
+import type {
+  ScreenshotCaptureRequest,
+  ScreenshotCaptureResponse,
+  GetDisplaysResponse
+} from '../shared/ipc/screenshot-schema'
 
 declare global {
   interface Window {
@@ -172,6 +177,16 @@ declare global {
       docx: {
         exportToDocx: (request: DocxExportRequest) => Promise<DocxExportResponse>
       }
+      /**
+       * Screenshot capture operations (macOS only)
+       * @see Issue #86 - Screenshot capture buttons for terminal panel
+       */
+      screenshot: {
+        /** Get available displays for multi-monitor support */
+        getDisplays: () => Promise<GetDisplaysResponse>
+        /** Capture a screenshot */
+        capture: (request: ScreenshotCaptureRequest) => Promise<ScreenshotCaptureResponse>
+      }
       globalSettings: {
         get: () => Promise<{ success: boolean; settings?: GlobalSettings; error?: string }>
         set: (key: string, value: unknown) => Promise<{ success: boolean; error?: string }>
@@ -210,6 +225,7 @@ declare global {
       /**
        * Utility operations for web content
        * @see Issue #85 - Terminal drag-and-drop file path insertion
+       * @see Issue #86 - Screenshot capture buttons for terminal panel
        */
       utils: {
         /**
@@ -217,6 +233,11 @@ declare global {
          * Required because File.path is not available in sandboxed renderers
          */
         getPathForFile: (file: File) => string
+        /**
+         * Get the current operating system platform
+         * Used for platform-specific UI features
+         */
+        getPlatform: () => NodeJS.Platform
       }
     }
   }

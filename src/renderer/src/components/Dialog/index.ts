@@ -9,6 +9,7 @@ export { AlertDialog } from './AlertDialog'
 export { RenameDialog } from './RenameDialog'
 export { NewFileDialog } from './NewFileDialog'
 export { NewFolderDialog } from './NewFolderDialog'
+export { ScreenSelectDialog } from './ScreenSelectDialog'
 export { showGlobalDialog, subscribeGlobalDialogs } from './dialogService'
 export type { PromptDialogResult } from './PromptDialog'
 

@@ -47,6 +47,14 @@ describe('TerminalPanel unavailable flow', () => {
         onProjectChanged: vi.fn().mockReturnValue(() => {}),
         getProjectPath: vi.fn().mockResolvedValue(null),
         validatePath: vi.fn().mockResolvedValue({ exists: false })
+      },
+      utils: {
+        getPathForFile: vi.fn(),
+        getPlatform: vi.fn().mockReturnValue('darwin')
+      },
+      screenshot: {
+        getDisplays: vi.fn().mockResolvedValue({ displays: [] }),
+        capture: vi.fn().mockResolvedValue({ success: true, filePath: '/tmp/screenshot.png' })
       }
     }
     // Mock clipboard

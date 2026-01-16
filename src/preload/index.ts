@@ -7,6 +7,11 @@ import type { GlobalSettings, GlobalSettingsChanged } from '../shared/ipc/global
 import type { LogEntry } from '../shared/ipc/logging-schema'
 import type { GitStateChangeEvent, GitWatcherStatus, GitPollTriggeredEvent } from '../shared/ipc/git-watcher-schema'
 import type { LockResult, LockStatus } from '../shared/ipc/project-lock-schema'
+import type {
+  ScreenshotCaptureRequest,
+  ScreenshotCaptureResponse,
+  GetDisplaysResponse
+} from '../shared/ipc/screenshot-schema'
 import { electronAPI } from '@electron-toolkit/preload'
 
 export interface FileNode {
@@ -419,6 +424,32 @@ const api = {
       ipcRenderer.invoke('docx:exportToDocx', request)
   },
 
+  /**
+   * Screenshot capture operations (macOS only)
+   *
+   * Captures screen, window, or selected area and saves to temp directory.
+   * @see Issue #86 - Screenshot capture buttons for terminal panel
+   */
+  screenshot: {
+    /**
+     * Get available displays for multi-monitor support
+     *
+     * @returns Array of display information (id, label, isPrimary, bounds)
+     * @see Issue #86 enhancement - multi-monitor support
+     */
+    getDisplays: (): Promise<GetDisplaysResponse> =>
+      ipcRenderer.invoke('screenshot:getDisplays'),
+
+    /**
+     * Capture a screenshot
+     *
+     * @param request - { mode: 'screen' | 'window' | 'area', displayId?: number }
+     * @returns Capture result with file path or error
+     */
+    capture: (request: ScreenshotCaptureRequest): Promise<ScreenshotCaptureResponse> =>
+      ipcRenderer.invoke('screenshot:capture', request)
+  },
+
   // Global settings operations
   globalSettings: {
     /**
@@ -575,7 +606,7 @@ const api = {
 
   /**
    * Utility operations for web content
-   * Provides access to Electron's webUtils API
+   * Provides access to Electron's webUtils API and platform info
    */
   utils: {
     /**
@@ -588,7 +619,18 @@ const api = {
      * @returns The absolute file path on the local filesystem
      * @see Issue #85 - Terminal drag-and-drop file path insertion
      */
-    getPathForFile: (file: File): string => webUtils.getPathForFile(file)
+    getPathForFile: (file: File): string => webUtils.getPathForFile(file),
+
+    /**
+     * Get the current operating system platform
+     *
+     * Returns Node.js process.platform value.
+     * Used for platform-specific UI features (e.g., screenshot buttons on macOS only).
+     *
+     * @returns Platform identifier ('darwin', 'win32', 'linux', etc.)
+     * @see Issue #86 - Screenshot capture buttons for terminal panel
+     */
+    getPlatform: (): NodeJS.Platform => process.platform
   }
 }
 

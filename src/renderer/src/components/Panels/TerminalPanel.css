@@ -189,3 +189,33 @@
   outline-offset: calc(-1 * var(--border-width-thick));
 }
 
+/* Loading state for screenshot buttons (issue #86) */
+.terminal-panel .icon-btn--loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.terminal-panel .icon-btn--loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border: 2px solid transparent;
+  border-top-color: var(--color-accent-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.terminal-panel .icon-btn--loading > svg {
+  opacity: 0.3;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
