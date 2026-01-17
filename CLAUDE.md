@@ -3,7 +3,7 @@
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
 - **Repository**: `qodeca/erfana` (GitHub)
-- **Version**: 0.6.5-beta
+- **Version**: 0.6.5-gamma
 - **Tech Stack**: Electron 39, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+ (Electron 39 bundles Node.js 22.20.0)
@@ -29,7 +29,7 @@ npm run test:e2e     # Playwright E2E tests
 ```
 src/
 ├── main/           # Electron main process
-│   ├── services/   # FileService, TerminalService, SettingsService, ProjectSettingsService, GlobalSettingsService, LoggingService, ProjectLockService, import/
+│   ├── services/   # FileService, TerminalService, ScreenshotService, SettingsService, ProjectSettingsService, GlobalSettingsService, LoggingService, ProjectLockService, import/
 │   └── ipc/        # IPC handlers
 ├── preload/        # Context bridge API
 ├── shared/         # Shared code (errors.ts, constants.ts, ipc schemas)

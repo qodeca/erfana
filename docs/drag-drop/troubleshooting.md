@@ -27,6 +27,11 @@ const sensors = useSensors(
 )
 ```
 
+## Implemented Enhancements (v0.6.5)
+
+- **Auto-expand folders on hover** - Folders expand after 1 second hover during drag
+- **Auto-scroll** - 50px edge threshold with 60fps smooth scrolling during drag
+
 ## Known Limitations
 
 1. **No undo/redo** - File operations are immediate and permanent
@@ -52,12 +57,7 @@ const sensors = useSensors(
    - Show count for multi-select ("3 items")
    - Semi-transparent overlay
 
-4. **Auto-Open Folders on Hover**
-   - Expand folder when hovering for >1 second during drag
-   - Collapse after drag completes
-   - Visual indication (pulsing outline)
-
-5. **Drop Between Items**
+4. **Drop Between Items**
    - Reorder files manually (override alphabetical sort)
    - Persist custom order in project settings
    - Visual indicator between items

@@ -375,9 +375,25 @@ window.api.terminal = {
 }
 ```
 
-### UI Component
+### UI Component (Modular Architecture, v0.6.5)
 
-**File**: `src/renderer/src/components/Panels/TerminalPanel.tsx` (~250 lines)
+**Main Component**: `src/renderer/src/components/Panels/TerminalPanel.tsx` (~250 lines)
+
+**Extracted Hooks** (`src/renderer/src/components/Panels/TerminalPanel/hooks/`):
+- `useTerminalDragDrop.ts` - External file drag-drop handling
+- `useScreenshotCapture.ts` - macOS screenshot capture workflow
+- `useTerminalResize.ts` - ResizeObserver-based terminal resize
+- `useTerminalPortal.ts` - DOM portal management for xterm
+
+**Extracted Components** (`src/renderer/src/components/Panels/TerminalPanel/components/`):
+- `TerminalToolbar.tsx` - Screenshot, scroll, restart buttons
+- `TerminalStatusContent.tsx` - Status state display (unavailable, loading, error)
+
+**Supporting Files**:
+- `types.ts` - TerminalState, ScreenshotCaptureMode types
+- `terminalPanel.logic.ts` - Pure functions and constants
+
+See [Terminal Architecture Review](../architecture/reviews/terminal-panel-architecture-review.md) for detailed refactoring documentation.
 
 **Key Features**:
 - Visibility check before xterm initialization (prevents rendering issues)

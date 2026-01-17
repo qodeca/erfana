@@ -138,6 +138,10 @@ if (!writeResult.success) {
 | `project-lock:check` | project-lock-handlers | Check lock status for project path |
 | `project-lock:requestFocus` | project-lock-handlers | Request focus from lock holder |
 | `project-lock:cleanup` | project-lock-handlers | Cleanup stale locks |
+| `screenshot:captureScreen` | screenshot-handlers | Capture full screen (macOS) |
+| `screenshot:captureWindow` | screenshot-handlers | Window picker capture (macOS) |
+| `screenshot:captureArea` | screenshot-handlers | Area selection capture (macOS) |
+| `screenshot:getDisplays` | screenshot-handlers | Get available displays for multi-monitor |
 
 ## Event-Based IPC Pattern
 
