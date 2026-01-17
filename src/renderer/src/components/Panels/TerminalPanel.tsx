@@ -82,6 +82,34 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }, [])
 
+  // Centralized terminal cleanup function (Phase 1.1 bug fix - race condition)
+  // Awaits terminal kill to prevent orphaned PTY processes
+  const cleanupTerminalInstance = useCallback(async (id: string | null) => {
+    if (!id) return
+    try {
+      await window.api.terminal.kill(id)
+    } catch (err) {
+      logger.error('Failed to kill terminal', err instanceof Error ? err : undefined)
+    }
+  }, [])
+
+  // Cleanup registry for error path handling (Phase 1.2 bug fix - memory leak)
+  // Ensures drag handlers are cleaned up if terminal init fails after attaching them
+  const cleanupRegistryRef = useRef<Array<() => void>>([])
+  const registerCleanup = useCallback((fn: () => void) => {
+    cleanupRegistryRef.current.push(fn)
+  }, [])
+  const runAllCleanups = useCallback(() => {
+    cleanupRegistryRef.current.forEach((fn) => {
+      try {
+        fn()
+      } catch (e) {
+        logger.warn('Cleanup function failed', e instanceof Error ? { error: e.message } : { error: String(e) })
+      }
+    })
+    cleanupRegistryRef.current = []
+  }, [])
+
   // Terminal store for cross-component communication
   const setActiveTerminalId = useTerminalStore((state) => state.setActiveTerminalId)
 
@@ -486,6 +514,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           drop: nativeDrop,
           dragend: nativeDragEnd
         }
+
+        // Phase 1.2 bug fix: Register cleanup in case init fails after this point
+        registerCleanup(cleanupDragHandlers)
       }
 
       // Clear terminal immediately and write clear sequences to ensure clean start
@@ -555,6 +586,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }
       clearUnsubscribe = window.api.terminal.onClear(handleClearForInit)
 
+      // Phase 1.3 bug fix: Register cleanup in case PTY creation fails
+      registerCleanup(() => {
+        if (clearUnsubscribe) {
+          clearUnsubscribe()
+          clearUnsubscribe = null
+        }
+      })
+
       // Create PTY
       const result = await window.api.terminal.create({
         cwd: projectPath || undefined,
@@ -582,7 +621,12 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           window.api.terminal.write(result.terminalId, data)
         }
       })
+
+      // Phase 1.2: Success - clear cleanup registry (handlers now owned by component lifecycle)
+      cleanupRegistryRef.current = []
     } catch (err) {
+      // Phase 1.2 bug fix: Run all registered cleanups on error
+      runAllCleanups()
       logger.error('Failed to initialize terminal', err instanceof Error ? err : undefined)
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
@@ -602,10 +646,10 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
     // Cleanup on unmount only
     return () => {
-      if (terminalIdRef.current) {
-        window.api.terminal.kill(terminalIdRef.current)
-        setActiveTerminalId(null)
-      }
+      // Use centralized cleanup (Phase 1.1 bug fix - race condition)
+      // Fire-and-forget in cleanup, but properly awaited internally
+      void cleanupTerminalInstance(terminalIdRef.current)
+      setActiveTerminalId(null)
       // Cleanup parser hooks before disposing xterm
       parserDisposablesRef.current.forEach((d) => d.dispose())
       parserDisposablesRef.current = []
@@ -626,16 +670,14 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         visibilityObserverRef.current = null
       }
     }
-  }, [isAvailable, setActiveTerminalId])
+  }, [isAvailable, setActiveTerminalId, cleanupTerminalInstance])
 
   // Restart terminal on project change
   useEffect(() => {
     const unsubscribe = window.api.file.onProjectChanged(async (data) => {
-      // Kill current terminal session
-      if (terminalIdRef.current) {
-        await window.api.terminal.kill(terminalIdRef.current)
-        setActiveTerminalId(null)
-      }
+      // Kill current terminal session (Phase 1.1 bug fix - use centralized cleanup)
+      await cleanupTerminalInstance(terminalIdRef.current)
+      setActiveTerminalId(null)
       // Cleanup parser hooks before disposing xterm
       parserDisposablesRef.current.forEach((d) => d.dispose())
       parserDisposablesRef.current = []
@@ -660,7 +702,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }
     })
     return () => unsubscribe()
-  }, [setActiveTerminalId])
+  }, [setActiveTerminalId, cleanupTerminalInstance])
 
   // Handle terminal data
   useEffect(() => {
@@ -922,11 +964,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   }, [])
 
   const handleRestartTerminal = useCallback(async () => {
-    // Kill current terminal session
-    if (terminalIdRef.current) {
-      await window.api.terminal.kill(terminalIdRef.current)
-      setActiveTerminalId(null)
-    }
+    // Kill current terminal session (Phase 1.1 bug fix - use centralized cleanup)
+    await cleanupTerminalInstance(terminalIdRef.current)
+    setActiveTerminalId(null)
 
     // Cleanup context menu handler before disposing xterm
     if (xtermRef.current?.element && contextMenuHandlerRef.current) {
@@ -952,7 +992,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     if (terminalRef.current && isAvailable) {
       await initializeTerminal()
     }
-  }, [setActiveTerminalId, isAvailable, cleanupDragHandlers])
+  }, [setActiveTerminalId, isAvailable, cleanupDragHandlers, cleanupTerminalInstance])
 
   const handleScrollToBottom = useCallback(() => {
     if (xtermRef.current) {

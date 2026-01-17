@@ -1,0 +1,9 @@
+/**
+ * Terminal Toolbar Styles
+ *
+ * Styles for the terminal panel header toolbar.
+ * Inherits base styles from sidebar-panel-header.
+ */
+
+/* The toolbar inherits styles from .sidebar-panel-header in TerminalPanel.css */
+/* No additional styles needed - using existing icon-btn styles */
