@@ -1,7 +1,7 @@
 {
   "sequence": {
-    "current": 11,
-    "next": 12
+    "current": 12,
+    "next": 13
   },
   "registry": [
     {
@@ -238,11 +238,32 @@
         "designs": [],
         "issues": ["#79"]
       }
+    },
+    {
+      "id": 12,
+      "slug": "external-file-drop",
+      "name": "External file drop to project tree",
+      "tier": "T3",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Drag files from Finder or external sources and drop to project tree with move/copy/import options",
+      "created": "2025-01-17T00:00:00.000Z",
+      "path": "brs012-external-file-drop",
+      "last_modified": "2025-01-17T19:00:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 36,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": ["#87"]
+      }
     }
   ],
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2025-12-27T17:00:00.000Z"
+    "last_updated": "2026-01-17T16:30:00.000Z"
   }
 }
