@@ -2,6 +2,22 @@
 
 Historical changelog entries for versions prior to current. For the latest changes, see [CLAUDE.md](../CLAUDE.md).
 
+## [0.6.5-gamma] - 2026-01-18
+
+### Added
+- **External file drop to project tree** (BRS-012): Drag files from Finder or file managers into project tree (#87)
+  - Drop mode dialog: Move, Copy, or Import options
+  - Conflict resolution: Replace or Keep Both
+  - Keyboard shortcut: Cmd/Ctrl+Shift+I to import via file picker
+  - Security: Path traversal protection, symlink validation, project boundary enforcement
+  - useExternalFileDrop hook, ExternalFileService backend
+  - 899 new tests for external file drop
+- **Terminal panel refactoring**: Extracted modular hooks and components
+  - Hooks: useTerminalDragDrop, useScreenshotCapture, useTerminalResize, useTerminalPortal
+  - Components: TerminalToolbar, TerminalStatusContent
+  - Improved testability and maintainability
+- **Import workflow improvements**: Unified processFiles method with batch size limits and better error handling
+
 ## [0.6.5] - 2026-01-16
 
 ### Added

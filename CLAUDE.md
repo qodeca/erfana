@@ -29,7 +29,7 @@ npm run test:e2e     # Playwright E2E tests
 ```
 src/
 ├── main/           # Electron main process
-│   ├── services/   # FileService, TerminalService, ScreenshotService, SettingsService, ProjectSettingsService, GlobalSettingsService, LoggingService, ProjectLockService, import/
+│   ├── services/   # FileService, TerminalService, ScreenshotService, SettingsService, ProjectSettingsService, GlobalSettingsService, LoggingService, ProjectLockService, ExternalFileService, import/
 │   └── ipc/        # IPC handlers
 ├── preload/        # Context bridge API
 ├── shared/         # Shared code (errors.ts, constants.ts, ipc schemas)
@@ -42,7 +42,7 @@ src/
 
 ## Core Features
 1. **Markdown Editor** - Monaco with live preview, scroll sync, Mermaid diagrams (zoom, pan, full-screen viewer), YAML frontmatter rendering, preserve line breaks option, unified in-file search (Cmd/Ctrl+F), context menu with AI prompts
-2. **Project Tree** - File explorer with drag-drop reorganization, markdown filtering, context menu, real-time git status indicators with polling fallback
+2. **Project Tree** - File explorer with drag-drop reorganization, external file drop (move/copy/import), markdown filtering, context menu, real-time git status indicators with polling fallback
 3. **Terminal** - xterm.js with PTY backend, clipboard support, file links, scroll recovery, auto-opens on project load, drag-drop file paths, screenshot capture (macOS: screen/window/area selection with path pasted to terminal)
 4. **Prompt Templates** - AI text operations via context menu (Elaborate, Modify, Ask, Visualize, diagram chat); Visualize generates Mermaid diagrams from selected text with dropdown for 22 diagram types
 5. **Project Settings** - Per-project configuration via `.erfana/settings.json` (watcher ignore, tree visibility)
@@ -82,7 +82,7 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 | BRS-007 | Temporal queries & timeline | T3 | draft | `specs/business-reqs/brs007-temporal-queries/` |
 | BRS-008 | Graph engine polish & maintenance | T3 | draft | `specs/business-reqs/brs008-graph-polish/` |
 | BRS-009 | Media import with transcription | T4 | draft | `specs/business-reqs/brs009-media-import-transcription/` |
-| BRS-012 | External file drop to project tree | T3 | draft | `specs/business-reqs/brs012-external-file-drop/` |
+| BRS-012 | External file drop to project tree | T3 | active | `specs/business-reqs/brs012-external-file-drop/` |
 
 ### Archived BRS (implemented)
 

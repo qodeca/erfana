@@ -249,7 +249,7 @@
       "slug": "external-file-drop",
       "name": "External file drop to project tree",
       "tier": "T3",
-      "status": "draft",
+      "status": "active",
       "scope": "feature",
       "description": "Drag files from Finder or external sources and drop to project tree with move/copy/import options",
       "created": "2025-01-17T00:00:00.000Z",
@@ -269,6 +269,6 @@
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2026-01-17T17:30:00.000Z"
+    "last_updated": "2026-01-18T12:30:00.000Z"
   }
 }
