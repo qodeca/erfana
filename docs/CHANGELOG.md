@@ -2,6 +2,16 @@
 
 Historical changelog entries for versions prior to current. For the latest changes, see [CLAUDE.md](../CLAUDE.md).
 
+## [0.7.0] - 2026-01-18
+
+### Changed
+- Version bump to 0.7.0 (milestone release)
+
+### Documentation
+- Archive BRS-012 (external file drop feature implemented)
+- Add ExternalFileService to api-services.md
+- Add external-file IPC channels documentation
+
 ## [0.6.5-gamma] - 2026-01-18
 
 ### Added

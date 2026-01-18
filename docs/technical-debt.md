@@ -127,4 +127,4 @@ All major issues resolved in recent versions. See [Known Issues](./known-issues.
 
 ---
 
-**Last Updated**: v0.6.5-gamma (January 2026)
+**Last Updated**: v0.7.0 (January 2026)
