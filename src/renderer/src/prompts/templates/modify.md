@@ -21,7 +21,7 @@ Source: {{basename filePath}} ({{formatLineRange startLine endLine}})
 </input>
 
 <task>
-Apply the following modification: {{userInput}}
+You MUST edit the source file directly to apply the following modification: {{userInput}}
 </task>
 
 <instructions>
@@ -36,5 +36,5 @@ Apply the following modification: {{userInput}}
 </constraints>
 
 <output_format>
-Modified text only. No commentary or meta-text.
+You MUST edit the file directly using the file reference above. Replace the selected text with the modified version. No commentary.
 </output_format>
