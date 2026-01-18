@@ -47,6 +47,7 @@ import {
   type ExternalDropFile
 } from '../../hooks/useExternalFileDrop'
 import type { ConflictResolution } from '../../../../shared/ipc/external-file-schema'
+import { IMPORT } from '../../../../shared/constants'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -828,7 +829,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       const importFiles = droppedFiles.map(file => ({
         path: file.path,
         name: file.name,
-        size: file.size
+        sizeInBytes: file.sizeInBytes
       }))
 
       // Use unified import workflow
@@ -864,6 +865,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         }
 
         // For move/copy, check for conflicts
+        // Note (M4): Using forward slash works cross-platform in Electron/Node.
+        // Actual file operations use backend APIs that handle path joining correctly.
         const targetPath = `${targetFolder}/${file.name}`
         const hasConflict = await window.api.file.checkConflict(targetFolder, file.name)
 
@@ -1046,14 +1049,53 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       return
     }
 
-    // Convert paths to ExternalDropFile format
-    // Note: File picker doesn't provide size, so we use 0 (size is only used for import mode large file warnings)
-    const droppedFiles: ExternalDropFile[] = result.paths.map(path => ({
-      path,
-      name: path.split('/').pop() || 'unknown',
-      size: 0,
-      isDirectory: false // File picker only returns files
-    }))
+    // Early batch size check to avoid unnecessary file stats fetching (C2 fix)
+    // Import mode goes through processFiles which enforces IMPORT.MAX_BATCH_SIZE
+    // but we check here to prevent expensive Promise.all(getStats) for oversized batches
+    if (result.paths.length > IMPORT.MAX_BATCH_SIZE) {
+      showGlobalToast({
+        title: 'Too many files',
+        message: `Cannot add more than ${IMPORT.MAX_BATCH_SIZE} files at once. Please select fewer files.`,
+        type: 'error'
+      })
+      return
+    }
+
+    // Convert paths to ExternalDropFile format with actual file stats (M1 fix)
+    // Fetch real file sizes to enable proper large file warnings in import mode
+    let statsFailureCount = 0
+    const droppedFiles: ExternalDropFile[] = await Promise.all(
+      result.paths.map(async (filePath) => {
+        try {
+          const stats = await window.api.file.getStats(filePath)
+          return {
+            path: filePath,
+            name: filePath.split('/').pop() || 'unknown',
+            sizeInBytes: stats.size,
+            isDirectory: false // File picker only returns files
+          }
+        } catch {
+          // If stats fail, use 0 as fallback (L3: warn user that size check may be skipped)
+          logger.warn('Failed to get file stats for import shortcut', { filePath })
+          statsFailureCount++
+          return {
+            path: filePath,
+            name: filePath.split('/').pop() || 'unknown',
+            sizeInBytes: 0, // Large file warning won't trigger
+            isDirectory: false
+          }
+        }
+      })
+    )
+
+    // L3: Warn user if some file sizes couldn't be determined
+    if (statsFailureCount > 0) {
+      showGlobalToast({
+        title: 'Warning',
+        message: `Could not determine size for ${statsFailureCount} file(s). Large file warnings may not apply.`,
+        type: 'warning'
+      })
+    }
 
     await executeExternalDrop(droppedFiles, targetFolder)
   }, [projectPath, executeExternalDrop])

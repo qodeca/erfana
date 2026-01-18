@@ -34,14 +34,28 @@ export const UI = {
   ICON_SIZE_LG: 64
 } as const
 
+/** Bytes per megabyte (for unit conversions) */
+export const BYTES_PER_MB = 1024 * 1024
+
 /** Import system constants */
 export const IMPORT = {
   /** Directory name for imported files */
   DIR_NAME: 'import',
   /** Size warning threshold in bytes (50MB) */
-  SIZE_WARNING_THRESHOLD: 50 * 1024 * 1024,
+  SIZE_WARNING_THRESHOLD: 50 * BYTES_PER_MB,
   /** Maximum number of auto-numbered copies before rejecting */
-  MAX_COPY_ATTEMPTS: 1000
+  MAX_COPY_ATTEMPTS: 1000,
+  /**
+   * Maximum batch size for import operations (security limit).
+   * Rationale for 100:
+   * - Prevents resource exhaustion from mass file drops (DOS prevention)
+   * - At 50MB threshold, 100 files could theoretically be 5GB total
+   * - Sequential dialog prompts for 100 large files would be tedious UX
+   * - Typical legitimate use: 1-10 files; 100 is generous for edge cases
+   * - Users needing more can import in multiple batches
+   * This is a SECURITY limit and should NOT be user-configurable.
+   */
+  MAX_BATCH_SIZE: 100
 } as const
 
 /** Text input character limits for AI prompts (PromptDialog, ChatBubble) */

@@ -21,8 +21,8 @@ export interface ExternalDropFile {
   path: string
   /** File name (basename) */
   name: string
-  /** File size in bytes */
-  size: number
+  /** File size in bytes (explicit naming for consistency with ImportFileInfo) */
+  sizeInBytes: number
   /**
    * Whether the dropped item is a directory.
    * Directories are filtered out per FR-011 (silently reject folder drops).
@@ -139,18 +139,20 @@ export function extractDroppedFiles(files: FileList): ExternalDropFile[] {
     }
 
     if (filePath) {
-      // Detect directories: they have size 0 and no extension typically,
-      // but more reliably, Electron's file.type is empty for directories
-      // and we can check if the path ends without an extension pattern.
-      // However, the most reliable check is file.size === 0 && file.type === ''
-      // combined with the fact that directories dropped from Finder have
-      // an empty type. We'll use a heuristic here.
+      // Directory detection heuristic (M3 documented limitation):
+      // Directories dropped from Finder/file managers have type='' and size=0.
+      // LIMITATION: This has false positives for empty files (0 bytes) which
+      // also match this pattern. Empty files will be treated as directories
+      // and filtered out. This is acceptable because:
+      // 1. Empty files are rarely intentionally dropped for import
+      // 2. Users can still import empty files via the dialog (selectFile API)
+      // A more reliable check would require async fs.stat() call per file.
       const isDirectory = file.type === '' && file.size === 0
 
       result.push({
         path: filePath,
         name: file.name,
-        size: file.size,
+        sizeInBytes: file.size,
         isDirectory
       })
     } else {
