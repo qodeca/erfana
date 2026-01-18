@@ -18,6 +18,7 @@ import { registerGlobalSettingsHandlers } from './ipc/global-settings-handlers'
 import { registerLoggingHandlers } from './ipc/logging-handlers'
 import { registerQuitHandlers } from './ipc/quit-handlers'
 import { registerProjectLockHandlers } from './ipc/project-lock-handlers'
+import { registerExternalFileHandlers } from './ipc/external-file-handlers'
 import { createApplicationMenu } from './menu'
 import { fileService } from './services/FileService'
 import { fileWatcherService } from './services/FileWatcherService'
@@ -191,6 +192,7 @@ app.whenReady().then(async () => {
   registerGlobalSettingsHandlers()
   registerLoggingHandlers()
   registerProjectLockHandlers()
+  registerExternalFileHandlers()
 
   // RELIABILITY FIX (todo012): Clean up stale projects on startup
   // This runs asynchronously but doesn't block window creation

@@ -5,6 +5,7 @@ import type { FilterMode } from '../../types/filters'
 import { ProjectTreeNode } from './ProjectTreeNode'
 import { ContextMenu, ContextMenuItem } from '../ContextMenu/ContextMenu'
 import { useDialog } from '../Dialog'
+import type { DropModeDialogResult, ConflictDialogResult } from '../Dialog/types'
 import './ProjectTree.css'
 import { showGlobalToast } from '../Toast/toastService'
 import { isPointInElement } from '../../utils/domGeometry'
@@ -40,6 +41,12 @@ import { useGitStatus } from '../../hooks/useGitStatus'
 import { GitStatusBar } from './GitStatusBar'
 import { GitErrorBoundary } from './GitErrorBoundary'
 import { TEST_IDS } from '../../constants/testids'
+import {
+  useExternalFileDrop,
+  isExternalDrag,
+  type ExternalDropFile
+} from '../../hooks/useExternalFileDrop'
+import type { ConflictResolution } from '../../../../shared/ipc/external-file-schema'
 
 interface ProjectTreeProps {
   onFileSelect: (filePath: string) => void
@@ -133,7 +140,22 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const contextMenuFactory = useMemo(() => new ContextMenuFactory(), [])
 
   // Dialog hooks
-  const { showConfirm, showRename, showNewFile, showNewFolder } = useDialog()
+  const { showConfirm, showRename, showNewFile, showNewFolder, showDropMode, showConflict } = useDialog()
+
+  // External file drop hook (BRS-012)
+  const {
+    isExternalDragActive,
+    externalDropTarget,
+    handleDragEnter: handleExternalDragEnter,
+    handleDragOver: handleExternalDragOver,
+    handleDragLeave: handleExternalDragLeave,
+    handleDrop: handleExternalDrop,
+    getTargetFromEvent
+  } = useExternalFileDrop({
+    projectPath,
+    expandedFolders,
+    setExpandedFolders
+  })
 
   // Drag sensors - require movement to prevent accidental drags
   const sensors = useSensors(
@@ -751,6 +773,317 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   }
 
   /**
+   * Execute external file drop operation (BRS-012)
+   *
+   * Handles the complete workflow for dropped external files:
+   * 1. Show drop mode dialog (move/copy/import)
+   * 2. Validate each file
+   * 3. Check for conflicts and prompt resolution
+   * 4. Execute the operation
+   *
+   * @param droppedFiles - Array of files dropped from external source
+   * @param targetFolder - Target folder path within project
+   */
+  const executeExternalDrop = useCallback(async (
+    droppedFiles: ExternalDropFile[],
+    targetFolder: string
+  ): Promise<void> => {
+    if (!projectPath || droppedFiles.length === 0) {
+      return
+    }
+
+    logger.info('Executing external drop', {
+      fileCount: droppedFiles.length,
+      targetFolder
+    })
+
+    // Check if any files are importable (to conditionally show Import option)
+    // Note: isSupported expects a filename/path, not just the extension
+    let hasImportableFiles = false
+    for (const file of droppedFiles) {
+      if (await window.api.import.isSupported(file.name)) {
+        hasImportableFiles = true
+        break
+      }
+    }
+
+    // Step 1: Show drop mode selection dialog
+    const modeResult: DropModeDialogResult | null = await showDropMode({
+      fileCount: droppedFiles.length,
+      fileName: droppedFiles.length === 1 ? droppedFiles[0].name : undefined,
+      showImport: hasImportableFiles
+    })
+
+    if (!modeResult) {
+      logger.info('External drop cancelled by user')
+      return
+    }
+
+    const { mode } = modeResult
+    let successCount = 0
+    let failCount = 0
+
+    // Step 2: Process each file
+    for (const file of droppedFiles) {
+      try {
+        // Validate file still exists and is valid
+        const validation = await window.api.file.validateExternal(file.path, projectPath)
+
+        if (!validation.valid) {
+          logger.warn('External file validation failed', {
+            path: file.path,
+            error: validation.error
+          })
+          showGlobalToast({
+            title: 'Validation failed',
+            message: validation.error || `Cannot process "${file.name}"`,
+            type: 'error'
+          })
+          failCount++
+          continue
+        }
+
+        // For import mode, use the import service (always goes to import/ folder)
+        if (mode === 'import') {
+          const importResult = await window.api.import.process(file.path)
+          if (importResult.success) {
+            successCount++
+          } else {
+            logger.warn('Import failed', { path: file.path, error: importResult.error })
+            showGlobalToast({
+              title: 'Import failed',
+              message: importResult.error || `Failed to import "${file.name}"`,
+              type: 'error'
+            })
+            failCount++
+          }
+          continue
+        }
+
+        // For move/copy, check for conflicts
+        const targetPath = `${targetFolder}/${file.name}`
+        const hasConflict = await window.api.file.checkConflict(targetFolder, file.name)
+
+        let conflictResolution: ConflictResolution | undefined
+
+        if (hasConflict) {
+          // Show conflict resolution dialog
+          const conflictResult: ConflictDialogResult | null = await showConflict({
+            fileName: file.name,
+            targetPath
+          })
+
+          if (!conflictResult) {
+            // User skipped this file
+            logger.info('User skipped conflicting file', { fileName: file.name })
+            continue
+          }
+
+          conflictResolution = conflictResult.resolution
+        }
+
+        // Execute the operation
+        if (mode === 'move') {
+          const result = await window.api.file.moveFromExternal(
+            file.path,
+            targetFolder,
+            projectPath,
+            conflictResolution
+          )
+
+          if (result.success) {
+            successCount++
+            if (result.isSymlink) {
+              showGlobalToast({
+                title: 'Symlink moved',
+                message: 'Warning: You moved a symbolic link. The target file remains at its original location.',
+                type: 'warning'
+              })
+            }
+          } else {
+            logger.warn('Move failed', { path: file.path, error: result.error })
+            showGlobalToast({
+              title: 'Move failed',
+              message: result.error || `Failed to move "${file.name}"`,
+              type: 'error'
+            })
+            failCount++
+          }
+        } else if (mode === 'copy') {
+          const result = await window.api.file.copyFromExternal(
+            file.path,
+            targetFolder,
+            projectPath,
+            conflictResolution
+          )
+
+          if (result.success) {
+            successCount++
+            if (result.isSymlink) {
+              showGlobalToast({
+                title: 'Symlink copied',
+                message: 'Warning: You copied a symbolic link. The target file remains at its original location.',
+                type: 'warning'
+              })
+            }
+          } else {
+            logger.warn('Copy failed', { path: file.path, error: result.error })
+            showGlobalToast({
+              title: 'Copy failed',
+              message: result.error || `Failed to copy "${file.name}"`,
+              type: 'error'
+            })
+            failCount++
+          }
+        }
+      } catch (err) {
+        logger.error('Error processing external file', err instanceof Error ? err : undefined, {
+          path: file.path
+        })
+        showGlobalToast({
+          title: 'Error',
+          message: `Failed to process "${file.name}"`,
+          type: 'error'
+        })
+        failCount++
+      }
+    }
+
+    // Step 3: Refresh tree and show summary
+    await refreshProjectTree()
+    refreshGitStatus()
+
+    // Show success summary if any files were processed
+    if (successCount > 0) {
+      const operationLabel = mode === 'import' ? 'Imported' : mode === 'move' ? 'Moved' : 'Copied'
+      const message = successCount === 1
+        ? `${operationLabel} 1 file`
+        : `${operationLabel} ${successCount} files`
+
+      showGlobalToast({
+        title: 'Success',
+        message: failCount > 0 ? `${message} (${failCount} failed)` : message,
+        type: failCount > 0 ? 'warning' : 'success'
+      })
+    }
+  }, [projectPath, showDropMode, showConflict, refreshProjectTree, refreshGitStatus])
+
+  /**
+   * Handle native dragenter events on the tree container.
+   * Delegates to external drop handler if it's an external drag.
+   */
+  const handleNativeDragEnter = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    // Only handle external drags (files from Finder/file manager)
+    if (isExternalDrag(e.nativeEvent)) {
+      handleExternalDragEnter(e.nativeEvent)
+    }
+    // Internal dnd-kit drags are handled by DndContext
+  }, [handleExternalDragEnter])
+
+  /**
+   * Handle native dragover events on the tree container.
+   * Must call preventDefault to allow drop.
+   */
+  const handleNativeDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    if (isExternalDrag(e.nativeEvent)) {
+      handleExternalDragOver(e.nativeEvent)
+    }
+  }, [handleExternalDragOver])
+
+  /**
+   * Handle native dragleave events on the tree container.
+   */
+  const handleNativeDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    if (isExternalDrag(e.nativeEvent)) {
+      handleExternalDragLeave(e.nativeEvent)
+    }
+  }, [handleExternalDragLeave])
+
+  /**
+   * Handle native drop events on the tree container.
+   * Processes external file drops.
+   */
+  const handleNativeDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
+    if (!isExternalDrag(e.nativeEvent)) {
+      return
+    }
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    // Get target folder from the drop location
+    const targetFolder = getTargetFromEvent(e.nativeEvent)
+    if (!targetFolder) {
+      logger.warn('External drop on invalid target')
+      return
+    }
+
+    // Extract dropped files
+    const droppedFiles = handleExternalDrop(e.nativeEvent)
+    if (!droppedFiles || droppedFiles.length === 0) {
+      return
+    }
+
+    // Execute the drop operation
+    await executeExternalDrop(droppedFiles, targetFolder)
+  }, [getTargetFromEvent, handleExternalDrop, executeExternalDrop])
+
+  /**
+   * Handle keyboard shortcut Cmd+Shift+I for adding external files (NFR-002)
+   * Only active when a folder is selected in the project tree.
+   */
+  const handleImportShortcut = useCallback(async (targetFolder: string) => {
+    if (!projectPath) {
+      return
+    }
+
+    // Open native file picker
+    const result = await window.api.file.selectExternalFiles()
+    if (!result || result.paths.length === 0) {
+      return
+    }
+
+    // Convert paths to ExternalDropFile format
+    const droppedFiles: ExternalDropFile[] = result.paths.map(path => ({
+      path,
+      name: path.split('/').pop() || 'unknown',
+      isDirectory: false // File picker only returns files
+    }))
+
+    await executeExternalDrop(droppedFiles, targetFolder)
+  }, [projectPath, executeExternalDrop])
+
+  // Keyboard shortcut for external file import (NFR-002)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip when user is typing in text inputs
+      const activeElement = document.activeElement as HTMLElement
+      if (
+        activeElement?.tagName === 'INPUT' ||
+        activeElement?.tagName === 'TEXTAREA' ||
+        activeElement?.contentEditable === 'true'
+      ) {
+        return
+      }
+
+      // Cmd+Shift+I (Mac) or Ctrl+Shift+I (Windows/Linux)
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'i') {
+        // Check if a folder is selected
+        if (selectedFolder) {
+          const node = enhancedFlattenedItems.find(item => item.path === selectedFolder)
+          if (node && node.type === 'directory') {
+            e.preventDefault()
+            handleImportShortcut(selectedFolder)
+          }
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedFolder, enhancedFlattenedItems, handleImportShortcut])
+
+  /**
    * Helper: Build MenuContext for context menu factory
    * Provides all dependencies needed by command execution
    */
@@ -796,7 +1129,15 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   }
 
   return (
-    <div className="project-tree" data-testid={TEST_IDS.PROJECT_TREE}>
+    <div
+      className="project-tree"
+      data-testid={TEST_IDS.PROJECT_TREE}
+      data-external-drag={isExternalDragActive}
+      onDragEnter={handleNativeDragEnter}
+      onDragOver={handleNativeDragOver}
+      onDragLeave={handleNativeDragLeave}
+      onDrop={handleNativeDrop}
+    >
       {error && (
         <div className="project-tree-error">
           {error}
@@ -910,6 +1251,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
               clipboardCut={clipboard.itemPath === rootFolderNode.path && clipboard.operation === 'cut'}
               getFileStatus={getFileStatus}
               getFolderStatus={getFolderStatus}
+              isExternalDragActive={isExternalDragActive}
+              externalDropTarget={externalDropTarget}
             />
           ) : (
             <div className="project-tree-empty" data-testid={TEST_IDS.PROJECT_TREE_EMPTY}>

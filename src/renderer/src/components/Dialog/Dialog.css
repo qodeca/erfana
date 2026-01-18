@@ -562,3 +562,94 @@
   color: var(--dialog-text-secondary);
   letter-spacing: 0.1px;
 }
+
+/* ============================================================================
+   Drop Mode Dialog Styles
+   ============================================================================ */
+
+/* Container for mode selection buttons */
+.dialog-drop-mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-12);
+}
+
+/* Individual mode option button */
+.dialog-drop-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-8);
+  background-color: var(--color-bg-secondary);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition-normal);
+  position: relative;
+}
+
+.dialog-drop-mode-btn:hover {
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-border-default);
+}
+
+.dialog-drop-mode-btn:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+/* Icon positioning in mode button */
+.dialog-drop-mode-btn svg {
+  position: absolute;
+  top: var(--space-6);
+  right: var(--space-6);
+  color: var(--color-text-secondary);
+}
+
+/* Mode button label (Move, Copy, Import) */
+.dialog-drop-mode-btn-label {
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-emphasis);
+}
+
+/* Mode button description */
+.dialog-drop-mode-btn-description {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-normal);
+}
+
+/* ============================================================================
+   Conflict Dialog Styles
+   ============================================================================ */
+
+/* Warning icon variant */
+.dialog-icon-warning {
+  background-color: rgba(255, 135, 113, 0.15);
+  color: var(--color-error);
+}
+
+/* Filename highlight in message */
+.dialog-filename {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  color: var(--color-text-emphasis);
+  word-break: break-all;
+}
+
+/* Button with icon styling */
+.dialog-btn-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.dialog-btn-with-icon svg {
+  flex-shrink: 0;
+}

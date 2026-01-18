@@ -12,6 +12,12 @@ import type {
   ScreenshotCaptureResponse,
   GetDisplaysResponse
 } from '../shared/ipc/screenshot-schema'
+import type {
+  ExternalFileValidateResponse,
+  ExternalFileCopyResponse,
+  ExternalFileMoveResponse,
+  ConflictResolution
+} from '../shared/ipc/external-file-schema'
 
 declare global {
   interface Window {
@@ -40,6 +46,39 @@ declare global {
           isFile?: boolean
           error?: string
         }>
+        /**
+         * Validate an external file for drop into project
+         * @see BRS-012 - External file drop to project tree
+         */
+        validateExternal: (
+          sourcePath: string,
+          projectRoot: string
+        ) => Promise<ExternalFileValidateResponse>
+        /**
+         * Copy an external file into the project
+         * @see BRS-012 - External file drop to project tree
+         */
+        copyFromExternal: (
+          sourcePath: string,
+          targetFolder: string,
+          projectRoot: string,
+          conflictResolution?: ConflictResolution
+        ) => Promise<ExternalFileCopyResponse>
+        /**
+         * Move an external file into the project
+         * @see BRS-012 - External file drop to project tree
+         */
+        moveFromExternal: (
+          sourcePath: string,
+          targetFolder: string,
+          projectRoot: string,
+          conflictResolution?: ConflictResolution
+        ) => Promise<ExternalFileMoveResponse>
+        /**
+         * Open native file picker for selecting external files
+         * @see BRS-012 - External file drop to project tree
+         */
+        selectExternalFiles: () => Promise<{ paths: string[] } | null>
         onProjectChanged: (
           callback: (data: { oldPath: string | null; newPath: string | null }) => void
         ) => () => void

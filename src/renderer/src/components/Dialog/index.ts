@@ -9,6 +9,8 @@ export { AlertDialog } from './AlertDialog'
 export { RenameDialog } from './RenameDialog'
 export { NewFileDialog } from './NewFileDialog'
 export { NewFolderDialog } from './NewFolderDialog'
+export { DropModeDialog } from './DropModeDialog'
+export { ConflictDialog } from './ConflictDialog'
 export { ScreenSelectDialog } from './ScreenSelectDialog'
 export { showGlobalDialog, subscribeGlobalDialogs } from './dialogService'
 export type { PromptDialogResult } from './PromptDialog'
@@ -27,6 +29,11 @@ export type {
   RenameDialogConfig,
   NewFileDialogConfig,
   NewFolderDialogConfig,
+  DropMode,
+  DropModeDialogConfig,
+  DropModeDialogResult,
+  ConflictDialogConfig,
+  ConflictDialogResult,
   DialogConfig,
   Dialog,
   DialogContextType,

@@ -6,7 +6,59 @@
  */
 
 /** Dialog type discriminator */
-export type DialogType = 'confirm' | 'prompt' | 'alert' | 'custom' | 'rename' | 'newFile' | 'newFolder'
+export type DialogType = 'confirm' | 'prompt' | 'alert' | 'custom' | 'rename' | 'newFile' | 'newFolder' | 'dropMode' | 'conflict'
+
+/**
+ * Mode for handling dropped external files
+ * - move: Move files from source location to target
+ * - copy: Copy files to target, keeping originals
+ * - import: Import files with additional processing (future)
+ */
+export type DropMode = 'move' | 'copy' | 'import'
+
+/**
+ * Configuration for drop mode selection dialog
+ * Shown when external files are dropped onto the project tree
+ */
+export interface DropModeDialogConfig {
+  /** Unique identifier (auto-generated if not provided) */
+  id?: string
+  /** Number of files being dropped */
+  fileCount: number
+  /** For single file, display the filename */
+  fileName?: string
+  /** Whether to show the Import option (default: true). Set to false when no dropped files are importable. */
+  showImport?: boolean
+}
+
+/**
+ * Result from drop mode dialog
+ */
+export interface DropModeDialogResult {
+  /** Selected mode for handling the dropped files */
+  mode: DropMode
+}
+
+/**
+ * Configuration for file conflict resolution dialog
+ * Shown when a file with the same name already exists at the target
+ */
+export interface ConflictDialogConfig {
+  /** Unique identifier (auto-generated if not provided) */
+  id?: string
+  /** Name of the conflicting file */
+  fileName: string
+  /** Full path to the target location */
+  targetPath: string
+}
+
+/**
+ * Result from conflict resolution dialog
+ */
+export interface ConflictDialogResult {
+  /** How to resolve the conflict */
+  resolution: 'replace' | 'keepBoth'
+}
 
 /**
  * Base configuration shared by all dialog types
@@ -153,6 +205,8 @@ export type DialogConfig =
   | RenameDialogConfig
   | NewFileDialogConfig
   | NewFolderDialogConfig
+  | DropModeDialogConfig
+  | ConflictDialogConfig
 
 // Internal dialog state (used by DialogContext)
 // Uses unknown for resolve/reject to support all dialog types (contravariance)
@@ -178,6 +232,8 @@ export interface DialogContextType {
   showRename: (config: Omit<RenameDialogConfig, 'id'>) => Promise<string | null>
   showNewFile: (config: Omit<NewFileDialogConfig, 'id'>) => Promise<string | null>
   showNewFolder: (config: Omit<NewFolderDialogConfig, 'id'>) => Promise<string | null>
+  showDropMode: (config: Omit<DropModeDialogConfig, 'id'>) => Promise<DropModeDialogResult | null>
+  showConflict: (config: Omit<ConflictDialogConfig, 'id'>) => Promise<ConflictDialogResult | null>
   closeDialog: (id: string) => void
   closeAll: () => void
 }

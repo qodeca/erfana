@@ -9,7 +9,11 @@ import type {
   CustomDialogConfig,
   RenameDialogConfig,
   NewFileDialogConfig,
-  NewFolderDialogConfig
+  NewFolderDialogConfig,
+  DropModeDialogConfig,
+  DropModeDialogResult,
+  ConflictDialogConfig,
+  ConflictDialogResult
 } from './types'
 
 const DialogContext = createContext<DialogContextType | undefined>(undefined)
@@ -199,6 +203,50 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     [generateId, getNextZIndex]
   )
 
+  // Show drop mode dialog (for external file drop)
+  const showDropMode = useCallback(
+    (config: Omit<DropModeDialogConfig, 'id'>): Promise<DropModeDialogResult | null> => {
+      return new Promise((resolve) => {
+        const id = generateId()
+        const zIndex = getNextZIndex()
+
+        const dialog: Dialog = {
+          id,
+          type: 'dropMode',
+          config: { ...config, id },
+          zIndex,
+          resolve: resolve as (value: unknown) => void,
+          reject: (() => resolve(null)) as (reason?: unknown) => void
+        }
+
+        setDialogs((prev) => [...prev, dialog])
+      })
+    },
+    [generateId, getNextZIndex]
+  )
+
+  // Show conflict resolution dialog
+  const showConflict = useCallback(
+    (config: Omit<ConflictDialogConfig, 'id'>): Promise<ConflictDialogResult | null> => {
+      return new Promise((resolve) => {
+        const id = generateId()
+        const zIndex = getNextZIndex()
+
+        const dialog: Dialog = {
+          id,
+          type: 'conflict',
+          config: { ...config, id },
+          zIndex,
+          resolve: resolve as (value: unknown) => void,
+          reject: (() => resolve(null)) as (reason?: unknown) => void
+        }
+
+        setDialogs((prev) => [...prev, dialog])
+      })
+    },
+    [generateId, getNextZIndex]
+  )
+
   // Close specific dialog
   const closeDialog = useCallback((id: string) => {
     setDialogs((prev) => {
@@ -253,6 +301,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
         showRename,
         showNewFile,
         showNewFolder,
+        showDropMode,
+        showConflict,
         closeDialog,
         closeAll
       }}

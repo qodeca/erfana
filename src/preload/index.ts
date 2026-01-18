@@ -12,6 +12,12 @@ import type {
   ScreenshotCaptureResponse,
   GetDisplaysResponse
 } from '../shared/ipc/screenshot-schema'
+import type {
+  ExternalFileValidateResponse,
+  ExternalFileCopyResponse,
+  ExternalFileMoveResponse,
+  ConflictResolution
+} from '../shared/ipc/external-file-schema'
 import { electronAPI } from '@electron-toolkit/preload'
 
 export interface FileNode {
@@ -68,6 +74,83 @@ const api = {
       isFile?: boolean
       error?: string
     }> => ipcRenderer.invoke('file:validatePath', filePath, projectRoot),
+
+    // External file drop operations (BRS-012)
+    /**
+     * Validate an external file for drop into project
+     *
+     * Performs security checks: exists, is file, not device/pipe/socket,
+     * symlink validation.
+     *
+     * @param sourcePath - Absolute path to external file
+     * @param projectRoot - Absolute path to project root
+     * @returns Validation result with file type info
+     */
+    validateExternal: (
+      sourcePath: string,
+      projectRoot: string
+    ): Promise<ExternalFileValidateResponse> =>
+      ipcRenderer.invoke('file:validateExternal', sourcePath, projectRoot),
+
+    /**
+     * Copy an external file into the project
+     *
+     * Validates file, then copies to target folder.
+     *
+     * @param sourcePath - Absolute path to external file
+     * @param targetFolder - Absolute path to target folder within project
+     * @param projectRoot - Absolute path to project root
+     * @param conflictResolution - How to handle name conflicts: 'replace' or 'keepBoth'
+     * @returns Copy result with new file path
+     */
+    copyFromExternal: (
+      sourcePath: string,
+      targetFolder: string,
+      projectRoot: string,
+      conflictResolution?: ConflictResolution
+    ): Promise<ExternalFileCopyResponse> =>
+      ipcRenderer.invoke(
+        'file:copyFromExternal',
+        sourcePath,
+        targetFolder,
+        projectRoot,
+        conflictResolution
+      ),
+
+    /**
+     * Move an external file into the project
+     *
+     * Validates file, copies to target folder, then deletes source.
+     *
+     * @param sourcePath - Absolute path to external file
+     * @param targetFolder - Absolute path to target folder within project
+     * @param projectRoot - Absolute path to project root
+     * @param conflictResolution - How to handle name conflicts: 'replace' or 'keepBoth'
+     * @returns Move result with new file path
+     */
+    moveFromExternal: (
+      sourcePath: string,
+      targetFolder: string,
+      projectRoot: string,
+      conflictResolution?: ConflictResolution
+    ): Promise<ExternalFileMoveResponse> =>
+      ipcRenderer.invoke(
+        'file:moveFromExternal',
+        sourcePath,
+        targetFolder,
+        projectRoot,
+        conflictResolution
+      ),
+
+    /**
+     * Open native file picker for selecting external files
+     *
+     * Used when a folder is selected and user presses Cmd+Shift+I.
+     *
+     * @returns Selected file paths or null if cancelled
+     */
+    selectExternalFiles: (): Promise<{ paths: string[] } | null> =>
+      ipcRenderer.invoke('file:selectExternalFiles'),
 
     // Project change event listener
     onProjectChanged: (callback: (data: ProjectChanged) => void) => {

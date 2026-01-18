@@ -398,6 +398,77 @@
 }
 
 /* ===================================================================
+   External File Drop Styles (BRS-012)
+   Visual feedback for drag-drop from external sources (Finder, etc.)
+   =================================================================== */
+
+/* External drag active indicator on the tree container */
+/* Provides subtle visual feedback that the tree is accepting drops */
+.project-tree[data-external-drag="true"] {
+  outline: var(--border-width) dashed var(--color-accent-drag-border);
+  outline-offset: -1px;
+}
+
+/* External drag active - highlight the content area */
+.project-tree[data-external-drag="true"] .project-tree-content {
+  background-color: var(--color-accent-drag-bg-subtle);
+}
+
+/* Valid drop target during external drag - folder being hovered */
+/* Reuses same visual language as internal drag-drop for consistency */
+.project-tree-item.directory[data-external-drop-target="true"] {
+  background-color: var(--color-accent-drag-bg);
+  position: relative;
+}
+
+/* Dashed border indicator for external drop target (distinguishes from internal drag) */
+.project-tree-item.directory[data-external-drop-target="true"]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: var(--border-width) dashed var(--color-accent-drag);
+  pointer-events: none;
+}
+
+/* Invalid drop target during external drag (file, not folder) */
+/* Shows not-allowed cursor and muted appearance */
+.project-tree-item:not(.directory)[data-external-drag-hover="true"] {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+/* Text indicator for external drop */
+/* Applied to folder name when it's the active drop target */
+.project-tree-item.directory[data-external-drop-target="true"] .file-name {
+  color: var(--color-accent-drag);
+  font-weight: var(--font-medium);
+}
+
+/* Children area highlight during external drop (for expanded folders) */
+/* Shows where files will be placed */
+.project-tree-node[data-external-drop-highlight="true"] > .project-tree-children {
+  background-color: var(--color-accent-drag-bg-subtle);
+  position: relative;
+}
+
+/* Left border indicator for children area */
+.project-tree-node[data-external-drop-highlight="true"] > .project-tree-children::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--border-width);
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--color-accent-drag) 0,
+    var(--color-accent-drag) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+/* ===================================================================
    Git Status Indicators
    =================================================================== */
 

@@ -76,6 +76,11 @@ interface ProjectTreeNodeProps {
   gitStatus?: GitDisplayStatus
   getFileStatus?: (path: string) => GitDisplayStatus | undefined
   getFolderStatus?: (path: string) => GitDisplayStatus | undefined
+  // External file drop props (BRS-012)
+  /** Whether an external drag is currently active over the project tree */
+  isExternalDragActive?: boolean
+  /** Path of the folder being hovered during external drag */
+  externalDropTarget?: string | null
 }
 
 export function ProjectTreeNode({
@@ -93,7 +98,9 @@ export function ProjectTreeNode({
   dragDisabled = false,
   gitStatus,
   getFileStatus,
-  getFolderStatus
+  getFolderStatus,
+  isExternalDragActive = false,
+  externalDropTarget = null
 }: ProjectTreeNodeProps) {
   // Controlled component - check if this folder is expanded
   const isExpanded = expandedFolders.has(node.path)
@@ -179,13 +186,21 @@ export function ProjectTreeNode({
   // Show drop target highlight if: 1) something is being dragged over this node, 2) it's a valid drop target (folder)
   const showDropHighlight = isOver && node.type === 'directory' && !actuallyDragging
 
+  // External drop target: this folder is being hovered during external drag (BRS-012)
+  const isExternalDropTargetNode = externalDropTarget === node.path && node.type === 'directory'
+  // External drag hover: file being hovered during external drag (invalid target)
+  const isExternalDragHover = isExternalDragActive && node.type !== 'directory'
+
   return (
     <div
       className="project-tree-node"
       ref={setRefs}
       data-dragging={actuallyDragging}
       data-drop-highlight={showDropHighlight}
+      data-external-drop-highlight={isExternalDropTargetNode}
       data-testid={getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, node.path)}
+      data-path={node.path}
+      data-type={node.type}
     >
       <div
         className={`project-tree-item ${node.type} ${isSelected ? 'selected' : ''}`}
@@ -196,10 +211,14 @@ export function ProjectTreeNode({
         data-drop-target={isDropTarget || showDropHighlight}
         data-drop-invalid={isDropInvalid}
         data-clipboard-cut={clipboardCut}
+        data-external-drop-target={isExternalDropTargetNode}
+        data-external-drag-hover={isExternalDragHover}
         data-testid={getDynamicTestId(
           node.type === 'file' ? TEST_IDS.PROJECT_TREE_NODE_FILE : TEST_IDS.PROJECT_TREE_NODE_FOLDER,
           node.path
         )}
+        data-path={node.path}
+        data-type={node.type}
         // @dnd-kit handles drag - terminal drop is detected in ProjectTree's handleDragEnd
         {...dragAttributes}
         {...dragListeners}
@@ -240,6 +259,8 @@ export function ProjectTreeNode({
               dragDisabled={dragDisabled}
               getFileStatus={getFileStatus}
               getFolderStatus={getFolderStatus}
+              isExternalDragActive={isExternalDragActive}
+              externalDropTarget={externalDropTarget}
             />
           ))}
         </div>

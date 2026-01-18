@@ -85,6 +85,15 @@ export enum ErrorCode {
   LOGGING_WRITE_FAILED = 'LOGGING_WRITE_FAILED',
   LOGGING_CLEANUP_FAILED = 'LOGGING_CLEANUP_FAILED',
 
+  // External file drop errors (BRS-012)
+  EXTERNAL_FILE_NOT_FOUND = 'EXTERNAL_FILE_NOT_FOUND',
+  EXTERNAL_FILE_IS_DIRECTORY = 'EXTERNAL_FILE_IS_DIRECTORY',
+  EXTERNAL_FILE_NOT_REGULAR = 'EXTERNAL_FILE_NOT_REGULAR',
+  EXTERNAL_FILE_SYMLINK_SYSTEM = 'EXTERNAL_FILE_SYMLINK_SYSTEM',
+  EXTERNAL_FILE_COPY_FAILED = 'EXTERNAL_FILE_COPY_FAILED',
+  EXTERNAL_FILE_MOVE_FAILED = 'EXTERNAL_FILE_MOVE_FAILED',
+  EXTERNAL_FILE_SOURCE_DELETED = 'EXTERNAL_FILE_SOURCE_DELETED',
+
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
 }
@@ -222,6 +231,15 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.LOGGING_INIT_FAILED]: 'Failed to initialize logging system',
   [ErrorCode.LOGGING_WRITE_FAILED]: 'Failed to write to log file',
   [ErrorCode.LOGGING_CLEANUP_FAILED]: 'Failed to cleanup old log files',
+
+  // External file drop errors (BRS-012)
+  [ErrorCode.EXTERNAL_FILE_NOT_FOUND]: 'External file not found or was deleted',
+  [ErrorCode.EXTERNAL_FILE_IS_DIRECTORY]: 'Cannot import directories, only files',
+  [ErrorCode.EXTERNAL_FILE_NOT_REGULAR]: 'Cannot import special files (devices, pipes, sockets)',
+  [ErrorCode.EXTERNAL_FILE_SYMLINK_SYSTEM]: 'Cannot import symlinks pointing to system directories',
+  [ErrorCode.EXTERNAL_FILE_COPY_FAILED]: 'Failed to copy external file',
+  [ErrorCode.EXTERNAL_FILE_MOVE_FAILED]: 'Failed to move external file',
+  [ErrorCode.EXTERNAL_FILE_SOURCE_DELETED]: 'Source file was deleted during operation',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'

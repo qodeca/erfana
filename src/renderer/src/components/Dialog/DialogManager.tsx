@@ -5,6 +5,8 @@ import { AlertDialog } from './AlertDialog'
 import { RenameDialog } from './RenameDialog'
 import { NewFileDialog } from './NewFileDialog'
 import { NewFolderDialog } from './NewFolderDialog'
+import { DropModeDialog } from './DropModeDialog'
+import { ConflictDialog } from './ConflictDialog'
 import { logger } from '../../utils/logger'
 import type {
   DialogType,
@@ -13,7 +15,11 @@ import type {
   AlertDialogConfig,
   RenameDialogConfig,
   NewFileDialogConfig,
-  NewFolderDialogConfig
+  NewFolderDialogConfig,
+  DropModeDialogConfig,
+  ConflictDialogConfig,
+  DropModeDialogResult,
+  ConflictDialogResult
 } from './types'
 
 /**
@@ -27,6 +33,8 @@ type DialogConfigUnion =
   | RenameDialogConfig
   | NewFileDialogConfig
   | NewFolderDialogConfig
+  | DropModeDialogConfig
+  | ConflictDialogConfig
 
 /**
  * Component registry for dialog types
@@ -42,6 +50,8 @@ const DIALOG_COMPONENTS: Record<DialogType, React.ComponentType<any> | null> = {
   rename: RenameDialog,
   newFile: NewFileDialog,
   newFolder: NewFolderDialog,
+  dropMode: DropModeDialog,
+  conflict: ConflictDialog,
   custom: null // Custom dialogs handled separately
 }
 
@@ -86,6 +96,30 @@ export function DialogManager() {
           closeDialog(dialog.id)
         }
 
+        // Handler for DropModeDialog - resolves with selected mode result
+        const handleDropModeSelect = (result: DropModeDialogResult) => {
+          dialog.resolve(result)
+          closeDialog(dialog.id)
+        }
+
+        // Handler for DropModeDialog cancel - resolves with null
+        const handleDropModeCancel = () => {
+          dialog.resolve(null)
+          closeDialog(dialog.id)
+        }
+
+        // Handler for ConflictDialog - resolves with selected resolution result
+        const handleConflictSelect = (result: ConflictDialogResult) => {
+          dialog.resolve(result)
+          closeDialog(dialog.id)
+        }
+
+        // Handler for ConflictDialog cancel/skip - resolves with null
+        const handleConflictCancel = () => {
+          dialog.resolve(null)
+          closeDialog(dialog.id)
+        }
+
         // Get component from registry
         const DialogComponent = DIALOG_COMPONENTS[dialog.type]
 
@@ -99,6 +133,8 @@ export function DialogManager() {
         const isAlertType = dialog.type === 'alert'
         const isSubmitType = dialog.type === 'prompt' || dialog.type === 'rename' ||
                              dialog.type === 'newFile' || dialog.type === 'newFolder'
+        const isDropModeType = dialog.type === 'dropMode'
+        const isConflictType = dialog.type === 'conflict'
 
         return (
           <DialogComponent
@@ -106,8 +142,17 @@ export function DialogManager() {
             config={dialog.config as DialogConfigUnion}
             zIndex={dialog.zIndex}
             onConfirm={isConfirmType || isAlertType ? handleConfirm : undefined}
-            onCancel={!isAlertType ? handleCancel : undefined}
+            onCancel={
+              isDropModeType ? handleDropModeCancel :
+              isConflictType ? handleConflictCancel :
+              !isAlertType ? handleCancel : undefined
+            }
             onSubmit={isSubmitType ? handleSubmit : undefined}
+            onSelect={
+              isDropModeType ? handleDropModeSelect :
+              isConflictType ? handleConflictSelect :
+              undefined
+            }
           />
         )
       })}

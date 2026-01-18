@@ -145,6 +145,34 @@ export const TEST_IDS = {
   DIALOG_TITLE: 'dialog-title',
 
   // =========================================================================
+  // Dialogs - External drop (4)
+  // =========================================================================
+
+  /** External drop dialog container */
+  EXTERNAL_DROP_DIALOG: 'external-drop-dialog',
+  /** Move files button */
+  EXTERNAL_DROP_MOVE_BUTTON: 'external-drop-move-button',
+  /** Copy files button */
+  EXTERNAL_DROP_COPY_BUTTON: 'external-drop-copy-button',
+  /** Import files button */
+  EXTERNAL_DROP_IMPORT_BUTTON: 'external-drop-import-button',
+  /** Cancel button */
+  EXTERNAL_DROP_CANCEL_BUTTON: 'external-drop-cancel-button',
+
+  // =========================================================================
+  // Dialogs - Conflict (4)
+  // =========================================================================
+
+  /** Conflict resolution dialog container */
+  CONFLICT_DIALOG: 'conflict-dialog',
+  /** Replace existing file button */
+  CONFLICT_REPLACE_BUTTON: 'conflict-replace-button',
+  /** Keep both files button */
+  CONFLICT_KEEP_BOTH_BUTTON: 'conflict-keep-both-button',
+  /** Cancel/skip button */
+  CONFLICT_CANCEL_BUTTON: 'conflict-cancel-button',
+
+  // =========================================================================
   // Dialogs - Confirm (4)
   // =========================================================================
 

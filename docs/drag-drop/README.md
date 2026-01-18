@@ -78,3 +78,55 @@ Right-click any file/folder in the project tree:
 - **File Service**: [src/main/services/FileService.ts](/src/main/services/FileService.ts)
 - **dnd-kit Documentation**: https://docs.dndkit.com/
 - **VS Code File Explorer**: https://code.visualstudio.com/docs/getstarted/userinterface#_explorer
+
+---
+
+## External file drop
+
+### Overview
+
+Users can drag files from external sources (Finder, file managers) into the project tree. This feature uses HTML5 DataTransfer API separately from the internal dnd-kit drag-drop system.
+
+### Supported operations
+
+- **Move**: Relocates file from source to project (source deleted)
+- **Copy**: Duplicates file to project (source preserved)
+- **Import**: Processes file through ImportService (always to `import/` folder)
+
+### Visual feedback
+
+- Drop zone border on project tree during drag
+- Folder highlighting for valid drop targets
+- Not-allowed cursor on files (invalid targets)
+- Auto-expand collapsed folders after 1 second hover
+
+### Conflict resolution
+
+When a file with the same name exists at the target:
+- **Replace**: Overwrites existing file
+- **Keep both**: Creates auto-numbered copy (e.g., `file (1).md`)
+
+### Keyboard shortcut
+
+**Cmd+Shift+I** (Mac) or **Ctrl+Shift+I** (Windows/Linux):
+- Opens file picker when a folder is selected in project tree
+- Ignored when no folder is selected
+
+### Security
+
+- Path traversal patterns sanitized from filenames
+- Symlinks to system directories rejected
+- All operations validated within project boundary
+- Special files (devices, pipes, sockets) rejected
+
+### Technical implementation
+
+- `useExternalFileDrop` hook handles drag detection and state
+- `ExternalFileService` handles security validation and file operations
+- IPC channels: `file:validateExternal`, `file:copyFromExternal`, `file:moveFromExternal`
+
+### Out of scope
+
+- Folder drops (silently ignored)
+- Remote/URL drops
+- Drag from project tree to external destinations

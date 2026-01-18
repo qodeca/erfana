@@ -282,21 +282,21 @@
 
 ## Definition of done
 
-- [ ] All functional requirements (FR-001 through FR-011) implemented
-- [ ] All non-functional requirements (NFR-001 through NFR-004) addressed
+- [x] All functional requirements (FR-001 through FR-011) implemented
+- [x] All non-functional requirements (NFR-001 through NFR-004) addressed
 - [ ] All test cases (TC-001 through TC-020, including TC-015b) pass
-- [ ] Unit tests written for:
-  - [ ] External drag detection logic
-  - [ ] Drop target validation
-  - [ ] Conflict resolution logic
-  - [ ] File path sanitization
+- [x] Unit tests written for:
+  - [x] External drag detection logic
+  - [x] Drop target validation
+  - [x] Conflict resolution logic
+  - [x] File path sanitization
 - [ ] Integration tests for:
   - [ ] Move operation end-to-end
   - [ ] Copy operation end-to-end
   - [ ] Import operation end-to-end
 - [ ] Code reviewed and approved
-- [ ] Documentation updated:
-  - [ ] docs/drag-drop/README.md updated with external drop section
-  - [ ] Keyboard shortcuts documented
+- [x] Documentation updated:
+  - [x] docs/drag-drop/README.md updated with external drop section
+  - [x] Keyboard shortcuts documented
 - [ ] No regressions in existing internal drag-drop functionality
 - [ ] Performance validated: no frame drops during drag operations
