@@ -83,6 +83,7 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 | BRS-008 | Graph engine polish & maintenance | T3 | draft | `specs/business-reqs/brs008-graph-polish/` |
 | BRS-009 | Media import with transcription | T4 | draft | `specs/business-reqs/brs009-media-import-transcription/` |
 | BRS-012 | External file drop to project tree | T3 | active | `specs/business-reqs/brs012-external-file-drop/` |
+| BRS-013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/business-reqs/brs013-multi-cli-tool-prompt-optimization/` |
 
 ### Archived BRS (implemented)
 

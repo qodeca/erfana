@@ -1,7 +1,7 @@
 {
   "sequence": {
-    "current": 12,
-    "next": 13
+    "current": 13,
+    "next": 14
   },
   "registry": [
     {
@@ -264,11 +264,32 @@
         "designs": [],
         "issues": ["#87"]
       }
+    },
+    {
+      "id": 13,
+      "slug": "multi-cli-tool-prompt-optimization",
+      "name": "Multi-CLI tool prompt optimization",
+      "tier": "T3",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Support for multiple CLI tools (Claude Code, Codex, Gemini CLI) with prompts optimized per tool selected from terminal dropdown",
+      "created": "2026-01-18T00:00:00.000Z",
+      "path": "brs013-multi-cli-tool-prompt-optimization",
+      "last_modified": "2026-01-18T18:30:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 27,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": ["#88"]
+      }
     }
   ],
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2026-01-18T12:30:00.000Z"
+"last_updated": "2026-01-18T18:30:00.000Z"
   }
 }
