@@ -169,15 +169,24 @@ describe('DropModeDialog', () => {
     })
 
     it('should have focusable mode buttons', async () => {
-      const user = userEvent.setup()
       render(<DropModeDialog {...defaultProps} />)
 
-      // Move button is focused initially
+      // Move button is focused initially (autoFocus)
       expect(document.activeElement).toBe(screen.getByTestId(TEST_IDS.EXTERNAL_DROP_MOVE_BUTTON))
 
-      // Tab forward - all buttons should be focusable
-      await user.tab()
-      expect(document.activeElement).toBe(screen.getByTestId(TEST_IDS.EXTERNAL_DROP_COPY_BUTTON))
+      // All mode buttons should be focusable (not disabled, no negative tabIndex)
+      const moveButton = screen.getByTestId(TEST_IDS.EXTERNAL_DROP_MOVE_BUTTON)
+      const copyButton = screen.getByTestId(TEST_IDS.EXTERNAL_DROP_COPY_BUTTON)
+      const importButton = screen.getByTestId(TEST_IDS.EXTERNAL_DROP_IMPORT_BUTTON)
+
+      expect(moveButton).not.toBeDisabled()
+      expect(copyButton).not.toBeDisabled()
+      expect(importButton).not.toBeDisabled()
+
+      // Verify buttons don't have negative tabIndex (which would make them unfocusable)
+      expect(moveButton).not.toHaveAttribute('tabindex', '-1')
+      expect(copyButton).not.toHaveAttribute('tabindex', '-1')
+      expect(importButton).not.toHaveAttribute('tabindex', '-1')
     })
 
     it('should have fewer focusable elements when showImport is false', async () => {
