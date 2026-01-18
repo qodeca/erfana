@@ -2,9 +2,11 @@
   "brs_id": 12,
   "brs_slug": "external-file-drop",
   "tier": "T3",
-  "version": "0.1.2",
+  "version": "1.0.0",
+  "status": "archived",
   "created": "2025-01-17T16:54:00.000Z",
-  "updated": "2025-01-17T19:00:00.000Z",
+  "updated": "2026-01-18T12:30:00.000Z",
+  "archived": "2026-01-18T12:30:00.000Z",
   "application": {
     "name": "External file drop to project tree",
     "domain": null,

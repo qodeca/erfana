@@ -142,6 +142,9 @@ if (!writeResult.success) {
 | `screenshot:captureWindow` | screenshot-handlers | Window picker capture (macOS) |
 | `screenshot:captureArea` | screenshot-handlers | Area selection capture (macOS) |
 | `screenshot:getDisplays` | screenshot-handlers | Get available displays for multi-monitor |
+| `external-file:validate` | external-file-handlers | Validate external file before copy/move |
+| `external-file:copy` | external-file-handlers | Copy external file into project |
+| `external-file:move` | external-file-handlers | Move external file into project |
 
 ## Event-Based IPC Pattern
 

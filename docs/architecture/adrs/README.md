@@ -21,6 +21,9 @@ Architectural decisions documented for Erfana project.
 #### BRS-011: UI testing ✅
 - [ADR-BRS011-001](adr-brs011-001-ui-test-architecture.md) - UI test compatibility architecture
 
+#### BRS-012: External file drop ✅
+- [Code Review](../code-review-drag-drop-2025-01.md) - External file drop architecture review
+
 ### Planned features (draft BRS)
 
 #### BRS-009: Media import

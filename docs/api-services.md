@@ -617,6 +617,70 @@ Get list of available monitors for multi-monitor selection.
 
 ---
 
+## ExternalFileService
+
+**File:** `src/main/services/ExternalFileService.ts`
+
+Handles external file operations for BRS-012 (external file drop to project tree).
+
+### Key Features
+- Security validation (symlinks, project boundary, special files)
+- Path traversal protection (sanitizes dangerous patterns from filenames)
+- Copy and move operations from external locations into project
+- Conflict resolution (replace or auto-number)
+
+### Public Methods
+
+#### `validateExternalFile(sourcePath: string, projectRoot: string): Promise<ValidationResult>`
+Validate an external file before copy/move operation.
+
+**Returns:**
+- `valid` - Whether file can be imported
+- `isSymlink` - Whether source is a symlink
+- `isDirectory` - Whether source is a directory (rejected)
+- `exists` - Whether source exists
+- `isRegularFile` - Whether source is a regular file (not device, pipe, socket)
+- `error` - Error message if validation failed
+- `errorCode` - Structured error code
+
+---
+
+#### `copyFromExternal(options: CopyOptions): Promise<OperationResult>`
+Copy a file from external location into project.
+
+**Parameters:**
+- `sourcePath` - Absolute path to external source file
+- `targetFolder` - Absolute path to target folder within project
+- `projectRoot` - Project root path (for boundary validation)
+- `conflictResolution` - `'replace'` or `'keepBoth'` (optional)
+
+**Returns:** `{ success, path?, isSymlink?, error?, errorCode? }`
+
+---
+
+#### `moveFromExternal(options: MoveOptions): Promise<OperationResult>`
+Move a file from external location into project (deletes source after copy).
+
+**Parameters:** Same as `copyFromExternal`
+
+**Returns:** `{ success, path?, isSymlink?, error?, errorCode? }`
+
+---
+
+### Security Validations
+1. **Path traversal** - Rejects paths with `..` or null bytes
+2. **Symlinks** - Detects and reports symlinks (warns user)
+3. **System directories** - Rejects symlinks pointing to system paths
+4. **Project boundary** - Ensures target is within project root
+5. **Special files** - Rejects devices, pipes, sockets
+
+### Related Files
+- `src/main/ipc/external-file-handlers.ts` - IPC handlers
+- `src/shared/ipc/external-file-schema.ts` - Zod schemas
+- `src/renderer/src/hooks/useExternalFileDrop.ts` - UI hook
+
+---
+
 ## See Also
 
 - [Architecture](./architecture.md) - Service class overview
@@ -624,3 +688,4 @@ Get list of available monitors for multi-monitor selection.
 - [Terminal](./terminal/README.md) - Terminal panel implementation
 - [File Watching](./file-watching/README.md) - Auto-refresh implementation
 - [Logging](./logging.md) - Logging layer documentation
+- [Drag-Drop](./drag-drop/README.md) - External file drop documentation
