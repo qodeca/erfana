@@ -83,6 +83,8 @@
     "last_validated": null,
     "threshold": 50
   },
+  "archived": "2026-01-17T17:30:00.000Z",
+  "archived_by": "user",
   "change_history": [
     {
       "date": "2025-12-22T15:59:02Z",
@@ -101,6 +103,13 @@
         "total_requirements": { "old": 15, "new": 30 },
         "requirement_sequences_key": { "old": "AC", "new": "TC" }
       }
+    },
+    {
+      "date": "2026-01-17T17:30:00.000Z",
+      "operation": "ARCHIVE",
+      "target": "manifest",
+      "description": "BRS archived - feature fully implemented (issue #74 closed)",
+      "by": "user"
     }
   ]
 }

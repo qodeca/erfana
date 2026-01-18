@@ -2,7 +2,9 @@
   "id": "BRS-010",
   "title": "Multiple independent instances",
   "tier": "T4",
-  "status": "draft",
+  "status": "archived",
+  "archived": "2026-01-17T17:30:00.000Z",
+  "archived_by": "user",
   "version": "1.0.0",
   "created": "2025-12-25T17:12:00.000Z",
   "last_modified": "2025-12-25T17:12:00.000Z",
@@ -64,5 +66,21 @@
     "total_words": 7473,
     "total_requirements": 116,
     "sections_count": 5
-  }
+  },
+  "change_history": [
+    {
+      "date": "2025-12-25T17:12:00.000Z",
+      "operation": "INIT",
+      "target": "manifest",
+      "description": "BRS initialized as T4 with 5 sections",
+      "by": "system"
+    },
+    {
+      "date": "2026-01-17T17:30:00.000Z",
+      "operation": "ARCHIVE",
+      "target": "manifest",
+      "description": "BRS archived - feature fully implemented (issue #27 closed)",
+      "by": "user"
+    }
+  ]
 }

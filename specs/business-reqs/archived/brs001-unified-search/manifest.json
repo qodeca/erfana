@@ -81,6 +81,8 @@
     "last_validated": null,
     "threshold": 50
   },
+  "archived": "2026-01-17T17:30:00.000Z",
+  "archived_by": "user",
   "change_history": [
     {
       "date": "2025-12-22T10:37:01Z",
@@ -122,6 +124,13 @@
           "words": {"old": 1912, "new": 2746}
         }
       }
+    },
+    {
+      "date": "2026-01-17T17:30:00.000Z",
+      "operation": "ARCHIVE",
+      "target": "manifest",
+      "description": "BRS archived - feature fully implemented (issue #71 closed)",
+      "by": "user"
     }
   ]
 }

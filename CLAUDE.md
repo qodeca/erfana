@@ -58,7 +58,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Build](docs/build/README.md) — Build configuration, electron-builder, ASAR, fuses, troubleshooting
 - [Security](docs/security.md) — Electron 39 security hardening, fuses, sandboxing, trade-offs
 - [Drag-Drop](docs/drag-drop/README.md) — VS Code-style file reorganization, visual feedback, validation
-- [Terminal](docs/terminal/README.md) — Bootstrap pattern, flickering prevention, scroll fixes, clipboard, drag-drop paths
+- [Terminal](docs/terminal/README.md) — Bootstrap pattern, scroll fixes, clipboard, drag-drop paths, screenshot capture (macOS)
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync, Mermaid diagrams
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
@@ -72,20 +72,27 @@ See `docs/` for details (keep Claude's context focused):
 
 Feature specifications live in `specs/business-reqs/`. Check registry before implementing new features.
 
+### Active BRS
+
 | ID | Name | Tier | Status | Path |
 |----|------|------|--------|------|
-| BRS-001 | Unified in-file search | T3 | draft | `specs/business-reqs/brs001-unified-search/` |
-| BRS-002 | Editor context menu with prompts | T3 | active | `specs/business-reqs/brs002-editor-context-menu/` |
-| BRS-003 | Real-time git status refresh | T3 | active | `specs/business-reqs/brs003-realtime-git-status/` |
 | BRS-004 | Graph engine foundation | T4 | draft | `specs/business-reqs/brs004-graph-foundation/` |
 | BRS-005 | Vector search & hybrid retrieval | T3 | draft | `specs/business-reqs/brs005-vector-search/` |
 | BRS-006 | Knowledge graph & entities | T3 | draft | `specs/business-reqs/brs006-knowledge-graph/` |
 | BRS-007 | Temporal queries & timeline | T3 | draft | `specs/business-reqs/brs007-temporal-queries/` |
 | BRS-008 | Graph engine polish & maintenance | T3 | draft | `specs/business-reqs/brs008-graph-polish/` |
 | BRS-009 | Media import with transcription | T4 | draft | `specs/business-reqs/brs009-media-import-transcription/` |
-| BRS-010 | Multiple independent instances | T4 | active | `specs/business-reqs/brs010-multi-instance/` |
-| BRS-011 | Automated UI testing compatibility | T3 | draft | `specs/business-reqs/brs011-ui-test-compatibility/` |
 | BRS-012 | External file drop to project tree | T3 | draft | `specs/business-reqs/brs012-external-file-drop/` |
+
+### Archived BRS (implemented)
+
+| ID | Name | Tier | Path |
+|----|------|------|------|
+| BRS-001 | Unified in-file search | T3 | `specs/business-reqs/archived/brs001-unified-search/` |
+| BRS-002 | Editor context menu with prompts | T3 | `specs/business-reqs/archived/brs002-editor-context-menu/` |
+| BRS-003 | Real-time git status refresh | T3 | `specs/business-reqs/archived/brs003-realtime-git-status/` |
+| BRS-010 | Multiple independent instances | T4 | `specs/business-reqs/archived/brs010-multi-instance/` |
+| BRS-011 | Automated UI testing compatibility | T3 | `specs/business-reqs/archived/brs011-ui-test-compatibility/` |
 
 **Registry**: `specs/business-reqs/registry.json`
 

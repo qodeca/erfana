@@ -584,6 +584,39 @@ Cleanup stale locks from dead processes or timed-out network locks.
 
 ---
 
+## ScreenshotService
+
+**File:** `src/main/services/ScreenshotService.ts`
+
+macOS screenshot capture using native `screencapture` command.
+
+### Key Features
+- Three capture modes: screen, window, area
+- Multi-monitor support with monitor selection dialog
+- Captures saved to OS temp directory as PNG
+- 30-second timeout for interactive selections
+
+### Public Methods
+
+#### `captureScreen(options?: { monitorIndex?: number }): Promise<ScreenshotResult>`
+Capture entire screen (primary or specified monitor).
+
+#### `captureWindow(): Promise<ScreenshotResult>`
+Open macOS window picker for user selection.
+
+#### `captureArea(): Promise<ScreenshotResult>`
+Open crosshair tool for area selection.
+
+#### `getMonitors(): Promise<MonitorInfo[]>`
+Get list of available monitors for multi-monitor selection.
+
+### Related Files
+- `src/main/ipc/screenshot-handlers.ts` - IPC handlers
+- `src/shared/ipc/screenshot-schema.ts` - Zod schemas
+- `src/renderer/src/components/Panels/TerminalPanel/hooks/useScreenshotCapture.ts` - UI hook
+
+---
+
 ## See Also
 
 - [Architecture](./architecture.md) - Service class overview
