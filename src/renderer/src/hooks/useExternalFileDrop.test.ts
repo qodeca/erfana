@@ -172,8 +172,8 @@ describe('extractDroppedFiles', () => {
     const result = extractDroppedFiles(fileList)
 
     expect(result).toEqual([
-      { path: '/external/file1.md', name: 'file1.md', isDirectory: false },
-      { path: '/external/file2.md', name: 'file2.md', isDirectory: false }
+      { path: '/external/file1.md', name: 'file1.md', size: 1024, isDirectory: false },
+      { path: '/external/file2.md', name: 'file2.md', size: 1024, isDirectory: false }
     ])
   })
 
@@ -508,8 +508,8 @@ describe('useExternalFileDrop', () => {
       })
 
       expect(droppedFiles).toEqual([
-        { path: '/external/file1.md', name: 'file1.md', isDirectory: false },
-        { path: '/external/file2.md', name: 'file2.md', isDirectory: false }
+        { path: '/external/file1.md', name: 'file1.md', size: 1024, isDirectory: false },
+        { path: '/external/file2.md', name: 'file2.md', size: 1024, isDirectory: false }
       ])
     })
 

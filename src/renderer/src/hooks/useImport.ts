@@ -29,11 +29,39 @@ import { logger } from '../utils/logger'
 /** Size threshold for confirmation dialog (in MB) */
 const LARGE_FILE_THRESHOLD_MB = IMPORT.SIZE_WARNING_THRESHOLD / (1024 * 1024)
 
+/** Information about a file to be imported */
+export interface ImportFileInfo {
+  /** Absolute path to the source file */
+  path: string
+  /** File name (for display in dialogs/toasts) */
+  name: string
+  /** File size in bytes */
+  size: number
+}
+
+/** Options for processFiles method */
+export interface ProcessFilesOptions {
+  /** Callback for individual file results (for tracking progress) */
+  onFileResult?: (file: ImportFileInfo, success: boolean, outputPath?: string) => void
+}
+
+/** Result of processFiles operation */
+export interface ProcessFilesResult {
+  /** Number of files successfully imported */
+  successCount: number
+  /** Number of files that failed to import */
+  failCount: number
+  /** Output paths of successfully imported files */
+  outputPaths: string[]
+}
+
 interface UseImportReturn {
   /** Whether an import is currently in progress */
   isImporting: boolean
-  /** Import a file. Returns output path or null if cancelled/failed */
+  /** Import via file dialog. Returns output path or null if cancelled/failed */
   importFile: () => Promise<string | null>
+  /** Process files directly (for drop, programmatic use). Returns results */
+  processFiles: (files: ImportFileInfo[], options?: ProcessFilesOptions) => Promise<ProcessFilesResult>
 }
 
 /**
@@ -58,6 +86,104 @@ export function useImport(): UseImportReturn {
   // Terminal portal context for scroll scheduling (issue #52)
   const terminalPortal = useTerminalPortalOptional()
 
+  /**
+   * Process files directly - core import workflow.
+   * Used by importFile (after dialog) and external drop handlers.
+   *
+   * Workflow per file:
+   * 1. Large file warning (skip if user cancels)
+   * 2. Process via IPC
+   * 3. Track success/failure
+   *
+   * After all files:
+   * 4. Summary toast (for batch imports)
+   * 5. Organize prompt (single file only)
+   */
+  const processFiles = useCallback(async (
+    files: ImportFileInfo[],
+    options?: ProcessFilesOptions
+  ): Promise<ProcessFilesResult> => {
+    if (files.length === 0) {
+      return { successCount: 0, failCount: 0, outputPaths: [] }
+    }
+
+    setIsImporting(true)
+    const outputPaths: string[] = []
+    let successCount = 0
+    let failCount = 0
+
+    try {
+      for (const file of files) {
+        // Large file warning
+        const fileSizeMB = file.size / (1024 * 1024)
+        if (fileSizeMB > LARGE_FILE_THRESHOLD_MB) {
+          const confirmed = await showConfirm({
+            title: 'Large file warning',
+            message: `The file "${file.name}" is ${fileSizeMB.toFixed(1)} MB. Large files may take longer to process and use more memory. Continue?`,
+            confirmLabel: 'Import anyway',
+            cancelLabel: 'Skip',
+            danger: false
+          })
+
+          if (!confirmed) {
+            logger.info('User skipped large file', { fileName: file.name })
+            options?.onFileResult?.(file, false)
+            failCount++
+            continue
+          }
+        }
+
+        // Process import
+        try {
+          const result = await window.api.import.process(file.path)
+
+          if (result.success && result.outputPath) {
+            successCount++
+            outputPaths.push(result.outputPath)
+            options?.onFileResult?.(file, true, result.outputPath)
+          } else {
+            failCount++
+            const errorMessage = getErrorMessage(result.errorCode, result.error)
+            showErrorToast('Import failed', `${file.name}: ${errorMessage}`)
+            options?.onFileResult?.(file, false)
+          }
+        } catch (error) {
+          failCount++
+          logger.error('Import error', error instanceof Error ? error : undefined)
+          showErrorToast('Import failed', `${file.name}: Unexpected error`)
+          options?.onFileResult?.(file, false)
+        }
+      }
+
+      // Success summary toast
+      if (files.length > 1) {
+        // Batch import summary
+        if (successCount > 0 && failCount === 0) {
+          showSuccessToast('Import complete', `Imported ${successCount} files`)
+        } else if (successCount > 0 && failCount > 0) {
+          showWarningToast('Import partially complete', `Imported ${successCount} of ${files.length} files`)
+        }
+        // All failed case already has individual error toasts
+      } else if (successCount === 1) {
+        // Single file success
+        showSuccessToast('File imported', `"${files[0].name}" imported successfully`)
+      }
+
+      // Organize prompt for single file import only
+      if (outputPaths.length === 1) {
+        await triggerOrganizePrompt(outputPaths[0], terminalPortal ?? undefined)
+      }
+
+      return { successCount, failCount, outputPaths }
+    } finally {
+      setIsImporting(false)
+    }
+  }, [showConfirm, terminalPortal])
+
+  /**
+   * Import via file dialog.
+   * Opens native file picker, then delegates to processFiles for actual import.
+   */
   const importFile = useCallback(async (): Promise<string | null> => {
     // 1. Select file via native file dialog
     let selectedFile: { path: string; name: string; sizeInMB: number; extension: string } | null
@@ -65,7 +191,7 @@ export function useImport(): UseImportReturn {
       selectedFile = await window.api.import.selectFile()
     } catch (error) {
       logger.error('Failed to open file dialog:', error instanceof Error ? error : undefined)
-      showErrorToast('File Selection Failed', 'Could not open file selection dialog')
+      showErrorToast('File selection failed', 'Could not open file selection dialog')
       return null
     }
 
@@ -74,60 +200,23 @@ export function useImport(): UseImportReturn {
       return null
     }
 
-    // 2. If file >50MB, show confirmation dialog
-    if (selectedFile.sizeInMB > LARGE_FILE_THRESHOLD_MB) {
-      const confirmed = await showConfirm({
-        title: 'Large File Warning',
-        message: `The selected file "${selectedFile.name}" is ${selectedFile.sizeInMB.toFixed(1)} MB. Large files may take longer to process and use more memory. Continue?`,
-        confirmLabel: 'Import Anyway',
-        cancelLabel: 'Cancel',
-        danger: false
-      })
-
-      if (!confirmed) {
-        showWarningToast('Import Cancelled', 'Large file import was cancelled')
-        return null
-      }
+    // 2. Convert to ImportFileInfo format
+    const fileInfo: ImportFileInfo = {
+      path: selectedFile.path,
+      name: selectedFile.name,
+      size: selectedFile.sizeInMB * 1024 * 1024 // Convert MB back to bytes
     }
 
-    // 3. Begin import process
-    setIsImporting(true)
+    // 3. Process using shared workflow
+    const result = await processFiles([fileInfo])
 
-    try {
-      const result = await window.api.import.process(selectedFile.path)
-
-      if (!result.success) {
-        // Handle specific error codes with user-friendly messages
-        const errorMessage = getErrorMessage(result.errorCode, result.error)
-        showErrorToast('Import Failed', errorMessage)
-        return null
-      }
-
-      // 4. Success - show toast and trigger organize prompt
-      const outputPath = result.outputPath
-      if (!outputPath) {
-        showErrorToast('Import Failed', 'Import succeeded but output path was not returned')
-        return null
-      }
-
-      showSuccessToast('File Imported', `"${selectedFile.name}" imported successfully`)
-
-      // 5. Trigger organize-import prompt to help user organize the file
-      await triggerOrganizePrompt(outputPath, terminalPortal ?? undefined)
-
-      return outputPath
-    } catch (error) {
-      logger.error('Import error:', error instanceof Error ? error : undefined)
-      showErrorToast('Import Failed', 'An unexpected error occurred during import')
-      return null
-    } finally {
-      setIsImporting(false)
-    }
-  }, [showConfirm, terminalPortal])
+    return result.outputPaths[0] ?? null
+  }, [processFiles])
 
   return {
     isImporting,
-    importFile
+    importFile,
+    processFiles
   }
 }
 

@@ -21,6 +21,8 @@ export interface ExternalDropFile {
   path: string
   /** File name (basename) */
   name: string
+  /** File size in bytes */
+  size: number
   /**
    * Whether the dropped item is a directory.
    * Directories are filtered out per FR-011 (silently reject folder drops).
@@ -148,6 +150,7 @@ export function extractDroppedFiles(files: FileList): ExternalDropFile[] {
       result.push({
         path: filePath,
         name: file.name,
+        size: file.size,
         isDirectory
       })
     } else {

@@ -133,8 +133,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const { flattenedItems, isDescendant } = useDragDropTree(files, projectPath)
   const clipboard = useClipboardStore()
 
-  // Import hook (for context menu)
-  const { importFile } = useImport()
+  // Import hook (for context menu and external drop)
+  const { importFile, processFiles } = useImport()
 
   // Context menu factory (Strategy + Command pattern)
   const contextMenuFactory = useMemo(() => new ContextMenuFactory(), [])
@@ -820,10 +820,30 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
 
     const { mode } = modeResult
+
+    // Step 2: Handle import mode via unified processFiles workflow (SOLID compliance)
+    // processFiles handles: large file warnings, IPC calls, toasts, organize prompt
+    if (mode === 'import') {
+      // Convert dropped files to ImportFileInfo format
+      const importFiles = droppedFiles.map(file => ({
+        path: file.path,
+        name: file.name,
+        size: file.size
+      }))
+
+      // Use unified import workflow
+      await processFiles(importFiles)
+
+      // Refresh tree and git status (processFiles handles all UI feedback)
+      await refreshProjectTree()
+      refreshGitStatus()
+      return
+    }
+
+    // Step 3: Process move/copy for each file
     let successCount = 0
     let failCount = 0
 
-    // Step 2: Process each file
     for (const file of droppedFiles) {
       try {
         // Validate file still exists and is valid
@@ -840,23 +860,6 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
             type: 'error'
           })
           failCount++
-          continue
-        }
-
-        // For import mode, use the import service (always goes to import/ folder)
-        if (mode === 'import') {
-          const importResult = await window.api.import.process(file.path)
-          if (importResult.success) {
-            successCount++
-          } else {
-            logger.warn('Import failed', { path: file.path, error: importResult.error })
-            showGlobalToast({
-              title: 'Import failed',
-              message: importResult.error || `Failed to import "${file.name}"`,
-              type: 'error'
-            })
-            failCount++
-          }
           continue
         }
 
@@ -953,9 +956,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     await refreshProjectTree()
     refreshGitStatus()
 
-    // Show success summary if any files were processed
+    // Show success summary if any files were processed (move/copy only - import handled above)
     if (successCount > 0) {
-      const operationLabel = mode === 'import' ? 'Imported' : mode === 'move' ? 'Moved' : 'Copied'
+      const operationLabel = mode === 'move' ? 'Moved' : 'Copied'
       const message = successCount === 1
         ? `${operationLabel} 1 file`
         : `${operationLabel} ${successCount} files`
@@ -966,7 +969,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
         type: failCount > 0 ? 'warning' : 'success'
       })
     }
-  }, [projectPath, showDropMode, showConflict, refreshProjectTree, refreshGitStatus])
+  }, [projectPath, showDropMode, showConflict, refreshProjectTree, refreshGitStatus, processFiles])
 
   /**
    * Handle native dragenter events on the tree container.
@@ -1044,9 +1047,11 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     }
 
     // Convert paths to ExternalDropFile format
+    // Note: File picker doesn't provide size, so we use 0 (size is only used for import mode large file warnings)
     const droppedFiles: ExternalDropFile[] = result.paths.map(path => ({
       path,
       name: path.split('/').pop() || 'unknown',
+      size: 0,
       isDirectory: false // File picker only returns files
     }))
 
