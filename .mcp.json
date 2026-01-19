@@ -1,13 +1,12 @@
 {
   "mcpServers": {
     "circuit-electron": {
-      "command": "npx",
-      "args": ["@snowfort/circuit-electron@latest"]
+      "command": "node",
+      "args": ["scripts/run-mcp.js", "@snowfort/circuit-electron@latest"]
     },
     "time": {
-      "command": "/Users/marcinobel/.local/bin/mcp-server-time",
-      "args": ["--local-timezone", "Europe/Warsaw"],
-      "env": {}
+      "command": "node",
+      "args": ["scripts/run-mcp.js", "-y", "@mcpcentral/mcp-time"]
     }
   }
 }
