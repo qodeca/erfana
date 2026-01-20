@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import { ISplitviewPanelProps } from 'dockview'
-import { Terminal as TerminalIcon, RotateCw, ArrowDownToLine, LockKeyhole, LockKeyholeOpen, Camera, AppWindow, BoxSelect } from 'lucide-react'
+import { Terminal as TerminalIcon, RotateCw, ArrowDownToLine, LockKeyhole, LockKeyholeOpen, Camera, AppWindow, BoxSelect, Webcam } from 'lucide-react'
 import type { DisplayInfo } from '../../../../shared/ipc/screenshot-schema'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
@@ -28,7 +28,7 @@ import { useProjectManagementContextSafe } from '../../context/ProjectManagement
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { TerminalContextMenu } from '../ContextMenu/TerminalContextMenu'
 import { FilePickerDialog } from '../Dialog/FilePickerDialog'
-import { ScreenSelectDialog } from '../Dialog'
+import { ScreenSelectDialog, CameraDialog } from '../Dialog'
 import { sanitizeFilePath } from '../../utils/fileUtils'
 import { formatPathsForTerminal, escapePathForShell } from '../../utils/shellPathEscape'
 import { logger } from '../../utils/logger'
@@ -68,6 +68,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // Multi-monitor display selection state (issue #86 enhancement)
   const [displays, setDisplays] = useState<DisplayInfo[]>([])
   const [showScreenSelectDialog, setShowScreenSelectDialog] = useState(false)
+  // Camera capture state (BRS-014)
+  const [isCameraDialogOpen, setIsCameraDialogOpen] = useState(false)
 
   // Cleanup helper for drag handlers (issue #85 - DRY principle)
   // Centralized cleanup to avoid duplication across unmount, project change, and restart
@@ -963,6 +965,43 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }, [])
 
+  /**
+   * Handle camera photo capture result (BRS-014)
+   *
+   * Receives the file path from CameraDialog and inserts it into the terminal.
+   * Closes the dialog and focuses the terminal for immediate use.
+   *
+   * @param filePath - Absolute path to the captured photo file
+   */
+  const handleCameraCapture = useCallback(
+    (filePath: string) => {
+      setIsCameraDialogOpen(false)
+
+      // Verify terminal is still available
+      const currentTerminalId = terminalIdRef.current
+      if (!currentTerminalId) {
+        showInfoToast('Terminal closed', `Photo saved to: ${filePath}`)
+        return
+      }
+
+      // Insert path to terminal with shell-safe escaping
+      const quotedPath = escapePathForShell(filePath)
+      window.api.terminal.write(currentTerminalId, quotedPath)
+
+      // Show success toast with filename only
+      const filename = filePath.split('/').pop() || 'photo.jpg'
+      showSuccessToast('Photo captured', filename)
+
+      // Return focus to terminal after dialog cleanup completes
+      // BaseDialog restores focus to previous element on close, so we need to
+      // defer our focus call until after that effect runs
+      requestAnimationFrame(() => {
+        xtermRef.current?.focus()
+      })
+    },
+    []
+  )
+
   const handleRestartTerminal = useCallback(async () => {
     // Kill current terminal session (Phase 1.1 bug fix - use centralized cleanup)
     await cleanupTerminalInstance(terminalIdRef.current)
@@ -1145,6 +1184,16 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                     </button>
                   </>
                 )}
+                {/* Camera photo capture button (BRS-014) - cross-platform */}
+                <button
+                  className="icon-btn"
+                  onClick={() => setIsCameraDialogOpen(true)}
+                  title="Capture photo"
+                  aria-label="Capture photo from camera"
+                  data-testid={TEST_IDS.TERMINAL_BTN_CAMERA}
+                >
+                  <Webcam size={14} />
+                </button>
                 <button
                   className="icon-btn"
                   onClick={handleScrollToBottom}
@@ -1230,6 +1279,18 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         )}
         {/* File picker dialog for smart path resolution disambiguation */}
         <FilePickerDialog {...pickerProps} />
+        {/* Camera dialog for photo capture (BRS-014) */}
+        <CameraDialog
+          isOpen={isCameraDialogOpen}
+          onClose={() => {
+            setIsCameraDialogOpen(false)
+            // Return focus to terminal after dialog cleanup completes
+            requestAnimationFrame(() => {
+              xtermRef.current?.focus()
+            })
+          }}
+          onCapture={handleCameraCapture}
+        />
       </div>
     </div>
   )

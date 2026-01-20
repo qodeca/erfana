@@ -202,3 +202,27 @@ export const SCREENSHOT = {
   /** Path to macOS screencapture binary */
   BINARY_PATH: '/usr/sbin/screencapture'
 } as const
+
+/**
+ * Camera capture constants
+ * Used by CameraService for saving webcam photos
+ *
+ * @see CameraService.ts
+ * @see BRS-014 - camera photo capture
+ */
+export const CAMERA = {
+  /** JPEG quality for canvas.toDataURL (0.0 - 1.0) */
+  JPEG_QUALITY: 0.92,
+  /** Prefix for temp file names */
+  TEMP_PREFIX: 'erfana-camera-',
+  /** File extension for photos */
+  FILE_EXTENSION: '.jpg',
+  /** Maximum preview width in pixels */
+  PREVIEW_MAX_WIDTH: 1920,
+  /** Maximum preview height in pixels */
+  PREVIEW_MAX_HEIGHT: 1080,
+  /** Maximum capture width in pixels */
+  CAPTURE_MAX_WIDTH: 3840,
+  /** Maximum capture height in pixels */
+  CAPTURE_MAX_HEIGHT: 2160
+} as const

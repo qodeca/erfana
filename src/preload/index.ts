@@ -13,6 +13,10 @@ import type {
   GetDisplaysResponse
 } from '../shared/ipc/screenshot-schema'
 import type {
+  CameraSaveRequest,
+  CameraSaveResponse
+} from '../shared/ipc/camera-schema'
+import type {
   ExternalFileValidateResponse,
   ExternalFileCopyResponse,
   ExternalFileMoveResponse,
@@ -531,6 +535,23 @@ const api = {
      */
     capture: (request: ScreenshotCaptureRequest): Promise<ScreenshotCaptureResponse> =>
       ipcRenderer.invoke('screenshot:capture', request)
+  },
+
+  /**
+   * Camera photo capture operations
+   *
+   * Saves webcam photos captured via MediaDevices API to temp directory.
+   * @see BRS-014 - Camera photo capture specification
+   */
+  camera: {
+    /**
+     * Save a captured photo to temp file
+     *
+     * @param request - { dataUrl: string, timestamp?: number }
+     * @returns Save result with file path or error
+     */
+    save: (request: CameraSaveRequest): Promise<CameraSaveResponse> =>
+      ipcRenderer.invoke('camera:save', request)
   },
 
   // Global settings operations

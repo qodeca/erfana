@@ -12,6 +12,7 @@ export { NewFolderDialog } from './NewFolderDialog'
 export { DropModeDialog } from './DropModeDialog'
 export { ConflictDialog } from './ConflictDialog'
 export { ScreenSelectDialog } from './ScreenSelectDialog'
+export { CameraDialog } from './CameraDialog'
 export { showGlobalDialog, subscribeGlobalDialogs } from './dialogService'
 export type { PromptDialogResult } from './PromptDialog'
 
