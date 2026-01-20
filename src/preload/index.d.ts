@@ -13,6 +13,10 @@ import type {
   GetDisplaysResponse
 } from '../shared/ipc/screenshot-schema'
 import type {
+  CameraSaveRequest,
+  CameraSaveResponse
+} from '../shared/ipc/camera-schema'
+import type {
   ExternalFileValidateResponse,
   ExternalFileCopyResponse,
   ExternalFileMoveResponse,
@@ -225,6 +229,14 @@ declare global {
         getDisplays: () => Promise<GetDisplaysResponse>
         /** Capture a screenshot */
         capture: (request: ScreenshotCaptureRequest) => Promise<ScreenshotCaptureResponse>
+      }
+      /**
+       * Camera photo capture operations
+       * @see BRS-014 - Camera photo capture specification
+       */
+      camera: {
+        /** Save a captured photo to temp file */
+        save: (request: CameraSaveRequest) => Promise<CameraSaveResponse>
       }
       globalSettings: {
         get: () => Promise<{ success: boolean; settings?: GlobalSettings; error?: string }>

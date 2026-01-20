@@ -94,7 +94,7 @@ export const TEST_IDS = {
   GIT_SYNC_INDICATOR: 'git-sync-indicator',
 
   // =========================================================================
-  // Terminal Panel (10)
+  // Terminal Panel (11)
   // =========================================================================
 
   /** Terminal panel container */
@@ -117,6 +117,8 @@ export const TEST_IDS = {
   TERMINAL_BTN_CAPTURE_WINDOW: 'terminal-btn-capture-window',
   /** Capture area screenshot button (macOS only) */
   TERMINAL_BTN_CAPTURE_AREA: 'terminal-btn-capture-area',
+  /** Capture camera photo button (cross-platform) */
+  TERMINAL_BTN_CAMERA: 'terminal-btn-camera',
 
   // =========================================================================
   // Editor Content Layout (5)
@@ -132,6 +134,27 @@ export const TEST_IDS = {
   EDITOR_MONACO: 'editor-monaco',
   /** Markdown preview container */
   EDITOR_PREVIEW: 'editor-preview',
+
+  // =========================================================================
+  // Camera Dialog (8)
+  // =========================================================================
+
+  /** Camera dialog container */
+  CAMERA_DIALOG: 'camera-dialog',
+  /** Camera device selector dropdown */
+  CAMERA_DEVICE_SELECT: 'camera-device-select',
+  /** Camera video preview element */
+  CAMERA_PREVIEW: 'camera-preview',
+  /** Capture photo button */
+  CAMERA_BTN_CAPTURE: 'camera-btn-capture',
+  /** Cancel button in camera dialog */
+  CAMERA_BTN_CANCEL: 'camera-btn-cancel',
+  /** Refresh devices button (shown when error) */
+  CAMERA_BTN_REFRESH: 'camera-btn-refresh',
+  /** Camera error message area */
+  CAMERA_ERROR: 'camera-error',
+  /** Shutter animation overlay */
+  CAMERA_SHUTTER: 'camera-shutter',
 
   // =========================================================================
   // Dialogs - Base (3)

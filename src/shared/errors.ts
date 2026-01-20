@@ -80,6 +80,13 @@ export enum ErrorCode {
   SCREENSHOT_FAILED = 'SCREENSHOT_FAILED',
   SCREENSHOT_NOT_SUPPORTED = 'SCREENSHOT_NOT_SUPPORTED',
 
+  // Camera capture errors (BRS-014)
+  CAMERA_PERMISSION_DENIED = 'CAMERA_PERMISSION_DENIED',
+  CAMERA_NOT_FOUND = 'CAMERA_NOT_FOUND',
+  CAMERA_DISCONNECTED = 'CAMERA_DISCONNECTED',
+  CAMERA_SAVE_FAILED = 'CAMERA_SAVE_FAILED',
+  CAMERA_INVALID_DATA = 'CAMERA_INVALID_DATA',
+
   // Logging errors
   LOGGING_INIT_FAILED = 'LOGGING_INIT_FAILED',
   LOGGING_WRITE_FAILED = 'LOGGING_WRITE_FAILED',
@@ -226,6 +233,13 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.SCREENSHOT_CANCELLED]: 'Screenshot capture was cancelled',
   [ErrorCode.SCREENSHOT_FAILED]: 'Failed to capture screenshot',
   [ErrorCode.SCREENSHOT_NOT_SUPPORTED]: 'Screenshot capture is only available on macOS',
+
+  // Camera capture errors (BRS-014)
+  [ErrorCode.CAMERA_PERMISSION_DENIED]: 'Camera permission required. Grant access in System Settings > Privacy & Security.',
+  [ErrorCode.CAMERA_NOT_FOUND]: 'No camera found. Please connect a camera and try again.',
+  [ErrorCode.CAMERA_DISCONNECTED]: 'Camera was disconnected during capture',
+  [ErrorCode.CAMERA_SAVE_FAILED]: 'Failed to save photo',
+  [ErrorCode.CAMERA_INVALID_DATA]: 'Invalid photo data received',
 
   // Logging errors
   [ErrorCode.LOGGING_INIT_FAILED]: 'Failed to initialize logging system',
