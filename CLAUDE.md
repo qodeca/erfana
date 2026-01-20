@@ -84,6 +84,7 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 | BRS-009 | Media import with transcription | T4 | draft | `specs/business-reqs/brs009-media-import-transcription/` |
 | BRS-013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/business-reqs/brs013-multi-cli-tool-prompt-optimization/` |
 | BRS-014 | Camera photo capture | T3 | draft | `specs/business-reqs/brs014-camera-capture/` |
+| BRS-015 | Image preview viewer | T3 | draft | `specs/business-reqs/brs015-image-preview/` |
 
 ### Archived BRS (implemented)
 
