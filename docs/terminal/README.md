@@ -173,6 +173,49 @@ Capture screenshots directly from terminal toolbar with file paths automatically
 **Related issues**:
 - #86 - Screenshot capture buttons for terminal panel
 
+### Camera Photo Capture (v0.7.0)
+
+Capture photos from connected cameras directly from the terminal toolbar.
+
+**Toolbar Button**:
+- **Camera** (Camera icon): Opens camera dialog with live preview
+
+**Dialog Features**:
+- Live camera preview with device selector (when multiple cameras available)
+- Hot-plug support: detects camera connect/disconnect
+- Fallback labels ("Camera 1", "Camera 2") when device labels unavailable
+- Keyboard shortcuts: Enter to capture, Escape to close
+- Shutter animation on capture
+
+**Behavior**:
+- Photos saved to OS temp directory as JPEG (`erfana-camera-{timestamp}.jpg`)
+- File path automatically pasted to active terminal with proper quoting
+- Success/error toasts provide user feedback
+- 20MB size limit for photo data
+
+**Use Cases**:
+- Quick attachment of photos in chat/command workflows
+- Document scanning and OCR workflows
+- Visual context for bug reports
+
+**Architecture**:
+- `CameraService.ts`: Main process service for JPEG file saving
+- `camera-handlers.ts`: IPC handlers for renderer communication
+- `camera-schema.ts`: Zod schemas for IPC types
+- `useCameraCapture.ts`: React hook for camera access and capture
+- `CameraDialog.tsx`: Modal dialog with preview and controls
+
+**Files**:
+- `src/main/services/CameraService.ts`
+- `src/main/ipc/camera-handlers.ts`
+- `src/shared/ipc/camera-schema.ts`
+- `src/renderer/src/hooks/useCameraCapture.ts`
+- `src/renderer/src/components/Dialog/CameraDialog.tsx`
+- `src/renderer/src/components/Panels/TerminalPanel.tsx` (toolbar button)
+
+**Related issues**:
+- #93 - Camera photo capture from terminal toolbar
+
 ### Scroll Lock Toggle (v0.6.0)
 
 Proactive scroll protection via a toggle button that locks terminal to always stay at bottom.
