@@ -1,0 +1,408 @@
+{
+  "implementation_plan": {
+    "overview": "Implement image preview viewer feature enabling users to open PNG, JPG, JPEG, GIF, WebP, SVG, BMP, ICO files in dedicated tabs with zoom, pan, and full-screen capabilities. Follows existing DiagramViewer patterns for zoom/pan logic while using local state management (no store needed since tabs are independent).",
+    "steps": [
+      {
+        "order": 1,
+        "description": "Create imageUtils.ts with isImageFile() function and IMAGE_EXTENSIONS constant",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/utils/imageUtils.ts"
+        ],
+        "dependencies": [],
+        "rationale": "Foundation for detecting image files throughout the codebase"
+      },
+      {
+        "order": 2,
+        "description": "Create imageViewer.logic.ts with zoom calculation functions adapted from diagramViewer.logic.ts",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/imageViewer.logic.ts"
+        ],
+        "dependencies": [],
+        "rationale": "Pure functions for zoom levels, fit calculation, cursor-centered zoom, and file size formatting"
+      },
+      {
+        "order": 3,
+        "description": "Add getImageMetadata IPC handler in main process FileService",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/main/services/FileService.ts",
+          "/Users/marcinobel/Projects/erfana/src/main/ipc/file-handlers.ts",
+          "/Users/marcinobel/Projects/erfana/src/preload/index.ts",
+          "/Users/marcinobel/Projects/erfana/src/shared/ipc/file-schemas.ts"
+        ],
+        "dependencies": [1],
+        "rationale": "Need to read image dimensions and file size from main process"
+      },
+      {
+        "order": 4,
+        "description": "Add readImageAsBase64 IPC handler for loading images as data URLs",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/main/services/FileService.ts",
+          "/Users/marcinobel/Projects/erfana/src/main/ipc/file-handlers.ts",
+          "/Users/marcinobel/Projects/erfana/src/preload/index.ts"
+        ],
+        "dependencies": [3],
+        "rationale": "Renderer cannot access file:// URLs due to CSP; use data URLs instead"
+      },
+      {
+        "order": 5,
+        "description": "Create ImageViewerPanel.tsx with basic structure, loading/error states",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/ImageViewerPanel.tsx"
+        ],
+        "dependencies": [2, 4],
+        "rationale": "Main component that renders the image viewer panel"
+      },
+      {
+        "order": 6,
+        "description": "Create ImageViewerPanel.module.css with styles using design tokens",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/ImageViewerPanel.module.css"
+        ],
+        "dependencies": [5],
+        "rationale": "Styling following VS Code-inspired dark theme"
+      },
+      {
+        "order": 7,
+        "description": "Create ImageTab.tsx tab header component with icon and close button",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Tabs/ImageTab.tsx",
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Tabs/ImageTab.css"
+        ],
+        "dependencies": [],
+        "rationale": "Custom tab header for image panels (simpler than EditorTab - no dirty state)"
+      },
+      {
+        "order": 8,
+        "description": "Export ImageTab from Tabs/index.ts",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Tabs/index.ts"
+        ],
+        "dependencies": [7],
+        "rationale": "Make ImageTab available for import in AppDockLayout"
+      },
+      {
+        "order": 9,
+        "description": "Register ImageViewerPanel and ImageTab in AppDockLayout.tsx",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/components/DockLayout/AppDockLayout.tsx"
+        ],
+        "dependencies": [5, 8],
+        "rationale": "Enable Dockview to render image panels and tabs"
+      },
+      {
+        "order": 10,
+        "description": "Update ProjectPanel.tsx to detect image files and open ImageViewerPanel",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/ProjectPanel.tsx"
+        ],
+        "dependencies": [1, 9],
+        "rationale": "Connect project tree to image viewer - clicking images opens them in tabs"
+      },
+      {
+        "order": 11,
+        "description": "Update fileUtils.ts to export isImageFile (if not using imageUtils.ts directly)",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/utils/fileUtils.ts"
+        ],
+        "dependencies": [1],
+        "rationale": "Centralize file type detection utilities"
+      },
+      {
+        "order": 12,
+        "description": "Implement zoom controls (buttons, keyboard shortcuts +/-/0/F)",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/ImageViewerPanel.tsx"
+        ],
+        "dependencies": [5, 6],
+        "rationale": "FR-004, FR-005, FR-006, FR-007 - zoom functionality"
+      },
+      {
+        "order": 13,
+        "description": "Implement mouse wheel zoom centered on cursor position",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/ImageViewerPanel.tsx"
+        ],
+        "dependencies": [12],
+        "rationale": "FR-012 - zoom at cursor position for precise control"
+      },
+      {
+        "order": 14,
+        "description": "Implement pan functionality (click-drag, arrow keys)",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/ImageViewerPanel.tsx"
+        ],
+        "dependencies": [12],
+        "rationale": "FR-008 - pan when zoomed beyond container"
+      },
+      {
+        "order": 15,
+        "description": "Implement fit-to-container with resize observer",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/ImageViewerPanel.tsx"
+        ],
+        "dependencies": [14],
+        "rationale": "FR-007, NFR-005 - fit mode and responsive recalculation"
+      },
+      {
+        "order": 16,
+        "description": "Implement full-screen modal with focus trapping",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/ImageViewerPanel.tsx"
+        ],
+        "dependencies": [15],
+        "rationale": "FR-009 - full-screen viewing mode"
+      },
+      {
+        "order": 17,
+        "description": "Implement double-click toggle between fit and 100%",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/ImageViewerPanel.tsx"
+        ],
+        "dependencies": [15],
+        "rationale": "FR-013 - quick toggle for common zoom levels"
+      },
+      {
+        "order": 18,
+        "description": "Add metadata display in toolbar (dimensions, size, format)",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/ImageViewerPanel.tsx"
+        ],
+        "dependencies": [5],
+        "rationale": "FR-010 - display image information"
+      },
+      {
+        "order": 19,
+        "description": "Write unit tests for imageViewer.logic.ts",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/imageViewer.logic.test.ts"
+        ],
+        "dependencies": [2],
+        "rationale": "Test pure logic functions"
+      },
+      {
+        "order": 20,
+        "description": "Write unit tests for ImageViewerPanel.tsx",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/ImageViewerPanel.test.tsx"
+        ],
+        "dependencies": [18],
+        "rationale": "Test component behavior"
+      },
+      {
+        "order": 21,
+        "description": "Write unit tests for imageUtils.ts",
+        "files": [
+          "/Users/marcinobel/Projects/erfana/src/renderer/src/utils/imageUtils.test.ts"
+        ],
+        "dependencies": [1],
+        "rationale": "Test utility functions"
+      }
+    ],
+    "patterns_to_follow": [
+      "Functional React components with hooks",
+      "CSS modules for component styling",
+      "Design tokens from design-tokens.css",
+      "Test IDs from constants/testids.ts",
+      "Pure logic extraction to .logic.ts files",
+      "IDockviewPanelProps for panel components",
+      "IDockviewPanelHeaderProps for tab components"
+    ],
+    "patterns_to_avoid": [
+      "Class components",
+      "Global Zustand store for per-panel state",
+      "Inline styles",
+      "Magic numbers (use constants)",
+      "innerHTML for SVG (use <img> tag for security)"
+    ]
+  },
+  "file_changes": [
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/renderer/src/utils/imageUtils.ts",
+      "action": "create",
+      "description": "Image file detection utilities (isImageFile, IMAGE_EXTENSIONS)"
+    },
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/renderer/src/utils/imageUtils.test.ts",
+      "action": "create",
+      "description": "Unit tests for image utilities"
+    },
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/imageViewer.logic.ts",
+      "action": "create",
+      "description": "Pure logic functions for zoom, pan, fit calculations"
+    },
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/imageViewer.logic.test.ts",
+      "action": "create",
+      "description": "Unit tests for image viewer logic"
+    },
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/ImageViewerPanel.tsx",
+      "action": "create",
+      "description": "Main image viewer panel component"
+    },
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/ImageViewerPanel.module.css",
+      "action": "create",
+      "description": "CSS module styles for ImageViewerPanel"
+    },
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/ImageViewerPanel.test.tsx",
+      "action": "create",
+      "description": "Unit tests for ImageViewerPanel"
+    },
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Tabs/ImageTab.tsx",
+      "action": "create",
+      "description": "Tab header component for image panels"
+    },
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Tabs/ImageTab.css",
+      "action": "create",
+      "description": "CSS styles for ImageTab"
+    },
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Tabs/index.ts",
+      "action": "modify",
+      "description": "Export ImageTab"
+    },
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/renderer/src/components/DockLayout/AppDockLayout.tsx",
+      "action": "modify",
+      "description": "Register ImageViewerPanel and ImageTab components"
+    },
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/ProjectPanel.tsx",
+      "action": "modify",
+      "description": "Add image file detection in handleFileSelect to open ImageViewerPanel"
+    },
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/renderer/src/utils/fileUtils.ts",
+      "action": "modify",
+      "description": "Re-export isImageFile from imageUtils"
+    },
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/main/services/FileService.ts",
+      "action": "modify",
+      "description": "Add getImageMetadata and readImageAsBase64 methods"
+    },
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/main/ipc/file-handlers.ts",
+      "action": "modify",
+      "description": "Add IPC handlers for getImageMetadata and readImageAsBase64"
+    },
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/preload/index.ts",
+      "action": "modify",
+      "description": "Expose getImageMetadata and readImageAsBase64 to renderer"
+    },
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/shared/ipc/file-schemas.ts",
+      "action": "modify",
+      "description": "Add Zod schemas for image metadata IPC"
+    },
+    {
+      "path": "/Users/marcinobel/Projects/erfana/src/renderer/src/constants/testids.ts",
+      "action": "modify",
+      "description": "Add test IDs for ImageViewerPanel and ImageTab"
+    }
+  ],
+  "test_strategy": {
+    "coverage_target": 80,
+    "test_types": [
+      "unit",
+      "integration"
+    ],
+    "test_files": [
+      "/Users/marcinobel/Projects/erfana/src/renderer/src/utils/imageUtils.test.ts",
+      "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/imageViewer.logic.test.ts",
+      "/Users/marcinobel/Projects/erfana/src/renderer/src/components/Panels/ImageViewerPanel.test.tsx"
+    ],
+    "key_scenarios": [
+      "isImageFile correctly identifies all supported formats",
+      "isImageFile rejects non-image files",
+      "getNextZoomLevel returns correct stepped values",
+      "calculateFitScale handles various aspect ratios",
+      "calculateCursorCenteredZoom maintains point under cursor",
+      "formatFileSize formats bytes to KB/MB correctly",
+      "ImageViewerPanel renders loading state initially",
+      "ImageViewerPanel displays image after load",
+      "ImageViewerPanel shows error state on load failure",
+      "Zoom buttons increase/decrease scale correctly",
+      "Keyboard shortcuts +/-/0/F work",
+      "Mouse wheel zooms centered on cursor",
+      "Pan via drag updates translation",
+      "Arrow keys pan when zoomed",
+      "Fit button calculates correct scale",
+      "Double-click toggles between fit and 100%",
+      "Full-screen modal opens and closes",
+      "Focus is trapped in full-screen mode",
+      "Escape exits full-screen",
+      "Multiple image tabs have independent state",
+      "Tab closes without save confirmation",
+      "Panel resize recalculates fit scale",
+      "Metadata displays correct dimensions, size, format"
+    ]
+  },
+  "risks": [
+    {
+      "risk": "Large images (>20MB) cause memory issues",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Use native browser image scaling; consider lazy loading or thumbnail generation for very large files"
+    },
+    {
+      "risk": "SVG files with embedded scripts pose security risk",
+      "likelihood": "low",
+      "impact": "high",
+      "mitigation": "Render SVG via <img> tag which prevents script execution; CSP also blocks inline scripts"
+    },
+    {
+      "risk": "file:// protocol blocked by CSP",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Use data: URLs by reading files as base64 in main process"
+    },
+    {
+      "risk": "Animated GIFs cause performance issues",
+      "likelihood": "low",
+      "impact": "low",
+      "mitigation": "Browser handles natively; no special handling needed"
+    }
+  ],
+  "estimates": {
+    "complexity": "medium",
+    "files_affected": 18,
+    "new_files": 10,
+    "test_files": 3
+  },
+  "verification_criteria": [
+    "All supported image formats (PNG, JPG, JPEG, GIF, WebP, SVG, BMP, ICO) open correctly in tabs",
+    "Zoom buttons (+/-) change zoom to next/prev discrete level",
+    "Keyboard shortcuts +/-/0/F trigger zoom in/out/reset/fit",
+    "Mouse wheel zooms centered on cursor position",
+    "Click-drag pans image when zoomed beyond container",
+    "Arrow keys pan image when zoomed",
+    "Fit button scales image to fit container with aspect ratio preserved",
+    "Double-click toggles between fit-to-container and 100%",
+    "Full-screen modal opens with toolbar at bottom",
+    "Escape key closes full-screen modal",
+    "Focus is trapped within full-screen modal",
+    "Metadata displays dimensions, file size, and format correctly",
+    "Loading spinner shows while image loads",
+    "Error message displays for invalid/corrupted images",
+    "Multiple image tabs maintain independent zoom/pan state",
+    "Tab closes without save confirmation dialog",
+    "Panel resize recalculates fit scale automatically",
+    "All tests pass with >80% coverage"
+  ],
+  "design_persisted": {
+    "path": "specs/designs/brs015-image-preview/sd-001-implementation.md",
+    "sequence": 1
+  },
+  "register_with_brs": {
+    "brs_id": 15,
+    "doc_type": "design",
+    "doc_path": "specs/designs/brs015-image-preview/sd-001-implementation.md"
+  }
+}

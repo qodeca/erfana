@@ -111,6 +111,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* L1: min-width ensures consistent button size for zoom percentages (1% to 1000%) */
   min-width: 50px;
   height: var(--input-height-sm);
   padding: 0 var(--space-4);
@@ -230,7 +231,8 @@
 }
 
 .errorMessage {
-  max-width: 400px;
+  /* L2: Use relative units for better scalability with user font preferences */
+  max-width: 25rem;
   text-align: center;
   word-wrap: break-word;
 }

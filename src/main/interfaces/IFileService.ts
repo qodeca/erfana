@@ -47,6 +47,17 @@ export interface IFileService {
   isMarkdownFile(filePath: string): boolean
 
   /**
+   * Check if file is a supported image file
+   */
+  isImageFile(filePath: string): boolean
+
+  /**
+   * Read a file and return it as a base64-encoded data URL.
+   * Used for loading images in the sandboxed renderer.
+   */
+  readFileAsBase64(filePath: string): Promise<string>
+
+  /**
    * Create a new file
    */
   createFile(dirPath: string, fileName: string): Promise<string>

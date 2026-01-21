@@ -11,6 +11,7 @@ import { FolderOpen, ChevronDown, ChevronLeft } from 'lucide-react'
 import { ProjectTree } from '../ProjectTree/ProjectTree'
 import type { FilterMode } from '../../types/filters'
 import { sanitizeFilePath } from '../../utils/fileUtils'
+import { isImageFile } from '../../utils/imageUtils'
 import './ProjectPanel.css'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { logger } from '../../utils/logger'
@@ -70,7 +71,33 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
       return
     }
 
-    const fileName = filePath.split('/').pop() || 'Editor'
+    const fileName = filePath.split('/').pop() || 'File'
+
+    // Check if the file is an image - open in ImageViewerPanel instead of editor
+    if (isImageFile(filePath)) {
+      const panelId = `image-${sanitizeFilePath(filePath)}`
+
+      // Check if panel already exists
+      let imagePanel = dockviewApi.getPanel(panelId)
+
+      if (!imagePanel) {
+        imagePanel = dockviewApi.addPanel({
+          id: panelId,
+          component: 'imageViewer',
+          title: fileName,
+          tabComponent: 'imageTab',
+          params: { filePath, panelId }
+        })
+        // Track opened panel id for later cleanup
+        useProjectStore.getState().registerEditorPanel(panelId)
+      }
+
+      imagePanel.api.setActive()
+      imagePanel.group.focus()
+      return
+    }
+
+    // Default: open as markdown editor
     const panelId = `editor-${sanitizeFilePath(filePath)}`
 
     let editorPanel = dockviewApi.getPanel(panelId)

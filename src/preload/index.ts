@@ -79,6 +79,21 @@ const api = {
       error?: string
     }> => ipcRenderer.invoke('file:validatePath', filePath, projectRoot),
 
+    /**
+     * Read a file as base64-encoded data URL
+     *
+     * Used by ImageViewerPanel to load images in the sandboxed renderer.
+     * Returns a data URL like: data:image/png;base64,iVBORw0KGgo...
+     *
+     * @param filePath - Absolute path to the image file
+     * @returns Data URL string for use in <img src="...">
+     * @throws Error if file doesn't exist, is outside project, or unsupported format
+     *
+     * @see BRS-015 - Image preview viewer specification
+     */
+    readAsBase64: (filePath: string): Promise<string> =>
+      ipcRenderer.invoke('file:readAsBase64', filePath),
+
     // External file drop operations (BRS-012)
     /**
      * Validate an external file for drop into project

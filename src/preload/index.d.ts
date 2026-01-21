@@ -51,6 +51,11 @@ declare global {
           error?: string
         }>
         /**
+         * Read a file as base64-encoded data URL
+         * @see BRS-015 - Image preview viewer specification
+         */
+        readAsBase64: (filePath: string) => Promise<string>
+        /**
          * Validate an external file for drop into project
          * @see BRS-012 - External file drop to project tree
          */

@@ -51,6 +51,7 @@ src/
 8. **Settings Overlay** - Full-screen settings UI accessed via gear icon in activity bar, with focus trapping and keyboard navigation (Escape to close)
 9. **Quit Confirmation** - Prompts before quitting with unsaved changes or active terminal sessions
 10. **Multi-Instance** - Multiple independent instances with file-based project locking, duplicate opens focus existing window
+11. **Image Preview** - Viewer for PNG, JPG, GIF, WebP, SVG, BMP, ICO with zoom, pan, fit controls, keyboard shortcuts (arrow keys, +/-, Home, F for fullscreen), and full-screen mode
 
 ## Documentation
 See `docs/` for details (keep Claude's context focused):
@@ -84,7 +85,6 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 | BRS-009 | Media import with transcription | T4 | draft | `specs/business-reqs/brs009-media-import-transcription/` |
 | BRS-013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/business-reqs/brs013-multi-cli-tool-prompt-optimization/` |
 | BRS-014 | Camera photo capture | T3 | draft | `specs/business-reqs/brs014-camera-capture/` |
-| BRS-015 | Image preview viewer | T3 | draft | `specs/business-reqs/brs015-image-preview/` |
 
 ### Archived BRS (implemented)
 
@@ -96,6 +96,7 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 | BRS-010 | Multiple independent instances | T4 | `specs/business-reqs/archived/brs010-multi-instance/` |
 | BRS-011 | Automated UI testing compatibility | T3 | `specs/business-reqs/archived/brs011-ui-test-compatibility/` |
 | BRS-012 | External file drop to project tree | T3 | `specs/business-reqs/archived/brs012-external-file-drop/` |
+| BRS-015 | Image preview viewer | T3 | `specs/business-reqs/archived/brs015-image-preview/` |
 
 **Registry**: `specs/business-reqs/registry.json`
 

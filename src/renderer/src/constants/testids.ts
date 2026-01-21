@@ -302,6 +302,35 @@ export const TEST_IDS = {
   DIAGRAM_VIEWER_BTN_CHAT: 'diagram-viewer-btn-chat',
 
   // =========================================================================
+  // Image Viewer Panel (12)
+  // =========================================================================
+
+  /** Image viewer panel container */
+  IMAGE_VIEWER_PANEL: 'image-viewer-panel',
+  /** Image viewer content area */
+  IMAGE_VIEWER_CONTENT: 'image-viewer-content',
+  /** Image element */
+  IMAGE_VIEWER_IMAGE: 'image-viewer-image',
+  /** Image viewer toolbar */
+  IMAGE_VIEWER_TOOLBAR: 'image-viewer-toolbar',
+  /** Zoom in button */
+  IMAGE_VIEWER_BTN_ZOOM_IN: 'image-viewer-btn-zoom-in',
+  /** Zoom out button */
+  IMAGE_VIEWER_BTN_ZOOM_OUT: 'image-viewer-btn-zoom-out',
+  /** Zoom level indicator (clickable to reset) */
+  IMAGE_VIEWER_ZOOM_LEVEL: 'image-viewer-zoom-level',
+  /** Fit to view button */
+  IMAGE_VIEWER_BTN_FIT: 'image-viewer-btn-fit',
+  /** Full screen button */
+  IMAGE_VIEWER_BTN_FULLSCREEN: 'image-viewer-btn-fullscreen',
+  /** Close full screen button */
+  IMAGE_VIEWER_BTN_CLOSE: 'image-viewer-btn-close',
+  /** Full screen overlay container */
+  IMAGE_VIEWER_FULLSCREEN: 'image-viewer-fullscreen',
+  /** Full screen content area */
+  IMAGE_VIEWER_FULLSCREEN_CONTENT: 'image-viewer-fullscreen-content',
+
+  // =========================================================================
   // Chat Bubble (15)
   // =========================================================================
 
@@ -368,6 +397,17 @@ export const TEST_IDS = {
   TAB_DIRTY: 'tab-dirty',
   /** Active tab marker - use with getDynamicTestId on active tab */
   TAB_ACTIVE: 'tab-active',
+
+  // =========================================================================
+  // Image Tabs (3)
+  // =========================================================================
+
+  /** Image tab item - use with getDynamicTestId */
+  IMAGE_TAB_ITEM: 'image-tab-item',
+  /** Image tab label text - use with getDynamicTestId */
+  IMAGE_TAB_LABEL: 'image-tab-label',
+  /** Image tab close button - use with getDynamicTestId */
+  IMAGE_TAB_CLOSE: 'image-tab-close',
 
   // =========================================================================
   // Search Bar (8)
