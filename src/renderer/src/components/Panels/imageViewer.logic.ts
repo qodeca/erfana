@@ -313,13 +313,18 @@ export function calculateCursorCenteredZoom(
 ): Transform {
   const { scale, translateX, translateY } = currentTransform
 
+  // Guard against division by zero (defensive, scale should always be >= MIN_SCALE)
+  if (scale <= 0) {
+    return { scale: newScale, translateX, translateY }
+  }
+
   // Calculate cursor position relative to container center
   const containerCenterX = containerRect.left + containerRect.width / 2
   const containerCenterY = containerRect.top + containerRect.height / 2
   const cursorRelX = cursorX - containerCenterX
   const cursorRelY = cursorY - containerCenterY
 
-  // L7: Calculate scale ratio (division is safe: scale is always >= MIN_SCALE due to clamping)
+  // Calculate scale ratio
   const scaleFactor = newScale / scale
 
   // Adjust translation to keep point under cursor stationary

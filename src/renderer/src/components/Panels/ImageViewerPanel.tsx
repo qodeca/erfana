@@ -65,6 +65,36 @@ import styles from './ImageViewerPanel.module.css'
 const FOCUSABLE_SELECTOR =
   'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
 
+/**
+ * Maximum length for displayed filename (for defense-in-depth).
+ */
+const MAX_FILENAME_LENGTH = 255
+
+/**
+ * Sanitize filename for display in alt/aria-label attributes.
+ * Defense-in-depth against path traversal and control characters in filenames.
+ *
+ * @param filePath - The file path to extract and sanitize filename from
+ * @returns Sanitized filename safe for display
+ */
+function sanitizeFileName(filePath: string): string {
+  // Extract filename from path
+  const fileName = filePath.split('/').pop() || 'image'
+
+  // Remove control characters (ASCII 0-31 and 127) and truncate to max length
+  // Using split/filter/join instead of regex to avoid eslint no-control-regex warning
+  const sanitized = fileName
+    .split('')
+    .filter((char) => {
+      const code = char.charCodeAt(0)
+      return code >= 32 && code !== 127
+    })
+    .join('')
+    .slice(0, MAX_FILENAME_LENGTH)
+
+  return sanitized || 'image'
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -135,6 +165,7 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
   // Refs
   // ========================================
 
+  const panelRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const fullScreenContainerRef = useRef<HTMLDivElement>(null)
@@ -150,6 +181,12 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
   useEffect(() => {
     transformRef.current = transform
   }, [transform])
+
+  // Track fullscreen state in ref for handlers that need current value without re-registration
+  const isFullScreenRef = useRef(isFullScreen)
+  useEffect(() => {
+    isFullScreenRef.current = isFullScreen
+  }, [isFullScreen])
 
   // ========================================
   // Derived Values
@@ -229,27 +266,42 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
    * This is called from the img onLoad handler.
    */
   const handleImageLoad = useCallback(() => {
-    if (imageRef.current) {
-      const { naturalWidth, naturalHeight } = imageRef.current
-      setImageSize({ width: naturalWidth, height: naturalHeight })
+    if (!imageRef.current) return
 
-      // Auto-fit on initial load if image is larger than container
-      if (containerRef.current) {
-        const containerRect = containerRef.current.getBoundingClientRect()
-        const fitScale = calculateFitScale(
-          naturalWidth,
-          naturalHeight,
-          containerRect.width,
-          containerRect.height
-        )
+    const { naturalWidth, naturalHeight } = imageRef.current
+    setImageSize({ width: naturalWidth, height: naturalHeight })
 
-        // If image needs to be scaled down to fit, apply fit mode
-        if (fitScale < 1) {
-          setTransform({ scale: fitScale, translateX: 0, translateY: 0 })
-          setIsFitMode(true)
-        }
+    // Auto-fit on initial load if image is larger than container
+    const applyFitIfNeeded = () => {
+      const container = isFullScreenRef.current
+        ? fullScreenContainerRef.current
+        : containerRef.current
+      if (!container) return
+
+      const containerRect = container.getBoundingClientRect()
+
+      // Validate container has been laid out (not 0x0)
+      if (containerRect.width <= 0 || containerRect.height <= 0) {
+        // Container not ready yet, defer to next frame
+        requestAnimationFrame(applyFitIfNeeded)
+        return
+      }
+
+      const fitScale = calculateFitScale(
+        naturalWidth,
+        naturalHeight,
+        containerRect.width,
+        containerRect.height
+      )
+
+      // If image needs to be scaled down to fit, apply fit mode
+      if (fitScale < 1) {
+        setTransform({ scale: fitScale, translateX: 0, translateY: 0 })
+        setIsFitMode(true)
       }
     }
+
+    applyFitIfNeeded()
   }, [])
 
   // ========================================
@@ -302,6 +354,11 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
   // ========================================
 
   const openFullScreen = useCallback(() => {
+    // Verify portal-root exists before entering fullscreen
+    if (!document.getElementById('portal-root')) {
+      logger.error('Cannot enter fullscreen: portal-root element not found')
+      return
+    }
     previousActiveElement.current = document.activeElement
     setIsFullScreen(true)
   }, [])
@@ -340,10 +397,13 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
   // ========================================
 
   useEffect(() => {
-    const container = isFullScreen ? fullScreenContainerRef.current : containerRef.current
-    if (!container) return
-
+    // Single wheel handler that checks current container based on fullscreen state
     const handleWheel = (e: WheelEvent) => {
+      const container = isFullScreenRef.current
+        ? fullScreenContainerRef.current
+        : containerRef.current
+      if (!container || !container.contains(e.target as Node)) return
+
       e.preventDefault()
 
       const containerRect = container.getBoundingClientRect()
@@ -362,9 +422,10 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
       )
     }
 
-    container.addEventListener('wheel', handleWheel, { passive: false })
-    return () => container.removeEventListener('wheel', handleWheel)
-  }, [isFullScreen])
+    // Register once on document, check container inside handler
+    document.addEventListener('wheel', handleWheel, { passive: false, capture: true })
+    return () => document.removeEventListener('wheel', handleWheel, { capture: true })
+  }, [])
 
   // ========================================
   // Mouse Drag Pan
@@ -420,6 +481,13 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
       // Skip if typing in an input
       const target = e.target as HTMLElement
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
+
+      // Scope keyboard shortcuts to the panel - check if focus is within panel or fullscreen overlay
+      const panel = panelRef.current
+      const overlay = fullScreenOverlayRef.current
+      const isPanelFocused = panel?.contains(document.activeElement)
+      const isOverlayFocused = overlay?.contains(document.activeElement)
+      if (!isPanelFocused && !isOverlayFocused) return
 
       const action = getKeyboardAction({
         key: e.key,
@@ -546,23 +614,37 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
     const container = isFullScreen ? fullScreenContainerRef.current : containerRef.current
     if (!container) return
 
-    const observer = new ResizeObserver(() => {
-      const containerRect = container.getBoundingClientRect()
-      const fitScale = calculateFitScale(
-        imageSize.width,
-        imageSize.height,
-        containerRect.width,
-        containerRect.height
-      )
+    let resizeTimeout: ReturnType<typeof setTimeout> | null = null
 
-      setTransform((prev) => ({
-        ...prev,
-        scale: clampScale(fitScale)
-      }))
+    const observer = new ResizeObserver(() => {
+      // Debounce resize updates to prevent jank during continuous resize
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout)
+      }
+
+      resizeTimeout = setTimeout(() => {
+        const containerRect = container.getBoundingClientRect()
+        const fitScale = calculateFitScale(
+          imageSize.width,
+          imageSize.height,
+          containerRect.width,
+          containerRect.height
+        )
+
+        setTransform((prev) => ({
+          ...prev,
+          scale: clampScale(fitScale)
+        }))
+      }, 16) // ~1 frame at 60fps
     })
 
     observer.observe(container)
-    return () => observer.disconnect()
+    return () => {
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout)
+      }
+      observer.disconnect()
+    }
   }, [isFitMode, imageSize, isFullScreen])
 
   // ========================================
@@ -695,7 +777,7 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
     ref: React.RefObject<HTMLDivElement>,
     inFullScreen: boolean = false
   ) => {
-    const fileName = filePath.split('/').pop() || 'image'
+    const fileName = sanitizeFileName(filePath)
 
     return (
       <div
@@ -719,7 +801,7 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
               transform: `translate(${transform.translateX}px, ${transform.translateY}px) scale(${transform.scale})`,
               transformOrigin: 'center center'
             }}
-            onLoad={inFullScreen ? undefined : handleImageLoad}
+            onLoad={handleImageLoad}
             draggable={false}
             data-testid={TEST_IDS.IMAGE_VIEWER_IMAGE}
           />
@@ -779,13 +861,13 @@ export function ImageViewerPanel(props: IDockviewPanelProps<ImageViewerPanelPara
 
   const portalRoot = document.getElementById('portal-root')
 
-  // H4: Validate portal-root exists for fullscreen functionality
-  if (isFullScreen && !portalRoot) {
-    logger.error('portal-root element not found for fullscreen overlay')
-  }
-
   return (
-    <div className={styles.container} data-testid={TEST_IDS.IMAGE_VIEWER_PANEL}>
+    <div
+      ref={panelRef}
+      className={styles.container}
+      data-testid={TEST_IDS.IMAGE_VIEWER_PANEL}
+      tabIndex={0}
+    >
       {/* Toolbar at top */}
       {renderToolbar(false)}
 

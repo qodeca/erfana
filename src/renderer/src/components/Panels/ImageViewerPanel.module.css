@@ -264,7 +264,7 @@
   bottom: 0;
   display: flex;
   flex-direction: column;
-  background: var(--color-overlay-dialog);
+  background: var(--color-bg-primary);
   z-index: var(--z-modal);
   animation: fadeIn var(--transition-normal);
 }
@@ -287,4 +287,23 @@
 .fullScreenOverlay .toolbar {
   background: var(--color-bg-tertiary-translucent);
   border-bottom-color: var(--color-border-subtle);
+}
+
+/* ============================================
+ * Reduced Motion Support
+ * ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .controlButton,
+  .zoomLevel {
+    transition: none;
+  }
+
+  .spinner {
+    animation: none;
+  }
+
+  .fullScreenOverlay {
+    animation: none;
+  }
 }
