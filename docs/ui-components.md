@@ -286,6 +286,31 @@ Terminal is considered "active" when:
 
 ---
 
+## Image Viewer Panel
+
+**Location**: `src/renderer/src/components/Panels/ImageViewerPanel.tsx`
+
+Opens when clicking image files (PNG, JPG, GIF, WebP, SVG, BMP, ICO) in project tree.
+
+**Features**:
+- Zoom controls: buttons, mouse wheel (cursor-centered), keyboard (+/-)
+- Pan via click-drag or arrow keys
+- Fit to view with auto-scale on resize
+- Full-screen mode with portal overlay and focus trap
+- Metadata display: dimensions, file size, format
+- Accessibility: ARIA labels, keyboard navigation, prefers-reduced-motion
+
+**Architecture**:
+- `ImageViewerPanel.tsx` - Main component with state management
+- `imageViewer.logic.ts` - Pure functions for zoom, pan, keyboard actions
+- `imageUtils.ts` - Image format detection, MIME types
+
+**Toolbar**: Zoom -, Zoom level %, Zoom +, Fit, Reset, Fullscreen
+
+📚 **Keyboard shortcuts**: [Keyboard Shortcuts](./keyboard-shortcuts.md#image-viewer)
+
+---
+
 ## Related documentation
 
 - [Architecture](./architecture.md) - Hybrid layout system

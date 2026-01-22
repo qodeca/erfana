@@ -29,7 +29,7 @@ npm run test:e2e     # Playwright E2E tests
 ```
 src/
 ├── main/           # Electron main process
-│   ├── services/   # FileService, TerminalService, ScreenshotService, SettingsService, ProjectSettingsService, GlobalSettingsService, LoggingService, ProjectLockService, ExternalFileService, import/
+│   ├── services/   # FileService, TerminalService, ScreenshotService, CameraService, SettingsService, ProjectSettingsService, GlobalSettingsService, LoggingService, ProjectLockService, ExternalFileService, import/
 │   └── ipc/        # IPC handlers
 ├── preload/        # Context bridge API
 ├── shared/         # Shared code (errors.ts, constants.ts, ipc schemas)
@@ -84,7 +84,6 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 | BRS-008 | Graph engine polish & maintenance | T3 | draft | `specs/business-reqs/brs008-graph-polish/` |
 | BRS-009 | Media import with transcription | T4 | draft | `specs/business-reqs/brs009-media-import-transcription/` |
 | BRS-013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/business-reqs/brs013-multi-cli-tool-prompt-optimization/` |
-| BRS-014 | Camera photo capture | T3 | draft | `specs/business-reqs/brs014-camera-capture/` |
 
 ### Archived BRS (implemented)
 
@@ -96,6 +95,7 @@ Feature specifications live in `specs/business-reqs/`. Check registry before imp
 | BRS-010 | Multiple independent instances | T4 | `specs/business-reqs/archived/brs010-multi-instance/` |
 | BRS-011 | Automated UI testing compatibility | T3 | `specs/business-reqs/archived/brs011-ui-test-compatibility/` |
 | BRS-012 | External file drop to project tree | T3 | `specs/business-reqs/archived/brs012-external-file-drop/` |
+| BRS-014 | Camera photo capture | T3 | `specs/business-reqs/archived/brs014-camera-capture/` |
 | BRS-015 | Image preview viewer | T3 | `specs/business-reqs/archived/brs015-image-preview/` |
 
 **Registry**: `specs/business-reqs/registry.json`

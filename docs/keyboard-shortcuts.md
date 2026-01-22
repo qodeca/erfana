@@ -156,6 +156,24 @@ Note: Clipboard shortcuts use native browser behavior for better undo/redo integ
 **macOS**: `Cmd+M` (Minimize), `Cmd+Q` (Quit), `Cmd+W` (Close), `Cmd+H` (Hide)
 **Windows/Linux**: `Alt+F4` (Close/Quit), `F11` (Fullscreen)
 
+## Image Viewer
+
+When image viewer panel is focused:
+
+| Shortcut | Action |
+|----------|--------|
+| `+` / `=` | Zoom in |
+| `-` | Zoom out |
+| `0` / `Home` | Reset to 100% |
+| `F` | Fit to view |
+| `Arrow Keys` | Pan image |
+| `Esc` | Exit fullscreen |
+| `Double-click` | Toggle between fit and 100% |
+
+**Mouse Controls**:
+- **Scroll wheel**: Zoom (cursor-centered)
+- **Click + Drag**: Pan image
+
 ## DevTools
 
 | Shortcut | Action |
