@@ -66,7 +66,7 @@ See `docs/` for details (keep Claude's context focused):
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
 - [Testing](docs/testing/README.md) — Workspace, coverage
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
-- [Changelog](docs/CHANGELOG.md) — Historical changelog entries (v0.3.x - v0.6.x)
+- [Changelog](docs/CHANGELOG.md) — Version history (v0.3.x onwards)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
 
 ## Business Requirements Specifications (BRS)
