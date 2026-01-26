@@ -56,7 +56,7 @@ export const TEST_IDS = {
   ACTIVITY_BAR_BTN_THEME: 'activity-bar-btn-theme',
 
   // =========================================================================
-  // Project Tree (8)
+  // Project Tree (11)
   // =========================================================================
 
   /** Project tree container */
@@ -71,6 +71,8 @@ export const TEST_IDS = {
   PROJECT_TREE_BTN_NEW_FILE: 'project-tree-btn-new-file',
   /** New folder button */
   PROJECT_TREE_BTN_NEW_FOLDER: 'project-tree-btn-new-folder',
+  /** Refresh project tree button */
+  PROJECT_TREE_BTN_REFRESH: 'project-tree-btn-refresh',
   /** Tree node (file or folder) - use with getDynamicTestId */
   PROJECT_TREE_NODE: 'project-tree-node',
   /** Tree node expand/collapse toggle - use with getDynamicTestId */

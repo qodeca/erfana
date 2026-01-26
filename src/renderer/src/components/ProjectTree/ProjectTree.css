@@ -63,6 +63,11 @@
   cursor: not-allowed;
 }
 
+.icon-btn:focus-visible {
+  outline: var(--border-width) solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
 .icon-btn .spin {
   animation: spin 0.9s linear infinite;
 }
