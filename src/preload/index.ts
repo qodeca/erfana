@@ -756,14 +756,22 @@ const api = {
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
 // just add to the DOM global.
+// Custom electron API with shell.openExternal for external link handling
+const electron = {
+  ...electronAPI,
+  shell: {
+    openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url)
+  }
+}
+
 if (process.contextIsolated) {
   try {
-    contextBridge.exposeInMainWorld('electron', electronAPI)
+    contextBridge.exposeInMainWorld('electron', electron)
     contextBridge.exposeInMainWorld('api', api)
   } catch (error) {
     console.error(error)
   }
 } else {
-  ;(window as unknown as { electron: typeof electronAPI }).electron = electronAPI
+  ;(window as unknown as { electron: typeof electron }).electron = electron
   ;(window as unknown as { api: typeof api }).api = api
 }

@@ -25,7 +25,11 @@ import type {
 
 declare global {
   interface Window {
-    electron: ElectronAPI
+    electron: ElectronAPI & {
+      shell: {
+        openExternal: (url: string) => Promise<void>
+      }
+    }
     api: {
       file: {
         openProject: () => Promise<string | null>
