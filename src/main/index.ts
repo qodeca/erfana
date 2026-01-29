@@ -14,6 +14,8 @@ import { registerGitWatcherHandlers } from './ipc/git-watcher-handlers'
 import { registerPdfHandlers } from './ipc/pdf-handlers'
 import { registerDocxHandlers } from './ipc/docx-handlers'
 import { registerScreenshotHandlers } from './ipc/screenshot-handlers'
+import { registerShellHandlers } from './ipc/shell-handlers'
+import { registerCameraHandlers } from './ipc/camera-handlers'
 import { registerGlobalSettingsHandlers } from './ipc/global-settings-handlers'
 import { registerLoggingHandlers } from './ipc/logging-handlers'
 import { registerQuitHandlers } from './ipc/quit-handlers'
@@ -189,6 +191,8 @@ app.whenReady().then(async () => {
   registerPdfHandlers()
   registerDocxHandlers()
   registerScreenshotHandlers()
+  registerShellHandlers()
+  registerCameraHandlers()
   registerGlobalSettingsHandlers()
   registerLoggingHandlers()
   registerProjectLockHandlers()

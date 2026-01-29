@@ -1,7 +1,7 @@
 {
   "sequence": {
-    "current": 13,
-    "next": 14
+    "current": 15,
+    "next": 16
   },
   "registry": [
     {
@@ -286,11 +286,55 @@
         "designs": [],
         "issues": ["#88"]
       }
+    },
+    {
+      "id": 14,
+      "slug": "camera-capture",
+      "name": "Camera photo capture",
+      "tier": "T3",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Functionality to select computer's camera and take a photo using it. Trigger button in Terminal Panel toolbar.",
+      "created": "2026-01-20T00:00:00.000Z",
+      "path": "brs014-camera-capture",
+      "last_modified": "2026-01-20T16:00:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 29,
+      "documents": {
+        "technical_adrs": [
+          "docs/architecture/adrs/adr-brs014-001-camera-capture.md"
+        ],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": ["#93"]
+      }
+    },
+    {
+      "id": 15,
+      "slug": "image-preview",
+      "name": "Image preview viewer",
+      "tier": "T3",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Open and view images in tabs with zoom, pan, fit controls and full-screen mode",
+      "created": "2026-01-20T18:00:00.000Z",
+      "path": "brs015-image-preview",
+      "last_modified": "2026-01-20T18:32:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 37,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": ["#94"]
+      }
     }
   ],
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-"last_updated": "2026-01-18T18:30:00.000Z"
+    "last_updated": "2026-01-20T18:00:00.000Z"
   }
 }

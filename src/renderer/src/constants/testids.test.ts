@@ -75,16 +75,22 @@ describe('TEST_IDS', () => {
       expect(activityBarIds).toHaveLength(5)
     })
 
-    it('should have 10 Project Tree IDs', async () => {
+    it('should have 11 Project Tree IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const projectTreeIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('PROJECT_TREE'))
-      expect(projectTreeIds).toHaveLength(10)
+      expect(projectTreeIds).toHaveLength(11)
     })
 
-    it('should have 10 Terminal Panel IDs', async () => {
+    it('should have 11 Terminal Panel IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const terminalIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('TERMINAL_'))
-      expect(terminalIds).toHaveLength(10)
+      expect(terminalIds).toHaveLength(11)
+    })
+
+    it('should have 8 Camera Dialog IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const cameraIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('CAMERA_'))
+      expect(cameraIds).toHaveLength(8)
     })
 
     it('should have 15 Chat Bubble IDs', async () => {

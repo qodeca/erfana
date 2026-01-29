@@ -17,3 +17,10 @@ body {
   color: var(--color-text-primary);
   overflow: hidden;
 }
+
+/* Fix: Allow native tooltips on buttons with SVG icons
+ * SVG icons capture hover events, preventing parent button's title tooltip.
+ * pointer-events: none makes hover events pass through to the button. */
+button svg {
+  pointer-events: none;
+}

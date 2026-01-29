@@ -13,6 +13,10 @@ import type {
   GetDisplaysResponse
 } from '../shared/ipc/screenshot-schema'
 import type {
+  CameraSaveRequest,
+  CameraSaveResponse
+} from '../shared/ipc/camera-schema'
+import type {
   ExternalFileValidateResponse,
   ExternalFileCopyResponse,
   ExternalFileMoveResponse,
@@ -74,6 +78,21 @@ const api = {
       isFile?: boolean
       error?: string
     }> => ipcRenderer.invoke('file:validatePath', filePath, projectRoot),
+
+    /**
+     * Read a file as base64-encoded data URL
+     *
+     * Used by ImageViewerPanel to load images in the sandboxed renderer.
+     * Returns a data URL like: data:image/png;base64,iVBORw0KGgo...
+     *
+     * @param filePath - Absolute path to the image file
+     * @returns Data URL string for use in <img src="...">
+     * @throws Error if file doesn't exist, is outside project, or unsupported format
+     *
+     * @see BRS-015 - Image preview viewer specification
+     */
+    readAsBase64: (filePath: string): Promise<string> =>
+      ipcRenderer.invoke('file:readAsBase64', filePath),
 
     // External file drop operations (BRS-012)
     /**
@@ -533,6 +552,23 @@ const api = {
       ipcRenderer.invoke('screenshot:capture', request)
   },
 
+  /**
+   * Camera photo capture operations
+   *
+   * Saves webcam photos captured via MediaDevices API to temp directory.
+   * @see BRS-014 - Camera photo capture specification
+   */
+  camera: {
+    /**
+     * Save a captured photo to temp file
+     *
+     * @param request - { dataUrl: string, timestamp?: number }
+     * @returns Save result with file path or error
+     */
+    save: (request: CameraSaveRequest): Promise<CameraSaveResponse> =>
+      ipcRenderer.invoke('camera:save', request)
+  },
+
   // Global settings operations
   globalSettings: {
     /**
@@ -720,14 +756,22 @@ const api = {
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
 // just add to the DOM global.
+// Custom electron API with shell.openExternal for external link handling
+const electron = {
+  ...electronAPI,
+  shell: {
+    openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:openExternal', url)
+  }
+}
+
 if (process.contextIsolated) {
   try {
-    contextBridge.exposeInMainWorld('electron', electronAPI)
+    contextBridge.exposeInMainWorld('electron', electron)
     contextBridge.exposeInMainWorld('api', api)
   } catch (error) {
     console.error(error)
   }
 } else {
-  ;(window as unknown as { electron: typeof electronAPI }).electron = electronAPI
+  ;(window as unknown as { electron: typeof electron }).electron = electron
   ;(window as unknown as { api: typeof api }).api = api
 }

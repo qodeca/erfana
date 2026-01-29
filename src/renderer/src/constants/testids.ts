@@ -56,7 +56,7 @@ export const TEST_IDS = {
   ACTIVITY_BAR_BTN_THEME: 'activity-bar-btn-theme',
 
   // =========================================================================
-  // Project Tree (8)
+  // Project Tree (11)
   // =========================================================================
 
   /** Project tree container */
@@ -71,6 +71,8 @@ export const TEST_IDS = {
   PROJECT_TREE_BTN_NEW_FILE: 'project-tree-btn-new-file',
   /** New folder button */
   PROJECT_TREE_BTN_NEW_FOLDER: 'project-tree-btn-new-folder',
+  /** Refresh project tree button */
+  PROJECT_TREE_BTN_REFRESH: 'project-tree-btn-refresh',
   /** Tree node (file or folder) - use with getDynamicTestId */
   PROJECT_TREE_NODE: 'project-tree-node',
   /** Tree node expand/collapse toggle - use with getDynamicTestId */
@@ -94,7 +96,7 @@ export const TEST_IDS = {
   GIT_SYNC_INDICATOR: 'git-sync-indicator',
 
   // =========================================================================
-  // Terminal Panel (10)
+  // Terminal Panel (11)
   // =========================================================================
 
   /** Terminal panel container */
@@ -117,6 +119,8 @@ export const TEST_IDS = {
   TERMINAL_BTN_CAPTURE_WINDOW: 'terminal-btn-capture-window',
   /** Capture area screenshot button (macOS only) */
   TERMINAL_BTN_CAPTURE_AREA: 'terminal-btn-capture-area',
+  /** Capture camera photo button (cross-platform) */
+  TERMINAL_BTN_CAMERA: 'terminal-btn-camera',
 
   // =========================================================================
   // Editor Content Layout (5)
@@ -132,6 +136,27 @@ export const TEST_IDS = {
   EDITOR_MONACO: 'editor-monaco',
   /** Markdown preview container */
   EDITOR_PREVIEW: 'editor-preview',
+
+  // =========================================================================
+  // Camera Dialog (8)
+  // =========================================================================
+
+  /** Camera dialog container */
+  CAMERA_DIALOG: 'camera-dialog',
+  /** Camera device selector dropdown */
+  CAMERA_DEVICE_SELECT: 'camera-device-select',
+  /** Camera video preview element */
+  CAMERA_PREVIEW: 'camera-preview',
+  /** Capture photo button */
+  CAMERA_BTN_CAPTURE: 'camera-btn-capture',
+  /** Cancel button in camera dialog */
+  CAMERA_BTN_CANCEL: 'camera-btn-cancel',
+  /** Refresh devices button (shown when error) */
+  CAMERA_BTN_REFRESH: 'camera-btn-refresh',
+  /** Camera error message area */
+  CAMERA_ERROR: 'camera-error',
+  /** Shutter animation overlay */
+  CAMERA_SHUTTER: 'camera-shutter',
 
   // =========================================================================
   // Dialogs - Base (3)
@@ -279,6 +304,35 @@ export const TEST_IDS = {
   DIAGRAM_VIEWER_BTN_CHAT: 'diagram-viewer-btn-chat',
 
   // =========================================================================
+  // Image Viewer Panel (12)
+  // =========================================================================
+
+  /** Image viewer panel container */
+  IMAGE_VIEWER_PANEL: 'image-viewer-panel',
+  /** Image viewer content area */
+  IMAGE_VIEWER_CONTENT: 'image-viewer-content',
+  /** Image element */
+  IMAGE_VIEWER_IMAGE: 'image-viewer-image',
+  /** Image viewer toolbar */
+  IMAGE_VIEWER_TOOLBAR: 'image-viewer-toolbar',
+  /** Zoom in button */
+  IMAGE_VIEWER_BTN_ZOOM_IN: 'image-viewer-btn-zoom-in',
+  /** Zoom out button */
+  IMAGE_VIEWER_BTN_ZOOM_OUT: 'image-viewer-btn-zoom-out',
+  /** Zoom level indicator (clickable to reset) */
+  IMAGE_VIEWER_ZOOM_LEVEL: 'image-viewer-zoom-level',
+  /** Fit to view button */
+  IMAGE_VIEWER_BTN_FIT: 'image-viewer-btn-fit',
+  /** Full screen button */
+  IMAGE_VIEWER_BTN_FULLSCREEN: 'image-viewer-btn-fullscreen',
+  /** Close full screen button */
+  IMAGE_VIEWER_BTN_CLOSE: 'image-viewer-btn-close',
+  /** Full screen overlay container */
+  IMAGE_VIEWER_FULLSCREEN: 'image-viewer-fullscreen',
+  /** Full screen content area */
+  IMAGE_VIEWER_FULLSCREEN_CONTENT: 'image-viewer-fullscreen-content',
+
+  // =========================================================================
   // Chat Bubble (15)
   // =========================================================================
 
@@ -345,6 +399,17 @@ export const TEST_IDS = {
   TAB_DIRTY: 'tab-dirty',
   /** Active tab marker - use with getDynamicTestId on active tab */
   TAB_ACTIVE: 'tab-active',
+
+  // =========================================================================
+  // Image Tabs (3)
+  // =========================================================================
+
+  /** Image tab item - use with getDynamicTestId */
+  IMAGE_TAB_ITEM: 'image-tab-item',
+  /** Image tab label text - use with getDynamicTestId */
+  IMAGE_TAB_LABEL: 'image-tab-label',
+  /** Image tab close button - use with getDynamicTestId */
+  IMAGE_TAB_CLOSE: 'image-tab-close',
 
   // =========================================================================
   // Search Bar (8)

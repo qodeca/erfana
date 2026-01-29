@@ -2,15 +2,54 @@
 
 Historical changelog entries for versions prior to current. For the latest changes, see [CLAUDE.md](../CLAUDE.md).
 
-## [0.7.0] - 2026-01-18
+## [0.7.0] - 2026-01-22
+
+### Added
+- **Image Preview Viewer** (BRS-015): Full-featured image viewer panel for PNG, JPG, GIF, WebP, SVG, BMP, ICO files (#94)
+  - Zoom controls: buttons, mouse wheel (cursor-centered), keyboard (+/-, 0, Home)
+  - Pan via click-drag or arrow keys
+  - Fit to view with auto-scale on window resize
+  - Full-screen mode with portal overlay and focus trap
+  - Metadata display: dimensions, file size, format
+  - Accessibility: ARIA labels, keyboard navigation, prefers-reduced-motion support
+  - Architecture: ImageViewerPanel.tsx, imageViewer.logic.ts, imageUtils.ts
+  - 691 logic tests
+- **Camera Photo Capture** (BRS-014): Webcam capture from terminal toolbar (#93)
+  - Cross-platform support (macOS, Windows, Linux)
+  - Real-time camera preview with device selection
+  - Captured photos saved to OS temp directory with timestamp
+  - File path pasted to terminal for immediate use
+  - CameraService backend with proper device enumeration
+  - CameraDialog with preview and capture controls
+  - useCameraCapture hook for terminal integration
+
+### Fixed
+- **Image viewer bug fixes** (code review findings):
+  - Critical: Fixed wheel event listener memory leak when switching images
+  - Major: Fixed race condition on initial fit calculation using requestAnimationFrame
+  - Major: Scoped keyboard handlers to panel container (prevents conflicts with terminal/editor)
+  - Major: Always call onLoad handler in fullscreen mode
+  - Major: Added filename sanitization for defense-in-depth XSS protection
+  - Medium: Handle portal-root missing gracefully
+  - Minor: Added prefers-reduced-motion CSS for accessibility
+  - Minor: Added division by zero guard in calculateCursorCenteredZoom
+  - Minor: Added debouncing to ResizeObserver callback
+- **Native tooltips on SVG icon buttons**: Buttons with SVG children now show native browser tooltips via title attribute
 
 ### Changed
 - Version bump to 0.7.0 (milestone release)
+- **Prompt templates**: Modify templates explicitly request file edits for clearer AI instructions
 
 ### Documentation
+- Archive BRS-015 (image preview viewer implemented)
+- Archive BRS-014 (camera capture implemented)
 - Archive BRS-012 (external file drop feature implemented)
+- Add CameraService to api-services.md
+- Add camera-capture IPC channels documentation
 - Add ExternalFileService to api-services.md
 - Add external-file IPC channels documentation
+- Add Image Viewer section to keyboard-shortcuts.md
+- Add Image Viewer Panel section to ui-components.md
 
 ## [0.6.5-gamma] - 2026-01-18
 

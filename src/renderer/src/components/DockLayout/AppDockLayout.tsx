@@ -13,9 +13,10 @@ import 'dockview/dist/styles/dockview.css'
 import './AppDockLayout.css'
 import { ProjectPanel } from '../Panels/ProjectPanel'
 import { MarkdownEditorPanel } from '../Panels/MarkdownEditorPanel'
+import { ImageViewerPanel } from '../Panels/ImageViewerPanel'
 import { WelcomePanel } from '../Panels/WelcomePanel'
 import { WelcomeTab } from '../Panels/WelcomeTab'
-import { EditorTab } from '../Tabs'
+import { EditorTab, ImageTab } from '../Tabs'
 // Copilot panel removed
 import { TerminalPanel } from '../Panels/TerminalPanel'
 import { ActivityBar } from '../ActivityBar/ActivityBar'
@@ -76,6 +77,7 @@ const EditorAreaSplitPanel = (props: ISplitviewPanelProps) => {
   // Dockview components registry for editor area
   const editorComponents = {
     editor: MarkdownEditorPanel,
+    imageViewer: ImageViewerPanel,
     welcome: WelcomePanel
   }
 
@@ -83,7 +85,7 @@ const EditorAreaSplitPanel = (props: ISplitviewPanelProps) => {
     <div style={{ width: '100%', height: '100%' }}>
       <DockviewReact
         components={editorComponents}
-        tabComponents={{ welcomeTab: WelcomeTab, editorTab: EditorTab }}
+        tabComponents={{ welcomeTab: WelcomeTab, editorTab: EditorTab, imageTab: ImageTab }}
         onReady={onEditorReady}
         className="dockview-theme-dark"
       />

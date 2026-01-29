@@ -28,6 +28,21 @@ Project panel displays hierarchical file tree with filtering, visual indicators,
 **ProjectPanel**: Header, control panel visibility, filter mode state & persistence
 **ProjectTree**: Tree rendering, expansion/collapse, context menu, file opening, recursive filtering
 
+## Toolbar
+
+### Refresh Button
+
+Manual refresh button in the toolbar (rightmost position) triggers both tree content and git status refresh in parallel.
+
+**Keyboard Shortcut**: Cmd+Alt+R (macOS) / Ctrl+Alt+R (Windows/Linux)
+**Visual Feedback**: Icon spins during refresh (CSS animation)
+**Accessibility**: Tooltip with shortcut, ARIA label, focus state
+
+**Use Cases**:
+- Force refresh after external file changes
+- Sync git status after operations in external tools
+- Verify file system state
+
 ## Control Panel
 
 Collapsible panel with chevron toggle (common pattern across panels).
@@ -303,6 +318,7 @@ See: [UI Components](./ui-components.md#panel-communication-pattern)
 **Arrow Keys**: Navigate nodes
 **Enter**: Open file
 **Space**: Expand/collapse folder
+**Cmd/Ctrl+Alt+R**: Refresh tree and git status
 **Right-Click**: Context menu
 **Accessibility**: ARIA labels, roles, focus indicators
 

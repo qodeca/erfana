@@ -1,5 +1,6 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
 import { stat } from 'fs/promises'
+import path from 'path'
 import { ProjectService } from '../services/ProjectService'
 import { fileService } from '../services/FileService'
 import { fileWatcherService } from '../services/FileWatcherService'
@@ -397,6 +398,35 @@ export function registerFileHandlers(): void {
       return hasConflict
     } catch (error) {
       logger.error('Error checking conflict', error instanceof Error ? error : undefined)
+      throw error
+    }
+  })
+
+  // Read file as base64 data URL (for image preview)
+  // Used by ImageViewerPanel to load images in sandboxed renderer
+  ipcMain.handle('file:readAsBase64', async (_event, filePath: string) => {
+    try {
+      // Validate input
+      if (!filePath || typeof filePath !== 'string') {
+        throw new Error('Invalid file path')
+      }
+
+      // Security check: require a project to be open and file within project boundaries
+      const projectPath = fileService.getProjectPath()
+      if (!projectPath) {
+        throw new Error('No project is open')
+      }
+
+      // Normalize paths to prevent path traversal attacks (e.g., "../../../etc/passwd")
+      const resolvedFilePath = path.resolve(filePath)
+      const resolvedProjectPath = path.resolve(projectPath)
+      if (!resolvedFilePath.startsWith(resolvedProjectPath + path.sep)) {
+        throw new Error('Cannot read files outside the project directory')
+      }
+
+      return await fileService.readFileAsBase64(filePath)
+    } catch (error) {
+      logger.error('Error reading file as base64', error instanceof Error ? error : undefined)
       throw error
     }
   })

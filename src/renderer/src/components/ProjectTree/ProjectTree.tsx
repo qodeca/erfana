@@ -97,6 +97,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     getFileStatus,
     getFolderStatus,
     refresh: refreshGitStatus,
+    isRefreshing,
   } = useGitStatus({ projectPath })
 
   // File operation handlers via hook (only toolbar actions; context menu uses commands)
@@ -136,6 +137,17 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
 
   // Import hook (for context menu and external drop)
   const { importFile, processFiles } = useImport()
+
+  // Manual refresh handler - refreshes both file tree and git status
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([
+      refreshFiles(),
+      refreshGitStatus()
+    ])
+  }, [refreshFiles, refreshGitStatus])
+
+  // Combined loading state for refresh operations
+  const isAnyRefreshing = loading || isRefreshing
 
   // Context menu factory (Strategy + Command pattern)
   const contextMenuFactory = useMemo(() => new ContextMenuFactory(), [])
@@ -1130,6 +1142,30 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedFolder, enhancedFlattenedItems, handleImportShortcut])
 
+  // Keyboard shortcut for manual refresh (Cmd/Ctrl+Alt+R)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeElement = document.activeElement as HTMLElement
+      if (
+        activeElement?.tagName === 'INPUT' ||
+        activeElement?.tagName === 'TEXTAREA' ||
+        activeElement?.contentEditable === 'true'
+      ) {
+        return
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.altKey && e.key.toLowerCase() === 'r') {
+        if (projectPath && !isAnyRefreshing) {
+          e.preventDefault()
+          handleRefresh()
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [projectPath, isAnyRefreshing, handleRefresh])
+
   /**
    * Helper: Build MenuContext for context menu factory
    * Provides all dependencies needed by command execution
@@ -1239,6 +1275,16 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
                 data-testid={TEST_IDS.PROJECT_TREE_BTN_NEW_FOLDER}
               >
                 <FolderPlus size={14} strokeWidth={2} />
+              </button>
+              <button
+                className="icon-btn"
+                onClick={handleRefresh}
+                disabled={isAnyRefreshing}
+                title="Refresh (Cmd/Ctrl+Alt+R)"
+                aria-label="Refresh project tree and git status"
+                data-testid={TEST_IDS.PROJECT_TREE_BTN_REFRESH}
+              >
+                <RotateCw size={14} strokeWidth={2} className={isAnyRefreshing ? 'spin' : ''} />
               </button>
             </>
           )}

@@ -1,0 +1,114 @@
+{
+  "id": "BRS-014",
+  "name": "Camera photo capture",
+  "slug": "camera-capture",
+  "tier": "T3",
+  "status": "draft",
+  "version": "1.0.0",
+  "created": "2026-01-20T12:00:00Z",
+  "updated": "2026-01-20T14:30:00Z",
+  "sections": [
+    { "id": "01", "file": "01-overview.md", "title": "Overview", "word_count": 494 },
+    { "id": "02", "file": "02-requirements.md", "title": "Requirements", "word_count": 1139 },
+    { "id": "03", "file": "03-acceptance.md", "title": "Acceptance", "word_count": 1435 }
+  ],
+  "requirement_sequences": {
+    "FR": 11,
+    "NFR": 3,
+    "AC": 15
+  },
+  "statistics": {
+    "total_sections": 3,
+    "total_words": 3068,
+    "total_requirements": 29
+  },
+  "requirements_index": [
+    { "id": "FR-001", "section": "02-requirements", "title": "Toolbar button", "status": "active" },
+    { "id": "FR-002", "section": "02-requirements", "title": "Camera dialog", "status": "active" },
+    { "id": "FR-003", "section": "02-requirements", "title": "Device enumeration", "status": "active" },
+    { "id": "FR-004", "section": "02-requirements", "title": "Live preview", "status": "active" },
+    { "id": "FR-005", "section": "02-requirements", "title": "Photo capture", "status": "active" },
+    { "id": "FR-006", "section": "02-requirements", "title": "File saving", "status": "active" },
+    { "id": "FR-007", "section": "02-requirements", "title": "Path insertion", "status": "active" },
+    { "id": "FR-008", "section": "02-requirements", "title": "Permission handling", "status": "active" },
+    { "id": "FR-009", "section": "02-requirements", "title": "No camera available handling", "status": "active" },
+    { "id": "FR-010", "section": "02-requirements", "title": "Device disconnection handling", "status": "active" },
+    { "id": "FR-011", "section": "02-requirements", "title": "Keyboard accessibility", "status": "active" },
+    { "id": "NFR-001", "section": "02-requirements", "title": "Cross-platform support", "status": "active" },
+    { "id": "NFR-002", "section": "02-requirements", "title": "Performance", "status": "active" },
+    { "id": "NFR-003", "section": "02-requirements", "title": "Resolution", "status": "active" },
+    { "id": "AC-001", "section": "03-acceptance", "title": "Toolbar button visibility and interaction", "status": "active" },
+    { "id": "AC-002", "section": "03-acceptance", "title": "Camera dialog structure", "status": "active" },
+    { "id": "AC-003", "section": "03-acceptance", "title": "Device enumeration", "status": "active" },
+    { "id": "AC-004", "section": "03-acceptance", "title": "Live preview functionality", "status": "active" },
+    { "id": "AC-005", "section": "03-acceptance", "title": "Photo capture execution", "status": "active" },
+    { "id": "AC-006", "section": "03-acceptance", "title": "File saving", "status": "active" },
+    { "id": "AC-007", "section": "03-acceptance", "title": "Terminal path insertion", "status": "active" },
+    { "id": "AC-008", "section": "03-acceptance", "title": "Permission handling", "status": "active" },
+    { "id": "AC-009", "section": "03-acceptance", "title": "Cross-platform compatibility", "status": "active" },
+    { "id": "AC-010", "section": "03-acceptance", "title": "Performance benchmarks", "status": "active" },
+    { "id": "AC-011", "section": "03-acceptance", "title": "Resolution handling", "status": "active" },
+    { "id": "AC-012", "section": "03-acceptance", "title": "No camera available", "status": "active" },
+    { "id": "AC-013", "section": "03-acceptance", "title": "Permission denied recovery", "status": "active" },
+    { "id": "AC-014", "section": "03-acceptance", "title": "Keyboard accessibility", "status": "active" },
+    { "id": "AC-015", "section": "03-acceptance", "title": "Camera hot-plug handling", "status": "active" }
+  ],
+  "validation": {
+    "overall_score": null,
+    "passed": false,
+    "last_validated": null,
+    "threshold": 50
+  },
+  "change_history": [
+    {
+      "date": "2026-01-20T12:00:00Z",
+      "operation": "INIT",
+      "target": "manifest",
+      "description": "BRS created as T3 Lite with 3 sections",
+      "by": "user"
+    },
+    {
+      "date": "2026-01-20T12:15:00Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed statistics and rebuilt requirements_index",
+      "by": "system",
+      "details": {
+        "word_count_updated": false,
+        "indexes_rebuilt": true,
+        "sections_synced": true,
+        "orphans_cleaned": 0,
+        "registry_synced": true,
+        "changes": [
+          "Added 11 AC entries to requirements_index",
+          "Updated statistics.total_requirements from 11 to 22"
+        ]
+      }
+    },
+    {
+      "date": "2026-01-20T14:30:00Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed statistics after major content update",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": true,
+        "sections_synced": true,
+        "orphans_cleaned": 0,
+        "registry_synced": true,
+        "changes": [
+          "Updated 01-overview.md word_count: 387 -> 494",
+          "Updated 02-requirements.md word_count: 747 -> 1139",
+          "Updated 03-acceptance.md word_count: 953 -> 1435",
+          "Updated statistics.total_words: 2087 -> 3068",
+          "Added FR-009, FR-010, FR-011 to requirements_index",
+          "Added AC-012, AC-013, AC-014, AC-015 to requirements_index",
+          "Updated requirement_sequences.FR: 8 -> 11",
+          "Updated requirement_sequences.AC: 11 -> 15",
+          "Updated statistics.total_requirements: 22 -> 29"
+        ]
+      }
+    }
+  ]
+}

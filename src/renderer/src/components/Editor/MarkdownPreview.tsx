@@ -420,7 +420,6 @@ function createMarkdownComponents(
       // External URLs open in browser/system
       if (isExternal) {
         try {
-          // @ts-expect-error - shell is available but not typed in ElectronAPI
           await window.electron.shell.openExternal(href)
         } catch (error) {
           logger.error('Failed to open external link', error instanceof Error ? error : undefined, { href })

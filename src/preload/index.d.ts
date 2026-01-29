@@ -13,6 +13,10 @@ import type {
   GetDisplaysResponse
 } from '../shared/ipc/screenshot-schema'
 import type {
+  CameraSaveRequest,
+  CameraSaveResponse
+} from '../shared/ipc/camera-schema'
+import type {
   ExternalFileValidateResponse,
   ExternalFileCopyResponse,
   ExternalFileMoveResponse,
@@ -21,7 +25,11 @@ import type {
 
 declare global {
   interface Window {
-    electron: ElectronAPI
+    electron: ElectronAPI & {
+      shell: {
+        openExternal: (url: string) => Promise<void>
+      }
+    }
     api: {
       file: {
         openProject: () => Promise<string | null>
@@ -46,6 +54,11 @@ declare global {
           isFile?: boolean
           error?: string
         }>
+        /**
+         * Read a file as base64-encoded data URL
+         * @see BRS-015 - Image preview viewer specification
+         */
+        readAsBase64: (filePath: string) => Promise<string>
         /**
          * Validate an external file for drop into project
          * @see BRS-012 - External file drop to project tree
@@ -225,6 +238,14 @@ declare global {
         getDisplays: () => Promise<GetDisplaysResponse>
         /** Capture a screenshot */
         capture: (request: ScreenshotCaptureRequest) => Promise<ScreenshotCaptureResponse>
+      }
+      /**
+       * Camera photo capture operations
+       * @see BRS-014 - Camera photo capture specification
+       */
+      camera: {
+        /** Save a captured photo to temp file */
+        save: (request: CameraSaveRequest) => Promise<CameraSaveResponse>
       }
       globalSettings: {
         get: () => Promise<{ success: boolean; settings?: GlobalSettings; error?: string }>
