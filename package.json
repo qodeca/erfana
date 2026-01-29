@@ -1,6 +1,6 @@
 {
   "name": "erfana",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Project IDE with Markdown, Project Tree, and Terminal",
   "main": "./out/main/index.js",
   "author": "Marcin Obel",
