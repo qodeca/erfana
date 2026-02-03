@@ -89,12 +89,12 @@ const api = {
      * @returns Data URL string for use in <img src="...">
      * @throws Error if file doesn't exist, is outside project, or unsupported format
      *
-     * @see BRS-015 - Image preview viewer specification
+     * @see Spec #015 - Image preview viewer specification
      */
     readAsBase64: (filePath: string): Promise<string> =>
       ipcRenderer.invoke('file:readAsBase64', filePath),
 
-    // External file drop operations (BRS-012)
+    // External file drop operations (Spec #012)
     /**
      * Validate an external file for drop into project
      *
@@ -556,7 +556,7 @@ const api = {
    * Camera photo capture operations
    *
    * Saves webcam photos captured via MediaDevices API to temp directory.
-   * @see BRS-014 - Camera photo capture specification
+   * @see Spec #014 - Camera photo capture specification
    */
   camera: {
     /**
@@ -650,7 +650,7 @@ const api = {
    * Uses file-based locking with focus request support.
    *
    * @see Issue #27 - Multiple independent instances
-   * @see BRS-010 - Multi-instance support specification
+   * @see Spec #010 - Multi-instance support specification
    */
   projectLock: {
     /**

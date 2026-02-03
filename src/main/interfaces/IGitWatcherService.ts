@@ -6,7 +6,7 @@
  * the minimal API needed by consumers (like GitPollingService).
  *
  * @see GitWatcherService for implementation
- * @see BRS-003 - Real-time git status refresh specification
+ * @see Spec #003 - Real-time git status refresh specification
  */
 export interface IGitWatcherService {
   /**

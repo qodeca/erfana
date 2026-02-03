@@ -4,7 +4,7 @@
  * Tests the camera dialog UI including rendering, keyboard navigation,
  * device selection, and photo capture flow.
  *
- * @see BRS-014 - Camera photo capture specification
+ * @see Spec #014 - Camera photo capture specification
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'

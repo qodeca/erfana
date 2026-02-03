@@ -13,7 +13,7 @@ import { logger } from '../services/LoggingService'
  * Channels:
  * - camera:save - Save captured photo to temp file
  *
- * @see BRS-014 - camera photo capture specification
+ * @see Spec #014 - camera photo capture specification
  */
 export function registerCameraHandlers(): void {
   /**

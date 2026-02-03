@@ -4,7 +4,7 @@ import { isAbsolute } from 'path'
 /**
  * External File Drop IPC Schema
  *
- * Defines Zod schemas for external file drop operations (BRS-012):
+ * Defines Zod schemas for external file drop operations (Spec #012):
  * - Validation of external files before copy/move
  * - Copy from external location into project
  * - Move from external location into project

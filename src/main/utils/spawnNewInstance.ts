@@ -4,7 +4,7 @@
  * Provides platform-specific logic for spawning new independent Erfana instances.
  * Used to allow multiple Erfana windows to run simultaneously with separate processes.
  *
- * @see BRS-010 - Multi-instance support specification
+ * @see Spec #010 - Multi-instance support specification
  *
  * @example
  * ```typescript

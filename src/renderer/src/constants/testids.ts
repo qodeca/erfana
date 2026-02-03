@@ -5,7 +5,7 @@
  * These constants ensure consistent, compile-time checked testid usage
  * across the entire application.
  *
- * @see BRS-011 - Automated UI testing compatibility
+ * @see Spec #011 - Automated UI testing compatibility
  * @see docs/testing/e2e-testing.md - Testing documentation
  *
  * @example Static testid usage

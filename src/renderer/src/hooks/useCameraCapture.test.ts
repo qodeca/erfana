@@ -4,7 +4,7 @@
  * Tests the camera capture functionality including device enumeration,
  * stream management, permission states, and photo capture.
  *
- * @see BRS-014 - Camera photo capture specification
+ * @see Spec #014 - Camera photo capture specification
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'

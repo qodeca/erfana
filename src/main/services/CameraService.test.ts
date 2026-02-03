@@ -4,7 +4,7 @@
  * Tests camera photo save functionality including file writing,
  * filename generation, validation, and error handling.
  *
- * @see BRS-014 - Camera photo capture specification
+ * @see Spec #014 - Camera photo capture specification
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'

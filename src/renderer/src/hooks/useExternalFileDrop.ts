@@ -5,7 +5,7 @@
  * into the project tree. Provides detection, validation, visual feedback, and file extraction.
  *
  * @module useExternalFileDrop
- * @see BRS-012 External File Drop to Project Tree
+ * @see Spec #012 External File Drop to Project Tree
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react'

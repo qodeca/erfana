@@ -76,7 +76,7 @@ interface ProjectTreeNodeProps {
   gitStatus?: GitDisplayStatus
   getFileStatus?: (path: string) => GitDisplayStatus | undefined
   getFolderStatus?: (path: string) => GitDisplayStatus | undefined
-  // External file drop props (BRS-012)
+  // External file drop props (Spec #012)
   /** Whether an external drag is currently active over the project tree */
   isExternalDragActive?: boolean
   /** Path of the folder being hovered during external drag */
@@ -186,7 +186,7 @@ export function ProjectTreeNode({
   // Show drop target highlight if: 1) something is being dragged over this node, 2) it's a valid drop target (folder)
   const showDropHighlight = isOver && node.type === 'directory' && !actuallyDragging
 
-  // External drop target: this folder is being hovered during external drag (BRS-012)
+  // External drop target: this folder is being hovered during external drag (Spec #012)
   const isExternalDropTargetNode = externalDropTarget === node.path && node.type === 'directory'
   // External drag hover: file being hovered during external drag (invalid target)
   const isExternalDragHover = isExternalDragActive && node.type !== 'directory'

@@ -4,7 +4,7 @@
  * Defines Zod schemas and TypeScript types for camera capture IPC.
  * Used by both main process (CameraService) and renderer (TerminalPanel).
  *
- * @see BRS-014 - Camera photo capture specification
+ * @see Spec #014 - Camera photo capture specification
  */
 
 import { z } from 'zod'

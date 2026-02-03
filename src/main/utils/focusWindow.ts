@@ -5,7 +5,7 @@
  * Used by ProjectLockService to focus existing instance when duplicate open attempted.
  *
  * @see ProjectLockService.ts - uses focusWindow for focus requests
- * @see BRS-010 - Multi-instance support specification
+ * @see Spec #010 - Multi-instance support specification
  */
 import { BrowserWindow, app } from 'electron'
 

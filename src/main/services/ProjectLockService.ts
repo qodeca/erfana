@@ -18,7 +18,7 @@
  * - Uses focusWindow for platform-adaptive focusing
  *
  * @see IProjectLockService for interface definition
- * @see BRS-010 - Multi-instance support specification
+ * @see Spec #010 - Multi-instance support specification
  * @see Issue #27 - Multiple independent instances
  */
 

@@ -16,7 +16,7 @@
  * - Keyboard accessible
  *
  * @module ImageTab
- * @see BRS-015 - Image preview viewer specification
+ * @see Spec #015 - Image preview viewer specification
  * @see EditorTab for editor panel tab implementation
  */
 

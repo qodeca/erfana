@@ -68,7 +68,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // Multi-monitor display selection state (issue #86 enhancement)
   const [displays, setDisplays] = useState<DisplayInfo[]>([])
   const [showScreenSelectDialog, setShowScreenSelectDialog] = useState(false)
-  // Camera capture state (BRS-014)
+  // Camera capture state (Spec #014)
   const [isCameraDialogOpen, setIsCameraDialogOpen] = useState(false)
 
   // Cleanup helper for drag handlers (issue #85 - DRY principle)
@@ -966,7 +966,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   }, [])
 
   /**
-   * Handle camera photo capture result (BRS-014)
+   * Handle camera photo capture result (Spec #014)
    *
    * Receives the file path from CameraDialog and inserts it into the terminal.
    * Closes the dialog and focuses the terminal for immediate use.
@@ -1184,7 +1184,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                     </button>
                   </>
                 )}
-                {/* Camera photo capture button (BRS-014) - cross-platform */}
+                {/* Camera photo capture button (Spec #014) - cross-platform */}
                 <button
                   className="icon-btn"
                   onClick={() => setIsCameraDialogOpen(true)}
@@ -1279,7 +1279,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         )}
         {/* File picker dialog for smart path resolution disambiguation */}
         <FilePickerDialog {...pickerProps} />
-        {/* Camera dialog for photo capture (BRS-014) */}
+        {/* Camera dialog for photo capture (Spec #014) */}
         <CameraDialog
           isOpen={isCameraDialogOpen}
           onClose={() => {

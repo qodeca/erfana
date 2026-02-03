@@ -2,7 +2,7 @@
  * External File Handlers Tests
  *
  * Tests for IPC handlers that expose external file drop functionality to renderer.
- * Covers BRS-012: External File Drop to Project Tree
+ * Covers Spec #012: External File Drop to Project Tree
  *
  * Test coverage:
  * - file:validateExternal - validation handler

@@ -21,7 +21,7 @@ export interface ExternalFileSelection {
 /**
  * Register external file drop IPC handlers
  *
- * Handles BRS-012: External file drop to project tree
+ * Handles Spec #012: External file drop to project tree
  *
  * Channels:
  * - file:validateExternal - Validate external file for drop

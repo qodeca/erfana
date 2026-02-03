@@ -80,7 +80,7 @@ export enum ErrorCode {
   SCREENSHOT_FAILED = 'SCREENSHOT_FAILED',
   SCREENSHOT_NOT_SUPPORTED = 'SCREENSHOT_NOT_SUPPORTED',
 
-  // Camera capture errors (BRS-014)
+  // Camera capture errors (Spec #014)
   CAMERA_PERMISSION_DENIED = 'CAMERA_PERMISSION_DENIED',
   CAMERA_NOT_FOUND = 'CAMERA_NOT_FOUND',
   CAMERA_DISCONNECTED = 'CAMERA_DISCONNECTED',
@@ -92,7 +92,7 @@ export enum ErrorCode {
   LOGGING_WRITE_FAILED = 'LOGGING_WRITE_FAILED',
   LOGGING_CLEANUP_FAILED = 'LOGGING_CLEANUP_FAILED',
 
-  // External file drop errors (BRS-012)
+  // External file drop errors (Spec #012)
   EXTERNAL_FILE_NOT_FOUND = 'EXTERNAL_FILE_NOT_FOUND',
   EXTERNAL_FILE_IS_DIRECTORY = 'EXTERNAL_FILE_IS_DIRECTORY',
   EXTERNAL_FILE_NOT_REGULAR = 'EXTERNAL_FILE_NOT_REGULAR',
@@ -234,7 +234,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.SCREENSHOT_FAILED]: 'Failed to capture screenshot',
   [ErrorCode.SCREENSHOT_NOT_SUPPORTED]: 'Screenshot capture is only available on macOS',
 
-  // Camera capture errors (BRS-014)
+  // Camera capture errors (Spec #014)
   [ErrorCode.CAMERA_PERMISSION_DENIED]: 'Camera permission required. Grant access in System Settings > Privacy & Security.',
   [ErrorCode.CAMERA_NOT_FOUND]: 'No camera found. Please connect a camera and try again.',
   [ErrorCode.CAMERA_DISCONNECTED]: 'Camera was disconnected during capture',
@@ -246,7 +246,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.LOGGING_WRITE_FAILED]: 'Failed to write to log file',
   [ErrorCode.LOGGING_CLEANUP_FAILED]: 'Failed to cleanup old log files',
 
-  // External file drop errors (BRS-012)
+  // External file drop errors (Spec #012)
   [ErrorCode.EXTERNAL_FILE_NOT_FOUND]: 'External file not found or was deleted',
   [ErrorCode.EXTERNAL_FILE_IS_DIRECTORY]: 'Cannot import directories, only files',
   [ErrorCode.EXTERNAL_FILE_NOT_REGULAR]: 'Cannot import special files (devices, pipes, sockets)',

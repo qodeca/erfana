@@ -4,7 +4,7 @@
  * Tests the IPC handler registration and request/response handling
  * for camera photo save operations.
  *
- * @see BRS-014 - Camera photo capture specification
+ * @see Spec #014 - Camera photo capture specification
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'

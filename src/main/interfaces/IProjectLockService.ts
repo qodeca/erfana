@@ -8,7 +8,7 @@
  * the minimal API needed by consumers.
  *
  * @see ProjectLockService for implementation
- * @see BRS-010 - Multi-instance support specification
+ * @see Spec #010 - Multi-instance support specification
  * @see Issue #27 - Multiple independent instances
  */
 import type { LockResult, LockStatus } from '../../shared/ipc/project-lock-schema'

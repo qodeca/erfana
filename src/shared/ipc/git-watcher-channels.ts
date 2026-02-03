@@ -5,7 +5,7 @@
  * Using constants eliminates typos and enables refactoring.
  *
  * @see Issue #74 - Real-time git status refresh
- * @see BRS-003 - Real-time git status refresh specification
+ * @see Spec #003 - Real-time git status refresh specification
  * @see ADR-BRS003-003 - Typed channel names
  */
 

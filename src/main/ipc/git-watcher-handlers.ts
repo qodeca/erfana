@@ -15,7 +15,7 @@
  * - 'git-polling:set-enabled' - Enable/disable polling
  *
  * @see Issue #74 - Real-time git status refresh
- * @see BRS-003 - Real-time git status refresh specification
+ * @see Spec #003 - Real-time git status refresh specification
  */
 import { ipcMain } from 'electron'
 import { gitWatcherService } from '../services/GitWatcherService'
