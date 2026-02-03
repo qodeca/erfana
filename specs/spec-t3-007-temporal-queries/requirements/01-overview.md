@@ -46,4 +46,4 @@ Temporal queries solve three key problems:
 
 ## Dependencies
 
-- **Spec #006** (Knowledge graph & entities): Provides entities and edges tables that this BRS extends with temporal fields
+- **Spec #006** (Knowledge graph & entities): Provides entities and edges tables that this spec extends with temporal fields

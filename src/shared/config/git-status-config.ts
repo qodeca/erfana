@@ -6,7 +6,7 @@
  *
  * @see Issue #74 - Real-time git status refresh
  * @see Spec #003 - Real-time git status refresh specification
- * @see ADR-BRS003-003 - Constants consolidation
+ * @see ADR-Spec003-003 - Constants consolidation
  */
 
 // ============================================================================
@@ -99,7 +99,7 @@ export const GIT_STATUS_COOLDOWN_DURATION_MS = 500
 /**
  * Health logger interval (ms) - 5 minutes.
  * Logs periodic health summaries for diagnostics.
- * @see ADR-BRS003-002 - Git status logging strategy
+ * @see ADR-Spec003-002 - Git status logging strategy
  */
 export const GIT_STATUS_HEALTH_LOG_INTERVAL_MS = 5 * 60 * 1000
 
@@ -107,6 +107,6 @@ export const GIT_STATUS_HEALTH_LOG_INTERVAL_MS = 5 * 60 * 1000
  * Polling efficiency threshold for degraded state warning (%).
  * If polling triggers more than this percentage of refreshes,
  * the watcher may be missing events.
- * @see ADR-BRS003-002 - Git status logging strategy
+ * @see ADR-Spec003-002 - Git status logging strategy
  */
 export const GIT_STATUS_HIGH_POLLING_THRESHOLD = 80

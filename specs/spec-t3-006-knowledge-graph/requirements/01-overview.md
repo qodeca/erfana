@@ -44,7 +44,7 @@ The Knowledge Graph system addresses these challenges by:
 
 ## Dependencies
 
-| BRS | Dependency Type | Description |
+| Spec | Dependency Type | Description |
 |-----|-----------------|-------------|
 | Spec #004 | Required | Database layer, sections table, indexing infrastructure |
 | Spec #005 | Optional | Enables semantic entity matching via vector similarity |

@@ -10,7 +10,7 @@
  * Strategy: Test via wrapper elements with testids and keyboard/mouse input.
  *
  * @see docs/testing/e2e-testing.md - Testing third-party components
- * @see BRS-011 - Automated UI testing compatibility
+ * @see Spec #011 - Automated UI testing compatibility
  */
 
 import { test, expect, _electron as electron } from '@playwright/test'

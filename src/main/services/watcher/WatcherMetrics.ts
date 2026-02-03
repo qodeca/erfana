@@ -385,6 +385,6 @@ export class WatcherMetrics {
 /**
  * Shared singleton instance for git status monitoring
  * Used by GitWatcherService, GitPollingService, and health logging
- * @see ADR-BRS003-002 - Git status logging strategy
+ * @see ADR-Spec003-002 - Git status logging strategy
  */
 export const watcherMetrics = new WatcherMetrics()

@@ -38,7 +38,7 @@ export const GitStateChangeEventSchema = z.object({
    * in older payloads, rather than being present with a null value.
    * This differs from fields like watchedPath which are always present but may be null.
    *
-   * @see ADR-BRS003-002 - Git status logging strategy
+   * @see ADR-Spec003-002 - Git status logging strategy
    */
   correlationId: z.string().optional()
 })

@@ -22,7 +22,7 @@ interface UseSearchKeyboardOptions {
  *
  * @param options - Optional configuration including editor ref for selection
  *
- * @see ADR-BRS001-001 - Unified search architecture
+ * @see ADR-Spec001-001 - Unified search architecture
  * @see FR-012 - Keyboard shortcut triggers search
  *
  * @example Basic usage

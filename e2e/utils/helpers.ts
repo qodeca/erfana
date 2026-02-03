@@ -10,7 +10,7 @@
  *
  * @see docs/testing/e2e-testing.md - E2E testing documentation
  * @see constants/testids.ts - Test ID constants
- * @see BRS-011 - Automated UI testing compatibility
+ * @see Spec #011 - Automated UI testing compatibility
  *
  * @example
  * ```typescript

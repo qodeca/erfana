@@ -71,8 +71,8 @@ Unified search overlay activated via `Cmd/Ctrl+F` in editor or preview panes.
 - `src/renderer/src/hooks/useSearchKeyboard.ts` - Keyboard shortcuts
 
 **Related ADRs**:
-- [ADR-BRS001-001: Unified search architecture](../architecture/adrs/adr-brs001-001-unified-search.md)
-- [ADR-BRS001-002: Search selection population](../architecture/adrs/adr-brs001-002-search-selection-population.md)
+- [ADR-Spec001-001: Unified search architecture](../architecture/adrs/adr-spec-001-001-unified-search.md)
+- [ADR-Spec001-002: Search selection population](../architecture/adrs/adr-spec-001-002-search-selection-population.md)
 
 ### Multi-File Support
 - Unique panel per file

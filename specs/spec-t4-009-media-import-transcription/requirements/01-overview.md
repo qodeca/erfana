@@ -48,7 +48,7 @@ Erfana users work with diverse content sources including podcasts, interviews, m
 | Developers | Extend import system with new converters | Implementation |
 | QA | Verify transcription accuracy and UX | Testing |
 
-## Related BRS Documents
+## Related spec documents
 
 - Spec #004 (Graph engine foundation) - Future integration for transcript indexing
 - Spec #005 (Vector search) - Semantic search over transcribed content

@@ -4,11 +4,11 @@
 
 Graph Engine Polish & Maintenance (Spec #008) delivers production-ready features for the Graph Engine ecosystem, including Mermaid diagram visualization of entity neighborhoods, comprehensive reindex/reembed user experience with progress tracking, safe model migration for switching embedding models, binary quantization for large datasets exceeding 100K documents, and monitoring/health checks for database integrity, worker status, and disk space.
 
-This BRS corresponds to **Milestone 5 (M5)** of the Graph Engine implementation roadmap.
+This spec corresponds to **Milestone 5 (M5)** of the Graph Engine implementation roadmap.
 
 ## Purpose
 
-Production environments require operational features beyond core functionality. This BRS addresses:
+Production environments require operational features beyond core functionality. This spec addresses:
 
 1. **Visualization** - Mermaid diagrams help users understand entity relationships visually
 2. **Maintenance UX** - Reindexing and re-embedding must be non-blocking with progress feedback
@@ -37,7 +37,7 @@ Production environments require operational features beyond core functionality. 
 
 ## Dependencies
 
-| BRS | Name | Relationship |
+| Spec | Name | Relationship |
 |-----|------|--------------|
 | Spec #004 | Graph engine foundation | Required - database layer, indexing |
 | Spec #005 | Vector search & hybrid retrieval | Required - embeddings, vector search |

@@ -97,7 +97,7 @@ Schemas: `src/shared/ipc/*.ts`
 | Services | `src/main/services/` |
 | Components | `src/renderer/src/components/` |
 | Stores | `src/renderer/src/stores/` |
-| BRS specs | `specs/business-reqs/` |
+| Feature specs | `specs/` |
 | Documentation | `docs/` |
 
 ## UI Rules (Non-negotiable)

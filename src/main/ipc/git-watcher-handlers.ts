@@ -40,7 +40,7 @@ export function registerGitWatcherHandlers(): void {
    * @returns { success: boolean, error?: string }
    */
   ipcMain.handle('git-watcher:start', async (_event, projectPath: string) => {
-    const startTime = Date.now() // Timing (ADR-BRS003-002)
+    const startTime = Date.now() // Timing (ADR-Spec003-002)
     try {
       // Validate input
       if (!projectPath || typeof projectPath !== 'string') {
@@ -52,7 +52,7 @@ export function registerGitWatcherHandlers(): void {
         return { success: false, error: 'Project path is empty' }
       }
 
-      // Trace log for handler entry (ADR-BRS003-002)
+      // Trace log for handler entry (ADR-Spec003-002)
       logger.trace('git-watcher:start invoked', { projectPath: trimmedPath })
 
       // Validate path security (prevent path traversal and system directory access)
@@ -90,7 +90,7 @@ export function registerGitWatcherHandlers(): void {
    * @returns { success: boolean, error?: string }
    */
   ipcMain.handle('git-watcher:stop', async () => {
-    const startTime = Date.now() // Timing (ADR-BRS003-002)
+    const startTime = Date.now() // Timing (ADR-Spec003-002)
     logger.trace('git-watcher:stop invoked')
     try {
       const result = await gitWatcherService.stop()
@@ -116,7 +116,7 @@ export function registerGitWatcherHandlers(): void {
    * @returns GitWatcherStatus - Current state, watched path, last event, error
    */
   ipcMain.handle('git-watcher:status', async () => {
-    const startTime = Date.now() // Timing (ADR-BRS003-002)
+    const startTime = Date.now() // Timing (ADR-Spec003-002)
     logger.trace('git-watcher:status invoked')
     try {
       const isWatching = gitWatcherService.isWatching()
@@ -158,7 +158,7 @@ export function registerGitWatcherHandlers(): void {
    * @returns { success: boolean, error?: string }
    */
   ipcMain.handle('git-polling:start', async (_event, projectPath: string) => {
-    const startTime = Date.now() // Timing (ADR-BRS003-002)
+    const startTime = Date.now() // Timing (ADR-Spec003-002)
     try {
       // Validate input
       if (!projectPath || typeof projectPath !== 'string') {
@@ -170,7 +170,7 @@ export function registerGitWatcherHandlers(): void {
         return { success: false, error: 'Project path is empty' }
       }
 
-      // Trace log for handler entry (ADR-BRS003-002)
+      // Trace log for handler entry (ADR-Spec003-002)
       logger.trace('git-polling:start invoked', { projectPath: trimmedPath })
 
       // Validate path security (prevent path traversal and system directory access)
@@ -206,7 +206,7 @@ export function registerGitWatcherHandlers(): void {
    * @returns { success: boolean, error?: string }
    */
   ipcMain.handle('git-polling:stop', async () => {
-    const startTime = Date.now() // Timing (ADR-BRS003-002)
+    const startTime = Date.now() // Timing (ADR-Spec003-002)
     logger.trace('git-polling:stop invoked')
     try {
       gitPollingService.stop()
@@ -231,7 +231,7 @@ export function registerGitWatcherHandlers(): void {
    * @returns { success: boolean, interval?: number, clamped?: boolean, error?: string }
    */
   ipcMain.handle('git-polling:set-interval', async (_event, intervalMs: number) => {
-    const startTime = Date.now() // Timing (ADR-BRS003-002)
+    const startTime = Date.now() // Timing (ADR-Spec003-002)
     logger.trace('git-polling:set-interval invoked', { requestedIntervalMs: intervalMs })
     try {
       // Validate input
@@ -271,7 +271,7 @@ export function registerGitWatcherHandlers(): void {
    * @returns { success: boolean, error?: string }
    */
   ipcMain.handle('git-polling:set-enabled', async (_event, enabled: boolean) => {
-    const startTime = Date.now() // Timing (ADR-BRS003-002)
+    const startTime = Date.now() // Timing (ADR-Spec003-002)
     logger.trace('git-polling:set-enabled invoked', { enabled })
     try {
       // Validate input
