@@ -207,7 +207,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 - Test helper utilities documentation
 - Troubleshooting guide
 
-See [BRS-011](../../specs/business-reqs/brs011-ui-test-compatibility/) for the specification.
+See Spec #011 (archived) for the specification.
 
 ### Coverage
 - Generate per-project coverage reports: `npm run test:cov`
@@ -288,7 +288,7 @@ For MCP visual testing:
 - [Development Tasks](../development-tasks.md) - Common development patterns
 - [Architecture](../architecture.md) - Application structure
 - [UI Components](../ui-components.md) - UI system details
-- [BRS-011](../../specs/business-reqs/brs011-ui-test-compatibility/) - UI testing compatibility specification
+- Spec #011 (archived) – UI testing compatibility specification
 
 ---
 

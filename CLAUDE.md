@@ -69,38 +69,25 @@ See `docs/` for details (keep Claude's context focused):
 - [Changelog](docs/CHANGELOG.md) — Version history (v0.3.x onwards)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
 
-## Business Requirements Specifications (BRS)
+## Feature specifications
 
-Feature specifications live in `specs/business-reqs/`. Check registry before implementing new features.
+Feature specifications live in `specs/`. Check registry before implementing new features.
 
-### Active BRS
+### Active specs
 
 | ID | Name | Tier | Status | Path |
 |----|------|------|--------|------|
-| BRS-004 | Graph engine foundation | T4 | draft | `specs/business-reqs/brs004-graph-foundation/` |
-| BRS-005 | Vector search & hybrid retrieval | T3 | draft | `specs/business-reqs/brs005-vector-search/` |
-| BRS-006 | Knowledge graph & entities | T3 | draft | `specs/business-reqs/brs006-knowledge-graph/` |
-| BRS-007 | Temporal queries & timeline | T3 | draft | `specs/business-reqs/brs007-temporal-queries/` |
-| BRS-008 | Graph engine polish & maintenance | T3 | draft | `specs/business-reqs/brs008-graph-polish/` |
-| BRS-009 | Media import with transcription | T4 | draft | `specs/business-reqs/brs009-media-import-transcription/` |
-| BRS-013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/business-reqs/brs013-multi-cli-tool-prompt-optimization/` |
+| 004 | Graph engine foundation | T4 | draft | `specs/spec-t4-004-graph-foundation/` |
+| 005 | Vector search & hybrid retrieval | T3 | draft | `specs/spec-t3-005-vector-search/` |
+| 006 | Knowledge graph & entities | T3 | draft | `specs/spec-t3-006-knowledge-graph/` |
+| 007 | Temporal queries & timeline | T3 | draft | `specs/spec-t3-007-temporal-queries/` |
+| 008 | Graph engine polish & maintenance | T3 | draft | `specs/spec-t3-008-graph-polish/` |
+| 009 | Media import with transcription | T4 | draft | `specs/spec-t4-009-media-import-transcription/` |
+| 013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/spec-t3-013-multi-cli-tool-prompt-optimization/` |
 
-### Archived BRS (implemented)
+**Registry**: `specs/registry.json`
 
-| ID | Name | Tier | Path |
-|----|------|------|------|
-| BRS-001 | Unified in-file search | T3 | `specs/business-reqs/archived/brs001-unified-search/` |
-| BRS-002 | Editor context menu with prompts | T3 | `specs/business-reqs/archived/brs002-editor-context-menu/` |
-| BRS-003 | Real-time git status refresh | T3 | `specs/business-reqs/archived/brs003-realtime-git-status/` |
-| BRS-010 | Multiple independent instances | T4 | `specs/business-reqs/archived/brs010-multi-instance/` |
-| BRS-011 | Automated UI testing compatibility | T3 | `specs/business-reqs/archived/brs011-ui-test-compatibility/` |
-| BRS-012 | External file drop to project tree | T3 | `specs/business-reqs/archived/brs012-external-file-drop/` |
-| BRS-014 | Camera photo capture | T3 | `specs/business-reqs/archived/brs014-camera-capture/` |
-| BRS-015 | Image preview viewer | T3 | `specs/business-reqs/archived/brs015-image-preview/` |
-
-**Registry**: `specs/business-reqs/registry.json`
-
-**Before implementing a feature**: Read the BRS overview (01-overview.md), requirements (02-requirements.md), and acceptance criteria (03-acceptance.md).
+**Before implementing a feature**: Read the spec overview (01-overview.md), requirements (02-requirements.md), and acceptance criteria (03-acceptance.md).
 
 ## Code Style & Conventions
 - TypeScript strict mode enabled

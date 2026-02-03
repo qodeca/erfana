@@ -7,7 +7,7 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 
 ### Core Documentation
 - [Architecture](./architecture.md) - System architecture and design patterns
-- [Architecture ADRs](./architecture/adrs/) - Architecture Decision Records for BRS features
+- [Architecture ADRs](./architecture/adrs/) - Architecture Decision Records for feature specifications
 - [API Services](./api-services.md) - Main process services and IPC handlers
 - [IPC Patterns](./ipc-patterns.md) - Inter-process communication patterns
 - [Security](./security.md) - Security considerations and implementations

@@ -2,6 +2,8 @@
 
 Historical changelog entries for versions prior to current. For the latest changes, see [CLAUDE.md](../CLAUDE.md).
 
+> **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All `BRS-XXX` references in code and docs now use `Spec #XXX`.
+
 ## [0.7.0] - 2026-01-22
 
 ### Added

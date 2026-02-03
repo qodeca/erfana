@@ -5,7 +5,7 @@ Complete catalog of all `data-testid` attributes available for E2E testing.
 **Related documentation**:
 - [E2E Testing Guide](./e2e-testing.md) - Main E2E documentation
 - [Test ID constants](../../src/renderer/src/constants/testids.ts) - Source code
-- [BRS-011](../../specs/business-reqs/brs011-ui-test-compatibility/) - Specification
+- Spec #011 (archived) – Specification
 
 ---
 
