@@ -2,7 +2,7 @@
 
 ## Summary
 
-BRS-007 implements temporal query capabilities and timeline visualization for the Graph Engine, enabling time-travel queries to reconstruct historical knowledge graph states and track documentation evolution over time.
+Spec #007 implements temporal query capabilities and timeline visualization for the Graph Engine, enabling time-travel queries to reconstruct historical knowledge graph states and track documentation evolution over time.
 
 This feature adds temporal semantics to graph edges (valid_from, valid_to, tx_time), provides as-of query APIs for point-in-time state reconstruction, implements a Timeline UI with date slider navigation, and exposes temporal data through the MCP `erfana_graph_timeline` tool.
 
@@ -46,4 +46,4 @@ Temporal queries solve three key problems:
 
 ## Dependencies
 
-- **BRS-006** (Knowledge graph & entities): Provides entities and edges tables that this BRS extends with temporal fields
+- **Spec #006** (Knowledge graph & entities): Provides entities and edges tables that this BRS extends with temporal fields

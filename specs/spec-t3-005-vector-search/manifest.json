@@ -378,7 +378,7 @@
   "cross_references": [
     {
       "type": "depends_on",
-      "target": "BRS-004",
+      "target": "Spec #004",
       "description": "Requires database infrastructure, file indexing pipeline, and sections table"
     }
   ],

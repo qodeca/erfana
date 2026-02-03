@@ -6,7 +6,7 @@
 
 | ID | Title | Description | Priority | Traces to |
 |----|-------|-------------|----------|-----------|
-| 007-FR-001 | Temporal fields on edges | The system shall extend the edges table to include temporal fields: valid_from (Unix timestamp when edge became valid), valid_to (Unix timestamp when edge was invalidated, nullable if still valid), tx_time (Unix timestamp when change was recorded in database). Data type specifications are deferred to design documentation. | Must | BRS-006 |
+| 007-FR-001 | Temporal fields on edges | The system shall extend the edges table to include temporal fields: valid_from (Unix timestamp when edge became valid), valid_to (Unix timestamp when edge was invalidated, nullable if still valid), tx_time (Unix timestamp when change was recorded in database). Data type specifications are deferred to design documentation. | Must | Spec #006 |
 | 007-FR-002 | Temporal indexes | The system shall create indexes on edges(valid_from), edges(valid_to), and edges(src_entity_id, valid_from) to optimize temporal queries | Must | 007-FR-001 |
 
 ### Edge lifecycle management

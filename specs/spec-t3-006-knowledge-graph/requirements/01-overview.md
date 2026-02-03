@@ -2,9 +2,9 @@
 
 ## Summary
 
-BRS-006 delivers a knowledge graph system that extracts entities from markdown content using rule-based pattern matching (wikilinks, tags, mentions, technical terms), builds a graph database with entities, edges, and mentions tables, and enables Obsidian-like backlink navigation for discovering connections between documents.
+Spec #006 delivers a knowledge graph system that extracts entities from markdown content using rule-based pattern matching (wikilinks, tags, mentions, technical terms), builds a graph database with entities, edges, and mentions tables, and enables Obsidian-like backlink navigation for discovering connections between documents.
 
-This feature corresponds to **Milestone 3 (M3)** of the Graph Engine specification and builds upon the database foundation established in BRS-004.
+This feature corresponds to **Milestone 3 (M3)** of the Graph Engine specification and builds upon the database foundation established in Spec #004.
 
 ## Purpose
 
@@ -25,7 +25,7 @@ The Knowledge Graph system addresses these challenges by:
 
 ### In Scope
 
-- **Graph schema**: Three tables (`entities`, `edges`, `mentions`) extending BRS-004 database
+- **Graph schema**: Three tables (`entities`, `edges`, `mentions`) extending Spec #004 database
 - **Rule-based entity extraction**: Wikilinks `[[Entity]]`, tags `#tag`, mentions `@user`, technical terms
 - **Entity storage**: Upsert logic with deduplication by (name, type) pair
 - **Mention linking**: Character position tracking (start_char, end_char) for highlighting
@@ -36,7 +36,7 @@ The Knowledge Graph system addresses these challenges by:
 
 ### Out of Scope
 
-- Semantic entity matching (covered by BRS-005 vector search)
+- Semantic entity matching (covered by Spec #005 vector search)
 - Natural language entity extraction (NER) - rule-based patterns only
 - Entity relationship types beyond mentions (e.g., "is-a", "part-of" hierarchies)
 - Cross-workspace entity linking
@@ -46,8 +46,8 @@ The Knowledge Graph system addresses these challenges by:
 
 | BRS | Dependency Type | Description |
 |-----|-----------------|-------------|
-| BRS-004 | Required | Database layer, sections table, indexing infrastructure |
-| BRS-005 | Optional | Enables semantic entity matching via vector similarity |
+| Spec #004 | Required | Database layer, sections table, indexing infrastructure |
+| Spec #005 | Optional | Enables semantic entity matching via vector similarity |
 
 ## Success Criteria
 

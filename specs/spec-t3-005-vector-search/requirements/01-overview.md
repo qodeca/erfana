@@ -40,7 +40,7 @@ This feature adds:
 
 ## Dependencies
 
-- **BRS-004** (Graph Engine Foundation) - Requires database infrastructure, file indexing pipeline, and sections table
+- **Spec #004** (Graph Engine Foundation) - Requires database infrastructure, file indexing pipeline, and sections table
 
 ## Success criteria
 

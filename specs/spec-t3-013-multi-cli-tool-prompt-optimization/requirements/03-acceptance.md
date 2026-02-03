@@ -122,13 +122,13 @@
 
 ### 013-TC-006: No performance regression
 
-**Description**: Verify prompt adaptation does not introduce noticeable latency compared to the pre-BRS-013 system.
+**Description**: Verify prompt adaptation does not introduce noticeable latency compared to the pre-Spec #013 system.
 
-**Preconditions**: Baseline prompt rendering time measured on pre-BRS-013 codebase (before multi-tool implementation).
+**Preconditions**: Baseline prompt rendering time measured on pre-Spec #013 codebase (before multi-tool implementation).
 
 **Steps**:
-1. Record baseline: Measure prompt rendering time in current system (pre-BRS-013)
-2. Implement BRS-013 changes
+1. Record baseline: Measure prompt rendering time in current system (pre-Spec #013)
+2. Implement Spec #013 changes
 3. Select "Claude Code" as CLI tool (same as baseline behavior)
 4. Measure prompt rendering time for 10 prompts of various types
 5. Calculate average additional latency vs baseline
@@ -207,11 +207,11 @@
 
 **Description**: Verify existing users without CLI tool preference are migrated correctly.
 
-**Preconditions**: GlobalSettings file exists without `cliTool` field (simulating pre-BRS-013 user).
+**Preconditions**: GlobalSettings file exists without `cliTool` field (simulating pre-Spec #013 user).
 
 **Steps**:
 1. Create/modify GlobalSettings to remove `cliTool` field
-2. Launch application with BRS-013 changes
+2. Launch application with Spec #013 changes
 3. Check CLI tool dropdown value
 4. Check GlobalSettings file for `cliTool` field
 

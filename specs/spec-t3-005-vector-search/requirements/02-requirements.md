@@ -8,11 +8,11 @@
 
 **Title:** Load sqlite-vec extension into better-sqlite3
 
-**Description:** The system shall load the sqlite-vec extension into the existing better-sqlite3 database connection established by BRS-004. Extension loading must occur after database initialization and before any vector operations.
+**Description:** The system shall load the sqlite-vec extension into the existing better-sqlite3 database connection established by Spec #004. Extension loading must occur after database initialization and before any vector operations.
 
 **Priority:** High
 
-**Traces to:** BRS-004 (database infrastructure)
+**Traces to:** Spec #004 (database infrastructure)
 
 ---
 
@@ -74,7 +74,7 @@
 
 **Priority:** High
 
-**Traces to:** 005-FR-004, BRS-004 (sections table)
+**Traces to:** 005-FR-004, Spec #004 (sections table)
 
 ---
 
@@ -88,7 +88,7 @@
 
 **Priority:** High
 
-**Traces to:** BRS-004 (main process infrastructure)
+**Traces to:** Spec #004 (main process infrastructure)
 
 ---
 
@@ -325,7 +325,7 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 **Priority:** High
 
-**Traces to:** BRS-004 (BM25 search)
+**Traces to:** Spec #004 (BM25 search)
 
 ---
 
@@ -437,7 +437,7 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 **Priority:** High
 
-**Traces to:** 005-FR-021, BRS-004 (MCP server)
+**Traces to:** 005-FR-021, Spec #004 (MCP server)
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## Summary
 
-BRS-009 extends Erfana's import system to support audio and video files through automated transcription. Users can import media files which are converted to markdown documents containing the transcribed text, enabling searchable, editable access to spoken content within the markdown-based workflow.
+Spec #009 extends Erfana's import system to support audio and video files through automated transcription. Users can import media files which are converted to markdown documents containing the transcribed text, enabling searchable, editable access to spoken content within the markdown-based workflow.
 
 ## Purpose
 
@@ -50,5 +50,5 @@ Erfana users work with diverse content sources including podcasts, interviews, m
 
 ## Related BRS Documents
 
-- BRS-004 (Graph engine foundation) - Future integration for transcript indexing
-- BRS-005 (Vector search) - Semantic search over transcribed content
+- Spec #004 (Graph engine foundation) - Future integration for transcript indexing
+- Spec #005 (Vector search) - Semantic search over transcribed content

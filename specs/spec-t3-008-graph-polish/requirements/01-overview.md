@@ -2,7 +2,7 @@
 
 ## Summary
 
-Graph Engine Polish & Maintenance (BRS-008) delivers production-ready features for the Graph Engine ecosystem, including Mermaid diagram visualization of entity neighborhoods, comprehensive reindex/reembed user experience with progress tracking, safe model migration for switching embedding models, binary quantization for large datasets exceeding 100K documents, and monitoring/health checks for database integrity, worker status, and disk space.
+Graph Engine Polish & Maintenance (Spec #008) delivers production-ready features for the Graph Engine ecosystem, including Mermaid diagram visualization of entity neighborhoods, comprehensive reindex/reembed user experience with progress tracking, safe model migration for switching embedding models, binary quantization for large datasets exceeding 100K documents, and monitoring/health checks for database integrity, worker status, and disk space.
 
 This BRS corresponds to **Milestone 5 (M5)** of the Graph Engine implementation roadmap.
 
@@ -29,8 +29,8 @@ Production environments require operational features beyond core functionality. 
 
 ### Out of Scope
 
-- New embedding models (uses existing BRS-005 infrastructure)
-- New entity types (uses existing BRS-006 infrastructure)
+- New embedding models (uses existing Spec #005 infrastructure)
+- New entity types (uses existing Spec #006 infrastructure)
 - Export/import of graph data (future feature)
 - Multi-project graph federation
 - Cloud backup/sync of graph database
@@ -39,9 +39,9 @@ Production environments require operational features beyond core functionality. 
 
 | BRS | Name | Relationship |
 |-----|------|--------------|
-| BRS-004 | Graph engine foundation | Required - database layer, indexing |
-| BRS-005 | Vector search & hybrid retrieval | Required - embeddings, vector search |
-| BRS-006 | Knowledge graph & entities | Optional - entity neighborhood visualization |
+| Spec #004 | Graph engine foundation | Required - database layer, indexing |
+| Spec #005 | Vector search & hybrid retrieval | Required - embeddings, vector search |
+| Spec #006 | Knowledge graph & entities | Optional - entity neighborhood visualization |
 
 ## Success Criteria
 

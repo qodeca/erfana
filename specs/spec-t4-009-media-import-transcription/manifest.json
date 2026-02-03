@@ -287,14 +287,14 @@
   },
   "cross_references": [
     {
-      "from": "BRS-009",
-      "to": "BRS-004",
+      "from": "Spec #009",
+      "to": "Spec #004",
       "type": "future-integration",
       "description": "Transcript indexing via graph engine foundation"
     },
     {
-      "from": "BRS-009",
-      "to": "BRS-005",
+      "from": "Spec #009",
+      "to": "Spec #005",
       "type": "future-integration",
       "description": "Semantic search of transcribed content via vector embeddings"
     }

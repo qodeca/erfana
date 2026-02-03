@@ -6,7 +6,7 @@
 
 **Description:** sqlite-vec extension loads into better-sqlite3 without errors.
 
-**Given:** Application starts with BRS-004 database initialized.
+**Given:** Application starts with Spec #004 database initialized.
 
 **When:** Vector search module initializes.
 
