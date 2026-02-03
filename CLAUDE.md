@@ -29,7 +29,7 @@ npm run test:e2e     # Playwright E2E tests
 ```
 src/
 ├── main/           # Electron main process
-│   ├── services/   # FileService, TerminalService, ScreenshotService, CameraService, SettingsService, ProjectSettingsService, GlobalSettingsService, LoggingService, ProjectLockService, ExternalFileService, import/
+│   ├── services/   # Core: FileService, TerminalService, ProjectService, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService; Watchers: DirectoryWatcherService, FileWatcherService; Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media: ScreenshotService, CameraService, PdfService, DocxService; Multi-instance: ProjectLockService, ExternalFileService; Subdirs: import/, watcher/
 │   └── ipc/        # IPC handlers
 ├── preload/        # Context bridge API
 ├── shared/         # Shared code (errors.ts, constants.ts, ipc schemas)
@@ -66,6 +66,10 @@ See `docs/` for details (keep Claude's context focused):
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
 - [Testing](docs/testing/README.md) — Workspace, coverage
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
+- [API Services](docs/api-services.md) — Service APIs (Terminal, File, Settings, Watchers)
+- [API Services – Features](docs/api-services-features.md) — Feature service APIs (Git, Camera, ProjectLock, ExternalFile)
+- [UI Components](docs/ui-components.md) — React component architecture, activity bars, panels
+- [Prompt Templates](docs/prompts/README.md) — AI prompt system, AutoExecute, template syntax
 - [Changelog](docs/CHANGELOG.md) — Version history (v0.3.x onwards)
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
 

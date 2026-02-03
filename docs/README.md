@@ -96,5 +96,5 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 
 ## Archive
 
-Archived specifications are located in [`./archive/`](./archive/):
-- [Graph Engine Spec 2025](./archive/graph-engine-spec-2025/) - SQLite-based knowledge graph specification (not implemented)
+Archived documentation is located in [`./archive/`](./archive/):
+- [Resolved Issues](./archive/resolved-issues.md) – Issues fixed in past versions

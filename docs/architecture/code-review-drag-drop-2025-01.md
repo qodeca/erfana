@@ -14,7 +14,7 @@ The drag-drop file reorganization feature in Erfana is comprehensively implement
 
 ### 1. Backend Operations - FileService.ts
 
-**File:** `/Users/marcinobel/Projects/erfana-brs/src/main/services/FileService.ts`
+**File:** `src/main/services/FileService.ts`
 
 | Aspect | Status | Evidence |
 |--------|--------|----------|
@@ -44,7 +44,7 @@ try {
 }
 ```
 
-**RollbackHandler:** `/Users/marcinobel/Projects/erfana-brs/src/main/utils/RollbackHandler.ts`
+**RollbackHandler:** `src/main/utils/RollbackHandler.ts`
 - Lines 21-39: Implements atomic rollback by deleting copied item if source deletion fails
 - Logs all operations for debugging
 
@@ -52,7 +52,7 @@ try {
 
 ### 2. IPC Layer - file-handlers.ts
 
-**File:** `/Users/marcinobel/Projects/erfana-brs/src/main/ipc/file-handlers.ts`
+**File:** `src/main/ipc/file-handlers.ts`
 
 | Handler | Status | Lines |
 |---------|--------|-------|
@@ -69,7 +69,7 @@ try {
 
 ### 3. Preload Bridge - index.ts
 
-**File:** `/Users/marcinobel/Projects/erfana-brs/src/preload/index.ts`
+**File:** `src/preload/index.ts`
 
 | API Method | Status | Lines |
 |------------|--------|-------|
@@ -87,7 +87,7 @@ moveItem: (sourcePath, targetParentPath, newName?, replaceExisting?) =>
 
 ### 4. Frontend Integration - ProjectTree.tsx
 
-**File:** `/Users/marcinobel/Projects/erfana-brs/src/renderer/src/components/ProjectTree/ProjectTree.tsx`
+**File:** `src/renderer/src/components/ProjectTree/ProjectTree.tsx`
 
 | Feature | Status | Lines |
 |---------|--------|-------|
@@ -119,7 +119,7 @@ const result = await withWatcherPause(projectPath, isInternalOperation, setFileO
 
 ### 5. State Management - useClipboardStore.ts
 
-**File:** `/Users/marcinobel/Projects/erfana-brs/src/renderer/src/stores/useClipboardStore.ts`
+**File:** `src/renderer/src/stores/useClipboardStore.ts`
 
 | Feature | Status | Lines |
 |---------|--------|-------|
@@ -138,7 +138,7 @@ const result = await withWatcherPause(projectPath, isInternalOperation, setFileO
 
 ### 6. Visual Feedback - CSS Implementation
 
-**File:** `/Users/marcinobel/Projects/erfana-brs/src/renderer/src/components/ProjectTree/ProjectTree.css`
+**File:** `src/renderer/src/components/ProjectTree/ProjectTree.css`
 
 | Visual State | CSS Selector | Lines |
 |--------------|--------------|-------|
@@ -158,7 +158,7 @@ const result = await withWatcherPause(projectPath, isInternalOperation, setFileO
 
 ### 7. Tree Algorithms - useDragDropTree.ts
 
-**File:** `/Users/marcinobel/Projects/erfana-brs/src/renderer/src/hooks/useDragDropTree.ts`
+**File:** `src/renderer/src/hooks/useDragDropTree.ts`
 
 | Function | Purpose | Lines |
 |----------|---------|-------|
@@ -172,7 +172,7 @@ const result = await withWatcherPause(projectPath, isInternalOperation, setFileO
 
 ### 8. Context Menu Integration
 
-**File:** `/Users/marcinobel/Projects/erfana-brs/src/renderer/src/components/ProjectTree/context-menu/commands.tsx`
+**File:** `src/renderer/src/components/ProjectTree/context-menu/commands.tsx`
 
 | Command | Class | Lines |
 |---------|-------|-------|
