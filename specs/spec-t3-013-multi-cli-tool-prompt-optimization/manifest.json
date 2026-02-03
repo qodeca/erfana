@@ -185,7 +185,7 @@
       "date": "2026-01-18T07:50:00+01:00",
       "operation": "INIT",
       "target": "manifest",
-      "description": "BRS initialized as T3 with 3 sections",
+      "description": "Spec initialized as T3 with 3 sections",
       "by": "system"
     },
     {
@@ -397,7 +397,7 @@
       "date": "2026-02-03T08:30:00+01:00",
       "operation": "MIGRATE",
       "target": "manifest",
-      "description": "Migrated from BRS to managing-specs structure: brs013-multi-cli-tool-prompt-optimization -> spec-t3-013-multi-cli-tool-prompt-optimization",
+      "description": "Migrated from BRS to managing-specs naming convention",
       "by": "system"
     }
   ],

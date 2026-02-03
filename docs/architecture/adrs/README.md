@@ -24,6 +24,9 @@ Architectural decisions documented for Erfana project.
 #### Spec #012: External file drop ✅
 - [Code Review](../code-review-drag-drop-2025-01.md) - External file drop architecture review
 
+#### Spec #014: Camera capture ✅
+- [ADR-Spec014-001](adr-spec-014-001-camera-capture.md) - Camera photo capture architecture
+
 ### Planned features (draft specs)
 
 #### Spec #009: Media import

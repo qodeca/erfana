@@ -281,7 +281,7 @@
       "date": "2025-12-22T17:57:00.000Z",
       "operation": "INIT",
       "target": "manifest",
-      "description": "BRS initialized as T3 with 3 sections",
+      "description": "Spec initialized as T3 with 3 sections",
       "by": "system"
     },
     {
@@ -327,7 +327,7 @@
       "date": "2026-02-03T08:30:00+01:00",
       "operation": "MIGRATE",
       "target": "manifest",
-      "description": "Migrated from BRS to managing-specs structure: brs007-temporal-queries -> spec-t3-007-temporal-queries",
+      "description": "Migrated from BRS to managing-specs naming convention",
       "by": "system"
     }
   ],

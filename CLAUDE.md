@@ -81,13 +81,13 @@ Feature specifications live in `specs/`. Check registry before implementing new 
 
 | ID | Name | Tier | Status | Path |
 |----|------|------|--------|------|
-| 004 | Graph engine foundation | T4 | draft | `specs/spec-t4-004-graph-foundation/` |
-| 005 | Vector search & hybrid retrieval | T3 | draft | `specs/spec-t3-005-vector-search/` |
-| 006 | Knowledge graph & entities | T3 | draft | `specs/spec-t3-006-knowledge-graph/` |
-| 007 | Temporal queries & timeline | T3 | draft | `specs/spec-t3-007-temporal-queries/` |
-| 008 | Graph engine polish & maintenance | T3 | draft | `specs/spec-t3-008-graph-polish/` |
-| 009 | Media import with transcription | T4 | draft | `specs/spec-t4-009-media-import-transcription/` |
-| 013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/spec-t3-013-multi-cli-tool-prompt-optimization/` |
+| 004 | Graph engine foundation | T4 | draft | `specs/spec-t4-004-graph-foundation` |
+| 005 | Vector search & hybrid retrieval | T3 | draft | `specs/spec-t3-005-vector-search` |
+| 006 | Knowledge graph & entities | T3 | draft | `specs/spec-t3-006-knowledge-graph` |
+| 007 | Temporal queries & timeline | T3 | draft | `specs/spec-t3-007-temporal-queries` |
+| 008 | Graph engine polish & maintenance | T3 | draft | `specs/spec-t3-008-graph-polish` |
+| 009 | Media import with transcription | T4 | draft | `specs/spec-t4-009-media-import-transcription` |
+| 013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/spec-t3-013-multi-cli-tool-prompt-optimization` |
 
 **Registry**: `specs/registry.json`
 
