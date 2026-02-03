@@ -1,8 +1,8 @@
 # Use Cases
 
-## UC-001: Import audio file with OpenAI backend
+## 009-UC-001: Import audio file with OpenAI backend
 
-**ID**: UC-001
+**ID**: 009-UC-001
 **Title**: Import audio file using OpenAI transcription
 **Actors**: User
 **Priority**: Must
@@ -38,13 +38,13 @@
 - Temporary files cleaned up
 
 ### Traces To
-FR-001, FR-003, FR-004, FR-005, FR-009, FR-012, FR-013
+009-FR-001, 009-FR-003, 009-FR-004, 009-FR-005, 009-FR-009, 009-FR-012, 009-FR-013
 
 ---
 
-## UC-002: Import video file with local Whisper
+## 009-UC-002: Import video file with local Whisper
 
-**ID**: UC-002
+**ID**: 009-UC-002
 **Title**: Import video file using local Whisper transcription
 **Actors**: User
 **Priority**: Should
@@ -83,13 +83,13 @@ FR-001, FR-003, FR-004, FR-005, FR-009, FR-012, FR-013
 - YAML frontmatter includes: source (video path), duration, date, language
 
 ### Traces To
-FR-002, FR-003, FR-004, FR-006, FR-009, FR-012
+009-FR-002, 009-FR-003, 009-FR-004, 009-FR-006, 009-FR-009, 009-FR-012
 
 ---
 
-## UC-003: Handle import failure with network error
+## 009-UC-003: Handle import failure with network error
 
-**ID**: UC-003
+**ID**: 009-UC-003
 **Title**: Recover from network failure during transcription
 **Actors**: User
 **Priority**: Must
@@ -119,13 +119,13 @@ FR-002, FR-003, FR-004, FR-006, FR-009, FR-012
 - Error logged with details for troubleshooting
 
 ### Traces To
-FR-016, FR-017, FR-019, NFR-005, NFR-007
+009-FR-016, 009-FR-017, 009-FR-019, 009-NFR-005, 009-NFR-007
 
 ---
 
-## UC-004: Configure transcription backend
+## 009-UC-004: Configure transcription backend
 
-**ID**: UC-004
+**ID**: 009-UC-004
 **Title**: User configures transcription settings
 **Actors**: User
 **Priority**: Must
@@ -155,13 +155,13 @@ FR-016, FR-017, FR-019, NFR-005, NFR-007
 - Next import uses configured backend
 
 ### Traces To
-FR-007, FR-020, FR-021, FR-022
+009-FR-007, 009-FR-020, 009-FR-021, 009-FR-022
 
 ---
 
-## UC-005: Import large audio file with chunking
+## 009-UC-005: Import large audio file with chunking
 
-**ID**: UC-005
+**ID**: 009-UC-005
 **Title**: Import audio file exceeding 10 minutes
 **Actors**: User
 **Priority**: Must
@@ -193,4 +193,4 @@ FR-007, FR-020, FR-021, FR-022
 - All temporary chunk files deleted
 
 ### Traces To
-FR-008, FR-014, NFR-003, NFR-004
+009-FR-008, 009-FR-014, 009-NFR-003, 009-NFR-004

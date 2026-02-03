@@ -2,18 +2,18 @@
 
 ## Functional requirements
 
-### FR-001: CLI tool dropdown in terminal toolbar
+### 013-FR-001: CLI tool dropdown in terminal toolbar
 
 **Priority**: High
 **Description**: Display a dropdown selector in the terminal toolbar that allows users to choose the active CLI tool from a list of supported tools. The dropdown should show the currently selected tool and update immediately upon selection.
 
 **Acceptance**: Dropdown visible in toolbar, selection updates state, selected tool displayed.
 
-**Traces to**: TC-001
+**Traces to**: 013-TC-001
 
 ---
 
-### FR-002: Persist default CLI tool preference
+### 013-FR-002: Persist default CLI tool preference
 
 **Priority**: High
 **Description**: Store the user's CLI tool selection in GlobalSettings. Selection changes are persisted immediately (no explicit save action required). The selected tool persists across application restarts and is applied when the terminal initializes.
@@ -25,11 +25,11 @@
 
 **Acceptance**: Selection survives restart, new terminals use saved default, settings overlay shows current value, changes persist immediately without explicit save.
 
-**Traces to**: TC-002
+**Traces to**: 013-TC-002
 
 ---
 
-### FR-003: Dedicated prompt templates per tool
+### 013-FR-003: Dedicated prompt templates per tool
 
 **Priority**: High
 **Description**: Create dedicated prompt template versions for each supported CLI tool, organized by area in subdirectories. Each tool has its own set of optimized templates that use the tool's preferred conventions for context blocks, instructions, and code references.
@@ -53,11 +53,11 @@ templates/
 
 **Acceptance**: Each prompt type has dedicated template versions for all supported tools; correct template selected based on active tool; templates organized in tool subfolders.
 
-**Traces to**: TC-003, TC-004
+**Traces to**: 013-TC-003, 013-TC-004
 
 ---
 
-### FR-004: CLI tool registry with template mappings
+### 013-FR-004: CLI tool registry with template mappings
 
 **Priority**: Medium
 **Description**: Implement a tool registry that defines supported CLI tools with their metadata, format configurations, and template mappings. The registry serves as the single source of truth for tool definitions. Adding a new tool requires: (1) a registry entry, and (2) dedicated template versions for all prompt types.
@@ -70,20 +70,20 @@ templates/
 - Supported features (e.g., file references, image input)
 - Template path pattern (e.g., `templates/{tool}/{area}/{prompt}.md`)
 
-**Traces to**: TC-005
+**Traces to**: 013-TC-005
 
 ---
 
-### FR-005: CLI tool selection state accessibility
+### 013-FR-005: CLI tool selection state accessibility
 
 **Priority**: Medium
 **Description**: Make the current CLI tool selection accessible throughout the prompt execution flow. The terminal store should expose the selected tool so that prompt rendering, variable factories, and any tool-specific logic can access it.
 
-**Traces to**: TC-003
+**Traces to**: 013-TC-003
 
 ---
 
-### FR-006: Tool-optimized template implementations
+### 013-FR-006: Tool-optimized template implementations
 
 **Priority**: High
 **Description**: Create dedicated template files for each supported CLI tool, optimized for the tool's specific conventions and capabilities. Each template version is hand-crafted to produce optimal results for its target tool.
@@ -95,11 +95,11 @@ templates/
 
 **Template organization**: `templates/{tool-slug}/{area}/{prompt}.md` (e.g., `templates/claude-code/markdown-preview/elaborate.md`)
 
-**Traces to**: TC-004
+**Traces to**: 013-TC-004
 
 ---
 
-### FR-007: Template fallback behavior
+### 013-FR-007: Template fallback behavior
 
 **Priority**: Medium
 **Description**: Define graceful fallback behavior when a tool-specific template is missing. If the selected tool's template does not exist, fall back to the Claude Code version of that template with a console warning logged for debugging.
@@ -111,11 +111,11 @@ templates/
 
 **Acceptance**: Missing tool template falls back to Claude Code version; warning logged to console; user sees prompt execute (not fail); error shown only if all fallbacks exhausted.
 
-**Traces to**: TC-008
+**Traces to**: 013-TC-008
 
 ---
 
-### FR-008: Tool-specific variable formatting
+### 013-FR-008: Tool-specific variable formatting
 
 **Priority**: High
 **Description**: Implement tool-aware variable formatting in the variable factory. Each tool may have different conventions for file references, line numbers, and code blocks. The variable factory must generate tool-appropriate values.
@@ -128,13 +128,13 @@ templates/
 
 **Acceptance**: `computeFileRef()` and related functions accept tool parameter; output format matches tool conventions; existing Claude Code behavior unchanged when Claude Code selected.
 
-**Traces to**: TC-003, TC-004
+**Traces to**: 013-TC-003, 013-TC-004
 
 ---
 
 ## Non-functional requirements
 
-### NFR-001: Prompt adaptation performance
+### 013-NFR-001: Prompt adaptation performance
 
 **Priority**: High
 **Description**: Tool-specific prompt adaptation must add no more than 50ms latency to the prompt rendering pipeline. Users should not perceive any delay when executing prompts.
@@ -143,7 +143,7 @@ templates/
 
 ---
 
-### NFR-002: Extensibility for future tools
+### 013-NFR-002: Extensibility for future tools
 
 **Priority**: Medium
 **Description**: The architecture must support adding new CLI tools with a well-defined process. Adding a new tool requires:
@@ -153,36 +153,36 @@ templates/
 
 **Quantitative metric**: Adding a new CLI tool must require modifications to no more than 3 source files (registry, variable factory config, templates directory). No changes to core rendering logic or existing tool templates should be required.
 
-**Traces to**: TC-009
+**Traces to**: 013-TC-009
 
 ---
 
-### NFR-003: Backward compatibility
+### 013-NFR-003: Backward compatibility
 
 **Priority**: High
 **Description**: Existing prompt templates must work without modification. The default tool (Claude Code) must produce output identical to the current system behavior. No existing user workflows should break.
 
 ---
 
-### NFR-004: Settings migration
+### 013-NFR-004: Settings migration
 
 **Priority**: Low
 **Description**: If GlobalSettings schema changes, provide migration for existing users. Default to Claude Code for users without a prior selection.
 
-**Traces to**: TC-010
+**Traces to**: 013-TC-010
 
 ---
 
-### NFR-005: UI consistency
+### 013-NFR-005: UI consistency
 
 **Priority**: Medium
 **Description**: The CLI tool dropdown must follow the existing UI style guide and design tokens. Use standard dropdown component patterns consistent with other toolbar controls. Dropdown must be keyboard accessible (Tab, Enter, Arrow keys per WCAG 2.1).
 
-**Traces to**: TC-011
+**Traces to**: 013-TC-011
 
 ---
 
-### NFR-006: Template maintainability
+### 013-NFR-006: Template maintainability
 
 **Priority**: Medium
 **Description**: The template organization must balance tool-specific optimization with long-term maintainability. While 42 separate template files provide maximum flexibility, shared logic should be extracted where possible to reduce duplication and drift risk.
@@ -197,19 +197,19 @@ templates/
 
 ---
 
-### NFR-007: Error handling
+### 013-NFR-007: Error handling
 
 **Priority**: Medium
 **Description**: The system must handle errors gracefully throughout the prompt flow. Template loading failures, registry lookup errors, and variable factory exceptions should be caught and reported without crashing the application.
 
 **Error scenarios**:
-- Missing template file → fallback per FR-007
+- Missing template file → fallback per 013-FR-007
 - Invalid registry entry → log error, exclude tool from dropdown
 - Variable factory error → log error, use raw values
 
 ---
 
-### NFR-008: Observability
+### 013-NFR-008: Observability
 
 **Priority**: Low
 **Description**: Log tool selection and prompt execution for debugging. When a user reports prompt issues, logs should indicate which tool was selected and which template was used.

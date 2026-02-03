@@ -2,7 +2,7 @@
 
 ## Test cases
 
-### TC-001: CLI tool dropdown displays and functions
+### 013-TC-001: CLI tool dropdown displays and functions
 
 **Description**: Verify the CLI tool dropdown appears in the terminal toolbar and allows selection.
 
@@ -18,11 +18,11 @@
 
 **Expected result**: Dropdown shows all tools, selection updates immediately, selected tool name displayed.
 
-**Traces to**: FR-001
+**Traces to**: 013-FR-001
 
 ---
 
-### TC-002: CLI tool preference persists across restarts
+### 013-TC-002: CLI tool preference persists across restarts
 
 **Description**: Verify the selected CLI tool is saved and restored on application restart.
 
@@ -37,11 +37,11 @@
 
 **Expected result**: Dropdown shows "Gemini CLI" after restart.
 
-**Traces to**: FR-002
+**Traces to**: 013-FR-002
 
 ---
 
-### TC-003: Correct template version selected per tool
+### 013-TC-003: Correct template version selected per tool
 
 **Description**: Verify the system selects the correct dedicated template version based on the active CLI tool.
 
@@ -60,11 +60,11 @@
 
 **Expected result**: Each tool uses its dedicated template version; output format matches tool conventions.
 
-**Traces to**: FR-003, FR-005
+**Traces to**: 013-FR-003, 013-FR-005
 
 ---
 
-### TC-004: All tool templates exist and produce valid output
+### 013-TC-004: All tool templates exist and produce valid output
 
 **Description**: Verify dedicated template versions exist for all prompt types and all tools (42 files total), and each produces well-formed output.
 
@@ -93,11 +93,11 @@
 
 **Expected result**: All 42 template versions exist; all prompts render correctly with tool-appropriate formatting.
 
-**Traces to**: FR-003, FR-006, FR-008
+**Traces to**: 013-FR-003, 013-FR-006, 013-FR-008
 
 ---
 
-### TC-005: Tool registry contains all required metadata and template mappings
+### 013-TC-005: Tool registry contains all required metadata and template mappings
 
 **Description**: Verify the tool registry provides complete definitions including template path patterns for all supported tools.
 
@@ -116,11 +116,11 @@
 
 **Expected result**: All tools have complete, valid metadata with template mappings; no duplicates; all referenced templates exist.
 
-**Traces to**: FR-004
+**Traces to**: 013-FR-004
 
 ---
 
-### TC-006: No performance regression
+### 013-TC-006: No performance regression
 
 **Description**: Verify prompt adaptation does not introduce noticeable latency compared to the pre-BRS-013 system.
 
@@ -135,11 +135,11 @@
 
 **Expected result**: Average additional latency is less than 50ms compared to baseline.
 
-**Traces to**: NFR-001
+**Traces to**: 013-NFR-001
 
 ---
 
-### TC-007: Backward compatibility with existing templates
+### 013-TC-007: Backward compatibility with existing templates
 
 **Description**: Verify existing templates produce identical output when Claude Code is selected.
 
@@ -153,11 +153,11 @@
 
 **Expected result**: Output is identical to baseline for Claude Code selection.
 
-**Traces to**: NFR-003
+**Traces to**: 013-NFR-003
 
 ---
 
-### TC-008: Template fallback behavior
+### 013-TC-008: Template fallback behavior
 
 **Description**: Verify the system gracefully falls back to Claude Code template when a tool-specific template is missing.
 
@@ -173,11 +173,11 @@
 
 **Expected result**: Prompt executes without error; warning logged to console; output uses Claude Code fallback format.
 
-**Traces to**: FR-007
+**Traces to**: 013-FR-007
 
 ---
 
-### TC-009: Extensibility - adding new tool
+### 013-TC-009: Extensibility - adding new tool
 
 **Description**: Verify a new CLI tool can be added by modifying only the specified files.
 
@@ -199,11 +199,11 @@
 
 **Expected result**: New tool added with changes to ≤3 source files; existing functionality unaffected; new tool works correctly.
 
-**Traces to**: NFR-002
+**Traces to**: 013-NFR-002
 
 ---
 
-### TC-010: Settings migration for existing users
+### 013-TC-010: Settings migration for existing users
 
 **Description**: Verify existing users without CLI tool preference are migrated correctly.
 
@@ -217,11 +217,11 @@
 
 **Expected result**: Dropdown shows "Claude Code" (default); GlobalSettings updated with `cliTool: "claude-code"`.
 
-**Traces to**: NFR-004
+**Traces to**: 013-NFR-004
 
 ---
 
-### TC-011: Dropdown keyboard accessibility
+### 013-TC-011: Dropdown keyboard accessibility
 
 **Description**: Verify CLI tool dropdown is fully keyboard accessible per WCAG 2.1.
 
@@ -238,7 +238,7 @@
 
 **Expected result**: All interactions work via keyboard; focus is visible throughout; selection updates correctly.
 
-**Traces to**: NFR-005
+**Traces to**: 013-NFR-005
 
 ---
 
@@ -261,4 +261,4 @@
 - [ ] Dropdown logs tool selection changes for debugging
 - [ ] Unit tests cover template selection logic, registry, and fallback behavior
 - [ ] Test coverage ≥ 80% for new code
-- [ ] All test cases (TC-001 through TC-011) pass
+- [ ] All test cases (013-TC-001 through 013-TC-011) pass

@@ -99,7 +99,7 @@ Existing templates will be migrated to the new structure as follows:
    - Before: `./templates/*.md`
    - After: `./templates/{tool}/{area}/*.md`
 
-6. **Backward compatibility**: Claude Code templates produce identical output to current system behavior (verified by TC-007).
+6. **Backward compatibility**: Claude Code templates produce identical output to current system behavior (verified by 013-TC-007).
 
 ### Excluded
 
