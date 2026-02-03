@@ -1,20 +1,20 @@
 ---
-brs_id: 14
+spec_id: 14
 document_type: technical_adr
 sequence: 1
 ---
 
-# ADR-BRS014-001: Camera photo capture architecture
+# ADR-Spec014-001: Camera photo capture architecture
 
 **Date:** 2026-01 | **Status:** Proposed
 
 ## Context
 
-BRS-014 specifies a camera photo capture feature for the Terminal Panel toolbar. Users need to quickly capture photos of physical objects (whiteboards, hardware, notes) and have the file path immediately available in the terminal for use in commands.
+Spec #014 specifies a camera photo capture feature for the Terminal Panel toolbar. Users need to quickly capture photos of physical objects (whiteboards, hardware, notes) and have the file path immediately available in the terminal for use in commands.
 
 ### Requirements summary
 
-From BRS-014, the key requirements are:
+From Spec #014, the key requirements are:
 
 - **FR-001 to FR-011**: Toolbar button, modal dialog, device enumeration, live preview (15+ FPS), photo capture, file saving, path insertion, permission handling, no-camera handling, device disconnection, keyboard accessibility
 - **NFR-001**: Cross-platform support (macOS, Windows, Linux)
@@ -536,9 +536,9 @@ This is a new feature with no existing code to migrate. However:
 
 ## References
 
-- [BRS-014 Overview](/specs/business-reqs/brs014-camera-capture/01-overview.md)
-- [BRS-014 Requirements](/specs/business-reqs/brs014-camera-capture/02-requirements.md)
-- [BRS-014 Acceptance Criteria](/specs/business-reqs/brs014-camera-capture/03-acceptance.md)
+- Spec #014 overview (archived)
+- Spec #014 requirements (archived)
+- Spec #014 acceptance criteria (archived)
 - [MDN: MediaDevices.getUserMedia()](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia)
 - [MDN: MediaDevices.enumerateDevices()](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/enumerateDevices)
 - [Electron: Media Permissions](https://www.electronjs.org/docs/latest/tutorial/security#15-handle-session-permission-requests-from-remote-content)

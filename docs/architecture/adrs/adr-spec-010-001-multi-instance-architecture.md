@@ -1,10 +1,10 @@
 ---
-brs_id: 10
+spec_id: 10
 document_type: technical_adr
 sequence: 1
 ---
 
-# ADR-BRS010-001: Multi-instance architecture
+# ADR-Spec010-001: Multi-instance architecture
 
 **Date:** 2025-12 | **Status:** Proposed
 
@@ -61,7 +61,7 @@ Independent per process:
 - Git watchers
 ```
 
-### Requirements from BRS-010
+### Requirements from Spec #010
 
 | Requirement | Description | Priority |
 |-------------|-------------|----------|
@@ -988,12 +988,12 @@ describe('ProjectLockService', () => {
 
 ### Internal references
 
-- [BRS-010 Overview](/specs/business-reqs/brs010-multi-instance/01-overview.md)
-- [BRS-010 Requirements](/specs/business-reqs/brs010-multi-instance/02-requirements.md)
-- [BRS-010 Use Cases](/specs/business-reqs/brs010-multi-instance/03-use-cases.md)
-- [BRS-010 Acceptance Criteria](/specs/business-reqs/brs010-multi-instance/04-acceptance.md)
-- [BRS-010 Implementation Notes](/specs/business-reqs/brs010-multi-instance/05-notes.md)
-- [ADR-BRS003-001: Git Watcher Architecture](/docs/architecture/adrs/adr-brs003-001-git-watcher-architecture.md) - Service pattern reference
+- Spec #010 overview (archived)
+- Spec #010 requirements (archived)
+- Spec #010 use cases (archived)
+- Spec #010 acceptance criteria (archived)
+- Spec #010 implementation notes (archived)
+- [ADR-Spec003-001: Git watcher architecture](/docs/architecture/adrs/adr-spec-003-001-git-watcher-architecture.md) - Service pattern reference
 - [Erfana Architecture](/docs/architecture.md) - Overall system design
 
 ### External references

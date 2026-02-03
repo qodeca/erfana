@@ -1,14 +1,14 @@
 ---
-brs_id: 9
+spec_id: 9
 document_type: technical_adr
 sequence: 1
 ---
 
-# ADR-BRS009-001: Media import with transcription
+# ADR-Spec009-001: Media import with transcription
 
 **Date:** 2025-12 | **Status:** Draft
 
-**BRS Reference**: `specs/business-reqs/brs009-media-import-transcription/`
+**Spec reference**: `specs/spec-t4-009-media-import-transcription/`
 
 ---
 
@@ -55,7 +55,7 @@ sequence: 1
 │  │                         ImportService                                │   │
 │  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────┐  │   │
 │  │  │  PdfConverter   │  │  TextConverter  │  │  MediaConverter     │  │   │
-│  │  │  (existing)     │  │  (existing)     │  │  (NEW - BRS-009)    │  │   │
+│  │  │  (existing)     │  │  (existing)     │  │  (NEW - Spec #009)    │  │   │
 │  │  └─────────────────┘  └─────────────────┘  └──────────┬──────────┘  │   │
 │  └───────────────────────────────────────────────────────┼──────────────┘   │
 │                                                          │                  │

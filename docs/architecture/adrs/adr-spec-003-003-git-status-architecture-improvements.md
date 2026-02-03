@@ -1,10 +1,10 @@
 ---
-brs_id: 3
+spec_id: 3
 document_type: technical_adr
 sequence: 3
 ---
 
-# ADR-BRS003-003: Git Status Architecture Improvements
+# ADR-Spec003-003: Git status architecture improvements
 
 **Date:** 2025-12 | **Status:** Proposed
 

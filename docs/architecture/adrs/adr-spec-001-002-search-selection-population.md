@@ -1,10 +1,10 @@
 ---
-brs_id: 1
+spec_id: 1
 document_type: technical_adr
 sequence: 2
 ---
 
-# ADR-BRS001-002: Populate search input with selected text
+# ADR-Spec001-002: Populate search input with selected text
 
 **Date:** 2025-12 | **Status:** Proposed
 
@@ -351,4 +351,4 @@ No migration needed - this is additive functionality. Existing code paths remain
 
 - [VSCode Basic Editing - Find and Replace](https://code.visualstudio.com/docs/editing/codebasics)
 - [VSCode GitHub Issue #30131 - Find in Selection](https://github.com/microsoft/vscode/issues/30131)
-- Existing ADR: `/docs/architecture/adrs/adr-brs001-001-unified-search.md`
+- Existing ADR: `/docs/architecture/adrs/adr-spec-001-001-unified-search.md`

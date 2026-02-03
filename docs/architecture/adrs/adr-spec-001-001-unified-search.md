@@ -1,10 +1,10 @@
 ---
-brs_id: 1
+spec_id: 1
 document_type: technical_adr
 sequence: 1
 ---
 
-# ADR-BRS001-001: Unified in-file search architecture
+# ADR-Spec001-001: Unified in-file search architecture
 
 **Date:** 2025-12 | **Status:** Proposed
 
@@ -29,7 +29,7 @@ Erfana needs unified search functionality across its markdown editor (Monaco-bas
 
 ## Decision drivers
 
-From BRS requirements:
+From Spec #001 requirements:
 
 - **NFR-001**: <100ms search latency for 10K lines
 - **NFR-002**: Full keyboard accessibility

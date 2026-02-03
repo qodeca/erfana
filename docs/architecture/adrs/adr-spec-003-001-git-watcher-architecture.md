@@ -1,10 +1,10 @@
 ---
-brs_id: 3
+spec_id: 3
 document_type: technical_adr
 sequence: 1
 ---
 
-# ADR-BRS003-001: Git watcher architecture
+# ADR-Spec003-001: Git watcher architecture
 
 **Date:** 2025-12 | **Status:** Proposed
 
@@ -22,7 +22,7 @@ Erfana requires real-time git status updates in the Project panel with < 1 secon
 - **useGitStatus hook**: 500ms debounce + 1500ms cooldown
 - **Detection gaps**: Branch switches, fetch, stash, branch operations
 
-### Requirements from BRS-003
+### Requirements from Spec #003
 
 - FR-001 to FR-010: Watch all critical git files, detect all change scenarios
 - NFR-001: < 1 second latency
@@ -164,7 +164,7 @@ Main Process
 
 ## References
 
-- [BRS-003 Architecture Document](/specs/business-reqs/brs003-realtime-git-status/architecture.md) - Full architecture specification
+- Spec #003 architecture document (archived)
 - [Chokidar](https://github.com/paulmillr/chokidar) - File watching library
 - [VS Code File Watcher Issues](https://github.com/microsoft/vscode/wiki/File-Watcher-Issues) - Known limitations
-- [ADR-BRS001-001](/docs/architecture/adrs/adr-brs001-001-unified-search.md) - Provider pattern reference
+- [ADR-Spec001-001](/docs/architecture/adrs/adr-spec-001-001-unified-search.md) - Provider pattern reference

@@ -1,10 +1,10 @@
 ---
-brs_id: 11
+spec_id: 11
 document_type: technical_adr
 sequence: 1
 ---
 
-# ADR-BRS011-001: UI test architecture
+# ADR-Spec011-001: UI test architecture
 
 **Date:** 2025-12 | **Status:** Proposed
 
@@ -25,7 +25,7 @@ Erfana has 5306 unit tests providing excellent code coverage, but lacks infrastr
 - **Portals**: Context menus, dialogs, settings overlay, and toasts render to `#portal-root`
 - **Third-party components**: Monaco Editor, xterm.js, Mermaid diagrams require wrapper-based testids
 
-### Requirements from BRS-011
+### Requirements from Spec #011
 
 - FR-001 to FR-012: Add testids to all interactive elements (26 functional requirements)
 - FR-025: TypeScript constants file for compile-time safety
@@ -652,8 +652,8 @@ testids.ts (constants)
 
 ## References
 
-- [BRS-011 Overview](/specs/business-reqs/brs011-ui-test-compatibility/01-overview.md)
-- [BRS-011 Requirements](/specs/business-reqs/brs011-ui-test-compatibility/02-requirements.md)
+- Spec #011 overview (archived)
+- Spec #011 requirements (archived)
 - [Playwright Electron Documentation](https://playwright.dev/docs/api/class-electron)
 - [Testing Library - ByTestId](https://testing-library.com/docs/queries/bytestid/)
 - [Kent C. Dodds - Making UI Tests Resilient to Change](https://kentcdodds.com/blog/making-your-ui-tests-resilient-to-change)

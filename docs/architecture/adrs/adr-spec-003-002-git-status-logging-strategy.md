@@ -1,10 +1,10 @@
 ---
-brs_id: 3
+spec_id: 3
 document_type: technical_adr
 sequence: 2
 ---
 
-# ADR-BRS003-002: Git status logging strategy
+# ADR-Spec003-002: Git status logging strategy
 
 **Date:** 2025-12 | **Status:** Proposed
 
@@ -355,6 +355,6 @@ try {
 
 ## Related
 
-- [ADR-BRS003-001](/docs/architecture/adrs/adr-brs003-001-git-watcher-architecture.md) - Git watcher architecture
+- [ADR-Spec003-001](/docs/architecture/adrs/adr-spec-003-001-git-watcher-architecture.md) - Git watcher architecture
 - [docs/logging.md](/docs/logging.md) - Logging layer documentation
 - [WatcherMetrics.ts](/src/main/services/watcher/WatcherMetrics.ts) - Metrics implementation

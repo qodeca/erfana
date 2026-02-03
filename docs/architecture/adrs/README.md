@@ -4,30 +4,30 @@ Architectural decisions documented for Erfana project.
 
 ## Index
 
-### Implemented features (archived BRS)
+### Implemented features (archived specs)
 
-#### BRS-001: Unified in-file search ✅
-- [ADR-BRS001-001](adr-brs001-001-unified-search.md) - Unified search architecture
-- [ADR-BRS001-002](adr-brs001-002-search-selection-population.md) - Search selection population
+#### Spec #001: Unified in-file search ✅
+- [ADR-Spec001-001](adr-spec-001-001-unified-search.md) - Unified search architecture
+- [ADR-Spec001-002](adr-spec-001-002-search-selection-population.md) - Search selection population
 
-#### BRS-003: Real-time git status ✅
-- [ADR-BRS003-001](adr-brs003-001-git-watcher-architecture.md) - Git watcher architecture
-- [ADR-BRS003-002](adr-brs003-002-git-status-logging-strategy.md) - Git status logging strategy
-- [ADR-BRS003-003](adr-brs003-003-git-status-architecture-improvements.md) - Architecture improvements
+#### Spec #003: Real-time git status ✅
+- [ADR-Spec003-001](adr-spec-003-001-git-watcher-architecture.md) - Git watcher architecture
+- [ADR-Spec003-002](adr-spec-003-002-git-status-logging-strategy.md) - Git status logging strategy
+- [ADR-Spec003-003](adr-spec-003-003-git-status-architecture-improvements.md) - Architecture improvements
 
-#### BRS-010: Multi-instance ✅
-- [ADR-BRS010-001](adr-brs010-001-multi-instance-architecture.md) - Multi-instance architecture
+#### Spec #010: Multi-instance ✅
+- [ADR-Spec010-001](adr-spec-010-001-multi-instance-architecture.md) - Multi-instance architecture
 
-#### BRS-011: UI testing ✅
-- [ADR-BRS011-001](adr-brs011-001-ui-test-architecture.md) - UI test compatibility architecture
+#### Spec #011: UI testing ✅
+- [ADR-Spec011-001](adr-spec-011-001-ui-test-architecture.md) - UI test compatibility architecture
 
-#### BRS-012: External file drop ✅
+#### Spec #012: External file drop ✅
 - [Code Review](../code-review-drag-drop-2025-01.md) - External file drop architecture review
 
-### Planned features (draft BRS)
+### Planned features (draft specs)
 
-#### BRS-009: Media import
-- [ADR-BRS009-001](adr-brs009-001-media-import-transcription.md) - Media import with transcription
+#### Spec #009: Media import
+- [ADR-Spec009-001](adr-spec-009-001-media-import-transcription.md) - Media import with transcription
 
 ### Code refactoring
 - [ADR-C001](adr-c001-markdown-editor-panel-decomposition.md) - MarkdownEditorPanel decomposition
@@ -55,4 +55,4 @@ Each ADR follows this structure:
 
 ---
 
-See: [Architecture](../architecture.md) | [BRS Registry](../../specs/business-reqs/registry.json)
+See: [Architecture](../architecture.md) | [Spec registry](../../specs/registry.json)
