@@ -152,10 +152,18 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
   *Phase 1-2: P0 Critical Tests (147 tests)*:
   - `constants.test.ts` (10 tests) - ProjectTree constants (DRAG_DROP, TERMINAL, AUTO_SCROLL)
   - `switchHelpers.test.ts` (34 tests) - Project switching logic with terminal activity tracking
-  - `withWatcherPause.test.ts` (16 tests) - Watcher pause/resume mechanism for file operations
+  - `withWatcherPause.test.ts` (17 tests) - Watcher pause/resume mechanism for file operations
   - `context-menu/commands.test.tsx` (65 tests) - 11 command classes (NewFileCommand, DeleteCommand, RenameCommand, etc.)
   - `context-menu/strategies.test.tsx` (15 tests) - Node-type strategies (FileStrategy, FolderStrategy)
   - `context-menu/factory.test.ts` (7 tests) - Strategy selection factory pattern
+
+  *Phase 2.5: Pipeline & Hook Behavioral Tests (25 tests) – Spec T3-016 verification*:
+  - `DirectoryWatcherService.pipeline.test.ts` (11 tests) - End-to-end pipeline integration
+    - Uses real ThrottledWorker, EventCoalescer, AtomicSaveDetector wired to processEvents
+    - Covers AC-001 (file creation), AC-002 (deletion), AC-003 (directory), AC-008 (coalescing), AC-013 (atomic save)
+  - `useDirectoryWatcher.test.ts` (11 tests) - Hook behavioral tests
+    - Event handling, AC-010 internal operation suppression, lifecycle, subscriptions
+  - `ProjectTree.timing.test.tsx` (3 tests) - Project switching timing and manual refresh (AC-007)
 
   *Phase 3: P1 Hook Logic Tests (173 tests) - "Extract Pure Logic" Pattern*:
   - `useDirectoryWatcher.logic.ts + .test.ts` (23 tests, 5 pure functions)

@@ -11,42 +11,34 @@ This document covers common implementation patterns, session token guards, and c
 Used to prevent double-refresh when internal operations trigger external file system events.
 
 ```typescript
-// ProjectTree.tsx - Internal CRUD operation
+// ProjectTree.tsx - Internal CRUD operation using withWatcherPause utility
+import { withWatcherPause } from './withWatcherPause'
+
 const handleCreateFile = async () => {
-  try {
-    // Mark as internal operation
-    isInternalOperation.current = true
-
-    // Pause directory watcher
-    if (projectPath) {
-      await window.api.directoryWatch.pause(projectPath)
+  const result = await withWatcherPause(
+    projectPath,
+    isInternalOperationRef,
+    setLoading,
+    async () => {
+      const createdFilePath = await window.api.file.createFile(targetPath, fileName)
+      await refreshFileTree()
+      return createdFilePath
     }
-
-    // Perform operation
-    const createdFilePath = await window.api.file.createFile(targetPath, fileName)
-    await refreshFileTree()
-
-    // Resume directory watcher
-    if (projectPath) {
-      await window.api.directoryWatch.resume(projectPath)
-    }
-    isInternalOperation.current = false
-  } catch (err) {
-    // Always resume even on error
-    if (projectPath) {
-      await window.api.directoryWatch.resume(projectPath)
-    }
-    isInternalOperation.current = false
-  }
+  )
 }
 ```
 
-**Why This Works**:
-- Directory watcher is paused before file creation
-- File is created (triggers fs event, but watcher is paused)
-- Tree refreshes manually via `refreshFileTree()`
-- Watcher resumes after manual refresh
-- No duplicate refresh from paused watcher event
+**How `withWatcherPause` works** (`src/renderer/src/components/ProjectTree/withWatcherPause.ts`):
+1. Sets `isInternalOperationRef.current = true` + `setLoading(true)`
+2. Calls `window.api.directoryWatch.pause(projectPath)` (IPC to main process)
+3. Executes the operation
+4. Resets `isInternalOperationRef.current = false` **before** calling resume (prevents race condition – AC-010)
+5. Calls `window.api.directoryWatch.resume(projectPath)`
+6. Sets `setLoading(false)` in finally block (even on error)
+
+**Dual-layer suppression**:
+- **Main process**: `PauseController` (ref-counting) drops filesystem events while paused
+- **Renderer**: `isInternalOperationRef` guard in `useDirectoryWatcher` hook suppresses any events that slip through
 
 ### Event Listening Pattern
 
@@ -179,7 +171,7 @@ echo "# New File" > /path/to/project/new-file.md
 
 # Expected:
 # - File appears in tree automatically
-# - Within 1 second
+# - Within 500ms (75ms ThrottledWorker collection delay)
 # - No manual refresh needed
 ```
 
