@@ -246,5 +246,23 @@ describe('withWatcherPause', () => {
         'setLoading(false)'
       ])
     })
+
+    it('resets isInternalOperationRef to false BEFORE calling resume (AC-010)', async () => {
+      let refValueWhenResumeWasCalled: boolean | undefined
+
+      mockWindowApi.directoryWatch.resume.mockImplementation(async () => {
+        // Capture the ref value at the moment resume is called
+        refValueWhenResumeWasCalled = isInternalOperationRef.current
+        return { success: true }
+      })
+
+      const operation = vi.fn().mockResolvedValue('result')
+
+      await withWatcherPause('/test/project', isInternalOperationRef, setLoading, operation)
+
+      // The ref must be false BEFORE resume is called
+      // This prevents a race where watcher events fire between resume and ref reset
+      expect(refValueWhenResumeWasCalled).toBe(false)
+    })
   })
 })
