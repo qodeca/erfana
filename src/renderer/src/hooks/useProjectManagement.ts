@@ -15,7 +15,7 @@
  * Complexity reduction: Uses switchHelpers for cleaner control flow
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { IProjectTreeApi, FileNode } from '../interfaces/IProjectTreeApi'
 import type { IUseProjectManagementOptions, IUseProjectManagementReturn } from '../interfaces/IProjectManagement'
 import { useDialog } from '../components/Dialog'
@@ -288,9 +288,11 @@ export function useProjectManagement(
   /**
    * Refresh the file tree
    *
-   * Used by file operations to update the tree after making changes
+   * Used by file operations to update the tree after making changes.
+   * Wrapped in useCallback to stabilize the reference and prevent
+   * unnecessary re-renders of context consumers.
    */
-  const refreshFiles = async (): Promise<void> => {
+  const refreshFiles = useCallback(async (): Promise<void> => {
     if (!shouldRefreshFiles(projectPath)) return
     try {
       const fileTree = await api.file.readDirectory(projectPath!)
@@ -298,7 +300,7 @@ export function useProjectManagement(
     } catch (err) {
       logger.error(createRefreshErrorLog(), err instanceof Error ? err : undefined)
     }
-  }
+  }, [projectPath, api.file])
 
   return {
     projectPath,
