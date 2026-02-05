@@ -8,7 +8,7 @@
  * the minimal API needed by consumers.
  *
  * @see GitPollingService for implementation
- * @see BRS-003 - Real-time git status refresh specification
+ * @see Spec #003 - Real-time git status refresh specification
  * @see Issue #74 review fix - added for consistency with IGitWatcherService
  */
 import type { GitPollingMetrics } from '../../shared/ipc/git-watcher-schema'

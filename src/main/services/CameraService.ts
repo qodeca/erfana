@@ -20,7 +20,7 @@ interface CameraSaveResult {
  * Defines the public API for camera photo save functionality.
  * Follows the interface pattern established by ScreenshotService.
  *
- * @see BRS-014 - camera photo capture specification
+ * @see Spec #014 - camera photo capture specification
  */
 interface ICameraService {
   /**
@@ -45,7 +45,7 @@ interface ICameraService {
  * - Writes to system temp directory only
  * - No shell command execution (pure Node.js file operations)
  *
- * @see BRS-014 - camera photo capture specification
+ * @see Spec #014 - camera photo capture specification
  */
 class CameraService implements ICameraService {
   /**

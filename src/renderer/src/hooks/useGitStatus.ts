@@ -113,7 +113,7 @@ export function useGitStatus({
         if (timeSinceLastRefresh < COOLDOWN_DURATION) {
           const remainingCooldown = COOLDOWN_DURATION - timeSinceLastRefresh
 
-          // Trace log for cooldown block (ADR-BRS003-002)
+          // Trace log for cooldown block (ADR-Spec003-002)
           logger.trace('[useGitStatus] Cooldown active, scheduling refresh', {
             remainingMs: remainingCooldown,
             timeSinceLastRefresh
@@ -149,7 +149,7 @@ export function useGitStatus({
 
       try {
         setRefreshing(true)
-        const startTime = performance.now() // Timing (ADR-BRS003-002)
+        const startTime = performance.now() // Timing (ADR-Spec003-002)
         const response = await window.api.git.getStatus(requestProjectPath)
 
         // CRITICAL: Ignore response if project changed during request
@@ -158,7 +158,7 @@ export function useGitStatus({
           return
         }
 
-        // Debug log with timing (ADR-BRS003-002)
+        // Debug log with timing (ADR-Spec003-002)
         logger.debug('[useGitStatus] Refresh completed', {
           projectPath: requestProjectPath,
           isGitRepo: response.isGitRepo,
@@ -275,14 +275,14 @@ export function useGitStatus({
     const unsubscribeWatcher = window.api.gitWatcher.onStateChanged((event: GitStateChangeEvent) => {
       // Only refresh if window is visible to avoid unnecessary work
       if (isWindowVisibleRef.current) {
-        // Log with correlation ID for tracing (ADR-BRS003-002)
+        // Log with correlation ID for tracing (ADR-Spec003-002)
         logger.info(`[useGitStatus] Git state changed: ${event.eventTypes.join(', ')}`, {
           projectPath: event.projectPath,
           correlationId: event.correlationId
         })
         debouncedRefresh()
       } else {
-        // Trace log when skipping due to hidden window (ADR-BRS003-002)
+        // Trace log when skipping due to hidden window (ADR-Spec003-002)
         logger.trace('[useGitStatus] Skipping refresh - window hidden', {
           correlationId: event.correlationId
         })
@@ -312,14 +312,14 @@ export function useGitStatus({
     const unsubscribePolling = window.api.gitPolling.onPollTriggered((event: GitPollTriggeredEvent) => {
       // Only refresh if window is visible
       if (isWindowVisibleRef.current) {
-        // Debug log with reason for tracing (ADR-BRS003-002)
+        // Debug log with reason for tracing (ADR-Spec003-002)
         logger.debug('[useGitStatus] Git poll triggered', {
           timestamp: event.timestamp,
           reason: event.reason
         })
         debouncedRefresh()
       } else {
-        // Trace log when skipping due to hidden window (ADR-BRS003-002)
+        // Trace log when skipping due to hidden window (ADR-Spec003-002)
         logger.trace('[useGitStatus] Skipping poll refresh - window hidden', {
           reason: event.reason
         })

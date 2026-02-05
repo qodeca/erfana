@@ -5,7 +5,7 @@
  * The provider pattern enables consistent search behavior across different
  * rendering contexts while allowing view-specific optimizations.
  *
- * @see ADR-BRS001-001 - Unified search architecture
+ * @see ADR-Spec001-001 - Unified search architecture
  */
 
 import type { SearchMatch, SearchOptions } from '../../stores/useSearchStore'

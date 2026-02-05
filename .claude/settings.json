@@ -1,0 +1,47 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch",
+      "Skill",
+
+      "mcp__time",
+      "mcp__plugin_context7_context7",
+      "mcp__chrome-devtools",
+      "mcp__circuit-electron",
+
+      "Bash(git:*)",
+      "Bash(gh:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(node:*)",
+
+      "Bash(pgrep:*)",
+      "Bash(pkill:*)",
+      "Bash(timeout:*)",
+      "Bash(jobs:*)",
+
+      "Bash(tree:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(file:*)",
+      "Bash(wc:*)",
+      "Bash(sort:*)",
+      "Bash(cut:*)",
+      "Bash(grep:*)",
+      "Bash(xargs:*)",
+      "Bash(tee:*)",
+      "Bash(open:*)",
+      "Bash(code:*)",
+      "Bash(plutil:*)",
+      "Bash(hdiutil:*)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "circuit-electron"
+  ]
+}

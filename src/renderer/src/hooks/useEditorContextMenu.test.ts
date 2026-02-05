@@ -12,7 +12,7 @@
  * - Paste action (5 tests)
  * - Cleanup on unmount (1 test)
  *
- * @see BRS #002 - Editor context menu with AI prompts
+ * @see Spec #002 - Editor context menu with AI prompts
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'

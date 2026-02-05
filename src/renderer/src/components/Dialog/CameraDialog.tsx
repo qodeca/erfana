@@ -12,7 +12,7 @@
  * - Error handling with refresh capability
  * - Accessibility support (ARIA labels, focus trap)
  *
- * @see BRS-014 - Camera photo capture specification
+ * @see Spec #014 - Camera photo capture specification
  * @see Issue #86 enhancement - Camera integration with terminal
  */
 

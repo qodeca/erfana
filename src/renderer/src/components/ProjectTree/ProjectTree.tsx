@@ -155,7 +155,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   // Dialog hooks
   const { showConfirm, showRename, showNewFile, showNewFolder, showDropMode, showConflict } = useDialog()
 
-  // External file drop hook (BRS-012)
+  // External file drop hook (Spec #012)
   const {
     isExternalDragActive,
     externalDropTarget,
@@ -786,7 +786,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   }
 
   /**
-   * Execute external file drop operation (BRS-012)
+   * Execute external file drop operation (Spec #012)
    *
    * Handles the complete workflow for dropped external files:
    * 1. Show drop mode dialog (move/copy/import)

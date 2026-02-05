@@ -20,7 +20,7 @@
  * - Coordinates with GitPollingService for hybrid fallback
  *
  * @see Issue #74 - Real-time git status refresh
- * @see BRS-003 - Real-time git status refresh specification
+ * @see Spec #003 - Real-time git status refresh specification
  */
 
 import chokidar, { FSWatcher } from 'chokidar'
@@ -42,10 +42,10 @@ const MAX_RESTART_ATTEMPTS = 3
 /** Base delay for exponential backoff (ms) */
 const RESTART_BASE_DELAY_MS = 800
 
-/** Health logger interval (5 minutes) - ADR-BRS003-002 */
+/** Health logger interval (5 minutes) - ADR-Spec003-002 */
 const HEALTH_LOG_INTERVAL_MS = 5 * 60 * 1000
 
-/** Polling efficiency threshold for degraded state warning (%) - ADR-BRS003-002 */
+/** Polling efficiency threshold for degraded state warning (%) - ADR-Spec003-002 */
 const HIGH_POLLING_DEPENDENCY_THRESHOLD = 80
 
 /** Git paths to watch (relative to project root) */
@@ -96,7 +96,7 @@ export class GitWatcherService implements IGitWatcherService {
   /** Timestamp of last emitted event (for polling coordination) */
   private lastEventTimestamp: number | null = null
 
-  /** Health logger interval timer - ADR-BRS003-002 */
+  /** Health logger interval timer - ADR-Spec003-002 */
   private healthLogInterval: NodeJS.Timeout | null = null
 
   /**
@@ -150,7 +150,7 @@ export class GitWatcherService implements IGitWatcherService {
    * Safe to call even if not currently watching.
    */
   async stop(): Promise<{ success: boolean; error?: string }> {
-    // Stop health logger (ADR-BRS003-002)
+    // Stop health logger (ADR-Spec003-002)
     this.stopHealthLogger()
 
     // Clear pending restart
@@ -288,7 +288,7 @@ export class GitWatcherService implements IGitWatcherService {
           projectPath,
           paths: existingPaths.length
         })
-        // Start health logger when watcher is ready (ADR-BRS003-002)
+        // Start health logger when watcher is ready (ADR-Spec003-002)
         this.startHealthLogger()
         resolve({ success: true })
       })
@@ -354,7 +354,7 @@ export class GitWatcherService implements IGitWatcherService {
     const timestamp = Date.now()
     this.lastEventTimestamp = timestamp
 
-    // Generate correlation ID for tracing (ADR-BRS003-002)
+    // Generate correlation ID for tracing (ADR-Spec003-002)
     const correlationId = this.generateCorrelationId()
 
     logger.info('GitWatcherService: Git state changed', {
@@ -364,7 +364,7 @@ export class GitWatcherService implements IGitWatcherService {
       correlationId
     })
 
-    // Record metrics (ADR-BRS003-002)
+    // Record metrics (ADR-Spec003-002)
     watcherMetrics.recordGitWatcherEvent()
 
     // Broadcast to all windows
@@ -482,7 +482,7 @@ export class GitWatcherService implements IGitWatcherService {
   /**
    * Generate a unique correlation ID for tracing refreshes across components
    * Format: git-{timestamp}-{random}
-   * @see ADR-BRS003-002 - Git status logging strategy
+   * @see ADR-Spec003-002 - Git status logging strategy
    */
   private generateCorrelationId(): string {
     return `git-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -491,7 +491,7 @@ export class GitWatcherService implements IGitWatcherService {
   /**
    * Start the health logger (5-minute interval)
    * Logs periodic health summaries and degraded state warnings
-   * @see ADR-BRS003-002 - Git status logging strategy
+   * @see ADR-Spec003-002 - Git status logging strategy
    */
   private startHealthLogger(): void {
     // Guard: Prevent duplicate intervals from rapid start() calls

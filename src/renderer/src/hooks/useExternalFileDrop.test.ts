@@ -2,7 +2,7 @@
  * useExternalFileDrop Hook Tests
  *
  * Tests for the external file drop custom hook.
- * Covers BRS-012: External File Drop to Project Tree
+ * Covers Spec #012: External File Drop to Project Tree
  *
  * Test coverage:
  * - isExternalDrag() - detection of external vs internal drags

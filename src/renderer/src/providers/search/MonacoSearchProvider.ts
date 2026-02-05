@@ -5,7 +5,7 @@
  * deltaDecorations() for visual highlighting. Supports case sensitivity
  * and whole word search options.
  *
- * @see ADR-BRS001-001 - Unified search architecture
+ * @see ADR-Spec001-001 - Unified search architecture
  * @see SearchProvider interface for contract documentation
  */
 

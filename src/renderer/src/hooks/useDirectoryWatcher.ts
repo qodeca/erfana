@@ -11,6 +11,10 @@
  * - Listen for watcher error events
  * - Cleanup on unmount or project change
  *
+ * Uses ref pattern for callbacks to prevent watcher stop/start cycling.
+ * The effect only re-runs when projectPath or initialLoadComplete change,
+ * not when callback references change (which happens on every render).
+ *
  * @param projectPath - Current project path to watch (null if no project open)
  * @param initialLoadComplete - Flag to prevent watching before initial load
  * @param isInternalOperationRef - Ref to check if change is from internal operation
@@ -18,7 +22,7 @@
  * @param onError - Callback when project folder is deleted or errors occur
  */
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import {
   shouldStartWatcher,
   shouldHandleDirectoryChange,
@@ -45,6 +49,17 @@ export function useDirectoryWatcher({
   onProjectDeleted,
   onError
 }: UseDirectoryWatcherOptions): void {
+  // Store callbacks in refs to avoid effect re-runs on reference changes.
+  // This prevents Chokidar watcher stop/start cycling on every render.
+  const onRefreshRef = useRef(onRefresh)
+  const onProjectDeletedRef = useRef(onProjectDeleted)
+  const onErrorRef = useRef(onError)
+
+  // Keep refs up to date with latest callbacks
+  onRefreshRef.current = onRefresh
+  onProjectDeletedRef.current = onProjectDeleted
+  onErrorRef.current = onError
+
   useEffect(() => {
     // Guard: Should we start the watcher?
     if (!shouldStartWatcher(projectPath, initialLoadComplete)) {
@@ -61,19 +76,19 @@ export function useDirectoryWatcher({
       // Only refresh if not during our own internal operations
       if (shouldHandleDirectoryChange(isInternalOperationRef.current)) {
         logger.info(createDirectoryChangeMessage(data.eventCount))
-        onRefresh()
+        onRefreshRef.current()
       }
     })
 
     // Listen for project deletion
     const unsubscribeDeleted = window.api.directoryWatch.onProjectDeleted(() => {
-      onProjectDeleted()
+      onProjectDeletedRef.current()
     })
 
     // Listen for errors
     const unsubscribeError = window.api.directoryWatch.onDirectoryError((data) => {
       logger.error(createDirectoryErrorMessage(), undefined, { error: data.error })
-      onError(data.error)
+      onErrorRef.current(data.error)
     })
 
     // Cleanup on unmount or when project changes
@@ -83,5 +98,5 @@ export function useDirectoryWatcher({
       unsubscribeDeleted()
       unsubscribeError()
     }
-  }, [projectPath, initialLoadComplete, isInternalOperationRef, onRefresh, onProjectDeleted, onError])
+  }, [projectPath, initialLoadComplete, isInternalOperationRef])
 }

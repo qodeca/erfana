@@ -67,9 +67,10 @@ Monitors entire project folder for structural changes (files/folders created, de
 ### Architecture
 
 - **Library**: Chokidar (recursive watching)
-- **Debouncing**: Adaptive
-  - Single events: 300ms
-  - Bulk operations (5+ events/sec): 1000ms
+- **Event Pipeline**: VS Code-inspired ThrottledWorker + EventCoalescer
+  - 75ms collection window for batching events
+  - 200ms throttle between processing rounds
+  - AtomicSaveDetector (100ms) for unlink events
 - **Events**: `add`, `addDir`, `unlink`, `unlinkDir`
 - **Scope**: Entire project directory (recursive)
 - **Cleanup**: Automatic on window close and app quit
@@ -114,7 +115,7 @@ Recommended:
 
 | Scenario | Behavior |
 |----------|----------|
-| Create file externally | Tree updates automatically within 1 second |
+| Create file externally | Tree updates automatically within 500ms |
 | Delete folder externally | Tree updates, expanded folder state preserved |
 | Git checkout (bulk changes) | Debounced to single refresh after changes settle |
 | Internal CRUD (create/delete/rename) | Watcher paused, no double refresh |
@@ -130,13 +131,18 @@ Recommended:
 | `directory-watch:resume` | Renderer → Main | Resume watching after CRUD completes |
 | `directory-watch:changed` | Main → Renderer | Event: Directory structure changed |
 | `directory-watch:project-deleted` | Main → Renderer | Event: Project folder deleted |
+| `directory-watch:error` | Main → Renderer | Event: Watcher error (transient/permanent) |
 
 ### Implementation Location
 
 - **Service**: `src/main/services/DirectoryWatcherService.ts`
 - **IPC Handlers**: `src/main/ipc/directory-watcher-handlers.ts`
+- **Renderer Hook**: `src/renderer/src/hooks/useDirectoryWatcher.ts` (lifecycle, event handling, AC-010 guard)
+- **Pure Logic**: `src/renderer/src/hooks/useDirectoryWatcher.logic.ts` (state guards, message creation)
+- **Pause Utility**: `src/renderer/src/components/ProjectTree/withWatcherPause.ts` (pause/resume wrapper)
 - **Integration**: `src/renderer/src/components/ProjectTree/ProjectTree.tsx`
 - **Component**: `src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx` (controlled pattern)
+- **Spec**: `specs/spec-t3-016-project-tree-refresh/` (behavioral contract)
 
 ### Expanded State Preservation
 
@@ -357,7 +363,10 @@ The service integrates these components:
 ### Files
 
 - `src/main/services/watcher/` - All watcher optimization modules
-- 57 tests in `src/main/services/watcher/__tests__/`
+- Watcher unit tests in `src/main/services/watcher/*.test.ts`
+- Pipeline integration tests in `src/main/services/DirectoryWatcherService.pipeline.test.ts` (11 tests)
+- Hook tests in `src/renderer/src/hooks/useDirectoryWatcher.test.ts` (11 tests)
+- Pause/resume tests in `src/renderer/src/components/ProjectTree/withWatcherPause.test.ts` (17 tests)
 
 ---
 

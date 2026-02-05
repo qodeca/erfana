@@ -208,7 +208,7 @@ export const SCREENSHOT = {
  * Used by CameraService for saving webcam photos
  *
  * @see CameraService.ts
- * @see BRS-014 - camera photo capture
+ * @see Spec #014 - camera photo capture
  */
 export const CAMERA = {
   /** JPEG quality for canvas.toDataURL (0.0 - 1.0) */

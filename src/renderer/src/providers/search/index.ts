@@ -1,7 +1,7 @@
 /**
  * Search providers barrel export.
  *
- * @see ADR-BRS001-001 - Unified search architecture
+ * @see ADR-Spec001-001 - Unified search architecture
  */
 
 // Interface and types

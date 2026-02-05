@@ -11,7 +11,7 @@ Erfana supports automated E2E testing using Playwright with Electron. This guide
 - [E2E Debugging](./e2e-debugging.md) - Debugging and CI/CD
 - [E2E Troubleshooting](./e2e-troubleshooting.md) - Common issues and fixes
 - [E2E Lessons Learned](./e2e-lessons-learned.md) - Hard-won insights
-- [BRS-011](../../specs/business-reqs/brs011-ui-test-compatibility/) - Specification
+- Spec #011 (archived) – Specification
 - [Test ID constants](../../src/renderer/src/constants/testids.ts) - Source code
 
 ---
@@ -241,6 +241,6 @@ See [E2E Helpers](./e2e-helpers.md) for implementation.
 
 - [Playwright Electron documentation](https://playwright.dev/docs/api/class-electron)
 - [Playwright locators](https://playwright.dev/docs/locators)
-- [BRS-011 specification](../../specs/business-reqs/brs011-ui-test-compatibility/)
+- Spec #011 (archived)
 - [Test ID constants](../../src/renderer/src/constants/testids.ts)
 - [Erfana security documentation](../security.md)

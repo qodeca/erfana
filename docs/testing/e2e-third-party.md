@@ -5,7 +5,7 @@ Strategies for testing third-party libraries whose internal DOM is not accessibl
 **Related documentation**:
 - [E2E Testing Guide](./e2e-testing.md) - Main E2E documentation
 - [E2E Selectors](./e2e-selectors.md) - Complete testid catalog
-- [BRS-011](../../specs/business-reqs/brs011-ui-test-compatibility/) - Specification
+- Spec #011 (archived) – Specification
 
 ---
 

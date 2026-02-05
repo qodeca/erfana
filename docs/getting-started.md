@@ -54,7 +54,7 @@ src/
 
 ### Adding a new feature
 
-1. Check if a BRS exists in `specs/business-reqs/`
+1. Check if a spec exists in `specs/`
 2. Create/update documentation in `docs/`
 3. Implement in appropriate layer:
    - Backend service: `src/main/services/`

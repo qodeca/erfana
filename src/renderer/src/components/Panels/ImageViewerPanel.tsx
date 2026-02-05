@@ -18,7 +18,7 @@
  * - ResizeObserver to recalculate fit on resize
  *
  * @module ImageViewerPanel
- * @see BRS-015 - Image preview viewer specification
+ * @see Spec #015 - Image preview viewer specification
  * @see {@link imageViewer.logic} for pure zoom/pan logic functions
  */
 

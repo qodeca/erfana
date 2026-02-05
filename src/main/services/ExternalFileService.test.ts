@@ -2,7 +2,7 @@
  * ExternalFileService Tests
  *
  * Tests for external file drop security validation and file operations.
- * Covers BRS-012: External File Drop to Project Tree
+ * Covers Spec #012: External File Drop to Project Tree
  *
  * Test coverage:
  * - validateExternalFile() - security validation of external files

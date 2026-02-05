@@ -369,18 +369,22 @@ export class DirectoryWatcherService {
    * Resume watching after internal operations complete
    * Only resumes when all pause operations have completed (pauseCount reaches 0)
    */
-  resumeWatch(dirPath: string): void {
+  resumeWatch(dirPath: string): boolean {
     const watched = this.watchedDirectories.get(dirPath)
-    if (watched) {
-      const isFullyResumed = watched.pauseController.resume()
-
-      // Only resume when all operations complete
-      if (isFullyResumed) {
-        this.safeLog(`▶️  Resumed directory watch for: ${dirPath}`)
-      } else {
-        this.safeLog(`⏸️  Directory watch still paused: ${dirPath} (count: ${watched.pauseController.getCount()})`)
-      }
+    if (!watched) {
+      this.safeLog(`⚠️  Resume called for non-existent watcher: ${dirPath}`)
+      return false
     }
+
+    const isFullyResumed = watched.pauseController.resume()
+
+    // Only resume when all operations complete
+    if (isFullyResumed) {
+      this.safeLog(`▶️  Resumed directory watch for: ${dirPath}`)
+    } else {
+      this.safeLog(`⏸️  Directory watch still paused: ${dirPath} (count: ${watched.pauseController.getCount()})`)
+    }
+    return true
   }
 
   /**

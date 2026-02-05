@@ -1,0 +1,366 @@
+{
+  "spec_id": 8,
+  "slug": "graph-polish",
+  "tier": "T3",
+  "version": "0.2.0",
+  "created": "2025-12-22T18:15:00.000Z",
+  "updated": "2025-12-22T19:30:00.000Z",
+  "application": {
+    "name": "Graph engine polish & maintenance",
+    "domain": null,
+    "tech_stack": []
+  },
+  "scope": {
+    "type": "feature",
+    "name": "Graph engine polish & maintenance"
+  },
+  "sections": [
+    {
+      "id": "01",
+      "file": "requirements/01-overview.md",
+      "title": "Overview",
+      "word_count": 401,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    },
+    {
+      "id": "02",
+      "file": "requirements/02-requirements.md",
+      "title": "Requirements",
+      "word_count": 1285,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    },
+    {
+      "id": "03",
+      "file": "requirements/03-acceptance.md",
+      "title": "Acceptance",
+      "word_count": 892,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    }
+  ],
+  "requirements_index": {
+    "008-FR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-005": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-006": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-007": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-008": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-009": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-010": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-011": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-012": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-013": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-014": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-015": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-016": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-017": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-018": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-019": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-020": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-021": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-022": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-023": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-024": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-025": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-026": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-027": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-028": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-029": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-FR-030": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-NFR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-NFR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-NFR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-NFR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-NFR-005": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-NFR-006": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-NFR-007": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-NFR-008": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-AC-001": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "008-AC-002": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "008-AC-003": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "008-AC-004": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "008-AC-005": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "008-AC-006": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "008-AC-007": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "008-AC-008": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "008-AC-009": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "008-AC-010": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "008-AC-011": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "008-AC-012": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "008-AC-013": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "008-AC-014": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "008-AC-015": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "008-AC-016": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "008-AC-017": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "008-AC-018": {
+      "section": "03-acceptance",
+      "status": "active"
+    }
+  },
+  "requirement_sequences": {
+    "FR": 30,
+    "NFR": 8,
+    "UC": 0,
+    "AC": 18,
+    "TC": 0,
+    "ES": 0,
+    "BO": 0,
+    "SH": 0,
+    "CA": 0,
+    "AP": 0
+  },
+  "cross_references": [],
+  "statistics": {
+    "total_sections": 3,
+    "total_requirements": 56,
+    "total_words": 2578,
+    "total_use_cases": 0,
+    "total_stakeholders": 0,
+    "deprecated_count": 0
+  },
+  "validation": {
+    "overall_score": null,
+    "passed": false,
+    "last_validated": null,
+    "threshold": 50
+  },
+  "change_history": [
+    {
+      "date": "2025-12-22T18:15:00.000Z",
+      "operation": "INIT",
+      "target": "manifest",
+      "description": "Spec initialized as T3 with 3 sections",
+      "by": "system"
+    },
+    {
+      "date": "2025-12-22T19:30:00.000Z",
+      "operation": "UPDATE",
+      "target": "02-requirements.md",
+      "description": "Applied validation findings: added FR-027 (worker crash recovery), FR-028 (auto-quantization recommendation), FR-029 (pre-migration database backup), FR-030 (vector search health check); fixed NFR-001 compression ratio (>20x to >30x); abstracted implementation details in FR-013 and FR-016; added FR-001 cross-reference to FR-003; updated traceability matrix",
+      "changes": {
+        "fields_updated": [
+          "requirements",
+          "nfr",
+          "traceability_matrix"
+        ],
+        "requirements_added": [
+          "008-FR-027",
+          "008-FR-028",
+          "008-FR-029",
+          "008-FR-030"
+        ]
+      },
+      "by": "user"
+    },
+    {
+      "date": "2025-12-22T19:30:00.000Z",
+      "operation": "UPDATE",
+      "target": "03-acceptance.md",
+      "description": "Applied validation findings: added AC-013 (diagram refresh for FR-005), AC-014 (reembed trigger for FR-011), AC-015 (embedder filter for FR-016), AC-016 (migration progress UI for FR-018), AC-017 (worker crash recovery for FR-027), AC-018 (vector search health for FR-030); added edge cases for new requirements; fixed AC-009 compression target to >30x",
+      "changes": {
+        "fields_updated": [
+          "acceptance_criteria",
+          "edge_cases"
+        ],
+        "acceptance_criteria_added": [
+          "008-AC-013",
+          "008-AC-014",
+          "008-AC-015",
+          "008-AC-016",
+          "008-AC-017",
+          "008-AC-018"
+        ]
+      },
+      "by": "user"
+    },
+    {
+      "date": "2026-02-03T08:30:00+01:00",
+      "operation": "MIGRATE",
+      "target": "manifest",
+      "description": "Migrated from BRS to managing-specs naming convention",
+      "by": "system"
+    }
+  ],
+  "components": {
+    "requirements": true,
+    "architecture": false,
+    "solution": false,
+    "design": false,
+    "ux": false
+  },
+  "tags": [],
+  "related_specs": [],
+  "id_migrations": []
+}

@@ -56,12 +56,12 @@ declare global {
         }>
         /**
          * Read a file as base64-encoded data URL
-         * @see BRS-015 - Image preview viewer specification
+         * @see Spec #015 - Image preview viewer specification
          */
         readAsBase64: (filePath: string) => Promise<string>
         /**
          * Validate an external file for drop into project
-         * @see BRS-012 - External file drop to project tree
+         * @see Spec #012 - External file drop to project tree
          */
         validateExternal: (
           sourcePath: string,
@@ -69,7 +69,7 @@ declare global {
         ) => Promise<ExternalFileValidateResponse>
         /**
          * Copy an external file into the project
-         * @see BRS-012 - External file drop to project tree
+         * @see Spec #012 - External file drop to project tree
          */
         copyFromExternal: (
           sourcePath: string,
@@ -79,7 +79,7 @@ declare global {
         ) => Promise<ExternalFileCopyResponse>
         /**
          * Move an external file into the project
-         * @see BRS-012 - External file drop to project tree
+         * @see Spec #012 - External file drop to project tree
          */
         moveFromExternal: (
           sourcePath: string,
@@ -89,7 +89,7 @@ declare global {
         ) => Promise<ExternalFileMoveResponse>
         /**
          * Open native file picker for selecting external files
-         * @see BRS-012 - External file drop to project tree
+         * @see Spec #012 - External file drop to project tree
          */
         selectExternalFiles: () => Promise<{ paths: string[] } | null>
         onProjectChanged: (
@@ -241,7 +241,7 @@ declare global {
       }
       /**
        * Camera photo capture operations
-       * @see BRS-014 - Camera photo capture specification
+       * @see Spec #014 - Camera photo capture specification
        */
       camera: {
         /** Save a captured photo to temp file */
@@ -264,7 +264,7 @@ declare global {
       /**
        * Project lock operations for multi-instance support
        * @see Issue #27 - Multiple independent instances
-       * @see BRS-010 - Multi-instance support specification
+       * @see Spec #010 - Multi-instance support specification
        */
       projectLock: {
         /** Acquire lock for a project path */

@@ -1,0 +1,414 @@
+{
+  "spec_id": 13,
+  "slug": "multi-cli-tool-prompt-optimization",
+  "tier": "T3",
+  "version": "0.1.0",
+  "created": "2026-01-18T07:50:00+01:00",
+  "updated": "2026-01-18T12:13:45+01:00",
+  "application": {
+    "name": "Multi-CLI tool prompt optimization",
+    "domain": null,
+    "tech_stack": []
+  },
+  "scope": {
+    "type": "feature",
+    "name": "Multi-CLI tool prompt optimization"
+  },
+  "sections": [
+    {
+      "id": "01",
+      "file": "requirements/01-overview.md",
+      "title": "Overview",
+      "word_count": 543,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    },
+    {
+      "id": "02",
+      "file": "requirements/02-requirements.md",
+      "title": "Requirements",
+      "word_count": 1243,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    },
+    {
+      "id": "03",
+      "file": "requirements/03-acceptance.md",
+      "title": "Acceptance",
+      "word_count": 1315,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    }
+  ],
+  "requirements_index": {
+    "013-FR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "013-FR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "013-FR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "013-FR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "013-FR-005": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "013-FR-006": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "013-FR-007": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "013-FR-008": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "013-NFR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "013-NFR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "013-NFR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "013-NFR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "013-NFR-005": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "013-NFR-006": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "013-NFR-007": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "013-NFR-008": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "013-TC-001": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "013-TC-002": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "013-TC-003": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "013-TC-004": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "013-TC-005": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "013-TC-006": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "013-TC-007": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "013-TC-008": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "013-TC-009": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "013-TC-010": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "013-TC-011": {
+      "section": "03-acceptance",
+      "status": "active"
+    }
+  },
+  "requirement_sequences": {
+    "FR": 8,
+    "NFR": 8,
+    "UC": 0,
+    "AC": 0,
+    "TC": 11,
+    "ES": 0,
+    "BO": 0,
+    "SH": 0,
+    "CA": 0,
+    "AP": 0
+  },
+  "cross_references": [],
+  "statistics": {
+    "total_sections": 3,
+    "total_requirements": 27,
+    "total_words": 3101,
+    "total_use_cases": 0,
+    "total_stakeholders": 0,
+    "deprecated_count": 0
+  },
+  "validation": {
+    "overall_score": null,
+    "passed": false,
+    "last_validated": null,
+    "threshold": 50
+  },
+  "change_history": [
+    {
+      "date": "2026-01-18T07:50:00+01:00",
+      "operation": "INIT",
+      "target": "manifest",
+      "description": "Spec initialized as T3 with 3 sections",
+      "by": "system"
+    },
+    {
+      "date": "2026-01-18T08:00:00+01:00",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 1 issue: corrected requirement_sequences key from AC to TC",
+      "by": "system",
+      "details": {
+        "word_count_updated": false,
+        "indexes_rebuilt": false,
+        "sections_synced": true,
+        "orphans_cleaned": 0,
+        "registry_synced": true,
+        "sequence_key_corrected": true
+      }
+    },
+    {
+      "date": "2026-01-18T09:00:00+01:00",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 4 issues: updated word counts for all 3 sections (+197 words total)",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": false,
+        "sections_synced": true,
+        "orphans_cleaned": 0,
+        "registry_synced": true,
+        "word_count_changes": {
+          "01-overview.md": {
+            "old": 241,
+            "new": 249
+          },
+          "02-requirements.md": {
+            "old": 588,
+            "new": 647
+          },
+          "03-acceptance.md": {
+            "old": 665,
+            "new": 795
+          },
+          "total": {
+            "old": 1494,
+            "new": 1691
+          }
+        }
+      }
+    },
+    {
+      "date": "2026-01-18T12:00:00+01:00",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 3 issues: updated word counts after template inventory addition (+221 words total)",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": false,
+        "sections_synced": true,
+        "orphans_cleaned": 0,
+        "registry_synced": true,
+        "word_count_changes": {
+          "01-overview.md": {
+            "old": 249,
+            "new": 412
+          },
+          "02-requirements.md": {
+            "old": 647,
+            "new": 647
+          },
+          "03-acceptance.md": {
+            "old": 795,
+            "new": 853
+          },
+          "total": {
+            "old": 1691,
+            "new": 1912
+          }
+        }
+      }
+    },
+    {
+      "date": "2026-01-18T13:00:00+01:00",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 3 issues: updated word counts after Mermaid templates included in scope (+10 words total)",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": false,
+        "sections_synced": true,
+        "orphans_cleaned": 0,
+        "registry_synced": true,
+        "word_count_changes": {
+          "01-overview.md": {
+            "old": 412,
+            "new": 387
+          },
+          "02-requirements.md": {
+            "old": 647,
+            "new": 647
+          },
+          "03-acceptance.md": {
+            "old": 853,
+            "new": 888
+          },
+          "total": {
+            "old": 1912,
+            "new": 1922
+          }
+        }
+      }
+    },
+    {
+      "date": "2026-01-18T18:00:00+01:00",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 10 issues after review changes: +2 FRs, +3 NFRs, +4 TCs, word counts updated (+1196 words)",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": true,
+        "sections_synced": true,
+        "orphans_cleaned": 0,
+        "registry_synced": true,
+        "requirements_added": [
+          "FR-007",
+          "FR-008",
+          "NFR-006",
+          "NFR-007",
+          "NFR-008",
+          "TC-008",
+          "TC-009",
+          "TC-010",
+          "TC-011"
+        ],
+        "sequence_changes": {
+          "FR": {
+            "old": 6,
+            "new": 8
+          },
+          "NFR": {
+            "old": 5,
+            "new": 8
+          },
+          "TC": {
+            "old": 7,
+            "new": 11
+          }
+        },
+        "word_count_changes": {
+          "01-overview.md": {
+            "old": 387,
+            "new": 493
+          },
+          "02-requirements.md": {
+            "old": 647,
+            "new": 1250
+          },
+          "03-acceptance.md": {
+            "old": 888,
+            "new": 1375
+          },
+          "total": {
+            "old": 1922,
+            "new": 3118
+          }
+        },
+        "total_requirements_change": {
+          "old": 18,
+          "new": 27
+        }
+      }
+    },
+    {
+      "date": "2026-01-18T12:13:45+01:00",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 4 issues: updated word counts after template structure reorganization (templates/{area}/{prompt}-{tool}.md to templates/{tool}/{area}/{prompt}.md)",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": false,
+        "sections_synced": true,
+        "orphans_cleaned": 0,
+        "registry_synced": false,
+        "word_count_changes": {
+          "01-overview.md": {
+            "old": 493,
+            "new": 543
+          },
+          "02-requirements.md": {
+            "old": 1250,
+            "new": 1243
+          },
+          "03-acceptance.md": {
+            "old": 1375,
+            "new": 1315
+          },
+          "total": {
+            "old": 3118,
+            "new": 3101
+          }
+        },
+        "template_structure_change": "Changed from templates/{area}/{prompt}-{tool}.md to templates/{tool}/{area}/{prompt}.md"
+      }
+    },
+    {
+      "date": "2026-02-03T08:30:00+01:00",
+      "operation": "MIGRATE",
+      "target": "manifest",
+      "description": "Migrated from BRS to managing-specs naming convention",
+      "by": "system"
+    }
+  ],
+  "components": {
+    "requirements": true,
+    "architecture": false,
+    "solution": false,
+    "design": false,
+    "ux": false
+  },
+  "tags": [],
+  "related_specs": [],
+  "id_migrations": []
+}

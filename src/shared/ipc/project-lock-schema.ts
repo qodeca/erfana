@@ -5,7 +5,7 @@
  * for preventing duplicate project opens across Erfana instances.
  *
  * @see ProjectLockService.ts - main process lock management implementation
- * @see BRS-010 - Multi-instance support specification
+ * @see Spec #010 - Multi-instance support specification
  * @see Issue #27 - Multiple independent instances
  */
 import { z } from 'zod'

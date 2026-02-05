@@ -161,7 +161,7 @@ Save a camera photo to the temp directory.
 
 **File:** `src/main/services/ExternalFileService.ts`
 
-Handles external file operations for BRS-012 (external file drop to project tree).
+Handles external file operations for Spec #012 (external file drop to project tree).
 
 ### Key Features
 - Security validation (symlinks, project boundary, special files)

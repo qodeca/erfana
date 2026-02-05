@@ -14,7 +14,7 @@
  * - Store integration (1 test)
  * - Selection population (5 tests)
  *
- * @see BRS #001 - Unified search feature
+ * @see Spec #001 - Unified search feature
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'

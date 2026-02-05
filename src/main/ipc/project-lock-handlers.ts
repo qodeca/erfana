@@ -12,7 +12,7 @@
  * - 'project-lock:cleanup' - Cleanup stale locks at startup
  *
  * @see ProjectLockService.ts - Main process lock management implementation
- * @see BRS-010 - Multi-instance support specification
+ * @see Spec #010 - Multi-instance support specification
  * @see Issue #27 - Multiple independent instances
  */
 import { ipcMain } from 'electron'

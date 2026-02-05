@@ -68,9 +68,9 @@ Project-specific terminology used in Erfana documentation and code.
 
 | Term | Definition |
 |------|------------|
-| **BRS** | Business Requirements Specification |
+| **Spec** | Feature specification (requirements, acceptance criteria) |
 | **ADR** | Architecture Decision Record |
-| **Tier** | BRS complexity level (T1=trivial, T4=complex) |
+| **Tier** | Spec complexity level (T1=trivial, T4=complex) |
 
 ## File Conventions
 

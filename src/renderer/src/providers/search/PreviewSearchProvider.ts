@@ -5,7 +5,7 @@
  * Highlight API for zero-DOM-mutation highlighting. Falls back to
  * ancestor class injection for browsers without Highlight API support.
  *
- * @see ADR-BRS001-001 - Unified search architecture
+ * @see ADR-Spec001-001 - Unified search architecture
  * @see SearchProvider interface for contract documentation
  */
 

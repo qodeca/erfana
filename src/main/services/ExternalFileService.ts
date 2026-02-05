@@ -1,7 +1,7 @@
 /**
  * ExternalFileService
  *
- * Handles secure file operations for external file drops (BRS-012).
+ * Handles secure file operations for external file drops (Spec #012).
  * Implements security validation per architect review:
  * - M1: Reuses validateSymlink() from pathSecurity.ts
  * - M2: Uses fs.realpath() to resolve symlink targets before validation

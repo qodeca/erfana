@@ -187,3 +187,96 @@ describe('ProjectTree project switching timing', () => {
     expect(readDirectory).not.toHaveBeenCalled()
   })
 })
+
+describe('AC-007: Manual refresh via keyboard shortcut', () => {
+  it('Cmd+Alt+R triggers readDirectory and getStatus directly', async () => {
+    const readDirectory = vi.fn(async () => [])
+    const getStatus = vi.fn(async () => ({
+      isGitRepo: true,
+      branch: 'main',
+      isDetached: false,
+      files: [],
+      counts: { modified: 0, untracked: 0, deleted: 0, staged: 0, conflicted: 0 },
+      truncated: false
+    }))
+
+    let onProjectChangedCallback: ((data: { newPath: string | null; oldPath: string | null }) => void) | null = null
+
+    ;(window as any).api = {
+      file: {
+        getLastProjectPath: vi.fn(async () => null),
+        readDirectory,
+        onProjectChanged: (cb: any) => {
+          onProjectChangedCallback = cb
+          return () => {}
+        },
+        moveItem: vi.fn(async () => ({ path: '/moved' })),
+        copyItem: vi.fn(async () => ({ path: '/copied' })),
+        checkConflict: vi.fn(async () => false)
+      },
+      directoryWatch: {
+        start: vi.fn(async () => ({ success: true })),
+        stop: vi.fn(async () => ({ success: true })),
+        onDirectoryChanged: () => () => {},
+        onProjectDeleted: () => () => {},
+        onDirectoryError: () => () => {}
+      },
+      gitWatcher: {
+        start: vi.fn(async () => ({ success: true })),
+        stop: vi.fn(async () => ({ success: true })),
+        onStateChanged: () => () => {}
+      },
+      gitPolling: {
+        start: vi.fn(async () => ({ success: true })),
+        stop: vi.fn(async () => ({ success: true })),
+        onPollTriggered: () => () => {}
+      },
+      git: { getStatus },
+      logging: { log: vi.fn() }
+    }
+
+    render(
+      <DialogProvider>
+        <ProjectManagementProvider>
+          <ProjectTree
+            onFileSelect={() => {}}
+            showControlPanel={false}
+            filterMode={'all' as any}
+            onFilterModeChange={() => {}}
+          />
+        </ProjectManagementProvider>
+      </DialogProvider>
+    )
+
+    // Set up project
+    expect(onProjectChangedCallback).not.toBeNull()
+    await act(async () => {
+      onProjectChangedCallback!({ newPath: '/proj', oldPath: null })
+    })
+
+    // Wait for initial load to complete
+    await waitFor(() => {
+      expect(readDirectory).toHaveBeenCalledWith('/proj')
+    })
+
+    // Clear call counts after initial load
+    readDirectory.mockClear()
+    getStatus.mockClear()
+
+    // Simulate Cmd+Alt+R keyboard shortcut
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'r',
+        altKey: true,
+        metaKey: true,
+        bubbles: true
+      }))
+    })
+
+    // Manual refresh should trigger both readDirectory and getStatus
+    await waitFor(() => {
+      expect(readDirectory).toHaveBeenCalledWith('/proj')
+      expect(getStatus).toHaveBeenCalledWith('/proj')
+    })
+  })
+})

@@ -1,0 +1,190 @@
+{
+  "sequence": {
+    "current": 16,
+    "next": 17
+  },
+  "registry": [
+    {
+      "id": 4,
+      "slug": "graph-foundation",
+      "name": "Graph engine foundation",
+      "tier": "T4",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Foundational graph engine delivering SQLite database layer (FTS5, WAL mode), text preprocessing pipeline, file indexing, BM25 keyword search, event-driven integration with FileWatcherService, four UI components (Related Sidebar, Global Search, Settings Panel, Status Indicator), and MCP server with `erfana_graph_search` tool for Claude Code integration. Corresponds to implementation milestone M1.",
+      "created": "2025-12-22T21:00:00.000Z",
+      "path": "spec-t4-004-graph-foundation",
+      "last_modified": "2025-12-22T21:00:00.000Z",
+      "sections_count": 5,
+      "requirements_count": 107,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": []
+      }
+    },
+    {
+      "id": 5,
+      "slug": "vector-search",
+      "name": "Vector search & hybrid retrieval",
+      "tier": "T3",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Adds semantic search via vector embeddings using sqlite-vec extension and ONNX Runtime in worker threads. Implements hybrid search fusion combining BM25 keyword scores with vector similarity using configurable weights (α, β). Includes Settings UI for weight tuning and MCP tool `erfana_graph_related` for finding related sections. Corresponds to implementation milestone M2.",
+      "created": "2025-12-22T22:30:00.000Z",
+      "path": "spec-t3-005-vector-search",
+      "last_modified": "2025-12-22T22:30:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 72,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": []
+      }
+    },
+    {
+      "id": 6,
+      "slug": "knowledge-graph",
+      "name": "Knowledge graph & entities",
+      "tier": "T3",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Extracts entities from markdown content using rule-based patterns (wikilinks, tags, mentions), builds a knowledge graph with entities, edges, and mentions tables, and enables Obsidian-like backlink navigation. Includes Knowledge Panel UI showing entities and backlinks for the current section, plus MCP tools `erfana_graph_entities` and `erfana_graph_backlinks` for Claude Code integration. Corresponds to implementation milestone M3.",
+      "created": "2025-12-22T23:00:00.000Z",
+      "path": "spec-t3-006-knowledge-graph",
+      "last_modified": "2025-12-22T16:54:15Z",
+      "sections_count": 3,
+      "requirements_count": 66,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": []
+      }
+    },
+    {
+      "id": 7,
+      "slug": "temporal-queries",
+      "name": "Temporal queries & timeline",
+      "tier": "T3",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Enables time-travel queries and change timelines for documentation evolution tracking. Implements temporal fields (valid_from, valid_to, tx_time) on edges, as-of query API for historical state reconstruction, Timeline UI with date slider for time-aware navigation, and MCP tool `erfana_graph_timeline` for Claude Code. Supports contradiction detection and audit trails. Corresponds to implementation milestone M4.",
+      "created": "2025-12-22T17:10:00.000Z",
+      "path": "spec-t3-007-temporal-queries",
+      "last_modified": "2025-12-22T17:57:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 49,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": []
+      }
+    },
+    {
+      "id": 8,
+      "slug": "graph-polish",
+      "name": "Graph engine polish & maintenance",
+      "tier": "T3",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Production-ready polish and maintenance features for the Graph Engine. Includes Mermaid graph visualization (entity neighborhood diagrams), reindex/reembed UX with progress tracking, binary quantization for large datasets (>100K documents), model migration for switching embedding models safely, and monitoring/health checks for database, workers, and disk space. Corresponds to implementation milestone M5.",
+      "created": "2025-12-22T18:15:00.000Z",
+      "path": "spec-t3-008-graph-polish",
+      "last_modified": "2025-12-22T18:15:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 46,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": []
+      }
+    },
+    {
+      "id": 9,
+      "slug": "media-import-transcription",
+      "name": "Media import with transcription",
+      "tier": "T4",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Extend import system to support audio/video files via transcription. Configurable backends (OpenAI API, local Whisper), markdown output with metadata, per-import language selection, progress reporting.",
+      "created": "2025-12-22T21:45:00.000Z",
+      "path": "spec-t4-009-media-import-transcription",
+      "last_modified": "2025-12-22T23:15:00.000Z",
+      "sections_count": 5,
+      "requirements_count": 51,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": [
+          "#75"
+        ]
+      }
+    },
+    {
+      "id": 13,
+      "slug": "multi-cli-tool-prompt-optimization",
+      "name": "Multi-CLI tool prompt optimization",
+      "tier": "T3",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Support for multiple CLI tools (Claude Code, Codex, Gemini CLI) with prompts optimized per tool selected from terminal dropdown",
+      "created": "2026-01-18T00:00:00.000Z",
+      "path": "spec-t3-013-multi-cli-tool-prompt-optimization",
+      "last_modified": "2026-01-18T18:30:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 27,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": [
+          "#88"
+        ]
+      }
+    },
+    {
+      "id": 16,
+      "slug": "project-tree-refresh",
+      "name": "Project Tree refresh specification",
+      "tier": "T3",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Comprehensive specification for how and when Project Tree content (folder structure and git statuses) should refresh to achieve near-live responsiveness. Documents the full refresh pipeline including watcher submodules, identifies gaps, and defines acceptance criteria.",
+      "created": "2026-02-05T12:00:00.000Z",
+      "path": "spec-t3-016-project-tree-refresh",
+      "last_modified": "2026-02-05T12:00:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 38,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": []
+      },
+      "components": {
+        "total": 0,
+        "implemented": 0,
+        "list": []
+      }
+    }
+  ],
+  "metadata": {
+    "schema_version": "2.0.0",
+    "created": "2025-12-22T00:00:00.000Z",
+    "last_updated": "2026-02-05T12:00:00.000Z"
+  }
+}

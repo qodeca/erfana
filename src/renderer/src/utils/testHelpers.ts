@@ -5,7 +5,7 @@
  * and React portal root (#portal-root) for dialogs, context menus, and toasts.
  *
  * @see constants/testids.ts - Test ID constants
- * @see BRS-011 - Automated UI testing compatibility
+ * @see Spec #011 - Automated UI testing compatibility
  *
  * @example Basic usage
  * ```typescript

@@ -7,7 +7,6 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 
 ### Core Documentation
 - [Architecture](./architecture.md) - System architecture and design patterns
-- [Architecture ADRs](./architecture/adrs/) - Architecture Decision Records for BRS features
 - [API Services](./api-services.md) - Main process services and IPC handlers
 - [IPC Patterns](./ipc-patterns.md) - Inter-process communication patterns
 - [Security](./security.md) - Security considerations and implementations
@@ -96,5 +95,5 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 
 ## Archive
 
-Archived specifications are located in [`./archive/`](./archive/):
-- [Graph Engine Spec 2025](./archive/graph-engine-spec-2025/) - SQLite-based knowledge graph specification (not implemented)
+Archived documentation is located in [`./archive/`](./archive/):
+- [Resolved Issues](./archive/resolved-issues.md) – Issues fixed in past versions

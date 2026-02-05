@@ -5,7 +5,7 @@
  * Used by ProjectLockService to ensure lock file integrity.
  *
  * @see ProjectLockService.ts - uses atomic writes for lock files
- * @see BRS-010 - Multi-instance support specification
+ * @see Spec #010 - Multi-instance support specification
  */
 import { writeFile, rename, unlink, mkdir } from 'node:fs/promises'
 import { dirname, join } from 'node:path'

@@ -22,7 +22,7 @@
  *   // After 150ms: callback fires once with 'git-changed'
  *
  * @see Issue #74 - Real-time git status refresh
- * @see BRS-003 - Real-time git status refresh specification
+ * @see Spec #003 - Real-time git status refresh specification
  */
 
 import { logger } from '../LoggingService'
@@ -64,7 +64,7 @@ export class GitEventCoalescer {
   /** Consecutive callback error count for circuit breaker (Issue #74 review fix) */
   private callbackErrorCount = 0
 
-  /** Window start time for timing measurement (ADR-BRS003-002) */
+  /** Window start time for timing measurement (ADR-Spec003-002) */
   private windowStartTime: number | null = null
 
   /**
@@ -89,7 +89,7 @@ export class GitEventCoalescer {
   queueEvent(eventType: GitEventType): void {
     if (this.isDisposed) return
 
-    // Start timing window on first event (ADR-BRS003-002)
+    // Start timing window on first event (ADR-Spec003-002)
     if (this.pendingEvents.size === 0) {
       this.windowStartTime = Date.now()
     }
@@ -97,7 +97,7 @@ export class GitEventCoalescer {
     // Add to pending set (automatically deduplicates)
     this.pendingEvents.add(eventType)
 
-    // Trace log for debugging event flow (ADR-BRS003-002)
+    // Trace log for debugging event flow (ADR-Spec003-002)
     logger.trace('GitCoalescer: Event queued', {
       eventType,
       pendingCount: this.pendingEvents.size
@@ -147,7 +147,7 @@ export class GitEventCoalescer {
       this.pendingEvents.clear()
       this.windowStartTime = null
 
-      // Debug log for coalesce completion (ADR-BRS003-002)
+      // Debug log for coalesce completion (ADR-Spec003-002)
       logger.debug('GitCoalescer: Flushed', {
         eventTypes,
         count: eventTypes.length,

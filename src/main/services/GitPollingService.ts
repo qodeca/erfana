@@ -17,7 +17,7 @@
  * - Coordinates with GitWatcherService for hybrid behavior
  *
  * @see Issue #74 - Real-time git status refresh
- * @see BRS-003 - Real-time git status refresh specification
+ * @see Spec #003 - Real-time git status refresh specification
  */
 
 import { stat } from 'fs/promises'
@@ -305,9 +305,9 @@ export class GitPollingService {
     // Check if watcher is active (triggered recently)
     if (this.shouldSkip()) {
       this.metrics.pollingSkippedCount++
-      watcherMetrics.recordPollingSkipped() // Record to shared metrics (ADR-BRS003-002)
+      watcherMetrics.recordPollingSkipped() // Record to shared metrics (ADR-Spec003-002)
       const lastWatcherEvent = this.getLastWatcherEventTimestamp()
-      // Trace log with context for debugging (ADR-BRS003-002)
+      // Trace log with context for debugging (ADR-Spec003-002)
       logger.trace('GitPolling: Skipped (watcher active)', {
         lastWatcherEventMs: lastWatcherEvent ? Date.now() - lastWatcherEvent : null
       })
@@ -318,8 +318,8 @@ export class GitPollingService {
     const indexChanged = await this.hasIndexChanged()
     if (!indexChanged) {
       this.metrics.pollingSkippedCount++
-      watcherMetrics.recordPollingSkipped() // Record to shared metrics (ADR-BRS003-002)
-      // Trace log with context for debugging (ADR-BRS003-002)
+      watcherMetrics.recordPollingSkipped() // Record to shared metrics (ADR-Spec003-002)
+      // Trace log with context for debugging (ADR-Spec003-002)
       logger.trace('GitPolling: Skipped (index unchanged)', {
         indexMtime: this.lastIndexMtime
       })
@@ -329,7 +329,7 @@ export class GitPollingService {
     // Trigger refresh
     this.metrics.pollingRefreshCount++
     this.metrics.lastRefreshTimestamp = Date.now()
-    watcherMetrics.recordPollingRefresh() // Record to shared metrics (ADR-BRS003-002)
+    watcherMetrics.recordPollingRefresh() // Record to shared metrics (ADR-Spec003-002)
 
     const reason = this.isWatcherActive() ? 'index_changed' : 'no_watcher'
 

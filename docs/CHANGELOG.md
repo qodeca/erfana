@@ -2,10 +2,12 @@
 
 Historical changelog entries for versions prior to current. For the latest changes, see [CLAUDE.md](../CLAUDE.md).
 
+> **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
+
 ## [0.7.0] - 2026-01-22
 
 ### Added
-- **Image Preview Viewer** (BRS-015): Full-featured image viewer panel for PNG, JPG, GIF, WebP, SVG, BMP, ICO files (#94)
+- **Image Preview Viewer** (Spec #015): Full-featured image viewer panel for PNG, JPG, GIF, WebP, SVG, BMP, ICO files (#94)
   - Zoom controls: buttons, mouse wheel (cursor-centered), keyboard (+/-, 0, Home)
   - Pan via click-drag or arrow keys
   - Fit to view with auto-scale on window resize
@@ -14,7 +16,7 @@ Historical changelog entries for versions prior to current. For the latest chang
   - Accessibility: ARIA labels, keyboard navigation, prefers-reduced-motion support
   - Architecture: ImageViewerPanel.tsx, imageViewer.logic.ts, imageUtils.ts
   - 691 logic tests
-- **Camera Photo Capture** (BRS-014): Webcam capture from terminal toolbar (#93)
+- **Camera Photo Capture** (Spec #014): Webcam capture from terminal toolbar (#93)
   - Cross-platform support (macOS, Windows, Linux)
   - Real-time camera preview with device selection
   - Captured photos saved to OS temp directory with timestamp
@@ -41,9 +43,9 @@ Historical changelog entries for versions prior to current. For the latest chang
 - **Prompt templates**: Modify templates explicitly request file edits for clearer AI instructions
 
 ### Documentation
-- Archive BRS-015 (image preview viewer implemented)
-- Archive BRS-014 (camera capture implemented)
-- Archive BRS-012 (external file drop feature implemented)
+- Archive Spec #015 (image preview viewer implemented)
+- Archive Spec #014 (camera capture implemented)
+- Archive Spec #012 (external file drop feature implemented)
 - Add CameraService to api-services.md
 - Add camera-capture IPC channels documentation
 - Add ExternalFileService to api-services.md
@@ -54,7 +56,7 @@ Historical changelog entries for versions prior to current. For the latest chang
 ## [0.6.5-gamma] - 2026-01-18
 
 ### Added
-- **External file drop to project tree** (BRS-012): Drag files from Finder or file managers into project tree (#87)
+- **External file drop to project tree** (Spec #012): Drag files from Finder or file managers into project tree (#87)
   - Drop mode dialog: Move, Copy, or Import options
   - Conflict resolution: Replace or Keep Both
   - Keyboard shortcut: Cmd/Ctrl+Shift+I to import via file picker
@@ -98,8 +100,8 @@ Historical changelog entries for versions prior to current. For the latest chang
 - **Logging Instance ID** (Dec 26, 2025):
   - Added instance ID to log entries for multi-instance isolation
   - Helps debug multi-window scenarios
-- **BRS-011: Automated UI Testing Compatibility** (Dec 27, 2025):
-  - New T3 BRS for Playwright/E2E testing infrastructure
+- **Spec #011: Automated UI Testing Compatibility** (Dec 27, 2025):
+  - New T3 spec for Playwright/E2E testing infrastructure
   - 42 requirements (26 FR + 6 NFR + 10 AC)
   - TypeScript constants, portal-aware helpers
 - **Total: 5612 tests passing** (180 test files)

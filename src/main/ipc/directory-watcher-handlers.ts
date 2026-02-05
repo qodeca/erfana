@@ -81,7 +81,10 @@ export function registerDirectoryWatcherHandlers(): void {
         return { success: false, error: 'Invalid directory path' }
       }
 
-      directoryWatcherService.resumeWatch(dirPath)
+      const resumed = directoryWatcherService.resumeWatch(dirPath)
+      if (!resumed) {
+        return { success: false, error: `No watcher found for ${dirPath}` }
+      }
 
       return { success: true }
     } catch (error) {

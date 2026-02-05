@@ -41,7 +41,7 @@
  * }
  * ```
  *
- * @see BRS-014 - Camera photo capture specification
+ * @see Spec #014 - Camera photo capture specification
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
