@@ -88,6 +88,7 @@ Feature specifications live in `specs/`. Check registry before implementing new 
 | 008 | Graph engine polish & maintenance | T3 | draft | `specs/spec-t3-008-graph-polish` |
 | 009 | Media import with transcription | T4 | draft | `specs/spec-t4-009-media-import-transcription` |
 | 013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/spec-t3-013-multi-cli-tool-prompt-optimization` |
+| 016 | Project Tree refresh specification | T3 | draft | `specs/spec-t3-016-project-tree-refresh` |
 
 **Registry**: `specs/registry.json`
 
