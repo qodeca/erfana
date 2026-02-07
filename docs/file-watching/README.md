@@ -368,6 +368,12 @@ The service integrates these components:
 - Git pipeline integration tests in `src/main/services/GitWatcherService.pipeline.test.ts` (22 tests, #99)
   - Covers AC-004 (git add), AC-005 (git commit), AC-006 (git checkout), AC-018 (coalescer dedup)
   - Additional: all 5 event types, correlation ID, WatcherMetrics, disposal guards, circuit breaker
+- Watcher resilience tests in `src/main/services/WatcherResilience.test.ts` (14 tests, #100)
+  - AC-011 (polling fallback), AC-015 (redundant polling suppression), AC-016 (exponential backoff restart)
+- Window visibility gating tests in `src/renderer/src/hooks/useGitStatus.test.ts` (5 tests, #102)
+  - AC-012: git status refreshes dropped while hidden, single catch-up on restore, cooldown respected
+- Event buffer overflow tests in `src/main/services/watcher/ThrottledWorker.test.ts` (6 tests, #102)
+  - AC-017: 30,000-event cap, FIFO eviction, no crash/hang, post-burst recovery
 - Hook tests in `src/renderer/src/hooks/useDirectoryWatcher.test.ts` (11 tests)
 - Pause/resume tests in `src/renderer/src/components/ProjectTree/withWatcherPause.test.ts` (17 tests)
 - Project switching tests in `src/main/services/ProjectService.switching.test.ts` (20 tests, #101)

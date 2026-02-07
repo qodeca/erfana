@@ -23,6 +23,10 @@ Historical changelog entries for versions prior to current. For the latest chang
   - ProjectTree.switching.test.tsx (11 tests) – tree clearing, stale event rejection, git status
   - AC-009 (a–d) and AC-014
   - Closes #101
+- **Performance, scalability, and window visibility gating tests** (#102): 11 tests across 2 files
+  - useGitStatus.test.ts (5 tests) – AC-012: window visibility gates git status refreshes (drop while hidden, catch-up on restore, cooldown respected)
+  - ThrottledWorker.test.ts (6 tests) – AC-017: event buffer overflow at production scale (30,000 cap, FIFO eviction, post-burst recovery)
+  - Closes #102
 
 ### Fixed
 - **Project Tree refresh regression** (#97): Unstable callback references in useDirectoryWatcher caused watcher cycling
