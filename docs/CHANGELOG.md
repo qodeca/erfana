@@ -28,6 +28,13 @@ Historical changelog entries for versions prior to current. For the latest chang
   - ThrottledWorker.test.ts (6 tests) – AC-017: event buffer overflow at production scale (30,000 cap, FIFO eviction, post-burst recovery)
   - Closes #102
 
+### Changed
+- **Spec T3-016 validated and marked implemented**: All 18 acceptance criteria pass (18 PASS, 0 FAIL). 4 gap issues filed:
+  - #103 – PauseController auto-resume timeout (bug)
+  - #104 – E2E Playwright test for watcher pipeline (testing)
+  - #105 – Performance benchmarks for large repos (testing)
+  - #106 – cleanupForWebContentsId for git services (bug)
+
 ### Fixed
 - **Project Tree refresh regression** (#97): Unstable callback references in useDirectoryWatcher caused watcher cycling
   - Ref pattern for callbacks prevents effect re-runs on reference changes
