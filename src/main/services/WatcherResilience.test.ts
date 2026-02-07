@@ -49,23 +49,14 @@ const mockWatcherMetrics = {
 
 vi.mock('chokidar', () => ({ default: mockChokidar }))
 
-vi.mock('electron', () => {
-  const mkWin = (id: number) => ({
-    isDestroyed: () => false,
-    webContents: {
-      id,
-      send: (ch: string, p: any) => sends.push({ id, channel: ch, payload: p })
-    }
-  })
-  return {
-    BrowserWindow: {
-      getAllWindows: vi.fn(() => mockBrowserWindows)
-    },
-    webContents: {
-      getAllWebContents: vi.fn(() => [])
-    }
+vi.mock('electron', () => ({
+  BrowserWindow: {
+    getAllWindows: vi.fn(() => mockBrowserWindows)
+  },
+  webContents: {
+    getAllWebContents: vi.fn(() => [])
   }
-})
+}))
 
 vi.mock('./LoggingService', () => ({
   logger: mockLogger

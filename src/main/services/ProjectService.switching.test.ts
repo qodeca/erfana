@@ -78,7 +78,7 @@ describe('ProjectService switching – session token orchestration', () => {
 
     // Setup mocked services
     mockFileService = {
-      setProjectPath: vi.fn((path) => {
+      setProjectPath: vi.fn((_path) => {
         callOrder.push('fileService.setProjectPath')
       }),
       getProjectPath: vi.fn(() => null),
@@ -86,7 +86,7 @@ describe('ProjectService switching – session token orchestration', () => {
     } as any
 
     mockFileWatcherService = {
-      setProjectPath: vi.fn((path) => {
+      setProjectPath: vi.fn((_path) => {
         callOrder.push('fileWatcherService.setProjectPath')
       }),
       stopAll: vi.fn(() => {
@@ -96,7 +96,7 @@ describe('ProjectService switching – session token orchestration', () => {
     } as any
 
     mockDirectoryWatcherService = {
-      setProjectPath: vi.fn((path) => {
+      setProjectPath: vi.fn((_path) => {
         callOrder.push('directoryWatcherService.setProjectPath')
       }),
       stopAll: vi.fn(() => {
@@ -296,7 +296,7 @@ describe('ProjectService switching – session token orchestration', () => {
       let versionAfterSetPath: number | undefined
       let currentVersion = 0
 
-      mockDirectoryWatcherService.setProjectPath = vi.fn((path) => {
+      mockDirectoryWatcherService.setProjectPath = vi.fn((_path) => {
         versionBeforeSetPath = currentVersion
         currentVersion++ // Simulate version bump in setProjectPath
         versionAfterSetPath = currentVersion
@@ -321,7 +321,7 @@ describe('ProjectService switching – session token orchestration', () => {
         return Promise.resolve()
       })
 
-      mockDirectoryWatcherService.setProjectPath = vi.fn((path) => {
+      mockDirectoryWatcherService.setProjectPath = vi.fn((_path) => {
         versionBumps++
         callOrder.push('directoryWatcherService.setProjectPath')
       })

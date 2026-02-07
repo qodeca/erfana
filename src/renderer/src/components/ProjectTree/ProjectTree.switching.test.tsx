@@ -13,7 +13,7 @@
  * full integration of project switching in the rendered component.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import React from 'react'
 import { ProjectTree } from './ProjectTree'
@@ -330,7 +330,7 @@ describe('ProjectTree project switching (AC-009)', () => {
 
       // Track unsubscribe calls
       let unsubscribeCallCount = 0
-      window.api.directoryWatch.onDirectoryChanged = vi.fn((cb: any) => {
+      window.api.directoryWatch.onDirectoryChanged = vi.fn((_cb: any) => {
         const unsubscribe = () => {
           unsubscribeCallCount++
         }
@@ -425,7 +425,7 @@ describe('AC-014: In-flight event from project A silently dropped', () => {
     // which returns an unsubscribe function. The effect cleanup calls this unsubscribe
     // function when projectPath changes, preventing stale event handlers from firing.
 
-    const { readDirectory } = setupMockApi()
+    setupMockApi()
 
     // Track callback registrations and unsubscribe calls
     const callbacks: Array<(data: any) => void> = []
