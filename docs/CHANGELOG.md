@@ -4,6 +4,25 @@ Historical changelog entries for versions prior to current. For the latest chang
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## [0.7.2] - 2026-02-07
+
+### Added
+- **Project switching and session token guard tests** (#101):
+  - `ProjectService.switching.test.ts` – 20 tests for main process switching orchestration
+    - 016-FR-007 step ordering, AC-009 clear/load, AC-014 in-flight event drop
+    - Session token bumping across DirectoryWatcherService and GitWatcherService
+  - `ProjectTree.switching.test.tsx` – 11 tests for renderer switching behavior
+    - AC-009a tree clears, AC-009b new project loads, AC-009c stale events rejected
+    - AC-009d git status updates, AC-014 in-flight events silently dropped
+  - 31 new tests total (test-only, no production code changes)
+  - Closes #101
+- **Watcher resilience and polling fallback tests** (#100):
+  - Verify watcher resilience and polling fallback behavior
+  - Closes #100
+- **Git status refresh pipeline tests** (#99):
+  - Verify git status refresh pipeline for 4 acceptance criteria
+  - Closes #99
+
 ## [0.7.0] - 2026-01-22
 
 ### Added

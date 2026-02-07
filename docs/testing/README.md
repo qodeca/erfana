@@ -157,6 +157,14 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
   - `context-menu/strategies.test.tsx` (15 tests) - Node-type strategies (FileStrategy, FolderStrategy)
   - `context-menu/factory.test.ts` (7 tests) - Strategy selection factory pattern
 
+  *Phase 2.5a: Project Switching Tests (31 tests) – Issue #101*:
+  - `ProjectService.switching.test.ts` (20 tests) - Main process switching orchestration
+    - 016-FR-007 step ordering, AC-009 clear/load, AC-014 in-flight event drop
+    - Session token bumping across DirectoryWatcherService and GitWatcherService
+  - `ProjectTree.switching.test.tsx` (11 tests) - Renderer switching behavior
+    - AC-009a tree clears, AC-009b new project loads, AC-009c stale events rejected
+    - AC-009d git status updates, AC-014 in-flight events silently dropped
+
   *Phase 2.5: Pipeline & Hook Behavioral Tests (47 tests) – Spec T3-016 verification*:
   - `DirectoryWatcherService.pipeline.test.ts` (11 tests) - End-to-end directory pipeline integration
     - Uses real ThrottledWorker, EventCoalescer, AtomicSaveDetector wired to processEvents

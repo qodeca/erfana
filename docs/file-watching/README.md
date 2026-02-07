@@ -370,6 +370,10 @@ The service integrates these components:
   - Additional: all 5 event types, correlation ID, WatcherMetrics, disposal guards, circuit breaker
 - Hook tests in `src/renderer/src/hooks/useDirectoryWatcher.test.ts` (11 tests)
 - Pause/resume tests in `src/renderer/src/components/ProjectTree/withWatcherPause.test.ts` (17 tests)
+- Project switching tests in `src/main/services/ProjectService.switching.test.ts` (20 tests, #101)
+  - Session token guards, step ordering, in-flight event handling during project switches
+- Renderer switching tests in `src/renderer/src/components/ProjectTree/ProjectTree.switching.test.tsx` (11 tests, #101)
+  - Tree clearing, new project loading, stale event rejection, git status updates
 
 ---
 
