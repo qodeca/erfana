@@ -4,24 +4,30 @@ Historical changelog entries for versions prior to current. For the latest chang
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
-## [0.7.2] - 2026-02-07
+## [0.7.2] - 2026-02-05
 
 ### Added
-- **Project switching and session token guard tests** (#101):
-  - `ProjectService.switching.test.ts` – 20 tests for main process switching orchestration
-    - 016-FR-007 step ordering, AC-009 clear/load, AC-014 in-flight event drop
-    - Session token bumping across DirectoryWatcherService and GitWatcherService
-  - `ProjectTree.switching.test.tsx` – 11 tests for renderer switching behavior
-    - AC-009a tree clears, AC-009b new project loads, AC-009c stale events rejected
-    - AC-009d git status updates, AC-014 in-flight events silently dropped
-  - 31 new tests total (test-only, no production code changes)
-  - Closes #101
-- **Watcher resilience and polling fallback tests** (#100):
-  - Verify watcher resilience and polling fallback behavior
-  - Closes #100
-- **Git status refresh pipeline tests** (#99):
-  - Verify git status refresh pipeline for 4 acceptance criteria
+- **Spec T3-016**: Project Tree refresh specification – behavioral contracts for directory/git refresh pipeline, project switching, session tokens
+- **Directory refresh pipeline tests** (#98): 24 tests across 4 files covering 7 ACs from spec T3-016
+  - DirectoryWatcherService.pipeline.test.ts (11 tests), useDirectoryWatcher.test.ts (11 tests)
+  - AC-001/002/003 (external changes), AC-007 (manual refresh), AC-008 (coalescing), AC-010 (internal ops), AC-013 (atomic save)
+  - Closes #98
+- **Git status refresh pipeline tests** (#99): 22 pipeline integration tests for GitWatcherService
+  - AC-004 (git add), AC-005 (git commit), AC-006 (git checkout), AC-018 (coalescer dedup)
   - Closes #99
+- **Watcher resilience and polling fallback tests** (#100): 14 tests covering 3 ACs
+  - AC-011 (polling fallback), AC-015 (redundant polling suppression), AC-016 (exponential backoff restart)
+  - Closes #100
+- **Project switching and session token guard tests** (#101): 31 tests across 2 files
+  - ProjectService.switching.test.ts (20 tests) – step ordering, session token bumping, rollback
+  - ProjectTree.switching.test.tsx (11 tests) – tree clearing, stale event rejection, git status
+  - AC-009 (a–d) and AC-014
+  - Closes #101
+
+### Fixed
+- **Project Tree refresh regression** (#97): Unstable callback references in useDirectoryWatcher caused watcher cycling
+  - Ref pattern for callbacks prevents effect re-runs on reference changes
+  - Closes #97
 
 ## [0.7.0] - 2026-01-22
 
@@ -477,31 +483,9 @@ Historical changelog entries for versions prior to current. For the latest chang
   - Moved graph-engine docs to docs/future/
   - Split docs/prompts/implementation.md
 
-## Changes in v0.3.3
-- **AutoExecute Race Condition Fix**:
-  - Promise-based writes with completion callbacks
-  - Terminal initialization polling
-  - 13 comprehensive tests
-
-## Changes in v0.3.2
-- **Terminal Flickering Prevention**:
-  - WebGL command line switches
-  - 6 comprehensive tests
-- **Scroll to Bottom Button**:
-  - Manual workaround for scroll jumping
-- **Documentation Restructuring**:
-  - terminal.md split into subfolder
-
-## Changes in v0.3.1
-- **Terminal Scroll Fix**:
-  - Scroll position tracking
-  - 6 comprehensive tests
-
-## Changes in v0.3.0
-- **Terminal Bootstrap Pattern**:
-  - Zero visible initialization commands
-  - 18 comprehensive tests
-- Symlink indicators in Project Tree
-- Watcher depth setting
-- Improved editor/preview scroll sync
-- Fixed EPIPE errors
+## v0.3.0–v0.3.3
+- Terminal bootstrap pattern with zero visible init commands (v0.3.0)
+- Terminal scroll fix with position tracking (v0.3.1)
+- Terminal flickering prevention via WebGL switches (v0.3.2)
+- AutoExecute race condition fix with Promise-based writes (v0.3.3)
+- Symlink indicators, watcher depth setting, EPIPE error fixes
