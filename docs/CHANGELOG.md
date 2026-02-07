@@ -4,6 +4,32 @@ Historical changelog entries for versions prior to current. For the latest chang
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## [0.7.3] - 2026-02-07
+
+### Added
+- **Audio transcription import** (Spec #009): Import MP3, WAV, M4A files with OpenAI-powered transcription (#75)
+  - GPT-4o-transcribe primary model with Whisper-1 fallback
+  - File chunking for long recordings (>8 min, 480s boundary, 0.5s overlap)
+  - Exponential backoff retry (max 3 attempts, 1s–30s delay)
+  - AbortSignal cancellation support
+  - TranscriptionDialog UI with language selection (30+ languages), progress bar, cancel
+  - Settings overlay transcription section (backend selection, API key management)
+  - AudioConverter in import pipeline for headless/batch usage
+  - New services: TranscriptionService, AudioMetadataService (music-metadata), ApiKeyService (Electron safeStorage)
+  - IPC channels: transcription:import, transcription:cancel, transcription:validate, transcription:setApiKey, transcription:hasApiKey, transcription:clearApiKey
+  - Zod schemas for all transcription IPC contracts
+  - useTranscriptionStore (Zustand) for dialog state management
+  - Output: markdown with YAML frontmatter (source, duration, date, language, backend)
+  - API key encrypted storage in `~/.erfana/` with safeStorage, plaintext fallback with warning
+  - 7 new test files
+  - Closes #75
+
+### Changed
+- **Spec T4-009 marked implemented**: Media import with transcription feature complete
+- **Global settings schema**: Added `transcription` section (backend, openaiApiKeyStored)
+- **ConverterRegistry**: Registered AudioConverter for MP3, WAV, M4A extensions
+- **Import system**: Audio files now supported in unified import pipeline
+
 ## [0.7.2] - 2026-02-05
 
 ### Added

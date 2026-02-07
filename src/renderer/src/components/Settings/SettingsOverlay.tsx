@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useSettingsStore } from '../../stores/useSettingsStore'
 import { useGlobalSettingsStore } from '../../stores/useGlobalSettingsStore'
 import { LoggingLevelSchema, type LoggingLevel } from '../../../../shared/ipc/global-settings-schema'
+import { TranscriptionBackendSchema } from '../../../../shared/ipc/transcription-schema'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
 import './SettingsOverlay.css'
@@ -46,10 +47,66 @@ export function SettingsOverlay() {
     updateLoggingLevel,
     updatePreserveLineBreaks,
     updateGitStatusPollingEnabled,
-    updateGitStatusPollingInterval
+    updateGitStatusPollingInterval,
+    updateTranscriptionBackend
   } = useGlobalSettingsStore()
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const previousActiveElement = useRef<HTMLElement | null>(null)
+
+  // API key state for transcription section
+  const [hasApiKey, setHasApiKey] = useState(false)
+
+  /**
+   * Check if an API key is stored on overlay open.
+   * Avoids polling -- checks once when the overlay becomes visible.
+   */
+  useEffect(() => {
+    if (!isOpen) return
+    window.api.transcription.hasApiKey()
+      .then((result) => setHasApiKey(result))
+      .catch(() => setHasApiKey(false))
+  }, [isOpen])
+
+  /**
+   * Save API key on input blur.
+   * Stores the key via the preload bridge and updates the local state.
+   */
+  const handleSaveApiKey = useCallback(
+    async (e: React.FocusEvent<HTMLInputElement>) => {
+      const value = e.target.value.trim()
+      if (!value) return
+
+      try {
+        const result = await window.api.transcription.setApiKey(value)
+        if (result.success) {
+          setHasApiKey(true)
+          // Clear the input after successful save
+          e.target.value = ''
+        } else {
+          logger.warn('Failed to save API key', { error: result.error })
+        }
+      } catch (error) {
+        logger.error('Failed to save API key', error instanceof Error ? error : undefined)
+      }
+    },
+    []
+  )
+
+  /**
+   * Clear stored API key.
+   */
+  const handleClearApiKey = useCallback(async () => {
+    try {
+      const result = await window.api.transcription.clearApiKey()
+      if (result.success) {
+        setHasApiKey(false)
+      } else {
+        logger.warn('Failed to clear API key', { error: result.error })
+      }
+    } catch (error) {
+      logger.error('Failed to clear API key', error instanceof Error ? error : undefined)
+    }
+  }, [])
 
   // Store the currently focused element when overlay opens
   useEffect(() => {
@@ -232,6 +289,67 @@ export function SettingsOverlay() {
                     </option>
                   ))}
                 </select>
+              </div>
+            </section>
+
+            <section className="settings-section" data-testid={TEST_IDS.SETTINGS_SECTION_TRANSCRIPTION}>
+              <h2 className="settings-section-title">Transcription</h2>
+              <div className="settings-row">
+                <div className="settings-field">
+                  <label htmlFor="transcription-backend" className="settings-label">
+                    Backend
+                  </label>
+                  <p className="settings-description">
+                    Service used for audio-to-text transcription
+                  </p>
+                </div>
+                <select
+                  id="transcription-backend"
+                  className="settings-select"
+                  value={settings?.transcription.backend ?? 'openai'}
+                  onChange={(e) => {
+                    const result = TranscriptionBackendSchema.safeParse(e.target.value)
+                    if (result.success) {
+                      updateTranscriptionBackend(result.data)
+                    } else {
+                      logger.warn('Invalid transcription backend selected', { value: e.target.value })
+                    }
+                  }}
+                  disabled={!settings}
+                  data-testid={TEST_IDS.SETTINGS_SELECT_TRANSCRIPTION_BACKEND}
+                >
+                  <option value="openai">OpenAI</option>
+                </select>
+              </div>
+              <div className="settings-row">
+                <div className="settings-field">
+                  <label htmlFor="openai-api-key" className="settings-label">
+                    OpenAI API key
+                  </label>
+                  <p className="settings-description">
+                    {hasApiKey ? 'API key is configured' : 'Required for transcription'}
+                  </p>
+                </div>
+                <div className="settings-api-key-controls">
+                  {hasApiKey ? (
+                    <button
+                      className="settings-btn-secondary"
+                      onClick={handleClearApiKey}
+                      data-testid={TEST_IDS.SETTINGS_BTN_CLEAR_API_KEY}
+                    >
+                      Remove key
+                    </button>
+                  ) : (
+                    <input
+                      type="password"
+                      id="openai-api-key"
+                      className="settings-input"
+                      placeholder="sk-..."
+                      onBlur={handleSaveApiKey}
+                      data-testid={TEST_IDS.SETTINGS_INPUT_API_KEY}
+                    />
+                  )}
+                </div>
               </div>
             </section>
           </div>

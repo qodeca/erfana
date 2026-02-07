@@ -17,6 +17,11 @@ import type {
   CameraSaveResponse
 } from '../shared/ipc/camera-schema'
 import type {
+  TranscriptionImportRequest,
+  TranscriptionImportResult,
+  TranscriptionProgress
+} from '../shared/ipc/transcription-schema'
+import type {
   ExternalFileValidateResponse,
   ExternalFileCopyResponse,
   ExternalFileMoveResponse,
@@ -567,6 +572,95 @@ const api = {
      */
     save: (request: CameraSaveRequest): Promise<CameraSaveResponse> =>
       ipcRenderer.invoke('camera:save', request)
+  },
+
+  /**
+   * Transcription operations for audio-to-text conversion
+   *
+   * Provides import with progress streaming, validation, cancellation,
+   * and API key management for the transcription backend.
+   *
+   * @see Issue #75 - Media import with transcription
+   * @see Spec #009 - Media import with transcription specification
+   */
+  transcription: {
+    /**
+     * Import an audio file with transcription
+     *
+     * Starts the full transcription workflow: validate, transcribe (with chunking
+     * for long files), and write markdown output to the import/ directory.
+     * Progress events are streamed via onProgress.
+     *
+     * @param request - Import request with filePath and language
+     * @returns Import result with success status and output path
+     */
+    import: (request: TranscriptionImportRequest): Promise<TranscriptionImportResult> =>
+      ipcRenderer.invoke('transcription:import', request),
+
+    /**
+     * Cancel the active transcription
+     *
+     * Aborts any in-progress transcription and cleans up temp files.
+     *
+     * @returns Success status
+     */
+    cancel: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('transcription:cancel'),
+
+    /**
+     * Validate an audio file before import
+     *
+     * Checks file exists, is a supported audio format, and extracts metadata.
+     *
+     * @param filePath - Absolute path to the audio file
+     * @returns Validation result with duration and size info
+     */
+    validate: (filePath: string): Promise<{
+      valid: boolean; error?: string; durationSeconds?: number; sizeInMB: number
+    }> => ipcRenderer.invoke('transcription:validate', filePath),
+
+    /**
+     * Store an API key in Electron safeStorage
+     *
+     * The key is encrypted and stored securely. Only a boolean flag
+     * is saved in settings JSON.
+     *
+     * @param apiKey - The API key to store (e.g., OpenAI key starting with "sk-")
+     * @returns Success status
+     */
+    setApiKey: (apiKey: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('transcription:setApiKey', apiKey),
+
+    /**
+     * Check whether an API key exists in safeStorage
+     *
+     * @returns true if a key is stored, false otherwise
+     */
+    hasApiKey: (): Promise<boolean> =>
+      ipcRenderer.invoke('transcription:hasApiKey'),
+
+    /**
+     * Remove the stored API key from safeStorage
+     *
+     * @returns Success status
+     */
+    clearApiKey: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('transcription:clearApiKey'),
+
+    /**
+     * Subscribe to transcription progress events
+     *
+     * Progress events are streamed from main process during active transcription.
+     * Returns a cleanup function to unsubscribe.
+     *
+     * @param callback - Called with progress updates (percent, phase, chunks, ETA)
+     * @returns Cleanup function to remove the listener
+     */
+    onProgress: (callback: (progress: TranscriptionProgress) => void): (() => void) => {
+      const listener = (_event: unknown, data: TranscriptionProgress): void => callback(data)
+      ipcRenderer.on('transcription:progress', listener)
+      return () => ipcRenderer.removeListener('transcription:progress', listener)
+    }
   },
 
   // Global settings operations

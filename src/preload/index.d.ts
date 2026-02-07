@@ -17,6 +17,11 @@ import type {
   CameraSaveResponse
 } from '../shared/ipc/camera-schema'
 import type {
+  TranscriptionImportRequest,
+  TranscriptionImportResult,
+  TranscriptionProgress
+} from '../shared/ipc/transcription-schema'
+import type {
   ExternalFileValidateResponse,
   ExternalFileCopyResponse,
   ExternalFileMoveResponse,
@@ -246,6 +251,28 @@ declare global {
       camera: {
         /** Save a captured photo to temp file */
         save: (request: CameraSaveRequest) => Promise<CameraSaveResponse>
+      }
+      /**
+       * Transcription operations for audio-to-text conversion
+       * @see Issue #75 - Media import with transcription
+       */
+      transcription: {
+        /** Import an audio file with transcription */
+        import: (request: TranscriptionImportRequest) => Promise<TranscriptionImportResult>
+        /** Cancel the active transcription */
+        cancel: () => Promise<{ success: boolean; error?: string }>
+        /** Validate an audio file before import */
+        validate: (filePath: string) => Promise<{
+          valid: boolean; error?: string; durationSeconds?: number; sizeInMB: number
+        }>
+        /** Store an API key in Electron safeStorage */
+        setApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
+        /** Check whether an API key exists in safeStorage */
+        hasApiKey: () => Promise<boolean>
+        /** Remove the stored API key from safeStorage */
+        clearApiKey: () => Promise<{ success: boolean; error?: string }>
+        /** Subscribe to transcription progress events */
+        onProgress: (callback: (progress: TranscriptionProgress) => void) => () => void
       }
       globalSettings: {
         get: () => Promise<{ success: boolean; settings?: GlobalSettings; error?: string }>

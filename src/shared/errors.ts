@@ -101,6 +101,18 @@ export enum ErrorCode {
   EXTERNAL_FILE_MOVE_FAILED = 'EXTERNAL_FILE_MOVE_FAILED',
   EXTERNAL_FILE_SOURCE_DELETED = 'EXTERNAL_FILE_SOURCE_DELETED',
 
+  // Transcription errors (Issue #75)
+  TRANSCRIPTION_NO_API_KEY = 'TRANSCRIPTION_NO_API_KEY',
+  TRANSCRIPTION_INVALID_API_KEY = 'TRANSCRIPTION_INVALID_API_KEY',
+  TRANSCRIPTION_API_ERROR = 'TRANSCRIPTION_API_ERROR',
+  TRANSCRIPTION_RATE_LIMITED = 'TRANSCRIPTION_RATE_LIMITED',
+  TRANSCRIPTION_NETWORK_ERROR = 'TRANSCRIPTION_NETWORK_ERROR',
+  TRANSCRIPTION_CANCELLED = 'TRANSCRIPTION_CANCELLED',
+  TRANSCRIPTION_INVALID_AUDIO = 'TRANSCRIPTION_INVALID_AUDIO',
+  TRANSCRIPTION_CHUNK_FAILED = 'TRANSCRIPTION_CHUNK_FAILED',
+  TRANSCRIPTION_TIMEOUT = 'TRANSCRIPTION_TIMEOUT',
+  TRANSCRIPTION_FAILED = 'TRANSCRIPTION_FAILED',
+
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
 }
@@ -254,6 +266,18 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.EXTERNAL_FILE_COPY_FAILED]: 'Failed to copy external file',
   [ErrorCode.EXTERNAL_FILE_MOVE_FAILED]: 'Failed to move external file',
   [ErrorCode.EXTERNAL_FILE_SOURCE_DELETED]: 'Source file was deleted during operation',
+
+  // Transcription errors (Issue #75)
+  [ErrorCode.TRANSCRIPTION_NO_API_KEY]: 'No API key configured. Add your OpenAI API key in Settings.',
+  [ErrorCode.TRANSCRIPTION_INVALID_API_KEY]: 'Invalid API key. Please check your OpenAI API key in Settings.',
+  [ErrorCode.TRANSCRIPTION_API_ERROR]: 'OpenAI API error. Please try again.',
+  [ErrorCode.TRANSCRIPTION_RATE_LIMITED]: 'API rate limit reached. Retrying automatically.',
+  [ErrorCode.TRANSCRIPTION_NETWORK_ERROR]: 'Network error. Please check your connection and try again.',
+  [ErrorCode.TRANSCRIPTION_CANCELLED]: 'Transcription was cancelled',
+  [ErrorCode.TRANSCRIPTION_INVALID_AUDIO]: 'Invalid audio file. Supported formats: MP3, WAV, M4A.',
+  [ErrorCode.TRANSCRIPTION_CHUNK_FAILED]: 'Failed to process audio chunk. Retrying.',
+  [ErrorCode.TRANSCRIPTION_TIMEOUT]: 'Transcription request timed out',
+  [ErrorCode.TRANSCRIPTION_FAILED]: 'Transcription failed. Please try again.',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'

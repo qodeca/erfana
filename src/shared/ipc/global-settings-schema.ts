@@ -5,6 +5,7 @@
  * @see Issue #50 - global settings service
  */
 import { z } from 'zod'
+import { TranscriptionSettingsSchema } from './transcription-schema'
 
 /**
  * Logging level enum
@@ -52,7 +53,12 @@ export const GlobalSettingsSchema = z.object({
   /** Editor configuration */
   editor: EditorSettingsSchema.default(() => ({ preserveLineBreaks: false })),
   /** Git status configuration */
-  gitStatus: GitStatusSettingsSchema.default(() => ({ pollingEnabled: true, pollingInterval: 5000 }))
+  gitStatus: GitStatusSettingsSchema.default(() => ({ pollingEnabled: true, pollingInterval: 5000 })),
+  /** Transcription configuration */
+  transcription: TranscriptionSettingsSchema.default(() => ({
+    backend: 'openai' as const,
+    openaiApiKeyStored: false
+  }))
 })
 export type GlobalSettings = z.infer<typeof GlobalSettingsSchema>
 

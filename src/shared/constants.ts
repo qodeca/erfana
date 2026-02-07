@@ -226,3 +226,37 @@ export const CAMERA = {
   /** Maximum capture height in pixels */
   CAPTURE_MAX_HEIGHT: 2160
 } as const
+
+/**
+ * Transcription constants
+ * Used by TranscriptionService for audio-to-text conversion
+ *
+ * @see TranscriptionService.ts
+ * @see Issue #75 - Media import with transcription
+ */
+export const TRANSCRIPTION = {
+  /** Chunk boundary in seconds (files >8 min are chunked) */
+  CHUNK_BOUNDARY_SECONDS: 8 * 60,
+  /** Overlap at chunk boundaries in seconds (prevents word truncation) */
+  CHUNK_OVERLAP_SECONDS: 0.5,
+  /** Maximum retry attempts for API calls */
+  MAX_RETRY_ATTEMPTS: 3,
+  /** Base delay for exponential backoff in ms */
+  RETRY_BASE_DELAY_MS: 1000,
+  /** Maximum delay for exponential backoff in ms */
+  RETRY_MAX_DELAY_MS: 30000,
+  /** API request timeout in ms (5 minutes per chunk) */
+  API_TIMEOUT_MS: 5 * 60 * 1000,
+  /** Temp file prefix for audio chunks */
+  TEMP_PREFIX: 'erfana-transcription-chunk-',
+  /** OpenAI API endpoint for audio transcription */
+  OPENAI_API_URL: 'https://api.openai.com/v1/audio/transcriptions',
+  /** Primary model */
+  PRIMARY_MODEL: 'gpt-4o-transcribe',
+  /** Fallback model */
+  FALLBACK_MODEL: 'whisper-1',
+  /** Maximum file size for single API call (25 MB, OpenAI limit) */
+  MAX_API_FILE_SIZE: 25 * 1024 * 1024,
+  /** Supported audio extensions */
+  SUPPORTED_EXTENSIONS: ['mp3', 'wav', 'm4a']
+} as const

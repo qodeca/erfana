@@ -446,7 +446,7 @@ export const TEST_IDS = {
   TOAST_BTN_DISMISS: 'toast-btn-dismiss',
 
   // =========================================================================
-  // Settings Overlay (10)
+  // Settings Overlay (14)
   // =========================================================================
 
   /** Settings overlay container */
@@ -469,6 +469,35 @@ export const TEST_IDS = {
   SETTINGS_SELECT_LOG_LEVEL: 'settings-select-log-level',
   /** Settings content container */
   SETTINGS_CONTAINER: 'settings-container',
+  /** Transcription settings section */
+  SETTINGS_SECTION_TRANSCRIPTION: 'settings-section-transcription',
+  /** Backend select dropdown */
+  SETTINGS_SELECT_TRANSCRIPTION_BACKEND: 'settings-select-transcription-backend',
+  /** API key input field */
+  SETTINGS_INPUT_API_KEY: 'settings-input-api-key',
+  /** API key clear button */
+  SETTINGS_BTN_CLEAR_API_KEY: 'settings-btn-clear-api-key',
+
+  // =========================================================================
+  // Transcription Dialog (8)
+  // =========================================================================
+
+  /** Transcription dialog container */
+  TRANSCRIPTION_DIALOG: 'transcription-dialog',
+  /** Language select dropdown */
+  TRANSCRIPTION_LANGUAGE_SELECT: 'transcription-language-select',
+  /** Start transcription button */
+  TRANSCRIPTION_BTN_START: 'transcription-btn-start',
+  /** Cancel transcription button */
+  TRANSCRIPTION_BTN_CANCEL: 'transcription-btn-cancel',
+  /** Progress bar element */
+  TRANSCRIPTION_PROGRESS_BAR: 'transcription-progress-bar',
+  /** Progress percentage text */
+  TRANSCRIPTION_PROGRESS_TEXT: 'transcription-progress-text',
+  /** Phase/status description text */
+  TRANSCRIPTION_PHASE_TEXT: 'transcription-phase-text',
+  /** Error message area */
+  TRANSCRIPTION_ERROR: 'transcription-error',
 
   // =========================================================================
   // Document Stats Bar (6)
