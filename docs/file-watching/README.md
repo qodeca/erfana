@@ -121,6 +121,8 @@ Recommended:
 | Internal CRUD (create/delete/rename) | Watcher paused, no double refresh |
 | Expand folders, make external changes | Folders remain expanded after refresh |
 
+**Auto-resume safety timeout (v0.7.2, #103):** The PauseController includes a 10-second safety timeout. If `resume()` is not called within 10 s of `pause()` – for example due to a lost IPC message – the controller auto-resumes, logs a warning, and triggers a compensating refresh to keep the tree in sync. This prevents the watcher from being permanently paused.
+
 ### IPC Channels
 
 | Channel | Direction | Purpose |

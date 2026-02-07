@@ -39,6 +39,10 @@ Historical changelog entries for versions prior to current. For the latest chang
 - **Project Tree refresh regression** (#97): Unstable callback references in useDirectoryWatcher caused watcher cycling
   - Ref pattern for callbacks prevents effect re-runs on reference changes
   - Closes #97
+- **PauseController auto-resume safety timeout** (#103): Prevents permanent pause states from lost IPC messages
+  - If `resume()` is not called within 10 s after `pause()`, auto-resumes with a warning log
+  - Triggers a compensating refresh on auto-resume to ensure tree stays current
+  - Closes #103
 
 ## [0.7.0] - 2026-01-22
 
