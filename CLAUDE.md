@@ -61,7 +61,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Drag-Drop](docs/drag-drop/README.md) — VS Code-style file reorganization, visual feedback, validation
 - [Terminal](docs/terminal/README.md) — Bootstrap pattern, scroll fixes, clipboard, drag-drop paths, screenshot capture (macOS), camera capture (cross-platform)
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync, Mermaid diagrams
-- [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens
+- [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens, spec 016 behavioral contract
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
 - [Testing](docs/testing/README.md) — Workspace, coverage
@@ -88,7 +88,7 @@ Feature specifications live in `specs/`. Check registry before implementing new 
 | 008 | Graph engine polish & maintenance | T3 | draft | `specs/spec-t3-008-graph-polish` |
 | 009 | Media import with transcription | T4 | draft | `specs/spec-t4-009-media-import-transcription` |
 | 013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/spec-t3-013-multi-cli-tool-prompt-optimization` |
-| 016 | Project Tree refresh specification | T3 | draft | `specs/spec-t3-016-project-tree-refresh` |
+| 016 | Project Tree refresh specification | T3 | implemented | `specs/spec-t3-016-project-tree-refresh` |
 
 **Registry**: `specs/registry.json`
 

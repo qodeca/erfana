@@ -238,6 +238,19 @@ rm -rf /path/to/project
 
 ---
 
+## Automated Test Suites
+
+The directory and git watcher pipelines are covered by 72 automated tests added in v0.7.2, verifying all 18 acceptance criteria from [spec T3-016](../../specs/spec-t3-016-project-tree-refresh/requirements/03-acceptance.md). For the full test breakdown (file names, test counts, AC coverage), see [Testing – spec 016 verification](../testing/README.md).
+
+Key test files:
+- `DirectoryWatcherService.pipeline.test.ts` – directory refresh pipeline (11 tests, AC-001/002/003/007/008/010/013)
+- `GitWatcherService.pipeline.test.ts` – git status pipeline (22 tests, AC-004/005/006/014/018)
+- `WatcherResilience.test.ts` – auto-restart and polling fallback (14 tests, AC-011/015/016)
+- `ProjectService.switching.test.ts` – project switching orchestration (20 tests, AC-009/014)
+- `useGitStatus.test.ts` – visibility gating and cooldowns (5 tests, AC-012)
+
+---
+
 ## Watcher Debugging
 
 Quick, low-noise checks to verify watcher health and boundaries.
