@@ -129,6 +129,18 @@ function createWindow(): BrowserWindow {
       logger.error('Error cleaning up terminals', err instanceof Error ? err : undefined)
     }
 
+    // Cleanup git watcher (async fire-and-forget pattern - issue #106)
+    gitWatcherService.cleanupForWebContentsId(webContentsId).catch((err) => {
+      logger.error('Error cleaning up git watcher', err instanceof Error ? err : undefined)
+    })
+
+    // Cleanup git polling (synchronous - issue #106)
+    try {
+      gitPollingService.cleanupForWebContentsId(webContentsId)
+    } catch (err) {
+      logger.error('Error cleaning up git polling', err instanceof Error ? err : undefined)
+    }
+
     logger.info('Service cleanup initiated for webContents', { webContentsId })
   })
 

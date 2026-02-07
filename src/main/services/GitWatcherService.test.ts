@@ -636,4 +636,50 @@ describe('GitWatcherService', () => {
       expect(service.activeWatcher).toBeNull()
     })
   })
+
+  describe('cleanupForWebContentsId', () => {
+    it('should increment sessionVersion before stopping', async () => {
+      await startServiceAndEmitReady('/project')
+
+      const versionBefore = service.sessionVersion
+
+      await service.cleanupForWebContentsId(42)
+
+      expect(service.sessionVersion).toBe(versionBefore + 1)
+    })
+
+    it('should stop the active watcher', async () => {
+      await startServiceAndEmitReady('/project')
+
+      expect(service.isWatching()).toBe(true)
+
+      await service.cleanupForWebContentsId(42)
+
+      expect(service.isWatching()).toBe(false)
+    })
+
+    it('should log cleanup with webContentsId', async () => {
+      await service.cleanupForWebContentsId(42)
+
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'GitWatcherService: Cleaned up for webContentsId',
+        { webContentsId: 42 }
+      )
+    })
+
+    it('should be safe when not watching', async () => {
+      expect(service.isWatching()).toBe(false)
+
+      await expect(service.cleanupForWebContentsId(42)).resolves.not.toThrow()
+    })
+
+    it('should be safe to call multiple times', async () => {
+      await startServiceAndEmitReady('/project')
+
+      await service.cleanupForWebContentsId(42)
+      await expect(service.cleanupForWebContentsId(42)).resolves.not.toThrow()
+
+      expect(service.isWatching()).toBe(false)
+    })
+  })
 })

@@ -214,6 +214,19 @@ export class GitWatcherService implements IGitWatcherService {
   }
 
   /**
+   * Cleanup resources when a webContents is destroyed.
+   * Bumps session version to invalidate pending events, then stops the watcher.
+   *
+   * @param webContentsId - The ID of the destroyed webContents
+   * @see Issue #106
+   */
+  async cleanupForWebContentsId(webContentsId: number): Promise<void> {
+    this.sessionVersion++
+    await this.stop()
+    logger.info('GitWatcherService: Cleaned up for webContentsId', { webContentsId })
+  }
+
+  /**
    * Create and configure the chokidar watcher
    */
   private async createWatcher(projectPath: string): Promise<{ success: boolean; error?: string }> {
