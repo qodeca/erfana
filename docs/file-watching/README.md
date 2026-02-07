@@ -364,7 +364,10 @@ The service integrates these components:
 
 - `src/main/services/watcher/` - All watcher optimization modules
 - Watcher unit tests in `src/main/services/watcher/*.test.ts`
-- Pipeline integration tests in `src/main/services/DirectoryWatcherService.pipeline.test.ts` (11 tests)
+- Directory pipeline integration tests in `src/main/services/DirectoryWatcherService.pipeline.test.ts` (11 tests)
+- Git pipeline integration tests in `src/main/services/GitWatcherService.pipeline.test.ts` (22 tests, #99)
+  - Covers AC-004 (git add), AC-005 (git commit), AC-006 (git checkout), AC-018 (coalescer dedup)
+  - Additional: all 5 event types, correlation ID, WatcherMetrics, disposal guards, circuit breaker
 - Hook tests in `src/renderer/src/hooks/useDirectoryWatcher.test.ts` (11 tests)
 - Pause/resume tests in `src/renderer/src/components/ProjectTree/withWatcherPause.test.ts` (17 tests)
 

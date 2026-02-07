@@ -157,10 +157,15 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
   - `context-menu/strategies.test.tsx` (15 tests) - Node-type strategies (FileStrategy, FolderStrategy)
   - `context-menu/factory.test.ts` (7 tests) - Strategy selection factory pattern
 
-  *Phase 2.5: Pipeline & Hook Behavioral Tests (25 tests) – Spec T3-016 verification*:
-  - `DirectoryWatcherService.pipeline.test.ts` (11 tests) - End-to-end pipeline integration
+  *Phase 2.5: Pipeline & Hook Behavioral Tests (47 tests) – Spec T3-016 verification*:
+  - `DirectoryWatcherService.pipeline.test.ts` (11 tests) - End-to-end directory pipeline integration
     - Uses real ThrottledWorker, EventCoalescer, AtomicSaveDetector wired to processEvents
     - Covers AC-001 (file creation), AC-002 (deletion), AC-003 (directory), AC-008 (coalescing), AC-013 (atomic save)
+  - `GitWatcherService.pipeline.test.ts` (22 tests) - End-to-end git pipeline integration (#99)
+    - Uses real GitEventCoalescer wired to handleCoalescedEvent (main process only)
+    - Covers AC-004 (git add), AC-005 (git commit), AC-006 (git checkout), AC-018 (coalescer dedup)
+    - Validates 150ms coalesce window, event deduplication, session token stale-event guard
+    - Additional: all 5 event types, correlation ID, WatcherMetrics, disposal guards, circuit breaker
   - `useDirectoryWatcher.test.ts` (11 tests) - Hook behavioral tests
     - Event handling, AC-010 internal operation suppression, lifecycle, subscriptions
   - `ProjectTree.timing.test.tsx` (3 tests) - Project switching timing and manual refresh (AC-007)
