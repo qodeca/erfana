@@ -87,6 +87,9 @@ function createWindow(): BrowserWindow {
   // Handle window close with confirmation
   mainWindow.on('close', (event) => {
     if (isQuitting) return
+    // If webContents is already destroyed (e.g., during E2E test teardown),
+    // let the close proceed without attempting to show a confirmation dialog
+    if (mainWindow.webContents.isDestroyed()) return
     event.preventDefault()
     isQuitting = true
     mainWindow.webContents.send('quit:requested', { reason: 'close' })

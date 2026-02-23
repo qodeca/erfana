@@ -446,15 +446,19 @@ export const monaco = {
   },
 
   /**
-   * Waits for the editor to be visible and ready.
+   * Waits for the editor to be visible and ready for keyboard input.
+   *
+   * @monaco-editor/react loads asynchronously: the .monaco-editor container
+   * appears in the DOM before the internal textarea (keyboard input target)
+   * is ready. Waiting for the textarea ensures Monaco is truly interactive.
    */
   async waitForReady(page: Page): Promise<void> {
     await waitForTestId(page, TEST_IDS.EDITOR_MONACO)
-    // Wait for Monaco's internal editor container to be present
-    // This indicates Monaco has fully initialized and is ready for input
-    // Note: Monaco wraps its internals inside our testid wrapper div
-    const monacoContainer = this.getEditor(page).locator('.monaco-editor')
-    await expect(monacoContainer).toBeAttached({ timeout: 5000 })
+    // Wait for Monaco's internal textarea – the actual keyboard input receiver.
+    // This is a stronger readiness signal than .monaco-editor being attached,
+    // because the textarea only appears after Monaco finishes initialization.
+    const textarea = this.getTextArea(page)
+    await expect(textarea).toBeAttached({ timeout: 10000 })
   },
 
   /**
@@ -1012,8 +1016,11 @@ export async function clickFileByName(page: Page, fileName: string): Promise<voi
   // Click the file node to open it in the editor
   await fileNode.click()
 
-  // Wait for the editor to open (file click triggers tab creation and editor mount)
-  await page.waitForTimeout(1000)
+  // Wait for editor content area to appear (condition-based instead of fixed delay).
+  // For markdown files the default mode is preview, so EDITOR_PREVIEW appears.
+  // For non-markdown files the default mode is editor, so EDITOR_CONTENT appears.
+  // EDITOR_CONTENT wraps both modes, so it's the reliable signal.
+  await waitForTestId(page, TEST_IDS.EDITOR_CONTENT, { timeout: 10000 })
 }
 
 /**
