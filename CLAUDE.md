@@ -30,7 +30,8 @@ npm run test:e2e     # Playwright E2E tests
 src/
 ├── main/           # Electron main process
 │   ├── services/   # Core: FileService, TerminalService, ProjectService, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService; Watchers: DirectoryWatcherService, FileWatcherService; Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media: ScreenshotService, CameraService, PdfService, DocxService; Multi-instance: ProjectLockService, ExternalFileService; Subdirs: import/, watcher/
-│   └── ipc/        # IPC handlers
+│   ├── ipc/        # IPC handlers
+│   └── utils/      # PauseController (pause/resume with safety timeout)
 ├── preload/        # Context bridge API
 ├── shared/         # Shared code (errors.ts, constants.ts, ipc schemas)
 └── renderer/       # React UI
@@ -67,10 +68,12 @@ See `docs/` for details (keep Claude's context focused):
 - [Testing](docs/testing/README.md) — Workspace, coverage
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [API Services](docs/api-services.md) — Service APIs (Terminal, File, Settings, Watchers)
-- [API Services – Features](docs/api-services-features.md) — Feature service APIs (Git, Camera, ProjectLock, ExternalFile)
+- [API Services – Features](docs/api-services-features.md) — Feature service APIs (GitWatcher, GitPolling, Camera, ProjectLock, ExternalFile, PDF, DOCX)
 - [UI Components](docs/ui-components.md) — React component architecture, activity bars, panels
 - [Prompt Templates](docs/prompts/README.md) — AI prompt system, AutoExecute, template syntax
 - [Changelog](docs/CHANGELOG.md) — Version history (v0.3.x onwards)
+- [Development Tasks](docs/development-tasks.md) — How-to guides: add IPC channels, panels, services, prompt templates
+- [Technical Debt](docs/technical-debt.md) — Known debt items and improvement opportunities
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
 
 ## Feature specifications

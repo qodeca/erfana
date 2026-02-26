@@ -219,6 +219,10 @@ Monitors git repository state files for real-time status updates in the Project 
 | Rapid git operations | Coalesced to single refresh (150ms window) |
 | Network/cloud drives | Falls back to GitPollingService |
 
+### Window Cleanup (#106)
+
+`cleanupForWebContentsId(id)` is called from `webContents.on('destroyed')` in `index.ts` to prevent stale git watchers from accumulating after window close or dev refresh.
+
 ### IPC Channels
 
 | Channel | Direction | Purpose |
@@ -275,6 +279,10 @@ Users can configure polling via Settings overlay:
 |---------|---------|-------|
 | `gitStatus.pollingEnabled` | `true` | boolean |
 | `gitStatus.pollingInterval` | `5000` | 3000-10000ms |
+
+### Window Cleanup (#106)
+
+`cleanupForWebContentsId(id)` is called from `webContents.on('destroyed')` in `index.ts` (synchronous) to stop polling for the destroyed window.
 
 ### IPC Channels
 

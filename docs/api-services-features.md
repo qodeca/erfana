@@ -25,6 +25,35 @@ Git status tracking with isomorphic-git.
 
 ---
 
+## GitWatcherService
+
+**File:** `src/main/services/GitWatcherService.ts`
+
+Real-time git state watching via chokidar. Monitors `.git/index`, `HEAD`, `refs/heads/`, `FETCH_HEAD`, and `stash`.
+
+See [File Watching – GitWatcherService](./file-watching/README.md#gitwatcherservice-git-state-watching---v063) for full architecture, watched paths, and IPC channels.
+
+### Key Methods
+- `cleanupForWebContentsId(id)` – Called on window close to prevent stale watchers (#106)
+- `getLastEventTimestamp()` – Used by GitPollingService for hybrid coordination
+- `isWatching()` – Reports active watcher status
+
+---
+
+## GitPollingService
+
+**File:** `src/main/services/GitPollingService.ts`
+
+Polling-based fallback for git status detection on network/cloud drives where file watching is unreliable.
+
+See [File Watching – GitPollingService](./file-watching/README.md#gitpollingservice-hybrid-polling-fallback---v063) for full architecture, polling strategy, and configuration.
+
+### Key Methods
+- `cleanupForWebContentsId(id)` – Called on window close to stop polling (#106)
+- `setWatcherCoordination(getTimestamp, isWatching)` – DIP pattern for hybrid coordination with GitWatcherService
+
+---
+
 ## ProjectLockService
 
 **File:** `src/main/services/ProjectLockService.ts`

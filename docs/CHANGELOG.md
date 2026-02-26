@@ -4,6 +4,16 @@ Historical changelog entries for versions prior to current. For the latest chang
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## Unreleased
+
+### Fixed
+- **Terminal prompt writes in bracketed paste mode** (#108): Wraps terminal prompt writes in `\x1b[200~...\x1b[201~` to prevent shell interpretation of pasted text
+- **Git watcher/polling cleanup on window close** (#106): Added `cleanupForWebContentsId()` to GitWatcherService and GitPollingService, called from `webContents.on('destroyed')` handler to prevent stale git watchers accumulating after window close
+- **Flaky Monaco E2E test stabilized**: Three targeted fixes – `webContents.isDestroyed()` guard in BrowserWindow close handler, wait for Monaco internal textarea (not just container), switch from `keyboard.type()` to `keyboard.insertText()` for reliable content input
+
+### Added
+- **E2E test for directory watcher pipeline** (#104): Verifies file creation via terminal appears in Project Tree within latency budget
+
 ## [0.7.2] - 2026-02-05
 
 ### Added
@@ -432,71 +442,13 @@ Historical changelog entries for versions prior to current. For the latest chang
   - Added `managing-skills` and `creating-issues` skills
   - Located in `.claude/skills/`
 
-## Changes in v0.3.9
-- **Auto-refresh Recent Projects** (Nov 21, 2025):
-  - WelcomePanel subscribes to `project:changed` IPC event
-- **React 18 StrictMode Bug Fix** (Nov 21, 2025):
-  - Fixed `isMounted` ref not resetting
-- **Error Handling System** (Nov 21, 2025):
-  - Created `src/shared/errors.ts`
-  - `ErrorCode` enum, `AppError` class
-- **Shared Utilities** (Nov 21, 2025):
-  - `src/shared/constants.ts`
-  - Toast helpers, time formatting
-- **Test Coverage Improvements** (Nov 21, 2025):
-  - **Total: 1330 tests passing** (62 test files)
-
-## Changes in v0.3.8
-- **Markdown Link Security & Features** (Nov 2, 2025):
-  - Fixed email links, dangerous protocol blocking
-  - Anchor-only links with smooth scrolling
-  - 55 new tests
-- **Version Display in Title Bar** (Nov 2, 2025):
-  - Production builds show version in title bar
-
-## Changes in v0.3.7
-- **Electron Builder Optimization** (Nov 2, 2025):
-  - Fixed recursive packaging bug (3.6GB → 231MB)
-- **ProjectTree.tsx Modularization** (Nov 1, 2025):
-  - Reduced complexity by 38.4%
-  - SOLID principles + design patterns
-- **Comprehensive Test Coverage** (Nov 1, 2025):
-  - Added 320 new tests
-  - **Total: 964 tests passing** (50 test files)
-- **Replace Confirmation Dialog** (Nov 1, 2025):
-  - Confirmation when cut+paste would overwrite
-
-## Changes in v0.3.6
-- **Drag-Drop CSS Layout Fix** (Nov 1, 2025):
-  - Fixed 18px layout shift issue
-- **Comprehensive Drag-Drop UX Improvements** (Nov 1, 2025):
-  - VS Code-style behavior
-  - Auto-scroll, auto-expand
-  - 896 lines of new tests
-- **Unified Dialog System**:
-  - Promise-based API via useDialog() hook
-  - BaseDialog, DialogContext, DialogManager
-- **SOLID Refactoring of File System Dialogs**:
-  - fileValidation.ts with shared utilities
-  - FileSystemDialog.tsx as base component
-- **Comprehensive Test Coverage**:
-  - **Total: 549 tests passing** (35 test files)
-
-## Changes in v0.3.5
-- **Comprehensive Test Coverage for Prompt System**:
-  - 319 new automated tests
-  - **Total: 395 tests passing** (32 test files)
-  - Coverage: 98.59% statements
-
-## Changes in v0.3.4
-- **AutoExecute Simplification**:
-  - Reverted to fire-and-forget approach
-  - Removed Promise-based writes
-  - 200ms delay (industry standard)
-  - 10 comprehensive tests
-- **Documentation Token Efficiency Improvements**:
-  - Moved graph-engine docs to docs/future/
-  - Split docs/prompts/implementation.md
+## v0.3.4–v0.3.9
+- Auto-refresh recent projects, React 18 StrictMode fix, error handling system (`src/shared/errors.ts`) (v0.3.9)
+- Markdown link security, dangerous protocol blocking, version display in title bar (v0.3.8)
+- Electron builder fix (3.6GB → 231MB), ProjectTree modularization, replace confirmation dialog (v0.3.7)
+- Drag-drop UX (VS Code-style), unified dialog system, SOLID file dialog refactoring (v0.3.6)
+- Prompt system test coverage (319 tests, 98.59% statements) (v0.3.5)
+- AutoExecute simplification (fire-and-forget, 200ms delay) (v0.3.4)
 
 ## v0.3.0–v0.3.3
 - Terminal bootstrap pattern with zero visible init commands (v0.3.0)

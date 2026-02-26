@@ -299,49 +299,10 @@ See [Scroll Fixes](./scroll-fixes.md) for related scroll preservation features.
 
 ### Terminal Configuration
 
-```typescript
-// xterm.js settings
-fontSize: 12
-fontFamily: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace
-fontWeight: 'normal'
-fontWeightBold: 'bold'
-
-// Theme - High contrast
-background: '#000000'  // Pure black
-foreground: '#ffffff'  // Bright white
-cursor: '#4fc1ff'      // Cyan
-```
-
-### Scrollbar Styling
-
-**Visibility**: Custom WebKit scrollbar styled for clear visibility against black background.
-
-```css
-/* Container padding */
-.terminal-container { padding: 0; }
-.xterm { padding: 8px; }
-
-/* Scrollbar (16px wide, dark gray with lighter thumb) */
-.xterm-viewport::-webkit-scrollbar {
-  width: 16px;
-}
-
-.xterm-viewport::-webkit-scrollbar-track {
-  background: #1e1e1e;
-}
-
-.xterm-viewport::-webkit-scrollbar-thumb {
-  background: #555555;        // Dark gray
-  border-radius: 0;
-  border: 3px solid #1e1e1e;  // Matches track
-}
-
-.xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background: #707070;        // Lighter on hover
-}
-```
-
-**Design Decision**: Darker scrollbar (#555555) provides subtlety while maintaining visibility. Border matches track for clean appearance.
+- **Font**: SF Mono / Monaco / Inconsolata, 12px, bold support
+- **Theme**: High contrast – black background (`#000000`), white foreground (`#ffffff`), cyan cursor (`#4fc1ff`)
+- **Scrollbar**: 16px wide, dark gray thumb (`#555555`) on `#1e1e1e` track, custom WebKit styling
+- **Container**: `padding: 0` on container, `padding: 8px` on `.xterm`
 
 ### Shell Configuration
 
@@ -445,26 +406,7 @@ See [Terminal Architecture Review](../architecture/reviews/terminal-panel-archit
 - useRef pattern to avoid useEffect cleanup issues
 - Clean screen on mount (`\x1b[2J\x1b[H`)
 
-**Critical Implementation Detail**:
-```typescript
-// IMPORTANT: Use ref to avoid cleanup issues
-const terminalIdRef = useRef<string | null>(null)
-
-useEffect(() => {
-  terminalIdRef.current = terminalId
-}, [terminalId])
-
-// Cleanup uses ref, not state
-useEffect(() => {
-  return () => {
-    if (terminalIdRef.current) {
-      window.api.terminal.kill(terminalIdRef.current)
-    }
-  }
-}, [isAvailable]) // terminalId NOT in dependencies
-```
-
-**Why**: Including `terminalId` in dependencies causes cleanup to run when terminal ID changes, disposing xterm before it can render.
+**Critical Implementation Detail**: Terminal cleanup uses `useRef` for `terminalId` instead of including it in `useEffect` dependencies. Including `terminalId` in deps causes cleanup to run on ID change, disposing xterm before it can render. The cleanup effect depends only on `isAvailable`.
 
 ### State Management
 
@@ -482,38 +424,25 @@ interface TerminalStore {
 
 **v0.3.3 Enhancement**: `sendToTerminal()` now supports `autoExecute` parameter to automatically send Enter key after text. Includes initialization polling (5s timeout, 50ms intervals) to prevent race conditions. See [Prompt Templates - Implementation Guide](../prompts/implementation.md).
 
+### Bracketed Paste Mode (v0.7.2+, #108)
+
+Terminal prompt writes are wrapped in **bracketed paste mode** escape sequences to prevent shell interpretation of pasted text:
+
+```
+\x1b[200~ ... text ... \x1b[201~
+```
+
+Without bracketed paste, multi-line text or text containing special characters (e.g., `!`, `$`, newlines) could be interpreted by the shell as commands. The bracketed paste wrapper tells the shell to treat the entire block as literal paste content.
+
+**Implementation**: `useTerminalStore.sendToTerminal()` wraps the text payload before writing to the PTY.
+
 ## Addons
 
-### FitAddon
-**Purpose**: Automatically fits terminal dimensions to container size
-**Usage**: Called on resize, mount, show/hide
-
-```typescript
-fitAddon.fit()  // Recalculate dimensions
-```
-
-### WebLinksAddon
-**Purpose**: Makes URLs in terminal clickable
-**Auto-enabled**: Loaded automatically on terminal creation
-
-### WebglAddon
-**Purpose**: Hardware-accelerated rendering
-**Loading Order**: MUST load AFTER `xterm.open()` or rendering fails
-
-```typescript
-xterm.open(container)
-
-// Load WebGL renderer AFTER open
-try {
-  const webglAddon = new WebglAddon()
-  webglAddon.onContextLoss(() => {
-    webglAddon.dispose()
-  })
-  xterm.loadAddon(webglAddon)
-} catch (error) {
-  console.warn('WebGL failed, falling back to canvas:', error)
-}
-```
+| Addon | Purpose | Notes |
+|-------|---------|-------|
+| **FitAddon** | Auto-fits terminal dimensions to container | Called on resize, mount, show/hide |
+| **WebLinksAddon** | Makes URLs clickable | Loaded automatically on creation |
+| **WebglAddon** | Hardware-accelerated rendering | MUST load AFTER `xterm.open()` or rendering fails; falls back to canvas on WebGL context loss |
 
 ## Integration Points
 

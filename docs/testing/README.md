@@ -230,9 +230,13 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 - Playwright setup and configuration for Electron
 - Testing patterns for third-party components (Monaco, xterm.js, Mermaid)
-- Complete selector catalog (138 testids) - see [e2e-selectors.md](./e2e-selectors.md)
+- Complete selector catalog (138 testids) – see [e2e-selectors.md](./e2e-selectors.md)
 - Test helper utilities documentation
 - Troubleshooting guide
+
+**E2E test files** (`e2e/`):
+- `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
+- `directory-watcher.e2e.ts` – Directory watcher pipeline (#104): verifies file creation via terminal appears in Project Tree within latency budget
 
 See Spec #011 (archived) for the specification.
 
