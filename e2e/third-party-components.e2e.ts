@@ -78,6 +78,12 @@ async function createTempUserDataDir(
 
 test.describe('Third-Party Components E2E', () => {
   test('Monaco editor: Set content via keyboard and verify in preview', async () => {
+    // Extended timeout: this test launches Electron, opens a project, switches
+    // view mode (triggering async Monaco initialization), types multi-line
+    // content, and verifies preview rendering. 60s is too tight in slow
+    // environments – the Mermaid test (simpler setup) already takes ~52s.
+    test.setTimeout(90_000)
+
     // Create test project and user data directory BEFORE launching app
     const projectPath = await createTestProject()
     const { userDataDir, cleanup: cleanupUserData } = await createTempUserDataDir('monaco')
@@ -107,16 +113,15 @@ test.describe('Third-Party Components E2E', () => {
       // Click on test.md file in project tree to open it
       await clickFileByName(window, 'test.md')
 
-      // Wait for editor panel to load (default is preview-only mode)
-      await window.waitForTimeout(500)
-
-      // Switch to split view mode to show Monaco editor alongside preview
-      // The app defaults to preview-only mode, so we need to enable the editor
+      // Switch to split view mode to show Monaco editor alongside preview.
+      // The app defaults to preview-only mode for .md files, so Monaco is not
+      // mounted until we switch. Wait for the toolbar button (condition-based)
+      // instead of a fixed delay – the button appears once the file is loaded.
       const splitViewBtn = byTestId(window, TEST_IDS.VIEW_MODE_BTN_SPLIT)
       await expect(splitViewBtn).toBeVisible({ timeout: 5000 })
       await splitViewBtn.click()
 
-      // Wait for Monaco editor to be fully initialized
+      // Wait for Monaco editor to be fully initialized (textarea ready)
       await monaco.waitForReady(window)
 
       // Focus editor and verify cursor is visible
@@ -125,18 +130,20 @@ test.describe('Third-Party Components E2E', () => {
       // Select all existing content
       await keyboard.selectAll(window)
 
-      // Type new content
+      // Insert new content via insertText (dispatches input event with full text).
+      // keyboard.type() sends individual keystrokes which Monaco sometimes drops
+      // during re-layout cycles (especially after \n → Enter). insertText sends
+      // the content as a single input event, equivalent to a paste operation.
       const newContent = '# Monaco Editor Test\n\nThis content was typed via keyboard!'
-      await window.keyboard.type(newContent)
+      await window.keyboard.insertText(newContent)
 
-      // Wait for debounced save
-      await window.waitForTimeout(500)
-
-      // Get preview pane to verify content appears
+      // Get preview pane to verify content appears.
+      // Use Playwright's auto-retrying assertion instead of a fixed delay –
+      // it polls until the preview renders the typed content or times out.
       const previewPane = byTestId(window, TEST_IDS.EDITOR_PREVIEW)
 
       // Verify the heading appears in preview
-      await expect(previewPane).toContainText('Monaco Editor Test', { timeout: 5000 })
+      await expect(previewPane).toContainText('Monaco Editor Test', { timeout: 10000 })
 
       // Verify the paragraph appears in preview
       await expect(previewPane).toContainText('This content was typed via keyboard!')

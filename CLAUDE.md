@@ -3,7 +3,7 @@
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
 - **Repository**: `qodeca/erfana` (GitHub)
-- **Version**: 0.7.2
+- **Version**: 0.7.3
 - **Tech Stack**: Electron 39, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 18+ (Electron 39 bundles Node.js 22.20.0)
@@ -30,7 +30,8 @@ npm run test:e2e     # Playwright E2E tests
 src/
 ├── main/           # Electron main process
 │   ├── services/   # Core: FileService, TerminalService, ProjectService, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService; Watchers: DirectoryWatcherService, FileWatcherService; Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media: ScreenshotService, CameraService, PdfService, DocxService, TranscriptionService, AudioMetadataService, ApiKeyService; Multi-instance: ProjectLockService, ExternalFileService; Subdirs: import/, watcher/
-│   └── ipc/        # IPC handlers
+│   ├── ipc/        # IPC handlers
+│   └── utils/      # PauseController (pause/resume with safety timeout)
 ├── preload/        # Context bridge API
 ├── shared/         # Shared code (errors.ts, constants.ts, ipc schemas)
 └── renderer/       # React UI
@@ -68,10 +69,12 @@ See `docs/` for details (keep Claude's context focused):
 - [Testing](docs/testing/README.md) — Workspace, coverage
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [API Services](docs/api-services.md) — Service APIs (Terminal, File, Settings, Watchers)
-- [API Services – Features](docs/api-services-features.md) — Feature service APIs (Git, Camera, ProjectLock, ExternalFile)
+- [API Services – Features](docs/api-services-features.md) — Feature service APIs (GitWatcher, GitPolling, Camera, ProjectLock, ExternalFile, PDF, DOCX)
 - [UI Components](docs/ui-components.md) — React component architecture, activity bars, panels
 - [Prompt Templates](docs/prompts/README.md) — AI prompt system, AutoExecute, template syntax
 - [Changelog](docs/CHANGELOG.md) — Version history (v0.3.x onwards)
+- [Development Tasks](docs/development-tasks.md) — How-to guides: add IPC channels, panels, services, prompt templates
+- [Technical Debt](docs/technical-debt.md) — Known debt items and improvement opportunities
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
 
 ## Feature specifications
@@ -89,7 +92,7 @@ Feature specifications live in `specs/`. Check registry before implementing new 
 | 008 | Graph engine polish & maintenance | T3 | draft | `specs/spec-t3-008-graph-polish` |
 | 009 | Media import with transcription | T4 | implemented | `specs/spec-t4-009-media-import-transcription` |
 | 013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/spec-t3-013-multi-cli-tool-prompt-optimization` |
-| 016 | Project Tree refresh specification | T3 | implemented | `specs/spec-t3-016-project-tree-refresh` |
+| 016 | Project Tree refresh specification | T3 | archived | `specs/archived/spec-t3-016-project-tree-refresh` |
 
 **Registry**: `specs/registry.json`
 

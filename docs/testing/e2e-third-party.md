@@ -35,21 +35,22 @@ await window.keyboard.press('Enter')
 
 Monaco requires special handling for reliable E2E tests:
 
-1. **Wait for ready state** - Use `monaco.waitForReady()` which waits for `.monaco-editor` container to be attached (Playwright auto-retry, no fixed timeouts)
+1. **Wait for ready state** - Use `monaco.waitForReady()` which waits for the internal textarea (keyboard input target) to be attached, not just the `.monaco-editor` container
 2. **Force click for focus** - Use `monaco.focus()` which clicks with `force: true` to handle Monaco's overlapping layers
 3. **Verify focus acquired** - `focus()` confirms cursor visibility before returning
+4. **Use `insertText()` for content** - `keyboard.type()` sends individual keystrokes which Monaco can drop during re-layout; `keyboard.insertText()` dispatches full text as a single input event
 
 ```typescript
 import { monaco } from './utils/helpers'
 
-// Wait for Monaco to be fully initialized
+// Wait for Monaco to be fully initialized (waits for internal textarea)
 await monaco.waitForReady(page)
 
 // Focus editor (handles overlapping layers, verifies cursor)
 await monaco.focus(page)
 
-// Now keyboard input will work reliably
-await page.keyboard.type('# Hello World')
+// Use insertText for reliable multi-line content (not keyboard.type)
+await page.keyboard.insertText('# Hello World\n\nContent here')
 ```
 
 ### Monaco testing patterns
@@ -58,8 +59,9 @@ await page.keyboard.type('# Hello World')
 |--------|--------|
 | Wait for ready | `monaco.waitForReady(page)` |
 | Focus editor | `monaco.focus(page)` |
-| Set content | `monaco.setContent(page, content)` |
+| Set content | `keyboard.selectAll()` + `keyboard.insertText()` |
 | Get content | `monaco.getContent(page)` |
+| Insert text | `page.keyboard.insertText(text)` (preferred over `type()`) |
 | Select all | `Cmd/Ctrl+A` |
 | Copy | `Cmd/Ctrl+C` |
 | Paste | `Cmd/Ctrl+V` |

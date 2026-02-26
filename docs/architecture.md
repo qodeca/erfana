@@ -429,7 +429,7 @@ moveItem: (sourcePath, targetParentPath, newName?) =>
 - **Auto-Open on Hover**: Expand folders during drag after 1s hover
 - **Progress Indicators**: Show progress for large operations with cancel option
 
-See: [Drag-Drop Implementation](./drag-drop.md) | [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md) | [Security](./security.md) | [Testing](./testing/README.md)
+See: [Drag-Drop Implementation](./drag-drop/README.md) | [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md) | [Security](./security.md) | [Testing](./testing/README.md)
 
 ## ProjectTree Modularization
 

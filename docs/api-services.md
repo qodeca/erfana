@@ -185,6 +185,8 @@ Pause watching (used during CRUD operations).
 **Parameters:**
 - `dirPath` - Absolute path to directory
 
+**Safety timeout:** A 10-second auto-resume guard prevents permanent pause states. If `resume()` is not called within 10 s (e.g., due to a lost IPC message), the PauseController auto-resumes, logs a warning, and triggers a compensating refresh (#103).
+
 **Usage Pattern:**
 ```typescript
 // Before internal operation

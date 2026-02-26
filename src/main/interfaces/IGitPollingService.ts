@@ -68,4 +68,13 @@ export interface IGitPollingService {
    * Dispose the service (call on app shutdown).
    */
   dispose(): void
+
+  /**
+   * Cleanup resources when a webContents is destroyed.
+   * Stops polling.
+   *
+   * @param webContentsId - The ID of the destroyed webContents
+   * @see Issue #106
+   */
+  cleanupForWebContentsId(webContentsId: number): void
 }

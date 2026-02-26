@@ -95,8 +95,18 @@ export function createTerminalStore(
     }
 
     try {
+      // For multi-line text, wrap in bracketed paste mode so the receiving
+      // terminal program (e.g. Claude CLI) treats it as a single paste event
+      // rather than character-by-character input. Convert line endings to \r
+      // (the standard terminal input line ending – Enter key sends \r).
+      // Uses the same bracketed paste protocol that xterm.js uses for clipboard pastes.
+      const isMultiLine = /[\r\n]/.test(text)
+      const textToWrite = isMultiLine
+        ? `\x1b[200~${text.replace(/\r?\n/g, '\r')}\x1b[201~`
+        : text
+
       // Write text to terminal using injected terminal operations
-      const writeResult = await terminalOps.write(terminalId, text)
+      const writeResult = await terminalOps.write(terminalId, textToWrite)
 
       if (!writeResult.success) {
         logger.error(`sendToTerminal: Write failed: ${writeResult.error}`)

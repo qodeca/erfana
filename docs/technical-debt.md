@@ -69,18 +69,19 @@ const config = PROMPT_REGISTRY['mermaid-bug-report']  // Returns undefined!
 
 ### Documentation Token Efficiency
 
-**Current State**: ~23,000 lines, ~115,000 tokens (excluding docs/future/)
-**Target**: ~8,500 lines, ~43,000 tokens (40% reduction)
+Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
-**Optimizations**:
-- Archive outdated architectural-review/ (-2,171 lines) ✅ **DONE**
-- Consolidate troubleshooting files (-330 lines)
-- Merge testing scenarios (-528 lines)
-- Reduce code example verbosity (-2,000 lines)
-- Remove repetitive content (-800 lines)
-- Apply brevity improvements (-1,500 lines)
+**Completed**:
+- Archive outdated architectural-review/ ✅
+- Condense logging.md (525 → 239 lines) ✅
+- Condense terminal/README.md (code examples → tables) ✅
+- Condense CHANGELOG.md (old versions compressed) ✅
 
-**Note**: docs/future/ (8,998 lines) preserved for future graph-engine implementation.
+**Remaining**:
+- Consolidate troubleshooting files (troubleshooting.md + troubleshooting-advanced.md)
+- Reduce code example verbosity across remaining files
+
+**Note**: docs/future/ (8,604 lines) preserved for future graph-engine implementation.
 
 ---
 
@@ -127,4 +128,4 @@ All major issues resolved in recent versions. See [Known Issues](./known-issues.
 
 ---
 
-**Last Updated**: v0.7.0 (January 2026)
+**Last Updated**: v0.7.2 (February 2026)

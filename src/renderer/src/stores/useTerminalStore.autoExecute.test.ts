@@ -203,7 +203,7 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
     expect(id).toBe('term123')
   })
 
-  it('should handle multi-line text with autoExecute', async () => {
+  it('should wrap multi-line text in bracketed paste mode with autoExecute', async () => {
     // Setup
     useTerminalStore.setState({ activeTerminalId: 'term1' })
     const multiLineText = 'Line 1\nLine 2\nLine 3'
@@ -216,14 +216,16 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
 
     const result = await promise
 
-    // Verify - text and Enter as separate writes
+    // Verify - multi-line text wrapped in bracketed paste with \n→\r, then Enter
     expect(result).toBe(true)
     expect(mockWrite).toHaveBeenCalledTimes(2)
-    expect(mockWrite).toHaveBeenNthCalledWith(1, 'term1', multiLineText)
+    expect(mockWrite).toHaveBeenNthCalledWith(
+      1, 'term1', '\x1b[200~Line 1\rLine 2\rLine 3\x1b[201~'
+    )
     expect(mockWrite).toHaveBeenNthCalledWith(2, 'term1', '\r')
   })
 
-  it('should handle multi-line text without autoExecute', async () => {
+  it('should wrap multi-line text in bracketed paste mode without autoExecute', async () => {
     // Setup
     useTerminalStore.setState({ activeTerminalId: 'term1' })
     const multiLineText = 'Line 1\nLine 2\nLine 3'
@@ -231,10 +233,39 @@ describe('useTerminalStore.sendToTerminal with autoExecute', () => {
     // Execute
     const result = await useTerminalStore.getState().sendToTerminal(multiLineText, false)
 
-    // Verify - text only, no Enter
+    // Verify - wrapped in bracketed paste with \n→\r, no Enter
     expect(result).toBe(true)
     expect(mockWrite).toHaveBeenCalledTimes(1)
-    expect(mockWrite).toHaveBeenCalledWith('term1', multiLineText)
+    expect(mockWrite).toHaveBeenCalledWith(
+      'term1', '\x1b[200~Line 1\rLine 2\rLine 3\x1b[201~'
+    )
+  })
+
+  it('should NOT wrap single-line text in bracketed paste mode', async () => {
+    // Setup
+    useTerminalStore.setState({ activeTerminalId: 'term1' })
+
+    // Execute
+    const result = await useTerminalStore.getState().sendToTerminal('single line', false)
+
+    // Verify - single-line text sent as-is, no bracketed paste wrapping
+    expect(result).toBe(true)
+    expect(mockWrite).toHaveBeenCalledWith('term1', 'single line')
+  })
+
+  it('should normalize Windows line endings (\\r\\n) in bracketed paste', async () => {
+    // Setup
+    useTerminalStore.setState({ activeTerminalId: 'term1' })
+    const windowsText = 'Line 1\r\nLine 2\r\nLine 3'
+
+    // Execute
+    const result = await useTerminalStore.getState().sendToTerminal(windowsText, false)
+
+    // Verify - \r\n converted to single \r (not double \r\r)
+    expect(result).toBe(true)
+    expect(mockWrite).toHaveBeenCalledWith(
+      'term1', '\x1b[200~Line 1\rLine 2\rLine 3\x1b[201~'
+    )
   })
 
   it('should handle empty string with autoExecute', async () => {
