@@ -742,4 +742,40 @@ describe('GitPollingService', () => {
       expect(service.metrics.pollingSkippedCount).toBe(1)
     })
   })
+
+  describe('cleanupForWebContentsId', () => {
+    it('should stop polling', () => {
+      service.start('/project')
+
+      expect(service.isPolling()).toBe(true)
+
+      service.cleanupForWebContentsId(42)
+
+      expect(service.isPolling()).toBe(false)
+    })
+
+    it('should log cleanup with webContentsId', () => {
+      service.cleanupForWebContentsId(42)
+
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'GitPollingService: Cleaned up for webContentsId',
+        { webContentsId: 42 }
+      )
+    })
+
+    it('should be safe when not polling', () => {
+      expect(service.isPolling()).toBe(false)
+
+      expect(() => service.cleanupForWebContentsId(42)).not.toThrow()
+    })
+
+    it('should be safe to call multiple times', () => {
+      service.start('/project')
+
+      service.cleanupForWebContentsId(42)
+      expect(() => service.cleanupForWebContentsId(42)).not.toThrow()
+
+      expect(service.isPolling()).toBe(false)
+    })
+  })
 })

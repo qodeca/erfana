@@ -49,117 +49,37 @@ The logging layer provides centralized, structured logging across both Electron 
 
 ## Quick start
 
-### Main process
-
+**Main process** (`import { logger } from '../services/LoggingService'`):
 ```typescript
-import { logger } from '../services/LoggingService'
-
-// Simple messages
 logger.info('Application started')
-logger.debug('Processing file', { path: '/path/to/file.md' })
-
-// Errors with stack traces
-try {
-  await riskyOperation()
-} catch (error) {
-  logger.error('Operation failed', error as Error, { context: 'startup' })
-}
+logger.error('Operation failed', error as Error, { context: 'startup' })
 ```
 
-### Renderer process
-
+**Renderer process** (`import { logger, initializeLogger } from '../utils/logger'`):
 ```typescript
-import { logger, initializeLogger } from '../utils/logger'
-
-// Initialize once on app startup
-await initializeLogger()
-
-// Same API as main process
+await initializeLogger()  // Call once on app startup
 logger.info('Component mounted', { component: 'Editor' })
-logger.warn('Deprecated API used', { api: 'oldMethod' })
 ```
 
-### Log level examples
-
-```typescript
-// Trace - very verbose, function entry/exit
-logger.trace('Entering parseMarkdown', { fileSize: 1024 })
-
-// Debug - development debugging
-logger.debug('Cache miss', { key: 'user-settings' })
-
-// Info - normal operations (default level)
-logger.info('File saved', { path: '/docs/readme.md' })
-
-// Warn - potential issues
-logger.warn('Large file detected', { size: '50MB', threshold: '10MB' })
-
-// Error - errors and exceptions
-logger.error('Failed to read file', new Error('ENOENT'), { path: '/missing.md' })
-
-// Fatal - unrecoverable errors
-logger.fatal('Database corruption detected', new Error('Checksum mismatch'))
-```
+All loggers share the same API: `trace`, `debug`, `info`, `warn`, `error(msg, error?, ctx?)`, `fatal(msg, error?, ctx?)`.
 
 ## API reference
 
-### MainLogger (main process)
+### Logger methods (same API for main and renderer)
 
-```typescript
-import { logger } from '../services/LoggingService'
-
-// Standard log methods
-logger.trace(message: string, context?: Record<string, unknown>): void
-logger.debug(message: string, context?: Record<string, unknown>): void
-logger.info(message: string, context?: Record<string, unknown>): void
-logger.warn(message: string, context?: Record<string, unknown>): void
-
-// Error methods (with optional Error object)
-logger.error(message: string, error?: Error, context?: Record<string, unknown>): void
-logger.fatal(message: string, error?: Error, context?: Record<string, unknown>): void
-```
-
-### RendererLogger (renderer process)
-
-```typescript
-import { logger, initializeLogger } from '../utils/logger'
-
-// Initialize (call once on app startup)
-await initializeLogger()
-
-// Same API as MainLogger
-logger.trace(message: string, context?: Record<string, unknown>): void
-logger.debug(message: string, context?: Record<string, unknown>): void
-logger.info(message: string, context?: Record<string, unknown>): void
-logger.warn(message: string, context?: Record<string, unknown>): void
-logger.error(message: string, error?: Error, context?: Record<string, unknown>): void
-logger.fatal(message: string, error?: Error, context?: Record<string, unknown>): void
-```
+| Method | Signature |
+|--------|-----------|
+| `trace/debug/info/warn` | `(message: string, context?: Record<string, unknown>): void` |
+| `error/fatal` | `(message: string, error?: Error, context?: Record<string, unknown>): void` |
 
 ### LoggingService (advanced)
 
-Direct access to the singleton for advanced use cases:
-
-```typescript
-import { loggingService } from '../services/LoggingService'
-
-// Initialize (called automatically on app ready)
-await loggingService.initialize()
-
-// Get/set log level programmatically
-const level = loggingService.getLevel() // 'info'
-loggingService.setLevel('debug')
-
-// Get instance identifiers (for multi-instance debugging)
-const shortId = loggingService.getInstanceId()     // 'a1b2c3d4' (8 chars)
-const fullId = loggingService.getFullInstanceId()  // 'a1b2c3d4-e5f6-...' (full UUID)
-
-// Cleanup old log files (runs automatically, but can be triggered manually)
-await loggingService.cleanupOldLogs()
-
-// Dispose (unsubscribe from settings)
-loggingService.dispose()
-```
+Singleton at `src/main/services/LoggingService.ts`:
+- `getLevel()` / `setLevel(level)` – get/set log level programmatically
+- `getInstanceId()` – 8-char short ID for multi-instance filtering
+- `getFullInstanceId()` – Full UUID for correlation
+- `cleanupOldLogs()` – Manual trigger (runs automatically)
+- `dispose()` – Unsubscribe from settings
 
 ## Log levels
 
@@ -242,24 +162,7 @@ Format: `[timestamp] [instanceId] [level] message | Error: ... | Stack: ... | {c
 
 ### Multi-instance support
 
-When running multiple Erfana instances (via "New Window"), each instance generates a unique 8-character ID at startup. This allows filtering logs by instance:
-
-```bash
-# View logs from specific instance
-grep '\[a1b2c3d4\]' ~/.erfana/logs/combined.log
-
-# Compare two instances
-grep '\[a1b2c3d4\]' ~/.erfana/logs/combined.log > instance1.log
-grep '\[b5c6d7e8\]' ~/.erfana/logs/combined.log > instance2.log
-
-# Find which instances have logged
-grep 'Instance started' ~/.erfana/logs/combined.log
-```
-
-The full UUID is logged at startup for correlation:
-```
-[2025-12-21 14:32:15.123] [a1b2c3d4] [info] Instance started {"instanceId":"a1b2c3d4","fullInstanceId":"a1b2c3d4-e5f6-7890-abcd-ef1234567890",...}
-```
+Each instance generates a unique 8-char ID at startup. Filter logs by instance: `grep '\[a1b2c3d4\]' ~/.erfana/logs/combined.log`. Full UUID logged at startup for correlation.
 
 ## Configuration
 
@@ -283,36 +186,9 @@ Global settings are stored in:
 
 ### Changing log level
 
-**Via settings file:**
-
-Edit `~/.erfana/settings.json`:
-
-```json
-{
-  "logging": {
-    "level": "debug"
-  }
-}
-```
-
-Changes are applied immediately (no restart required).
-
-**Via settings UI:**
-
-1. Click the gear icon in the bottom of the activity bar
-2. In the Settings overlay, find the "Logging" section
-3. Select the desired log level from the dropdown
-
-Changes are applied immediately.
-
-**Programmatically:**
-
-```typescript
-// Main process
-import { globalSettingsService } from '../services/GlobalSettingsService'
-
-await globalSettingsService.updateSetting('logging', { level: 'debug' })
-```
+- **Settings file**: Edit `~/.erfana/settings.json` → `{ "logging": { "level": "debug" } }`. Applied immediately (no restart).
+- **Settings UI**: Gear icon → Logging section → dropdown. Applied immediately.
+- **Programmatically**: `globalSettingsService.updateSetting('logging', { level: 'debug' })`
 
 ### Default level
 
@@ -329,197 +205,35 @@ The default log level is `info`. This captures normal operations, warnings, and 
 
 ## Troubleshooting
 
-### Viewing logs in real-time
+**Viewing logs**: `tail -f ~/.erfana/logs/combined.log` (or `main.log` / `renderer.log`). Filter: `| grep '\[error\]'`
 
-```bash
-# All logs
-tail -f ~/.erfana/logs/combined.log
+**Logs not appearing**: Check log level (set to `debug`/`trace`), verify `~/.erfana/logs/` exists, check disk space.
 
-# Main process only
-tail -f ~/.erfana/logs/main.log
+**Symlink error**: Logging service refuses symlinked logs directory for security. Remove symlink: `rm ~/.erfana/logs && mkdir -p ~/.erfana/logs`
 
-# Renderer process only
-tail -f ~/.erfana/logs/renderer.log
+**Low disk space**: Log cleanup skipped below 100MB free. Free disk space to resume.
 
-# Filter by level
-tail -f ~/.erfana/logs/combined.log | grep '\[error\]'
+**IPC errors**: Check console for `Failed to send log to main process`. Verify preload script loads correctly.
 
-# Search for specific text
-grep 'FileService' ~/.erfana/logs/main.log
-```
-
-### Common issues
-
-**Logs not appearing:**
-
-1. Check log level - set to `debug` or `trace` for verbose output
-2. Verify log directory exists: `ls -la ~/.erfana/logs/`
-3. Check disk space: `df -h ~`
-
-**Logs directory is a symlink (security error):**
-
-The logging service refuses to write to a symlinked logs directory for security reasons. Remove the symlink and create a real directory:
-
-```bash
-rm ~/.erfana/logs
-mkdir -p ~/.erfana/logs
-```
-
-**Low disk space warning:**
-
-Log cleanup is skipped when disk space is below 100MB. Free up disk space to resume automatic cleanup.
-
-**IPC logging errors:**
-
-If renderer logs fail to reach main process:
-- Check console for `Failed to send log to main process` errors
-- Verify preload script is loaded correctly
-- Ensure `window.api.logging` is available
-
-**EPIPE errors:**
-
-The logging system includes `safeConsole` wrapper that suppresses EPIPE errors during app shutdown. These are normal and not a cause for concern.
-
-### Debug logging
-
-To diagnose logging issues, enable trace level temporarily:
-
-1. Edit `~/.erfana/settings.json`:
-   ```json
-   { "logging": { "level": "trace" } }
-   ```
-
-2. Check initialization logs:
-   ```bash
-   grep 'Instance started' ~/.erfana/logs/main.log
-   ```
-
-3. Look for level change logs:
-   ```bash
-   grep 'Log level changed' ~/.erfana/logs/main.log
-   ```
+**EPIPE errors**: Normal during shutdown. `safeConsole` wrapper suppresses these.
 
 ## Security
 
-### Symlink protection
-
-The logging service validates that `~/.erfana/logs/` is not a symbolic link before writing. This prevents symlink attacks where an attacker could redirect logs to arbitrary locations (e.g., overwriting system files).
-
-```typescript
-// Validation runs on initialize()
-private validateLogsDir(logsDir: string): void {
-  const stats = lstatSync(logsDir)
-  if (stats.isSymbolicLink()) {
-    throw new Error('Logs directory is a symlink (security risk)')
-  }
-}
-```
-
-### Disk space checks
-
-Before cleanup operations, available disk space is checked. Operations are skipped if free space is below 100MB to prevent issues during low-disk scenarios.
-
-### Input validation
-
-All log entries from renderer are validated using Zod schema before processing:
-
-```typescript
-const LogEntrySchema = z.object({
-  level: LogLevelSchema,
-  message: z.string(),
-  timestamp: z.string(),
-  source: z.enum(['main', 'renderer']),
-  context: z.record(z.string(), z.unknown()).optional(),
-  error: z.object({
-    name: z.string(),
-    message: z.string(),
-    stack: z.string().optional()
-  }).optional()
-})
-```
-
-Invalid entries are rejected and logged to console.
-
-### Sensitive data
-
-**Never log:**
-- Passwords or API keys
-- Full file contents (use paths instead)
-- Personal identifiable information (PII)
-- Session tokens or authentication data
-
-**Safe patterns:**
-
-```typescript
-// Good - log path, not content
-logger.info('File saved', { path: filePath, size: content.length })
-
-// Bad - logs sensitive content
-logger.info('File saved', { content: fileContent })
-
-// Good - redact sensitive fields
-logger.debug('API response', { status: response.status, body: '[redacted]' })
-```
+- **Symlink protection**: `~/.erfana/logs/` validated as real directory (not symlink) on initialize
+- **Disk space checks**: Cleanup skipped below 100MB free
+- **Input validation**: Renderer log entries validated via Zod schema (`LogEntrySchema` in `logging-schema.ts`). Invalid entries rejected.
+- **Sensitive data**: Never log passwords, API keys, file contents, PII, or session tokens. Log paths and sizes instead.
 
 ## Implementation details
 
-### Electron-log integration
-
-The logging service uses [electron-log](https://github.com/megahertz/electron-log) with custom configuration:
-
-- Custom archive function for logrotate-style rotation
-- Separate logger instances for combined, main, and renderer logs
-- Console transport disabled in production (only file transport)
-
-### Log level mapping
-
-Electron-log doesn't have `trace` or `fatal` levels, so they are mapped:
-
-| Our level | Electron-log level |
-|-----------|-------------------|
-| `trace` | `verbose` |
-| `debug` | `debug` |
-| `info` | `info` |
-| `warn` | `warn` |
-| `error` | `error` |
-| `fatal` | `error` |
-
-### Global error handlers
-
-The renderer logger automatically captures unhandled errors:
-
-```typescript
-// Unhandled promise rejections
-window.addEventListener('unhandledrejection', (event) => {
-  logger.error('Unhandled promise rejection', event.reason)
-})
-
-// Uncaught errors
-window.addEventListener('error', (event) => {
-  logger.error('Uncaught error', event.error, {
-    filename: event.filename,
-    lineno: event.lineno
-  })
-})
-```
-
-### Safe console wrapper
-
-The `safeConsole` utility prevents EPIPE errors during app shutdown:
-
-```typescript
-import { safeConsole, installSafeConsole } from '../utils/safeConsole'
-
-// Install globally (called on app startup)
-installSafeConsole()
-
-// Or use directly
-safeConsole.log('Safe message')
-safeConsole.error('Safe error')
-```
+- **Library**: [electron-log](https://github.com/megahertz/electron-log) with custom logrotate-style archive function
+- **Transports**: Separate logger instances for combined, main, renderer. Console disabled in production.
+- **Level mapping**: `trace` → `verbose`, `fatal` → `error` (electron-log lacks these)
+- **Global error handlers**: Renderer auto-captures `unhandledrejection` and `error` events
+- **Safe console**: `safeConsole` utility (`src/main/utils/safeConsole.ts`) wraps console to suppress EPIPE errors during shutdown. Installed globally on app startup via `installSafeConsole()`. See [EPIPE error handling](./epipe-error-handling.md).
 
 ## Related documentation
 
-- [Global settings service](../CLAUDE.md#global-settings-service-dec-21-2025) - Settings persistence
-- [IPC patterns](./ipc-patterns.md) - IPC communication patterns
-- [Architecture](./architecture.md) - System design overview
+- [IPC patterns](./ipc-patterns.md) – IPC communication patterns
+- [Architecture](./architecture.md) – System design overview
+- [EPIPE error handling](./epipe-error-handling.md) – EPIPE error details

@@ -279,6 +279,18 @@ export class GitPollingService {
   }
 
   /**
+   * Cleanup resources when a webContents is destroyed.
+   * Stops polling.
+   *
+   * @param webContentsId - The ID of the destroyed webContents
+   * @see Issue #106
+   */
+  cleanupForWebContentsId(webContentsId: number): void {
+    this.stop()
+    logger.info('GitPollingService: Cleaned up for webContentsId', { webContentsId })
+  }
+
+  /**
    * Schedule the next poll
    */
   private scheduleNextPoll(): void {

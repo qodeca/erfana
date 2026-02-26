@@ -12,7 +12,7 @@ import {
   getPlatformDiagnostics,
   type FileChangeEvent
 } from './watcher'
-import { DEFAULT_WATCHER_IGNORE_PATTERNS } from '../../shared/constants'
+import { DEFAULT_WATCHER_IGNORE_PATTERNS, PAUSE_CONTROLLER } from '../../shared/constants'
 import { logger } from './LoggingService'
 import { isSystemDirectory } from '../utils/pathSecurity'
 import { AppError, ErrorCode } from '../../shared/errors'
@@ -102,6 +102,7 @@ export class DirectoryWatcherService {
     this.restartAttempts.clear()
 
     for (const [, watched] of this.watchedDirectories.entries()) {
+      watched.pauseController.dispose()
       watched.throttledWorker.dispose()
       watched.atomicSaveDetector.dispose()
       try {
@@ -215,7 +216,10 @@ export class DirectoryWatcherService {
       dirPath,
       watcher,
       webContentsIds: new Set([webContentsId]),
-      pauseController: new PauseController(),
+      pauseController: new PauseController({
+        timeoutMs: PAUSE_CONTROLLER.SAFETY_TIMEOUT_MS,
+        onTimeout: () => this.handlePauseTimeout(dirPath)
+      }),
       throttledWorker,
       atomicSaveDetector: new AtomicSaveDetector(),
       version: this.switchVersion
@@ -280,6 +284,7 @@ export class DirectoryWatcherService {
     // If no more webContents watching this directory, stop watching entirely
     if (watched.webContentsIds.size === 0) {
       this.safeLog(`👁️  Stopping directory watch for: ${dirPath}`)
+      watched.pauseController.dispose()
       watched.throttledWorker.dispose()
       watched.atomicSaveDetector.dispose()
       await watched.watcher.close()
@@ -342,6 +347,7 @@ export class DirectoryWatcherService {
     for (const dirPath of directoriesToCleanup) {
       const watched = this.watchedDirectories.get(dirPath)
       if (watched) {
+        watched.pauseController.dispose()
         watched.throttledWorker.dispose()
         watched.atomicSaveDetector.dispose()
         await watched.watcher.close()
@@ -385,6 +391,27 @@ export class DirectoryWatcherService {
       this.safeLog(`⏸️  Directory watch still paused: ${dirPath} (count: ${watched.pauseController.getCount()})`)
     }
     return true
+  }
+
+  /**
+   * Handle auto-resume when pause safety timeout fires
+   * Logs warning and triggers compensating refresh
+   *
+   * @see Issue #103 - PauseController can remain paused permanently
+   */
+  private handlePauseTimeout(dirPath: string): void {
+    logger.warn(
+      `Safety timeout: auto-resumed directory watch for ${dirPath} after ${PAUSE_CONTROLLER.SAFETY_TIMEOUT_MS}ms (resume was never called)`
+    )
+
+    // Trigger compensating refresh to recover any events missed during stuck pause
+    this.notifyWebContents(dirPath, 'directory-watch:changed', {
+      dirPath,
+      eventCount: 0,
+      originalEventCount: 0,
+      coalescedCount: 0,
+      summary: {}
+    })
   }
 
   /**
@@ -558,6 +585,7 @@ export class DirectoryWatcherService {
     this.restartAttempts.clear()
 
     for (const [, watched] of this.watchedDirectories.entries()) {
+      watched.pauseController.dispose()
       watched.throttledWorker.dispose()
       watched.atomicSaveDetector.dispose()
       try {
@@ -664,6 +692,7 @@ export class DirectoryWatcherService {
       // Stop existing watcher if any
       const existing = this.watchedDirectories.get(dirPath)
       if (existing) {
+        existing.pauseController.dispose()
         existing.throttledWorker.dispose()
         existing.atomicSaveDetector.dispose()
         await existing.watcher.close()

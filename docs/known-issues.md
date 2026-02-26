@@ -99,77 +99,25 @@ name: Mermaid Bug Report  # Display name (can change freely)
 
 **Issue**: Vite cannot resolve `dockview/dist/styles.css`
 
-**Solution**: Use correct path:
-```typescript
-import 'dockview/dist/styles/dockview.css'  // ✅ Correct
-```
+**Solution**: Use `import 'dockview/dist/styles/dockview.css'` (note the `/styles/` in path).
 
 ---
 
 ## electron-store ES Module Import
 
-**Issue**: electron-store v11+ is an ES Module and cannot be imported with `require()` in CommonJS
+**Issue**: electron-store v11+ is an ES Module and cannot be imported with `require()` in CommonJS.
 
-**Error**:
-```
-ERR_REQUIRE_ESM: require() of ES Module not supported
-```
+**Solution**: Use dynamic `import()`. All SettingsService methods are async to handle this.
 
-**Solution**: Use dynamic `import()` instead:
-```typescript
-export class SettingsService {
-  private store: any
-  private storePromise: Promise<any>
+**Pattern**: `constructor()` calls `import('electron-store')`, stores the promise. All methods await `ensureStore()` before accessing the store.
 
-  constructor() {
-    this.storePromise = import('electron-store').then((module) => {
-      const ElectronStore = module.default
-      this.store = new ElectronStore<Settings>({
-        name: 'erfana-settings'
-      })
-      return this.store
-    })
-  }
-
-  private async ensureStore(): Promise<any> {
-    if (!this.store) await this.storePromise
-    return this.store
-  }
-
-  async getLastProjectPath(): Promise<string | null> {
-    const store = await this.ensureStore()
-    return store.get('lastProjectPath') || null
-  }
-}
-```
-
-**Pattern**: All SettingsService methods must be async to handle dynamic import.
-
-**Files**:
-- `src/main/services/SettingsService.ts`
-- `src/main/ipc/file-handlers.ts` (must await settingsService calls)
+**Files**: `src/main/services/SettingsService.ts`, `src/main/ipc/file-handlers.ts`
 
 ---
 
 ## ESLint Peer Dependency Warnings
 
-**Issue**: ESLint 9 vs ESLint 8 peer dependencies
-
-**Impact**: None (warnings only)
-
-**Action**: Ignore warnings; electron-toolkit will update
-
----
-
-## Panel Close Button CSS Selectors
-
-**Status**: No longer applicable after v0.1.0 architectural refactoring
-
-**Previous Issue**: CSS used `:has()` selector for hiding close buttons on protected panels
-
-**Current State**: New SplitviewReact architecture handles panel visibility through API rather than hiding close buttons. This issue is resolved by the architectural change.
-
-**Browser Support Note**: Electron uses recent Chromium which supports `:has()` if needed elsewhere
+**Issue**: ESLint 9 vs ESLint 8 peer dependencies. **Impact**: None (warnings only). Ignore.
 
 ---
 

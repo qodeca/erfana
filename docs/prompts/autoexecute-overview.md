@@ -67,12 +67,10 @@ When `autoExecute: true` is set in a prompt template's YAML frontmatter, the sys
 ### When to Use
 
 **Use autoExecute for**:
-- Trusted, read-only operations (e.g., "Explain this code")
-- Safe commands that don't modify files
+- Trusted operations (e.g., "Explain this code", "Modify selection")
 - Operations where immediate execution is expected
 
 **Don't use autoExecute for**:
-- Destructive operations (delete, modify files)
 - Commands that require user review before execution
 - Multi-step processes requiring user input
 

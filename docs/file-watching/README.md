@@ -121,6 +121,8 @@ Recommended:
 | Internal CRUD (create/delete/rename) | Watcher paused, no double refresh |
 | Expand folders, make external changes | Folders remain expanded after refresh |
 
+**Auto-resume safety timeout (v0.7.2, #103):** The PauseController includes a 10-second safety timeout. If `resume()` is not called within 10 s of `pause()` – for example due to a lost IPC message – the controller auto-resumes, logs a warning, and triggers a compensating refresh to keep the tree in sync. This prevents the watcher from being permanently paused.
+
 ### IPC Channels
 
 | Channel | Direction | Purpose |
@@ -217,6 +219,10 @@ Monitors git repository state files for real-time status updates in the Project 
 | Rapid git operations | Coalesced to single refresh (150ms window) |
 | Network/cloud drives | Falls back to GitPollingService |
 
+### Window Cleanup (#106)
+
+`cleanupForWebContentsId(id)` is called from `webContents.on('destroyed')` in `index.ts` to prevent stale git watchers from accumulating after window close or dev refresh.
+
 ### IPC Channels
 
 | Channel | Direction | Purpose |
@@ -273,6 +279,10 @@ Users can configure polling via Settings overlay:
 |---------|---------|-------|
 | `gitStatus.pollingEnabled` | `true` | boolean |
 | `gitStatus.pollingInterval` | `5000` | 3000-10000ms |
+
+### Window Cleanup (#106)
+
+`cleanupForWebContentsId(id)` is called from `webContents.on('destroyed')` in `index.ts` (synchronous) to stop polling for the destroyed window.
 
 ### IPC Channels
 
@@ -364,9 +374,22 @@ The service integrates these components:
 
 - `src/main/services/watcher/` - All watcher optimization modules
 - Watcher unit tests in `src/main/services/watcher/*.test.ts`
-- Pipeline integration tests in `src/main/services/DirectoryWatcherService.pipeline.test.ts` (11 tests)
+- Directory pipeline integration tests in `src/main/services/DirectoryWatcherService.pipeline.test.ts` (11 tests)
+- Git pipeline integration tests in `src/main/services/GitWatcherService.pipeline.test.ts` (22 tests, #99)
+  - Covers AC-004 (git add), AC-005 (git commit), AC-006 (git checkout), AC-018 (coalescer dedup)
+  - Additional: all 5 event types, correlation ID, WatcherMetrics, disposal guards, circuit breaker
+- Watcher resilience tests in `src/main/services/WatcherResilience.test.ts` (14 tests, #100)
+  - AC-011 (polling fallback), AC-015 (redundant polling suppression), AC-016 (exponential backoff restart)
+- Window visibility gating tests in `src/renderer/src/hooks/useGitStatus.test.ts` (5 tests, #102)
+  - AC-012: git status refreshes dropped while hidden, single catch-up on restore, cooldown respected
+- Event buffer overflow tests in `src/main/services/watcher/ThrottledWorker.test.ts` (6 tests, #102)
+  - AC-017: 30,000-event cap, FIFO eviction, no crash/hang, post-burst recovery
 - Hook tests in `src/renderer/src/hooks/useDirectoryWatcher.test.ts` (11 tests)
 - Pause/resume tests in `src/renderer/src/components/ProjectTree/withWatcherPause.test.ts` (17 tests)
+- Project switching tests in `src/main/services/ProjectService.switching.test.ts` (20 tests, #101)
+  - Session token guards, step ordering, in-flight event handling during project switches
+- Renderer switching tests in `src/renderer/src/components/ProjectTree/ProjectTree.switching.test.tsx` (11 tests, #101)
+  - Tree clearing, new project loading, stale event rejection, git status updates
 
 ---
 

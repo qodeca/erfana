@@ -214,7 +214,8 @@ describe('Main Process - Window Creation', () => {
       gitWatcherService: {
         dispose: vi.fn(() => Promise.resolve()),
         getLastEventTimestamp: vi.fn(() => 0),
-        isWatching: vi.fn(() => false)
+        isWatching: vi.fn(() => false),
+        cleanupForWebContentsId: vi.fn(() => Promise.resolve())
       }
     }))
 
@@ -222,7 +223,8 @@ describe('Main Process - Window Creation', () => {
     vi.doMock('./services/GitPollingService', () => ({
       gitPollingService: {
         dispose: vi.fn(),
-        setWatcherCoordination: vi.fn()
+        setWatcherCoordination: vi.fn(),
+        cleanupForWebContentsId: vi.fn()
       }
     }))
 

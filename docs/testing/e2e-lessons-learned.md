@@ -164,3 +164,32 @@ const app = await electron.launch({
 ```
 
 **Lesson**: Process-level isolation (`--user-data-dir`) is more robust than runtime cleanup. Each Playwright worker gets a fresh Chromium profile with empty localStorage.
+
+---
+
+## 13. Guard webContents against destroyed state
+
+During E2E teardown, `closeApp()` triggers `window.close()` which fires the BrowserWindow `close` event. If `webContents` is already destroyed (race with Playwright cleanup), calling `webContents.send()` throws an uncaught "Object has been destroyed" exception that shows a native error dialog and blocks the process.
+
+**Fix**: Add `if (mainWindow.webContents.isDestroyed()) return` guard before any `webContents.send()` in the close handler.
+
+**Lesson**: Always check `webContents.isDestroyed()` before sending IPC in lifecycle handlers. Electron's close/destroy sequence has race conditions that E2E tests expose.
+
+---
+
+## 14. Use `insertText()` instead of `keyboard.type()` for Monaco
+
+`keyboard.type()` sends individual key-down/key-up events. Monaco Editor drops characters during re-layout cycles – especially after newline characters cause line breaks. Adding delays between keystrokes makes it *worse*, not better.
+
+**Anti-pattern**:
+```typescript
+await page.keyboard.type('# Hello\n\nWorld')  // Drops chars: "keyoard" instead of "keyboard"
+await page.keyboard.type('text', { delay: 30 })  // Even worse: 80% failure rate
+```
+
+**Correct pattern**:
+```typescript
+await page.keyboard.insertText('# Hello\n\nWorld')  // Single input event, like paste
+```
+
+**Lesson**: `insertText()` dispatches the entire text as a single input event (equivalent to a paste operation). This bypasses Monaco's per-keystroke re-layout and is 100% reliable.

@@ -101,7 +101,7 @@ Integrated terminal with xterm.js + node-pty.
 
 **Tech**: xterm.js v5.5.0, node-pty v1.0.0, WebglAddon, FitAddon, WebLinksAddon
 
-📚 **Full docs**: [Terminal](./terminal.md)
+📚 **Full docs**: [Terminal](./terminal/README.md)
 
 ## Context Menu
 

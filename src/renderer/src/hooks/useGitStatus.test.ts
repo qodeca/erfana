@@ -562,4 +562,222 @@ describe('useGitStatus behavioral tests', () => {
       expect(mockGitPolling.start).toHaveBeenCalledWith('/test/project')
     })
   })
+
+  describe('window visibility gating (016-AC-012)', () => {
+    let directoryChangeCallback: () => void
+    let stateChangeCallback: (event: { eventTypes: string[]; projectPath: string; correlationId: string }) => void
+    let pollTriggeredCallback: (event: { timestamp: number; reason: string }) => void
+    const originalHiddenDescriptor = Object.getOwnPropertyDescriptor(document, 'hidden')
+
+    afterEach(() => {
+      if (originalHiddenDescriptor) {
+        Object.defineProperty(document, 'hidden', originalHiddenDescriptor)
+      }
+    })
+
+    beforeEach(() => {
+      // Capture callbacks from subscriptions
+      mockOnDirectoryChanged.mockImplementation((cb) => {
+        directoryChangeCallback = cb
+        return () => {}
+      })
+
+      mockGitWatcher.onStateChanged.mockImplementation((cb) => {
+        stateChangeCallback = cb
+        return () => {}
+      })
+
+      mockGitPolling.onPollTriggered.mockImplementation((cb) => {
+        pollTriggeredCallback = cb
+        return () => {}
+      })
+    })
+
+    it('should drop git status refreshes while window is hidden', async () => {
+      renderHook(() =>
+        useGitStatus({ projectPath: '/test/project', enabled: true })
+      )
+
+      // Let initial load complete
+      await act(async () => {
+        await vi.runAllTimersAsync()
+      })
+
+      mockGetStatus.mockClear()
+
+      // Simulate hiding window
+      await act(async () => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+
+      // Trigger git state change while hidden
+      await act(async () => {
+        stateChangeCallback({
+          eventTypes: ['index'],
+          projectPath: '/test/project',
+          correlationId: 'test-1'
+        })
+        await vi.runAllTimersAsync()
+      })
+
+      // Should NOT have called getStatus (0 calls)
+      expect(mockGetStatus).toHaveBeenCalledTimes(0)
+    })
+
+    it('should drop polling-triggered refreshes while window is hidden', async () => {
+      renderHook(() =>
+        useGitStatus({ projectPath: '/test/project', enabled: true })
+      )
+
+      // Let initial load complete
+      await act(async () => {
+        await vi.runAllTimersAsync()
+      })
+
+      mockGetStatus.mockClear()
+
+      // Simulate hiding window
+      await act(async () => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+
+      // Trigger poll event while hidden
+      await act(async () => {
+        pollTriggeredCallback({
+          timestamp: Date.now(),
+          reason: 'interval'
+        })
+        await vi.runAllTimersAsync()
+      })
+
+      // Should NOT have called getStatus (0 calls)
+      expect(mockGetStatus).toHaveBeenCalledTimes(0)
+    })
+
+    // Note: this tests that git status refreshes triggered by directory changes
+    // are gated. Directory *tree* refreshes (useDirectoryWatcher) are NOT gated
+    // by visibility -- they continue even while hidden, as specified in FR-008.
+    it('should drop directory-change-triggered git refreshes while hidden', async () => {
+      renderHook(() =>
+        useGitStatus({ projectPath: '/test/project', enabled: true })
+      )
+
+      // Let initial load complete
+      await act(async () => {
+        await vi.runAllTimersAsync()
+      })
+
+      mockGetStatus.mockClear()
+
+      // Simulate hiding window
+      await act(async () => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+
+      // Trigger directory change while hidden
+      await act(async () => {
+        directoryChangeCallback()
+        await vi.runAllTimersAsync()
+      })
+
+      // Should NOT have called getStatus (0 calls)
+      expect(mockGetStatus).toHaveBeenCalledTimes(0)
+    })
+
+    it('should fire single catch-up refresh on restore', async () => {
+      renderHook(() =>
+        useGitStatus({ projectPath: '/test/project', enabled: true })
+      )
+
+      // Let initial load complete
+      await act(async () => {
+        await vi.runAllTimersAsync()
+      })
+
+      mockGetStatus.mockClear()
+
+      // Simulate hiding window
+      await act(async () => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+
+      // Trigger multiple events while hidden
+      await act(async () => {
+        stateChangeCallback({
+          eventTypes: ['index'],
+          projectPath: '/test/project',
+          correlationId: 'test-1'
+        })
+        pollTriggeredCallback({
+          timestamp: Date.now(),
+          reason: 'interval'
+        })
+        directoryChangeCallback()
+        await vi.runAllTimersAsync()
+      })
+
+      // Verify no calls while hidden
+      expect(mockGetStatus).toHaveBeenCalledTimes(0)
+
+      // Simulate restoring visibility
+      await act(async () => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
+        document.dispatchEvent(new Event('visibilitychange'))
+        await vi.runAllTimersAsync()
+      })
+
+      // Should have exactly 1 catch-up refresh
+      expect(mockGetStatus).toHaveBeenCalledTimes(1)
+      expect(mockGetStatus).toHaveBeenCalledWith('/test/project')
+    })
+
+    it('should respect cooldown when catch-up refresh fires on restore', async () => {
+      renderHook(() =>
+        useGitStatus({ projectPath: '/test/project', enabled: true })
+      )
+
+      // Let initial load complete
+      await act(async () => {
+        await vi.runAllTimersAsync()
+      })
+
+      mockGetStatus.mockClear()
+
+      // Set lastRefreshTime to recent (within cooldown window)
+      const elapsed = 100
+      const recentTime = Date.now() - elapsed
+      const remainingCooldown = GIT_STATUS.COOLDOWN_DURATION - elapsed
+      act(() => {
+        useGitStore.setState({ lastRefreshTime: recentTime })
+      })
+
+      // Simulate hiding window
+      await act(async () => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+
+      // Simulate restoring visibility
+      await act(async () => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+
+      // Should NOT fire immediately (cooldown active)
+      expect(mockGetStatus).toHaveBeenCalledTimes(0)
+
+      // Advance time by remaining cooldown
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(remainingCooldown)
+      })
+
+      // Now should have called getStatus after cooldown expires
+      expect(mockGetStatus).toHaveBeenCalledTimes(1)
+      expect(mockGetStatus).toHaveBeenCalledWith('/test/project')
+    })
+  })
 })

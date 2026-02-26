@@ -238,4 +238,187 @@ describe('ThrottledWorker', () => {
       expect(onWork).toHaveBeenCalledTimes(2)
     })
   })
+
+  describe('event buffer overflow at production scale (016-AC-017)', () => {
+    it('should not trigger overflow with exactly 30,000 events', () => {
+      const onWork = vi.fn()
+      const onOverflow = vi.fn()
+      const worker = new ThrottledWorker<string>(
+        { maxWorkChunkSize: 500, collectionDelay: 75, throttleDelay: 200, maxBufferedWork: 30000 },
+        { onWork, onOverflow }
+      )
+
+      // Add exactly 30,000 events
+      for (let i = 0; i < 30000; i++) {
+        worker.work(`event-${i}`)
+      }
+
+      // onOverflow should NOT be called
+      expect(onOverflow).not.toHaveBeenCalled()
+      // Buffer should retain all 30,000 events
+      expect(worker.getBufferSize()).toBe(30000)
+    })
+
+    it('should trigger FIFO eviction when 30,001 events are added', () => {
+      const onWork = vi.fn()
+      const onOverflow = vi.fn()
+      const worker = new ThrottledWorker<string>(
+        { maxWorkChunkSize: 500, collectionDelay: 75, throttleDelay: 200, maxBufferedWork: 30000 },
+        { onWork, onOverflow }
+      )
+
+      // Add 30,001 events
+      for (let i = 0; i < 30001; i++) {
+        worker.work(`event-${i}`)
+      }
+
+      // onOverflow should be called with droppedCount=1
+      expect(onOverflow).toHaveBeenCalledTimes(1)
+      expect(onOverflow).toHaveBeenCalledWith(1)
+
+      // Buffer should contain exactly 30,000 events
+      expect(worker.getBufferSize()).toBe(30000)
+
+      // Process and verify oldest event was dropped (event-0 should be gone)
+      vi.advanceTimersByTime(80)
+
+      // First chunk should contain events starting from event-1 (event-0 dropped)
+      expect(onWork).toHaveBeenCalledTimes(1)
+      const firstChunk = onWork.mock.calls[0][0] as string[]
+      expect(firstChunk[0]).toBe('event-1') // Oldest event dropped was event-0
+      expect(firstChunk.length).toBe(500)
+    })
+
+    it('should drop 30,000 oldest events when 60,000 events are added', () => {
+      const onWork = vi.fn()
+      const onOverflow = vi.fn()
+      const worker = new ThrottledWorker<string>(
+        { maxWorkChunkSize: 500, collectionDelay: 75, throttleDelay: 200, maxBufferedWork: 30000 },
+        { onWork, onOverflow }
+      )
+
+      // Add 60,000 events
+      for (let i = 0; i < 60000; i++) {
+        worker.work(`event-${i}`)
+      }
+
+      // onOverflow should be called 30,000 times (once per dropped event)
+      expect(onOverflow).toHaveBeenCalledTimes(30000)
+
+      // Buffer should contain exactly 30,000 events (latest ones)
+      expect(worker.getBufferSize()).toBe(30000)
+
+      // Process and verify we have the latest 30,000 events (30000-59999)
+      vi.advanceTimersByTime(80)
+
+      expect(onWork).toHaveBeenCalledTimes(1)
+      const firstChunk = onWork.mock.calls[0][0] as string[]
+      expect(firstChunk[0]).toBe('event-30000') // First event in buffer should be 30000
+      expect(firstChunk.length).toBe(500)
+    })
+
+    it('should report correct dropped count in each onOverflow call', () => {
+      const onWork = vi.fn()
+      const onOverflow = vi.fn()
+      const worker = new ThrottledWorker<string>(
+        { maxWorkChunkSize: 500, collectionDelay: 75, throttleDelay: 200, maxBufferedWork: 30000 },
+        { onWork, onOverflow }
+      )
+
+      // Add 30,000 events (no overflow)
+      for (let i = 0; i < 30000; i++) {
+        worker.work(`event-${i}`)
+      }
+      expect(onOverflow).not.toHaveBeenCalled()
+
+      // Add 5 more events (each triggers overflow with droppedCount=1)
+      for (let i = 30000; i < 30005; i++) {
+        worker.work(`event-${i}`)
+      }
+
+      // Should have 5 overflow calls, each with droppedCount=1
+      expect(onOverflow).toHaveBeenCalledTimes(5)
+      for (let i = 0; i < 5; i++) {
+        expect(onOverflow.mock.calls[i][0]).toBe(1)
+      }
+    })
+
+    it('should not crash or hang during overflow and processing', () => {
+      const onWork = vi.fn()
+      const onOverflow = vi.fn()
+      const worker = new ThrottledWorker<string>(
+        { maxWorkChunkSize: 500, collectionDelay: 75, throttleDelay: 200, maxBufferedWork: 30000 },
+        { onWork, onOverflow }
+      )
+
+      // Add 35,000 events (5,000 over limit)
+      for (let i = 0; i < 35000; i++) {
+        worker.work(`event-${i}`)
+      }
+
+      expect(onOverflow).toHaveBeenCalledTimes(5000)
+      expect(worker.getBufferSize()).toBe(30000)
+
+      // Advance timers to process all events
+      // Collection delay: 75ms
+      vi.advanceTimersByTime(80)
+      expect(onWork).toHaveBeenCalled()
+
+      // Process all chunks (30000 events / 500 per chunk = 60 chunks)
+      // Each chunk needs throttle delay (200ms) after the first
+      for (let chunk = 0; chunk < 59; chunk++) {
+        vi.advanceTimersByTime(205)
+      }
+
+      // All events should be processed
+      expect(onWork).toHaveBeenCalledTimes(60)
+
+      // Worker should return to idle state
+      expect(worker.isBusy()).toBe(false)
+      expect(worker.getBufferSize()).toBe(0)
+    })
+
+    it('should process post-burst events normally after overflow', () => {
+      const onWork = vi.fn()
+      const onOverflow = vi.fn()
+      const worker = new ThrottledWorker<string>(
+        { maxWorkChunkSize: 500, collectionDelay: 75, throttleDelay: 200, maxBufferedWork: 30000 },
+        { onWork, onOverflow }
+      )
+
+      // Add 35,000 events causing overflow
+      for (let i = 0; i < 35000; i++) {
+        worker.work(`burst-${i}`)
+      }
+
+      expect(onOverflow).toHaveBeenCalledTimes(5000)
+
+      // Process all events
+      vi.advanceTimersByTime(80)
+      for (let chunk = 0; chunk < 59; chunk++) {
+        vi.advanceTimersByTime(205)
+      }
+
+      // Worker should be idle
+      expect(worker.isBusy()).toBe(false)
+      expect(worker.getBufferSize()).toBe(0)
+
+      // Reset mocks
+      onWork.mockClear()
+      onOverflow.mockClear()
+
+      // Add new events after burst
+      worker.work('post-burst-1')
+      worker.work('post-burst-2')
+      worker.work('post-burst-3')
+
+      // No overflow should occur
+      expect(onOverflow).not.toHaveBeenCalled()
+
+      // Events should be processed normally
+      vi.advanceTimersByTime(80)
+      expect(onWork).toHaveBeenCalledTimes(1)
+      expect(onWork).toHaveBeenCalledWith(['post-burst-1', 'post-burst-2', 'post-burst-3'])
+    })
+  })
 })

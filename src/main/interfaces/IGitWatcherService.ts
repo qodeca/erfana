@@ -43,4 +43,13 @@ export interface IGitWatcherService {
    * Dispose the service (call on app shutdown).
    */
   dispose(): Promise<void>
+
+  /**
+   * Cleanup resources when a webContents is destroyed.
+   * Bumps session version and stops the watcher.
+   *
+   * @param webContentsId - The ID of the destroyed webContents
+   * @see Issue #106
+   */
+  cleanupForWebContentsId(webContentsId: number): Promise<void>
 }

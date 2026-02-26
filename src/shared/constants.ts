@@ -226,3 +226,15 @@ export const CAMERA = {
   /** Maximum capture height in pixels */
   CAPTURE_MAX_HEIGHT: 2160
 } as const
+
+/**
+ * PauseController safety timeout constants
+ * Auto-resumes directory watcher if resume() is not called within the timeout
+ *
+ * @see PauseController.ts
+ * @see Issue #103 - auto-resume safety timeout
+ */
+export const PAUSE_CONTROLLER = {
+  /** Safety timeout in ms: auto-resume if resume() not called within this window */
+  SAFETY_TIMEOUT_MS: 10_000
+} as const

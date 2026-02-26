@@ -396,7 +396,7 @@ npm run build
 
 **Common Selectors:** `.app-dock-layout`, `.project-tree`, `.monaco-editor`, `.preview-pane`, `[title="Project"]`, `[title="Terminal"]`
 
-See: [Testing Index](./testing/README.md) | [UI Scenarios](./testing/ui-scenarios.md) | [Interaction Scenarios](./testing/interaction-scenarios.md)
+See: [Testing Index](./testing/README.md) | [Test Scenarios](./testing/test-scenarios.md)
 
 ## Testing Auto-Refresh
 
@@ -408,7 +408,7 @@ File and directory watching with chokidar provides automatic refresh on external
 - Directory tree refresh (1000ms debounce) - external file/folder creation appears automatically
 - Pause/resume pattern - internal CRUD operations don't trigger duplicate refreshes
 
-See: [File Watching](./file-watching.md) for detailed testing instructions
+See: [File Watching](./file-watching/README.md) for detailed testing instructions
 
 ## Debugging
 

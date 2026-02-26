@@ -157,10 +157,29 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
   - `context-menu/strategies.test.tsx` (15 tests) - Node-type strategies (FileStrategy, FolderStrategy)
   - `context-menu/factory.test.ts` (7 tests) - Strategy selection factory pattern
 
-  *Phase 2.5: Pipeline & Hook Behavioral Tests (25 tests) – Spec T3-016 verification*:
-  - `DirectoryWatcherService.pipeline.test.ts` (11 tests) - End-to-end pipeline integration
+  *Phase 2.5a: Project Switching Tests (31 tests) – Issue #101*:
+  - `ProjectService.switching.test.ts` (20 tests) - Main process switching orchestration
+    - 016-FR-007 step ordering, AC-009 clear/load, AC-014 in-flight event drop
+    - Session token bumping across DirectoryWatcherService and GitWatcherService
+  - `ProjectTree.switching.test.tsx` (11 tests) - Renderer switching behavior
+    - AC-009a tree clears, AC-009b new project loads, AC-009c stale events rejected
+    - AC-009d git status updates, AC-014 in-flight events silently dropped
+
+  *Phase 2.5: Pipeline & Hook Behavioral Tests (72 tests) – Spec T3-016 verification*:
+  - `DirectoryWatcherService.pipeline.test.ts` (11 tests) - End-to-end directory pipeline integration
     - Uses real ThrottledWorker, EventCoalescer, AtomicSaveDetector wired to processEvents
     - Covers AC-001 (file creation), AC-002 (deletion), AC-003 (directory), AC-008 (coalescing), AC-013 (atomic save)
+  - `GitWatcherService.pipeline.test.ts` (22 tests) - End-to-end git pipeline integration (#99)
+    - Uses real GitEventCoalescer wired to handleCoalescedEvent (main process only)
+    - Covers AC-004 (git add), AC-005 (git commit), AC-006 (git checkout), AC-018 (coalescer dedup)
+    - Validates 150ms coalesce window, event deduplication, session token stale-event guard
+    - Additional: all 5 event types, correlation ID, WatcherMetrics, disposal guards, circuit breaker
+  - `WatcherResilience.test.ts` (14 tests) - Watcher resilience and polling fallback (#100)
+    - AC-011 (polling fallback when watcher fails), AC-015 (redundant polling suppression), AC-016 (exponential backoff restart)
+  - `useGitStatus.test.ts` visibility gating (5 tests) - Window visibility gating (#102)
+    - AC-012: drops git status refreshes while hidden (watcher, polling, directory-change sources), single catch-up on restore, cooldown respected
+  - `ThrottledWorker.test.ts` overflow (6 tests) - Event buffer overflow at production scale (#102)
+    - AC-017: 30,000-event cap, FIFO eviction, correct overflow reporting, no crash/hang, post-burst recovery
   - `useDirectoryWatcher.test.ts` (11 tests) - Hook behavioral tests
     - Event handling, AC-010 internal operation suppression, lifecycle, subscriptions
   - `ProjectTree.timing.test.tsx` (3 tests) - Project switching timing and manual refresh (AC-007)
@@ -211,9 +230,13 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 - Playwright setup and configuration for Electron
 - Testing patterns for third-party components (Monaco, xterm.js, Mermaid)
-- Complete selector catalog (138 testids) - see [e2e-selectors.md](./e2e-selectors.md)
+- Complete selector catalog (138 testids) – see [e2e-selectors.md](./e2e-selectors.md)
 - Test helper utilities documentation
 - Troubleshooting guide
+
+**E2E test files** (`e2e/`):
+- `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
+- `directory-watcher.e2e.ts` – Directory watcher pipeline (#104): verifies file creation via terminal appears in Project Tree within latency budget
 
 See Spec #011 (archived) for the specification.
 
