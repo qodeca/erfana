@@ -66,7 +66,11 @@ interface IAudioMetadataService {
 const MIME_TYPES: Record<string, string> = {
   mp3: 'audio/mpeg',
   wav: 'audio/wav',
-  m4a: 'audio/mp4'
+  m4a: 'audio/mp4',
+  ogg: 'audio/ogg',
+  flac: 'audio/flac',
+  aac: 'audio/aac',
+  wma: 'audio/x-ms-wma'
 }
 
 /**
@@ -170,7 +174,7 @@ class AudioMetadataService implements IAudioMetadataService {
     if (!supportedExtensions.includes(ext)) {
       return {
         valid: false,
-        error: `Unsupported audio format: .${ext}. Supported: MP3, WAV, M4A.`,
+        error: `Unsupported audio format: .${ext}. Supported: MP3, WAV, M4A, OGG, FLAC, AAC, WMA.`,
         errorCode: ErrorCode.TRANSCRIPTION_INVALID_AUDIO,
         sizeInMB
       }

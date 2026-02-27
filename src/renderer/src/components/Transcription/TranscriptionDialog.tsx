@@ -24,7 +24,30 @@ import { useTranscriptionStore } from '../../stores/useTranscriptionStore'
 import { LanguageSelect } from './LanguageSelect'
 import { TEST_IDS } from '../../constants/testids'
 import type { TranscriptionLanguage } from '../../../../shared/ipc/transcription-schema'
+import { ErrorCode } from '../../../../shared/errors'
 import './TranscriptionDialog.css'
+
+/**
+ * Get actionable suggestion text for a transcription error code.
+ */
+function getErrorSuggestion(errorCode: string | undefined): string | null {
+  switch (errorCode) {
+    case ErrorCode.TRANSCRIPTION_NO_API_KEY:
+      return 'Add your OpenAI API key in Settings.'
+    case ErrorCode.TRANSCRIPTION_INVALID_API_KEY:
+      return 'Check your API key in Settings.'
+    case ErrorCode.TRANSCRIPTION_NETWORK_ERROR:
+      return 'Check your internet connection and try again.'
+    case ErrorCode.TRANSCRIPTION_RATE_LIMITED:
+      return 'Wait a moment and try again.'
+    case ErrorCode.TRANSCRIPTION_INVALID_AUDIO:
+      return 'Ensure the file is a valid audio file in a supported format.'
+    case ErrorCode.TRANSCRIPTION_TIMEOUT:
+      return 'The file may be too large. Try a shorter recording.'
+    default:
+      return null
+  }
+}
 
 /**
  * Format seconds as a human-readable ETA string.
@@ -73,21 +96,23 @@ export function TranscriptionDialog(): JSX.Element | null {
     progress,
     result,
     error,
+    lastLanguage,
     closeDialog,
     startTranscription,
-    cancelTranscription
+    cancelTranscription,
+    setLastLanguage
   } = useTranscriptionStore()
 
   const [selectedLanguage, setSelectedLanguage] = useState<TranscriptionLanguage>('auto')
   const dialogRef = useRef<HTMLDivElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
 
-  // Reset language selection when dialog opens with a new file
+  // Initialize language selection from last used language when dialog opens
   useEffect(() => {
     if (isDialogOpen) {
-      setSelectedLanguage('auto')
+      setSelectedLanguage(lastLanguage)
     }
-  }, [isDialogOpen, filePath])
+  }, [isDialogOpen, filePath, lastLanguage])
 
   // Focus close button when dialog opens
   useEffect(() => {
@@ -164,8 +189,12 @@ export function TranscriptionDialog(): JSX.Element | null {
   const hasError = error !== null && !isTranscribing
   const hasSuccess = result?.success === true && !isTranscribing
   const showLanguageSelection = !isTranscribing && !hasError && !hasSuccess
+  const errorSuggestion = hasError && result?.errorCode
+    ? getErrorSuggestion(result.errorCode)
+    : null
 
   const handleStart = (): void => {
+    setLastLanguage(selectedLanguage)
     startTranscription(selectedLanguage)
   }
 
@@ -316,6 +345,9 @@ export function TranscriptionDialog(): JSX.Element | null {
           {hasError && (
             <div className="transcription-error" data-testid={TEST_IDS.TRANSCRIPTION_ERROR}>
               <p className="transcription-error-message">{error}</p>
+              {errorSuggestion && (
+                <p className="transcription-error-suggestion">{errorSuggestion}</p>
+              )}
             </div>
           )}
 

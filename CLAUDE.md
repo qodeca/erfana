@@ -53,7 +53,7 @@ src/
 9. **Quit Confirmation** - Prompts before quitting with unsaved changes or active terminal sessions
 10. **Multi-Instance** - Multiple independent instances with file-based project locking, duplicate opens focus existing window
 11. **Image Preview** - Viewer for PNG, JPG, GIF, WebP, SVG, BMP, ICO with zoom, pan, fit controls, keyboard shortcuts (arrow keys, +/-, Home, F for fullscreen), and full-screen mode
-12. **Audio Transcription** - Import MP3, WAV, M4A files with OpenAI-powered transcription (GPT-4o-transcribe primary, Whisper-1 fallback), file chunking for long recordings (>8 min), TranscriptionDialog with language selection and progress, API key management via Electron safeStorage
+12. **Audio Transcription** - Import audio files (MP3, WAV, M4A, OGG, FLAC, AAC, WMA) with OpenAI-powered transcription (GPT-4o-transcribe primary, Whisper-1 fallback), file chunking for long recordings (>8 min), TranscriptionDialog with language selection (persists within session) and progress, pre-validation before dialog opens, batch import rejects audio with toast, API key management via Electron safeStorage
 
 ## Documentation
 See `docs/` for details (keep Claude's context focused):
@@ -91,7 +91,7 @@ Feature specifications live in `specs/`. Check registry before implementing new 
 | 006 | Knowledge graph & entities | T3 | draft | `specs/spec-t3-006-knowledge-graph` |
 | 007 | Temporal queries & timeline | T3 | draft | `specs/spec-t3-007-temporal-queries` |
 | 008 | Graph engine polish & maintenance | T3 | draft | `specs/spec-t3-008-graph-polish` |
-| 009 | Media import with transcription | T4 | implemented | `specs/spec-t4-009-media-import-transcription` |
+| 009 | Media import with transcription | T4 | implemented (stage 2) | `specs/spec-t4-009-media-import-transcription` |
 | 013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/spec-t3-013-multi-cli-tool-prompt-optimization` |
 | 016 | Project Tree refresh specification | T3 | archived | `specs/archived/spec-t3-016-project-tree-refresh` |
 

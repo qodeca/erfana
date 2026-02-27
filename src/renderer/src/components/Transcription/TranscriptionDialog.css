@@ -234,11 +234,17 @@
   margin: 0;
 }
 
+.transcription-error-suggestion {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: var(--space-4) 0 0 0;
+}
+
 /* Success section */
 .transcription-success {
   padding: var(--space-6);
-  background: rgba(227, 232, 41, 0.1);
-  border: var(--border-width) solid rgba(227, 232, 41, 0.3);
+  background: var(--color-success-bg);
+  border: var(--border-width) solid var(--color-success-border);
   border-radius: 0;
   margin-bottom: var(--space-8);
 }

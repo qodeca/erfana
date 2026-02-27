@@ -47,7 +47,7 @@ export function registerImportHandlers(): void {
         // Document files (require conversion)
         { name: 'Documents (PDF)', extensions: requiresConversion },
         // Audio files
-        { name: 'Audio Files', extensions: ['mp3', 'wav', 'm4a'] },
+        { name: 'Audio Files', extensions: ['mp3', 'wav', 'm4a', 'ogg', 'flac', 'aac', 'wma'] },
         // Text files (passthrough)
         { name: 'Text Files', extensions: passthrough },
         // Allow any file for advanced users

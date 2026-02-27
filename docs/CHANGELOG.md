@@ -7,7 +7,18 @@ Historical changelog entries for versions prior to current. For the latest chang
 ## Unreleased
 
 ### Added
-- **Audio transcription import** (Spec #009): Import MP3, WAV, M4A files with OpenAI-powered transcription (#75)
+- **Audio transcription UI wiring** (Spec #009, Stage 2): End-to-end audio transcription flow (#109)
+  - TranscriptionDialog mounted in App.tsx (previously built but not rendered)
+  - useImport hook detects audio files and routes to TranscriptionDialog
+  - Audio file pre-validation before dialog opens
+  - 7 audio formats supported: MP3, WAV, M4A, OGG, FLAC, AAC, WMA
+  - Single-file transcription retry protection
+  - Improved error messages with actionable suggestions
+  - Language selection persists within session
+  - Batch imports reject audio files with toast message
+  - New design tokens: `--color-success-bg`, `--color-success-border`
+  - Closes #109
+- **Audio transcription import** (Spec #009, Stage 1): Import MP3, WAV, M4A files with OpenAI-powered transcription (#75)
   - GPT-4o-transcribe primary model with Whisper-1 fallback
   - File chunking for long recordings (>8 min, 480s boundary, 0.5s overlap)
   - Exponential backoff retry (max 3 attempts, 1s–30s delay)

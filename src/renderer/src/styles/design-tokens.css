@@ -147,6 +147,13 @@
   --color-error-text-hint: #d4a5a5;       /* Muted error hints */
 
   /* ============================================
+   * COLORS: Success State
+   * For success dialogs, transcription complete, etc.
+   * ============================================ */
+  --color-success-bg: rgba(227, 232, 41, 0.1);  /* Success container background */
+  --color-success-border: rgba(227, 232, 41, 0.3); /* Success container border */
+
+  /* ============================================
    * COLORS: Syntax Highlighting
    * For code blocks and inline code
    * ============================================ */

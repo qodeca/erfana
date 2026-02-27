@@ -258,7 +258,7 @@ export const TRANSCRIPTION = {
   /** Maximum file size for single API call (25 MB, OpenAI limit) */
   MAX_API_FILE_SIZE: 25 * 1024 * 1024,
   /** Supported audio extensions */
-  SUPPORTED_EXTENSIONS: ['mp3', 'wav', 'm4a']
+  SUPPORTED_EXTENSIONS: ['mp3', 'wav', 'm4a', 'ogg', 'flac', 'aac', 'wma']
 } as const
 
 /**

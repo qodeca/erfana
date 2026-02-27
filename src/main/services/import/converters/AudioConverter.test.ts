@@ -50,8 +50,8 @@ describe('AudioConverter', () => {
   // ===========================================================================
 
   describe('properties', () => {
-    it('should support mp3, wav, m4a extensions', () => {
-      expect(converter.supportedExtensions).toEqual(['mp3', 'wav', 'm4a'])
+    it('should support all 7 audio extensions', () => {
+      expect(converter.supportedExtensions).toEqual(['mp3', 'wav', 'm4a', 'ogg', 'flac', 'aac', 'wma'])
     })
 
     it('should require conversion', () => {
@@ -197,7 +197,7 @@ describe('AudioConverter', () => {
       )
 
       expect(instance).toBeInstanceOf(AudioConverter)
-      expect(instance.supportedExtensions).toEqual(['mp3', 'wav', 'm4a'])
+      expect(instance.supportedExtensions).toEqual(['mp3', 'wav', 'm4a', 'ogg', 'flac', 'aac', 'wma'])
     })
 
     it('should create independent instances', () => {

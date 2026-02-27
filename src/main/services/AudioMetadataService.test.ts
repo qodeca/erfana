@@ -62,7 +62,7 @@ vi.mock('../../shared/errors', () => ({
 
 vi.mock('../../shared/constants', () => ({
   TRANSCRIPTION: {
-    SUPPORTED_EXTENSIONS: ['mp3', 'wav', 'm4a']
+    SUPPORTED_EXTENSIONS: ['mp3', 'wav', 'm4a', 'ogg', 'flac', 'aac', 'wma']
   }
 }))
 
@@ -250,7 +250,7 @@ describe('AudioMetadataService', () => {
       const { createAudioMetadataService } = await import('./AudioMetadataService')
       const service = createAudioMetadataService()
 
-      const result = await service.validate('/path/to/audio.ogg')
+      const result = await service.validate('/path/to/audio.aif')
 
       expect(result.valid).toBe(false)
       expect(result.errorCode).toBe('TRANSCRIPTION_INVALID_AUDIO')

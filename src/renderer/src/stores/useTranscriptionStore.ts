@@ -42,6 +42,10 @@ interface TranscriptionState {
   /** Error message if transcription failed (null if no error) */
   error: string | null
 
+  // Language persistence (session-level, spec NFR-008)
+  /** Last selected language, persists across dialog open/close within session */
+  lastLanguage: TranscriptionLanguage
+
   // Actions
   /** Open the transcription dialog for a specific audio file */
   openDialog: (filePath: string, fileName: string) => void
@@ -51,6 +55,8 @@ interface TranscriptionState {
   startTranscription: (language: TranscriptionLanguage) => Promise<void>
   /** Cancel the active transcription */
   cancelTranscription: () => Promise<void>
+  /** Update the remembered language selection (persists within session) */
+  setLastLanguage: (language: TranscriptionLanguage) => void
 
   // Internal -- progress event handler (exposed for testing)
   /** Handle incoming progress events from the main process */
@@ -86,6 +92,7 @@ export const useTranscriptionStore = create<TranscriptionState>((set, get) => ({
   progress: null,
   result: null,
   error: null,
+  lastLanguage: 'auto',
 
   openDialog: (filePath: string, fileName: string) => {
     set({
@@ -193,6 +200,10 @@ export const useTranscriptionStore = create<TranscriptionState>((set, get) => ({
       progress: null,
       error: null
     })
+  },
+
+  setLastLanguage: (language: TranscriptionLanguage) => {
+    set({ lastLanguage: language })
   },
 
   _handleProgress: (progress: TranscriptionProgress) => {

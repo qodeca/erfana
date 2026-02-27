@@ -112,7 +112,11 @@ async function withRetry<T>(
 const AUDIO_MIME_TYPES: Record<string, string> = {
   mp3: 'audio/mpeg',
   wav: 'audio/wav',
-  m4a: 'audio/mp4'
+  m4a: 'audio/mp4',
+  ogg: 'audio/ogg',
+  flac: 'audio/flac',
+  aac: 'audio/aac',
+  wma: 'audio/x-ms-wma'
 }
 
 /**
@@ -258,7 +262,11 @@ class TranscriptionService implements ITranscriptionService {
   ): Promise<string> {
     onProgress({ percent: 10, phase: 'Sending to API' })
 
-    const transcript = await this.callTranscriptionApi(filePath, language, apiKey, signal)
+    const transcript = await withRetry(
+      () => this.callTranscriptionApi(filePath, language, apiKey, signal),
+      TRANSCRIPTION.MAX_RETRY_ATTEMPTS,
+      signal
+    )
 
     onProgress({ percent: 90, phase: 'Processing result' })
 

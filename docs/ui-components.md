@@ -315,9 +315,7 @@ Opens when clicking image files (PNG, JPG, GIF, WebP, SVG, BMP, ICO) in project 
 
 **Location**: `src/renderer/src/components/Transcription/`
 
-Modal dialog for audio file import with OpenAI transcription. Opened when importing audio files (MP3, WAV, M4A).
-
-**Note**: Stage 1 components are built and tested but not yet mounted in the app layout (see #109 for Stage 2 wiring).
+Modal dialog for audio file import with OpenAI transcription. Mounted in `App.tsx` and opened automatically when importing audio files (MP3, WAV, M4A, OGG, FLAC, AAC, WMA). Audio files are detected by `useImport` and routed to the dialog with pre-validation.
 
 **Components**:
 - `TranscriptionDialog.tsx` – Main dialog with progress bar, error display, cancel
@@ -329,8 +327,10 @@ Modal dialog for audio file import with OpenAI transcription. Opened when import
 - Progress bar with percentage, ETA, and chunk indicator ("chunk N of M")
 - ARIA attributes: `role="progressbar"`, `aria-valuenow/min/max`, `aria-label`
 - Cancel via footer button, X button, or Escape key
-- Error display with retry option
-- Language selector: English, Polish, German, French, Spanish, Italian, Portuguese, Dutch, Russian, Japanese, Chinese, Korean + 19 more
+- Error display with retry option and actionable suggestions
+- Language selector: English, Polish, German, French, Spanish, Italian, Portuguese, Dutch, Russian, Japanese, Chinese, Korean + 19 more (persists within session)
+- Batch import rejection: audio files in multi-file drops show toast, not dialog
+- Single-file retry protection
 
 **IPC flow**: `transcription:import` (invoke) + `transcription:progress` (streamed events) + `transcription:cancel` (abort)
 

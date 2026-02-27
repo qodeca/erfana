@@ -55,7 +55,8 @@ function resetStore(): void {
     isTranscribing: false,
     progress: null,
     result: null,
-    error: null
+    error: null,
+    lastLanguage: 'auto'
   })
 }
 

@@ -345,6 +345,60 @@ describe('TranscriptionService', () => {
       expect(result.success).toBe(true)
       expect(mockFetch.mock.calls.length).toBeGreaterThanOrEqual(3)
     })
+
+    it('should retry on rate limit error for single file (under chunk boundary)', async () => {
+      // Duration is well below CHUNK_BOUNDARY_SECONDS (480) → takes transcribeSingle path
+      mockGetDuration.mockResolvedValue(60)
+
+      let callCount = 0
+      mockFetch.mockImplementation(() => {
+        callCount++
+        if (callCount === 1) {
+          return Promise.resolve({
+            ok: false,
+            status: 429,
+            statusText: 'Too Many Requests',
+            text: () => Promise.resolve('rate limit exceeded')
+          })
+        }
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve('Single file transcription.')
+        })
+      })
+
+      const { createTranscriptionService } = await import('./TranscriptionService')
+      const service = createTranscriptionService()
+
+      const result = await service.transcribe('/path/to/short.mp3', 'en', onProgress)
+
+      // First attempt fails with 429, second attempt succeeds
+      expect(result.success).toBe(true)
+      expect(result.transcript).toBe('Single file transcription.')
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+    })
+
+    it('should not retry on auth error (401) for single file', async () => {
+      // Duration is well below CHUNK_BOUNDARY_SECONDS (480) → takes transcribeSingle path
+      mockGetDuration.mockResolvedValue(60)
+
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+        text: () => Promise.resolve('Incorrect API key provided')
+      })
+
+      const { createTranscriptionService } = await import('./TranscriptionService')
+      const service = createTranscriptionService()
+
+      const result = await service.transcribe('/path/to/short.mp3', 'en', onProgress)
+
+      // Auth errors are not retryable – API must be called exactly once
+      expect(result.success).toBe(false)
+      expect(result.errorCode).toBe('TRANSCRIPTION_INVALID_API_KEY')
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+    })
   })
 
   // ===========================================================================

@@ -270,7 +270,7 @@ Audio-to-text transcription using the OpenAI API. Handles chunking for long file
 Transcribe an audio file to text.
 
 **Parameters:**
-- `filePath` – Absolute path to the audio file (MP3, WAV, M4A)
+- `filePath` – Absolute path to the audio file (MP3, WAV, M4A, OGG, FLAC, AAC, WMA)
 - `language` – Language code (e.g., `'en'`, `'pl'`) or `'auto'` for detection
 - `onProgress` – Callback for UI progress updates (percent 0–100, phase string, chunk info, ETA)
 - `signal` – Optional AbortSignal for cancellation
@@ -348,7 +348,7 @@ Populate the `hasKey()` cache by checking the filesystem. Call after app is read
 Lightweight audio file metadata extraction using the `music-metadata` npm package. Pure JavaScript – no native dependencies (no ffmpeg required).
 
 ### Key Features
-- Supports MP3 (ID3v1/v2, MPEG frames), WAV (RIFF/PCM), M4A (MP4/AAC)
+- Supports MP3 (ID3v1/v2, MPEG frames), WAV (RIFF/PCM), M4A (MP4/AAC), OGG, FLAC, AAC, WMA
 - Duration, bitrate, sample rate, channel count extraction
 - Audio validation for transcription (existence, extension, parsability)
 
@@ -373,7 +373,7 @@ Validate an audio file for transcription.
 
 **Checks:**
 - File exists and is accessible
-- File has a supported extension (MP3, WAV, M4A)
+- File has a supported extension (MP3, WAV, M4A, OGG, FLAC, AAC, WMA)
 - File can be parsed as audio
 - Duration is determinable
 

@@ -62,9 +62,26 @@ vi.mock('../utils/logger', () => ({
   }
 }))
 
+// Mock useTranscriptionStore
+const mockOpenDialog = vi.fn()
+vi.mock('../stores/useTranscriptionStore', () => ({
+  useTranscriptionStore: Object.assign(
+    vi.fn(() => ({
+      isDialogOpen: false,
+      openDialog: mockOpenDialog
+    })),
+    {
+      getState: vi.fn(() => ({
+        openDialog: mockOpenDialog
+      }))
+    }
+  )
+}))
+
 // Mock window.api
 const mockSelectFile = vi.fn()
 const mockProcessImport = vi.fn()
+const mockValidateAudio = vi.fn()
 
 Object.defineProperty(window, 'api', {
   writable: true,
@@ -73,6 +90,9 @@ Object.defineProperty(window, 'api', {
     import: {
       selectFile: mockSelectFile,
       process: mockProcessImport
+    },
+    transcription: {
+      validate: mockValidateAudio
     }
   }
 })
@@ -98,6 +118,7 @@ describe('useImport', () => {
       outputPath: '/project/import/file.md'
     })
     mockExecutePromptTemplate.mockResolvedValue({ success: true })
+    mockValidateAudio.mockResolvedValue({ valid: true })
   })
 
   afterEach(() => {
@@ -801,6 +822,135 @@ describe('useImport', () => {
       // Zero-size files should not trigger large file warning
       expect(mockShowConfirm).not.toHaveBeenCalled()
       expect(mockProcessImport).toHaveBeenCalled()
+    })
+  })
+
+  // Audio file routing tests
+  describe('audio file routing', () => {
+    it('importFile() with .mp3 file opens TranscriptionDialog', async () => {
+      mockSelectFile.mockResolvedValue({
+        path: '/external/recording.mp3',
+        name: 'recording.mp3',
+        sizeInMB: 10,
+        extension: '.mp3'
+      })
+      mockValidateAudio.mockResolvedValue({ valid: true })
+
+      const { result } = renderHook(() => useImport())
+
+      let importResult: string | null | undefined
+      await act(async () => {
+        importResult = await result.current.importFile()
+      })
+
+      expect(mockOpenDialog).toHaveBeenCalledWith('/external/recording.mp3', 'recording.mp3')
+      expect(mockProcessImport).not.toHaveBeenCalled()
+      expect(importResult).toBeNull()
+    })
+
+    it('importFile() with .ogg file opens TranscriptionDialog', async () => {
+      mockSelectFile.mockResolvedValue({
+        path: '/external/audio.ogg',
+        name: 'audio.ogg',
+        sizeInMB: 5,
+        extension: '.ogg'
+      })
+      mockValidateAudio.mockResolvedValue({ valid: true })
+
+      const { result } = renderHook(() => useImport())
+
+      let importResult: string | null | undefined
+      await act(async () => {
+        importResult = await result.current.importFile()
+      })
+
+      expect(mockOpenDialog).toHaveBeenCalledWith('/external/audio.ogg', 'audio.ogg')
+      expect(mockProcessImport).not.toHaveBeenCalled()
+      expect(importResult).toBeNull()
+    })
+
+    it('importFile() with .pdf file proceeds through normal import', async () => {
+      mockSelectFile.mockResolvedValue({
+        path: '/external/document.pdf',
+        name: 'document.pdf',
+        sizeInMB: 2,
+        extension: '.pdf'
+      })
+
+      const { result } = renderHook(() => useImport())
+
+      let importResult: string | null | undefined
+      await act(async () => {
+        importResult = await result.current.importFile()
+      })
+
+      expect(mockProcessImport).toHaveBeenCalledWith('/external/document.pdf')
+      expect(mockOpenDialog).not.toHaveBeenCalled()
+      expect(importResult).toBe('/project/import/file.md')
+    })
+
+    it('importFile() with invalid audio file shows error toast', async () => {
+      mockSelectFile.mockResolvedValue({
+        path: '/external/corrupt.mp3',
+        name: 'corrupt.mp3',
+        sizeInMB: 3,
+        extension: '.mp3'
+      })
+      mockValidateAudio.mockResolvedValue({ valid: false, error: 'File is corrupted' })
+
+      const { result } = renderHook(() => useImport())
+
+      let importResult: string | null | undefined
+      await act(async () => {
+        importResult = await result.current.importFile()
+      })
+
+      expect(mockShowErrorToast).toHaveBeenCalledWith('Invalid audio file', 'File is corrupted')
+      expect(mockOpenDialog).not.toHaveBeenCalled()
+      expect(importResult).toBeNull()
+    })
+
+    it('processFiles() with mixed batch skips audio files and warns', async () => {
+      const { result } = renderHook(() => useImport())
+      const files = [
+        createTestFile({ path: '/test/recording.mp3', name: 'recording.mp3' }),
+        createTestFile({ path: '/test/document.pdf', name: 'document.pdf' })
+      ]
+
+      mockProcessImport.mockResolvedValue({ success: true, outputPath: '/import/document.md' })
+
+      let processResult: ProcessFilesResult | undefined
+      await act(async () => {
+        processResult = await result.current.processFiles(files)
+      })
+
+      expect(mockShowWarningToast).toHaveBeenCalledWith(
+        'Audio files skipped',
+        expect.stringContaining('audio file(s) skipped')
+      )
+      expect(mockProcessImport).toHaveBeenCalledWith('/test/document.pdf')
+      expect(mockProcessImport).not.toHaveBeenCalledWith('/test/recording.mp3')
+      expect(processResult?.successCount).toBe(1)
+    })
+
+    it('processFiles() with all-audio batch rejects entirely', async () => {
+      const { result } = renderHook(() => useImport())
+      const files = [
+        createTestFile({ path: '/test/audio1.mp3', name: 'audio1.mp3' }),
+        createTestFile({ path: '/test/audio2.mp3', name: 'audio2.mp3' })
+      ]
+
+      let processResult: ProcessFilesResult | undefined
+      await act(async () => {
+        processResult = await result.current.processFiles(files)
+      })
+
+      expect(mockShowWarningToast).toHaveBeenCalledWith(
+        'Audio files not supported in batch',
+        expect.any(String)
+      )
+      expect(mockProcessImport).not.toHaveBeenCalled()
+      expect(processResult?.skippedCount).toBe(2)
     })
   })
 })

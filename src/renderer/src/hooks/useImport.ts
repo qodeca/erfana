@@ -4,7 +4,7 @@
  * Unified hook for importing files of any supported type:
  * - PDF files (converted to markdown)
  * - Text files (imported as-is)
- * - Future: Audio/video files (transcribed to markdown)
+ * - Audio files (routed to TranscriptionDialog for interactive transcription)
  *
  * Workflow:
  * 1. Select file via native dialog (supports all importable types)
@@ -20,11 +20,23 @@ import { useDialog } from '../components/Dialog/DialogContext'
 import { showSuccessToast, showErrorToast, showWarningToast } from '../utils/toastHelpers'
 import { executePromptTemplate } from '../utils/panelUtils'
 import type { PromptVariables } from '../prompts/types'
-import { IMPORT, BYTES_PER_MB } from '../../../shared/constants'
+import { IMPORT, BYTES_PER_MB, TRANSCRIPTION } from '../../../shared/constants'
 import { ERROR_MESSAGES, ErrorCode } from '../../../shared/errors'
 import { useTerminalPortalOptional } from '../context/TerminalPortalContext'
 import { scheduleScrollIfNeeded } from '../utils/promptScrollScheduler.logic'
 import { logger } from '../utils/logger'
+import { useTranscriptionStore } from '../stores/useTranscriptionStore'
+
+/**
+ * Check if a file is an audio file based on its extension.
+ * Uses the canonical list from TRANSCRIPTION.SUPPORTED_EXTENSIONS.
+ */
+function isAudioFile(fileName: string): boolean {
+  const dotIndex = fileName.lastIndexOf('.')
+  if (dotIndex === -1) return false
+  const ext = fileName.slice(dotIndex + 1).toLowerCase()
+  return (TRANSCRIPTION.SUPPORTED_EXTENSIONS as readonly string[]).includes(ext)
+}
 
 /** Size threshold for confirmation dialog (in MB) */
 const LARGE_FILE_THRESHOLD_MB = IMPORT.SIZE_WARNING_THRESHOLD / BYTES_PER_MB
@@ -135,6 +147,30 @@ export function useImport(): UseImportReturn {
       return { successCount: 0, failCount: 0, skippedCount: 0, outputPaths: [], failures: [] }
     }
 
+    // Filter audio files from batch imports (audio requires individual import for transcription)
+    const audioFiles = files.filter(f => isAudioFile(f.name))
+    const nonAudioFiles = files.filter(f => !isAudioFile(f.name))
+
+    if (audioFiles.length > 0) {
+      if (nonAudioFiles.length > 0) {
+        // Mixed batch: warn about skipped audio, continue with non-audio
+        showWarningToast(
+          'Audio files skipped',
+          `${audioFiles.length} audio file(s) skipped. Import audio files individually for transcription.`
+        )
+      } else {
+        // All-audio batch: reject entirely
+        showWarningToast(
+          'Audio files not supported in batch',
+          'Import audio files individually for transcription with language selection.'
+        )
+        return { successCount: 0, failCount: 0, skippedCount: audioFiles.length, outputPaths: [], failures: [] }
+      }
+    }
+
+    // Use non-audio files for processing (or all files if no audio detected)
+    const filesToProcess = audioFiles.length > 0 ? nonAudioFiles : files
+
     setIsImporting(true)
     const outputPaths: string[] = []
     const failures: Array<{ file: ImportFileInfo; error: string }> = []
@@ -143,7 +179,7 @@ export function useImport(): UseImportReturn {
     let skippedCount = 0
 
     try {
-      for (const file of files) {
+      for (const file of filesToProcess) {
         // Large file warning
         const fileSizeMB = file.sizeInBytes / BYTES_PER_MB
         if (fileSizeMB > LARGE_FILE_THRESHOLD_MB) {
@@ -199,9 +235,13 @@ export function useImport(): UseImportReturn {
         }
       }
 
+      // Account for audio files skipped from batch
+      const totalAudioSkipped = audioFiles.length
+      skippedCount += totalAudioSkipped
+
       // Summary toast
       const totalProcessed = successCount + failCount
-      if (files.length > 1) {
+      if (filesToProcess.length > 1) {
         // Batch import summary
         if (successCount > 0 && failCount === 0) {
           showSuccessToast('Import complete', `Imported ${successCount} files`)
@@ -214,7 +254,7 @@ export function useImport(): UseImportReturn {
         // Note: If all files were skipped (skippedCount === files.length), no summary needed
       } else if (successCount === 1) {
         // Single file success
-        showSuccessToast('File imported', `"${files[0].name}" imported successfully`)
+        showSuccessToast('File imported', `"${filesToProcess[0].name}" imported successfully`)
       }
 
       // Organize prompt for single file import only
@@ -245,6 +285,28 @@ export function useImport(): UseImportReturn {
 
     if (!selectedFile) {
       // User cancelled file selection
+      return null
+    }
+
+    // Route audio files to TranscriptionDialog for interactive transcription
+    if (isAudioFile(selectedFile.name)) {
+      // Validate audio file before opening dialog (spec FR-018)
+      try {
+        const validation = await window.api.transcription.validate(selectedFile.path)
+        if (!validation.valid) {
+          showErrorToast(
+            'Invalid audio file',
+            validation.error || 'The selected file is not a valid audio file.'
+          )
+          return null
+        }
+      } catch (error) {
+        logger.error('Audio validation failed', error instanceof Error ? error : undefined)
+        showErrorToast('Validation error', 'Could not validate audio file.')
+        return null
+      }
+
+      useTranscriptionStore.getState().openDialog(selectedFile.path, selectedFile.name)
       return null
     }
 

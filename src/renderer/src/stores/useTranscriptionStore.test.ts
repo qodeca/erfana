@@ -44,7 +44,8 @@ function resetStore(): void {
     isTranscribing: false,
     progress: null,
     result: null,
-    error: null
+    error: null,
+    lastLanguage: 'auto'
   })
 }
 
@@ -296,6 +297,45 @@ describe('useTranscriptionStore', () => {
       useTranscriptionStore.getState()._handleProgress(newProgress)
 
       expect(useTranscriptionStore.getState().progress).toEqual(newProgress)
+    })
+  })
+
+  describe('lastLanguage persistence', () => {
+    it('should default lastLanguage to auto', () => {
+      const state = useTranscriptionStore.getState()
+
+      expect(state.lastLanguage).toBe('auto')
+    })
+
+    it('should update lastLanguage via setLastLanguage', () => {
+      const { setLastLanguage } = useTranscriptionStore.getState()
+
+      setLastLanguage('pl')
+
+      expect(useTranscriptionStore.getState().lastLanguage).toBe('pl')
+    })
+
+    it('should preserve lastLanguage when openDialog is called', () => {
+      // Arrange: set a non-default language
+      useTranscriptionStore.getState().setLastLanguage('pl')
+
+      // Act: open a dialog for a new file
+      useTranscriptionStore.getState().openDialog('/path/to/audio.mp3', 'audio.mp3')
+
+      // Assert: lastLanguage is unchanged
+      expect(useTranscriptionStore.getState().lastLanguage).toBe('pl')
+    })
+
+    it('should preserve lastLanguage when closeDialog is called', () => {
+      // Arrange: open dialog and set a non-default language
+      useTranscriptionStore.getState().openDialog('/path/to/audio.mp3', 'audio.mp3')
+      useTranscriptionStore.getState().setLastLanguage('en')
+
+      // Act: close the dialog
+      useTranscriptionStore.getState().closeDialog()
+
+      // Assert: lastLanguage survives dialog close
+      expect(useTranscriptionStore.getState().lastLanguage).toBe('en')
     })
   })
 })
