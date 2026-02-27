@@ -476,7 +476,7 @@ See [Logging Documentation](./logging.md) for details.
 
 ## See Also
 
-- [API Services - Feature Services](./api-services-features.md) - Git, Lock, Screenshot, Camera, External, PDF, DOCX
+- [API Services - Feature Services](./api-services-features.md) - Git, Lock, Screenshot, Camera, External, PDF, DOCX, Transcription, AudioMetadata, ApiKey
 - [Architecture](./architecture.md) - Service class overview
 - [IPC Patterns](./ipc-patterns.md) - IPC handler integration
 - [Terminal](./terminal/README.md) - Terminal panel implementation

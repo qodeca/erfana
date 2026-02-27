@@ -81,15 +81,22 @@ src/
 │   │   ├── ProjectService.ts    # Project switching orchestration
 │   │   ├── PdfService.ts        # PDF export
 │   │   ├── DocxService.ts       # DOCX export
-│   │   └── TerminalService.ts   # PTY management with node-pty
-│   └── ipc/
-│       ├── file-handlers.ts     # IPC handlers
-│       ├── file-watcher-handlers.ts  # File watching IPC
-│       ├── directory-watcher-handlers.ts  # Directory watching IPC
-│       ├── logging-handlers.ts  # Logging IPC
-│       ├── git-watcher-handlers.ts # Git watching IPC (v0.6.3)
-│       ├── project-lock-handlers.ts # Project lock IPC (v0.6.5)
-│       └── terminal-handlers.ts # Terminal emulator IPC
+│   │   ├── TranscriptionService.ts  # OpenAI audio transcription with chunking
+│   │   ├── AudioMetadataService.ts  # Audio metadata extraction (music-metadata)
+│   │   ├── ApiKeyService.ts     # Encrypted API key storage (Electron safeStorage)
+│   │   ├── TerminalService.ts   # PTY management with node-pty
+│   │   └── import/converters/AudioConverter.ts  # Audio import (IConverter)
+│   ├── ipc/
+│   │   ├── file-handlers.ts     # IPC handlers
+│   │   ├── file-watcher-handlers.ts  # File watching IPC
+│   │   ├── directory-watcher-handlers.ts  # Directory watching IPC
+│   │   ├── logging-handlers.ts  # Logging IPC
+│   │   ├── git-watcher-handlers.ts # Git watching IPC (v0.6.3)
+│   │   ├── project-lock-handlers.ts # Project lock IPC (v0.6.5)
+│   │   ├── transcription-handlers.ts # Transcription IPC (v0.7.3)
+│   │   └── terminal-handlers.ts # Terminal emulator IPC
+│   └── utils/
+│       └── PauseController.ts   # Pause/resume with safety timeout
 ├── preload/
 │   ├── index.ts              # contextBridge setup
 │   └── index.d.ts            # TypeScript definitions
@@ -105,7 +112,8 @@ src/
         │   ├── Dialog/          # Unified dialog system (Context + Provider + Hook)
         │   ├── ContextMenu/     # Right-click context menu
         │   ├── Toast/           # Toast notification system
-        │   └── Settings/        # Settings overlay
+        │   ├── Settings/        # Settings overlay
+        │   └── Transcription/   # TranscriptionDialog, LanguageSelect
         ├── prompts/             # Prompt template system
         │   ├── templates/       # Markdown templates with YAML frontmatter
         │   ├── parser.ts        # CSP-safe YAML parser
@@ -114,7 +122,7 @@ src/
         │   ├── registry.ts      # Dynamic template loading
         │   ├── helpers.ts       # Template helper functions
         │   └── types.ts         # TypeScript interfaces
-        ├── stores/              # Zustand stores (ActivityBar, Settings, GlobalSettings)
+        ├── stores/              # Zustand stores (ActivityBar, Settings, GlobalSettings, Transcription)
         ├── context/             # React contexts (ProjectManagementContext)
         ├── hooks/               # React hooks
         ├── types/               # Shared TypeScript types (filters.ts)

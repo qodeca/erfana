@@ -311,9 +311,35 @@ Opens when clicking image files (PNG, JPG, GIF, WebP, SVG, BMP, ICO) in project 
 
 ---
 
+## Transcription dialog
+
+**Location**: `src/renderer/src/components/Transcription/`
+
+Modal dialog for audio file import with OpenAI transcription. Opened when importing audio files (MP3, WAV, M4A).
+
+**Note**: Stage 1 components are built and tested but not yet mounted in the app layout (see #109 for Stage 2 wiring).
+
+**Components**:
+- `TranscriptionDialog.tsx` – Main dialog with progress bar, error display, cancel
+- `LanguageSelect.tsx` – Dropdown with 31 languages + auto-detect option
+
+**State**: `useTranscriptionStore.ts` (Zustand) manages dialog visibility, progress, result, error
+
+**Features**:
+- Progress bar with percentage, ETA, and chunk indicator ("chunk N of M")
+- ARIA attributes: `role="progressbar"`, `aria-valuenow/min/max`, `aria-label`
+- Cancel via footer button, X button, or Escape key
+- Error display with retry option
+- Language selector: English, Polish, German, French, Spanish, Italian, Portuguese, Dutch, Russian, Japanese, Chinese, Korean + 19 more
+
+**IPC flow**: `transcription:import` (invoke) + `transcription:progress` (streamed events) + `transcription:cancel` (abort)
+
+---
+
 ## Related documentation
 
 - [Architecture](./architecture.md) - Hybrid layout system
 - [Editor](./editor/README.md) - Editor features
+- [Settings](./settings.md) - Transcription settings section
 - [Development Tasks](./development-tasks.md) - Adding components
 - [Known Issues](./known-issues.md) - Workarounds

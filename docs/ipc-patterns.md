@@ -145,6 +145,13 @@ if (!writeResult.success) {
 | `external-file:validate` | external-file-handlers | Validate external file before copy/move |
 | `external-file:copy` | external-file-handlers | Copy external file into project |
 | `external-file:move` | external-file-handlers | Move external file into project |
+| `transcription:import` | transcription-handlers | Import audio file with transcription (streamed progress) |
+| `transcription:cancel` | transcription-handlers | Cancel active transcription (AbortSignal) |
+| `transcription:validate` | transcription-handlers | Validate audio file before transcription |
+| `transcription:setApiKey` | transcription-handlers | Store API key via Electron safeStorage |
+| `transcription:hasApiKey` | transcription-handlers | Check if API key exists for service |
+| `transcription:clearApiKey` | transcription-handlers | Remove stored API key |
+| `transcription:progress` | transcription-handlers | Event: Progress update (main → renderer) |
 
 ## Event-Based IPC Pattern
 
@@ -160,6 +167,7 @@ To keep IPC payloads consistent across processes, shared zod schemas live at `sr
   - Shape: `{ oldPath: string | null; newPath: string | null }`
   - Used in main when broadcasting, and in preload typings for `onProjectChanged`
 - Terminal event schemas — `TerminalDataSchema`, `TerminalExitSchema`, `TerminalErrorSchema`
+- Transcription schemas — `TranscriptionImportRequestSchema`, `TranscriptionProgress`, `TranscriptionImportResult`, `TranscriptionSettingsSchema` (see `src/shared/ipc/transcription-schema.ts`)
 
 Recommended:
 - Validate payloads in tests using these schemas (see contract tests under `src/preload/__tests__/`)
