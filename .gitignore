@@ -41,3 +41,7 @@ test-results/
 
 # E2E test temp projects
 .e2e-temp/
+
+# Test audio fixtures (binary, not tracked in git)
+tests/fixtures/audio/supported/
+tests/fixtures/audio/unsupported/
