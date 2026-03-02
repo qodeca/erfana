@@ -128,4 +128,4 @@ All major issues resolved in recent versions. See [Known Issues](./known-issues.
 
 ---
 
-**Last Updated**: v0.7.2 (February 2026)
+**Last Updated**: v0.7.3 (March 2026)
