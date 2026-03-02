@@ -144,6 +144,27 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 - Tests validate SOLID refactoring of file system dialogs with comprehensive validation logic
 - See [Architecture - Dialog System](../architecture.md#dialog-system) for implementation details
 
+**Audio Transcription** (multiple files across `main/`, `renderer/`, `shared/`) **v0.7.3**
+- **~4,000 lines of tests** covering the full transcription pipeline (spec 009)
+- **Test Organization**:
+
+  *Main process tests*:
+  - `TranscriptionService.test.ts` (621 lines) – chunking, retry, progress, cancellation
+  - `AudioMetadataService.test.ts` (314 lines) – duration, format, validation
+  - `ApiKeyService.test.ts` (410 lines) – safeStorage encryption, cache, path traversal
+  - `transcription-handlers.test.ts` (459 lines) – IPC handlers (import, cancel, validate, API key CRUD)
+  - `AudioConverter.test.ts` (216 lines) – import pipeline converter
+
+  *Renderer tests*:
+  - `TranscriptionDialog.test.tsx` (465 lines) – dialog UI, progress, language selection, cancel
+  - `useTranscriptionStore.test.ts` (341 lines) – Zustand store state management
+  - `useImport.test.ts` (956 lines) – audio detection, routing, pre-validation
+
+  *Shared tests*:
+  - `transcription-schema.test.ts` (272 lines) – Zod schema validation for IPC contracts
+
+- **Audio test fixtures**: `tests/fixtures/audio/` – speech recordings with known content for transcription accuracy verification (see [fixtures README](../../tests/fixtures/audio/README.md))
+
 **ProjectTree Refactoring** (`src/renderer/src/hooks/*.logic.ts`, `src/renderer/src/components/ProjectTree/`) **v0.3.7**
 - **320 comprehensive tests** covering ProjectTree modularization using "Extract Pure Logic" pattern
 - Run `npm run test` for current test totals
