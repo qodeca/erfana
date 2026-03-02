@@ -5,7 +5,7 @@
  * npm package. Extracts duration, format, bitrate, and validates
  * audio files without requiring ffmpeg.
  *
- * Supports: MP3 (ID3v1/v2, MPEG frames), WAV (RIFF/PCM), M4A (MP4/AAC)
+ * Supports: MP3 (ID3v1/v2, MPEG frames), WAV (RIFF/PCM), M4A (MP4/AAC), AAC (ADTS)
  *
  * @see Issue #75 - Media import with transcription
  */
@@ -89,10 +89,10 @@ class AudioMetadataService implements IAudioMetadataService {
    */
   async getDuration(filePath: string): Promise<number> {
     try {
-      const metadata = await parseFile(filePath)
+      const metadata = await parseFile(filePath, { duration: true })
       const duration = metadata.format.duration
 
-      if (duration === undefined || duration <= 0) {
+      if (duration === undefined || !Number.isFinite(duration) || duration <= 0) {
         throw new Error('Could not determine audio duration')
       }
 
@@ -111,7 +111,7 @@ class AudioMetadataService implements IAudioMetadataService {
    */
   async getFormat(filePath: string): Promise<AudioFormat> {
     try {
-      const metadata = await parseFile(filePath)
+      const metadata = await parseFile(filePath, { duration: true })
       const ext = extname(filePath).slice(1).toLowerCase()
 
       return {
@@ -182,10 +182,10 @@ class AudioMetadataService implements IAudioMetadataService {
 
     // Parse audio metadata
     try {
-      const metadata = await parseFile(filePath)
+      const metadata = await parseFile(filePath, { duration: true })
       const duration = metadata.format.duration
 
-      if (duration === undefined || duration <= 0) {
+      if (duration === undefined || !Number.isFinite(duration) || duration <= 0) {
         return {
           valid: false,
           error: 'Could not determine audio duration. File may be corrupted.',

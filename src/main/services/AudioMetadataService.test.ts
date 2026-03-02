@@ -99,12 +99,38 @@ describe('AudioMetadataService', () => {
       const duration = await service.getDuration('/path/to/audio.mp3')
 
       expect(duration).toBe(120.5)
-      expect(mockParseFile).toHaveBeenCalledWith('/path/to/audio.mp3')
+      expect(mockParseFile).toHaveBeenCalledWith('/path/to/audio.mp3', { duration: true })
     })
 
     it('should throw when duration is undefined', async () => {
       mockParseFile.mockResolvedValue({
         format: { duration: undefined }
+      })
+
+      const { createAudioMetadataService } = await import('./AudioMetadataService')
+      const service = createAudioMetadataService()
+
+      await expect(service.getDuration('/path/to/audio.mp3')).rejects.toThrow(
+        'Could not determine audio duration'
+      )
+    })
+
+    it('should throw when duration is NaN', async () => {
+      mockParseFile.mockResolvedValue({
+        format: { duration: NaN }
+      })
+
+      const { createAudioMetadataService } = await import('./AudioMetadataService')
+      const service = createAudioMetadataService()
+
+      await expect(service.getDuration('/path/to/audio.mp3')).rejects.toThrow(
+        'Could not determine audio duration'
+      )
+    })
+
+    it('should throw when duration is Infinity', async () => {
+      mockParseFile.mockResolvedValue({
+        format: { duration: Infinity }
       })
 
       const { createAudioMetadataService } = await import('./AudioMetadataService')
@@ -154,6 +180,7 @@ describe('AudioMetadataService', () => {
       expect(format.bitrate).toBe(192)
       expect(format.sampleRate).toBe(44100)
       expect(format.channels).toBe(2)
+      expect(mockParseFile).toHaveBeenCalledWith('/path/to/audio.mp3', { duration: true })
     })
 
     it('should return format for WAV file', async () => {
@@ -279,6 +306,21 @@ describe('AudioMetadataService', () => {
       const service = createAudioMetadataService()
 
       const result = await service.validate('/path/to/noduration.mp3')
+
+      expect(result.valid).toBe(false)
+      expect(result.errorCode).toBe('TRANSCRIPTION_INVALID_AUDIO')
+      expect(result.error).toContain('Could not determine audio duration')
+    })
+
+    it('should return error when duration is NaN', async () => {
+      mockParseFile.mockResolvedValue({
+        format: { duration: NaN }
+      })
+
+      const { createAudioMetadataService } = await import('./AudioMetadataService')
+      const service = createAudioMetadataService()
+
+      const result = await service.validate('/path/to/corrupt.aac')
 
       expect(result.valid).toBe(false)
       expect(result.errorCode).toBe('TRANSCRIPTION_INVALID_AUDIO')
