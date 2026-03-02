@@ -30,6 +30,8 @@
  * ```
  */
 
+import * as fs from 'fs'
+import * as path from 'path'
 import { Page, expect, Locator, ElectronApplication } from '@playwright/test'
 import { stubDialog } from 'electron-playwright-helpers'
 import { TEST_IDS, getPathHash } from '../../src/renderer/src/constants/testids'
@@ -1108,5 +1110,66 @@ export async function closeApp(
     await electronApp.close()
   } catch {
     // App already closed - this is fine
+  }
+}
+
+// =============================================================================
+// Project and user data directory helpers
+// =============================================================================
+
+/**
+ * Create a temporary test project directory with optional seed files.
+ * Uses .e2e-temp inside project directory (gitignored).
+ *
+ * @param seedFiles - Map of filename to content (default: single test.md)
+ * @returns Object with projectPath and cleanup function
+ */
+export async function createTestProject(
+  seedFiles?: Record<string, string>
+): Promise<{ projectPath: string; cleanup: () => Promise<void> }> {
+  const e2eTestDir = path.join(__dirname, '..', '..', '.e2e-temp')
+  await fs.promises.mkdir(e2eTestDir, { recursive: true })
+  const projectPath = await fs.promises.mkdtemp(path.join(e2eTestDir, 'test-'))
+
+  const files = seedFiles ?? { 'test.md': '# Test Document\n\nTest content.\n' }
+  for (const [name, content] of Object.entries(files)) {
+    await fs.promises.writeFile(path.join(projectPath, name), content, 'utf-8')
+  }
+
+  return {
+    projectPath,
+    cleanup: async () => {
+      try {
+        await fs.promises.rm(projectPath, { recursive: true, force: true })
+      } catch {
+        // Ignore cleanup errors – must not mask test failures
+      }
+    }
+  }
+}
+
+/**
+ * Create an isolated user data directory for test isolation.
+ *
+ * @param prefix - Descriptive prefix for the temp directory name
+ * @returns Object with userDataDir path and cleanup function
+ */
+export async function createTempUserDataDir(
+  prefix: string
+): Promise<{ userDataDir: string; cleanup: () => Promise<void> }> {
+  const e2eTempDir = path.join(__dirname, '..', '..', '.e2e-temp')
+  await fs.promises.mkdir(e2eTempDir, { recursive: true })
+
+  const userDataDir = await fs.promises.mkdtemp(path.join(e2eTempDir, `${prefix}-`))
+
+  return {
+    userDataDir,
+    cleanup: async () => {
+      try {
+        await fs.promises.rm(userDataDir, { recursive: true, force: true })
+      } catch {
+        // Ignore cleanup errors – must not mask test failures
+      }
+    }
   }
 }

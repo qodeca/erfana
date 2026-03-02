@@ -416,6 +416,7 @@ export function TranscriptionDialog(): JSX.Element | null {
             <button
               className="transcription-btn-primary"
               onClick={closeDialog}
+              data-testid={TEST_IDS.TRANSCRIPTION_BTN_DONE}
             >
               Done
             </button>

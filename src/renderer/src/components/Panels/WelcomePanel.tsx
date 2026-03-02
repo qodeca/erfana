@@ -8,6 +8,7 @@ import { showErrorToast, showSuccessToast, showWarningToast } from '../../utils/
 import { formatRelativeTime } from '../../utils/timeFormatting'
 import { useImport } from '../../hooks/useImport'
 import { logger } from '../../utils/logger'
+import { TEST_IDS } from '../../constants/testids'
 
 interface RecentProject {
   path: string
@@ -172,6 +173,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
                 onClick={importFile}
                 disabled={isImporting || isProjectChanging}
                 title={isImporting ? 'Importing file...' : 'Import a file (PDF, text, or other supported formats)'}
+                data-testid={TEST_IDS.WELCOME_BTN_IMPORT}
               >
                 <FileUp size={16} />
                 {isImporting ? 'Importing...' : 'Import...'}

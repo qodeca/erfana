@@ -479,7 +479,7 @@ export const TEST_IDS = {
   SETTINGS_BTN_CLEAR_API_KEY: 'settings-btn-clear-api-key',
 
   // =========================================================================
-  // Transcription Dialog (8)
+  // Transcription Dialog (9)
   // =========================================================================
 
   /** Transcription dialog container */
@@ -498,6 +498,15 @@ export const TEST_IDS = {
   TRANSCRIPTION_PHASE_TEXT: 'transcription-phase-text',
   /** Error message area */
   TRANSCRIPTION_ERROR: 'transcription-error',
+  /** Done button in transcription dialog success state */
+  TRANSCRIPTION_BTN_DONE: 'transcription-btn-done',
+
+  // =========================================================================
+  // Welcome Panel (1)
+  // =========================================================================
+
+  /** Import file button on WelcomePanel */
+  WELCOME_BTN_IMPORT: 'welcome-btn-import',
 
   // =========================================================================
   // Document Stats Bar (6)

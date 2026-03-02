@@ -7,6 +7,19 @@ Historical changelog entries for versions prior to current. For the latest chang
 ## Unreleased
 
 ### Added
+- **Audio transcription E2E test** (Spec #009): Real OpenAI API end-to-end test for full transcription lifecycle
+  - File dialog → validation → TranscriptionDialog → language select → progress → success → output file
+  - No mocks – only native file dialog is stubbed (Playwright cannot interact with OS dialogs)
+  - Skips gracefully when `OPENAI_API_KEY` env var is not set
+  - Retries disabled to avoid duplicate API costs
+  - Harvard sentence multi-word matching for non-deterministic transcription output
+- **E2E shared helpers**: Extracted `createTestProject()` and `createTempUserDataDir()` to `e2e/utils/helpers.ts`
+  - All 4 E2E test files refactored to use shared helpers (eliminates duplication)
+- **Environment variable management**: `.env` file support for E2E API keys
+  - `dotenv` added to Playwright config for automatic `.env` loading
+  - `.env.example` documents required variables
+  - `.env` and `.env.local` added to `.gitignore`
+- **New testids**: `WELCOME_BTN_IMPORT` (WelcomePanel), `TRANSCRIPTION_BTN_DONE` (TranscriptionDialog)
 - **Audio transcription UI wiring** (Spec #009, Stage 2): End-to-end audio transcription flow (#109)
   - TranscriptionDialog mounted in App.tsx (previously built but not rendered)
   - useImport hook detects audio files and routes to TranscriptionDialog
@@ -475,17 +488,8 @@ Historical changelog entries for versions prior to current. For the latest chang
   - Added `managing-skills` and `creating-issues` skills
   - Located in `.claude/skills/`
 
-## v0.3.4–v0.3.9
-- Auto-refresh recent projects, React 18 StrictMode fix, error handling system (`src/shared/errors.ts`) (v0.3.9)
-- Markdown link security, dangerous protocol blocking, version display in title bar (v0.3.8)
-- Electron builder fix (3.6GB → 231MB), ProjectTree modularization, replace confirmation dialog (v0.3.7)
-- Drag-drop UX (VS Code-style), unified dialog system, SOLID file dialog refactoring (v0.3.6)
-- Prompt system test coverage (319 tests, 98.59% statements) (v0.3.5)
-- AutoExecute simplification (fire-and-forget, 200ms delay) (v0.3.4)
-
-## v0.3.0–v0.3.3
-- Terminal bootstrap pattern with zero visible init commands (v0.3.0)
-- Terminal scroll fix with position tracking (v0.3.1)
-- Terminal flickering prevention via WebGL switches (v0.3.2)
-- AutoExecute race condition fix with Promise-based writes (v0.3.3)
-- Symlink indicators, watcher depth setting, EPIPE error fixes
+## v0.3.0–v0.3.9
+- Terminal bootstrap, scroll fix, WebGL flicker fix, AutoExecute race condition fix (v0.3.0–v0.3.3)
+- Prompt system tests (319 tests, 98.59%), drag-drop UX, dialog system refactoring (v0.3.4–v0.3.6)
+- Electron builder fix (3.6GB → 231MB), ProjectTree modularization (v0.3.7)
+- Markdown link security, auto-refresh recent projects, error handling system (v0.3.8–v0.3.9)

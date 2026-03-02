@@ -63,6 +63,10 @@ Create `playwright.config.ts` in the project root:
 
 ```typescript
 import { defineConfig } from '@playwright/test'
+import dotenv from 'dotenv'
+
+// Load .env file so E2E tests can access API keys (e.g., OPENAI_API_KEY)
+dotenv.config()
 
 export default defineConfig({
   testDir: './e2e',
@@ -199,6 +203,30 @@ test('activity bar buttons work', async ({ window }) => {
   await expect(projectTree).toBeVisible()
 })
 ```
+
+---
+
+## Environment setup
+
+### API key configuration
+
+Some E2E tests require external API credentials:
+
+1. Create `.env` file in project root with your API keys:
+   ```bash
+   OPENAI_API_KEY=your-key-here
+   ```
+
+2. See `.env.example` for all available environment variables
+
+3. Tests requiring API keys will skip gracefully if the variable is not set
+
+### Test files
+
+- `app-launch.e2e.ts` – Application launch, activity bar, welcome panel visibility
+- `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
+- `directory-watcher.e2e.ts` – Directory watcher pipeline verification
+- `audio-transcription.e2e.ts` – Full audio import transcription lifecycle (real OpenAI API, requires `OPENAI_API_KEY`, skips if not set)
 
 ---
 
