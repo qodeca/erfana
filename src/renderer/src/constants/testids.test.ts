@@ -111,10 +111,10 @@ describe('TEST_IDS', () => {
       expect(settingsIds).toHaveLength(14)
     })
 
-    it('should have 8 Transcription Dialog IDs', async () => {
+    it('should have 9 Transcription Dialog IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const transcriptionIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('TRANSCRIPTION_'))
-      expect(transcriptionIds).toHaveLength(8)
+      expect(transcriptionIds).toHaveLength(9)
     })
 
     it('should have 6 Document Stats Bar IDs', async () => {
