@@ -44,7 +44,7 @@ interface IAudioMetadataServiceLike {
  * source path, duration, date, language, and transcription backend.
  */
 export class AudioConverter implements IConverter {
-  readonly supportedExtensions = ['mp3', 'wav', 'm4a', 'ogg', 'flac', 'aac', 'wma']
+  readonly supportedExtensions = ['mp3', 'wav', 'm4a', 'ogg', 'flac']
   readonly requiresConversion = true
   readonly category: FileTypeCategory = 'audio'
 

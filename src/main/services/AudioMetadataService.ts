@@ -5,7 +5,7 @@
  * npm package. Extracts duration, format, bitrate, and validates
  * audio files without requiring ffmpeg.
  *
- * Supports: MP3 (ID3v1/v2, MPEG frames), WAV (RIFF/PCM), M4A (MP4/AAC), AAC (ADTS)
+ * Supports: MP3 (ID3v1/v2, MPEG frames), WAV (RIFF/PCM), M4A (MP4/AAC), OGG, FLAC
  *
  * @see Issue #75 - Media import with transcription
  */
@@ -68,9 +68,7 @@ const MIME_TYPES: Record<string, string> = {
   wav: 'audio/wav',
   m4a: 'audio/mp4',
   ogg: 'audio/ogg',
-  flac: 'audio/flac',
-  aac: 'audio/aac',
-  wma: 'audio/x-ms-wma'
+  flac: 'audio/flac'
 }
 
 /**
@@ -174,7 +172,7 @@ class AudioMetadataService implements IAudioMetadataService {
     if (!supportedExtensions.includes(ext)) {
       return {
         valid: false,
-        error: `Unsupported audio format: .${ext}. Supported: MP3, WAV, M4A, OGG, FLAC, AAC, WMA.`,
+        error: `Unsupported audio format: .${ext}. Supported: MP3, WAV, M4A, OGG, FLAC.`,
         errorCode: ErrorCode.TRANSCRIPTION_INVALID_AUDIO,
         sizeInMB
       }

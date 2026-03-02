@@ -274,7 +274,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.TRANSCRIPTION_RATE_LIMITED]: 'API rate limit reached. Retrying automatically.',
   [ErrorCode.TRANSCRIPTION_NETWORK_ERROR]: 'Network error. Please check your connection and try again.',
   [ErrorCode.TRANSCRIPTION_CANCELLED]: 'Transcription was cancelled',
-  [ErrorCode.TRANSCRIPTION_INVALID_AUDIO]: 'Invalid audio file. Supported formats: MP3, WAV, M4A, OGG, FLAC, AAC, WMA.',
+  [ErrorCode.TRANSCRIPTION_INVALID_AUDIO]: 'Invalid audio file. Supported formats: MP3, WAV, M4A, OGG, FLAC.',
   [ErrorCode.TRANSCRIPTION_CHUNK_FAILED]: 'Failed to process audio chunk. Retrying.',
   [ErrorCode.TRANSCRIPTION_TIMEOUT]: 'Transcription request timed out',
   [ErrorCode.TRANSCRIPTION_FAILED]: 'Transcription failed. Please try again.',

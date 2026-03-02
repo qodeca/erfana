@@ -24,7 +24,7 @@ Historical changelog entries for versions prior to current. For the latest chang
   - TranscriptionDialog mounted in App.tsx (previously built but not rendered)
   - useImport hook detects audio files and routes to TranscriptionDialog
   - Audio file pre-validation before dialog opens
-  - 7 audio formats supported: MP3, WAV, M4A, OGG, FLAC, AAC, WMA
+  - 5 audio formats supported: MP3, WAV, M4A, OGG, FLAC
   - Single-file transcription retry protection
   - Improved error messages with actionable suggestions
   - Language selection persists within session

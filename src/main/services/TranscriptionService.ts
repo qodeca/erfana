@@ -114,9 +114,7 @@ const AUDIO_MIME_TYPES: Record<string, string> = {
   wav: 'audio/wav',
   m4a: 'audio/mp4',
   ogg: 'audio/ogg',
-  flac: 'audio/flac',
-  aac: 'audio/aac',
-  wma: 'audio/x-ms-wma'
+  flac: 'audio/flac'
 }
 
 /**

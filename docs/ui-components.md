@@ -315,7 +315,7 @@ Opens when clicking image files (PNG, JPG, GIF, WebP, SVG, BMP, ICO) in project 
 
 **Location**: `src/renderer/src/components/Transcription/`
 
-Modal dialog for audio file import with OpenAI transcription. Mounted in `App.tsx` and opened automatically when importing audio files (MP3, WAV, M4A, OGG, FLAC, AAC, WMA). Audio files are detected by `useImport` and routed to the dialog with pre-validation.
+Modal dialog for audio file import with OpenAI transcription. Mounted in `App.tsx` and opened automatically when importing audio files (MP3, WAV, M4A, OGG, FLAC). Audio files are detected by `useImport` and routed to the dialog with pre-validation.
 
 **Components**:
 - `TranscriptionDialog.tsx` – Main dialog with progress bar, error display, cancel
