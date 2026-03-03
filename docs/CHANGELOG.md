@@ -56,6 +56,8 @@ Historical changelog entries for versions prior to current. For the latest chang
 - **Import system**: Audio files now supported in unified import pipeline
 
 ### Fixed
+- **AAC and WMA audio format removal**: OpenAI API returns 400 "Unsupported file format" for raw AAC (ADTS) and WMA – removed from supported formats (5 remain: MP3, WAV, M4A, OGG, FLAC)
+- **AudioMetadataService duration detection**: Added `{ duration: true }` to `parseFile()` for headerless formats, `Number.isFinite()` guard against NaN/Infinity from malformed frame headers
 - **Terminal prompt writes in bracketed paste mode** (#108): Wraps terminal prompt writes in `\x1b[200~...\x1b[201~` to prevent shell interpretation of pasted text
 - **Git watcher/polling cleanup on window close** (#106): Added `cleanupForWebContentsId()` to GitWatcherService and GitPollingService, called from `webContents.on('destroyed')` handler to prevent stale git watchers accumulating after window close
 - **Flaky Monaco E2E test stabilized**: Three targeted fixes – `webContents.isDestroyed()` guard in BrowserWindow close handler, wait for Monaco internal textarea (not just container), switch from `keyboard.type()` to `keyboard.insertText()` for reliable content input
