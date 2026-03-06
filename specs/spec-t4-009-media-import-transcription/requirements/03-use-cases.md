@@ -10,7 +10,7 @@
 ### Preconditions
 - OpenAI API key is configured in GlobalSettings (`transcription.openaiApiKey`)
 - Transcription backend is set to "openai" in GlobalSettings
-- User has a valid audio file (MP3, WAV, M4A, OGG, FLAC, AAC, or WMA)
+- User has a valid audio file (MP3, WAV, M4A, OGG, or FLAC)
 
 ### Main Flow
 1. User initiates import via File menu or keyboard shortcut

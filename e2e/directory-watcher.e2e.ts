@@ -14,7 +14,6 @@
  */
 
 import { test, expect, _electron as electron } from '@playwright/test'
-import * as fs from 'fs'
 import * as path from 'path'
 import type { ElectronApplication, Page } from '@playwright/test'
 import {
@@ -22,65 +21,10 @@ import {
   waitForAppReady,
   openProject,
   terminal,
-  closeApp
+  closeApp,
+  createTestProject,
+  createTempUserDataDir
 } from './utils/helpers'
-
-// =============================================================================
-// Local helpers
-// =============================================================================
-
-/**
- * Creates a temporary test project with a single seed markdown file.
- * Uses `.e2e-temp/` inside the project directory (gitignored).
- *
- * @returns Object with projectPath and async cleanup function.
- */
-async function createTestProject(): Promise<{ projectPath: string; cleanup: () => Promise<void> }> {
-  const e2eTempDir = path.join(__dirname, '..', '.e2e-temp')
-  await fs.promises.mkdir(e2eTempDir, { recursive: true })
-
-  const projectPath = await fs.promises.mkdtemp(path.join(e2eTempDir, 'dir-watcher-'))
-  await fs.promises.writeFile(path.join(projectPath, 'test.md'), '# Test\n', 'utf-8')
-
-  return {
-    projectPath,
-    cleanup: async () => {
-      try {
-        await fs.promises.rm(projectPath, { recursive: true, force: true })
-      } catch {
-        // Ignore cleanup errors
-      }
-    }
-  }
-}
-
-/**
- * Creates an isolated user data directory for Electron.
- * Ensures each test run does not share persisted state.
- *
- * @param testName - Short label used in the temp directory name.
- * @returns Object with userDataDir path and async cleanup function.
- */
-async function createTempUserDataDir(testName: string): Promise<{
-  userDataDir: string
-  cleanup: () => Promise<void>
-}> {
-  const e2eTempDir = path.join(__dirname, '..', '.e2e-temp')
-  await fs.promises.mkdir(e2eTempDir, { recursive: true })
-
-  const userDataDir = await fs.promises.mkdtemp(path.join(e2eTempDir, `dir-watcher-${testName}-`))
-
-  return {
-    userDataDir,
-    cleanup: async () => {
-      try {
-        await fs.promises.rm(userDataDir, { recursive: true, force: true })
-      } catch {
-        // Ignore cleanup errors
-      }
-    }
-  }
-}
 
 // =============================================================================
 // Tests
@@ -88,8 +32,12 @@ async function createTempUserDataDir(testName: string): Promise<{
 
 test.describe('Directory watcher pipeline', () => {
   test('file created via terminal appears in Project Tree within latency budget', async () => {
-    const { projectPath, cleanup: cleanupProject } = await createTestProject()
-    const { userDataDir, cleanup: cleanupUserData } = await createTempUserDataDir('latency')
+    const { projectPath, cleanup: cleanupProject } = await createTestProject({
+      'test.md': '# Test\n'
+    })
+    const { userDataDir, cleanup: cleanupUserData } = await createTempUserDataDir(
+      'dir-watcher-latency'
+    )
 
     let electronApp: ElectronApplication | undefined
     let window: Page | undefined

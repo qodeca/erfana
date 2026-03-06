@@ -27,15 +27,16 @@ npm run test:e2e     # Playwright E2E tests
 
 ## Project Structure
 ```
+e2e/                # Playwright E2E tests (shared helpers in e2e/utils/helpers.ts)
 src/
 ├── main/           # Electron main process
-│   ├── services/   # Core: FileService, TerminalService, ProjectService, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService; Watchers: DirectoryWatcherService, FileWatcherService; Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media: ScreenshotService, CameraService, PdfService, DocxService; Multi-instance: ProjectLockService, ExternalFileService; Subdirs: import/, watcher/
+│   ├── services/   # Core: FileService, TerminalService, ProjectService, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService; Watchers: DirectoryWatcherService, FileWatcherService; Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media: ScreenshotService, CameraService, PdfService, DocxService, TranscriptionService, AudioMetadataService, ApiKeyService; Multi-instance: ProjectLockService, ExternalFileService; Subdirs: import/, watcher/
 │   ├── ipc/        # IPC handlers
 │   └── utils/      # PauseController (pause/resume with safety timeout)
 ├── preload/        # Context bridge API
 ├── shared/         # Shared code (errors.ts, constants.ts, ipc schemas)
 └── renderer/       # React UI
-    ├── components/ # UI components (Tabs/, Dialog/, ContextMenu/, etc.)
+    ├── components/ # UI components (Tabs/, Dialog/, ContextMenu/, Transcription/, etc.)
     ├── context/    # React contexts (ProjectManagementContext, TerminalPortalContext)
     ├── stores/     # Zustand state
     └── prompts/    # Template system
@@ -44,7 +45,7 @@ src/
 ## Core Features
 1. **Markdown Editor** - Monaco with live preview, scroll sync, Mermaid diagrams (zoom, pan, full-screen viewer), YAML frontmatter rendering, preserve line breaks option, unified in-file search (Cmd/Ctrl+F), context menu with AI prompts
 2. **Project Tree** - File explorer with drag-drop reorganization, external file drop (move/copy/import), markdown filtering, context menu, real-time git status indicators with polling fallback, manual refresh button (Cmd/Ctrl+Alt+R)
-3. **Terminal** - xterm.js with PTY backend, clipboard support, file links, scroll recovery, auto-opens on project load, drag-drop file paths, screenshot capture (macOS: screen/window/area selection with path pasted to terminal), camera photo capture (cross-platform: captures photo from webcam with path pasted to terminal)
+3. **Terminal** - xterm.js with PTY backend, clipboard support, file links, scroll recovery, auto-opens on project load, drag-drop file paths, bracketed paste mode for safe multi-line input, screenshot capture (macOS: screen/window/area selection with path pasted to terminal), camera photo capture (cross-platform: captures photo from webcam with path pasted to terminal)
 4. **Prompt Templates** - AI text operations via context menu (Elaborate, Modify, Ask, Visualize, diagram chat); Visualize generates Mermaid diagrams from selected text with dropdown for 22 diagram types
 5. **Project Settings** - Per-project configuration via `.erfana/settings.json` (watcher ignore, tree visibility)
 6. **PDF Export** - Export markdown to print-optimized PDF with vector Mermaid diagrams, A4 page size, print-friendly styling
@@ -53,6 +54,7 @@ src/
 9. **Quit Confirmation** - Prompts before quitting with unsaved changes or active terminal sessions
 10. **Multi-Instance** - Multiple independent instances with file-based project locking, duplicate opens focus existing window
 11. **Image Preview** - Viewer for PNG, JPG, GIF, WebP, SVG, BMP, ICO with zoom, pan, fit controls, keyboard shortcuts (arrow keys, +/-, Home, F for fullscreen), and full-screen mode
+12. **Audio Transcription** - Import audio files (MP3, WAV, M4A, OGG, FLAC) with OpenAI-powered transcription (GPT-4o-transcribe primary, Whisper-1 fallback), file chunking for long recordings (>8 min), TranscriptionDialog with language selection (persists within session) and progress, pre-validation before dialog opens, batch import rejects audio with toast, API key management via Electron safeStorage
 
 ## Documentation
 See `docs/` for details (keep Claude's context focused):
@@ -62,17 +64,18 @@ See `docs/` for details (keep Claude's context focused):
 - [Drag-Drop](docs/drag-drop/README.md) — VS Code-style file reorganization, visual feedback, validation
 - [Terminal](docs/terminal/README.md) — Bootstrap pattern, scroll fixes, clipboard, drag-drop paths, screenshot capture (macOS), camera capture (cross-platform)
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync, Mermaid diagrams
-- [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens, spec 016 behavioral contract
+- [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens, PauseController auto-resume
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
 - [Testing](docs/testing/README.md) — Workspace, coverage
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [API Services](docs/api-services.md) — Service APIs (Terminal, File, Settings, Watchers)
-- [API Services – Features](docs/api-services-features.md) — Feature service APIs (GitWatcher, GitPolling, Camera, ProjectLock, ExternalFile, PDF, DOCX)
+- [API Services – Features](docs/api-services-features.md) — Feature service APIs (GitWatcher, GitPolling, Camera, ProjectLock, ExternalFile, PDF, DOCX, Transcription, AudioMetadata, ApiKey)
 - [UI Components](docs/ui-components.md) — React component architecture, activity bars, panels
 - [Prompt Templates](docs/prompts/README.md) — AI prompt system, AutoExecute, template syntax
+- [Settings](docs/settings.md) — Settings overlay sections (Editor, Git, Logging, Transcription)
 - [Changelog](docs/CHANGELOG.md) — Version history (v0.3.x onwards)
-- [Development Tasks](docs/development-tasks.md) — How-to guides: add IPC channels, panels, services, prompt templates
+- [Development Tasks](docs/development-tasks.md) — How-to guides: add IPC channels, panels, services, import converters, prompt templates
 - [Technical Debt](docs/technical-debt.md) — Known debt items and improvement opportunities
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
 
@@ -89,7 +92,7 @@ Feature specifications live in `specs/`. Check registry before implementing new 
 | 006 | Knowledge graph & entities | T3 | draft | `specs/spec-t3-006-knowledge-graph` |
 | 007 | Temporal queries & timeline | T3 | draft | `specs/spec-t3-007-temporal-queries` |
 | 008 | Graph engine polish & maintenance | T3 | draft | `specs/spec-t3-008-graph-polish` |
-| 009 | Media import with transcription | T4 | draft | `specs/spec-t4-009-media-import-transcription` |
+| 009 | Media import with transcription | T4 | implemented (stage 2) | `specs/spec-t4-009-media-import-transcription` |
 | 013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/spec-t3-013-multi-cli-tool-prompt-optimization` |
 | 016 | Project Tree refresh specification | T3 | archived | `specs/archived/spec-t3-016-project-tree-refresh` |
 
@@ -123,6 +126,7 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - E2E: Playwright with Electron (see [docs/testing/e2e-testing.md](docs/testing/e2e-testing.md))
+- E2E env vars: Some tests require API keys via `.env` file (see `.env.example`); tests skip gracefully if not set
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
 
 ## Project Switching Safeguards

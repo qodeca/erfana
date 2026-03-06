@@ -99,6 +99,10 @@ describe('GlobalSettingsSchema', () => {
         gitStatus: {
           pollingEnabled: true,
           pollingInterval: 5000
+        },
+        transcription: {
+          backend: 'openai' as const,
+          openaiApiKeyStored: false
         }
       }
 
@@ -117,6 +121,10 @@ describe('GlobalSettingsSchema', () => {
         gitStatus: {
           pollingEnabled: false,
           pollingInterval: 3000
+        },
+        transcription: {
+          backend: 'openai' as const,
+          openaiApiKeyStored: false
         }
       }
 
@@ -176,6 +184,10 @@ describe('GlobalSettingsSchema', () => {
         gitStatus: {
           pollingEnabled: true,
           pollingInterval: 5000
+        },
+        transcription: {
+          backend: 'openai',
+          openaiApiKeyStored: false
         }
       }
 
@@ -189,7 +201,8 @@ describe('GlobalSettingsSchema', () => {
       const validSettings: GlobalSettings = {
         logging: { level: 'info' },
         editor: { preserveLineBreaks: false },
-        gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+        gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+        transcription: { backend: 'openai', openaiApiKeyStored: false }
       }
       expect(validSettings.logging.level).toBe('info')
     })

@@ -6,7 +6,7 @@
 
 | ID | Title | Description | Priority | Traces To |
 |----|-------|-------------|----------|-----------|
-| 009-FR-001 | Audio file import | System SHALL support importing audio files in formats: MP3, WAV, M4A, OGG, FLAC, AAC, WMA | Must | 009-UC-001 |
+| 009-FR-001 | Audio file import | System SHALL support importing audio files in formats: MP3, WAV, M4A, OGG, FLAC | Must | 009-UC-001 |
 | 009-FR-002 | Video file import | System SHALL support importing video files in formats: MP4, MOV, AVI, MKV, WebM, FLV, WMV | Must | 009-UC-002 |
 | 009-FR-003 | Media to transcript conversion | System SHALL convert media files to text transcript (not import original media file) | Must | 009-UC-001, 009-UC-002 |
 | 009-FR-004 | Markdown output with frontmatter | System SHALL output markdown with YAML frontmatter containing: source file path, duration, transcription date, detected/selected language | Must | 009-AC-001, 009-AC-013, 009-AC-014 |

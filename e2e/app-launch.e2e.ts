@@ -1,31 +1,10 @@
 import { test, expect, _electron as electron } from '@playwright/test'
-import * as fs from 'fs'
 import * as path from 'path'
-import { TEST_IDS, byTestId } from './utils/helpers'
-
-/**
- * Creates a temporary user data directory for test isolation.
- * Returns the path and a cleanup function.
- */
-async function createTempUserDataDir(
-  testName: string
-): Promise<{ userDataDir: string; cleanup: () => Promise<void> }> {
-  const e2eTempDir = path.join(__dirname, '..', '.e2e-temp')
-  await fs.promises.mkdir(e2eTempDir, { recursive: true })
-
-  const userDataDir = await fs.promises.mkdtemp(path.join(e2eTempDir, `app-launch-${testName}-`))
-
-  return {
-    userDataDir,
-    cleanup: async () => {
-      await fs.promises.rm(userDataDir, { recursive: true, force: true })
-    }
-  }
-}
+import { TEST_IDS, byTestId, createTempUserDataDir } from './utils/helpers'
 
 test.describe('Erfana App Launch', () => {
   test('should launch and display main window with testids', async () => {
-    const { userDataDir, cleanup } = await createTempUserDataDir('testids')
+    const { userDataDir, cleanup } = await createTempUserDataDir('app-launch-testids')
 
     try {
       // Launch Electron app in dev mode with isolated user data directory
@@ -64,7 +43,7 @@ test.describe('Erfana App Launch', () => {
   })
 
   test('should have unique testids in DOM', async () => {
-    const { userDataDir, cleanup } = await createTempUserDataDir('unique')
+    const { userDataDir, cleanup } = await createTempUserDataDir('app-launch-unique')
 
     try {
       const electronApp = await electron.launch({

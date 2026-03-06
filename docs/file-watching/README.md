@@ -144,7 +144,7 @@ Recommended:
 - **Pause Utility**: `src/renderer/src/components/ProjectTree/withWatcherPause.ts` (pause/resume wrapper)
 - **Integration**: `src/renderer/src/components/ProjectTree/ProjectTree.tsx`
 - **Component**: `src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx` (controlled pattern)
-- **Spec**: `specs/spec-t3-016-project-tree-refresh/` (behavioral contract)
+- **Spec**: `specs/archived/spec-t3-016-project-tree-refresh/` (behavioral contract, archived)
 
 ### Expanded State Preservation
 

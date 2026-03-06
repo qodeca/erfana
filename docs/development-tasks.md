@@ -113,6 +113,35 @@ For editor tabs that should appear in the center area:
 
 See: [Architecture](./architecture.md#hybrid-layout-architecture) | [UI Components](./ui-components.md#panel-communication-pattern)
 
+## Adding import converters
+
+The import pipeline uses `ConverterRegistry` to match file extensions to converters implementing `IConverter`.
+
+1. Create converter in `src/main/services/import/converters/MyConverter.ts`:
+   ```typescript
+   import { IConverter, ConversionResult } from '../types'
+
+   export class MyConverter implements IConverter {
+     async convert(sourcePath: string, projectPath: string): Promise<ConversionResult> {
+       // Transform source file into markdown
+       return { success: true, outputPath: '/path/to/output.md', content: '...' }
+     }
+   }
+   ```
+
+2. Register in `src/main/services/import/ConverterRegistry.ts`:
+   ```typescript
+   import { MyConverter } from './converters/MyConverter'
+
+   registry.register(['.ext1', '.ext2'], new MyConverter())
+   ```
+
+3. Add extension to `SUPPORTED_EXTENSIONS` in `src/shared/constants.ts` if not already present.
+
+**Example**: See `AudioConverter.ts` – converts audio files to markdown via OpenAI transcription.
+
+See: [API Services – Features](./api-services-features.md) for service documentation
+
 ## Adding Service Class
 
 1. Create `src/main/services/MyService.ts`:

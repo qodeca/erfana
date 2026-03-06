@@ -35,6 +35,15 @@ Full-screen settings dialog for app-wide configuration.
 |---------|-------------|---------|
 | Log level | Minimum severity for file logging (trace, debug, info, warn, error, fatal) | info |
 
+### Transcription
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Backend | Transcription backend selection (OpenAI) | openai |
+| OpenAI API key | API key for OpenAI transcription (stored encrypted via Electron safeStorage in `~/.erfana/`) | – |
+
+**API key security**: Keys are encrypted using platform-native keychain (macOS Keychain, Linux libsecret, Windows DPAPI). The global settings JSON only stores a boolean `openaiApiKeyStored` flag, never the key itself. Plaintext fallback with warning if safeStorage unavailable.
+
 ## Storage
 
 Settings persist to `~/.erfana/settings.json` via GlobalSettingsService.

@@ -2,7 +2,7 @@
 
 **Location:** `src/main/services/`
 
-Feature-specific services for git integration, multi-instance support, media capture, and file import.
+Feature-specific services for git integration, multi-instance support, media capture, transcription, and file import.
 
 See [api-services.md](./api-services.md) for core services (Terminal, File, Settings, Watchers).
 
@@ -247,6 +247,137 @@ Move a file from external location into project (deletes source after copy).
 - `src/main/ipc/external-file-handlers.ts` - IPC handlers
 - `src/shared/ipc/external-file-schema.ts` - Zod schemas
 - `src/renderer/src/hooks/useExternalFileDrop.ts` - UI hook
+
+---
+
+## TranscriptionService
+
+**File:** `src/main/services/TranscriptionService.ts`
+
+Audio-to-text transcription using the OpenAI API. Handles chunking for long files, retry with exponential backoff, progress reporting, and temp file cleanup.
+
+### Key Features
+- GPT-4o-transcribe primary model, Whisper-1 fallback on 404
+- File chunking for files >8 minutes (480s boundary, 0.5s overlap)
+- Exponential backoff retry (max 3 attempts, 1s–30s delay)
+- AbortSignal cancellation support
+- Temp file cleanup in finally blocks
+- Native fetch() for API calls (no openai npm package)
+
+### Public Methods
+
+#### `transcribe(filePath: string, language: TranscriptionLanguage, onProgress: (progress: TranscriptionProgress) => void, signal?: AbortSignal): Promise<TranscriptionResult>`
+Transcribe an audio file to text.
+
+**Parameters:**
+- `filePath` – Absolute path to the audio file (MP3, WAV, M4A, OGG, FLAC)
+- `language` – Language code (e.g., `'en'`, `'pl'`) or `'auto'` for detection
+- `onProgress` – Callback for UI progress updates (percent 0–100, phase string, chunk info, ETA)
+- `signal` – Optional AbortSignal for cancellation
+
+**Returns:**
+- `success` – Whether transcription completed
+- `transcript` – Transcribed text (on success)
+- `duration` – Audio duration in seconds
+- `language` – Detected or specified language
+- `error` – Error message (on failure)
+- `errorCode` – Structured error code (e.g., `TRANSCRIPTION_NO_API_KEY`, `TRANSCRIPTION_CANCELLED`, `TRANSCRIPTION_RATE_LIMITED`)
+
+### Related Files
+- `src/main/ipc/transcription-handlers.ts` – IPC handlers (import, cancel, validate, API key CRUD)
+- `src/shared/ipc/transcription-schema.ts` – Zod schemas and TypeScript types
+- `src/shared/ipc/transcription-channels.ts` – IPC channel name constants
+- `src/renderer/src/stores/useTranscriptionStore.ts` – Zustand store for dialog state
+- `src/renderer/src/components/Transcription/TranscriptionDialog.tsx` – Dialog UI
+- `src/main/services/import/converters/AudioConverter.ts` – Import pipeline converter
+
+---
+
+## ApiKeyService
+
+**File:** `src/main/services/ApiKeyService.ts`
+
+Manages API key encryption/decryption using Electron's safeStorage API. Service-agnostic design supports multiple API providers.
+
+### Key Features
+- Platform-native encryption via `safeStorage.encryptString()`
+- Falls back to plaintext with warning if safeStorage is unavailable
+- Keys stored as binary files in `~/.erfana/{serviceName}-api-key.enc`
+- Path traversal protection (validates service name format: `[a-z0-9-]+`)
+- In-memory cache for `hasKey()` checks
+- Directory created with `0o700`, key files with `0o600` permissions
+- Never logs API key values
+
+### Public Methods
+
+#### `storeKey(serviceName: string, key: string): Promise<void>`
+Store an API key encrypted with safeStorage.
+
+**Parameters:**
+- `serviceName` – Service identifier (e.g., `'openai'`)
+- `key` – The API key to store
+
+---
+
+#### `getKey(serviceName: string): Promise<string | null>`
+Retrieve a stored API key (decrypted).
+
+**Returns:** The decrypted API key, or `null` if not found.
+
+---
+
+#### `hasKey(serviceName: string): boolean`
+Check if an API key exists (uses in-memory cache).
+
+---
+
+#### `clearKey(serviceName: string): Promise<void>`
+Remove a stored API key.
+
+---
+
+#### `initializeCache(serviceNames: string[]): Promise<void>`
+Populate the `hasKey()` cache by checking the filesystem. Call after app is ready.
+
+---
+
+## AudioMetadataService
+
+**File:** `src/main/services/AudioMetadataService.ts`
+
+Lightweight audio file metadata extraction using the `music-metadata` npm package. Pure JavaScript – no native dependencies (no ffmpeg required).
+
+### Key Features
+- Supports MP3 (ID3v1/v2, MPEG frames), WAV (RIFF/PCM), M4A (MP4 container), OGG, FLAC
+- Duration, bitrate, sample rate, channel count extraction
+- Audio validation for transcription (existence, extension, parsability)
+
+### Public Methods
+
+#### `getDuration(filePath: string): Promise<number>`
+Get audio duration in seconds.
+
+**Throws:** Error if file cannot be parsed or duration is undetermined.
+
+---
+
+#### `getFormat(filePath: string): Promise<AudioFormat>`
+Get audio format information.
+
+**Returns:** `{ extension, mimeType, bitrate?, sampleRate?, channels? }`
+
+---
+
+#### `validate(filePath: string): Promise<AudioValidationResult>`
+Validate an audio file for transcription.
+
+**Checks:**
+- File exists and is accessible
+- File has a supported extension (MP3, WAV, M4A, OGG, FLAC)
+- File can be parsed as audio
+- Duration is determinable
+
+**Returns:** `{ valid, error?, errorCode?, format?, durationSeconds?, sizeInMB }`
 
 ---
 

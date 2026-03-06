@@ -114,7 +114,7 @@
       "slug": "media-import-transcription",
       "name": "Media import with transcription",
       "tier": "T4",
-      "status": "draft",
+      "status": "implemented",
       "scope": "feature",
       "description": "Extend import system to support audio/video files via transcription. Configurable backends (OpenAI API, local Whisper), markdown output with metadata, per-import language selection, progress reporting.",
       "created": "2025-12-22T21:45:00.000Z",

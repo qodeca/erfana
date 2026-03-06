@@ -34,6 +34,7 @@ export { ConverterRegistry, createConverterRegistry, converterRegistry } from '.
 // Converters
 export { PdfConverter, createPdfConverter } from './converters/PdfConverter'
 export { TextConverter, createTextConverter } from './converters/TextConverter'
+export { AudioConverter, createAudioConverter } from './converters/AudioConverter'
 
 // Extensions
 export {

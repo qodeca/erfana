@@ -178,6 +178,8 @@ background: var(--color-btn-danger-hover);    /* #e03e18 */
 | Token | Value | Usage |
 |-------|-------|-------|
 | `--color-success` | Lime (#E3E829) | Success messages, valid states |
+| `--color-success-bg` | `rgba(227, 232, 41, 0.1)` | Success container background |
+| `--color-success-border` | `rgba(227, 232, 41, 0.3)` | Success container border |
 | `--color-warning` | `#cca700` | Warnings (unchanged) |
 | `--color-error` | `#f48771` | Errors (unchanged) |
 | `--color-info` | Violet (#A0A8FF) | Informational messages |

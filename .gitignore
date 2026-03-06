@@ -41,3 +41,7 @@ test-results/
 
 # E2E test temp projects
 .e2e-temp/
+
+# Environment variables (API keys)
+.env
+.env.local

@@ -50,6 +50,15 @@ describe('SettingsOverlay', () => {
 
     // Clear logger mocks
     vi.clearAllMocks()
+
+    // Mock window.api.transcription for component's useEffect
+    ;(window as any).api = {
+      transcription: {
+        hasApiKey: vi.fn().mockResolvedValue(false),
+        setApiKey: vi.fn().mockResolvedValue({ success: true }),
+        clearApiKey: vi.fn().mockResolvedValue({ success: true })
+      }
+    }
   })
 
   afterEach(() => {
@@ -341,7 +350,8 @@ describe('SettingsOverlay', () => {
         settings: {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
-          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
         },
         isLoading: false,
         error: null,
@@ -354,7 +364,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -368,7 +379,8 @@ describe('SettingsOverlay', () => {
       const mockSettings: GlobalSettings = {
         logging: { level: 'debug' },
         editor: { preserveLineBreaks: false },
-        gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+        gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+        transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
       }
       useGlobalSettingsStore.setState({
         settings: mockSettings,
@@ -383,7 +395,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -398,7 +411,8 @@ describe('SettingsOverlay', () => {
         settings: {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
-          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
         },
         isLoading: false,
         error: null,
@@ -411,7 +425,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -440,7 +455,8 @@ describe('SettingsOverlay', () => {
         settings: {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
-          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
         },
         isLoading: false,
         error: null,
@@ -453,7 +469,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -479,7 +496,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -502,7 +520,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -522,7 +541,8 @@ describe('SettingsOverlay', () => {
         settings: {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
-          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
         },
         isLoading: false,
         error: null,
@@ -535,7 +555,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -550,7 +571,8 @@ describe('SettingsOverlay', () => {
         settings: {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
-          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
         },
         isLoading: false,
         error: null,
@@ -563,7 +585,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -578,7 +601,8 @@ describe('SettingsOverlay', () => {
         settings: {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: true },
-          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
         },
         isLoading: false,
         error: null,
@@ -591,7 +615,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -607,7 +632,8 @@ describe('SettingsOverlay', () => {
         settings: {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
-          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
         },
         isLoading: false,
         error: null,
@@ -620,7 +646,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -646,7 +673,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -666,7 +694,8 @@ describe('SettingsOverlay', () => {
         settings: {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
-          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
         },
         isLoading: false,
         error: null,
@@ -679,7 +708,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -694,7 +724,8 @@ describe('SettingsOverlay', () => {
         settings: {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
-          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
         },
         isLoading: false,
         error: null,
@@ -707,7 +738,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -722,7 +754,8 @@ describe('SettingsOverlay', () => {
         settings: {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
-          gitStatus: { pollingEnabled: false, pollingInterval: 5000 }
+          gitStatus: { pollingEnabled: false, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
         },
         isLoading: false,
         error: null,
@@ -735,7 +768,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -751,7 +785,8 @@ describe('SettingsOverlay', () => {
         settings: {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
-          gitStatus: { pollingEnabled: false, pollingInterval: 5000 }
+          gitStatus: { pollingEnabled: false, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
         },
         isLoading: false,
         error: null,
@@ -764,7 +799,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -781,7 +817,8 @@ describe('SettingsOverlay', () => {
         settings: {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
-          gitStatus: { pollingEnabled: true, pollingInterval: 7000 }
+          gitStatus: { pollingEnabled: true, pollingInterval: 7000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
         },
         isLoading: false,
         error: null,
@@ -794,7 +831,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -809,7 +847,8 @@ describe('SettingsOverlay', () => {
         settings: {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
-          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
         },
         isLoading: false,
         error: null,
@@ -822,7 +861,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -847,7 +887,8 @@ describe('SettingsOverlay', () => {
         settings: {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
-          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
         },
         isLoading: false,
         error: null,
@@ -860,7 +901,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: mockUpdateGitStatusPollingInterval,
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -877,7 +919,8 @@ describe('SettingsOverlay', () => {
         settings: {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
-          gitStatus: { pollingEnabled: false, pollingInterval: 5000 }
+          gitStatus: { pollingEnabled: false, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
         },
         isLoading: false,
         error: null,
@@ -890,7 +933,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -904,7 +948,8 @@ describe('SettingsOverlay', () => {
         settings: {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
-          gitStatus: { pollingEnabled: true, pollingInterval: 5000 }
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
         },
         isLoading: false,
         error: null,
@@ -917,7 +962,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -940,7 +986,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -963,7 +1010,8 @@ describe('SettingsOverlay', () => {
         updateGitStatusPollingInterval: vi.fn(),
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
-        _handleSettingsChanged: vi.fn()
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn()
       })
 
       render(<SettingsOverlay />)
