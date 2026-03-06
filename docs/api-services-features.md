@@ -348,7 +348,7 @@ Populate the `hasKey()` cache by checking the filesystem. Call after app is read
 Lightweight audio file metadata extraction using the `music-metadata` npm package. Pure JavaScript – no native dependencies (no ffmpeg required).
 
 ### Key Features
-- Supports MP3 (ID3v1/v2, MPEG frames), WAV (RIFF/PCM), M4A (MP4/AAC), OGG, FLAC
+- Supports MP3 (ID3v1/v2, MPEG frames), WAV (RIFF/PCM), M4A (MP4 container), OGG, FLAC
 - Duration, bitrate, sample rate, channel count extraction
 - Audio validation for transcription (existence, extension, parsability)
 

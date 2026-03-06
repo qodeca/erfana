@@ -5,7 +5,7 @@
  * npm package. Extracts duration, format, bitrate, and validates
  * audio files without requiring ffmpeg.
  *
- * Supports: MP3 (ID3v1/v2, MPEG frames), WAV (RIFF/PCM), M4A (MP4/AAC), OGG, FLAC
+ * Supports: MP3 (ID3v1/v2, MPEG frames), WAV (RIFF/PCM), M4A (MP4 container), OGG, FLAC
  *
  * @see Issue #75 - Media import with transcription
  */

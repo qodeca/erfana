@@ -31,6 +31,8 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
   - [AutoExecute Testing](./prompts/autoexecute-testing.md) - Test coverage and mocking strategy
   - [AutoExecute Reference](./prompts/autoexecute-reference.md) - Implementation files and error handling
 - [Logging](./logging.md) - Logging layer, log levels, file rotation, settings
+- [Audio Transcription](./api-services-features.md#transcriptionservice) - OpenAI-powered audio import (MP3, WAV, M4A, OGG, FLAC)
+- [Settings](./settings.md) - Editor, git, logging, and transcription configuration
 
 ### UI/UX
 - [UI Style Guide](./ui-style-guide.md) - Design tokens, colors, typography (MANDATORY for UI changes)

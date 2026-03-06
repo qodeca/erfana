@@ -95,7 +95,7 @@ ffmpeg -y -i ../supported/speech-legal.mp3 -c:a libopus speech-legal.opus
    - "The birch canoe slid on the smooth planks"
    - "Glue the sheet to the dark blue background"
 2. **Legal dictation (MP3)**: Import `speech-legal.mp3` – verify transcription matches legal dictation content. Compare against [reference transcript PDF](https://www.nch.com.au/scribe/practice/completed-transcription-1.pdf).
-3. **All format conversions**: Import each converted format (M4A, OGG, FLAC, AAC, WMA) – verify all produce recognizable transcription matching the legal dictation content. Since all are derived from the same source, transcription output should be essentially identical.
+3. **All format conversions**: Import each converted format (M4A, OGG, FLAC) – verify all produce recognizable transcription matching the legal dictation content. Since all are derived from the same source, transcription output should be essentially identical.
 
 ### Chunking (long file)
 
