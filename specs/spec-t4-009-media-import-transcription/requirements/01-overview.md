@@ -12,7 +12,7 @@ Erfana users work with diverse content sources including podcasts, interviews, m
 
 ### Included
 
-- **Audio file import**: MP3, WAV, M4A, OGG, FLAC, AAC, WMA formats
+- **Audio file import**: MP3, WAV, M4A, OGG, FLAC formats
 - **Video file import**: MP4, MOV, AVI, MKV, WebM, FLV, WMV formats (audio extracted)
 - **Transcription backends**: OpenAI API (GPT-4o-transcribe, Whisper-1) and local Whisper
 - **User configuration**: Backend selection, API keys, model selection in GlobalSettings
