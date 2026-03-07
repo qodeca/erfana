@@ -567,6 +567,38 @@ describe('AudioExtractionService', () => {
       expect(onProgress).toHaveBeenCalledTimes(1)
       expect(onProgress).toHaveBeenCalledWith(50)
     })
+
+    it('should reject with timeout error when extraction exceeds timeout', async () => {
+      vi.useFakeTimers()
+
+      mockFfprobe.mockImplementation((_path: string, cb: (err: Error | null, data: unknown) => void) => {
+        cb(null, {
+          streams: [{ codec_type: 'audio', codec_name: 'aac' }],
+          format: { duration: '60' }
+        })
+      })
+
+      // Don't fire 'end' or 'error' – simulate a hung ffmpeg process
+      mockOn.mockImplementation(function(this: typeof mockFfmpegInstance) {
+        return this
+      })
+
+      const { AudioExtractionService } = await import('./AudioExtractionService')
+      const service = new AudioExtractionService()
+
+      const promise = service.extractAudio('/path/to/video.mp4')
+
+      // Attach rejection handler immediately to prevent unhandled rejection
+      const resultPromise = expect(promise).rejects.toThrow('Audio extraction timed out')
+
+      // Advance past the timeout (5 minutes)
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000 + 1)
+
+      await resultPromise
+      expect(mockKill).toHaveBeenCalledWith('SIGKILL')
+
+      vi.useRealTimers()
+    })
   })
 
   // ===========================================================================
