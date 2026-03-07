@@ -533,6 +533,40 @@ describe('AudioExtractionService', () => {
         'ffmpeg is not available'
       )
     })
+
+    it('should not call progress callback when percent is null or undefined', async () => {
+      mockFfprobe.mockImplementation((_path: string, cb: (err: Error | null, data: unknown) => void) => {
+        cb(null, {
+          streams: [{ codec_type: 'audio', codec_name: 'aac' }],
+          format: { duration: '60' }
+        })
+      })
+
+      const onProgress = vi.fn()
+
+      mockOn.mockImplementation(function(this: typeof mockFfmpegInstance, event: string, handler: (arg?: unknown) => void) {
+        if (event === 'progress') {
+          Promise.resolve().then(() => {
+            handler({ percent: null })
+            handler({ percent: undefined })
+            handler({})
+            handler({ percent: 50 }) // Only this one should trigger callback
+          })
+        }
+        if (event === 'end') {
+          Promise.resolve().then(() => Promise.resolve().then(() => handler()))
+        }
+        return this
+      })
+
+      const { AudioExtractionService } = await import('./AudioExtractionService')
+      const service = new AudioExtractionService()
+
+      await service.extractAudio('/path/to/video.mp4', onProgress)
+
+      expect(onProgress).toHaveBeenCalledTimes(1)
+      expect(onProgress).toHaveBeenCalledWith(50)
+    })
   })
 
   // ===========================================================================
