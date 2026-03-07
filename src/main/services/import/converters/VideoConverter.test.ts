@@ -211,6 +211,19 @@ describe('VideoConverter', () => {
       )
     })
 
+    it('should fall back to IMPORT_CONVERSION_FAILED when errorCode is not a known ErrorCode', async () => {
+      mockTranscriptionService.transcribe.mockResolvedValue({
+        success: false,
+        error: 'Unknown error',
+        errorCode: 'SOME_UNKNOWN_CODE'
+      })
+
+      const result = await converter.convert('/path/to/video.mp4')
+
+      expect(result.success).toBe(false)
+      expect(result.errorCode).toBe(ErrorCode.IMPORT_CONVERSION_FAILED)
+    })
+
     it('should return error when transcript is empty', async () => {
       mockTranscriptionService.transcribe.mockResolvedValue({
         success: true,
@@ -296,6 +309,55 @@ describe('VideoConverter', () => {
         'auto',
         expect.any(Function)
       )
+    })
+
+    it('should default to "auto" language when transcription returns no language', async () => {
+      mockTranscriptionService.transcribe.mockResolvedValue({
+        success: true,
+        transcript: 'Some text.',
+        duration: 60,
+        language: undefined
+      })
+
+      const result = await converter.convert('/path/to/video.mp4')
+
+      expect(result.success).toBe(true)
+      expect(result.content).toContain('language: auto')
+    })
+
+    it('should format zero-duration video', async () => {
+      mockAudioExtractionService.getVideoMetadata.mockResolvedValue({
+        durationSeconds: 0,
+        resolution: '640x480',
+        videoCodec: 'h264',
+        audioCodec: 'aac'
+      })
+      mockAudioExtractionService.extractAudio.mockResolvedValue({
+        audioPath: '/tmp/erfana-video-audio-test.wav',
+        durationSeconds: 0
+      })
+
+      const result = await converter.convert('/path/to/video.mp4')
+
+      expect(result.content).toContain('duration: "0:00"')
+    })
+
+    it('should format hour-length video duration', async () => {
+      mockAudioExtractionService.getVideoMetadata.mockResolvedValue({
+        durationSeconds: 5425,
+        resolution: '1920x1080',
+        videoCodec: 'h264',
+        audioCodec: 'aac'
+      })
+      mockAudioExtractionService.extractAudio.mockResolvedValue({
+        audioPath: '/tmp/erfana-video-audio-test.wav',
+        durationSeconds: 5425
+      })
+
+      const result = await converter.convert('/path/to/video.mp4')
+
+      // 5425 seconds = 1:30:25
+      expect(result.content).toContain('duration: "1:30:25"')
     })
 
     it('should use extraction duration when video metadata duration is preferred', async () => {

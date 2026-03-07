@@ -134,12 +134,15 @@ export class VideoConverter implements IConverter {
       )
 
       if (!result.success || !result.transcript) {
+        const knownErrorCodes = Object.values(ErrorCode) as string[]
+        const resolvedErrorCode =
+          result.errorCode && knownErrorCodes.includes(result.errorCode)
+            ? (result.errorCode as ErrorCode)
+            : ErrorCode.IMPORT_CONVERSION_FAILED
         return {
           success: false,
           error: result.error || 'Transcription failed',
-          errorCode: result.errorCode
-            ? (result.errorCode as ErrorCode)
-            : ErrorCode.IMPORT_CONVERSION_FAILED
+          errorCode: resolvedErrorCode
         }
       }
 
