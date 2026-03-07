@@ -599,6 +599,46 @@ describe('AudioExtractionService', () => {
 
       vi.useRealTimers()
     })
+
+    it('should reject with cancellation error when abort fires mid-extraction', async () => {
+      mockFfprobe.mockImplementation((_path: string, cb: (err: Error | null, data: unknown) => void) => {
+        cb(null, {
+          streams: [{ codec_type: 'audio', codec_name: 'aac' }],
+          format: { duration: '60' }
+        })
+      })
+
+      const abortController = new AbortController()
+
+      // When 'error' is registered, store the handler so we can simulate ffmpeg crash after kill
+      let errorHandler: ((err: Error) => void) | undefined
+
+      mockOn.mockImplementation(function(this: typeof mockFfmpegInstance, event: string, handler: (err?: Error) => void) {
+        if (event === 'error') {
+          errorHandler = handler as (err: Error) => void
+        }
+        return this
+      })
+
+      const { AudioExtractionService } = await import('./AudioExtractionService')
+      const service = new AudioExtractionService()
+
+      const promise = service.extractAudio('/path/to/video.mp4', undefined, abortController.signal)
+
+      // Flush microtasks so extractAudio reaches the point where the abort listener is registered
+      // (it awaits getVideoMetadata internally before setting up the ffmpeg command)
+      await Promise.resolve()
+      await Promise.resolve()
+
+      // Simulate: user aborts, which kills ffmpeg, which triggers error event
+      abortController.abort()
+      expect(mockKill).toHaveBeenCalledWith('SIGKILL')
+
+      // Simulate ffmpeg error event after being killed
+      errorHandler?.(new Error('ffmpeg was killed with signal SIGKILL'))
+
+      await expect(promise).rejects.toThrow('Audio extraction cancelled')
+    })
   })
 
   // ===========================================================================
