@@ -264,7 +264,7 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Settings overlay (10 testids)
+## Settings overlay (12 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -278,6 +278,32 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 | `settings-toggle-polling` | Git polling toggle | static |
 | `settings-select-polling-interval` | Polling interval select | static |
 | `settings-select-log-level` | Log level select | static |
+| `settings-section-transcription` | Transcription settings section | static |
+| `settings-select-transcription-backend` | Backend selector | static |
+
+---
+
+## Transcription dialog (11 testids)
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `transcription-dialog` | Dialog container | static |
+| `transcription-language-select` | Language dropdown | static |
+| `transcription-btn-start` | Start transcription button | static |
+| `transcription-btn-cancel` | Cancel button | static |
+| `transcription-progress-bar` | Progress bar | static |
+| `transcription-progress-text` | Progress percentage text | static |
+| `transcription-phase-text` | Current phase description | static |
+| `transcription-error` | Error message container | static |
+| `transcription-btn-done` | Done/close button | static |
+
+---
+
+## Welcome panel (1 testid)
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `welcome-btn-import` | Import button | static |
 
 ---
 

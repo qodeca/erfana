@@ -46,6 +46,9 @@ Project-specific terminology used in Erfana documentation and code.
 | **SettingsService** | Per-project settings persistence |
 | **GlobalSettingsService** | Application-wide settings in `~/.erfana/` |
 | **ProjectLockService** | File-based locking for multi-instance support |
+| **TranscriptionService** | Audio-to-text transcription via OpenAI API (GPT-4o-transcribe, Whisper-1 fallback) |
+| **AudioMetadataService** | Extracts duration, format, bitrate from audio files using music-metadata |
+| **ApiKeyService** | Encrypts/decrypts API keys using Electron safeStorage |
 
 ## State Management
 
