@@ -16,22 +16,24 @@
  */
 import { ipcMain } from 'electron'
 import { writeFile, mkdir } from 'fs/promises'
-import { join, basename, isAbsolute } from 'path'
+import { join, basename, extname, isAbsolute, normalize } from 'path'
 import { TRANSCRIPTION_CHANNELS } from '../../shared/ipc/transcription-channels'
 import {
   TranscriptionImportRequestSchema,
   type TranscriptionImportResult,
   type TranscriptionProgress
 } from '../../shared/ipc/transcription-schema'
-import { ErrorCode } from '../../shared/errors'
-import { IMPORT } from '../../shared/constants'
+import { ErrorCode, getUserFriendlyMessage } from '../../shared/errors'
+import { IMPORT, VIDEO_IMPORT } from '../../shared/constants'
 import { transcriptionService } from '../services/TranscriptionService'
 import { audioMetadataService } from '../services/AudioMetadataService'
+import { audioExtractionService } from '../services/AudioExtractionService'
 import { apiKeyService } from '../services/ApiKeyService'
 import { globalSettingsService } from '../services/GlobalSettingsService'
 import { fileService } from '../services/FileService'
 import { logger } from '../services/LoggingService'
-import { changeExtension, sanitizeFileName, findAvailableFileName } from '../utils/fileUtils'
+import { changeExtension, sanitizeFileName, findAvailableFileName, formatDuration } from '../utils/fileUtils'
+import { isVideoExtension } from '../services/import/extensions'
 
 /** Active AbortController for current transcription */
 let activeController: AbortController | null = null
@@ -69,7 +71,7 @@ export function registerTranscriptionHandlers(): void {
       const { filePath, language } = parseResult.data
 
       // Validate file path (prevent path traversal)
-      if (!isAbsolute(filePath) || filePath.includes('..')) {
+      if (!isAbsolute(filePath) || normalize(filePath) !== filePath) {
         return {
           success: false,
           error: 'Invalid file path',
@@ -121,72 +123,192 @@ export function registerTranscriptionHandlers(): void {
         }
       }
 
+      // Detect video vs. audio path
+      const ext = extname(filePath).slice(1).toLowerCase()
+      const isVideo = isVideoExtension(ext)
+
       try {
-        // Transcribe
-        const result = await transcriptionService.transcribe(
-          filePath,
-          language,
-          sendProgress,
-          activeController.signal
-        )
+        if (isVideo) {
+          // Video path: check ffmpeg, extract audio, then transcribe
+          if (!audioExtractionService.isAvailable()) {
+            return {
+              success: false,
+              error: 'Video import requires ffmpeg which is not available.',
+              errorCode: ErrorCode.VIDEO_FFMPEG_UNAVAILABLE
+            }
+          }
 
-        if (!result.success || !result.transcript) {
+          const hasAudio = await audioExtractionService.hasAudioStream(filePath)
+          if (!hasAudio) {
+            return {
+              success: false,
+              error: 'This video file contains no audio track to transcribe.',
+              errorCode: ErrorCode.VIDEO_NO_AUDIO_TRACK
+            }
+          }
+
+          // Get video metadata for frontmatter (best-effort)
+          let resolution: string | undefined
+          let videoCodec: string | undefined
+          let videoDuration = 0
+          try {
+            const videoMetadata = await audioExtractionService.getVideoMetadata(filePath)
+            resolution = videoMetadata.resolution
+            videoCodec = videoMetadata.videoCodec
+            videoDuration = videoMetadata.durationSeconds
+          } catch {
+            // Metadata is optional – continue without it
+          }
+
+          // Extract audio with progress mapped to 0–20%
+          const extraction = await audioExtractionService.extractAudio(
+            filePath,
+            (extractionPercent) => {
+              sendProgress({
+                percent: extractionPercent * VIDEO_IMPORT.EXTRACTION_PROGRESS_WEIGHT,
+                phase: 'Extracting audio...'
+              })
+            },
+            activeController.signal
+          )
+
+          try {
+            // Transcribe the extracted audio with progress mapped to 20–100%
+            const result = await transcriptionService.transcribe(
+              extraction.audioPath,
+              language,
+              (progress) => {
+                sendProgress({
+                  percent: Math.min(
+                    VIDEO_IMPORT.EXTRACTION_PROGRESS_WEIGHT * 100 +
+                    progress.percent * (1 - VIDEO_IMPORT.EXTRACTION_PROGRESS_WEIGHT),
+                    100
+                  ),
+                  phase: progress.phase
+                })
+              },
+              activeController.signal
+            )
+
+            if (!result.success || !result.transcript) {
+              return {
+                success: false,
+                error: result.error || 'Transcription failed',
+                errorCode: result.errorCode || ErrorCode.TRANSCRIPTION_FAILED
+              }
+            }
+
+            const duration = videoDuration || extraction.durationSeconds
+            const fileName = basename(filePath)
+            const durationFormatted = formatDuration(duration)
+            const date = new Date().toISOString()
+
+            const frontmatterLines = [
+              '---',
+              `source: "${fileName}"`,
+              `type: video`,
+              `duration: "${durationFormatted}"`,
+              `date: "${date}"`,
+              `language: ${language === 'auto' ? (result.language || 'auto') : language}`,
+              `transcription_backend: openai`
+            ]
+
+            if (resolution) {
+              frontmatterLines.push(`resolution: "${resolution}"`)
+            }
+
+            if (videoCodec) {
+              frontmatterLines.push(`video_codec: "${videoCodec}"`)
+            }
+
+            frontmatterLines.push('---', '', result.transcript, '')
+
+            const markdown = frontmatterLines.join('\n')
+
+            // Write to import/ directory
+            const importDir = join(projectPath, IMPORT.DIR_NAME)
+            await mkdir(importDir, { recursive: true })
+
+            const outputFileName = sanitizeFileName(changeExtension(fileName, '.md'))
+            const outputPath = await findAvailableFileName(importDir, outputFileName)
+            await writeFile(outputPath, markdown, 'utf-8')
+
+            logger.info('Video transcription import complete', { outputPath })
+
+            return {
+              success: true,
+              outputPath
+            }
+          } finally {
+            // Always clean up the temp audio file
+            await audioExtractionService.cleanupTempFile(extraction.audioPath)
+          }
+        } else {
+          // Audio path: existing flow unchanged
+          const result = await transcriptionService.transcribe(
+            filePath,
+            language,
+            sendProgress,
+            activeController.signal
+          )
+
+          if (!result.success || !result.transcript) {
+            return {
+              success: false,
+              error: result.error || 'Transcription failed',
+              errorCode: result.errorCode || ErrorCode.TRANSCRIPTION_FAILED
+            }
+          }
+
+          // Get duration for frontmatter
+          let duration = result.duration || 0
+          try {
+            if (!duration) {
+              duration = await audioMetadataService.getDuration(filePath)
+            }
+          } catch {
+            // Duration is optional in frontmatter
+          }
+
+          // Format markdown with YAML frontmatter
+          const fileName = basename(filePath)
+          const durationFormatted = formatDuration(duration)
+          const date = new Date().toISOString()
+
+          const markdown = [
+            '---',
+            `source: "${fileName}"`,
+            `duration: "${durationFormatted}"`,
+            `date: "${date}"`,
+            `language: ${language === 'auto' ? (result.language || 'auto') : language}`,
+            `transcription_backend: openai`,
+            '---',
+            '',
+            result.transcript,
+            ''
+          ].join('\n')
+
+          // Write to import/ directory
+          const importDir = join(projectPath, IMPORT.DIR_NAME)
+          await mkdir(importDir, { recursive: true })
+
+          const outputFileName = sanitizeFileName(changeExtension(fileName, '.md'))
+          const outputPath = await findAvailableFileName(importDir, outputFileName)
+          await writeFile(outputPath, markdown, 'utf-8')
+
+          logger.info('Transcription import complete', { outputPath })
+
           return {
-            success: false,
-            error: result.error || 'Transcription failed',
-            errorCode: result.errorCode || ErrorCode.TRANSCRIPTION_FAILED
+            success: true,
+            outputPath
           }
-        }
-
-        // Get duration for frontmatter
-        let duration = result.duration || 0
-        try {
-          if (!duration) {
-            duration = await audioMetadataService.getDuration(filePath)
-          }
-        } catch {
-          // Duration is optional in frontmatter
-        }
-
-        // Format markdown with YAML frontmatter
-        const fileName = basename(filePath)
-        const durationFormatted = formatDuration(duration)
-        const date = new Date().toISOString()
-
-        const markdown = [
-          '---',
-          `source: "${fileName}"`,
-          `duration: "${durationFormatted}"`,
-          `date: "${date}"`,
-          `language: ${language === 'auto' ? (result.language || 'auto') : language}`,
-          `transcription_backend: openai`,
-          '---',
-          '',
-          result.transcript,
-          ''
-        ].join('\n')
-
-        // Write to import/ directory
-        const importDir = join(projectPath, IMPORT.DIR_NAME)
-        await mkdir(importDir, { recursive: true })
-
-        const outputFileName = sanitizeFileName(changeExtension(fileName, '.md'))
-        const outputPath = await findAvailableFileName(importDir, outputFileName)
-        await writeFile(outputPath, markdown, 'utf-8')
-
-        logger.info('Transcription import complete', { outputPath })
-
-        return {
-          success: true,
-          outputPath
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
         logger.error('Transcription import failed', error instanceof Error ? error : undefined)
 
         return {
           success: false,
-          error: message,
+          error: getUserFriendlyMessage(error),
           errorCode: ErrorCode.TRANSCRIPTION_FAILED
         }
       } finally {
@@ -230,7 +352,7 @@ export function registerTranscriptionHandlers(): void {
       }
 
       // Validate file path (prevent path traversal)
-      if (!isAbsolute(filePath) || filePath.includes('..')) {
+      if (!isAbsolute(filePath) || normalize(filePath) !== filePath) {
         return { valid: false, error: 'Invalid file path', sizeInMB: 0 }
       }
 
@@ -327,11 +449,3 @@ export function registerTranscriptionHandlers(): void {
   )
 }
 
-/**
- * Format duration in seconds to MM:SS string
- */
-function formatDuration(seconds: number): string {
-  const minutes = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${minutes}:${String(secs).padStart(2, '0')}`
-}

@@ -13,7 +13,7 @@
  */
 import { basename } from 'path'
 import { ErrorCode } from '../../../../shared/errors'
-import { validateFileForImport } from '../../../utils/fileUtils'
+import { validateFileForImport, formatDuration } from '../../../utils/fileUtils'
 import type {
   IConverter,
   ValidationResult,
@@ -125,7 +125,7 @@ export class AudioConverter implements IConverter {
     transcript: string
   ): string {
     const fileName = basename(filePath)
-    const durationFormatted = this.formatDuration(durationSeconds)
+    const durationFormatted = formatDuration(durationSeconds)
     const date = new Date().toISOString()
 
     return [
@@ -140,15 +140,6 @@ export class AudioConverter implements IConverter {
       transcript,
       ''
     ].join('\n')
-  }
-
-  /**
-   * Format duration in seconds to MM:SS string
-   */
-  private formatDuration(seconds: number): string {
-    const minutes = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    return `${minutes}:${String(secs).padStart(2, '0')}`
   }
 }
 

@@ -9,10 +9,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ErrorCode } from '../../../../shared/errors'
 
-// Mock validateFileForImport
-vi.mock('../../../utils/fileUtils', () => ({
-  validateFileForImport: vi.fn()
-}))
+// Mock validateFileForImport, keep formatDuration real
+vi.mock('../../../utils/fileUtils', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...(actual as object),
+    validateFileForImport: vi.fn()
+  }
+})
 
 // Import after mocking
 import { validateFileForImport } from '../../../utils/fileUtils'
