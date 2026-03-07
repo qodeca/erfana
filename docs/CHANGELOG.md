@@ -7,6 +7,16 @@ Historical changelog entries for versions prior to current. For the latest chang
 ## Unreleased
 
 ### Added
+- **Video file import with transcription** (Spec #009, Stage 3): Import video files with audio extraction and OpenAI transcription (#110)
+  - 7 video formats supported: MP4, MOV, AVI, MKV, WebM, FLV, WMV
+  - Audio extraction via ffmpeg (fluent-ffmpeg + ffmpeg-static + ffprobe-static)
+  - Extracted audio routed through existing transcription pipeline
+  - Video-specific frontmatter: type, resolution, video_codec
+  - TranscriptionDialog updated for video (FileVideo icon, "Transcribe video" title)
+  - New service: AudioExtractionService (isAvailable, hasAudioStream, extractAudio, getVideoMetadata, cleanupTempFile)
+  - New converter: VideoConverter in import pipeline
+  - Video error codes: VIDEO_NO_AUDIO_TRACK, VIDEO_EXTRACTION_FAILED, VIDEO_FFMPEG_UNAVAILABLE
+  - Closes #110
 - **Audio transcription E2E test** (Spec #009): Real OpenAI API end-to-end test for full transcription lifecycle
   - File dialog → validation → TranscriptionDialog → language select → progress → success → output file
   - No mocks – only native file dialog is stubbed (Playwright cannot interact with OS dialogs)
