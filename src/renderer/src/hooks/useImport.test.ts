@@ -825,6 +825,294 @@ describe('useImport', () => {
     })
   })
 
+  // Video file routing tests
+  describe('video file routing', () => {
+    it('importFile() with .mp4 file opens TranscriptionDialog', async () => {
+      mockSelectFile.mockResolvedValue({
+        path: '/external/presentation.mp4',
+        name: 'presentation.mp4',
+        sizeInMB: 500,
+        extension: '.mp4'
+      })
+
+      const { result } = renderHook(() => useImport())
+
+      let importResult: string | null | undefined
+      await act(async () => {
+        importResult = await result.current.importFile()
+      })
+
+      expect(mockOpenDialog).toHaveBeenCalledWith('/external/presentation.mp4', 'presentation.mp4')
+      expect(mockProcessImport).not.toHaveBeenCalled()
+      expect(importResult).toBeNull()
+    })
+
+    it('importFile() with .mov file opens TranscriptionDialog', async () => {
+      mockSelectFile.mockResolvedValue({
+        path: '/external/screencast.mov',
+        name: 'screencast.mov',
+        sizeInMB: 200,
+        extension: '.mov'
+      })
+
+      const { result } = renderHook(() => useImport())
+
+      let importResult: string | null | undefined
+      await act(async () => {
+        importResult = await result.current.importFile()
+      })
+
+      expect(mockOpenDialog).toHaveBeenCalledWith('/external/screencast.mov', 'screencast.mov')
+      expect(mockProcessImport).not.toHaveBeenCalled()
+      expect(importResult).toBeNull()
+    })
+
+    it('importFile() with .mkv file opens TranscriptionDialog', async () => {
+      mockSelectFile.mockResolvedValue({
+        path: '/external/lecture.mkv',
+        name: 'lecture.mkv',
+        sizeInMB: 800,
+        extension: '.mkv'
+      })
+
+      const { result } = renderHook(() => useImport())
+
+      let importResult: string | null | undefined
+      await act(async () => {
+        importResult = await result.current.importFile()
+      })
+
+      expect(mockOpenDialog).toHaveBeenCalledWith('/external/lecture.mkv', 'lecture.mkv')
+      expect(mockProcessImport).not.toHaveBeenCalled()
+      expect(importResult).toBeNull()
+    })
+
+    it('importFile() with .avi file opens TranscriptionDialog', async () => {
+      mockSelectFile.mockResolvedValue({
+        path: '/external/clip.avi',
+        name: 'clip.avi',
+        sizeInMB: 100,
+        extension: '.avi'
+      })
+
+      const { result } = renderHook(() => useImport())
+
+      let importResult: string | null | undefined
+      await act(async () => {
+        importResult = await result.current.importFile()
+      })
+
+      expect(mockOpenDialog).toHaveBeenCalledWith('/external/clip.avi', 'clip.avi')
+      expect(importResult).toBeNull()
+    })
+
+    it('importFile() with .webm file opens TranscriptionDialog', async () => {
+      mockSelectFile.mockResolvedValue({
+        path: '/external/video.webm',
+        name: 'video.webm',
+        sizeInMB: 50,
+        extension: '.webm'
+      })
+
+      const { result } = renderHook(() => useImport())
+
+      await act(async () => {
+        await result.current.importFile()
+      })
+
+      expect(mockOpenDialog).toHaveBeenCalledWith('/external/video.webm', 'video.webm')
+      expect(mockProcessImport).not.toHaveBeenCalled()
+    })
+
+    it('importFile() with .flv file opens TranscriptionDialog', async () => {
+      mockSelectFile.mockResolvedValue({
+        path: '/external/old.flv',
+        name: 'old.flv',
+        sizeInMB: 30,
+        extension: '.flv'
+      })
+
+      const { result } = renderHook(() => useImport())
+
+      await act(async () => {
+        await result.current.importFile()
+      })
+
+      expect(mockOpenDialog).toHaveBeenCalledWith('/external/old.flv', 'old.flv')
+      expect(mockProcessImport).not.toHaveBeenCalled()
+    })
+
+    it('importFile() with .wmv file opens TranscriptionDialog', async () => {
+      mockSelectFile.mockResolvedValue({
+        path: '/external/recording.wmv',
+        name: 'recording.wmv',
+        sizeInMB: 120,
+        extension: '.wmv'
+      })
+
+      const { result } = renderHook(() => useImport())
+
+      await act(async () => {
+        await result.current.importFile()
+      })
+
+      expect(mockOpenDialog).toHaveBeenCalledWith('/external/recording.wmv', 'recording.wmv')
+      expect(mockProcessImport).not.toHaveBeenCalled()
+    })
+
+    it('importFile() does NOT validate video file via transcription.validate (no pre-validation for video)', async () => {
+      mockSelectFile.mockResolvedValue({
+        path: '/external/video.mp4',
+        name: 'video.mp4',
+        sizeInMB: 100,
+        extension: '.mp4'
+      })
+
+      const { result } = renderHook(() => useImport())
+
+      await act(async () => {
+        await result.current.importFile()
+      })
+
+      // Audio validation is skipped for video files
+      expect(mockValidateAudio).not.toHaveBeenCalled()
+      expect(mockOpenDialog).toHaveBeenCalled()
+    })
+
+    it('processFiles() with video files in batch are filtered out with media warning', async () => {
+      const { result } = renderHook(() => useImport())
+      const files = [
+        createTestFile({ path: '/test/video.mp4', name: 'video.mp4' }),
+        createTestFile({ path: '/test/document.pdf', name: 'document.pdf' })
+      ]
+
+      mockProcessImport.mockResolvedValue({ success: true, outputPath: '/import/document.md' })
+
+      let processResult: ProcessFilesResult | undefined
+      await act(async () => {
+        processResult = await result.current.processFiles(files)
+      })
+
+      // Video file should be skipped with a media warning
+      expect(mockShowWarningToast).toHaveBeenCalledWith(
+        'Media files skipped',
+        expect.stringContaining('media file(s) skipped')
+      )
+      // Only the PDF should be processed
+      expect(mockProcessImport).toHaveBeenCalledWith('/test/document.pdf')
+      expect(mockProcessImport).not.toHaveBeenCalledWith('/test/video.mp4')
+      expect(processResult?.successCount).toBe(1)
+    })
+
+    it('processFiles() with mixed video + non-media: video skipped, others processed', async () => {
+      const { result } = renderHook(() => useImport())
+      const files = [
+        createTestFile({ path: '/test/lecture.mkv', name: 'lecture.mkv' }),
+        createTestFile({ path: '/test/notes.txt', name: 'notes.txt' }),
+        createTestFile({ path: '/test/report.pdf', name: 'report.pdf' })
+      ]
+
+      mockProcessImport.mockResolvedValue({ success: true, outputPath: '/import/file.md' })
+
+      let processResult: ProcessFilesResult | undefined
+      await act(async () => {
+        processResult = await result.current.processFiles(files)
+      })
+
+      expect(mockShowWarningToast).toHaveBeenCalledWith(
+        'Media files skipped',
+        expect.stringContaining('1 media file(s) skipped')
+      )
+      expect(mockProcessImport).toHaveBeenCalledTimes(2)
+      expect(mockProcessImport).not.toHaveBeenCalledWith('/test/lecture.mkv')
+      expect(processResult?.successCount).toBe(2)
+    })
+
+    it('processFiles() with all-video batch: rejected entirely with warning toast', async () => {
+      const { result } = renderHook(() => useImport())
+      const files = [
+        createTestFile({ path: '/test/video1.mp4', name: 'video1.mp4' }),
+        createTestFile({ path: '/test/video2.mov', name: 'video2.mov' }),
+        createTestFile({ path: '/test/video3.mkv', name: 'video3.mkv' })
+      ]
+
+      let processResult: ProcessFilesResult | undefined
+      await act(async () => {
+        processResult = await result.current.processFiles(files)
+      })
+
+      expect(mockShowWarningToast).toHaveBeenCalledWith(
+        'Media files not supported in batch',
+        expect.any(String)
+      )
+      expect(mockProcessImport).not.toHaveBeenCalled()
+      expect(processResult?.skippedCount).toBe(3)
+      expect(processResult?.successCount).toBe(0)
+    })
+
+    it('processFiles() with mixed audio and video batch: both treated as media, all skipped', async () => {
+      const { result } = renderHook(() => useImport())
+      const files = [
+        createTestFile({ path: '/test/audio.mp3', name: 'audio.mp3' }),
+        createTestFile({ path: '/test/video.mp4', name: 'video.mp4' })
+      ]
+
+      let processResult: ProcessFilesResult | undefined
+      await act(async () => {
+        processResult = await result.current.processFiles(files)
+      })
+
+      // All-media batch: rejected entirely
+      expect(mockShowWarningToast).toHaveBeenCalledWith(
+        'Media files not supported in batch',
+        expect.any(String)
+      )
+      expect(mockProcessImport).not.toHaveBeenCalled()
+      expect(processResult?.skippedCount).toBe(2)
+    })
+
+    it('processFiles() with video + audio + non-media: media skipped, non-media processed', async () => {
+      const { result } = renderHook(() => useImport())
+      const files = [
+        createTestFile({ path: '/test/video.mp4', name: 'video.mp4' }),
+        createTestFile({ path: '/test/audio.mp3', name: 'audio.mp3' }),
+        createTestFile({ path: '/test/document.pdf', name: 'document.pdf' })
+      ]
+
+      mockProcessImport.mockResolvedValue({ success: true, outputPath: '/import/document.md' })
+
+      let processResult: ProcessFilesResult | undefined
+      await act(async () => {
+        processResult = await result.current.processFiles(files)
+      })
+
+      expect(mockShowWarningToast).toHaveBeenCalledWith(
+        'Media files skipped',
+        expect.stringContaining('media file(s) skipped')
+      )
+      expect(mockProcessImport).toHaveBeenCalledWith('/test/document.pdf')
+      expect(mockProcessImport).not.toHaveBeenCalledWith('/test/video.mp4')
+      expect(mockProcessImport).not.toHaveBeenCalledWith('/test/audio.mp3')
+      expect(processResult?.successCount).toBe(1)
+    })
+
+    it('should route uppercase .MP4 extension to TranscriptionDialog', async () => {
+      mockSelectFile.mockResolvedValue({
+        path: '/path/to/VIDEO.MP4',
+        name: 'VIDEO.MP4',
+        sizeInMB: 10,
+        extension: '.MP4'
+      })
+
+      const { result } = renderHook(() => useImport())
+      await act(async () => {
+        await result.current.importFile()
+      })
+
+      expect(mockOpenDialog).toHaveBeenCalledWith('/path/to/VIDEO.MP4', 'VIDEO.MP4')
+    })
+  })
+
   // Audio file routing tests
   describe('audio file routing', () => {
     it('importFile() with .mp3 file opens TranscriptionDialog', async () => {
@@ -925,8 +1213,8 @@ describe('useImport', () => {
       })
 
       expect(mockShowWarningToast).toHaveBeenCalledWith(
-        'Audio files skipped',
-        expect.stringContaining('audio file(s) skipped')
+        'Media files skipped',
+        expect.stringContaining('media file(s) skipped')
       )
       expect(mockProcessImport).toHaveBeenCalledWith('/test/document.pdf')
       expect(mockProcessImport).not.toHaveBeenCalledWith('/test/recording.mp3')
@@ -946,7 +1234,7 @@ describe('useImport', () => {
       })
 
       expect(mockShowWarningToast).toHaveBeenCalledWith(
-        'Audio files not supported in batch',
+        'Media files not supported in batch',
         expect.any(String)
       )
       expect(mockProcessImport).not.toHaveBeenCalled()
