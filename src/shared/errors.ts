@@ -113,6 +113,11 @@ export enum ErrorCode {
   TRANSCRIPTION_TIMEOUT = 'TRANSCRIPTION_TIMEOUT',
   TRANSCRIPTION_FAILED = 'TRANSCRIPTION_FAILED',
 
+  // Video import errors (Issue #110)
+  VIDEO_NO_AUDIO_TRACK = 'VIDEO_NO_AUDIO_TRACK',
+  VIDEO_EXTRACTION_FAILED = 'VIDEO_EXTRACTION_FAILED',
+  VIDEO_FFMPEG_UNAVAILABLE = 'VIDEO_FFMPEG_UNAVAILABLE',
+
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
 }
@@ -278,6 +283,11 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.TRANSCRIPTION_CHUNK_FAILED]: 'Failed to process audio chunk. Retrying.',
   [ErrorCode.TRANSCRIPTION_TIMEOUT]: 'Transcription request timed out',
   [ErrorCode.TRANSCRIPTION_FAILED]: 'Transcription failed. Please try again.',
+
+  // Video import errors (Issue #110)
+  [ErrorCode.VIDEO_NO_AUDIO_TRACK]: 'This video file contains no audio track to transcribe.',
+  [ErrorCode.VIDEO_EXTRACTION_FAILED]: 'Failed to extract audio from video file.',
+  [ErrorCode.VIDEO_FFMPEG_UNAVAILABLE]: 'Video import requires ffmpeg which is not available.',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'

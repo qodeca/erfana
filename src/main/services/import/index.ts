@@ -35,6 +35,7 @@ export { ConverterRegistry, createConverterRegistry, converterRegistry } from '.
 export { PdfConverter, createPdfConverter } from './converters/PdfConverter'
 export { TextConverter, createTextConverter } from './converters/TextConverter'
 export { AudioConverter, createAudioConverter } from './converters/AudioConverter'
+export { VideoConverter, createVideoConverter } from './converters/VideoConverter'
 
 // Extensions
 export {
@@ -43,7 +44,9 @@ export {
   ALL_TEXT_LIKE_EXTENSIONS,
   isTextExtension,
   isCodeExtension,
-  isTextLikeExtension
+  isTextLikeExtension,
+  VIDEO_EXTENSIONS,
+  isVideoExtension
 } from './extensions'
 
 // Main service
