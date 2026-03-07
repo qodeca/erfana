@@ -17,22 +17,12 @@ import { VIDEO_IMPORT } from '../../../../shared/constants'
 import { validateFileForImport, formatDuration } from '../../../utils/fileUtils'
 import type {
   IConverter,
+  ITranscriptionServiceLike,
   ValidationResult,
   ConversionResult,
   FileTypeCategory
 } from '../types'
-import type { TranscriptionResult } from '../../../../shared/ipc/transcription-schema'
 import type { VideoMetadata, ExtractionResult } from '../../AudioExtractionService'
-
-/** Interface for TranscriptionService dependency */
-interface ITranscriptionServiceLike {
-  transcribe(
-    filePath: string,
-    language: 'auto' | string,
-    onProgress: (progress: { percent: number; phase: string }) => void,
-    signal?: AbortSignal
-  ): Promise<TranscriptionResult>
-}
 
 /** Interface for AudioExtractionService dependency */
 interface IAudioExtractionServiceLike {

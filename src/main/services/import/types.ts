@@ -6,6 +6,7 @@
  */
 
 import { ErrorCode } from '../../../shared/errors'
+import type { TranscriptionResult } from '../../../shared/ipc/transcription-schema'
 
 /**
  * Result of file validation before import
@@ -53,6 +54,16 @@ export interface ImportResult {
  * File type category for grouping similar file types
  */
 export type FileTypeCategory = 'document' | 'text' | 'audio' | 'video'
+
+/** Interface for TranscriptionService dependency (used by audio/video converters) */
+export interface ITranscriptionServiceLike {
+  transcribe(
+    filePath: string,
+    language: 'auto' | string,
+    onProgress: (progress: { percent: number; phase: string }) => void,
+    signal?: AbortSignal
+  ): Promise<TranscriptionResult>
+}
 
 /**
  * Converter interface - Strategy Pattern

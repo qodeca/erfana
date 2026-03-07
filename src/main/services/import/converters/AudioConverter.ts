@@ -16,21 +16,11 @@ import { ErrorCode } from '../../../../shared/errors'
 import { validateFileForImport, formatDuration } from '../../../utils/fileUtils'
 import type {
   IConverter,
+  ITranscriptionServiceLike,
   ValidationResult,
   ConversionResult,
   FileTypeCategory
 } from '../types'
-import type { TranscriptionResult } from '../../../../shared/ipc/transcription-schema'
-
-/** Interface for TranscriptionService dependency */
-interface ITranscriptionServiceLike {
-  transcribe(
-    filePath: string,
-    language: 'auto' | string,
-    onProgress: (progress: { percent: number; phase: string }) => void,
-    signal?: AbortSignal
-  ): Promise<TranscriptionResult>
-}
 
 /** Interface for AudioMetadataService dependency */
 interface IAudioMetadataServiceLike {
