@@ -383,8 +383,7 @@ describe('TranscriptionDialog', () => {
       })
 
       render(<TranscriptionDialog />)
-      const dialog = screen.getByTestId(TEST_IDS.TRANSCRIPTION_DIALOG)
-      expect(dialog).toHaveAttribute('role', 'dialog')
+      const dialog = screen.getByRole('dialog')
       expect(dialog).toHaveAttribute('aria-modal', 'true')
     })
 
@@ -396,8 +395,11 @@ describe('TranscriptionDialog', () => {
       })
 
       render(<TranscriptionDialog />)
-      const dialog = screen.getByTestId(TEST_IDS.TRANSCRIPTION_DIALOG)
-      expect(dialog).toHaveAttribute('aria-labelledby', 'transcription-dialog-title')
+      const dialog = screen.getByRole('dialog')
+      const labelledBy = dialog.getAttribute('aria-labelledby')
+      expect(labelledBy).toBeTruthy()
+      const titleElement = document.getElementById(labelledBy!)
+      expect(titleElement).toHaveTextContent('Transcribe audio')
     })
 
     it('progress bar has correct ARIA role', () => {
@@ -424,6 +426,74 @@ describe('TranscriptionDialog', () => {
       render(<TranscriptionDialog />)
       const select = screen.getByTestId(TEST_IDS.TRANSCRIPTION_LANGUAGE_SELECT)
       expect(select).toHaveAttribute('aria-label', 'Transcription language')
+    })
+
+    it('has aria-describedby pointing to body', () => {
+      useTranscriptionStore.setState({
+        isDialogOpen: true,
+        filePath: '/path/to/audio.mp3',
+        fileName: 'audio.mp3'
+      })
+
+      render(<TranscriptionDialog />)
+      const dialog = screen.getByRole('dialog')
+      expect(dialog).toHaveAttribute('aria-describedby')
+    })
+
+    it('error state has role="alert" with aria-live', () => {
+      useTranscriptionStore.setState({
+        isDialogOpen: true,
+        filePath: '/path/to/audio.mp3',
+        fileName: 'audio.mp3',
+        isTranscribing: false,
+        error: 'Test error'
+      })
+
+      render(<TranscriptionDialog />)
+      const errorEl = screen.getByTestId(TEST_IDS.TRANSCRIPTION_ERROR)
+      expect(errorEl).toHaveAttribute('role', 'alert')
+      expect(errorEl).toHaveAttribute('aria-live', 'assertive')
+    })
+
+    it('success state has role="status" with aria-live', () => {
+      useTranscriptionStore.setState({
+        isDialogOpen: true,
+        filePath: '/path/to/audio.mp3',
+        fileName: 'audio.mp3',
+        isTranscribing: false,
+        result: { success: true, outputPath: '/out.md' },
+        error: null
+      })
+
+      render(<TranscriptionDialog />)
+      const successEl = screen.getByText('Transcription complete').closest('[role="status"]')
+      expect(successEl).toHaveAttribute('aria-live', 'polite')
+    })
+
+    it('phase text has aria-live for screen reader announcements', () => {
+      useTranscriptionStore.setState({
+        isDialogOpen: true,
+        filePath: '/path/to/audio.mp3',
+        fileName: 'audio.mp3',
+        isTranscribing: true,
+        progress: { percent: 50, phase: 'Processing' }
+      })
+
+      render(<TranscriptionDialog />)
+      const phaseText = screen.getByTestId(TEST_IDS.TRANSCRIPTION_PHASE_TEXT)
+      expect(phaseText).toHaveAttribute('aria-live', 'polite')
+    })
+
+    it('uses h3 for title (consistent with other dialogs)', () => {
+      useTranscriptionStore.setState({
+        isDialogOpen: true,
+        filePath: '/path/to/audio.mp3',
+        fileName: 'audio.mp3'
+      })
+
+      render(<TranscriptionDialog />)
+      const title = screen.getByText('Transcribe audio')
+      expect(title.tagName).toBe('H3')
     })
   })
 
