@@ -394,8 +394,8 @@ class TranscriptionService implements ITranscriptionService {
     if (!response.ok) {
       const errorBody = await response.text().catch(() => '')
 
-      // Try fallback model on model-specific errors (404 = model not found,
-      // 400 unsupported_format = model doesn't support this audio format e.g. WAV)
+      // Try fallback model on model-specific errors
+      // 404 = model not found, 400 unsupported_format = format not supported by gpt-4o-transcribe
       if (model === TRANSCRIPTION.PRIMARY_MODEL &&
         (response.status === 404 ||
           (response.status === 400 && errorBody.includes('unsupported_format')))) {

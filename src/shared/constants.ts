@@ -276,7 +276,7 @@ export const VIDEO_IMPORT = {
   /** Temp file prefix for extracted audio */
   TEMP_PREFIX: 'erfana-video-audio-',
   /** Output format for extracted audio */
-  AUDIO_OUTPUT_FORMAT: 'wav',
+  AUDIO_OUTPUT_FORMAT: 'mp3',
   /** Extraction progress weight (0-1) – fraction of total progress allocated to extraction */
   EXTRACTION_PROGRESS_WEIGHT: 0.2
 } as const

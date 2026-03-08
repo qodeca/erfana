@@ -389,7 +389,7 @@ Extracts audio tracks from video files using ffmpeg for transcription pipeline i
 
 ### Key Features
 - Supports MP4, MOV, AVI, MKV, WebM, FLV, WMV video formats
-- Audio extraction to temporary WAV files for transcription
+- Audio extraction to temporary MP3 files for transcription
 - Video metadata extraction (resolution, codecs, duration)
 - Audio stream detection before extraction attempt
 - Progress reporting via callback
@@ -414,7 +414,7 @@ Check if a video file contains an audio track.
 ---
 
 #### `extractAudio(filePath: string, onProgress?: (percent: number) => void, signal?: AbortSignal): Promise<ExtractionResult>`
-Extract audio from a video file to a temporary WAV file.
+Extract audio from a video file to a temporary MP3 file.
 
 **Parameters:**
 - `filePath` – Absolute path to the video file

@@ -13,7 +13,7 @@
  */
 import { basename } from 'path'
 import { ErrorCode } from '../../../../shared/errors'
-import { VIDEO_IMPORT } from '../../../../shared/constants'
+import { VIDEO_IMPORT, TRANSCRIPTION } from '../../../../shared/constants'
 import { validateFileForImport, formatDuration } from '../../../utils/fileUtils'
 import type {
   IConverter,
@@ -22,7 +22,7 @@ import type {
   ConversionResult,
   FileTypeCategory
 } from '../types'
-import type { VideoMetadata, ExtractionResult } from '../../AudioExtractionService'
+import type { VideoMetadata, ExtractionResult, SegmentedExtractionResult } from '../../AudioExtractionService'
 
 /** Interface for AudioExtractionService dependency */
 interface IAudioExtractionServiceLike {
@@ -33,8 +33,15 @@ interface IAudioExtractionServiceLike {
     onProgress?: (percent: number) => void,
     signal?: AbortSignal
   ): Promise<ExtractionResult>
+  extractAudioSegments(
+    filePath: string,
+    segmentSeconds?: number,
+    onProgress?: (percent: number) => void,
+    signal?: AbortSignal
+  ): Promise<SegmentedExtractionResult>
   getVideoMetadata(filePath: string): Promise<VideoMetadata>
   cleanupTempFile(filePath: string): Promise<void>
+  cleanupTempFiles(filePaths: string[]): Promise<void>
 }
 
 /**
@@ -110,7 +117,24 @@ export class VideoConverter implements IConverter {
       // Metadata is optional – continue without it
     }
 
-    // Extract audio to temp file
+    // Choose extraction strategy based on duration
+    const durationSeconds = videoMetadata?.durationSeconds ?? 0
+    const isLongVideo = durationSeconds > TRANSCRIPTION.CHUNK_BOUNDARY_SECONDS
+
+    if (isLongVideo) {
+      return this.convertLongVideo(filePath, durationSeconds, videoMetadata)
+    }
+
+    return this.convertShortVideo(filePath, videoMetadata)
+  }
+
+  /**
+   * Convert a short video (<=8 min) – single extraction + single transcription
+   */
+  private async convertShortVideo(
+    filePath: string,
+    videoMetadata?: VideoMetadata
+  ): Promise<ConversionResult> {
     let extraction: ExtractionResult
     try {
       extraction = await this.audioExtractionService.extractAudio(
@@ -126,7 +150,6 @@ export class VideoConverter implements IConverter {
     }
 
     try {
-      // Transcribe the extracted audio (no progress reporting in batch mode)
       const result = await this.transcriptionService.transcribe(
         extraction.audioPath,
         'auto',
@@ -134,19 +157,9 @@ export class VideoConverter implements IConverter {
       )
 
       if (!result.success || !result.transcript) {
-        const knownErrorCodes = Object.values(ErrorCode) as string[]
-        const resolvedErrorCode =
-          result.errorCode && knownErrorCodes.includes(result.errorCode)
-            ? (result.errorCode as ErrorCode)
-            : ErrorCode.IMPORT_CONVERSION_FAILED
-        return {
-          success: false,
-          error: result.error || 'Transcription failed',
-          errorCode: resolvedErrorCode
-        }
+        return this.mapTranscriptionError(result.error, result.errorCode)
       }
 
-      // Format as markdown with YAML frontmatter
       const markdown = this.formatMarkdown(
         filePath,
         videoMetadata?.durationSeconds ?? extraction.durationSeconds,
@@ -156,13 +169,85 @@ export class VideoConverter implements IConverter {
         videoMetadata?.videoCodec
       )
 
-      return {
-        success: true,
-        content: markdown
-      }
+      return { success: true, content: markdown }
     } finally {
-      // Always clean up the temp audio file
       await this.audioExtractionService.cleanupTempFile(extraction.audioPath)
+    }
+  }
+
+  /**
+   * Convert a long video (>8 min) – segmented extraction + per-segment transcription
+   */
+  private async convertLongVideo(
+    filePath: string,
+    durationSeconds: number,
+    videoMetadata?: VideoMetadata
+  ): Promise<ConversionResult> {
+    let segmented: SegmentedExtractionResult
+    try {
+      segmented = await this.audioExtractionService.extractAudioSegments(
+        filePath,
+        undefined,
+        () => { /* no-op progress in batch mode */ }
+      )
+    } catch {
+      return {
+        success: false,
+        error: 'Failed to extract audio from video file.',
+        errorCode: ErrorCode.VIDEO_EXTRACTION_FAILED
+      }
+    }
+
+    try {
+      const transcriptParts: string[] = []
+      let detectedLanguage: string | undefined
+
+      for (const segmentPath of segmented.segmentPaths) {
+        const result = await this.transcriptionService.transcribe(
+          segmentPath,
+          'auto',
+          () => { /* no-op progress in batch mode */ }
+        )
+
+        if (!result.success || !result.transcript) {
+          return this.mapTranscriptionError(result.error, result.errorCode)
+        }
+
+        transcriptParts.push(result.transcript)
+        if (!detectedLanguage && result.language) {
+          detectedLanguage = result.language
+        }
+      }
+
+      const transcript = transcriptParts.join(' ')
+      const markdown = this.formatMarkdown(
+        filePath,
+        durationSeconds,
+        detectedLanguage || 'auto',
+        transcript,
+        videoMetadata?.resolution,
+        videoMetadata?.videoCodec
+      )
+
+      return { success: true, content: markdown }
+    } finally {
+      await this.audioExtractionService.cleanupTempFiles(segmented.segmentPaths)
+    }
+  }
+
+  /**
+   * Map transcription error to ConversionResult
+   */
+  private mapTranscriptionError(error?: string, errorCode?: string): ConversionResult {
+    const knownErrorCodes = Object.values(ErrorCode) as string[]
+    const resolvedErrorCode =
+      errorCode && knownErrorCodes.includes(errorCode)
+        ? (errorCode as ErrorCode)
+        : ErrorCode.IMPORT_CONVERSION_FAILED
+    return {
+      success: false,
+      error: error || 'Transcription failed',
+      errorCode: resolvedErrorCode
     }
   }
 

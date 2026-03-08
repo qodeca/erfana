@@ -13,7 +13,7 @@ import { randomUUID } from 'crypto'
 import Ffmpeg from 'fluent-ffmpeg'
 import ffmpegPath from 'ffmpeg-static'
 import ffprobePath from 'ffprobe-static'
-import { VIDEO_IMPORT } from '../../shared/constants'
+import { VIDEO_IMPORT, TRANSCRIPTION } from '../../shared/constants'
 import { logger } from './LoggingService'
 
 // Configure ffmpeg binary paths
@@ -44,8 +44,27 @@ export interface ExtractionResult {
   durationSeconds: number
 }
 
+/** Segmented extraction result – time-based MP3 chunks for long videos */
+export interface SegmentedExtractionResult {
+  /** Paths to extracted segment files (in order) */
+  segmentPaths: string[]
+  /** Total duration in seconds */
+  durationSeconds: number
+}
+
 /** Progress callback type */
 export type ExtractionProgressCallback = (percent: number) => void
+
+/** Options for the shared ffmpeg extraction runner */
+interface FfmpegExtractionOptions {
+  inputPath: string
+  outputPath: string
+  startTime?: number
+  duration?: number
+  timeoutMs: number
+  onProgress?: ExtractionProgressCallback
+  signal?: AbortSignal
+}
 
 export class AudioExtractionService {
   /**
@@ -90,9 +109,10 @@ export class AudioExtractionService {
   }
 
   /**
-   * Extract audio from a video file to a temp WAV file
+   * Extract audio from a video file to a temp MP3 file
    *
-   * Extracts 16kHz mono WAV – smaller files, optimized for speech transcription.
+   * Extracts 16 kHz mono MP3 at 64 kbps – optimized for speech transcription.
+   * The libmp3lame encoder is bundled with ffmpeg-static.
    *
    * @param filePath - Path to the video file
    * @param onProgress - Progress callback (0-100)
@@ -122,39 +142,166 @@ export class AudioExtractionService {
       // Duration unknown – progress will be approximate
     }
 
-    return new Promise<ExtractionResult>((resolve, reject) => {
+    await this.runFfmpegExtraction({
+      inputPath: filePath,
+      outputPath,
+      timeoutMs: VIDEO_IMPORT.EXTRACTION_TIMEOUT_MS,
+      onProgress,
+      signal
+    })
+
+    return { audioPath: outputPath, durationSeconds }
+  }
+
+  /**
+   * Extract audio from a video file as time-based MP3 segments
+   *
+   * Uses ffmpeg's -ss/-t flags to produce frame-aligned MP3 chunks,
+   * avoiding the corrupt-audio problem of byte-stream slicing.
+   *
+   * @param filePath - Path to the video file
+   * @param segmentSeconds - Duration of each segment (default: CHUNK_BOUNDARY_SECONDS)
+   * @param onProgress - Progress callback (0-100) across all segments
+   * @param signal - AbortSignal for cancellation
+   * @returns Segmented extraction result with paths and total duration
+   */
+  async extractAudioSegments(
+    filePath: string,
+    segmentSeconds: number = TRANSCRIPTION.CHUNK_BOUNDARY_SECONDS,
+    onProgress?: ExtractionProgressCallback,
+    signal?: AbortSignal
+  ): Promise<SegmentedExtractionResult> {
+    if (!this.isAvailable()) {
+      throw new Error('ffmpeg is not available')
+    }
+
+    // Probe duration first
+    let durationSeconds = 0
+    try {
+      const metadata = await this.getVideoMetadata(filePath)
+      durationSeconds = metadata.durationSeconds
+    } catch {
+      throw new Error('Failed to get video duration for segmented extraction')
+    }
+
+    if (durationSeconds <= 0) {
+      throw new Error('Video duration is zero or negative; cannot extract segments')
+    }
+
+    const segmentCount = Math.ceil(durationSeconds / segmentSeconds)
+    const segmentPaths: string[] = []
+
+    try {
+      for (let i = 0; i < segmentCount; i++) {
+        if (signal?.aborted) {
+          throw new Error('Audio extraction cancelled')
+        }
+
+        const startTime = i * segmentSeconds
+        const outputPath = join(
+          tmpdir(),
+          `${VIDEO_IMPORT.TEMP_PREFIX}${randomUUID()}-seg${i}.${VIDEO_IMPORT.AUDIO_OUTPUT_FORMAT}`
+        )
+
+        await this.extractSegment(filePath, outputPath, startTime, segmentSeconds, (percent) => {
+          if (onProgress) {
+            const segmentProgress = (i + percent / 100) / segmentCount * 100
+            onProgress(Math.min(segmentProgress, 100))
+          }
+        }, signal)
+
+        segmentPaths.push(outputPath)
+      }
+
+      if (onProgress) {
+        onProgress(100)
+      }
+
+      return { segmentPaths, durationSeconds }
+    } catch (error) {
+      // Clean up any segments created so far on error
+      await this.cleanupTempFiles(segmentPaths)
+      throw error
+    }
+  }
+
+  /**
+   * Extract a single audio segment using ffmpeg -ss/-t
+   */
+  private extractSegment(
+    filePath: string,
+    outputPath: string,
+    startTime: number,
+    segmentDuration: number,
+    onProgress?: ExtractionProgressCallback,
+    signal?: AbortSignal
+  ): Promise<void> {
+    return this.runFfmpegExtraction({
+      inputPath: filePath,
+      outputPath,
+      startTime,
+      duration: segmentDuration,
+      timeoutMs: Math.max(60_000, segmentDuration * 1000),
+      onProgress,
+      signal
+    })
+  }
+
+  /**
+   * Shared ffmpeg extraction runner
+   *
+   * Consolidates the common ffmpeg audio extraction logic used by both
+   * extractAudio (full-file) and extractSegment (time-slice).
+   */
+  private runFfmpegExtraction(options: FfmpegExtractionOptions): Promise<void> {
+    const { inputPath, outputPath, startTime, duration, timeoutMs, onProgress, signal } = options
+
+    return new Promise<void>((resolve, reject) => {
       let settled = false
 
-      const settle = (fn: typeof resolve | typeof reject, value: ExtractionResult | Error): void => {
+      const settle = (fn: typeof resolve | typeof reject, value?: Error): void => {
         if (settled) return
         settled = true
         clearTimeout(timeout)
         if (signal && onAbort) signal.removeEventListener('abort', onAbort)
-        ;(fn as (v: unknown) => void)(value)
+        if (value) {
+          ;(fn as (v: unknown) => void)(value)
+        } else {
+          ;(fn as () => void)()
+        }
       }
 
-      const command = Ffmpeg(filePath)
+      // Audio encoding – must match VIDEO_IMPORT.AUDIO_OUTPUT_FORMAT ('mp3')
+      const command = Ffmpeg(inputPath)
+
+      if (startTime != null) {
+        command.setStartTime(startTime)
+      }
+      if (duration != null) {
+        command.duration(duration)
+      }
+
+      command
         .noVideo()
-        .audioCodec('pcm_s16le')
+        .audioCodec('libmp3lame')
+        .audioBitrate('64k')
         .audioFrequency(16000)
         .audioChannels(1)
-        .format('wav')
+        .format('mp3')
         .on('progress', (progress: { percent?: number }) => {
           if (onProgress && progress.percent != null) {
             onProgress(Math.min(progress.percent, 100))
           }
         })
         .on('end', () => {
-          settle(resolve, { audioPath: outputPath, durationSeconds })
+          settle(resolve)
         })
         .on('error', async (err: Error) => {
-          // Clean up temp file on error
           try {
             await unlink(outputPath)
           } catch {
             // File may not exist yet
           }
-          // Distinguish cancellation from other errors
           if (signal?.aborted) {
             settle(reject, new Error('Audio extraction cancelled'))
           } else {
@@ -180,8 +327,17 @@ export class AudioExtractionService {
       const timeout = setTimeout(() => {
         command.kill('SIGKILL')
         settle(reject, new Error('Audio extraction timed out'))
-      }, VIDEO_IMPORT.EXTRACTION_TIMEOUT_MS)
+      }, timeoutMs)
     })
+  }
+
+  /**
+   * Clean up multiple temporary files (batch cleanup)
+   */
+  async cleanupTempFiles(filePaths: string[]): Promise<void> {
+    for (const fp of filePaths) {
+      await this.cleanupTempFile(fp)
+    }
   }
 
   /**

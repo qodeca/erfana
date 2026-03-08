@@ -35,8 +35,10 @@ describe('VideoConverter', () => {
     isAvailable: vi.fn(),
     hasAudioStream: vi.fn(),
     extractAudio: vi.fn(),
+    extractAudioSegments: vi.fn(),
     getVideoMetadata: vi.fn(),
-    cleanupTempFile: vi.fn()
+    cleanupTempFile: vi.fn(),
+    cleanupTempFiles: vi.fn()
   }
 
   let converter: VideoConverter
@@ -55,10 +57,15 @@ describe('VideoConverter', () => {
       audioCodec: 'aac'
     })
     mockAudioExtractionService.extractAudio.mockResolvedValue({
-      audioPath: '/tmp/erfana-video-audio-test.wav',
+      audioPath: '/tmp/erfana-video-audio-test.mp3',
       durationSeconds: 180
     })
     mockAudioExtractionService.cleanupTempFile.mockResolvedValue(undefined)
+    mockAudioExtractionService.cleanupTempFiles.mockResolvedValue(undefined)
+    mockAudioExtractionService.extractAudioSegments.mockResolvedValue({
+      segmentPaths: ['/tmp/erfana-video-audio-seg0.mp3', '/tmp/erfana-video-audio-seg1.mp3'],
+      durationSeconds: 960
+    })
     mockTranscriptionService.transcribe.mockResolvedValue({
       success: true,
       transcript: 'Hello, this is a video transcription.',
@@ -207,7 +214,7 @@ describe('VideoConverter', () => {
       await converter.convert('/path/to/video.mp4')
 
       expect(mockAudioExtractionService.cleanupTempFile).toHaveBeenCalledWith(
-        '/tmp/erfana-video-audio-test.wav'
+        '/tmp/erfana-video-audio-test.mp3'
       )
     })
 
@@ -283,7 +290,7 @@ describe('VideoConverter', () => {
         audioCodec: 'aac'
       })
       mockAudioExtractionService.extractAudio.mockResolvedValue({
-        audioPath: '/tmp/erfana-video-audio-test.wav',
+        audioPath: '/tmp/erfana-video-audio-test.mp3',
         durationSeconds: 125
       })
 
@@ -297,7 +304,7 @@ describe('VideoConverter', () => {
       await converter.convert('/path/to/video.mp4')
 
       expect(mockAudioExtractionService.cleanupTempFile).toHaveBeenCalledWith(
-        '/tmp/erfana-video-audio-test.wav'
+        '/tmp/erfana-video-audio-test.mp3'
       )
     })
 
@@ -305,7 +312,7 @@ describe('VideoConverter', () => {
       await converter.convert('/path/to/video.mp4')
 
       expect(mockTranscriptionService.transcribe).toHaveBeenCalledWith(
-        '/tmp/erfana-video-audio-test.wav',
+        '/tmp/erfana-video-audio-test.mp3',
         'auto',
         expect.any(Function)
       )
@@ -333,7 +340,7 @@ describe('VideoConverter', () => {
         audioCodec: 'aac'
       })
       mockAudioExtractionService.extractAudio.mockResolvedValue({
-        audioPath: '/tmp/erfana-video-audio-test.wav',
+        audioPath: '/tmp/erfana-video-audio-test.mp3',
         durationSeconds: 0
       })
 
@@ -350,7 +357,7 @@ describe('VideoConverter', () => {
         audioCodec: 'aac'
       })
       mockAudioExtractionService.extractAudio.mockResolvedValue({
-        audioPath: '/tmp/erfana-video-audio-test.wav',
+        audioPath: '/tmp/erfana-video-audio-test.mp3',
         durationSeconds: 5425
       })
 
@@ -369,7 +376,7 @@ describe('VideoConverter', () => {
         audioCodec: 'aac'
       })
       mockAudioExtractionService.extractAudio.mockResolvedValue({
-        audioPath: '/tmp/erfana-video-audio-test.wav',
+        audioPath: '/tmp/erfana-video-audio-test.mp3',
         durationSeconds: 195 // slightly different from metadata
       })
 
@@ -402,7 +409,7 @@ describe('VideoConverter', () => {
         new Error('Cannot read metadata')
       )
       mockAudioExtractionService.extractAudio.mockResolvedValue({
-        audioPath: '/tmp/erfana-video-audio-test.wav',
+        audioPath: '/tmp/erfana-video-audio-test.mp3',
         durationSeconds: 240
       })
 
@@ -423,6 +430,139 @@ describe('VideoConverter', () => {
       expect(result.success).toBe(true)
       expect(result.content).toContain('source: "myvideo.mov"')
       expect(result.content).toContain('type: video')
+    })
+  })
+
+  // ===========================================================================
+  // convert – long video (segmented extraction)
+  // ===========================================================================
+
+  describe('convert – long video (segmented extraction)', () => {
+    beforeEach(() => {
+      // Long video: >480 seconds triggers segmented path
+      mockAudioExtractionService.getVideoMetadata.mockResolvedValue({
+        durationSeconds: 960,
+        resolution: '1920x1080',
+        videoCodec: 'h264',
+        audioCodec: 'aac'
+      })
+    })
+
+    it('should use segmented extraction for videos >8 min', async () => {
+      let callCount = 0
+      mockTranscriptionService.transcribe.mockImplementation(() => {
+        callCount++
+        return Promise.resolve({
+          success: true,
+          transcript: `Segment ${callCount} text.`,
+          duration: 480,
+          language: 'en'
+        })
+      })
+
+      const result = await converter.convert('/path/to/long-video.mp4')
+
+      expect(result.success).toBe(true)
+      expect(mockAudioExtractionService.extractAudioSegments).toHaveBeenCalledWith(
+        '/path/to/long-video.mp4',
+        undefined,
+        expect.any(Function)
+      )
+      // Should NOT use single extractAudio
+      expect(mockAudioExtractionService.extractAudio).not.toHaveBeenCalled()
+    })
+
+    it('should transcribe each segment individually and join results', async () => {
+      let callCount = 0
+      mockTranscriptionService.transcribe.mockImplementation(() => {
+        callCount++
+        return Promise.resolve({
+          success: true,
+          transcript: `Part ${callCount}.`,
+          duration: 480,
+          language: 'en'
+        })
+      })
+
+      const result = await converter.convert('/path/to/long-video.mp4')
+
+      expect(result.success).toBe(true)
+      expect(result.content).toContain('Part 1. Part 2.')
+      expect(mockTranscriptionService.transcribe).toHaveBeenCalledTimes(2)
+    })
+
+    it('should cleanup segment files in finally block', async () => {
+      mockTranscriptionService.transcribe.mockResolvedValue({
+        success: true,
+        transcript: 'Some text.',
+        duration: 480,
+        language: 'en'
+      })
+
+      await converter.convert('/path/to/long-video.mp4')
+
+      expect(mockAudioExtractionService.cleanupTempFiles).toHaveBeenCalledWith([
+        '/tmp/erfana-video-audio-seg0.mp3',
+        '/tmp/erfana-video-audio-seg1.mp3'
+      ])
+    })
+
+    it('should cleanup segment files even when transcription fails', async () => {
+      mockTranscriptionService.transcribe.mockResolvedValue({
+        success: false,
+        error: 'API error',
+        errorCode: 'TRANSCRIPTION_FAILED'
+      })
+
+      await converter.convert('/path/to/long-video.mp4')
+
+      expect(mockAudioExtractionService.cleanupTempFiles).toHaveBeenCalledWith([
+        '/tmp/erfana-video-audio-seg0.mp3',
+        '/tmp/erfana-video-audio-seg1.mp3'
+      ])
+    })
+
+    it('should use detected language from first segment', async () => {
+      let callCount = 0
+      mockTranscriptionService.transcribe.mockImplementation(() => {
+        callCount++
+        return Promise.resolve({
+          success: true,
+          transcript: `Segment ${callCount}.`,
+          duration: 480,
+          language: callCount === 1 ? 'fr' : 'en'
+        })
+      })
+
+      const result = await converter.convert('/path/to/long-video.mp4')
+
+      expect(result.success).toBe(true)
+      expect(result.content).toContain('language: fr')
+    })
+
+    it('should fall back to auto when no segment returns language', async () => {
+      mockTranscriptionService.transcribe.mockResolvedValue({
+        success: true,
+        transcript: 'Some text.',
+        duration: 480,
+        language: undefined
+      })
+
+      const result = await converter.convert('/path/to/long-video.mp4')
+
+      expect(result.success).toBe(true)
+      expect(result.content).toContain('language: auto')
+    })
+
+    it('should return error when segmented extraction fails', async () => {
+      mockAudioExtractionService.extractAudioSegments.mockRejectedValue(
+        new Error('ffmpeg crashed')
+      )
+
+      const result = await converter.convert('/path/to/long-video.mp4')
+
+      expect(result.success).toBe(false)
+      expect(result.errorCode).toBe(ErrorCode.VIDEO_EXTRACTION_FAILED)
     })
   })
 

@@ -22,33 +22,42 @@ const mockFfprobe = vi.fn()
 // Track chainable instance method mocks
 const mockNoVideo = vi.fn()
 const mockAudioCodec = vi.fn()
+const mockAudioBitrate = vi.fn()
 const mockAudioFrequency = vi.fn()
 const mockAudioChannels = vi.fn()
 const mockFormat = vi.fn()
 const mockSave = vi.fn()
 const mockKill = vi.fn()
 const mockOn = vi.fn()
+const mockSetStartTime = vi.fn()
+const mockDuration = vi.fn()
 
 // The Ffmpeg constructor mock – returns a chainable object
 const mockFfmpegInstance = {
   noVideo: mockNoVideo,
   audioCodec: mockAudioCodec,
+  audioBitrate: mockAudioBitrate,
   audioFrequency: mockAudioFrequency,
   audioChannels: mockAudioChannels,
   format: mockFormat,
   on: mockOn,
   save: mockSave,
-  kill: mockKill
+  kill: mockKill,
+  setStartTime: mockSetStartTime,
+  duration: mockDuration
 }
 
 // Make all chainable methods return the same instance
 mockNoVideo.mockReturnValue(mockFfmpegInstance)
 mockAudioCodec.mockReturnValue(mockFfmpegInstance)
+mockAudioBitrate.mockReturnValue(mockFfmpegInstance)
 mockAudioFrequency.mockReturnValue(mockFfmpegInstance)
 mockAudioChannels.mockReturnValue(mockFfmpegInstance)
 mockFormat.mockReturnValue(mockFfmpegInstance)
 mockOn.mockReturnValue(mockFfmpegInstance)
 mockSave.mockReturnValue(mockFfmpegInstance)
+mockSetStartTime.mockReturnValue(mockFfmpegInstance)
+mockDuration.mockReturnValue(mockFfmpegInstance)
 
 // The constructor function itself
 const MockFfmpeg = vi.fn(() => mockFfmpegInstance)
@@ -111,8 +120,11 @@ vi.mock('../../shared/constants', () => ({
     SUPPORTED_EXTENSIONS: ['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv'],
     EXTRACTION_TIMEOUT_MS: 5 * 60 * 1000,
     TEMP_PREFIX: 'erfana-video-audio-',
-    AUDIO_OUTPUT_FORMAT: 'wav',
+    AUDIO_OUTPUT_FORMAT: 'mp3',
     EXTRACTION_PROGRESS_WEIGHT: 0.2
+  },
+  TRANSCRIPTION: {
+    CHUNK_BOUNDARY_SECONDS: 480
   }
 }))
 
@@ -127,11 +139,14 @@ describe('AudioExtractionService', () => {
     // Restore chainable return values after clearing mocks
     mockNoVideo.mockReturnValue(mockFfmpegInstance)
     mockAudioCodec.mockReturnValue(mockFfmpegInstance)
+    mockAudioBitrate.mockReturnValue(mockFfmpegInstance)
     mockAudioFrequency.mockReturnValue(mockFfmpegInstance)
     mockAudioChannels.mockReturnValue(mockFfmpegInstance)
     mockFormat.mockReturnValue(mockFfmpegInstance)
     mockOn.mockReturnValue(mockFfmpegInstance)
     mockSave.mockReturnValue(mockFfmpegInstance)
+    mockSetStartTime.mockReturnValue(mockFfmpegInstance)
+    mockDuration.mockReturnValue(mockFfmpegInstance)
     MockFfmpeg.mockReturnValue(mockFfmpegInstance)
 
     mockUnlink.mockResolvedValue(undefined)
@@ -338,7 +353,7 @@ describe('AudioExtractionService', () => {
   // ===========================================================================
 
   describe('extractAudio', () => {
-    it('should create WAV file and return extraction result', async () => {
+    it('should create MP3 file and return extraction result', async () => {
       // Probe returns metadata for duration
       mockFfprobe.mockImplementation((_path: string, cb: (err: Error | null, data: unknown) => void) => {
         cb(null, {
@@ -363,7 +378,7 @@ describe('AudioExtractionService', () => {
 
       const result = await service.extractAudio('/path/to/video.mp4')
 
-      expect(result.audioPath).toMatch(/\.wav$/)
+      expect(result.audioPath).toMatch(/\.mp3$/)
       expect(result.audioPath).toContain('erfana-video-audio-')
       expect(result.durationSeconds).toBe(180)
       expect(mockSave).toHaveBeenCalledWith(result.audioPath)
@@ -390,10 +405,11 @@ describe('AudioExtractionService', () => {
       await service.extractAudio('/path/to/video.mp4')
 
       expect(mockNoVideo).toHaveBeenCalled()
-      expect(mockAudioCodec).toHaveBeenCalledWith('pcm_s16le')
+      expect(mockAudioCodec).toHaveBeenCalledWith('libmp3lame')
+      expect(mockAudioBitrate).toHaveBeenCalledWith('64k')
       expect(mockAudioFrequency).toHaveBeenCalledWith(16000)
       expect(mockAudioChannels).toHaveBeenCalledWith(1)
-      expect(mockFormat).toHaveBeenCalledWith('wav')
+      expect(mockFormat).toHaveBeenCalledWith('mp3')
     })
 
     it('should call progress callback with percent values', async () => {
@@ -652,7 +668,7 @@ describe('AudioExtractionService', () => {
       const { AudioExtractionService } = await import('./AudioExtractionService')
       const service = new AudioExtractionService()
 
-      const tempPath = `${tmpdir()}/erfana-video-audio-abc.wav`
+      const tempPath = `${tmpdir()}/erfana-video-audio-abc.mp3`
       await service.cleanupTempFile(tempPath)
 
       expect(mockUnlink).toHaveBeenCalledWith(tempPath)
@@ -664,14 +680,14 @@ describe('AudioExtractionService', () => {
       const { AudioExtractionService } = await import('./AudioExtractionService')
       const service = new AudioExtractionService()
 
-      const tempPath = `${tmpdir()}/erfana-video-audio-missing.wav`
+      const tempPath = `${tmpdir()}/erfana-video-audio-missing.mp3`
       // Should not throw
       await expect(
         service.cleanupTempFile(tempPath)
       ).resolves.toBeUndefined()
 
       expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('erfana-video-audio-missing.wav')
+        expect.stringContaining('erfana-video-audio-missing.mp3')
       )
     })
 
@@ -681,7 +697,7 @@ describe('AudioExtractionService', () => {
       const { AudioExtractionService } = await import('./AudioExtractionService')
       const service = new AudioExtractionService()
 
-      await service.cleanupTempFile(`${tmpdir()}/erfana-video-audio-locked.wav`)
+      await service.cleanupTempFile(`${tmpdir()}/erfana-video-audio-locked.mp3`)
 
       expect(mockLogger.warn).toHaveBeenCalled()
     })
@@ -708,6 +724,251 @@ describe('AudioExtractionService', () => {
       expect(mockLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining('Refusing to delete non-temp file')
       )
+    })
+  })
+
+  // ===========================================================================
+  // extractAudioSegments
+  // ===========================================================================
+
+  describe('extractAudioSegments', () => {
+    it('should produce a single segment for short video (<480s)', async () => {
+      mockFfprobe.mockImplementation((_path: string, cb: (err: Error | null, data: unknown) => void) => {
+        cb(null, {
+          streams: [
+            { codec_type: 'video', codec_name: 'h264', width: 1280, height: 720 },
+            { codec_type: 'audio', codec_name: 'aac' }
+          ],
+          format: { duration: '300' }
+        })
+      })
+
+      mockOn.mockImplementation(function(this: typeof mockFfmpegInstance, event: string, handler: () => void) {
+        if (event === 'end') {
+          Promise.resolve().then(() => handler())
+        }
+        return this
+      })
+
+      const { AudioExtractionService } = await import('./AudioExtractionService')
+      const service = new AudioExtractionService()
+
+      const result = await service.extractAudioSegments('/path/to/short.mp4')
+
+      expect(result.segmentPaths).toHaveLength(1)
+      expect(result.durationSeconds).toBe(300)
+      expect(result.segmentPaths[0]).toContain('erfana-video-audio-')
+      expect(result.segmentPaths[0]).toContain('-seg0.mp3')
+    })
+
+    it('should produce multiple segments for long video (>480s)', async () => {
+      mockFfprobe.mockImplementation((_path: string, cb: (err: Error | null, data: unknown) => void) => {
+        cb(null, {
+          streams: [
+            { codec_type: 'video', codec_name: 'h264', width: 1920, height: 1080 },
+            { codec_type: 'audio', codec_name: 'aac' }
+          ],
+          format: { duration: '960' }
+        })
+      })
+
+      mockOn.mockImplementation(function(this: typeof mockFfmpegInstance, event: string, handler: () => void) {
+        if (event === 'end') {
+          Promise.resolve().then(() => handler())
+        }
+        return this
+      })
+
+      const { AudioExtractionService } = await import('./AudioExtractionService')
+      const service = new AudioExtractionService()
+
+      const result = await service.extractAudioSegments('/path/to/long.mp4')
+
+      // 960 / 480 = 2 segments
+      expect(result.segmentPaths).toHaveLength(2)
+      expect(result.durationSeconds).toBe(960)
+      expect(mockSetStartTime).toHaveBeenCalledWith(0)
+      expect(mockSetStartTime).toHaveBeenCalledWith(480)
+    })
+
+    it('should report progress across segments', async () => {
+      mockFfprobe.mockImplementation((_path: string, cb: (err: Error | null, data: unknown) => void) => {
+        cb(null, {
+          streams: [{ codec_type: 'audio', codec_name: 'aac' }],
+          format: { duration: '960' }
+        })
+      })
+
+      const progressValues: number[] = []
+
+      mockOn.mockImplementation(function(this: typeof mockFfmpegInstance, event: string, handler: () => void) {
+        if (event === 'end') {
+          Promise.resolve().then(() => handler())
+        }
+        return this
+      })
+
+      const { AudioExtractionService } = await import('./AudioExtractionService')
+      const service = new AudioExtractionService()
+
+      await service.extractAudioSegments('/path/to/long.mp4', undefined, (percent) => {
+        progressValues.push(percent)
+      })
+
+      // Should end at 100%
+      expect(progressValues[progressValues.length - 1]).toBe(100)
+    })
+
+    it('should abort and skip remaining segments when signal fires', async () => {
+      mockFfprobe.mockImplementation((_path: string, cb: (err: Error | null, data: unknown) => void) => {
+        cb(null, {
+          streams: [{ codec_type: 'audio', codec_name: 'aac' }],
+          format: { duration: '1440' } // 3 segments
+        })
+      })
+
+      const abortController = new AbortController()
+      let segmentCount = 0
+
+      mockOn.mockImplementation(function(this: typeof mockFfmpegInstance, event: string, handler: () => void) {
+        if (event === 'end') {
+          Promise.resolve().then(() => {
+            segmentCount++
+            if (segmentCount === 1) {
+              // Abort after first segment completes
+              abortController.abort()
+            }
+            handler()
+          })
+        }
+        return this
+      })
+
+      const { AudioExtractionService } = await import('./AudioExtractionService')
+      const service = new AudioExtractionService()
+
+      await expect(
+        service.extractAudioSegments('/path/to/long.mp4', undefined, undefined, abortController.signal)
+      ).rejects.toThrow('Audio extraction cancelled')
+
+      // Should have cleaned up the first segment file
+      expect(mockUnlink).toHaveBeenCalled()
+    })
+
+    it('should clean up segment files on error', async () => {
+      mockFfprobe.mockImplementation((_path: string, cb: (err: Error | null, data: unknown) => void) => {
+        cb(null, {
+          streams: [{ codec_type: 'audio', codec_name: 'aac' }],
+          format: { duration: '960' }
+        })
+      })
+
+      let ffmpegCallCount = 0
+      MockFfmpeg.mockImplementation(() => {
+        ffmpegCallCount++
+        const currentCall = ffmpegCallCount
+        const instance = { ...mockFfmpegInstance }
+
+        // Override 'on' for this specific instance
+        instance.on = vi.fn().mockImplementation(function(this: typeof mockFfmpegInstance, event: string, handler: (err?: Error) => void) {
+          if (currentCall === 1 && event === 'end') {
+            Promise.resolve().then(() => handler())
+          }
+          if (currentCall === 2 && event === 'error') {
+            Promise.resolve().then(() => handler(new Error('ffmpeg crashed')))
+          }
+          return this
+        }) as typeof mockOn
+
+        // Ensure all chainable methods return this instance
+        for (const method of ['noVideo', 'audioCodec', 'audioBitrate', 'audioFrequency', 'audioChannels', 'format', 'save', 'setStartTime', 'duration'] as const) {
+          (instance as Record<string, ReturnType<typeof vi.fn>>)[method] = vi.fn().mockReturnValue(instance)
+        }
+        instance.kill = vi.fn()
+
+        return instance
+      })
+
+      const { AudioExtractionService } = await import('./AudioExtractionService')
+      const service = new AudioExtractionService()
+
+      await expect(
+        service.extractAudioSegments('/path/to/long.mp4')
+      ).rejects.toThrow('ffmpeg crashed')
+
+      // Should clean up the first segment that was created
+      expect(mockUnlink).toHaveBeenCalled()
+    })
+
+    it('should throw when ffmpeg is not available', async () => {
+      const { AudioExtractionService } = await import('./AudioExtractionService')
+      const service = new AudioExtractionService()
+      vi.spyOn(service, 'isAvailable').mockReturnValue(false)
+
+      await expect(
+        service.extractAudioSegments('/path/to/video.mp4')
+      ).rejects.toThrow('ffmpeg is not available')
+    })
+
+    it('should throw when duration probe fails', async () => {
+      mockFfprobe.mockImplementation((_path: string, cb: (err: Error | null, data: unknown) => void) => {
+        cb(new Error('Cannot read file'), null)
+      })
+
+      const { AudioExtractionService } = await import('./AudioExtractionService')
+      const service = new AudioExtractionService()
+
+      await expect(
+        service.extractAudioSegments('/path/to/corrupt.mp4')
+      ).rejects.toThrow('Failed to get video duration for segmented extraction')
+    })
+
+    it('should throw when video duration is zero', async () => {
+      mockFfprobe.mockImplementation((_path: string, cb: (err: Error | null, data: unknown) => void) => {
+        cb(null, {
+          streams: [
+            { codec_type: 'video', codec_name: 'h264', width: 1280, height: 720 },
+            { codec_type: 'audio', codec_name: 'aac' }
+          ],
+          format: { duration: '0' }
+        })
+      })
+
+      const { AudioExtractionService } = await import('./AudioExtractionService')
+      const service = new AudioExtractionService()
+
+      await expect(
+        service.extractAudioSegments('/path/to/zero-duration.mp4')
+      ).rejects.toThrow('Video duration is zero or negative; cannot extract segments')
+    })
+  })
+
+  // ===========================================================================
+  // cleanupTempFiles (batch)
+  // ===========================================================================
+
+  describe('cleanupTempFiles', () => {
+    it('should clean up multiple temp files', async () => {
+      mockUnlink.mockResolvedValue(undefined)
+
+      const { AudioExtractionService } = await import('./AudioExtractionService')
+      const service = new AudioExtractionService()
+
+      const paths = [
+        `${tmpdir()}/erfana-video-audio-a.mp3`,
+        `${tmpdir()}/erfana-video-audio-b.mp3`
+      ]
+      await service.cleanupTempFiles(paths)
+
+      expect(mockUnlink).toHaveBeenCalledTimes(2)
+    })
+
+    it('should handle empty array gracefully', async () => {
+      const { AudioExtractionService } = await import('./AudioExtractionService')
+      const service = new AudioExtractionService()
+
+      await expect(service.cleanupTempFiles([])).resolves.toBeUndefined()
+      expect(mockUnlink).not.toHaveBeenCalled()
     })
   })
 

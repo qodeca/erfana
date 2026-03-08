@@ -24,10 +24,11 @@ import {
   type TranscriptionProgress
 } from '../../shared/ipc/transcription-schema'
 import { ErrorCode, getUserFriendlyMessage } from '../../shared/errors'
-import { IMPORT, VIDEO_IMPORT } from '../../shared/constants'
+import { IMPORT, VIDEO_IMPORT, TRANSCRIPTION } from '../../shared/constants'
 import { transcriptionService } from '../services/TranscriptionService'
 import { audioMetadataService } from '../services/AudioMetadataService'
 import { audioExtractionService } from '../services/AudioExtractionService'
+import type { SegmentedExtractionResult } from '../services/AudioExtractionService'
 import { apiKeyService } from '../services/ApiKeyService'
 import { globalSettingsService } from '../services/GlobalSettingsService'
 import { fileService } from '../services/FileService'
@@ -160,88 +161,153 @@ export function registerTranscriptionHandlers(): void {
             // Metadata is optional – continue without it
           }
 
-          // Extract audio with progress mapped to 0–20%
-          const extraction = await audioExtractionService.extractAudio(
-            filePath,
-            (extractionPercent) => {
-              sendProgress({
-                percent: extractionPercent * VIDEO_IMPORT.EXTRACTION_PROGRESS_WEIGHT,
-                phase: 'Extracting audio...'
-              })
-            },
-            activeController.signal
-          )
+          // Choose extraction strategy based on duration
+          const isLongVideo = videoDuration > TRANSCRIPTION.CHUNK_BOUNDARY_SECONDS
 
-          try {
-            // Transcribe the extracted audio with progress mapped to 20–100%
-            const result = await transcriptionService.transcribe(
-              extraction.audioPath,
-              language,
-              (progress) => {
+          let transcript: string
+          let detectedLanguage: string | undefined
+
+          if (isLongVideo) {
+            // Long video: segmented extraction + per-segment transcription
+            let segmented: SegmentedExtractionResult | undefined
+            try {
+              segmented = await audioExtractionService.extractAudioSegments(
+                filePath,
+                undefined,
+                (extractionPercent) => {
+                  sendProgress({
+                    percent: extractionPercent * VIDEO_IMPORT.EXTRACTION_PROGRESS_WEIGHT,
+                    phase: 'Extracting audio...'
+                  })
+                },
+                activeController.signal
+              )
+
+              const transcriptParts: string[] = []
+              const segmentCount = segmented.segmentPaths.length
+
+              for (let i = 0; i < segmentCount; i++) {
+                const segmentPath = segmented.segmentPaths[i]
+                const result = await transcriptionService.transcribe(
+                  segmentPath,
+                  language,
+                  (progress) => {
+                    // Map each segment's progress to its slice of 20–100%
+                    const segmentStart = 20 + (i / segmentCount) * 80
+                    const segmentRange = 80 / segmentCount
+                    sendProgress({
+                      percent: Math.min(segmentStart + (progress.percent / 100) * segmentRange, 100),
+                      phase: progress.phase
+                    })
+                  },
+                  activeController.signal
+                )
+
+                if (!result.success || !result.transcript) {
+                  return {
+                    success: false,
+                    error: result.error || 'Transcription failed',
+                    errorCode: result.errorCode || ErrorCode.TRANSCRIPTION_FAILED
+                  }
+                }
+
+                transcriptParts.push(result.transcript)
+                if (!detectedLanguage && result.language) {
+                  detectedLanguage = result.language
+                }
+              }
+
+              transcript = transcriptParts.join(' ')
+            } finally {
+              if (segmented) {
+                await audioExtractionService.cleanupTempFiles(segmented.segmentPaths)
+              }
+            }
+          } else {
+            // Short video: single extraction + single transcription
+            const extraction = await audioExtractionService.extractAudio(
+              filePath,
+              (extractionPercent) => {
                 sendProgress({
-                  percent: Math.min(
-                    VIDEO_IMPORT.EXTRACTION_PROGRESS_WEIGHT * 100 +
-                    progress.percent * (1 - VIDEO_IMPORT.EXTRACTION_PROGRESS_WEIGHT),
-                    100
-                  ),
-                  phase: progress.phase
+                  percent: extractionPercent * VIDEO_IMPORT.EXTRACTION_PROGRESS_WEIGHT,
+                  phase: 'Extracting audio...'
                 })
               },
               activeController.signal
             )
 
-            if (!result.success || !result.transcript) {
-              return {
-                success: false,
-                error: result.error || 'Transcription failed',
-                errorCode: result.errorCode || ErrorCode.TRANSCRIPTION_FAILED
+            try {
+              const result = await transcriptionService.transcribe(
+                extraction.audioPath,
+                language,
+                (progress) => {
+                  sendProgress({
+                    percent: Math.min(
+                      VIDEO_IMPORT.EXTRACTION_PROGRESS_WEIGHT * 100 +
+                      progress.percent * (1 - VIDEO_IMPORT.EXTRACTION_PROGRESS_WEIGHT),
+                      100
+                    ),
+                    phase: progress.phase
+                  })
+                },
+                activeController.signal
+              )
+
+              if (!result.success || !result.transcript) {
+                return {
+                  success: false,
+                  error: result.error || 'Transcription failed',
+                  errorCode: result.errorCode || ErrorCode.TRANSCRIPTION_FAILED
+                }
               }
+
+              transcript = result.transcript
+              detectedLanguage = result.language
+            } finally {
+              await audioExtractionService.cleanupTempFile(extraction.audioPath)
             }
+          }
 
-            const duration = videoDuration || extraction.durationSeconds
-            const fileName = basename(filePath)
-            const durationFormatted = formatDuration(duration)
-            const date = new Date().toISOString()
+          const duration = videoDuration || 0
+          const fileName = basename(filePath)
+          const durationFormatted = formatDuration(duration)
+          const date = new Date().toISOString()
 
-            const frontmatterLines = [
-              '---',
-              `source: "${fileName}"`,
-              `type: video`,
-              `duration: "${durationFormatted}"`,
-              `date: "${date}"`,
-              `language: ${language === 'auto' ? (result.language || 'auto') : language}`,
-              `transcription_backend: openai`
-            ]
+          const frontmatterLines = [
+            '---',
+            `source: "${fileName}"`,
+            `type: video`,
+            `duration: "${durationFormatted}"`,
+            `date: "${date}"`,
+            `language: ${language === 'auto' ? (detectedLanguage || 'auto') : language}`,
+            `transcription_backend: openai`
+          ]
 
-            if (resolution) {
-              frontmatterLines.push(`resolution: "${resolution}"`)
-            }
+          if (resolution) {
+            frontmatterLines.push(`resolution: "${resolution}"`)
+          }
 
-            if (videoCodec) {
-              frontmatterLines.push(`video_codec: "${videoCodec}"`)
-            }
+          if (videoCodec) {
+            frontmatterLines.push(`video_codec: "${videoCodec}"`)
+          }
 
-            frontmatterLines.push('---', '', result.transcript, '')
+          frontmatterLines.push('---', '', transcript, '')
 
-            const markdown = frontmatterLines.join('\n')
+          const markdown = frontmatterLines.join('\n')
 
-            // Write to import/ directory
-            const importDir = join(projectPath, IMPORT.DIR_NAME)
-            await mkdir(importDir, { recursive: true })
+          // Write to import/ directory
+          const importDir = join(projectPath, IMPORT.DIR_NAME)
+          await mkdir(importDir, { recursive: true })
 
-            const outputFileName = sanitizeFileName(changeExtension(fileName, '.md'))
-            const outputPath = await findAvailableFileName(importDir, outputFileName)
-            await writeFile(outputPath, markdown, 'utf-8')
+          const outputFileName = sanitizeFileName(changeExtension(fileName, '.md'))
+          const outputPath = await findAvailableFileName(importDir, outputFileName)
+          await writeFile(outputPath, markdown, 'utf-8')
 
-            logger.info('Video transcription import complete', { outputPath })
+          logger.info('Video transcription import complete', { outputPath })
 
-            return {
-              success: true,
-              outputPath
-            }
-          } finally {
-            // Always clean up the temp audio file
-            await audioExtractionService.cleanupTempFile(extraction.audioPath)
+          return {
+            success: true,
+            outputPath
           }
         } else {
           // Audio path: existing flow unchanged
