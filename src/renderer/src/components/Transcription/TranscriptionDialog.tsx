@@ -17,8 +17,7 @@
  * @see Spec #009 - Media import with transcription specification
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { useState, useEffect, useRef, useCallback, useId } from 'react'
 import { X, FileAudio, FileVideo } from 'lucide-react'
 import { VIDEO_IMPORT } from '../../../../shared/constants'
 import { useTranscriptionStore } from '../../stores/useTranscriptionStore'
@@ -26,6 +25,7 @@ import { LanguageSelect } from './LanguageSelect'
 import { TEST_IDS } from '../../constants/testids'
 import type { TranscriptionLanguage } from '../../../../shared/ipc/transcription-schema'
 import { ErrorCode } from '../../../../shared/errors'
+import { BaseDialog } from '../Dialog/BaseDialog'
 import './TranscriptionDialog.css'
 
 /**
@@ -110,9 +110,12 @@ export function TranscriptionDialog(): JSX.Element | null {
     setLastLanguage
   } = useTranscriptionStore()
 
+  const id = useId()
+  const titleId = `transcription-title${id}`
+  const descriptionId = `transcription-desc${id}`
+
   const [selectedLanguage, setSelectedLanguage] = useState<TranscriptionLanguage>('auto')
   const dialogRef = useRef<HTMLDivElement>(null)
-  const closeButtonRef = useRef<HTMLButtonElement>(null)
 
   // Initialize language selection from last used language when dialog opens
   useEffect(() => {
@@ -121,19 +124,7 @@ export function TranscriptionDialog(): JSX.Element | null {
     }
   }, [isDialogOpen, filePath, lastLanguage])
 
-  // Focus close button when dialog opens
-  useEffect(() => {
-    if (isDialogOpen) {
-      // Small delay to ensure the dialog is rendered
-      const timer = setTimeout(() => {
-        closeButtonRef.current?.focus()
-      }, 10)
-      return () => clearTimeout(timer)
-    }
-    return undefined
-  }, [isDialogOpen])
-
-  // Escape key handler
+  // Escape key handler (custom cancel-vs-close logic)
   useEffect(() => {
     if (!isDialogOpen) return undefined
 
@@ -189,9 +180,6 @@ export function TranscriptionDialog(): JSX.Element | null {
 
   if (!isDialogOpen) return null
 
-  const portalRoot = document.getElementById('portal-root')
-  if (!portalRoot) return null
-
   /** Check if the current file is a video file */
   const isVideo = fileName
     ? (VIDEO_IMPORT.SUPPORTED_EXTENSIONS as readonly string[]).includes(
@@ -226,31 +214,24 @@ export function TranscriptionDialog(): JSX.Element | null {
     startTranscription(selectedLanguage)
   }
 
-  const dialogContent = (
-    <div
-      className="transcription-overlay"
-      // Clicking outside the dialog closes it (unless transcribing)
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !isTranscribing) {
-          closeDialog()
-        }
-      }}
+  return (
+    <BaseDialog
+      isOpen={isDialogOpen}
+      onClose={closeDialog}
+      zIndex={10000}
+      closeOnBackdrop={false}
+      closeOnEscape={false}
+      className="transcription-dialog"
+      ariaLabelledBy={titleId}
+      ariaDescribedBy={descriptionId}
     >
-      <div
-        ref={dialogRef}
-        className="transcription-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="transcription-dialog-title"
-        data-testid={TEST_IDS.TRANSCRIPTION_DIALOG}
-      >
+      <div ref={dialogRef} data-testid={TEST_IDS.TRANSCRIPTION_DIALOG}>
         {/* Header */}
         <div className="transcription-header">
-          <h2 id="transcription-dialog-title" className="transcription-title">
+          <h3 id={titleId} className="transcription-title">
             {dialogTitle}
-          </h2>
+          </h3>
           <button
-            ref={closeButtonRef}
             className="transcription-close-btn"
             onClick={handleClose}
             aria-label={isTranscribing ? 'Cancel transcription' : 'Close dialog'}
@@ -261,7 +242,7 @@ export function TranscriptionDialog(): JSX.Element | null {
         </div>
 
         {/* Body */}
-        <div className="transcription-body">
+        <div id={descriptionId} className="transcription-body">
           {/* File info -- always visible */}
           <div className="transcription-file-info">
             <FileIcon size={18} strokeWidth={1.5} className="transcription-file-icon" />
@@ -304,6 +285,7 @@ export function TranscriptionDialog(): JSX.Element | null {
                 <span
                   className="transcription-phase-text"
                   data-testid={TEST_IDS.TRANSCRIPTION_PHASE_TEXT}
+                  aria-live="polite"
                 >
                   {progress.phase}
                   {progress.currentChunk !== undefined && progress.totalChunks !== undefined && (
@@ -344,6 +326,7 @@ export function TranscriptionDialog(): JSX.Element | null {
                 <span
                   className="transcription-phase-text"
                   data-testid={TEST_IDS.TRANSCRIPTION_PHASE_TEXT}
+                  aria-live="polite"
                 >
                   Starting transcription...
                 </span>
@@ -359,7 +342,12 @@ export function TranscriptionDialog(): JSX.Element | null {
 
           {/* Error state */}
           {hasError && (
-            <div className="transcription-error" data-testid={TEST_IDS.TRANSCRIPTION_ERROR}>
+            <div
+              className="transcription-error"
+              data-testid={TEST_IDS.TRANSCRIPTION_ERROR}
+              role="alert"
+              aria-live="assertive"
+            >
               <p className="transcription-error-message">{error}</p>
               {errorSuggestion && (
                 <p className="transcription-error-suggestion">{errorSuggestion}</p>
@@ -369,7 +357,7 @@ export function TranscriptionDialog(): JSX.Element | null {
 
           {/* Success state */}
           {hasSuccess && result?.outputPath && (
-            <div className="transcription-success">
+            <div className="transcription-success" role="status" aria-live="polite">
               <p className="transcription-success-message">Transcription complete</p>
               <p className="transcription-output-path">{result.outputPath}</p>
             </div>
@@ -382,13 +370,13 @@ export function TranscriptionDialog(): JSX.Element | null {
           {showLanguageSelection && (
             <>
               <button
-                className="transcription-btn-secondary"
+                className="dialog-btn dialog-btn-secondary"
                 onClick={closeDialog}
               >
                 Cancel
               </button>
               <button
-                className="transcription-btn-primary"
+                className="dialog-btn dialog-btn-primary"
                 onClick={handleStart}
                 data-testid={TEST_IDS.TRANSCRIPTION_BTN_START}
               >
@@ -400,7 +388,7 @@ export function TranscriptionDialog(): JSX.Element | null {
           {/* Progress: Cancel button */}
           {isTranscribing && (
             <button
-              className="transcription-btn-danger"
+              className="dialog-btn dialog-btn-danger"
               onClick={cancelTranscription}
               data-testid={TEST_IDS.TRANSCRIPTION_BTN_CANCEL}
             >
@@ -412,13 +400,13 @@ export function TranscriptionDialog(): JSX.Element | null {
           {hasError && (
             <>
               <button
-                className="transcription-btn-secondary"
+                className="dialog-btn dialog-btn-secondary"
                 onClick={closeDialog}
               >
                 Dismiss
               </button>
               <button
-                className="transcription-btn-primary"
+                className="dialog-btn dialog-btn-primary"
                 onClick={handleRetry}
                 data-testid={TEST_IDS.TRANSCRIPTION_BTN_START}
               >
@@ -430,7 +418,7 @@ export function TranscriptionDialog(): JSX.Element | null {
           {/* Success: Close button */}
           {hasSuccess && (
             <button
-              className="transcription-btn-primary"
+              className="dialog-btn dialog-btn-primary"
               onClick={closeDialog}
               data-testid={TEST_IDS.TRANSCRIPTION_BTN_DONE}
             >
@@ -439,8 +427,6 @@ export function TranscriptionDialog(): JSX.Element | null {
           )}
         </div>
       </div>
-    </div>
+    </BaseDialog>
   )
-
-  return createPortal(dialogContent, portalRoot)
 }
