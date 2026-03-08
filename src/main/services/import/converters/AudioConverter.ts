@@ -13,24 +13,14 @@
  */
 import { basename } from 'path'
 import { ErrorCode } from '../../../../shared/errors'
-import { validateFileForImport } from '../../../utils/fileUtils'
+import { validateFileForImport, formatDuration } from '../../../utils/fileUtils'
 import type {
   IConverter,
+  ITranscriptionServiceLike,
   ValidationResult,
   ConversionResult,
   FileTypeCategory
 } from '../types'
-import type { TranscriptionResult } from '../../../../shared/ipc/transcription-schema'
-
-/** Interface for TranscriptionService dependency */
-interface ITranscriptionServiceLike {
-  transcribe(
-    filePath: string,
-    language: 'auto' | string,
-    onProgress: (progress: { percent: number; phase: string }) => void,
-    signal?: AbortSignal
-  ): Promise<TranscriptionResult>
-}
 
 /** Interface for AudioMetadataService dependency */
 interface IAudioMetadataServiceLike {
@@ -125,7 +115,7 @@ export class AudioConverter implements IConverter {
     transcript: string
   ): string {
     const fileName = basename(filePath)
-    const durationFormatted = this.formatDuration(durationSeconds)
+    const durationFormatted = formatDuration(durationSeconds)
     const date = new Date().toISOString()
 
     return [
@@ -140,15 +130,6 @@ export class AudioConverter implements IConverter {
       transcript,
       ''
     ].join('\n')
-  }
-
-  /**
-   * Format duration in seconds to MM:SS string
-   */
-  private formatDuration(seconds: number): string {
-    const minutes = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    return `${minutes}:${String(secs).padStart(2, '0')}`
   }
 }
 

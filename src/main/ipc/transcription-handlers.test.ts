@@ -94,11 +94,15 @@ const mockFindAvailableFileName = vi.fn((_dir: string, name: string) =>
   `/project/import/${name}`
 )
 
-vi.mock('../utils/fileUtils', () => ({
-  changeExtension: mockChangeExtension,
-  sanitizeFileName: mockSanitizeFileName,
-  findAvailableFileName: mockFindAvailableFileName
-}))
+vi.mock('../utils/fileUtils', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...(actual as object),
+    changeExtension: mockChangeExtension,
+    sanitizeFileName: mockSanitizeFileName,
+    findAvailableFileName: mockFindAvailableFileName
+  }
+})
 
 // =============================================================================
 // Mock LoggingService

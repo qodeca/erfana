@@ -30,7 +30,8 @@ import {
   findAvailableFileName,
   getExtension,
   changeExtension,
-  validateFileForImport
+  validateFileForImport,
+  formatDuration
 } from './fileUtils'
 
 const mockedAccess = vi.mocked(access)
@@ -322,6 +323,36 @@ describe('fileUtils', () => {
 
     it('should preserve path when changing extension', () => {
       expect(changeExtension('/path/to/file.pdf', '.md')).toBe('/path/to/file.md')
+    })
+  })
+
+  describe('formatDuration', () => {
+    it('should format zero seconds', () => {
+      expect(formatDuration(0)).toBe('0:00')
+    })
+
+    it('should format sub-minute duration', () => {
+      expect(formatDuration(45)).toBe('0:45')
+    })
+
+    it('should format exact minutes', () => {
+      expect(formatDuration(180)).toBe('3:00')
+    })
+
+    it('should pad seconds with zero', () => {
+      expect(formatDuration(125)).toBe('2:05')
+    })
+
+    it('should format hour-length duration', () => {
+      expect(formatDuration(3600)).toBe('1:00:00')
+    })
+
+    it('should format hours with minutes and seconds', () => {
+      expect(formatDuration(5425)).toBe('1:30:25')
+    })
+
+    it('should pad minutes when hours are present', () => {
+      expect(formatDuration(3665)).toBe('1:01:05')
     })
   })
 

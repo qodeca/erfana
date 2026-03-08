@@ -2,7 +2,7 @@
 
 **Location:** `src/main/services/`
 
-Feature-specific services for git integration, multi-instance support, media capture, transcription, and file import.
+Feature-specific services for git integration, multi-instance support, media capture, transcription, audio extraction, and file import.
 
 See [api-services.md](./api-services.md) for core services (Terminal, File, Settings, Watchers).
 
@@ -378,6 +378,76 @@ Validate an audio file for transcription.
 - Duration is determinable
 
 **Returns:** `{ valid, error?, errorCode?, format?, durationSeconds?, sizeInMB }`
+
+---
+
+## AudioExtractionService
+
+**File:** `src/main/services/AudioExtractionService.ts`
+
+Extracts audio tracks from video files using ffmpeg for transcription pipeline input. Uses fluent-ffmpeg with ffmpeg-static and ffprobe-static for zero-config binary resolution.
+
+### Key Features
+- Supports MP4, MOV, AVI, MKV, WebM, FLV, WMV video formats
+- Audio extraction to temporary MP3 files for transcription
+- Video metadata extraction (resolution, codecs, duration)
+- Audio stream detection before extraction attempt
+- Progress reporting via callback
+- AbortSignal cancellation support
+- Automatic temp file cleanup
+
+### Public Methods
+
+#### `isAvailable(): boolean`
+Check if ffmpeg binaries are available.
+
+---
+
+#### `hasAudioStream(filePath: string): Promise<boolean>`
+Check if a video file contains an audio track.
+
+**Parameters:**
+- `filePath` – Absolute path to the video file
+
+**Returns:** `true` if the video contains at least one audio stream.
+
+---
+
+#### `extractAudio(filePath: string, onProgress?: (percent: number) => void, signal?: AbortSignal): Promise<ExtractionResult>`
+Extract audio from a video file to a temporary MP3 file.
+
+**Parameters:**
+- `filePath` – Absolute path to the video file
+- `onProgress` – Optional callback for extraction progress (0–100)
+- `signal` – Optional AbortSignal for cancellation
+
+**Returns:**
+- `audioPath` – Path to the extracted temporary audio file
+- `duration` – Audio duration in seconds
+- `error` – Error message (on failure)
+- `errorCode` – `VIDEO_NO_AUDIO_TRACK`, `VIDEO_EXTRACTION_FAILED`, or `VIDEO_FFMPEG_UNAVAILABLE`
+
+---
+
+#### `getVideoMetadata(filePath: string): Promise<VideoMetadata>`
+Get video file metadata.
+
+**Returns:** `{ duration, resolution, videoCodec, audioCodec, fileSize }`
+
+---
+
+#### `cleanupTempFile(filePath: string): Promise<void>`
+Remove a temporary extracted audio file.
+
+### Error Codes
+- `VIDEO_NO_AUDIO_TRACK` – Video file has no audio stream
+- `VIDEO_EXTRACTION_FAILED` – ffmpeg extraction process failed
+- `VIDEO_FFMPEG_UNAVAILABLE` – ffmpeg binaries not found
+
+### Related Files
+- `src/main/services/import/converters/VideoConverter.ts` – Import pipeline converter
+- `src/main/services/TranscriptionService.ts` – Consumes extracted audio
+- `src/renderer/src/components/Transcription/TranscriptionDialog.tsx` – Video-aware dialog UI
 
 ---
 

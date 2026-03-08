@@ -132,6 +132,24 @@ export const CODE_EXTENSIONS = [
 export const ALL_TEXT_LIKE_EXTENSIONS = [...TEXT_EXTENSIONS, ...CODE_EXTENSIONS] as const
 
 /**
+ * Video file extensions supported for import with audio extraction
+ *
+ * @see Issue #110 - Video file import
+ */
+export const VIDEO_EXTENSIONS = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv'] as const
+
+/**
+ * Check if an extension is a supported video file extension
+ *
+ * @param ext - Extension to check (with or without dot, case-insensitive)
+ * @returns true if it's a video extension
+ */
+export function isVideoExtension(ext: string): boolean {
+  const normalized = ext.replace(/^\./, '').toLowerCase()
+  return (VIDEO_EXTENSIONS as readonly string[]).includes(normalized)
+}
+
+/**
  * Check if an extension is a known text file extension
  * (from TEXT_EXTENSIONS list)
  *

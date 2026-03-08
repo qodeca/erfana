@@ -5,6 +5,7 @@
  * - PDF files (converted to markdown)
  * - Text files (imported as-is)
  * - Audio files (routed to TranscriptionDialog for interactive transcription)
+ * - Video files (routed to TranscriptionDialog for extraction + transcription)
  *
  * Workflow:
  * 1. Select file via native dialog (supports all importable types)
@@ -20,7 +21,7 @@ import { useDialog } from '../components/Dialog/DialogContext'
 import { showSuccessToast, showErrorToast, showWarningToast } from '../utils/toastHelpers'
 import { executePromptTemplate } from '../utils/panelUtils'
 import type { PromptVariables } from '../prompts/types'
-import { IMPORT, BYTES_PER_MB, TRANSCRIPTION } from '../../../shared/constants'
+import { IMPORT, BYTES_PER_MB, TRANSCRIPTION, VIDEO_IMPORT } from '../../../shared/constants'
 import { ERROR_MESSAGES, ErrorCode } from '../../../shared/errors'
 import { useTerminalPortalOptional } from '../context/TerminalPortalContext'
 import { scheduleScrollIfNeeded } from '../utils/promptScrollScheduler.logic'
@@ -36,6 +37,25 @@ function isAudioFile(fileName: string): boolean {
   if (dotIndex === -1) return false
   const ext = fileName.slice(dotIndex + 1).toLowerCase()
   return (TRANSCRIPTION.SUPPORTED_EXTENSIONS as readonly string[]).includes(ext)
+}
+
+/**
+ * Check if a file is a video file based on its extension.
+ * Uses the canonical list from VIDEO_IMPORT.SUPPORTED_EXTENSIONS.
+ */
+function isVideoFile(fileName: string): boolean {
+  const dotIndex = fileName.lastIndexOf('.')
+  if (dotIndex === -1) return false
+  const ext = fileName.slice(dotIndex + 1).toLowerCase()
+  return (VIDEO_IMPORT.SUPPORTED_EXTENSIONS as readonly string[]).includes(ext)
+}
+
+/**
+ * Check if a file is a media file (audio or video) that requires
+ * interactive transcription via TranscriptionDialog.
+ */
+function isMediaFile(fileName: string): boolean {
+  return isAudioFile(fileName) || isVideoFile(fileName)
 }
 
 /** Size threshold for confirmation dialog (in MB) */
@@ -147,29 +167,29 @@ export function useImport(): UseImportReturn {
       return { successCount: 0, failCount: 0, skippedCount: 0, outputPaths: [], failures: [] }
     }
 
-    // Filter audio files from batch imports (audio requires individual import for transcription)
-    const audioFiles = files.filter(f => isAudioFile(f.name))
-    const nonAudioFiles = files.filter(f => !isAudioFile(f.name))
+    // Filter media files from batch imports (audio/video requires individual import for transcription)
+    const mediaFiles = files.filter(f => isMediaFile(f.name))
+    const nonMediaFiles = files.filter(f => !isMediaFile(f.name))
 
-    if (audioFiles.length > 0) {
-      if (nonAudioFiles.length > 0) {
-        // Mixed batch: warn about skipped audio, continue with non-audio
+    if (mediaFiles.length > 0) {
+      if (nonMediaFiles.length > 0) {
+        // Mixed batch: warn about skipped media, continue with non-media
         showWarningToast(
-          'Audio files skipped',
-          `${audioFiles.length} audio file(s) skipped. Import audio files individually for transcription.`
+          'Media files skipped',
+          `${mediaFiles.length} media file(s) skipped. Import audio/video files individually for transcription.`
         )
       } else {
-        // All-audio batch: reject entirely
+        // All-media batch: reject entirely
         showWarningToast(
-          'Audio files not supported in batch',
-          'Import audio files individually for transcription with language selection.'
+          'Media files not supported in batch',
+          'Import audio/video files individually for transcription with language selection.'
         )
-        return { successCount: 0, failCount: 0, skippedCount: audioFiles.length, outputPaths: [], failures: [] }
+        return { successCount: 0, failCount: 0, skippedCount: mediaFiles.length, outputPaths: [], failures: [] }
       }
     }
 
-    // Use non-audio files for processing (or all files if no audio detected)
-    const filesToProcess = audioFiles.length > 0 ? nonAudioFiles : files
+    // Use non-media files for processing (or all files if no media detected)
+    const filesToProcess = mediaFiles.length > 0 ? nonMediaFiles : files
 
     setIsImporting(true)
     const outputPaths: string[] = []
@@ -235,9 +255,9 @@ export function useImport(): UseImportReturn {
         }
       }
 
-      // Account for audio files skipped from batch
-      const totalAudioSkipped = audioFiles.length
-      skippedCount += totalAudioSkipped
+      // Account for media files skipped from batch
+      const totalMediaSkipped = mediaFiles.length
+      skippedCount += totalMediaSkipped
 
       // Summary toast
       const totalProcessed = successCount + failCount
@@ -306,6 +326,12 @@ export function useImport(): UseImportReturn {
         return null
       }
 
+      useTranscriptionStore.getState().openDialog(selectedFile.path, selectedFile.name)
+      return null
+    }
+
+    // Route video files to TranscriptionDialog for extraction + transcription
+    if (isVideoFile(selectedFile.name)) {
       useTranscriptionStore.getState().openDialog(selectedFile.path, selectedFile.name)
       return null
     }

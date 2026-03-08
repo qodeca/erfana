@@ -19,7 +19,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { X, FileAudio } from 'lucide-react'
+import { X, FileAudio, FileVideo } from 'lucide-react'
+import { VIDEO_IMPORT } from '../../../../shared/constants'
 import { useTranscriptionStore } from '../../stores/useTranscriptionStore'
 import { LanguageSelect } from './LanguageSelect'
 import { TEST_IDS } from '../../constants/testids'
@@ -44,6 +45,12 @@ function getErrorSuggestion(errorCode: string | undefined): string | null {
       return 'Ensure the file is a valid audio file in a supported format.'
     case ErrorCode.TRANSCRIPTION_TIMEOUT:
       return 'The file may be too large. Try a shorter recording.'
+    case ErrorCode.VIDEO_NO_AUDIO_TRACK:
+      return 'This video has no audio track. Only videos with audio can be transcribed.'
+    case ErrorCode.VIDEO_EXTRACTION_FAILED:
+      return 'Audio extraction failed. The video file may be corrupted.'
+    case ErrorCode.VIDEO_FFMPEG_UNAVAILABLE:
+      return 'Video import requires ffmpeg. Please reinstall the application.'
     default:
       return null
   }
@@ -185,6 +192,15 @@ export function TranscriptionDialog(): JSX.Element | null {
   const portalRoot = document.getElementById('portal-root')
   if (!portalRoot) return null
 
+  /** Check if the current file is a video file */
+  const isVideo = fileName
+    ? (VIDEO_IMPORT.SUPPORTED_EXTENSIONS as readonly string[]).includes(
+        fileName.slice(fileName.lastIndexOf('.') + 1).toLowerCase()
+      )
+    : false
+  const FileIcon = isVideo ? FileVideo : FileAudio
+  const dialogTitle = isVideo ? 'Transcribe video' : 'Transcribe audio'
+
   /** Determine dialog view state */
   const hasError = error !== null && !isTranscribing
   const hasSuccess = result?.success === true && !isTranscribing
@@ -231,7 +247,7 @@ export function TranscriptionDialog(): JSX.Element | null {
         {/* Header */}
         <div className="transcription-header">
           <h2 id="transcription-dialog-title" className="transcription-title">
-            Transcribe audio
+            {dialogTitle}
           </h2>
           <button
             ref={closeButtonRef}
@@ -248,7 +264,7 @@ export function TranscriptionDialog(): JSX.Element | null {
         <div className="transcription-body">
           {/* File info -- always visible */}
           <div className="transcription-file-info">
-            <FileAudio size={18} strokeWidth={1.5} className="transcription-file-icon" />
+            <FileIcon size={18} strokeWidth={1.5} className="transcription-file-icon" />
             <span className="transcription-file-name">{fileName}</span>
           </div>
 

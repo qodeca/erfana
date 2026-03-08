@@ -395,10 +395,14 @@ class TranscriptionService implements ITranscriptionService {
       const errorBody = await response.text().catch(() => '')
 
       // Try fallback model on model-specific errors
-      if (model === TRANSCRIPTION.PRIMARY_MODEL && response.status === 404) {
-        logger.warn('Primary model unavailable, falling back', {
+      // 404 = model not found, 400 unsupported_format = format not supported by gpt-4o-transcribe
+      if (model === TRANSCRIPTION.PRIMARY_MODEL &&
+        (response.status === 404 ||
+          (response.status === 400 && errorBody.includes('unsupported_format')))) {
+        logger.warn('Primary model error, falling back', {
           model,
-          fallback: TRANSCRIPTION.FALLBACK_MODEL
+          fallback: TRANSCRIPTION.FALLBACK_MODEL,
+          status: response.status
         })
         return this.callTranscriptionApi(
           filePath, language, apiKey, signal, TRANSCRIPTION.FALLBACK_MODEL

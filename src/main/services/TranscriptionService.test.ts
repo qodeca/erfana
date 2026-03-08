@@ -510,6 +510,37 @@ describe('TranscriptionService', () => {
   // ===========================================================================
 
   describe('fallback model', () => {
+    it('should fall back to whisper-1 on 400 unsupported_format', async () => {
+      let callCount = 0
+      mockFetch.mockImplementation(() => {
+        callCount++
+        if (callCount === 1) {
+          return Promise.resolve({
+            ok: false,
+            status: 400,
+            statusText: 'Bad Request',
+            text: () => Promise.resolve('{"error":{"message":"This model does not support the format you provided.","type":"invalid_request_error","code":"unsupported_format"}}')
+          })
+        }
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve('Fallback transcription from unsupported format.')
+        })
+      })
+
+      const { createTranscriptionService } = await import('./TranscriptionService')
+      const service = createTranscriptionService()
+
+      const result = await service.transcribe('/path/to/audio.wav', 'en', onProgress)
+
+      expect(result.success).toBe(true)
+      expect(result.transcript).toBe('Fallback transcription from unsupported format.')
+      // First call with primary model, second with fallback
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+      const secondFormData = mockFetch.mock.calls[1][1].body as FormData
+      expect(secondFormData.get('model')).toBe('whisper-1')
+    })
+
     it('should fall back to whisper-1 when primary model returns 404', async () => {
       let callCount = 0
       mockFetch.mockImplementation(() => {
@@ -602,7 +633,41 @@ describe('TranscriptionService', () => {
       const result = await service.transcribe('/path/to/audio.mp3', 'en', onProgress)
 
       expect(result.success).toBe(false)
+      expect(result.error).toBeDefined()
       expect(result.errorCode).toBe('TRANSCRIPTION_FAILED')
+    })
+
+    it('should return error when both primary and fallback models fail', async () => {
+      let callCount = 0
+      mockFetch.mockImplementation(() => {
+        callCount++
+        if (callCount === 1) {
+          // Primary model returns 404 → triggers fallback
+          return Promise.resolve({
+            ok: false,
+            status: 404,
+            statusText: 'Not Found',
+            text: () => Promise.resolve('Model not found')
+          })
+        }
+        // Fallback model returns 400 (non-retryable)
+        return Promise.resolve({
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          text: () => Promise.resolve('Invalid request')
+        })
+      })
+
+      const { createTranscriptionService } = await import('./TranscriptionService')
+      const service = createTranscriptionService()
+
+      const result = await service.transcribe('/path/to/audio.mp3', 'en', onProgress)
+
+      expect(result.success).toBe(false)
+      expect(result.errorCode).toBe('TRANSCRIPTION_FAILED')
+      // 1 primary (404) → 1 fallback (400, non-retryable)
+      expect(mockFetch).toHaveBeenCalledTimes(2)
     })
   })
 

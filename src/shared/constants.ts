@@ -262,6 +262,26 @@ export const TRANSCRIPTION = {
 } as const
 
 /**
+ * Video import constants
+ * Used by AudioExtractionService for video-to-audio extraction
+ *
+ * @see AudioExtractionService.ts
+ * @see Issue #110 - Video file import with audio extraction
+ */
+export const VIDEO_IMPORT = {
+  /** Supported video extensions */
+  SUPPORTED_EXTENSIONS: ['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv'],
+  /** Extraction timeout in ms (5 minutes) */
+  EXTRACTION_TIMEOUT_MS: 5 * 60 * 1000,
+  /** Temp file prefix for extracted audio */
+  TEMP_PREFIX: 'erfana-video-audio-',
+  /** Output format for extracted audio */
+  AUDIO_OUTPUT_FORMAT: 'mp3',
+  /** Extraction progress weight (0-1) – fraction of total progress allocated to extraction */
+  EXTRACTION_PROGRESS_WEIGHT: 0.2
+} as const
+
+/**
  * PauseController safety timeout constants
  * Auto-resumes directory watcher if resume() is not called within the timeout
  *

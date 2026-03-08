@@ -30,7 +30,7 @@ npm run test:e2e     # Playwright E2E tests
 e2e/                # Playwright E2E tests (shared helpers in e2e/utils/helpers.ts)
 src/
 ├── main/           # Electron main process
-│   ├── services/   # Core: FileService, TerminalService, ProjectService, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService; Watchers: DirectoryWatcherService, FileWatcherService; Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media: ScreenshotService, CameraService, PdfService, DocxService, TranscriptionService, AudioMetadataService, ApiKeyService; Multi-instance: ProjectLockService, ExternalFileService; Subdirs: import/, watcher/
+│   ├── services/   # Core: FileService, TerminalService, ProjectService, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService; Watchers: DirectoryWatcherService, FileWatcherService; Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media: ScreenshotService, CameraService, PdfService, DocxService, TranscriptionService, AudioMetadataService, AudioExtractionService, ApiKeyService; Multi-instance: ProjectLockService, ExternalFileService; Subdirs: import/, watcher/
 │   ├── ipc/        # IPC handlers
 │   └── utils/      # PauseController (pause/resume with safety timeout)
 ├── preload/        # Context bridge API
@@ -54,7 +54,7 @@ src/
 9. **Quit Confirmation** - Prompts before quitting with unsaved changes or active terminal sessions
 10. **Multi-Instance** - Multiple independent instances with file-based project locking, duplicate opens focus existing window
 11. **Image Preview** - Viewer for PNG, JPG, GIF, WebP, SVG, BMP, ICO with zoom, pan, fit controls, keyboard shortcuts (arrow keys, +/-, Home, F for fullscreen), and full-screen mode
-12. **Audio Transcription** - Import audio files (MP3, WAV, M4A, OGG, FLAC) with OpenAI-powered transcription (GPT-4o-transcribe primary, Whisper-1 fallback), file chunking for long recordings (>8 min), TranscriptionDialog with language selection (persists within session) and progress, pre-validation before dialog opens, batch import rejects audio with toast, API key management via Electron safeStorage
+12. **Media Transcription** - Import audio (MP3, WAV, M4A, OGG, FLAC) and video (MP4, MOV, AVI, MKV, WebM, FLV, WMV) files with OpenAI-powered transcription (GPT-4o-transcribe primary, Whisper-1 fallback), video audio extraction via ffmpeg (fluent-ffmpeg), file chunking for long recordings (>8 min), TranscriptionDialog with language selection (persists within session) and progress, pre-validation before dialog opens, batch import rejects media with toast, API key management via Electron safeStorage, video-specific frontmatter (type, resolution, video_codec)
 
 ## Documentation
 See `docs/` for details (keep Claude's context focused):
@@ -70,7 +70,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Testing](docs/testing/README.md) — Workspace, coverage
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [API Services](docs/api-services.md) — Service APIs (Terminal, File, Settings, Watchers)
-- [API Services – Features](docs/api-services-features.md) — Feature service APIs (GitWatcher, GitPolling, Camera, ProjectLock, ExternalFile, PDF, DOCX, Transcription, AudioMetadata, ApiKey)
+- [API Services – Features](docs/api-services-features.md) — Feature service APIs (GitWatcher, GitPolling, Camera, ProjectLock, ExternalFile, PDF, DOCX, Transcription, AudioMetadata, AudioExtraction, ApiKey)
 - [UI Components](docs/ui-components.md) — React component architecture, activity bars, panels
 - [Prompt Templates](docs/prompts/README.md) — AI prompt system, AutoExecute, template syntax
 - [Settings](docs/settings.md) — Settings overlay sections (Editor, Git, Logging, Transcription)
@@ -92,7 +92,7 @@ Feature specifications live in `specs/`. Check registry before implementing new 
 | 006 | Knowledge graph & entities | T3 | draft | `specs/spec-t3-006-knowledge-graph` |
 | 007 | Temporal queries & timeline | T3 | draft | `specs/spec-t3-007-temporal-queries` |
 | 008 | Graph engine polish & maintenance | T3 | draft | `specs/spec-t3-008-graph-polish` |
-| 009 | Media import with transcription | T4 | implemented (stage 2) | `specs/spec-t4-009-media-import-transcription` |
+| 009 | Media import with transcription | T4 | implemented (stage 3) | `specs/spec-t4-009-media-import-transcription` |
 | 013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/spec-t3-013-multi-cli-tool-prompt-optimization` |
 | 016 | Project Tree refresh specification | T3 | archived | `specs/archived/spec-t3-016-project-tree-refresh` |
 

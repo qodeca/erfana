@@ -2,9 +2,11 @@ import type { IConverter, FileTypeCategory } from './types'
 import { PdfConverter } from './converters/PdfConverter'
 import { TextConverter } from './converters/TextConverter'
 import { AudioConverter } from './converters/AudioConverter'
+import { VideoConverter } from './converters/VideoConverter'
 import { isCodeExtension } from './extensions'
 import { transcriptionService } from '../TranscriptionService'
 import { audioMetadataService } from '../AudioMetadataService'
+import { audioExtractionService } from '../AudioExtractionService'
 
 /**
  * Converter Registry
@@ -148,6 +150,9 @@ function registerBuiltInConverters(registry: ConverterRegistry): void {
 
   // Audio converters (Issue #75)
   registry.register(new AudioConverter(transcriptionService, audioMetadataService))
+
+  // Video converters (Issue #110)
+  registry.register(new VideoConverter(transcriptionService, audioExtractionService))
 }
 
 /**

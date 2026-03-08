@@ -5,6 +5,7 @@ import { importService, converterRegistry } from '../services/import'
 import { fileService } from '../services/FileService'
 import type { ValidationResult, ImportResult } from '../services/import'
 import { logger } from '../services/LoggingService'
+import { VIDEO_IMPORT } from '../../shared/constants'
 
 /**
  * File selection result from the native dialog
@@ -48,6 +49,8 @@ export function registerImportHandlers(): void {
         { name: 'Documents (PDF)', extensions: requiresConversion },
         // Audio files
         { name: 'Audio Files', extensions: ['mp3', 'wav', 'm4a', 'ogg', 'flac'] },
+        // Video files (Issue #110)
+        { name: 'Video Files', extensions: [...VIDEO_IMPORT.SUPPORTED_EXTENSIONS] },
         // Text files (passthrough)
         { name: 'Text Files', extensions: passthrough },
         // Allow any file for advanced users
