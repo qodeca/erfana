@@ -48,6 +48,7 @@ Project-specific terminology used in Erfana documentation and code.
 | **ProjectLockService** | File-based locking for multi-instance support |
 | **TranscriptionService** | Audio-to-text transcription via OpenAI API (GPT-4o-transcribe, Whisper-1 fallback) |
 | **AudioMetadataService** | Extracts duration, format, bitrate from audio files using music-metadata |
+| **AudioExtractionService** | Extracts audio tracks from video files using ffmpeg for transcription pipeline input |
 | **ApiKeyService** | Encrypts/decrypts API keys using Electron safeStorage |
 
 ## State Management

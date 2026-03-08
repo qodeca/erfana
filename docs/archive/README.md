@@ -5,6 +5,7 @@ This directory contains historical specification documents that are not part of 
 ## Contents
 
 - [resolved-issues.md](./resolved-issues.md) - Issues fixed in past versions
+- [2026-03-07-video-import-fixes.md](./2026-03-07-video-import-fixes.md) - Completed implementation plan for video import (#110)
 
 ## Restoring Archived Documentation
 
