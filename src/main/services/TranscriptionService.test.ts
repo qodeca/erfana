@@ -510,6 +510,36 @@ describe('TranscriptionService', () => {
   // ===========================================================================
 
   describe('fallback model', () => {
+    it('should fall back to whisper-1 when primary model returns 400 unsupported_format', async () => {
+      let callCount = 0
+      mockFetch.mockImplementation(() => {
+        callCount++
+        if (callCount === 1) {
+          return Promise.resolve({
+            ok: false,
+            status: 400,
+            statusText: 'Bad Request',
+            text: () => Promise.resolve('{"error":{"message":"This model does not support the format you provided.","type":"invalid_request_error","code":"unsupported_format"}}')
+          })
+        }
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve('Fallback transcription.')
+        })
+      })
+
+      const { createTranscriptionService } = await import('./TranscriptionService')
+      const service = createTranscriptionService()
+
+      const result = await service.transcribe('/path/to/audio.mp3', 'en', onProgress)
+
+      expect(result.success).toBe(true)
+      expect(result.transcript).toBe('Fallback transcription.')
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+      const secondFormData = mockFetch.mock.calls[1][1].body as FormData
+      expect(secondFormData.get('model')).toBe('whisper-1')
+    })
+
     it('should fall back to whisper-1 when primary model returns 404', async () => {
       let callCount = 0
       mockFetch.mockImplementation(() => {

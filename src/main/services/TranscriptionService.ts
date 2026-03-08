@@ -394,11 +394,15 @@ class TranscriptionService implements ITranscriptionService {
     if (!response.ok) {
       const errorBody = await response.text().catch(() => '')
 
-      // Try fallback model on model-specific errors
-      if (model === TRANSCRIPTION.PRIMARY_MODEL && response.status === 404) {
-        logger.warn('Primary model unavailable, falling back', {
+      // Try fallback model on model-specific errors (404 = model not found,
+      // 400 unsupported_format = model doesn't support this audio format e.g. WAV)
+      if (model === TRANSCRIPTION.PRIMARY_MODEL &&
+        (response.status === 404 ||
+          (response.status === 400 && errorBody.includes('unsupported_format')))) {
+        logger.warn('Primary model error, falling back', {
           model,
-          fallback: TRANSCRIPTION.FALLBACK_MODEL
+          fallback: TRANSCRIPTION.FALLBACK_MODEL,
+          status: response.status
         })
         return this.callTranscriptionApi(
           filePath, language, apiKey, signal, TRANSCRIPTION.FALLBACK_MODEL
