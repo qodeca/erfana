@@ -21,11 +21,16 @@ import { useState, useEffect, useRef, useCallback, useId } from 'react'
 import { FileAudio, FileVideo } from 'lucide-react'
 import { VIDEO_IMPORT } from '../../../../shared/constants'
 import { useTranscriptionStore } from '../../stores/useTranscriptionStore'
+import { useProjectStore } from '../../stores/useProjectStore'
 import { LanguageSelect } from './LanguageSelect'
 import { TEST_IDS } from '../../constants/testids'
 import type { TranscriptionLanguage } from '../../../../shared/ipc/transcription-schema'
 import { ErrorCode } from '../../../../shared/errors'
 import { BaseDialog } from '../Dialog/BaseDialog'
+import { sanitizeFilePath } from '../../utils/fileUtils'
+import { triggerOrganizePrompt } from '../../hooks/useImport'
+import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
+import { logger } from '../../utils/logger'
 import './TranscriptionDialog.css'
 
 /**
@@ -109,6 +114,8 @@ export function TranscriptionDialog(): JSX.Element | null {
     cancelTranscription,
     setLastLanguage
   } = useTranscriptionStore()
+
+  const terminalPortal = useTerminalPortalOptional()
 
   const id = useId()
   const titleId = `transcription-title${id}`
@@ -212,6 +219,45 @@ export function TranscriptionDialog(): JSX.Element | null {
 
   const handleRetry = (): void => {
     startTranscription(selectedLanguage)
+  }
+
+  const handleDone = (): void => {
+    // Capture outputPath before closeDialog resets store state
+    const outputPath = result?.outputPath
+
+    closeDialog()
+
+    if (!outputPath) return
+
+    // Auto-open transcript file in editor (AC-022)
+    try {
+      const dockviewApi = useProjectStore.getState().dockviewApi
+      if (dockviewApi) {
+        const panelTitle = outputPath.split('/').pop() || 'Transcript'
+        const panelId = `editor-${sanitizeFilePath(outputPath)}`
+
+        let editorPanel = dockviewApi.getPanel(panelId)
+        if (!editorPanel) {
+          editorPanel = dockviewApi.addPanel({
+            id: panelId,
+            component: 'editor',
+            title: panelTitle,
+            tabComponent: 'editorTab',
+            params: { filePath: outputPath, panelId }
+          })
+          useProjectStore.getState().registerEditorPanel(panelId)
+        }
+        editorPanel.api.setActive()
+        editorPanel.group.focus()
+      }
+    } catch {
+      logger.warn('Failed to auto-open transcript file')
+    }
+
+    // Trigger organize-import prompt (AC-019) – fire-and-forget
+    triggerOrganizePrompt(outputPath, terminalPortal ?? undefined).catch(() => {
+      // Non-fatal, already logged inside triggerOrganizePrompt
+    })
   }
 
   return (
@@ -407,11 +453,11 @@ export function TranscriptionDialog(): JSX.Element | null {
             </>
           )}
 
-          {/* Success: Close button */}
+          {/* Success: Done button – opens transcript and triggers organize prompt */}
           {hasSuccess && (
             <button
               className="dialog-btn dialog-btn-primary"
-              onClick={closeDialog}
+              onClick={handleDone}
               data-testid={TEST_IDS.TRANSCRIPTION_BTN_DONE}
             >
               Done

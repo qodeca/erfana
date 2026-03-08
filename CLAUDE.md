@@ -54,7 +54,7 @@ src/
 9. **Quit Confirmation** - Prompts before quitting with unsaved changes or active terminal sessions
 10. **Multi-Instance** - Multiple independent instances with file-based project locking, duplicate opens focus existing window
 11. **Image Preview** - Viewer for PNG, JPG, GIF, WebP, SVG, BMP, ICO with zoom, pan, fit controls, keyboard shortcuts (arrow keys, +/-, Home, F for fullscreen), and full-screen mode
-12. **Media Transcription** - Import audio (MP3, WAV, M4A, OGG, FLAC) and video (MP4, MOV, AVI, MKV, WebM, FLV, WMV) files with OpenAI-powered transcription (GPT-4o-transcribe primary, Whisper-1 fallback), video audio extraction via ffmpeg (fluent-ffmpeg), file chunking for long recordings (>8 min), TranscriptionDialog with language selection (persists within session) and progress, pre-validation before dialog opens, batch import rejects media with toast, API key management via Electron safeStorage, video-specific frontmatter (type, resolution, video_codec)
+12. **Media Transcription** - Import audio (MP3, WAV, M4A, OGG, FLAC) and video (MP4, MOV, AVI, MKV, WebM, FLV, WMV) files with OpenAI-powered transcription (GPT-4o-transcribe primary, Whisper-1 fallback), video audio extraction via ffmpeg (fluent-ffmpeg), file chunking for long recordings (>8 min), TranscriptionDialog with language selection (persists within session) and progress, pre-validation before dialog opens, batch import rejects media with toast, API key management via Electron safeStorage, video-specific frontmatter (type, resolution, video_codec), post-transcription auto-open of transcript file and organize-import prompt
 
 ## Documentation
 See `docs/` for details (keep Claude's context focused):

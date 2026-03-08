@@ -16,6 +16,7 @@ useTranscriptionStore.ts ← Zustand store (stores/)
 - **Tab-cycling focus trap**: Implemented manually via `handleFocusTrap` (BaseDialog only auto-focuses, doesn't cycle)
 - **`onClose={handleClose}`**: Safety guard – uses cancel-aware handler, not raw `closeDialog`
 - **Video detection**: Checks file extension against `VIDEO_IMPORT.SUPPORTED_EXTENSIONS` to show FileVideo icon and "Transcribe video" title
+- **Done button post-actions**: `handleDone` auto-opens the transcript file in an editor tab and triggers the organize-import prompt in the terminal (#113)
 
 ## IPC flow
 

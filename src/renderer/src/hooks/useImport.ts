@@ -391,7 +391,7 @@ function getErrorMessage(errorCode?: string, fallbackError?: string): string {
  * @param importedFilePath - Path to the imported file
  * @param terminalPortal - Optional terminal context for scroll scheduling (issue #52)
  */
-async function triggerOrganizePrompt(
+export async function triggerOrganizePrompt(
   importedFilePath: string,
   terminalPortal?: {
     terminalControls: { scrollToBottom: () => void } | null

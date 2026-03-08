@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { TranscriptionDialog } from './TranscriptionDialog'
 import { useTranscriptionStore } from '../../stores/useTranscriptionStore'
+import { useProjectStore } from '../../stores/useProjectStore'
 import { TEST_IDS } from '../../constants/testids'
 
 // =============================================================================
@@ -24,6 +25,24 @@ vi.mock('react-dom', async () => {
     createPortal: (node: React.ReactNode) => node
   }
 })
+
+// =============================================================================
+// Mock triggerOrganizePrompt
+// =============================================================================
+
+const mockTriggerOrganizePrompt = vi.fn().mockResolvedValue(undefined)
+
+vi.mock('../../hooks/useImport', () => ({
+  triggerOrganizePrompt: (...args: unknown[]) => mockTriggerOrganizePrompt(...args)
+}))
+
+// =============================================================================
+// Mock TerminalPortalContext
+// =============================================================================
+
+vi.mock('../../context/TerminalPortalContext', () => ({
+  useTerminalPortalOptional: () => null
+}))
 
 // =============================================================================
 // Mock window.api.transcription
@@ -498,6 +517,142 @@ describe('TranscriptionDialog', () => {
       render(<TranscriptionDialog />)
       const title = screen.getByText('Transcribe audio')
       expect(title.tagName).toBe('H3')
+    })
+  })
+
+  describe('Done button behavior', () => {
+    it('closes dialog when Done is clicked', () => {
+      const closeDialogSpy = vi.fn()
+      useTranscriptionStore.setState({
+        isDialogOpen: true,
+        filePath: '/path/to/audio.mp3',
+        fileName: 'audio.mp3',
+        isTranscribing: false,
+        result: { success: true, outputPath: '/project/import/audio.md' },
+        error: null,
+        closeDialog: closeDialogSpy
+      })
+
+      render(<TranscriptionDialog />)
+      fireEvent.click(screen.getByTestId(TEST_IDS.TRANSCRIPTION_BTN_DONE))
+
+      expect(closeDialogSpy).toHaveBeenCalledOnce()
+    })
+
+    it('opens transcript file in editor on Done click (AC-022)', () => {
+      const mockSetActive = vi.fn()
+      const mockFocus = vi.fn()
+      const mockGetPanel = vi.fn().mockReturnValue(null)
+      const mockAddPanel = vi.fn().mockReturnValue({
+        api: { setActive: mockSetActive },
+        group: { focus: mockFocus }
+      })
+      const mockRegisterEditorPanel = vi.fn()
+
+      // Set up dockview API mock
+      useProjectStore.setState({
+        dockviewApi: {
+          getPanel: mockGetPanel,
+          addPanel: mockAddPanel
+        } as any,
+        registerEditorPanel: mockRegisterEditorPanel
+      })
+
+      useTranscriptionStore.setState({
+        isDialogOpen: true,
+        filePath: '/path/to/audio.mp3',
+        fileName: 'audio.mp3',
+        isTranscribing: false,
+        result: { success: true, outputPath: '/project/import/audio.md' },
+        error: null
+      })
+
+      render(<TranscriptionDialog />)
+      fireEvent.click(screen.getByTestId(TEST_IDS.TRANSCRIPTION_BTN_DONE))
+
+      expect(mockAddPanel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          component: 'editor',
+          title: 'audio.md',
+          params: expect.objectContaining({ filePath: '/project/import/audio.md' })
+        })
+      )
+      expect(mockSetActive).toHaveBeenCalled()
+      expect(mockFocus).toHaveBeenCalled()
+      expect(mockRegisterEditorPanel).toHaveBeenCalled()
+    })
+
+    it('reuses existing editor panel if already open (AC-022)', () => {
+      const mockSetActive = vi.fn()
+      const mockFocus = vi.fn()
+      const existingPanel = {
+        api: { setActive: mockSetActive },
+        group: { focus: mockFocus }
+      }
+      const mockGetPanel = vi.fn().mockReturnValue(existingPanel)
+      const mockAddPanel = vi.fn()
+
+      useProjectStore.setState({
+        dockviewApi: {
+          getPanel: mockGetPanel,
+          addPanel: mockAddPanel
+        } as any
+      })
+
+      useTranscriptionStore.setState({
+        isDialogOpen: true,
+        filePath: '/path/to/audio.mp3',
+        fileName: 'audio.mp3',
+        isTranscribing: false,
+        result: { success: true, outputPath: '/project/import/audio.md' },
+        error: null
+      })
+
+      render(<TranscriptionDialog />)
+      fireEvent.click(screen.getByTestId(TEST_IDS.TRANSCRIPTION_BTN_DONE))
+
+      expect(mockAddPanel).not.toHaveBeenCalled()
+      expect(mockSetActive).toHaveBeenCalled()
+      expect(mockFocus).toHaveBeenCalled()
+    })
+
+    it('triggers organize-import prompt on Done click (AC-019)', () => {
+      useTranscriptionStore.setState({
+        isDialogOpen: true,
+        filePath: '/path/to/audio.mp3',
+        fileName: 'audio.mp3',
+        isTranscribing: false,
+        result: { success: true, outputPath: '/project/import/audio.md' },
+        error: null
+      })
+
+      render(<TranscriptionDialog />)
+      fireEvent.click(screen.getByTestId(TEST_IDS.TRANSCRIPTION_BTN_DONE))
+
+      expect(mockTriggerOrganizePrompt).toHaveBeenCalledWith(
+        '/project/import/audio.md',
+        undefined
+      )
+    })
+
+    it('does not open file or trigger prompt when outputPath is missing', () => {
+      const closeDialogSpy = vi.fn()
+      useTranscriptionStore.setState({
+        isDialogOpen: true,
+        filePath: '/path/to/audio.mp3',
+        fileName: 'audio.mp3',
+        isTranscribing: false,
+        result: { success: true },
+        error: null,
+        closeDialog: closeDialogSpy
+      })
+
+      render(<TranscriptionDialog />)
+      fireEvent.click(screen.getByTestId(TEST_IDS.TRANSCRIPTION_BTN_DONE))
+
+      // Dialog closes but no file open or prompt trigger
+      expect(closeDialogSpy).toHaveBeenCalledOnce()
+      expect(mockTriggerOrganizePrompt).not.toHaveBeenCalled()
     })
   })
 
