@@ -22,9 +22,15 @@
 7. System displays progress dialog with progress bar and ETA
 8. System sends audio to OpenAI API (GPT-4o-transcribe, fallback to Whisper-1)
 9. System receives transcript and creates markdown file with YAML frontmatter
-10. System saves markdown to project's `import/` directory
-11. System displays success notification
-12. System opens newly created markdown file in editor
+10. System creates `import/` directory if it does not exist
+11. System determines output filename using sanitized source name with `.md` extension, resolving duplicates with sequential suffix
+12. System saves markdown to project's `import/` directory
+13. System displays success state in TranscriptionDialog (note: in-dialog feedback replaces the toast notification used by text/PDF import, because the dialog already holds user focus)
+14. User dismisses dialog
+15. System opens newly created markdown file in editor
+16. System triggers organize-import prompt in terminal (single-file imports only)
+17. Project tree refreshes automatically via Chokidar directory watcher
+18. System triggers git status refresh
 
 ### Alternative Flows
 - **4a. User cancels language selection**: Import cancelled, no file created
@@ -36,9 +42,12 @@
 - Markdown file created in `project/import/` with transcript
 - YAML frontmatter includes: source, duration, date, language
 - Temporary files cleaned up
+- Project tree shows the new file in `import/`
+- Git status indicators reflect the new untracked file
+- Organize-import prompt offered in terminal (single-file import)
 
 ### Traces To
-009-FR-001, 009-FR-003, 009-FR-004, 009-FR-005, 009-FR-009, 009-FR-012, 009-FR-013
+009-FR-001, 009-FR-003, 009-FR-004, 009-FR-005, 009-FR-009, 009-FR-012, 009-FR-013, 009-FR-023, 009-FR-024, 009-FR-025, 009-FR-026, 009-FR-027, 009-FR-028, 009-FR-029
 
 ---
 
@@ -67,10 +76,16 @@
 9. System updates progress to "Transcribing..." with progress bar and ETA
 10. System processes audio through local Whisper model
 11. System creates markdown file with YAML frontmatter
-12. System saves markdown to project's `import/` directory
-13. System cleans up temporary audio file
-14. System displays success notification
-15. System opens newly created markdown file in editor
+12. System creates `import/` directory if it does not exist
+13. System determines output filename using sanitized source name with `.md` extension, resolving duplicates with sequential suffix
+14. System saves markdown to project's `import/` directory
+15. System cleans up temporary audio file
+16. System displays success state in TranscriptionDialog
+17. User dismisses dialog
+18. System opens newly created markdown file in editor
+19. System triggers organize-import prompt in terminal (single-file imports only)
+20. Project tree refreshes automatically via Chokidar directory watcher
+21. System triggers git status refresh
 
 ### Alternative Flows
 - **6a. Invalid video format**: System displays error with supported formats
@@ -81,9 +96,12 @@
 - Markdown file created in `project/import/` with transcript
 - Extracted audio file deleted
 - YAML frontmatter includes: source (video path), duration, date, language
+- Project tree shows the new file in `import/`
+- Git status indicators reflect the new untracked file
+- Organize-import prompt offered in terminal (single-file import)
 
 ### Traces To
-009-FR-002, 009-FR-003, 009-FR-004, 009-FR-006, 009-FR-009, 009-FR-012
+009-FR-002, 009-FR-003, 009-FR-004, 009-FR-006, 009-FR-009, 009-FR-012, 009-FR-023, 009-FR-024, 009-FR-025, 009-FR-026, 009-FR-027, 009-FR-028, 009-FR-029
 
 ---
 

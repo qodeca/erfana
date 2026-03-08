@@ -47,6 +47,18 @@
 |----|-------------|-------|-----------------|-----------|
 | 009-AC-015 | Progress updates don't block UI thread | 1. Import large file<br>2. During transcription, interact with UI (resize window, click buttons) | UI remains responsive, no freezing or lag during progress updates | 009-NFR-002, 009-FR-015 |
 
+### Post-Import Behavior
+
+| ID | Description | Steps | Expected Result | Traces To |
+|----|-------------|-------|-----------------|-----------|
+| 009-AC-016 | Import folder created if missing | 1. Open project without `import/` directory<br>2. Import audio file and complete transcription | `import/` directory created automatically, markdown file saved inside it | 009-FR-023 |
+| 009-AC-017 | Output filename derived from source | 1. Import file named `My Recording.mp3`<br>2. Complete transcription | Output file named `My Recording.md` in `import/` directory | 009-FR-024 |
+| 009-AC-018 | Duplicate filenames resolved with suffix | 1. Import `recording.mp3` twice<br>2. Complete both transcriptions | First creates `recording.md`, second creates `recording (1).md` | 009-FR-025 |
+| 009-AC-019 | Organize prompt triggered after import | 1. Import single audio file<br>2. Complete transcription<br>3. Observe terminal | Organize-import prompt auto-executes in terminal, offering to move/rename the file | 009-FR-026 |
+| 009-AC-020 | Project tree shows new file | 1. Import audio file<br>2. Complete transcription<br>3. Observe project tree | New markdown file appears in `import/` folder in the project tree without manual refresh | 009-FR-027 |
+| 009-AC-021 | Git status reflects new file | 1. Import audio file<br>2. Complete transcription<br>3. Observe project tree git indicators | New file in `import/` shows as untracked (git indicator) without requiring manual refresh or window refocus | 009-FR-028 |
+| 009-AC-022 | Transcript opens in editor after dialog close | 1. Import audio file<br>2. Complete transcription<br>3. Click "Done" in TranscriptionDialog | Newly created markdown file opens in editor tab, ready for review | 009-FR-029 |
+
 ---
 
 ## Definition of Done
@@ -59,7 +71,7 @@
 - [ ] Integration tests cover import workflows
 
 ### Functionality
-- [ ] All acceptance criteria (009-AC-001 through 009-AC-015) pass
+- [ ] All acceptance criteria (009-AC-001 through 009-AC-022) pass
 - [ ] OpenAI backend works with valid API key
 - [ ] Local Whisper backend works offline (if implemented)
 - [ ] Progress bar displays accurately

@@ -162,9 +162,20 @@ transcription: z.object({
 
 ### File Naming Convention
 
-- Audio: `import/recording.mp3` → `import/recording-transcript.md`
-- Video: `import/video.mp4` → `import/video-transcript.md`
-- Collision handling: Append timestamp if file exists
+- Audio: `import/recording.mp3` → `import/recording.md`
+- Video: `import/video.mp4` → `import/video.md`
+- Collision handling: Append sequential number if file exists (e.g., `recording (1).md`)
+- Uses shared `sanitizeFileName` and `findAvailableFileName` utilities from `src/main/utils/fileUtils.ts`, consistent with text/PDF import
+
+## Design Deviations from Text/PDF Import
+
+### Success feedback: in-dialog state vs toast
+
+Text/PDF import shows a toast notification (`showSuccessToast`) after file creation. Media transcription uses an in-dialog success state instead, because the TranscriptionDialog is a modal workflow that already holds user focus – adding a toast on top would be redundant. This is an intentional deviation documented in UC-001 step 13 and UC-002 step 16.
+
+### Project switch during long transcription
+
+Transcription can take several minutes. If the user switches projects during transcription, the file writes to the original project's `import/` directory (project path is captured at transcription start). The Chokidar watcher may be watching the new project, so the tree refresh may not apply to the current view. This is a known limitation – the file is still saved correctly and will appear when the user switches back to the original project.
 
 ## Open Questions
 

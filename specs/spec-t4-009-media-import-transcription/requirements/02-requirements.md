@@ -54,6 +54,18 @@
 | 009-FR-021 | API key setting | GlobalSettings SHALL include `transcription.openaiApiKey` setting for OpenAI API authentication | Must | 009-UC-001, 009-AC-005 |
 | 009-FR-022 | Local model setting | GlobalSettings SHALL include `transcription.whisperModel` setting for local Whisper model selection (tiny, base, small, medium, large) | Should | 009-UC-002, 009-AC-006 |
 
+### Post-Import Behavior
+
+| ID | Title | Description | Priority | Traces To |
+|----|-------|-------------|----------|-----------|
+| 009-FR-023 | Import folder creation | System SHALL create the `import/` directory (using `mkdir` with `recursive: true`) if it does not exist before saving transcription output, consistent with text/PDF import behavior | Must | 009-AC-016 |
+| 009-FR-024 | Output filename convention | System SHALL name the output markdown file using the sanitized source media filename with `.md` extension (e.g., `recording.mp3` → `recording.md`), using the same `sanitizeFileName` utility as text/PDF import | Must | 009-AC-017 |
+| 009-FR-025 | Duplicate filename handling | System SHALL resolve filename conflicts by appending sequential numbers (e.g., `recording (1).md`, `recording (2).md`) up to 1000 attempts, using the existing `findAvailableFileName` utility | Must | 009-AC-018 |
+| 009-FR-026 | Organize prompt trigger | System SHALL trigger the `organize-import` prompt template in the terminal after single-file transcription completes, consistent with text/PDF import behavior. Implementation note: `triggerOrganizePrompt` must be extracted from `useImport.ts` into a shared utility accessible by the transcription flow. The prompt fires after the user dismisses the TranscriptionDialog success state, not during it | Should | 009-AC-019 |
+| 009-FR-027 | Project tree refresh | System SHALL ensure the project tree reflects the newly created file in `import/` after transcription completes. Tree refresh relies on the existing Chokidar directory watcher detecting the new file, consistent with the context-menu import path. Note: if the user switches projects during a long transcription, the tree refresh may not apply to the current view (known limitation) | Must | 009-AC-020 |
+| 009-FR-028 | Git status refresh | System SHALL trigger a git status refresh after successful transcription completion, so the new untracked file in `import/` shows git indicators in the project tree without requiring manual refresh or window refocus, consistent with text/PDF import behavior | Must | 009-AC-021 |
+| 009-FR-029 | Auto-open transcript in editor | System SHOULD open the newly created markdown file in the editor after transcription completes and the user dismisses the TranscriptionDialog, enabling immediate review of the transcript | Should | 009-AC-022 |
+
 ---
 
 ## Non-Functional Requirements

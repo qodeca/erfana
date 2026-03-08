@@ -156,6 +156,34 @@
       "section": "02-requirements",
       "status": "active"
     },
+    "009-FR-023": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-024": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-025": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-026": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-027": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-028": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-029": {
+      "section": "02-requirements",
+      "status": "active"
+    },
     "009-NFR-001": {
       "section": "02-requirements",
       "status": "active"
@@ -271,13 +299,41 @@
     "009-AC-015": {
       "section": "04-acceptance",
       "status": "active"
+    },
+    "009-AC-016": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-017": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-018": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-019": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-020": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-021": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-022": {
+      "section": "04-acceptance",
+      "status": "active"
     }
   },
   "requirement_sequences": {
-    "FR": 22,
+    "FR": 29,
     "NFR": 9,
     "UC": 5,
-    "AC": 15,
+    "AC": 22,
     "TC": 0,
     "ES": 0,
     "BO": 0,
@@ -301,7 +357,7 @@
   ],
   "statistics": {
     "total_sections": 5,
-    "total_requirements": 51,
+    "total_requirements": 65,
     "total_words": 4176,
     "total_use_cases": 0,
     "total_stakeholders": 0,
@@ -334,6 +390,20 @@
       "target": "manifest",
       "description": "Migrated from BRS to managing-specs naming convention",
       "by": "system"
+    },
+    {
+      "date": "2026-03-08T22:50:00+01:00",
+      "operation": "ADD",
+      "target": "02-requirements, 04-acceptance",
+      "description": "Added post-import behavior requirements (FR-023 to FR-027) and acceptance criteria (AC-016 to AC-020): import folder creation, output filename convention, duplicate handling, organize prompt trigger, project tree refresh",
+      "by": "user"
+    },
+    {
+      "date": "2026-03-08T23:00:00+01:00",
+      "operation": "UPDATE",
+      "target": "multiple",
+      "description": "Architecture review fixes: added FR-028 (git status refresh), FR-029 (auto-open transcript), AC-021, AC-022; updated UC-001/UC-002 with post-import steps and traces; clarified FR-026 implementation guidance and FR-027 Chokidar mechanism; added design deviation notes (success feedback, project switch edge case); corrected file naming convention in notes",
+      "by": "user"
     }
   ],
   "components": {
