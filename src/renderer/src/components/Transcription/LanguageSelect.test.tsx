@@ -16,10 +16,10 @@ describe('LanguageSelect', () => {
     expect(select).toHaveAttribute('aria-label', 'Transcription language')
   })
 
-  it('renders all 30 language options', () => {
+  it('renders all language options', () => {
     render(<LanguageSelect value="auto" onChange={() => {}} />)
     const select = screen.getByTestId(TEST_IDS.TRANSCRIPTION_LANGUAGE_SELECT) as HTMLSelectElement
-    expect(select.options).toHaveLength(30)
+    expect(select.options).toHaveLength(31)
   })
 
   it('has Auto-detect as first option with value "auto"', () => {
