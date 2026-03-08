@@ -175,7 +175,7 @@ export function FilePickerDialog({
         </ul>
 
         <div className="dialog-actions">
-          <button className="dialog-button dialog-button-secondary" onClick={onClose} data-testid={TEST_IDS.FILE_PICKER_BTN_CANCEL}>
+          <button className="dialog-btn dialog-btn-secondary" onClick={onClose} data-testid={TEST_IDS.FILE_PICKER_BTN_CANCEL}>
             Cancel
           </button>
         </div>
