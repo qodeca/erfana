@@ -7,6 +7,12 @@ Historical changelog entries for versions prior to current. For the latest chang
 ## Unreleased
 
 ### Added
+- **Post-transcription behaviors** (Spec #009): Auto-open transcript and organize-import prompt (#113)
+  - Done button in TranscriptionDialog opens the transcript markdown file in an editor tab (AC-022)
+  - After dialog dismiss, triggers organize-import prompt in the terminal (AC-019)
+  - Exported `triggerOrganizePrompt` from `useImport` hook for reuse
+  - 5 new tests in `TranscriptionDialog.test.tsx`
+  - Closes #113
 - **Video file import with transcription** (Spec #009, Stage 3): Import video files with audio extraction and OpenAI transcription (#110)
   - 7 video formats supported: MP4, MOV, AVI, MKV, WebM, FLV, WMV
   - Audio extraction via ffmpeg (fluent-ffmpeg + ffmpeg-static + ffprobe-static)
