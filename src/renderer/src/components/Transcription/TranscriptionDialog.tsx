@@ -18,7 +18,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useId } from 'react'
-import { X, FileAudio, FileVideo } from 'lucide-react'
+import { FileAudio, FileVideo } from 'lucide-react'
 import { VIDEO_IMPORT } from '../../../../shared/constants'
 import { useTranscriptionStore } from '../../stores/useTranscriptionStore'
 import { LanguageSelect } from './LanguageSelect'
@@ -227,22 +227,14 @@ export function TranscriptionDialog(): JSX.Element | null {
     >
       <div ref={dialogRef} data-testid={TEST_IDS.TRANSCRIPTION_DIALOG}>
         {/* Header */}
-        <div className="transcription-header">
-          <h3 id={titleId} className="transcription-title">
+        <div className="dialog-header">
+          <h3 id={titleId} className="dialog-title">
             {dialogTitle}
           </h3>
-          <button
-            className="transcription-close-btn"
-            onClick={handleClose}
-            aria-label={isTranscribing ? 'Cancel transcription' : 'Close dialog'}
-            title={isTranscribing ? 'Cancel transcription' : 'Close dialog'}
-          >
-            <X size={18} strokeWidth={1.5} />
-          </button>
         </div>
 
         {/* Body */}
-        <div id={descriptionId} className="transcription-body">
+        <div id={descriptionId}>
           {/* File info -- always visible */}
           <div className="transcription-file-info">
             <FileIcon size={18} strokeWidth={1.5} className="transcription-file-icon" />
@@ -365,7 +357,7 @@ export function TranscriptionDialog(): JSX.Element | null {
         </div>
 
         {/* Footer */}
-        <div className="transcription-footer">
+        <div className="dialog-actions">
           {/* Language selection: Start + Cancel buttons */}
           {showLanguageSelection && (
             <>

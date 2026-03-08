@@ -59,6 +59,13 @@ Historical changelog entries for versions prior to current. For the latest chang
   - Closes #75
 - **E2E test for directory watcher pipeline** (#104): Verifies file creation via terminal appears in Project Tree within latency budget
 
+- **TranscriptionDialog BaseDialog migration**: Refactored to compose on BaseDialog, eliminating duplicated portal/overlay/focus-restore infrastructure
+  - Visual alignment: flat header (removed colored title bar and X close button), standard `dialog-actions` footer (removed border-top), inherited container padding
+  - Migrated buttons from `transcription-btn-*` to `dialog-btn dialog-btn-*` classes
+  - Added ARIA live regions (`role="alert"`, `role="status"`, `aria-live`), `aria-describedby`, unique IDs via `useId()`
+  - New test file: `LanguageSelect.test.tsx` (7 tests)
+  - Fixed FilePickerDialog button class (`dialog-button` → `dialog-btn`)
+
 ### Changed
 - **Spec T4-009 marked implemented**: Media import with transcription feature complete
 - **Global settings schema**: Added `transcription` section (backend, openaiApiKeyStored)

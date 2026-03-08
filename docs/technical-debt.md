@@ -65,6 +65,28 @@ const config = PROMPT_REGISTRY['mermaid-bug-report']  // Returns undefined!
 
 ---
 
+### 3. BaseDialog lacks Tab-cycling focus trap
+
+**Severity**: Low
+**Impact**: Only TranscriptionDialog has proper Tab cycling; all other dialogs allow Tab to escape the dialog.
+
+**Problem**: BaseDialog's comment says "Focus trap" but the code only auto-focuses the first element – it does NOT cycle Tab/Shift+Tab within the dialog. TranscriptionDialog implements its own `handleFocusTrap` to work around this.
+
+**Recommended Solution**: Move TranscriptionDialog's Tab-cycling logic into BaseDialog so all dialogs benefit.
+
+**Files**: `src/renderer/src/components/Dialog/BaseDialog.tsx`, `src/renderer/src/components/Transcription/TranscriptionDialog.tsx`
+
+---
+
+### 4. LanguageSelect missing `id` for label association
+
+**Severity**: Low
+**Impact**: `htmlFor="transcription-lang"` on the label references a non-existent `id` on `<select>`. Label click doesn't focus the select.
+
+**Fix**: Add `id="transcription-lang"` to `<select>` in `LanguageSelect.tsx`.
+
+---
+
 ## Code Quality Improvements
 
 ### Documentation Token Efficiency

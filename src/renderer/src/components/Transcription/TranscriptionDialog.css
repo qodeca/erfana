@@ -3,54 +3,6 @@
 /* Dialog container override */
 .dialog-container.transcription-dialog {
   max-width: 600px;
-  padding: 0;
-}
-
-/* Dialog header */
-.transcription-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-8);
-  border-bottom: var(--border-width) solid var(--color-border-default);
-  background: var(--color-bg-tertiary);
-}
-
-.transcription-title {
-  font-size: var(--text-xl);
-  font-weight: var(--font-semibold);
-  color: var(--color-text-emphasis);
-  margin: 0;
-}
-
-.transcription-close-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--btn-height-md);
-  height: var(--btn-height-md);
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: color var(--transition-normal), background var(--transition-normal);
-}
-
-.transcription-close-btn:hover {
-  color: var(--color-text-primary);
-  background: var(--color-bg-hover);
-}
-
-.transcription-close-btn:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: var(--space-1);
-}
-
-/* Dialog body */
-.transcription-body {
-  padding: var(--space-8);
 }
 
 /* File info display */
@@ -230,13 +182,4 @@
   font-family: var(--font-mono);
   margin: 0;
   word-break: break-all;
-}
-
-/* Dialog footer */
-.transcription-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-6);
-  padding: var(--space-6) var(--space-8);
-  border-top: var(--border-width) solid var(--color-border-default);
 }

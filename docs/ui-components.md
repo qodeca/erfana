@@ -315,22 +315,24 @@ Opens when clicking image files (PNG, JPG, GIF, WebP, SVG, BMP, ICO) in project 
 
 **Location**: `src/renderer/src/components/Transcription/`
 
-Modal dialog for audio file import with OpenAI transcription. Mounted in `App.tsx` and opened automatically when importing audio files (MP3, WAV, M4A, OGG, FLAC). Audio files are detected by `useImport` and routed to the dialog with pre-validation.
+Modal dialog for media file import with OpenAI transcription. Composes on `BaseDialog` for portal rendering, overlay, and focus management. Mounted in `App.tsx` and opened automatically when importing audio (MP3, WAV, M4A, OGG, FLAC) or video (MP4, MOV, AVI, MKV, WebM, FLV, WMV) files. Media files are detected by `useImport` and routed to the dialog with pre-validation.
 
 **Components**:
-- `TranscriptionDialog.tsx` – Main dialog with progress bar, error display, cancel
+- `TranscriptionDialog.tsx` – Composes on BaseDialog; progress bar, error display, cancel
 - `LanguageSelect.tsx` – Dropdown with 31 languages + auto-detect option
 
 **State**: `useTranscriptionStore.ts` (Zustand) manages dialog visibility, progress, result, error
 
 **Features**:
+- Composes on BaseDialog (`closeOnEscape={false}`, `closeOnBackdrop={false}`) with custom Escape handling (cancel when transcribing, close otherwise)
+- Tab-cycling focus trap (unique to this dialog – BaseDialog only auto-focuses)
 - Progress bar with percentage, ETA, and chunk indicator ("chunk N of M")
-- ARIA attributes: `role="progressbar"`, `aria-valuenow/min/max`, `aria-label`
-- Cancel via footer button, X button, or Escape key
-- Error display with retry option and actionable suggestions
-- Language selector: English, Polish, German, French, Spanish, Italian, Portuguese, Dutch, Russian, Japanese, Chinese, Korean + 19 more (persists within session)
-- Batch import rejection: audio files in multi-file drops show toast, not dialog
-- Single-file retry protection
+- ARIA: `role="progressbar"`, `aria-live` on phase text/error/success, `aria-describedby`
+- Cancel via footer button or Escape key
+- Error display with retry option and actionable suggestions per error code
+- Language selector: 31 options (persists within session)
+- Video-aware: FileVideo icon and "Transcribe video" title for video files
+- Batch import rejection: media files in multi-file drops show toast, not dialog
 
 **IPC flow**: `transcription:import` (invoke) + `transcription:progress` (streamed events) + `transcription:cancel` (abort)
 
