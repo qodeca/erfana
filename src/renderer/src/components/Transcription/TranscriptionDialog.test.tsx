@@ -437,7 +437,11 @@ describe('TranscriptionDialog', () => {
 
       render(<TranscriptionDialog />)
       const dialog = screen.getByRole('dialog')
-      expect(dialog).toHaveAttribute('aria-describedby')
+      const describedBy = dialog.getAttribute('aria-describedby')
+      expect(describedBy).toBeTruthy()
+      const bodyElement = document.getElementById(describedBy!)
+      expect(bodyElement).toBeInTheDocument()
+      expect(bodyElement).toHaveTextContent('audio.mp3')
     })
 
     it('error state has role="alert" with aria-live', () => {

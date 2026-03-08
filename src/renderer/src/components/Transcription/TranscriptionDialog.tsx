@@ -4,7 +4,7 @@
  * Modal dialog for the audio import transcription workflow. Displays four
  * distinct states: language selection, progress, success, and error.
  *
- * Renders as a portal to #portal-root for proper overlay stacking.
+ * Composes on BaseDialog for portal rendering, overlay, and focus management.
  *
  * Features:
  * - Language selector with 30+ supported languages
@@ -82,7 +82,7 @@ function formatEta(seconds: number): string {
  * Reads all state from useTranscriptionStore. Renders nothing when the
  * dialog is not open.
  *
- * @returns Rendered dialog via portal, or null when closed
+ * @returns Rendered dialog via BaseDialog, or null when closed
  *
  * @example
  * ```tsx
@@ -217,7 +217,7 @@ export function TranscriptionDialog(): JSX.Element | null {
   return (
     <BaseDialog
       isOpen={isDialogOpen}
-      onClose={closeDialog}
+      onClose={handleClose}
       zIndex={10000}
       closeOnBackdrop={false}
       closeOnEscape={false}
