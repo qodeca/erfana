@@ -18,7 +18,7 @@
 | 009-FR-005 | OpenAI API transcription | System SHALL support OpenAI API transcription using GPT-4o-transcribe as primary, Whisper-1 as fallback | Must | 009-UC-001, 009-AC-005 |
 | 009-FR-006 | Local Whisper transcription | System SHALL support local Whisper transcription via whisper.cpp or equivalent | Should | 009-UC-002, 009-AC-006 |
 | 009-FR-007 | Backend selection in settings | System SHALL allow user to select transcription backend in GlobalSettings | Must | 009-UC-004, 009-AC-012 |
-| 009-FR-008 | Large file chunking | System SHALL chunk media files exceeding 10 minutes for processing, handling API size limits | Must | 009-AC-007 |
+| 009-FR-008 | Large file chunking | System SHALL chunk media files exceeding 8 minutes for processing, handling API size limits. Implementation note: 8-minute boundary provides conservative margin under 25 MB API limit; see Notes § Chunking Strategy | Must | 009-AC-007 |
 
 ### Language Selection
 

@@ -33,7 +33,7 @@
 |------------|---------|------------|
 | OpenAI file size limit | 25MB per request | Chunk large files before upload |
 | OpenAI rate limits | Varies by tier | Exponential backoff with retry |
-| Whisper-1 duration limit | ~10 minutes optimal | Chunk files at 9-minute boundaries |
+| Whisper-1 duration limit | ~10 minutes optimal | Chunk files at 8-minute boundaries (conservative margin for high-bitrate formats) |
 | GPT-4o-transcribe availability | May have regional restrictions | Fallback to Whisper-1 |
 
 ### Technical Constraints
@@ -112,8 +112,8 @@ MediaConverter (implements IConverter)
    - Rationale: Shared transcription logic, simpler registry
 
 2. **Chunking Strategy**
-   - Split at 9-minute boundaries (under 10-min API limit)
-   - Overlap last 5 seconds to catch split words
+   - Split at 8-minute boundaries – conservative margin under 25 MB API upload limit across all supported audio bitrates (higher-bitrate formats like WAV need more headroom than the original 10-min estimate assumed)
+   - Overlap last 0.5 seconds to catch split words – sufficient for average word duration (~0.3–0.5 s) while avoiding meaningful duplicate text that would require complex deduplication
    - Post-process to remove duplicate content
 
 3. **Progress Event Format**

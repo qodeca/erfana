@@ -35,7 +35,7 @@
 ### Alternative Flows
 - **4a. User cancels language selection**: Import cancelled, no file created
 - **6a. Invalid audio format**: System displays error with supported formats, import cancelled
-- **8a. File exceeds 10 minutes**: System chunks file and processes sequentially, updating progress per chunk
+- **8a. File exceeds 8 minutes**: System chunks file and processes sequentially, updating progress per chunk
 - **8b. API rate limit reached**: System waits with exponential backoff, retries, updates progress message
 
 ### Postconditions
@@ -180,19 +180,19 @@
 ## 009-UC-005: Import large audio file with chunking
 
 **ID**: 009-UC-005
-**Title**: Import audio file exceeding 10 minutes
+**Title**: Import audio file exceeding 8 minutes
 **Actors**: User
 **Priority**: Must
 
 ### Preconditions
-- User has audio file longer than 10 minutes
+- User has audio file longer than 8 minutes
 - Transcription backend is configured
 
 ### Main Flow
 1. User initiates import of large audio file
 2. User selects language
-3. System detects file duration exceeds 10 minutes
-4. System calculates chunk count (e.g., 35-minute file = 4 chunks)
+3. System detects file duration exceeds 8 minutes
+4. System calculates chunk count (e.g., 32-minute file = 4 chunks)
 5. System displays progress with "Processing chunk 1 of 4"
 6. System processes first chunk
 7. System updates progress "Processing chunk 2 of 4" with updated ETA
