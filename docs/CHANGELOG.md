@@ -18,6 +18,10 @@ Historical changelog entries for versions prior to current. For the latest chang
   - Closes #111
 
 ### Fixed
+- **Transcription settings – ensureBinary result check** – Download handler now checks `ensureBinary()` result before proceeding to `ensureModel()`; previously a non-throwing failure silently continued (#112)
+- **Transcription settings – stale download error** – `downloadError` now clears on backend switch and model dropdown change, preventing stale errors from persisting across UI state transitions (#112)
+- **Transcription settings – disabled button styling** – Added `.settings-btn-secondary:disabled` CSS rule matching existing disabled patterns (opacity + cursor) (#112)
+- **Test ID count mismatch** – Fixed test description "17 Settings Overlay IDs" → "18" to match actual assertion (#112)
 - **Local Whisper – listModels API contract mismatch** – Handler now returns `{ success, models }` matching preload types; Settings UI correctly shows model download status (#111)
 - **Local Whisper – download progress display** – Progress callback sends `{ percent, downloadedBytes, totalBytes }` matching renderer expectations; progress bar updates during model downloads (#111)
 - **Local Whisper – download timeout** – Wired `DOWNLOAD_TIMEOUT` (10 min) into fetch calls via `AbortSignal.timeout()` + `AbortSignal.any()`; stalled downloads no longer hang indefinitely (#111)

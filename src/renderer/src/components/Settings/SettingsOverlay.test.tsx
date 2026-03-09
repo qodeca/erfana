@@ -15,7 +15,7 @@
  * - Logging section (6 tests)
  * - Editor section (5 tests)
  * - Git status section (11 tests)
- * - Transcription section (10 tests)
+ * - Transcription section (31 tests)
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -1391,6 +1391,897 @@ describe('SettingsOverlay', () => {
       expect(localOption).toBeInTheDocument()
       expect(localOption).toHaveTextContent('Local (macOS only)')
       expect(localOption).toBeDisabled()
+    })
+
+    it('changing backend dropdown calls updateTranscriptionBackend', () => {
+      const mockUpdateTranscriptionBackend = vi.fn()
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: mockUpdateTranscriptionBackend,
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const dropdown = screen.getByTestId('settings-select-transcription-backend')
+      fireEvent.change(dropdown, { target: { value: 'local' } })
+
+      expect(mockUpdateTranscriptionBackend).toHaveBeenCalledWith('local')
+    })
+
+    it('changing whisper model dropdown calls updateWhisperModel', () => {
+      const mockUpdateWhisperModel = vi.fn()
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: mockUpdateWhisperModel
+      })
+
+      render(<SettingsOverlay />)
+
+      const dropdown = screen.getByTestId('settings-select-whisper-model')
+      fireEvent.change(dropdown, { target: { value: 'small' } })
+
+      expect(mockUpdateWhisperModel).toHaveBeenCalledWith('small')
+    })
+
+    it('clicking "Download model" calls ensureBinary and ensureModel', async () => {
+      ;(window as any).api.whisper.listModels = vi.fn().mockResolvedValue({
+        success: true,
+        models: [{ name: 'base', size: 142000000, installed: false }]
+      })
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-btn-whisper-model')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByTestId('settings-btn-whisper-model'))
+
+      await waitFor(() => {
+        expect((window as any).api.whisper.ensureBinary).toHaveBeenCalled()
+      })
+      await waitFor(() => {
+        expect((window as any).api.whisper.ensureModel).toHaveBeenCalledWith('base')
+      })
+    })
+
+    it('download progress shows percentage in status and "Downloading..." on button', async () => {
+      let progressCallback: ((progress: { percent: number; downloadedBytes: number; totalBytes: number }) => void) | undefined
+      ;(window as any).api.whisper.onDownloadProgress = vi.fn().mockImplementation((cb: any) => {
+        progressCallback = cb
+        return vi.fn()
+      })
+      ;(window as any).api.whisper.listModels = vi.fn().mockResolvedValue({
+        success: true,
+        models: [{ name: 'base', size: 142000000, installed: false }]
+      })
+      // Make ensureBinary return a promise that won't resolve during the test
+      ;(window as any).api.whisper.ensureBinary = vi.fn().mockReturnValue(new Promise(() => {}))
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-btn-whisper-model')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByTestId('settings-btn-whisper-model'))
+
+      // Button should show "Downloading..."
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-btn-whisper-model')).toHaveTextContent('Downloading...')
+      })
+
+      // Trigger progress callback
+      progressCallback?.({ percent: 42, downloadedBytes: 59640000, totalBytes: 142000000 })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-whisper-model-status')).toHaveTextContent('Downloading... (42%)')
+      })
+    })
+
+    it('model status shows "Model not downloaded" when model is not installed', async () => {
+      ;(window as any).api.whisper.listModels = vi.fn().mockResolvedValue({
+        success: true,
+        models: [{ name: 'base', size: 142000000, installed: false }]
+      })
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-whisper-model-status')).toHaveTextContent('Model not downloaded')
+      })
+    })
+
+    it('API key input blur saves key via IPC', async () => {
+      ;(window as any).api.transcription.hasApiKey = vi.fn().mockResolvedValue(false)
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-input-api-key')).toBeInTheDocument()
+      })
+
+      const input = screen.getByTestId('settings-input-api-key')
+      fireEvent.blur(input, { target: { value: 'sk-testkey12345678901234567890' } })
+
+      await waitFor(() => {
+        expect((window as any).api.transcription.setApiKey).toHaveBeenCalledWith('sk-testkey12345678901234567890')
+      })
+    })
+
+    it('API key shorter than 8 characters is silently rejected', async () => {
+      ;(window as any).api.transcription.hasApiKey = vi.fn().mockResolvedValue(false)
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-input-api-key')).toBeInTheDocument()
+      })
+
+      const input = screen.getByTestId('settings-input-api-key')
+      fireEvent.blur(input, { target: { value: 'short' } })
+
+      // Should not call setApiKey for keys shorter than 8 characters
+      expect((window as any).api.transcription.setApiKey).not.toHaveBeenCalled()
+    })
+
+    it('"Remove key" click calls clearApiKey', async () => {
+      ;(window as any).api.transcription.hasApiKey = vi.fn().mockResolvedValue(true)
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-btn-clear-api-key')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByTestId('settings-btn-clear-api-key'))
+
+      await waitFor(() => {
+        expect((window as any).api.transcription.clearApiKey).toHaveBeenCalled()
+      })
+    })
+
+    it('backend dropdown is disabled when settings is null', () => {
+      useGlobalSettingsStore.setState({
+        settings: null as unknown as GlobalSettings,
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const dropdown = screen.getByTestId('settings-select-transcription-backend')
+      expect(dropdown).toBeDisabled()
+    })
+
+    it('whisper model dropdown is disabled during download', async () => {
+      ;(window as any).api.whisper.listModels = vi.fn().mockResolvedValue({
+        success: true,
+        models: [{ name: 'base', size: 142000000, installed: false }]
+      })
+      // Never-resolving promise keeps download in progress
+      ;(window as any).api.whisper.ensureBinary = vi.fn().mockReturnValue(new Promise(() => {}))
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-btn-whisper-model')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByTestId('settings-btn-whisper-model'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-select-whisper-model')).toBeDisabled()
+      })
+    })
+
+    it('local option is enabled and shows "Local (whisper.cpp)" on macOS', () => {
+      ;(window as any).api.utils.getPlatform = vi.fn().mockReturnValue('darwin')
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const backendDropdown = screen.getByTestId('settings-select-transcription-backend')
+      const localOption = Array.from(backendDropdown.querySelectorAll('option')).find(
+        (opt) => opt.value === 'local'
+      )
+
+      expect(localOption).toBeInTheDocument()
+      expect(localOption).toHaveTextContent('Local (whisper.cpp)')
+      expect(localOption).not.toBeDisabled()
+    })
+
+    it('download failure shows inline error message', async () => {
+      ;(window as any).api.whisper.listModels = vi.fn().mockResolvedValue({
+        success: true,
+        models: [{ name: 'base', size: 142000000, installed: false }]
+      })
+      ;(window as any).api.whisper.ensureBinary = vi.fn().mockRejectedValue(new Error('Network error'))
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-btn-whisper-model')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByTestId('settings-btn-whisper-model'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-whisper-download-error')).toBeInTheDocument()
+      })
+      expect(screen.getByTestId('settings-whisper-download-error')).toHaveTextContent('Network error')
+    })
+
+    it('ensureBinary succeeds but ensureModel returns { success: false } shows error', async () => {
+      ;(window as any).api.whisper.listModels = vi.fn().mockResolvedValue({
+        success: true,
+        models: [{ name: 'base', size: 142000000, installed: false }]
+      })
+      ;(window as any).api.whisper.ensureBinary = vi.fn().mockResolvedValue({ success: true, path: '/path/to/binary' })
+      ;(window as any).api.whisper.ensureModel = vi.fn().mockResolvedValue({ success: false, error: 'Model download failed' })
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-btn-whisper-model')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByTestId('settings-btn-whisper-model'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-whisper-download-error')).toHaveTextContent('Model download failed')
+      })
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Failed to download whisper model',
+        expect.objectContaining({ error: 'Model download failed' })
+      )
+    })
+
+    it('ensureModel returns { success: false } without error field shows fallback message', async () => {
+      ;(window as any).api.whisper.listModels = vi.fn().mockResolvedValue({
+        success: true,
+        models: [{ name: 'base', size: 142000000, installed: false }]
+      })
+      ;(window as any).api.whisper.ensureBinary = vi.fn().mockResolvedValue({ success: true, path: '/path/to/binary' })
+      ;(window as any).api.whisper.ensureModel = vi.fn().mockResolvedValue({ success: false })
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-btn-whisper-model')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByTestId('settings-btn-whisper-model'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-whisper-download-error')).toHaveTextContent('Download failed')
+      })
+    })
+
+    it('download error clears when whisper model dropdown changes', async () => {
+      ;(window as any).api.whisper.listModels = vi.fn().mockResolvedValue({
+        success: true,
+        models: [{ name: 'base', size: 142000000, installed: false }]
+      })
+      ;(window as any).api.whisper.ensureBinary = vi.fn().mockRejectedValue(new Error('Network error'))
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-btn-whisper-model')).toBeInTheDocument()
+      })
+
+      // Trigger download failure
+      fireEvent.click(screen.getByTestId('settings-btn-whisper-model'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-whisper-download-error')).toBeInTheDocument()
+      })
+
+      // Change whisper model – error should clear
+      const dropdown = screen.getByTestId('settings-select-whisper-model')
+      fireEvent.change(dropdown, { target: { value: 'small' } })
+
+      expect(screen.queryByTestId('settings-whisper-download-error')).not.toBeInTheDocument()
+    })
+
+    it('download error clears on backend switch', async () => {
+      ;(window as any).api.whisper.listModels = vi.fn().mockResolvedValue({
+        success: true,
+        models: [{ name: 'base', size: 142000000, installed: false }]
+      })
+      ;(window as any).api.whisper.ensureBinary = vi.fn().mockRejectedValue(new Error('Network error'))
+
+      const mockUpdateTranscriptionBackend = vi.fn()
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: mockUpdateTranscriptionBackend,
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-btn-whisper-model')).toBeInTheDocument()
+      })
+
+      // Trigger download failure
+      fireEvent.click(screen.getByTestId('settings-btn-whisper-model'))
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-whisper-download-error')).toBeInTheDocument()
+      })
+
+      // Switch backend to openai – downloadError should be cleared
+      const backendDropdown = screen.getByTestId('settings-select-transcription-backend')
+      fireEvent.change(backendDropdown, { target: { value: 'openai' } })
+
+      expect(mockUpdateTranscriptionBackend).toHaveBeenCalledWith('openai')
+      // The local section unmounts on backend switch, but downloadError state was cleared
+      // by the onChange handler before the re-render
+      expect(screen.queryByTestId('settings-whisper-download-error')).not.toBeInTheDocument()
+    })
+
+    it('API key with exactly 8 characters is accepted', async () => {
+      ;(window as any).api.transcription.hasApiKey = vi.fn().mockResolvedValue(false)
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-input-api-key')).toBeInTheDocument()
+      })
+
+      const input = screen.getByTestId('settings-input-api-key')
+      fireEvent.blur(input, { target: { value: '12345678' } })
+
+      await waitFor(() => {
+        expect((window as any).api.transcription.setApiKey).toHaveBeenCalledWith('12345678')
+      })
+    })
+
+    it('API key with 7 characters is rejected', async () => {
+      ;(window as any).api.transcription.hasApiKey = vi.fn().mockResolvedValue(false)
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-input-api-key')).toBeInTheDocument()
+      })
+
+      const input = screen.getByTestId('settings-input-api-key')
+      fireEvent.blur(input, { target: { value: '1234567' } })
+
+      expect((window as any).api.transcription.setApiKey).not.toHaveBeenCalled()
+    })
+
+    it('API key with whitespace-only is rejected', async () => {
+      ;(window as any).api.transcription.hasApiKey = vi.fn().mockResolvedValue(false)
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-input-api-key')).toBeInTheDocument()
+      })
+
+      const input = screen.getByTestId('settings-input-api-key')
+      fireEvent.blur(input, { target: { value: '        ' } })
+
+      expect((window as any).api.transcription.setApiKey).not.toHaveBeenCalled()
+    })
+
+    it('download progress at boundary values (0% and 100%)', async () => {
+      let progressCallback: ((progress: { percent: number; downloadedBytes: number; totalBytes: number }) => void) | undefined
+      ;(window as any).api.whisper.onDownloadProgress = vi.fn().mockImplementation((cb: any) => {
+        progressCallback = cb
+        return vi.fn()
+      })
+      ;(window as any).api.whisper.listModels = vi.fn().mockResolvedValue({
+        success: true,
+        models: [{ name: 'base', size: 142000000, installed: false }]
+      })
+      // Never-resolving promise keeps download in progress
+      ;(window as any).api.whisper.ensureBinary = vi.fn().mockReturnValue(new Promise(() => {}))
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-btn-whisper-model')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByTestId('settings-btn-whisper-model'))
+
+      // Wait for downloading state
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-btn-whisper-model')).toHaveTextContent('Downloading...')
+      })
+
+      // Test 0%
+      progressCallback?.({ percent: 0, downloadedBytes: 0, totalBytes: 142000000 })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-whisper-model-status')).toHaveTextContent('Downloading... (0%)')
+      })
+
+      // Test 100%
+      progressCallback?.({ percent: 100, downloadedBytes: 142000000, totalBytes: 142000000 })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-whisper-model-status')).toHaveTextContent('Downloading... (100%)')
+      })
+    })
+
+    it('invalid backend value is rejected by Zod and logs warning', () => {
+      const mockUpdateTranscriptionBackend = vi.fn()
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: mockUpdateTranscriptionBackend,
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      // jsdom resets <select> to "" when value doesn't match any option
+      const dropdown = screen.getByTestId('settings-select-transcription-backend')
+      fireEvent.change(dropdown, { target: { value: 'invalid_backend' } })
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Invalid transcription backend selected',
+        expect.objectContaining({ value: expect.any(String) })
+      )
+      expect(mockUpdateTranscriptionBackend).not.toHaveBeenCalled()
     })
   })
 })

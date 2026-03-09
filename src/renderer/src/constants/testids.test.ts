@@ -105,10 +105,10 @@ describe('TEST_IDS', () => {
       expect(gitIds).toHaveLength(4)
     })
 
-    it('should have 17 Settings Overlay IDs', async () => {
+    it('should have 18 Settings Overlay IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const settingsIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('SETTINGS_'))
-      expect(settingsIds).toHaveLength(17)
+      expect(settingsIds).toHaveLength(18)
     })
 
     it('should have 10 Transcription Dialog IDs', async () => {

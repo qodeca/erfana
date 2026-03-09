@@ -79,6 +79,7 @@ export function SettingsOverlay() {
   const [installedModels, setInstalledModels] = useState<WhisperModel[]>([])
   const [modelDownloading, setModelDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState<{ percent: number; downloadedBytes: number; totalBytes: number } | null>(null)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
 
   /**
    * Check if an API key is stored on overlay open.
@@ -128,17 +129,28 @@ export function SettingsOverlay() {
 
     setModelDownloading(true)
     setDownloadProgress({ percent: 0, downloadedBytes: 0, totalBytes: 0 })
+    setDownloadError(null)
     try {
       // Ensure binary is available before downloading the model
-      await window.api.whisper.ensureBinary()
+      const binaryResult = await window.api.whisper.ensureBinary()
+      if (!binaryResult.success) {
+        const errorMsg = binaryResult.error || 'Binary setup failed'
+        setDownloadError(errorMsg)
+        logger.warn('Failed to ensure whisper binary', { error: binaryResult.error })
+        return
+      }
 
       const result = await window.api.whisper.ensureModel(model)
       if (result.success) {
         setInstalledModels((prev) => prev.includes(model) ? prev : [...prev, model])
       } else {
+        const errorMsg = result.error || 'Download failed'
+        setDownloadError(errorMsg)
         logger.warn('Failed to download whisper model', { error: result.error })
       }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Download failed'
+      setDownloadError(errorMsg)
       logger.error('Failed to download whisper model', error instanceof Error ? error : undefined)
     } finally {
       setModelDownloading(false)
@@ -153,7 +165,7 @@ export function SettingsOverlay() {
   const handleSaveApiKey = useCallback(
     async (e: React.FocusEvent<HTMLInputElement>) => {
       const value = e.target.value.trim()
-      if (!value) return
+      if (!value || value.length < 8) return
 
       try {
         const result = await window.api.transcription.setApiKey(value)
@@ -389,6 +401,7 @@ export function SettingsOverlay() {
                   onChange={(e) => {
                     const result = TranscriptionBackendSchema.safeParse(e.target.value)
                     if (result.success) {
+                      setDownloadError(null)
                       updateTranscriptionBackend(result.data)
                     } else {
                       logger.warn('Invalid transcription backend selected', { value: e.target.value })
@@ -458,6 +471,7 @@ export function SettingsOverlay() {
                         const result = WhisperModelSchema.safeParse(e.target.value)
                         if (result.success) {
                           updateWhisperModel(result.data)
+                          setDownloadError(null)
                         } else {
                           logger.warn('Invalid whisper model selected', { value: e.target.value })
                         }
@@ -503,6 +517,16 @@ export function SettingsOverlay() {
                       )}
                     </div>
                   </div>
+                  {downloadError && (
+                    <div className="settings-row">
+                      <p
+                        className="settings-inline-error"
+                        data-testid={TEST_IDS.SETTINGS_WHISPER_DOWNLOAD_ERROR}
+                      >
+                        {downloadError}
+                      </p>
+                    </div>
+                  )}
                 </>
               )}
             </section>

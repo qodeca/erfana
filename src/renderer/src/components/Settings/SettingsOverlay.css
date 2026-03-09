@@ -297,6 +297,11 @@
   border-color: var(--color-border-subtle);
 }
 
+.settings-btn-secondary:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
 .settings-btn-secondary:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;
@@ -314,4 +319,12 @@
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   font-weight: var(--font-medium);
+}
+
+/* Settings Inline Error - Error message below controls */
+.settings-inline-error {
+  font-size: var(--text-sm);
+  color: var(--color-error);
+  margin: 0;
+  line-height: var(--leading-normal);
 }

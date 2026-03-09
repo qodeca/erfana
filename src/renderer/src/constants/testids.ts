@@ -446,7 +446,7 @@ export const TEST_IDS = {
   TOAST_BTN_DISMISS: 'toast-btn-dismiss',
 
   // =========================================================================
-  // Settings Overlay (17)
+  // Settings Overlay (18)
   // =========================================================================
 
   /** Settings overlay container */
@@ -483,6 +483,8 @@ export const TEST_IDS = {
   SETTINGS_BTN_WHISPER_MODEL: 'settings-btn-whisper-model',
   /** Whisper model status text */
   SETTINGS_WHISPER_MODEL_STATUS: 'settings-whisper-model-status',
+  /** Whisper download error message */
+  SETTINGS_WHISPER_DOWNLOAD_ERROR: 'settings-whisper-download-error',
 
   // =========================================================================
   // Transcription Dialog (10)
