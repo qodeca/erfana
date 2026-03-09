@@ -84,7 +84,7 @@ source: "meeting.mp4"
 type: video
 duration: "45:30"
 resolution: "1920x1080"
-codec: "h264"
+video_codec: "h264"
 date: "2026-03-07T..."
 language: en
 transcription_backend: openai
