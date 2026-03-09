@@ -132,10 +132,9 @@ MediaConverter (implements IConverter)
    ---
    source: /path/to/original/file.mp3
    duration: "5:30"
-   transcribed: 2025-12-22T18:00:00Z
+   date: 2025-12-22T18:00:00Z
    language: en
-   backend: openai
-   model: gpt-4o-transcribe
+   transcription_backend: openai
    ---
    ```
 
