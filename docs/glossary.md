@@ -47,6 +47,8 @@ Project-specific terminology used in Erfana documentation and code.
 | **GlobalSettingsService** | Application-wide settings in `~/.erfana/` |
 | **ProjectLockService** | File-based locking for multi-instance support |
 | **TranscriptionService** | Audio-to-text transcription via OpenAI API (GPT-4o-transcribe, Whisper-1 fallback) |
+| **LocalWhisperService** | Offline transcription via whisper.cpp child process (macOS only), format conversion, chunking with overlap |
+| **WhisperModelManager** | Downloads/manages whisper.cpp binary and GGML models, stored in `{userData}/whisper/` |
 | **AudioMetadataService** | Extracts duration, format, bitrate from audio files using music-metadata |
 | **AudioExtractionService** | Extracts audio tracks from video files using ffmpeg for transcription pipeline input |
 | **ApiKeyService** | Encrypts/decrypts API keys using Electron safeStorage |

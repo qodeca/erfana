@@ -293,6 +293,67 @@ Transcribe an audio file to text.
 
 ---
 
+## WhisperModelManager
+
+**File:** `src/main/services/WhisperModelManager.ts`
+
+Manages whisper.cpp binary and model downloads for local transcription. Stores assets in the Electron `userData` directory.
+
+### Key Features
+- Downloads whisper.cpp binary and GGML model files
+- Model sizes: tiny, base, small, medium, large (sizes from `LOCAL_WHISPER.MODEL_SIZES`)
+- Download progress reporting via callback (`{ percent, downloadedBytes, totalBytes }`)
+- Download timeout via `AbortSignal.timeout(LOCAL_WHISPER.DOWNLOAD_TIMEOUT)` (10 min)
+- Binary and model availability checks
+- Storage in `{userData}/whisper/` directory
+- Version managed via `LOCAL_WHISPER.VERSION` in shared constants
+- macOS only – rejects on other platforms with `WHISPER_UNSUPPORTED_PLATFORM`
+
+### Public Methods
+- `ensureBinary(onProgress?, signal?)` – Download binary if missing (returns path)
+- `ensureModel(model, onProgress?, signal?)` – Download model if missing (returns path)
+- `isModelDownloaded(model)` / `isBinaryAvailable()` – Availability checks
+- `listInstalledModels()` / `getModelInfo(model)` – Installed model queries
+- `deleteModel(model)` – Remove a downloaded model
+- `getModelPath(model)` / `getBinaryPath()` – Filesystem path getters
+
+---
+
+## LocalWhisperService
+
+**File:** `src/main/services/LocalWhisperService.ts`
+
+Local audio transcription using whisper.cpp as a child process. Provides offline transcription without API dependencies.
+
+### Key Features
+- Runs whisper.cpp as a child process (no native bindings)
+- Format conversion for non-WAV input files (MP3 always converted via ffmpeg for reliability)
+- File chunking for long recordings with `CHUNK_OVERLAP_SECONDS` (0.5s) at boundaries to prevent word loss
+- Progress reporting via callback
+- AbortSignal cancellation support
+- Process timeout via `WHISPER_PROCESS_TIMEOUT`
+
+### Public Methods
+
+#### `transcribe(filePath: string, language: TranscriptionLanguage, model: WhisperModel, onProgress: (progress: TranscriptionProgress) => void, signal?: AbortSignal): Promise<TranscriptionResult>`
+Transcribe an audio file using the local whisper.cpp backend.
+
+**Parameters:**
+- `filePath` – Absolute path to the audio file
+- `language` – Language code or `'auto'` for detection
+- `model` – Whisper model size (tiny/base/small/medium/large)
+- `onProgress` – Callback for UI progress updates
+- `signal` – Optional AbortSignal for cancellation
+
+**Returns:** Same shape as `TranscriptionService.transcribe()` – `{ success, transcript, duration, language, error, errorCode }`
+
+### Related Files
+- `src/main/services/WhisperModelManager.ts` – Binary and model management
+- `src/main/ipc/transcription-handlers.ts` – Backend routing logic
+- `src/shared/ipc/transcription-schema.ts` – TranscriptionBackendSchema, WhisperModelSchema
+
+---
+
 ## ApiKeyService
 
 **File:** `src/main/services/ApiKeyService.ts`
@@ -309,35 +370,11 @@ Manages API key encryption/decryption using Electron's safeStorage API. Service-
 - Never logs API key values
 
 ### Public Methods
-
-#### `storeKey(serviceName: string, key: string): Promise<void>`
-Store an API key encrypted with safeStorage.
-
-**Parameters:**
-- `serviceName` – Service identifier (e.g., `'openai'`)
-- `key` – The API key to store
-
----
-
-#### `getKey(serviceName: string): Promise<string | null>`
-Retrieve a stored API key (decrypted).
-
-**Returns:** The decrypted API key, or `null` if not found.
-
----
-
-#### `hasKey(serviceName: string): boolean`
-Check if an API key exists (uses in-memory cache).
-
----
-
-#### `clearKey(serviceName: string): Promise<void>`
-Remove a stored API key.
-
----
-
-#### `initializeCache(serviceNames: string[]): Promise<void>`
-Populate the `hasKey()` cache by checking the filesystem. Call after app is ready.
+- `storeKey(serviceName, key)` – Encrypt and store an API key
+- `getKey(serviceName)` – Retrieve decrypted key (returns `null` if not found)
+- `hasKey(serviceName)` – Check existence (in-memory cache)
+- `clearKey(serviceName)` – Remove a stored key
+- `initializeCache(serviceNames)` – Populate `hasKey()` cache from filesystem (call after app ready)
 
 ---
 
@@ -397,52 +434,14 @@ Extracts audio tracks from video files using ffmpeg for transcription pipeline i
 - Automatic temp file cleanup
 
 ### Public Methods
-
-#### `isAvailable(): boolean`
-Check if ffmpeg binaries are available.
-
----
-
-#### `hasAudioStream(filePath: string): Promise<boolean>`
-Check if a video file contains an audio track.
-
-**Parameters:**
-- `filePath` – Absolute path to the video file
-
-**Returns:** `true` if the video contains at least one audio stream.
-
----
-
-#### `extractAudio(filePath: string, onProgress?: (percent: number) => void, signal?: AbortSignal): Promise<ExtractionResult>`
-Extract audio from a video file to a temporary MP3 file.
-
-**Parameters:**
-- `filePath` – Absolute path to the video file
-- `onProgress` – Optional callback for extraction progress (0–100)
-- `signal` – Optional AbortSignal for cancellation
-
-**Returns:**
-- `audioPath` – Path to the extracted temporary audio file
-- `duration` – Audio duration in seconds
-- `error` – Error message (on failure)
-- `errorCode` – `VIDEO_NO_AUDIO_TRACK`, `VIDEO_EXTRACTION_FAILED`, or `VIDEO_FFMPEG_UNAVAILABLE`
-
----
-
-#### `getVideoMetadata(filePath: string): Promise<VideoMetadata>`
-Get video file metadata.
-
-**Returns:** `{ duration, resolution, videoCodec, audioCodec, fileSize }`
-
----
-
-#### `cleanupTempFile(filePath: string): Promise<void>`
-Remove a temporary extracted audio file.
+- `isAvailable()` – Check if ffmpeg binaries are available
+- `hasAudioStream(filePath)` – Check if video contains an audio track
+- `extractAudio(filePath, onProgress?, signal?)` – Extract audio to temp MP3; returns `{ audioPath, duration, error?, errorCode? }`
+- `getVideoMetadata(filePath)` – Returns `{ duration, resolution, videoCodec, audioCodec, fileSize }`
+- `cleanupTempFile(filePath)` – Remove temporary extracted audio file
 
 ### Error Codes
-- `VIDEO_NO_AUDIO_TRACK` – Video file has no audio stream
-- `VIDEO_EXTRACTION_FAILED` – ffmpeg extraction process failed
-- `VIDEO_FFMPEG_UNAVAILABLE` – ffmpeg binaries not found
+- `VIDEO_NO_AUDIO_TRACK`, `VIDEO_EXTRACTION_FAILED`, `VIDEO_FFMPEG_UNAVAILABLE`
 
 ### Related Files
 - `src/main/services/import/converters/VideoConverter.ts` – Import pipeline converter

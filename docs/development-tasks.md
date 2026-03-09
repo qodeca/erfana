@@ -138,7 +138,7 @@ The import pipeline uses `ConverterRegistry` to match file extensions to convert
 
 3. Add extension to `SUPPORTED_EXTENSIONS` in `src/shared/constants.ts` if not already present.
 
-**Example**: See `AudioConverter.ts` – converts audio files to markdown via OpenAI transcription.
+**Example**: See `AudioConverter.ts` – converts audio files to markdown via transcription (OpenAI or local whisper.cpp).
 
 See: [API Services – Features](./api-services-features.md) for service documentation
 

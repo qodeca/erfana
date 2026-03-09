@@ -1,6 +1,6 @@
 # Transcription components
 
-Media import dialog for audio/video transcription via OpenAI API.
+Media import dialog for audio/video transcription – dual backend: OpenAI API (cloud) or local whisper.cpp (offline, macOS only).
 
 ## Architecture
 
@@ -23,7 +23,9 @@ useTranscriptionStore.ts ← Zustand store (stores/)
 ```
 renderer                          main
    │                                │
-   ├─ transcription:import ────────►│ TranscriptionService.transcribe()
+   ├─ transcription:import ────────►│ routes by backend setting:
+   │                                │   openai → TranscriptionService.transcribe()
+   │                                │   local  → LocalWhisperService.transcribe()
    │◄─ transcription:progress ──────┤ (streamed events)
    │◄─ result ──────────────────────┤
    │                                │
@@ -31,7 +33,14 @@ renderer                          main
    │                                │
    Video files:                     │
    │────────────────────────────────►│ AudioExtractionService.extractAudio()
-   │                                │ → then TranscriptionService.transcribe()
+   │                                │ → then route by backend (as above)
+   │                                │
+   Whisper model management:        │
+   ├─ whisper:ensureBinary ────────►│ WhisperModelManager.ensureBinary()
+   ├─ whisper:ensureModel ─────────►│ WhisperModelManager.ensureModel()
+   ├─ whisper:listModels ──────────►│ WhisperModelManager.listInstalledModels()
+   ├─ whisper:deleteModel ─────────►│ WhisperModelManager.deleteModel()
+   │◄─ whisper:downloadProgress ────┤ (streamed during downloads)
 ```
 
 ## State management
@@ -51,9 +60,11 @@ renderer                          main
 
 ## Related files
 
-- `src/shared/ipc/transcription-schema.ts` – Zod schemas, `TranscriptionLanguage` type
-- `src/shared/ipc/transcription-channels.ts` – IPC channel constants
-- `src/shared/constants.ts` – `VIDEO_IMPORT.SUPPORTED_EXTENSIONS`
-- `src/main/services/TranscriptionService.ts` – backend transcription
-- `src/main/services/AudioExtractionService.ts` – video → audio extraction
-- `src/main/ipc/transcription-handlers.ts` – IPC handlers
+- `src/shared/ipc/transcription-schema.ts` – Zod schemas (`TranscriptionLanguage`, `WhisperModelSchema`, `TranscriptionBackendSchema`)
+- `src/shared/ipc/transcription-channels.ts` – IPC channel constants (transcription + whisper model management)
+- `src/shared/constants.ts` – `VIDEO_IMPORT.SUPPORTED_EXTENSIONS`, `LOCAL_WHISPER` (version, model sizes, timeouts)
+- `src/main/services/TranscriptionService.ts` – OpenAI backend transcription
+- `src/main/services/LocalWhisperService.ts` – Local whisper.cpp backend (macOS only)
+- `src/main/services/WhisperModelManager.ts` – Binary and model download management
+- `src/main/services/AudioExtractionService.ts` – Video → audio extraction
+- `src/main/ipc/transcription-handlers.ts` – IPC handlers (backend routing, whisper model management)

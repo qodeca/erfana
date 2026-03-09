@@ -315,7 +315,7 @@ Opens when clicking image files (PNG, JPG, GIF, WebP, SVG, BMP, ICO) in project 
 
 **Location**: `src/renderer/src/components/Transcription/`
 
-Modal dialog for media file import with OpenAI transcription. Composes on `BaseDialog` for portal rendering, overlay, and focus management. Mounted in `App.tsx` and opened automatically when importing audio (MP3, WAV, M4A, OGG, FLAC) or video (MP4, MOV, AVI, MKV, WebM, FLV, WMV) files. Media files are detected by `useImport` and routed to the dialog with pre-validation.
+Modal dialog for media file import with transcription (OpenAI API or local whisper.cpp). Composes on `BaseDialog` for portal rendering, overlay, and focus management. Mounted in `App.tsx` and opened automatically when importing audio (MP3, WAV, M4A, OGG, FLAC) or video (MP4, MOV, AVI, MKV, WebM, FLV, WMV) files. Media files are detected by `useImport` and routed to the dialog with pre-validation.
 
 **Components**:
 - `TranscriptionDialog.tsx` – Composes on BaseDialog; progress bar, error display, cancel

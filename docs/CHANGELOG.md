@@ -7,6 +7,29 @@ Historical changelog entries for versions prior to current. For the latest chang
 ## Unreleased
 
 ### Added
+- **Local Whisper transcription** – Added offline transcription via whisper.cpp child process with model selection (tiny/base/small/medium/large), download management with progress, and settings UI integration (#111)
+  - New services: WhisperModelManager (binary and model download, storage in userData), LocalWhisperService (local transcription, format conversion, chunking)
+  - Extended TranscriptionBackendSchema with `'local'` option
+  - Added WhisperModelSchema for model size validation
+  - Whisper model management IPC channels
+  - Settings overlay: model selector and download controls (shown when backend is 'local')
+  - Backend routing in transcription handlers
+  - Dynamic `transcription_backend` frontmatter field
+  - Closes #111
+
+### Fixed
+- **Local Whisper – listModels API contract mismatch** – Handler now returns `{ success, models }` matching preload types; Settings UI correctly shows model download status (#111)
+- **Local Whisper – download progress display** – Progress callback sends `{ percent, downloadedBytes, totalBytes }` matching renderer expectations; progress bar updates during model downloads (#111)
+- **Local Whisper – download timeout** – Wired `DOWNLOAD_TIMEOUT` (10 min) into fetch calls via `AbortSignal.timeout()` + `AbortSignal.any()`; stalled downloads no longer hang indefinitely (#111)
+- **Local Whisper – chunk overlap** – Local backend now uses `CHUNK_OVERLAP_SECONDS` (0.5s) at chunk boundaries, preventing word loss on long recordings (#111)
+- **Local Whisper – platform guard** – "Local (whisper.cpp)" option disabled on non-macOS with "(macOS only)" label (#111)
+- **Local Whisper – binary download UX** – Settings triggers `ensureBinary()` alongside model download so the whisper-cli binary is not silently downloaded on first transcription (#111)
+- **Local Whisper – version centralization** – Moved `WHISPER_VERSION` from local constant to `LOCAL_WHISPER.VERSION` in shared constants (#111)
+- **Local Whisper – MP3 native format** – Removed MP3 from `NATIVE_EXTENSIONS`; all MP3 files now convert via ffmpeg for reliable playback (#111)
+- **Local Whisper – error codes** – `deleteModel` uses `WHISPER_MODEL_NOT_FOUND` instead of misleading `WHISPER_PROCESS_FAILED` (#111)
+- **Local Whisper – magic numbers** – Replaced ffmpeg probe timeout `30_000` with named `FFMPEG_PROBE_TIMEOUT` constant (#111)
+- **Local Whisper – hardcoded model sizes** – Settings overlay uses `LOCAL_WHISPER.MODEL_SIZES` from shared constants (#111)
+- **Transcription retry button test ID** – Added distinct `TRANSCRIPTION_BTN_RETRY` test ID instead of reusing `TRANSCRIPTION_BTN_START` (#111)
 - **Post-transcription behaviors** (Spec #009): Auto-open transcript and organize-import prompt (#113)
   - Done button in TranscriptionDialog opens the transcript markdown file in an editor tab (AC-022)
   - After dialog dismiss, triggers organize-import prompt in the terminal (AC-019)

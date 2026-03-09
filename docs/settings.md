@@ -39,10 +39,14 @@ Full-screen settings dialog for app-wide configuration.
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| Backend | Transcription backend selection (OpenAI) | openai |
-| OpenAI API key | API key for OpenAI transcription (stored encrypted via Electron safeStorage in `~/.erfana/`) | – |
+| Backend | Transcription backend selection – OpenAI (cloud API) or Local (whisper.cpp, offline) | openai |
+| OpenAI API key | API key for OpenAI transcription (stored encrypted via Electron safeStorage in `~/.erfana/`). Shown when backend is 'openai'. | – |
+| Whisper model | Model size for local transcription: tiny, base, small, medium, large. Shown when backend is 'local'. | – |
+| Model download | Download controls for whisper.cpp binary and selected model with progress indicator. Shown when backend is 'local'. | – |
 
 **API key security**: Keys are encrypted using platform-native keychain (macOS Keychain, Linux libsecret, Windows DPAPI). The global settings JSON only stores a boolean `openaiApiKeyStored` flag, never the key itself. Plaintext fallback with warning if safeStorage unavailable.
+
+**Local backend** (macOS only): When backend is set to 'local', transcription runs entirely offline via whisper.cpp child process. The binary and model files are stored in the Electron `userData` directory. Model download (which also downloads the whisper-cli binary) is required before first use – progress is shown in the settings UI. On non-macOS platforms the "Local" option is disabled with a "(macOS only)" label. Downloads have a 10-minute timeout to prevent indefinite hangs.
 
 ## Storage
 

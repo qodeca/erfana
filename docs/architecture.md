@@ -82,10 +82,13 @@ src/
 │   │   ├── PdfService.ts        # PDF export
 │   │   ├── DocxService.ts       # DOCX export
 │   │   ├── TranscriptionService.ts  # OpenAI audio transcription with chunking
+│   │   ├── LocalWhisperService.ts   # Local whisper.cpp transcription (macOS)
+│   │   ├── WhisperModelManager.ts   # Whisper binary and model downloads
 │   │   ├── AudioMetadataService.ts  # Audio metadata extraction (music-metadata)
+│   │   ├── AudioExtractionService.ts # Video → audio extraction (ffmpeg)
 │   │   ├── ApiKeyService.ts     # Encrypted API key storage (Electron safeStorage)
 │   │   ├── TerminalService.ts   # PTY management with node-pty
-│   │   └── import/converters/AudioConverter.ts  # Audio import (IConverter)
+│   │   └── import/converters/   # Audio/VideoConverter (IConverter)
 │   ├── ipc/
 │   │   ├── file-handlers.ts     # IPC handlers
 │   │   ├── file-watcher-handlers.ts  # File watching IPC
