@@ -79,7 +79,7 @@ export class VideoConverter implements IConverter {
    * @param filePath - Absolute path to the video file
    * @returns Conversion result with markdown content or error
    */
-  async convert(filePath: string): Promise<ConversionResult> {
+  async convert(filePath: string, backend: string = 'openai'): Promise<ConversionResult> {
     // Check ffmpeg availability
     if (!this.audioExtractionService.isAvailable()) {
       return {
@@ -122,10 +122,10 @@ export class VideoConverter implements IConverter {
     const isLongVideo = durationSeconds > TRANSCRIPTION.CHUNK_BOUNDARY_SECONDS
 
     if (isLongVideo) {
-      return this.convertLongVideo(filePath, durationSeconds, videoMetadata)
+      return this.convertLongVideo(filePath, durationSeconds, videoMetadata, backend)
     }
 
-    return this.convertShortVideo(filePath, videoMetadata)
+    return this.convertShortVideo(filePath, videoMetadata, backend)
   }
 
   /**
@@ -133,7 +133,8 @@ export class VideoConverter implements IConverter {
    */
   private async convertShortVideo(
     filePath: string,
-    videoMetadata?: VideoMetadata
+    videoMetadata?: VideoMetadata,
+    backend: string = 'openai'
   ): Promise<ConversionResult> {
     let extraction: ExtractionResult
     try {
@@ -166,7 +167,8 @@ export class VideoConverter implements IConverter {
         result.language || 'auto',
         result.transcript,
         videoMetadata?.resolution,
-        videoMetadata?.videoCodec
+        videoMetadata?.videoCodec,
+        backend
       )
 
       return { success: true, content: markdown }
@@ -181,7 +183,8 @@ export class VideoConverter implements IConverter {
   private async convertLongVideo(
     filePath: string,
     durationSeconds: number,
-    videoMetadata?: VideoMetadata
+    videoMetadata?: VideoMetadata,
+    backend: string = 'openai'
   ): Promise<ConversionResult> {
     let segmented: SegmentedExtractionResult
     try {
@@ -226,7 +229,8 @@ export class VideoConverter implements IConverter {
         detectedLanguage || 'auto',
         transcript,
         videoMetadata?.resolution,
-        videoMetadata?.videoCodec
+        videoMetadata?.videoCodec,
+        backend
       )
 
       return { success: true, content: markdown }
@@ -260,7 +264,8 @@ export class VideoConverter implements IConverter {
     language: string,
     transcript: string,
     resolution?: string,
-    videoCodec?: string
+    videoCodec?: string,
+    backend: string = 'openai'
   ): string {
     const fileName = basename(filePath)
     const durationFormatted = formatDuration(durationSeconds)
@@ -273,7 +278,7 @@ export class VideoConverter implements IConverter {
       `duration: "${durationFormatted}"`,
       `date: "${date}"`,
       `language: ${language}`,
-      `transcription_backend: openai`
+      `transcription_backend: ${backend}`
     ]
 
     if (resolution) {

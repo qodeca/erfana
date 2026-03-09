@@ -61,7 +61,7 @@ export class AudioConverter implements IConverter {
    * @param filePath - Absolute path to the audio file
    * @returns Conversion result with markdown content or error
    */
-  async convert(filePath: string): Promise<ConversionResult> {
+  async convert(filePath: string, backend: string = 'openai'): Promise<ConversionResult> {
     // Get duration for frontmatter
     let duration: number
     try {
@@ -96,7 +96,8 @@ export class AudioConverter implements IConverter {
       filePath,
       duration,
       result.language || 'auto',
-      result.transcript
+      result.transcript,
+      backend
     )
 
     return {
@@ -112,7 +113,8 @@ export class AudioConverter implements IConverter {
     filePath: string,
     durationSeconds: number,
     language: string,
-    transcript: string
+    transcript: string,
+    backend: string = 'openai'
   ): string {
     const fileName = basename(filePath)
     const durationFormatted = formatDuration(durationSeconds)
@@ -124,7 +126,7 @@ export class AudioConverter implements IConverter {
       `duration: "${durationFormatted}"`,
       `date: "${date}"`,
       `language: ${language}`,
-      `transcription_backend: openai`,
+      `transcription_backend: ${backend}`,
       '---',
       '',
       transcript,

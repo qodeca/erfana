@@ -113,6 +113,16 @@ export enum ErrorCode {
   TRANSCRIPTION_TIMEOUT = 'TRANSCRIPTION_TIMEOUT',
   TRANSCRIPTION_FAILED = 'TRANSCRIPTION_FAILED',
 
+  // Local Whisper errors (Issue #111)
+  WHISPER_BINARY_NOT_FOUND = 'WHISPER_BINARY_NOT_FOUND',
+  WHISPER_BINARY_DOWNLOAD_FAILED = 'WHISPER_BINARY_DOWNLOAD_FAILED',
+  WHISPER_MODEL_NOT_FOUND = 'WHISPER_MODEL_NOT_FOUND',
+  WHISPER_MODEL_DOWNLOAD_FAILED = 'WHISPER_MODEL_DOWNLOAD_FAILED',
+  WHISPER_PROCESS_FAILED = 'WHISPER_PROCESS_FAILED',
+  WHISPER_PROCESS_TIMEOUT = 'WHISPER_PROCESS_TIMEOUT',
+  WHISPER_OUTPUT_PARSE_FAILED = 'WHISPER_OUTPUT_PARSE_FAILED',
+  WHISPER_UNSUPPORTED_PLATFORM = 'WHISPER_UNSUPPORTED_PLATFORM',
+
   // Video import errors (Issue #110)
   VIDEO_NO_AUDIO_TRACK = 'VIDEO_NO_AUDIO_TRACK',
   VIDEO_EXTRACTION_FAILED = 'VIDEO_EXTRACTION_FAILED',
@@ -283,6 +293,16 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.TRANSCRIPTION_CHUNK_FAILED]: 'Failed to process audio chunk. Retrying.',
   [ErrorCode.TRANSCRIPTION_TIMEOUT]: 'Transcription request timed out',
   [ErrorCode.TRANSCRIPTION_FAILED]: 'Transcription failed. Please try again.',
+
+  // Local Whisper errors (Issue #111)
+  [ErrorCode.WHISPER_BINARY_NOT_FOUND]: 'Whisper binary not found. Please download it from Settings.',
+  [ErrorCode.WHISPER_BINARY_DOWNLOAD_FAILED]: 'Failed to download whisper binary. Please check your connection and try again.',
+  [ErrorCode.WHISPER_MODEL_NOT_FOUND]: 'Whisper model not found. Please download it from Settings.',
+  [ErrorCode.WHISPER_MODEL_DOWNLOAD_FAILED]: 'Failed to download whisper model. Please check your connection and try again.',
+  [ErrorCode.WHISPER_PROCESS_FAILED]: 'Local transcription failed. Please try again or switch to OpenAI backend.',
+  [ErrorCode.WHISPER_PROCESS_TIMEOUT]: 'Local transcription timed out. Try a smaller model or shorter file.',
+  [ErrorCode.WHISPER_OUTPUT_PARSE_FAILED]: 'Failed to parse transcription output. Please try again.',
+  [ErrorCode.WHISPER_UNSUPPORTED_PLATFORM]: 'Local Whisper is not supported on this platform.',
 
   // Video import errors (Issue #110)
   [ErrorCode.VIDEO_NO_AUDIO_TRACK]: 'This video file contains no audio track to transcribe.',

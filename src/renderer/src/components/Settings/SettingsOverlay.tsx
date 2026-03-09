@@ -4,7 +4,9 @@ import { X } from 'lucide-react'
 import { useSettingsStore } from '../../stores/useSettingsStore'
 import { useGlobalSettingsStore } from '../../stores/useGlobalSettingsStore'
 import { LoggingLevelSchema, type LoggingLevel } from '../../../../shared/ipc/global-settings-schema'
-import { TranscriptionBackendSchema } from '../../../../shared/ipc/transcription-schema'
+import { TranscriptionBackendSchema, WhisperModelSchema } from '../../../../shared/ipc/transcription-schema'
+import type { WhisperModel } from '../../../../shared/ipc/transcription-schema'
+import { LOCAL_WHISPER } from '../../../../shared/constants'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
 import './SettingsOverlay.css'
@@ -30,6 +32,19 @@ const POLLING_INTERVAL_OPTIONS: { value: number; label: string }[] = [
   { value: 10000, label: '10s' }
 ]
 
+// Format bytes as human-readable size
+function formatModelSize(bytes: number): string {
+  if (bytes >= 1_000_000_000) return `~${(bytes / 1_000_000_000).toFixed(1)} GB`
+  return `~${Math.round(bytes / 1_000_000)} MB`
+}
+
+// Whisper model options derived from shared constants
+const WHISPER_MODEL_OPTIONS: { value: WhisperModel; label: string }[] =
+  LOCAL_WHISPER.SUPPORTED_MODELS.map((model) => ({
+    value: model,
+    label: `${model.charAt(0).toUpperCase() + model.slice(1)} (${formatModelSize(LOCAL_WHISPER.MODEL_SIZES[model])})`
+  }))
+
 /**
  * SettingsOverlay - Full-screen settings dialog
  *
@@ -48,13 +63,22 @@ export function SettingsOverlay() {
     updatePreserveLineBreaks,
     updateGitStatusPollingEnabled,
     updateGitStatusPollingInterval,
-    updateTranscriptionBackend
+    updateTranscriptionBackend,
+    updateWhisperModel
   } = useGlobalSettingsStore()
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const previousActiveElement = useRef<HTMLElement | null>(null)
 
+  // Platform check for local whisper support (macOS only)
+  const isMacOS = window.api.utils.getPlatform() === 'darwin'
+
   // API key state for transcription section
   const [hasApiKey, setHasApiKey] = useState(false)
+
+  // Whisper model management state
+  const [installedModels, setInstalledModels] = useState<WhisperModel[]>([])
+  const [modelDownloading, setModelDownloading] = useState(false)
+  const [downloadProgress, setDownloadProgress] = useState<{ percent: number; downloadedBytes: number; totalBytes: number } | null>(null)
 
   /**
    * Check if an API key is stored on overlay open.
@@ -66,6 +90,61 @@ export function SettingsOverlay() {
       .then((result) => setHasApiKey(result))
       .catch(() => setHasApiKey(false))
   }, [isOpen])
+
+  /**
+   * Load installed whisper models when overlay opens.
+   */
+  useEffect(() => {
+    if (!isOpen) return
+    window.api.whisper.listModels()
+      .then((result) => {
+        if (result.success && result.models) {
+          const installed = result.models
+            .filter((m) => m.installed)
+            .map((m) => m.name)
+          setInstalledModels(installed)
+        }
+      })
+      .catch(() => setInstalledModels([]))
+  }, [isOpen])
+
+  /**
+   * Subscribe to whisper download progress while overlay is open.
+   */
+  useEffect(() => {
+    if (!isOpen) return undefined
+    const cleanup = window.api.whisper.onDownloadProgress((progress) => {
+      setDownloadProgress(progress)
+    })
+    return cleanup
+  }, [isOpen])
+
+  /**
+   * Handle whisper model download.
+   */
+  const handleDownloadModel = useCallback(async () => {
+    const model = settings?.transcription.whisperModel
+    if (!model || modelDownloading) return
+
+    setModelDownloading(true)
+    setDownloadProgress({ percent: 0, downloadedBytes: 0, totalBytes: 0 })
+    try {
+      // Ensure binary is available before downloading the model
+      await window.api.whisper.ensureBinary()
+
+      const result = await window.api.whisper.ensureModel(model)
+      if (result.success) {
+        setInstalledModels((prev) => prev.includes(model) ? prev : [...prev, model])
+      } else {
+        logger.warn('Failed to download whisper model', { error: result.error })
+      }
+    } catch (error) {
+      logger.error('Failed to download whisper model', error instanceof Error ? error : undefined)
+    } finally {
+      setModelDownloading(false)
+      setDownloadProgress(null)
+    }
+  }, [settings?.transcription.whisperModel, modelDownloading])
 
   /**
    * Save API key on input blur.
@@ -319,38 +398,113 @@ export function SettingsOverlay() {
                   data-testid={TEST_IDS.SETTINGS_SELECT_TRANSCRIPTION_BACKEND}
                 >
                   <option value="openai">OpenAI</option>
+                  <option value="local" disabled={!isMacOS}>
+                    {isMacOS ? 'Local (whisper.cpp)' : 'Local (macOS only)'}
+                  </option>
                 </select>
               </div>
-              <div className="settings-row">
-                <div className="settings-field">
-                  <label htmlFor="openai-api-key" className="settings-label">
-                    OpenAI API key
-                  </label>
-                  <p className="settings-description">
-                    {hasApiKey ? 'API key is configured' : 'Required for transcription'}
-                  </p>
+
+              {/* OpenAI backend: API key management */}
+              {settings?.transcription.backend === 'openai' && (
+                <div className="settings-row">
+                  <div className="settings-field">
+                    <label htmlFor="openai-api-key" className="settings-label">
+                      OpenAI API key
+                    </label>
+                    <p className="settings-description">
+                      {hasApiKey ? 'API key is configured' : 'Required for transcription'}
+                    </p>
+                  </div>
+                  <div className="settings-api-key-controls">
+                    {hasApiKey ? (
+                      <button
+                        className="settings-btn-secondary"
+                        onClick={handleClearApiKey}
+                        data-testid={TEST_IDS.SETTINGS_BTN_CLEAR_API_KEY}
+                      >
+                        Remove key
+                      </button>
+                    ) : (
+                      <input
+                        type="password"
+                        id="openai-api-key"
+                        className="settings-input"
+                        placeholder="sk-..."
+                        onBlur={handleSaveApiKey}
+                        data-testid={TEST_IDS.SETTINGS_INPUT_API_KEY}
+                      />
+                    )}
+                  </div>
                 </div>
-                <div className="settings-api-key-controls">
-                  {hasApiKey ? (
-                    <button
-                      className="settings-btn-secondary"
-                      onClick={handleClearApiKey}
-                      data-testid={TEST_IDS.SETTINGS_BTN_CLEAR_API_KEY}
+              )}
+
+              {/* Local backend: whisper model selection and download */}
+              {settings?.transcription.backend === 'local' && (
+                <>
+                  <div className="settings-row">
+                    <div className="settings-field">
+                      <label htmlFor="whisper-model" className="settings-label">
+                        Whisper model
+                      </label>
+                      <p className="settings-description">
+                        Larger models are more accurate but slower and use more memory
+                      </p>
+                    </div>
+                    <select
+                      id="whisper-model"
+                      className="settings-select"
+                      value={settings.transcription.whisperModel ?? 'base'}
+                      onChange={(e) => {
+                        const result = WhisperModelSchema.safeParse(e.target.value)
+                        if (result.success) {
+                          updateWhisperModel(result.data)
+                        } else {
+                          logger.warn('Invalid whisper model selected', { value: e.target.value })
+                        }
+                      }}
+                      disabled={modelDownloading}
+                      data-testid={TEST_IDS.SETTINGS_SELECT_WHISPER_MODEL}
                     >
-                      Remove key
-                    </button>
-                  ) : (
-                    <input
-                      type="password"
-                      id="openai-api-key"
-                      className="settings-input"
-                      placeholder="sk-..."
-                      onBlur={handleSaveApiKey}
-                      data-testid={TEST_IDS.SETTINGS_INPUT_API_KEY}
-                    />
-                  )}
-                </div>
-              </div>
+                      {WHISPER_MODEL_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="settings-row">
+                    <div className="settings-field">
+                      <label className="settings-label">
+                        Model status
+                      </label>
+                      <p
+                        className="settings-description"
+                        data-testid={TEST_IDS.SETTINGS_WHISPER_MODEL_STATUS}
+                      >
+                        {modelDownloading && downloadProgress
+                          ? `Downloading... (${Math.round(downloadProgress.percent)}%)`
+                          : installedModels.includes(settings.transcription.whisperModel ?? 'base')
+                            ? 'Ready'
+                            : 'Model not downloaded'}
+                      </p>
+                    </div>
+                    <div className="settings-api-key-controls">
+                      {installedModels.includes(settings.transcription.whisperModel ?? 'base') ? (
+                        <span className="settings-status-ready">Ready</span>
+                      ) : (
+                        <button
+                          className="settings-btn-secondary"
+                          onClick={handleDownloadModel}
+                          disabled={modelDownloading}
+                          data-testid={TEST_IDS.SETTINGS_BTN_WHISPER_MODEL}
+                        >
+                          {modelDownloading ? 'Downloading...' : 'Download model'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </section>
           </div>
         </div>

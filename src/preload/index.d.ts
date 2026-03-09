@@ -19,7 +19,8 @@ import type {
 import type {
   TranscriptionImportRequest,
   TranscriptionImportResult,
-  TranscriptionProgress
+  TranscriptionProgress,
+  WhisperModel
 } from '../shared/ipc/transcription-schema'
 import type {
   ExternalFileValidateResponse,
@@ -273,6 +274,25 @@ declare global {
         clearApiKey: () => Promise<{ success: boolean; error?: string }>
         /** Subscribe to transcription progress events */
         onProgress: (callback: (progress: TranscriptionProgress) => void) => () => void
+      }
+      /**
+       * Whisper model management for local transcription backend
+       * @see Issue #111 - Local Whisper transcription backend
+       */
+      whisper: {
+        /** Ensure whisper.cpp binary is downloaded */
+        ensureBinary: () => Promise<{ success: boolean; path?: string; error?: string }>
+        /** Ensure a specific whisper model is downloaded */
+        ensureModel: (model: WhisperModel) => Promise<{ success: boolean; path?: string; error?: string }>
+        /** List installed whisper models with info */
+        listModels: () => Promise<{
+          success: boolean
+          models: Array<{ name: WhisperModel; size: number; installed: boolean }>
+        }>
+        /** Delete a downloaded whisper model */
+        deleteModel: (model: WhisperModel) => Promise<{ success: boolean; error?: string }>
+        /** Subscribe to whisper model download progress */
+        onDownloadProgress: (callback: (progress: { percent: number; downloadedBytes: number; totalBytes: number }) => void) => () => void
       }
       globalSettings: {
         get: () => Promise<{ success: boolean; settings?: GlobalSettings; error?: string }>

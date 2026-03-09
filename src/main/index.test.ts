@@ -233,6 +233,24 @@ describe('Main Process - Window Creation', () => {
       registerGitWatcherHandlers: vi.fn()
     }))
 
+    // Mock LocalWhisperService
+    vi.doMock('./services/LocalWhisperService', () => ({
+      localWhisperService: {
+        transcribe: vi.fn()
+      }
+    }))
+
+    // Mock WhisperModelManager
+    vi.doMock('./services/WhisperModelManager', () => ({
+      whisperModelManager: {
+        ensureBinary: vi.fn(),
+        ensureModel: vi.fn(),
+        listInstalledModels: vi.fn(() => Promise.resolve([])),
+        getModelInfo: vi.fn(() => ({ size: 0, installed: false })),
+        deleteModel: vi.fn()
+      }
+    }))
+
     // Mock safe console
     vi.doMock('./utils/safeConsole', () => ({
       installSafeConsole: vi.fn()

@@ -19,8 +19,10 @@ import type {
 import type {
   TranscriptionImportRequest,
   TranscriptionImportResult,
-  TranscriptionProgress
+  TranscriptionProgress,
+  WhisperModel
 } from '../shared/ipc/transcription-schema'
+import { TRANSCRIPTION_CHANNELS } from '../shared/ipc/transcription-channels'
 import type {
   ExternalFileValidateResponse,
   ExternalFileCopyResponse,
@@ -660,6 +662,65 @@ const api = {
       const listener = (_event: unknown, data: TranscriptionProgress): void => callback(data)
       ipcRenderer.on('transcription:progress', listener)
       return () => ipcRenderer.removeListener('transcription:progress', listener)
+    }
+  },
+
+  /**
+   * Whisper model management for local transcription backend
+   *
+   * Manages whisper.cpp binary and model downloads for offline transcription.
+   *
+   * @see Issue #111 - Local Whisper transcription backend
+   */
+  whisper: {
+    /**
+     * Ensure the whisper.cpp binary is downloaded and available
+     *
+     * @returns Success status with binary path or error
+     */
+    ensureBinary: (): Promise<{ success: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_BINARY),
+
+    /**
+     * Ensure a specific whisper model is downloaded
+     *
+     * Triggers download if not present. Progress is streamed via onDownloadProgress.
+     *
+     * @param model - Model size to ensure (tiny, base, small, medium, large)
+     * @returns Success status with model path or error
+     */
+    ensureModel: (model: WhisperModel): Promise<{ success: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_MODEL, model),
+
+    /**
+     * List installed whisper models
+     *
+     * @returns Array of installed model names
+     */
+    listModels: (): Promise<{
+      success: boolean
+      models: Array<{ name: WhisperModel; size: number; installed: boolean }>
+    }> => ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_LIST_MODELS),
+
+    /**
+     * Delete a downloaded whisper model
+     *
+     * @param model - Model to delete
+     * @returns Success status
+     */
+    deleteModel: (model: WhisperModel): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke(TRANSCRIPTION_CHANNELS.WHISPER_DELETE_MODEL, model),
+
+    /**
+     * Subscribe to whisper model download progress events
+     *
+     * @param callback - Called with download progress updates
+     * @returns Cleanup function to remove the listener
+     */
+    onDownloadProgress: (callback: (progress: { percent: number; downloadedBytes: number; totalBytes: number }) => void): (() => void) => {
+      const listener = (_event: unknown, data: { percent: number; downloadedBytes: number; totalBytes: number }): void => callback(data)
+      ipcRenderer.on(TRANSCRIPTION_CHANNELS.WHISPER_DOWNLOAD_PROGRESS, listener)
+      return () => ipcRenderer.removeListener(TRANSCRIPTION_CHANNELS.WHISPER_DOWNLOAD_PROGRESS, listener)
     }
   },
 

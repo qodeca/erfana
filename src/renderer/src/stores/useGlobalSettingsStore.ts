@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { GlobalSettings, LoggingLevel } from '../../../shared/ipc/global-settings-schema'
-import type { TranscriptionBackend } from '../../../shared/ipc/transcription-schema'
+import type { TranscriptionBackend, WhisperModel } from '../../../shared/ipc/transcription-schema'
 
 /**
  * Helper type for setting section keys
@@ -25,6 +25,7 @@ interface GlobalSettingsState {
   updateGitStatusPollingEnabled: (enabled: boolean) => Promise<void>
   updateGitStatusPollingInterval: (interval: number) => Promise<void>
   updateTranscriptionBackend: (backend: TranscriptionBackend) => Promise<void>
+  updateWhisperModel: (model: WhisperModel) => Promise<void>
   resetSettings: () => Promise<void>
   clearCorruptionFlag: () => void
 
@@ -81,6 +82,10 @@ export const useGlobalSettingsStore = create<GlobalSettingsState>((set, get) => 
 
   updateTranscriptionBackend: async (backend: TranscriptionBackend) => {
     await get()._updateSection('transcription', (current) => ({ ...current, backend }))
+  },
+
+  updateWhisperModel: async (model: WhisperModel) => {
+    await get()._updateSection('transcription', (current) => ({ ...current, whisperModel: model }))
   },
 
   resetSettings: async () => {

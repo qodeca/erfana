@@ -28,7 +28,18 @@ export const TRANSCRIPTION_CHANNELS = {
   /** Check if API key exists (ipcMain.handle) */
   HAS_API_KEY: 'transcription:hasApiKey',
   /** Remove stored API key (ipcMain.handle) */
-  CLEAR_API_KEY: 'transcription:clearApiKey'
+  CLEAR_API_KEY: 'transcription:clearApiKey',
+
+  /** Ensure whisper.cpp binary is downloaded (ipcMain.handle) */
+  WHISPER_ENSURE_BINARY: 'transcription:whisperEnsureBinary',
+  /** Ensure a specific whisper model is downloaded (ipcMain.handle) */
+  WHISPER_ENSURE_MODEL: 'transcription:whisperEnsureModel',
+  /** List installed whisper models (ipcMain.handle) */
+  WHISPER_LIST_MODELS: 'transcription:whisperListModels',
+  /** Delete a whisper model (ipcMain.handle) */
+  WHISPER_DELETE_MODEL: 'transcription:whisperDeleteModel',
+  /** Download progress event streamed to renderer (webContents.send) */
+  WHISPER_DOWNLOAD_PROGRESS: 'transcription:whisperDownloadProgress'
 } as const
 
 /**

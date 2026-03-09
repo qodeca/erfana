@@ -308,3 +308,10 @@
   gap: var(--space-4);
   align-items: center;
 }
+
+/* Settings Status Ready - Inline status text */
+.settings-status-ready {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-medium);
+}

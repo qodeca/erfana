@@ -11,8 +11,13 @@
  * - transcription:setApiKey  - Store API key in safeStorage
  * - transcription:hasApiKey  - Check if API key exists
  * - transcription:clearApiKey - Remove stored API key
+ * - transcription:whisperEnsureBinary  - Download whisper.cpp binary
+ * - transcription:whisperEnsureModel   - Download whisper model
+ * - transcription:whisperListModels    - List installed models
+ * - transcription:whisperDeleteModel   - Delete a model
  *
  * @see Issue #75 - Media import with transcription
+ * @see Issue #111 - Local Whisper transcription backend
  */
 import { ipcMain } from 'electron'
 import { writeFile, mkdir } from 'fs/promises'
@@ -21,11 +26,18 @@ import { TRANSCRIPTION_CHANNELS } from '../../shared/ipc/transcription-channels'
 import {
   TranscriptionImportRequestSchema,
   type TranscriptionImportResult,
-  type TranscriptionProgress
+  type TranscriptionProgress,
+  type TranscriptionBackend,
+  type TranscriptionLanguage,
+  type WhisperModel,
+  WhisperModelSchema
 } from '../../shared/ipc/transcription-schema'
 import { ErrorCode, getUserFriendlyMessage } from '../../shared/errors'
 import { IMPORT, VIDEO_IMPORT, TRANSCRIPTION } from '../../shared/constants'
 import { transcriptionService } from '../services/TranscriptionService'
+import { localWhisperService } from '../services/LocalWhisperService'
+import { whisperModelManager } from '../services/WhisperModelManager'
+import type { ProgressCallback } from '../services/WhisperModelManager'
 import { audioMetadataService } from '../services/AudioMetadataService'
 import { audioExtractionService } from '../services/AudioExtractionService'
 import type { SegmentedExtractionResult } from '../services/AudioExtractionService'
@@ -38,6 +50,29 @@ import { isVideoExtension } from '../services/import/extensions'
 
 /** Active AbortController for current transcription */
 let activeController: AbortController | null = null
+
+/**
+ * Route a transcription call to the appropriate backend
+ */
+async function transcribeWithBackend(
+  filePath: string,
+  language: TranscriptionLanguage,
+  backend: TranscriptionBackend,
+  whisperModel: WhisperModel,
+  onProgress: (progress: TranscriptionProgress) => void,
+  signal: AbortSignal
+): Promise<import('../../shared/ipc/transcription-schema').TranscriptionResult> {
+  if (backend === 'local') {
+    return localWhisperService.transcribe({
+      filePath,
+      language,
+      model: whisperModel,
+      signal,
+      onProgress
+    })
+  }
+  return transcriptionService.transcribe(filePath, language, onProgress, signal)
+}
 
 /**
  * Register all transcription IPC handlers
@@ -89,13 +124,20 @@ export function registerTranscriptionHandlers(): void {
         }
       }
 
-      // Check API key
-      const apiKey = await apiKeyService.getKey('openai')
-      if (!apiKey) {
-        return {
-          success: false,
-          error: 'No API key configured. Add your OpenAI API key in Settings.',
-          errorCode: ErrorCode.TRANSCRIPTION_NO_API_KEY
+      // Read active backend from settings
+      const transcriptionSettings = globalSettingsService.getSetting('transcription')
+      const backend: TranscriptionBackend = transcriptionSettings?.backend ?? 'openai'
+      const whisperModel: WhisperModel = transcriptionSettings?.whisperModel ?? 'base'
+
+      // Check API key (only required for OpenAI backend)
+      if (backend === 'openai') {
+        const apiKey = await apiKeyService.getKey('openai')
+        if (!apiKey) {
+          return {
+            success: false,
+            error: 'No API key configured. Add your OpenAI API key in Settings.',
+            errorCode: ErrorCode.TRANSCRIPTION_NO_API_KEY
+          }
         }
       }
 
@@ -188,9 +230,11 @@ export function registerTranscriptionHandlers(): void {
 
               for (let i = 0; i < segmentCount; i++) {
                 const segmentPath = segmented.segmentPaths[i]
-                const result = await transcriptionService.transcribe(
+                const result = await transcribeWithBackend(
                   segmentPath,
                   language,
+                  backend,
+                  whisperModel,
                   (progress) => {
                     // Map each segment's progress to its slice of 20–100%
                     const segmentStart = 20 + (i / segmentCount) * 80
@@ -237,9 +281,11 @@ export function registerTranscriptionHandlers(): void {
             )
 
             try {
-              const result = await transcriptionService.transcribe(
+              const result = await transcribeWithBackend(
                 extraction.audioPath,
                 language,
+                backend,
+                whisperModel,
                 (progress) => {
                   sendProgress({
                     percent: Math.min(
@@ -280,7 +326,7 @@ export function registerTranscriptionHandlers(): void {
             `duration: "${durationFormatted}"`,
             `date: "${date}"`,
             `language: ${language === 'auto' ? (detectedLanguage || 'auto') : language}`,
-            `transcription_backend: openai`
+            `transcription_backend: ${backend}`
           ]
 
           if (resolution) {
@@ -310,10 +356,12 @@ export function registerTranscriptionHandlers(): void {
             outputPath
           }
         } else {
-          // Audio path: existing flow unchanged
-          const result = await transcriptionService.transcribe(
+          // Audio path: route to appropriate backend
+          const result = await transcribeWithBackend(
             filePath,
             language,
+            backend,
+            whisperModel,
             sendProgress,
             activeController.signal
           )
@@ -347,7 +395,7 @@ export function registerTranscriptionHandlers(): void {
             `duration: "${durationFormatted}"`,
             `date: "${date}"`,
             `language: ${language === 'auto' ? (result.language || 'auto') : language}`,
-            `transcription_backend: openai`,
+            `transcription_backend: ${backend}`,
             '---',
             '',
             result.transcript,
@@ -509,6 +557,133 @@ export function registerTranscriptionHandlers(): void {
         return {
           success: false,
           error: 'Failed to clear API key'
+        }
+      }
+    }
+  )
+
+  /**
+   * Ensure whisper.cpp binary is downloaded
+   *
+   * Streams download progress to renderer via WHISPER_DOWNLOAD_PROGRESS channel.
+   */
+  ipcMain.handle(
+    TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_BINARY,
+    async (event): Promise<{ success: boolean; path?: string; error?: string }> => {
+      const webContents = event.sender
+
+      const onProgress: ProgressCallback = (progressData) => {
+        try {
+          if (!webContents.isDestroyed()) {
+            webContents.send(TRANSCRIPTION_CHANNELS.WHISPER_DOWNLOAD_PROGRESS, progressData)
+          }
+        } catch {
+          // WebContents may be destroyed during download
+        }
+      }
+
+      try {
+        const path = await whisperModelManager.ensureBinary({ onProgress })
+        return { success: true, path }
+      } catch (error) {
+        logger.error('Failed to ensure whisper binary', error instanceof Error ? error : undefined)
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to download whisper binary'
+        }
+      }
+    }
+  )
+
+  /**
+   * Ensure a specific whisper model is downloaded
+   *
+   * Streams download progress to renderer via WHISPER_DOWNLOAD_PROGRESS channel.
+   */
+  ipcMain.handle(
+    TRANSCRIPTION_CHANNELS.WHISPER_ENSURE_MODEL,
+    async (
+      event,
+      model: string
+    ): Promise<{ success: boolean; path?: string; error?: string }> => {
+      const webContents = event.sender
+
+      const onProgress: ProgressCallback = (progressData) => {
+        try {
+          if (!webContents.isDestroyed()) {
+            webContents.send(TRANSCRIPTION_CHANNELS.WHISPER_DOWNLOAD_PROGRESS, progressData)
+          }
+        } catch {
+          // WebContents may be destroyed during download
+        }
+      }
+
+      try {
+        const parsed = WhisperModelSchema.safeParse(model)
+        if (!parsed.success) {
+          return { success: false, error: `Invalid whisper model: ${model}` }
+        }
+
+        const path = await whisperModelManager.ensureModel(parsed.data, { onProgress })
+        return { success: true, path }
+      } catch (error) {
+        logger.error('Failed to ensure whisper model', error instanceof Error ? error : undefined)
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to download whisper model'
+        }
+      }
+    }
+  )
+
+  /**
+   * List installed whisper models with info
+   */
+  ipcMain.handle(
+    TRANSCRIPTION_CHANNELS.WHISPER_LIST_MODELS,
+    async (): Promise<{
+      success: boolean
+      models: Array<{ name: WhisperModel; size: number; installed: boolean }>
+    }> => {
+      try {
+        // Populate cache by listing installed models
+        await whisperModelManager.listInstalledModels()
+
+        const models = (['tiny', 'base', 'small', 'medium', 'large'] as const).map((name) => {
+          const info = whisperModelManager.getModelInfo(name)
+          return { name, ...info }
+        })
+
+        return { success: true, models }
+      } catch (error) {
+        logger.error('Failed to list whisper models', error instanceof Error ? error : undefined)
+        return { success: false, models: [] }
+      }
+    }
+  )
+
+  /**
+   * Delete an installed whisper model
+   */
+  ipcMain.handle(
+    TRANSCRIPTION_CHANNELS.WHISPER_DELETE_MODEL,
+    async (
+      _event,
+      model: string
+    ): Promise<{ success: boolean; error?: string }> => {
+      try {
+        const parsed = WhisperModelSchema.safeParse(model)
+        if (!parsed.success) {
+          return { success: false, error: `Invalid whisper model: ${model}` }
+        }
+
+        await whisperModelManager.deleteModel(parsed.data)
+        return { success: true }
+      } catch (error) {
+        logger.error('Failed to delete whisper model', error instanceof Error ? error : undefined)
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to delete model'
         }
       }
     }

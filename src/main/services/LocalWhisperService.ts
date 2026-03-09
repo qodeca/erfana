@@ -1,0 +1,688 @@
+/**
+ * Local Whisper Service
+ *
+ * Performs local audio transcription by spawning the whisper.cpp CLI binary
+ * as a child process. Handles input format conversion, chunking for long files,
+ * progress reporting, and cancellation.
+ *
+ * Features:
+ * - Spawns whisper-cli binary for offline transcription
+ * - Converts non-wav inputs to 16 kHz mono PCM wav via ffmpeg
+ * - File chunking for files >8 minutes (480 seconds) via ffmpeg time-based splitting
+ * - Progress parsing from whisper.cpp stderr output
+ * - AbortSignal cancellation support
+ * - Temp file cleanup in finally blocks
+ *
+ * @see Issue #111 - Local Whisper transcription backend
+ */
+import { spawn, execFile } from 'child_process'
+import { stat, readFile, unlink } from 'fs/promises'
+import { tmpdir } from 'os'
+import { join, extname, basename } from 'path'
+import { randomUUID } from 'crypto'
+import ffmpegPath from 'ffmpeg-static'
+import { LOCAL_WHISPER, TRANSCRIPTION } from '../../shared/constants'
+import { AppError, ErrorCode } from '../../shared/errors'
+import type {
+  TranscriptionProgress,
+  TranscriptionResult,
+  WhisperModel
+} from '../../shared/ipc/transcription-schema'
+import { logger } from './LoggingService'
+import type { IWhisperModelManager } from './WhisperModelManager'
+import { whisperModelManager } from './WhisperModelManager'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** Options for the transcribe() method */
+export interface LocalTranscribeOptions {
+  /** Absolute path to the audio file (mp3, wav, m4a, ogg, flac) */
+  filePath: string
+  /** ISO language code or 'auto' for auto-detection */
+  language: string
+  /** Whisper model size to use */
+  model: WhisperModel
+  /** Optional AbortSignal for cancellation */
+  signal?: AbortSignal
+  /** Optional progress callback */
+  onProgress?: (progress: TranscriptionProgress) => void
+}
+
+// Re-export for convenience and backward compatibility
+export type { IWhisperModelManager } from './WhisperModelManager'
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/** Temp file prefix for local whisper operations */
+const TEMP_PREFIX = 'erfana-whisper-'
+
+/** Extensions that whisper.cpp handles natively (no conversion needed) */
+const NATIVE_EXTENSIONS = new Set(['wav'])
+
+/** Timeout for ffmpeg duration probe (30 seconds) */
+const FFMPEG_PROBE_TIMEOUT = 30_000
+
+/** Regex to parse whisper.cpp progress output from stderr */
+const PROGRESS_REGEX = /progress\s*=\s*(\d+)%/
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the ffmpeg binary path.
+ *
+ * ffmpeg-static may return a path inside the asar archive during production
+ * builds. Electron cannot exec binaries from inside asar, so we replace
+ * `.asar` with `.asar.unpacked` when detected.
+ */
+function resolveFfmpegPath(): string {
+  if (!ffmpegPath) {
+    throw new AppError('ffmpeg binary not available', ErrorCode.WHISPER_PROCESS_FAILED)
+  }
+
+  // Handle asar-packed path
+  if (ffmpegPath.includes('.asar')) {
+    return ffmpegPath.replace('.asar', '.asar.unpacked')
+  }
+
+  return ffmpegPath
+}
+
+// ---------------------------------------------------------------------------
+// Service
+// ---------------------------------------------------------------------------
+
+export class LocalWhisperService {
+  constructor(private modelManager: IWhisperModelManager) {}
+
+  /**
+   * Transcribe an audio file using the local whisper.cpp binary
+   *
+   * @param options - Transcription options
+   * @returns Transcription result with text, language, and duration
+   */
+  async transcribe(options: LocalTranscribeOptions): Promise<TranscriptionResult> {
+    const { filePath, language, model, signal, onProgress } = options
+    const tempFiles = new Set<string>()
+
+    const progress = onProgress ?? ((): void => {})
+
+    try {
+      // Early cancellation check
+      if (signal?.aborted) {
+        return {
+          success: false,
+          error: 'Transcription was cancelled',
+          errorCode: ErrorCode.TRANSCRIPTION_CANCELLED
+        }
+      }
+
+      progress({ percent: 0, phase: 'Preparing' })
+
+      // Ensure whisper binary and model are available
+      progress({ percent: 2, phase: 'Checking whisper binary' })
+      const binaryPath = await this.modelManager.ensureBinary({ signal })
+
+      if (signal?.aborted) {
+        return {
+          success: false,
+          error: 'Transcription was cancelled',
+          errorCode: ErrorCode.TRANSCRIPTION_CANCELLED
+        }
+      }
+
+      progress({ percent: 4, phase: 'Checking whisper model' })
+      const modelPath = await this.modelManager.ensureModel(model, { signal })
+
+      if (signal?.aborted) {
+        return {
+          success: false,
+          error: 'Transcription was cancelled',
+          errorCode: ErrorCode.TRANSCRIPTION_CANCELLED
+        }
+      }
+
+      // Convert input to wav if necessary
+      progress({ percent: 6, phase: 'Preparing audio' })
+      const wavPath = await this.ensureWavFormat(filePath, tempFiles, signal)
+
+      // Get audio duration for chunking decision
+      progress({ percent: 8, phase: 'Analyzing audio' })
+      const duration = await this.getWavDuration(wavPath)
+      const needsChunking = duration > TRANSCRIPTION.CHUNK_BOUNDARY_SECONDS
+
+      let transcript: string
+
+      if (needsChunking) {
+        transcript = await this.transcribeChunked(
+          wavPath, duration, binaryPath, modelPath, language, tempFiles, progress, signal
+        )
+      } else {
+        transcript = await this.transcribeSingle(
+          wavPath, binaryPath, modelPath, language, progress, signal
+        )
+      }
+
+      progress({ percent: 100, phase: 'Complete' })
+
+      return {
+        success: true,
+        transcript,
+        duration,
+        language: language === 'auto' ? undefined : language
+      }
+    } catch (error) {
+      if (signal?.aborted) {
+        return {
+          success: false,
+          error: 'Transcription was cancelled',
+          errorCode: ErrorCode.TRANSCRIPTION_CANCELLED
+        }
+      }
+
+      if (error instanceof AppError) {
+        logger.error('Local whisper transcription failed', error)
+        return {
+          success: false,
+          error: error.message,
+          errorCode: error.code
+        }
+      }
+
+      const message = error instanceof Error ? error.message : String(error)
+      logger.error('Local whisper transcription failed', error instanceof Error ? error : undefined)
+
+      return {
+        success: false,
+        error: message,
+        errorCode: ErrorCode.WHISPER_PROCESS_FAILED
+      }
+    } finally {
+      await this.cleanupTempFiles(tempFiles)
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Input conversion
+  // -------------------------------------------------------------------------
+
+  /**
+   * Convert input to 16 kHz mono PCM wav if not already in a native format.
+   *
+   * whisper.cpp works best with wav (16 kHz, mono, 16-bit PCM).
+   * All non-wav formats (mp3, m4a, ogg, flac) are converted via ffmpeg
+   * to ensure consistent behavior across whisper.cpp builds.
+   */
+  private async ensureWavFormat(
+    filePath: string,
+    tempFiles: Set<string>,
+    signal?: AbortSignal
+  ): Promise<string> {
+    const ext = extname(filePath).slice(1).toLowerCase()
+
+    if (NATIVE_EXTENSIONS.has(ext)) {
+      return filePath
+    }
+
+    const outputPath = join(tmpdir(), `${TEMP_PREFIX}${randomUUID()}.wav`)
+    tempFiles.add(outputPath)
+
+    const ffmpeg = resolveFfmpegPath()
+
+    await new Promise<void>((resolve, reject) => {
+      const args = [
+        '-i', filePath,
+        '-ar', '16000',
+        '-ac', '1',
+        '-c:a', 'pcm_s16le',
+        '-y',
+        outputPath
+      ]
+
+      // execFile is safe against shell injection – arguments are passed as an array,
+      // not interpolated into a shell command string.
+      let onAbort: (() => void) | undefined
+
+      const child = execFile(ffmpeg, args, { timeout: LOCAL_WHISPER.PROCESS_TIMEOUT }, (error) => {
+        // Clean up abort listener on all paths
+        if (signal && onAbort) signal.removeEventListener('abort', onAbort)
+
+        if (signal?.aborted) {
+          reject(new AppError('Transcription was cancelled', ErrorCode.TRANSCRIPTION_CANCELLED))
+          return
+        }
+        if (error) {
+          reject(new AppError(
+            `Failed to convert audio to wav: ${error.message}`,
+            ErrorCode.WHISPER_PROCESS_FAILED,
+            error
+          ))
+          return
+        }
+        resolve()
+      })
+
+      if (signal) {
+        onAbort = (): void => {
+          child.kill('SIGTERM')
+        }
+        if (signal.aborted) {
+          child.kill('SIGTERM')
+        } else {
+          signal.addEventListener('abort', onAbort, { once: true })
+        }
+      }
+    })
+
+    logger.debug('Converted audio to wav', { input: filePath, output: outputPath })
+    return outputPath
+  }
+
+  // -------------------------------------------------------------------------
+  // Duration detection
+  // -------------------------------------------------------------------------
+
+  /**
+   * Get the duration of an audio file using ffmpeg.
+   *
+   * Falls back to estimating from file size for raw PCM wav
+   * (16 kHz * 1 channel * 2 bytes = 32,000 bytes/sec).
+   */
+  private async getWavDuration(filePath: string): Promise<number> {
+    try {
+      const ffmpeg = resolveFfmpegPath()
+
+      const duration = await new Promise<number>((resolve, reject) => {
+        let stderr = ''
+
+        // execFile is safe – arguments are passed as an array.
+        const child = execFile(ffmpeg, ['-i', filePath, '-f', 'null', '-'], {
+          timeout: FFMPEG_PROBE_TIMEOUT
+        }, () => {
+          // ffmpeg exits non-zero when writing to null, but stderr has the duration info.
+          // The 'close' handler below parses stderr.
+        })
+
+        child.stderr?.on('data', (data: Buffer) => {
+          stderr += data.toString()
+        })
+
+        child.on('error', (err: Error) => {
+          reject(err)
+        })
+
+        child.on('close', () => {
+          const match = /Duration:\s*(\d+):(\d+):(\d+)\.(\d+)/.exec(stderr)
+          if (match) {
+            const hours = parseInt(match[1], 10)
+            const minutes = parseInt(match[2], 10)
+            const seconds = parseInt(match[3], 10)
+            const centiseconds = parseInt(match[4], 10)
+            resolve(hours * 3600 + minutes * 60 + seconds + centiseconds / 100)
+          } else {
+            reject(new Error('Could not determine audio duration'))
+          }
+        })
+      })
+
+      return duration
+    } catch {
+      // Fallback: estimate from file size (16 kHz, mono, 16-bit PCM = 32,000 bytes/sec)
+      logger.warn('Could not probe audio duration, estimating from file size')
+      const stats = await stat(filePath)
+      const bytesPerSecond = 32_000
+      return Math.max(1, stats.size / bytesPerSecond)
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Single-file transcription
+  // -------------------------------------------------------------------------
+
+  /**
+   * Transcribe a single audio file (no chunking)
+   */
+  private async transcribeSingle(
+    wavPath: string,
+    binaryPath: string,
+    modelPath: string,
+    language: string,
+    onProgress: (progress: TranscriptionProgress) => void,
+    signal?: AbortSignal
+  ): Promise<string> {
+    onProgress({ percent: 10, phase: 'Transcribing' })
+
+    const text = await this.runWhisper(
+      wavPath, binaryPath, modelPath, language,
+      (whisperPercent) => {
+        // Map whisper 0-100 to overall 10-90
+        const overall = 10 + (whisperPercent / 100) * 80
+        onProgress({ percent: Math.round(overall), phase: 'Transcribing' })
+      },
+      signal
+    )
+
+    onProgress({ percent: 95, phase: 'Finalizing' })
+    return text
+  }
+
+  // -------------------------------------------------------------------------
+  // Chunked transcription
+  // -------------------------------------------------------------------------
+
+  /**
+   * Transcribe a long audio file by splitting into time-based chunks.
+   *
+   * Uses ffmpeg -ss/-t to split the wav file into segments,
+   * then transcribes each sequentially and joins results.
+   */
+  private async transcribeChunked(
+    wavPath: string,
+    duration: number,
+    binaryPath: string,
+    modelPath: string,
+    language: string,
+    tempFiles: Set<string>,
+    onProgress: (progress: TranscriptionProgress) => void,
+    signal?: AbortSignal
+  ): Promise<string> {
+    const chunkDuration = TRANSCRIPTION.CHUNK_BOUNDARY_SECONDS
+    const totalChunks = Math.ceil(duration / chunkDuration)
+
+    onProgress({
+      percent: 10,
+      phase: `Splitting into ${totalChunks} chunks`,
+      totalChunks
+    })
+
+    const transcriptParts: string[] = []
+    const ffmpeg = resolveFfmpegPath()
+
+    for (let i = 0; i < totalChunks; i++) {
+      if (signal?.aborted) {
+        throw new AppError('Transcription was cancelled', ErrorCode.TRANSCRIPTION_CANCELLED)
+      }
+
+      const chunkNum = i + 1
+      // Apply overlap for chunks after the first to prevent word truncation at boundaries
+      const overlap = i > 0 ? TRANSCRIPTION.CHUNK_OVERLAP_SECONDS : 0
+      const startTime = Math.max(0, i * chunkDuration - overlap)
+      const chunkLen = chunkDuration + overlap
+
+      // Split chunk using ffmpeg time-based extraction
+      const chunkPath = join(tmpdir(), `${TEMP_PREFIX}${randomUUID()}-chunk${chunkNum}.wav`)
+      tempFiles.add(chunkPath)
+
+      await this.extractChunk(ffmpeg, wavPath, chunkPath, startTime, chunkLen, signal)
+
+      // Progress update
+      const progressBase = 10
+      const progressRange = 80
+      const chunkStartPercent = progressBase + ((i) / totalChunks) * progressRange
+      const chunkEndPercent = progressBase + ((i + 1) / totalChunks) * progressRange
+
+      onProgress({
+        percent: Math.round(chunkStartPercent),
+        phase: `Transcribing chunk ${chunkNum} of ${totalChunks}`,
+        currentChunk: chunkNum,
+        totalChunks
+      })
+
+      // Transcribe the chunk
+      const chunkText = await this.runWhisper(
+        chunkPath, binaryPath, modelPath, language,
+        (whisperPercent) => {
+          const overall = chunkStartPercent + (whisperPercent / 100) * (chunkEndPercent - chunkStartPercent)
+          onProgress({
+            percent: Math.round(overall),
+            phase: `Transcribing chunk ${chunkNum} of ${totalChunks}`,
+            currentChunk: chunkNum,
+            totalChunks
+          })
+        },
+        signal
+      )
+
+      if (chunkText.trim()) {
+        transcriptParts.push(chunkText.trim())
+      }
+    }
+
+    return transcriptParts.join(' ')
+  }
+
+  /**
+   * Extract a time-based chunk from an audio file using ffmpeg
+   */
+  private extractChunk(
+    ffmpeg: string,
+    inputPath: string,
+    outputPath: string,
+    startTime: number,
+    duration: number,
+    signal?: AbortSignal
+  ): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const args = [
+        '-ss', String(startTime),
+        '-i', inputPath,
+        '-t', String(duration),
+        '-ar', '16000',
+        '-ac', '1',
+        '-c:a', 'pcm_s16le',
+        '-y',
+        outputPath
+      ]
+
+      let onAbort: (() => void) | undefined
+
+      // execFile is safe – arguments are passed as an array.
+      const child = execFile(ffmpeg, args, { timeout: LOCAL_WHISPER.PROCESS_TIMEOUT }, (error) => {
+        // Clean up abort listener on all paths
+        if (signal && onAbort) signal.removeEventListener('abort', onAbort)
+
+        if (signal?.aborted) {
+          reject(new AppError('Transcription was cancelled', ErrorCode.TRANSCRIPTION_CANCELLED))
+          return
+        }
+        if (error) {
+          reject(new AppError(
+            `Failed to extract audio chunk: ${error.message}`,
+            ErrorCode.WHISPER_PROCESS_FAILED,
+            error
+          ))
+          return
+        }
+        resolve()
+      })
+
+      if (signal) {
+        onAbort = (): void => {
+          child.kill('SIGTERM')
+        }
+        if (signal.aborted) {
+          child.kill('SIGTERM')
+        } else {
+          signal.addEventListener('abort', onAbort, { once: true })
+        }
+      }
+    })
+  }
+
+  // -------------------------------------------------------------------------
+  // whisper.cpp process runner
+  // -------------------------------------------------------------------------
+
+  /**
+   * Spawn whisper-cli and return the transcribed text.
+   *
+   * Parses progress from stderr and reads the output text file
+   * that whisper.cpp produces with the -otxt flag.
+   */
+  private runWhisper(
+    audioPath: string,
+    binaryPath: string,
+    modelPath: string,
+    language: string,
+    onWhisperProgress: (percent: number) => void,
+    signal?: AbortSignal
+  ): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      const args = [
+        '-m', modelPath,
+        '-l', language,
+        '-otxt',
+        '--no-timestamps',
+        '-f', audioPath
+      ]
+
+      logger.debug('Spawning whisper-cli', { binaryPath, args })
+
+      const child = spawn(binaryPath, args, {
+        stdio: ['ignore', 'pipe', 'pipe']
+      })
+
+      let stderr = ''
+      let settled = false
+
+      const settle = (fn: typeof resolve | typeof reject, value: string | Error): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(timeout)
+        if (signal && onAbort) signal.removeEventListener('abort', onAbort)
+        if (value instanceof Error) {
+          (fn as (e: Error) => void)(value)
+        } else {
+          (fn as (s: string) => void)(value)
+        }
+      }
+
+      // Parse progress from stderr
+      child.stderr?.on('data', (data: Buffer) => {
+        const chunk = data.toString()
+        stderr += chunk
+
+        const match = PROGRESS_REGEX.exec(chunk)
+        if (match) {
+          const percent = parseInt(match[1], 10)
+          onWhisperProgress(Math.min(percent, 100))
+        }
+      })
+
+      child.on('error', (error: Error) => {
+        settle(reject, new AppError(
+          `Failed to start whisper process: ${error.message}`,
+          ErrorCode.WHISPER_PROCESS_FAILED,
+          error
+        ))
+      })
+
+      child.on('close', async (code) => {
+        if (settled) return
+
+        if (signal?.aborted) {
+          settle(reject, new AppError(
+            'Transcription was cancelled',
+            ErrorCode.TRANSCRIPTION_CANCELLED
+          ))
+          return
+        }
+
+        if (code !== 0) {
+          const detail = stderr.slice(-500).trim()
+          settle(reject, new AppError(
+            `Whisper process exited with code ${code}: ${detail}`,
+            ErrorCode.WHISPER_PROCESS_FAILED
+          ))
+          return
+        }
+
+        // whisper.cpp with -otxt creates a .txt file next to the input
+        const outputTxtPath = `${audioPath}.txt`
+
+        try {
+          const text = await readFile(outputTxtPath, 'utf-8')
+          // Clean up the output file
+          await unlink(outputTxtPath).catch(() => {})
+          settle(resolve, text.trim())
+        } catch {
+          settle(reject, new AppError(
+            'Whisper output file not found',
+            ErrorCode.WHISPER_OUTPUT_PARSE_FAILED
+          ))
+        }
+      })
+
+      // Handle abort signal
+      let onAbort: (() => void) | undefined
+      if (signal) {
+        onAbort = (): void => {
+          child.kill('SIGTERM')
+        }
+        if (signal.aborted) {
+          child.kill('SIGTERM')
+        } else {
+          signal.addEventListener('abort', onAbort, { once: true })
+        }
+      }
+
+      // Timeout safety
+      const timeout = setTimeout(() => {
+        child.kill('SIGTERM')
+        settle(reject, new AppError(
+          'Local transcription timed out',
+          ErrorCode.WHISPER_PROCESS_TIMEOUT
+        ))
+      }, LOCAL_WHISPER.PROCESS_TIMEOUT)
+    })
+  }
+
+  // -------------------------------------------------------------------------
+  // Cleanup
+  // -------------------------------------------------------------------------
+
+  /**
+   * Clean up temporary files.
+   *
+   * Best-effort cleanup -- logs warnings but does not throw.
+   * Only deletes files within tmpdir with the expected prefix (defense in depth).
+   */
+  private async cleanupTempFiles(tempFiles: Set<string>): Promise<void> {
+    const tempDir = tmpdir()
+
+    for (const filePath of tempFiles) {
+      // Guard: only delete files within tmpdir with expected prefix
+      if (!filePath.startsWith(tempDir) || !basename(filePath).startsWith(TEMP_PREFIX)) {
+        logger.warn('Refusing to delete non-temp file', { filePath })
+        continue
+      }
+
+      try {
+        await unlink(filePath)
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code
+        if (code !== 'ENOENT') {
+          logger.warn('Failed to clean up temp file', {
+            filePath,
+            error: error instanceof Error ? error.message : String(error)
+          })
+        }
+      }
+    }
+
+    tempFiles.clear()
+  }
+}
+
+/** Singleton instance wired to the default WhisperModelManager */
+export const localWhisperService = new LocalWhisperService(whisperModelManager)
+
+/** Factory function for testing (accepts custom model manager) */
+export function createLocalWhisperService(modelManager: IWhisperModelManager): LocalWhisperService {
+  return new LocalWhisperService(modelManager)
+}

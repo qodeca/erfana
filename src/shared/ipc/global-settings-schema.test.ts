@@ -102,7 +102,8 @@ describe('GlobalSettingsSchema', () => {
         },
         transcription: {
           backend: 'openai' as const,
-          openaiApiKeyStored: false
+          openaiApiKeyStored: false,
+          whisperModel: 'base' as const
         }
       }
 
@@ -124,7 +125,8 @@ describe('GlobalSettingsSchema', () => {
         },
         transcription: {
           backend: 'openai' as const,
-          openaiApiKeyStored: false
+          openaiApiKeyStored: false,
+          whisperModel: 'base' as const
         }
       }
 
@@ -187,7 +189,8 @@ describe('GlobalSettingsSchema', () => {
         },
         transcription: {
           backend: 'openai',
-          openaiApiKeyStored: false
+          openaiApiKeyStored: false,
+          whisperModel: 'base'
         }
       }
 
@@ -202,7 +205,7 @@ describe('GlobalSettingsSchema', () => {
         logging: { level: 'info' },
         editor: { preserveLineBreaks: false },
         gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-        transcription: { backend: 'openai', openaiApiKeyStored: false }
+        transcription: { backend: 'openai', openaiApiKeyStored: false, whisperModel: 'base' }
       }
       expect(validSettings.logging.level).toBe('info')
     })
@@ -259,5 +262,10 @@ describe('getDefaultGlobalSettings', () => {
   it('does not include $schema by default', () => {
     const defaults = getDefaultGlobalSettings()
     expect(defaults.$schema).toBeUndefined()
+  })
+
+  it('returns transcription.whisperModel as base by default', () => {
+    const defaults = getDefaultGlobalSettings()
+    expect(defaults.transcription.whisperModel).toBe('base')
   })
 })

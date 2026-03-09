@@ -446,7 +446,7 @@ export const TEST_IDS = {
   TOAST_BTN_DISMISS: 'toast-btn-dismiss',
 
   // =========================================================================
-  // Settings Overlay (14)
+  // Settings Overlay (17)
   // =========================================================================
 
   /** Settings overlay container */
@@ -477,9 +477,15 @@ export const TEST_IDS = {
   SETTINGS_INPUT_API_KEY: 'settings-input-api-key',
   /** API key clear button */
   SETTINGS_BTN_CLEAR_API_KEY: 'settings-btn-clear-api-key',
+  /** Whisper model select dropdown */
+  SETTINGS_SELECT_WHISPER_MODEL: 'settings-select-whisper-model',
+  /** Whisper model download/status button */
+  SETTINGS_BTN_WHISPER_MODEL: 'settings-btn-whisper-model',
+  /** Whisper model status text */
+  SETTINGS_WHISPER_MODEL_STATUS: 'settings-whisper-model-status',
 
   // =========================================================================
-  // Transcription Dialog (9)
+  // Transcription Dialog (10)
   // =========================================================================
 
   /** Transcription dialog container */
@@ -488,6 +494,8 @@ export const TEST_IDS = {
   TRANSCRIPTION_LANGUAGE_SELECT: 'transcription-language-select',
   /** Start transcription button */
   TRANSCRIPTION_BTN_START: 'transcription-btn-start',
+  /** Retry transcription button (shown on error) */
+  TRANSCRIPTION_BTN_RETRY: 'transcription-btn-retry',
   /** Cancel transcription button */
   TRANSCRIPTION_BTN_CANCEL: 'transcription-btn-cancel',
   /** Progress bar element */

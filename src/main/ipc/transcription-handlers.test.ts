@@ -17,6 +17,9 @@ import type { IpcMainInvokeEvent } from 'electron'
 const mockIpcMainHandle = vi.fn()
 
 vi.mock('electron', () => ({
+  app: {
+    getPath: vi.fn(() => '/mock/userData')
+  },
   ipcMain: {
     handle: mockIpcMainHandle
   },
@@ -55,6 +58,24 @@ vi.mock('../services/ApiKeyService', () => ({
     getKey: mockApiKeyGetKey,
     storeKey: mockApiKeyStoreKey,
     clearKey: mockApiKeyClearKey
+  }
+}))
+
+const mockLocalWhisperTranscribe = vi.fn()
+
+vi.mock('../services/LocalWhisperService', () => ({
+  localWhisperService: {
+    transcribe: mockLocalWhisperTranscribe
+  }
+}))
+
+vi.mock('../services/WhisperModelManager', () => ({
+  whisperModelManager: {
+    ensureBinary: vi.fn(),
+    ensureModel: vi.fn(),
+    listInstalledModels: vi.fn().mockResolvedValue([]),
+    getModelInfo: vi.fn(() => ({ size: 0, installed: false })),
+    deleteModel: vi.fn()
   }
 }))
 
@@ -200,6 +221,10 @@ describe('transcription-handlers', () => {
       expect(channels).toContain('transcription:setApiKey')
       expect(channels).toContain('transcription:hasApiKey')
       expect(channels).toContain('transcription:clearApiKey')
+      expect(channels).toContain('transcription:whisperEnsureBinary')
+      expect(channels).toContain('transcription:whisperEnsureModel')
+      expect(channels).toContain('transcription:whisperListModels')
+      expect(channels).toContain('transcription:whisperDeleteModel')
     })
   })
 
@@ -458,6 +483,342 @@ describe('transcription-handlers', () => {
 
       expect(result.success).toBe(false)
       expect(result.error).toContain('Failed to clear API key')
+    })
+  })
+
+  // ===========================================================================
+  // transcription:whisperEnsureBinary
+  // ===========================================================================
+
+  describe('transcription:whisperEnsureBinary', () => {
+    it('should return success with path when ensureBinary succeeds', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      vi.mocked(whisperModelManager.ensureBinary).mockResolvedValue('/usr/local/bin/whisper')
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:whisperEnsureBinary')
+      expect(handler).toBeDefined()
+
+      const result = await handler!(mockEvent) as { success: boolean; path?: string; error?: string }
+
+      expect(result.success).toBe(true)
+      expect(result.path).toBe('/usr/local/bin/whisper')
+      expect(whisperModelManager.ensureBinary).toHaveBeenCalledWith(
+        expect.objectContaining({ onProgress: expect.any(Function) })
+      )
+    })
+
+    it('should return failure when ensureBinary throws', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      vi.mocked(whisperModelManager.ensureBinary).mockRejectedValue(new Error('Download failed'))
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:whisperEnsureBinary')
+      const result = await handler!(mockEvent) as { success: boolean; path?: string; error?: string }
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Download failed')
+      expect(result.path).toBeUndefined()
+    })
+
+    it('should stream download progress to renderer', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      vi.mocked(whisperModelManager.ensureBinary).mockImplementation(async ({ onProgress }) => {
+        onProgress?.({ percent: 42, phase: 'Downloading' })
+        return '/usr/local/bin/whisper'
+      })
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:whisperEnsureBinary')
+      await handler!(mockEvent)
+
+      const sender = (mockEvent as { sender: { send: ReturnType<typeof vi.fn> } }).sender
+      expect(sender.send).toHaveBeenCalledWith(
+        'transcription:whisperDownloadProgress',
+        expect.objectContaining({ percent: 42, phase: 'Downloading' })
+      )
+    })
+  })
+
+  // ===========================================================================
+  // transcription:whisperEnsureModel
+  // ===========================================================================
+
+  describe('transcription:whisperEnsureModel', () => {
+    it('should return success with path for a valid model name', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      vi.mocked(whisperModelManager.ensureModel).mockResolvedValue('/models/whisper/base.bin')
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:whisperEnsureModel')
+      expect(handler).toBeDefined()
+
+      const result = await handler!(mockEvent, 'base') as { success: boolean; path?: string; error?: string }
+
+      expect(result.success).toBe(true)
+      expect(result.path).toBe('/models/whisper/base.bin')
+      expect(whisperModelManager.ensureModel).toHaveBeenCalledWith(
+        'base',
+        expect.objectContaining({ onProgress: expect.any(Function) })
+      )
+    })
+
+    it('should return failure for an invalid model name', async () => {
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:whisperEnsureModel')
+      const result = await handler!(mockEvent, 'invalid-model') as { success: boolean; path?: string; error?: string }
+
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('Invalid whisper model')
+      expect(result.path).toBeUndefined()
+    })
+
+    it('should return failure when ensureModel throws', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      vi.mocked(whisperModelManager.ensureModel).mockRejectedValue(new Error('Disk full'))
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:whisperEnsureModel')
+      const result = await handler!(mockEvent, 'small') as { success: boolean; path?: string; error?: string }
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Disk full')
+    })
+
+    it('should stream download progress to renderer', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      vi.mocked(whisperModelManager.ensureModel).mockImplementation(async (_model, { onProgress }) => {
+        onProgress?.({ percent: 75, phase: 'Downloading model' })
+        return '/models/whisper/small.bin'
+      })
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:whisperEnsureModel')
+      await handler!(mockEvent, 'small')
+
+      const sender = (mockEvent as { sender: { send: ReturnType<typeof vi.fn> } }).sender
+      expect(sender.send).toHaveBeenCalledWith(
+        'transcription:whisperDownloadProgress',
+        expect.objectContaining({ percent: 75, phase: 'Downloading model' })
+      )
+    })
+  })
+
+  // ===========================================================================
+  // transcription:whisperListModels
+  // ===========================================================================
+
+  describe('transcription:whisperListModels', () => {
+    it('should return all models with their info', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      vi.mocked(whisperModelManager.listInstalledModels).mockResolvedValue(['base', 'small'])
+      vi.mocked(whisperModelManager.getModelInfo).mockImplementation((name) => {
+        if (name === 'base') return { size: 142_000_000, installed: true }
+        if (name === 'small') return { size: 484_000_000, installed: true }
+        return { size: 0, installed: false }
+      })
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:whisperListModels')
+      expect(handler).toBeDefined()
+
+      const result = await handler!() as { success: boolean; models: Array<{ name: string; size: number; installed: boolean }> }
+
+      expect(result.success).toBe(true)
+      expect(result.models).toHaveLength(5)
+      expect(result.models).toContainEqual(expect.objectContaining({ name: 'base', installed: true }))
+      expect(result.models).toContainEqual(expect.objectContaining({ name: 'small', installed: true }))
+      expect(result.models).toContainEqual(expect.objectContaining({ name: 'tiny', installed: false }))
+      expect(result.models.every((m) => 'name' in m && 'size' in m && 'installed' in m)).toBe(true)
+    })
+
+    it('should return success: false with empty models array on error', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      vi.mocked(whisperModelManager.listInstalledModels).mockRejectedValue(new Error('Permission denied'))
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:whisperListModels')
+      const result = await handler!() as { success: boolean; models: unknown[] }
+
+      expect(result.success).toBe(false)
+      expect(result.models).toEqual([])
+    })
+  })
+
+  // ===========================================================================
+  // transcription:whisperDeleteModel
+  // ===========================================================================
+
+  describe('transcription:whisperDeleteModel', () => {
+    it('should return success for a valid installed model', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      vi.mocked(whisperModelManager.deleteModel).mockResolvedValue(undefined)
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:whisperDeleteModel')
+      expect(handler).toBeDefined()
+
+      const result = await handler!(mockEvent, 'medium') as { success: boolean; error?: string }
+
+      expect(result.success).toBe(true)
+      expect(result.error).toBeUndefined()
+      expect(whisperModelManager.deleteModel).toHaveBeenCalledWith('medium')
+    })
+
+    it('should return failure for an invalid model name', async () => {
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:whisperDeleteModel')
+      const result = await handler!(mockEvent, 'unknown-model') as { success: boolean; error?: string }
+
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('Invalid whisper model')
+    })
+
+    it('should return failure when deleteModel throws', async () => {
+      const { whisperModelManager } = await import('../services/WhisperModelManager')
+      vi.mocked(whisperModelManager.deleteModel).mockRejectedValue(new Error('File not found'))
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:whisperDeleteModel')
+      const result = await handler!(mockEvent, 'large') as { success: boolean; error?: string }
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('File not found')
+    })
+  })
+
+  // ===========================================================================
+  // Backend routing (transcribeWithBackend)
+  // ===========================================================================
+
+  describe('backend routing', () => {
+    it('should route to localWhisperService when backend is local', async () => {
+      mockGetSetting.mockReturnValue({ backend: 'local', whisperModel: 'small', openaiApiKeyStored: false })
+      mockLocalWhisperTranscribe.mockResolvedValue({
+        success: true,
+        transcript: 'Local transcription result.',
+        duration: 30,
+        language: 'en'
+      })
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:import')
+      const request = { filePath: '/path/to/audio.mp3', language: 'en' }
+      const result = await handler!(mockEvent, request) as { success: boolean; outputPath?: string }
+
+      expect(result.success).toBe(true)
+      expect(mockLocalWhisperTranscribe).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filePath: '/path/to/audio.mp3',
+          language: 'en',
+          model: 'small'
+        })
+      )
+      expect(mockTranscribe).not.toHaveBeenCalled()
+    })
+
+    it('should pass the whisperModel setting to the local backend', async () => {
+      mockGetSetting.mockReturnValue({ backend: 'local', whisperModel: 'medium', openaiApiKeyStored: false })
+      mockLocalWhisperTranscribe.mockResolvedValue({
+        success: true,
+        transcript: 'Medium model output.',
+        duration: 45,
+        language: 'fr'
+      })
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:import')
+      const request = { filePath: '/path/to/recording.mp3', language: 'fr' }
+      await handler!(mockEvent, request)
+
+      expect(mockLocalWhisperTranscribe).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'medium' })
+      )
+    })
+
+    it('should fall back to base model when whisperModel setting is absent', async () => {
+      mockGetSetting.mockReturnValue({ backend: 'local', openaiApiKeyStored: false })
+      mockLocalWhisperTranscribe.mockResolvedValue({
+        success: true,
+        transcript: 'Fallback model output.',
+        duration: 20,
+        language: 'en'
+      })
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:import')
+      const request = { filePath: '/path/to/recording.mp3', language: 'en' }
+      await handler!(mockEvent, request)
+
+      expect(mockLocalWhisperTranscribe).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'base' })
+      )
+    })
+
+    it('should route to transcriptionService when backend is openai', async () => {
+      mockGetSetting.mockReturnValue({ backend: 'openai', openaiApiKeyStored: true })
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:import')
+      const request = { filePath: '/path/to/audio.mp3', language: 'en' }
+      const result = await handler!(mockEvent, request) as { success: boolean }
+
+      expect(result.success).toBe(true)
+      expect(mockTranscribe).toHaveBeenCalled()
+      expect(mockLocalWhisperTranscribe).not.toHaveBeenCalled()
+    })
+
+    it('should not require API key when backend is local', async () => {
+      mockGetSetting.mockReturnValue({ backend: 'local', whisperModel: 'tiny', openaiApiKeyStored: false })
+      mockApiKeyGetKey.mockResolvedValue(null)
+      mockLocalWhisperTranscribe.mockResolvedValue({
+        success: true,
+        transcript: 'Offline transcription.',
+        duration: 10,
+        language: 'en'
+      })
+
+      const { registerTranscriptionHandlers } = await import('./transcription-handlers')
+      registerTranscriptionHandlers()
+
+      const handler = getHandler('transcription:import')
+      const request = { filePath: '/path/to/audio.mp3', language: 'en' }
+      const result = await handler!(mockEvent, request) as { success: boolean; errorCode?: string }
+
+      expect(result.success).toBe(true)
+      expect(result.errorCode).toBeUndefined()
     })
   })
 })

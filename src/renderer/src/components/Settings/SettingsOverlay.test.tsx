@@ -15,6 +15,7 @@
  * - Logging section (6 tests)
  * - Editor section (5 tests)
  * - Git status section (11 tests)
+ * - Transcription section (10 tests)
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -51,12 +52,22 @@ describe('SettingsOverlay', () => {
     // Clear logger mocks
     vi.clearAllMocks()
 
-    // Mock window.api.transcription for component's useEffect
+    // Mock window.api for component's useEffect hooks
     ;(window as any).api = {
       transcription: {
         hasApiKey: vi.fn().mockResolvedValue(false),
         setApiKey: vi.fn().mockResolvedValue({ success: true }),
         clearApiKey: vi.fn().mockResolvedValue({ success: true })
+      },
+      whisper: {
+        ensureBinary: vi.fn().mockResolvedValue({ success: true, path: '/path/to/binary' }),
+        ensureModel: vi.fn().mockResolvedValue({ success: true, path: '/path/to/model' }),
+        listModels: vi.fn().mockResolvedValue({ success: true, models: [] }),
+        deleteModel: vi.fn().mockResolvedValue({ success: true }),
+        onDownloadProgress: vi.fn().mockReturnValue(vi.fn())
+      },
+      utils: {
+        getPlatform: vi.fn().mockReturnValue('darwin')
       }
     }
   })
@@ -351,7 +362,7 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
         },
         isLoading: false,
         error: null,
@@ -365,7 +376,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -380,7 +392,7 @@ describe('SettingsOverlay', () => {
         logging: { level: 'debug' },
         editor: { preserveLineBreaks: false },
         gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-        transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
+        transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
       }
       useGlobalSettingsStore.setState({
         settings: mockSettings,
@@ -396,7 +408,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -412,7 +425,7 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
         },
         isLoading: false,
         error: null,
@@ -426,7 +439,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -456,7 +470,7 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
         },
         isLoading: false,
         error: null,
@@ -470,7 +484,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -497,7 +512,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -521,7 +537,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -542,7 +559,7 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
         },
         isLoading: false,
         error: null,
@@ -556,7 +573,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -572,7 +590,7 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
         },
         isLoading: false,
         error: null,
@@ -586,7 +604,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -602,7 +621,7 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: true },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
         },
         isLoading: false,
         error: null,
@@ -616,7 +635,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -633,7 +653,7 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
         },
         isLoading: false,
         error: null,
@@ -647,7 +667,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -674,7 +695,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -695,7 +717,7 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
         },
         isLoading: false,
         error: null,
@@ -709,7 +731,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -725,7 +748,7 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
         },
         isLoading: false,
         error: null,
@@ -739,7 +762,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -755,7 +779,7 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: false, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
         },
         isLoading: false,
         error: null,
@@ -769,7 +793,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -786,7 +811,7 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: false, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
         },
         isLoading: false,
         error: null,
@@ -800,7 +825,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -818,7 +844,7 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 7000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
         },
         isLoading: false,
         error: null,
@@ -832,7 +858,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -848,7 +875,7 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
         },
         isLoading: false,
         error: null,
@@ -862,7 +889,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -888,7 +916,7 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
         },
         isLoading: false,
         error: null,
@@ -902,7 +930,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -920,7 +949,7 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: false, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
         },
         isLoading: false,
         error: null,
@@ -934,7 +963,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -949,7 +979,7 @@ describe('SettingsOverlay', () => {
           logging: { level: 'info' },
           editor: { preserveLineBreaks: false },
           gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
-          transcription: { backend: 'openai' as const, openaiApiKeyStored: false }
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
         },
         isLoading: false,
         error: null,
@@ -963,7 +993,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -987,7 +1018,8 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
@@ -1011,13 +1043,354 @@ describe('SettingsOverlay', () => {
         resetSettings: vi.fn(),
         clearCorruptionFlag: vi.fn(),
         _handleSettingsChanged: vi.fn(),
-        updateTranscriptionBackend: vi.fn()
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
       })
 
       render(<SettingsOverlay />)
 
       const dropdown = screen.getByRole('combobox', { name: 'Polling interval' })
       expect(dropdown).toHaveValue('5000')
+    })
+  })
+
+  describe('Transcription section', () => {
+    beforeEach(() => {
+      useSettingsStore.setState({ isOpen: true })
+    })
+
+    it('renders transcription section with heading "Transcription"', () => {
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const heading = screen.getByRole('heading', { name: 'Transcription' })
+      expect(heading).toBeInTheDocument()
+      expect(heading).toHaveClass('settings-section-title')
+    })
+
+    it('backend dropdown renders with "openai" selected by default', () => {
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const dropdown = screen.getByTestId('settings-select-transcription-backend')
+      expect(dropdown).toBeInTheDocument()
+      expect(dropdown).toHaveValue('openai')
+    })
+
+    it('changing backend to "local" shows whisper model UI and hides API key UI', () => {
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      expect(screen.getByTestId('settings-select-whisper-model')).toBeInTheDocument()
+      expect(screen.queryByTestId('settings-input-api-key')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('settings-btn-clear-api-key')).not.toBeInTheDocument()
+    })
+
+    it('changing backend to "openai" shows API key UI and hides whisper model UI', () => {
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      expect(screen.queryByTestId('settings-select-whisper-model')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('settings-btn-whisper-model')).not.toBeInTheDocument()
+    })
+
+    it('API key input renders when hasApiKey is false and backend is "openai"', async () => {
+      ;(window as any).api.transcription.hasApiKey = vi.fn().mockResolvedValue(false)
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-input-api-key')).toBeInTheDocument()
+      })
+      expect(screen.queryByTestId('settings-btn-clear-api-key')).not.toBeInTheDocument()
+    })
+
+    it('"Remove key" button shows when hasApiKey is true and backend is "openai"', async () => {
+      ;(window as any).api.transcription.hasApiKey = vi.fn().mockResolvedValue(true)
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-btn-clear-api-key')).toBeInTheDocument()
+      })
+      expect(screen.queryByTestId('settings-input-api-key')).not.toBeInTheDocument()
+    })
+
+    it('whisper model dropdown renders when backend is "local"', () => {
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const whisperDropdown = screen.getByTestId('settings-select-whisper-model')
+      expect(whisperDropdown).toBeInTheDocument()
+      expect(whisperDropdown).toHaveValue('base')
+    })
+
+    it('"Download model" button shows when model is not installed and backend is "local"', async () => {
+      ;(window as any).api.whisper.listModels = vi.fn().mockResolvedValue({
+        success: true,
+        models: [{ name: 'base', size: 142000000, installed: false }]
+      })
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-btn-whisper-model')).toBeInTheDocument()
+      })
+      expect(screen.getByTestId('settings-btn-whisper-model')).toHaveTextContent('Download model')
+    })
+
+    it('model status shows "Ready" when model is installed and backend is "local"', async () => {
+      ;(window as any).api.whisper.listModels = vi.fn().mockResolvedValue({
+        success: true,
+        models: [{ name: 'base', size: 142000000, installed: true }]
+      })
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'local' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('settings-whisper-model-status')).toHaveTextContent('Ready')
+      })
+      expect(screen.queryByTestId('settings-btn-whisper-model')).not.toBeInTheDocument()
+    })
+
+    it('local option is disabled and shows "Local (macOS only)" on non-macOS platforms', () => {
+      ;(window as any).api.utils.getPlatform = vi.fn().mockReturnValue('win32')
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const backendDropdown = screen.getByTestId('settings-select-transcription-backend')
+      const localOption = Array.from(backendDropdown.querySelectorAll('option')).find(
+        (opt) => opt.value === 'local'
+      )
+
+      expect(localOption).toBeInTheDocument()
+      expect(localOption).toHaveTextContent('Local (macOS only)')
+      expect(localOption).toBeDisabled()
     })
   })
 })

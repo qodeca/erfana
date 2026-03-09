@@ -57,7 +57,8 @@ export const GlobalSettingsSchema = z.object({
   /** Transcription configuration */
   transcription: TranscriptionSettingsSchema.default(() => ({
     backend: 'openai' as const,
-    openaiApiKeyStored: false
+    openaiApiKeyStored: false,
+    whisperModel: 'base' as const
   }))
 })
 export type GlobalSettings = z.infer<typeof GlobalSettingsSchema>

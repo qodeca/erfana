@@ -21,6 +21,7 @@ import { useState, useEffect, useRef, useCallback, useId } from 'react'
 import { FileAudio, FileVideo } from 'lucide-react'
 import { VIDEO_IMPORT } from '../../../../shared/constants'
 import { useTranscriptionStore } from '../../stores/useTranscriptionStore'
+import { useGlobalSettingsStore } from '../../stores/useGlobalSettingsStore'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { LanguageSelect } from './LanguageSelect'
 import { TEST_IDS } from '../../constants/testids'
@@ -35,15 +36,21 @@ import './TranscriptionDialog.css'
 
 /**
  * Get actionable suggestion text for a transcription error code.
+ *
+ * @param errorCode - Error code from the transcription result
+ * @param backend - Active transcription backend ('openai' or 'local')
  */
-function getErrorSuggestion(errorCode: string | undefined): string | null {
+function getErrorSuggestion(errorCode: string | undefined, backend: string): string | null {
   switch (errorCode) {
     case ErrorCode.TRANSCRIPTION_NO_API_KEY:
-      return 'Add your OpenAI API key in Settings.'
+      // API key errors are only relevant for the OpenAI backend
+      return backend === 'openai' ? 'Add your OpenAI API key in Settings.' : null
     case ErrorCode.TRANSCRIPTION_INVALID_API_KEY:
-      return 'Check your API key in Settings.'
+      return backend === 'openai' ? 'Check your API key in Settings.' : null
     case ErrorCode.TRANSCRIPTION_NETWORK_ERROR:
-      return 'Check your internet connection and try again.'
+      return backend === 'local'
+        ? 'Check the local whisper model is downloaded in Settings.'
+        : 'Check your internet connection and try again.'
     case ErrorCode.TRANSCRIPTION_RATE_LIMITED:
       return 'Wait a moment and try again.'
     case ErrorCode.TRANSCRIPTION_INVALID_AUDIO:
@@ -115,6 +122,7 @@ export function TranscriptionDialog(): JSX.Element | null {
     setLastLanguage
   } = useTranscriptionStore()
 
+  const { settings } = useGlobalSettingsStore()
   const terminalPortal = useTerminalPortalOptional()
 
   const id = useId()
@@ -200,8 +208,9 @@ export function TranscriptionDialog(): JSX.Element | null {
   const hasError = error !== null && !isTranscribing
   const hasSuccess = result?.success === true && !isTranscribing
   const showLanguageSelection = !isTranscribing && !hasError && !hasSuccess
+  const activeBackend = settings?.transcription.backend ?? 'openai'
   const errorSuggestion = hasError && result?.errorCode
-    ? getErrorSuggestion(result.errorCode)
+    ? getErrorSuggestion(result.errorCode, activeBackend)
     : null
 
   const handleStart = (): void => {
@@ -446,7 +455,7 @@ export function TranscriptionDialog(): JSX.Element | null {
               <button
                 className="dialog-btn dialog-btn-primary"
                 onClick={handleRetry}
-                data-testid={TEST_IDS.TRANSCRIPTION_BTN_START}
+                data-testid={TEST_IDS.TRANSCRIPTION_BTN_RETRY}
               >
                 Retry
               </button>

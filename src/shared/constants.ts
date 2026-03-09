@@ -262,6 +262,43 @@ export const TRANSCRIPTION = {
 } as const
 
 /**
+ * Local Whisper (whisper.cpp) constants
+ * Used by local transcription backend for offline speech-to-text
+ *
+ * @see Issue #111 - Local Whisper transcription backend
+ */
+export const LOCAL_WHISPER = {
+  /** Pinned whisper.cpp release version */
+  VERSION: '1.7.3',
+  /** Name of the whisper.cpp CLI binary */
+  BINARY_NAME: 'whisper-cli',
+  /** Subdirectory for downloaded models */
+  MODELS_DIR: 'models',
+  /** Subdirectory for the whisper binary */
+  BIN_DIR: 'bin',
+  /** Top-level subdirectory under userData */
+  WHISPER_DIR: 'whisper',
+  /** Supported model sizes */
+  SUPPORTED_MODELS: ['tiny', 'base', 'small', 'medium', 'large'] as const,
+  /** Approximate download sizes in bytes per model */
+  MODEL_SIZES: {
+    tiny: 75_000_000,
+    base: 142_000_000,
+    small: 466_000_000,
+    medium: 1_500_000_000,
+    large: 2_900_000_000
+  },
+  /** Download timeout in ms (10 minutes – large models) */
+  DOWNLOAD_TIMEOUT: 600_000,
+  /** Process timeout in ms (30 minutes – long transcriptions) */
+  PROCESS_TIMEOUT: 1_800_000,
+  /** GitHub release base URL for whisper.cpp binaries */
+  GITHUB_RELEASE_BASE_URL: 'https://github.com/ggml-org/whisper.cpp/releases/download',
+  /** Hugging Face base URL for GGML model files */
+  HUGGINGFACE_MODEL_BASE_URL: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main'
+} as const
+
+/**
  * Video import constants
  * Used by AudioExtractionService for video-to-audio extraction
  *

@@ -16,8 +16,16 @@ import { z } from 'zod'
  * Currently only OpenAI is supported. Additional backends
  * can be added as new enum values.
  */
-export const TranscriptionBackendSchema = z.enum(['openai'])
+export const TranscriptionBackendSchema = z.enum(['openai', 'local'])
 export type TranscriptionBackend = z.infer<typeof TranscriptionBackendSchema>
+
+/**
+ * Whisper model sizes for local transcription backend
+ *
+ * Controls quality vs. speed trade-off for local whisper.cpp inference.
+ */
+export const WhisperModelSchema = z.enum(['tiny', 'base', 'small', 'medium', 'large'])
+export type WhisperModel = z.infer<typeof WhisperModelSchema>
 
 /**
  * Language options for transcription
@@ -86,6 +94,8 @@ export const TranscriptionSettingsSchema = z.object({
   /** Selected transcription backend */
   backend: TranscriptionBackendSchema.default('openai'),
   /** Whether an API key has been stored (key itself in safeStorage) */
-  openaiApiKeyStored: z.boolean().default(false)
+  openaiApiKeyStored: z.boolean().default(false),
+  /** Selected whisper.cpp model for local backend */
+  whisperModel: WhisperModelSchema.default('base')
 })
 export type TranscriptionSettings = z.infer<typeof TranscriptionSettingsSchema>

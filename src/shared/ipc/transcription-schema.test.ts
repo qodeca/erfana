@@ -11,13 +11,15 @@ import {
   TranscriptionLanguageSchema,
   TranscriptionImportRequestSchema,
   TranscriptionSettingsSchema,
+  WhisperModelSchema,
   type TranscriptionBackend,
   type TranscriptionLanguage,
   type TranscriptionImportRequest,
   type TranscriptionSettings,
   type TranscriptionProgress,
   type TranscriptionImportResult,
-  type TranscriptionResult
+  type TranscriptionResult,
+  type WhisperModel
 } from './transcription-schema'
 
 describe('TranscriptionBackendSchema', () => {
@@ -31,9 +33,59 @@ describe('TranscriptionBackendSchema', () => {
     expect(() => TranscriptionBackendSchema.parse(123)).toThrow()
   })
 
+  it('validates local backend', () => {
+    expect(TranscriptionBackendSchema.parse('local')).toBe('local')
+  })
+
   it('infers correct type', () => {
     const backend: TranscriptionBackend = 'openai'
     expect(backend).toBe('openai')
+  })
+})
+
+describe('WhisperModelSchema', () => {
+  it('validates all 5 model sizes', () => {
+    const validModels: WhisperModel[] = ['tiny', 'base', 'small', 'medium', 'large']
+    for (const model of validModels) {
+      expect(WhisperModelSchema.parse(model)).toBe(model)
+    }
+  })
+
+  it('validates tiny model', () => {
+    expect(WhisperModelSchema.parse('tiny')).toBe('tiny')
+  })
+
+  it('validates base model', () => {
+    expect(WhisperModelSchema.parse('base')).toBe('base')
+  })
+
+  it('validates small model', () => {
+    expect(WhisperModelSchema.parse('small')).toBe('small')
+  })
+
+  it('validates medium model', () => {
+    expect(WhisperModelSchema.parse('medium')).toBe('medium')
+  })
+
+  it('validates large model', () => {
+    expect(WhisperModelSchema.parse('large')).toBe('large')
+  })
+
+  it('rejects invalid model name', () => {
+    expect(() => WhisperModelSchema.parse('xlarge')).toThrow()
+  })
+
+  it('rejects empty string', () => {
+    expect(() => WhisperModelSchema.parse('')).toThrow()
+  })
+
+  it('rejects numeric value', () => {
+    expect(() => WhisperModelSchema.parse(123)).toThrow()
+  })
+
+  it('infers correct type', () => {
+    const model: WhisperModel = 'small'
+    expect(model).toBe('small')
   })
 })
 
@@ -152,7 +204,8 @@ describe('TranscriptionSettingsSchema', () => {
   it('validates complete settings', () => {
     const settings = {
       backend: 'openai',
-      openaiApiKeyStored: true
+      openaiApiKeyStored: true,
+      whisperModel: 'base'
     }
     const result = TranscriptionSettingsSchema.parse(settings)
     expect(result).toEqual(settings)
@@ -186,10 +239,36 @@ describe('TranscriptionSettingsSchema', () => {
     ).toThrow()
   })
 
+  it('accepts all valid whisperModel values', () => {
+    const validModels = ['tiny', 'base', 'small', 'medium', 'large'] as const
+    for (const model of validModels) {
+      const result = TranscriptionSettingsSchema.parse({ whisperModel: model })
+      expect(result.whisperModel).toBe(model)
+    }
+  })
+
+  it('applies default whisperModel of base when not provided', () => {
+    const result = TranscriptionSettingsSchema.parse({})
+    expect(result.whisperModel).toBe('base')
+  })
+
+  it('rejects invalid whisperModel string', () => {
+    expect(() =>
+      TranscriptionSettingsSchema.parse({ whisperModel: 'xlarge' })
+    ).toThrow()
+  })
+
+  it('rejects empty string whisperModel', () => {
+    expect(() =>
+      TranscriptionSettingsSchema.parse({ whisperModel: '' })
+    ).toThrow()
+  })
+
   it('infers correct type', () => {
     const settings: TranscriptionSettings = {
       backend: 'openai',
-      openaiApiKeyStored: false
+      openaiApiKeyStored: false,
+      whisperModel: 'base'
     }
     expect(settings.backend).toBe('openai')
     expect(settings.openaiApiKeyStored).toBe(false)
