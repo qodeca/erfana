@@ -92,7 +92,7 @@ Feature specifications live in `specs/`. Check registry before implementing new 
 | 006 | Knowledge graph & entities | T3 | draft | `specs/spec-t3-006-knowledge-graph` |
 | 007 | Temporal queries & timeline | T3 | draft | `specs/spec-t3-007-temporal-queries` |
 | 008 | Graph engine polish & maintenance | T3 | draft | `specs/spec-t3-008-graph-polish` |
-| 009 | Media import with transcription | T4 | implemented (stage 3) | `specs/spec-t4-009-media-import-transcription` |
+| 009 | Media import with transcription | T4 | archived | `specs/archived/spec-t4-009-media-import-transcription` |
 | 013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/spec-t3-013-multi-cli-tool-prompt-optimization` |
 | 016 | Project Tree refresh specification | T3 | archived | `specs/archived/spec-t3-016-project-tree-refresh` |
 

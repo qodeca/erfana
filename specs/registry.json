@@ -114,11 +114,11 @@
       "slug": "media-import-transcription",
       "name": "Media import with transcription",
       "tier": "T4",
-      "status": "implemented (stage 3)",
+      "status": "archived",
       "scope": "feature",
-      "description": "Extend import system to support audio/video files via transcription. Configurable backends (OpenAI API, local Whisper), markdown output with metadata, per-import language selection, progress reporting. Stage 3 complete: video import (MP4, MOV, AVI, MKV, WebM, FLV, WMV) with audio extraction via ffmpeg. Remaining: local Whisper (#111), settings UI (#112).",
+      "description": "Extend import system to support audio/video files via transcription. Dual backends (OpenAI API, local whisper.cpp), markdown output with metadata, per-import language selection, progress reporting, settings UI for backend selection and model management. All stages complete: audio (#75), video (#110), local whisper (#111), settings UI (#112).",
       "created": "2025-12-22T21:45:00.000Z",
-      "path": "spec-t4-009-media-import-transcription",
+      "path": "archived/spec-t4-009-media-import-transcription",
       "last_modified": "2025-12-22T23:15:00.000Z",
       "sections_count": 5,
       "requirements_count": 51,
@@ -129,7 +129,9 @@
         "designs": [],
         "issues": [
           "#75",
-          "#110"
+          "#110",
+          "#111",
+          "#112"
         ]
       }
     },
