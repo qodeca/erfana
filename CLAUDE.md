@@ -22,7 +22,9 @@ npm run test:renderer
 npm run test:main
 npm run test:preload
 npm run test:cov     # Coverage (v8) per project
-npm run test:e2e     # Playwright E2E tests
+npm run test:e2e     # Playwright E2E tests (functional only)
+npm run test:e2e:visual           # Visual regression tests
+npm run test:e2e:update-screenshots  # Update visual baselines
 ```
 
 ## Project Structure
@@ -129,6 +131,7 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - E2E: Playwright with Electron (see [docs/testing/e2e-testing.md](docs/testing/e2e-testing.md))
+- Visual regression: Playwright `toHaveScreenshot()` for 5 UI states (welcome, editor, terminal, settings, confirm dialog); baselines in `e2e/screenshots/` with platform suffix; `--project=visual` in Playwright config
 - E2E env vars: Some tests require API keys via `.env` file (see `.env.example`); tests skip gracefully if not set
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
 

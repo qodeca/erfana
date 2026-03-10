@@ -247,19 +247,27 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 ### E2E/UI (Playwright Electron)
 
-**[e2e-testing.md](./e2e-testing.md)** - Comprehensive E2E testing guide
+**[e2e-testing.md](./e2e-testing.md)** – Comprehensive E2E testing guide
 
-- Playwright setup and configuration for Electron
+- Playwright setup and configuration for Electron (two projects: `electron` functional, `visual` regression)
 - Testing patterns for third-party components (Monaco, xterm.js, Mermaid)
 - Complete selector catalog (138 testids) – see [e2e-selectors.md](./e2e-selectors.md)
 - Test helper utilities documentation
 - Troubleshooting guide
+
+**Commands**:
+```bash
+npm run test:e2e                   # Functional E2E tests (electron project)
+npm run test:e2e:visual            # Visual regression tests (visual project)
+npm run test:e2e:update-screenshots  # Update visual baselines
+```
 
 **E2E test files** (`e2e/`):
 - `app-launch.e2e.ts` – Application launch, activity bar, welcome panel visibility
 - `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
 - `directory-watcher.e2e.ts` – Directory watcher pipeline (#104): verifies file creation via terminal appears in Project Tree within latency budget
 - `audio-transcription.e2e.ts` – Full audio import transcription lifecycle (real OpenAI API, requires `OPENAI_API_KEY`, skips if not set)
+- `visual-regression.e2e.ts` – Visual regression for 5 UI states (see below)
 
 **Shared helpers** (`e2e/utils/helpers.ts`):
 - `createTestProject(seedFiles?)` – Creates temp project directory with optional seed files, returns `{ projectPath, cleanup }`
@@ -269,6 +277,25 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 - See [E2E Helpers](./e2e-helpers.md) for full reference
 
 See Spec #011 (archived) for the specification.
+
+### Visual regression (Spec #019)
+
+Screenshot-based comparison for 5 core UI states:
+- **(a)** Welcome panel – empty project
+- **(b)** Editor loaded – tree + editor + preview
+- **(c)** Terminal open – split view with terminal
+- **(d)** Settings overlay – full-screen settings
+- **(e)** Confirm dialog – quit confirmation overlay
+
+**Key details**:
+- Baselines in `e2e/screenshots/` with platform suffix (e.g., `welcome-empty-darwin.png`)
+- Deterministic rendering: 1280x800 window, 1x DPR (`--force-device-scale-factor=1`)
+- Monaco cursor blink disabled; minimap and scrollbar masked
+- Tests skip gracefully when no baseline exists for the current platform
+- `maxDiffPixelRatio: 0.01`, `retries: 0` (diffs must be investigated, not retried)
+- CI records video on failure for debugging
+
+See `specs/spec-t2-019-visual-regression-ci/` for full specification.
 
 ### Coverage
 - Generate per-project coverage reports: `npm run test:cov`
@@ -309,8 +336,9 @@ See Spec #011 (archived) for the specification.
 
 ### Comprehensive Testing
 1. Run unit/integration tests (Vitest)
-2. Run E2E tests: `npm run test:e2e`
-3. Run visual scenarios in [test-scenarios.md](./test-scenarios.md)
+2. Run functional E2E tests: `npm run test:e2e`
+3. Run visual regression tests: `npm run test:e2e:visual`
+4. Run visual scenarios in [test-scenarios.md](./test-scenarios.md)
 
 ### Learning Circuit Electron MCP
 1. Start with simple flows from [test-scenarios.md](./test-scenarios.md)

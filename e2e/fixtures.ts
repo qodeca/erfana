@@ -44,6 +44,27 @@ import * as path from 'path'
 import { TEST_IDS, byTestId } from './utils/helpers'
 
 /**
+ * Creates a worker-scoped userDataDir fixture with a given prefix.
+ * Each worker gets a unique temp directory under `.e2e-temp/` that is
+ * cleaned up after all tests in the worker complete.
+ */
+function createUserDataDirFixture(prefix: string) {
+  return [
+    // eslint-disable-next-line no-empty-pattern
+    async ({}, use: (value: string) => Promise<void>, workerInfo: { workerIndex: number }) => {
+      const e2eTempDir = path.join(__dirname, '..', '.e2e-temp')
+      await fs.promises.mkdir(e2eTempDir, { recursive: true })
+      const userDataDir = await fs.promises.mkdtemp(
+        path.join(e2eTempDir, `${prefix}${workerInfo.workerIndex}-`)
+      )
+      await use(userDataDir)
+      await fs.promises.rm(userDataDir, { recursive: true, force: true })
+    },
+    { scope: 'worker' as const }
+  ]
+}
+
+/**
  * Path to the Erfana project root (for launching the app).
  */
 const PROJECT_ROOT = path.join(__dirname, '..')
@@ -118,34 +139,8 @@ type TestFixtures = {
  * ```
  */
 export const test = base.extend<TestFixtures, WorkerFixtures>({
-  /**
-   * Worker-scoped isolated user data directory.
-   *
-   * Creates a unique directory per worker under `.e2e-temp/` and cleans it
-   * up after all tests in the worker complete. This ensures:
-   * - No Zustand/localStorage state pollution between test runs
-   * - Parallel workers don't interfere with each other
-   * - Clean slate for each test run
-   */
-  userDataDir: [
-    // eslint-disable-next-line no-empty-pattern
-    async ({}, use, workerInfo) => {
-      // Create base temp directory
-      const e2eTempDir = path.join(__dirname, '..', '.e2e-temp')
-      await fs.promises.mkdir(e2eTempDir, { recursive: true })
-
-      // Create unique directory for this worker
-      const userDataDir = await fs.promises.mkdtemp(
-        path.join(e2eTempDir, `worker-${workerInfo.workerIndex}-`)
-      )
-
-      await use(userDataDir)
-
-      // Cleanup after worker completes
-      await fs.promises.rm(userDataDir, { recursive: true, force: true })
-    },
-    { scope: 'worker' }
-  ],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  userDataDir: createUserDataDirFixture('worker-') as any,
 
   /**
    * Launches the Electron app and provides it to the test.
@@ -214,6 +209,195 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 
     // Wait for project tree to be populated (project is loaded)
     await byTestId(window, TEST_IDS.PROJECT_TREE).waitFor({ state: 'visible', timeout: 15000 })
+
+    await use(window)
+  }
+})
+
+/**
+ * Visual test fixture type definitions.
+ * Extends standard fixtures with deterministic sizing and CI video recording.
+ */
+type VisualTestFixtures = {
+  /** Electron app with deterministic 1280x800 window, 1x DPR, and CI video recording. */
+  visualApp: ElectronApplication
+  /** Window from visual app, ready for screenshot capture. */
+  visualWindow: Page
+  /** Isolated test project directory with seed markdown files. */
+  visualTestProject: string
+  /** Visual app with a project loaded. */
+  visualAppWithProject: ElectronApplication
+  /** Window from visual app with project, ready for screenshot capture. */
+  visualWindowWithProject: Page
+}
+
+/**
+ * Seed files for the visual test project.
+ * Creates a minimal project with a known markdown file for deterministic screenshots.
+ */
+const VISUAL_TEST_SEED_FILES: Record<string, string> = {
+  'README.md': `# Visual test project
+
+This is a test document used for visual regression testing.
+
+## Features
+
+- Markdown rendering
+- Code blocks
+- Lists and headings
+
+\`\`\`typescript
+const greeting = 'Hello, world!'
+console.log(greeting)
+\`\`\`
+
+> A blockquote for visual variety.
+`
+}
+
+/**
+ * Build Electron launch options for visual regression tests.
+ * Adds --force-device-scale-factor=1 for consistent rendering and
+ * enables video recording when running in CI.
+ */
+function buildVisualLaunchOptions(
+  userDataDir: string,
+  projectPath?: string
+): { args: string[]; env: Record<string, string>; recordVideo?: { dir: string; size: { width: number; height: number } } } {
+  const args = [PROJECT_ROOT, '--force-device-scale-factor=1', `--user-data-dir=${userDataDir}`]
+  if (projectPath) {
+    args.splice(1, 0, projectPath)
+  }
+
+  const opts: ReturnType<typeof buildVisualLaunchOptions> = {
+    args,
+    env: { ...process.env, NODE_ENV: 'development' }
+  }
+
+  if (process.env.CI) {
+    opts.recordVideo = {
+      dir: path.join(__dirname, '..', 'test-results', 'videos'),
+      size: { width: 1280, height: 720 }
+    }
+  }
+
+  return opts
+}
+
+/**
+ * Force-close an Electron app by destroying all windows first.
+ * BrowserWindow.destroy() skips the 'close' event, preventing quit
+ * confirmation dialogs from blocking teardown.
+ */
+async function forceCloseApp(app: ElectronApplication): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  try {
+    await app.evaluate(({ BrowserWindow }) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.destroy()
+      }
+    })
+  } catch (e) {
+    // App may already be closing – log for CI debugging
+    if (process.env.CI) console.warn('forceCloseApp: window destroy failed –', e)
+  }
+  try {
+    await app.close()
+  } catch (e) {
+    // Process may already be dead after destroy – log for CI debugging
+    if (process.env.CI) console.warn('forceCloseApp: app.close() failed –', e)
+  }
+}
+
+/**
+ * Resize the BrowserWindow to exact dimensions via Electron's main process API.
+ */
+async function resizeBrowserWindow(
+  app: ElectronApplication,
+  width: number,
+  height: number
+): Promise<void> {
+  await app.evaluate(({ BrowserWindow }, size) => {
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win) {
+      win.setSize(size.width, size.height)
+      win.setContentSize(size.width, size.height)
+    }
+  }, { width, height })
+}
+
+/**
+ * Extended Playwright test with visual regression fixtures.
+ *
+ * Provides fixtures with deterministic window sizing (1280x800 at 1x DPR),
+ * CI video recording, and consistent rendering for screenshot comparison.
+ *
+ * @example
+ * ```typescript
+ * import { visualTest, expect } from './fixtures';
+ *
+ * visualTest('welcome panel matches baseline', async ({ visualWindow }) => {
+ *   await expect(visualWindow).toHaveScreenshot({ name: 'welcome-empty' });
+ * });
+ * ```
+ */
+export const visualTest = base.extend<VisualTestFixtures, WorkerFixtures>({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  userDataDir: createUserDataDirFixture('worker-visual-') as any,
+
+  visualApp: async ({ userDataDir }, use) => {
+    const opts = buildVisualLaunchOptions(userDataDir)
+    const app = await electron.launch(opts)
+    await resizeBrowserWindow(app, 1280, 800)
+    await use(app)
+    await forceCloseApp(app)
+  },
+
+  visualWindow: async ({ visualApp }, use) => {
+    const window = await visualApp.firstWindow()
+    await window.waitForLoadState('domcontentloaded')
+    await byTestId(window, TEST_IDS.ACTIVITY_BAR).waitFor({ state: 'visible', timeout: 10000 })
+    await use(window)
+  },
+
+  // eslint-disable-next-line no-empty-pattern
+  visualTestProject: async ({}, use) => {
+    // Create isolated test project with controlled seed files in .e2e-temp (gitignored)
+    const e2eTempDir = path.join(__dirname, '..', '.e2e-temp')
+    await fs.promises.mkdir(e2eTempDir, { recursive: true })
+    const projectPath = await fs.promises.mkdtemp(path.join(e2eTempDir, 'visual-project-'))
+    for (const [name, content] of Object.entries(VISUAL_TEST_SEED_FILES)) {
+      await fs.promises.writeFile(path.join(projectPath, name), content, 'utf-8')
+    }
+    await use(projectPath)
+    await fs.promises.rm(projectPath, { recursive: true, force: true })
+  },
+
+  visualAppWithProject: async ({ userDataDir }, use) => {
+    const opts = buildVisualLaunchOptions(userDataDir)
+    const app = await electron.launch(opts)
+    await resizeBrowserWindow(app, 1280, 800)
+    await use(app)
+    await forceCloseApp(app)
+  },
+
+  visualWindowWithProject: async ({ visualAppWithProject, visualTestProject }, use) => {
+    const window = await visualAppWithProject.firstWindow()
+    await window.waitForLoadState('domcontentloaded')
+    await byTestId(window, TEST_IDS.ACTIVITY_BAR).waitFor({ state: 'visible', timeout: 10000 })
+
+    // Open the project via IPC – Erfana's main process does not parse project paths
+    // from process.argv; the CLI arg in appWithProject only works because electron-store
+    // restores the last project. With isolated userDataDir (no persisted state),
+    // IPC openProjectByPath is the only reliable way to load a specific project.
+    await window.evaluate(async (projectPath: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (window as any).api.file.openProjectByPath(projectPath)
+    }, visualTestProject)
+
+    // Wait for file nodes to appear in the project tree
+    const fileNodes = window.locator(`[data-testid^="project-tree-node-file-"]`)
+    await expect(fileNodes.first()).toBeVisible({ timeout: 15000 })
 
     await use(window)
   }
@@ -301,25 +485,8 @@ export function createAppLauncher(options: {
  * ```
  */
 export const testMultiWindow = base.extend<TestFixtures, WorkerFixtures>({
-  /**
-   * Worker-scoped isolated user data directory for multi-window tests.
-   */
-  userDataDir: [
-    // eslint-disable-next-line no-empty-pattern
-    async ({}, use, workerInfo) => {
-      const e2eTempDir = path.join(__dirname, '..', '.e2e-temp')
-      await fs.promises.mkdir(e2eTempDir, { recursive: true })
-
-      const userDataDir = await fs.promises.mkdtemp(
-        path.join(e2eTempDir, `worker-multiwin-${workerInfo.workerIndex}-`)
-      )
-
-      await use(userDataDir)
-
-      await fs.promises.rm(userDataDir, { recursive: true, force: true })
-    },
-    { scope: 'worker' }
-  ],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  userDataDir: createUserDataDirFixture('worker-multiwin-') as any,
 
   app: async ({ userDataDir }, use) => {
     const app = await electron.launch({
