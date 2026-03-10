@@ -17,6 +17,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { WelcomePanel } from './WelcomePanel'
 import { AppError, ErrorCode } from '../../../../shared/errors'
+import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
 
 // Mock data
 const mockProjects = [
@@ -503,6 +504,40 @@ describe('WelcomePanel', () => {
 
       // Button is disabled, but the handler also checks and shows warning
       expect(mockRemoveRecentProject).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Test IDs', () => {
+    it('should have WELCOME_RECENT_PROJECTS test ID on the list container', async () => {
+      render(<WelcomePanel {...mockDockviewProps} />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId(TEST_IDS.WELCOME_RECENT_PROJECTS)).toBeInTheDocument()
+      })
+    })
+
+    it('should have dynamic WELCOME_RECENT_PROJECT test IDs on each project item', async () => {
+      render(<WelcomePanel {...mockDockviewProps} />)
+
+      await waitFor(() => {
+        for (const project of mockProjects) {
+          expect(
+            screen.getByTestId(getDynamicTestId(TEST_IDS.WELCOME_RECENT_PROJECT, project.path))
+          ).toBeInTheDocument()
+        }
+      })
+    })
+
+    it('should have dynamic WELCOME_RECENT_PROJECT_BTN_REMOVE test IDs on remove buttons', async () => {
+      render(<WelcomePanel {...mockDockviewProps} />)
+
+      await waitFor(() => {
+        for (const project of mockProjects) {
+          expect(
+            screen.getByTestId(getDynamicTestId(TEST_IDS.WELCOME_RECENT_PROJECT_BTN_REMOVE, project.path))
+          ).toBeInTheDocument()
+        }
+      })
     })
   })
 

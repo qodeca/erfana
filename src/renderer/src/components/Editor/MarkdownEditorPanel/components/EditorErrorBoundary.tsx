@@ -10,6 +10,7 @@
  */
 
 import { Component, type ReactNode, type ErrorInfo } from 'react'
+import { TEST_IDS } from '../../../../constants/testids'
 import { logger } from '../../../../utils/logger'
 
 /**
@@ -94,6 +95,8 @@ export class EditorErrorBoundary extends Component<
             fontSize: 'var(--text-sm)',
             textAlign: 'center'
           }}
+          role="alert"
+          data-testid={TEST_IDS.EDITOR_ERROR_BOUNDARY}
         >
           Component failed to render
         </div>

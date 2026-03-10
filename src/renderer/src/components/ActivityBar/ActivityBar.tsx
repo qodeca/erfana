@@ -27,7 +27,7 @@ export function ActivityBar({ side, activePanel, onPanelClick, projectPath }: Ac
   }
 
   return (
-    <div className={`activity-bar activity-bar-${side}`} data-testid={TEST_IDS.ACTIVITY_BAR}>
+    <div className={`activity-bar activity-bar-${side}`} role="toolbar" aria-label="Activity bar" aria-orientation="vertical" data-testid={TEST_IDS.ACTIVITY_BAR}>
       <div className="activity-bar-items">
         {panels.map((panel) => (
           <ActivityBarItem
@@ -40,6 +40,7 @@ export function ActivityBar({ side, activePanel, onPanelClick, projectPath }: Ac
             badge={panel.badge?.()}
             onClick={() => onPanelClick(panel.id)}
             side={side}
+            testId={panel.testId}
           />
         ))}
       </div>
@@ -49,6 +50,7 @@ export function ActivityBar({ side, activePanel, onPanelClick, projectPath }: Ac
           onClick={openSettings}
           title="Settings"
           role="button"
+          aria-label="Settings"
           tabIndex={0}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {

@@ -71,7 +71,7 @@ describe('TerminalPanel unavailable flow', () => {
 
     // Wait for unavailable header (uses real timers, fine for async rendering)
     await waitFor(() => {
-      expect(screen.getByText('Terminal Not Available')).toBeInTheDocument()
+      expect(screen.getByText('Terminal not available')).toBeInTheDocument()
     })
 
     const recheckBtn = screen.getByRole('button', { name: /recheck/i })

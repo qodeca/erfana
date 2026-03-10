@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { EditorErrorBoundary } from './EditorErrorBoundary'
+import { TEST_IDS } from '../../../../constants/testids'
 import { logger } from '../../../../utils/logger'
 
 // Mock logger
@@ -154,6 +155,28 @@ describe('EditorErrorBoundary', () => {
       expect(screen.getByText('Component failed to render')).toBeInTheDocument()
       // Second boundary renders normally
       expect(screen.getByTestId('normal-content')).toBeInTheDocument()
+    })
+  })
+
+  describe('Accessibility', () => {
+    it('default fallback has role="alert"', () => {
+      render(
+        <EditorErrorBoundary>
+          <ThrowingComponent />
+        </EditorErrorBoundary>
+      )
+
+      expect(screen.getByRole('alert')).toBeInTheDocument()
+    })
+
+    it('default fallback has data-testid', () => {
+      render(
+        <EditorErrorBoundary>
+          <ThrowingComponent />
+        </EditorErrorBoundary>
+      )
+
+      expect(screen.getByTestId(TEST_IDS.EDITOR_ERROR_BOUNDARY)).toBeInTheDocument()
     })
   })
 

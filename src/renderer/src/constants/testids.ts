@@ -41,7 +41,7 @@
  */
 export const TEST_IDS = {
   // =========================================================================
-  // Activity Bar (5)
+  // Activity Bar (4)
   // =========================================================================
 
   /** Activity bar container */
@@ -52,11 +52,9 @@ export const TEST_IDS = {
   ACTIVITY_BAR_BTN_TERMINAL: 'activity-bar-btn-terminal',
   /** Settings overlay toggle button */
   ACTIVITY_BAR_BTN_SETTINGS: 'activity-bar-btn-settings',
-  /** Theme toggle button */
-  ACTIVITY_BAR_BTN_THEME: 'activity-bar-btn-theme',
 
   // =========================================================================
-  // Project Tree (11)
+  // Project Tree (15)
   // =========================================================================
 
   /** Project tree container */
@@ -81,6 +79,14 @@ export const TEST_IDS = {
   PROJECT_TREE_NODE_FILE: 'project-tree-node-file',
   /** Folder node - use with getDynamicTestId for specific folder targeting */
   PROJECT_TREE_NODE_FOLDER: 'project-tree-node-folder',
+  /** Drag overlay ghost element during drag operations */
+  PROJECT_TREE_DRAG_OVERLAY: 'project-tree-drag-overlay',
+  /** Error state container */
+  PROJECT_TREE_ERROR: 'project-tree-error',
+  /** Loading/switching spinner */
+  PROJECT_TREE_LOADING: 'project-tree-loading',
+  /** Folder drop target - use with getDynamicTestId */
+  PROJECT_TREE_DROP_TARGET: 'project-tree-drop-target',
 
   // =========================================================================
   // Git Status Bar (4)
@@ -96,7 +102,7 @@ export const TEST_IDS = {
   GIT_SYNC_INDICATOR: 'git-sync-indicator',
 
   // =========================================================================
-  // Terminal Panel (11)
+  // Terminal Panel (13)
   // =========================================================================
 
   /** Terminal panel container */
@@ -109,10 +115,14 @@ export const TEST_IDS = {
   TERMINAL_BTN_RESTART: 'terminal-btn-restart',
   /** Scroll lock toggle button */
   TERMINAL_BTN_LOCK: 'terminal-btn-lock',
-  /** Terminal status indicator */
-  TERMINAL_STATUS: 'terminal-status',
   /** Terminal drop zone for drag-and-drop file path insertion */
   TERMINAL_DROP_ZONE: 'terminal-drop-zone',
+  /** Terminal status: checking availability */
+  TERMINAL_STATUS_CHECKING: 'terminal-status-checking',
+  /** Terminal status: unavailable (node-pty missing) */
+  TERMINAL_STATUS_UNAVAILABLE: 'terminal-status-unavailable',
+  /** Terminal status: error occurred */
+  TERMINAL_STATUS_ERROR: 'terminal-status-error',
   /** Capture full screen screenshot button (macOS only) */
   TERMINAL_BTN_CAPTURE_SCREEN: 'terminal-btn-capture-screen',
   /** Capture window screenshot button (macOS only) */
@@ -121,6 +131,33 @@ export const TEST_IDS = {
   TERMINAL_BTN_CAPTURE_AREA: 'terminal-btn-capture-area',
   /** Capture camera photo button (cross-platform) */
   TERMINAL_BTN_CAMERA: 'terminal-btn-camera',
+
+  // =========================================================================
+  // UI Blocker (1)
+  // =========================================================================
+
+  /** UI blocker overlay */
+  UI_BLOCKER: 'ui-blocker',
+
+  // =========================================================================
+  // Editor Error Boundary (1)
+  // =========================================================================
+
+  /** Editor error boundary fallback container */
+  EDITOR_ERROR_BOUNDARY: 'editor-error-boundary',
+
+  // =========================================================================
+  // File Conflict Notification (4)
+  // =========================================================================
+
+  /** File conflict notification container */
+  FILE_CONFLICT_NOTIFICATION: 'file-conflict-notification',
+  /** Reload from disk button */
+  FILE_CONFLICT_BTN_RELOAD: 'file-conflict-btn-reload',
+  /** Keep local version button */
+  FILE_CONFLICT_BTN_KEEP: 'file-conflict-btn-keep',
+  /** Dismiss notification button */
+  FILE_CONFLICT_BTN_DISMISS: 'file-conflict-btn-dismiss',
 
   // =========================================================================
   // Editor Content Layout (5)
@@ -170,9 +207,11 @@ export const TEST_IDS = {
   DIALOG_TITLE: 'dialog-title',
 
   // =========================================================================
-  // Dialogs - External drop (4)
+  // Dialogs - External drop (6)
   // =========================================================================
 
+  /** External file drop overlay (visible when dragging files from OS into window) */
+  EXTERNAL_DROP_OVERLAY: 'external-drop-overlay',
   /** External drop dialog container */
   EXTERNAL_DROP_DIALOG: 'external-drop-dialog',
   /** Move files button */
@@ -512,11 +551,17 @@ export const TEST_IDS = {
   TRANSCRIPTION_BTN_DONE: 'transcription-btn-done',
 
   // =========================================================================
-  // Welcome Panel (1)
+  // Welcome Panel (4)
   // =========================================================================
 
   /** Import file button on WelcomePanel */
   WELCOME_BTN_IMPORT: 'welcome-btn-import',
+  /** Recent projects list container */
+  WELCOME_RECENT_PROJECTS: 'welcome-recent-projects',
+  /** Recent project item - use with getDynamicTestId */
+  WELCOME_RECENT_PROJECT: 'welcome-recent-project',
+  /** Remove recent project button - use with getDynamicTestId */
+  WELCOME_RECENT_PROJECT_BTN_REMOVE: 'welcome-recent-project-btn-remove',
 
   // =========================================================================
   // Document Stats Bar (6)

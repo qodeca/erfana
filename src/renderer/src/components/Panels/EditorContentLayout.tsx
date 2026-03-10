@@ -134,7 +134,7 @@ export function EditorContentLayout({
   onSelectionChange
 }: EditorContentLayoutProps): JSX.Element {
   return (
-    <div className={`editor-content view-mode-${viewMode}`} data-testid={TEST_IDS.EDITOR_CONTENT}>
+    <div className={`editor-content view-mode-${viewMode}`} role="region" aria-label="Editor" data-testid={TEST_IDS.EDITOR_CONTENT}>
       {/* HORIZONTAL SPLIT: Preview on top, Editor on bottom */}
       {viewMode === 'split-horizontal' && (
         <>

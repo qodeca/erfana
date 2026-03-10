@@ -195,6 +195,9 @@ export function ProjectTreeNode({
     <div
       className="project-tree-node"
       ref={setRefs}
+      role="treeitem"
+      aria-expanded={node.type === 'directory' ? isExpanded : undefined}
+      aria-selected={isSelected}
       data-dragging={actuallyDragging}
       data-drop-highlight={showDropHighlight}
       data-external-drop-highlight={isExternalDropTargetNode}
@@ -213,10 +216,14 @@ export function ProjectTreeNode({
         data-clipboard-cut={clipboardCut}
         data-external-drop-target={isExternalDropTargetNode}
         data-external-drag-hover={isExternalDragHover}
-        data-testid={getDynamicTestId(
-          node.type === 'file' ? TEST_IDS.PROJECT_TREE_NODE_FILE : TEST_IDS.PROJECT_TREE_NODE_FOLDER,
-          node.path
-        )}
+        data-testid={
+          node.type === 'directory' && (showDropHighlight || isExternalDropTargetNode)
+            ? getDynamicTestId(TEST_IDS.PROJECT_TREE_DROP_TARGET, node.path)
+            : getDynamicTestId(
+                node.type === 'file' ? TEST_IDS.PROJECT_TREE_NODE_FILE : TEST_IDS.PROJECT_TREE_NODE_FOLDER,
+                node.path
+              )
+        }
         data-path={node.path}
         data-type={node.type}
         // @dnd-kit handles drag - terminal drop is detected in ProjectTree's handleDragEnd
@@ -245,7 +252,7 @@ export function ProjectTreeNode({
         )}
       </div>
       {node.type === 'directory' && isExpanded && node.children && (
-        <div className="project-tree-children">
+        <div className="project-tree-children" role="group">
           {node.children.map((child) => (
             <ProjectTreeNode
               key={child.path}

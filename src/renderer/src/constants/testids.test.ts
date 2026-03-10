@@ -22,7 +22,6 @@ describe('TEST_IDS', () => {
       expect(TEST_IDS.ACTIVITY_BAR_BTN_FILES).toBe('activity-bar-btn-files')
       expect(TEST_IDS.ACTIVITY_BAR_BTN_TERMINAL).toBe('activity-bar-btn-terminal')
       expect(TEST_IDS.ACTIVITY_BAR_BTN_SETTINGS).toBe('activity-bar-btn-settings')
-      expect(TEST_IDS.ACTIVITY_BAR_BTN_THEME).toBe('activity-bar-btn-theme')
 
       // Project Tree
       expect(TEST_IDS.PROJECT_TREE).toBe('project-tree')
@@ -69,22 +68,22 @@ describe('TEST_IDS', () => {
   })
 
   describe('component counts', () => {
-    it('should have 5 Activity Bar IDs', async () => {
+    it('should have 4 Activity Bar IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const activityBarIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('ACTIVITY_BAR'))
-      expect(activityBarIds).toHaveLength(5)
+      expect(activityBarIds).toHaveLength(4)
     })
 
-    it('should have 11 Project Tree IDs', async () => {
+    it('should have 15 Project Tree IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const projectTreeIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('PROJECT_TREE'))
-      expect(projectTreeIds).toHaveLength(11)
+      expect(projectTreeIds).toHaveLength(15)
     })
 
-    it('should have 11 Terminal Panel IDs', async () => {
+    it('should have 13 Terminal Panel IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const terminalIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('TERMINAL_'))
-      expect(terminalIds).toHaveLength(11)
+      expect(terminalIds).toHaveLength(13)
     })
 
     it('should have 8 Camera Dialog IDs', async () => {
@@ -123,6 +122,185 @@ describe('TEST_IDS', () => {
         (k) => k.startsWith('DOCUMENT_STATS_') || k.startsWith('STATS_')
       )
       expect(statsIds).toHaveLength(6)
+    })
+
+    it('should have 1 UI Blocker ID', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const uiBlockerIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('UI_BLOCKER'))
+      expect(uiBlockerIds).toHaveLength(1)
+    })
+
+    it('should have 1 Editor Error Boundary ID', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const editorErrorIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('EDITOR_ERROR'))
+      expect(editorErrorIds).toHaveLength(1)
+    })
+
+    it('should have 4 File Conflict Notification IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const fileConflictIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('FILE_CONFLICT'))
+      expect(fileConflictIds).toHaveLength(4)
+    })
+
+    it('should have 4 Welcome Panel IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const welcomeIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('WELCOME_'))
+      expect(welcomeIds).toHaveLength(4)
+    })
+
+    it('should have 2 Context Menu base IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter(
+        (k) =>
+          k.startsWith('CONTEXT_MENU') &&
+          !k.startsWith('CONTEXT_MENU_TERMINAL') &&
+          !k.startsWith('CONTEXT_MENU_EDITOR') &&
+          !k.startsWith('CONTEXT_MENU_PREVIEW') &&
+          !k.startsWith('CONTEXT_MENU_ITEM_')
+      )
+      expect(ids).toHaveLength(2)
+    })
+
+    it('should have 3 Context Menu terminal IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter(
+        (k) =>
+          k.startsWith('CONTEXT_MENU_TERMINAL') ||
+          k === 'CONTEXT_MENU_ITEM_COPY' ||
+          k === 'CONTEXT_MENU_ITEM_PASTE'
+      )
+      expect(ids).toHaveLength(3)
+    })
+
+    it('should have 7 Context Menu editor/preview IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter(
+        (k) =>
+          k.startsWith('CONTEXT_MENU_EDITOR') ||
+          k.startsWith('CONTEXT_MENU_PREVIEW') ||
+          (k.startsWith('CONTEXT_MENU_ITEM_') &&
+            k !== 'CONTEXT_MENU_ITEM_COPY' &&
+            k !== 'CONTEXT_MENU_ITEM_PASTE')
+      )
+      expect(ids).toHaveLength(7)
+    })
+
+    it('should have 3 Dialog base IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter(
+        (k) =>
+          k === 'DIALOG_OVERLAY' || k === 'DIALOG_CONTAINER' || k === 'DIALOG_TITLE'
+      )
+      expect(ids).toHaveLength(3)
+    })
+
+    it('should have 6 External drop dialog IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('EXTERNAL_DROP_'))
+      expect(ids).toHaveLength(6)
+    })
+
+    it('should have 4 Conflict dialog IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('CONFLICT_'))
+      expect(ids).toHaveLength(4)
+    })
+
+    it('should have 4 Confirm dialog IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter(
+        (k) => k.startsWith('DIALOG_CONFIRM') || k === 'DIALOG_BTN_CONFIRM' || k === 'DIALOG_BTN_CANCEL'
+      )
+      expect(ids).toHaveLength(4)
+    })
+
+    it('should have 3 Alert dialog IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter(
+        (k) => k.startsWith('DIALOG_ALERT') || k === 'DIALOG_BTN_OK'
+      )
+      expect(ids).toHaveLength(3)
+    })
+
+    it('should have 4 Prompt dialog IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('DIALOG_PROMPT'))
+      expect(ids).toHaveLength(4)
+    })
+
+    it('should have 5 File picker IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('FILE_PICKER'))
+      expect(ids).toHaveLength(5)
+    })
+
+    it('should have 5 Diagram Viewer IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('DIAGRAM_VIEWER'))
+      expect(ids).toHaveLength(5)
+    })
+
+    it('should have 12 Image Viewer IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('IMAGE_VIEWER_'))
+      expect(ids).toHaveLength(12)
+    })
+
+    it('should have 4 Mermaid Toolbar IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('MERMAID_'))
+      expect(ids).toHaveLength(4)
+    })
+
+    it('should have 6 Editor Tab IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('TAB_') && !k.startsWith('IMAGE_TAB_'))
+      expect(ids).toHaveLength(6)
+    })
+
+    it('should have 3 Image Tab IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('IMAGE_TAB_'))
+      expect(ids).toHaveLength(3)
+    })
+
+    it('should have 8 Search Bar IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('SEARCH_BAR'))
+      expect(ids).toHaveLength(8)
+    })
+
+    it('should have 4 Toast Notification IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('TOAST'))
+      expect(ids).toHaveLength(4)
+    })
+
+    it('should have 5 Editor Content Layout IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter(
+        (k) =>
+          k === 'EDITOR_CONTENT' ||
+          k === 'EDITOR_PANE' ||
+          k === 'PREVIEW_PANE' ||
+          k === 'EDITOR_MONACO' ||
+          k === 'EDITOR_PREVIEW'
+      )
+      expect(ids).toHaveLength(5)
+    })
+
+    it('should have 20 Markdown Toolbar IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const ids = Object.keys(TEST_IDS).filter(
+        (k) =>
+          k.startsWith('MARKDOWN_') ||
+          k.startsWith('TOOLBAR_BTN_') ||
+          k.startsWith('VIEW_MODE_BTN_') ||
+          k === 'MODIFIED_INDICATOR' ||
+          k === 'AUTOSAVE_INDICATOR' ||
+          k === 'RELOAD_INDICATOR'
+      )
+      expect(ids).toHaveLength(20)
     })
   })
 })
@@ -214,7 +392,7 @@ describe('getPathHash', () => {
 
 describe('getDynamicTestId', () => {
    
-  let getDynamicTestId: (prefix: any, path: string) => string
+  let getDynamicTestId: (prefix: string, path: string) => string
   let TEST_IDS: Record<string, string>
 
   beforeEach(async () => {

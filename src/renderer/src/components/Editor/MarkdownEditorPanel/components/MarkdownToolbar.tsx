@@ -124,7 +124,7 @@ export function MarkdownToolbar({
   const exportDisabled = viewMode === 'editor'
 
   return (
-    <div className="markdown-toolbar" data-testid={TEST_IDS.MARKDOWN_TOOLBAR}>
+    <div className="markdown-toolbar" role="toolbar" aria-label="Markdown formatting" data-testid={TEST_IDS.MARKDOWN_TOOLBAR}>
       {/* Formatting buttons - only shown when editor is visible */}
       {showFormattingButtons && (
         <>
@@ -132,6 +132,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.formatBold()}
             title="Bold (Cmd/Ctrl+B)"
+            aria-label="Bold"
             data-testid={TEST_IDS.TOOLBAR_BTN_BOLD}
           >
             <Bold size={16} strokeWidth={2} />
@@ -140,6 +141,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.formatItalic()}
             title="Italic (Cmd/Ctrl+I)"
+            aria-label="Italic"
             data-testid={TEST_IDS.TOOLBAR_BTN_ITALIC}
           >
             <Italic size={16} strokeWidth={2} />
@@ -148,6 +150,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.formatStrikethrough()}
             title="Strikethrough"
+            aria-label="Strikethrough"
             data-testid={TEST_IDS.TOOLBAR_BTN_STRIKETHROUGH}
           >
             <Strikethrough size={16} strokeWidth={2} />
@@ -159,6 +162,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.formatCode()}
             title="Inline Code"
+            aria-label="Inline code"
             data-testid={TEST_IDS.TOOLBAR_BTN_CODE}
           >
             <Code size={16} strokeWidth={2} />
@@ -167,6 +171,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.insertLink()}
             title="Insert Link (Cmd/Ctrl+K)"
+            aria-label="Insert link"
             data-testid={TEST_IDS.TOOLBAR_BTN_LINK}
           >
             <Link size={16} strokeWidth={2} />
@@ -175,6 +180,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.insertImage()}
             title="Insert Image"
+            aria-label="Insert image"
             data-testid={TEST_IDS.TOOLBAR_BTN_IMAGE}
           >
             <Image size={16} strokeWidth={2} />
@@ -186,6 +192,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.insertHeading(1)}
             title="Heading 1"
+            aria-label="Heading 1"
             data-testid={TEST_IDS.TOOLBAR_BTN_HEADING}
           >
             <Heading1 size={16} strokeWidth={2} />
@@ -194,6 +201,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.insertList(false)}
             title="Bullet List"
+            aria-label="Bullet list"
             data-testid={TEST_IDS.TOOLBAR_BTN_LIST}
           >
             <List size={16} strokeWidth={2} />
@@ -202,6 +210,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={() => editorRef.current?.insertList(true)}
             title="Numbered List"
+            aria-label="Numbered list"
             data-testid={TEST_IDS.TOOLBAR_BTN_LIST_ORDERED}
           >
             <ListOrdered size={16} strokeWidth={2} />
@@ -213,6 +222,7 @@ export function MarkdownToolbar({
             className="toolbar-btn"
             onClick={handleOpenSearch}
             title="Find (Cmd/Ctrl+F)"
+            aria-label="Find"
             data-testid={TEST_IDS.TOOLBAR_BTN_SEARCH}
           >
             <Search size={16} strokeWidth={2} />
@@ -226,6 +236,7 @@ export function MarkdownToolbar({
           className="toolbar-btn"
           onClick={handleOpenSearch}
           title="Find (Cmd/Ctrl+F)"
+          aria-label="Find"
           data-testid={TEST_IDS.TOOLBAR_BTN_SEARCH}
         >
           <Search size={16} strokeWidth={2} />
@@ -256,6 +267,7 @@ export function MarkdownToolbar({
         className={`view-mode-btn ${viewMode === 'editor' ? 'active' : ''}`}
         onClick={() => onViewModeChange('editor')}
         title="Editor Only"
+        aria-label="Editor only"
         data-testid={TEST_IDS.VIEW_MODE_BTN_EDITOR}
       >
         <FileEdit size={16} strokeWidth={2} />
@@ -264,6 +276,7 @@ export function MarkdownToolbar({
         className={`view-mode-btn ${viewMode === 'split-horizontal' ? 'active' : ''}`}
         onClick={() => onViewModeChange('split-horizontal')}
         title="Split Horizontal (Preview Top)"
+        aria-label="Split horizontal"
         data-testid={TEST_IDS.VIEW_MODE_BTN_SPLIT_HORIZONTAL}
       >
         <Rows2 size={16} strokeWidth={2} />
@@ -272,6 +285,7 @@ export function MarkdownToolbar({
         className={`view-mode-btn ${viewMode === 'split' ? 'active' : ''}`}
         onClick={() => onViewModeChange('split')}
         title="Split Vertical (Side by Side)"
+        aria-label="Split vertical"
         data-testid={TEST_IDS.VIEW_MODE_BTN_SPLIT}
       >
         <Columns2 size={16} strokeWidth={2} />
@@ -280,6 +294,7 @@ export function MarkdownToolbar({
         className={`view-mode-btn ${viewMode === 'preview' ? 'active' : ''}`}
         onClick={() => onViewModeChange('preview')}
         title="Preview Only"
+        aria-label="Preview only"
         data-testid={TEST_IDS.VIEW_MODE_BTN_PREVIEW}
       >
         <Eye size={16} strokeWidth={2} />
@@ -297,6 +312,7 @@ export function MarkdownToolbar({
             ? 'Export to PDF (switch to preview or split mode)'
             : 'Export to PDF'
         }
+        aria-label="Export to PDF"
         data-testid={TEST_IDS.TOOLBAR_BTN_EXPORT_PDF}
       >
         <FileDown size={16} strokeWidth={2} />
@@ -310,6 +326,7 @@ export function MarkdownToolbar({
             ? 'Export to Word (switch to preview or split mode)'
             : 'Export to Word'
         }
+        aria-label="Export to Word"
         data-testid={TEST_IDS.TOOLBAR_BTN_EXPORT_DOCX}
       >
         <FileText size={16} strokeWidth={2} />

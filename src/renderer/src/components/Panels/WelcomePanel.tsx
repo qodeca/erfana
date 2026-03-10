@@ -8,7 +8,7 @@ import { showErrorToast, showSuccessToast, showWarningToast } from '../../utils/
 import { formatRelativeTime } from '../../utils/timeFormatting'
 import { useImport } from '../../hooks/useImport'
 import { logger } from '../../utils/logger'
-import { TEST_IDS } from '../../constants/testids'
+import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
 
 interface RecentProject {
   path: string
@@ -187,7 +187,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
                 <Clock size={16} />
                 Recent Projects
               </h3>
-              <div className="recent-projects-list">
+              <div className="recent-projects-list" data-testid={TEST_IDS.WELCOME_RECENT_PROJECTS}>
                 {recentProjects.map((project) => {
                   const isOpening = loadingState.type === 'opening' && loadingState.path === project.path
                   const isRemoving = loadingState.type === 'removing' && loadingState.path === project.path
@@ -204,6 +204,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
                       className={itemClasses}
                       onClick={() => !isDisabled && handleProjectClick(project.path)}
                       title={getProjectItemTitle(project.path, isOpening, isProjectChanging)}
+                      data-testid={getDynamicTestId(TEST_IDS.WELCOME_RECENT_PROJECT, project.path)}
                     >
                       <Folder size={16} className="recent-project-icon" />
                       <div className="recent-project-info">
@@ -222,6 +223,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
                         title="Remove from recent projects"
                         aria-label="Remove from recent projects"
                         disabled={isDisabled}
+                        data-testid={getDynamicTestId(TEST_IDS.WELCOME_RECENT_PROJECT_BTN_REMOVE, project.path)}
                       >
                         <X size={16} />
                       </button>

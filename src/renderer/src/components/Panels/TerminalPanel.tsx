@@ -37,6 +37,8 @@ import '@xterm/xterm/css/xterm.css'
 import './TerminalPanel.css'
 import { isElementVisible } from '../../utils/domUtils'
 import { isPointInElement } from '../../utils/domGeometry'
+import { TerminalStatusContent } from './TerminalPanel/components/TerminalStatusContent'
+import type { TerminalState } from './TerminalPanel/types'
 
 export function TerminalPanel(_props: ISplitviewPanelProps) {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null)
@@ -1114,10 +1116,15 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // - createPortal re-renders JSX, creating NEW DOM nodes each time
   // - xterm.js is attached to the original DOM node and won't move
   // - appendChild() physically moves the existing DOM node, preserving xterm.js
+  const terminalState: TerminalState =
+    isAvailable === null ? 'checking' :
+    !isAvailable ? 'unavailable' :
+    error ? 'error' : 'ready'
+
   return (
     <div ref={mainContainerRef} className="terminal-portal-shell">
       {/* Terminal panel - rendered here initially, moved by useLayoutEffect */}
-      <div ref={terminalPanelRef} className="terminal-panel sidebar-panel" data-testid={TEST_IDS.TERMINAL_PANEL}>
+      <div ref={terminalPanelRef} className="terminal-panel sidebar-panel" role="region" aria-label="Terminal" data-testid={TEST_IDS.TERMINAL_PANEL}>
         {/* Hide header when portalled to DiagramViewer (issue #37) */}
         {portalTarget !== 'diagram-viewer' && (
           <div className="sidebar-panel-header">
@@ -1198,6 +1205,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                   className="icon-btn"
                   onClick={handleScrollToBottom}
                   title="Scroll to bottom"
+                  aria-label="Scroll to bottom"
                   data-testid={TEST_IDS.TERMINAL_BTN_SCROLL}
                 >
                   <ArrowDownToLine size={14} />
@@ -1206,6 +1214,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                   className="icon-btn"
                   onClick={handleRestartTerminal}
                   title="Restart terminal"
+                  aria-label="Restart terminal"
                   data-testid={TEST_IDS.TERMINAL_BTN_RESTART}
                 >
                   <RotateCw size={14} />
@@ -1214,6 +1223,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                   className={`icon-btn${scrollLocked ? ' icon-btn--active' : ''}`}
                   onClick={handleToggleScrollLock}
                   title={scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom'}
+                  aria-label={scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom'}
                   aria-pressed={scrollLocked}
                   data-testid={TEST_IDS.TERMINAL_BTN_LOCK}
                 >
@@ -1223,50 +1233,15 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
             )}
           </div>
         )}
-        <div className="sidebar-panel-content">
-          {isAvailable === null ? (
-            // Checking availability
-            <div className="terminal-status" data-testid={TEST_IDS.TERMINAL_STATUS}>
-              <p>Checking terminal availability...</p>
-            </div>
-          ) : !isAvailable ? (
-            // Not available
-            <div className="terminal-status" data-testid={TEST_IDS.TERMINAL_STATUS}>
-              <div className="terminal-error-icon">⚠️</div>
-              <h3>Terminal Not Available</h3>
-              <p>
-                node-pty is not available. Terminal functionality requires node-pty to be built
-                successfully.
-              </p>
-              {error && <p className="error-details">{error}</p>}
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button className="icon-btn" onClick={handleRecheck} disabled={recheckCooldown} aria-label="Recheck">
-                  Recheck
-                </button>
-                <button className="icon-btn" onClick={handleCopyFix} aria-label="Copy Fix Command">
-                  Copy Fix Command
-                </button>
-              </div>
-            </div>
-          ) : error ? (
-            // Error occurred
-            <div className="terminal-status" data-testid={TEST_IDS.TERMINAL_STATUS}>
-              <div className="terminal-error-icon">❌</div>
-              <h3>Terminal Error</h3>
-              <p className="error-details">{error}</p>
-            </div>
-          ) : (
-            // Terminal ready - context menu handled via native listener on xterm.element
-            <div
-              ref={terminalRef}
-              className="terminal-container"
-              data-testid={TEST_IDS.TERMINAL_INSTANCE}
-              data-drop-target={isDropTarget}
-              aria-dropeffect={isDropTarget ? 'copy' : 'none'}
-              aria-label={isDropTarget ? 'Drop files here to insert paths' : undefined}
-            />
-          )}
-        </div>
+        <TerminalStatusContent
+          state={terminalState}
+          errorMessage={error}
+          recheckCooldown={recheckCooldown}
+          isDropTarget={isDropTarget}
+          terminalContainerRef={terminalRef}
+          onRecheck={handleRecheck}
+          onCopyFix={handleCopyFix}
+        />
         {portalContext?.terminalContextMenuPosition && (
           <TerminalContextMenu
             x={portalContext.terminalContextMenuPosition.x}
