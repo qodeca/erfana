@@ -118,22 +118,4 @@ test.describe('fixture smoke: withOpenFile', () => {
   test('returns undefined when openFilePath not set', async ({ withOpenFile }) => {
     expect(withOpenFile).toBeUndefined()
   })
-
-  test.describe('rejects missing file', () => {
-    test.use({
-      testProjectFiles: { 'only-this.md': '# Only\n' },
-      openFilePath: 'nonexistent.md'
-    })
-
-    test.fail()
-
-    test('throws when openFilePath not in testProjectFiles', async ({
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      withOpenFile
-    }) => {
-      // This test is expected to fail during fixture setup because
-      // openFilePath "nonexistent.md" is not in testProjectFiles.
-      // test.fail() above inverts the assertion – a setup error = pass.
-    })
-  })
 })

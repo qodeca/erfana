@@ -1,6 +1,11 @@
-# Graph Capabilities
+# Graph capabilities – entities and linking
 
-> ⚠️ **WORK IN PROGRESS - NOT READY FOR DEVELOPMENT**
+> This is part 1 of the graph capabilities documentation, split for readability.
+>
+> **Other parts:**
+> - [Graph capabilities – traversal and UI](./graph-capabilities-traversal-ui.md)
+
+> ⚠️ **WORK IN PROGRESS – NOT READY FOR DEVELOPMENT**
 >
 > This documentation is currently under active development and review. The Graph Engine specification, architecture, and implementation details are subject to significant changes. **DO NOT start implementation work based on these documents.**
 >
@@ -13,22 +18,9 @@ This document covers the graph layer of the Erfana Graph Engine: entity extracti
 
 ---
 
-## Table of Contents
+## Graph overview
 
-1. [Graph Overview](#graph-overview)
-2. [Entity Extraction](#entity-extraction)
-3. [Entity Linking & Deduplication](#entity-linking--deduplication)
-4. [Temporal Relationships](#temporal-relationships)
-5. [Backlinks & Impact Analysis](#backlinks--impact-analysis)
-6. [Graph Traversal](#graph-traversal)
-7. [Timeline Queries](#timeline-queries)
-8. [Knowledge Panel UI](#knowledge-panel-ui)
-
----
-
-## Graph Overview
-
-### What is a Knowledge Graph?
+### What is a knowledge graph?
 
 A knowledge graph represents entities (concepts, people, technologies) and their relationships as nodes and edges.
 
@@ -39,14 +31,14 @@ A knowledge graph represents entities (concepts, people, technologies) and their
 (Entity: FTS5) --[implements]--> (Entity: BM25)
 ```
 
-### Why Add Graphs to Hybrid Search?
+### Why add graphs to hybrid search?
 
 1. **Contextual Relevance:** Boost results related to user's current context
 2. **Backlinks:** "Where else is this mentioned?"
 3. **Impact Analysis:** "What would break if I change this?"
 4. **Change Timeline:** "How has this concept evolved?"
 
-### Erfana's Graph Model
+### Erfana's graph model
 
 **Tables (from data-model.md):**
 - **entities**: Named concepts (name, type, canonical_id)
@@ -55,11 +47,11 @@ A knowledge graph represents entities (concepts, people, technologies) and their
 
 ---
 
-## Entity Extraction
+## Entity extraction
 
-### Extraction Methods
+### Extraction methods
 
-#### Method 1: Rule-Based (M3 Default)
+#### Method 1: Rule-based (M3 default)
 
 Extract entities using regex patterns (fast, no LLM needed).
 
@@ -116,7 +108,7 @@ export class RuleBasedExtractor {
     // Technical terms (from predefined list)
     const technicalTerms = ['SQLite', 'React', 'Electron', 'FTS5', 'ONNX'];
     for (const term of technicalTerms) {
-      const regex = new RegExp(`\b${term}\b`, 'gi');
+      const regex = new RegExp(`\\b${term}\\b`, 'gi');
       while ((match = regex.exec(text)) !== null) {
         entities.push({
           name: term,
@@ -135,7 +127,7 @@ export class RuleBasedExtractor {
 **Pros:** Fast, deterministic, no API costs
 **Cons:** Limited recall (misses unlabeled entities)
 
-#### Method 2: LLM-Based (M4 Optional)
+#### Method 2: LLM-based (M4 optional)
 
 Use GPT-4/Claude to extract structured entities.
 
@@ -186,7 +178,7 @@ async extractEntitiesLLM(text: string): Promise<ExtractedData> {
 
 ---
 
-## Entity Linking & Deduplication
+## Entity linking & deduplication
 
 ### Problem: Aliases
 
@@ -194,7 +186,7 @@ Different names for the same entity:
 - "React" vs "ReactJS" vs "React.js"
 - "SQLite" vs "sqlite" (case-insensitive)
 
-### Solution: Canonical Entities
+### Solution: Canonical entities
 
 **Schema (from data-model.md):**
 
@@ -225,16 +217,16 @@ FROM entities e
 LEFT JOIN entities canonical ON e.canonical_id = canonical.id;
 ```
 
-### Deduplication Strategy
+### Deduplication strategy
 
-**Option 1: Manual Curation**
+**Option 1: Manual curation**
 
 User manually links aliases in UI:
 ```
 "ReactJS" → canonical: "React"
 ```
 
-**Option 2: String Similarity**
+**Option 2: String similarity**
 
 Auto-link if Levenshtein distance < threshold:
 
@@ -258,7 +250,7 @@ function findPotentialAliases(newEntity: string, existingEntities: string[]): st
 }
 ```
 
-**Option 3: Embedding Similarity**
+**Option 3: Embedding similarity**
 
 Embed entity names, link if cosine > 0.9:
 
@@ -284,15 +276,15 @@ async findSemanticAliases(newEntity: string, existingEntities: Entity[]): Promis
 
 ---
 
-## Temporal Relationships
+## Temporal relationships
 
-### Why Temporal Graphs?
+### Why temporal graphs?
 
 Knowledge changes over time:
 - "Project uses React 17" → "Project uses React 18" (upgrade)
 - "SQLite supports vectors via sqlite-vss" → "SQLite supports vectors via sqlite-vec" (migration)
 
-### Bitemporal Model
+### Bitemporal model
 
 **Schema (from data-model.md):**
 
@@ -343,9 +335,9 @@ VALUES (
 );
 ```
 
-### Querying Temporal Edges
+### Querying temporal edges
 
-**As-Of Query:** "What was true on date X?"
+**As-of query:** "What was true on date X?"
 
 ```sql
 SELECT src.name AS from_entity, edge.type, dst.name AS to_entity
@@ -378,7 +370,7 @@ console.log(edges); // [{ extension: 'sqlite-vss' }]
 
 ---
 
-## Backlinks & Impact Analysis
+## Backlinks & impact analysis
 
 ### Backlinks: "Where is this mentioned?"
 
@@ -428,7 +420,7 @@ getBacklinks(options: BacklinkOptions): Backlink[] {
 }
 ```
 
-### Impact Analysis: "What depends on this?"
+### Impact analysis: "What depends on this?"
 
 **Query:**
 
@@ -457,7 +449,7 @@ FROM dependents
 ORDER BY depth, name;
 ```
 
-**Use Case:**
+**Use case:**
 
 > User: "I'm thinking of replacing SQLite with DuckDB. What would break?"
 >
@@ -465,261 +457,10 @@ ORDER BY depth, name;
 
 ---
 
-## Graph Traversal
+## See also
 
-### graphology Integration
-
-**Load graph from SQLite:**
-
-```typescript
-import { Graph } from 'graphology';
-
-export class GraphStore {
-  private graph: Graph;
-
-  loadGraph(): void {
-    this.graph = new Graph();
-
-    // Load entities (nodes)
-    const entities = this.db.prepare(`
-      SELECT id, name, type
-      FROM entities
-    `).all();
-
-    entities.forEach(e => {
-      this.graph.addNode(e.id, { name: e.name, type: e.type });
-    });
-
-    // Load current edges (valid_to IS NULL)
-    const edges = this.db.prepare(`
-      SELECT src_id, dst_id, type
-      FROM edges
-      WHERE valid_to IS NULL
-    `).all();
-
-    edges.forEach(e => {
-      if (!this.graph.hasEdge(e.src_id, e.dst_id)) {
-        this.graph.addEdge(e.src_id, e.dst_id, { type: e.type });
-      }
-    });
-
-    console.log(`Graph loaded: ${this.graph.order} nodes, ${this.graph.size} edges`);
-  }
-}
-```
-
-### Centrality Metrics
-
-**PageRank:** Identify important entities.
-
-```typescript
-import pagerank from 'graphology-metrics/centrality/pagerank';
-
-const scores = pagerank(this.graph);
-
-// Top 10 most important entities
-const ranked = Object.entries(scores)
-  .sort((a, b) => b[1] - a[1])
-  .slice(0, 10);
-
-console.log('Top entities:', ranked.map(([id, score]) => ({
-  name: this.graph.getNodeAttribute(id, 'name'),
-  score
-})));
-```
-
-**Betweenness:** Find bridge entities (connect different clusters).
-
-```typescript
-import betweenness from 'graphology-metrics/centrality/betweenness';
-
-const scores = betweenness(this.graph);
-```
-
-### Neighborhood Queries
-
-**N-hop neighbors:**
-
-```typescript
-import { neighbors } from 'graphology-operators';
-
-function getNeighborhood(graph: Graph, entityId: number, hops: number): Set<number> {
-  let frontier = new Set([entityId]);
-  let visited = new Set<number>();
-
-  for (let i = 0; i < hops; i++) {
-    const nextFrontier = new Set<number>();
-
-    for (const node of frontier) {
-      if (visited.has(node)) continue;
-      visited.add(node);
-
-      // Get direct neighbors
-      graph.forEachNeighbor(node, (neighbor) => {
-        nextFrontier.add(neighbor);
-      });
-    }
-
-    frontier = nextFrontier;
-  }
-
-  return visited;
-}
-```
-
-**Use Case:** "Show me all entities within 2 hops of 'SQLite'" → Returns: FTS5, BM25, ERFANA, hybrid search, etc.
-
----
-
-## Timeline Queries
-
-### Change Timeline for Entity
-
-**Query:**
-
-```sql
--- Get change history for "ERFANA" entity
-SELECT
-  edge.type,
-  dst.name AS target,
-  edge.valid_from,
-  edge.valid_to,
-  edge.tx_time
-FROM edges edge
-JOIN entities src ON src.id = edge.src_id
-JOIN entities dst ON dst.id = edge.dst_id
-WHERE src.name = 'ERFANA'
-ORDER BY edge.valid_from DESC;
-```
-
-**Result:**
-
-```
-type   | target        | valid_from   | valid_to     | tx_time
--------|---------------|--------------|--------------|-------------
-uses   | sqlite-vec    | 2024-10-01   | NULL         | 2024-10-01
-uses   | sqlite-vss    | 2024-01-01   | 2024-10-01   | 2024-01-01
-uses   | React         | 2023-06-01   | NULL         | 2023-06-01
-```
-
-**Interpretation:**
-- ERFANA used sqlite-vss from Jan-Oct 2024, then switched to sqlite-vec
-- Still uses React (no valid_to)
-
-### Contradiction Detection
-
-**Problem:** Multiple active edges of same type.
-
-**Query:**
-
-```sql
--- Find contradictions: Entity has multiple "uses" edges with valid_to IS NULL
-SELECT
-  src.name,
-  edge.type,
-  GROUP_CONCAT(dst.name, ', ') AS conflicting_targets
-FROM edges edge
-JOIN entities src ON src.id = edge.src_id
-JOIN entities dst ON dst.id = edge.dst_id
-WHERE edge.valid_to IS NULL
-GROUP BY src.id, edge.type
-HAVING COUNT(*) > 1;
-```
-
-**Use Case:** Alert user if knowledge base has conflicting facts.
-
----
-
-## Knowledge Panel UI
-
-### Component Structure
-
-**File:** `src/renderer/src/components/Panels/GraphPanel.tsx`
-
-```tsx
-export function GraphPanel() {
-  const [entities, setEntities] = useState<Entity[]>([]);
-  const [backlinks, setBacklinks] = useState<Backlink[]>([]);
-
-  useEffect(() => {
-    const loadEntities = async () => {
-      const sectionId = /* current active section */;
-      const data = await window.api.graph.entities.forSection(sectionId);
-      setEntities(data);
-    };
-
-    loadEntities();
-  }, [/* dependencies */]);
-
-  const handleEntityClick = async (entity: Entity) => {
-    const links = await window.api.graph.backlinks(entity.name);
-    setBacklinks(links);
-  };
-
-  return (
-    <div className="graph-panel">
-      <section>
-        <h3>Entities in Current Section</h3>
-        {entities.map(e => (
-          <button key={e.id} onClick={() => handleEntityClick(e)}>
-            {e.name} <span className="type-badge">{e.type}</span>
-          </button>
-        ))}
-      </section>
-
-      {backlinks.length > 0 && (
-        <section>
-          <h3>Backlinks</h3>
-          {backlinks.map(b => (
-            <div key={b.section_id} className="backlink">
-              <a href={`file://${b.path}#${b.section_id}`}>
-                {b.heading || b.path}
-              </a>
-              <p>{b.text.slice(0, 100)}...</p>
-            </div>
-          ))}
-        </section>
-      )}
-    </div>
-  );
-}
-```
-
-### Timeline Slider (M4)
-
-**Component:** `TimelineSlider.tsx`
-
-```tsx
-export function TimelineSlider() {
-  const [asOfDate, setAsOfDate] = useState<number>(Date.now());
-
-  const handleSliderChange = (timestamp: number) => {
-    setAsOfDate(timestamp);
-
-    // Re-run queries with as-of filter
-    window.api.graph.search({ q: currentQuery, asOf: timestamp });
-  };
-
-  return (
-    <div className="timeline-slider">
-      <label>View knowledge as of:</label>
-      <input
-        type="range"
-        min={projectStartDate}
-        max={Date.now()}
-        value={asOfDate}
-        onChange={(e) => handleSliderChange(parseInt(e.target.value))}
-      />
-      <span>{new Date(asOfDate).toLocaleDateString()}</span>
-    </div>
-  );
-}
-```
-
----
-
-**Related:**
-- [Architecture](./architecture.md) - Graph store integration with graphology
-- [Data Model](./data-model.md) - Entities, edges, mentions schema
-- [Hybrid Search](./hybrid-search.md) - Graph-aware boosts
-- [Implementation Guide](./implementation-guide.md) - M3/M4 milestones
+- [Graph capabilities – traversal and UI](./graph-capabilities-traversal-ui.md) – graph traversal, timeline queries, knowledge panel UI
+- [Architecture](./architecture-overview.md) – Graph store integration with graphology
+- [Data Model](./data-model.md) – Entities, edges, mentions schema
+- [Hybrid Search](./hybrid-search-fundamentals.md) – Graph-aware boosts
+- [Implementation Guide](./implementation-guide.md) – M3/M4 milestones

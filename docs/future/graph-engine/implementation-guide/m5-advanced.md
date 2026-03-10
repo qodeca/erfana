@@ -64,7 +64,7 @@ export class ReindexService {
 
 #### 5.3 Binary Quantization (Optional)
 
-**If corpus > 500K docs:** Implement binary quantization (see [vector-search.md](./vector-search.md)).
+**If corpus > 500K docs:** Implement binary quantization (see [vector-search-advanced.md](./vector-search-advanced.md)).
 
 #### 5.4 Monitoring & Health Checks
 
@@ -235,10 +235,10 @@ describe('Indexing Pipeline', () => {
 ---
 
 **Related:**
-- [User Guide](./user-guide.md) - Learn what the graph engine does and how to use it
-- [Data Ingestion](./data-ingestion.md) - How files are discovered and indexed
-- [MCP Server](./mcp-server.md) - Claude Code integration details
-- [Architecture](./architecture.md) - System design overview
+- [User Guide](./user-guide-features.md) - Learn what the graph engine does and how to use it
+- [Data Ingestion](./data-ingestion-discovery.md) - How files are discovered and indexed
+- [MCP Server](./mcp-server-tools.md) - Claude Code integration details
+- [Architecture](./architecture-overview.md) - System design overview
 - [Data Model](./data-model.md) - Schema reference
 - [Packaging](./packaging.md) - Electron build configuration
-- [Production Readiness](./production-readiness.md) - Pre-deployment checklist
+- [Production Readiness](./production-readiness-checklist.md) - Pre-deployment checklist

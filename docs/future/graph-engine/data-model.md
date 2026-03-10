@@ -440,6 +440,6 @@ SELECT DISTINCT v.section_id FROM vector_results v;
 ---
 
 **Related:**
-- [Architecture](./architecture.md)
-- [Vector Search](./vector-search.md)
-- [Graph Capabilities](./graph-capabilities.md)
+- [Architecture](./architecture-overview.md)
+- [Vector Search](./vector-search-overview.md)
+- [Graph Capabilities](./graph-capabilities-entities.md)

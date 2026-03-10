@@ -50,7 +50,7 @@ constructor(projectPath: string) {
 
 **File:** `src/main/workers/embedder.worker.ts`
 
-**Implementation:** See [embedding-pipeline.md](./embedding-pipeline.md) for full code.
+**Implementation:** See [embedding-pipeline-overview.md](./embedding-pipeline-overview.md) for full code.
 
 **Test:**
 
@@ -70,7 +70,7 @@ worker.on('message', (msg) => {
 
 **File:** `src/main/services/EmbedderWorkerPool.ts`
 
-**Implementation:** See [embedding-pipeline.md](./embedding-pipeline.md).
+**Implementation:** See [embedding-pipeline-overview.md](./embedding-pipeline-overview.md).
 
 **Key:** Limit to 2-4 workers (onnxruntime-node stability).
 
@@ -117,7 +117,7 @@ async vectorSearch(queryVector: Float32Array, k: number): Promise<VectorResult[]
 
 #### 2.8 Hybrid Search
 
-**Implementation:** See [hybrid-search.md](./hybrid-search.md) for score fusion logic.
+**Implementation:** See [hybrid-search-fundamentals.md](./hybrid-search-fundamentals.md) for score fusion logic.
 
 **Key:**
 - Normalize BM25 scores to [0, 1]

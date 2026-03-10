@@ -263,7 +263,7 @@ export default defineConfig({
 
 **Cause:** onnxruntime-node stability issue with multiple workers.
 
-**Fix:** Limit to 2-4 workers (see [embedding-pipeline.md](./embedding-pipeline.md)).
+**Fix:** Limit to 2-4 workers (see [embedding-pipeline-onnx-workers.md](./embedding-pipeline-onnx-workers.md)).
 
 ---
 
@@ -412,6 +412,6 @@ Then download models on first launch (optional).
 ---
 
 **Related:**
-- [Architecture](./architecture.md) - Native module usage in system design
-- [Embedding Pipeline](./embedding-pipeline.md) - Worker thread setup
-- [Production Readiness](./production-readiness.md) - Deployment checklist
+- [Architecture](./architecture-overview.md) - Native module usage in system design
+- [Embedding Pipeline](./embedding-pipeline-overview.md) - Worker thread setup
+- [Production Readiness](./production-readiness-checklist.md) - Deployment checklist

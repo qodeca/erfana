@@ -1,6 +1,11 @@
-# Data Ingestion & Indexing
+# Data ingestion – updates and performance
 
-> ⚠️ **WORK IN PROGRESS - NOT READY FOR DEVELOPMENT**
+> This is part 2 of the data ingestion documentation, split for readability.
+>
+> **Other parts:**
+> - [Data ingestion – discovery and indexing](./data-ingestion-discovery.md)
+
+> ⚠️ **WORK IN PROGRESS – NOT READY FOR DEVELOPMENT**
 >
 > This documentation is currently under active development and review. The Graph Engine specification, architecture, and implementation details are subject to significant changes. **DO NOT start implementation work based on these documents.**
 >
@@ -9,291 +14,17 @@
 
 **Last Updated:** October 2025
 
-This document explains how the Erfana Graph Engine automatically discovers, processes, and indexes markdown files from your project.
-
 ---
 
-## Table of Contents
+## Incremental updates
 
-1. [Overview](#overview)
-2. [Project Initialization](#project-initialization)
-3. [File Discovery](#file-discovery)
-4. [Event-Driven Indexing](#event-driven-indexing)
-5. [Incremental Updates](#incremental-updates)
-6. [Progress Reporting](#progress-reporting)
-7. [Error Handling](#error-handling)
-8. [Performance Considerations](#performance-considerations)
-
----
-
-## Overview
-
-### Automatic Indexing Philosophy
-
-**Design principle:** Zero-configuration knowledge graph that "just works."
-
-**User experience:**
-1. User opens project in ERFANA
-2. Graph engine automatically detects all `.md` files
-3. Indexing starts in background (non-blocking)
-4. User can continue working while indexing completes
-5. Related Sidebar/Search become available once indexed
-
-**No manual steps required.**
-
----
-
-## Project Initialization
-
-### Trigger: `project:changed` Event
-
-When user opens a project (File → Open Project), ERFANA's main process emits `project:changed` event.
-
-**Event payload:**
-```typescript
-{
-  oldPath: string | null,  // Previous project path (null if first open)
-  newPath: string          // New project path
-}
-```
-
-**GraphEngineService subscribes to this event:**
-
-```typescript
-// File: src/main/services/GraphEngineService.ts
-
-export class GraphEngineService {
-  constructor(
-    private eventBus: EventEmitter,
-    private fileService: FileService
-  ) {
-    // Subscribe to project changes
-    this.eventBus.on('project:changed', this.handleProjectChange.bind(this));
-  }
-
-  private async handleProjectChange(event: ProjectChangeEvent): Promise<void> {
-    console.log(`[GraphEngine] Project changed: ${event.newPath}`);
-
-    // 1. Close previous database (if any)
-    if (this.db) {
-      this.db.close();
-    }
-
-    // 2. Open/create database for new project
-    const dbPath = path.join(event.newPath, '.erfana', 'graph.db');
-    this.db = new GraphDatabaseService(dbPath);
-
-    // 3. Start initial indexing
-    await this.initialIndex(event.newPath);
-  }
-}
-```
-
-### Initial Indexing Flow
-
-```
-1. User opens project
-   │
-   ▼
-2. GraphEngineService receives 'project:changed' event
-   │
-   ▼
-3. Create/open SQLite database (.erfana/graph.db)
-   │
-   ▼
-4. Discover all .md files (recursive scan)
-   │
-   ├─▶ Skip: node_modules/, .git/, .erfana/
-   └─▶ Include: *.md, *.markdown
-   │
-   ▼
-5. Queue files for indexing (prioritize open files first)
-   │
-   ▼
-6. Process batches (10 files/batch)
-   │
-   ├─▶ Parse markdown → sections
-   ├─▶ Normalize text
-   ├─▶ Insert into database (FTS5 + sections)
-   ├─▶ Tokenize + chunk
-   ├─▶ Embed (worker pool)
-   ├─▶ Store embeddings + vectors
-   └─▶ Extract entities (M3+)
-   │
-   ▼
-7. Report progress (emit 'graph:indexing:progress' event)
-   │
-   ▼
-8. Indexing complete → emit 'graph:indexing:complete' event
-```
-
----
-
-## File Discovery
-
-### Recursive File Scan
-
-**Implementation:**
-
-```typescript
-async discoverFiles(projectPath: string): Promise<string[]> {
-  const files: string[] = [];
-
-  const walkDir = (dir: string) => {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-
-      // Skip excluded directories
-      if (entry.isDirectory()) {
-        if (this.shouldSkipDirectory(entry.name)) {
-          continue;
-        }
-        walkDir(fullPath);
-      }
-
-      // Include markdown files
-      if (entry.isFile() && this.isMarkdownFile(entry.name)) {
-        files.push(fullPath);
-      }
-    }
-  };
-
-  walkDir(projectPath);
-  return files;
-}
-
-private shouldSkipDirectory(dirName: string): boolean {
-  const excluded = [
-    'node_modules',
-    '.git',
-    '.erfana',
-    'dist',
-    'out',
-    'build',
-    '.vscode',
-    '.idea'
-  ];
-  return excluded.includes(dirName);
-}
-
-private isMarkdownFile(filename: string): boolean {
-  return /\.(md|markdown)$/i.test(filename);
-}
-```
-
-### Prioritization Strategy
-
-**Problem:** User may start working before indexing finishes.
-
-**Solution:** Prioritize currently open files.
-
-```typescript
-async initialIndex(projectPath: string): Promise<void> {
-  // 1. Discover all files
-  const allFiles = await this.discoverFiles(projectPath);
-
-  // 2. Get currently open files from editor
-  const openFiles = this.getOpenFilesFromEditor();
-
-  // 3. Prioritize: open files first, then rest
-  const prioritized = [
-    ...openFiles.filter(f => allFiles.includes(f)),
-    ...allFiles.filter(f => !openFiles.includes(f))
-  ];
-
-  // 4. Index in priority order
-  await this.indexFiles(prioritized);
-}
-```
-
----
-
-## Event-Driven Indexing
-
-### FileWatcherService Integration
-
-**Architecture:** Graph engine subscribes to file change events from `FileWatcherService` (event-driven, not polling).
-
-**Events:**
-
-| Event | Trigger | Action |
-|-------|---------|--------|
-| `file:saved` | User saves file in editor | Re-index file |
-| `file:created` | New file created | Index file |
-| `file:deleted` | File deleted | Remove from index |
-| `file:renamed` | File renamed | Update path, re-index |
-
-**Implementation:**
-
-```typescript
-// File: src/main/services/FileWatcherService.ts
-
-export class FileWatcherService {
-  private eventBus: EventEmitter;
-
-  constructor(eventBus: EventEmitter) {
-    this.eventBus = eventBus;
-    this.setupWatcher();
-  }
-
-  private setupWatcher(): void {
-    // Chokidar-based file watcher (existing)
-    this.watcher = chokidar.watch(this.projectPath, {
-      ignored: /(node_modules|\.git)/,
-      persistent: true
-    });
-
-    this.watcher.on('change', (path) => {
-      this.eventBus.emit('file:saved', { path });
-    });
-
-    this.watcher.on('add', (path) => {
-      this.eventBus.emit('file:created', { path });
-    });
-
-    this.watcher.on('unlink', (path) => {
-      this.eventBus.emit('file:deleted', { path });
-    });
-  }
-}
-```
-
-**GraphEngineService subscription:**
-
-```typescript
-// File: src/main/services/GraphEngineService.ts
-
-constructor(eventBus: EventEmitter) {
-  // Subscribe to file events
-  eventBus.on('file:saved', this.handleFileSaved.bind(this));
-  eventBus.on('file:created', this.handleFileCreated.bind(this));
-  eventBus.on('file:deleted', this.handleFileDeleted.bind(this));
-}
-
-private async handleFileSaved(event: { path: string }): Promise<void> {
-  if (!this.isMarkdownFile(event.path)) return;
-
-  console.log(`[GraphEngine] Re-indexing: ${event.path}`);
-  await this.indexFile(event.path);
-
-  // Notify UI to refresh Related Sidebar
-  this.eventBus.emit('graph:file:indexed', { path: event.path });
-}
-```
-
----
-
-## Incremental Updates
-
-### Problem: Avoid Re-Embedding Unchanged Content
+### Problem: Avoid re-embedding unchanged content
 
 **Scenario:** User saves file with minor edit (fix typo). Should we re-embed entire file?
 
 **Answer:** No! Use content hashing to skip unchanged sections.
 
-### Content-Based Deduplication
+### Content-based deduplication
 
 **Strategy:**
 
@@ -345,7 +76,7 @@ async indexFile(filePath: string): Promise<void> {
 }
 ```
 
-**Performance Impact:**
+**Performance impact:**
 
 | Scenario | Sections Changed | Time (Before Dedupe) | Time (After Dedupe) | Speedup |
 |----------|------------------|----------------------|---------------------|---------|
@@ -357,16 +88,16 @@ async indexFile(filePath: string): Promise<void> {
 
 ---
 
-## Progress Reporting
+## Progress reporting
 
-### UI Feedback Requirements
+### UI feedback requirements
 
 Users need to know:
 1. Is indexing in progress?
 2. How much is left?
 3. Did it finish successfully?
 
-### Progress Events
+### Progress events
 
 **Emitted by GraphEngineService:**
 
@@ -396,7 +127,7 @@ this.eventBus.emit('graph:indexing:error', {
 });
 ```
 
-### Status Indicator Component
+### Status indicator component
 
 **File:** `src/renderer/src/components/StatusBar/GraphStatusIndicator.tsx`
 
@@ -451,11 +182,11 @@ export function GraphStatusIndicator() {
 
 ---
 
-## Error Handling
+## Error handling
 
-### Common Indexing Errors
+### Common indexing errors
 
-#### 1. Parse Error (Malformed Markdown)
+#### 1. Parse error (malformed markdown)
 
 **Cause:** Invalid markdown syntax breaks parser.
 
@@ -475,7 +206,7 @@ try {
 }
 ```
 
-#### 2. Worker Crash (ONNX Runtime)
+#### 2. Worker crash (ONNX Runtime)
 
 **Cause:** onnxruntime-node crashes with >4 workers.
 
@@ -499,7 +230,7 @@ private handleWorkerExit(worker: Worker, code: number): void {
 }
 ```
 
-#### 3. Database Lock (SQLite BUSY)
+#### 3. Database lock (SQLite BUSY)
 
 **Cause:** Concurrent writes without proper transaction management.
 
@@ -529,7 +260,7 @@ async indexFile(filePath: string): Promise<void> {
 }
 ```
 
-### Error Recovery Strategy
+### Error recovery strategy
 
 **Principle:** Never crash the app. Log errors, skip problematic files, continue indexing.
 
@@ -540,9 +271,9 @@ async indexFile(filePath: string): Promise<void> {
 
 ---
 
-## Performance Considerations
+## Performance considerations
 
-### Batch Processing
+### Batch processing
 
 **Problem:** Indexing 10K files one-by-one is slow (sequential I/O).
 
@@ -571,7 +302,7 @@ async indexFiles(files: string[]): Promise<void> {
 - Sequential: 10K files @ 100ms/file = 16.7 minutes
 - Batch (10 parallel): 10K files @ 10ms/file = 1.7 minutes (10x faster)
 
-### Debouncing File Saves
+### Debouncing file saves
 
 **Problem:** User rapidly saves file (Cmd+S, Cmd+S, Cmd+S) → triggers 3 index operations.
 
@@ -601,7 +332,7 @@ private handleFileSaved(event: { path: string }): void {
 
 **Result:** 3 rapid saves → 1 index operation (67% reduction).
 
-### Memory Management
+### Memory management
 
 **Problem:** Loading 10K files into memory at once → OOM.
 
@@ -650,8 +381,10 @@ async indexFiles(files: string[]): Promise<void> {
 
 ---
 
-**Related:**
-- [Architecture](./architecture.md) - Event-driven integration with FileWatcherService
-- [User Guide](./user-guide.md) - User-facing features and workflows
-- [Implementation Guide](./implementation-guide.md) - M1 indexing pipeline tasks
-- [Performance](./performance.md) - Indexing benchmarks and optimization
+## See also
+
+- [Data ingestion – discovery and indexing](./data-ingestion-discovery.md) – project initialization, file discovery, event-driven indexing
+- [Architecture](./architecture-overview.md) – Event-driven integration with FileWatcherService
+- [User Guide](./user-guide-features.md) – User-facing features and workflows
+- [Implementation Guide](./implementation-guide.md) – M1 indexing pipeline tasks
+- [Performance](./performance.md) – Indexing benchmarks and optimization

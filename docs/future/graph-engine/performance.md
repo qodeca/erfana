@@ -409,7 +409,7 @@ console.log(`Memory delta: ${(memAfter.heapUsed - memBefore.heapUsed) / 1024 / 1
 ---
 
 **Related:**
-- [Architecture](./architecture.md) - Performance considerations in design
-- [Vector Search](./vector-search.md) - sqlite-vec performance characteristics
-- [Embedding Pipeline](./embedding-pipeline.md) - Batching and worker concurrency
-- [Production Readiness](./production-readiness.md) - Performance checklist
+- [Architecture](./architecture-overview.md) - Performance considerations in design
+- [Vector Search](./vector-search-overview.md) - sqlite-vec performance characteristics
+- [Embedding Pipeline](./embedding-pipeline-overview.md) - Batching and worker concurrency
+- [Production Readiness](./production-readiness-checklist.md) - Performance checklist

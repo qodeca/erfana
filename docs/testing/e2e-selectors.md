@@ -1,15 +1,17 @@
-# E2E Selector Catalog
+# E2E selector catalog
 
-Complete catalog of all `data-testid` attributes available for E2E testing.
+All `data-testid` attributes available for E2E testing – **211 testids** across 28 sections.
 
 **Related documentation**:
-- [E2E Testing Guide](./e2e-testing.md) - Main E2E documentation
-- [Test ID constants](../../src/renderer/src/constants/testids.ts) - Source code
+- [E2E Testing Guide](./e2e-testing.md) – Main E2E documentation
+- [Test ID constants](../../src/renderer/src/constants/testids.ts) – Source of truth
 - Spec #011 (archived) – Specification
+
+> **Counts are validated** by automated tests in `testids.test.ts`. If a section count becomes stale, tests fail.
 
 ---
 
-## Activity bar (5 testids)
+## Activity bar (4 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -17,11 +19,10 @@ Complete catalog of all `data-testid` attributes available for E2E testing.
 | `activity-bar-btn-files` | Files panel button | static |
 | `activity-bar-btn-terminal` | Terminal panel button | static |
 | `activity-bar-btn-settings` | Settings button | static |
-| `activity-bar-btn-theme` | Theme toggle | static |
 
 ---
 
-## Project tree (8 testids)
+## Project tree (15 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -31,14 +32,20 @@ Complete catalog of all `data-testid` attributes available for E2E testing.
 | `project-tree-btn-close` | Close project button | static |
 | `project-tree-btn-new-file` | New file button | static |
 | `project-tree-btn-new-folder` | New folder button | static |
+| `project-tree-btn-refresh` | Refresh tree button | static |
 | `project-tree-node-{hash}` | Tree node | dynamic |
 | `project-tree-toggle-{hash}` | Folder toggle | dynamic |
+| `project-tree-node-file-{hash}` | File node | dynamic |
+| `project-tree-node-folder-{hash}` | Folder node | dynamic |
+| `project-tree-drag-overlay` | Drag ghost element | static |
+| `project-tree-error` | Error state container | static |
+| `project-tree-loading` | Loading spinner | static |
+| `project-tree-drop-target-{hash}` | Folder drop target | dynamic |
 
 **Dynamic testid example**:
 ```typescript
 import { getDynamicTestId, TEST_IDS } from '@/constants/testids'
 
-// For file 'src/main/index.ts'
 const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 // Result: 'project-tree-node-a1b2c3d4' (hash varies by path)
 ```
@@ -56,7 +63,7 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Terminal panel (6 testids)
+## Terminal panel (13 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -65,19 +72,68 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 | `terminal-btn-scroll` | Scroll to bottom | static |
 | `terminal-btn-restart` | Restart terminal | static |
 | `terminal-btn-lock` | Scroll lock toggle | static |
-| `terminal-status` | Status indicator | static |
+| `terminal-drop-zone` | Drag-drop file path zone | static |
+| `terminal-status-checking` | Status: checking availability | static |
+| `terminal-status-unavailable` | Status: node-pty missing | static |
+| `terminal-status-error` | Status: error occurred | static |
+| `terminal-btn-capture-screen` | Full screen capture (macOS) | static |
+| `terminal-btn-capture-window` | Window capture (macOS) | static |
+| `terminal-btn-capture-area` | Area capture (macOS) | static |
+| `terminal-btn-camera` | Camera photo capture | static |
 
 ---
 
-## Editor (5 testids)
+## UI blocker (1 testid)
 
 | Testid | Element | Type |
 |--------|---------|------|
-| `editor-content` | Content layout container | static |
+| `ui-blocker` | Overlay | static |
+
+---
+
+## Editor error boundary (1 testid)
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `editor-error-boundary` | Fallback container | static |
+
+---
+
+## File conflict notification (4 testids)
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `file-conflict-notification` | Container | static |
+| `file-conflict-btn-reload` | Reload from disk | static |
+| `file-conflict-btn-keep` | Keep local version | static |
+| `file-conflict-btn-dismiss` | Dismiss notification | static |
+
+---
+
+## Editor content layout (5 testids)
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `editor-content` | Content container | static |
 | `editor-pane` | Editor pane wrapper | static |
 | `preview-pane` | Preview pane wrapper | static |
 | `editor-monaco` | Monaco editor wrapper | static |
-| `editor-preview` | Markdown preview wrapper | static |
+| `editor-preview` | Markdown preview container | static |
+
+---
+
+## Camera dialog (8 testids)
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `camera-dialog` | Dialog container | static |
+| `camera-device-select` | Device selector dropdown | static |
+| `camera-preview` | Video preview element | static |
+| `camera-btn-capture` | Capture photo button | static |
+| `camera-btn-cancel` | Cancel button | static |
+| `camera-btn-refresh` | Refresh devices (on error) | static |
+| `camera-error` | Error message area | static |
+| `camera-shutter` | Shutter animation overlay | static |
 
 ---
 
@@ -108,7 +164,7 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Dialogs - Base (3 testids)
+## Dialogs – base (3 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -118,7 +174,31 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Dialogs - Confirm (4 testids)
+## Dialogs – external drop (6 testids)
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `external-drop-overlay` | Drop overlay (OS file drag) | static |
+| `external-drop-dialog` | Dialog container | static |
+| `external-drop-move-button` | Move files button | static |
+| `external-drop-copy-button` | Copy files button | static |
+| `external-drop-import-button` | Import files button | static |
+| `external-drop-cancel-button` | Cancel button | static |
+
+---
+
+## Dialogs – conflict (4 testids)
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `conflict-dialog` | Dialog container | static |
+| `conflict-replace-button` | Replace existing file | static |
+| `conflict-keep-both-button` | Keep both files | static |
+| `conflict-cancel-button` | Cancel/skip | static |
+
+---
+
+## Dialogs – confirm (4 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -129,7 +209,7 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Dialogs - Alert (3 testids)
+## Dialogs – alert (3 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -139,18 +219,18 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Dialogs - Prompt (4 testids)
+## Dialogs – prompt (4 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
 | `dialog-prompt` | Prompt dialog | static |
 | `dialog-prompt-message` | Prompt message | static |
-| `dialog-prompt-input` | Prompt input | static |
-| `dialog-prompt-dropdown` | Prompt dropdown | static |
+| `dialog-prompt-input` | Text input | static |
+| `dialog-prompt-dropdown` | Dropdown select | static |
 
 ---
 
-## File picker (5 testids)
+## Dialogs – file picker (5 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -162,22 +242,36 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Context menus (12 testids)
+## Context menu – base (2 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
 | `context-menu` | Base menu container | static |
 | `context-menu-separator` | Menu separator | static |
+
+---
+
+## Context menu – terminal (3 testids)
+
+| Testid | Element | Type |
+|--------|---------|------|
 | `context-menu-terminal` | Terminal menu | static |
-| `context-menu-editor` | Editor menu | static |
-| `context-menu-preview` | Preview menu | static |
 | `context-menu-item-copy` | Copy item | static |
 | `context-menu-item-paste` | Paste item | static |
-| `context-menu-item-cut` | Cut item | static |
+
+---
+
+## Context menu – editor/preview (7 testids)
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `context-menu-editor` | Editor menu | static |
+| `context-menu-preview` | Preview menu | static |
 | `context-menu-item-elaborate` | Elaborate prompt | static |
 | `context-menu-item-modify` | Modify prompt | static |
 | `context-menu-item-ask` | Ask prompt | static |
 | `context-menu-item-visualize` | Visualize prompt | static |
+| `context-menu-item-cut` | Cut item (editor) | static |
 
 ---
 
@@ -190,6 +284,25 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 | `diagram-viewer-content` | Content wrapper | static |
 | `diagram-viewer-svg` | SVG container | static |
 | `diagram-viewer-btn-chat` | Chat trigger | static |
+
+---
+
+## Image viewer panel (12 testids)
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `image-viewer-panel` | Panel container | static |
+| `image-viewer-content` | Content area | static |
+| `image-viewer-image` | Image element | static |
+| `image-viewer-toolbar` | Toolbar | static |
+| `image-viewer-btn-zoom-in` | Zoom in | static |
+| `image-viewer-btn-zoom-out` | Zoom out | static |
+| `image-viewer-zoom-level` | Zoom level (click to reset) | static |
+| `image-viewer-btn-fit` | Fit to view | static |
+| `image-viewer-btn-fullscreen` | Enter full screen | static |
+| `image-viewer-btn-close` | Close full screen | static |
+| `image-viewer-fullscreen` | Full screen overlay | static |
+| `image-viewer-fullscreen-content` | Full screen content area | static |
 
 ---
 
@@ -208,7 +321,7 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 | `chat-btn-reset` | Reset zoom | static |
 | `chat-direction-btn-{dir}` | Direction (TB/BT/LR/RL) | dynamic |
 | `chat-btn-scroll-bottom` | Scroll to bottom | static |
-| `chat-btn-restart` | Restart terminal | static |
+| `chat-btn-restart` | Restart diagram | static |
 | `chat-btn-scroll-lock` | Scroll lock | static |
 | `chat-zoom-indicator` | Zoom level display | static |
 | `chat-character-count` | Character counter | static |
@@ -226,7 +339,7 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Tabs (5 testids)
+## Editor tabs (6 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -235,6 +348,17 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 | `tab-label-{hash}` | Tab label | dynamic |
 | `tab-close-{hash}` | Tab close button | dynamic |
 | `tab-dirty-{hash}` | Unsaved indicator | dynamic |
+| `tab-active-{hash}` | Active tab marker | dynamic |
+
+---
+
+## Image tabs (3 testids)
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `image-tab-item-{hash}` | Image tab item | dynamic |
+| `image-tab-label-{hash}` | Image tab label | dynamic |
+| `image-tab-close-{hash}` | Image tab close button | dynamic |
 
 ---
 
@@ -258,13 +382,13 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 | Testid | Element | Type |
 |--------|---------|------|
 | `toast-container` | Toast container | static |
-| `toast-{type}` | Toast by type (success/error/warning/info) | dynamic |
+| `toast` | Individual toast | static |
 | `toast-message` | Toast message | static |
 | `toast-btn-dismiss` | Dismiss button | static |
 
 ---
 
-## Settings overlay (12 testids)
+## Settings overlay (18 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -280,30 +404,40 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 | `settings-select-log-level` | Log level select | static |
 | `settings-section-transcription` | Transcription settings section | static |
 | `settings-select-transcription-backend` | Backend selector | static |
+| `settings-input-api-key` | API key input | static |
+| `settings-btn-clear-api-key` | Clear API key button | static |
+| `settings-select-whisper-model` | Whisper model select | static |
+| `settings-btn-whisper-model` | Whisper model download/status | static |
+| `settings-whisper-model-status` | Whisper model status text | static |
+| `settings-whisper-download-error` | Whisper download error | static |
 
 ---
 
-## Transcription dialog (11 testids)
+## Transcription dialog (10 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
 | `transcription-dialog` | Dialog container | static |
 | `transcription-language-select` | Language dropdown | static |
-| `transcription-btn-start` | Start transcription button | static |
+| `transcription-btn-start` | Start transcription | static |
+| `transcription-btn-retry` | Retry (on error) | static |
 | `transcription-btn-cancel` | Cancel button | static |
 | `transcription-progress-bar` | Progress bar | static |
-| `transcription-progress-text` | Progress percentage text | static |
-| `transcription-phase-text` | Current phase description | static |
-| `transcription-error` | Error message container | static |
-| `transcription-btn-done` | Done/close button | static |
+| `transcription-progress-text` | Progress percentage | static |
+| `transcription-phase-text` | Phase description | static |
+| `transcription-error` | Error message | static |
+| `transcription-btn-done` | Done button (success state) | static |
 
 ---
 
-## Welcome panel (1 testid)
+## Welcome panel (4 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
-| `welcome-btn-import` | Import button | static |
+| `welcome-btn-import` | Import file button | static |
+| `welcome-recent-projects` | Recent projects list | static |
+| `welcome-recent-project-{hash}` | Recent project item | dynamic |
+| `welcome-recent-project-btn-remove-{hash}` | Remove recent project | dynamic |
 
 ---
 
