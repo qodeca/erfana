@@ -32,12 +32,17 @@ Erfana supports automated E2E testing using Playwright with Electron. This guide
 ### Running tests
 
 ```bash
-# Run E2E tests (requires dev server running)
-npm run dev &  # Start dev server in background
+# Functional E2E tests
 npm run test:e2e
 
 # Run with visible window
 npm run test:e2e:headed
+
+# Visual regression tests
+npm run test:e2e:visual
+
+# Update visual baselines
+npm run test:e2e:update-screenshots
 ```
 
 ### Test build vs production build
@@ -65,36 +70,16 @@ ERFANA_TEST_BUILD=true npm run build:mac
 
 Create `playwright.config.ts` in the project root:
 
-```typescript
-import { defineConfig } from '@playwright/test'
-import dotenv from 'dotenv'
+Two Playwright projects are configured:
 
-// Load .env file so E2E tests can access API keys (e.g., OPENAI_API_KEY)
-dotenv.config()
+| Project | Test match | Retries | Purpose |
+|---------|-----------|---------|---------|
+| `electron` | `**/*.e2e.ts` (ignores `visual-regression*`) | 1 | Functional E2E tests |
+| `visual` | `**/visual-regression.e2e.ts` | 0 | Screenshot comparison (diffs must be investigated) |
 
-export default defineConfig({
-  testDir: './e2e',
-  timeout: 60000,
-  retries: 1,
-  use: {
-    trace: 'retain-on-failure',
-    screenshot: 'only-on-failure',
-  },
-  projects: [
-    {
-      name: 'electron',
-      testMatch: '**/*.e2e.ts',
-    },
-  ],
-})
-```
+Visual project settings: `snapshotDir: './e2e/screenshots'`, `snapshotPathTemplate: '{snapshotDir}/{arg}-{platform}{ext}'`, `maxDiffPixelRatio: 0.01`, `animations: 'disabled'`.
 
-| Option | Value | Rationale |
-|--------|-------|-----------|
-| `testDir` | `./e2e` | Separate E2E tests from unit tests |
-| `timeout` | `60000` | Electron apps need longer startup time |
-| `retries` | `1` | Retry flaky tests once |
-| `trace` | `retain-on-failure` | Capture trace on failures for debugging |
+See `playwright.config.ts` for the full configuration.
 
 ---
 
@@ -380,6 +365,7 @@ Some E2E tests require external API credentials:
 - `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
 - `directory-watcher.e2e.ts` – Directory watcher pipeline verification
 - `audio-transcription.e2e.ts` – Full audio import transcription lifecycle (real OpenAI API, requires `OPENAI_API_KEY`, skips if not set)
+- `visual-regression.e2e.ts` – Visual regression for 5 UI states (welcome, editor, terminal, settings, confirm dialog)
 
 ---
 

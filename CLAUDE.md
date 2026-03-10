@@ -22,7 +22,9 @@ npm run test:renderer
 npm run test:main
 npm run test:preload
 npm run test:cov     # Coverage (v8) per project
-npm run test:e2e     # Playwright E2E tests
+npm run test:e2e     # Playwright E2E tests (functional only)
+npm run test:e2e:visual           # Visual regression tests
+npm run test:e2e:update-screenshots  # Update visual baselines
 ```
 
 ## Project Structure
@@ -140,6 +142,7 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
   - Condition-based waits preferred over `waitForTimeout` – use `waitForPrompt()`, `waitForOutput()`, Playwright auto-waiting
   - Wait helpers in `e2e/utils/wait-helpers.ts`: `waitForIpcComplete` (race-safe IPC wait helper)
   - Shared locators in `e2e/utils/locators.ts`: `byTestId`, `byDynamicTestId`, `waitForTestId`, `waitForTestIdHidden`
+- Visual regression: Playwright `toHaveScreenshot()` for 5 UI states (welcome, editor, terminal, settings, confirm dialog); baselines in `e2e/screenshots/` with platform suffix; `--project=visual` in Playwright config
 - E2E env vars: Some tests require API keys via `.env` file (see `.env.example`); tests skip gracefully if not set
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
 

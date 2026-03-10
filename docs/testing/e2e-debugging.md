@@ -100,95 +100,22 @@ npx playwright test --headed
 
 ## CI/CD integration
 
-### GitHub Actions example
+### GitHub Actions workflow
 
-```yaml
-# .github/workflows/e2e-tests.yml
-name: E2E Tests
+The CI workflow (`.github/workflows/e2e.yml`) runs on `push` to `develop` and on all PRs:
+1. Installs dependencies (`npm ci`)
+2. Builds the app (`npx electron-vite build`)
+3. Runs both `electron` and `visual` Playwright projects (`npx playwright test`)
+4. Uploads `test-results/` and `playwright-report/` as artifacts (30-day retention on develop, 14-day on PRs)
 
-on:
-  pull_request:
-    branches: [main, develop]
-  push:
-    branches: [main, develop]
+Visual tests skip gracefully in CI when no baseline exists for the runner platform (macOS). Video is recorded on failure for visual test debugging.
 
-jobs:
-  test-e2e:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright
-        run: npx playwright install --with-deps
-
-      - name: Build Electron app
-        run: npm run build
-
-      - name: Run E2E tests
-        run: npm run test:e2e
-
-      - name: Upload trace on failure
-        if: failure()
-        uses: actions/upload-artifact@v3
-        with:
-          name: playwright-traces-${{ matrix.os }}
-          path: test-results/**/trace.zip
-          retention-days: 7
-
-      - name: Upload screenshots on failure
-        if: failure()
-        uses: actions/upload-artifact@v3
-        with:
-          name: playwright-screenshots-${{ matrix.os }}
-          path: test-results/**/*.png
-          retention-days: 7
-```
+See `.github/workflows/e2e.yml` for the full workflow.
 
 ### CI best practices
 
-- Run on multiple OS (macOS, Windows, Linux) for cross-platform validation
 - Upload traces and screenshots as artifacts on failure
 - Use `npm ci` instead of `npm install` for consistent dependencies
 - Cache `node_modules` to speed up builds
-- Set reasonable timeouts (E2E tests may be slower in CI)
-
-### Parallel test execution
-
-```yaml
-# Run tests in parallel across multiple workers
-- name: Run E2E tests
-  run: npm run test:e2e -- --workers=4
-```
-
-**Worker recommendations**:
-- Local: `--workers=2` (don't overload development machine)
-- CI: `--workers=4` to `--workers=8` (depends on runner specs)
-- GitHub Actions runners: 2-core machines, use `--workers=2`
-
-### Test sharding
-
-```yaml
-# Split tests across multiple CI jobs
-jobs:
-  test-e2e:
-    strategy:
-      matrix:
-        shard: [1, 2, 3, 4]
-    steps:
-      - name: Run E2E tests (shard ${{ matrix.shard }})
-        run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
-```
+- Set reasonable timeouts (30 min for the full job)
+- Visual regression baselines are platform-specific – generate separately per OS
