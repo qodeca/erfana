@@ -57,15 +57,15 @@ export function TerminalStatusContent({
   onCopyFix
 }: TerminalStatusContentProps): JSX.Element {
   return (
-    <div className="sidebar-panel-content">
+    <div className="sidebar-panel-content" data-testid={TEST_IDS.TERMINAL_DROP_ZONE}>
       {state === 'checking' && (
-        <div className="terminal-status" data-testid={TEST_IDS.TERMINAL_STATUS}>
+        <div className="terminal-status" data-testid={TEST_IDS.TERMINAL_STATUS_CHECKING}>
           <p>Checking terminal availability...</p>
         </div>
       )}
 
       {state === 'unavailable' && (
-        <div className="terminal-status" data-testid={TEST_IDS.TERMINAL_STATUS}>
+        <div className="terminal-status" data-testid={TEST_IDS.TERMINAL_STATUS_UNAVAILABLE}>
           <div className="terminal-error-icon">⚠️</div>
           <h3>Terminal not available</h3>
           <p>
@@ -93,7 +93,7 @@ export function TerminalStatusContent({
       )}
 
       {state === 'error' && (
-        <div className="terminal-status" data-testid={TEST_IDS.TERMINAL_STATUS}>
+        <div className="terminal-status" data-testid={TEST_IDS.TERMINAL_STATUS_ERROR}>
           <div className="terminal-error-icon">❌</div>
           <h3>Terminal error</h3>
           {errorMessage && <p className="error-details">{errorMessage}</p>}

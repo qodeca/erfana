@@ -30,7 +30,7 @@ describe('TerminalStatusContent', () => {
       render(<TerminalStatusContent {...defaultProps} state="checking" />)
 
       expect(screen.getByText('Checking terminal availability...')).toBeInTheDocument()
-      expect(screen.getByTestId(TEST_IDS.TERMINAL_STATUS)).toBeInTheDocument()
+      expect(screen.getByTestId(TEST_IDS.TERMINAL_STATUS_CHECKING)).toBeInTheDocument()
     })
   })
 
@@ -40,6 +40,7 @@ describe('TerminalStatusContent', () => {
 
       expect(screen.getByText('Terminal not available')).toBeInTheDocument()
       expect(screen.getByText(/node-pty is not available/)).toBeInTheDocument()
+      expect(screen.getByTestId(TEST_IDS.TERMINAL_STATUS_UNAVAILABLE)).toBeInTheDocument()
     })
 
     it('shows error details when provided', () => {
@@ -96,6 +97,7 @@ describe('TerminalStatusContent', () => {
       render(<TerminalStatusContent {...defaultProps} state="error" />)
 
       expect(screen.getByText('Terminal error')).toBeInTheDocument()
+      expect(screen.getByTestId(TEST_IDS.TERMINAL_STATUS_ERROR)).toBeInTheDocument()
     })
 
     it('shows error details when provided', () => {

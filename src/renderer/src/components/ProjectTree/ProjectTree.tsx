@@ -1221,8 +1221,11 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       onDragLeave={handleNativeDragLeave}
       onDrop={handleNativeDrop}
     >
+      {isExternalDragActive && (
+        <div className="external-drop-overlay" data-testid={TEST_IDS.EXTERNAL_DROP_OVERLAY} aria-hidden="true" />
+      )}
       {error && (
-        <div className="project-tree-error">
+        <div className="project-tree-error" role="alert" data-testid={TEST_IDS.PROJECT_TREE_ERROR}>
           {error}
         </div>
       )}
@@ -1235,10 +1238,11 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
             onClick={handleOpenProject}
             disabled={isSwitchingProject}
             title={projectPath ? 'Change project' : 'Open project'}
+            aria-label={projectPath ? 'Change project' : 'Open project'}
             data-testid={TEST_IDS.PROJECT_TREE_BTN_OPEN}
           >
             {isSwitchingProject ? (
-              <RotateCw size={14} strokeWidth={2} className="spin" />
+              <RotateCw size={14} strokeWidth={2} className="spin" data-testid={TEST_IDS.PROJECT_TREE_LOADING} />
             ) : projectPath ? (
               <Replace size={14} strokeWidth={2} />
             ) : (
@@ -1251,6 +1255,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
               onClick={handleCloseProject}
               disabled={isSwitchingProject}
               title="Close project"
+              aria-label="Close project"
               data-testid={TEST_IDS.PROJECT_TREE_BTN_CLOSE}
             >
               <CloseIcon size={14} strokeWidth={2} />
@@ -1263,6 +1268,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
                 onClick={handleNewFile}
                 disabled={loading}
                 title="Create new markdown file"
+                aria-label="Create new markdown file"
                 data-testid={TEST_IDS.PROJECT_TREE_BTN_NEW_FILE}
               >
                 <FilePlus size={14} strokeWidth={2} />
@@ -1272,6 +1278,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
                 onClick={handleNewFolder}
                 disabled={loading}
                 title="Create new folder"
+                aria-label="Create new folder"
                 data-testid={TEST_IDS.PROJECT_TREE_BTN_NEW_FOLDER}
               >
                 <FolderPlus size={14} strokeWidth={2} />
@@ -1321,7 +1328,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       </div>
     )}
 
-      <div className="project-tree-content" ref={treeContainerRef}>
+      <div className="project-tree-content" role="tree" aria-label="Project files" ref={treeContainerRef}>
         <DndContext
           sensors={sensors}
           collisionDetection={customCollisionDetection}
@@ -1354,7 +1361,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
           )}
           <DragOverlay dropAnimation={null}>
             {activeId ? (
-              <div className="drag-overlay">
+              <div className="drag-overlay" data-testid={TEST_IDS.PROJECT_TREE_DRAG_OVERLAY}>
                 <span className="file-name">
                   {enhancedFlattenedItems.find(item => item.path === activeId)?.name}
                 </span>

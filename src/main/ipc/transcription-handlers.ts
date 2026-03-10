@@ -321,7 +321,7 @@ export function registerTranscriptionHandlers(): void {
 
           const frontmatterLines = [
             '---',
-            `source: "${filePath}"`,
+            `source: "${fileName}"`,
             `type: video`,
             `duration: "${durationFormatted}"`,
             `date: "${date}"`,
@@ -391,7 +391,7 @@ export function registerTranscriptionHandlers(): void {
 
           const markdown = [
             '---',
-            `source: "${filePath}"`,
+            `source: "${fileName}"`,
             `duration: "${durationFormatted}"`,
             `date: "${date}"`,
             `language: ${language === 'auto' ? (result.language || 'auto') : language}`,

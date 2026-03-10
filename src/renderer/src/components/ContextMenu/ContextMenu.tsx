@@ -119,6 +119,7 @@ export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMe
     <div
       ref={menuRef}
       className="context-menu"
+      role="menu"
       data-testid={containerTestId ?? TEST_IDS.CONTEXT_MENU}
       style={{
         position: 'fixed',
@@ -132,12 +133,15 @@ export function ContextMenu({ x, y, items, onClose, containerTestId }: ContextMe
           <div
             key={index}
             className="context-menu-separator"
+            role="separator"
             data-testid={TEST_IDS.CONTEXT_MENU_SEPARATOR}
           />
         ) : (
           <div
             key={index}
             className={`context-menu-item ${item.danger ? 'danger' : ''} ${item.disabled ? 'disabled' : ''}`}
+            role="menuitem"
+            aria-disabled={item.disabled || undefined}
             onClick={() => handleItemClick(item)}
             data-testid={item.testId}
           >

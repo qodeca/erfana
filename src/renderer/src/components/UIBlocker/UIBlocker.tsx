@@ -1,4 +1,5 @@
 import { useProjectStore } from '../../stores/useProjectStore'
+import { TEST_IDS } from '../../constants/testids'
 import './UIBlocker.css'
 
 /**
@@ -43,6 +44,10 @@ export function UIBlockerBase({
       onKeyUp={(e) => e.preventDefault()}
       onWheel={(e) => e.preventDefault()}
       title={tooltip}
+      role="status"
+      aria-live="polite"
+      aria-label={message}
+      data-testid={TEST_IDS.UI_BLOCKER}
     >
       <div className="ui-blocker-content">
         <div className="ui-blocker-spinner"></div>

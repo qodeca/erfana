@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { createRef } from 'react'
 import { EditorContentLayout, type EditorContentLayoutProps, type EditorFile } from './EditorContentLayout'
+import { TEST_IDS } from '../../constants/testids'
 import type { MonacoEditorHandle } from '../Editor/MonacoMarkdownEditor'
 import type { MarkdownPreviewHandle } from '../Editor/MarkdownPreview'
 
@@ -273,6 +274,39 @@ describe('EditorContentLayout', () => {
       fireEvent.click(previewPane!)
 
       expect(props.onActivePaneChange).toHaveBeenCalledWith('preview')
+    })
+  })
+
+  describe('Accessibility and test IDs', () => {
+    it('container has role="region" and aria-label="Editor"', () => {
+      const props = createDefaultProps()
+      render(<EditorContentLayout {...props} />)
+
+      const container = screen.getByRole('region', { name: 'Editor' })
+      expect(container).toBeInTheDocument()
+    })
+
+    it('container has data-testid', () => {
+      const props = createDefaultProps()
+      render(<EditorContentLayout {...props} />)
+
+      expect(screen.getByTestId(TEST_IDS.EDITOR_CONTENT)).toBeInTheDocument()
+    })
+
+    it('editor pane has data-testid', () => {
+      const props = createDefaultProps()
+      props.viewMode = 'editor'
+      render(<EditorContentLayout {...props} />)
+
+      expect(screen.getByTestId(TEST_IDS.EDITOR_PANE)).toBeInTheDocument()
+    })
+
+    it('preview pane has data-testid', () => {
+      const props = createDefaultProps()
+      props.viewMode = 'preview'
+      render(<EditorContentLayout {...props} />)
+
+      expect(screen.getByTestId(TEST_IDS.PREVIEW_PANE)).toBeInTheDocument()
     })
   })
 

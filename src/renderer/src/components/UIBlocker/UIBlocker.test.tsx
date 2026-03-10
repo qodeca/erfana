@@ -12,6 +12,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { UIBlocker, UIBlockerBase } from './UIBlocker'
+import { TEST_IDS } from '../../constants/testids'
 
 // Mock useProjectStore
 const mockIsProjectChanging = vi.fn(() => false)
@@ -163,6 +164,28 @@ describe('UIBlocker', () => {
       render(<UIBlocker />)
       const blocker = screen.getByTitle('Waiting for folder selection...')
       expect(blocker).toBeInTheDocument()
+    })
+
+    it('should have role="status"', () => {
+      render(<UIBlocker />)
+      expect(screen.getByRole('status')).toBeInTheDocument()
+    })
+
+    it('should have aria-live="polite"', () => {
+      render(<UIBlocker />)
+      const blocker = screen.getByRole('status')
+      expect(blocker).toHaveAttribute('aria-live', 'polite')
+    })
+
+    it('should have aria-label matching message prop', () => {
+      render(<UIBlocker />)
+      const blocker = screen.getByRole('status')
+      expect(blocker).toHaveAttribute('aria-label', 'Waiting for folder selection...')
+    })
+
+    it('should have data-testid', () => {
+      render(<UIBlocker />)
+      expect(screen.getByTestId(TEST_IDS.UI_BLOCKER)).toBeInTheDocument()
     })
   })
 

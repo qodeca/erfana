@@ -392,6 +392,43 @@ describe('ActivityBar', () => {
     })
   })
 
+  describe('accessibility: icon-only buttons', () => {
+    it('all icon-only buttons should have aria-label (left side)', () => {
+      render(
+        <ActivityBar side="left" activePanel={null} onPanelClick={mockOnPanelClick} projectPath="/some/path" />
+      )
+
+      const buttons = screen.getAllByRole('button')
+      const iconOnlyButtons = buttons.filter(
+        (button) => !button.textContent?.trim()
+      )
+
+      for (const button of iconOnlyButtons) {
+        expect(button).toHaveAttribute('aria-label')
+      }
+    })
+
+    it('all icon-only buttons should have aria-label (right side)', () => {
+      render(
+        <ActivityBar
+          side="right"
+          activePanel={null}
+          onPanelClick={mockOnPanelClick}
+          projectPath="/some/path"
+        />
+      )
+
+      const buttons = screen.getAllByRole('button')
+      const iconOnlyButtons = buttons.filter(
+        (button) => !button.textContent?.trim()
+      )
+
+      for (const button of iconOnlyButtons) {
+        expect(button).toHaveAttribute('aria-label')
+      }
+    })
+  })
+
   describe('Tooltips', () => {
     it('should display tooltip for terminal panel', () => {
       render(

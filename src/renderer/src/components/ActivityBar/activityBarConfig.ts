@@ -1,4 +1,5 @@
 import { LucideIcon, Files, Search, Terminal } from 'lucide-react'
+import { TEST_IDS } from '../../constants/testids'
 
 export interface ActivityBarPanel {
   id: string
@@ -11,6 +12,7 @@ export interface ActivityBarPanel {
   keyboardShortcut?: string
   enabled?: boolean
   requiresProject?: boolean // Panel hidden when no project is loaded
+  testId?: string
   badge?: () => number | string | null
 }
 
@@ -38,6 +40,7 @@ export const activityBarPanels: ActivityBarPanel[] = [
     order: 1,
     keyboardShortcut: 'mod+b',
     enabled: true,
+    testId: TEST_IDS.ACTIVITY_BAR_BTN_FILES,
     badge: getFileCount
   },
   {
@@ -64,6 +67,7 @@ export const activityBarPanels: ActivityBarPanel[] = [
     keyboardShortcut: 'mod+j',
     enabled: true,
     requiresProject: true, // Hide when no project loaded
+    testId: TEST_IDS.ACTIVITY_BAR_BTN_TERMINAL,
     badge: getTerminalActiveIndicator
   }
 ]
