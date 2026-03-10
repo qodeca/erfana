@@ -40,16 +40,19 @@ function hasBaseline(screenshotName: string, testInfo: import('@playwright/test'
 
 /**
  * Disable Monaco cursor blinking to prevent non-deterministic screenshots.
+ * Returns the number of editors found and patched.
  */
-async function disableCursorBlink(page: import('@playwright/test').Page): Promise<void> {
-  await page.evaluate(() => {
+async function disableCursorBlink(page: import('@playwright/test').Page): Promise<number> {
+  return await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const editors = (window as any).monaco?.editor?.getEditors?.()
     if (editors) {
       for (const editor of editors) {
         editor.updateOptions({ cursorBlinking: 'solid' })
       }
+      return editors.length
     }
+    return 0
   })
 }
 
@@ -71,9 +74,16 @@ async function clearSelection(page: import('@playwright/test').Page): Promise<vo
 
 /**
  * Prepare Monaco editor for deterministic screenshot capture.
+ *
+ * FR-008.7 (timestamp masking) – none of the 5 tested UI states display
+ * timestamps or relative times. If future states include timestamps,
+ * add mask entries targeting those elements.
  */
 async function stabilizeEditor(page: import('@playwright/test').Page): Promise<void> {
-  await disableCursorBlink(page)
+  const editorCount = await disableCursorBlink(page)
+  if (editorCount === 0) {
+    console.warn('stabilizeEditor: no Monaco editors found – cursor blink may not be disabled')
+  }
   await clearSelection(page)
   // Monaco rendering pipeline settle – no DOM signal for cursorBlinking change;
   // toHaveScreenshot does two-pass stability check on top of this
