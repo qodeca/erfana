@@ -163,8 +163,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 
     await use(app)
 
-    // Cleanup: close app after test
-    // Small delay to let pending electron-log operations complete (prevents "Object has been destroyed" error)
+    // KNOWN_WAIT: electron-log flush before close (teardown path, not assertion)
     await new Promise((resolve) => setTimeout(resolve, 100))
     await app.close()
   },
@@ -197,7 +196,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 
     await use(app)
 
-    // Cleanup
+    // KNOWN_WAIT: electron-log flush before close (teardown path, not assertion)
     await new Promise((resolve) => setTimeout(resolve, 100))
     await app.close()
   },
@@ -331,6 +330,7 @@ export const testMultiWindow = base.extend<TestFixtures, WorkerFixtures>({
     })
 
     await use(app)
+    // KNOWN_WAIT: electron-log flush before close (teardown path, not assertion)
     await new Promise((resolve) => setTimeout(resolve, 100))
     await app.close()
   },
@@ -353,6 +353,7 @@ export const testMultiWindow = base.extend<TestFixtures, WorkerFixtures>({
     })
 
     await use(app)
+    // KNOWN_WAIT: electron-log flush before close (teardown path, not assertion)
     await new Promise((resolve) => setTimeout(resolve, 100))
     await app.close()
   },

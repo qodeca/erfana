@@ -189,11 +189,11 @@
       "slug": "test-id-accessibility",
       "name": "Test ID coverage and accessibility selectors",
       "tier": "T2",
-      "status": "draft",
+      "status": "archived",
       "scope": "improvement",
-      "description": "Expand data-testid coverage to UI elements currently missing identifiers (drag handles, drop zones, overflow menus, transitional states, tooltips) and add ARIA attributes to improve both accessibility and test selector reliability.",
+      "description": "Expand data-testid coverage to UI elements currently missing identifiers (drag handles, drop zones, overflow menus, transitional states, tooltips) and add ARIA attributes to improve both accessibility and test selector reliability. All testids implemented (211 total), ARIA roles added, unit tests added. Delivered in PRs #116, #117.",
       "created": "2026-03-09T12:23:00.000Z",
-      "path": "spec-t2-017-test-id-accessibility",
+      "path": "archived/spec-t2-017-test-id-accessibility",
       "last_modified": "2026-03-09T12:23:00.000Z",
       "sections_count": 1,
       "requirements_count": 17,
@@ -210,11 +210,11 @@
       "slug": "e2e-infrastructure",
       "name": "E2E infrastructure overhaul",
       "tier": "T3",
-      "status": "draft",
+      "status": "archived",
       "scope": "improvement",
-      "description": "Modernize E2E test infrastructure: migrate helper functions to Page Object Model classes, promote test project setup to Playwright fixtures, and replace all fixed waitForTimeout() calls with condition-based waits for deterministic test execution.",
+      "description": "Modernize E2E test infrastructure: migrate helper functions to Page Object Model classes, promote test project setup to Playwright fixtures, and replace all fixed waitForTimeout() calls with condition-based waits for deterministic test execution. POM classes, composed fixtures, condition-based waits, waitForIpcComplete all delivered. PRs #117, #119, #120.",
       "created": "2026-03-09T12:23:00.000Z",
-      "path": "spec-t3-018-e2e-infrastructure",
+      "path": "archived/spec-t3-018-e2e-infrastructure",
       "last_modified": "2026-03-09T12:23:00.000Z",
       "sections_count": 3,
       "requirements_count": 25,
@@ -251,6 +251,6 @@
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2026-03-09T12:23:00.000Z"
+    "last_updated": "2026-03-10T11:50:00.000Z"
   }
 }

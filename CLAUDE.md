@@ -27,7 +27,10 @@ npm run test:e2e     # Playwright E2E tests
 
 ## Project Structure
 ```
-e2e/                # Playwright E2E tests (shared helpers in e2e/utils/helpers.ts)
+e2e/                # Playwright E2E tests (POM pattern)
+├── fixtures/       # Composed Playwright fixtures (app, window, POM instances)
+├── pages/          # Page Object Model classes (TerminalPage, MonacoPage, MermaidPage, ProjectTreePage, KeyboardHelper)
+└── utils/          # Shared helpers (helpers.ts backward-compat adapter), locators (byTestId)
 src/
 ├── main/           # Electron main process
 │   ├── services/   # Core: FileService, TerminalService, ProjectService, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService; Watchers: DirectoryWatcherService, FileWatcherService; Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media: ScreenshotService, CameraService, PdfService, DocxService, TranscriptionService, LocalWhisperService, WhisperModelManager, AudioMetadataService, AudioExtractionService, ApiKeyService; Multi-instance: ProjectLockService, ExternalFileService; Subdirs: import/, watcher/
@@ -95,8 +98,8 @@ Feature specifications live in `specs/`. Check registry before implementing new 
 | 009 | Media import with transcription | T4 | archived | `specs/archived/spec-t4-009-media-import-transcription` |
 | 013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/spec-t3-013-multi-cli-tool-prompt-optimization` |
 | 016 | Project Tree refresh specification | T3 | archived | `specs/archived/spec-t3-016-project-tree-refresh` |
-| 017 | Test ID coverage and accessibility selectors | T2 | draft | `specs/spec-t2-017-test-id-accessibility` |
-| 018 | E2E infrastructure overhaul | T3 | draft | `specs/spec-t3-018-e2e-infrastructure` |
+| 017 | Test ID coverage and accessibility selectors | T2 | archived | `specs/archived/spec-t2-017-test-id-accessibility` |
+| 018 | E2E infrastructure overhaul | T3 | archived | `specs/archived/spec-t3-018-e2e-infrastructure` |
 | 019 | Visual regression and CI resilience | T2 | draft | `specs/spec-t2-019-visual-regression-ci` |
 
 **Registry**: `specs/registry.json`
@@ -128,7 +131,15 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
-- E2E: Playwright with Electron (see [docs/testing/e2e-testing.md](docs/testing/e2e-testing.md))
+- E2E: Playwright with Electron, Page Object Model pattern (see [docs/testing/e2e-testing.md](docs/testing/e2e-testing.md))
+  - POM classes in `e2e/pages/`: TerminalPage, MonacoPage, MermaidPage, ProjectTreePage, KeyboardHelper
+  - Composed fixtures in `e2e/fixtures/index.ts` – use `test` export with POM fixtures (worker-scoped userDataDir, test-scoped app/window)
+  - Project fixtures: `testProject` (isolated temp dir with seed files), `withSettings` (writes `.erfana/settings.json`), `withOpenFile` (opens file in editor, waits for Monaco readiness)
+  - App-with-project fixtures: `appWithTestProject` / `windowWithTestProject` – launch Electron with testProject path
+  - Backward-compatible adapter in `e2e/utils/helpers.ts` (WeakMap caching delegates to POM instances)
+  - Condition-based waits preferred over `waitForTimeout` – use `waitForPrompt()`, `waitForOutput()`, Playwright auto-waiting
+  - Wait helpers in `e2e/utils/wait-helpers.ts`: `waitForIpcComplete` (race-safe IPC wait helper)
+  - Shared locators in `e2e/utils/locators.ts`: `byTestId`, `byDynamicTestId`, `waitForTestId`, `waitForTestIdHidden`
 - E2E env vars: Some tests require API keys via `.env` file (see `.env.example`); tests skip gracefully if not set
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
 

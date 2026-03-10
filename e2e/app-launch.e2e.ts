@@ -34,7 +34,7 @@ test.describe('Erfana App Launch', () => {
       const settingsButton = byTestId(window, TEST_IDS.ACTIVITY_BAR_BTN_SETTINGS)
       await expect(settingsButton).toBeVisible()
 
-      // Clean up - delay to let pending electron-log operations complete
+      // KNOWN_WAIT: electron-log flush before close (teardown path, not assertion)
       await new Promise((resolve) => setTimeout(resolve, 100))
       await electronApp.close()
     } finally {
@@ -68,6 +68,7 @@ test.describe('Erfana App Launch', () => {
       const uniqueStaticIds = new Set(staticTestIds)
       expect(staticTestIds.length).toBe(uniqueStaticIds.size)
 
+      // KNOWN_WAIT: electron-log flush before close (teardown path, not assertion)
       await new Promise((resolve) => setTimeout(resolve, 100))
       await electronApp.close()
     } finally {

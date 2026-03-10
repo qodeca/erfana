@@ -92,7 +92,7 @@ test.describe('Audio transcription', () => {
     try {
       window = await electronApp.firstWindow()
       await waitForAppReady(window)
-      await openProject(electronApp, window, projectPath)
+      await openProject(window, projectPath)
 
       // Wait for project tree to confirm project is loaded
       await waitForTestId(window, TEST_IDS.PROJECT_TREE, { timeout: 10000 })

@@ -65,7 +65,7 @@ test.describe('Third-Party Components E2E', () => {
       await waitForAppReady(window)
 
       // Open project via UI (clicks button with mocked dialog)
-      await openProject(electronApp, window, projectPath)
+      await openProject(window, projectPath)
 
       // Wait for project tree to show the file
       await waitForTestId(window, TEST_IDS.PROJECT_TREE, { timeout: 10000 })
@@ -138,27 +138,24 @@ test.describe('Third-Party Components E2E', () => {
       await waitForAppReady(window)
 
       // Open project via UI (clicks button with mocked dialog)
-      await openProject(electronApp, window, projectPath)
+      await openProject(window, projectPath)
 
       // Wait for project to load
       await waitForTestId(window, TEST_IDS.PROJECT_TREE, { timeout: 10000 })
 
-      // Open terminal panel using helper (clicks activity bar button)
+      // Open terminal panel using helper (includes waitForPrompt() internally)
       await terminal.open(window)
 
       // Get terminal instance wrapper (third-party component: xterm.js)
       const terminalInstance = byTestId(window, TEST_IDS.TERMINAL_INSTANCE)
       await expect(terminalInstance).toBeVisible({ timeout: 5000 })
 
-      // Wait for terminal to initialize (PTY needs time to start)
-      await window.waitForTimeout(1500)
-
       // Send a command using terminal helper
       await terminal.sendCommand(window, 'echo "E2E Terminal Test"')
 
-      // Wait for command to execute - xterm.js renders to canvas so we can't use toContainText
-      // Instead, verify terminal remains responsive by waiting for a brief period
-      // If the command failed or terminal crashed, the test would timeout earlier
+      // KNOWN_WAIT: xterm.js WebGL renderer doesn't expose text to the DOM,
+      // so toContainText/waitForOutput cannot verify command output.
+      // Wait briefly for command execution, then verify terminal didn't crash.
       await window.waitForTimeout(1000)
 
       // Verify terminal is still visible (didn't crash after command)
@@ -194,7 +191,7 @@ test.describe('Third-Party Components E2E', () => {
       await waitForAppReady(window)
 
       // Open project via UI (clicks button with mocked dialog)
-      await openProject(electronApp, window, projectPath)
+      await openProject(window, projectPath)
 
       // Wait for project tree to be visible
       await waitForTestId(window, TEST_IDS.PROJECT_TREE, { timeout: 10000 })
@@ -202,28 +199,19 @@ test.describe('Third-Party Components E2E', () => {
       // Click on test.md file in project tree to open it
       await clickFileByName(window, 'test.md')
 
-      // Wait for editor and preview to load
-      await window.waitForTimeout(500)
-
-      // Get preview pane (where Mermaid diagrams render)
+      // Wait for preview pane to be visible (condition-based instead of fixed delay)
       const previewPane = byTestId(window, TEST_IDS.EDITOR_PREVIEW)
       await expect(previewPane).toBeVisible({ timeout: 5000 })
 
-      // Wait for Mermaid diagram to render (it's async)
-      await window.waitForTimeout(2000)
-
-      // Find the Mermaid diagram container
-      // The app renders Mermaid diagrams with class 'mermaid-container'
+      // Wait for Mermaid diagram to render by checking for SVG presence
       const diagramContainer = previewPane.locator('.mermaid-container').first()
-      await expect(diagramContainer).toBeVisible({ timeout: 5000 })
+      await expect(diagramContainer).toBeVisible({ timeout: 10000 })
+      await diagramContainer.locator('.mermaid-diagram svg').waitFor({ state: 'visible', timeout: 10000 })
 
       // Hover over diagram to show toolbar
       await diagramContainer.hover()
 
-      // Wait for toolbar to appear (transition delay)
-      await window.waitForTimeout(300)
-
-      // Mermaid toolbar should be visible
+      // Mermaid toolbar should be visible (hoverDiagram already waits for it)
       const mermaidToolbar = byTestId(window, TEST_IDS.MERMAID_TOOLBAR)
       await expect(mermaidToolbar).toBeVisible({ timeout: 3000 })
 
@@ -238,8 +226,8 @@ test.describe('Third-Party Components E2E', () => {
         // Click the direction button
         await directionButton.click()
 
-        // Wait for diagram re-render
-        await window.waitForTimeout(1000)
+        // Wait for diagram re-render by checking for new SVG (condition-based)
+        await diagramContainer.locator('.mermaid-diagram svg').waitFor({ state: 'visible', timeout: 10000 })
 
         // Toolbar should still be visible after clicking direction button
         await expect(mermaidToolbar).toBeVisible()
