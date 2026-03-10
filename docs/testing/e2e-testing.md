@@ -5,7 +5,7 @@
 Erfana supports automated E2E testing using Playwright with Electron. This guide covers setup, configuration, and test patterns.
 
 **Related documentation**:
-- [E2E Selectors](./e2e-selectors.md) - Complete testid catalog (138 testids)
+- [E2E Selectors](./e2e-selectors.md) - Complete testid catalog (211 testids)
 - [E2E Third-Party](./e2e-third-party.md) - Monaco, xterm.js, Mermaid testing
 - [E2E Helpers](./e2e-helpers.md) - Test utilities and patterns
 - [E2E Debugging](./e2e-debugging.md) - Debugging and CI/CD

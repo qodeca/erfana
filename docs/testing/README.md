@@ -251,7 +251,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 - Playwright setup and configuration for Electron
 - Testing patterns for third-party components (Monaco, xterm.js, Mermaid)
-- Complete selector catalog (138 testids) – see [e2e-selectors.md](./e2e-selectors.md)
+- Complete selector catalog (211 testids) – see [e2e-selectors.md](./e2e-selectors.md)
 - Test helper utilities documentation
 - Troubleshooting guide
 

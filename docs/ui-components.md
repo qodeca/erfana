@@ -101,6 +101,11 @@ Integrated terminal with xterm.js + node-pty.
 
 **Tech**: xterm.js v5.5.0, node-pty v1.0.0, WebglAddon, FitAddon, WebLinksAddon
 
+**Modular architecture** (v0.6.5+):
+- `TerminalStatusContent.tsx` – Status state display (checking, unavailable, error, ready)
+- Extracted hooks: `useTerminalDragDrop`, `useScreenshotCapture`, `useTerminalResize`, `useTerminalPortal`
+- `activityBarConfig.ts` owns panel `testId` values (no more parallel mapping in `ActivityBarItem`)
+
 📚 **Full docs**: [Terminal](./terminal/README.md)
 
 ## Context Menu
