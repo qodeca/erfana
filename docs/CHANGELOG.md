@@ -7,6 +7,14 @@ Historical changelog entries for versions prior to current. For the latest chang
 ## Unreleased
 
 ### Added
+- **E2E infrastructure overhaul** – Page Object Model pattern, composed fixtures, condition-based waits (#117)
+  - POM classes in `e2e/pages/`: KeyboardHelper, TerminalPage, MonacoPage, MermaidPage, ProjectTreePage
+  - Composed Playwright fixtures in `e2e/fixtures/index.ts` (worker-scoped userDataDir, test-scoped app/window)
+  - Backward-compatible adapter in `e2e/utils/helpers.ts` – WeakMap-based caching delegates namespace calls to POM instances
+  - Shared locator utilities in `e2e/utils/locators.ts`: `byTestId`, `byDynamicTestId`, `waitForTestId`, `waitForTestIdHidden`
+  - 13 `waitForTimeout` calls replaced: 6 with `waitForPrompt()`, 3 with Playwright auto-waiting, 2 removed (redundant), 1 with `waitForOutput()`, 1 annotated as KNOWN_WAIT
+  - 6 additional `setTimeout` calls annotated as KNOWN_WAIT
+  - Closes #117
 - **Local Whisper transcription** – Added offline transcription via whisper.cpp child process with model selection (tiny/base/small/medium/large), download management with progress, and settings UI integration (#111)
   - New services: WhisperModelManager (binary and model download, storage in userData), LocalWhisperService (local transcription, format conversion, chunking)
   - Extended TranscriptionBackendSchema with `'local'` option

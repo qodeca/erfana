@@ -5,14 +5,17 @@
 Erfana supports automated E2E testing using Playwright with Electron. This guide covers setup, configuration, and test patterns.
 
 **Related documentation**:
-- [E2E Selectors](./e2e-selectors.md) - Complete testid catalog (211 testids)
-- [E2E Third-Party](./e2e-third-party.md) - Monaco, xterm.js, Mermaid testing
-- [E2E Helpers](./e2e-helpers.md) - Test utilities and patterns
-- [E2E Debugging](./e2e-debugging.md) - Debugging and CI/CD
-- [E2E Troubleshooting](./e2e-troubleshooting.md) - Common issues and fixes
-- [E2E Lessons Learned](./e2e-lessons-learned.md) - Hard-won insights
+- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog (211 testids)
+- [E2E Third-Party](./e2e-third-party.md) – Monaco, xterm.js, Mermaid testing
+- [E2E Helpers](./e2e-helpers.md) – Test utilities and patterns (backward-compatible adapter)
+- [E2E Debugging](./e2e-debugging.md) – Debugging and CI/CD
+- [E2E Troubleshooting](./e2e-troubleshooting.md) – Common issues and fixes
+- [E2E Lessons Learned](./e2e-lessons-learned.md) – Hard-won insights
 - Spec #011 (archived) – Specification
-- [Test ID constants](../../src/renderer/src/constants/testids.ts) - Source code
+- Spec #018 – E2E infrastructure overhaul (POM pattern, fixtures, condition-based waits)
+- [Test ID constants](../../src/renderer/src/constants/testids.ts) – Source code
+- [POM classes](../../e2e/pages/) – Page Object Model implementations
+- [Fixtures](../../e2e/fixtures/index.ts) – Composed Playwright fixtures
 
 ---
 
@@ -91,6 +94,85 @@ export default defineConfig({
 | `timeout` | `60000` | Electron apps need longer startup time |
 | `retries` | `1` | Retry flaky tests once |
 | `trace` | `retain-on-failure` | Capture trace on failures for debugging |
+
+---
+
+## Page Object Model (POM) architecture
+
+Erfana E2E tests use a Page Object Model pattern with composed Playwright fixtures.
+
+### POM classes
+
+Located in `e2e/pages/`:
+
+| Class | Purpose |
+|-------|---------|
+| `KeyboardHelper` | Platform-aware keyboard shortcuts (Cmd/Ctrl abstraction) |
+| `TerminalPage` | Terminal interactions – `waitForPrompt()`, `sendCommand()`, `waitForOutput()` |
+| `MonacoPage` | Editor interactions – `waitForReady()`, `focus()`, `setContent()`, `getContent()` |
+| `MermaidPage` | Mermaid diagram interactions |
+| `ProjectTreePage` | Project tree navigation and file operations |
+
+### Composed fixtures
+
+Import `test` from `e2e/fixtures/index.ts` to get POM instances as fixtures:
+
+```typescript
+import { test, expect } from '../fixtures'
+
+test('terminal sends command', async ({ terminalPage }) => {
+  await terminalPage.waitForPrompt()
+  await terminalPage.sendCommand('echo hello')
+  await terminalPage.waitForOutput('hello')
+})
+```
+
+Available fixtures:
+
+| Fixture | Scope | Description |
+|---------|-------|-------------|
+| `userDataDir` | Worker | Isolated Electron user data directory |
+| `app` | Test | Electron application instance |
+| `window` | Test | First window page |
+| `keyboardHelper` | Test | Platform-aware keyboard shortcuts |
+| `terminalPage` | Test | Terminal POM instance |
+| `monacoPage` | Test | Monaco editor POM instance |
+| `mermaidPage` | Test | Mermaid diagram POM instance |
+| `projectTreePage` | Test | Project tree POM instance |
+
+### Backward compatibility
+
+The `e2e/utils/helpers.ts` adapter provides backward compatibility – existing tests using namespace helpers (e.g., `monaco.focus(page)`) continue to work. The adapter uses WeakMap-based caching to delegate calls to POM instances internally.
+
+### Condition-based waits
+
+Prefer condition-based waits over `waitForTimeout`:
+
+| Instead of | Use |
+|------------|-----|
+| `waitForTimeout(1000)` after terminal init | `terminalPage.waitForPrompt()` |
+| `waitForTimeout(500)` after command | `terminalPage.waitForOutput(expected)` |
+| `waitForTimeout(N)` for element | Playwright auto-waiting (`toBeVisible()`, `toBeAttached()`) |
+
+When a timeout is truly necessary (e.g., animation settling), annotate it with `// KNOWN_WAIT: <reason>`.
+
+### Shared locator utilities
+
+Located in `e2e/utils/locators.ts`:
+
+```typescript
+import { byTestId, byDynamicTestId, waitForTestId, waitForTestIdHidden } from '../utils/locators'
+
+// Static testid
+const btn = byTestId(page, 'activity-bar-btn-files')
+
+// Dynamic testid (with path hash)
+const node = byDynamicTestId(page, 'project-tree-node', filePath)
+
+// Wait for visibility
+await waitForTestId(page, 'terminal-instance')
+await waitForTestIdHidden(page, 'dialog-overlay')
+```
 
 ---
 

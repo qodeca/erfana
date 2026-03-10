@@ -55,7 +55,7 @@ test.describe('Directory watcher pipeline', () => {
       await waitForAppReady(window)
 
       // Open project via IPC API (bypasses native dialog)
-      await openProject(electronApp, window, projectPath)
+      await openProject(window, projectPath)
 
       // Wait for project tree to show the seed file – confirms watchers are active
       await expect(

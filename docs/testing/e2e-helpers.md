@@ -2,10 +2,14 @@
 
 Reusable test utilities and patterns for Playwright E2E tests.
 
+> **Note**: As of #117, the preferred approach is to use POM classes via composed fixtures (see [E2E Testing Guide – POM architecture](./e2e-testing.md#page-object-model-pom-architecture)). The helpers below remain available as a backward-compatible adapter – they delegate to POM instances internally via WeakMap-based caching.
+
 **Related documentation**:
-- [E2E Testing Guide](./e2e-testing.md) - Main E2E documentation
-- [E2E Selectors](./e2e-selectors.md) - Complete testid catalog
-- [Test helpers source](../../e2e/utils/helpers.ts) - Implementation
+- [E2E Testing Guide](./e2e-testing.md) – Main E2E documentation (includes POM architecture)
+- [E2E Selectors](./e2e-selectors.md) – Complete testid catalog
+- [Test helpers source](../../e2e/utils/helpers.ts) – Implementation (backward-compatible adapter)
+- [POM classes](../../e2e/pages/) – Page Object Model implementations
+- [Shared locators](../../e2e/utils/locators.ts) – `byTestId`, `byDynamicTestId`, `waitForTestId`, `waitForTestIdHidden`
 
 ---
 
