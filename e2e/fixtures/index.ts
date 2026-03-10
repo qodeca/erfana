@@ -43,6 +43,15 @@ type TestFixtures = {
   window: Page
   appWithProject: ElectronApplication
   windowWithProject: Page
+  // Test project fixtures
+  testProjectFiles: Record<string, string>
+  testProject: { path: string }
+  projectSettings: Record<string, unknown> | undefined
+  withSettings: void
+  openFilePath: string | undefined
+  appWithTestProject: ElectronApplication
+  windowWithTestProject: Page
+  withOpenFile: MonacoPage | undefined
   // POM fixtures
   keyboardHelper: KeyboardHelper
   terminalPage: TerminalPage
@@ -84,7 +93,11 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 
     // KNOWN_WAIT: electron-log flush before close (teardown path, not assertion)
     await new Promise((resolve) => setTimeout(resolve, 100))
-    await app.close()
+    try {
+      await app.close()
+    } catch {
+      // App may already be closed (e.g. crash during test)
+    }
   },
 
   // Test-scoped: main window
@@ -110,7 +123,11 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 
     // KNOWN_WAIT: electron-log flush before close (teardown path, not assertion)
     await new Promise((resolve) => setTimeout(resolve, 100))
-    await app.close()
+    try {
+      await app.close()
+    } catch {
+      // App may already be closed (e.g. crash during test)
+    }
   },
 
   // Test-scoped: window with project loaded
@@ -122,6 +139,139 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 
     await use(window)
   },
+
+  // --- Test project fixtures ---
+
+  // Option: seed files for testProject (override with test.use())
+  testProjectFiles: [{}, { option: true }],
+
+  // Test-scoped: isolated project directory with seed files
+  testProject: async ({ testProjectFiles }, use) => {
+    const e2eTempDir = path.join(__dirname, '..', '..', '.e2e-temp')
+    await fs.promises.mkdir(e2eTempDir, { recursive: true })
+
+    const projectPath = await fs.promises.mkdtemp(path.join(e2eTempDir, 'test-'))
+    const files =
+      Object.keys(testProjectFiles).length > 0
+        ? testProjectFiles
+        : { 'test.md': '# Test Document\n\nTest content.\n' }
+
+    for (const [name, content] of Object.entries(files)) {
+      const filePath = path.join(projectPath, name)
+      const resolved = path.resolve(filePath)
+      if (!resolved.startsWith(path.resolve(projectPath) + path.sep)) {
+        throw new Error(`testProjectFiles key "${name}" escapes project directory`)
+      }
+      await fs.promises.mkdir(path.dirname(filePath), { recursive: true })
+      await fs.promises.writeFile(filePath, content, 'utf-8')
+    }
+
+    await use({ path: projectPath })
+
+    try {
+      await fs.promises.rm(projectPath, { recursive: true, force: true })
+    } catch {
+      // Ignore cleanup errors – must not mask test failures
+    }
+  },
+
+  // Option: project settings to write (override with test.use())
+  projectSettings: [undefined, { option: true }],
+
+  // Test-scoped: writes .erfana/settings.json to testProject before use.
+  // Note: restore logic is defensive – testProject always creates a fresh dir,
+  // so pre-existing settings won't exist. Kept for future decoupling from testProject.
+  withSettings: async ({ testProject, projectSettings }, use) => {
+    const settingsDir = path.join(testProject.path, '.erfana')
+    const settingsFile = path.join(settingsDir, 'settings.json')
+
+    let originalContent: string | undefined
+    let settingsExisted = false
+
+    if (projectSettings !== undefined) {
+      try {
+        originalContent = await fs.promises.readFile(settingsFile, 'utf-8')
+        settingsExisted = true
+      } catch {
+        // File does not exist – will be created fresh
+      }
+
+      await fs.promises.mkdir(settingsDir, { recursive: true })
+      await fs.promises.writeFile(
+        settingsFile,
+        JSON.stringify(projectSettings, null, 2),
+        'utf-8'
+      )
+    }
+
+    await use()
+
+    // Teardown: restore or remove settings file
+    if (projectSettings !== undefined) {
+      try {
+        if (settingsExisted && originalContent !== undefined) {
+          await fs.promises.writeFile(settingsFile, originalContent, 'utf-8')
+        } else {
+          await fs.promises.rm(settingsFile, { force: true })
+        }
+      } catch {
+        // Ignore cleanup errors – must not mask test failures
+      }
+    }
+  },
+
+  // Option: file path to open in editor (override with test.use())
+  openFilePath: [undefined, { option: true }],
+
+  // Test-scoped: app launched with testProject path
+  appWithTestProject: async ({ userDataDir, testProject }, use) => {
+    const app = await electron.launch({
+      args: [PROJECT_ROOT, testProject.path, `--user-data-dir=${userDataDir}`],
+      env: {
+        ...process.env,
+        NODE_ENV: 'development'
+      }
+    })
+
+    await use(app)
+
+    // KNOWN_WAIT: electron-log flush before close (teardown path, not assertion)
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    try {
+      await app.close()
+    } catch {
+      // App may already be closed (e.g. crash during test)
+    }
+  },
+
+  // Test-scoped: window from appWithTestProject
+  windowWithTestProject: async ({ appWithTestProject }, use) => {
+    const window = await appWithTestProject.firstWindow()
+    await window.waitForLoadState('domcontentloaded')
+    await byTestId(window, TEST_IDS.ACTIVITY_BAR).waitFor({ state: 'visible', timeout: 10000 })
+    await byTestId(window, TEST_IDS.PROJECT_TREE).waitFor({ state: 'visible', timeout: 15000 })
+
+    await use(window)
+  },
+
+  // Test-scoped: opens a file in the editor and provides MonacoPage
+  withOpenFile: async ({ windowWithTestProject, openFilePath }, use) => {
+    if (openFilePath === undefined) {
+      await use(undefined)
+      return
+    }
+
+    const keyboard = new KeyboardHelper(windowWithTestProject)
+    const projectTree = new ProjectTreePage(windowWithTestProject)
+    const monaco = new MonacoPage(windowWithTestProject, keyboard)
+
+    await projectTree.clickFileByName(path.basename(openFilePath))
+    await monaco.waitForReady()
+
+    await use(monaco)
+  },
+
+  // --- POM fixtures ---
 
   // POM fixtures – bound to `window` (no-project window).
   // Tests using `windowWithProject` should instantiate POMs directly:

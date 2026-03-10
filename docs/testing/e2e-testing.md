@@ -15,7 +15,8 @@ Erfana supports automated E2E testing using Playwright with Electron. This guide
 - Spec #018 – E2E infrastructure overhaul (POM pattern, fixtures, condition-based waits)
 - [Test ID constants](../../src/renderer/src/constants/testids.ts) – Source code
 - [POM classes](../../e2e/pages/) – Page Object Model implementations
-- [Fixtures](../../e2e/fixtures/index.ts) – Composed Playwright fixtures
+- [Fixtures](../../e2e/fixtures/index.ts) – Composed Playwright fixtures (POM, project, settings, open-file)
+- [Wait helpers](../../e2e/utils/wait-helpers.ts) – Race-safe IPC wait utilities
 
 ---
 
@@ -139,6 +140,52 @@ Available fixtures:
 | `monacoPage` | Test | Monaco editor POM instance |
 | `mermaidPage` | Test | Mermaid diagram POM instance |
 | `projectTreePage` | Test | Project tree POM instance |
+
+### Project and setup fixtures
+
+Additional fixtures for tests that need a project directory, settings, or an open file:
+
+| Fixture | Scope | Description |
+|---------|-------|-------------|
+| `testProject` | Test | Creates an isolated temp directory with configurable seed files; auto-cleanup on teardown |
+| `withSettings` | Test | Writes `.erfana/settings.json` into the project; restores on teardown |
+| `withOpenFile` | Test | Opens a file in the editor, waits for Monaco readiness, provides a `MonacoPage` |
+| `appWithTestProject` | Test | Launches Electron with the `testProject` path as argument |
+| `windowWithTestProject` | Test | First window page from `appWithTestProject` |
+
+Configure via option fixtures with `test.use()`:
+
+```typescript
+import { test, expect } from '../fixtures'
+
+test.use({
+  testProjectFiles: { 'notes.md': '# Notes\n\nSeed content.' },
+  openFilePath: 'notes.md'
+})
+
+test('editor opens seed file', async ({ withOpenFile }) => {
+  const content = await withOpenFile!.getContent()
+  expect(content).toContain('Seed content')
+})
+```
+
+### Wait helpers
+
+Located in `e2e/utils/wait-helpers.ts`:
+
+| Helper | Purpose |
+|--------|---------|
+| `waitForIpcComplete` | Race-safe IPC wait – uses `Promise.all` to observe a UI state change triggered by an async operation |
+
+```typescript
+import { waitForIpcComplete } from '../utils/wait-helpers'
+
+await waitForIpcComplete({
+  locator: byTestId(page, 'title-bar'),
+  expectedState: 'visible',
+  trigger: () => keyboard.save()
+})
+```
 
 ### Backward compatibility
 
