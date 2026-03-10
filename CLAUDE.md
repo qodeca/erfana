@@ -98,8 +98,8 @@ Feature specifications live in `specs/`. Check registry before implementing new 
 | 009 | Media import with transcription | T4 | archived | `specs/archived/spec-t4-009-media-import-transcription` |
 | 013 | Multi-CLI tool prompt optimization | T3 | draft | `specs/spec-t3-013-multi-cli-tool-prompt-optimization` |
 | 016 | Project Tree refresh specification | T3 | archived | `specs/archived/spec-t3-016-project-tree-refresh` |
-| 017 | Test ID coverage and accessibility selectors | T2 | draft | `specs/spec-t2-017-test-id-accessibility` |
-| 018 | E2E infrastructure overhaul | T3 | draft | `specs/spec-t3-018-e2e-infrastructure` |
+| 017 | Test ID coverage and accessibility selectors | T2 | archived | `specs/archived/spec-t2-017-test-id-accessibility` |
+| 018 | E2E infrastructure overhaul | T3 | archived | `specs/archived/spec-t3-018-e2e-infrastructure` |
 | 019 | Visual regression and CI resilience | T2 | draft | `specs/spec-t2-019-visual-regression-ci` |
 
 **Registry**: `specs/registry.json`
