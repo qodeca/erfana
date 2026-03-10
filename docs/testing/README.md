@@ -260,13 +260,14 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 - `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
 - `directory-watcher.e2e.ts` – Directory watcher pipeline (#104): verifies file creation via terminal appears in Project Tree within latency budget
 - `audio-transcription.e2e.ts` – Full audio import transcription lifecycle (real OpenAI API, requires `OPENAI_API_KEY`, skips if not set)
+- `fixture-smoke.e2e.ts` – Smoke tests for composed fixtures (testProject, withSettings, withOpenFile, appWithTestProject)
 
-**Shared helpers** (`e2e/utils/helpers.ts`):
-- `createTestProject(seedFiles?)` – Creates temp project directory with optional seed files, returns `{ projectPath, cleanup }`
-- `createTempUserDataDir(prefix)` – Creates isolated Electron user data directory, returns `{ userDataDir, cleanup }`
-- `waitForAppReady`, `openProject`, `closeApp` – App lifecycle helpers
-- `byTestId`, `waitForTestId`, `waitForTestIdHidden` – Element location helpers
-- See [E2E Helpers](./e2e-helpers.md) for full reference
+**Shared utilities**:
+- POM classes in `e2e/pages/` – see [e2e-testing.md](./e2e-testing.md#pom-classes)
+- Composed fixtures in `e2e/fixtures/index.ts` – see [e2e-testing.md](./e2e-testing.md#composed-fixtures)
+- Locators in `e2e/utils/locators.ts`: `byTestId`, `byDynamicTestId`, `waitForTestId`, `waitForTestIdHidden`
+- Wait helpers in `e2e/utils/wait-helpers.ts`: `waitForIpcComplete`
+- Backward-compatible adapter in `e2e/utils/helpers.ts` – see [E2E Helpers](./e2e-helpers.md)
 
 See Spec #011 (archived) for the specification.
 

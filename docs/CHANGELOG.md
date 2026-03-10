@@ -15,6 +15,21 @@ Historical changelog entries for versions prior to current. For the latest chang
   - 13 `waitForTimeout` calls replaced: 6 with `waitForPrompt()`, 3 with Playwright auto-waiting, 2 removed (redundant), 1 with `waitForOutput()`, 1 annotated as KNOWN_WAIT
   - 6 additional `setTimeout` calls annotated as KNOWN_WAIT
   - Closes #117
+- **E2E project fixtures and wait helpers** – testProject, withSettings, withOpenFile fixtures + waitForIpcComplete (#120)
+  - `testProject` – isolated temp directory with configurable seed files and auto-cleanup
+  - `withSettings` – writes `.erfana/settings.json` into testProject
+  - `withOpenFile` – opens file in editor, waits for Monaco readiness, provides MonacoPage
+  - `appWithTestProject` / `windowWithTestProject` – launch Electron with testProject path
+  - `waitForIpcComplete` – race-safe IPC wait helper using Promise.all pattern
+  - Fixture smoke tests in `e2e/fixture-smoke.e2e.ts`
+  - Closes #120
+- **E2E fixture review findings** – DRY refactoring, validation fixes, documentation (#120 follow-up)
+  - Extracted `launchApp()` and `getReadyWindow()` helpers (3 fixtures each → single function)
+  - Path traversal validation: `startsWith()` → `path.relative()` for cross-platform robustness
+  - Simplified `withSettings` – removed dead restore code (testProject owns cleanup)
+  - Added `openFilePath` validation against effective file set in `withOpenFile`
+  - Fixture dependency graph and selection guide in `e2e-testing.md`
+  - JSDoc documentation for fixture types and `waitForIpcComplete` limitations
 - **Local Whisper transcription** – Added offline transcription via whisper.cpp child process with model selection (tiny/base/small/medium/large), download management with progress, and settings UI integration (#111)
   - New services: WhisperModelManager (binary and model download, storage in userData), LocalWhisperService (local transcription, format conversion, chunking)
   - Extended TranscriptionBackendSchema with `'local'` option
@@ -445,108 +460,23 @@ Historical changelog entries for versions prior to current. For the latest chang
   - **Total: 2684 tests passing** (94 test files)
   - Closes #34
 
-## Changes in v0.5.2
-- **Mermaid Diagram Layout Direction Buttons** (Nov 28, 2025):
-  - Layout direction controls in diagram hover toolbar
-  - 7 Mermaid diagram types supported
-  - Prompt template with diagram context
-  - 151 new tests
-  - Closes #32
+## v0.5.0–v0.5.2
+- Mermaid diagram layout direction buttons, 7 diagram types (#32) (v0.5.2)
+- Mermaid theming with dark/light mode (#33), zoom pixelation fix (#31), full-screen viewer (#30) (v0.5.1)
+- Smart terminal file links with line:column support, FilePickerDialog (#26) (v0.5.0)
 
-## Changes in v0.5.1
-- **Mermaid Diagram Theming with Dark/Light Mode** (Nov 28, 2025):
-  - System preference detection
-  - Theme registry pattern
-  - 43 new tests
-  - Closes #33
-- **Fix: DiagramViewer Zoom Pixelation** (Nov 28, 2025):
-  - Scale SVG width/height directly (no CSS transform)
-  - 51 new tests
-  - Closes #31
-- **Full-Screen Mermaid Diagram Viewer** (Nov 27, 2025):
-  - Expand diagrams to full-screen overlay
-  - Zoom, pan, fit-to-screen controls
-  - Keyboard shortcuts: +, -, 0, F, Escape
-  - Accessibility: ARIA labels, focus management
-  - 168 tests
-  - Closes #30
+## v0.4.5–v0.4.7
+- Terminal clipboard support: copy/paste, smart Ctrl/Cmd+C (#28) (v0.4.7)
+- VS Code-inspired watcher performance: EventCoalescer, ThrottledWorker, AtomicSaveDetector (v0.4.6)
+- File watcher selective blacklist, unified import system with strategy pattern (#21) (v0.4.5)
 
-## Changes in v0.5.0 (was v0.4.8)
-- **Smart Terminal File Links** (Nov 27, 2025):
-  - Clickable file paths with line:column support
-  - Smart resolution with filename fallback
-  - FilePickerDialog for disambiguation
-  - Paths with spaces support (VS Code-style)
-  - 157 new tests
-  - Closes #26
+## v0.4.2–v0.4.4
+- PDF import with AI-assisted organization (#19), organize-import prompt enhancements (#20) (v0.4.4)
+- Terminal scroll auto-recovery with three-signal correlation (#12) (v0.4.3)
+- Chrome-style dynamic tabs, ContextMenu disabled state, implementing-issues skill (v0.4.2)
 
-## Changes in v0.4.7
-- **Terminal Clipboard Support** (Nov 27, 2025):
-  - Copy/paste via keyboard shortcuts and context menu
-  - Smart Ctrl/Cmd+C (copy when selected, SIGINT when not)
-  - Platform-specific shortcuts
-  - 103 new tests
-  - Closes #28
-
-## Changes in v0.4.6
-- **VS Code-Inspired Watcher Performance** (Nov 25, 2025):
-  - EventCoalescer, ThrottledWorker, AtomicSaveDetector, WatcherMetrics
-  - 57 new tests
-
-## Changes in v0.4.5
-- **File Watcher Selective Blacklist** (Nov 23, 2025):
-  - VS Code-style function-based ignore
-  - Watches: `.claude/`, `.github/`, `.vscode/`
-  - Ignores: `node_modules/`, `.venv/`, `.git/objects/`
-  - Closes #21
-- **Unified Import System with Strategy Pattern** (Nov 23, 2025):
-  - Strategy, Registry, Factory patterns
-  - PDF and text file support
-  - 296 new tests
-  - **Total: 1923 tests passing** (80 test files)
-
-## Changes in v0.4.4
-- **PDF Import with AI-Assisted Organization** (Nov 22, 2025):
-  - PDF to Markdown conversion (@opendocsg/pdf2md)
-  - Output to `{project}/import/` directory
-  - AI prompt auto-executes
-  - Error handling: encrypted, empty, corrupted, large files
-  - Closes #19
-- **Organize-Import Prompt Enhancements** (Nov 22, 2025):
-  - 7-step workflow
-  - 3-5 file name suggestions
-  - 2-3 location suggestions
-  - Cleanup option
-  - Closes #20
-
-## Changes in v0.4.3
-- **Terminal Scroll Auto-Recovery** (Nov 22, 2025):
-  - Automatic detection/recovery from Claude Code Ink scroll anomalies
-  - Three-signal correlation
-  - Pure logic extraction pattern
-  - 44 new tests
-  - Closes #12
-
-## Changes in v0.4.2
-- **Chrome-style Dynamic Tabs** (Nov 22, 2025):
-  - Dynamic sizing (min 80px, max 300px)
-  - Dirty indicator, close button, middle-click
-  - Context menu: Close, Close Others, Close All
-  - 62 new tests
-- **ContextMenu Disabled State** (Nov 22, 2025):
-  - Added `disabled` property to ContextMenuItem
-- **implementing-issues skill** (Nov 22, 2025):
-  - 11-phase workflow
-  - 3 complexity tiers
-  - Located in `.claude/skills/implementing-issues/`
-
-## Changes in v0.4.0-0.4.1
-- **ProjectManagementContext Singleton** (Nov 22, 2025):
-  - Fixed duplicate toast issue
-  - ISP-compliant hooks
-- **Claude Code Skills** (Nov 22, 2025):
-  - Added `managing-skills` and `creating-issues` skills
-  - Located in `.claude/skills/`
+## v0.4.0–v0.4.1
+- ProjectManagementContext singleton, Claude Code skills (v0.4.0–v0.4.1)
 
 ## v0.3.0–v0.3.9
 - Terminal bootstrap, scroll fix, WebGL flicker fix, AutoExecute race condition fix (v0.3.0–v0.3.3)

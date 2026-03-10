@@ -148,7 +148,7 @@ Additional fixtures for tests that need a project directory, settings, or an ope
 | Fixture | Scope | Description |
 |---------|-------|-------------|
 | `testProject` | Test | Creates an isolated temp directory with configurable seed files; auto-cleanup on teardown |
-| `withSettings` | Test | Writes `.erfana/settings.json` into the project; restores on teardown |
+| `withSettings` | Test | Writes `.erfana/settings.json` into the project (no teardown – testProject owns cleanup) |
 | `withOpenFile` | Test | Opens a file in the editor, waits for Monaco readiness, provides a `MonacoPage` |
 | `appWithTestProject` | Test | Launches Electron with the `testProject` path as argument |
 | `windowWithTestProject` | Test | First window page from `appWithTestProject` |
@@ -190,6 +190,30 @@ await waitForIpcComplete({
 ### Backward compatibility
 
 The `e2e/utils/helpers.ts` adapter provides backward compatibility – existing tests using namespace helpers (e.g., `monaco.focus(page)`) continue to work. The adapter uses WeakMap-based caching to delegate calls to POM instances internally.
+
+### Fixture dependency graph
+
+```
+Worker: userDataDir
+Test:   app → window → POM fixtures (keyboardHelper, terminalPage, monacoPage, ...)
+        appWithProject → windowWithProject
+        testProject → appWithTestProject → windowWithTestProject
+                    → withSettings (side effect)
+                                           → withOpenFile (provides MonacoPage)
+```
+
+### Fixture selection guide
+
+| Scenario | Fixtures to use |
+|----------|----------------|
+| Basic app launch, no project | `app`, `window`, POM fixtures |
+| Existing project directory | `appWithProject`, `windowWithProject` |
+| Isolated temp project (default seed) | `testProject`, `appWithTestProject`, `windowWithTestProject` |
+| Custom seed files | `test.use({ testProjectFiles: { ... } })` + above |
+| Project settings | `test.use({ projectSettings: { ... } })` + `withSettings` |
+| Open a file in editor | `test.use({ openFilePath: 'file.md' })` + `withOpenFile` |
+
+> **Note**: `withOpenFile` uses `clickFileByName` (basename match). This works for flat projects with unique filenames. For nested projects with duplicate basenames, instantiate `ProjectTreePage` and use `clickFileInTree()` directly.
 
 ### Condition-based waits
 

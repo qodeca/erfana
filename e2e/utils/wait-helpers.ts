@@ -13,6 +13,10 @@ import { Locator } from '@playwright/test'
  * Uses Promise.all pattern to prevent race conditions – the wait starts
  * BEFORE the trigger executes, so fast completions are caught.
  *
+ * **Limitation**: Does not handle state transitions (e.g., visible → hidden → visible).
+ * If the locator is already in `expectedState` before the trigger fires, the wait
+ * resolves immediately. A future `waitForStateTransition` variant could address this.
+ *
  * @example
  * ```typescript
  * // Wait for file save (title bar loses modified indicator)
