@@ -12,7 +12,7 @@ Erfana supports automated E2E testing using Playwright with Electron. This guide
 - [E2E Troubleshooting](./e2e-troubleshooting.md) – Common issues and fixes
 - [E2E Lessons Learned](./e2e-lessons-learned.md) – Hard-won insights
 - Spec #011 (archived) – Specification
-- Spec #018 – E2E infrastructure overhaul (POM pattern, fixtures, condition-based waits)
+- Spec #018 (archived) – E2E infrastructure overhaul (POM pattern, fixtures, condition-based waits)
 - [Test ID constants](../../src/renderer/src/constants/testids.ts) – Source code
 - [POM classes](../../e2e/pages/) – Page Object Model implementations
 - [Fixtures](../../e2e/fixtures/index.ts) – Composed Playwright fixtures (POM, project, settings, open-file)
