@@ -41,6 +41,7 @@ test-results/
 
 # E2E test temp projects
 .e2e-temp/
+playwright-report/
 
 # Environment variables (API keys)
 .env
