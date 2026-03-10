@@ -4,7 +4,7 @@ Historical changelog entries for versions prior to current. For the latest chang
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
-## Unreleased
+## 0.8.0-beta
 
 ### Added
 - **E2E infrastructure overhaul** – Page Object Model pattern, composed fixtures, condition-based waits (#117)
@@ -21,7 +21,7 @@ Historical changelog entries for versions prior to current. For the latest chang
   - `withOpenFile` – opens file in editor, waits for Monaco readiness, provides MonacoPage
   - `appWithTestProject` / `windowWithTestProject` – launch Electron with testProject path
   - `waitForIpcComplete` – race-safe IPC wait helper using Promise.all pattern
-  - Fixture smoke tests in `e2e/fixture-smoke.e2e.ts`
+  - Fixture smoke tests in `e2e/fixture-smoke.e2e.ts` (one failing test removed in 823fc70; 5 tests remain active)
   - Closes #120
 - **E2E fixture review findings** – DRY refactoring, validation fixes, documentation (#120 follow-up)
   - Extracted `launchApp()` and `getReadyWindow()` helpers (3 fixtures each → single function)

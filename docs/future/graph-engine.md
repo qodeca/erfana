@@ -48,7 +48,7 @@ The Erfana Graph Engine solves common documentation challenges:
 ## Quick Start
 
 ### For Users (Want to use the graph engine)
-1. **Read**: [User Guide](./graph-engine/user-guide.md) - Learn workflows and features
+1. **Read**: [User Guide](./graph-engine/user-guide-features.md) - Learn workflows and features
 2. **Wait for M1**: Graph engine will auto-index `.md` files on project open
 3. **Try Features**:
    - Edit file → See Related Sidebar update
@@ -57,13 +57,13 @@ The Erfana Graph Engine solves common documentation challenges:
    - Terminal → Use Claude Code with `erfana_graph_search` tool
 
 ### For Developers (Want to implement the graph engine)
-1. **Read**: [Architecture](./graph-engine/architecture.md) - Understand system design
-2. **Read**: [Data Ingestion](./graph-engine/data-ingestion.md) - Learn how files are indexed
+1. **Read**: [Architecture](./graph-engine/architecture-overview.md) - Understand system design
+2. **Read**: [Data Ingestion](./graph-engine/data-ingestion-discovery.md) - Learn how files are indexed
 3. **Follow**: [Implementation Guide](./graph-engine/implementation-guide.md) - Step-by-step M1-M5 milestones
-4. **Test**: [Production Readiness](./graph-engine/production-readiness.md) - Pre-deployment checklist
+4. **Test**: [Production Readiness](./graph-engine/production-readiness-checklist.md) - Pre-deployment checklist
 
 ### For Claude Code (Want to understand integration)
-1. **Read**: [MCP Server](./graph-engine/mcp-server.md) - Complete integration guide
+1. **Read**: [MCP Server](./graph-engine/mcp-server-tools.md) - Complete integration guide
 2. **Tools Available**:
    - `erfana_graph_search` - Hybrid search across docs
    - `erfana_graph_related` - Find related sections
@@ -77,19 +77,19 @@ The Erfana Graph Engine solves common documentation challenges:
 
 ### Getting Started (NEW)
 
-1. **[User Guide](./graph-engine/user-guide.md)** 👤 FOR USERS
+1. **[User Guide](./graph-engine/user-guide-features.md)** 👤 FOR USERS
    - What the graph engine does and why it's valuable
    - User workflows with examples
    - UI components (Related Sidebar, Global Search, Knowledge Panel)
    - Claude Code integration from user perspective
 
-2. **[Data Ingestion](./graph-engine/data-ingestion.md)** 📥 HOW FILES ARE INDEXED
+2. **[Data Ingestion](./graph-engine/data-ingestion-discovery.md)** 📥 HOW FILES ARE INDEXED
    - Project initialization flow (auto-index on open)
    - Event-driven architecture (FileWatcherService integration)
    - Incremental updates and content deduplication
    - Progress reporting and error handling
 
-3. **[MCP Server](./graph-engine/mcp-server.md)** 🤖 CLAUDE CODE INTEGRATION
+3. **[MCP Server](./graph-engine/mcp-server-tools.md)** 🤖 CLAUDE CODE INTEGRATION
    - MCP architecture and protocol
    - 5 MCP tools exposed to Claude Code
    - Server implementation and client usage
@@ -97,7 +97,7 @@ The Erfana Graph Engine solves common documentation challenges:
 
 ### Core Documentation
 
-4. **[Architecture](./graph-engine/architecture.md)** ⭐ START HERE
+4. **[Architecture](./graph-engine/architecture-overview.md)** ⭐ START HERE
    - System design and component interactions
    - ERFANA services integration (event-driven)
    - MCP layer and Claude Code flow
@@ -108,22 +108,22 @@ The Erfana Graph Engine solves common documentation challenges:
    - Temporal graph patterns (`valid_from`, `valid_to`, `tx_time`)
    - Entity-relationship design
 
-6. **[Vector Search (sqlite-vec)](./graph-engine/vector-search.md)** 🔄 UPDATED
+6. **[Vector Search (sqlite-vec)](./graph-engine/vector-search-overview.md)** 🔄 UPDATED
    - Why sqlite-vec over sqlite-vss (deprecation status)
    - Performance characteristics and scale limits
    - Binary quantization strategy
 
-7. **[Embedding Pipeline](./graph-engine/embedding-pipeline.md)**
+7. **[Embedding Pipeline](./graph-engine/embedding-pipeline-overview.md)**
    - ONNX Runtime integration with Electron
    - Worker thread strategy and stability concerns
    - Chunking and tokenization best practices
 
-8. **[Hybrid Search & Ranking](./graph-engine/hybrid-search.md)**
+8. **[Hybrid Search & Ranking](./graph-engine/hybrid-search-fundamentals.md)**
    - BM25 + vector similarity fusion
    - Configurable weight tuning
    - Graph-aware boosts
 
-9. **[Graph Capabilities](./graph-engine/graph-capabilities.md)**
+9. **[Graph Capabilities](./graph-engine/graph-capabilities-entities.md)**
    - Entity extraction and linking
    - Temporal queries and change timelines
    - Graphology integration patterns
@@ -146,7 +146,7 @@ The Erfana Graph Engine solves common documentation challenges:
     - Electron-vite setup
     - Platform-specific builds
 
-13. **[Production Readiness](./graph-engine/production-readiness.md)** ✅ CHECKLIST
+13. **[Production Readiness](./graph-engine/production-readiness-checklist.md)** ✅ CHECKLIST
     - Pre-deployment validation
     - Known limitations and workarounds
     - Monitoring and observability
@@ -236,7 +236,7 @@ The Erfana Graph Engine is designed to provide:
 3. **Scale Limits**: Document realistic performance (100K optimal, >500K requires ANN)
 4. **better-sqlite3 Packaging**: Requires careful electron-vite configuration
 
-See **[Production Readiness](./graph-engine/production-readiness.md)** for detailed mitigation strategies.
+See **[Production Readiness](./graph-engine/production-readiness-operations.md)** for detailed mitigation strategies.
 
 ---
 
@@ -401,10 +401,10 @@ When switching embedding models:
 
 ## Next Steps for Implementation
 
-1. **Read [Architecture](./graph-engine/architecture.md)** to understand system design
+1. **Read [Architecture](./graph-engine/architecture-overview.md)** to understand system design
 2. **Review [Data Model](./graph-engine/data-model.md)** for schema details
 3. **Follow [Implementation Guide](./graph-engine/implementation-guide.md)** for M1-M5 milestones
-4. **Check [Production Readiness](./graph-engine/production-readiness.md)** before deployment
+4. **Check [Production Readiness](./graph-engine/production-readiness-checklist.md)** before deployment
 
 ---
 
