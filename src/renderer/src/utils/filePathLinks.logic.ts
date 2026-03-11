@@ -80,6 +80,11 @@ const COMMON_EXTENSIONS =
   'ts|tsx|js|jsx|json|md|txt|py|rb|go|rs|java|c|cpp|h|hpp|css|scss|html|xml|yaml|yml|toml|sh|bash|zsh|sql|graphql|vue|svelte|astro|pdf|png|jpg|jpeg|gif|svg|ico|webp|mp3|mp4|wav|avi|mov|zip|tar|gz|rar|doc|docx|xls|xlsx|ppt|pptx|csv|log|env|lock|config|conf|ini|properties|gradle|kt|swift|m|mm|scala|clj|ex|exs|erl|hs|lua|pl|php|r|jl|nim|zig|v|d|ada|f90|f95|cob|asm|s|vhd|vhdl|sv|tcl|ps1|bat|cmd|exe|dll|so|dylib|bin|app|dmg|pkg|deb|rpm';
 
 /**
+ * Set of common file extensions for O(1) lookup in domain detection.
+ */
+const COMMON_EXTENSIONS_SET = new Set(COMMON_EXTENSIONS.split('|'));
+
+/**
  * Interface for fallback matchers that detect paths with spaces.
  * VS Code uses this approach for known output formats where path boundaries are clear.
  */
@@ -297,11 +302,16 @@ const COMMON_TLDS = [
  * @returns True if text looks like a domain name
  */
 function looksLikeDomain(text: string): boolean {
-  // Check if it ends with a common TLD
+  // Paths containing directory separators are clearly not domains
+  if (text.includes('/') || text.includes('\\')) return false;
+
   const parts = text.split('.');
   if (parts.length < 2) return false;
 
   const lastPart = parts[parts.length - 1].toLowerCase();
+  // Known file extensions take precedence over TLD matching
+  if (COMMON_EXTENSIONS_SET.has(lastPart)) return false;
+
   return COMMON_TLDS.includes(lastPart);
 }
 
@@ -379,7 +389,7 @@ export function detectFilePaths(line: string): FilePathMatch[] {
 
   // SECOND: Detect quoted paths (can contain spaces)
   // Matches: "path/to file.ext" or 'path/to file.ext'
-  const quotedPathPattern = /(['"])(\/[^'"]+\.[a-zA-Z0-9]{1,10}(?::\d{1,6}(?::\d{1,6})?)?)\1/g;
+  const quotedPathPattern = /(['"])((?:\.{0,2}\/|[a-zA-Z0-9_@])[^'"]{1,512}\.[a-zA-Z0-9]{1,10}(?::\d{1,6}(?::\d{1,6})?)?)\1/g;
   let quotedMatch: RegExpExecArray | null;
   while ((quotedMatch = quotedPathPattern.exec(cleanLine)) !== null) {
     const fullMatch = quotedMatch[2]; // Path without quotes
@@ -439,8 +449,8 @@ export function detectFilePaths(line: string): FilePathMatch[] {
       (MAX_PATH_LENGTH - 3) +
       '}' +
       '|' +
-      // 4. Project-relative: src/path/to/file.ext
-      '[a-zA-Z0-9_-]+(?:/[^\\s:()\\[\\]{}"\',;<>|*?\\x00-\\x1f]{1,' +
+      // 4. Project-relative: src/path/to/file.ext, .github/workflows/ci.yml, @types/node/index.d.ts
+      '[a-zA-Z0-9_.@-]{1,' + MAX_FILENAME_LENGTH + '}(?:/[^\\s:()\\[\\]{}"\',;<>|*?\\x00-\\x1f]{1,' +
       MAX_FILENAME_LENGTH +
       '})+' +
       '|' +
@@ -460,13 +470,15 @@ export function detectFilePaths(line: string): FilePathMatch[] {
       ')?' +
       ')' +
       // End boundary
-      '(?=\\s|[\\)\\]}"\']|$)',
+      '(?=\\s|[\\)\\]}"\',;>|]|:(?!\\d)|$)',
     'g'
   );
 
   let match: RegExpExecArray | null;
   while ((match = pathPattern.exec(cleanLine)) !== null) {
-    const fullMatch = match[1];
+    // Strip trailing dots – sentence punctuation like "Saved to src/file.ts."
+    // Period is valid mid-path (file.test.ts) but trailing dots break extension detection.
+    const fullMatch = match[1].replace(/\.+$/, '');
 
     // Skip if it looks like a URL, email, or domain name
     if (looksLikeUrl(fullMatch) || looksLikeEmail(fullMatch) || looksLikeDomain(fullMatch)) {
@@ -491,8 +503,9 @@ export function detectFilePaths(line: string): FilePathMatch[] {
     const { path, line, column } = parseLineColumn(fullMatch);
 
     // Calculate actual indices in the original line (with ANSI codes)
-    // This is a simplified approach - for precise mapping we'd need to track ANSI codes
-    const startIndex = match.index;
+    // match.index points to the boundary char (space, bracket, quote) from the
+    // non-capturing group (?:^|\s|...). We need to skip past it to the captured group.
+    const startIndex = match.index + (match[0].length - fullMatch.length);
     const endIndex = startIndex + fullMatch.length;
 
     // Skip if this match overlaps with an already detected quoted path

@@ -839,6 +839,15 @@ describe('filePathLinks.logic', () => {
             column: 10
           })
         })
+
+        it('has correct startIndex for Python error format', () => {
+          const line = '  File "/Users/test/my project/main.py", line 42'
+          const matches = detectFilePaths(line)
+          expect(matches).toHaveLength(1)
+          // Fallback matchers: startIndex/endIndex span the raw path (not the reconstructed fullMatch)
+          expect(matches[0].path).toBe('/Users/test/my project/main.py')
+          expect(matches[0].startIndex).toBe(line.indexOf('/Users/test'))
+        })
       })
 
       describe('standalone paths on own line', () => {
@@ -1090,6 +1099,13 @@ describe('filePathLinks.logic', () => {
           expect(matches).toHaveLength(1)
           expect(matches[0].path).toBe('node_modules/package/index.js')
         })
+
+        it('has correct startIndex for git status format', () => {
+          const line = 'M src/main/services/NewService.ts'
+          const matches = detectFilePaths(line)
+          expect(matches).toHaveLength(1)
+          expect(matches[0].startIndex).toBe(line.indexOf('src/main'))
+        })
       })
 
       describe('Markdown link format', () => {
@@ -1267,6 +1283,8 @@ describe('filePathLinks.logic', () => {
           '\x1b[31m\x1b[1mError:\x1b[0m \x1b[36m./src/file.ts:42\x1b[0m → \x1b[32m/lib/main.ts:100\x1b[0m'
         )
         expect(matches).toHaveLength(2)
+        expect(matches[0]).toMatchObject({ path: './src/file.ts', line: 42 })
+        expect(matches[1]).toMatchObject({ path: '/lib/main.ts', line: 100 })
       })
     })
 
@@ -1289,6 +1307,19 @@ describe('filePathLinks.logic', () => {
       it('skips other protocol URLs', () => {
         const matches = detectFilePaths('Open ftp://server.com/file.txt')
         expect(matches).toHaveLength(0)
+      })
+
+      it('matches version-like strings as paths (pre-existing behavior)', () => {
+        // v1.2.3 has extension .3 which isn't filtered – acceptable false positive
+        expect(detectFilePaths('v1.2.3')).toHaveLength(1)
+      })
+
+      it('skips domain names like socket.io', () => {
+        expect(detectFilePaths('socket.io')).toHaveLength(0)
+      })
+
+      it('skips domain names like npm.io', () => {
+        expect(detectFilePaths('npm.io')).toHaveLength(0)
       })
 
       it('skips paths without file extensions (unless known dirs)', () => {
@@ -1377,9 +1408,61 @@ describe('filePathLinks.logic', () => {
         // Verify indices are within line bounds
         expect(matches[0].startIndex).toBeGreaterThanOrEqual(0)
         expect(matches[0].endIndex).toBeLessThanOrEqual(line.length)
-        // Verify the extracted substring contains the fullMatch
+        // Verify the extracted substring exactly equals the fullMatch
         const extracted = line.substring(matches[0].startIndex, matches[0].endIndex)
-        expect(extracted).toContain(matches[0].fullMatch.split(':')[0]) // Contains the path part
+        expect(extracted).toBe(matches[0].fullMatch)
+      })
+
+      it('startIndex points to path, not the boundary character', () => {
+        const line = 'error in src/main/index.ts:42'
+        const matches = detectFilePaths(line)
+        expect(matches).toHaveLength(1)
+        expect(matches[0].startIndex).toBe(line.indexOf('src/main/index.ts'))
+        expect(line.substring(matches[0].startIndex, matches[0].endIndex)).toBe('src/main/index.ts:42')
+      })
+
+      it('startIndex is correct for paths after brackets', () => {
+        const line = '(src/file.ts:10:5)'
+        const matches = detectFilePaths(line)
+        expect(matches).toHaveLength(1)
+        expect(matches[0].startIndex).toBe(1)
+        expect(line.substring(matches[0].startIndex, matches[0].endIndex)).toBe('src/file.ts:10:5')
+      })
+
+      it('startIndex is correct at start of line', () => {
+        const line = 'src/file.ts:42'
+        const matches = detectFilePaths(line)
+        expect(matches).toHaveLength(1)
+        expect(matches[0].startIndex).toBe(0)
+        expect(line.substring(matches[0].startIndex, matches[0].endIndex)).toBe('src/file.ts:42')
+      })
+
+      it('startIndex is correct for paths after square bracket', () => {
+        const line = '[src/file.ts:10]'
+        const matches = detectFilePaths(line)
+        expect(matches).toHaveLength(1)
+        expect(matches[0].startIndex).toBe(1)
+      })
+
+      it('startIndex is correct for paths after curly brace', () => {
+        const line = '{src/file.ts}'
+        const matches = detectFilePaths(line)
+        expect(matches).toHaveLength(1)
+        expect(matches[0].startIndex).toBe(1)
+      })
+
+      it('startIndex is correct for paths after single quote', () => {
+        const line = "'src/file.ts'"
+        const matches = detectFilePaths(line)
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('src/file.ts')
+      })
+
+      it('startIndex is correct for paths after multiple spaces', () => {
+        const line = '   src/file.ts:42'
+        const matches = detectFilePaths(line)
+        expect(matches).toHaveLength(1)
+        expect(matches[0].startIndex).toBe(3)
       })
 
       it('handles multiple file extensions', () => {
@@ -1389,6 +1472,274 @@ describe('filePathLinks.logic', () => {
           expect(matches).toHaveLength(1)
           expect(matches[0].path).toBe(`src/file.${ext}`)
         })
+      })
+    })
+
+    describe('end boundary characters (bug fix: colon, comma, semicolon)', () => {
+      it('detects path followed by colon and error message', () => {
+        const matches = detectFilePaths('src/main/index.ts: error message here')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('src/main/index.ts')
+      })
+
+      it('detects path followed by comma', () => {
+        const matches = detectFilePaths('src/file.ts, src/other.ts')
+        expect(matches).toHaveLength(2)
+        expect(matches[0].path).toBe('src/file.ts')
+        expect(matches[1].path).toBe('src/other.ts')
+      })
+
+      it('detects path followed by semicolon', () => {
+        const matches = detectFilePaths('src/file.ts; echo done')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('src/file.ts')
+      })
+
+      it('preserves colon-digit parsing for line:col notation', () => {
+        const matches = detectFilePaths('src/file.ts:42:10')
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          path: 'src/file.ts',
+          line: 42,
+          column: 10
+        })
+      })
+
+      it('handles compiler output: path: error message', () => {
+        const matches = detectFilePaths('/home/user/src/app.ts: Cannot find module')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('/home/user/src/app.ts')
+      })
+
+      it('detects path with line number followed by comma', () => {
+        const matches = detectFilePaths('src/file.ts:42, src/other.ts')
+        expect(matches).toHaveLength(2)
+        expect(matches[0]).toMatchObject({ path: 'src/file.ts', line: 42 })
+        expect(matches[1].path).toBe('src/other.ts')
+      })
+
+      it('verifies substring matches fullMatch for comma-terminated path', () => {
+        const line = 'src/file.ts, src/other.ts'
+        const matches = detectFilePaths(line)
+        expect(matches).toHaveLength(2)
+        expect(line.substring(matches[0].startIndex, matches[0].endIndex)).toBe(matches[0].fullMatch)
+      })
+
+      it('detects paths in parentheses separated by comma', () => {
+        const matches = detectFilePaths('(src/file.ts, src/other.ts)')
+        expect(matches).toHaveLength(2)
+        expect(matches[0].path).toBe('src/file.ts')
+        expect(matches[1].path).toBe('src/other.ts')
+      })
+
+      it('detects path followed by shell redirect >', () => {
+        const matches = detectFilePaths('src/file.ts > output.log')
+        expect(matches).toHaveLength(2)
+        expect(matches[0].path).toBe('src/file.ts')
+        expect(matches[1].path).toBe('output.log')
+      })
+
+      it('detects path followed by shell pipe |', () => {
+        const matches = detectFilePaths('src/file.ts | grep error')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('src/file.ts')
+      })
+    })
+
+    describe('domain false positive prevention (bug fix: TLD-like extensions)', () => {
+      it('detects files with .app extension', () => {
+        const matches = detectFilePaths('src/style.app')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('src/style.app')
+      })
+
+      it('detects files with .io extension', () => {
+        const matches = detectFilePaths('src/utils.io')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('src/utils.io')
+      })
+
+      it('detects files with .dev extension', () => {
+        const matches = detectFilePaths('src/module.dev')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('src/module.dev')
+      })
+
+      it('detects bare filename with .app extension', () => {
+        const matches = detectFilePaths('style.app')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('style.app')
+      })
+
+      it('rejects bare filename with .dev as domain-like', () => {
+        // .dev is in COMMON_TLDS but NOT in COMMON_EXTENSIONS_SET
+        expect(detectFilePaths('module.dev')).toHaveLength(0)
+      })
+
+      it('rejects bare filename with .io not in COMMON_EXTENSIONS_SET', () => {
+        expect(detectFilePaths('socket.io')).toHaveLength(0)
+      })
+
+      it('rejects npm.io as domain-like', () => {
+        expect(detectFilePaths('npm.io')).toHaveLength(0)
+      })
+
+      it('rejects example.org as domain-like', () => {
+        expect(detectFilePaths('example.org')).toHaveLength(0)
+      })
+
+      it('still rejects actual domain names', () => {
+        const matches = detectFilePaths('google.com')
+        expect(matches).toHaveLength(0)
+      })
+
+      it('detects paths with TLD-like extensions containing separators', () => {
+        const matches = detectFilePaths('/home/user/project/build.app')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('/home/user/project/build.app')
+      })
+    })
+
+    describe('quoted relative paths (bug fix: non-absolute quoted paths)', () => {
+      it('detects relative quoted path with ./', () => {
+        const matches = detectFilePaths('"./src/file.ts"')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('./src/file.ts')
+      })
+
+      it('detects project-relative quoted path', () => {
+        const matches = detectFilePaths('"src/file.ts"')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('src/file.ts')
+      })
+
+      it('detects quoted path with ../', () => {
+        const matches = detectFilePaths('"../utils/helper.ts"')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('../utils/helper.ts')
+      })
+
+      it('detects quoted path with line:col', () => {
+        const matches = detectFilePaths('"./src/file.ts:42:10"')
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          path: './src/file.ts',
+          line: 42,
+          column: 10
+        })
+      })
+
+      it('still detects absolute quoted paths', () => {
+        const matches = detectFilePaths('"/usr/local/bin/file.sh"')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('/usr/local/bin/file.sh')
+      })
+
+      it('detects quoted path with underscore prefix', () => {
+        const matches = detectFilePaths('"_internal/config.ts"')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('_internal/config.ts')
+      })
+
+      it('detects quoted @-scoped path', () => {
+        const matches = detectFilePaths('"@types/node/index.d.ts"')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('@types/node/index.d.ts')
+      })
+
+      it('has correct startIndex/endIndex for quoted path', () => {
+        const line = '"./src/file.ts"'
+        const matches = detectFilePaths(line)
+        expect(matches).toHaveLength(1)
+        expect(matches[0].startIndex).toBe(1)
+        expect(matches[0].endIndex).toBe(14)
+      })
+
+      it('rejects mismatched quotes', () => {
+        const matches = detectFilePaths("'src/file.ts\"")
+        // Mismatched quotes should not match via quoted stage
+        // (may still match via unquoted stage if the path is valid)
+        const quotedMatches = matches.filter(m => m.fullMatch.startsWith("'") || m.fullMatch.startsWith('"'))
+        expect(quotedMatches).toHaveLength(0)
+      })
+    })
+
+    describe('dot-directory paths (bug fix: .github, .config, etc.)', () => {
+      it('detects .github/workflows path', () => {
+        const matches = detectFilePaths('.github/workflows/ci.yml')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('.github/workflows/ci.yml')
+      })
+
+      it('detects .config directory path', () => {
+        const matches = detectFilePaths('.config/settings.json')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('.config/settings.json')
+      })
+
+      it('detects .vscode directory path', () => {
+        const matches = detectFilePaths('.vscode/launch.json')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('.vscode/launch.json')
+      })
+
+      it('detects .github/workflows path with line number', () => {
+        const matches = detectFilePaths('.github/workflows/ci.yml:42')
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          path: '.github/workflows/ci.yml',
+          line: 42
+        })
+      })
+
+      it('detects multi-level dot-directory path', () => {
+        const matches = detectFilePaths('.config/app/nested/settings.json')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('.config/app/nested/settings.json')
+      })
+
+      it('startIndex is 0 for dot-directory at line start', () => {
+        const line = '.github/workflows/ci.yml'
+        const matches = detectFilePaths(line)
+        expect(matches).toHaveLength(1)
+        expect(matches[0].startIndex).toBe(0)
+      })
+    })
+
+    describe('@-prefixed paths (bug fix: scoped packages)', () => {
+      it('detects @types/node path', () => {
+        const matches = detectFilePaths('@types/node/index.d.ts')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('@types/node/index.d.ts')
+      })
+
+      it('detects @scope/package path', () => {
+        const matches = detectFilePaths('@angular/core/src/component.ts')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('@angular/core/src/component.ts')
+      })
+
+      it('detects @-scoped path with hyphens', () => {
+        const matches = detectFilePaths('@my-org/my-pkg/src/index.ts')
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('@my-org/my-pkg/src/index.ts')
+      })
+
+      it('detects @types path with line number', () => {
+        const matches = detectFilePaths('@types/node/index.d.ts:42')
+        expect(matches).toHaveLength(1)
+        expect(matches[0]).toMatchObject({
+          path: '@types/node/index.d.ts',
+          line: 42
+        })
+      })
+
+      it('rejects standalone @username without path', () => {
+        expect(detectFilePaths('@username')).toHaveLength(0)
+      })
+
+      it('rejects @mention in text', () => {
+        expect(detectFilePaths('@mention some text')).toHaveLength(0)
       })
     })
 
@@ -1454,6 +1805,42 @@ describe('filePathLinks.logic', () => {
           column: 10
         })
       })
+
+      it('detects path starting with digits', () => {
+        const line = '  01-knowledge-base/emails/20260311-draft-reply.md'
+        const matches = detectFilePaths(line)
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('01-knowledge-base/emails/20260311-draft-reply.md')
+      })
+
+      it('detects path with trailing sentence period', () => {
+        const line = '  01-knowledge-base/emails/20260311-draft-reply.md.'
+        const matches = detectFilePaths(line)
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('01-knowledge-base/emails/20260311-draft-reply.md')
+      })
+
+      it('detects path followed by sentence period and more text', () => {
+        const line = '  01-knowledge-base/emails/20260311-draft-reply.md. Edit it there.'
+        const matches = detectFilePaths(line)
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('01-knowledge-base/emails/20260311-draft-reply.md')
+      })
+
+      it('detects path in "Saved to <path>." sentence', () => {
+        const line = 'Saved to src/file.ts.'
+        const matches = detectFilePaths(line)
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('src/file.ts')
+      })
+
+      it('does not strip dots from multi-dot extensions like .d.ts', () => {
+        const line = 'Error in index.d.ts'
+        const matches = detectFilePaths(line)
+        expect(matches).toHaveLength(1)
+        expect(matches[0].path).toBe('index.d.ts')
+      })
+
     })
   })
 

@@ -15,6 +15,8 @@
  * - Cross-platform path handling (Windows/POSIX)
  * - Smart resolution: Falls back to filename search when exact path not found
  * - File picker dialog when multiple matches exist
+ * - CLI-wrap joining: Detects multi-line tool output (Write(, Saved to, etc.)
+ *   and joins split paths before detection
  */
 
 import { useEffect, useRef, useMemo, useCallback, useState } from 'react'
@@ -33,6 +35,7 @@ import {
   type SmartResolutionResult
 } from '../utils/smartPathResolver.logic'
 import type { PathScore } from '../utils/pathScoring'
+import { findCliWrapGroup, joinedPosToBuffer, type JoinSegment } from '../utils/cliWrapJoin.logic'
 import { logger } from '../utils/logger'
 
 // Create a module-level cache shared across hook instances
@@ -217,20 +220,99 @@ export function useTerminalFileLinks(
         callback: (links: ILink[] | undefined) => void
       ) => {
         try {
+          const buffer = terminal.buffer.active
+          const bufferIndex = bufferLineNumber - 1
+
           // Get the line content from xterm buffer
-          const line = terminal.buffer.active.getLine(bufferLineNumber - 1)
+          const line = buffer.getLine(bufferIndex)
           if (!line) {
             callback(undefined)
             return
           }
 
-          const lineText = line.translateToString(true)
+          // Phase 1: Build full logical line by joining xterm-wrapped continuations.
+          // xterm.js marks continuation lines with isWrapped when content
+          // exceeds terminal.cols and wraps to the next row.
+          let logicalStart = bufferIndex
+          while (logicalStart > 0) {
+            const checkLine = buffer.getLine(logicalStart)
+            if (!checkLine?.isWrapped) break
+            logicalStart--
+          }
 
-          // Detect file paths in the line using pure logic
-          const matches = detectFilePaths(lineText)
+          let logicalEnd = bufferIndex
+          while (true) {
+            const nextLine = buffer.getLine(logicalEnd + 1)
+            if (!nextLine?.isWrapped) break
+            logicalEnd++
+          }
+
+          // Join all lines in the logical group
+          let logicalText = ''
+          let lineWidths: number[] = []
+          for (let i = logicalStart; i <= logicalEnd; i++) {
+            const bufLine = buffer.getLine(i)
+            if (bufLine) {
+              const text = bufLine.translateToString(true)
+              lineWidths.push(text.length)
+              logicalText += text
+            }
+          }
+
+          // Phase 2: CLI-wrap joining for tool-formatted line breaks.
+          // CLI tools (e.g., Claude Code) insert explicit \n + indentation
+          // to wrap long paths. These are separate buffer lines with
+          // isWrapped: false, so Phase 1 doesn't catch them.
+          let cliSegments: JoinSegment[] | null = null
+
+          const getBufferLine = (idx: number): string | null => {
+            const bufLine = buffer.getLine(idx)
+            if (!bufLine) return null
+            return bufLine.translateToString(true)
+          }
+
+          const cliGroup = findCliWrapGroup(logicalStart, getBufferLine)
+
+          if (cliGroup) {
+            // Phase 2 replaces Phase 1 data entirely – the CLI group is the
+            // authoritative context for file-path detection. This is safe
+            // because CLI-formatted lines (explicit \n + indentation) are
+            // short and do not also trigger xterm wrapping.
+            logicalText = cliGroup.joinedText
+            logicalStart = cliGroup.groupStart
+            logicalEnd = cliGroup.groupEnd
+            lineWidths = cliGroup.segments.map((s) => s.text.length)
+            cliSegments = cliGroup.segments
+          }
+
+          // Detect file paths in the full logical line
+          const matches = detectFilePaths(logicalText)
           if (matches.length === 0) {
             callback(undefined)
             return
+          }
+
+          // Helper: convert logical text position to buffer coordinates (1-based)
+          const logicalToBuffer = (pos: number): { x: number; y: number } => {
+            // When CLI-wrap joining is active, delegate to the tested
+            // joinedPosToBuffer and convert 0-based output to xterm 1-based
+            if (cliSegments) {
+              const mapped = joinedPosToBuffer(pos, cliSegments)
+              return {
+                x: mapped.columnOffset + 1,
+                y: mapped.bufferIndex + 1
+              }
+            }
+
+            let remaining = pos
+            for (let i = 0; i < lineWidths.length; i++) {
+              if (remaining < lineWidths[i]) {
+                return { x: remaining + 1, y: logicalStart + i + 1 }
+              }
+              remaining -= lineWidths[i]
+            }
+            const lastIdx = lineWidths.length - 1
+            return { x: lineWidths[lastIdx] + 1, y: logicalStart + lastIdx + 1 }
           }
 
           // Get CWD for relative path resolution
@@ -296,11 +378,18 @@ export function useTerminalFileLinks(
 
             const absolutePath = finalPath
 
+            // Map logical positions to buffer coordinates (handles wrapped lines)
+            const rangeStart = logicalToBuffer(match.startIndex)
+            const rangeEnd = logicalToBuffer(match.endIndex)
+
+            // Only include links that overlap with the requested buffer line
+            if (rangeStart.y > bufferLineNumber || rangeEnd.y < bufferLineNumber) continue
+
             // Create the link with optional smart-resolved decoration
             const link: ILink = {
               range: {
-                start: { x: match.startIndex + 1, y: bufferLineNumber },
-                end: { x: match.endIndex + 1, y: bufferLineNumber }
+                start: rangeStart,
+                end: rangeEnd
               },
               text: match.fullMatch,
               decorations: wasSmartResolved ? SMART_LINK_DECORATIONS : undefined,

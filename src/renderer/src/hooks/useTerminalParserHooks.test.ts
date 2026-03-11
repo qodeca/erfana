@@ -5,12 +5,15 @@
  * ED sequences and calculate restoration positions.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { renderHook } from '@testing-library/react'
 import {
   isScrollAffectingED,
   calculateRestoredPosition,
-  shouldSkipRestoration
+  shouldSkipRestoration,
+  useTerminalParserHooks
 } from './useTerminalParserHooks'
+import type { Terminal, IDisposable } from '@xterm/xterm'
 
 describe('useTerminalParserHooks pure functions', () => {
   describe('isScrollAffectingED', () => {
@@ -186,12 +189,159 @@ describe('useTerminalParserHooks pure functions', () => {
       const ed2 = isScrollAffectingED(2)
       expect(ed2).toBe(true)
 
-      // Followed immediately by ED 3 (within 16ms debounce)
+      // Followed immediately by ED 3 (coalesced via restorationPendingRef)
       const ed3 = isScrollAffectingED(3)
       expect(ed3).toBe(true)
 
-      // Both should trigger restoration, but debouncing will ensure only one restore
-      // (tested in hook integration tests)
+      // Both should trigger restoration, but coalescing will ensure only one restore
+      // (tested in hook-level tests below)
     })
+  })
+})
+
+// === Hook-level tests ===
+
+describe('useTerminalParserHooks hook', () => {
+  // Mock terminal with parser hook registration
+  const createMockTerminal = (viewportY = 100, baseY = 100) => {
+    const handlers: { final: string; handler: (params: number[]) => boolean }[] = []
+    const mockDisposable: IDisposable = { dispose: vi.fn() }
+
+    return {
+      terminal: {
+        buffer: { active: { viewportY, baseY } },
+        scrollToBottom: vi.fn(),
+        scrollToLine: vi.fn(),
+        parser: {
+          registerCsiHandler: vi.fn(
+            (id: { final: string }, handler: (params: number[]) => boolean) => {
+              handlers.push({ final: id.final, handler })
+              return mockDisposable
+            }
+          )
+        }
+      } as unknown as Terminal,
+      handlers,
+      disposable: mockDisposable
+    }
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.stubGlobal('requestAnimationFrame', vi.fn((cb: FrameRequestCallback) => {
+      cb(0)
+      return 0
+    }))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('enabled: false returns empty disposables array (A7)', () => {
+    const { terminal } = createMockTerminal()
+    const { result } = renderHook(() =>
+      useTerminalParserHooks({ enabled: false })
+    )
+
+    const disposables = result.current.registerHooks(terminal)
+    expect(disposables).toEqual([])
+    expect(terminal.parser.registerCsiHandler).not.toHaveBeenCalled()
+  })
+
+  it('microtask fires without setTimeout delay (A1)', async () => {
+    const { terminal, handlers } = createMockTerminal(50, 100)
+    const onIntercept = vi.fn()
+
+    const { result } = renderHook(() =>
+      useTerminalParserHooks({ enabled: true, onIntercept })
+    )
+
+    result.current.registerHooks(terminal)
+
+    // Trigger ED2 handler
+    const jHandler = handlers.find(h => h.final === 'J')
+    expect(jHandler).toBeDefined()
+    jHandler!.handler([2])
+
+    // Microtask should fire without needing setTimeout – just flush microtasks
+    await Promise.resolve()
+
+    // onIntercept should have been called (restoration ran in microtask)
+    expect(onIntercept).toHaveBeenCalledWith('ED2')
+  })
+
+  it('restorationPendingRef coalesces rapid ED2+ED3 – only one restoration (A2)', async () => {
+    const { terminal, handlers } = createMockTerminal(50, 100)
+    const onIntercept = vi.fn()
+
+    const { result } = renderHook(() =>
+      useTerminalParserHooks({ enabled: true, onIntercept })
+    )
+
+    result.current.registerHooks(terminal)
+
+    const jHandler = handlers.find(h => h.final === 'J')!
+
+    // Fire ED2 then ED3 in same synchronous block (before microtask runs)
+    jHandler.handler([2])
+    jHandler.handler([3])
+
+    // Flush microtasks
+    await Promise.resolve()
+
+    // Only one restoration should have fired (ED2 – the first one)
+    expect(onIntercept).toHaveBeenCalledTimes(1)
+    expect(onIntercept).toHaveBeenCalledWith('ED2')
+  })
+
+  it('pending ref resets after microtask – second sequence triggers new restoration (A3)', async () => {
+    const { terminal, handlers } = createMockTerminal(50, 100)
+    const onIntercept = vi.fn()
+
+    const { result } = renderHook(() =>
+      useTerminalParserHooks({ enabled: true, onIntercept })
+    )
+
+    result.current.registerHooks(terminal)
+
+    const jHandler = handlers.find(h => h.final === 'J')!
+
+    // First sequence
+    jHandler.handler([2])
+    await Promise.resolve()
+    expect(onIntercept).toHaveBeenCalledTimes(1)
+
+    // Second sequence – should trigger new restoration since pending ref was reset
+    jHandler.handler([3])
+    await Promise.resolve()
+    expect(onIntercept).toHaveBeenCalledTimes(2)
+    expect(onIntercept).toHaveBeenLastCalledWith('ED3')
+  })
+
+  it('user-scroll cooldown skips restoration when lastUserScrollTsRef is recent (A4)', async () => {
+    const { terminal, handlers } = createMockTerminal(50, 100)
+    const onIntercept = vi.fn()
+    const lastUserScrollTsRef = { current: Date.now() } // scrolled "just now"
+
+    const { result } = renderHook(() =>
+      useTerminalParserHooks({
+        enabled: true,
+        onIntercept,
+        lastUserScrollTsRef
+      })
+    )
+
+    result.current.registerHooks(terminal)
+
+    const jHandler = handlers.find(h => h.final === 'J')!
+    jHandler.handler([2])
+
+    await Promise.resolve()
+
+    // Should skip restoration because user scrolled recently
+    expect(onIntercept).not.toHaveBeenCalled()
+    expect(terminal.scrollToBottom).not.toHaveBeenCalled()
   })
 })

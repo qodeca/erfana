@@ -350,25 +350,9 @@ if (parserHandledRef?.current) {
 
 ### Test Coverage
 
-**Total: 3426 tests passing** (118 test files)
-
-- **Parser Hooks** (`useTerminalParserHooks.test.ts`): 24 tests
-  - ED 2/3 detection (scroll-affecting vs non-affecting)
-  - Position restoration calculations
-  - User scroll cooldown logic
-  - Integration scenarios (Ink ED2+ED3 sequence)
-
-- **Fallback Detection** (`scrollAnomalyDetector.test.ts`): 76 tests
-  - Position-based detection with boundary conditions
-  - Escape sequence detection (ED 2/3, cursor home)
-  - Buffer truncation detection
-  - Smart recovery target calculation
-
-- **Fallback Hook** (`useScrollAnomalyRecovery.test.ts`): 18 tests
-  - Fixed-interval queue approach
-  - Coordination with parser hooks
-  - Keyboard scroll detection
-  - RAF cancellation
+- **Parser Hooks** (`useTerminalParserHooks.test.ts`): ED 2/3 detection, position restoration, user scroll cooldown, integration scenarios
+- **Fallback Detection** (`scrollAnomalyDetector.test.ts`): Position-based detection, escape sequence detection, buffer truncation, recovery target calculation
+- **Fallback Hook** (`useScrollAnomalyRecovery.test.ts`): Fixed-interval queue, coordination with parser hooks, keyboard scroll detection, RAF cancellation
 
 ### Implementation Files
 

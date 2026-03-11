@@ -24,8 +24,7 @@ import type { Terminal, IDisposable } from '@xterm/xterm'
 // User scroll cooldown - don't restore if user scrolled within this window
 const USER_SCROLL_COOLDOWN_MS = 300
 
-// Debounce rapid clear sequences (ED2 + ED3 in quick succession)
-const RESTORE_DEBOUNCE_MS = 16 // ~1 frame at 60fps
+// Note: ED2+ED3 coalescing is handled by restorationPendingRef (no timer needed)
 
 export interface ParserHookOptions {
   /** Enable/disable parser hooks (default: true) */
@@ -79,9 +78,6 @@ export function useTerminalParserHooks(
   // Flag to coordinate with useScrollAnomalyRecovery
   const parserHandledRef = useRef(false)
 
-  // Debounce timer for rapid sequences
-  const debounceTimerRef = useRef<number | null>(null)
-
   // Track if we're in a restoration microtask
   const restorationPendingRef = useRef(false)
 
@@ -114,27 +110,17 @@ export function useTerminalParserHooks(
         savedBaseY: number,
         type: 'ED2' | 'ED3'
       ) => {
-        // Clear any pending debounce
-        if (debounceTimerRef.current !== null) {
-          clearTimeout(debounceTimerRef.current)
-          debounceTimerRef.current = null
-        }
-
-        // If already restoring this frame, just update the flag
+        // Coalesce rapid ED2+ED3 in the same microtask batch
         if (restorationPendingRef.current) {
           return
         }
 
-        // Debounce rapid sequences
-        debounceTimerRef.current = window.setTimeout(() => {
-          debounceTimerRef.current = null
-          restorationPendingRef.current = true
+        restorationPendingRef.current = true
 
-          // Use microtask for synchronous (same-frame) restoration
-          queueMicrotask(() => {
-            restorationPendingRef.current = false
-
-            // Check if user scrolled recently - respect their position
+        // Use microtask for true same-frame restoration (no setTimeout delay)
+        queueMicrotask(() => {
+          try {
+            // Check if user scrolled recently – respect their position
             const lastUserScrollTs = lastUserScrollTsRefStable.current?.current ?? 0
             if (Date.now() - lastUserScrollTs < USER_SCROLL_COOLDOWN_MS) {
               return
@@ -168,8 +154,10 @@ export function useTerminalParserHooks(
             }
 
             onInterceptRef.current?.(type)
-          })
-        }, RESTORE_DEBOUNCE_MS)
+          } finally {
+            restorationPendingRef.current = false
+          }
+        })
       }
 
       /**
@@ -211,16 +199,6 @@ export function useTerminalParserHooks(
       )
 
       disposables.push(edHandler)
-
-      // Cleanup debounce timer on dispose
-      disposables.push({
-        dispose: () => {
-          if (debounceTimerRef.current !== null) {
-            clearTimeout(debounceTimerRef.current)
-            debounceTimerRef.current = null
-          }
-        }
-      })
 
       return disposables
     },

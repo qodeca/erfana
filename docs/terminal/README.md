@@ -72,6 +72,7 @@ Clickable file path links in terminal output with intelligent path resolution.
 - Supports line:column notation (`:42:10`, `(15,3)`)
 - Path validation with LRU cache (100 entries, 30s TTL)
 - Click to open file in editor at specified location
+- Multi-line link ranges – links span correctly across xterm-wrapped and CLI-wrapped lines
 
 **Smart Resolution**:
 - Falls back to filename search when exact path not found
@@ -85,15 +86,27 @@ Clickable file path links in terminal output with intelligent path resolution.
 - Bullet point lists: `- /path/to my/project/file.ts`
 - Based on VS Code Issue #97941 and PR #43733
 
+**Multi-line Path Detection** (two-phase joining):
+- **Phase 1 – xterm wrapping**: Joins lines marked `isWrapped` by xterm.js when content exceeds `terminal.cols`
+- **Phase 2 – CLI-wrap joining**: Detects CLI tool output split across buffer lines with explicit `\n` + indentation (e.g., `Write(path/fi` + `       le.md)`)
+- Three CLI patterns: tool output (`Write(`, `Read(`, etc.), `Saved to`/`Wrote to`, `@`-prefixed paths
+- Phase 2 replaces Phase 1 data when a CLI group is found (mutually exclusive – CLI-formatted lines are short)
+- Position mapping via `joinedPosToBuffer()` converts joined text positions back to buffer coordinates
+
 **Architecture** (Pure Logic Extraction):
+- `filePathLinks.logic.ts`: Path detection, fallback matchers for paths with spaces
+- `cliWrapJoin.logic.ts`: CLI-wrap group detection (`findCliWrapGroup`, `joinedPosToBuffer`)
 - `filenameIndex.ts`: Map-based O(1) filename lookup
 - `pathScoring.ts`: Candidate ranking algorithm
 - `smartPathResolver.logic.ts`: Resolution orchestration
 - `useFilenameIndex.ts`: Lazy index management hook
 - `FilePickerDialog.tsx`: Disambiguation UI component
-- `filePathLinks.logic.ts`: Fallback matchers for paths with spaces
+- `useTerminalFileLinks.ts`: Hook integrating all detection phases
 
 **Files**:
+- `src/renderer/src/utils/cliWrapJoin.logic.ts` – Pure logic (no React/xterm deps)
+- `src/renderer/src/utils/cliWrapJoin.logic.test.ts` – 51 tests
+- `src/renderer/src/hooks/useTerminalFileLinks.ts` – Integration hook
 - `src/renderer/src/components/Panels/Terminal/FileLinks/`
 
 ### Drag-Drop File Path Insertion (v0.6.5)
