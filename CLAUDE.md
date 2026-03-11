@@ -50,7 +50,7 @@ src/
 ## Core Features
 1. **Markdown Editor** - Monaco with live preview, scroll sync, Mermaid diagrams (zoom, pan, full-screen viewer), YAML frontmatter rendering, preserve line breaks option, unified in-file search (Cmd/Ctrl+F), context menu with AI prompts
 2. **Project Tree** - File explorer with drag-drop reorganization, external file drop (move/copy/import), markdown filtering, context menu, real-time git status indicators with polling fallback, manual refresh button (Cmd/Ctrl+Alt+R)
-3. **Terminal** - xterm.js with PTY backend, clipboard support, file links, scroll recovery, auto-opens on project load, drag-drop file paths, bracketed paste mode for safe multi-line input, screenshot capture (macOS: screen/window/area selection with path pasted to terminal), camera photo capture (cross-platform: captures photo from webcam with path pasted to terminal)
+3. **Terminal** - xterm.js with PTY backend, clipboard support, file links (multi-line: xterm-wrap joining + CLI-wrap joining for tool output), scroll recovery, auto-opens on project load, drag-drop file paths, bracketed paste mode for safe multi-line input, screenshot capture (macOS: screen/window/area selection with path pasted to terminal), camera photo capture (cross-platform: captures photo from webcam with path pasted to terminal)
 4. **Prompt Templates** - AI text operations via context menu (Elaborate, Modify, Ask, Visualize, diagram chat); Visualize generates Mermaid diagrams from selected text with dropdown for 22 diagram types
 5. **Project Settings** - Per-project configuration via `.erfana/settings.json` (watcher ignore, tree visibility)
 6. **PDF Export** - Export markdown to print-optimized PDF with vector Mermaid diagrams, A4 page size, print-friendly styling
@@ -67,7 +67,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Build](docs/build/README.md) — Build configuration, electron-builder, ASAR, fuses, troubleshooting
 - [Security](docs/security.md) — Electron 39 security hardening, fuses, sandboxing, trade-offs
 - [Drag-Drop](docs/drag-drop/README.md) — VS Code-style file reorganization, visual feedback, validation
-- [Terminal](docs/terminal/README.md) — Bootstrap pattern, scroll fixes, clipboard, drag-drop paths, screenshot capture (macOS), camera capture (cross-platform)
+- [Terminal](docs/terminal/README.md) — Bootstrap pattern, scroll fixes, clipboard, file links (CLI-wrap joining), drag-drop paths, screenshot capture (macOS), camera capture (cross-platform)
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync, Mermaid diagrams
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens, PauseController auto-resume
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration

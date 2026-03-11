@@ -22,7 +22,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 #### Key test areas
 
-Run `npm run test` for current totals (~6,800+ tests across 224 files as of v0.8.0-beta).
+Run `npm run test` for current totals (~6,990 tests across 225 files as of v0.8.0-beta).
 
 | Area | Key files | Docs |
 |------|-----------|------|
