@@ -26,9 +26,9 @@ vi.mock('../../prompts/registry', async (importOriginal) => {
 
   // Define editor prompts for testing
   const editorPrompts = {
-    'editor-elaborate': {
-      id: 'editor-elaborate',
-      label: 'Elaborate',
+    'editor-explain': {
+      id: 'editor-explain',
+      label: 'Explain',
       icon: 'maximize2',
       targetPanel: 'terminal',
       autoExecute: true,

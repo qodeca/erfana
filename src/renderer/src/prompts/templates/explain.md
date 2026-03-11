@@ -1,7 +1,7 @@
 ---
 area: markdown-preview
 subArea: context-menu
-name: Elaborate
+name: Explain
 icon: maximize2
 targetPanel: terminal
 autoExecute: true
@@ -17,12 +17,12 @@ Source: {{basename filePath}} ({{formatLineRange startLine endLine}})
 </input>
 
 <task>
-Think about the content, then elaborate on it in 2-3 focused paragraphs.
+Explain and expand on the content below in 2-3 focused paragraphs. Do NOT edit or modify the source file.
 </task>
 
 <instructions>
 - Cover relevant aspects: background, supporting details, examples, connections to related concepts, or practical implications
-- Adapt elaboration style to the content type
+- Adapt explanation style to the content type
 - Reference surrounding context only if the selection is unclear
 </instructions>
 
@@ -30,8 +30,9 @@ Think about the content, then elaborate on it in 2-3 focused paragraphs.
 - 200-300 words maximum
 - Clear and concise language
 - No preamble or meta-commentary
+- Do NOT edit, modify, or rewrite the source file – respond in the terminal only
 </constraints>
 
 <output_format>
-Direct elaboration text. No headings or formatting unless content requires it.
+Respond in the terminal only. Direct explanation text. No headings or formatting unless content requires it.
 </output_format>

@@ -339,13 +339,13 @@ const variables: PromptVariables = {
 }
 
 // Execute template by ID
-const success = await executePromptTemplate('elaborate', variables)
+const success = await executePromptTemplate('explain', variables)
 ```
 
 ### Example: Button Click Handler
 
 ```typescript
-const handleElaborateClick = async () => {
+const handleExplainClick = async () => {
   const variables: PromptVariables = {
     selectedText: getCurrentSelection(),
     filePath: currentFile.path,
@@ -355,7 +355,7 @@ const handleElaborateClick = async () => {
     fileRef: `@${currentFile.path}:${selectionStart}-${selectionEnd}`
   }
 
-  await executePromptTemplate('elaborate', variables)
+  await executePromptTemplate('explain', variables)
   // Prompt automatically sent to target panel (Terminal)
   // autoExecute, sendDirectly handled automatically
 }
@@ -398,7 +398,7 @@ Get template IDs dynamically:
 import { getAllPromptIds, getPromptsForArea } from '../prompts/registry'
 
 // All templates
-const allIds = getAllPromptIds()  // ['elaborate', 'modify', 'mermaid-bug-report']
+const allIds = getAllPromptIds()  // ['explain', 'modify', 'mermaid-bug-report']
 
 // Templates for specific area
 const contextMenuPrompts = getPromptsForArea('markdown-preview', 'context-menu')

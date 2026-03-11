@@ -100,7 +100,7 @@ erfana/
 ### 1. AI-Powered Text Operations
 1. Open a markdown file in split view (editor + preview)
 2. Select text in the preview pane
-3. Right-click and choose prompt template (Elaborate, Improve, Simplify, Rewrite, or Custom)
+3. Right-click and choose prompt template (Explain, Modify, Ask, Visualize, or custom)
 4. Prompt is sent to the Terminal panel based on template configuration
 5. Review AI response and iterate
 6. File references include precise line numbers for context

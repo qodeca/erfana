@@ -173,7 +173,7 @@ See [Terminal Bootstrap Pattern](../terminal/bootstrap-pattern.md) for detailed 
 
 **Template Configuration**:
 - `src/renderer/src/prompts/templates/modify.md` - `autoExecute: true` example
-- `src/renderer/src/prompts/templates/elaborate.md` - `autoExecute: true` example
+- `src/renderer/src/prompts/templates/explain.md` - `autoExecute: true` example
 - `src/renderer/src/prompts/templates/ask.md` - `autoExecute: true` example
 
 **Context Menu Integration**:

@@ -105,7 +105,7 @@ Templates use custom regex-based rendering (no eval):
 ## Icon Selection
 
 Common Lucide icons:
-- `maximize2` - Expand/elaborate
+- `maximize2` - Expand/explain
 - `minimize2` - Simplify
 - `refresh` - Rewrite
 - `sparkles` - Improve

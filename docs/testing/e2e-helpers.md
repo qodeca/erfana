@@ -267,8 +267,8 @@ test('editor context menu', async ({ window }) => {
   const menu = window.locator('[data-testid="context-menu-editor"]')
   await expect(menu).toBeVisible()
 
-  // Click elaborate action
-  await window.locator('[data-testid="context-menu-item-elaborate"]').click()
+  // Click explain action
+  await window.locator('[data-testid="context-menu-item-explain"]').click()
 
   // Menu should dismiss
   await expect(menu).not.toBeVisible()

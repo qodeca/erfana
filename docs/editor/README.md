@@ -36,12 +36,12 @@ Right-click with text selected in Monaco editor shows context menu with AI promp
 
 **Features:**
 - Prompts filtered by `area: code-editor`, `subArea: context-menu`
-- Actions: Elaborate (direct), Modify/Ask (with input dialog), Visualize (with dropdown)
+- Actions: Explain (direct), Modify/Ask (with input dialog), Visualize (with dropdown)
 - "Copy selection" copies text to clipboard
 - Menu dismisses on Escape, click outside, or action execution
 
 **Templates** (5 editor-specific):
-- `editor-elaborate.md` - Expand on selected code/text
+- `editor-explain.md` - Explain selected code/text
 - `editor-modify.md` - Apply modifications
 - `editor-ask.md` - Answer questions
 - `editor-visualize.md` - Generate diagrams

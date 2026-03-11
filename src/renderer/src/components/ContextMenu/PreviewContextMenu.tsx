@@ -18,7 +18,7 @@ import { logger } from '../../utils/logger'
  * Used for automated UI testing to identify context menu items.
  */
 const PROMPT_TEST_ID_MAP: Record<string, string> = {
-  elaborate: TEST_IDS.CONTEXT_MENU_ITEM_ELABORATE,
+  explain: TEST_IDS.CONTEXT_MENU_ITEM_EXPLAIN,
   modify: TEST_IDS.CONTEXT_MENU_ITEM_MODIFY,
   ask: TEST_IDS.CONTEXT_MENU_ITEM_ASK,
   visualize: TEST_IDS.CONTEXT_MENU_ITEM_VISUALIZE

@@ -274,7 +274,7 @@ Automatic scroll to bottom 1 second after executing prompt templates, respecting
 **Behavior**:
 - Terminal scrolls to bottom 1 second after prompt execution completes
 - Skips scroll if user manually scrolled during the 1-second delay window
-- Works with all prompt templates: Elaborate, Modify, Ask, diagram chat, Mermaid directions, import organization
+- Works with all prompt templates: Explain, Modify, Ask, diagram chat, Mermaid directions, import organization
 
 **Architecture** (Pure Logic Extraction):
 - `promptScrollScheduler.logic.ts`: Timestamp-based scheduling with user scroll detection
@@ -293,7 +293,7 @@ Automatic scroll to bottom 1 second after executing prompt templates, respecting
 - `src/renderer/src/utils/promptScrollScheduler.logic.test.ts` (871 lines, 66 tests)
 
 **Integration Points** (6 call sites):
-- PreviewContextMenu (Elaborate, Modify, Ask)
+- PreviewContextMenu (Explain, Modify, Ask)
 - ChatBubble (diagram chat + direction changes)
 - MermaidToolbar (direction buttons)
 - MermaidDiagram (bug report)

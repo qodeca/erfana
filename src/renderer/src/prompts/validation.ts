@@ -11,14 +11,14 @@ import type { PromptVariables } from './types'
  */
 export const PROMPT_REQUIREMENTS: Record<string, (keyof PromptVariables)[]> = {
   // Context menu prompts (markdown-preview area)
-  'elaborate': ['selectedText', 'filePath'],
+  'explain': ['selectedText', 'filePath'],
   'modify': ['selectedText', 'filePath', 'userInput'],
   'ask': ['selectedText', 'filePath', 'userInput'],
   'visualize': ['selectedText', 'filePath', 'diagramType'],
   'prompt': ['selectedText', 'filePath', 'userInput'],
 
   // Context menu prompts (code-editor area)
-  'editor-elaborate': ['selectedText', 'filePath'],
+  'editor-explain': ['selectedText', 'filePath'],
   'editor-modify': ['selectedText', 'filePath', 'userInput'],
   'editor-ask': ['selectedText', 'filePath', 'userInput'],
   'editor-visualize': ['selectedText', 'filePath', 'diagramType'],

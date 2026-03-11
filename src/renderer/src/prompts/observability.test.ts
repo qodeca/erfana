@@ -81,12 +81,12 @@ describe('observability', () => {
     })
 
     it('should record successful execution', () => {
-      const trace = startTrace('elaborate')
+      const trace = startTrace('explain')
       trace.success()
 
       const history = getTraceHistory()
       expect(history).toHaveLength(1)
-      expect(history[0].promptId).toBe('elaborate')
+      expect(history[0].promptId).toBe('explain')
       expect(history[0].success).toBe(true)
       expect(history[0].duration).toBeDefined()
       expect(history[0].duration).toBeGreaterThanOrEqual(0)
@@ -112,7 +112,7 @@ describe('observability', () => {
     })
 
     it('should include metadata', () => {
-      const trace = startTrace('elaborate', { userId: '123' })
+      const trace = startTrace('explain', { userId: '123' })
       trace.success({ resultSize: 500 })
 
       const history = getTraceHistory()
@@ -123,11 +123,11 @@ describe('observability', () => {
       setTracingEnabled(true)
       mockLogger.info.mockClear()
 
-      const trace = startTrace('elaborate')
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Starting execution: elaborate'))
+      const trace = startTrace('explain')
+      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Starting execution: explain'))
 
       trace.success()
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Execution succeeded: elaborate'))
+      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Execution succeeded: explain'))
     })
 
     it('should log failures when tracing is enabled', () => {
@@ -145,7 +145,7 @@ describe('observability', () => {
       setTracingEnabled(false)
       mockLogger.info.mockClear()
 
-      const trace = startTrace('elaborate')
+      const trace = startTrace('explain')
       trace.success()
 
       expect(mockLogger.info).not.toHaveBeenCalled()
@@ -205,18 +205,18 @@ describe('observability', () => {
 
   describe('getTracesForPrompt()', () => {
     it('should filter traces by prompt ID', () => {
-      startTrace('elaborate').success()
+      startTrace('explain').success()
       startTrace('modify').success()
-      startTrace('elaborate').failure({ message: 'Error' })
+      startTrace('explain').failure({ message: 'Error' })
       startTrace('ask').success()
 
-      const elaborateTraces = getTracesForPrompt('elaborate')
-      expect(elaborateTraces).toHaveLength(2)
-      expect(elaborateTraces.every(t => t.promptId === 'elaborate')).toBe(true)
+      const explainTraces = getTracesForPrompt('explain')
+      expect(explainTraces).toHaveLength(2)
+      expect(explainTraces.every(t => t.promptId === 'explain')).toBe(true)
     })
 
     it('should return empty array for unknown prompt', () => {
-      startTrace('elaborate').success()
+      startTrace('explain').success()
 
       expect(getTracesForPrompt('unknown')).toEqual([])
     })
@@ -279,13 +279,13 @@ describe('observability', () => {
     })
 
     it('should aggregate by prompt ID', () => {
-      startTrace('elaborate').success()
-      startTrace('elaborate').success()
+      startTrace('explain').success()
+      startTrace('explain').success()
       startTrace('modify').failure({ message: 'Error' })
 
       const metrics = getExecutionMetrics()
 
-      expect(metrics.byPromptId['elaborate']).toEqual({
+      expect(metrics.byPromptId['explain']).toEqual({
         total: 2,
         successful: 2,
         failed: 0,

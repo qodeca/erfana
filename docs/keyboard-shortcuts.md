@@ -38,7 +38,7 @@ Alternative to shortcuts - toolbar buttons in Editor/Split View modes:
 
 Right-click selected text:
 
-- **Elaborate** - Expand with detail → Terminal
+- **Explain** - Explain with detail → Terminal
 - **Improve** - Enhance grammar/style → Terminal
 - **Simplify** - Make clearer → Terminal
 - **Rewrite** - Rephrase → Terminal

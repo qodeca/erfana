@@ -101,7 +101,7 @@ describe('PreviewContextMenu Component', () => {
       renderWithProvider(<PreviewContextMenu {...defaultProps} />)
 
       // Should include all 5 context-menu prompts
-      expect(screen.getByText('Elaborate')).toBeInTheDocument()
+      expect(screen.getByText('Explain')).toBeInTheDocument()
       expect(screen.getByText('Modify')).toBeInTheDocument()
       expect(screen.getByText('Ask')).toBeInTheDocument()
       expect(screen.getByText('Visualize')).toBeInTheDocument()
@@ -124,7 +124,7 @@ describe('PreviewContextMenu Component', () => {
       const menuItems = portalRoot!.querySelectorAll('.context-menu-item:not(.context-menu-separator)')
       const labels = Array.from(menuItems).map((item) => item.textContent)
 
-      expect(labels[0]).toBe('Elaborate')
+      expect(labels[0]).toBe('Explain')
       expect(labels[1]).toBe('Modify')
       expect(labels[2]).toBe('Ask')
       expect(labels[3]).toBe('Visualize')
@@ -146,15 +146,15 @@ describe('PreviewContextMenu Component', () => {
   })
 
   describe('Icon Mapping', () => {
-    it('should render Maximize2 icon for Elaborate', () => {
+    it('should render Maximize2 icon for Explain', () => {
       renderWithProvider(<PreviewContextMenu {...defaultProps} />)
 
-      // Find the Elaborate menu item (div, not button)
-      const elaborateItem = screen.getByText('Elaborate').closest('.context-menu-item')
-      expect(elaborateItem).toBeInTheDocument()
+      // Find the Explain menu item (div, not button)
+      const explainItem = screen.getByText('Explain').closest('.context-menu-item')
+      expect(explainItem).toBeInTheDocument()
 
       // Check that it has an SVG icon
-      const icon = elaborateItem?.querySelector('svg.lucide-maximize2')
+      const icon = explainItem?.querySelector('svg.lucide-maximize2')
       expect(icon).toBeInTheDocument()
     })
 
@@ -307,18 +307,18 @@ describe('PreviewContextMenu Component', () => {
   })
 
   describe('Prompt Execution - Auto Execute', () => {
-    it('should execute immediately for Elaborate command (no input required)', async () => {
+    it('should execute immediately for Explain command (no input required)', async () => {
       const user = userEvent.setup()
       const onClose = vi.fn()
 
       renderWithProvider(<PreviewContextMenu {...defaultProps} onClose={onClose} />)
 
-      const elaborateBtn = screen.getByText('Elaborate')
-      await user.click(elaborateBtn)
+      const explainBtn = screen.getByText('Explain')
+      await user.click(explainBtn)
 
       // Should execute immediately
       await waitFor(() => {
-        expect(panelUtils.executePromptTemplate).toHaveBeenCalledWith('elaborate', {
+        expect(panelUtils.executePromptTemplate).toHaveBeenCalledWith('explain', {
           selectedText: 'Sample selected text',
           filePath: '/test/document.md',
           fullDocument: 'Full document content',
@@ -339,12 +339,12 @@ describe('PreviewContextMenu Component', () => {
 
       renderWithProvider(<PreviewContextMenu {...defaultProps} startLine={10} endLine={15} />)
 
-      const elaborateBtn = screen.getByText('Elaborate')
-      await user.click(elaborateBtn)
+      const explainBtn = screen.getByText('Explain')
+      await user.click(explainBtn)
 
       await waitFor(() => {
         expect(panelUtils.executePromptTemplate).toHaveBeenCalledWith(
-          'elaborate',
+          'explain',
           expect.objectContaining({
             startLine: 10,
             endLine: 15,
@@ -360,12 +360,12 @@ describe('PreviewContextMenu Component', () => {
 
       renderWithProvider(<PreviewContextMenu {...defaultProps} startLine={5} endLine={5} />)
 
-      const elaborateBtn = screen.getByText('Elaborate')
-      await user.click(elaborateBtn)
+      const explainBtn = screen.getByText('Explain')
+      await user.click(explainBtn)
 
       await waitFor(() => {
         expect(panelUtils.executePromptTemplate).toHaveBeenCalledWith(
-          'elaborate',
+          'explain',
           expect.objectContaining({
             lineRange: 'line 5',
             fileRef: '@/test/document.md:5'
@@ -439,17 +439,17 @@ describe('PreviewContextMenu Component', () => {
 
       // Temporarily modify PROMPT_REGISTRY to remove a prompt
       const { PROMPT_REGISTRY } = await import('../../prompts/registry')
-      const originalElaborate = PROMPT_REGISTRY['elaborate']
-      delete (PROMPT_REGISTRY as any)['elaborate']
+      const originalExplain = PROMPT_REGISTRY['explain']
+      delete (PROMPT_REGISTRY as any)['explain']
 
       renderWithProvider(<PreviewContextMenu {...defaultProps} />)
 
-      // Try to click the (now missing) elaborate prompt
+      // Try to click the (now missing) explain prompt
       // Since the registry is memoized, we'll test the error path differently
       // by directly testing the handleAction logic
 
       // Restore
-      ;(PROMPT_REGISTRY as any)['elaborate'] = originalElaborate
+      ;(PROMPT_REGISTRY as any)['explain'] = originalExplain
     })
   })
 })

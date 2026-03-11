@@ -18,7 +18,7 @@ The prompt template system enables AI-powered text operations through context me
 
 #### v0.3.3 - Initial autoExecute Implementation
 
-**Problem**: The "Elaborate", "Modify", and "Ask" context menu actions inconsistently executed the Enter key after pasting prompts to the terminal.
+**Problem**: The "Explain", "Modify", and "Ask" context menu actions inconsistently executed the Enter key after pasting prompts to the terminal.
 
 **Root Causes**:
 - Fire-and-forget terminal writes (no completion confirmation)
@@ -80,8 +80,8 @@ In template YAML frontmatter:
 
 ```yaml
 ---
-id: elaborate-selection
-label: Elaborate
+id: explain-selection
+label: Explain
 autoExecute: true  # ← Enables automatic Enter key press
 ---
 ```
@@ -90,7 +90,7 @@ autoExecute: true  # ← Enables automatic Enter key press
 
 **With autoExecute (true)**:
 1. User selects text in preview
-2. User right-clicks → "Elaborate"
+2. User right-clicks → "Explain"
 3. Prompt appears in terminal **and executes immediately**
 4. Claude/AI tool processes the request
 

@@ -52,7 +52,7 @@ const config = PROMPT_REGISTRY['mermaid-bug-report']  // Returns undefined!
 1. Add explicit `id` field to frontmatter schema
 2. Update parser to use explicit ID instead of slugify
 3. Add uniqueness validation in registry
-4. Migrate all existing templates (elaborate, improve, rewrite, simplify, mermaid-bug-report)
+4. Migrate all existing templates (explain, improve, rewrite, simplify, mermaid-bug-report)
 5. Remove slugify function
 
 **Implementation Files**:

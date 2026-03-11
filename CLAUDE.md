@@ -51,7 +51,7 @@ src/
 1. **Markdown Editor** - Monaco with live preview, scroll sync, Mermaid diagrams (zoom, pan, full-screen viewer), YAML frontmatter rendering, preserve line breaks option, unified in-file search (Cmd/Ctrl+F), context menu with AI prompts
 2. **Project Tree** - File explorer with drag-drop reorganization, external file drop (move/copy/import), markdown filtering, context menu, real-time git status indicators with polling fallback, manual refresh button (Cmd/Ctrl+Alt+R)
 3. **Terminal** - xterm.js with PTY backend, clipboard support, file links (multi-line: xterm-wrap joining + CLI-wrap joining for tool output), scroll recovery, auto-opens on project load, drag-drop file paths, bracketed paste mode for safe multi-line input, screenshot capture (macOS: screen/window/area selection with path pasted to terminal), camera photo capture (cross-platform: captures photo from webcam with path pasted to terminal)
-4. **Prompt Templates** - AI text operations via context menu (Elaborate, Modify, Ask, Visualize, diagram chat); Visualize generates Mermaid diagrams from selected text with dropdown for 22 diagram types
+4. **Prompt Templates** - AI text operations via context menu (Explain, Modify, Ask, Visualize, diagram chat); Visualize generates Mermaid diagrams from selected text with dropdown for 22 diagram types
 5. **Project Settings** - Per-project configuration via `.erfana/settings.json` (watcher ignore, tree visibility)
 6. **PDF Export** - Export markdown to print-optimized PDF with vector Mermaid diagrams, A4 page size, print-friendly styling
 7. **DOCX Export** - Export markdown to Word format with Mermaid diagrams as high-resolution PNG images

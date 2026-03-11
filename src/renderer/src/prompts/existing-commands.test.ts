@@ -8,52 +8,52 @@ import { mockPromptVariables } from './__test-utils__/fixtures'
  * This validates that no existing functionality was broken
  */
 describe('Existing Commands - Regression Tests', () => {
-  describe('Elaborate Command', () => {
+  describe('Explain Command', () => {
     it('should still exist and work correctly', () => {
-      const elaborate = getPrompt('elaborate')
+      const explain = getPrompt('explain')
 
-      expect(elaborate).not.toBeNull()
-      expect(elaborate?.id).toBe('elaborate')
-      expect(elaborate?.label).toBe('Elaborate')
+      expect(explain).not.toBeNull()
+      expect(explain?.id).toBe('explain')
+      expect(explain?.label).toBe('Explain')
     })
 
     it('should still have autoExecute enabled', () => {
-      const elaborate = getPrompt('elaborate')
+      const explain = getPrompt('explain')
 
-      expect(elaborate?.autoExecute).toBe(true)
+      expect(explain?.autoExecute).toBe(true)
     })
 
     it('should not require user input', () => {
-      const elaborate = getPrompt('elaborate')
+      const explain = getPrompt('explain')
 
-      expect(elaborate?.requiresInput).toBe(false)
+      expect(explain?.requiresInput).toBe(false)
     })
 
     it('should render template correctly', () => {
-      const elaborate = getPrompt('elaborate')
-      expect(elaborate).not.toBeNull()
+      const explain = getPrompt('explain')
+      expect(explain).not.toBeNull()
 
       const variables = mockPromptVariables({
-        selectedText: 'Test content to elaborate'
+        selectedText: 'Test content to explain'
       })
 
-      const result = promptRenderer.render(elaborate!.template, variables)
+      const result = promptRenderer.render(explain!.template, variables)
 
-      expect(result).toContain('Test content to elaborate')
-      // Template uses XML structure with "elaborate" task
-      expect(result).toContain('elaborate')
+      expect(result).toContain('Test content to explain')
+      // Template uses XML structure with "Explain" task
+      expect(result).toContain('Explain')
     })
 
     it('should maintain maximize2 icon', () => {
-      const elaborate = getPrompt('elaborate')
+      const explain = getPrompt('explain')
 
-      expect(elaborate?.icon).toBe('maximize2')
+      expect(explain?.icon).toBe('maximize2')
     })
 
     it('should be positioned first in context menu (order: 0 or undefined)', () => {
-      const elaborate = getPrompt('elaborate')
+      const explain = getPrompt('explain')
 
-      expect(elaborate?.order || 0).toBe(0)
+      expect(explain?.order || 0).toBe(0)
     })
   })
 
@@ -211,11 +211,11 @@ describe('Existing Commands - Regression Tests', () => {
   })
 
   describe('Context Menu Ordering - No Regression', () => {
-    it('should maintain correct order: Elaborate, Modify, Ask, Prompt', () => {
+    it('should maintain correct order: Explain, Modify, Ask, Prompt', () => {
       const prompts = getPromptsForArea('markdown-preview', 'context-menu')
       const ids = prompts.map((p) => p.id)
 
-      expect(ids[0]).toBe('elaborate')
+      expect(ids[0]).toBe('explain')
       expect(ids[1]).toBe('modify')
       expect(ids[2]).toBe('ask')
       expect(ids[3]).toBe('visualize')
@@ -251,7 +251,7 @@ describe('Existing Commands - Regression Tests', () => {
       const prompts = getPromptsForArea('markdown-preview')
       const ids = prompts.map((p) => p.id)
 
-      expect(ids).toContain('elaborate')
+      expect(ids).toContain('explain')
       expect(ids).toContain('modify')
       expect(ids).toContain('ask')
       expect(ids).toContain('visualize')
@@ -282,13 +282,13 @@ describe('Existing Commands - Regression Tests', () => {
 
   describe('RequiresInput Pattern - No Regression', () => {
     it('should maintain requiresInput pattern correctly', () => {
-      const elaborate = getPrompt('elaborate')
+      const explain = getPrompt('explain')
       const modify = getPrompt('modify')
       const ask = getPrompt('ask')
       const visualize = getPrompt('visualize')
       const prompt = getPrompt('prompt')
 
-      expect(elaborate?.requiresInput).toBe(false) // Direct execution
+      expect(explain?.requiresInput).toBe(false) // Direct execution
       expect(modify?.requiresInput).toBe(true)     // Needs modification instruction
       expect(ask?.requiresInput).toBe(true)        // Needs question
       expect(visualize?.requiresInput).toBe(true)  // Needs diagram type selection
@@ -305,7 +305,7 @@ describe('Existing Commands - Regression Tests', () => {
 
   describe('Template Variable Support - No Regression', () => {
     it('should still support all common variables across commands', () => {
-      const commands = ['elaborate', 'modify', 'ask', 'visualize', 'prompt']
+      const commands = ['explain', 'modify', 'ask', 'visualize', 'prompt']
 
       commands.forEach((cmdId) => {
         const cmd = getPrompt(cmdId)
@@ -314,10 +314,10 @@ describe('Existing Commands - Regression Tests', () => {
     })
 
     it('should still support file context variables', () => {
-      const elaborate = getPrompt('elaborate')
+      const explain = getPrompt('explain')
       const modify = getPrompt('modify')
 
-      expect(elaborate?.template).toContain('{{#if fileRef}}')
+      expect(explain?.template).toContain('{{#if fileRef}}')
       // Templates now use basename helper for displaying file path
       expect(modify?.template).toContain('{{basename filePath}}')
     })

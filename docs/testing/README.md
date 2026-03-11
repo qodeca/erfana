@@ -63,6 +63,7 @@ npm run test:e2e:update-screenshots  # Update visual baselines
 - `app-launch.e2e.ts` – Application launch, activity bar, welcome panel visibility
 - `third-party-components.e2e.ts` – Monaco editor, xterm.js terminal, Mermaid diagrams
 - `directory-watcher.e2e.ts` – Directory watcher pipeline (#104): verifies file creation via terminal appears in Project Tree within latency budget
+- `context-menu-explain.e2e.ts` – Context menu Explain prompt flow: preview (selection gating, menu items, click-outside dismiss, Explain → terminal) and editor (disabled state, enabled after selection, Explain → terminal)
 - `audio-transcription.e2e.ts` – Full audio import transcription lifecycle (real OpenAI API, requires `OPENAI_API_KEY`, skips if not set)
 - `fixture-smoke.e2e.ts` – Smoke tests for composed fixtures (testProject, withSettings, withOpenFile, appWithTestProject)
 - `visual-regression.e2e.ts` – Visual regression for 5 UI states (see below)

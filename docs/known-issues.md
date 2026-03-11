@@ -86,7 +86,7 @@ name: Mermaid Bug Report  # Display name (can change freely)
 1. Add `id` field to `PromptFrontmatterSchema` (schema.ts)
 2. Update parser to use explicit ID instead of slugify
 3. Add uniqueness validation in registry
-4. Migrate all existing templates (elaborate, improve, rewrite, simplify, mermaid-bug-report)
+4. Migrate all existing templates (explain, improve, rewrite, simplify, mermaid-bug-report)
 5. Remove slugify function
 
 **Status**: Architecture review complete, implementation pending.

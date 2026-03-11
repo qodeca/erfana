@@ -34,11 +34,11 @@ vi.mock('./toastHelpers', () => ({
 // Mock the registry and renderer
 vi.mock('../prompts/registry', () => ({
   PROMPT_REGISTRY: {
-    'elaborate': {
-      id: 'elaborate',
-      label: 'Elaborate',
+    'explain': {
+      id: 'explain',
+      label: 'Explain',
       icon: 'maximize2',
-      template: 'Elaborate on: {{selectedText}}',
+      template: 'Explain: {{selectedText}}',
       autoExecute: true
     },
     'modify': {
@@ -288,7 +288,7 @@ describe('panelUtils.ts', () => {
       const managers = createMockManagers()
 
       const result = await executePromptTemplate(
-        'elaborate',
+        'explain',
         {
           selectedText: 'Hello world',
           filePath: '/path/file.md',
@@ -300,8 +300,8 @@ describe('panelUtils.ts', () => {
       expect(result.success).toBe(true)
       expect(result.error).toBeUndefined()
       expect(managers.terminalManager.sendToTerminal).toHaveBeenCalledWith(
-        'Elaborate on: Hello world',
-        true // autoExecute is true for elaborate
+        'Explain: Hello world',
+        true // autoExecute is true for explain
       )
     })
 
@@ -365,7 +365,7 @@ describe('panelUtils.ts', () => {
       const managers = createMockManagers()
 
       await executePromptTemplate(
-        'elaborate',
+        'explain',
         {
           selectedText: 'Test',
           filePath: '/file.md',
@@ -385,7 +385,7 @@ describe('panelUtils.ts', () => {
       mockLogger.warn.mockClear()
 
       const result = await executePromptTemplate(
-        'elaborate',
+        'explain',
         {
           selectedText: 'Test',
           filePath: '/file.md',
@@ -520,12 +520,12 @@ describe('panelUtils.ts', () => {
 
       const promises = [
         executePromptTemplate(
-          'elaborate',
+          'explain',
           { selectedText: 'Text 1', filePath: '/a.md', fullDocument: '' },
           { managers, showToast: false }
         ),
         executePromptTemplate(
-          'elaborate',
+          'explain',
           { selectedText: 'Text 2', filePath: '/b.md', fullDocument: '' },
           { managers, showToast: false }
         )

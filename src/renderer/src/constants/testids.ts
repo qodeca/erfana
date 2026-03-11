@@ -316,8 +316,8 @@ export const TEST_IDS = {
   CONTEXT_MENU_EDITOR: 'context-menu-editor',
   /** Preview context menu container */
   CONTEXT_MENU_PREVIEW: 'context-menu-preview',
-  /** Elaborate prompt action */
-  CONTEXT_MENU_ITEM_ELABORATE: 'context-menu-item-elaborate',
+  /** Explain prompt action */
+  CONTEXT_MENU_ITEM_EXPLAIN: 'context-menu-item-explain',
   /** Modify prompt action */
   CONTEXT_MENU_ITEM_MODIFY: 'context-menu-item-modify',
   /** Ask prompt action */

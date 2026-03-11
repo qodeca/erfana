@@ -15,8 +15,8 @@ import type { PromptVariables } from './types'
 // Helper to create minimal valid variables for each template
 function createValidVariables(templateId: string): Partial<PromptVariables> {
   switch (templateId) {
-    case 'elaborate':
-    case 'editor-elaborate':
+    case 'explain':
+    case 'editor-explain':
       return { selectedText: 'Some text', filePath: '/path/file.md' }
     case 'modify':
     case 'ask':
@@ -45,7 +45,7 @@ describe('validation.ts', () => {
   describe('PROMPT_REQUIREMENTS', () => {
     it('should define requirements for all known templates', () => {
       const expectedTemplates = [
-        'elaborate',
+        'explain',
         'modify',
         'ask',
         'visualize',
@@ -93,8 +93,8 @@ describe('validation.ts', () => {
 
   describe('validateVariables()', () => {
     describe('valid cases', () => {
-      it('should return valid for elaborate with required variables', () => {
-        const result = validateVariables('elaborate', {
+      it('should return valid for explain with required variables', () => {
+        const result = validateVariables('explain', {
           selectedText: 'Hello world',
           filePath: '/path/to/file.md',
           fullDocument: 'Full doc content'
@@ -141,8 +141,8 @@ describe('validation.ts', () => {
     })
 
     describe('invalid cases', () => {
-      it('should return invalid for elaborate missing selectedText', () => {
-        const result = validateVariables('elaborate', {
+      it('should return invalid for explain missing selectedText', () => {
+        const result = validateVariables('explain', {
           selectedText: '',
           filePath: '/path/file.md',
           fullDocument: 'Content'
@@ -207,7 +207,7 @@ describe('validation.ts', () => {
 
     describe('edge cases', () => {
       it('should treat whitespace-only strings as missing', () => {
-        const result = validateVariables('elaborate', {
+        const result = validateVariables('explain', {
           selectedText: '   ',
           filePath: '/path/file.md',
           fullDocument: ''
@@ -218,7 +218,7 @@ describe('validation.ts', () => {
       })
 
       it('should treat undefined as missing', () => {
-        const result = validateVariables('elaborate', {
+        const result = validateVariables('explain', {
           selectedText: undefined as unknown as string,
           filePath: '/path/file.md',
           fullDocument: ''
@@ -229,7 +229,7 @@ describe('validation.ts', () => {
       })
 
       it('should treat null as missing', () => {
-        const result = validateVariables('elaborate', {
+        const result = validateVariables('explain', {
           selectedText: null as unknown as string,
           filePath: '/path/file.md',
           fullDocument: ''
@@ -240,7 +240,7 @@ describe('validation.ts', () => {
       })
 
       it('should accept valid non-empty strings', () => {
-        const result = validateVariables('elaborate', {
+        const result = validateVariables('explain', {
           selectedText: 'Valid text',
           filePath: '/path/file.md',
           fullDocument: ''
@@ -252,13 +252,13 @@ describe('validation.ts', () => {
 
     describe('error message formatting', () => {
       it('should format single missing variable', () => {
-        const result = validateVariables('elaborate', {
+        const result = validateVariables('explain', {
           selectedText: '',
           filePath: '/path/file.md',
           fullDocument: ''
         })
 
-        expect(result.errorMessage).toBe('Missing required variables for "elaborate": selectedText')
+        expect(result.errorMessage).toBe('Missing required variables for "explain": selectedText')
       })
 
       it('should format multiple missing variables', () => {
@@ -278,7 +278,7 @@ describe('validation.ts', () => {
 
   describe('getRequiredVariables()', () => {
     it('should return required variables for known template', () => {
-      const result = getRequiredVariables('elaborate')
+      const result = getRequiredVariables('explain')
       expect(result).toEqual(['selectedText', 'filePath'])
     })
 
@@ -296,7 +296,7 @@ describe('validation.ts', () => {
 
   describe('hasRequirements()', () => {
     it('should return true for template with requirements', () => {
-      expect(hasRequirements('elaborate')).toBe(true)
+      expect(hasRequirements('explain')).toBe(true)
       expect(hasRequirements('modify')).toBe(true)
       expect(hasRequirements('diagram-chat')).toBe(true)
     })

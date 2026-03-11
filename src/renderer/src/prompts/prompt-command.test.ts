@@ -236,16 +236,16 @@ describe('Prompt Command - New Feature Tests', () => {
       expect(lastPrompt.id).toBe('prompt')
     })
 
-    it('should appear after Elaborate, Modify, and Ask commands', () => {
+    it('should appear after Explain, Modify, and Ask commands', () => {
       const prompts = getPromptsForArea('markdown-preview', 'context-menu')
       const ids = prompts.map((p) => p.id)
 
-      const elaborateIndex = ids.indexOf('elaborate')
+      const explainIndex = ids.indexOf('explain')
       const modifyIndex = ids.indexOf('modify')
       const askIndex = ids.indexOf('ask')
       const promptIndex = ids.indexOf('prompt')
 
-      expect(promptIndex).toBeGreaterThan(elaborateIndex)
+      expect(promptIndex).toBeGreaterThan(explainIndex)
       expect(promptIndex).toBeGreaterThan(modifyIndex)
       expect(promptIndex).toBeGreaterThan(askIndex)
     })
@@ -274,13 +274,13 @@ describe('Prompt Command - New Feature Tests', () => {
       })
     })
 
-    it('should be more flexible than Elaborate (no fixed instruction)', () => {
-      const elaborate = getPrompt('elaborate')
+    it('should be more flexible than Explain (no fixed instruction)', () => {
+      const explain = getPrompt('explain')
       const prompt = getPrompt('prompt')
 
-      // Elaborate has fixed instruction in template (XML-structured with "elaborate" task)
-      expect(elaborate?.template).toContain('elaborate')
-      expect(elaborate?.requiresInput).toBe(false)
+      // Explain has fixed instruction in template (XML-structured with "Explain" task)
+      expect(explain?.template).toContain('Explain')
+      expect(explain?.requiresInput).toBe(false)
 
       // Prompt uses user's custom instruction
       expect(prompt?.template).toContain('{{userInput}}')

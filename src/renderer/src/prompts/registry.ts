@@ -24,7 +24,7 @@ const templateModules = import.meta.glob<string>('./templates/*.md', {
  * Extracts filename from path and pairs with raw content
  */
 const templateInputs = Object.entries(templateModules).map(([path, raw]) => {
-  // Extract filename from path: './templates/elaborate.md' -> 'elaborate.md'
+  // Extract filename from path: './templates/explain.md' -> 'explain.md'
   const filename = path.split('/').pop() || path
   return { raw, filename }
 })

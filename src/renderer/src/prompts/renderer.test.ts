@@ -337,7 +337,7 @@ From {{filePath}} ({{formatLineRange startLine endLine}}):
       expect(result).toContain('Summarize this in bullet points')
     })
 
-    it('should render elaborate template (no user input)', () => {
+    it('should render explain template', () => {
       const template = `{{#if fileRef}}{{fileRef}}
 
 From {{filePath}} ({{formatLineRange startLine endLine}}):
@@ -347,14 +347,14 @@ From {{filePath}} ({{formatLineRange startLine endLine}}):
 {{selectedText}}
 ---
 
-Elaborate on this text in 2-3 focused paragraphs.`
+Explain and expand on this text in 2-3 focused paragraphs.`
 
       const variables = TEST_VARIABLES.withLineRange
 
       const result = promptRenderer.render(template, variables)
 
       expect(result).toContain('Selected text:')
-      expect(result).toContain('Elaborate on this text')
+      expect(result).toContain('Explain and expand on this text')
     })
 
     it('should handle template with missing optional fields', () => {

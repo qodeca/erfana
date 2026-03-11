@@ -30,8 +30,8 @@ export interface ParsedTemplate {
  * @throws Error if frontmatter is invalid
  *
  * @example
- * const template = parseTemplate(rawContent, 'elaborate.md')
- * console.log(template.frontmatter.name) // "Elaborate"
+ * const template = parseTemplate(rawContent, 'explain.md')
+ * console.log(template.frontmatter.name) // "Explain"
  * console.log(template.content) // Handlebars template content
  */
 export function parseTemplate(raw: string, filename: string): ParsedTemplate {
@@ -86,7 +86,7 @@ export function parseTemplate(raw: string, filename: string): ParsedTemplate {
  * @returns Lowercase, hyphenated string
  *
  * @example
- * slugify("Ask to Elaborate") // "ask-to-elaborate"
+ * slugify("Ask to Explain") // "ask-to-explain"
  */
 export function slugify(str: string): string {
   return str

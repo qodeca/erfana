@@ -39,7 +39,7 @@
 templates/
 ├── claude-code/
 │   ├── markdown-preview/
-│   │   ├── elaborate.md
+│   │   ├── explain.md
 │   │   ├── modify.md
 │   │   └── ... (5 files)
 │   ├── monaco-editor/ (5 files)
@@ -93,7 +93,7 @@ templates/
 2. **Codex**: Markdown-style with headers and code fences, standard file paths, concise instructions
 3. **Gemini CLI**: Plain text with clear section headers, standard file references, natural language formatting
 
-**Template organization**: `templates/{tool-slug}/{area}/{prompt}.md` (e.g., `templates/claude-code/markdown-preview/elaborate.md`)
+**Template organization**: `templates/{tool-slug}/{area}/{prompt}.md` (e.g., `templates/claude-code/markdown-preview/explain.md`)
 
 **Traces to**: 013-TC-004
 
@@ -216,5 +216,5 @@ templates/
 
 **Log entries**:
 - Tool selection change: `[TerminalStore] CLI tool changed: claude-code → codex`
-- Template resolution: `[PromptRegistry] Resolved: elaborate → markdown-preview/elaborate-codex.md`
+- Template resolution: `[PromptRegistry] Resolved: explain → markdown-preview/explain-codex.md`
 - Fallback triggered: `[PromptRegistry] WARN: Template not found, falling back to claude-code`

@@ -267,7 +267,7 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 |--------|---------|------|
 | `context-menu-editor` | Editor menu | static |
 | `context-menu-preview` | Preview menu | static |
-| `context-menu-item-elaborate` | Elaborate prompt | static |
+| `context-menu-item-explain` | Explain prompt | static |
 | `context-menu-item-modify` | Modify prompt | static |
 | `context-menu-item-ask` | Ask prompt | static |
 | `context-menu-item-visualize` | Visualize prompt | static |

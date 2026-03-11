@@ -49,13 +49,13 @@
 
 **Steps**:
 1. Select "Claude Code" as CLI tool
-2. Trigger "Elaborate" prompt from context menu
+2. Trigger "Explain" prompt from context menu
 3. Verify output uses Claude Code template (XML blocks: `<context>`, `<task>`)
 4. Change CLI tool to "Codex"
-5. Trigger the same "Elaborate" prompt
+5. Trigger the same "Explain" prompt
 6. Verify output uses Codex template (markdown with headers and code fences)
 7. Change CLI tool to "Gemini CLI"
-8. Trigger the same "Elaborate" prompt
+8. Trigger the same "Explain" prompt
 9. Verify output uses Gemini CLI template (plain text with section headers)
 
 **Expected result**: Each tool uses its dedicated template version; output format matches tool conventions.
@@ -74,8 +74,8 @@
 1. Verify template directory structure exists (3 tools × 14 templates = 42 files):
 
    **Claude Code** (`templates/claude-code/`):
-   - `markdown-preview/`: elaborate.md, modify.md, ask.md, visualize.md, prompt.md
-   - `monaco-editor/`: elaborate.md, modify.md, ask.md, visualize.md, prompt.md
+   - `markdown-preview/`: explain.md, modify.md, ask.md, visualize.md, prompt.md
+   - `monaco-editor/`: explain.md, modify.md, ask.md, visualize.md, prompt.md
    - `mermaid-viewer/`: chat.md, bug-report.md, change-direction.md
    - `other/`: organize-import.md
 
@@ -161,11 +161,11 @@
 
 **Description**: Verify the system gracefully falls back to Claude Code template when a tool-specific template is missing.
 
-**Preconditions**: Temporarily remove or rename one Codex template file (e.g., `elaborate-codex.md`).
+**Preconditions**: Temporarily remove or rename one Codex template file (e.g., `explain-codex.md`).
 
 **Steps**:
 1. Select "Codex" as CLI tool
-2. Trigger "Elaborate" prompt (whose template was removed)
+2. Trigger "Explain" prompt (whose template was removed)
 3. Observe console for warning message
 4. Verify prompt executes successfully
 5. Verify output uses Claude Code format (fallback)
@@ -187,7 +187,7 @@
 1. Add a mock tool "TestCLI" to the tool registry:
    - Add registry entry with format configuration
    - Add variable factory configuration for file reference format
-   - Create one test template (e.g., `elaborate-test-cli.md`)
+   - Create one test template (e.g., `explain-test-cli.md`)
 2. Verify no changes required to:
    - Core rendering logic (`renderer.ts`)
    - Existing tool templates

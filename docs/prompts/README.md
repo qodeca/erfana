@@ -11,7 +11,7 @@ The template system enables AI-powered text operations through right-click conte
 ## Quick Start
 
 1. Right-click selected text in preview or editor
-2. Choose action: **Elaborate**, **Modify**, **Ask**, **Visualize**, or custom template
+2. Choose action: **Explain**, **Modify**, **Ask**, **Visualize**, or custom template
 3. Prompt sent to Terminal panel
 4. Review/edit before execution (unless auto-execute enabled)
 
@@ -97,7 +97,7 @@ Templates can include thinking triggers for Claude Code to enable deeper analysi
 | "ultrathink" | ~32,000 | Very complex problems |
 
 **Applied in templates:**
-- `elaborate.md`: "Think about the content..."
+- `explain.md`: "Think about the content..."
 - `ask.md`: "Think about the question..."
 - `visualize.md`: "Think hard about how to best represent..."
 
@@ -107,7 +107,7 @@ Templates can include thinking triggers for Claude Code to enable deeper analysi
 
 | Template | Purpose | Input Required |
 |----------|---------|----------------|
-| `elaborate.md` | Expand on selected text | No |
+| `explain.md` | Explain selected text | No |
 | `modify.md` | Apply modifications | Yes (instruction) |
 | `ask.md` | Answer questions | Yes (question) |
 | `visualize.md` | Generate Mermaid diagrams | Yes (diagram type dropdown) |
@@ -121,7 +121,7 @@ Templates can include thinking triggers for Claude Code to enable deeper analysi
 
 | Template | Purpose | Input Required |
 |----------|---------|----------------|
-| `editor-elaborate.md` | Expand on selected code/text | No |
+| `editor-explain.md` | Explain selected code/text | No |
 | `editor-modify.md` | Apply modifications to code | Yes (instruction) |
 | `editor-ask.md` | Answer questions about code | Yes (question) |
 | `editor-visualize.md` | Generate diagrams from code | Yes (diagram type dropdown) |

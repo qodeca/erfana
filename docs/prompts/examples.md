@@ -2,14 +2,14 @@
 
 ## Built-in Templates
 
-### Elaborate
-Expands selected text with detail and examples.
+### Explain
+Explains selected text with detail and examples.
 
 ```markdown
 ---
 area: markdown-preview
 subArea: context-menu
-name: Elaborate
+name: Explain
 icon: maximize2
 targetPanel: terminal
 autoExecute: true
@@ -24,7 +24,7 @@ In {{filePath}} ({{formatLineRange startLine endLine}}):
 {{selectedText}}
 ---
 
-Please elaborate on this text with more detail, examples, and context.
+Please explain this text with more detail, examples, and context.
 ```
 
 ### Modify

@@ -23,14 +23,14 @@ Currently, the prompt template system is designed around a single CLI tool forma
 Current templates requiring multi-tool versions:
 
 **Markdown preview context menu** (5 templates):
-- `elaborate.md` - Expand/elaborate on selected text
+- `explain.md` - Expand/explain on selected text
 - `modify.md` - Apply user-specified modification
 - `ask.md` - Answer questions about selection
 - `visualize.md` - Generate Mermaid diagram (22 diagram types)
 - `prompt.md` - Free-form prompt with context
 
 **Monaco editor context menu** (5 templates):
-- `editor-elaborate.md` - Elaborate on selected code
+- `editor-explain.md` - Explain on selected code
 - `editor-modify.md` - Modify selected code
 - `editor-ask.md` - Ask about selected code
 - `editor-visualize.md` - Visualize code as diagram
@@ -51,8 +51,8 @@ Current templates requiring multi-tool versions:
 Existing templates will be migrated to the new structure as follows:
 
 1. **Rename existing templates** to Claude Code versions in tool-specific subfolders:
-   - `templates/elaborate.md` → `templates/claude-code/markdown-preview/elaborate.md`
-   - `templates/editor-elaborate.md` → `templates/claude-code/monaco-editor/elaborate.md`
+   - `templates/explain.md` → `templates/claude-code/markdown-preview/explain.md`
+   - `templates/editor-explain.md` → `templates/claude-code/monaco-editor/explain.md`
    - etc.
 
 2. **Research prompting best practices** for each non-Claude tool:
@@ -68,8 +68,8 @@ Existing templates will be migrated to the new structure as follows:
      - Instruction style recommendations
 
 3. **Create Codex and Gemini CLI versions** in their respective tool subfolders:
-   - `templates/codex/markdown-preview/elaborate.md`
-   - `templates/gemini-cli/markdown-preview/elaborate.md`
+   - `templates/codex/markdown-preview/explain.md`
+   - `templates/gemini-cli/markdown-preview/explain.md`
    - Apply research findings to optimize each template for its target tool
    - Convert XML blocks to markdown (Codex) or plain text (Gemini)
    - Update file reference format per tool conventions

@@ -18,7 +18,7 @@ describe('Template Registry', () => {
 
       const ids = getAllPromptIds()
       // Markdown-preview prompts
-      expect(ids).toContain('elaborate')
+      expect(ids).toContain('explain')
       expect(ids).toContain('modify')
       expect(ids).toContain('ask')
       expect(ids).toContain('visualize')
@@ -28,7 +28,7 @@ describe('Template Registry', () => {
       expect(ids).toContain('diagram-chat')
       expect(ids).toContain('organize-import')
       // Editor prompts
-      expect(ids).toContain('editor-elaborate')
+      expect(ids).toContain('editor-explain')
       expect(ids).toContain('editor-modify')
       expect(ids).toContain('editor-ask')
       expect(ids).toContain('editor-visualize')
@@ -51,12 +51,12 @@ describe('Template Registry', () => {
   })
 
   describe('getPrompt() Function', () => {
-    it('should return correct config for valid ID: elaborate', () => {
-      const prompt = getPrompt('elaborate')
+    it('should return correct config for valid ID: explain', () => {
+      const prompt = getPrompt('explain')
 
       expect(prompt).not.toBeNull()
-      expect(prompt?.id).toBe('elaborate')
-      expect(prompt?.label).toBe('Elaborate')
+      expect(prompt?.id).toBe('explain')
+      expect(prompt?.label).toBe('Explain')
       expect(prompt?.icon).toBe('maximize2')
       expect(prompt?.area).toBe('markdown-preview')
       expect(prompt?.autoExecute).toBe(true)
@@ -137,7 +137,7 @@ describe('Template Registry', () => {
       const ids = getAllPromptIds()
 
       // Markdown-preview prompts
-      expect(ids).toContain('elaborate')
+      expect(ids).toContain('explain')
       expect(ids).toContain('modify')
       expect(ids).toContain('ask')
       expect(ids).toContain('visualize')
@@ -148,7 +148,7 @@ describe('Template Registry', () => {
       expect(ids).toContain('organize-import')
 
       // Editor prompts
-      expect(ids).toContain('editor-elaborate')
+      expect(ids).toContain('editor-explain')
       expect(ids).toContain('editor-modify')
       expect(ids).toContain('editor-ask')
       expect(ids).toContain('editor-visualize')
@@ -177,9 +177,9 @@ describe('Template Registry', () => {
         expect(prompt.subArea).toBe('context-menu')
       })
 
-      // Should include elaborate, modify, ask, visualize, prompt
+      // Should include explain, modify, ask, visualize, prompt
       const ids = prompts.map((p) => p.id)
-      expect(ids).toContain('elaborate')
+      expect(ids).toContain('explain')
       expect(ids).toContain('modify')
       expect(ids).toContain('ask')
       expect(ids).toContain('visualize')
@@ -262,8 +262,8 @@ describe('Template Registry', () => {
       expect(prompt?.inputPlaceholder).toContain('summarize')
     })
 
-    it('should have "Elaborate" template without requiresInput', () => {
-      const prompt = getPrompt('elaborate')
+    it('should have "Explain" template without requiresInput', () => {
+      const prompt = getPrompt('explain')
 
       expect(prompt?.requiresInput).toBe(false)
     })
@@ -276,7 +276,7 @@ describe('Template Registry', () => {
         return acc
       }, {} as Record<string, string>)
 
-      expect(iconMap['elaborate']).toBe('maximize2')
+      expect(iconMap['explain']).toBe('maximize2')
       expect(iconMap['modify']).toBe('edit-3')
       expect(iconMap['ask']).toBe('help-circle')
       expect(iconMap['visualize']).toBe('layout-grid')
@@ -292,12 +292,23 @@ describe('Template Registry', () => {
       expect(prompt?.template).toContain('{{selectedText}}')
     })
 
-    it('should have "Elaborate" template with specific instructions', () => {
-      const prompt = getPrompt('elaborate')
+    it('should have "Explain" template with specific instructions', () => {
+      const prompt = getPrompt('explain')
 
       expect(prompt?.template).toContain('{{selectedText}}')
-      // Template uses XML structure with "elaborate" task
-      expect(prompt?.template).toContain('elaborate')
+      // Template uses XML structure with "Explain" task
+      expect(prompt?.template).toContain('Explain')
+      // Guardrail: must not edit the source file
+      expect(prompt?.template).toContain('Do NOT edit')
+    })
+
+    it('should have "editor-explain" template with guardrail instructions', () => {
+      const prompt = getPrompt('editor-explain')
+
+      expect(prompt?.template).toContain('{{selectedText}}')
+      expect(prompt?.template).toContain('Explain')
+      // Guardrail: must not edit the source file
+      expect(prompt?.template).toContain('Do NOT edit')
     })
 
     it('should have all templates with file context handling', () => {
