@@ -58,12 +58,6 @@
   position: relative;
 }
 
-/* Debug: Ensure xterm content is visible */
-.terminal-container * {
-  visibility: visible !important;
-  opacity: 1 !important;
-}
-
 /* Ensure xterm terminal fills the container */
 .terminal-container .xterm {
   height: 100% !important;

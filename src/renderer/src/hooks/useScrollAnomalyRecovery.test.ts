@@ -644,6 +644,55 @@ describe('useScrollAnomalyRecovery', () => {
     // scrollToBottom should not be called after unmount
   })
 
+  describe('injected lastUserScrollTsRef', () => {
+    it('uses injected ref when provided (B1)', () => {
+      const xtermRef = { current: createMockXterm() }
+      const terminalRef = createMockTerminalRef()
+      const injectedRef = { current: 0 }
+
+      const { result } = renderHook(() =>
+        useScrollAnomalyRecovery(xtermRef, terminalRef, {
+          lastUserScrollTsRef: injectedRef
+        })
+      )
+
+      // Returned ref should be the same object as injected ref
+      expect(result.current.lastUserScrollTsRef).toBe(injectedRef)
+    })
+
+    it('creates internal fallback ref when no injection (B2)', () => {
+      const xtermRef = { current: createMockXterm() }
+      const terminalRef = createMockTerminalRef()
+
+      const { result } = renderHook(() =>
+        useScrollAnomalyRecovery(xtermRef, terminalRef)
+      )
+
+      // Should still return a ref (internally created)
+      expect(result.current.lastUserScrollTsRef).toBeDefined()
+      expect(result.current.lastUserScrollTsRef.current).toBe(0)
+    })
+
+    it('resetAll zeroes the injected ref (B3)', () => {
+      const xtermRef = { current: createMockXterm() }
+      const terminalRef = createMockTerminalRef()
+      const injectedRef = { current: 5000 }
+
+      const { result } = renderHook(() =>
+        useScrollAnomalyRecovery(xtermRef, terminalRef, {
+          lastUserScrollTsRef: injectedRef
+        })
+      )
+
+      act(() => {
+        result.current.resetAll()
+      })
+
+      // Injected ref should be zeroed
+      expect(injectedRef.current).toBe(0)
+    })
+  })
+
   it('cancels previous RAF when new data arrives rapidly', async () => {
     const cancelAnimationFrame = vi.fn()
     vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrame)

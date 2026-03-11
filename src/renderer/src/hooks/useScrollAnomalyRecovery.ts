@@ -59,6 +59,12 @@ export interface UseScrollAnomalyRecoveryOptions {
    * Used to coordinate with useTerminalParserHooks to avoid double-recovery.
    */
   parserHandledRef?: React.MutableRefObject<boolean>
+  /**
+   * Shared last user scroll timestamp ref – injected from parent for coordination
+   * with useTerminalParserHooks. If provided, used instead of creating an internal one.
+   * User scroll events still update this ref from within this hook.
+   */
+  lastUserScrollTsRef?: React.MutableRefObject<number>
 }
 
 export interface UseScrollAnomalyRecoveryReturn {
@@ -83,7 +89,7 @@ export interface UseScrollAnomalyRecoveryReturn {
   resetAll: () => void
 
   /**
-   * Last user scroll timestamp ref - exposed for coordination with parser hooks.
+   * Last user scroll timestamp ref – reflects the active ref (injected or internal).
    * Parser hooks use this to avoid restoring position when user recently scrolled.
    */
   lastUserScrollTsRef: React.MutableRefObject<number>
@@ -124,7 +130,13 @@ export function useScrollAnomalyRecovery(
   terminalRef: React.RefObject<HTMLDivElement | null>,
   options: UseScrollAnomalyRecoveryOptions = {}
 ): UseScrollAnomalyRecoveryReturn {
-  const { enabled = true, config: configOverrides, onRecovery, parserHandledRef } = options
+  const {
+    enabled = true,
+    config: configOverrides,
+    onRecovery,
+    parserHandledRef,
+    lastUserScrollTsRef: injectedLastUserScrollTsRef
+  } = options
 
   // Merge config with defaults
   const config = useMemo<ScrollAnomalyConfig>(
@@ -135,8 +147,10 @@ export function useScrollAnomalyRecovery(
     [configOverrides]
   )
 
-  // Refs for tracking state without causing re-renders
-  const lastUserScrollTsRef = useRef(0)
+  // Internal ref as fallback when no shared ref is injected
+  const internalLastUserScrollTsRef = useRef(0)
+  // Use injected ref if provided (shared with parser hooks), otherwise internal
+  const lastUserScrollTsRef = injectedLastUserScrollTsRef ?? internalLastUserScrollTsRef
   const lastDataTsRef = useRef(0)
   const rafIdRef = useRef<number | null>(null)
 
@@ -424,6 +438,7 @@ export function useScrollAnomalyRecovery(
   }, [])
 
   // Issue #22 Enhanced: Reset all tracking state (call on terminal/project change)
+  // Note: zeroes the shared lastUserScrollTsRef, affecting both this hook and parser hooks
   const resetAll = useCallback(() => {
     anomalyCountRef.current = 0
     immediateRecoveryRef.current = false

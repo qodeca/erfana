@@ -120,11 +120,16 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // Project store for file opening functionality (issue #26)
   const dockviewApi = useProjectStore((state) => state.dockviewApi)
 
+  // Shared ref for coordinating user-scroll cooldown between parser hooks and anomaly recovery.
+  // Both hooks read/write this ref so the parser hook's 300ms cooldown actually activates.
+  const sharedLastUserScrollTsRef = useRef(0)
+
   // Parser hooks for same-frame scroll preservation (primary recovery mechanism)
   // Intercepts ED 2/3 sequences BEFORE they affect viewport, restores via microtask
   // Must be declared first to get parserHandledRef for scroll recovery coordination
   const { registerHooks, parserHandledRef } = useTerminalParserHooks({
     enabled: true,
+    lastUserScrollTsRef: sharedLastUserScrollTsRef,
     onIntercept: (type) => {
       logger.debug(`[ParserHooks] Intercepted ${type}, restoring scroll position`)
     }
@@ -137,10 +142,11 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // - Fast recovery interval: 50ms (reduced from 100ms for faster fallback)
   // - Smart recovery target: Restore reading position, not just scroll to bottom
   // Parser hooks handle primary recovery; this interval is now a fallback
-  const { wrapOnDataHandler, resetAll, lastUserScrollTsRef } = useScrollAnomalyRecovery(
+  const { wrapOnDataHandler, resetAll } = useScrollAnomalyRecovery(
     xtermRef,
     terminalRef,
     {
+      lastUserScrollTsRef: sharedLastUserScrollTsRef,
       onRecovery: (count) => {
         logger.debug(`[ScrollRecovery] Fallback recovery from ${count} anomalous scroll event(s)`)
       },
@@ -801,7 +807,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     // This handles panel drag, window resize, and show/hide
     const resizeObserver = new ResizeObserver(() => {
       // Debounce slightly to avoid excessive resize calls
-      pendingTimeouts.push(setTimeout(handleResize, 10))
+      pendingTimeouts.push(setTimeout(handleResize, 50))
     })
 
     resizeObserver.observe(terminalRef.current)
@@ -1009,6 +1015,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     await cleanupTerminalInstance(terminalIdRef.current)
     setActiveTerminalId(null)
 
+    // Cleanup parser hooks before disposing xterm
+    parserDisposablesRef.current.forEach((d) => d.dispose())
+    parserDisposablesRef.current = []
     // Cleanup context menu handler before disposing xterm
     if (xtermRef.current?.element && contextMenuHandlerRef.current) {
       xtermRef.current.element.removeEventListener('contextmenu', contextMenuHandlerRef.current)
@@ -1098,12 +1107,12 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   useEffect(() => {
     if (!registerLastUserScrollTsRef || !unregisterLastUserScrollTsRef) return
 
-    registerLastUserScrollTsRef(lastUserScrollTsRef)
+    registerLastUserScrollTsRef(sharedLastUserScrollTsRef)
 
     return () => {
       unregisterLastUserScrollTsRef()
     }
-  }, [registerLastUserScrollTsRef, unregisterLastUserScrollTsRef, lastUserScrollTsRef])
+  }, [registerLastUserScrollTsRef, unregisterLastUserScrollTsRef, sharedLastUserScrollTsRef])
 
   // Context menu close handler - uses stable callback ref
   const handleCloseContextMenu = useCallback(() => {
