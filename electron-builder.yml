@@ -1,6 +1,7 @@
 appId: com.erfana.app
 productName: Erfana
 afterPack: ./scripts/fuses.js
+afterSign: ./scripts/resign.js
 directories:
   buildResources: resources
   output: release/${version}

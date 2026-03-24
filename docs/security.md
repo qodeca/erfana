@@ -474,7 +474,18 @@ If a security vulnerability is discovered:
 
 ---
 
-## Future Enhancements
+## Ad-hoc code signing (macOS)
+
+Erfana uses ad-hoc signing (no Apple Developer ID). The build pipeline has two signing-related hooks:
+
+1. **`afterPack`** (`scripts/fuses.js`) – flips Electron fuses, resets ad-hoc signature on main binary
+2. **`afterSign`** (`scripts/resign.js`) – deep re-signs the entire `.app` bundle atomically
+
+The `afterSign` hook is critical: without it, macOS Sequoia+ rejects `@rpath` library loads between the main process and helper processes because they have mismatched ad-hoc code directory hashes. See `docs/build/troubleshooting.md` for details.
+
+---
+
+## Future enhancements
 
 1. **Code signing**: Sign macOS builds with Developer ID (requires Apple Developer account)
 2. **Notarization**: Notarize macOS builds for Gatekeeper (requires code signing)

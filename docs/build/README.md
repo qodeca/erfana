@@ -86,8 +86,10 @@ npm install
    - Preload script: ~30 kB (bundled dependencies)
    - Renderer: ~10.9 MB (Monaco, Mermaid, xterm.js included)
 4. **electron-builder Package**: Create platform packages
-5. **afterPack Hook**: Apply Electron fuses
-6. **DMG/ZIP Creation**: Package for distribution
+5. **afterPack Hook**: Apply Electron fuses (`scripts/fuses.js`)
+6. **Code Signing**: electron-builder ad-hoc signs all binaries
+7. **afterSign Hook**: Deep re-sign bundle for consistent identity (`scripts/resign.js`)
+8. **DMG/ZIP Creation**: Package for distribution
 
 **Build Output**:
 ```

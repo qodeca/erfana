@@ -166,6 +166,38 @@ npm run build:mac
 
 ---
 
+## App crashes on launch from DMG (dyld "different Team IDs")
+
+### Error message
+
+```
+dyld: Library not loaded: @rpath/Electron Framework.framework/Electron Framework
+Reason: code signature not valid for use in process: mapping process and
+mapped file (non-platform) have different Team IDs
+```
+
+### Cause
+
+macOS Sequoia+ enforces Team ID matching across `@rpath` library loads. When
+`flipFuses` modifies only the main Electron binary and electron-builder then
+ad-hoc signs each component separately, the code directory hashes don't match
+across binaries. The `afterSign` hook (`scripts/resign.js`) exists to fix this
+by deep re-signing the entire bundle atomically.
+
+### Solution
+
+If this error appears, the `afterSign` hook is missing or failed:
+
+```bash
+# Manual fix for an already-built app
+codesign --force --deep --sign - /path/to/Erfana.app
+
+# Proper fix: ensure electron-builder.yml has
+# afterSign: ./scripts/resign.js
+```
+
+---
+
 ## DMG "Damaged" Error
 
 ### Error Message
