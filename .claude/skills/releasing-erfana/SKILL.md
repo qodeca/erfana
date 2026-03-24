@@ -36,6 +36,17 @@ Activate when user says:
 4. **All quality gates must pass** - No skipping lint, typecheck, or tests
 5. **Human approves release notes** - Draft is generated, user reviews/edits
 
+## CRITICAL ENFORCEMENT RULES
+
+**These rules are NON-NEGOTIABLE. Violations are automatic failures.**
+
+1. **NO PHASE SKIPPING** – ALL phases (0–5) MUST execute every time. No exceptions.
+2. **NO CHECKPOINT SKIPPING** – Every checkpoint (0.3, 1.5, 2.6, 3.3, 4.1) MUST present options to user.
+3. **SEQUENTIAL EXECUTION** – Phase N cannot start until Phase N-1 checkpoint passes.
+4. **"Already done" is NOT a valid skip reason** – Even if artifacts exist from a previous attempt, re-execute the phase. Prior state may be stale.
+5. **Smoke test crash = STOP** – A crash during any smoke test blocks the release. NEVER dismiss a crash as "expected behavior."
+6. **User confirms every checkpoint** – Do not auto-approve on behalf of the user.
+
 ---
 
 ## Phase 0: Pre-flight Checks
@@ -274,7 +285,9 @@ Build Artifacts:
 
 ---
 
-## Phase 3: Release Notes
+## Phase 3: Release Notes – MANDATORY
+
+**This phase MUST execute even if release notes exist from a prior attempt. Prior notes may be stale.**
 
 ### 3.1 Analyze Changes
 
@@ -306,6 +319,8 @@ Using the template in `templates/release-notes.md`, create a draft with:
 
 ### 3.3 Checkpoint: User Reviews Release Notes
 
+**MANDATORY: This checkpoint requires explicit user approval. Do not skip even if notes exist from a prior release attempt.**
+
 Present the draft and ask:
 > "Please review these release notes. They will be saved as `erfana-{version}-release-notes.md` in the release folder."
 
@@ -323,7 +338,9 @@ write release/{version}/erfana-{version}-release-notes.md
 
 ---
 
-## Phase 4: Git Tag (Optional)
+## Phase 4: Git Tag – MANDATORY CHECKPOINT
+
+**This checkpoint MUST be presented to the user even if a tag already exists. The user decides whether to re-tag, skip, or confirm.**
 
 ### 4.1 Checkpoint: Confirm Tagging
 
@@ -389,6 +406,8 @@ Next Steps:
 | Auto-push git tags | Always confirm with user first |
 | Build without version check | Verify version > last tag |
 | Dismiss a crash as "expected" | A crash during smoke test ALWAYS blocks the release |
+| Skip a phase because "already done" | Re-execute every phase – prior state may be stale |
+| Auto-approve a checkpoint | Always present checkpoint to user for explicit confirmation |
 
 ---
 
