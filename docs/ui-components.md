@@ -99,7 +99,7 @@ Integrated terminal with xterm.js + node-pty.
 
 **Theme**: Uses design tokens - `var(--color-black)` bg, white fg, `var(--color-cursor)` cursor
 
-**Tech**: xterm.js v5.5.0, node-pty v1.0.0, WebglAddon, FitAddon, WebLinksAddon
+**Tech**: xterm.js v6.0.0, node-pty v1.0.0, WebglAddon, FitAddon, WebLinksAddon
 
 **Modular architecture** (v0.6.5+):
 - `TerminalStatusContent.tsx` – Status state display (checking, unavailable, error, ready)

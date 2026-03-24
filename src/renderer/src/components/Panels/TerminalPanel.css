@@ -64,12 +64,11 @@
   padding: var(--space-4);
 }
 
-/* FIX: Changed from 'scroll' to 'auto' to let xterm.js handle scroll behavior
- * The !important on overflow-y: scroll was forcing scrollbars and interfering
- * with xterm's internal viewport management, contributing to scroll jump issues */
+/* xterm v6: DomScrollableElement handles scrolling via its own custom scrollbar widget.
+ * Hide native scrollbar on .xterm-viewport to prevent double scrollbar. */
 .terminal-container .xterm-viewport {
   background: var(--color-black) !important;
-  overflow-y: auto;
+  overflow-y: hidden;
 }
 
 .terminal-container .xterm-screen {
@@ -146,23 +145,22 @@
   border: none !important;
 }
 
-/* Custom scrollbar for terminal (highly visible) */
-.terminal-container .xterm-viewport::-webkit-scrollbar {
-  width: var(--space-8);
-}
-
-.terminal-container .xterm-viewport::-webkit-scrollbar-track {
-  background: var(--color-bg-primary);
-}
-
-.terminal-container .xterm-viewport::-webkit-scrollbar-thumb {
+/* Custom scrollbar for terminal – xterm v6 uses VS Code's DomScrollableElement */
+.terminal-container .xterm-scrollable-element > .scrollbar > .slider {
   background: var(--color-gray-700);
-  border-radius: var(--border-radius);
-  border: 3px solid var(--color-bg-primary);
 }
 
-.terminal-container .xterm-viewport::-webkit-scrollbar-thumb:hover {
+.terminal-container .xterm-scrollable-element > .scrollbar > .slider:hover {
   background: var(--color-gray-600);
+}
+
+.terminal-container .xterm-scrollable-element > .scrollbar > .slider:active {
+  background: var(--color-gray-500);
+}
+
+/* Hide the top shadow that VS Code's scrollbar adds by default */
+.terminal-container .xterm-scrollable-element > .shadow {
+  display: none !important;
 }
 
 /* Active state for toggle buttons (scroll lock) - issue #60 */

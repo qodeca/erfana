@@ -7,7 +7,7 @@ Integrated terminal emulator with xterm.js and node-pty for native shell access 
 **Status**: ✅ FULLY IMPLEMENTED
 
 The Terminal Panel provides a full-featured terminal emulator using:
-- **xterm.js v5.5.0** - Modern terminal emulator for web
+- **xterm.js v6.0.0** - Modern terminal emulator for web
 - **node-pty v1.0.0** - Native pseudo-terminal (PTY) backend
 - **WebGL rendering** - Hardware-accelerated rendering for performance
 

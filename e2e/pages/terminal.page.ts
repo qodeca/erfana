@@ -3,7 +3,7 @@
  *
  * Encapsulates xterm.js terminal interactions with condition-based waits.
  *
- * NOTE: xterm.js v5 with WebGL renderer does not expose terminal text content
+ * NOTE: xterm.js v6 with WebGL renderer does not expose terminal text content
  * to the DOM (.xterm-rows only exists with the DOM renderer, and
  * .xterm-accessibility-tree requires screenReaderMode: true). Therefore
  * prompt detection uses xterm textarea presence (condition-based) plus a

@@ -36,7 +36,7 @@ Known issues, common problems, and solutions for ERFANA's terminal panel.
 - `scrollOnUserInput: false` - Prevents auto-scroll when typing
 - Buffer API scroll position tracking (`viewportY` vs `baseY`)
 - `smoothScrollDuration: 0` - Instant scroll response
-- `overflow-y: auto` - Let xterm.js manage scrollbar
+- `overflow-y: hidden` - xterm v6 DomScrollableElement manages scrolling
 
 **Why ERFANA Can't Fix This**: The issue is in Claude Code's closed-source Ink library, which controls terminal rendering and line management. The buffer redraws happen at a level below xterm.js's scroll management, making it impossible for terminal emulators to prevent.
 
