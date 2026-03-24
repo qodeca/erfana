@@ -211,7 +211,7 @@ class MetricsService {
 ### Documentation to provide
 
 1. **System requirements:**
-   - Node.js 18+
+   - Node.js 24+
    - 8GB RAM (16GB recommended for large projects)
    - 2GB free disk space
 

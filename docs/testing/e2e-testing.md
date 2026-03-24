@@ -22,7 +22,7 @@ Erfana supports automated E2E testing using Playwright with Electron. This guide
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 24+
 - Playwright installed: `npm install --save-dev @playwright/test`
 
 ---

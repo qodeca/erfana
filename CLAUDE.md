@@ -3,10 +3,10 @@
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
 - **Repository**: `qodeca/erfana` (GitHub)
-- **Version**: 0.8.0-beta
+- **Version**: 0.8.0
 - **Tech Stack**: Electron 39, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
-- **Node Version**: 18+ (Electron 39 bundles Node.js 22.20.0)
+- **Node Version**: 24+ (development), Electron 39 bundles Node.js 22.20.0
 
 ## Key Commands
 ```bash

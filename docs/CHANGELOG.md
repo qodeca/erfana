@@ -4,7 +4,18 @@ Historical changelog entries for versions prior to current. For the latest chang
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
-## 0.8.0-beta
+## 0.8.0
+
+### Changed
+- **Dependency housekeeping** (#127)
+  - Removed unused `react-syntax-highlighter` (zero imports in `src/`)
+  - Refreshed lockfile: zustand 5.0.12, electron-builder 26.8.1
+  - Added npm `overrides` to pin `@electron/rebuild` to 3.7.1 (fixes CI build failure)
+  - Upgraded CI e2e workflow from Node 18 to Node 24 (matches local dev environment)
+  - Closed 5 stale dependabot PRs (#84, #89, #90, #91, #92)
+- **Renamed Elaborate prompt to Explain** – all templates, docs, and tests updated
+
+### Previous beta
 
 ### Added
 - **E2E infrastructure overhaul** – Page Object Model pattern, composed fixtures, condition-based waits (#117)

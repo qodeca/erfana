@@ -10,7 +10,7 @@ This directory contains detailed documentation for Erfana's production build con
 
 **TL;DR** - Build command:
 ```bash
-# Prerequisites: macOS 12+, Node.js 18+, Python 3.12, npm install completed
+# Prerequisites: macOS 12+, Node.js 24+, Python 3.12, npm install completed
 
 # Build both x64 and arm64 (workaround runs automatically via prebuild script)
 npm run build:mac
@@ -33,7 +33,7 @@ npm run build:mac
 - Linux or Windows can build for those platforms, but not for macOS
 
 **Development Tools**:
-- Node.js 18+ (Electron 39 requires Node 18 or newer)
+- Node.js 24+ (CI and development use Node 24)
 - npm 9+ or compatible package manager
 - Xcode Command Line Tools (macOS only):
   ```bash
