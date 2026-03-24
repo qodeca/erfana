@@ -43,7 +43,6 @@
     "@opendocsg/pdf2md": "^0.2.2",
     "@tanstack/react-query": "^5.90.2",
     "@turbodocx/html-to-docx": "^1.18.1",
-    "@types/react-syntax-highlighter": "^15.5.13",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-web-links": "^0.11.0",
     "@xterm/addon-webgl": "^0.18.0",
@@ -72,7 +71,6 @@
     "node-pty": "^1.0.0",
     "path-browserify": "^1.0.1",
     "react-markdown": "^10.1.0",
-    "react-syntax-highlighter": "^15.6.6",
     "rehype-raw": "^7.0.0",
     "rehype-sanitize": "^6.0.0",
     "remark-breaks": "^4.0.0",
@@ -113,5 +111,8 @@
     "typescript-eslint": "^8.46.1",
     "vite": "^5.4.11",
     "vitest": "^2.1.9"
+  },
+  "overrides": {
+    "@electron/rebuild": "3.7.1"
   }
 }
