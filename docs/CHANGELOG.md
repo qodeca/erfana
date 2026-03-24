@@ -308,7 +308,7 @@ Historical changelog entries for versions prior to current. For the latest chang
 ## Changes in v0.6.4-beta
 - **Editor Context Menu with AI Prompts** (Dec 25, 2025):
   - Right-click with text selected shows context menu in Monaco editor
-  - 5 new editor-specific prompts: Elaborate, Modify, Ask, Visualize, Prompt
+  - 5 new editor-specific prompts: Explain, Modify, Ask, Visualize, Prompt
   - Prompts filtered by `area: code-editor`, `subArea: context-menu`
   - Menu dismisses on Escape, click outside, or action execution
   - 8 new tests

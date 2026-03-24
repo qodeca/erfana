@@ -1,6 +1,6 @@
 # Electron Builder Configuration
 
-**Last Updated**: December 2025 (v0.6.0)
+**Last Updated**: March 2026 (v0.8.0)
 
 This document explains the electron-builder version choice and the aproba workaround.
 

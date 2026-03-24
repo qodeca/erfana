@@ -1,6 +1,6 @@
 # Build Documentation
 
-**Last Updated**: December 2025 (v0.6.0)
+**Last Updated**: March 2026 (v0.8.0)
 
 This directory contains detailed documentation for Erfana's production build configuration.
 
@@ -91,11 +91,11 @@ npm install
 
 **Build Output**:
 ```
-release/0.6.0/
-├── erfana-0.6.0-x64.dmg             (179 MB)
-├── erfana-0.6.0-arm64.dmg           (172 MB)
-├── Erfana-0.6.0-mac.zip             (179 MB)
-├── Erfana-0.6.0-arm64-mac.zip       (173 MB)
+release/{version}/
+├── erfana-{version}-x64.dmg
+├── erfana-{version}-arm64.dmg
+├── Erfana-{version}-mac.zip
+├── Erfana-{version}-arm64-mac.zip
 ├── *.blockmap                        (for updates)
 └── mac/ and mac-arm64/              (build directories)
 ```

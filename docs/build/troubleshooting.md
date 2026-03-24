@@ -74,7 +74,7 @@ Cannot find module '@electron-toolkit/preload'
 
 ### Cause
 
-Preload script not bundled (externalizeDepsPlugin enabled)
+Preload script not bundled (dependency externalization enabled)
 
 ### Solution
 
@@ -82,8 +82,8 @@ Verify preload bundling configuration:
 ```typescript
 // electron.vite.config.ts
 preload: {
-  // No externalizeDepsPlugin - bundle all dependencies
   build: {
+    externalizeDeps: false,  // Bundle all dependencies for sandbox compatibility
     rollupOptions: {
       output: { format: 'cjs' }
     }
