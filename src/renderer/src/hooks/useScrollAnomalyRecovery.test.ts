@@ -29,15 +29,13 @@ describe('useScrollAnomalyRecovery', () => {
         baseY
       }
     },
-    scrollToBottom: mockScrollToBottom
+    scrollToBottom: mockScrollToBottom,
+    scrollToLine: vi.fn()
   }) as unknown as Terminal
 
-  // Create mock terminal ref with viewport element
+  // Create mock terminal ref (container element for scroll event listeners)
   const createMockTerminalRef = () => {
-    const viewport = document.createElement('div')
-    viewport.className = 'xterm-viewport'
     const container = document.createElement('div')
-    container.appendChild(viewport)
     return { current: container }
   }
 
@@ -426,10 +424,8 @@ describe('useScrollAnomalyRecovery', () => {
     // First call to establish lastDataTs
     wrappedHandler({ terminalId: 'test', data: 'first' })
 
-    // Simulate user scroll on viewport - this sets lastUserScrollTs
-    const viewport = terminalRef.current.querySelector('.xterm-viewport')
-    expect(viewport).toBeTruthy()
-    viewport!.dispatchEvent(new WheelEvent('wheel', { bubbles: true }))
+    // Simulate user scroll on container - this sets lastUserScrollTs
+    terminalRef.current.dispatchEvent(new WheelEvent('wheel', { bubbles: true }))
 
     // Enable jump for second call
     jumpOnWrite = true
@@ -477,12 +473,10 @@ describe('useScrollAnomalyRecovery', () => {
       // Establish lastDataTs (no anomaly)
       wrappedHandler({ terminalId: 'test', data: 'first' })
 
-      // Simulate Page Up keypress - dispatch directly on viewport
-      const viewport = terminalRef.current.querySelector('.xterm-viewport')!
-      // Make viewport focusable and focus it
-      ;(viewport as HTMLElement).tabIndex = 0
-      ;(viewport as HTMLElement).focus()
-      viewport.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageUp', bubbles: true }))
+      // Simulate Page Up keypress on container
+      terminalRef.current.tabIndex = 0
+      terminalRef.current.focus()
+      terminalRef.current.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageUp', bubbles: true }))
 
       // Now enable anomaly
       triggerAnomaly = true
@@ -524,10 +518,9 @@ describe('useScrollAnomalyRecovery', () => {
 
       wrappedHandler({ terminalId: 'test', data: 'first' })
 
-      const viewport = terminalRef.current.querySelector('.xterm-viewport')!
-      ;(viewport as HTMLElement).tabIndex = 0
-      ;(viewport as HTMLElement).focus()
-      viewport.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+      terminalRef.current.tabIndex = 0
+      terminalRef.current.focus()
+      terminalRef.current.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
 
       triggerAnomaly = true
       mockXterm.buffer.active.viewportY = 100
@@ -567,10 +560,9 @@ describe('useScrollAnomalyRecovery', () => {
       wrappedHandler({ terminalId: 'test', data: 'first' })
 
       // Simulate regular key (not a scroll key)
-      const viewport = terminalRef.current.querySelector('.xterm-viewport')!
-      ;(viewport as HTMLElement).tabIndex = 0
-      ;(viewport as HTMLElement).focus()
-      viewport.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }))
+      terminalRef.current.tabIndex = 0
+      terminalRef.current.focus()
+      terminalRef.current.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }))
 
       triggerAnomaly = true
       mockXterm.buffer.active.viewportY = 100

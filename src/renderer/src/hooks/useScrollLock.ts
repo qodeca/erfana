@@ -6,7 +6,7 @@
  * 2. Keyboard handler wrapper - blocks PageUp/Home/ArrowUp keys
  * 3. Polling watcher - catches scrollbar drag (no native event available)
  *
- * @requires xterm.js 5.x+ (uses buffer.active.viewportY/baseY APIs)
+ * @requires xterm.js 6.x+ (uses buffer.active.viewportY/baseY APIs)
  */
 
 import { useCallback, useEffect, useMemo, useRef } from 'react'

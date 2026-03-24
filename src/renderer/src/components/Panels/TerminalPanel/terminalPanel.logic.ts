@@ -72,7 +72,12 @@ export const TERMINAL_THEME: ITheme = {
   brightBlue: '#3b8eea',
   brightMagenta: '#d670d6',
   brightCyan: '#29b8db',
-  brightWhite: '#ffffff'
+  brightWhite: '#ffffff',
+  // xterm v6: scrollbar colors via ITheme (primary mechanism, CSS as fallback)
+  // Values match design tokens: --color-gray-700, --color-gray-600, --color-gray-500
+  scrollbarSliderBackground: '#454545',
+  scrollbarSliderHoverBackground: '#6e6e6e',
+  scrollbarSliderActiveBackground: '#858585'
 }
 
 /**

@@ -59,14 +59,14 @@ const xterm = new Terminal({
 
 #### 3. CSS Viewport Fix (TerminalPanel.css:69)
 
-Changed `overflow-y: scroll !important` to `overflow-y: auto`:
-- Lets xterm.js manage scrollbar behavior instead of forcing scrollbars
-- Improves scroll position retention during buffer operations
+Changed `overflow-y: scroll !important` to `overflow-y: hidden` (updated in v6 upgrade):
+- xterm v6 uses DomScrollableElement for scrolling – native scrollbar is no longer needed
+- Prevents double scrollbar (native + custom widget)
 
 ```css
 .xterm-viewport {
-  overflow-y: auto !important;
-  /* Changed from: overflow-y: scroll !important; */
+  overflow-y: hidden;
+  /* v6: DomScrollableElement handles scrolling via its own custom scrollbar widget */
 }
 ```
 
@@ -235,7 +235,7 @@ new Terminal({
 
 ```css
 .xterm-viewport {
-  overflow-y: auto !important;  /* Not 'scroll' */
+  overflow-y: hidden;  /* v6: DomScrollableElement handles scrolling via its own widget */
 }
 ```
 

@@ -34,8 +34,10 @@ import {
 } from '../utils/scrollAnomalyDetector'
 import { logger } from '../utils/logger'
 
-// xterm.js internal class name - may change in future versions
-const XTERM_VIEWPORT_SELECTOR = '.xterm-viewport'
+// User scroll detection listeners attach to the container element directly
+// rather than querying xterm.js internal DOM nodes (e.g., .xterm-viewport).
+// xterm v6 replaced the native scrollbar with DomScrollableElement, which
+// may intercept wheel events before they reach internal elements.
 
 // Keys that indicate user-initiated scroll navigation
 const SCROLL_NAVIGATION_KEYS = new Set([
@@ -188,12 +190,10 @@ export function useScrollAnomalyRecovery(
     configRef.current = config
   }, [config])
 
-  // Attach user scroll listeners to .xterm-viewport element
+  // Attach user scroll listeners to the container element directly
   useEffect(() => {
-    if (!enabled || !terminalRef.current) return
-
-    const viewport = terminalRef.current.querySelector(XTERM_VIEWPORT_SELECTOR)
-    if (!viewport) return
+    const container = terminalRef.current
+    if (!enabled || !container) return
 
     const handleUserScroll = () => {
       lastUserScrollTsRef.current = Date.now()
@@ -209,15 +209,15 @@ export function useScrollAnomalyRecovery(
 
     // wheel and touchmove capture user-initiated scrolls
     // Note: xterm.js onScroll does NOT fire on user scroll (only on programmatic/new lines)
-    viewport.addEventListener('wheel', handleUserScroll, { passive: true })
-    viewport.addEventListener('touchmove', handleUserScroll, { passive: true })
+    container.addEventListener('wheel', handleUserScroll, { passive: true })
+    container.addEventListener('touchmove', handleUserScroll, { passive: true })
     // Issue #22: Add keyboard scroll detection
-    viewport.addEventListener('keydown', handleKeyScroll, { passive: true })
+    container.addEventListener('keydown', handleKeyScroll, { passive: true })
 
     return () => {
-      viewport.removeEventListener('wheel', handleUserScroll)
-      viewport.removeEventListener('touchmove', handleUserScroll)
-      viewport.removeEventListener('keydown', handleKeyScroll)
+      container.removeEventListener('wheel', handleUserScroll)
+      container.removeEventListener('touchmove', handleUserScroll)
+      container.removeEventListener('keydown', handleKeyScroll)
     }
   }, [enabled, terminalRef])
 
