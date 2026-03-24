@@ -82,9 +82,9 @@ npm install
 1. **prebuild**: Create aproba workaround (automatic)
 2. **Typecheck**: Verify TypeScript compilation
 3. **Vite Build**: Bundle application code
-   - Main process: 144.97 kB (externalized dependencies)
-   - Preload script: 12.08 kB (bundled dependencies)
-   - Renderer: 10.5 MB (Monaco, Mermaid, xterm.js included)
+   - Main process: ~207 kB minified (externalized dependencies)
+   - Preload script: ~30 kB (bundled dependencies)
+   - Renderer: ~10.9 MB (Monaco, Mermaid, xterm.js included)
 4. **electron-builder Package**: Create platform packages
 5. **afterPack Hook**: Apply Electron fuses
 6. **DMG/ZIP Creation**: Package for distribution

@@ -1,6 +1,6 @@
 # Preload Script Bundling
 
-**Last Updated**: December 2025 (v0.6.0)
+**Last Updated**: March 2026 (v0.8.0)
 
 This document explains why the preload script must be bundled for sandbox compatibility.
 
@@ -11,8 +11,8 @@ This document explains why the preload script must be bundled for sandbox compat
 ```typescript
 // electron.vite.config.ts
 preload: {
-  // No externalizeDepsPlugin - bundle all dependencies for sandbox compatibility
   build: {
+    externalizeDeps: false,  // Bundle all dependencies for sandbox compatibility
     rollupOptions: {
       output: {
         format: 'cjs'
@@ -21,6 +21,8 @@ preload: {
   }
 }
 ```
+
+In electron-vite v5, dependency externalization is enabled by default for all targets. The preload must explicitly disable it with `externalizeDeps: false` to bundle dependencies inline.
 
 ---
 
@@ -32,11 +34,9 @@ With process sandboxing enabled (default since Electron 20), the preload script 
 
 ### Problem with External Dependencies
 
-**Original Configuration** (failed with sandbox):
-```typescript
-preload: {
-  plugins: [externalizeDepsPlugin()]  // ❌ Breaks with sandbox
-}
+If externalization is left enabled (the default), the preload would emit:
+```javascript
+const preload = require("@electron-toolkit/preload");  // ❌ Fails in sandbox
 ```
 
 **Runtime Error**:
@@ -46,7 +46,7 @@ VM4 sandbox_bundle:2 Error: module not found: @electron-toolkit/preload
 
 ### Root Cause
 
-- Sandboxed preload script cannot use `require('@electron-toolkit/preload')` from node_modules
+- Sandboxed preload script cannot use `require()` for packages from node_modules
 - Sandboxing restricts file system access to protect security
 - External dependencies must be bundled into the preload script itself
 
@@ -54,28 +54,13 @@ VM4 sandbox_bundle:2 Error: module not found: @electron-toolkit/preload
 
 ## Solution
 
-Remove `externalizeDepsPlugin()` from preload config, allowing Vite to bundle all dependencies inline.
+Set `build.externalizeDeps: false` in the preload config, allowing Vite to bundle all dependencies inline.
 
 ### Result
 
-**Before** (externalized):
-- Preload script size: 9.95 kB
-- Requires node_modules access
-- ❌ Incompatible with sandboxing
-
-**After** (bundled):
-- Preload script size: 12.08 kB
-- No external dependencies
-- ✅ Compatible with sandboxing
-
----
-
-## Trade-off Analysis
-
-**Cost**: +2 kB preload script size
-**Benefit**: Process sandboxing works correctly (critical security feature)
-
-**Verdict**: The 2 kB increase is negligible compared to security benefits of sandboxing.
+- Preload script size: ~30 kB (bundled)
+- No external dependency requires
+- Compatible with sandboxing
 
 ---
 
@@ -83,13 +68,13 @@ Remove `externalizeDepsPlugin()` from preload config, allowing Vite to bundle al
 
 To verify bundling works correctly:
 
-1. Build the app: `npm run build:mac`
-2. Check preload script has no external requires:
+1. Build the app: `npm run build`
+2. Check preload script has no external requires for non-builtins:
    ```bash
-   grep -r "require('@electron-toolkit" out/preload/index.js
+   grep 'require("@electron-toolkit' out/preload/index.js
    # Should return nothing (all bundled inline)
    ```
-3. Install and launch app - no sandbox errors should appear
+3. Install and launch app – no sandbox errors should appear
 
 ---
 
