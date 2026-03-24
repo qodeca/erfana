@@ -12,7 +12,7 @@ export default defineConfig({
     reporters: 'default',
   },
   coverage: {
-    provider: 'c8',
+    provider: 'v8',
     reporter: ['text-summary', 'lcov', 'html'],
     reportsDirectory: 'coverage/preload',
     include: ['src/preload/**/*.{ts,tsx}'],

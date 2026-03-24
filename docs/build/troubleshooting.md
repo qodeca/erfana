@@ -1,6 +1,6 @@
 # Build Troubleshooting
 
-**Last Updated**: December 2025 (v0.6.0)
+**Last Updated**: March 2026 (v0.8.0)
 
 This document provides solutions to common build errors.
 
@@ -74,7 +74,7 @@ Cannot find module '@electron-toolkit/preload'
 
 ### Cause
 
-Preload script not bundled (externalizeDepsPlugin enabled)
+Preload script not bundled (dependency externalization enabled)
 
 ### Solution
 
@@ -82,8 +82,8 @@ Verify preload bundling configuration:
 ```typescript
 // electron.vite.config.ts
 preload: {
-  // No externalizeDepsPlugin - bundle all dependencies
   build: {
+    externalizeDeps: false,  // Bundle all dependencies for sandbox compatibility
     rollupOptions: {
       output: { format: 'cjs' }
     }
@@ -142,12 +142,12 @@ asar: false
 
 ### Symptoms
 
-No DMG/ZIP files in `release/0.6.0/`
+No DMG/ZIP files in `release/{version}/`
 
 ### Check
 
 1. Build completed without errors?
-2. Check `release/0.6.0/mac/` and `release/0.6.0/mac-arm64/` directories exist
+2. Check `release/{version}/mac/` and `release/{version}/mac-arm64/` directories exist
 3. Look for error messages in build log
 
 ### Common Causes

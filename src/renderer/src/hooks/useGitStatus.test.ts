@@ -259,7 +259,7 @@ describe('useGitStatus behavioral tests', () => {
   const originalApi = (window as { api?: unknown }).api
 
   beforeEach(() => {
-    vi.useFakeTimers()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'setInterval', 'clearTimeout', 'clearInterval', 'Date'] })
     vi.clearAllMocks()
 
     // Reset stores

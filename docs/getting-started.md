@@ -4,7 +4,7 @@ Quick onboarding guide for new developers working on Erfana.
 
 ## Prerequisites
 
-- **Node.js**: 18+ (Electron 39 bundles Node.js 22.20.0)
+- **Node.js**: 24+ (Electron 39 bundles Node.js 22.20.0)
 - **Python**: 3.12 (node-pty fails on 3.13)
 - **Git**: For version control
 

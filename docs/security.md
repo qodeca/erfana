@@ -113,7 +113,7 @@ await flipFuses(electronBinaryPath, {
 Build logs show fuses applied during `npm run build:mac`:
 
 ```
-🔒 Applying Electron fuses to: release/0.6.0/mac/Erfana.app
+🔒 Applying Electron fuses to: release/{version}/mac/Erfana.app
 ✅ Electron fuses applied successfully
    - RunAsNode: disabled
    - CookieEncryption: disabled (no keychain prompt)

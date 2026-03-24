@@ -15,7 +15,7 @@ export default defineConfig({
     reporters: 'default',
   },
   coverage: {
-    provider: 'c8',
+    provider: 'v8',
     reporter: ['text-summary', 'lcov', 'html'],
     reportsDirectory: 'coverage/renderer',
     include: ['src/renderer/src/**/*.{ts,tsx}'],

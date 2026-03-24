@@ -1,19 +1,16 @@
 import { resolve } from 'path'
-import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
+import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
     build: {
-      rollupOptions: {
-        external: ['node-pty']
-      }
+      minify: true // Vite 6 SSR default changed to false; explicit true halves bundle (429→207 kB)
     }
   },
   preload: {
-    // No externalizeDepsPlugin - bundle all dependencies for sandbox compatibility
     build: {
+      externalizeDeps: false,
       rollupOptions: {
         output: {
           format: 'cjs'

@@ -86,7 +86,7 @@ To verify exclusions work correctly:
 1. Build the app: `npm run build:mac`
 2. Check excluded dependencies aren't present:
    ```bash
-   ls release/0.6.0/mac/Erfana.app/Contents/Resources/app/node_modules/ | grep -E "jsdom|canvas|node-pre-gyp"
+   ls release/*/mac/Erfana.app/Contents/Resources/app/node_modules/ | grep -E "jsdom|canvas|node-pre-gyp"
    # Should return nothing
    ```
 3. Install and launch app - all functionality works

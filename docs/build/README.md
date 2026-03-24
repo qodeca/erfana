@@ -1,6 +1,6 @@
 # Build Documentation
 
-**Last Updated**: December 2025 (v0.6.0)
+**Last Updated**: March 2026 (v0.8.0)
 
 This directory contains detailed documentation for Erfana's production build configuration.
 
@@ -16,7 +16,7 @@ This directory contains detailed documentation for Erfana's production build con
 npm run build:mac
 ```
 
-**Output**: `release/0.6.0/erfana-0.6.0-{x64,arm64}.dmg` + ZIP files
+**Output**: `release/{version}/erfana-{version}-{x64,arm64}.dmg` + ZIP files
 
 **Duration**: ~2-3 minutes on modern Mac
 
@@ -82,20 +82,20 @@ npm install
 1. **prebuild**: Create aproba workaround (automatic)
 2. **Typecheck**: Verify TypeScript compilation
 3. **Vite Build**: Bundle application code
-   - Main process: 144.97 kB (externalized dependencies)
-   - Preload script: 12.08 kB (bundled dependencies)
-   - Renderer: 10.5 MB (Monaco, Mermaid, xterm.js included)
+   - Main process: ~207 kB minified (externalized dependencies)
+   - Preload script: ~30 kB (bundled dependencies)
+   - Renderer: ~10.9 MB (Monaco, Mermaid, xterm.js included)
 4. **electron-builder Package**: Create platform packages
 5. **afterPack Hook**: Apply Electron fuses
 6. **DMG/ZIP Creation**: Package for distribution
 
 **Build Output**:
 ```
-release/0.6.0/
-├── erfana-0.6.0-x64.dmg             (179 MB)
-├── erfana-0.6.0-arm64.dmg           (172 MB)
-├── Erfana-0.6.0-mac.zip             (179 MB)
-├── Erfana-0.6.0-arm64-mac.zip       (173 MB)
+release/{version}/
+├── erfana-{version}-x64.dmg
+├── erfana-{version}-arm64.dmg
+├── Erfana-{version}-mac.zip
+├── Erfana-{version}-arm64-mac.zip
 ├── *.blockmap                        (for updates)
 └── mac/ and mac-arm64/              (build directories)
 ```
@@ -122,7 +122,7 @@ For detailed information on specific build aspects, see:
 
 1. **Check build artifacts exist**:
    ```bash
-   ls -lh release/0.6.0/*.dmg
+   ls -lh release/${npm_package_version}/*.dmg
    ```
 
 2. **Verify file sizes** (approximately):
