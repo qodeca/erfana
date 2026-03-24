@@ -91,15 +91,15 @@ npm install sqlite-vec better-sqlite3
 **File:** `electron.vite.config.ts`
 
 ```typescript
-import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
+import { defineConfig } from 'electron-vite'
 
 export default defineConfig({
   main: {
-    plugins: [
-      externalizeDepsPlugin({
+    build: {
+      externalizeDeps: {
         exclude: ['sqlite-vec'] // Bundle into main process
-      })
-    ]
+      }
+    }
   },
   // ... preload, renderer configs
 })

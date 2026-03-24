@@ -14,6 +14,11 @@ Historical changelog entries for versions prior to current. For the latest chang
   - Upgraded CI e2e workflow from Node 18 to Node 24 (matches local dev environment)
   - Closed 5 stale dependabot PRs (#84, #89, #90, #91, #92)
 - **Renamed Elaborate prompt to Explain** – all templates, docs, and tests updated
+- **Build toolchain upgrade** – electron-vite 5, Vite 6, vitest 3 (#126)
+  - Replaced deprecated `externalizeDepsPlugin` with `build.externalizeDeps`
+  - Migrated coverage provider from c8 to v8
+  - Added main process minification (429 kB → 207 kB)
+  - Added `moduleResolution: "bundler"` for Vite 6 compatibility
 
 ### Previous beta
 

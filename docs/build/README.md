@@ -16,7 +16,7 @@ This directory contains detailed documentation for Erfana's production build con
 npm run build:mac
 ```
 
-**Output**: `release/0.6.0/erfana-0.6.0-{x64,arm64}.dmg` + ZIP files
+**Output**: `release/{version}/erfana-{version}-{x64,arm64}.dmg` + ZIP files
 
 **Duration**: ~2-3 minutes on modern Mac
 
@@ -122,7 +122,7 @@ For detailed information on specific build aspects, see:
 
 1. **Check build artifacts exist**:
    ```bash
-   ls -lh release/0.6.0/*.dmg
+   ls -lh release/${npm_package_version}/*.dmg
    ```
 
 2. **Verify file sizes** (approximately):

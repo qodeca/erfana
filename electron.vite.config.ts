@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   main: {
     build: {
-      minify: true
+      minify: true // Vite 6 SSR default changed to false; explicit true halves bundle (429→207 kB)
     }
   },
   preload: {

@@ -57,17 +57,15 @@ npm install --save-dev electron-rebuild
 **File:** `electron.vite.config.ts`
 
 ```typescript
-import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
+import { defineConfig } from 'electron-vite'
 import path from 'path'
 
 export default defineConfig({
   main: {
-    plugins: [
-      externalizeDepsPlugin({
-        exclude: ['sqlite-vec'] // Bundle sqlite-vec
-      })
-    ],
     build: {
+      externalizeDeps: {
+        exclude: ['sqlite-vec'] // Bundle sqlite-vec into main process
+      },
       rollupOptions: {
         external: [
           'better-sqlite3',
@@ -77,7 +75,9 @@ export default defineConfig({
     }
   },
   preload: {
-    plugins: [externalizeDepsPlugin()]
+    build: {
+      externalizeDeps: false // Bundle all deps for sandbox compatibility
+    }
   },
   renderer: {
     // ... React config ...
@@ -179,11 +179,11 @@ console.log(`sqlite-vec version: ${version}`); // Should print: v0.1.x
 // electron.vite.config.ts
 export default defineConfig({
   main: {
-    plugins: [
-      externalizeDepsPlugin({
+    build: {
+      externalizeDeps: {
         exclude: ['sqlite-vec'] // Bundle into main process
-      })
-    ]
+      }
+    }
   }
 })
 ```
@@ -367,7 +367,7 @@ npm run build:win
 
 **Cause:** Native module not included in bundle.
 
-**Fix:** Add to `externalizeDepsPlugin` or copy manually.
+**Fix:** Add to `build.externalizeDeps.exclude` or copy manually.
 
 ### Worker Thread Crashes
 
