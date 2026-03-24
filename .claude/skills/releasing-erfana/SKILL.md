@@ -26,7 +26,7 @@ Activate when user says:
 | Release folder | `release/{version}/` |
 | DMG naming | `erfana-{version}.dmg` |
 | Release notes | `erfana-{version}-release-notes.md` (in release folder) |
-| Expected DMG size | 230-250 MB (universal macOS) |
+| Expected DMG size | 230-290 MB (per-arch macOS) |
 
 ## Important Rules
 
@@ -139,7 +139,7 @@ npm audit
 npm run test
 ```
 
-**Pass:** All tests pass (expect ~1700+ tests)
+**Pass:** All tests pass (expect ~7000+ tests)
 **Fail:** Show failures, stop release
 
 ### 1.5 Checkpoint: Quality Summary
@@ -201,24 +201,65 @@ ls -lh release/{version}/
 ls -lh release/{version}/erfana-{version}.dmg
 ```
 
+```bash
+# Verify code signing consistency (MANDATORY)
+codesign --verify --deep --strict release/{version}/mac-arm64/Erfana.app
+```
+
 **Size verification (macOS universal):**
-- Expected: 230-250 MB
+- Expected: 230-290 MB
 - Warning if: <200 MB or >300 MB
 - Critical if: >500 MB (likely includes excluded files)
 
-### 2.5 Smoke Test (macOS)
+### 2.5 Smoke Test (macOS) – MANDATORY
 
-Verify the built app actually launches:
+**This gate is NON-OVERRIDABLE. A crash blocks the release. No exceptions.**
+
+#### 2.5.1 Code signature verification
 
 ```bash
-# Mount DMG and test app launch
-hdiutil attach release/{version}/erfana-{version}.dmg -quiet
-/Volumes/Erfana*/Erfana.app/Contents/MacOS/Erfana --version
+codesign --verify --deep --strict release/{version}/mac-arm64/Erfana.app
+```
+
+**Pass:** No output (clean verification)
+**Fail:** STOP – code signing is broken, do not proceed
+
+#### 2.5.2 Launch from built app
+
+```bash
+# Launch the built app (NOT from dev environment) and capture errors
+release/{version}/mac-arm64/Erfana.app/Contents/MacOS/Erfana 2>/tmp/smoke-test-stderr.log &
+APP_PID=$!
+sleep 5
+kill $APP_PID 2>/dev/null
+wait $APP_PID 2>/dev/null
+cat /tmp/smoke-test-stderr.log
+rm -f /tmp/smoke-test-stderr.log
+```
+
+**Check stderr for:**
+- `dyld` errors (library loading failures)
+- `FATAL` messages (GPU process crashes)
+- `SIGABRT` or `SIGKILL` (process crashes)
+
+**Pass:** App launches, no crash indicators in stderr
+**Fail:** STOP – investigate and fix before proceeding. **NEVER dismiss a crash as "expected behavior".**
+
+#### 2.5.3 Launch from mounted DMG
+
+```bash
+hdiutil attach release/{version}/erfana-{version}-arm64.dmg -quiet
+/Volumes/Erfana*/Erfana.app/Contents/MacOS/Erfana 2>/tmp/smoke-test-dmg-stderr.log &
+APP_PID=$!
+sleep 5
+kill $APP_PID 2>/dev/null
+wait $APP_PID 2>/dev/null
+cat /tmp/smoke-test-dmg-stderr.log
+rm -f /tmp/smoke-test-dmg-stderr.log
 hdiutil detach /Volumes/Erfana* -quiet
 ```
 
-**Pass:** App launches and outputs version
-**Fail:** Investigate build issues before proceeding
+**Same pass/fail criteria as 2.5.2.**
 
 ### 2.6 Checkpoint: Build Success
 
@@ -347,6 +388,7 @@ Next Steps:
 | Skip quality gates | All gates must pass |
 | Auto-push git tags | Always confirm with user first |
 | Build without version check | Verify version > last tag |
+| Dismiss a crash as "expected" | A crash during smoke test ALWAYS blocks the release |
 
 ---
 

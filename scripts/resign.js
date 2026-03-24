@@ -33,5 +33,10 @@ module.exports = async function afterSign(context) {
     stdio: 'inherit'
   });
 
-  console.log('✅ App bundle re-signed successfully');
+  console.log('🔍 Verifying code signature consistency...');
+  execFileSync('codesign', ['--verify', '--deep', '--strict', appPath], {
+    stdio: 'inherit'
+  });
+
+  console.log('✅ App bundle re-signed and verified successfully');
 };
