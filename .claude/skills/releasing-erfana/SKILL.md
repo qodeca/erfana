@@ -107,6 +107,28 @@ git status --porcelain
 - [ ] No dev servers running (or user confirms kill)
 - [ ] No uncommitted changes (or user confirms proceed)
 
+### 0.2.5 Change classification (empty release guard)
+
+```bash
+# Get last tag
+LAST_TAG=$(git tag --list 'v*' --sort=-v:refname | head -1)
+# List commits since last tag with conventional commit prefixes
+git log ${LAST_TAG}..HEAD --pretty=format:"%s"
+```
+
+Classify commits using conventional commit prefixes:
+- **User-facing:** `feat:`, `fix:`, `perf:` – these produce release note content
+- **Developer-only:** `chore:`, `docs:`, `refactor:`, `test:`, `ci:`, `build:`, `style:`
+
+**If ALL commits are developer-only:** Present warning via AskUserQuestion:
+> "No user-facing changes detected since {last_tag}. All {N} commits are developer-only ({list prefixes}). This would be a maintenance-only release. Continue anyway?"
+
+Options:
+- Continue (maintenance release)
+- Abort release
+
+This is informational, not blocking – user may have valid reasons for a maintenance release.
+
 ### 0.3 Version verification
 
 ```bash
