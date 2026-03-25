@@ -1,13 +1,14 @@
 ---
 name: releasing-erfana
 description: Build and release new versions of the Erfana Electron app. Runs quality gates (lint, typecheck, tests, security audit), builds platform packages, generates user-friendly release notes, and creates git tags. Use when asked to "release", "build release", "prepare release", or "new version".
+allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList
 ---
 
 # Releasing Erfana
 
-This skill guides you through the complete release process for Erfana, an Electron-based markdown IDE.
+This skill orchestrates the complete release process for Erfana, an Electron-based markdown IDE. All execution is delegated to agents – the skill manages workflow progression, user interaction, and checkpoints.
 
-## When This Skill Applies
+## When this skill applies
 
 Activate when user says:
 - "release new version"
@@ -17,7 +18,15 @@ Activate when user says:
 - "create release"
 - "build for production"
 
-## Quick Reference
+## Agents
+
+| Agent | Purpose | Source | Used in |
+|-------|---------|--------|---------|
+| `release-quality-runner` | Run lint, typecheck, tests, security audit | shared | Phase 1 |
+| `release-build-executor` | Build packages, verify output, smoke test | shared | Phase 2 |
+| `release-notes-drafter` | Analyze commits, draft user-focused notes | shared | Phase 3 |
+
+## Quick reference
 
 | Item | Value |
 |------|-------|
@@ -26,325 +35,247 @@ Activate when user says:
 | Release folder | `release/{version}/` |
 | DMG naming | `erfana-{version}.dmg` |
 | Release notes | `erfana-{version}-release-notes.md` (in release folder) |
-| Expected DMG size | 230-290 MB (per-arch macOS) |
-
-## Important Rules
-
-1. **NEVER delete previous releases** - Only clean the current version folder if needed
-2. **Release notes are USER-focused** - No developer content, skills, or test info
-3. **Release notes filename** - `erfana-{version}-release-notes.md`
-4. **All quality gates must pass** - No skipping lint, typecheck, or tests
-5. **Human approves release notes** - Draft is generated, user reviews/edits
+| Expected DMG size | 230–290 MB (per-arch macOS) |
 
 ## CRITICAL ENFORCEMENT RULES
 
 **These rules are NON-NEGOTIABLE. Violations are automatic failures.**
 
 1. **NO PHASE SKIPPING** – ALL phases (0–5) MUST execute every time. No exceptions.
-2. **NO CHECKPOINT SKIPPING** – Every checkpoint (0.3, 1.5, 2.6, 3.3, 4.1) MUST present options to user.
+2. **NO CHECKPOINT SKIPPING** – Every checkpoint MUST present options to user.
 3. **SEQUENTIAL EXECUTION** – Phase N cannot start until Phase N-1 checkpoint passes.
-4. **"Already done" is NOT a valid skip reason** – Even if artifacts exist from a previous attempt, re-execute the phase. Prior state may be stale.
-5. **Smoke test crash = STOP** – A crash during any smoke test blocks the release. NEVER dismiss a crash as "expected behavior."
+4. **"Already done" is NOT a valid skip reason** – Re-execute phases. Prior state may be stale.
+5. **Smoke test crash = STOP** – A crash during any smoke test blocks the release. NEVER dismiss a crash.
 6. **User confirms every checkpoint** – Do not auto-approve on behalf of the user.
+7. **Delegate, don't execute** – All quality gates, builds, and note drafting go through agents.
 
 ---
 
-## Phase 0: Pre-flight Checks
+## Todo list (MANDATORY)
 
-### 0.1 Check Environment
+At release start, create a todo list tracking all phases:
+
+```
+TaskCreate: "Phase 0: Pre-flight checks" (pending)
+TaskCreate: "Phase 1: Quality gates" (pending)
+TaskCreate: "Phase 2: Build and smoke test" (pending)
+TaskCreate: "Phase 3: Release notes" (pending)
+TaskCreate: "Phase 4: Git tag" (pending)
+TaskCreate: "Phase 5: Summary" (pending)
+```
+
+Update each task to `in_progress` before starting and `completed` after checkpoint passes.
+
+---
+
+## Phase 0: Pre-flight checks
+
+**Input conditions:** None (first phase).
+
+### 0.1 Requirements gathering
+
+Ask user with structured options (AskUserQuestion):
+
+**Version bump type:**
+
+| Option | Description | Recommended |
+|--------|-------------|-------------|
+| PATCH | Bug fixes only, no new features | ✓ (for bug-fix-only releases) |
+| MINOR | New features, backward compatible | |
+| MAJOR | Breaking changes, major rewrites | |
+
+**Target platform:**
+
+| Option | Description | Recommended |
+|--------|-------------|-------------|
+| macOS | Default platform | ✓ |
+| Windows | Windows build | |
+| Linux | Linux build | |
+| All | All platforms | |
+
+### 0.2 Check environment
+
+Run directly (lightweight pre-flight, not worth agent delegation):
 
 ```bash
 # Check for running dev servers
 pgrep -f "electron-vite" || echo "No dev servers running"
-
 # Check git status
 git status --porcelain
 ```
 
-**If dev servers running:** Ask user if they should be killed.
+- [ ] No dev servers running (or user confirms kill)
+- [ ] No uncommitted changes (or user confirms proceed)
 
-**If uncommitted changes:** Warn user and ask how to proceed.
-
-### 0.2 Version Verification
+### 0.3 Version verification
 
 ```bash
 # Get current version from package.json
 grep '"version"' package.json | head -1
-
 # Get last git tag
 git tag --list 'v*' --sort=-v:refname | head -1
-
-# Compare: version should be HIGHER than last tag
 ```
 
-**Present to user:**
-- Current version: `{version}` (from package.json)
-- Last release tag: `{tag}`
-- Status: Version bumped / NOT BUMPED (needs attention)
+- [ ] Current version > last tag
+- [ ] Version matches user's bump type selection
 
-### Semantic Versioning Guide
+**If version has NOT been bumped** (equals last tag): STOP. Present the semver guide from 0.1, ask user to bump version in package.json, then re-verify. Do not proceed with a version that matches an existing tag.
 
-If version needs bumping, help user choose:
+### 0.4 Checkpoint: confirm version
 
-| Type | When to Use | Example |
-|------|-------------|---------|
-| **PATCH** | Bug fixes only, no new features | 0.4.5 → 0.4.6 |
-| **MINOR** | New features, backward compatible | 0.4.5 → 0.5.0 |
-| **MAJOR** | Breaking changes, major rewrites | 0.4.5 → 1.0.0 |
-
-**Ask user:** "Based on the commits, this looks like a [PATCH/MINOR/MAJOR] release. Confirm?"
-
-### 0.3 Checkpoint: Confirm Version
-
-Ask user:
-> "Ready to release version **{version}**? This will be tagged as `v{version}`."
+**Ask user:** "Ready to release version **{version}**? This will be tagged as `v{version}`."
 
 Options:
 - Proceed with {version}
 - Need to bump version first (stop and let user update package.json)
 
----
-
-## Phase 1: Quality Gates
-
-Run all quality checks. **All must pass to proceed.**
-
-### 1.1 Linting
-
-```bash
-npm run lint
-```
-
-**Pass:** No output (clean)
-**Fail:** Show errors, stop release
-
-### 1.2 TypeScript
-
-```bash
-npm run typecheck
-```
-
-**Pass:** Both node and web configs complete without errors
-**Fail:** Show errors, stop release
-
-### 1.3 Security Audit
-
-```bash
-npm audit
-```
-
-**Evaluate results (strict policy):**
-
-| Severity | Production Deps | Dev Deps Only |
-|----------|-----------------|---------------|
-| Critical | **STOP** - Must fix before release | Warn, require explicit override |
-| High | **STOP** - Must fix or get explicit override | Note but continue |
-| Moderate | Note but continue | Continue |
-| Low | Continue | Continue |
-
-**If blocked:** Show affected packages and suggest `npm audit fix` or manual resolution.
-
-### 1.4 Tests
-
-```bash
-npm run test
-```
-
-**Pass:** All tests pass (expect ~7000+ tests)
-**Fail:** Show failures, stop release
-
-### 1.5 Checkpoint: Quality Summary
-
-Present results:
-```
-Quality Gates:
-- Lint: PASSED / FAILED
-- TypeScript: PASSED / FAILED
-- Security: X vulnerabilities (Y high, Z critical)
-- Tests: N tests passed
-```
-
-Only proceed if lint, typecheck, and tests all pass.
+**Post-checkpoint validation:** User explicitly confirmed version.
 
 ---
 
-## Phase 2: Build
+## Phase 1: Quality gates
 
-### 2.1 Platform Selection
+**Input conditions:**
+- [ ] Phase 0 checkpoint passed
+- [ ] Version confirmed by user
 
-Ask user which platform(s) to build:
-- macOS (default) → `npm run build:mac`
-- Windows → `npm run build:win`
-- Linux → `npm run build:linux`
-- All platforms
+### 1.1 Delegate to release-quality-runner
 
-### 2.2 Clean Current Version Folder (Optional)
+```
+Agent(subagent_type: "release-quality-runner")
+Prompt: "Run all quality gates for the Erfana project at {project_path}. Return structured pass/fail results."
+```
 
-**IMPORTANT:** Only clean the specific version folder, NOT the entire release/ directory.
+### 1.2 Process results
+
+Parse agent results. Present summary:
+
+```
+Quality gates:
+- [ ] Lint: PASSED / FAILED
+- [ ] TypeScript: PASSED / FAILED
+- [ ] Security: X vulnerabilities (Y critical, Z high)
+- [ ] Tests: N tests passed
+```
+
+### 1.3 Retry logic
+
+If any gate fails:
+- **Attempt 1:** Report failure, ask user to fix
+- **Attempt 2:** After user fixes, re-delegate to agent
+- **Attempt 3:** If still failing, escalate – ask user whether to override or abort
+
+Max retries: 3 per gate. After 3 failures, STOP and ask user for direction.
+
+### 1.4 Checkpoint: quality summary
+
+Only proceed if lint, typecheck, and tests all pass. Security audit allows user override for non-critical findings.
+
+**Post-checkpoint validation:** All 4 gates have PASS or explicit user override.
+
+---
+
+## Phase 2: Build and smoke test
+
+**Input conditions:**
+- [ ] Phase 1 checkpoint passed
+- [ ] All quality gates PASS (or user override documented)
+
+### 2.1 Clean current version folder (optional)
+
+Only if rebuilding same version. Ask user first:
 
 ```bash
 # Only if rebuilding same version
 rm -rf release/{version}/
 ```
 
-### 2.3 Build Execution
+**IMPORTANT:** Only clean the specific version folder, NEVER the entire release/ directory.
 
-```bash
-# macOS (most common)
-npm run build:mac
+### 2.2 Delegate to release-build-executor
 
-# Windows
-npm run build:win
-
-# Linux
-npm run build:linux
+```
+Agent(subagent_type: "release-build-executor")
+Prompt: "Build version {version} for {platform}. Project path: {project_path}. App name: Erfana. Release dir: release/{version}. Mac arch: mac-arm64. Expected DMG size: 230-290 MB. Verify build output and run smoke tests."
 ```
 
-**Build includes:** typecheck + electron-vite build + electron-builder
+### 2.3 Process results
 
-### 2.4 Verify Build Output
+Parse agent results. Present summary:
 
-```bash
-# List release artifacts
-ls -lh release/{version}/
-
-# Check DMG size (macOS)
-ls -lh release/{version}/erfana-{version}.dmg
+```
+Build artifacts:
+- [ ] DMG: erfana-{version}.dmg ({size} MB)
+- [ ] Size check: PASS / WARN / FAIL
+- [ ] Code signature: PASS / FAIL
+- [ ] Smoke test (app): PASS / FAIL
+- [ ] Smoke test (DMG): PASS / FAIL
 ```
 
-```bash
-# Verify code signing consistency (MANDATORY)
-codesign --verify --deep --strict release/{version}/mac-arm64/Erfana.app
-```
+### 2.4 Retry logic
 
-**Size verification (macOS universal):**
-- Expected: 230-290 MB
-- Warning if: <200 MB or >300 MB
-- Critical if: >500 MB (likely includes excluded files)
+If build fails:
+- **Attempt 1:** Report error, ask user to fix source issue
+- **Attempt 2:** Re-delegate to agent after user fix
+- **Attempt 3:** Escalate – present full error log, ask user for direction
 
-### 2.5 Smoke Test (macOS) – MANDATORY
+If smoke test fails (crash):
+- **NO RETRIES** – A crash blocks the release. Present crash indicators and STOP.
 
-**This gate is NON-OVERRIDABLE. A crash blocks the release. No exceptions.**
+### 2.5 Checkpoint: build success
 
-#### 2.5.1 Code signature verification
-
-```bash
-codesign --verify --deep --strict release/{version}/mac-arm64/Erfana.app
-```
-
-**Pass:** No output (clean verification)
-**Fail:** STOP – code signing is broken, do not proceed
-
-#### 2.5.2 Launch from built app
-
-```bash
-# Launch the built app (NOT from dev environment) and capture errors
-release/{version}/mac-arm64/Erfana.app/Contents/MacOS/Erfana 2>/tmp/smoke-test-stderr.log &
-APP_PID=$!
-sleep 5
-kill $APP_PID 2>/dev/null
-wait $APP_PID 2>/dev/null
-cat /tmp/smoke-test-stderr.log
-rm -f /tmp/smoke-test-stderr.log
-```
-
-**Check stderr for:**
-- `dyld` errors (library loading failures)
-- `FATAL` messages (GPU process crashes)
-- `SIGABRT` or `SIGKILL` (process crashes)
-
-**Pass:** App launches, no crash indicators in stderr
-**Fail:** STOP – investigate and fix before proceeding. **NEVER dismiss a crash as "expected behavior".**
-
-#### 2.5.3 Launch from mounted DMG
-
-```bash
-hdiutil attach release/{version}/erfana-{version}-arm64.dmg -quiet
-/Volumes/Erfana*/Erfana.app/Contents/MacOS/Erfana 2>/tmp/smoke-test-dmg-stderr.log &
-APP_PID=$!
-sleep 5
-kill $APP_PID 2>/dev/null
-wait $APP_PID 2>/dev/null
-cat /tmp/smoke-test-dmg-stderr.log
-rm -f /tmp/smoke-test-dmg-stderr.log
-hdiutil detach /Volumes/Erfana* -quiet
-```
-
-**Same pass/fail criteria as 2.5.2.**
-
-### 2.6 Checkpoint: Build Success
-
-Present:
-```
-Build Artifacts:
-- DMG: erfana-{version}.dmg ({size} MB)
-- ZIP: Erfana-{version}-universal-mac.zip ({size} MB)
-- Location: release/{version}/
-- Smoke Test: PASSED / FAILED
-```
+**Post-checkpoint validation:** Build PASS, codesign PASS, both smoke tests PASS.
 
 ---
 
-## Phase 3: Release Notes – MANDATORY
+## Phase 3: Release notes – MANDATORY
 
 **This phase MUST execute even if release notes exist from a prior attempt. Prior notes may be stale.**
 
-### 3.1 Analyze Changes
+**Input conditions:**
+- [ ] Phase 2 checkpoint passed
+- [ ] Build artifacts verified
 
-```bash
-# Get commits since last tag
-git log {last-tag}..HEAD --oneline
+### 3.1 Delegate to release-notes-drafter
 
-# Get detailed changes
-git log {last-tag}..HEAD --pretty=format:"%h %s"
+```
+Agent(subagent_type: "release-notes-drafter")
+Prompt: "Draft release notes for Erfana version {version}. Last tag: {last_tag}. Template: {skill_path}/templates/release-notes.md. Output: release/{version}/erfana-{version}-release-notes.md"
 ```
 
-### 3.2 Draft Release Notes
-
-Using the template in `templates/release-notes.md`, create a draft with:
-
-**INCLUDE (user-focused):**
-- New features users can use
-- Bug fixes that affected users
-- UI/UX improvements
-- Performance improvements
-
-**EXCLUDE (developer-focused):**
-- Test coverage changes
-- Refactoring without user impact
-- Skill/agent updates
-- Development tooling changes
-- Commit hashes
-- Issue numbers (unless user-facing bug)
-
-### 3.3 Checkpoint: User Reviews Release Notes
+### 3.2 Checkpoint: user reviews release notes
 
 **MANDATORY: This checkpoint requires explicit user approval. Do not skip even if notes exist from a prior release attempt.**
 
 Present the draft and ask:
 > "Please review these release notes. They will be saved as `erfana-{version}-release-notes.md` in the release folder."
 
-User can:
+Options:
 - Approve as-is
-- Request changes
+- Request changes (provide feedback, re-delegate to agent)
 - Edit directly
 
-### 3.4 Save Release Notes
+### 3.3 Retry logic
 
-```bash
-# Save to release folder
-write release/{version}/erfana-{version}-release-notes.md
-```
+If user requests changes:
+- Re-delegate to agent with user feedback (max 3 rounds)
+- After 3 rounds, let user edit directly
+
+**Post-checkpoint validation:** User explicitly approved release notes.
 
 ---
 
-## Phase 4: Git Tag – MANDATORY CHECKPOINT
+## Phase 4: Git tag – MANDATORY CHECKPOINT
 
-**This checkpoint MUST be presented to the user even if a tag already exists. The user decides whether to re-tag, skip, or confirm.**
+**This checkpoint MUST be presented even if a tag already exists.**
 
-### 4.1 Checkpoint: Confirm Tagging
+**Input conditions:**
+- [ ] Phase 3 checkpoint passed
+- [ ] Release notes approved by user
 
-Ask user:
+### 4.1 Checkpoint: confirm tagging
+
+**Ask user:**
 > "Create git tag `v{version}` for this release?"
 
 Options:
@@ -352,29 +283,32 @@ Options:
 - No, skip tagging
 - Yes, and push to remote
 
-### 4.2 Create Tag
+### 4.2 Execute tag (directly – simple command)
 
 ```bash
 git tag v{version}
-
 # If user requested push:
 git push origin v{version}
 ```
+
+**Post-checkpoint validation:** Tag created (or user chose to skip).
 
 ---
 
 ## Phase 5: Summary
 
-### 5.1 Release Checklist
+**Input conditions:**
+- [ ] All prior phases completed
+
+### 5.1 Release checklist
 
 Present final summary:
 
 ```
-Release v{version} Complete
+Release v{version} complete
 
 Artifacts:
 - DMG: release/{version}/erfana-{version}.dmg
-- ZIP: release/{version}/Erfana-{version}-universal-mac.zip
 - Notes: release/{version}/erfana-{version}-release-notes.md
 
 Quality:
@@ -387,17 +321,17 @@ Git:
 - Tag: v{version} (created / not created)
 - Pushed: yes / no
 
-Next Steps:
+Next steps:
 - Test DMG installation manually
-- Create GitHub Release (if applicable)
+- Create GitHub release (if applicable)
 - Distribute to users
 ```
 
 ---
 
-## Anti-Patterns
+## Anti-patterns
 
-| Don't | Do Instead |
+| Don't | Do instead |
 |-------|------------|
 | Delete entire `release/` folder | Only clean `release/{version}/` |
 | Include test counts in release notes | Keep notes user-focused |
@@ -408,95 +342,54 @@ Next Steps:
 | Dismiss a crash as "expected" | A crash during smoke test ALWAYS blocks the release |
 | Skip a phase because "already done" | Re-execute every phase – prior state may be stale |
 | Auto-approve a checkpoint | Always present checkpoint to user for explicit confirmation |
+| Run commands directly instead of delegating | Use agents for quality gates, builds, and notes |
 
 ---
 
-## Troubleshooting
+## Reference files
 
-### Build Size Too Large (>300 MB)
-
-Check electron-builder.yml excludes:
-```yaml
-files:
-  - "!release/**"
-  - "!coverage/**"
-  - "!tests/**"
-```
-
-### Tests Failing
-
-```bash
-# Run specific test suite for debugging
-npm run test:renderer
-npm run test:main
-npm run test:preload
-```
-
-### TypeScript Errors
-
-```bash
-# Check specific config
-npm run typecheck:node
-npm run typecheck:web
-```
+- `templates/release-notes.md` – Release notes template
+- `guides/troubleshooting.md` – Troubleshooting and rollback procedures
 
 ---
 
-## Rollback Procedures
+## Examples
 
-### If Build Fails Mid-Process
-
-1. Check error messages in terminal
-2. Fix the issue (usually in source code)
-3. Clean the failed build: `rm -rf release/{version}/`
-4. Restart from Phase 1 (Quality Gates)
-
-### If Critical Bug Found Post-Release
-
-1. **Do NOT delete the release folder** (keep for reference)
-2. Create hotfix branch: `git checkout -b hotfix/{version}`
-3. Fix the bug
-4. Bump patch version in package.json
-5. Run full release process for new version
-6. If git tag was pushed:
-   ```bash
-   # Delete remote tag (use with caution)
-   git push --delete origin v{version}
-   # Delete local tag
-   git tag -d v{version}
-   ```
-
-### If GitHub Release Was Created
-
-1. Go to GitHub Releases page
-2. Edit the release and mark as "Pre-release" or delete draft
-3. Add note explaining the issue
-4. Create new release with fixed version
-
-### Recovery Checklist
-
-- [ ] Identify what went wrong
-- [ ] Document the issue for future reference
-- [ ] Clean up any partial artifacts
-- [ ] Communicate with users if release was distributed
-- [ ] Create new release with fix
-
----
-
-## Example: Full Release Flow
+### Example 1: Successful release flow
 
 **User:** "Release new version of erfana"
 
 **Skill does:**
 
-1. **Pre-flight:** Checks git status, compares version 0.4.6 vs tag v0.4.5
-2. **Confirms:** "Ready to release v0.4.6?"
-3. **Quality gates:** Runs lint, typecheck, audit, tests - all pass
-4. **Asks platform:** User selects macOS
-5. **Builds:** Creates DMG (235 MB) and ZIP
-6. **Analyzes commits:** Finds 3 features, 2 bug fixes
-7. **Drafts notes:** User-friendly release notes
-8. **User reviews:** Approves with minor edit
-9. **Saves:** `release/0.4.6/erfana-0.4.6-release-notes.md`
-10. **Asks about tag:** User says yes, create v0.4.6
-11. **Summary:** Shows all artifacts and next steps
+1. **Pre-flight:** Creates todo list. Asks bump type (user picks MINOR) and platform (macOS). Checks git status, compares version 0.5.0 vs tag v0.4.6.
+2. **Checkpoint 0.4:** "Ready to release v0.5.0?" → User confirms.
+3. **Quality gates:** Delegates to `release-quality-runner`. All pass (lint clean, typecheck clean, 7200 tests pass, no critical vulnerabilities).
+4. **Checkpoint 1.4:** Shows quality summary → User confirms.
+5. **Build:** Delegates to `release-build-executor`. DMG 245 MB, codesign PASS, both smoke tests PASS.
+6. **Checkpoint 2.5:** Shows build artifacts → User confirms.
+7. **Release notes:** Delegates to `release-notes-drafter`. Finds 3 features, 2 bug fixes. Drafts user-focused notes.
+8. **Checkpoint 3.2:** User reviews notes, requests one edit. Re-delegates with feedback. User approves.
+9. **Git tag:** Asks user → creates v0.5.0, pushes to remote.
+10. **Summary:** All artifacts, quality results, and next steps.
+
+### Example 2: Quality gate failure and recovery
+
+**User:** "Build release"
+
+**Skill does:**
+
+1. **Pre-flight:** Asks bump type (PATCH), platform (macOS). Version 0.4.7 confirmed.
+2. **Quality gates:** Delegates to `release-quality-runner`. Tests fail (2 failures in renderer suite).
+3. **Attempt 1:** Reports failures with details. User fixes the tests.
+4. **Attempt 2:** Re-delegates to agent. All gates pass.
+5. **Checkpoint 1.4:** Shows quality summary → User confirms.
+6. **Build through summary:** Proceeds normally.
+
+### Example 3: Smoke test crash blocks release
+
+**User:** "Prepare release"
+
+1. **Pre-flight through quality gates:** All pass normally.
+2. **Build:** Delegates to `release-build-executor`. Build succeeds (240 MB). Codesign PASS. App launch smoke test detects `SIGABRT` in stderr.
+3. **STOP:** "Smoke test detected a crash (SIGABRT). Release blocked. See `guides/troubleshooting.md` for rollback procedures."
+4. Release does NOT proceed. User must fix the crash and restart.
