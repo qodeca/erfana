@@ -157,3 +157,38 @@
 **Error path (partial failure):** If some refreshes succeed and others fail, toast shows "Refreshed N of M links (K errors)" with error details for each failure.
 **Error path (rate limited):** If Google API returns 429, the system pauses with exponential backoff and retries, extending the total operation time. Progress toast updates accordingly.
 **Note:** Subdirectories are not included – the operation is non-recursive by design.
+
+## UC-010: Cloned repository with existing .gdrive files
+
+**Actor:** User
+**Precondition:** User clones a repository that contains `.gdrive` files committed by another team member
+**Trigger:** User opens the cloned project in Erfana
+
+**Flow:**
+1. Project tree renders, detecting `.gdrive` files by extension
+2. `DriveLinkService.enrichNodes()` parses frontmatter from each `.gdrive` file
+3. Tree shows Cloud icons with display names and freshness indicators (from cached `last_modified` in frontmatter)
+4. User is NOT signed in – Drive actions requiring network show "Sign in with Google" prompt on first use
+5. If user signs in and triggers "Refresh metadata", the system attempts to fetch metadata using the user's own `drive.file` scope
+
+**Postcondition:** `.gdrive` files are visible with cached metadata; network actions require the user's own authentication
+**Error path (scope limitation):** If the `.gdrive` file references a document the user has NOT opened via Picker, the `drive.file` scope will deny access (403). Toast shows: "Cannot access this document – you may need to open it via Google Picker first to grant access, or ask the document owner to share it with you." This is a fundamental limitation of `drive.file` scope (see 05-notes.md constraints).
+**Note:** This UC highlights that `.gdrive` files are portable references but NOT portable access grants. The `drive.file` scope is per-app-per-user – it does not transfer via git.
+
+## UC-011: Google account switch
+
+**Actor:** User
+**Precondition:** User is signed in to Google account A; project contains `.gdrive` files linked under account A
+**Trigger:** User signs out and signs in with Google account B
+
+**Flow:**
+1. User clicks "Sign out" in Settings – tokens for account A are cleared
+2. User clicks "Sign in with Google" – OAuth flow opens for account B
+3. After sign-in, Settings shows account B email
+4. Existing `.gdrive` files remain in the project tree (they are local files, unaffected by auth state)
+5. User triggers "Refresh metadata" on an existing `.gdrive` file
+6. If account B has access to the document (via sharing), refresh succeeds
+7. If account B does NOT have access, toast shows "Access denied – this document was linked under a different account"
+
+**Postcondition:** User is authenticated as account B; `.gdrive` files linked under account A may become inaccessible via Erfana SDK (but remain accessible if shared with account B, or via browser where Google's own session applies)
+**Note:** v1 supports a single account. Multi-account is a future consideration.

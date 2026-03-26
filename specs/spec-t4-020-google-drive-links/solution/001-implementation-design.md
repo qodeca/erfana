@@ -105,12 +105,13 @@ interface DriveFileMetadata {
 
 ```typescript
 import { z } from 'zod'
+import { ErrorCode } from '../errors'
 
 export const DriveFileTypeSchema = z.enum(['document', 'spreadsheet', 'presentation', 'file'])
 
 export const GDriveFrontmatterSchema = z.object({
   type: DriveFileTypeSchema,
-  drive_id: z.string().min(1),
+  drive_id: z.string().min(10).max(64).regex(/^[a-zA-Z0-9_-]+$/, 'Invalid Google Drive file ID format'),
   name: z.string().min(1),
   url: z.string().url(),
   mime_type: z.string().min(1),
@@ -124,7 +125,8 @@ export const GDriveFrontmatterSchema = z.object({
 export const DriveAuthResultSchema = z.object({
   success: z.boolean(),
   email: z.string().email().optional(),
-  error: z.string().optional()
+  error: z.string().optional(),
+  errorCode: z.nativeEnum(ErrorCode).optional()
 })
 
 // drive:signOut – no input
@@ -140,7 +142,8 @@ export const DriveAccountInfoResultSchema = z.object({ email: z.string().nullabl
 export const DriveOpenPickerRequestSchema = z.object({ targetDir: z.string().min(1) })
 export const DriveOpenPickerResultSchema = z.object({
   created: z.array(z.string()),
-  error: z.string().optional()
+  error: z.string().optional(),
+  errorCode: z.nativeEnum(ErrorCode).optional()
 })
 
 // drive:fetchContent
@@ -149,8 +152,11 @@ export const DriveFetchContentRequestSchema = z.object({
   mimeType: z.string().min(1)
 })
 export const DriveFetchContentResultSchema = z.object({
-  content: z.string(),
-  truncated: z.boolean()
+  success: z.boolean(),
+  content: z.string().optional(),
+  truncated: z.boolean().optional(),
+  error: z.string().optional(),
+  errorCode: z.nativeEnum(ErrorCode).optional()
 })
 
 // drive:refreshMetadata
@@ -158,14 +164,17 @@ export const DriveRefreshMetadataRequestSchema = z.object({ filePath: z.string()
 export const DriveRefreshMetadataResultSchema = z.object({
   success: z.boolean(),
   name: z.string().optional(),
-  error: z.string().optional()
+  error: z.string().optional(),
+  errorCode: z.nativeEnum(ErrorCode).optional()
 })
 
 // drive:refreshAllMetadata
 export const DriveRefreshAllMetadataRequestSchema = z.object({ dirPath: z.string().min(1) })
 export const DriveRefreshAllMetadataResultSchema = z.object({
+  success: z.boolean(),
   refreshed: z.number(),
-  errors: z.array(z.string())
+  errors: z.array(z.string()),
+  errorCode: z.nativeEnum(ErrorCode).optional()
 })
 
 // drive:linkFiles
@@ -180,7 +189,8 @@ export const DriveLinkFilesRequestSchema = z.object({
 })
 export const DriveLinkFilesResultSchema = z.object({
   created: z.array(z.string()),
-  error: z.string().optional()
+  error: z.string().optional(),
+  errorCode: z.nativeEnum(ErrorCode).optional()
 })
 
 // drive:exportAsPdf
@@ -189,7 +199,8 @@ export const DriveExportAsPdfRequestSchema = z.object({
 })
 export const DriveExportAsPdfResultSchema = z.object({
   filePath: z.string().optional(),
-  error: z.string().optional()
+  error: z.string().optional(),
+  errorCode: z.nativeEnum(ErrorCode).optional()
 })
 ```
 
@@ -224,7 +235,7 @@ Renderer – proceeds with originally requested action
 
 ### Link creation flow (Picker → .gdrive file)
 
-`drive:openPicker` opens the Google Picker BrowserWindow AND creates .gdrive files for each selected file. It returns `{ created: [...paths] }`. `drive:linkFiles` is a separate programmatic API for creating .gdrive files without opening the Picker (for future URL-paste flow).
+The `drive:openPicker` IPC handler orchestrates the full linking flow: (1) ensure authenticated, (2) open Picker, (3) create `.gdrive` files. While this handler combines Picker + file creation, the underlying services maintain SRP: `DrivePickerService` handles only the Picker UI, `DriveLinkService` handles only file creation. The handler is an orchestration layer, not a service. `drive:linkFiles` is a separate programmatic API for creating `.gdrive` files without opening the Picker (for future URL-paste flow).
 
 ```
 Renderer (directory context menu → "Link Google Drive file")
@@ -243,8 +254,10 @@ drive-handlers.ts
   ├── user selects files → Picker posts { type: 'picked', files: [...] }
   │     BrowserWindow picker-preload captures postMessage → ipcRenderer.send
   │
-  ├── ipcMain.once('drive:picker-result:{nonce}') resolves promise
-  ├── DriveLinkService.create(targetDir, fileMetadata) × N files
+  ├── ipcMain.once('drive:picker-result') → validate nonce in payload → resolves promise
+  ├── withWatcherPause(() => {
+  │     DriveLinkService.create(targetDir, fileMetadata) × N files
+  │   })  // prevents N individual watcher events during bulk creation
   └── return { created: ['/path/to/report.gdrive', ...] }
   ▼
 Renderer
@@ -319,6 +332,7 @@ Renderer
 | `src/renderer/src/components/Settings/GoogleDriveSection.tsx` | Settings UI section |
 | `src/renderer/src/components/ProjectTree/DriveFreshnessIndicator.tsx` | Relative time badge component |
 | `resources/picker.html` | Static HTML for Picker BrowserWindow |
+| `src/renderer/src/stores/useDriveStore.ts` | Zustand store for Drive renderer state: `isAuthenticated`, `accountEmail`, `isPickerOpen`, `isFetchingContent` (follows `useGitStore` pattern) |
 
 ### Files to modify
 
@@ -326,19 +340,19 @@ Renderer
 |------|--------|
 | `src/main/index.ts` | Import and call `registerDriveHandlers(mainWindow)` |
 | `src/shared/constants.ts` | Add `GOOGLE_DRIVE` constant group |
-| `src/shared/ipc/global-settings-schema.ts` | Add `GoogleDriveSettingsSchema` under `googleDrive` key |
+| `src/shared/ipc/global-settings-schema.ts` | Add `GoogleDriveSettingsSchema` (only `enabled: boolean`) under `googleDrive` key. No `connected` or `accountEmail` – those are runtime state in `useDriveStore` |
 | `src/preload/index.ts` | Add `drive` namespace to `api` object; extend `FileNode` with `driveDisplayName`, `driveLastModified` |
 | `src/renderer/src/prompts/schema.ts` | Extend `area` enum with `'drive-link'` |
 | `src/renderer/src/prompts/types.ts` | Add Drive variables to `PromptVariables`. Verify actual filename during implementation – the Drive variables may need to be added to `types.ts` directly if variableFactory.ts does not exist |
 | `src/renderer/src/prompts/variableFactory.ts` | Pass through Drive variables in `createPromptVariables()`. Verify actual filename during implementation – the Drive variables may need to be added to `types.ts` directly if variableFactory.ts does not exist |
 | `src/renderer/src/components/ProjectTree/context-menu/factory.ts` | Register `DriveFileContextMenuStrategy` before `FileContextMenuStrategy` |
-| `src/renderer/src/components/ProjectTree/context-menu/strategies.tsx` | Export `DriveFileContextMenuStrategy`; extend `DirectoryContextMenuStrategy` with "Link Drive file" and "Refresh all Drive links" items |
+| `src/renderer/src/components/ProjectTree/context-menu/strategies.tsx` | Extend `DirectoryContextMenuStrategy` with "Link Drive file" and "Refresh all Drive links" items. `DriveFileContextMenuStrategy` lives in its own dedicated file (line 318), NOT in strategies.tsx |
 | `src/renderer/src/components/ProjectTree/context-menu/types.ts` | Add `drive` to `MenuContext` |
 | `src/renderer/src/components/ProjectTree/ProjectTreeNode.tsx` | Cloud icon, display name, freshness, double-click handler |
 | `src/renderer/src/utils/iconRegistry.tsx` | Add `'cloud'` icon name |
 | `src/renderer/src/components/Settings/SettingsOverlay.tsx` | Render `<GoogleDriveSection />` |
 | `CLAUDE.md` | Add "Google Drive links" section |
-| `package.json` | Add `@googleapis/drive`, `@googleapis/docs`, `@googleapis/sheets`, `google-auth-library`, `p-limit` |
+| `package.json` | Add `@googleapis/drive`, `@googleapis/docs`, `@googleapis/sheets`, `google-auth-library` (no `p-limit` – concurrency uses inline semaphore) |
 
 ---
 
@@ -429,13 +443,21 @@ this.strategies = [
 - Create `GoogleDriveSection` settings component
 - IPC handlers: authenticate, signOut, isAuthenticated, getAccountInfo
 
-### Phase 3 – Picker + Drive API (DrivePickerService, DriveApiService, content fetch)
+### Phase 3a – Drive API (DriveApiService, content fetch, error mapping)
 
 - Implement `DriveApiService` with mime-type routing
-- Implement `DrivePickerService` with BrowserWindow, nonce/postMessage handshake
+- Error mapping to `ErrorCode` enum (`DRIVE_NOT_FOUND`, `DRIVE_PERMISSION_DENIED`, etc.)
+- IPC handlers: fetchContent, refreshMetadata, exportAsPdf
+- Retry logic (exponential backoff for 429)
+- AbortSignal support for long-running operations
+
+### Phase 3b – Picker (DrivePickerService, PoC spike, BrowserWindow)
+
+- **PoC spike:** Verify Google Picker loads in sandboxed BrowserWindow (see FR-048)
+- Implement `DrivePickerService` with BrowserWindow, contextBridge token injection (ADR-009), static IPC (ADR-010)
 - Create `resources/picker.html` and `src/preload/picker-preload.ts`
-- IPC handlers: fetchContent, refreshMetadata, openPicker, exportAsPdf
-- Error mapping and retry logic
+- IPC handlers: openPicker, linkFiles
+- postMessage origin validation
 
 ### Phase 4 – Project tree rendering (Cloud icon, display name, freshness)
 
@@ -501,11 +523,11 @@ E2E tests must not call real Google APIs. Use IPC interception to stub all `driv
 
 ### Error handling
 
-All `drive:*` handlers return `{ error: string }` on failure, never throw. The renderer maps error codes to toast messages. Specific handling: 401 → re-auth, 403 → "check sharing settings", 404 → "document may have been deleted", 429 → exponential backoff (3 retries), offline → "no network connection" toast.
+All `drive:*` handlers return `{ success: false, error: string, errorCode: ErrorCode }` on failure, never throw. This matches the codebase convention in `src/main/ipc/` (see ADR-008). Error codes extend the unified `ErrorCode` enum in `src/shared/errors.ts`. Specific handling: 401 → `DRIVE_AUTH_REQUIRED` (re-auth), 403 → `DRIVE_PERMISSION_DENIED` or `DRIVE_SCOPE_DENIED`, 404 → `DRIVE_NOT_FOUND`, 429 → `DRIVE_RATE_LIMITED` (exponential backoff, 3 retries), offline → `DRIVE_OFFLINE`.
 
 ### OAuth client ID bundling
 
-Read from `import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID` at build time. Set in `.env.local` for development. `DriveAuthService` throws a clear error if missing.
+Read from `process.env.GOOGLE_OAUTH_CLIENT_ID` in the main process. The value is injected via electron-vite `define` in `electron.vite.config.ts`. The main process never uses `import.meta.env` (see ADR-009 in architecture doc).
 
 ### Token file name
 
@@ -517,7 +539,7 @@ The encrypted refresh token is stored at `~/.erfana/google-drive-refresh-token.e
 
 ### Rate limiting
 
-"Refresh all Drive links" uses `p-limit` with concurrency 5. Per-file progress is streamed to the renderer via `webContents.send('drive:refresh-progress', { completed, total, errors })`. Total time for 50 files: ~10s with concurrent requests, with better progress feedback.
+"Refresh all Drive links" uses an inline semaphore (~20 lines) with concurrency 5. Per-file progress is streamed to the renderer via `webContents.send('drive:refresh-progress', { completed, total, errors })`. Total time for 50 files: ~10s with concurrent requests, with better progress feedback.
 
 ### Offline degradation
 

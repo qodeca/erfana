@@ -76,3 +76,27 @@
 - **020-AC-038**: Given the OAuth authorization URL constructed by `DriveAuthService`, then it contains both a cryptographic `state` parameter (random, unguessable) and `code_challenge_method=S256`. The callback handler shall reject responses where the `state` parameter does not match.
 - **020-AC-039**: Given a renderer sends `drive:fetchContent` with a `driveId` that does not match any `.gdrive` file in the currently open project, then the handler returns a structured error without making any Google API call.
 - **020-AC-040**: Given `safeStorage.isEncryptionAvailable()` returns false, when the user triggers Google sign-in, then the system shows an error message explaining that a system keyring is required and does not attempt to store tokens in plaintext.
+
+## Cancellation and token management
+
+- **020-AC-045**: Given a user triggers "Fetch content" and then cancels (e.g., navigates away or triggers another action), when the AbortSignal fires, then the in-flight Google API request is cancelled and no content is returned to the renderer.
+- **020-AC-046**: Given Google returns a new refresh token during a token refresh response (token rotation), then the system stores the new refresh token immediately via safeStorage, replacing the previous one, without user interaction.
+
+## Double-click and keyboard interaction
+
+- **020-AC-047**: Given a user double-clicks a `.gdrive` file in the project tree, then the linked URL opens in the default browser. The first click of the double-click sequence may briefly open the file in Monaco editor before the browser launches – this is documented as expected behavior.
+- **020-AC-048**: Given a user presses Enter on a focused `.gdrive` tree node, then the file opens in the Monaco editor (single-click behavior). To open in the browser, the user must use the context menu "Open in browser" action or double-click.
+
+## Accessibility
+
+- **020-AC-049**: Given a `.gdrive` node in the project tree, then the tree item has `aria-label` including the display name, freshness, and type (e.g., "Q1 Sales Report, modified 2 days ago, Google Drive link").
+- **020-AC-050**: Given the freshness indicator on a `.gdrive` node, then it has `aria-hidden="true"` (the equivalent information is conveyed via the parent node's `aria-label`).
+
+## PDF export
+
+- **020-AC-051**: Given a user selects "Export as PDF" on a `.gdrive` file, then a save dialog appears allowing the user to choose the destination. The default filename is `{drive-display-name}.pdf` and the default directory is the project root.
+
+## Feature management
+
+- **020-AC-052**: Given `googleDrive.enabled` is set to `false` in global settings, then Drive context menu items are not shown, the Settings Google Drive section shows "Feature disabled", and `drive:*` IPC calls return `{ success: false, errorCode: 'DRIVE_FEATURE_DISABLED' }`.
+- **020-AC-053**: Given the renderer mounts any Drive-related component (GoogleDriveSection, DriveFileContextMenuStrategy), then authentication state is read from `useDriveStore` (Zustand), not from direct IPC calls on every render.

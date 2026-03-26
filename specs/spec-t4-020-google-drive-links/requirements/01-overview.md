@@ -25,6 +25,8 @@ This feature bridges the gap by making Drive resources first-class citizens in t
 - Context menu strategy for `.gdrive` files (direct ops + AI prompts)
 - New prompt templates with `area: drive-link`
 - Settings overlay "Google Drive" section
+- `useDriveStore` Zustand store for renderer-side Drive state management
+- Feature flag (`googleDrive.enabled`) to disable the feature without code changes
 - CLAUDE.md conventions for Claude Code discovery
 - Support for four Google Workspace types: Document, Spreadsheet, Presentation, generic File
 
@@ -52,3 +54,5 @@ This feature bridges the gap by making Drive resources first-class citizens in t
 | Content strategy | Fetched on demand, never cached locally | Stays local-first, avoids sync complexity |
 | Tree enrichment | Post-read enrichment via DriveLinkService.enrichNodes() | FileService stays pure; mirrors git status overlay pattern |
 | Picker service | Separate DrivePickerService (not on DriveApiService) | SRP: API wrapper vs UI orchestration are different concerns |
+| Renderer state | `useDriveStore` Zustand store | Follows `useGitStore` / `useTranscriptionStore` pattern for reactive state management across components |
+| Feature flag | `googleDrive.enabled` in GlobalSettings | Allows disabling the feature without code changes; skips tree enrichment and hides UI when off |

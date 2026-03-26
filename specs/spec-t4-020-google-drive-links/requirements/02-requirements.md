@@ -33,7 +33,7 @@
 
 - **020-FR-019**: `DriveAuthService` shall manage the full OAuth2 lifecycle: authenticate, getAccessToken, signOut, isAuthenticated, getAccountInfo.
 - **020-FR-020**: `DriveLinkService` shall handle `.gdrive` file operations: create, parse, update, validate, list (all `.gdrive` files in a project). This service shall perform no network calls.
-- **020-FR-021**: `DriveApiService` shall wrap googleapis SDK calls: fetchMetadata, fetchContent, listFiles, exportFile, and openPicker. It shall depend on `DriveAuthService` for tokens.
+- **020-FR-021**: `DriveApiService` shall wrap googleapis SDK calls: `fetchMetadata`, `fetchContent`, `exportFile`. It shall depend on `DriveAuthService` for token injection. It is a pure API wrapper with no UI or file-system concerns. Picker functionality is handled by `DrivePickerService` (separate service per ADR-003).
 - **020-FR-022**: `DriveApiService.fetchContent` shall return plain text content appropriate to the file type: document body for Docs, cell values for Sheets, slide text for Presentations, raw content or export for generic files.
 
 ### IPC channels
@@ -82,6 +82,16 @@
 - **020-FR-043**: Before calling `shell.openExternal()` with a URL from `.gdrive` frontmatter, the system shall validate that the URL uses the `https:` protocol. URLs with other protocols (http, javascript, file, etc.) shall be rejected.
 - **020-FR-044**: If a token refresh response from Google includes a new refresh token (token rotation), the system shall store the new token immediately, replacing the previous one.
 
+### Feature management
+
+- **020-FR-045**: The system shall support a `googleDrive.enabled` feature flag in `GlobalSettingsSchema` (default: `true`). When disabled, all Drive context menu items and settings UI shall be hidden, tree enrichment shall be skipped, and `drive:*` IPC handlers shall return `{ success: false, errorCode: 'DRIVE_FEATURE_DISABLED' }`.
+- **020-FR-046**: The renderer shall manage Drive integration state via a `useDriveStore` Zustand store (`src/renderer/src/stores/useDriveStore.ts`), following the `useGitStore` / `useTranscriptionStore` pattern. The store shall track: `isAuthenticated`, `accountEmail`, `isPickerOpen`, `isFetchingContent`, and expose actions for state transitions. Components shall read auth state from this store, not from direct IPC calls.
+- **020-FR-047**: The `shell:openExternal` IPC handler in `src/main/ipc/shell-handlers.ts` shall validate the URL protocol server-side, rejecting protocols other than `https:` and `mailto:` with a structured error. This is a codebase-wide hardening that benefits Drive links but applies to all `shell:openExternal` callers.
+- **020-FR-048**: Before Phase 3b implementation begins, a proof-of-concept spike shall verify that Google Picker API loads and functions correctly inside an Electron BrowserWindow with `contextIsolation: true` and `sandbox: true`. The spike shall document exact CSP requirements and whether `'unsafe-eval'` is needed. If the Picker fails in a sandboxed BrowserWindow, the fallback is a custom Drive file browser dialog using `DriveApiService` with the user's `drive.file`-scoped files.
+- **020-FR-049**: The `.gdrive` YAML frontmatter shall include an optional `schema_version` field (integer, default `1`). `DriveLinkService.parse()` shall support migrating older schema versions forward, enabling non-breaking format evolution.
+- **020-FR-050**: When creating the first `.gdrive` file in a git-tracked project, the system shall check if `*.gdrive` is in `.gitignore`. If not, it shall show a one-time toast: "Consider adding *.gdrive to .gitignore – these files may contain Google Drive IDs and email addresses."
+- **020-FR-051**: The Google Picker API key shall be read from `process.env.GOOGLE_PICKER_API_KEY` via electron-vite `define` configuration. It shall never be read via `import.meta.env` in the main process, consistent with the zero `import.meta.env` usage in `src/main/`.
+
 ## Non-functional requirements
 
 - **020-NFR-001**: OAuth token refresh shall complete within 2 seconds. If refresh fails, the system shall prompt re-authentication rather than silently failing.
@@ -97,3 +107,5 @@
 - **020-NFR-011**: If `safeStorage.isEncryptionAvailable()` returns false, the system shall refuse to store OAuth refresh tokens and shall display a clear error message requiring a system keyring (e.g., GNOME Keyring, KWallet). The system shall not fall back to plaintext storage for OAuth tokens.
 - **020-NFR-012**: Error messages crossing the IPC boundary from Drive services shall be sanitized to never contain access tokens, authorization headers, or URL query parameters containing credentials.
 - **020-NFR-013**: The Picker BrowserWindow shall validate `postMessage` event origins against `https://docs.google.com` before processing file selection results. Messages from other origins shall be ignored.
+- **020-NFR-014**: The combined size of new npm dependencies (`@googleapis/drive`, `@googleapis/docs`, `@googleapis/sheets`, `google-auth-library`) shall not increase the production ASAR bundle by more than 5 MB. Bundle size shall be verified during Phase 1 and documented.
+- **020-NFR-015**: All `drive:*` IPC handlers shall return `{ success: boolean, error?: string, errorCode?: ErrorCode, ...data }` matching the codebase convention in `src/main/ipc/`. Error codes shall extend the `ErrorCode` enum in `src/shared/errors.ts` as `DRIVE_*` entries (e.g., `DRIVE_NOT_FOUND`, `DRIVE_PERMISSION_DENIED`, `DRIVE_AUTH_REQUIRED`, `DRIVE_RATE_LIMITED`, `DRIVE_OFFLINE`, `DRIVE_SCOPE_DENIED`, `DRIVE_INVALID_FILE`, `DRIVE_FEATURE_DISABLED`) – not a separate `DriveErrorCode` type.

@@ -7,7 +7,7 @@
   "scope": "feature",
   "description": "Reference-based Google Drive integration via .gdrive link files visible in the project tree. Includes OAuth2 sign-in, Google Picker for linking, context menu with direct operations and AI prompts, googleapis SDK for Erfana internals, and CLAUDE.md conventions for Claude Code discovery via gws CLI.",
   "created": "2026-03-26T14:39:00.000Z",
-  "last_modified": "2026-03-26T17:30:00.000Z",
+  "last_modified": "2026-03-26T22:04:00.000Z",
   "documents": {
     "architecture": ["architecture/001-drive-integration-architecture.md"],
     "design": ["design/001-technical-design.md"],
@@ -16,14 +16,14 @@
   },
   "authors": ["marcin"],
   "requirement_sequences": {
-    "FR": 44,
-    "NFR": 13,
-    "UC": 9,
-    "AC": 44
+    "FR": 51,
+    "NFR": 15,
+    "UC": 11,
+    "AC": 53
   },
   "statistics": {
-    "total_requirements": 110,
-    "total_words": 5521
+    "total_requirements": 130,
+    "total_words": 17006
   },
   "requirements_index": {
     "020-FR-001": "02-requirements.md",
@@ -66,6 +66,17 @@
     "020-FR-038": "02-requirements.md",
     "020-FR-039": "02-requirements.md",
     "020-FR-040": "02-requirements.md",
+    "020-FR-041": "02-requirements.md",
+    "020-FR-042": "02-requirements.md",
+    "020-FR-043": "02-requirements.md",
+    "020-FR-044": "02-requirements.md",
+    "020-FR-045": "02-requirements.md",
+    "020-FR-046": "02-requirements.md",
+    "020-FR-047": "02-requirements.md",
+    "020-FR-048": "02-requirements.md",
+    "020-FR-049": "02-requirements.md",
+    "020-FR-050": "02-requirements.md",
+    "020-FR-051": "02-requirements.md",
     "020-NFR-001": "02-requirements.md",
     "020-NFR-002": "02-requirements.md",
     "020-NFR-003": "02-requirements.md",
@@ -76,6 +87,11 @@
     "020-NFR-008": "02-requirements.md",
     "020-NFR-009": "02-requirements.md",
     "020-NFR-010": "02-requirements.md",
+    "020-NFR-011": "02-requirements.md",
+    "020-NFR-012": "02-requirements.md",
+    "020-NFR-013": "02-requirements.md",
+    "020-NFR-014": "02-requirements.md",
+    "020-NFR-015": "02-requirements.md",
     "UC-001": "03-use-cases.md",
     "UC-002": "03-use-cases.md",
     "UC-003": "03-use-cases.md",
@@ -84,6 +100,9 @@
     "UC-006": "03-use-cases.md",
     "UC-007": "03-use-cases.md",
     "UC-008": "03-use-cases.md",
+    "UC-009": "03-use-cases.md",
+    "UC-010": "03-use-cases.md",
+    "UC-011": "03-use-cases.md",
     "020-AC-001": "04-acceptance.md",
     "020-AC-002": "04-acceptance.md",
     "020-AC-003": "04-acceptance.md",
@@ -120,7 +139,23 @@
     "020-AC-034": "04-acceptance.md",
     "020-AC-035": "04-acceptance.md",
     "020-AC-036": "04-acceptance.md",
-    "020-AC-037": "04-acceptance.md"
+    "020-AC-037": "04-acceptance.md",
+    "020-AC-038": "04-acceptance.md",
+    "020-AC-039": "04-acceptance.md",
+    "020-AC-040": "04-acceptance.md",
+    "020-AC-041": "04-acceptance.md",
+    "020-AC-042": "04-acceptance.md",
+    "020-AC-043": "04-acceptance.md",
+    "020-AC-044": "04-acceptance.md",
+    "020-AC-045": "04-acceptance.md",
+    "020-AC-046": "04-acceptance.md",
+    "020-AC-047": "04-acceptance.md",
+    "020-AC-048": "04-acceptance.md",
+    "020-AC-049": "04-acceptance.md",
+    "020-AC-050": "04-acceptance.md",
+    "020-AC-051": "04-acceptance.md",
+    "020-AC-052": "04-acceptance.md",
+    "020-AC-053": "04-acceptance.md"
   },
   "change_history": [
     {
@@ -128,6 +163,13 @@
       "operation": "INIT",
       "target": "manifest",
       "description": "T4 spec created from approved brainstorming design plan",
+      "by": "claude"
+    },
+    {
+      "date": "2026-03-26T22:04:00.000Z",
+      "operation": "REVIEW_UPDATE",
+      "target": "all",
+      "description": "Comprehensive spec update from 4-agent review (47 findings): fixed ErrorCode alignment, import.meta.env, drive_id schema, executeJavaScript security; added useDriveStore, feature flag, PoC spike, 3 new ADRs (008-010), 11 new FRs (041-051), 5 new NFRs (011-015), 2 new UCs (010-011), 16 new ACs (038-053), accessibility/ARIA, 13 constraints, 4 future considerations",
       "by": "claude"
     }
   ]

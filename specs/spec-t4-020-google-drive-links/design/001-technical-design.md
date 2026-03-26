@@ -25,7 +25,7 @@ export const GDriveFrontmatterSchema = z.object({
   /** Google Workspace document type */
   type: DriveFileTypeSchema,
   /** Google Drive file ID (alphanumeric, 25–44 chars) */
-  drive_id: z.string().min(10).max(64).regex(/^[a-zA-Z0-9_-]+$/),
+  drive_id: z.string().min(10).max(64).regex(/^[a-zA-Z0-9_-]+$/, 'Invalid Google Drive file ID format'),
   /** Display name shown in the project tree */
   name: z.string().min(1).max(500),
   /** Full Google Drive URL */
@@ -187,21 +187,20 @@ Content truncated at **100,000 characters** with notice appended when truncation
 ### Error mapping
 
 ```typescript
-export type DriveErrorCode =
-  | 'NOT_FOUND'         // 404
-  | 'PERMISSION_DENIED' // 403
-  | 'AUTH_REQUIRED'     // 401
-  | 'RATE_LIMITED'      // 429
-  | 'OFFLINE'           // ENOTFOUND
-  | 'UNKNOWN'
-
-export class DriveApiError extends Error {
-  constructor(
-    public readonly code: DriveErrorCode,
-    message: string,
-    public readonly retryable: boolean
-  ) { super(message) }
-}
+// Error codes extend the existing ErrorCode enum in src/shared/errors.ts:
+//   DRIVE_NOT_FOUND        // 404
+//   DRIVE_PERMISSION_DENIED // 403
+//   DRIVE_AUTH_REQUIRED     // 401
+//   DRIVE_RATE_LIMITED      // 429
+//   DRIVE_OFFLINE           // ENOTFOUND
+//   DRIVE_SCOPE_DENIED      // drive.file scope limitation
+//   DRIVE_INVALID_FILE      // bad .gdrive format
+//   DRIVE_FEATURE_DISABLED  // feature flag off
+//
+// Uses AppError from src/shared/errors.ts (not a separate DriveApiError class):
+//   throw new AppError('Document not found', ErrorCode.DRIVE_NOT_FOUND, { driveId })
+//
+// See ADR-008 for rationale on extending ErrorCode vs creating DriveErrorCode.
 ```
 
 Rate limit handling: retry up to 3 times with exponential backoff (1s base, 2x multiplier, 30s max).
@@ -237,7 +236,7 @@ contextBridge.exposeInMainWorld('pickerBridge', {
 1. Main process generates a random nonce per Picker session
 2. Opens BrowserWindow loading `resources/picker.html`
 3. `picker.html` loads Google Picker API (`apis.google.com/js/api.js`)
-4. Main process injects access token + app key via `webContents.executeJavaScript()`
+4. `picker.html` calls `window.pickerBridge.getConfig()` (via contextBridge) which returns `{ accessToken, pickerApiKey }` from the main process via IPC (see ADR-009)
 5. User selects files → Picker fires callback
 6. `picker.html` calls `window.pickerBridge.sendResult(files)`
 7. Main process receives via `ipcMain.once('drive:picker-result')`, validates nonce
@@ -412,13 +411,44 @@ Only applies to the Picker window, not the main window.
 
 ### Error message sanitization
 
-All Drive service errors are sanitized before crossing the IPC boundary. Access tokens, authorization headers, and URL query parameters containing credentials are stripped. Only the `DriveErrorCode` and a user-friendly message string are passed to the renderer.
+All Drive service errors are sanitized before crossing the IPC boundary. Access tokens, authorization headers, and URL query parameters containing credentials are stripped. Only the `ErrorCode` (from the unified enum in `src/shared/errors.ts`) and a user-friendly message string are passed to the renderer (see ADR-008).
+
+### shell:openExternal protocol validation
+
+The existing `shell:openExternal` handler at `src/main/ipc/shell-handlers.ts` passes URLs directly to Electron's `shell.openExternal()` without server-side protocol validation. The comment states "Dangerous protocols should be blocked in renderer" – this is insufficient for defense-in-depth.
+
+**Required change (020-FR-047):** Add server-side URL protocol validation in the handler:
+
+```typescript
+const parsed = new URL(url)
+const ALLOWED_PROTOCOLS = new Set(['https:', 'mailto:'])
+if (!ALLOWED_PROTOCOLS.has(parsed.protocol)) {
+  throw new AppError(
+    `Protocol ${parsed.protocol} not allowed`,
+    ErrorCode.PATH_INVALID
+  )
+}
+```
+
+This benefits all callers (markdown preview links, Drive URLs, etc.), not just Drive integration.
 
 ---
 
 ## OAuth client ID bundling
 
-Read from `import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID` at build time. Set in `.env.local` for development, baked in during CI for production. `DriveAuthService` throws a clear startup error if missing.
+Read from `process.env.GOOGLE_OAUTH_CLIENT_ID` in the main process. The value is injected via electron-vite `define` configuration in `electron.vite.config.ts`:
+
+```typescript
+// electron.vite.config.ts
+main: {
+  define: {
+    'process.env.GOOGLE_OAUTH_CLIENT_ID': JSON.stringify(process.env.GOOGLE_OAUTH_CLIENT_ID),
+    'process.env.GOOGLE_PICKER_API_KEY': JSON.stringify(process.env.GOOGLE_PICKER_API_KEY)
+  }
+}
+```
+
+The main process has zero `import.meta.env` usage in the codebase – this convention must be maintained. `DriveAuthService` throws a clear startup error if the value is missing.
 
 ## Settings overlay integration
 
@@ -426,11 +456,13 @@ Read from `import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID` at build time. Set in `.
 
 ```typescript
 export const GoogleDriveSettingsSchema = z.object({
-  connected: z.boolean().default(false),
-  accountEmail: z.string().email().optional()
+  /** Feature flag – set to false to disable all Drive UI and IPC */
+  enabled: z.boolean().default(true)
 })
 ```
 
 Embedded under `googleDrive` key in `GlobalSettingsSchema`.
+
+**Note:** `connected` and `accountEmail` are NOT stored in settings – they are runtime state derived from `DriveAuthService.isAuthenticated()` and `getAccountInfo()`. They belong in the `useDriveStore` Zustand store, not in the persisted settings schema. The settings schema stores only user-configurable preferences.
 
 `GoogleDriveSection.tsx` uses `window.api.drive.isAuthenticated()` and `getAccountInfo()` on mount. Shows account email + "Sign out" when connected, "Sign in with Google" button when disconnected, and linked file count for current project.

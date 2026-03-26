@@ -82,13 +82,15 @@ project-root/
 | Node hover | `var(--color-bg-hover)` | rgba(255,255,255,0.05) -- standard tree hover |
 | Selected node | `var(--color-bg-selected)` | violet-muted -- same as current selection |
 
-**Freshness indicator format:** Relative time -- "2m ago", "5h ago", "2d ago", "3w ago". Falls back to nothing if `last_modified` is absent. Uses `var(--font-mono)` for fixed-width alignment.
+**Freshness indicator format:** Relative time -- "2m ago", "5h ago", "2d ago", "3w ago". Falls back to nothing if `last_modified` is absent. Uses `var(--font-mono)` for fixed-width alignment. If this creates visual inconsistency with the proportional display name, `tabular-nums` on `var(--font-sans)` maintains numeric alignment without a monospace typeface.
 
 **Visual distinction from other node types:**
 
 - Regular files: `File` or `FileText` icon in `var(--color-text-secondary)` -- gray
 - Symlinks: `Link` icon prefix (12px) -- gray, with 0.8 opacity
 - `.gdrive` files: `Cloud` icon in `var(--color-brand-violet)` -- violet, immediately recognizable
+
+**Color-blind accessibility:** The `.gdrive` node is distinguished by BOTH icon shape (Cloud vs File/FileText) and color (violet vs gray). Shape alone is sufficient for differentiation – color is supplementary, not the sole differentiator. No additional color-blind accommodation is needed.
 
 ### Invalid .gdrive files
 
@@ -133,6 +135,8 @@ The `.gdrive` context menu follows the existing `ContextMenuItem` interface with
 | Metadata | Refresh metadata, Copy Drive URL | Housekeeping actions |
 | AI prompts | Summarize, Explain, Extract key points, Ask about document, Analyze with context | Claude Code prompt injection |
 | Destructive | Unlink | Dangerous -- styled with `danger: true` |
+
+**"Fetch content" behavior:** Opens the fetched document content in a new read-only editor tab (titled "{displayName} [Drive]"). Does NOT paste into terminal – terminal paste is reserved for AI prompt actions. See 05-notes.md "Fetch content action target" constraint.
 
 **Icons:** All from `lucide-react`, 16px, `strokeWidth={2}`. The AI section uses distinguishing icons to differentiate prompt types.
 
@@ -354,6 +358,8 @@ Note: Double-click handling requires intercepting the standard "open in editor" 
 
 **Intentional divergence:** Double-click on `.gdrive` files opens the document in the browser (via `shell.openExternal`), unlike regular files where double-click opens in the editor. This is intentional – `.gdrive` files are references to external documents, and opening in browser is the primary action. The first click of a double-click sequence may briefly flash the editor open before the browser launches; this matches macOS Finder behavior for alias files. Single-click opens the `.gdrive` file in Monaco for editing local notes.
 
+> **Design decision:** This is the only file type in Erfana where double-click does NOT open in the editor. The rationale is that `.gdrive` files are references to external documents – the "primary" action is opening the real document, not editing the reference file. For users who find this confusing, the context menu "Open in browser" provides an explicit, discoverable alternative. Keyboard users press Enter to open in editor (single-click behavior); there is no keyboard shortcut for double-click – context menu is the path (see AC-047, AC-048).
+
 ### Keyboard accessibility
 
 - **Context menu:** Arrow keys navigate items, Enter activates, Escape closes (standard `role="menu"` behavior, already implemented)
@@ -362,6 +368,14 @@ Note: Double-click handling requires intercepting the standard "open in editor" 
 - **Ask about document:** Same keyboard pattern as existing `PromptDialog` -- Cmd/Ctrl+Enter submits, Escape cancels
 - **Settings section:** Sign in/Sign out button is focusable and activatable via Enter/Space; focus ring uses `var(--shadow-focus)`
 - **Tree node:** `.gdrive` nodes are focusable via arrow keys (existing tree keyboard nav). Enter triggers single-click (open in editor). No dedicated shortcut for double-click behavior -- use context menu "Open in browser" instead.
+
+### ARIA and screen reader support
+
+- **Tree nodes:** `.gdrive` nodes use `aria-label="{displayName}, modified {freshness}, Google Drive link"` for screen reader context. Example: "Q1 Sales Report, modified 2 days ago, Google Drive link"
+- **Freshness indicator:** `aria-hidden="true"` – information is conveyed via parent node's `aria-label` (see AC-049, AC-050)
+- **Cloud icon:** Decorative, `aria-hidden="true"` – node type is conveyed in the `aria-label` text
+- **Context menu:** Uses standard `role="menu"` / `role="menuitem"` (already implemented in existing context menu)
+- **Settings section:** Form elements use `aria-label` for Sign in/Sign out buttons; linked file count is a `<span>` with `role="status"`
 
 ### Offline behavior
 

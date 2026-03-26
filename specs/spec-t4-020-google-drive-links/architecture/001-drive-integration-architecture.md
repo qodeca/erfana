@@ -77,6 +77,8 @@ Four services with explicit interface contracts:
 Positive: unit tests for file operations need no HTTP mocks; future MCP server extraction can reuse `DriveApiService` directly; `openPicker` extracted to dedicated service, each service has single reason to change.
 Negative: four service registrations added to the main process bootstrap; `DriveLinkService` must duplicate the YAML parsing setup already in the renderer-side prompt parser.
 
+**Design note (SRP for enrichNodes):** `DriveLinkService.enrichNodes(nodes)` performs a read-only scan of `.gdrive` files and populates `driveDisplayName` / `driveLastModified` on `FileNode` objects. It does NOT perform file creation or updates – those are separate methods (`create`, `update`). The enrichment concern is cohesive with file parsing (both use `parse()` internally). It is placed on `DriveLinkService` rather than in the IPC handler because the caching logic (mtime-based, LRU) is a service-level concern, not a handler-level concern.
+
 ---
 
 ## ADR-004: OAuth2 loopback with BrowserWindow
@@ -164,3 +166,66 @@ Keeping `FileService` pure prevents a precedent where every new "smart file type
 
 Positive: `FileService` remains unchanged and untouched; enrichment is independently testable; parsing can be cached by mtime to avoid redundant YAML parsing; future smart file types follow the same pattern.
 Negative: adds one additional async step to tree population; the IPC handler must compose `readDirectory()` + `enrichNodes()`.
+
+---
+
+## ADR-008: Drive errors extend codebase ErrorCode enum
+
+### Context
+
+The technical design initially proposed a separate `DriveErrorCode` type and `DriveApiError` class. The codebase uses a unified `ErrorCode` enum in `src/shared/errors.ts` with prefixed groups (e.g., `TRANSCRIPTION_*`, `IMPORT_*`, `CAMERA_*`). IPC handlers return `{ success: boolean, error?: string, errorCode?: ErrorCode }`.
+
+### Decision
+
+Drive error codes are added to the existing `ErrorCode` enum as `DRIVE_*` entries: `DRIVE_NOT_FOUND`, `DRIVE_PERMISSION_DENIED`, `DRIVE_AUTH_REQUIRED`, `DRIVE_RATE_LIMITED`, `DRIVE_OFFLINE`, `DRIVE_SCOPE_DENIED`, `DRIVE_INVALID_FILE`, `DRIVE_FEATURE_DISABLED`. The separate `DriveErrorCode` type and `DriveApiError` class proposed in the technical design are replaced by the standard `AppError` class with `ErrorCode`.
+
+### Rationale
+
+Consistent with `TRANSCRIPTION_*`, `IMPORT_*`, `CAMERA_*` patterns. A single error enum means renderer error handling code can use one type guard for all features. The `ERROR_MESSAGES` record in `errors.ts` provides centralized user-friendly message mapping.
+
+### Consequences
+
+Positive: unified error handling; no new error class; renderer toast logic reuses existing patterns.
+Negative: `ErrorCode` enum grows larger; unrelated features share the same enum file.
+
+---
+
+## ADR-009: Picker token injection via contextBridge, not executeJavaScript
+
+### Context
+
+The technical design proposed injecting the access token and Picker API key into the Picker BrowserWindow via `webContents.executeJavaScript()`. This bypasses `contextIsolation` and creates a security risk – arbitrary code execution in the renderer context with a race condition window.
+
+### Decision
+
+The Picker BrowserWindow uses a dedicated `picker-preload.ts` that exposes a `pickerBridge` object via `contextBridge.exposeInMainWorld()`. The main process sends the access token and API key via `ipcMain`/`ipcRenderer` message passing (not `executeJavaScript`). The `picker.html` page reads credentials from `window.pickerBridge.getConfig()` which internally uses `ipcRenderer.invoke('drive:picker-config')`.
+
+### Rationale
+
+`executeJavaScript()` defeats `contextIsolation`. If a navigation redirect or content injection in the Picker window occurs before the script runs, the access token could be exfiltrated. The contextBridge pattern is Electron's recommended approach and is already used for the main preload. This ensures the Picker window's JavaScript context cannot access Node.js APIs even if a Picker-loaded script is compromised.
+
+### Consequences
+
+Positive: no `executeJavaScript` calls; credentials flow through the secure contextBridge channel; consistent with main preload pattern.
+Negative: slightly more complex setup (dedicated preload + IPC channel for config); requires a `drive:picker-config` channel not originally planned.
+
+---
+
+## ADR-010: Static IPC channels replace dynamic nonce-based channels
+
+### Context
+
+The implementation design proposed `drive:picker-result:{nonce}` as a dynamic IPC channel name, where a random nonce is generated per Picker session. Dynamic channel names are an anti-pattern in Electron – they cannot be type-checked, cannot be pre-registered in the preload, and make IPC auditing difficult.
+
+### Decision
+
+Use a single static channel `drive:picker-result` with a nonce field in the message payload: `{ nonce: string, files: DrivePickerFile[] }`. The main process validates the nonce in the message handler. The preload exposes `pickerBridge.sendResult(nonce, files)` which calls `ipcRenderer.send('drive:picker-result', { nonce, files })`.
+
+### Rationale
+
+Static channels can be allowlisted in the preload's `contextBridge` configuration. Nonce validation in the handler provides the same security guarantee (preventing stale/replayed results) without the anti-pattern of dynamic channel registration.
+
+### Consequences
+
+Positive: all IPC channels are statically defined and auditable; preload allowlist is fixed; TypeScript can type-check the channel name.
+Negative: handler must filter by nonce in the payload rather than by channel name (trivial).
