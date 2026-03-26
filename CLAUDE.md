@@ -104,6 +104,7 @@ Feature specifications live in `specs/`. Check registry before implementing new 
 | 017 | Test ID coverage and accessibility selectors | T2 | archived | `specs/archived/spec-t2-017-test-id-accessibility` |
 | 018 | E2E infrastructure overhaul | T3 | archived | `specs/archived/spec-t3-018-e2e-infrastructure` |
 | 019 | Visual regression and CI resilience | T2 | archived | `specs/archived/spec-t2-019-visual-regression-ci` |
+| 020 | Google Drive link integration | T4 | draft | `specs/spec-t4-020-google-drive-links` |
 
 **Registry**: `specs/registry.json`
 
