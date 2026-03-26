@@ -90,6 +90,16 @@ project-root/
 - Symlinks: `Link` icon prefix (12px) -- gray, with 0.8 opacity
 - `.gdrive` files: `Cloud` icon in `var(--color-brand-violet)` -- violet, immediately recognizable
 
+### Invalid .gdrive files
+
+If a `.gdrive` file has corrupt YAML or missing required frontmatter fields, the tree node degrades gracefully:
+- **Icon:** `AlertTriangle` (warning) instead of `Cloud`, using `var(--color-warning)`
+- **Label:** Raw filename (e.g., `broken-link.gdrive`) instead of Drive display name
+- **Tooltip:** 'Invalid .gdrive file – check frontmatter format'
+- **No toast on render** – the warning is passive (icon + tooltip only), not disruptive
+- **Context menu:** Only shows 'Delete' and 'Open in editor' – Drive-specific actions are disabled
+- Triggering an explicit action (e.g., right-click → Refresh metadata) shows a toast: 'Cannot refresh – invalid .gdrive file format'
+
 ---
 
 ## 3. Context menu layout
@@ -236,6 +246,29 @@ Uses `PromptDialog` (MessageSquare icon, textarea with validation).
 +------------------------------------------+
 ```
 
+### Corporate OAuth restriction dialog
+
+**Trigger:** OAuth flow returns `admin_policy_enforced` (403)
+**Type:** AlertDialog (requires user acknowledgment)
+**Title:** 'Sign-in blocked by your organization'
+**Body:** 'Your IT administrator has not approved Erfana for Google Workspace access. You can contact your administrator to request approval, or sign in with a personal Google account.'
+**Button:** [OK]
+**Style:** Uses `var(--color-warning)` accent
+
+### Dialog vs toast decision matrix
+
+| Scenario | UI element | Rationale |
+|----------|-----------|-----------|
+| Auth failure (expired, revoked) | AlertDialog | Requires user action (re-sign-in) |
+| Corporate OAuth block | AlertDialog | Requires user acknowledgment |
+| safeStorage unavailable | AlertDialog | Blocks feature entirely |
+| Document inaccessible (403/404) | Toast (error) | Informational, no action needed |
+| Metadata refresh success | Toast (success) | Confirmatory |
+| Partial refresh failure | Toast (warning) | Informational with details |
+| Linking success | Toast (success) | Confirmatory |
+| Network offline | Toast (error) | Informational |
+| URL protocol invalid | Toast (error) | Blocked action feedback |
+
 ---
 
 ## 5. Settings overlay section
@@ -295,6 +328,11 @@ All toasts use the existing toast system. Messages use sentence case.
 | Content fetch for AI prompt | info | "Fetching document content..." (shown briefly during fetch) |
 | `.gdrive` file invalid | error | "Invalid .gdrive file -- missing required fields" |
 
+### Partial metadata refresh
+
+- **Mixed result:** 'Refreshed N of M Drive links (K errors)' – type: warning
+- **All failed:** 'Failed to refresh Drive links – check internet connection' – type: error
+
 ---
 
 ## 7. Interaction patterns
@@ -313,6 +351,8 @@ All toasts use the existing toast system. Messages use sentence case.
 | Double-click | Opens linked URL in default browser | Natural "open the real thing" gesture; editing the raw file is the secondary use case |
 
 Note: Double-click handling requires intercepting the standard "open in editor" behavior for `.gdrive` files specifically. The first single-click of a double-click sequence will briefly flash the editor open -- this matches macOS Finder behavior for alias files and is acceptable.
+
+**Intentional divergence:** Double-click on `.gdrive` files opens the document in the browser (via `shell.openExternal`), unlike regular files where double-click opens in the editor. This is intentional – `.gdrive` files are references to external documents, and opening in browser is the primary action. The first click of a double-click sequence may briefly flash the editor open before the browser launches; this matches macOS Finder behavior for alias files. Single-click opens the `.gdrive` file in Monaco for editing local notes.
 
 ### Keyboard accessibility
 

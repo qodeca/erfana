@@ -1,4 +1,4 @@
-# ADR-001–006: Google Drive link integration – architecture decisions
+# ADR-001–007: Google Drive link integration – architecture decisions
 
 **Spec:** 020 – Google Drive link integration
 **Status:** accepted
@@ -38,7 +38,7 @@ Two separate consumers need to read Drive content: Erfana itself (for context me
 
 ### Decision
 
-Erfana uses the `@googleapis/drive`, `@googleapis/docs`, `@googleapis/sheets`, and `google-auth-library` Node.js packages inside the main process for all network operations. Claude Code uses the `gws` CLI already present in the developer environment (`gws docs documents get`, `gws sheets spreadsheets values get`, etc.). The `.gdrive` frontmatter encodes `drive_id`, `type`, and `mime_type` – sufficient to construct the correct `gws` command without any additional Erfana tooling (UC-005).
+Erfana uses the `@googleapis/drive`, `@googleapis/docs`, `@googleapis/sheets`, and `google-auth-library` Node.js packages inside the main process for all network operations. Erfana uses `drive.file` scope only – the Google Picker grants per-file access tokens, so Erfana's SDK access is limited to Picker-selected files. Claude Code uses the `gws` CLI already present in the developer environment (`gws docs documents get`, `gws sheets spreadsheets values get`, etc.). The `.gdrive` frontmatter encodes `drive_id`, `type`, and `mime_type` – sufficient to construct the correct `gws` command without any additional Erfana tooling (UC-005).
 
 ### Rationale
 
@@ -49,30 +49,33 @@ The googleapis SDK gives Erfana typed responses, proper error handling, token in
 Positive: each consumer uses the tool best suited to its runtime; no IPC bridging needed for Claude Code agentic flows.
 Negative: two auth paths must be kept in sync via CLAUDE.md documentation (020-FR-040, 020-AC-032).
 
+Note: `drive.file` scope means Claude Code via gws CLI has access to all Drive files (gws has its own broader auth), while Erfana's SDK access is limited to Picker-selected files only.
+
 ---
 
-## ADR-003: Three-service decomposition
+## ADR-003: Four-service decomposition
 
 ### Context
 
-Drive integration spans three distinct concerns: credential lifecycle, local file operations, and Google API calls. Following Erfana's interface-first DI pattern (020-NFR-008), these must be separated into individually testable units. The existing `ApiKeyService` / `TranscriptionService` split establishes the precedent: one service stores credentials, another uses them.
+Drive integration spans four distinct concerns: credential lifecycle, local file operations, Google API calls, and Picker UI orchestration. Following Erfana's interface-first DI pattern (020-NFR-008), these must be separated into individually testable units. The existing `ApiKeyService` / `TranscriptionService` split establishes the precedent: one service stores credentials, another uses them.
 
 ### Decision
 
-Three services with explicit interface contracts:
+Four services with explicit interface contracts:
 
 - `IDriveAuthService` / `DriveAuthService` – owns the OAuth2 lifecycle: `authenticate`, `getAccessToken`, `signOut`, `isAuthenticated`, `getAccountInfo`. Wraps `google-auth-library` OAuth2Client; delegates encrypted storage to safeStorage following the `ApiKeyService` pattern.
 - `IDriveLinkService` / `DriveLinkService` – owns `.gdrive` file CRUD: `create`, `parse`, `update`, `validate`, `list`. Makes zero network calls. Uses the same YAML parsing library as the prompt system; validates with a Zod schema (020-FR-004).
-- `IDriveApiService` / `DriveApiService` – wraps googleapis SDK calls: `fetchMetadata`, `fetchContent`, `listFiles`, `exportFile`, `openPicker`. Depends solely on `IDriveAuthService` for token injection.
+- `IDriveApiService` / `DriveApiService` – wraps googleapis SDK calls: `fetchMetadata`, `fetchContent`, `listFiles`, `exportFile`. Depends solely on `IDriveAuthService` for token injection. A pure API wrapper with no UI concerns.
+- `IDrivePickerService` / `DrivePickerService` – owns the Google Picker BrowserWindow lifecycle: open, postMessage handshake, nonce-based IPC, result collection. Depends on `IDriveAuthService` for tokens. Uses a dedicated `picker-preload.ts` to expose only `sendPickerResult()` via contextBridge.
 
 ### Rationale
 
-`DriveLinkService` being network-free makes it trivially testable without HTTP mocks. `DriveApiService` has a single injected dependency so it can be unit tested with a mock auth service. This mirrors the `ApiKeyService` (stores credentials) / `TranscriptionService` (consumes them) split already in the codebase.
+`DriveLinkService` being network-free makes it trivially testable without HTTP mocks. `DriveApiService` has a single injected dependency so it can be unit tested with a mock auth service. This mirrors the `ApiKeyService` (stores credentials) / `TranscriptionService` (consumes them) split already in the codebase. `openPicker` was extracted from `DriveApiService` into `DrivePickerService` to maintain SRP – `DriveApiService` is a pure API wrapper, while `DrivePickerService` handles UI orchestration (BrowserWindow, postMessage). This mirrors the existing separation between `AudioMetadataService` and `TranscriptionService`.
 
 ### Consequences
 
-Positive: unit tests for file operations need no HTTP mocks; future MCP server extraction can reuse `DriveApiService` directly.
-Negative: three service registrations added to the main process bootstrap; `DriveLinkService` must duplicate the YAML parsing setup already in the renderer-side prompt parser.
+Positive: unit tests for file operations need no HTTP mocks; future MCP server extraction can reuse `DriveApiService` directly; `openPicker` extracted to dedicated service, each service has single reason to change.
+Negative: four service registrations added to the main process bootstrap; `DriveLinkService` must duplicate the YAML parsing setup already in the renderer-side prompt parser.
 
 ---
 
@@ -84,7 +87,7 @@ Consumer-grade OAuth ("Sign in with Google") requires a redirect URI. Google's O
 
 ### Decision
 
-`DriveAuthService.authenticate()` spawns an ephemeral HTTP server on a random localhost port, opens a `BrowserWindow` with `nodeIntegration: false`, `contextIsolation: true`, and a strict CSP that permits only `accounts.google.com` and `*.googleapis.com`. A `will-navigate` listener blocks navigation to any domain outside that allowlist (020-AC-005). After receiving the auth code on the loopback listener, both the server and window are destroyed. PKCE is used for code exchange. The resulting refresh token is stored via `safeStorage.encryptString()` following the existing `ApiKeyService` encryption pattern (file mode `0o600`).
+`DriveAuthService.authenticate()` spawns an ephemeral HTTP server on a random localhost port, opens a `BrowserWindow` with `nodeIntegration: false`, `contextIsolation: true`, and a strict CSP that permits only `accounts.google.com` and `*.googleapis.com`. A `will-navigate` listener blocks navigation to any domain outside that allowlist (020-AC-005). After receiving the auth code on the loopback listener, both the server and window are destroyed. PKCE is used for code exchange. A cryptographic `state` parameter (32 random bytes, base64url) is included in the authorization URL and validated on callback to prevent CSRF attacks (RFC 6749 section 10.12). The PKCE code challenge uses `code_challenge_method=S256` exclusively – the `plain` method is not supported. The resulting refresh token is stored via `safeStorage.encryptString()` following the existing `ApiKeyService` encryption pattern (file mode `0o600`).
 
 ### Rationale
 
@@ -92,7 +95,7 @@ The loopback pattern is Google's recommended approach for installed apps and req
 
 ### Consequences
 
-Positive: no user-visible GCP configuration required; tokens encrypted at rest; OAuth window cannot execute Node.js.
+Positive: no user-visible GCP configuration required; tokens encrypted at rest; OAuth window cannot execute Node.js; CSRF protection via state parameter.
 Negative: loopback may be blocked by enterprise firewalls or antivirus (risk documented in `05-notes.md`); external refresh token revocation must be detected on the next 401 and trigger re-authentication.
 
 ---
@@ -130,7 +133,7 @@ The prompt template engine validates templates against `PromptFrontmatterSchema`
 
 Extend `PromptFrontmatterSchema.area` to include `'drive-link'` as a fifth enum value. Add five template files: `drive-summarize.md`, `drive-explain.md`, `drive-extract.md`, `drive-ask.md` (with `requiresInput: true`), and `drive-analyze.md`. All use `area: drive-link` and `subArea: context-menu`.
 
-Extend `PromptVariables` and `PromptVariableInput` with five Drive-specific optional fields: `driveContent`, `driveName`, `driveType`, `driveUrl`, `driveMimeType`. Drive prompt content fetch and variable construction is the responsibility of `DriveFileContextMenuStrategy` – the renderer remains content-agnostic.
+Extend `PromptVariables` with five Drive-specific optional fields: `driveContent`, `driveName`, `driveType`, `driveUrl`, `driveMimeType`. Drive prompt content fetch and variable construction is the responsibility of `DriveFileContextMenuStrategy` – the renderer remains content-agnostic.
 
 ### Rationale
 
@@ -140,3 +143,24 @@ Adding one enum value is the minimal, non-breaking change (one location, all oth
 
 Positive: Drive templates participate in the same registry, filtering, and rendering pipeline as all other templates; future MCP-based content fetch is a strategy-layer change only.
 Negative: `PromptFrontmatterSchema` enum must be updated and schema tests must include `'drive-link'` in valid-area test cases.
+
+---
+
+## ADR-007: Post-read tree enrichment pattern
+
+### Context
+
+The project tree is populated by `FileService.readDirectory()` which recursively reads directory entries. The spec originally proposed calling `DriveLinkService.parse()` inline during this traversal to populate `driveDisplayName` and `driveLastModified` on `FileNode` objects. This would add file I/O + YAML parsing per `.gdrive` file on every tree refresh – an O(n) cost that accumulates in large projects.
+
+### Decision
+
+`FileService.readDirectory()` remains a pure filesystem operation with no knowledge of `.gdrive` file semantics. A post-processing enrichment step is added: after `readDirectory()` returns, the IPC handler (or a composition layer) calls `DriveLinkService.enrichNodes(nodes: FileNode[]): Promise<FileNode[]>` which scans for `.gdrive` nodes, reads their frontmatter, and populates the Drive-specific `FileNode` fields. This mirrors how git status is overlaid onto the tree separately via `GitStatusService` rather than being embedded in `FileService`.
+
+### Rationale
+
+Keeping `FileService` pure prevents a precedent where every new "smart file type" (`.gdrive`, `.bookmark`, etc.) requires changes to `FileService`. The enrichment pattern is independently cacheable (cache by file mtime), parallelizable, and can be skipped entirely when Drive integration is disabled.
+
+### Consequences
+
+Positive: `FileService` remains unchanged and untouched; enrichment is independently testable; parsing can be cached by mtime to avoid redundant YAML parsing; future smart file types follow the same pattern.
+Negative: adds one additional async step to tree population; the IPC handler must compose `readDirectory()` + `enrichNodes()`.

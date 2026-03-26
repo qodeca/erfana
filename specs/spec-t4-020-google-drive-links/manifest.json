@@ -7,7 +7,7 @@
   "scope": "feature",
   "description": "Reference-based Google Drive integration via .gdrive link files visible in the project tree. Includes OAuth2 sign-in, Google Picker for linking, context menu with direct operations and AI prompts, googleapis SDK for Erfana internals, and CLAUDE.md conventions for Claude Code discovery via gws CLI.",
   "created": "2026-03-26T14:39:00.000Z",
-  "last_modified": "2026-03-26T16:15:00.000Z",
+  "last_modified": "2026-03-26T17:30:00.000Z",
   "documents": {
     "architecture": ["architecture/001-drive-integration-architecture.md"],
     "design": ["design/001-technical-design.md"],
@@ -16,14 +16,14 @@
   },
   "authors": ["marcin"],
   "requirement_sequences": {
-    "FR": 40,
-    "NFR": 10,
-    "UC": 8,
-    "AC": 37
+    "FR": 44,
+    "NFR": 13,
+    "UC": 9,
+    "AC": 44
   },
   "statistics": {
-    "total_requirements": 95,
-    "total_words": 4242
+    "total_requirements": 110,
+    "total_words": 5521
   },
   "requirements_index": {
     "020-FR-001": "02-requirements.md",

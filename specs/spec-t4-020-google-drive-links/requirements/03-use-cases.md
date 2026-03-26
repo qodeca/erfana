@@ -19,6 +19,7 @@
 
 **Postcondition:** User is authenticated; subsequent Drive actions skip sign-in
 **Error path:** If user closes the BrowserWindow without completing sign-in, the original action is cancelled with no error toast.
+**Error path (corporate restriction):** If the OAuth flow returns `admin_policy_enforced` (403), the system shows an AlertDialog: 'Your organization has not approved this application. Contact your IT administrator or try signing in with a personal Google account.'
 
 ## UC-002: Link a Google Drive file to a project
 
@@ -37,6 +38,8 @@
 
 **Postcondition:** `.gdrive` files exist in the directory, visible in the project tree
 **Error path:** If Picker is closed without selection, no files are created. If file creation fails (disk full, permissions), toast shows error.
+**Error path (Picker timeout):** If the Google Picker BrowserWindow fails to load within 10 seconds, a toast shows 'Google Picker failed to load. Check your internet connection.' and the window is closed.
+**Error path (partial failure):** If some `.gdrive` files are created but others fail (e.g., filename sanitization collision at max attempts), a toast shows 'Linked N of M files. K files could not be created.' with details.
 
 ## UC-003: Execute AI prompt on a linked Drive document
 
@@ -68,7 +71,9 @@
 5. Toast confirms: "Metadata refreshed for Q1 Sales Report"
 
 **Postcondition:** `.gdrive` frontmatter reflects current Drive state
-**Error path:** If file no longer exists on Drive, toast warns: "Document not found on Google Drive – it may have been deleted."
+**Error path (not found):** If the Drive API returns 404, toast warns: 'Document not found on Google Drive – it may have been deleted.'
+**Error path (permission revoked):** If the Drive API returns 403, toast warns: 'Access denied – the document may have been unshared or your permissions changed.'
+**Error path (invalid .gdrive):** If DriveLinkService.parse() fails, toast warns: 'Cannot refresh – invalid .gdrive file format.'
 
 ## UC-005: Claude Code discovers and reads a Drive link
 
@@ -101,6 +106,7 @@
 3. Default browser opens with the Google Drive document
 
 **Postcondition:** Document is open in the browser
+**Error path:** If `shell.openExternal()` fails (no browser registered, invalid URL), a toast shows 'Could not open document in browser.' If the URL does not use `https:` protocol, the action is blocked with toast: 'Invalid URL protocol – only HTTPS links are supported.'
 **Note:** No authentication check needed – the browser handles its own Google session.
 
 ## UC-007: Sign out from Google
@@ -117,6 +123,7 @@
 5. All Drive context menu actions now trigger re-authentication when used
 
 **Postcondition:** No Google tokens stored, Drive features require sign-in again
+**Error path (offline sign-out):** If the token revocation API call fails (network error), local tokens are still cleared, settings UI updates to 'Not connected', and a toast warns: 'Signed out locally, but could not revoke access on Google. You can revoke manually at myaccount.google.com/permissions.'
 
 ## UC-008: Unlink a Drive file
 
@@ -131,3 +138,22 @@
 4. Project tree refreshes
 
 **Postcondition:** `.gdrive` file is deleted, Drive document is unaffected
+**Error path:** If the `.gdrive` file cannot be deleted (read-only file system, file locked), a toast shows 'Could not remove link – file may be read-only or locked.'
+
+## UC-009: Refresh all Drive links in a directory
+
+**Actor:** User
+**Precondition:** A directory contains one or more `.gdrive` files, user is signed in
+**Trigger:** User right-clicks a directory in the project tree → "Refresh all Drive links"
+
+**Flow:**
+1. System identifies all `.gdrive` files directly in the directory (non-recursive)
+2. Toast shows: "Refreshing metadata for N Drive links..."
+3. System calls `DriveApiService.fetchMetadata()` for each file using a concurrency pool (max 5 concurrent)
+4. For each successful refresh, `DriveLinkService.update()` writes updated frontmatter
+5. Toast updates on completion: "Refreshed N Drive links"
+
+**Postcondition:** All `.gdrive` files in the directory have updated cached metadata; tree re-renders with fresh indicators
+**Error path (partial failure):** If some refreshes succeed and others fail, toast shows "Refreshed N of M links (K errors)" with error details for each failure.
+**Error path (rate limited):** If Google API returns 429, the system pauses with exponential backoff and retries, extending the total operation time. Progress toast updates accordingly.
+**Note:** Subdirectories are not included – the operation is non-recursive by design.

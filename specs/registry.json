@@ -259,7 +259,7 @@
       "path": "spec-t4-020-google-drive-links",
       "last_modified": "2026-03-26T15:45:00.000Z",
       "sections_count": 5,
-      "requirements_count": 95,
+      "requirements_count": 110,
       "documents": {
         "technical_adrs": [],
         "solution_adrs": [],

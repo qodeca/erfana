@@ -19,7 +19,7 @@ This feature bridges the gap by making Drive resources first-class citizens in t
 - `.gdrive` file format with YAML frontmatter and optional markdown body
 - OAuth2 "Sign in with Google" flow (consumer-grade UX, no GCP knowledge required)
 - Google Picker integration for browsing and selecting Drive files
-- Three new main process services: DriveAuthService, DriveLinkService, DriveApiService
+- Four new main process services: DriveAuthService, DriveLinkService, DriveApiService, DrivePickerService
 - IPC channels for Drive operations
 - Project tree integration (cloud icon, display name from frontmatter, freshness indicator)
 - Context menu strategy for `.gdrive` files (direct ops + AI prompts)
@@ -38,14 +38,17 @@ This feature bridges the gap by making Drive resources first-class citizens in t
 - Google Drive folder browsing in the project tree (only individual file links)
 - Shared Drive / Team Drive specific features
 - Background periodic metadata refresh (on-demand only in v1)
+- Multiple Google accounts (v1 supports single account)
 
 ## Key decisions
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | File format | `.gdrive` with YAML frontmatter | Git-trackable, self-documenting, individually visible in tree |
-| Auth approach | OAuth2 loopback with consumer "Sign in with Google" UX | No GCP knowledge required from users |
+| Auth approach | OAuth2 loopback with `drive.file` scope only | Picker grants per-file access; no need for broad read scope. Reduces blast radius of compromised tokens |
 | Erfana backend | googleapis Node.js SDK | Typed responses, proper error handling, extensible |
 | Claude Code backend | gws CLI via Bash | Already authenticated, works from terminal |
 | Metadata strategy | Light cache in frontmatter, refreshed on demand | Shows freshness without background polling |
 | Content strategy | Fetched on demand, never cached locally | Stays local-first, avoids sync complexity |
+| Tree enrichment | Post-read enrichment via DriveLinkService.enrichNodes() | FileService stays pure; mirrors git status overlay pattern |
+| Picker service | Separate DrivePickerService (not on DriveApiService) | SRP: API wrapper vs UI orchestration are different concerns |

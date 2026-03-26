@@ -14,6 +14,7 @@
 - **020-AC-007**: Given a user selects files in Google Picker, when they click "Select", then `.gdrive` files are created in the target directory with correct frontmatter (all required fields populated).
 - **020-AC-008**: Given a `.gdrive` file with the same sanitized name already exists, when a new link is created, then the system appends an increment suffix (e.g., `report (1).gdrive`).
 - **020-AC-009**: Given the user is not authenticated, when they trigger "Link Google Drive file", then the sign-in flow completes first and the Picker opens automatically afterward.
+- **020-AC-042**: Given a Google Drive file named "Q1 Sales Report (Final v2)", when it is linked via Picker, then the created file is named `q1-sales-report-final-v2.gdrive` (lowercase, spaces to hyphens, special chars removed).
 
 ## Project tree display
 
@@ -22,6 +23,7 @@
 - **020-AC-012**: Given a `.gdrive` file with `last_modified` in frontmatter, when displayed in the tree, then a relative freshness indicator is visible (e.g., "2d ago").
 - **020-AC-013**: Given a user double-clicks a `.gdrive` file, then the linked URL opens in the default system browser.
 - **020-AC-014**: Given a user single-clicks a `.gdrive` file, then it opens in the Monaco editor showing the raw YAML frontmatter and markdown body.
+- **020-AC-041**: Given a `.gdrive` file with invalid YAML syntax (not a schema error – a parse error), when the project tree renders, then the node displays the raw filename (not a display name), shows a warning icon, and no toast notification is triggered.
 
 ## Context menu – direct operations
 
@@ -36,11 +38,13 @@
 - **020-AC-020**: Given a user selects "Summarize", then the system fetches document content via SDK, renders the prompt template with `driveContent` injected, and pastes the result into the terminal panel.
 - **020-AC-021**: Given a user selects "Ask about document", then an input dialog appears for the user's question, which is included in the rendered prompt alongside the document content.
 - **020-AC-022**: Given the Drive document is inaccessible (deleted, unshared), when an AI prompt is triggered, then a toast shows an error message and no prompt is pasted to the terminal.
+- **020-AC-043**: Given a linked Google Spreadsheet, when the "Summarize" AI prompt is triggered, then the fetched content passed to the template contains cell values in a structured text format (TSV or similar), not raw HTML or JSON API response.
 
 ## Metadata refresh
 
 - **020-AC-023**: Given a user right-clicks a directory containing `.gdrive` files and selects "Refresh all Drive links", then metadata is refreshed for all `.gdrive` files in that directory.
 - **020-AC-024**: Given a Drive file has been renamed since linking, when metadata is refreshed, then the `name` field in frontmatter is updated to the new name and the tree label updates accordingly.
+- **020-AC-044**: Given a directory containing `.gdrive` files and subdirectories that also contain `.gdrive` files, when "Refresh all Drive links" is triggered on the parent directory, then only `.gdrive` files directly in that directory are refreshed – files in subdirectories are not included.
 
 ## Settings overlay
 
@@ -69,3 +73,6 @@
 
 - **020-AC-036**: Given the token storage, then refresh tokens are encrypted via `safeStorage` and never stored in plain text.
 - **020-AC-037**: Given the OAuth/Picker BrowserWindow, then `nodeIntegration` is disabled, `contextIsolation` is enabled, and CSP is enforced.
+- **020-AC-038**: Given the OAuth authorization URL constructed by `DriveAuthService`, then it contains both a cryptographic `state` parameter (random, unguessable) and `code_challenge_method=S256`. The callback handler shall reject responses where the `state` parameter does not match.
+- **020-AC-039**: Given a renderer sends `drive:fetchContent` with a `driveId` that does not match any `.gdrive` file in the currently open project, then the handler returns a structured error without making any Google API call.
+- **020-AC-040**: Given `safeStorage.isEncryptionAvailable()` returns false, when the user triggers Google sign-in, then the system shows an error message explaining that a system keyring is required and does not attempt to store tokens in plaintext.

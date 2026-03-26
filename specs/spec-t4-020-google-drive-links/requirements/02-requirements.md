@@ -13,11 +13,11 @@
 ### Authentication
 
 - **020-FR-006**: On first use of any Drive feature, the system shall prompt the user with "Sign in with Google" and open a BrowserWindow with Google's standard OAuth2 consent screen.
-- **020-FR-007**: The OAuth2 flow shall use the loopback redirect method (HTTP server on `127.0.0.1` with dynamic port) with PKCE for security.
+- **020-FR-007**: The OAuth2 flow shall use the loopback redirect method (HTTP server on `127.0.0.1` with dynamic port) with PKCE (S256 code challenge method) and a cryptographic `state` parameter for CSRF protection.
 - **020-FR-008**: The system shall store refresh tokens encrypted via Electron `safeStorage`, following the existing `ApiKeyService` pattern.
 - **020-FR-009**: The system shall silently refresh expired access tokens using the stored refresh token without user interaction.
 - **020-FR-010**: The system shall provide a sign-out action that clears all stored tokens and revokes the Google OAuth grant.
-- **020-FR-011**: The system shall request minimal OAuth scopes: `drive.readonly` (list and read files) and `drive.file` (manage files opened by the app).
+- **020-FR-011**: The system shall request a single OAuth scope: `drive.file` (manage files created or opened by the app via Picker). The `drive.readonly` scope shall not be requested, limiting access to only files the user explicitly selects.
 - **020-FR-012**: The OAuth client ID shall be bundled with the application – users shall never need to configure GCP projects or API keys.
 
 ### Google Picker integration
@@ -38,7 +38,7 @@
 
 ### IPC channels
 
-- **020-FR-023**: The system shall expose IPC channels: `drive:authenticate`, `drive:signOut`, `drive:isAuthenticated`, `drive:getAccountInfo`, `drive:openPicker`, `drive:fetchContent`, `drive:refreshMetadata`, `drive:linkFiles`.
+- **020-FR-023**: The system shall expose IPC channels: `drive:authenticate`, `drive:signOut`, `drive:isAuthenticated`, `drive:getAccountInfo`, `drive:openPicker`, `drive:fetchContent`, `drive:refreshMetadata`, `drive:refreshAllMetadata`, `drive:exportAsPdf`, `drive:linkFiles`.
 - **020-FR-024**: All IPC channel inputs and outputs shall be validated with Zod schemas in `src/shared/ipc/drive-schema.ts`.
 
 ### Project tree integration
@@ -58,7 +58,7 @@
 
 ### Prompt templates
 
-- **020-FR-034**: New prompt templates shall be created with `area: drive-link` and `subArea: context-menu` in `src/renderer/src/prompts/`.
+- **020-FR-034**: New prompt templates shall be created with `area: drive-link` and `subArea: context-menu` in `src/renderer/src/prompts/templates/`.
 - **020-FR-035**: The prompt template engine shall support new variables: `driveContent`, `driveName`, `driveType`, `driveUrl`, `driveMimeType`.
 - **020-FR-036**: Prompt templates for Drive links shall follow the existing template format (YAML frontmatter + Handlebars-style content body).
 
@@ -75,6 +75,13 @@
 
 - **020-FR-040**: The project CLAUDE.md shall be updated with a "Google Drive links" section documenting: `.gdrive` file format, how to discover links (`glob *.gdrive`), and the correct `gws` CLI commands per file type.
 
+### Security and validation
+
+- **020-FR-041**: The `drive:fetchContent` handler shall validate that the requested `driveId` matches a `.gdrive` file in the currently open project (via `DriveLinkService.list()`) before making any Google API call. Requests for unlinked file IDs shall be rejected with a structured error.
+- **020-FR-042**: Long-running IPC operations (`drive:fetchContent`, `drive:refreshAllMetadata`, `drive:openPicker`) shall accept an optional `AbortSignal` for cancellation, following the `TranscriptionService` pattern.
+- **020-FR-043**: Before calling `shell.openExternal()` with a URL from `.gdrive` frontmatter, the system shall validate that the URL uses the `https:` protocol. URLs with other protocols (http, javascript, file, etc.) shall be rejected.
+- **020-FR-044**: If a token refresh response from Google includes a new refresh token (token rotation), the system shall store the new token immediately, replacing the previous one.
+
 ## Non-functional requirements
 
 - **020-NFR-001**: OAuth token refresh shall complete within 2 seconds. If refresh fails, the system shall prompt re-authentication rather than silently failing.
@@ -87,3 +94,6 @@
 - **020-NFR-008**: New services shall follow Erfana's existing DI pattern with interface-first design (`IDriveAuthService`, `IDriveLinkService`, `IDriveApiService`).
 - **020-NFR-009**: All new code shall be covered by unit tests (services) and the feature shall include E2E test coverage for the authentication and linking flows.
 - **020-NFR-010**: The feature shall degrade gracefully when offline – `.gdrive` files remain visible and editable (local notes), but actions requiring network shall show a clear error message.
+- **020-NFR-011**: If `safeStorage.isEncryptionAvailable()` returns false, the system shall refuse to store OAuth refresh tokens and shall display a clear error message requiring a system keyring (e.g., GNOME Keyring, KWallet). The system shall not fall back to plaintext storage for OAuth tokens.
+- **020-NFR-012**: Error messages crossing the IPC boundary from Drive services shall be sanitized to never contain access tokens, authorization headers, or URL query parameters containing credentials.
+- **020-NFR-013**: The Picker BrowserWindow shall validate `postMessage` event origins against `https://docs.google.com` before processing file selection results. Messages from other origins shall be ignored.
