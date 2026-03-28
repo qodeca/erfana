@@ -19,17 +19,17 @@
   "sections": [
     { "id": "01", "file": "requirements/01-overview.md", "title": "Overview", "word_count": 536 },
     { "id": "02", "file": "requirements/02-requirements.md", "title": "Requirements", "word_count": 1329 },
-    { "id": "03", "file": "requirements/03-acceptance.md", "title": "Acceptance", "word_count": 990 }
+    { "id": "03", "file": "requirements/03-acceptance.md", "title": "Acceptance", "word_count": 1088 }
   ],
   "requirement_sequences": {
     "FR": 27,
     "NFR": 10,
-    "AC": 28
+    "AC": 31
   },
   "statistics": {
     "total_sections": 3,
-    "total_requirements": 65,
-    "total_words": 2855
+    "total_requirements": 68,
+    "total_words": 2953
   },
   "requirements_index": {
     "FR-001": { "section": "02-requirements", "status": "active" },
@@ -96,7 +96,10 @@
     "AC-025": { "section": "03-acceptance", "status": "active" },
     "AC-026": { "section": "03-acceptance", "status": "active" },
     "AC-027": { "section": "03-acceptance", "status": "active" },
-    "AC-028": { "section": "03-acceptance", "status": "active" }
+    "AC-028": { "section": "03-acceptance", "status": "active" },
+    "AC-029": { "section": "03-acceptance", "status": "active" },
+    "AC-030": { "section": "03-acceptance", "status": "active" },
+    "AC-031": { "section": "03-acceptance", "status": "active" }
   },
   "cross_references": [],
   "validation": {
@@ -146,6 +149,20 @@
       "operation": "RECONCILE",
       "target": "manifest",
       "description": "Auto-fixed 15 issues after comprehensive review: added FR-022..027/NFR-008..010/AC-023..028 to index, updated word counts (01-overview 298->536, 02-requirements 821->1329, 03-acceptance 737->990), updated sequences (FR 21->27, NFR 7->10, AC 22->28), updated totals (requirements 50->65, words 1856->2855), synced registry",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": true,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": true
+      }
+    },
+    {
+      "date": "2026-03-28T18:00:00.000Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 6 issues: added AC-029/AC-030/AC-031 to index, updated word count (03-acceptance 990->1088), updated sequences (AC 28->31), updated totals (requirements 65->68, words 2855->2953), synced registry",
       "by": "system",
       "details": {
         "word_count_updated": true,

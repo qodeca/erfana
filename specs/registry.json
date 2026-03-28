@@ -32,7 +32,7 @@
       "tier": "T3",
       "status": "draft",
       "scope": "feature",
-      "description": "Adds semantic search via vector embeddings using sqlite-vec extension and ONNX Runtime in worker threads. Implements hybrid search fusion combining BM25 keyword scores with vector similarity using configurable weights (α, β). Includes Settings UI for weight tuning and MCP tool `erfana_graph_related` for finding related sections. Corresponds to implementation milestone M2.",
+      "description": "Adds semantic search via vector embeddings using sqlite-vec extension and ONNX Runtime in worker threads. Implements hybrid search fusion combining BM25 keyword scores with vector similarity using configurable weights (\u03b1, \u03b2). Includes Settings UI for weight tuning and MCP tool `erfana_graph_related` for finding related sections. Corresponds to implementation milestone M2.",
       "created": "2025-12-22T22:30:00.000Z",
       "path": "spec-t3-005-vector-search",
       "last_modified": "2025-12-22T22:30:00.000Z",
@@ -278,9 +278,9 @@
       "description": "Replace PdfConverter with LiteParse for enhanced document import supporting PDF, Office, and image files with OCR, spatial text output, and optional page screenshots.",
       "created": "2026-03-28T12:00:00.000Z",
       "path": "spec-t3-021-liteparse-document-import",
-      "last_modified": "2026-03-28T16:30:00.000Z",
+      "last_modified": "2026-03-28T18:00:00.000Z",
       "sections_count": 3,
-      "requirements_count": 65,
+      "requirements_count": 68,
       "documents": {
         "technical_adrs": [],
         "solution_adrs": [],
@@ -307,6 +307,6 @@
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2026-03-28T16:30:00.000Z"
+    "last_updated": "2026-03-28T18:00:00.000Z"
   }
 }
