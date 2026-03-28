@@ -286,7 +286,7 @@
         "solution_adrs": [],
         "solution_specs": [],
         "designs": [
-          "docs/superpowers/specs/2026-03-28-liteparse-document-import-design.md"
+          "specs/spec-t3-021-liteparse-document-import/design/001-liteparse-document-import-design.md"
         ],
         "issues": []
       },

@@ -96,11 +96,11 @@
 **When** examining the output file
 **Then** frontmatter contains: source (filename), format: pdf, pages: 15, parser: liteparse, ocr: true, date (ISO)
 
-## AC-017: Headless batch path
+## AC-017: Headless batch path with spatial text output
 
 **Given** programmatic usage via ImportService.importFile() (not dialog)
 **When** a PDF is imported
-**Then** LiteParseConverter.convert() works with default options (OCR on, no screenshots)
+**Then** LiteParseConverter.convert() works with default options (OCR on, no screenshots) and produces spatial text output with YAML frontmatter containing source, format, pages, date, parser, and ocr fields
 
 ## AC-018: PdfConverter fully removed
 

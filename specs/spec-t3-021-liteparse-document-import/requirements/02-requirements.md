@@ -8,7 +8,7 @@ The system shall provide a `LiteParseConverter` class implementing the `IConvert
 
 ### FR-002: PDF parsing
 
-The converter shall parse PDF files using LiteParse's built-in PDF.js engine, extracting text with spatial layout preservation. No external dependencies required for PDF files.
+The converter shall parse PDF files using LiteParse's built-in `@hyzyla/pdfium` engine, extracting text with spatial layout preservation. No external dependencies required for PDF files.
 
 ### FR-003: Office document support
 

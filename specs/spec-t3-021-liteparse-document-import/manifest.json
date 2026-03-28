@@ -7,7 +7,7 @@
   "scope": "feature",
   "description": "Replace PdfConverter with LiteParse for enhanced document import supporting PDF, Office, and image files with OCR, spatial text output, and optional page screenshots.",
   "created": "2026-03-28T12:47:00.000Z",
-  "last_modified": "2026-03-28T21:15:00.000Z",
+  "last_modified": "2026-03-28T22:30:00.000Z",
   "components": [
     "main-services",
     "ipc",
@@ -19,7 +19,7 @@
   "sections": [
     { "id": "01", "file": "requirements/01-overview.md", "title": "Overview", "word_count": 704 },
     { "id": "02", "file": "requirements/02-requirements.md", "title": "Requirements", "word_count": 1595 },
-    { "id": "03", "file": "requirements/03-acceptance.md", "title": "Acceptance", "word_count": 1290 }
+    { "id": "03", "file": "requirements/03-acceptance.md", "title": "Acceptance", "word_count": 1311 }
   ],
   "requirement_sequences": {
     "FR": 27,
@@ -29,7 +29,7 @@
   "statistics": {
     "total_sections": 3,
     "total_requirements": 73,
-    "total_words": 3589
+    "total_words": 3610
   },
   "requirements_index": {
     "FR-001": { "section": "02-requirements", "status": "active" },
@@ -203,6 +203,20 @@
         "sections_synced": false,
         "orphans_cleaned": 0,
         "registry_synced": true
+      }
+    },
+    {
+      "date": "2026-03-28T22:30:00.000Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 1 issue after validation fixes: updated word count (03-acceptance 1290->1311), updated total words (3589->3610)",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": false,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": false
       }
     }
   ]
