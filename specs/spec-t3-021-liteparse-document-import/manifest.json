@@ -1,0 +1,130 @@
+{
+  "id": 21,
+  "name": "LiteParse document import",
+  "slug": "liteparse-document-import",
+  "tier": "T3",
+  "status": "draft",
+  "scope": "feature",
+  "description": "Replace PdfConverter with LiteParse for enhanced document import supporting PDF, Office, and image files with OCR, spatial text output, and optional page screenshots.",
+  "created": "2026-03-28T12:47:00.000Z",
+  "last_modified": "2026-03-28T13:45:00.000Z",
+  "components": [
+    "main-services",
+    "ipc",
+    "preload",
+    "renderer-components",
+    "renderer-stores",
+    "shared-types"
+  ],
+  "sections": [
+    { "id": "01", "file": "requirements/01-overview.md", "title": "Overview", "word_count": 298 },
+    { "id": "02", "file": "requirements/02-requirements.md", "title": "Requirements", "word_count": 821 },
+    { "id": "03", "file": "requirements/03-acceptance.md", "title": "Acceptance", "word_count": 737 }
+  ],
+  "requirement_sequences": {
+    "FR": 21,
+    "NFR": 7,
+    "AC": 22
+  },
+  "statistics": {
+    "total_sections": 3,
+    "total_requirements": 50,
+    "total_words": 1856
+  },
+  "requirements_index": {
+    "FR-001": { "section": "02-requirements", "status": "active" },
+    "FR-002": { "section": "02-requirements", "status": "active" },
+    "FR-003": { "section": "02-requirements", "status": "active" },
+    "FR-004": { "section": "02-requirements", "status": "active" },
+    "FR-005": { "section": "02-requirements", "status": "active" },
+    "FR-006": { "section": "02-requirements", "status": "active" },
+    "FR-007": { "section": "02-requirements", "status": "active" },
+    "FR-008": { "section": "02-requirements", "status": "active" },
+    "FR-009": { "section": "02-requirements", "status": "active" },
+    "FR-010": { "section": "02-requirements", "status": "active" },
+    "FR-011": { "section": "02-requirements", "status": "active" },
+    "FR-012": { "section": "02-requirements", "status": "active" },
+    "FR-013": { "section": "02-requirements", "status": "active" },
+    "FR-014": { "section": "02-requirements", "status": "active" },
+    "FR-015": { "section": "02-requirements", "status": "active" },
+    "FR-016": { "section": "02-requirements", "status": "active" },
+    "FR-017": { "section": "02-requirements", "status": "active" },
+    "FR-018": { "section": "02-requirements", "status": "active" },
+    "FR-019": { "section": "02-requirements", "status": "active" },
+    "FR-020": { "section": "02-requirements", "status": "active" },
+    "FR-021": { "section": "02-requirements", "status": "active" },
+    "NFR-001": { "section": "02-requirements", "status": "active" },
+    "NFR-002": { "section": "02-requirements", "status": "active" },
+    "NFR-003": { "section": "02-requirements", "status": "active" },
+    "NFR-004": { "section": "02-requirements", "status": "active" },
+    "NFR-005": { "section": "02-requirements", "status": "active" },
+    "NFR-006": { "section": "02-requirements", "status": "active" },
+    "NFR-007": { "section": "02-requirements", "status": "active" },
+    "AC-001": { "section": "03-acceptance", "status": "active" },
+    "AC-002": { "section": "03-acceptance", "status": "active" },
+    "AC-003": { "section": "03-acceptance", "status": "active" },
+    "AC-004": { "section": "03-acceptance", "status": "active" },
+    "AC-005": { "section": "03-acceptance", "status": "active" },
+    "AC-006": { "section": "03-acceptance", "status": "active" },
+    "AC-007": { "section": "03-acceptance", "status": "active" },
+    "AC-008": { "section": "03-acceptance", "status": "active" },
+    "AC-009": { "section": "03-acceptance", "status": "active" },
+    "AC-010": { "section": "03-acceptance", "status": "active" },
+    "AC-011": { "section": "03-acceptance", "status": "active" },
+    "AC-012": { "section": "03-acceptance", "status": "active" },
+    "AC-013": { "section": "03-acceptance", "status": "active" },
+    "AC-014": { "section": "03-acceptance", "status": "active" },
+    "AC-015": { "section": "03-acceptance", "status": "active" },
+    "AC-016": { "section": "03-acceptance", "status": "active" },
+    "AC-017": { "section": "03-acceptance", "status": "active" },
+    "AC-018": { "section": "03-acceptance", "status": "active" },
+    "AC-019": { "section": "03-acceptance", "status": "active" },
+    "AC-020": { "section": "03-acceptance", "status": "active" },
+    "AC-021": { "section": "03-acceptance", "status": "active" },
+    "AC-022": { "section": "03-acceptance", "status": "active" }
+  },
+  "cross_references": [],
+  "validation": {
+    "overall_score": null,
+    "passed": false,
+    "last_validated": null,
+    "threshold": 50
+  },
+  "change_history": [
+    {
+      "date": "2026-03-28T12:47:00.000Z",
+      "operation": "INIT",
+      "target": "manifest",
+      "description": "Spec created from validated design document with 3 sections",
+      "by": "user"
+    },
+    {
+      "date": "2026-03-28T12:17:56.000Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 2 issues: synced registry sections_count (0 -> 3) and requirements_count (0 -> 45)",
+      "by": "system",
+      "details": {
+        "word_count_updated": false,
+        "indexes_rebuilt": false,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": true
+      }
+    },
+    {
+      "date": "2026-03-28T13:45:00.000Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 8 issues: added FR-021/AC-019-022 to index, updated word counts (02-requirements 764->821, 03-acceptance 615->737), updated sequences (FR 20->21, AC 18->22), updated totals (requirements 45->50, words 1677->1856), synced registry",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": true,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": true
+      }
+    }
+  ]
+}
