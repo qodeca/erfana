@@ -46,7 +46,7 @@
 
 **Given** a large PDF (50+ pages) with OCR enabled
 **When** import is in progress
-**Then** the dialog shows a progress bar with per-page updates
+**Then** the dialog shows a progress indicator (determinate with per-page updates if LiteParse supports progress callbacks; indeterminate with "Parsing document..." text otherwise)
 
 ## AC-009: Import cancellation
 
@@ -114,23 +114,82 @@
 **When** user selects "German" from the OCR language dropdown and clicks Import
 **Then** LiteParse receives `ocrLanguage: "deu"` in its configuration
 
-## AC-020: ConversionResult additionalFiles structure
+## AC-020: Screenshot disk output
 
 **Given** a PDF imported with screenshots enabled
 **When** examining the ConversionResult returned by LiteParseConverter
-**Then** the `additionalFiles` array contains entries with `relativePath` (string) and `data` (Buffer) for each page
+**Then** the `screenshotDir` field contains the path to the screenshots directory, and PNG files exist on disk for each page
 
-## AC-021: Performance – 100-page PDF
+## AC-021: Performance – 100-page PDF (manual verification only)
 
 **Given** a 100-page PDF with native text
 **When** imported with default settings (OCR enabled)
 **Then** parsing completes within 5 seconds on commodity hardware
+**Note**: This AC is verified manually, not in automated tests (timing assertions are flaky in CI).
 
 ## AC-022: Max pages limit warning
 
 **Given** a document exceeding 1000 pages
 **When** import is attempted
 **Then** the user sees a warning about the page limit before proceeding
+
+## AC-023: Cancel IPC stops active import
+
+**Given** a document import in progress
+**When** `import:documentCancel` IPC is called
+**Then** the active AbortController is triggered, partial output files are cleaned up, and the handler rejects with cancellation status
+
+## AC-024: Dependency detection timeout
+
+**Given** both `soffice --version` and `magick --version` hang for >5 seconds
+**When** DependencyDetector completes
+**Then** both dependencies report as unavailable, the app starts normally with PDF-only import support, and no startup delay exceeds 5 seconds
+
+## AC-025: RTF extension ownership
+
+**Given** LibreOffice is installed
+**When** an RTF file is imported
+**Then** it is handled by LiteParseConverter (rich document parsing), not TextConverter (raw markup)
+
+**Given** LibreOffice is NOT installed
+**When** an RTF file is imported
+**Then** it is handled by TextConverter (raw text fallback)
+
+## AC-026: Extension overlap guard
+
+**Given** LiteParseConverter is registered with any dependency configuration
+**When** checking its `supportedExtensions`
+**Then** `csv`, `tsv`, and `svg` are never included (these remain with TextConverter)
+
+## AC-027: Category key consistency
+
+**Given** LiteParseConverter is registered in ConverterRegistry
+**When** checking its `category` property
+**Then** it is `'document'` (same as the replaced PdfConverter); `FileTypeCategory` union is not modified
+
+## AC-028: Concurrent import prevention
+
+**Given** a document import is already in progress
+**When** a second `import:document` IPC call is made
+**Then** the second call is rejected, and the first import continues unaffected
+
+## AC-029: Preload bridge methods callable
+
+**Given** DocumentImportDialog triggers an import
+**When** calling the preload bridge
+**Then** `window.api.import.documentImport()`, `window.api.import.onDocumentProgress()`, `window.api.import.cancelDocument()`, and `window.api.import.getDocumentExtensions()` are all callable and return expected types
+
+## AC-030: Dynamic extension detection in renderer
+
+**Given** app startup with LibreOffice installed
+**When** calling `window.api.import.getDocumentExtensions()`
+**Then** the returned set includes `pdf` and `docx` but not `csv`, `tsv`, or `svg`
+
+## AC-031: Offline OCR with bundled English
+
+**Given** a packaged build with no internet connection
+**When** importing a PDF with OCR enabled and language set to English
+**Then** OCR succeeds using bundled English language data without any network requests
 
 ## Definition of done
 

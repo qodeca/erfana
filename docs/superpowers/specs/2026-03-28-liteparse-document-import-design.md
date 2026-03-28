@@ -36,7 +36,7 @@ Replaces `PdfConverter`. Implements `IConverter` with `category: 'document'`.
 | | `ppt`, `pptx`, `pptm`, `odp` | |
 | | `xls`, `xlsx`, `xlsm`, `ods` | |
 
-**Extension overlap**: `csv`, `tsv`, and `svg` remain with `TextConverter` (plain text import is more appropriate for these formats).
+**Extension overlap**: `csv`, `tsv`, and `svg` are explicitly excluded from `LiteParseConverter.supportedExtensions` (remain with TextConverter). `rtf` is owned by LiteParseConverter when LibreOffice is available; otherwise falls back to TextConverter. Remove `rtf` from `TEXT_EXTENSIONS` in `extensions.ts` and handle via ConverterRegistry registration order.
 
 **Constructor** receives `DependencyStatus` to determine which extensions to register.
 
@@ -79,14 +79,16 @@ const screenshots = await parser.screenshot(       // optional PNGs
 
 ```typescript
 interface DependencyStatus {
-  libreOffice: boolean    // checked via: soffice --version
-  imageMagick: boolean    // checked via: magick --version
+  libreOffice: boolean    // soffice --version (+ macOS bundle path)
+  imageMagick: boolean    // magick --version, fallback: convert --version (v6)
 }
 ```
 
-- Runs once at app startup, caches result for session
-- `LiteParseConverter` adjusts `supportedExtensions` based on status
-- Formats lacking their dependency simply aren't registered in the converter
+- Runs async at app startup with 5s timeout per command – does not block window creation
+- Caches result for session (single detection, no re-checking)
+- `ConverterRegistry` must await detection before registering `LiteParseConverter`
+- Startup sequence: `DependencyDetector.detect()` → `new LiteParseConverter(status)` → `registry.register(converter)`
+- If detection is still in progress when user imports, PDF-only mode available immediately
 
 ### Extended ConversionResult
 
@@ -98,17 +100,29 @@ export interface ConversionResult {
   content?: string
   error?: string
   errorCode?: ErrorCode
-  /** Additional files generated during conversion (e.g., page screenshots) */
-  additionalFiles?: Array<{
-    /** Relative path from output file (e.g., "screenshots/page-1.png") */
-    relativePath: string
-    /** File content as Buffer */
-    data: Buffer
-  }>
+  /** Path to screenshot directory if screenshots were generated */
+  screenshotDir?: string
 }
 ```
 
-`ImportService.importFile()` writes `additionalFiles` into subdirectories relative to the main output file.
+Screenshots are written directly to disk during conversion (not held in memory). The `screenshotDir` field tells ImportService where they are, so it can move them to the final import location alongside the .md file.
+
+### Extended ImportService
+
+**File**: `src/main/services/import/ImportService.ts` – add optional `ImportOptions` parameter:
+
+```typescript
+interface ImportOptions {
+  ocr?: boolean
+  ocrLanguage?: string
+  screenshots?: boolean
+  dpi?: number
+  onProgress?: (progress: ImportDocumentProgress) => void
+  signal?: AbortSignal
+}
+```
+
+`ImportService.importFile(filePath, projectPath, options?)` replaces the IPC bypass pattern. Both the dialog path (with options) and the headless path (without options, using defaults) go through ImportService. This keeps file-writing logic in one place.
 
 ---
 
@@ -142,15 +156,31 @@ User selects document file (via dialog or drag-drop)
 - Zustand store manages dialog state (same as `useTranscriptionStore`)
 - `useImport` hook routes document files to this dialog (same pattern as audio/video → TranscriptionDialog)
 - Focus trapping, Escape to cancel, ARIA attributes
-- **IPC bypass**: the dialog calls the `import:document` IPC handler directly (not `ImportService.importFile()`), passing options. This matches how TranscriptionDialog calls `transcription:import` directly instead of going through `ImportService`. The `IConverter.convert()` interface stays unchanged – it remains the headless/batch path without options (OCR enabled, no screenshots).
+- **Extended ImportService (not IPC bypass)**: the dialog calls `import:document` IPC handler, which delegates to `ImportService.importFile(path, project, options)`. Unlike the transcription bypass pattern, this keeps file-writing logic in one place. The `IConverter.convert()` interface stays unchanged – it remains the headless/batch path without options.
 
 ### IPC
 
-- New channel: `import:document` – accepts file path + options object
-- New channel: `import:document:progress` – streamed progress events
+- `import:document` – accepts file path + options object, delegates to ImportService
+- `import:documentProgress` – streamed progress events (ImportDocumentProgress type with optional pageErrors)
+- `import:documentCancel` – triggers AbortController to cancel active import
 - Schemas in `src/shared/ipc/import-schema.ts`
 - Channel constants in `src/shared/ipc/import-channels.ts`
-- Handlers in `src/main/ipc/import-handlers.ts`
+- Handlers in `src/main/ipc/import-handlers.ts` (with `activeController` mutex)
+
+### Preload bridge surface
+
+```typescript
+window.api.import.documentImport(options: DocumentImportOptions): Promise<ImportResult>
+window.api.import.onDocumentProgress(callback: (progress: ImportDocumentProgress) => void): () => void
+window.api.import.cancelDocument(): void
+window.api.import.getDocumentExtensions(): Promise<string[]>
+```
+
+### Store interface (useDocumentImportStore)
+
+**Persists across closeDialog()**: `lastOcr`, `lastLanguage`, `lastScreenshots`, `lastDpi`
+**Resets on closeDialog()**: `isImporting`, `progress`, `result`, `error`, `filePath`, `fileName`
+**Guards**: `startImport()` no-ops when `isImporting === true` or `filePath === null`
 
 ---
 
@@ -175,7 +205,11 @@ This triggers at import time – when the file extension maps to a dependency th
 | Code | When |
 |---|---|
 | `IMPORT_DEPENDENCY_MISSING` | LibreOffice/ImageMagick not found for format that needs it |
-| `IMPORT_OCR_FAILED` | Tesseract.js fails on a page (non-fatal – continue with remaining pages) |
+| `IMPORT_OCR_FAILED` | Tesseract.js fails on a page (non-fatal – reported via progress stream pageErrors, not in final result) |
+
+**ERROR_MESSAGES entries** (required for TypeScript exhaustiveness):
+- `IMPORT_DEPENDENCY_MISSING`: `'Required tool is not installed. Check the import error for installation instructions.'`
+- `IMPORT_OCR_FAILED`: `'OCR failed on one or more pages. Check the output for missing content.'`
 
 ### Reused error codes
 
@@ -208,27 +242,62 @@ This triggers at import time – when the file extension maps to a dependency th
 | **Create** | `src/main/ipc/import-handlers.ts` | IPC handlers for document import |
 | **Create** | `src/shared/ipc/import-schema.ts` | Zod schemas for import IPC |
 | **Create** | `src/shared/ipc/import-channels.ts` | IPC channel constants |
-| **Modify** | `src/main/services/import/types.ts` | Add `additionalFiles` to ConversionResult |
-| **Modify** | `src/main/services/import/ConverterRegistry.ts` | Replace PdfConverter with LiteParseConverter |
-| **Modify** | `src/main/services/import/ImportService.ts` | Handle `additionalFiles` writing |
+| **Modify** | `src/main/services/import/types.ts` | Add `screenshotDir` to ConversionResult, add `ImportOptions` type |
+| **Modify** | `src/main/services/import/ConverterRegistry.ts` | Async init with DependencyDetector, replace PdfConverter |
+| **Modify** | `src/main/services/import/ImportService.ts` | Add optional `ImportOptions` param, handle screenshotDir |
+| **Modify** | `src/main/services/import/index.ts` | Update exports (remove PdfConverter, add LiteParseConverter) |
+| **Modify** | `src/main/services/import/extensions.ts` | Remove `rtf` from TEXT_EXTENSIONS |
 | **Modify** | `src/renderer/src/hooks/useImport.ts` | Route document files to DocumentImportDialog |
 | **Modify** | `src/shared/errors.ts` | Add `IMPORT_DEPENDENCY_MISSING`, `IMPORT_OCR_FAILED` |
 | **Modify** | `src/preload/index.ts` | Expose new IPC channels |
 | **Modify** | `src/shared/constants.ts` | Add `DOCUMENT_IMPORT` constants |
 | **Modify** | `src/renderer/src/constants/testids.ts` | Add test IDs for DocumentImportDialog |
 | **Delete** | `src/main/services/import/converters/PdfConverter.ts` | Replaced by LiteParseConverter |
-| **Add dep** | `package.json` | `@llamaindex/liteparse` |
+| **Delete** | `src/main/services/import/converters/PdfConverter.test.ts` | Replaced by LiteParseConverter.test.ts |
+| **Add dep** | `package.json` | `@llamaindex/liteparse` (pinned exact version) |
+| **Remove dep** | `package.json` | `@opendocsg/pdf2md` |
 
 ---
 
 ## Testing
 
-- **Unit**: `LiteParseConverter` – mock LiteParse, test options, errors, frontmatter
-- **Unit**: `DependencyDetector` – mock `execFile`, test detection paths
-- **Unit**: `DocumentImportDialog` – render states, option toggles, submit/cancel
-- **Unit**: `useDocumentImportStore` – state transitions
-- **Integration**: end-to-end import of small PDF fixture
-- **E2E**: Playwright test – dialog opens for document files, import completes, file appears in project tree
+### Test fixtures
+
+Create `tests/fixtures/documents/`:
+- `simple-text.pdf` – minimal PDF with native text (happy path)
+- `encrypted.pdf` – password-protected PDF (AC-013)
+- `simple-text.docx` – minimal DOCX (AC-002, AC-003)
+- `simple.png` – image with text for OCR (AC-004)
+
+### Mock factory
+
+Create shared `createMockLiteParse()` factory returning mock with `parse: vi.fn()` and `screenshot: vi.fn()`. Mock at module level: `vi.mock('@llamaindex/liteparse')`.
+
+### Unit tests
+
+- **LiteParseConverter** – supportedExtensions per dependency matrix (4 states), convert() options passthrough, frontmatter fields, error paths (null/undefined/non-Error rejections, encrypted, empty, timeout), screenshot disk output, extension exclusion guard (csv/tsv/svg never included)
+- **DependencyDetector** – ENOENT (not found), non-zero exit, success, caching (single execFile call), 5s timeout, concurrent call guard
+- **DocumentImportDialog** – render/hidden states, option interactions (OCR toggle hides language, screenshot toggle shows DPI), button states during import, Escape behavior, progress display, error display
+- **useDocumentImportStore** – initial state, openDialog preserves lastOptions, closeDialog resets transient but keeps persistent, startImport guards (isImporting, null filePath), cancelImport, concurrent import rejection
+- **useImport routing** – PDF → dialog, DOCX without LibreOffice → popup, mixed batch with documents → warning
+
+### Integration tests
+
+- PDF import end-to-end with real LiteParse (since it's local, no env gating needed) using `simple-text.pdf` fixture. Verify .md file written with correct frontmatter.
+
+### E2E tests
+
+- Playwright: stub native dialog → click import → dialog opens → configure options → import → file appears in project tree. Uses existing POM fixture pattern.
+
+### Coverage targets
+
+- LiteParseConverter, DependencyDetector, useDocumentImportStore: 85%+
+- DocumentImportDialog: 75%+
+- import-handlers.ts: 70%+
+
+### Test ID enumeration
+
+Minimum 10 IDs for DocumentImportDialog: `DOCUMENT_IMPORT_DIALOG`, `DOCUMENT_IMPORT_BTN_IMPORT`, `DOCUMENT_IMPORT_BTN_CANCEL`, `DOCUMENT_IMPORT_PROGRESS_BAR`, `DOCUMENT_IMPORT_TOGGLE_OCR`, `DOCUMENT_IMPORT_LANGUAGE_SELECT`, `DOCUMENT_IMPORT_TOGGLE_SCREENSHOTS`, `DOCUMENT_IMPORT_DPI_SELECT`, `DOCUMENT_IMPORT_ERROR`, `DOCUMENT_IMPORT_BTN_DONE`. Update `testids.ts` count comment and `testids.test.ts` expectation.
 
 ---
 

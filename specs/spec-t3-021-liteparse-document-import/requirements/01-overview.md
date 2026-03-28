@@ -16,8 +16,9 @@ The current PDF import pipeline is limited: no OCR for scanned documents, no spa
 - Runtime dependency detection for LibreOffice (Office formats) and ImageMagick (image formats)
 - New `DocumentImportDialog` component with per-import options (OCR, language, screenshots, DPI)
 - New IPC channels with Zod schemas for document import with options and progress streaming
-- Extended `ConversionResult` type supporting additional output files (screenshots)
+- Screenshot generation writes to disk (not in-memory Buffers)
 - New error codes for dependency and OCR failures
+- Cancellation channel (`import:documentCancel`) with AbortController pattern
 - Dependency missing popup with install guidance
 - Deletion of old `PdfConverter`
 
@@ -31,8 +32,25 @@ The current PDF import pipeline is limited: no OCR for scanned documents, no spa
 ## Key decisions
 
 - **Spatial text over markdown**: LiteParse preserves document layout using whitespace/indentation rather than converting to markdown tables. This is better for both human readability and LLM consumption.
-- **IPC bypass pattern**: The dialog calls `import:document` IPC handler directly (not `ImportService.importFile()`), matching how `TranscriptionDialog` bypasses `ImportService` for audio/video.
-- **Dynamic extension registration**: `LiteParseConverter` adjusts its `supportedExtensions` based on which external tools are available at startup.
+- **Extended ImportService over IPC bypass**: Instead of creating a third copy of file-writing logic (after ImportService and transcription-handlers), the dialog calls an extended `ImportService.importFile()` that accepts optional `ImportOptions`. This keeps file-writing in one place.
+- **Dynamic extension registration**: `LiteParseConverter` adjusts its `supportedExtensions` based on which external tools are available at startup. Detection is async and must complete before converter registration.
+- **Screenshots write to disk, not memory**: `parser.screenshot()` results are written directly to disk during conversion, not held as Buffers in `ConversionResult`. This prevents OOM on large documents (1000 pages at 150 DPI could be 500 MB+).
+
+## Risks
+
+- **Library maturity**: LiteParse was released March 19, 2026. Pin exact version (no caret). Monitor for API changes. Have a contingency plan if the library is abandoned or has critical bugs.
+- **Native dependencies**: LiteParse depends on Sharp (native C++ addon) and Tesseract.js (WASM). Both have known Electron packaging challenges. A **pre-implementation spike** must verify these work in a packaged `npm run build:mac` build before committing to implementation.
+- **Bundle size**: Expected +40-65 MB (Sharp ~30 MB, Tesseract.js ~10 MB, pdfjs-dist ~7 MB) vs current pdf2md (~2 MB). Acceptable for desktop Electron app but must be verified.
+
+## Pre-implementation spike
+
+Before implementation begins, a spike must verify:
+1. Sharp loads correctly in packaged Electron binary (`npm run build:mac`)
+2. Tesseract.js WASM resolves in bundled app (not just dev mode)
+3. `parser.parse()` works on a simple PDF in the packaged build
+4. Actual bundle size delta measured
+5. LiteParse API surface confirmed: progress callbacks, AbortSignal, screenshot return type, ParseResult shape
+6. Tesseract.js language data loading strategy (bundled vs downloaded)
 
 ## Design document
 

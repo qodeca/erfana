@@ -40,7 +40,7 @@ Imported documents shall include YAML frontmatter with: `source` (original filen
 
 ### FR-010: Dependency detection service
 
-A `DependencyDetector` service shall check for LibreOffice (`soffice --version`) and ImageMagick (`magick --version`) at app startup and cache results for the session.
+A `DependencyDetector` service shall check for LibreOffice and ImageMagick at app startup and cache results for the session. Detection is async and must complete before `ConverterRegistry` registers `LiteParseConverter`. Each command has a 5-second timeout – if a command hangs, the dependency is assumed unavailable. Detection commands: `soffice --version` (LibreOffice), `magick --version` with fallback to `convert --version` (ImageMagick v6 compatibility). On macOS, also check `/Applications/LibreOffice.app/Contents/MacOS/soffice` directly.
 
 ### FR-011: Dynamic extension registration
 
@@ -56,7 +56,7 @@ A new dialog component shall open when importing document files (PDF, Office, im
 
 ### FR-014: Import progress
 
-The dialog shall display a progress indicator during import, with per-page progress events streamed from the main process via `import:document:progress` IPC channel.
+The dialog shall display a progress indicator during import via `import:documentProgress` IPC channel. If LiteParse supports per-page callbacks, show determinate progress. If not, show an indeterminate progress bar with a "Parsing document..." message. The progress schema (`ImportDocumentProgress`) shall include optional `pageErrors` for non-fatal OCR failures on individual pages.
 
 ### FR-015: Post-import actions
 
@@ -72,11 +72,11 @@ Document files in batch imports (drag-drop of multiple files) shall be routed in
 
 ### FR-018: IPC channels
 
-New IPC channels shall be created: `import:document` (import with options) and `import:document:progress` (progress events), with Zod schemas for request/response validation.
+New IPC channels shall be created: `import:document` (import with options), `import:documentProgress` (progress events), and `import:documentCancel` (abort active import). All channels use Zod schemas for request/response validation. Channel naming follows the `import:` prefix convention.
 
-### FR-019: Extended ConversionResult
+### FR-019: Screenshot disk-based output
 
-The `ConversionResult` type shall support an optional `additionalFiles` array for files generated during conversion (screenshots), each with `relativePath` and `data` (Buffer).
+Screenshots shall be written directly to disk during conversion (into a `screenshots/` subfolder), not held as Buffers in memory. The `ConversionResult` type gains an optional `screenshotDir` (string path) field instead of in-memory Buffers. This prevents OOM on large documents (1000 pages at 150 DPI could generate 500 MB+ of PNGs).
 
 ### FR-020: PdfConverter removal
 
@@ -84,7 +84,31 @@ The existing `PdfConverter` class and its `@opendocsg/pdf2md` dependency shall b
 
 ### FR-021: Import cancellation
 
-The user shall be able to cancel an in-progress document import by clicking Cancel or pressing Escape. Cancellation shall abort the parsing operation and clean up any partial output files.
+The user shall be able to cancel an in-progress document import by clicking Cancel or pressing Escape. The `import:documentCancel` IPC channel triggers an AbortController in the handler (matching `transcription:cancel` pattern). If LiteParse does not support AbortSignal, cancellation is best-effort – the parse completes but the result is discarded and partial output files are cleaned up.
+
+### FR-022: Preload bridge surface
+
+The preload bridge shall expose: `window.api.import.documentImport(options)` (starts import), `window.api.import.onDocumentProgress(callback)` (subscribes to progress), `window.api.import.cancelDocument()` (cancels active import). These mirror the `window.api.transcription.*` pattern.
+
+### FR-023: Document extension detection in renderer
+
+The renderer shall determine which extensions are document files via `window.api.import.getDocumentExtensions()` IPC call, which returns the current set of registered document extensions from `LiteParseConverter.supportedExtensions`. The result is cached in the renderer for the session. The `useImport` hook uses this cached list for routing decisions.
+
+### FR-024: Store interface with persistence semantics
+
+`useDocumentImportStore` shall define which fields persist across `closeDialog()` (lastOcr, lastLanguage, lastScreenshots, lastDpi) and which reset (isImporting, progress, result, error, filePath, fileName). This mirrors `useTranscriptionStore.lastLanguage` persistence pattern.
+
+### FR-025: Single-import mutex
+
+Only one document import may be active at a time. The IPC handler maintains an `activeController` (AbortController) – if `import:document` is called while one is active, the call is rejected. The store's `startImport()` guards against double-invocation when `isImporting === true`.
+
+### FR-026: OCR language mapping
+
+A mapping utility shall convert ISO 639-1 language codes (from `LanguageSelect`: `de`, `en`, `fr`) to Tesseract ISO 639-3 codes (`deu`, `eng`, `fra`) as required by LiteParse's `ocrLanguage` configuration.
+
+### FR-027: Tesseract.js language data
+
+English language data shall be pre-bundled with the app to enable offline OCR (satisfying NFR-002). Additional languages may be downloaded on first use, with a progress indication in the dialog. The language data cache location shall be configurable (default: app data directory).
 
 ## Non-functional requirements
 
@@ -110,8 +134,20 @@ Office document conversion via LibreOffice shall timeout after 60 seconds with a
 
 ### NFR-006: Security
 
-Password-protected PDFs shall be detected and reported with `IMPORT_ENCRYPTED` error code. Parsed output shall not contain embedded JavaScript, macros, or external resource references from the source document. LiteParse's text-only spatial output inherently strips these – no additional sanitization layer required.
+Password-protected PDFs shall be detected and reported with `IMPORT_ENCRYPTED` error code. Parsed output shall not contain embedded JavaScript, macros, or external resource references from the source document. LiteParse's text-only spatial output inherently strips these – no additional sanitization layer required. LibreOffice temp files shall be cleaned up in a try/finally on timeout or crash.
 
 ### NFR-007: Backward compatibility
 
 The `IConverter` interface shall remain unchanged. `LiteParseConverter.convert()` (headless path) shall work with default options (OCR enabled, no screenshots) for batch/programmatic usage.
+
+### NFR-008: Dependency version pinning
+
+`@llamaindex/liteparse` shall be pinned to an exact version (no caret, no tilde) in `package.json`. The library is less than 1 month old and has no stable API guarantee.
+
+### NFR-009: Bundle size
+
+The expected bundle size increase is +40-65 MB (Sharp ~30 MB, Tesseract.js ~10 MB, pdfjs-dist ~7 MB). This replaces the ~2 MB `@opendocsg/pdf2md`. The increase is acceptable for a desktop Electron app. Actual delta must be measured during the pre-implementation spike.
+
+### NFR-010: Non-blocking startup
+
+`DependencyDetector` shall not block app startup or main window creation. Detection runs asynchronously with a 5-second timeout per command. If detection is still in progress when a user attempts import, PDF-only mode is available immediately; Office/image support activates once detection completes.
