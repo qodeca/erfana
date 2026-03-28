@@ -1,6 +1,6 @@
 # Electron Builder Configuration
 
-**Last Updated**: March 2026 (v0.8.0)
+**Last Updated**: March 2026 (v0.8.2)
 
 This document explains the electron-builder version choice and the aproba workaround.
 
@@ -74,11 +74,32 @@ mkdir -p node_modules/aproba && echo '{}' > node_modules/aproba/package.json
 
 ---
 
-## Status and Future
+## Code signing hooks
 
-**Status**: Workaround automated in v0.6.0 via `prebuild` script
+electron-builder supports two lifecycle hooks that erfana uses for macOS builds:
 
-**Future**: Bug may be fixed in electron-builder 27+, at which point the `prebuild` script can be removed.
+| Hook | Script | Purpose |
+|------|--------|---------|
+| `afterPack` | `scripts/fuses.js` | Applies Electron fuses, resets ad-hoc signature on main binary |
+| `afterSign` | `scripts/resign.js` | Deep re-signs entire `.app` bundle atomically |
+
+```yaml
+# electron-builder.yml
+afterPack: ./scripts/fuses.js
+afterSign: ./scripts/resign.js
+```
+
+**Why both hooks?** `flipFuses` modifies the main binary's code directory hash, causing signature mismatches with helper processes (GPU, Renderer, Network) and Electron Framework. The `afterSign` hook re-signs everything so macOS Sequoia+ accepts `@rpath` library loads between components.
+
+See [Fuses](./fuses.md) for fuse configuration and [Security](../security.md) for the full signing rationale.
+
+---
+
+## Status and future
+
+**Aproba**: Workaround automated in v0.6.0 via `prebuild` script. May be fixed in electron-builder 27+.
+
+**Code signing**: Added in v0.8.2 after macOS Sequoia dyld crashes.
 
 ---
 

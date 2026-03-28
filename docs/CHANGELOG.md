@@ -4,6 +4,19 @@ Historical changelog entries for versions prior to current. For the latest chang
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## 0.8.2
+
+### Fixed
+- **macOS code signing** – added `afterSign` hook (`scripts/resign.js`) for deep re-signing of `.app` bundle, fixing dyld crash on macOS Sequoia+ caused by Team ID mismatch between Electron components after fuses are applied
+
+### Added
+- **Spec #020** – Google Drive link integration (T4, 130 requirements) – reference-based `.gdrive` link files with OAuth2, Drive API, Picker API
+- **Spec #021** – LiteParse document import (T3, 50 requirements) – replace PdfConverter with `@llamaindex/liteparse` for PDF, Office, and image import with OCR
+
+### Changed
+- Release process hardened: mandatory smoke test gate with codesign verification, enforcement guardrails preventing phase/checkpoint skipping
+- `releasing-erfana` skill refactored to orchestrator pattern with 3 specialized agents
+
 ## 0.8.0
 
 ### Changed

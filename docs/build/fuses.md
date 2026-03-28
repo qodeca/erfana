@@ -1,6 +1,6 @@
 # Electron Fuses
 
-**Last Updated**: December 2025 (v0.6.0)
+**Last Updated**: March 2026 (v0.8.2)
 
 This document explains the Electron fuses configuration and security decisions.
 
@@ -29,11 +29,14 @@ await flipFuses(electronBinaryPath, {
 ```yaml
 # electron-builder.yml
 afterPack: ./scripts/fuses.js
+afterSign: ./scripts/resign.js
 ```
+
+**Hook sequencing**: `afterPack` runs first (applies fuses, resets main binary signature), then `afterSign` runs (deep re-signs the entire `.app` bundle). The `afterSign` step is critical because `flipFuses` modifies the main binary's code directory hash, creating a mismatch with helper processes. Without deep re-signing, macOS Sequoia+ rejects `@rpath` library loads. See [electron-builder.md](./electron-builder.md) for details.
 
 ---
 
-## Fuse Decisions
+## Fuse decisions
 
 | Fuse | Value | Reason |
 |------|-------|--------|
