@@ -4,7 +4,7 @@
 
 ### FR-001: LiteParseConverter core
 
-The system shall provide a `LiteParseConverter` class implementing the `IConverter` interface that uses `@llamaindex/liteparse` to parse documents and produce spatial text output with YAML frontmatter.
+The system shall provide a `LiteParseConverter` class implementing the `IConverter` interface that uses `@llamaindex/liteparse` to parse documents and produce spatial text output with YAML frontmatter. The converter supports per-import configuration via a `createConfigured(options: ImportOptions): LiteParseConverter` factory method that returns a new instance pre-configured with given options. The default `convert(filePath)` method (headless path) uses default options. `ImportService` creates a configured instance when `ImportOptions` are provided, preserving the `IConverter` interface contract.
 
 ### FR-002: PDF parsing
 
@@ -40,7 +40,7 @@ Imported documents shall include YAML frontmatter with: `source` (original filen
 
 ### FR-010: Dependency detection service
 
-A `DependencyDetector` service shall check for LibreOffice and ImageMagick at app startup and cache results for the session. Detection is async and must complete before `ConverterRegistry` registers `LiteParseConverter`. Each command has a 5-second timeout – if a command hangs, the dependency is assumed unavailable. Detection commands: `soffice --version` (LibreOffice), `magick --version` with fallback to `convert --version` (ImageMagick v6 compatibility). On macOS, also check `/Applications/LibreOffice.app/Contents/MacOS/soffice` directly.
+A `DependencyDetector` service shall check for LibreOffice and ImageMagick at app startup and cache results for the session. Two-phase approach: `LiteParseConverter` registers synchronously with PDF-only extensions. `DependencyDetector.detect()` runs async in the background with a 5-second timeout per command. On completion, calls `converterRegistry.updateConverterExtensions('document', additionalExtensions)` to add Office/image extensions, and fires `import:dependenciesReady` IPC event to notify the renderer. Detection commands: `soffice --version` (LibreOffice), `magick --version` with fallback to `convert --version` (ImageMagick v6 compatibility). On macOS, also check `/Applications/LibreOffice.app/Contents/MacOS/soffice` directly. `ImportService` uses the shared `converterRegistry` singleton (not a private instance).
 
 ### FR-011: Dynamic extension registration
 
@@ -76,7 +76,7 @@ New IPC channels shall be created: `import:document` (import with options), `imp
 
 ### FR-019: Screenshot disk-based output
 
-LiteParse's `screenshot()` returns `ScreenshotResult[]` with `imageBuffer: Buffer` (no disk option). The IPC handler shall write each Buffer to disk immediately and release it, iterating page-by-page to avoid holding all screenshots in memory. The `ConversionResult` type gains an optional `screenshotDir` (string path). For documents over 100 pages, screenshot generation shall be capped (configurable) to prevent excessive disk usage.
+LiteParse's `screenshot()` returns `ScreenshotResult[]` with `imageBuffer: Buffer` (no disk option). `LiteParseConverter.convert()` writes each Buffer to a temp directory (`os.tmpdir()/erfana-screenshots-<uuid>/`) immediately during conversion, releasing each Buffer after write. The `ConversionResult` type gains an optional `screenshotDir` (string path to temp dir). `ImportService.importFile()` copies the temp screenshots dir to `import/screenshots/<stem>/` alongside the .md file, then removes the temp dir in a `finally` block. If copy fails, the .md file still succeeds but a warning is emitted. Backend caps screenshot generation at 100 pages (configurable). `DocumentImportDialog` shows a warning when page count > 100 and screenshots are enabled: "Screenshots will be generated for the first 100 pages only."
 
 ### FR-020: PdfConverter removal
 
@@ -92,7 +92,7 @@ The preload bridge shall expose: `window.api.import.documentImport(options)` (st
 
 ### FR-023: Document extension detection in renderer
 
-The renderer shall determine which extensions are document files via `window.api.import.getDocumentExtensions()` IPC call, which returns the current set of registered document extensions from `LiteParseConverter.supportedExtensions`. The result is cached in the renderer for the session. The `useImport` hook uses this cached list for routing decisions.
+The renderer shall determine which extensions are document files via `window.api.import.getDocumentExtensions()` IPC call, which returns the current set of registered document extensions from `LiteParseConverter.supportedExtensions`. The result is eagerly fetched at app startup (PDF-only initially) and cached. When the `import:dependenciesReady` IPC event fires, the cache is refreshed to include newly available extensions. The `useImport` hook uses this cached list for routing decisions.
 
 ### FR-024: Store interface with persistence semantics
 
@@ -100,15 +100,15 @@ The renderer shall determine which extensions are document files via `window.api
 
 ### FR-025: Single-import mutex
 
-Only one document import may be active at a time. The IPC handler maintains an `activeController` (AbortController) – if `import:document` is called while one is active, the call is rejected. The store's `startImport()` guards against double-invocation when `isImporting === true`.
+Only one document import may be active at a time via the `import:document` channel. The IPC handler maintains an `activeController` (AbortController) – if `import:document` is called while one is active, the call is rejected. The store's `startImport()` guards against double-invocation when `isImporting === true`. Note: the existing `import:process` channel for text files is unguarded – concurrent text and document imports are permitted since text imports are fast and stateless.
 
 ### FR-026: OCR language codes
 
-LiteParse's `ocrLanguage` config accepts ISO 639-1 codes directly (default `"en"`). The `LanguageSelect` component values can be passed through without mapping. No conversion utility needed (spike confirmed `"en"` works as-is).
+LiteParse's `ocrLanguage` passes the value directly to Tesseract.js. Tesseract uses ISO 639-3 codes (e.g., `"eng"`, `"deu"`, `"fra"`). Tesseract.js has built-in alias mapping for ISO 639-1 codes when downloading from CDN, but offline tessdata files use ISO 639-3 filenames (e.g., `eng.traineddata`). Since FR-027 pre-bundles tessdata with ISO 639-3 names, a mapping from `LanguageSelect` ISO 639-1 values to ISO 639-3 is required. Provide a lightweight `isoToTessLang(code: string): string` mapping utility.
 
 ### FR-027: Tesseract.js language data
 
-English language data shall be pre-bundled with the app to enable offline OCR (satisfying NFR-002). Additional languages may be downloaded on first use, with a progress indication in the dialog. The language data cache location shall be configurable (default: app data directory).
+English language data (`eng.traineddata`, ~4 MB) shall be pre-bundled with the app to enable offline OCR (satisfying NFR-002). Build mechanism: place `eng.traineddata` in `resources/tessdata/`, add `extraResources: [{ from: "resources/tessdata", to: "tessdata" }]` to `electron-builder.yml`. Runtime path: `tessdataPath = app.isPackaged ? path.join(process.resourcesPath, 'tessdata') : path.join(__dirname, '../../resources/tessdata')`. Additional languages may be downloaded on first use via Tesseract.js CDN fallback. The language data cache location is `tessdataPath` (used as both source and cache by Tesseract.js).
 
 ## Non-functional requirements
 
@@ -150,4 +150,4 @@ Measured bundle size increase: DMG +61 MB (260 → 321 MB, +23%). Raw dependenci
 
 ### NFR-010: Non-blocking startup
 
-`DependencyDetector` shall not block app startup or main window creation. Detection runs asynchronously with a 5-second timeout per command. If detection is still in progress when a user attempts import, PDF-only mode is available immediately; Office/image support activates once detection completes.
+`DependencyDetector` shall not block app startup or main window creation. Two-phase registration: `LiteParseConverter` registers PDF-only synchronously, then extensions update async. Detection runs with a 5-second timeout per command. `import:dependenciesReady` IPC event notifies renderer when detection completes. `electron.vite.config.ts` must maintain `externalizeDeps: true` (default) for the main process – native modules (Sharp, pdfium) require this. Add an explicit comment in the config file documenting this requirement.

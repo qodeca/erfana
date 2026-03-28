@@ -7,7 +7,7 @@
   "scope": "feature",
   "description": "Replace PdfConverter with LiteParse for enhanced document import supporting PDF, Office, and image files with OCR, spatial text output, and optional page screenshots.",
   "created": "2026-03-28T12:47:00.000Z",
-  "last_modified": "2026-03-28T19:30:00.000Z",
+  "last_modified": "2026-03-28T21:15:00.000Z",
   "components": [
     "main-services",
     "ipc",
@@ -17,19 +17,19 @@
     "shared-types"
   ],
   "sections": [
-    { "id": "01", "file": "requirements/01-overview.md", "title": "Overview", "word_count": 692 },
-    { "id": "02", "file": "requirements/02-requirements.md", "title": "Requirements", "word_count": 1344 },
-    { "id": "03", "file": "requirements/03-acceptance.md", "title": "Acceptance", "word_count": 1084 }
+    { "id": "01", "file": "requirements/01-overview.md", "title": "Overview", "word_count": 704 },
+    { "id": "02", "file": "requirements/02-requirements.md", "title": "Requirements", "word_count": 1595 },
+    { "id": "03", "file": "requirements/03-acceptance.md", "title": "Acceptance", "word_count": 1290 }
   ],
   "requirement_sequences": {
     "FR": 27,
     "NFR": 10,
-    "AC": 31
+    "AC": 36
   },
   "statistics": {
     "total_sections": 3,
-    "total_requirements": 68,
-    "total_words": 3120
+    "total_requirements": 73,
+    "total_words": 3589
   },
   "requirements_index": {
     "FR-001": { "section": "02-requirements", "status": "active" },
@@ -99,7 +99,12 @@
     "AC-028": { "section": "03-acceptance", "status": "active" },
     "AC-029": { "section": "03-acceptance", "status": "active" },
     "AC-030": { "section": "03-acceptance", "status": "active" },
-    "AC-031": { "section": "03-acceptance", "status": "active" }
+    "AC-031": { "section": "03-acceptance", "status": "active" },
+    "AC-032": { "section": "03-acceptance", "status": "active" },
+    "AC-033": { "section": "03-acceptance", "status": "active" },
+    "AC-034": { "section": "03-acceptance", "status": "active" },
+    "AC-035": { "section": "03-acceptance", "status": "active" },
+    "AC-036": { "section": "03-acceptance", "status": "active" }
   },
   "cross_references": [],
   "validation": {
@@ -181,6 +186,20 @@
       "details": {
         "word_count_updated": true,
         "indexes_rebuilt": false,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": true
+      }
+    },
+    {
+      "date": "2026-03-28T21:15:00.000Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 8 issues after round 2 review: added AC-032..036 to index, updated word counts (01-overview 692->704, 02-requirements 1344->1595, 03-acceptance 1084->1290), updated sequences (AC 31->36), updated totals (requirements 68->73, words 3120->3589), synced registry",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": true,
         "sections_synced": false,
         "orphans_cleaned": 0,
         "registry_synced": true

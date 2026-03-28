@@ -36,7 +36,11 @@ Replaces `PdfConverter`. Implements `IConverter` with `category: 'document'`.
 | | `ppt`, `pptx`, `pptm`, `odp` | |
 | | `xls`, `xlsx`, `xlsm`, `ods` | |
 
-**Extension overlap**: `csv`, `tsv`, and `svg` are explicitly excluded from `LiteParseConverter.supportedExtensions` (remain with TextConverter). `rtf` is owned by LiteParseConverter when LibreOffice is available; otherwise falls back to TextConverter. Remove `rtf` from `TEXT_EXTENSIONS` in `extensions.ts` and handle via ConverterRegistry registration order.
+**Extension overlap**: `csv`, `tsv`, and `svg` are explicitly excluded from `LiteParseConverter.supportedExtensions` (remain with TextConverter). `rtf` stays in `TEXT_EXTENSIONS` (TextConverter registers it first); when LibreOffice is available, `LiteParseConverter` overrides `rtf` via later registration (Map overwrite behavior in `ConverterRegistry.register()`).
+
+**Factory pattern**: `LiteParseConverter.createConfigured(options: ImportOptions)` returns a new instance pre-configured with OCR/language/DPI/screenshot options. `ImportService` uses this when `ImportOptions` are provided; the default `convert(filePath)` uses default options. This preserves the `IConverter` interface contract (NFR-007).
+
+**Two-phase registration**: `LiteParseConverter` registers synchronously with PDF-only. `DependencyDetector.detect()` runs async, then calls `converterRegistry.updateConverterExtensions('document', officeExtensions)`. `ConverterRegistry` gains `updateConverterExtensions(category, extensions[])` method. `ImportService` uses the shared `converterRegistry` singleton (not a private instance). Renderer notified via `import:dependenciesReady` IPC event.
 
 **Constructor** receives `DependencyStatus` to determine which extensions to register.
 
@@ -84,10 +88,11 @@ interface DependencyStatus {
 }
 ```
 
-- Runs async at app startup with 5s timeout per command – does not block window creation
+- Two-phase approach: LiteParseConverter registers PDF-only synchronously at module load
+- `DependencyDetector.detect()` runs async in background (5s timeout per command)
+- On completion: `converterRegistry.updateConverterExtensions('document', officeExtensions)` adds Office/image extensions
+- Fires `import:dependenciesReady` IPC event to notify renderer
 - Caches result for session (single detection, no re-checking)
-- `ConverterRegistry` must await detection before registering `LiteParseConverter`
-- Startup sequence: `DependencyDetector.detect()` → `new LiteParseConverter(status)` → `registry.register(converter)`
 - If detection is still in progress when user imports, PDF-only mode available immediately
 
 ### Extended ConversionResult
@@ -246,7 +251,10 @@ This triggers at import time – when the file extension maps to a dependency th
 | **Modify** | `src/main/services/import/ConverterRegistry.ts` | Async init with DependencyDetector, replace PdfConverter |
 | **Modify** | `src/main/services/import/ImportService.ts` | Add optional `ImportOptions` param, handle screenshotDir |
 | **Modify** | `src/main/services/import/index.ts` | Update exports (remove PdfConverter, add LiteParseConverter) |
-| **Modify** | `src/main/services/import/extensions.ts` | Remove `rtf` from TEXT_EXTENSIONS |
+| **Create** | `src/main/services/import/isoToTessLang.ts` | ISO 639-1 → ISO 639-3 mapping for OCR language codes |
+| **Create** | `resources/tessdata/eng.traineddata` | Pre-bundled English OCR language data (~4 MB) |
+| **Modify** | `electron-builder.yml` | Add `extraResources` for tessdata |
+| **Modify** | `electron.vite.config.ts` | Add comment documenting native module externalizeDeps requirement |
 | **Modify** | `src/renderer/src/hooks/useImport.ts` | Route document files to DocumentImportDialog |
 | **Modify** | `src/shared/errors.ts` | Add `IMPORT_DEPENDENCY_MISSING`, `IMPORT_OCR_FAILED` |
 | **Modify** | `src/preload/index.ts` | Expose new IPC channels |
@@ -271,7 +279,7 @@ Create `tests/fixtures/documents/`:
 
 ### Mock factory
 
-Create shared `createMockLiteParse()` factory returning mock with `parse: vi.fn()` and `screenshot: vi.fn()`. Mock at module level: `vi.mock('@llamaindex/liteparse')`.
+Create shared `createMockLiteParse()` factory returning mock with `parse: vi.fn()` and `screenshot: vi.fn()`. Mock at module level: `vi.mock('@llamaindex/liteparse')`. **Important**: In store tests, use `(window as any).api = {...}` not `vi.stubGlobal('window', {...})` – the latter destroys React DOM internals (documented in MEMORY.md).
 
 ### Unit tests
 
@@ -283,11 +291,13 @@ Create shared `createMockLiteParse()` factory returning mock with `parse: vi.fn(
 
 ### Integration tests
 
-- PDF import end-to-end with real LiteParse (since it's local, no env gating needed) using `simple-text.pdf` fixture. Verify .md file written with correct frontmatter.
+- PDF import end-to-end with real LiteParse using `simple-text.pdf` fixture. Verify .md file written with correct frontmatter.
+- **CI guard**: Wrap with try/catch on LiteParse import – skip test if native modules fail to load (Sharp/pdfium may not be available in all CI environments).
 
 ### E2E tests
 
 - Playwright: stub native dialog → click import → dialog opens → configure options → import → file appears in project tree. Uses existing POM fixture pattern.
+- **E2E uses PDF only** (always available, no LibreOffice needed in CI). DOCX/image E2E paths are manual verification only.
 
 ### Coverage targets
 

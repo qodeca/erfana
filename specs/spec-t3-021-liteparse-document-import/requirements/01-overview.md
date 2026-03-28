@@ -32,9 +32,9 @@ The current PDF import pipeline is limited: no OCR for scanned documents, no spa
 ## Key decisions
 
 - **Spatial text over markdown**: LiteParse preserves document layout using whitespace/indentation rather than converting to markdown tables. This is better for both human readability and LLM consumption.
-- **Extended ImportService over IPC bypass**: Instead of creating a third copy of file-writing logic (after ImportService and transcription-handlers), the dialog calls an extended `ImportService.importFile()` that accepts optional `ImportOptions`. This keeps file-writing in one place.
-- **Dynamic extension registration**: `LiteParseConverter` adjusts its `supportedExtensions` based on which external tools are available at startup. Detection is async and must complete before converter registration.
-- **Screenshots write to disk, not memory**: `parser.screenshot()` results are written directly to disk during conversion, not held as Buffers in `ConversionResult`. This prevents OOM on large documents (1000 pages at 150 DPI could be 500 MB+).
+- **Extended ImportService with factory pattern**: `ImportService.importFile()` accepts optional `ImportOptions`. When options are provided, it creates a configured `LiteParseConverter` instance via `createConfigured(options)` factory method, then calls the standard `convert(filePath)`. This keeps the `IConverter` interface unchanged (NFR-007) while enabling per-import options.
+- **Two-phase extension registration**: `LiteParseConverter` registers with PDF-only extensions synchronously at startup. `DependencyDetector.detect()` runs async in background. On completion, `ConverterRegistry.updateConverterExtensions()` adds Office/image extensions. Renderer notified via `import:dependenciesReady` IPC event.
+- **Screenshots write to disk, not memory**: `LiteParseConverter.convert()` writes screenshot Buffers to `os.tmpdir()` subfolder during conversion, returns `screenshotDir` path. `ImportService` copies them to the final import location, then cleans up temp dir in `finally` block. This prevents OOM on large documents.
 
 ## Risks
 

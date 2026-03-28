@@ -108,11 +108,11 @@
 **When** checking the codebase
 **Then** PdfConverter.ts is deleted and @opendocsg/pdf2md is removed from package.json
 
-## AC-019: OCR language passed to LiteParse
+## AC-019: OCR language mapped and passed to LiteParse
 
 **Given** DocumentImportDialog is open
-**When** user selects "German" from the OCR language dropdown and clicks Import
-**Then** LiteParse receives `ocrLanguage: "deu"` in its configuration
+**When** user selects "German" from the OCR language dropdown (value: `"de"`) and clicks Import
+**Then** the `isoToTessLang` mapping converts `"de"` → `"deu"`, and LiteParse receives `ocrLanguage: "deu"` in its configuration
 
 ## AC-020: Screenshot disk output
 
@@ -190,6 +190,38 @@
 **Given** a packaged build with no internet connection
 **When** importing a PDF with OCR enabled and language set to English
 **Then** OCR succeeds using bundled English language data without any network requests
+
+## AC-032: Factory pattern for import options
+
+**Given** ImportService.importFile() is called with ImportOptions (OCR, language, DPI)
+**When** LiteParseConverter is the matched converter
+**Then** a configured instance is created via `createConfigured(options)` and its `convert()` uses the provided options, without modifying the `IConverter` interface
+
+## AC-033: Two-phase extension registration
+
+**Given** the app starts with LibreOffice installed
+**When** ConverterRegistry is first created (synchronous)
+**Then** LiteParseConverter is registered with PDF extensions only
+**And when** DependencyDetector completes async detection
+**Then** Office extensions are added via `updateConverterExtensions()` and `import:dependenciesReady` fires
+
+## AC-034: Renderer refreshes extensions on dependency detection
+
+**Given** the renderer cached document extensions at startup (PDF only)
+**When** `import:dependenciesReady` IPC event fires
+**Then** the renderer re-fetches `getDocumentExtensions()` and the cached list now includes Office/image extensions
+
+## AC-035: Screenshot temp dir cleanup on failure
+
+**Given** a PDF imported with screenshots enabled
+**When** ImportService successfully writes the .md file but fails to copy screenshots
+**Then** the temp screenshots directory is cleaned up in a `finally` block and the .md import succeeds with a warning
+
+## AC-036: CI integration test guard
+
+**Given** the CI environment
+**When** LiteParse native modules fail to load
+**Then** integration tests using real LiteParse skip gracefully (not crash)
 
 ## Definition of done
 

@@ -278,9 +278,9 @@
       "description": "Replace PdfConverter with LiteParse for enhanced document import supporting PDF, Office, and image files with OCR, spatial text output, and optional page screenshots.",
       "created": "2026-03-28T12:00:00.000Z",
       "path": "spec-t3-021-liteparse-document-import",
-      "last_modified": "2026-03-28T19:30:00.000Z",
+      "last_modified": "2026-03-28T21:15:00.000Z",
       "sections_count": 3,
-      "requirements_count": 68,
+      "requirements_count": 73,
       "documents": {
         "technical_adrs": [],
         "solution_adrs": [],
@@ -307,6 +307,6 @@
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2026-03-28T19:30:00.000Z"
+    "last_updated": "2026-03-28T21:15:00.000Z"
   }
 }
