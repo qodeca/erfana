@@ -56,7 +56,7 @@ A new dialog component shall open when importing document files (PDF, Office, im
 
 ### FR-014: Import progress
 
-The dialog shall display a progress indicator during import via `import:documentProgress` IPC channel. If LiteParse supports per-page callbacks, show determinate progress. If not, show an indeterminate progress bar with a "Parsing document..." message. The progress schema (`ImportDocumentProgress`) shall include optional `pageErrors` for non-fatal OCR failures on individual pages.
+The dialog shall display an **indeterminate** progress indicator during import (LiteParse's `parse()` API has no progress callback). The indicator shows "Parsing document..." while parsing, and "Generating screenshots..." if screenshots are enabled. The `import:documentProgress` IPC channel streams phase transitions only (not per-page). The progress schema (`ImportDocumentProgress`) shall include optional `warnings` for non-fatal OCR failures.
 
 ### FR-015: Post-import actions
 
@@ -76,7 +76,7 @@ New IPC channels shall be created: `import:document` (import with options), `imp
 
 ### FR-019: Screenshot disk-based output
 
-Screenshots shall be written directly to disk during conversion (into a `screenshots/` subfolder), not held as Buffers in memory. The `ConversionResult` type gains an optional `screenshotDir` (string path) field instead of in-memory Buffers. This prevents OOM on large documents (1000 pages at 150 DPI could generate 500 MB+ of PNGs).
+LiteParse's `screenshot()` returns `ScreenshotResult[]` with `imageBuffer: Buffer` (no disk option). The IPC handler shall write each Buffer to disk immediately and release it, iterating page-by-page to avoid holding all screenshots in memory. The `ConversionResult` type gains an optional `screenshotDir` (string path). For documents over 100 pages, screenshot generation shall be capped (configurable) to prevent excessive disk usage.
 
 ### FR-020: PdfConverter removal
 
@@ -102,9 +102,9 @@ The renderer shall determine which extensions are document files via `window.api
 
 Only one document import may be active at a time. The IPC handler maintains an `activeController` (AbortController) – if `import:document` is called while one is active, the call is rejected. The store's `startImport()` guards against double-invocation when `isImporting === true`.
 
-### FR-026: OCR language mapping
+### FR-026: OCR language codes
 
-A mapping utility shall convert ISO 639-1 language codes (from `LanguageSelect`: `de`, `en`, `fr`) to Tesseract ISO 639-3 codes (`deu`, `eng`, `fra`) as required by LiteParse's `ocrLanguage` configuration.
+LiteParse's `ocrLanguage` config accepts ISO 639-1 codes directly (default `"en"`). The `LanguageSelect` component values can be passed through without mapping. No conversion utility needed (spike confirmed `"en"` works as-is).
 
 ### FR-027: Tesseract.js language data
 
@@ -146,7 +146,7 @@ The `IConverter` interface shall remain unchanged. `LiteParseConverter.convert()
 
 ### NFR-009: Bundle size
 
-The expected bundle size increase is +40-65 MB (Sharp ~30 MB, Tesseract.js ~10 MB, pdfjs-dist ~7 MB). This replaces the ~2 MB `@opendocsg/pdf2md`. The increase is acceptable for a desktop Electron app. Actual delta must be measured during the pre-implementation spike.
+Measured bundle size increase: DMG +61 MB (260 → 321 MB, +23%). Raw dependencies in app bundle: ~113 MB (@llamaindex 33 MB, tesseract.js-core 50 MB, @img/sharp 16 MB, @hyzyla/pdfium 12 MB). Replaces ~2 MB `@opendocsg/pdf2md`. Accepted as reasonable for PDF/Office/image import with OCR.
 
 ### NFR-010: Non-blocking startup
 

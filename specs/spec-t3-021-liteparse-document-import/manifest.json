@@ -7,7 +7,7 @@
   "scope": "feature",
   "description": "Replace PdfConverter with LiteParse for enhanced document import supporting PDF, Office, and image files with OCR, spatial text output, and optional page screenshots.",
   "created": "2026-03-28T12:47:00.000Z",
-  "last_modified": "2026-03-28T16:30:00.000Z",
+  "last_modified": "2026-03-28T19:30:00.000Z",
   "components": [
     "main-services",
     "ipc",
@@ -17,9 +17,9 @@
     "shared-types"
   ],
   "sections": [
-    { "id": "01", "file": "requirements/01-overview.md", "title": "Overview", "word_count": 536 },
-    { "id": "02", "file": "requirements/02-requirements.md", "title": "Requirements", "word_count": 1329 },
-    { "id": "03", "file": "requirements/03-acceptance.md", "title": "Acceptance", "word_count": 1088 }
+    { "id": "01", "file": "requirements/01-overview.md", "title": "Overview", "word_count": 692 },
+    { "id": "02", "file": "requirements/02-requirements.md", "title": "Requirements", "word_count": 1344 },
+    { "id": "03", "file": "requirements/03-acceptance.md", "title": "Acceptance", "word_count": 1084 }
   ],
   "requirement_sequences": {
     "FR": 27,
@@ -29,7 +29,7 @@
   "statistics": {
     "total_sections": 3,
     "total_requirements": 68,
-    "total_words": 2953
+    "total_words": 3120
   },
   "requirements_index": {
     "FR-001": { "section": "02-requirements", "status": "active" },
@@ -167,6 +167,20 @@
       "details": {
         "word_count_updated": true,
         "indexes_rebuilt": true,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": true
+      }
+    },
+    {
+      "date": "2026-03-28T19:30:00.000Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 3 issues: updated word counts (01-overview 536->692, 02-requirements 1329->1344, 03-acceptance 1088->1084), updated total words (2953->3120)",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": false,
         "sections_synced": false,
         "orphans_cleaned": 0,
         "registry_synced": true

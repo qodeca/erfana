@@ -46,7 +46,7 @@
 
 **Given** a large PDF (50+ pages) with OCR enabled
 **When** import is in progress
-**Then** the dialog shows a progress indicator (determinate with per-page updates if LiteParse supports progress callbacks; indeterminate with "Parsing document..." text otherwise)
+**Then** the dialog shows an indeterminate progress indicator with phase text ("Parsing document...", then "Generating screenshots..." if enabled)
 
 ## AC-009: Import cancellation
 
