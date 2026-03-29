@@ -34,6 +34,8 @@ e2e/                # Playwright E2E tests (POM pattern)
 ├── fixtures/       # Composed Playwright fixtures (app, window, POM instances)
 ├── pages/          # Page Object Model classes (TerminalPage, MonacoPage, MermaidPage, ProjectTreePage, KeyboardHelper)
 └── utils/          # Shared helpers (helpers.ts backward-compat adapter), locators (byTestId)
+resources/
+└── tessdata/       # Pre-bundled Tesseract OCR language data (eng.traineddata)
 src/
 ├── main/           # Electron main process
 │   ├── services/   # Core: FileService, TerminalService, ProjectService, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService; Watchers: DirectoryWatcherService, FileWatcherService; Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media: ScreenshotService, CameraService, PdfService, DocxService, TranscriptionService, LocalWhisperService, WhisperModelManager, AudioMetadataService, AudioExtractionService, ApiKeyService; Multi-instance: ProjectLockService, ExternalFileService; Subdirs: import/, watcher/
@@ -80,10 +82,11 @@ See `docs/` for details (keep Claude's context focused):
 - [UI Components](docs/ui-components.md) — React component architecture, activity bars, panels
 - [Prompt Templates](docs/prompts/README.md) — AI prompt system, AutoExecute, template syntax
 - [Settings](docs/settings.md) — Settings overlay sections (Editor, Git, Logging, Transcription)
-- [Changelog](docs/CHANGELOG.md) — Version history (v0.3.x onwards)
+- [Changelog](docs/CHANGELOG.md) — Version history (v0.6.0 onwards; earlier in [archive](docs/archive/changelog-v03-v05.md))
 - [Development Tasks](docs/development-tasks.md) — How-to guides: add IPC channels, panels, services, import converters, prompt templates
 - [Technical Debt](docs/technical-debt.md) — Known debt items and improvement opportunities
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
+- [Source Grounding](docs/future/source-grounding/README.md) — NotebookLM-style grounding research, gap analysis, strategy, implementation roadmap
 
 ## Feature specifications
 

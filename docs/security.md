@@ -507,23 +507,8 @@ The `afterSign` hook is critical: without it, macOS Sequoia+ rejects `@rpath` li
 
 ## References
 
-**Official Documentation**:
-- [Electron Security](https://www.electronjs.org/docs/latest/tutorial/security)
-- [Process Sandboxing](https://www.electronjs.org/docs/latest/tutorial/sandbox)
-- [Electron Fuses](https://www.electronjs.org/docs/latest/tutorial/fuses)
-- [ASAR Integrity](https://www.electronjs.org/docs/latest/tutorial/asar-integrity)
-- [Context Isolation](https://www.electronjs.org/docs/latest/tutorial/context-isolation)
-
-**Security Research**:
-- [Living Off The Land Attack (Druva, Jan 2025)](https://www.druva.com/blog/living-off-the-land-lotl-attack-due-to-electron-fuses-misconfiguration)
-- [Securing Electron Apps (Vulert)](https://vulert.com/blog/securing-your-electron-app-tips-to-prevent-asar-integrity-bypass/)
-- [Electron Security Checklist](https://www.electronjs.org/docs/latest/tutorial/security)
-
-**Community Tools**:
-- [@electron/fuses](https://www.npmjs.com/package/@electron/fuses) - Official fuses package
-- [electron-builder](https://www.electron.build/) - Build and packaging
-- [Electron Hardener](https://github.com/1Password/electron-hardener) - 1Password's security tool
-
----
+- [Electron Security](https://www.electronjs.org/docs/latest/tutorial/security) | [Sandboxing](https://www.electronjs.org/docs/latest/tutorial/sandbox) | [Fuses](https://www.electronjs.org/docs/latest/tutorial/fuses) | [ASAR Integrity](https://www.electronjs.org/docs/latest/tutorial/asar-integrity) | [Context Isolation](https://www.electronjs.org/docs/latest/tutorial/context-isolation)
+- [Living Off The Land Attack (Druva, Jan 2025)](https://www.druva.com/blog/living-off-the-land-lotl-attack-due-to-electron-fuses-misconfiguration) | [Securing Electron Apps (Vulert)](https://vulert.com/blog/securing-your-electron-app-tips-to-prevent-asar-integrity-bypass/)
+- [@electron/fuses](https://www.npmjs.com/package/@electron/fuses) | [electron-builder](https://www.electron.build/) | [Electron Hardener (1Password)](https://github.com/1Password/electron-hardener)
 
 See also: [IPC Patterns](./ipc-patterns.md) | [Architecture](./architecture.md) | [Testing](./testing/README.md)

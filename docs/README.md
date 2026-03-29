@@ -45,7 +45,7 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 - [Build](./build/README.md) - electron-builder, ASAR, fuses, troubleshooting
 - [Testing](./testing/README.md) - Testing strategies and coverage
   - [E2E Testing](./testing/e2e-testing.md) - Playwright/Electron E2E guide
-  - [E2E Selectors](./testing/e2e-selectors.md) - 138 testids catalog
+  - [E2E Selectors](./testing/e2e-selectors.md) - 211 testids catalog
   - [E2E Helpers](./testing/e2e-helpers.md) - Test utility functions
   - [E2E Third-Party](./testing/e2e-third-party.md) - Monaco, xterm.js, Mermaid patterns
   - [E2E Debugging](./testing/e2e-debugging.md) - Debugging and CI/CD
@@ -66,7 +66,8 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 - [HTML Rendering](./rendering/README.md) - Markdown to HTML conversion architecture
 
 ### Future Features (Planned)
-- [Graph Engine](./future/graph-engine.md) - SQLite + vec + FTS5 knowledge graph (not yet implemented)
+- [Graph Engine](./future/graph-engine.md) – SQLite + vec + FTS5 knowledge graph (not yet implemented)
+- [Source Grounding](./future/source-grounding/README.md) – NotebookLM-style source grounding research for audit document generation
 
 ## Quick Links
 
@@ -99,3 +100,4 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 
 Archived documentation is located in [`./archive/`](./archive/):
 - [Resolved Issues](./archive/resolved-issues.md) – Issues fixed in past versions
+- [Changelog v0.3–v0.5](./archive/changelog-v03-v05.md) – Historical changelog entries

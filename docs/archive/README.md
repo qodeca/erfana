@@ -4,8 +4,9 @@ This directory contains historical specification documents that are not part of 
 
 ## Contents
 
-- [resolved-issues.md](./resolved-issues.md) - Issues fixed in past versions
-- [2026-03-07-video-import-fixes.md](./2026-03-07-video-import-fixes.md) - Completed implementation plan for video import (#110)
+- [resolved-issues.md](./resolved-issues.md) – Issues fixed in past versions
+- [2026-03-07-video-import-fixes.md](./2026-03-07-video-import-fixes.md) – Completed implementation plan for video import (#110)
+- [changelog-v03-v05.md](./changelog-v03-v05.md) – Changelog entries for v0.3.0–v0.5.4
 
 ## Restoring Archived Documentation
 
