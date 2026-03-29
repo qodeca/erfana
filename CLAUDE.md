@@ -58,7 +58,7 @@ src/
 5. **Project Settings** - Per-project configuration via `.erfana/settings.json` (watcher ignore, tree visibility)
 6. **PDF Export** - Export markdown to print-optimized PDF with vector Mermaid diagrams, A4 page size, print-friendly styling
 7. **DOCX Export** - Export markdown to Word format with Mermaid diagrams as high-resolution PNG images
-8. **Document Import** – Import 50+ document formats via LiteParse (PDF, Office, images) with local OCR (Tesseract.js), spatial text extraction, YAML frontmatter, optional page screenshots; two-phase extension registration (PDF always, Office/image conditional on LibreOffice/ImageMagick); DependencyDetector for runtime tool detection
+8. **Document Import** – Import 50+ document formats via LiteParse (PDF, Office, images) with local OCR (Tesseract.js), spatial text extraction, YAML frontmatter, optional page screenshots; two-phase extension registration (PDF always, Office/image conditional on LibreOffice/ImageMagick); DependencyDetector for runtime tool detection; IPC layer with Zod-validated schemas, progress streaming, cancellation, and preload bridge (`api.import.*`)
 9. **Settings Overlay** - Full-screen settings UI accessed via gear icon in activity bar, with focus trapping and keyboard navigation (Escape to close)
 10. **Quit Confirmation** - Prompts before quitting with unsaved changes or active terminal sessions
 11. **Multi-Instance** - Multiple independent instances with file-based project locking, duplicate opens focus existing window
@@ -168,6 +168,12 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## IPC Contracts
 - Shared schemas/types: `src/shared/ipc/*.ts` (zod schemas)
 - `project:changed` payload: `{ oldPath: string | null; newPath: string | null }`
+- Document import channels (`src/shared/ipc/import-channels.ts`, `import-schema.ts`):
+  - `import:document` – Start document import with options and progress streaming
+  - `import:documentProgress` – Progress events (main → renderer push)
+  - `import:documentCancel` – Cancel active import
+  - `import:getDocumentExtensions` – Query available document extensions
+  - `import:dependenciesReady` – Dependency detection complete (main → renderer push)
 
 ## Important Notes
 - node-pty may fail to build on Python 3.13 (use 3.12)

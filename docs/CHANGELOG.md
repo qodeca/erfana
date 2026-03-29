@@ -12,6 +12,14 @@ Historical changelog entries for versions prior to current. For the latest chang
 ### Added
 - **Spec #020** – Google Drive link integration (T4, 130 requirements) – reference-based `.gdrive` link files with OAuth2, Drive API, Picker API
 - **Spec #021** – LiteParse document import (T3, 50 requirements) – replace PdfConverter with `@llamaindex/liteparse` for PDF, Office, and image import with OCR
+- **Document import IPC layer** (#133) – IPC handlers, Zod schemas, and preload bridge for LiteParse
+  - 5 IPC channels: `import:document`, `import:documentProgress`, `import:documentCancel`, `import:getDocumentExtensions`, `import:dependenciesReady`
+  - Zod-validated request/options schemas (`DocumentImportRequestSchema`, `DocumentImportOptionsSchema`)
+  - TypeScript interfaces for progress, result, and dependency events
+  - Preload `api.import` namespace with 5 methods (import, cancel, get extensions, progress subscription, dependency subscription)
+  - `IMPORT_BUSY` error code for concurrent import guard
+  - DependencyDetector fire-and-forget startup integration
+  - Closes #133
 
 ### Changed
 - Release process hardened: mandatory smoke test gate with codesign verification, enforcement guardrails preventing phase/checkpoint skipping

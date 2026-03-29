@@ -62,6 +62,7 @@ export enum ErrorCode {
   IMPORT_OCR_FAILED = 'IMPORT_OCR_FAILED',
   IMPORT_PAGE_LIMIT_EXCEEDED = 'IMPORT_PAGE_LIMIT_EXCEEDED',
   IMPORT_TIMEOUT = 'IMPORT_TIMEOUT',
+  IMPORT_BUSY = 'IMPORT_BUSY',
 
   // Prompt execution errors
   PROMPT_NOT_FOUND = 'PROMPT_NOT_FOUND',
@@ -249,6 +250,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.IMPORT_OCR_FAILED]: 'OCR text recognition failed for some pages',
   [ErrorCode.IMPORT_PAGE_LIMIT_EXCEEDED]: 'Document exceeds the maximum page limit',
   [ErrorCode.IMPORT_TIMEOUT]: 'Document conversion timed out',
+  [ErrorCode.IMPORT_BUSY]: 'A document import is already in progress',
 
   // Prompt execution errors
   [ErrorCode.PROMPT_NOT_FOUND]: 'Prompt template not found',
