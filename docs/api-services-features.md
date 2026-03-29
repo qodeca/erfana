@@ -200,48 +200,15 @@ Handles external file operations for Spec #012 (external file drop to project tr
 
 ### Public Methods
 
-#### `validateExternalFile(sourcePath: string, projectRoot: string): Promise<ValidationResult>`
-Validate an external file before copy/move operation.
+#### `validateExternalFile(sourcePath, projectRoot)` – Validate file before copy/move
+#### `copyFromExternal(options: CopyOptions)` – Copy external file into project
+#### `moveFromExternal(options: MoveOptions)` – Move external file (deletes source after copy)
 
-**Returns:**
-- `valid` - Whether file can be imported
-- `isSymlink` - Whether source is a symlink
-- `isDirectory` - Whether source is a directory (rejected)
-- `exists` - Whether source exists
-- `isRegularFile` - Whether source is a regular file (not device, pipe, socket)
-- `error` - Error message if validation failed
-- `errorCode` - Structured error code
+Options: `sourcePath`, `targetFolder`, `projectRoot`, `conflictResolution` (`'replace'`/`'keepBoth'`).
+Returns: `{ success, path?, isSymlink?, error?, errorCode? }`
 
----
-
-#### `copyFromExternal(options: CopyOptions): Promise<OperationResult>`
-Copy a file from external location into project.
-
-**Parameters:**
-- `sourcePath` - Absolute path to external source file
-- `targetFolder` - Absolute path to target folder within project
-- `projectRoot` - Project root path (for boundary validation)
-- `conflictResolution` - `'replace'` or `'keepBoth'` (optional)
-
-**Returns:** `{ success, path?, isSymlink?, error?, errorCode? }`
-
----
-
-#### `moveFromExternal(options: MoveOptions): Promise<OperationResult>`
-Move a file from external location into project (deletes source after copy).
-
-**Parameters:** Same as `copyFromExternal`
-
-**Returns:** `{ success, path?, isSymlink?, error?, errorCode? }`
-
----
-
-### Security Validations
-1. **Path traversal** - Rejects paths with `..` or null bytes
-2. **Symlinks** - Detects and reports symlinks (warns user)
-3. **System directories** - Rejects symlinks pointing to system paths
-4. **Project boundary** - Ensures target is within project root
-5. **Special files** - Rejects devices, pipes, sockets
+### Security validations
+Path traversal rejection, symlink detection, system directory blocking, project boundary enforcement, special file rejection (devices, pipes, sockets).
 
 ### Related Files
 - `src/main/ipc/external-file-handlers.ts` - IPC handlers
@@ -266,22 +233,8 @@ Audio-to-text transcription using the OpenAI API. Handles chunking for long file
 
 ### Public Methods
 
-#### `transcribe(filePath: string, language: TranscriptionLanguage, onProgress: (progress: TranscriptionProgress) => void, signal?: AbortSignal): Promise<TranscriptionResult>`
-Transcribe an audio file to text.
-
-**Parameters:**
-- `filePath` – Absolute path to the audio file (MP3, WAV, M4A, OGG, FLAC)
-- `language` – Language code (e.g., `'en'`, `'pl'`) or `'auto'` for detection
-- `onProgress` – Callback for UI progress updates (percent 0–100, phase string, chunk info, ETA)
-- `signal` – Optional AbortSignal for cancellation
-
-**Returns:**
-- `success` – Whether transcription completed
-- `transcript` – Transcribed text (on success)
-- `duration` – Audio duration in seconds
-- `language` – Detected or specified language
-- `error` – Error message (on failure)
-- `errorCode` – Structured error code (e.g., `TRANSCRIPTION_NO_API_KEY`, `TRANSCRIPTION_CANCELLED`, `TRANSCRIPTION_RATE_LIMITED`)
+#### `transcribe(filePath, language, onProgress, signal?): Promise<TranscriptionResult>`
+Transcribe audio to text. Accepts MP3/WAV/M4A/OGG/FLAC, language code or `'auto'`, progress callback, optional AbortSignal. Returns `{ success, transcript, duration, language, error?, errorCode? }`.
 
 ### Related Files
 - `src/main/ipc/transcription-handlers.ts` – IPC handlers (import, cancel, validate, API key CRUD)
@@ -389,30 +342,10 @@ Lightweight audio file metadata extraction using the `music-metadata` npm packag
 - Duration, bitrate, sample rate, channel count extraction
 - Audio validation for transcription (existence, extension, parsability)
 
-### Public Methods
-
-#### `getDuration(filePath: string): Promise<number>`
-Get audio duration in seconds.
-
-**Throws:** Error if file cannot be parsed or duration is undetermined.
-
----
-
-#### `getFormat(filePath: string): Promise<AudioFormat>`
-Get audio format information.
-
-**Returns:** `{ extension, mimeType, bitrate?, sampleRate?, channels? }`
-
----
-
-#### `validate(filePath: string): Promise<AudioValidationResult>`
-Validate an audio file for transcription.
-
-**Checks:**
-- File exists and is accessible
-- File has a supported extension (MP3, WAV, M4A, OGG, FLAC)
-- File can be parsed as audio
-- Duration is determinable
+### Public methods
+- `getDuration(filePath)` – Audio duration in seconds
+- `getFormat(filePath)` – Format info (`{ extension, mimeType, bitrate?, sampleRate?, channels? }`)
+- `validate(filePath)` – Validate for transcription (exists, supported extension, parsable, duration determinable)
 
 **Returns:** `{ valid, error?, errorCode?, format?, durationSeconds?, sizeInMB }`
 
@@ -447,6 +380,70 @@ Extracts audio tracks from video files using ffmpeg for transcription pipeline i
 - `src/main/services/import/converters/VideoConverter.ts` – Import pipeline converter
 - `src/main/services/TranscriptionService.ts` – Consumes extracted audio
 - `src/renderer/src/components/Transcription/TranscriptionDialog.tsx` – Video-aware dialog UI
+
+---
+
+## LiteParseConverter
+
+**File:** `src/main/services/import/converters/LiteParseConverter.ts`
+
+Document import converter for 50+ formats via `@llamaindex/liteparse` with local OCR.
+
+### Key features
+- PDF, Office (DOC/DOCX/PPT/PPTX/XLS/XLSX/ODT/ODP/ODS), and image (JPG/PNG/GIF/BMP/TIFF/WEBP) import
+- Local OCR via Tesseract.js with pre-bundled English language data
+- Spatial text extraction preserving document layout
+- YAML frontmatter (source, format, pages, date, parser, ocr, truncated)
+- Optional page screenshots to temp directory
+- Two-phase extension registration (PDF always, Office/image conditional on system tools)
+- Implements `IConfigurableConverter` for per-import options via `createConfigured()`
+- 60-second conversion timeout via `Promise.race` (NFR-005); 1000-page document limit (`MAX_PARSE_PAGES`)
+- csv/tsv/svg explicitly excluded (`LITEPARSE_EXCLUDED_EXTENSIONS`)
+
+### Public methods
+- `validate(filePath)` – Delegates to `validateFileForImport()`
+- `convert(filePath)` – Parse document, generate frontmatter + spatial text, optional screenshots
+- `createConfigured(options: ImportOptions)` – Factory returning new instance with baked-in options
+
+### ImportOptions
+- `ocr?: boolean` – Enable OCR (default: true)
+- `ocrLanguage?: string` – ISO 639-1 code mapped to Tesseract 639-3 via `isoToTessLang()`
+- `screenshots?: boolean` – Generate page PNGs (default: false)
+- `dpi?: number` – Screenshot resolution (default: 150)
+
+### Error codes
+- `IMPORT_ENCRYPTED`, `IMPORT_EMPTY`, `IMPORT_PAGE_LIMIT_EXCEEDED`, `IMPORT_TIMEOUT`, `IMPORT_CONVERSION_FAILED`
+
+### Related files
+- `src/main/services/import/isoToTessLang.ts` – ISO 639-1 to 639-3 language mapping
+- `src/main/services/import/extensions.ts` – `LITEPARSE_EXCLUDED_EXTENSIONS`
+- `resources/tessdata/eng.traineddata` – Pre-bundled English OCR data
+
+---
+
+## DependencyDetector
+
+**File:** `src/main/services/import/DependencyDetector.ts`
+
+Runtime detection of optional system tools for document import.
+
+### Key features
+- Checks LibreOffice (`soffice --version`) and ImageMagick (`magick --version`, v6 `convert` fallback)
+- 5-second timeout per command via `execFile` (no shell – safe from injection)
+- Session-level caching (single detection, concurrent calls share one promise)
+- macOS bundle path fallback for LibreOffice
+- Non-blocking – never blocks app startup
+
+### Public methods
+- `detect(): Promise<DependencyStatus>` – Run detection (cached after first call)
+- `clearCache(): void` – Reset cache (testing only)
+
+### DependencyStatus
+`{ libreOffice: boolean, imageMagick: boolean }`
+
+### Related files
+- `src/main/services/import/ConverterRegistry.ts` – `updateConverterExtensions()` consumes detection result
+- `src/main/services/import/converters/LiteParseConverter.ts` – `getExtensionsForDependencies()` maps status to extensions
 
 ---
 

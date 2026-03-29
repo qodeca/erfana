@@ -2,6 +2,11 @@ appId: com.erfana.app
 productName: Erfana
 afterPack: ./scripts/fuses.js
 afterSign: ./scripts/resign.js
+extraResources:
+  - from: resources/tessdata
+    to: tessdata
+    filter:
+      - '**/*'
 directories:
   buildResources: resources
   output: release/${version}

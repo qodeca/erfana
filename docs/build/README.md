@@ -85,7 +85,7 @@ npm install
    - Main process: ~207 kB minified (externalized dependencies)
    - Preload script: ~30 kB (bundled dependencies)
    - Renderer: ~10.9 MB (Monaco, Mermaid, xterm.js included)
-4. **electron-builder Package**: Create platform packages
+4. **electron-builder Package**: Create platform packages (includes `extraResources` – tessdata for offline OCR)
 5. **afterPack Hook**: Apply Electron fuses (`scripts/fuses.js`)
 6. **Code Signing**: electron-builder ad-hoc signs all binaries
 7. **afterSign Hook**: Deep re-sign bundle for consistent identity (`scripts/resign.js`)

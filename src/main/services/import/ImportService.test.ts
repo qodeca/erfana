@@ -19,7 +19,9 @@ import { ErrorCode, AppError } from '../../../shared/errors'
 // Mock fs/promises
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
-  mkdir: vi.fn()
+  mkdir: vi.fn(),
+  cp: vi.fn(),
+  rm: vi.fn()
 }))
 
 // Mock fileUtils
@@ -33,11 +35,12 @@ vi.mock('../../utils/fileUtils', () => ({
 // Mock ConverterRegistry - we'll create controlled mocks
 vi.mock('./ConverterRegistry', () => ({
   createConverterRegistry: vi.fn(),
-  ConverterRegistry: vi.fn()
+  ConverterRegistry: vi.fn(),
+  converterRegistry: {} // placeholder – overridden per-test via constructor injection
 }))
 
 // Import after mocking
-import { writeFile, mkdir } from 'fs/promises'
+import { writeFile, mkdir, cp, rm } from 'fs/promises'
 import {
   sanitizeFileName,
   findAvailableFileName,
@@ -46,10 +49,12 @@ import {
 } from '../../utils/fileUtils'
 import { createConverterRegistry } from './ConverterRegistry'
 import { ImportService, createImportService } from './ImportService'
-import type { IConverter, ValidationResult, ConversionResult, FileTypeCategory } from './types'
+import type { IConverter, ValidationResult, ConversionResult, FileTypeCategory, ImportOptions } from './types'
 
 const mockedWriteFile = vi.mocked(writeFile)
 const mockedMkdir = vi.mocked(mkdir)
+const mockedCp = vi.mocked(cp)
+const mockedRm = vi.mocked(rm)
 const mockedSanitizeFileName = vi.mocked(sanitizeFileName)
 const mockedFindAvailableFileName = vi.mocked(findAvailableFileName)
 const mockedGetExtension = vi.mocked(getExtension)
@@ -407,6 +412,8 @@ describe('ImportService', () => {
     beforeEach(() => {
       mockedMkdir.mockResolvedValue(undefined)
       mockedWriteFile.mockResolvedValue(undefined)
+      mockedCp.mockResolvedValue(undefined)
+      mockedRm.mockResolvedValue(undefined)
     })
 
     describe('successful imports', () => {
@@ -883,6 +890,232 @@ describe('ImportService', () => {
   })
 
   // ==========================================================================
+  // importFile() with ImportOptions (IConfigurableConverter)
+  // ==========================================================================
+
+  describe('importFile with ImportOptions', () => {
+    const projectPath = '/project/root'
+
+    // Build a configurable converter whose createConfigured returns a distinct
+    // converter with its own convert mock so we can assert which one ran.
+    let mockConfiguredConvert: ReturnType<typeof vi.fn>
+    let mockCreateConfigured: ReturnType<typeof vi.fn>
+    let configurableConverter: IConverter & { createConfigured: ReturnType<typeof vi.fn> }
+
+    beforeEach(() => {
+      mockedMkdir.mockResolvedValue(undefined)
+      mockedWriteFile.mockResolvedValue(undefined)
+      mockedCp.mockResolvedValue(undefined)
+      mockedRm.mockResolvedValue(undefined)
+
+      mockConfiguredConvert = vi.fn().mockResolvedValue({
+        success: true,
+        content: 'configured result'
+      })
+      mockCreateConfigured = vi.fn().mockReturnValue({
+        supportedExtensions: ['pdf'],
+        requiresConversion: true,
+        category: 'document',
+        validate: vi.fn().mockResolvedValue({ valid: true, sizeInMB: 1, fileName: 'test.pdf' }),
+        convert: mockConfiguredConvert
+      })
+      configurableConverter = {
+        supportedExtensions: ['pdf'],
+        requiresConversion: true,
+        category: 'document',
+        validate: vi.fn().mockResolvedValue({ valid: true, sizeInMB: 1, fileName: 'test.pdf' }),
+        convert: vi.fn().mockResolvedValue({ success: true, content: 'base result' }),
+        createConfigured: mockCreateConfigured
+      }
+    })
+
+    it('should call createConfigured(options) when converter is configurable and options are provided', async () => {
+      mockedGetExtension.mockReturnValue('pdf')
+      mockRegistry.getConverter.mockReturnValue(configurableConverter)
+      mockedSanitizeFileName.mockReturnValue('test.pdf')
+      mockedChangeExtension.mockReturnValue('test.md')
+      mockedFindAvailableFileName.mockResolvedValue('/project/root/import/test.md')
+
+      const options: ImportOptions = { ocr: false, ocrLanguage: 'de' }
+      await service.importFile('/path/to/test.pdf', projectPath, options)
+
+      expect(mockCreateConfigured).toHaveBeenCalledWith(options)
+    })
+
+    it('should use the configured converter convert() instead of the base converter', async () => {
+      mockedGetExtension.mockReturnValue('pdf')
+      mockRegistry.getConverter.mockReturnValue(configurableConverter)
+      mockedSanitizeFileName.mockReturnValue('test.pdf')
+      mockedChangeExtension.mockReturnValue('test.md')
+      mockedFindAvailableFileName.mockResolvedValue('/project/root/import/test.md')
+
+      const options: ImportOptions = { ocr: true }
+      const result = await service.importFile('/path/to/test.pdf', projectPath, options)
+
+      // configured converter was used
+      expect(mockConfiguredConvert).toHaveBeenCalledWith('/path/to/test.pdf')
+      // base converter.convert should NOT have been called
+      expect(configurableConverter.convert).not.toHaveBeenCalled()
+      expect(result.success).toBe(true)
+    })
+
+    it('should NOT call createConfigured when converter is not configurable', async () => {
+      mockedGetExtension.mockReturnValue('txt')
+      mockRegistry.getConverter.mockReturnValue(textConverter)
+      ;(textConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        valid: true,
+        sizeInMB: 0.1,
+        fileName: 'notes.txt'
+      })
+      ;(textConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: true,
+        content: 'text content'
+      })
+      mockedSanitizeFileName.mockReturnValue('notes.txt')
+      mockedFindAvailableFileName.mockResolvedValue('/project/root/import/notes.txt')
+
+      const options: ImportOptions = { ocr: false }
+      const result = await service.importFile('/path/to/notes.txt', projectPath, options)
+
+      // textConverter has no createConfigured – import should still succeed using base converter
+      expect(result.success).toBe(true)
+      expect(textConverter.convert).toHaveBeenCalledWith('/path/to/notes.txt')
+    })
+
+    it('should NOT call createConfigured when no options are provided even for configurable converter', async () => {
+      mockedGetExtension.mockReturnValue('pdf')
+      mockRegistry.getConverter.mockReturnValue(configurableConverter)
+      mockedSanitizeFileName.mockReturnValue('test.pdf')
+      mockedChangeExtension.mockReturnValue('test.md')
+      mockedFindAvailableFileName.mockResolvedValue('/project/root/import/test.md')
+
+      // No options argument
+      await service.importFile('/path/to/test.pdf', projectPath)
+
+      expect(mockCreateConfigured).not.toHaveBeenCalled()
+      // Base converter.convert should have been used
+      expect(configurableConverter.convert).toHaveBeenCalledWith('/path/to/test.pdf')
+    })
+  })
+
+  // ==========================================================================
+  // importFile() screenshot copy / cleanup
+  // ==========================================================================
+
+  describe('screenshot handling', () => {
+    const projectPath = '/project/root'
+
+    function setupSuccessfulImport(screenshotDir?: string): void {
+      mockedGetExtension.mockReturnValue('pdf')
+      mockRegistry.getConverter.mockReturnValue(pdfConverter)
+      ;(pdfConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        valid: true,
+        sizeInMB: 1,
+        fileName: 'doc.pdf'
+      })
+      ;(pdfConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: true,
+        content: '# Content',
+        ...(screenshotDir ? { screenshotDir } : {})
+      })
+      mockedSanitizeFileName.mockReturnValue('doc.pdf')
+      mockedChangeExtension.mockReturnValue('doc.md')
+      mockedFindAvailableFileName.mockResolvedValue('/project/root/import/doc.md')
+    }
+
+    beforeEach(() => {
+      mockedMkdir.mockResolvedValue(undefined)
+      mockedWriteFile.mockResolvedValue(undefined)
+      mockedCp.mockResolvedValue(undefined)
+      mockedRm.mockResolvedValue(undefined)
+    })
+
+    it('should copy screenshots and clean up temp dir on happy path', async () => {
+      const screenshotDir = '/tmp/erfana-screenshots-abc123'
+      setupSuccessfulImport(screenshotDir)
+
+      const result = await service.importFile('/path/to/doc.pdf', projectPath)
+
+      expect(result.success).toBe(true)
+      expect(mockedCp).toHaveBeenCalledWith(
+        screenshotDir,
+        expect.stringContaining('screenshots'),
+        { recursive: true }
+      )
+      expect(mockedRm).toHaveBeenCalledWith(screenshotDir, { recursive: true, force: true })
+    })
+
+    it('should still succeed and call rm for cleanup when cp fails', async () => {
+      const screenshotDir = '/tmp/erfana-screenshots-abc123'
+      setupSuccessfulImport(screenshotDir)
+      mockedCp.mockRejectedValue(new Error('EACCES: permission denied'))
+
+      const result = await service.importFile('/path/to/doc.pdf', projectPath)
+
+      // Import succeeds even though screenshot copy failed
+      expect(result.success).toBe(true)
+      expect(result.outputPath).toBe('/project/root/import/doc.md')
+      // Cleanup should still run
+      expect(mockedRm).toHaveBeenCalledWith(screenshotDir, { recursive: true, force: true })
+    })
+
+    it('should still succeed when rm cleanup fails (silently swallowed)', async () => {
+      const screenshotDir = '/tmp/erfana-screenshots-abc123'
+      setupSuccessfulImport(screenshotDir)
+      mockedRm.mockRejectedValue(new Error('EBUSY: resource busy'))
+
+      const result = await service.importFile('/path/to/doc.pdf', projectPath)
+
+      // rm failure is silently swallowed
+      expect(result.success).toBe(true)
+      expect(result.outputPath).toBe('/project/root/import/doc.md')
+    })
+
+    it('should not call cp or rm when conversion result has no screenshotDir', async () => {
+      setupSuccessfulImport() // no screenshotDir
+
+      await service.importFile('/path/to/doc.pdf', projectPath)
+
+      expect(mockedCp).not.toHaveBeenCalled()
+      expect(mockedRm).not.toHaveBeenCalled()
+    })
+
+    it('should call rm to clean up screenshotDir when writeFile throws', async () => {
+      const screenshotDir = '/tmp/erfana-screenshots-abc123'
+      setupSuccessfulImport(screenshotDir)
+      mockedWriteFile.mockRejectedValue(new Error('ENOSPC: no space left on device'))
+
+      const result = await service.importFile('/path/to/doc.pdf', projectPath)
+
+      expect(result.success).toBe(false)
+      expect(mockedRm).toHaveBeenCalledWith(screenshotDir, { recursive: true, force: true })
+    })
+
+    it('should clean up screenshotDir when conversion fails with partial result', async () => {
+      const screenshotDir = '/tmp/erfana-screenshots-partial'
+      mockedGetExtension.mockReturnValue('pdf')
+      mockRegistry.getConverter.mockReturnValue(pdfConverter)
+      ;(pdfConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        valid: true,
+        sizeInMB: 1,
+        fileName: 'doc.pdf'
+      })
+      ;(pdfConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: false,
+        error: 'Parse failed',
+        errorCode: ErrorCode.IMPORT_CONVERSION_FAILED,
+        screenshotDir
+      })
+
+      const result = await service.importFile('/path/to/doc.pdf', projectPath)
+
+      expect(result.success).toBe(false)
+      expect(result.errorCode).toBe(ErrorCode.IMPORT_CONVERSION_FAILED)
+      expect(mockedRm).toHaveBeenCalledWith(screenshotDir, { recursive: true, force: true })
+    })
+  })
+
+  // ==========================================================================
   // createImportService() factory
   // ==========================================================================
 
@@ -902,12 +1135,10 @@ describe('ImportService', () => {
       expect(extensions).toEqual(['custom'])
     })
 
-    it('should create registry if not provided', () => {
-      mockedCreateConverterRegistry.mockReturnValue(mockRegistry as never)
-
+    it('should create service with default shared registry if not provided', () => {
       const service = createImportService()
 
-      expect(mockedCreateConverterRegistry).toHaveBeenCalled()
+      // Uses the shared converterRegistry singleton as default
       expect(service).toBeInstanceOf(ImportService)
     })
   })

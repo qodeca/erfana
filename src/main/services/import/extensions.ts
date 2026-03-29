@@ -132,6 +132,15 @@ export const CODE_EXTENSIONS = [
 export const ALL_TEXT_LIKE_EXTENSIONS = [...TEXT_EXTENSIONS, ...CODE_EXTENSIONS] as const
 
 /**
+ * Extensions that LiteParseConverter must never claim.
+ * These are handled natively by TextConverter (csv, tsv as data, svg as markup).
+ * Used by both LiteParseConverter and ConverterRegistry.updateConverterExtensions().
+ *
+ * @see Issue #132 – LiteParse document import
+ */
+export const LITEPARSE_EXCLUDED_EXTENSIONS = new Set(['csv', 'tsv', 'svg'])
+
+/**
  * Video file extensions supported for import with audio extraction
  *
  * @see Issue #110 - Video file import

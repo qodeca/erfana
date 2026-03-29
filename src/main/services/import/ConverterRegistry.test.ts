@@ -17,7 +17,7 @@
  * - converterRegistry singleton - pre-configured instance
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   ConverterRegistry,
   createConverterRegistry,
@@ -25,6 +25,8 @@ import {
 } from './ConverterRegistry'
 import type { IConverter, FileTypeCategory, ValidationResult, ConversionResult } from './types'
 import { TEXT_EXTENSIONS, CODE_EXTENSIONS } from './extensions'
+import { LiteParseConverter } from './converters/LiteParseConverter'
+import { logger } from '../LoggingService'
 
 // ============================================================================
 // Mock Converters for Isolated Testing
@@ -656,6 +658,14 @@ describe('createConverterRegistry', () => {
     expect(categories).toContain('text')
   })
 
+  it('should register LiteParseConverter as the document converter', () => {
+    const registry = createConverterRegistry()
+    const converter = registry.getConverterByCategory('document')
+
+    expect(converter).toBeDefined()
+    expect(converter).toBeInstanceOf(LiteParseConverter)
+  })
+
   it('should create independent registry instances', () => {
     const registry1 = createConverterRegistry()
     const registry2 = createConverterRegistry()
@@ -760,5 +770,179 @@ describe('converterRegistry singleton', () => {
         `CODE_EXTENSION '${ext}' should be detected as potential text file`
       ).toBe(true)
     }
+  })
+})
+
+// ============================================================================
+// updateConverterExtensions() Tests
+// ============================================================================
+
+describe('updateConverterExtensions', () => {
+  let registry: ConverterRegistry
+
+  beforeEach(() => {
+    registry = new ConverterRegistry()
+  })
+
+  it('should add extensions to an existing converter by category', () => {
+    const docConverter = createMockConverter({
+      extensions: ['pdf'],
+      requiresConversion: true,
+      category: 'document'
+    })
+    registry.register(docConverter)
+
+    registry.updateConverterExtensions('document', ['doc', 'docx'])
+
+    expect(registry.getConverter('doc')).toBe(docConverter)
+    expect(registry.getConverter('docx')).toBe(docConverter)
+  })
+
+  it('should skip csv extensions silently', () => {
+    const docConverter = createMockConverter({
+      extensions: ['pdf'],
+      requiresConversion: true,
+      category: 'document'
+    })
+    registry.register(docConverter)
+
+    registry.updateConverterExtensions('document', ['csv', 'docx'])
+
+    expect(registry.getConverter('csv')).toBeUndefined()
+    expect(registry.getConverter('docx')).toBe(docConverter)
+  })
+
+  it('should skip tsv extensions silently', () => {
+    const docConverter = createMockConverter({
+      extensions: ['pdf'],
+      requiresConversion: true,
+      category: 'document'
+    })
+    registry.register(docConverter)
+
+    registry.updateConverterExtensions('document', ['tsv', 'doc'])
+
+    expect(registry.getConverter('tsv')).toBeUndefined()
+    expect(registry.getConverter('doc')).toBe(docConverter)
+  })
+
+  it('should skip svg extensions silently', () => {
+    const docConverter = createMockConverter({
+      extensions: ['pdf'],
+      requiresConversion: true,
+      category: 'document'
+    })
+    registry.register(docConverter)
+
+    registry.updateConverterExtensions('document', ['svg', 'png'])
+
+    expect(registry.getConverter('svg')).toBeUndefined()
+  })
+
+  it('should be a no-op when category does not exist', () => {
+    registry.updateConverterExtensions('document', ['doc', 'docx'])
+
+    // No converter registered – extensions should not be mapped
+    expect(registry.getConverter('doc')).toBeUndefined()
+    expect(registry.getConverter('docx')).toBeUndefined()
+  })
+
+  it('should reflect new additions in getSupportedExtensions()', () => {
+    const docConverter = createMockConverter({
+      extensions: ['pdf'],
+      requiresConversion: true,
+      category: 'document'
+    })
+    registry.register(docConverter)
+
+    registry.updateConverterExtensions('document', ['doc', 'docx'])
+
+    const exts = registry.getSupportedExtensions()
+    expect(exts).toContain('pdf')
+    expect(exts).toContain('doc')
+    expect(exts).toContain('docx')
+  })
+
+  it('should return the correct converter for newly added extensions via getConverter()', () => {
+    const docConverter = createMockConverter({
+      extensions: ['pdf'],
+      requiresConversion: true,
+      category: 'document'
+    })
+    registry.register(docConverter)
+
+    registry.updateConverterExtensions('document', ['jpg', 'png'])
+
+    expect(registry.getConverter('jpg')).toBe(docConverter)
+    expect(registry.getConverter('png')).toBe(docConverter)
+  })
+
+  it('should overwrite existing extension mapping from another converter', () => {
+    const textConverter = createMockConverter({
+      extensions: ['rtf'],
+      requiresConversion: false,
+      category: 'text'
+    })
+    const docConverter = createMockConverter({
+      extensions: ['pdf'],
+      requiresConversion: true,
+      category: 'document'
+    })
+
+    registry.register(textConverter)
+    registry.register(docConverter)
+
+    // Confirm rtf is mapped to textConverter initially
+    expect(registry.getConverter('rtf')).toBe(textConverter)
+
+    // Reassign rtf to docConverter
+    registry.updateConverterExtensions('document', ['rtf'])
+
+    expect(registry.getConverter('rtf')).toBe(docConverter)
+  })
+
+  it('should normalize extensions to lowercase when updating', () => {
+    const docConverter = createMockConverter({
+      extensions: ['pdf'],
+      requiresConversion: true,
+      category: 'document'
+    })
+    registry.register(docConverter)
+
+    registry.updateConverterExtensions('document', ['DOC', 'DOCX'])
+
+    expect(registry.getConverter('doc')).toBe(docConverter)
+    expect(registry.getConverter('docx')).toBe(docConverter)
+  })
+
+  it('should handle empty extensions array without error', () => {
+    const docConverter = createMockConverter({
+      extensions: ['pdf'],
+      requiresConversion: true,
+      category: 'document'
+    })
+    registry.register(docConverter)
+
+    expect(() => registry.updateConverterExtensions('document', [])).not.toThrow()
+
+    const exts = registry.getSupportedExtensions()
+    expect(exts).toEqual(['pdf'])
+  })
+
+  it('should not log when remapping extension to the same converter', () => {
+    const converter = createMockConverter({
+      extensions: ['pdf'],
+      requiresConversion: true,
+      category: 'document'
+    })
+    registry.register(converter)
+
+    const loggerSpy = vi.spyOn(logger, 'info')
+
+    // Remap 'pdf' to the same converter – should NOT log since existing === converter
+    registry.updateConverterExtensions('document', ['pdf'])
+
+    expect(loggerSpy).not.toHaveBeenCalled()
+    loggerSpy.mockRestore()
   })
 })

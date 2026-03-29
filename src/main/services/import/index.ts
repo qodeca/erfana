@@ -22,17 +22,27 @@
 // Types
 export type {
   IConverter,
+  IConfigurableConverter,
   ValidationResult,
   ConversionResult,
   ImportResult,
-  FileTypeCategory
+  ImportOptions,
+  FileTypeCategory,
+  DependencyStatus
 } from './types'
+export { isConfigurableConverter } from './types'
 
 // Registry
 export { ConverterRegistry, createConverterRegistry, converterRegistry } from './ConverterRegistry'
 
+// Dependency detection
+export { DependencyDetector } from './DependencyDetector'
+
+// Language mapping
+export { isoToTessLang } from './isoToTessLang'
+
 // Converters
-export { PdfConverter, createPdfConverter } from './converters/PdfConverter'
+export { LiteParseConverter, getExtensionsForDependencies, createLiteParseConverter } from './converters/LiteParseConverter'
 export { TextConverter, createTextConverter } from './converters/TextConverter'
 export { AudioConverter, createAudioConverter } from './converters/AudioConverter'
 export { VideoConverter, createVideoConverter } from './converters/VideoConverter'
@@ -46,7 +56,8 @@ export {
   isCodeExtension,
   isTextLikeExtension,
   VIDEO_EXTENSIONS,
-  isVideoExtension
+  isVideoExtension,
+  LITEPARSE_EXCLUDED_EXTENSIONS
 } from './extensions'
 
 // Main service
