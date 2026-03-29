@@ -22,6 +22,9 @@ const MAX_SCREENSHOT_PAGES = 100
 /** Maximum pages to parse from a document */
 const MAX_PARSE_PAGES = 1000
 
+/** Conversion timeout for Office documents via LibreOffice (ms) */
+const CONVERSION_TIMEOUT_MS = 60_000
+
 /** PDF extensions -- always available */
 const PDF_EXTENSIONS = ['pdf']
 
@@ -136,10 +139,13 @@ export class LiteParseConverter implements IConverter, IConfigurableConverter {
       ...(tessdataPath ? { tessdataPath } : {})
     })
 
-    // Parse document
+    // Parse document with timeout enforcement (NFR-005: 60s for LibreOffice conversions)
     let result: { pages: Array<{ pageNum: number; text: string }>; text: string }
     try {
-      result = await parser.parse(filePath)
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Document conversion timed out')), CONVERSION_TIMEOUT_MS)
+      )
+      result = await Promise.race([parser.parse(filePath), timeoutPromise])
     } catch (error) {
       return this.handleParseError(error, fileName)
     }

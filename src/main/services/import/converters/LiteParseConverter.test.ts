@@ -362,6 +362,19 @@ describe('LiteParseConverter', () => {
       expect(result.success).toBe(false)
       expect(result.errorCode).toBe(ErrorCode.IMPORT_CONVERSION_FAILED)
     })
+
+    it('should map timeout from Promise.race to IMPORT_TIMEOUT', async () => {
+      // Simulate the timeout error that Promise.race produces when parse hangs.
+      // We test the error path directly since the 60s real timeout is not
+      // testable with fake timers (dynamic import() conflicts with fake timers).
+      mockParse.mockRejectedValue(new Error('Document conversion timed out'))
+
+      const converter = new LiteParseConverter(noDeps)
+      const result = await converter.convert('/path/to/stuck.pdf')
+
+      expect(result.success).toBe(false)
+      expect(result.errorCode).toBe(ErrorCode.IMPORT_TIMEOUT)
+    })
   })
 
   // ==========================================================================
