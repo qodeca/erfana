@@ -494,21 +494,8 @@ The `afterSign` hook is critical: without it, macOS Sequoia+ rejects `@rpath` li
 5. **Permission prompts**: Ask user before destructive operations (delete project, etc.)
 6. **Universal binaries with fuses**: Use `afterAllArtifactBuild` hook for universal binaries
 
----
-
-## Security Audit History
-
-| Date | Version | Auditor | Findings | Status |
-|------|---------|---------|----------|--------|
-| Dec 2025 | v0.6.0 | Internal | Outdated sandbox config, missing fuses | ✅ Fixed |
-| Nov 2024 | v0.1.0 | Internal | Initial security review | ✅ Passed |
-
----
-
 ## References
 
-- [Electron Security](https://www.electronjs.org/docs/latest/tutorial/security) | [Sandboxing](https://www.electronjs.org/docs/latest/tutorial/sandbox) | [Fuses](https://www.electronjs.org/docs/latest/tutorial/fuses) | [ASAR Integrity](https://www.electronjs.org/docs/latest/tutorial/asar-integrity) | [Context Isolation](https://www.electronjs.org/docs/latest/tutorial/context-isolation)
-- [Living Off The Land Attack (Druva, Jan 2025)](https://www.druva.com/blog/living-off-the-land-lotl-attack-due-to-electron-fuses-misconfiguration) | [Securing Electron Apps (Vulert)](https://vulert.com/blog/securing-your-electron-app-tips-to-prevent-asar-integrity-bypass/)
-- [@electron/fuses](https://www.npmjs.com/package/@electron/fuses) | [electron-builder](https://www.electron.build/) | [Electron Hardener (1Password)](https://github.com/1Password/electron-hardener)
-
-See also: [IPC Patterns](./ipc-patterns.md) | [Architecture](./architecture.md) | [Testing](./testing/README.md)
+- Electron: [Security](https://www.electronjs.org/docs/latest/tutorial/security) | [Sandboxing](https://www.electronjs.org/docs/latest/tutorial/sandbox) | [Fuses](https://www.electronjs.org/docs/latest/tutorial/fuses) | [Context Isolation](https://www.electronjs.org/docs/latest/tutorial/context-isolation)
+- Packages: [@electron/fuses](https://www.npmjs.com/package/@electron/fuses) | [electron-builder](https://www.electron.build/)
+- See also: [IPC Patterns](./ipc-patterns.md) | [Architecture](./architecture.md) | [Testing](./testing/README.md)
