@@ -397,6 +397,7 @@ Document import converter for 50+ formats via `@llamaindex/liteparse` with local
 - Optional page screenshots to temp directory
 - Two-phase extension registration (PDF always, Office/image conditional on system tools)
 - Implements `IConfigurableConverter` for per-import options via `createConfigured()`
+- 60-second conversion timeout via `Promise.race` (NFR-005); 1000-page document limit (`MAX_PARSE_PAGES`)
 - csv/tsv/svg explicitly excluded (`LITEPARSE_EXCLUDED_EXTENSIONS`)
 
 ### Public methods

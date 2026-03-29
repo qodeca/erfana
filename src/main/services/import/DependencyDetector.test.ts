@@ -324,9 +324,9 @@ describe('DependencyDetector', () => {
       // execFile returns a child process that emits 'error' immediately
       // but never fires the callback
       mockedExecFile.mockImplementation((_cmd, _args, _opts, _callback) => {
-        const handlers: Record<string, Function> = {}
+        const handlers: Record<string, (...args: unknown[]) => void> = {}
         const fakeChild = {
-          on: vi.fn((event: string, handler: Function) => {
+          on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
             handlers[event] = handler
             // Immediately fire the error event
             if (event === 'error') {
