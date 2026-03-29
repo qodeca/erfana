@@ -115,30 +115,17 @@ See: [Architecture](./architecture.md#hybrid-layout-architecture) | [UI Componen
 
 ## Adding import converters
 
-The import pipeline uses `ConverterRegistry` to match file extensions to converters implementing `IConverter`.
+The import pipeline uses `ConverterRegistry` to match file extensions to converters implementing `IConverter`. Built-in converters: `LiteParseConverter` (PDF/Office/image), `TextConverter`, `AudioConverter`, `VideoConverter`.
 
-1. Create converter in `src/main/services/import/converters/MyConverter.ts`:
-   ```typescript
-   import { IConverter, ConversionResult } from '../types'
+1. Create converter in `src/main/services/import/converters/MyConverter.ts` implementing `IConverter` (see `src/main/services/import/types.ts` for the interface)
+2. Register in `registerBuiltInConverters()` in `src/main/services/import/ConverterRegistry.ts`
+3. Export from `src/main/services/import/index.ts`
 
-   export class MyConverter implements IConverter {
-     async convert(sourcePath: string, projectPath: string): Promise<ConversionResult> {
-       // Transform source file into markdown
-       return { success: true, outputPath: '/path/to/output.md', content: '...' }
-     }
-   }
-   ```
+**Configurable converters**: If your converter needs per-import options, implement `IConfigurableConverter` and the `createConfigured(options)` method. `ImportService` detects this via the `isConfigurableConverter()` type guard – no `instanceof` checks needed.
 
-2. Register in `src/main/services/import/ConverterRegistry.ts`:
-   ```typescript
-   import { MyConverter } from './converters/MyConverter'
+**Dynamic extensions**: If extensions depend on runtime tool availability, use `ConverterRegistry.updateConverterExtensions(category, extensions)` after detection completes (see `DependencyDetector` pattern).
 
-   registry.register(['.ext1', '.ext2'], new MyConverter())
-   ```
-
-3. Add extension to `SUPPORTED_EXTENSIONS` in `src/shared/constants.ts` if not already present.
-
-**Example**: See `AudioConverter.ts` – converts audio files to markdown via transcription (OpenAI or local whisper.cpp).
+**Example**: See `LiteParseConverter.ts` (document import with OCR) or `AudioConverter.ts` (transcription).
 
 See: [API Services – Features](./api-services-features.md) for service documentation
 

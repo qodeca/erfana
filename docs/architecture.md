@@ -88,7 +88,7 @@ src/
 │   │   ├── AudioExtractionService.ts # Video → audio extraction (ffmpeg)
 │   │   ├── ApiKeyService.ts     # Encrypted API key storage (Electron safeStorage)
 │   │   ├── TerminalService.ts   # PTY management with node-pty
-│   │   └── import/converters/   # Audio/VideoConverter (IConverter)
+│   │   └── import/converters/   # LiteParseConverter, Audio/VideoConverter, TextConverter (IConverter)
 │   ├── ipc/
 │   │   ├── file-handlers.ts     # IPC handlers
 │   │   ├── file-watcher-handlers.ts  # File watching IPC
