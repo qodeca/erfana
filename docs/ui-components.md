@@ -343,6 +343,31 @@ Modal dialog for media file import with transcription (OpenAI API or local whisp
 
 ---
 
+## Document import dialog
+
+**Location**: `src/renderer/src/components/DocumentImport/`
+
+Modal dialog for configuring and executing LiteParse document imports (PDF, Office, images). Composes on `BaseDialog` for portal rendering, overlay, and focus management. Mounted in `App.tsx` and opened automatically when importing document files detected by `useImport` via the extension cache.
+
+**Components**:
+- `DocumentImportDialog.tsx` – Import options form, indeterminate progress with phase text, OCR warnings, success/error states
+- `OcrLanguageSelect.tsx` – Dropdown with 31 Tesseract ISO 639-3 languages
+
+**State**: `useDocumentImportStore.ts` (Zustand) manages dialog visibility, import options (OCR, language, screenshots, DPI), extension cache, and progress
+
+**Features**:
+- OCR toggle with language selection (session-persistent options)
+- Screenshot generation toggle with DPI configuration
+- Indeterminate progress bar with phase text during import
+- OCR warning when OCR is disabled
+- Auto-open imported file on success
+- Dependency-missing modal for LibreOffice/ImageMagick with install guidance
+- Batch drag-drop filtering – document files in multi-file drops show warning toast
+
+**IPC flow**: `import:document` (invoke with options) + `import:documentProgress` (streamed phase events) + `import:documentCancel` (abort)
+
+---
+
 ## Related documentation
 
 - [Architecture](./architecture.md) - Hybrid layout system

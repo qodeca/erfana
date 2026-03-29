@@ -154,6 +154,13 @@
   --color-success-border: rgba(227, 232, 41, 0.3); /* Success container border */
 
   /* ============================================
+   * COLORS: Warning State
+   * For OCR warnings, import cautions, etc.
+   * ============================================ */
+  --color-warning-bg: rgba(204, 167, 0, 0.1);    /* Warning container background */
+  --color-warning-border: rgba(204, 167, 0, 0.3); /* Warning container border */
+
+  /* ============================================
    * COLORS: Syntax Highlighting
    * For code blocks and inline code
    * ============================================ */

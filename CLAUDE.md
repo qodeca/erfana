@@ -3,7 +3,7 @@
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
 - **Repository**: `qodeca/erfana` (GitHub)
-- **Version**: 0.8.2
+- **Version**: 0.8.3
 - **Tech Stack**: Electron 39, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Build Toolchain**: electron-vite 5, Vite 6, vitest 3
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
@@ -44,7 +44,7 @@ src/
 ├── preload/        # Context bridge API
 ├── shared/         # Shared code (errors.ts, constants.ts, ipc schemas)
 └── renderer/       # React UI
-    ├── components/ # UI components (Tabs/, Dialog/, ContextMenu/, Transcription/, etc.)
+    ├── components/ # UI components (Tabs/, Dialog/, ContextMenu/, Transcription/, DocumentImport/, etc.)
     ├── context/    # React contexts (ProjectManagementContext, TerminalPortalContext)
     ├── stores/     # Zustand state
     └── prompts/    # Template system
@@ -58,7 +58,7 @@ src/
 5. **Project Settings** - Per-project configuration via `.erfana/settings.json` (watcher ignore, tree visibility)
 6. **PDF Export** - Export markdown to print-optimized PDF with vector Mermaid diagrams, A4 page size, print-friendly styling
 7. **DOCX Export** - Export markdown to Word format with Mermaid diagrams as high-resolution PNG images
-8. **Document Import** – Import 50+ document formats via LiteParse (PDF, Office, images) with local OCR (Tesseract.js), spatial text extraction, YAML frontmatter, optional page screenshots; two-phase extension registration (PDF always, Office/image conditional on LibreOffice/ImageMagick); DependencyDetector for runtime tool detection; IPC layer with Zod-validated schemas, progress streaming, cancellation, and preload bridge (`api.import.*`)
+8. **Document Import** – Import 50+ document formats via LiteParse (PDF, Office, images) with local OCR (Tesseract.js), spatial text extraction, YAML frontmatter, optional page screenshots; DocumentImportDialog with OCR toggle, language selection (31 languages), screenshot generation, DPI configuration; session-persistent options; indeterminate progress with phase text and OCR warnings; dependency-missing modal for LibreOffice/ImageMagick; batch drag-drop filtering; two-phase extension registration; DependencyDetector for runtime tool detection; IPC layer with Zod-validated schemas, progress streaming, cancellation, and preload bridge (`api.import.*`)
 9. **Settings Overlay** - Full-screen settings UI accessed via gear icon in activity bar, with focus trapping and keyboard navigation (Escape to close)
 10. **Quit Confirmation** - Prompts before quitting with unsaved changes or active terminal sessions
 11. **Multi-Instance** - Multiple independent instances with file-based project locking, duplicate opens focus existing window

@@ -8,6 +8,7 @@ import { DialogManager } from './components/Dialog/DialogManager'
 import { SettingsOverlay } from './components/Settings/SettingsOverlay'
 import { UIBlocker } from './components/UIBlocker/UIBlocker'
 import { TranscriptionDialog } from './components/Transcription/TranscriptionDialog'
+import { DocumentImportDialog } from './components/DocumentImport/DocumentImportDialog'
 import { ProjectManagementProvider } from './context/ProjectManagementContext'
 import { TerminalPortalProvider } from './context/TerminalPortalContext'
 import { useGlobalSettingsInit } from './hooks/useGlobalSettingsInit'
@@ -54,6 +55,7 @@ function AppContent() {
             <SettingsOverlay />
             <UIBlocker />
             <TranscriptionDialog />
+            <DocumentImportDialog />
           </div>
         </ToastProvider>
       </TerminalPortalProvider>

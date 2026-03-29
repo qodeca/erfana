@@ -414,6 +414,10 @@ Document import converter for 50+ formats via `@llamaindex/liteparse` with local
 - `src/main/services/import/isoToTessLang.ts` – ISO 639-1 to 639-3 language mapping
 - `src/main/services/import/extensions.ts` – `LITEPARSE_EXCLUDED_EXTENSIONS`
 - `resources/tessdata/eng.traineddata` – Pre-bundled English OCR data
+- `src/renderer/src/components/DocumentImport/DocumentImportDialog.tsx` – Import options dialog UI (#134)
+- `src/renderer/src/components/DocumentImport/OcrLanguageSelect.tsx` – OCR language dropdown (31 languages)
+- `src/renderer/src/stores/useDocumentImportStore.ts` – Zustand store for dialog state and options persistence
+- `src/renderer/src/hooks/useImport.ts` – Document file detection and routing to DocumentImportDialog
 
 ---
 
