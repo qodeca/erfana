@@ -44,10 +44,11 @@ vi.mock('../../../utils/fileUtils', async (importOriginal) => {
   }
 })
 
-// Mock fs/promises for mkdtemp / writeFile used during screenshots
+// Mock fs/promises for mkdtemp / writeFile / rm used during screenshots
 vi.mock('fs/promises', () => ({
   mkdtemp: vi.fn().mockResolvedValue('/tmp/erfana-screenshots-abc123'),
   writeFile: vi.fn().mockResolvedValue(undefined),
+  rm: vi.fn().mockResolvedValue(undefined),
   access: vi.fn().mockResolvedValue(undefined),
   constants: { X_OK: 1 }
 }))
@@ -407,6 +408,14 @@ describe('LiteParseConverter', () => {
       expect(result.content).not.toContain('source: "file\nname.pdf"')
       expect(result.content).toContain('source: "file name.pdf"')
     })
+
+    it('should escape backslashes in the source filename', async () => {
+      const converter = new LiteParseConverter(noDeps)
+      const result = await converter.convert('/path/to/file\\name.pdf')
+
+      expect(result.success).toBe(true)
+      expect(result.content).toContain('source: "file\\\\name.pdf"')
+    })
   })
 
   // ==========================================================================
@@ -445,6 +454,118 @@ describe('LiteParseConverter', () => {
 
       expect(result.success).toBe(true)
       expect(result.content).not.toContain('truncated')
+    })
+  })
+
+  // ==========================================================================
+  // convert() – LiteParse constructor args
+  // ==========================================================================
+
+  describe('convert() – LiteParse constructor args', () => {
+    beforeEach(() => {
+      mockParse.mockResolvedValue({ pages: [{ pageNum: 1, text: 'content' }], text: 'content' })
+    })
+
+    it('should pass mapped ocrLanguage to LiteParse constructor', async () => {
+      const converter = new LiteParseConverter(noDeps, { ocrLanguage: 'de' })
+      await converter.convert('/path/to/doc.pdf')
+
+      const { LiteParse } = await import('@llamaindex/liteparse')
+      const ctorArgs = vi.mocked(LiteParse).mock.calls.at(-1)?.[0]
+      expect(ctorArgs?.ocrLanguage).toBe('deu') // isoToTessLang('de') -> 'deu'
+    })
+
+    it('should pass custom DPI to LiteParse constructor', async () => {
+      const converter = new LiteParseConverter(noDeps, { dpi: 300 })
+      await converter.convert('/path/to/doc.pdf')
+
+      const { LiteParse } = await import('@llamaindex/liteparse')
+      const ctorArgs = vi.mocked(LiteParse).mock.calls.at(-1)?.[0]
+      expect(ctorArgs?.dpi).toBe(300)
+    })
+
+    it('should default DPI to 150 when not specified', async () => {
+      const converter = new LiteParseConverter(noDeps)
+      await converter.convert('/path/to/doc.pdf')
+
+      const { LiteParse } = await import('@llamaindex/liteparse')
+      const ctorArgs = vi.mocked(LiteParse).mock.calls.at(-1)?.[0]
+      expect(ctorArgs?.dpi).toBe(150)
+    })
+  })
+
+  // ==========================================================================
+  // resolveTessdataPath()
+  // ==========================================================================
+
+  describe('resolveTessdataPath()', () => {
+    beforeEach(() => {
+      mockParse.mockResolvedValue({ pages: [{ pageNum: 1, text: 'content' }], text: 'content' })
+    })
+
+    it('should use process.resourcesPath when app is packaged', async () => {
+      const { app } = await import('electron')
+      const origIsPackaged = app.isPackaged
+      const origResourcesPath = process.resourcesPath
+
+      Object.defineProperty(app, 'isPackaged', { value: true, configurable: true })
+      Object.defineProperty(process, 'resourcesPath', {
+        value: '/mock/resources',
+        configurable: true
+      })
+
+      try {
+        const converter = new LiteParseConverter(noDeps)
+        await converter.convert('/path/to/test.pdf')
+
+        const { LiteParse } = await import('@llamaindex/liteparse')
+        const ctorArgs = vi.mocked(LiteParse).mock.calls.at(-1)?.[0]
+        expect(ctorArgs?.tessdataPath).toBe('/mock/resources/tessdata')
+      } finally {
+        Object.defineProperty(app, 'isPackaged', { value: origIsPackaged, configurable: true })
+        Object.defineProperty(process, 'resourcesPath', {
+          value: origResourcesPath,
+          configurable: true
+        })
+      }
+    })
+
+    it('should use app.getAppPath() when app is not packaged', async () => {
+      // Default mock has isPackaged: false and getAppPath() -> '/mock/app/path'
+      const converter = new LiteParseConverter(noDeps)
+      await converter.convert('/path/to/test.pdf')
+
+      const { LiteParse } = await import('@llamaindex/liteparse')
+      const ctorArgs = vi.mocked(LiteParse).mock.calls.at(-1)?.[0]
+      expect(ctorArgs?.tessdataPath).toContain('tessdata')
+      expect(ctorArgs?.tessdataPath).toContain('/mock/app/path')
+    })
+
+    it('should not set tessdataPath when app throws', async () => {
+      const { app } = await import('electron')
+      const origDescriptor = Object.getOwnPropertyDescriptor(app, 'isPackaged')
+
+      Object.defineProperty(app, 'isPackaged', {
+        get: () => {
+          throw new Error('no app')
+        },
+        configurable: true
+      })
+
+      try {
+        const converter = new LiteParseConverter(noDeps)
+        await converter.convert('/path/to/test.pdf')
+
+        const { LiteParse } = await import('@llamaindex/liteparse')
+        const ctorArgs = vi.mocked(LiteParse).mock.calls.at(-1)?.[0]
+        expect(ctorArgs?.tessdataPath).toBeUndefined()
+      } finally {
+        if (origDescriptor) {
+          Object.defineProperty(app, 'isPackaged', origDescriptor)
+        } else {
+          Object.defineProperty(app, 'isPackaged', { value: false, configurable: true })
+        }
+      }
     })
   })
 
@@ -541,6 +662,36 @@ describe('LiteParseConverter', () => {
 
       // Conversion should succeed even though screenshots failed
       expect(result.success).toBe(true)
+    })
+
+    it('should cap screenshot pages at 100 for large documents', async () => {
+      const pages = Array.from({ length: 150 }, (_, i) => ({ pageNum: i + 1, text: `p${i}` }))
+      mockParse.mockResolvedValue({ pages, text: pages.map((p) => p.text).join('\n') })
+      mockScreenshot.mockResolvedValue([])
+
+      const converter = new LiteParseConverter(noDeps, { screenshots: true })
+      await converter.convert('/path/to/large.pdf')
+
+      expect(mockScreenshot).toHaveBeenCalledTimes(1)
+      const [, pageNumbers] = mockScreenshot.mock.calls[0]
+      expect(pageNumbers).toHaveLength(100)
+      expect(pageNumbers[0]).toBe(1)
+      expect(pageNumbers[99]).toBe(100)
+    })
+
+    it('should clean up temp dir when screenshot() throws internally', async () => {
+      mockParse.mockResolvedValue({ pages: [{ pageNum: 1, text: 'content' }], text: 'content' })
+      mockScreenshot.mockRejectedValue(new Error('screenshot internal error'))
+
+      const { rm: mockedRm } = await import('fs/promises')
+
+      const converter = new LiteParseConverter(noDeps, { screenshots: true })
+      const result = await converter.convert('/path/to/document.pdf')
+
+      // Conversion still succeeds (screenshot failure is non-fatal)
+      expect(result.success).toBe(true)
+      // But temp dir was cleaned up inside generateScreenshots catch block
+      expect(vi.mocked(mockedRm)).toHaveBeenCalled()
     })
   })
 

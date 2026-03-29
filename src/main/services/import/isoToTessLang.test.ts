@@ -138,6 +138,24 @@ describe('isoToTessLang', () => {
   })
 
   // --------------------------------------------------------------------------
+  // 3-letter codes with non-alpha characters
+  // --------------------------------------------------------------------------
+
+  describe('3-letter codes with non-alpha characters', () => {
+    it('should return eng for code with digits like e1g', () => {
+      expect(isoToTessLang('e1g')).toBe('eng')
+    })
+
+    it('should return eng for code with punctuation like en!', () => {
+      expect(isoToTessLang('en!')).toBe('eng')
+    })
+
+    it('should return eng for code with spaces like "e g"', () => {
+      expect(isoToTessLang('e g')).toBe('eng')
+    })
+  })
+
+  // --------------------------------------------------------------------------
   // Whitespace handling
   // --------------------------------------------------------------------------
 

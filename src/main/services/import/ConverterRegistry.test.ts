@@ -17,7 +17,7 @@
  * - converterRegistry singleton - pre-configured instance
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import {
   ConverterRegistry,
   createConverterRegistry,
@@ -25,6 +25,8 @@ import {
 } from './ConverterRegistry'
 import type { IConverter, FileTypeCategory, ValidationResult, ConversionResult } from './types'
 import { TEXT_EXTENSIONS, CODE_EXTENSIONS } from './extensions'
+import { LiteParseConverter } from './converters/LiteParseConverter'
+import { logger } from '../LoggingService'
 
 // ============================================================================
 // Mock Converters for Isolated Testing
@@ -656,6 +658,14 @@ describe('createConverterRegistry', () => {
     expect(categories).toContain('text')
   })
 
+  it('should register LiteParseConverter as the document converter', () => {
+    const registry = createConverterRegistry()
+    const converter = registry.getConverterByCategory('document')
+
+    expect(converter).toBeDefined()
+    expect(converter).toBeInstanceOf(LiteParseConverter)
+  })
+
   it('should create independent registry instances', () => {
     const registry1 = createConverterRegistry()
     const registry2 = createConverterRegistry()
@@ -917,5 +927,22 @@ describe('updateConverterExtensions', () => {
 
     const exts = registry.getSupportedExtensions()
     expect(exts).toEqual(['pdf'])
+  })
+
+  it('should not log when remapping extension to the same converter', () => {
+    const converter = createMockConverter({
+      extensions: ['pdf'],
+      requiresConversion: true,
+      category: 'document'
+    })
+    registry.register(converter)
+
+    const loggerSpy = vi.spyOn(logger, 'info')
+
+    // Remap 'pdf' to the same converter – should NOT log since existing === converter
+    registry.updateConverterExtensions('document', ['pdf'])
+
+    expect(loggerSpy).not.toHaveBeenCalled()
+    loggerSpy.mockRestore()
   })
 })

@@ -294,6 +294,79 @@ describe('DependencyDetector', () => {
   })
 
   // --------------------------------------------------------------------------
+  // tryCommand edge cases
+  // --------------------------------------------------------------------------
+
+  describe('tryCommand edge cases', () => {
+    it('should resolve to false when execFile throws synchronously', async () => {
+      Object.defineProperty(process, 'platform', {
+        value: 'linux',
+        configurable: true
+      })
+
+      // Make execFile throw instead of returning a child process
+      mockedExecFile.mockImplementation(() => {
+        throw new Error('spawn EACCES')
+      })
+
+      const detector = new DependencyDetector()
+      const result = await detector.detect()
+
+      expect(result).toEqual({ libreOffice: false, imageMagick: false })
+    })
+
+    it('should resolve to false when child process emits error event', async () => {
+      Object.defineProperty(process, 'platform', {
+        value: 'linux',
+        configurable: true
+      })
+
+      // execFile returns a child process that emits 'error' immediately
+      // but never fires the callback
+      mockedExecFile.mockImplementation((_cmd, _args, _opts, _callback) => {
+        const handlers: Record<string, Function> = {}
+        const fakeChild = {
+          on: vi.fn((event: string, handler: Function) => {
+            handlers[event] = handler
+            // Immediately fire the error event
+            if (event === 'error') {
+              handler(new Error('spawn ENOENT'))
+            }
+          })
+        }
+        return fakeChild as any
+      })
+
+      const detector = new DependencyDetector()
+      const result = await detector.detect()
+
+      expect(result).toEqual({ libreOffice: false, imageMagick: false })
+    })
+  })
+
+  // --------------------------------------------------------------------------
+  // ImageMagick only
+  // --------------------------------------------------------------------------
+
+  describe('ImageMagick only', () => {
+    it('should detect ImageMagick only when soffice fails on non-darwin', async () => {
+      Object.defineProperty(process, 'platform', {
+        value: 'linux',
+        configurable: true
+      })
+
+      setupExecFileMock({
+        magick: true
+      })
+
+      const detector = new DependencyDetector()
+      const result = await detector.detect()
+
+      expect(result).toEqual({ libreOffice: false, imageMagick: true })
+    })
+  })
+
+  // --------------------------------------------------------------------------
   // macOS bundle path fallback
   // --------------------------------------------------------------------------
 

@@ -1090,6 +1090,29 @@ describe('ImportService', () => {
       expect(result.success).toBe(false)
       expect(mockedRm).toHaveBeenCalledWith(screenshotDir, { recursive: true, force: true })
     })
+
+    it('should clean up screenshotDir when conversion fails with partial result', async () => {
+      const screenshotDir = '/tmp/erfana-screenshots-partial'
+      mockedGetExtension.mockReturnValue('pdf')
+      mockRegistry.getConverter.mockReturnValue(pdfConverter)
+      ;(pdfConverter.validate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        valid: true,
+        sizeInMB: 1,
+        fileName: 'doc.pdf'
+      })
+      ;(pdfConverter.convert as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: false,
+        error: 'Parse failed',
+        errorCode: ErrorCode.IMPORT_CONVERSION_FAILED,
+        screenshotDir
+      })
+
+      const result = await service.importFile('/path/to/doc.pdf', projectPath)
+
+      expect(result.success).toBe(false)
+      expect(result.errorCode).toBe(ErrorCode.IMPORT_CONVERSION_FAILED)
+      expect(mockedRm).toHaveBeenCalledWith(screenshotDir, { recursive: true, force: true })
+    })
   })
 
   // ==========================================================================
