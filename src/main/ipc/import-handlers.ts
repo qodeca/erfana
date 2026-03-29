@@ -1,11 +1,20 @@
 import { ipcMain, dialog } from 'electron'
-import { stat } from 'fs/promises'
-import { basename } from 'path'
+import { stat, writeFile, mkdir, cp, rm } from 'fs/promises'
+import { basename, extname, isAbsolute, normalize, join } from 'path'
 import { importService, converterRegistry } from '../services/import'
 import { fileService } from '../services/FileService'
 import type { ValidationResult, ImportResult } from '../services/import'
 import { logger } from '../services/LoggingService'
-import { VIDEO_IMPORT } from '../../shared/constants'
+import { VIDEO_IMPORT, IMPORT } from '../../shared/constants'
+import { IMPORT_CHANNELS } from '../../shared/ipc/import-channels'
+import {
+  DocumentImportRequestSchema,
+  type DocumentImportResult,
+  type DocumentImportProgress
+} from '../../shared/ipc/import-schema'
+import { ErrorCode, AppError, getUserFriendlyMessage } from '../../shared/errors'
+import { isConfigurableConverter } from '../services/import/types'
+import { changeExtension, sanitizeFileName, findAvailableFileName } from '../utils/fileUtils'
 
 /**
  * File selection result from the native dialog
@@ -166,4 +175,223 @@ export function registerImportHandlers(): void {
     }
     return importService.isSupported(extension)
   })
+}
+
+/** Active AbortController for current document import */
+let activeDocumentController: AbortController | null = null
+
+/**
+ * Register document import IPC handlers (LiteParse)
+ *
+ * Channels:
+ * - import:document           - Import document with options and progress streaming
+ * - import:documentCancel     - Cancel active document import
+ * - import:getDocumentExtensions - Get supported document extensions
+ *
+ * @see Issue #133 - LiteParse IPC handlers
+ * @see Spec #021 - LiteParse document import
+ */
+export function registerDocumentImportHandlers(): void {
+  /**
+   * Import a document with LiteParse
+   *
+   * 1. Validates request with Zod schema
+   * 2. Validates file path (absolute, no traversal)
+   * 3. Rejects concurrent imports (mutex)
+   * 4. Gets converter from registry, configures if options provided
+   * 5. Runs conversion with progress streaming
+   * 6. Writes result to import/ directory
+   */
+  ipcMain.handle(
+    IMPORT_CHANNELS.DOCUMENT,
+    async (event, request: unknown): Promise<DocumentImportResult> => {
+      // Validate request schema
+      const parseResult = DocumentImportRequestSchema.safeParse(request)
+      if (!parseResult.success) {
+        logger.error('Document import validation error', parseResult.error)
+        return {
+          success: false,
+          error: 'Invalid import request',
+          errorCode: ErrorCode.IMPORT_CONVERSION_FAILED
+        }
+      }
+
+      const { filePath, options } = parseResult.data
+
+      // Validate file path (prevent path traversal)
+      if (!isAbsolute(filePath) || normalize(filePath) !== filePath) {
+        return {
+          success: false,
+          error: 'Invalid file path',
+          errorCode: ErrorCode.PATH_TRAVERSAL
+        }
+      }
+
+      // Prevent concurrent document imports
+      if (activeDocumentController) {
+        return {
+          success: false,
+          error: 'A document import is already in progress',
+          errorCode: ErrorCode.IMPORT_BUSY
+        }
+      }
+
+      // Check project is open
+      const projectPath = fileService.getProjectPath()
+      if (!projectPath) {
+        return {
+          success: false,
+          error: 'No project is currently open.',
+          errorCode: ErrorCode.PROJECT_NOT_FOUND
+        }
+      }
+
+      // Create AbortController for cancellation support
+      activeDocumentController = new AbortController()
+      // Capture local reference – the cancel handler nulls the module-level variable
+      const controller = activeDocumentController
+
+      // Progress callback that streams to renderer
+      const webContents = event.sender
+      const sendProgress = (progress: DocumentImportProgress): void => {
+        try {
+          if (!webContents.isDestroyed()) {
+            webContents.send(IMPORT_CHANNELS.DOCUMENT_PROGRESS, progress)
+          }
+        } catch {
+          // WebContents may be destroyed during import
+        }
+      }
+
+      try {
+        sendProgress({ percent: 0, phase: 'Validating document...' })
+
+        // Get file extension
+        const fileName = basename(filePath)
+        const ext = extname(filePath).slice(1).toLowerCase()
+
+        // Get converter from registry
+        const converter = converterRegistry.getConverter(ext)
+        if (!converter) {
+          return {
+            success: false,
+            error: getUserFriendlyMessage(new AppError('Unsupported file type', ErrorCode.IMPORT_UNSUPPORTED_TYPE)),
+            errorCode: ErrorCode.IMPORT_UNSUPPORTED_TYPE
+          }
+        }
+
+        // Configure converter if options provided
+        const configuredConverter =
+          options && isConfigurableConverter(converter)
+            ? converter.createConfigured(options)
+            : converter
+
+        sendProgress({ percent: 10, phase: 'Converting document...' })
+
+        // Run conversion
+        const result = await configuredConverter.convert(filePath)
+
+        // Check if cancelled during conversion (uses local ref – immune to cancel handler nulling)
+        if (controller.signal.aborted) {
+          return {
+            success: false,
+            error: 'Import cancelled'
+          }
+        }
+
+        if (!result.success || !result.content) {
+          return {
+            success: false,
+            error: result.error || 'Conversion failed',
+            errorCode: result.errorCode || ErrorCode.IMPORT_CONVERSION_FAILED
+          }
+        }
+
+        // Second abort check before file write
+        if (controller.signal.aborted) {
+          return {
+            success: false,
+            error: 'Import cancelled'
+          }
+        }
+
+        sendProgress({ percent: 90, phase: 'Writing file...' })
+
+        // Write to import/ directory
+        const importDir = join(projectPath, IMPORT.DIR_NAME)
+        await mkdir(importDir, { recursive: true })
+
+        const safeName = sanitizeFileName(fileName)
+        const outputName = changeExtension(safeName, '.md')
+        const outputPath = await findAvailableFileName(importDir, outputName)
+
+        await writeFile(outputPath, result.content, 'utf-8')
+
+        // Copy screenshots if generated
+        if (result.screenshotDir) {
+          try {
+            const screenshotDestDir = join(importDir, 'screenshots', basename(outputPath, '.md'))
+            await mkdir(screenshotDestDir, { recursive: true })
+            await cp(result.screenshotDir, screenshotDestDir, { recursive: true })
+          } catch (copyError) {
+            // Screenshot copy failure is non-fatal
+            const message = copyError instanceof Error ? copyError.message : String(copyError)
+            logger.warn('Failed to copy screenshots', { error: message })
+          } finally {
+            // Clean up temp directory to prevent /tmp leaks
+            rm(result.screenshotDir, { recursive: true, force: true }).catch(() => {})
+          }
+        }
+
+        sendProgress({ percent: 100, phase: 'Complete' })
+
+        return {
+          success: true,
+          outputPath
+        }
+      } catch (error) {
+        logger.error('Document import failed', error instanceof Error ? error : undefined)
+        return {
+          success: false,
+          error: getUserFriendlyMessage(error),
+          errorCode: ErrorCode.IMPORT_CONVERSION_FAILED
+        }
+      } finally {
+        activeDocumentController = null
+      }
+    }
+  )
+
+  /**
+   * Cancel active document import
+   *
+   * Aborts the AbortController (best-effort since LiteParse has no AbortSignal).
+   * The import handler checks the abort flag before writing output.
+   */
+  ipcMain.handle(
+    IMPORT_CHANNELS.DOCUMENT_CANCEL,
+    async (): Promise<{ success: boolean; error?: string }> => {
+      if (activeDocumentController) {
+        activeDocumentController.abort()
+        activeDocumentController = null
+        logger.info('Document import cancelled by user')
+        return { success: true }
+      }
+      return { success: false, error: 'No active document import' }
+    }
+  )
+
+  /**
+   * Get supported document extensions
+   *
+   * Returns the current list of supported document extensions,
+   * which may change after DependencyDetector completes.
+   */
+  ipcMain.handle(
+    IMPORT_CHANNELS.GET_DOCUMENT_EXTENSIONS,
+    async (): Promise<string[]> => {
+      const { requiresConversion } = converterRegistry.getExtensionsByConversionType()
+      return requiresConversion
+    }
+  )
 }

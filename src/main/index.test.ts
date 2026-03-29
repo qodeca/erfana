@@ -136,8 +136,29 @@ describe('Main Process - Window Creation', () => {
       registerTerminalHandlers: vi.fn()
     }))
     vi.doMock('./ipc/import-handlers', () => ({
-      registerImportHandlers: vi.fn()
+      registerImportHandlers: vi.fn(),
+      registerDocumentImportHandlers: vi.fn()
     }))
+    vi.doMock('./services/import', () => ({
+      DependencyDetector: vi.fn().mockImplementation(() => ({
+        detect: vi.fn().mockResolvedValue({ libreOffice: false, imageMagick: false })
+      })),
+      converterRegistry: {
+        updateConverterExtensions: vi.fn(),
+        getExtensionsByConversionType: vi.fn().mockReturnValue({ requiresConversion: ['pdf'], passthrough: [] })
+      },
+      getExtensionsForDependencies: vi.fn().mockReturnValue([])
+    }))
+    vi.doMock('../shared/ipc/import-channels', () => ({
+      IMPORT_CHANNELS: {
+        DOCUMENT: 'import:document',
+        DOCUMENT_PROGRESS: 'import:documentProgress',
+        DOCUMENT_CANCEL: 'import:documentCancel',
+        GET_DOCUMENT_EXTENSIONS: 'import:getDocumentExtensions',
+        DEPENDENCIES_READY: 'import:dependenciesReady'
+      }
+    }))
+    vi.doMock('../shared/ipc/import-schema', () => ({}))
     vi.doMock('./ipc/git-handlers', () => ({
       registerGitHandlers: vi.fn()
     }))

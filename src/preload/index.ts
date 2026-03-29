@@ -23,6 +23,13 @@ import type {
   WhisperModel
 } from '../shared/ipc/transcription-schema'
 import { TRANSCRIPTION_CHANNELS } from '../shared/ipc/transcription-channels'
+import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
+import type {
+  DocumentImportRequest,
+  DocumentImportResult,
+  DocumentImportProgress,
+  DependencyReadyEvent
+} from '../shared/ipc/import-schema'
 import type {
   ExternalFileValidateResponse,
   ExternalFileCopyResponse,
@@ -493,7 +500,45 @@ const api = {
      * Check if a file type is supported for import
      */
     isSupported: (extension: string): Promise<boolean> =>
-      ipcRenderer.invoke('import:isSupported', extension)
+      ipcRenderer.invoke('import:isSupported', extension),
+
+    /**
+     * Import a document via LiteParse converter with options
+     */
+    documentImport: (request: DocumentImportRequest): Promise<DocumentImportResult> =>
+      ipcRenderer.invoke(IMPORT_CHANNELS.DOCUMENT, request),
+
+    /**
+     * Cancel an active document import
+     */
+    documentCancel: (): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke(IMPORT_CHANNELS.DOCUMENT_CANCEL),
+
+    /**
+     * Get list of supported document extensions (depends on system tools)
+     */
+    getDocumentExtensions: (): Promise<string[]> =>
+      ipcRenderer.invoke(IMPORT_CHANNELS.GET_DOCUMENT_EXTENSIONS),
+
+    /**
+     * Subscribe to document import progress events
+     * Returns cleanup function to unsubscribe
+     */
+    onDocumentProgress: (callback: (progress: DocumentImportProgress) => void): (() => void) => {
+      const listener = (_event: unknown, data: DocumentImportProgress): void => callback(data)
+      ipcRenderer.on(IMPORT_CHANNELS.DOCUMENT_PROGRESS, listener)
+      return () => ipcRenderer.removeListener(IMPORT_CHANNELS.DOCUMENT_PROGRESS, listener)
+    },
+
+    /**
+     * Subscribe to dependency detection completion event
+     * Returns cleanup function to unsubscribe
+     */
+    onDependenciesReady: (callback: (event: DependencyReadyEvent) => void): (() => void) => {
+      const listener = (_event: unknown, data: DependencyReadyEvent): void => callback(data)
+      ipcRenderer.on(IMPORT_CHANNELS.DEPENDENCIES_READY, listener)
+      return () => ipcRenderer.removeListener(IMPORT_CHANNELS.DEPENDENCIES_READY, listener)
+    }
   },
 
   // Git operations

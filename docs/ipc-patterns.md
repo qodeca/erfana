@@ -152,6 +152,11 @@ if (!writeResult.success) {
 | `transcription:hasApiKey` | transcription-handlers | Check if API key exists for service |
 | `transcription:clearApiKey` | transcription-handlers | Remove stored API key |
 | `transcription:progress` | transcription-handlers | Event: Progress update (main → renderer) |
+| `import:document` | import-handlers | Import document with options (streamed progress) |
+| `import:documentProgress` | import-handlers | Event: Import progress update (main → renderer) |
+| `import:documentCancel` | import-handlers | Cancel active document import |
+| `import:getDocumentExtensions` | import-handlers | Query available document extensions |
+| `import:dependenciesReady` | import-handlers | Event: Dependency detection complete (main → renderer) |
 
 ## Event-Based IPC Pattern
 
@@ -168,6 +173,7 @@ To keep IPC payloads consistent across processes, shared zod schemas live at `sr
   - Used in main when broadcasting, and in preload typings for `onProjectChanged`
 - Terminal event schemas — `TerminalDataSchema`, `TerminalExitSchema`, `TerminalErrorSchema`
 - Transcription schemas — `TranscriptionImportRequestSchema`, `TranscriptionProgress`, `TranscriptionImportResult`, `TranscriptionSettingsSchema` (see `src/shared/ipc/transcription-schema.ts`)
+- Document import schemas — `DocumentImportRequestSchema`, `DocumentImportOptionsSchema`, `DocumentImportProgress`, `DocumentImportResult`, `DependencyReadyEvent` (see `src/shared/ipc/import-schema.ts`); channel constants in `src/shared/ipc/import-channels.ts`
 
 Recommended:
 - Validate payloads in tests using these schemas (see contract tests under `src/preload/__tests__/`)

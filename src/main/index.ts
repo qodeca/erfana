@@ -8,7 +8,7 @@ import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
 import { registerDirectoryWatcherHandlers } from './ipc/directory-watcher-handlers'
 import { registerSettingsHandlers } from './ipc/settings-handlers'
 import { registerTerminalHandlers } from './ipc/terminal-handlers'
-import { registerImportHandlers } from './ipc/import-handlers'
+import { registerImportHandlers, registerDocumentImportHandlers } from './ipc/import-handlers'
 import { registerGitHandlers } from './ipc/git-handlers'
 import { registerGitWatcherHandlers } from './ipc/git-watcher-handlers'
 import { registerPdfHandlers } from './ipc/pdf-handlers'
@@ -22,6 +22,9 @@ import { registerQuitHandlers } from './ipc/quit-handlers'
 import { registerProjectLockHandlers } from './ipc/project-lock-handlers'
 import { registerExternalFileHandlers } from './ipc/external-file-handlers'
 import { registerTranscriptionHandlers } from './ipc/transcription-handlers'
+import { DependencyDetector, converterRegistry, getExtensionsForDependencies } from './services/import'
+import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
+import type { DependencyReadyEvent } from '../shared/ipc/import-schema'
 import { createApplicationMenu } from './menu'
 import { fileService } from './services/FileService'
 import { fileWatcherService } from './services/FileWatcherService'
@@ -202,6 +205,7 @@ app.whenReady().then(async () => {
   registerSettingsHandlers()
   registerTerminalHandlers()
   registerImportHandlers()
+  registerDocumentImportHandlers()
   registerGitHandlers()
   registerGitWatcherHandlers()
   registerPdfHandlers()
@@ -233,6 +237,27 @@ app.whenReady().then(async () => {
 
   // Create main window
   createWindow()
+
+  // Fire-and-forget: detect system dependencies for LiteParse document import
+  // Runs async after window creation so it doesn't block startup
+  const dependencyDetector = new DependencyDetector()
+  dependencyDetector.detect().then((deps) => {
+    const extensions = getExtensionsForDependencies(deps)
+    if (extensions.length > 0) {
+      converterRegistry.updateConverterExtensions('document', extensions)
+    }
+    // Notify renderer that dependencies have been detected
+    if (mainWindowRef && !mainWindowRef.isDestroyed()) {
+      const payload: DependencyReadyEvent = {
+        libreOffice: deps.libreOffice,
+        imageMagick: deps.imageMagick,
+        extensions: converterRegistry.getExtensionsByConversionType().requiresConversion
+      }
+      mainWindowRef.webContents.send(IMPORT_CHANNELS.DEPENDENCIES_READY, payload)
+    }
+  }).catch((error) => {
+    logger.error('Failed to detect document import dependencies', error instanceof Error ? error : undefined)
+  })
 
   // Register quit confirmation handler
   registerQuitHandlers((proceed) => {

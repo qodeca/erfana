@@ -28,6 +28,12 @@ import type {
   ExternalFileMoveResponse,
   ConflictResolution
 } from '../shared/ipc/external-file-schema'
+import type {
+  DocumentImportRequest,
+  DocumentImportResult,
+  DocumentImportProgress,
+  DependencyReadyEvent
+} from '../shared/ipc/import-schema'
 
 declare global {
   interface Window {
@@ -225,6 +231,16 @@ declare global {
         }>
         getSupportedExtensions: () => Promise<string[]>
         isSupported: (extension: string) => Promise<boolean>
+        /** Import a document via LiteParse converter with options */
+        documentImport: (request: DocumentImportRequest) => Promise<DocumentImportResult>
+        /** Cancel an active document import */
+        documentCancel: () => Promise<{ success: boolean; error?: string }>
+        /** Get list of supported document extensions (depends on system tools) */
+        getDocumentExtensions: () => Promise<string[]>
+        /** Subscribe to document import progress events */
+        onDocumentProgress: (callback: (progress: DocumentImportProgress) => void) => () => void
+        /** Subscribe to dependency detection completion event */
+        onDependenciesReady: (callback: (event: DependencyReadyEvent) => void) => () => void
       }
       git: {
         getStatus: (projectPath: string) => Promise<GitStatusResponse>

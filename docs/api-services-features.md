@@ -414,6 +414,13 @@ Document import converter for 50+ formats via `@llamaindex/liteparse` with local
 ### Error codes
 - `IMPORT_ENCRYPTED`, `IMPORT_EMPTY`, `IMPORT_PAGE_LIMIT_EXCEEDED`, `IMPORT_TIMEOUT`, `IMPORT_CONVERSION_FAILED`
 
+### IPC layer (#133)
+- `src/shared/ipc/import-channels.ts` – Channel name constants (`IMPORT_CHANNELS`)
+- `src/shared/ipc/import-schema.ts` – Zod schemas (`DocumentImportRequestSchema`, `DocumentImportOptionsSchema`) and TypeScript interfaces (`DocumentImportProgress`, `DocumentImportResult`, `DependencyReadyEvent`)
+- `src/main/ipc/import-handlers.ts` – `registerDocumentImportHandlers()` with 3 IPC handlers (`import:document`, `import:documentCancel`, `import:getDocumentExtensions`) and 2 push events (`import:documentProgress`, `import:dependenciesReady`)
+- `src/preload/index.ts` – `api.import` namespace: `documentImport(request)`, `documentCancel()`, `getDocumentExtensions()`, `onDocumentProgress(callback)`, `onDependenciesReady(callback)`
+- Error code: `IMPORT_BUSY` (in `src/shared/errors.ts`) – returned when import is already in progress
+
 ### Related files
 - `src/main/services/import/isoToTessLang.ts` – ISO 639-1 to 639-3 language mapping
 - `src/main/services/import/extensions.ts` – `LITEPARSE_EXCLUDED_EXTENSIONS`
@@ -440,6 +447,11 @@ Runtime detection of optional system tools for document import.
 
 ### DependencyStatus
 `{ libreOffice: boolean, imageMagick: boolean }`
+
+### IPC integration (#133)
+- DependencyDetector runs fire-and-forget at app startup (`src/main/index.ts`)
+- Detection result pushed to renderer via `import:dependenciesReady` channel
+- Renderer subscribes via `api.import.onDependenciesReady(callback)`
 
 ### Related files
 - `src/main/services/import/ConverterRegistry.ts` – `updateConverterExtensions()` consumes detection result
