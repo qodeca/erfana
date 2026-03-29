@@ -34,6 +34,8 @@ export interface ConversionResult {
   error?: string
   /** Structured error code for categorization */
   errorCode?: ErrorCode
+  /** Directory containing page screenshots (PNG files), if screenshots were requested */
+  screenshotDir?: string
 }
 
 /**
@@ -48,6 +50,24 @@ export interface ImportResult {
   error?: string
   /** Structured error code for categorization */
   errorCode?: ErrorCode
+}
+
+/**
+ * Options for document import via LiteParseConverter
+ *
+ * These options configure OCR, screenshots, and DPI for document imports.
+ * Used by ImportService when the converter supports configuration via
+ * the IConfigurableConverter interface.
+ */
+export interface ImportOptions {
+  /** Enable OCR text recognition (default: true) */
+  ocr?: boolean
+  /** OCR language code in ISO 639-1 format (e.g., 'en', 'de') – mapped to ISO 639-3 internally */
+  ocrLanguage?: string
+  /** Generate page screenshots as PNG files (default: false) */
+  screenshots?: boolean
+  /** Screenshot DPI resolution (default: 150) */
+  dpi?: number
 }
 
 /**
@@ -81,7 +101,7 @@ export interface ITranscriptionServiceLike {
 export interface IConverter {
   /**
    * File extensions this converter handles (lowercase, without dot)
-   * Example: ['pdf'] for PdfConverter, ['txt', 'md', 'json'] for TextConverter
+   * Example: ['pdf'] for LiteParseConverter, ['txt', 'md', 'json'] for TextConverter
    */
   readonly supportedExtensions: string[]
 
@@ -128,4 +148,50 @@ export interface IConverter {
    * @returns Conversion result with content or error
    */
   convert(filePath: string): Promise<ConversionResult>
+}
+
+/**
+ * Extended converter interface for converters that support per-import configuration.
+ *
+ * Converters implementing this interface can produce a configured instance
+ * with specific import options, while keeping the base IConverter.convert()
+ * signature unchanged.
+ *
+ * Used by ImportService to detect configurable converters via type guard
+ * instead of instanceof checks (OCP compliance).
+ */
+export interface IConfigurableConverter extends IConverter {
+  /**
+   * Create a new converter instance configured with the given options.
+   * The returned instance should be used for a single import operation.
+   *
+   * @param options - Import configuration options
+   * @returns A new converter instance with options baked in
+   */
+  createConfigured(options: ImportOptions): IConverter
+}
+
+/**
+ * Type guard for IConfigurableConverter
+ *
+ * @param converter - Converter to check
+ * @returns true if the converter supports createConfigured()
+ */
+export function isConfigurableConverter(
+  converter: IConverter
+): converter is IConfigurableConverter {
+  return 'createConfigured' in converter && typeof (converter as IConfigurableConverter).createConfigured === 'function'
+}
+
+/**
+ * Runtime dependency detection result
+ *
+ * Indicates which optional system tools are available for document conversion.
+ * LibreOffice enables Office format support; ImageMagick enables image OCR.
+ */
+export interface DependencyStatus {
+  /** Whether LibreOffice (soffice) is available */
+  libreOffice: boolean
+  /** Whether ImageMagick (magick/convert) is available */
+  imageMagick: boolean
 }

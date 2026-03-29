@@ -55,6 +55,14 @@ export enum ErrorCode {
   IMPORT_DIR_CREATE_FAILED = 'IMPORT_DIR_CREATE_FAILED',
   IMPORT_WRITE_FAILED = 'IMPORT_WRITE_FAILED',
 
+  // Document import errors (Issue #132)
+  // Reserved for issue 2 – emitted by import:document IPC handler when dependencies missing
+  IMPORT_DEPENDENCY_MISSING = 'IMPORT_DEPENDENCY_MISSING',
+  // Reserved for issue 2 – reported via progress stream when OCR fails on individual pages
+  IMPORT_OCR_FAILED = 'IMPORT_OCR_FAILED',
+  IMPORT_PAGE_LIMIT_EXCEEDED = 'IMPORT_PAGE_LIMIT_EXCEEDED',
+  IMPORT_TIMEOUT = 'IMPORT_TIMEOUT',
+
   // Prompt execution errors
   PROMPT_NOT_FOUND = 'PROMPT_NOT_FOUND',
   PROMPT_VALIDATION_FAILED = 'PROMPT_VALIDATION_FAILED',
@@ -235,6 +243,12 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.IMPORT_TEXT_ENCODING_ERROR]: 'File has invalid text encoding',
   [ErrorCode.IMPORT_DIR_CREATE_FAILED]: 'Failed to create import directory',
   [ErrorCode.IMPORT_WRITE_FAILED]: 'Failed to write imported file',
+
+  // Document import errors (Issue #132)
+  [ErrorCode.IMPORT_DEPENDENCY_MISSING]: 'Required system tool is not installed. Check Settings for details.',
+  [ErrorCode.IMPORT_OCR_FAILED]: 'OCR text recognition failed for some pages',
+  [ErrorCode.IMPORT_PAGE_LIMIT_EXCEEDED]: 'Document exceeds the maximum page limit',
+  [ErrorCode.IMPORT_TIMEOUT]: 'Document conversion timed out',
 
   // Prompt execution errors
   [ErrorCode.PROMPT_NOT_FOUND]: 'Prompt template not found',

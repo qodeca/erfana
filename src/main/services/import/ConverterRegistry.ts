@@ -1,9 +1,10 @@
 import type { IConverter, FileTypeCategory } from './types'
-import { PdfConverter } from './converters/PdfConverter'
+import { LiteParseConverter } from './converters/LiteParseConverter'
 import { TextConverter } from './converters/TextConverter'
 import { AudioConverter } from './converters/AudioConverter'
 import { VideoConverter } from './converters/VideoConverter'
-import { isCodeExtension } from './extensions'
+import { isCodeExtension, LITEPARSE_EXCLUDED_EXTENSIONS } from './extensions'
+import { logger } from '../LoggingService'
 import { transcriptionService } from '../TranscriptionService'
 import { audioMetadataService } from '../AudioMetadataService'
 import { audioExtractionService } from '../AudioExtractionService'
@@ -136,14 +137,41 @@ export class ConverterRegistry {
     // Check against code file extensions (likely text but not in primary list)
     return isCodeExtension(normalizedExt)
   }
+
+  /**
+   * Dynamically add extensions to an existing converter's mapping.
+   * Used by DependencyDetector to add Office/image extensions after startup.
+   *
+   * Extensions already mapped to another converter are overwritten (last-write-wins).
+   * Extensions in the exclusion set (csv, tsv, svg) are silently skipped.
+   *
+   * @param category - Category of the converter to extend
+   * @param extensions - New extensions to map
+   */
+  updateConverterExtensions(category: FileTypeCategory, extensions: string[]): void {
+    const converter = this.converters.get(category)
+    if (!converter) return
+
+    for (const ext of extensions) {
+      const normalized = ext.toLowerCase()
+      if (LITEPARSE_EXCLUDED_EXTENSIONS.has(normalized)) continue
+
+      const existing = this.extensionToConverter.get(normalized)
+      if (existing && existing !== converter) {
+        logger.info(`Extension .${normalized} reassigned from ${existing.category} to ${converter.category}`)
+      }
+      this.extensionToConverter.set(normalized, converter)
+    }
+  }
 }
 
 /**
  * Register built-in converters
  */
 function registerBuiltInConverters(registry: ConverterRegistry): void {
-  // Document converters
-  registry.register(new PdfConverter())
+  // Document converter – PDF only at startup; Office/image extensions added
+  // dynamically by DependencyDetector after async detection completes
+  registry.register(new LiteParseConverter())
 
   // Text converters
   registry.register(new TextConverter())
