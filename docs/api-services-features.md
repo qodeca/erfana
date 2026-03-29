@@ -75,29 +75,18 @@ Attempt to acquire lock for a project.
 
 **Returns:** `{ status: 'acquired' | 'already_locked' | 'error', holderPid?, holderHostname?, message? }`
 
----
-
 #### `releaseLock(projectPath: string): Promise<void>`
 Release lock for a project.
 
----
-
 #### `checkLock(projectPath: string): Promise<LockStatus>`
 Check lock status without acquiring.
-
 **Returns:** `{ status: 'unlocked' | 'locked_by_self' | 'locked_by_other' | 'error' }`
-
----
 
 #### `requestFocus(projectPath: string): Promise<boolean>`
 Request focus from the lock holder (triggers window focus via polling).
 
----
-
 #### `cleanupStaleLocks(): Promise<number>`
 Cleanup stale locks from dead processes or timed-out network locks.
-
----
 
 ### Lock File Format
 ```json
