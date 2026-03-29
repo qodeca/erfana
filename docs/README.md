@@ -13,7 +13,7 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 - [Technical Debt](./technical-debt.md) - Technical debt tracking and priorities
 
 ### Feature Documentation
-- [Editor](./editor/README.md) - Monaco editor, markdown preview, and scroll sync
+- [Editor](./editor/README.md) - Monaco editor, markdown preview, scroll sync, Mermaid diagrams (full-screen viewer), PDF/DOCX export
 - [Image Viewer](./ui-components.md#image-viewer-panel) - Image preview panel with zoom, pan, and fullscreen
 - [Terminal](./terminal/README.md) - xterm.js terminal integration
   - [Bootstrap Pattern](./terminal/bootstrap-pattern.md) - Clean initialization without artifacts

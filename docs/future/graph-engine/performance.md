@@ -68,7 +68,7 @@ This document provides performance benchmarks, scalability analysis, and optimiz
 ### Software
 
 - Node.js 24.x
-- Electron 33.0.0
+- Electron 39
 - SQLite 3.45.0 (bundled with better-sqlite3)
 - sqlite-vec v0.1.0
 - onnxruntime-node 1.17.0

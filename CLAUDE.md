@@ -87,6 +87,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Technical Debt](docs/technical-debt.md) — Known debt items and improvement opportunities
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
 - [Source Grounding](docs/future/source-grounding/README.md) — NotebookLM-style grounding research, gap analysis, strategy, implementation roadmap
+- [Roadmap](ROADMAP.md) — Implementation order for active specs with dependency analysis
 
 ## Feature specifications
 
