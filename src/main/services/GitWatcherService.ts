@@ -36,6 +36,19 @@ import type { GitStateChangeEvent } from '../../shared/ipc/git-watcher-schema'
 /** Coalescing window for git events (ms) */
 const GIT_COALESCE_WINDOW_MS = 150
 
+/** Timeout for chokidar ready event before fallback (ms)
+ *
+ * Chokidar v4 uses a counter-based ready mechanism – if any watched path
+ * fails to complete its initial scan, the ready event never fires.
+ * Known causes: CPU contention during Electron startup, non-existent paths
+ * between stat check and watch call, large .git directories with many refs.
+ *
+ * @see Issue #136 - Investigate chokidar ready timeout fallback
+ * @see https://github.com/paulmillr/chokidar/issues/873
+ * @see https://github.com/paulmillr/chokidar/issues/949
+ */
+export const WATCHER_READY_TIMEOUT_MS = 5000
+
 /** Maximum restart attempts before giving up */
 const MAX_RESTART_ATTEMPTS = 3
 
@@ -294,25 +307,64 @@ export class GitWatcherService implements IGitWatcherService {
       this.handleWatcherError(error)
     })
 
-    // Return a promise that resolves when watcher is ready
+    // Ready/timeout lifecycle – three possible outcomes:
+    // 1. Ready-first: chokidar ready fires before timeout → normal path
+    // 2. Timeout-first: timeout fires before ready → degraded mode, polling handles git status
+    // 3. Late-ready: ready fires after timeout → logged for diagnostics (Issue #136)
+    const startTime = Date.now()
+    let raceResolved = false
+
     return new Promise((resolve) => {
-      watcher.on('ready', () => {
-        logger.info('GitWatcherService: Watcher ready', {
+      const timeoutHandle = setTimeout(() => {
+        if (raceResolved) return
+        if (this.activeWatcher?.version !== currentVersion) {
+          resolve({ success: true })
+          return
+        }
+
+        raceResolved = true
+        const elapsedMs = Date.now() - startTime
+        logger.warn('GitWatcherService: Watcher ready timeout fallback triggered', {
           projectPath,
-          paths: existingPaths.length
+          elapsedMs,
+          timeoutMs: WATCHER_READY_TIMEOUT_MS,
+          pathCount: existingPaths.length
         })
-        // Start health logger when watcher is ready (ADR-Spec003-002)
+
+        // Start health logger even in degraded mode (ADR-Spec003-002)
         this.startHealthLogger()
         resolve({ success: true })
-      })
+      }, WATCHER_READY_TIMEOUT_MS)
 
-      // Timeout fallback in case ready never fires
-      setTimeout(() => {
-        if (this.activeWatcher?.version === currentVersion) {
-          logger.warn('GitWatcherService: Watcher ready timeout fallback triggered - chokidar may have issues')
+      watcher.on('ready', () => {
+        if (this.activeWatcher?.version !== currentVersion) return
+
+        const elapsedMs = Date.now() - startTime
+
+        if (!raceResolved) {
+          raceResolved = true
+          clearTimeout(timeoutHandle)
+
+          logger.info('GitWatcherService: Watcher ready', {
+            projectPath,
+            pathCount: existingPaths.length,
+            elapsedMs
+          })
+
+          // Start health logger when watcher is ready (ADR-Spec003-002)
+          this.startHealthLogger()
           resolve({ success: true })
+        } else {
+          // Late ready – timeout already fired and resolved the promise.
+          // This diagnostic log helps determine whether chokidar eventually
+          // becomes ready (timeout too short) or never does (permanent failure).
+          logger.info('GitWatcherService: Late ready event received after timeout', {
+            projectPath,
+            elapsedMs,
+            pathCount: existingPaths.length
+          })
         }
-      }, 5000)
+      })
     })
   }
 
@@ -462,6 +514,7 @@ export class GitWatcherService implements IGitWatcherService {
     this.pendingRestart = setTimeout(async () => {
       this.pendingRestart = null
       this.restartAttempts++
+      this.sessionVersion++ // Invalidate old watcher's timeout handles
 
       try {
         // Stop current watcher
