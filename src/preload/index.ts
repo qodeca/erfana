@@ -814,7 +814,18 @@ const api = {
     /**
      * Get current log level from main process
      */
-    getLevel: (): Promise<string> => ipcRenderer.invoke('logging:getLevel')
+    getLevel: (): Promise<string> => ipcRenderer.invoke('logging:getLevel'),
+
+    /**
+     * Get logs directory path
+     */
+    getLogsDir: (): Promise<string> => ipcRenderer.invoke('logging:getLogsDir'),
+
+    /**
+     * Open logs folder in the system file manager
+     * Returns empty string on success, error string on failure
+     */
+    openLogsFolder: (): Promise<string> => ipcRenderer.invoke('logging:openLogsFolder')
   },
 
   // Quit confirmation operations

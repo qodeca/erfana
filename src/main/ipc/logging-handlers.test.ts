@@ -8,11 +8,14 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import type { LogEntry } from '../../shared/ipc/logging-schema'
 
-// Mock ipcMain
+// Mock ipcMain and shell
 vi.mock('electron', () => ({
   ipcMain: {
     on: vi.fn(),
     handle: vi.fn()
+  },
+  shell: {
+    openPath: vi.fn()
   }
 }))
 
@@ -20,19 +23,21 @@ vi.mock('electron', () => ({
 vi.mock('../services/LoggingService', () => ({
   loggingService: {
     logFromRenderer: vi.fn(),
-    getLevel: vi.fn()
+    getLevel: vi.fn(),
+    getLogsDir: vi.fn()
   }
 }))
 
 // Import after mocks are defined
 import { registerLoggingHandlers } from './logging-handlers'
-import { ipcMain } from 'electron'
+import { ipcMain, shell } from 'electron'
 import { loggingService } from '../services/LoggingService'
 
 // Get references to mocked modules
 const mockIpcMainOn = (ipcMain.on as any)
 const mockIpcMainHandle = (ipcMain.handle as any)
 const mockLoggingService = loggingService as any
+const mockShell = shell as any
 
 // Mock console.error for invalid entry tests
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>
@@ -60,11 +65,23 @@ describe('registerLoggingHandlers', () => {
       expect(mockIpcMainHandle).toHaveBeenCalledWith('logging:getLevel', expect.any(Function))
     })
 
-    it('registers exactly 2 handlers', () => {
+    it('registers logging:getLogsDir handler', () => {
+      registerLoggingHandlers()
+
+      expect(mockIpcMainHandle).toHaveBeenCalledWith('logging:getLogsDir', expect.any(Function))
+    })
+
+    it('registers logging:openLogsFolder handler', () => {
+      registerLoggingHandlers()
+
+      expect(mockIpcMainHandle).toHaveBeenCalledWith('logging:openLogsFolder', expect.any(Function))
+    })
+
+    it('registers exactly 4 handlers', () => {
       registerLoggingHandlers()
 
       expect(mockIpcMainOn).toHaveBeenCalledTimes(1)
-      expect(mockIpcMainHandle).toHaveBeenCalledTimes(1)
+      expect(mockIpcMainHandle).toHaveBeenCalledTimes(3)
     })
   })
 
@@ -401,6 +418,94 @@ describe('registerLoggingHandlers', () => {
     })
   })
 
+  describe('logging:getLogsDir handler', () => {
+    let getLogsDirHandler: () => Promise<any>
+
+    beforeEach(() => {
+      registerLoggingHandlers()
+
+      // Extract the handler function
+      const handleCalls = mockIpcMainHandle.mock.calls
+      const call = handleCalls.find((c) => c[0] === 'logging:getLogsDir')
+      getLogsDirHandler = call![1]
+    })
+
+    it('returns the logs directory path from loggingService', async () => {
+      mockLoggingService.getLogsDir.mockReturnValue('/home/user/.config/erfana/logs')
+
+      const result = await getLogsDirHandler()
+
+      expect(result).toBe('/home/user/.config/erfana/logs')
+      expect(mockLoggingService.getLogsDir).toHaveBeenCalled()
+    })
+
+    it('calls loggingService.getLogsDir once per call', async () => {
+      mockLoggingService.getLogsDir.mockReturnValue('/tmp/erfana/logs')
+
+      await getLogsDirHandler()
+
+      expect(mockLoggingService.getLogsDir).toHaveBeenCalledTimes(1)
+    })
+
+    it('is async handler', () => {
+      mockLoggingService.getLogsDir.mockReturnValue('/tmp/erfana/logs')
+
+      const result = getLogsDirHandler()
+
+      expect(result).toBeInstanceOf(Promise)
+    })
+  })
+
+  describe('logging:openLogsFolder handler', () => {
+    let openLogsFolderHandler: () => Promise<any>
+
+    beforeEach(() => {
+      registerLoggingHandlers()
+
+      // Extract the handler function
+      const handleCalls = mockIpcMainHandle.mock.calls
+      const call = handleCalls.find((c) => c[0] === 'logging:openLogsFolder')
+      openLogsFolderHandler = call![1]
+    })
+
+    it('calls shell.openPath with the logs directory path', async () => {
+      const logsDir = '/home/user/.config/erfana/logs'
+      mockLoggingService.getLogsDir.mockReturnValue(logsDir)
+      mockShell.openPath.mockResolvedValue('')
+
+      await openLogsFolderHandler()
+
+      expect(mockShell.openPath).toHaveBeenCalledWith(logsDir)
+    })
+
+    it('returns empty string on success', async () => {
+      mockLoggingService.getLogsDir.mockReturnValue('/tmp/erfana/logs')
+      mockShell.openPath.mockResolvedValue('')
+
+      const result = await openLogsFolderHandler()
+
+      expect(result).toBe('')
+    })
+
+    it('returns error string when shell.openPath fails', async () => {
+      mockLoggingService.getLogsDir.mockReturnValue('/tmp/erfana/logs')
+      mockShell.openPath.mockResolvedValue('Failed to open path: /tmp/erfana/logs')
+
+      const result = await openLogsFolderHandler()
+
+      expect(result).toBe('Failed to open path: /tmp/erfana/logs')
+    })
+
+    it('is async handler', () => {
+      mockLoggingService.getLogsDir.mockReturnValue('/tmp/erfana/logs')
+      mockShell.openPath.mockResolvedValue('')
+
+      const result = openLogsFolderHandler()
+
+      expect(result).toBeInstanceOf(Promise)
+    })
+  })
+
   describe('multiple registrations', () => {
     it('can be called multiple times (idempotent)', () => {
       registerLoggingHandlers()
@@ -408,7 +513,7 @@ describe('registerLoggingHandlers', () => {
 
       // Should register handlers twice (not a problem, last one wins)
       expect(mockIpcMainOn).toHaveBeenCalledTimes(2)
-      expect(mockIpcMainHandle).toHaveBeenCalledTimes(2)
+      expect(mockIpcMainHandle).toHaveBeenCalledTimes(6)
     })
   })
 

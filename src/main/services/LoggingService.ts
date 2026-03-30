@@ -443,7 +443,7 @@ export class LoggingService {
    * Get logs directory path
    * Uses temp directory during tests to avoid polluting production logs
    */
-  private getLogsDir(): string {
+  public getLogsDir(): string {
     if (process.env.VITEST) {
       return join(tmpdir(), 'erfana-test-logs')
     }

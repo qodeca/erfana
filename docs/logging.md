@@ -75,6 +75,7 @@ All loggers share the same API: `trace`, `debug`, `info`, `warn`, `error(msg, er
 ### LoggingService (advanced)
 
 Singleton at `src/main/services/LoggingService.ts`:
+- `getLogsDir()` – Resolved logs directory path (public since #137)
 - `getLevel()` / `setLevel(level)` – get/set log level programmatically
 - `getInstanceId()` – 8-char short ID for multi-instance filtering
 - `getFullInstanceId()` – Full UUID for correlation

@@ -81,6 +81,9 @@ export function SettingsOverlay() {
   const [downloadProgress, setDownloadProgress] = useState<{ percent: number; downloadedBytes: number; totalBytes: number } | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
 
+  // Logs folder path for display in settings
+  const [logsDir, setLogsDir] = useState<string>('')
+
   /**
    * Check if an API key is stored on overlay open.
    * Avoids polling -- checks once when the overlay becomes visible.
@@ -90,6 +93,16 @@ export function SettingsOverlay() {
     window.api.transcription.hasApiKey()
       .then((result) => setHasApiKey(result))
       .catch(() => setHasApiKey(false))
+  }, [isOpen])
+
+  /**
+   * Load logs directory path when overlay opens.
+   */
+  useEffect(() => {
+    if (!isOpen) return
+    window.api.logging.getLogsDir()
+      .then((dir) => setLogsDir(dir))
+      .catch(() => setLogsDir(''))
   }, [isOpen])
 
   /**
@@ -119,6 +132,20 @@ export function SettingsOverlay() {
     })
     return cleanup
   }, [isOpen])
+
+  /**
+   * Open logs folder in the system file manager.
+   */
+  const handleOpenLogsFolder = useCallback(async () => {
+    try {
+      const result = await window.api.logging.openLogsFolder()
+      if (result) {
+        logger.error('Failed to open logs folder', undefined, { reason: result })
+      }
+    } catch (err) {
+      logger.error('Failed to open logs folder', err instanceof Error ? err : undefined)
+    }
+  }, [])
 
   /**
    * Handle whisper model download.
@@ -380,6 +407,21 @@ export function SettingsOverlay() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div className="settings-row">
+                <div className="settings-field">
+                  <label className="settings-label">Logs folder</label>
+                  <p className="settings-description" data-testid={TEST_IDS.SETTINGS_LOGS_FOLDER_PATH}>
+                    {logsDir}
+                  </p>
+                </div>
+                <button
+                  className="settings-btn-secondary"
+                  data-testid={TEST_IDS.SETTINGS_BTN_OPEN_LOGS}
+                  onClick={handleOpenLogsFolder}
+                >
+                  Open
+                </button>
               </div>
             </section>
 

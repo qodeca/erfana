@@ -34,6 +34,7 @@ Full-screen settings dialog for app-wide configuration.
 | Setting | Description | Default |
 |---------|-------------|---------|
 | Log level | Minimum severity for file logging (trace, debug, info, warn, error, fatal) | info |
+| Logs folder | Displays resolved logs directory path (`~/.erfana/logs/`) with "Open" button to reveal in native file manager | – |
 
 ### Transcription
 
