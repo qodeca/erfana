@@ -33,6 +33,10 @@ Project-specific terminology used in Erfana documentation and code.
 | **Prompt templates** | AI-powered text operations via context menu |
 | **AutoExecute** | Automatically run prompt in terminal after generation |
 | **Git status indicators** | VS Code-style badges (M/U/D/A/!) on files |
+| **LiteParse** | @llamaindex/liteparse – parser library for 50+ document formats with spatial text extraction |
+| **OCR** | Optical character recognition – text extraction from images/scanned documents via Tesseract.js |
+| **Tesseract.js** | JavaScript OCR engine used by LiteParse for local text extraction (no external API calls) |
+| **tessdata** | Pre-trained Tesseract language models bundled in `resources/tessdata/` for offline OCR |
 
 ## Services
 
@@ -52,6 +56,9 @@ Project-specific terminology used in Erfana documentation and code.
 | **AudioMetadataService** | Extracts duration, format, bitrate from audio files using music-metadata |
 | **AudioExtractionService** | Extracts audio tracks from video files using ffmpeg for transcription pipeline input |
 | **ApiKeyService** | Encrypts/decrypts API keys using Electron safeStorage |
+| **ImportService** | Orchestrates document import – routes files to converters, manages progress and cancellation |
+| **LiteParseConverter** | Document converter backed by @llamaindex/liteparse for 50+ formats (PDF, Office, images) with local OCR |
+| **DependencyDetector** | Async detection of optional system tools (LibreOffice, ImageMagick) with 5s timeout and session caching |
 
 ## State Management
 

@@ -1,6 +1,6 @@
 # Security Guidelines
 
-**Last Updated**: March 2026 (v0.8.2, Electron 39)
+**Last Updated**: March 2026 (v0.8.3, Electron 39)
 
 ## Security Posture Summary
 
@@ -445,19 +445,9 @@ npm run build:mac
 
 ---
 
-## Known Vulnerabilities
+## Known vulnerabilities
 
-Run `npm audit` to check for dependency vulnerabilities:
-
-```bash
-npm audit
-```
-
-**Current Status** (as of Dec 2025):
-- 12 moderate severity vulnerabilities (all in devDependencies, not shipped to production)
-- 0 high/critical vulnerabilities in production dependencies
-
-**Policy**: Fix all high/critical vulnerabilities in production dependencies before release.
+Run `npm audit` to check. **Policy**: Fix all high/critical vulnerabilities in production dependencies before release.
 
 ---
 
@@ -484,6 +474,14 @@ Erfana uses ad-hoc signing (no Apple Developer ID). The build pipeline has two s
 The `afterSign` hook is critical: without it, macOS Sequoia+ rejects `@rpath` library loads between the main process and helper processes because they have mismatched ad-hoc code directory hashes. See `docs/build/troubleshooting.md` for details.
 
 ---
+
+## Document import security
+
+- **Local OCR only** – Tesseract.js runs locally; no data sent to external APIs
+- **File validation** – LiteParseConverter validates file type, checks for encryption, enforces 1000-page limit and 60s timeout
+- **Temp dir cleanup** – Screenshot temp directories cleaned in `finally` blocks (including abort paths)
+- **Dependency isolation** – LibreOffice/ImageMagick invoked via child process with no user-controlled arguments
+- **Zod validation** – All import IPC inputs validated via Zod schemas (`import-schema.ts`)
 
 ## Future enhancements
 

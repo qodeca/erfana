@@ -125,6 +125,16 @@ When a file with the same name exists at the target:
 - `ExternalFileService` handles security validation and file operations
 - IPC channels: `file:validateExternal`, `file:copyFromExternal`, `file:moveFromExternal`
 
+### Batch document filtering
+
+When multiple files are dropped simultaneously, document files (PDF, Office, images supported by LiteParse) are **filtered out** of the batch and not moved/copied. Instead:
+- A warning toast notifies the user that document files require individual import
+- Non-document files proceed with the normal move/copy/import flow
+- To import document files, drop them individually – this opens the DocumentImportDialog with OCR, language, screenshot, and DPI options
+- If required dependencies (LibreOffice, ImageMagick) are missing, a dependency-missing modal appears with install guidance
+
+See [ui-components.md](../ui-components.md) for DocumentImportDialog details.
+
 ### Out of scope
 
 - Folder drops (silently ignored)

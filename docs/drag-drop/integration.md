@@ -277,6 +277,28 @@ Errors propagate through layers:
 - "Permission denied"
 - "Source and target paths are the same"
 
+## Document import integration
+
+External file drops of document formats (PDF, Office, images) route through the LiteParse import pipeline instead of the standard move/copy flow:
+
+```
+External file drop
+  → useImport checks extension against cached document extension list
+  → Document file? → Open DocumentImportDialog (OCR, language, screenshots, DPI)
+  → DependencyDetector ran at startup? → Show dependency-missing modal if LibreOffice/ImageMagick absent
+  → User confirms → import:document IPC → LiteParseConverter processes file
+  → Progress streamed via import:documentProgress
+  → Cancellation via import:documentCancel
+```
+
+**Key integration points**:
+- `useImport` hook routes files by extension (calls `import:getDocumentExtensions` once, caches result)
+- Batch drops filter document files out with a warning toast – only individual drops trigger the dialog
+- `import:dependenciesReady` event fires after startup dependency detection completes
+- DocumentImportDialog state managed by `useDocumentImportStore` (Zustand, session-persistent options)
+
+See [api-services-features.md](../api-services-features.md) for LiteParseConverter and DependencyDetector APIs.
+
 ## Related Files
 
 - **File Service**: [src/main/services/FileService.ts](/src/main/services/FileService.ts)
