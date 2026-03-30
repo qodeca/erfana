@@ -357,7 +357,7 @@ Modal dialog for configuring and executing LiteParse document imports (PDF, Offi
 
 **Features**:
 - OCR toggle with language selection (session-persistent options)
-- Screenshot generation toggle with DPI configuration
+- Screenshot generation toggle with DPI configuration (100-page limit hint shown when enabled)
 - Indeterminate progress bar with phase text during import
 - OCR warning when OCR is disabled
 - Auto-open imported file on success

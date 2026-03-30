@@ -140,6 +140,13 @@
   padding: var(--space-4);
 }
 
+/* Screenshot page limit hint */
+.doc-import-screenshot-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-2);
+}
+
 /* Progress section */
 .doc-import-progress-section {
   margin-bottom: var(--space-8);

@@ -254,17 +254,17 @@ describe('DocumentImportProgress interface', () => {
       phase: 'Validating document...'
     }
     expect(progress.percent).toBe(0)
-    expect(progress.warning).toBeUndefined()
+    expect(progress.warnings).toBeUndefined()
   })
 
   it('allows progress with warning', () => {
     const progress: DocumentImportProgress = {
       percent: 50,
       phase: 'Converting document...',
-      warning: 'OCR failed on page 3'
+      warnings: 'OCR failed on page 3'
     }
     expect(progress.percent).toBe(50)
-    expect(progress.warning).toBe('OCR failed on page 3')
+    expect(progress.warnings).toBe('OCR failed on page 3')
   })
 
   it('allows complete progress at 100', () => {

@@ -50,8 +50,8 @@ export interface DocumentImportProgress {
   percent: number
   /** Current phase description */
   phase: string
-  /** Optional non-fatal warning (e.g., OCR failure on a page) */
-  warning?: string
+  /** Optional non-fatal warnings (e.g., OCR failure on a page) */
+  warnings?: string
 }
 
 /**

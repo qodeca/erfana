@@ -293,6 +293,10 @@ export function registerDocumentImportHandlers(): void {
 
         // Check if cancelled during conversion (uses local ref – immune to cancel handler nulling)
         if (controller.signal.aborted) {
+          // Clean up temp screenshot dir if generated before cancellation
+          if (result.screenshotDir) {
+            rm(result.screenshotDir, { recursive: true, force: true }).catch(() => {})
+          }
           return {
             success: false,
             error: 'Import cancelled'
@@ -309,6 +313,9 @@ export function registerDocumentImportHandlers(): void {
 
         // Second abort check before file write
         if (controller.signal.aborted) {
+          if (result.screenshotDir) {
+            rm(result.screenshotDir, { recursive: true, force: true }).catch(() => {})
+          }
           return {
             success: false,
             error: 'Import cancelled'

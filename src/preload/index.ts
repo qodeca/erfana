@@ -511,7 +511,7 @@ const api = {
     /**
      * Cancel an active document import
      */
-    documentCancel: (): Promise<{ success: boolean; error?: string }> =>
+    cancelDocument: (): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke(IMPORT_CHANNELS.DOCUMENT_CANCEL),
 
     /**

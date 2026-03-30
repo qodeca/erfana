@@ -31,7 +31,7 @@ const mockOnDependenciesReady = vi.fn()
   import: {
     ...(window as any).api?.import,
     documentImport: mockDocumentImport,
-    documentCancel: mockDocumentCancel,
+    cancelDocument: mockDocumentCancel,
     getDocumentExtensions: mockGetDocumentExtensions,
     onDocumentProgress: mockOnDocumentProgress,
     onDependenciesReady: mockOnDependenciesReady
@@ -494,7 +494,7 @@ describe('useDocumentImportStore', () => {
   })
 
   describe('cancelImport', () => {
-    it('calls documentCancel and resets isImporting', async () => {
+    it('calls cancelDocument and resets isImporting', async () => {
       mockDocumentCancel.mockResolvedValue(undefined)
 
       useDocumentImportStore.setState({

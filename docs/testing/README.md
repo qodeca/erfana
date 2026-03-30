@@ -22,7 +22,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 #### Key test areas
 
-Run `npm run test` for current totals (~6,990 tests across 225 files as of v0.8.0-beta).
+Run `npm run test` for current totals (~7,318 tests across 237 files as of v0.8.3).
 
 | Area | Key files | Docs |
 |------|-----------|------|
@@ -30,6 +30,7 @@ Run `npm run test` for current totals (~6,990 tests across 225 files as of v0.8.
 | Prompt system | `src/renderer/src/prompts/*.test.ts{,x}` (core, UI, regression) | [Prompts](../prompts/) |
 | Dialog system | `FileSystemDialog.test.tsx`, `fileValidation.test.ts` | [Architecture – Dialog system](../architecture.md#dialog-system) |
 | Transcription pipeline | Tests across `main/`, `renderer/`, `shared/` (spec 009) | [Transcription CLAUDE.md](../../src/renderer/src/components/Transcription/CLAUDE.md) |
+| Document import | `LiteParseConverter.test.ts`, `DependencyDetector.test.ts`, `DocumentImportDialog.test.tsx`, `useDocumentImportStore.test.ts`, `import-handlers*.test.ts`, `LiteParseConverter.integration.test.ts` | [API services – features](../api-services-features.md) |
 | ProjectTree & watchers | `*.logic.test.ts`, `*.pipeline.test.ts`, `*.switching.test.ts` | [Architecture – ProjectTree](../architecture.md#projecttree-modularization) |
 | Local whisper | `LocalWhisperService.test.ts`, `WhisperModelManager.test.ts` | [API services – features](../api-services-features.md) |
 | Settings overlay | `SettingsOverlay.test.tsx` | [Settings](../settings.md) |

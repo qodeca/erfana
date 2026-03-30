@@ -16,6 +16,14 @@ Historical changelog entries for versions prior to current. For the latest chang
 - **Warning design tokens** – Added `--color-warning-bg` and `--color-warning-border` to design tokens
 - **E2E test** – Document import dialog flow test with PDF fixture
 - **Unit tests** – 68 new tests for document import store (46) and OCR language select (22)
+- **Integration test** – LiteParseConverter real-library test against PDF fixture with CI skip guard (AC-036)
+- **Screenshot page limit hint** – Dialog shows "first 100 pages only" when screenshots enabled (FR-019)
+- **Dependency modal in drag-drop** – Missing-dependency check added to batch import path (FR-012)
+
+### Fixed
+- **Temp dir leak on cancellation** – Screenshot temp directory now cleaned up in abort paths (FR-021)
+- **Preload method naming** – `documentCancel()` renamed to `cancelDocument()` matching FR-022 spec
+- **Progress schema field** – `warning` renamed to `warnings` matching FR-014 spec
 
 ### Removed
 - PdfConverter fully removed (completed in #132) – no source references remain
