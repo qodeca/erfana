@@ -4,6 +4,16 @@ Historical changelog entries for versions prior to current. For the latest chang
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## 0.9.0
+
+### Added
+- **LiteParse document import** – Import 50+ document formats (PDF, Office, images) with local OCR via Tesseract.js, spatial text extraction, YAML frontmatter, and optional page screenshots. Full stack: backend converter (#132), IPC layer (#133), frontend UI (#134). Spec #021 fully implemented and archived
+- **Logs folder shortcut** – Settings overlay Logging section shows clickable logs directory path with "Open" button that opens Finder (#137)
+- **GitWatcherService diagnostics** – Diagnostic logging with `raceResolved` guard, late-ready handler, and lifecycle fixes for reliable git status indicators (#136)
+
+### Changed
+- Version bump from 0.8.3 to 0.9.0
+
 ## 0.8.3
 
 ### Improved

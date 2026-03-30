@@ -1,6 +1,6 @@
 # Security Guidelines
 
-**Last Updated**: March 2026 (v0.8.3, Electron 39)
+**Last Updated**: March 2026 (v0.9.0, Electron 39)
 
 ## Security Posture Summary
 

@@ -1,6 +1,6 @@
 # Preload Script Bundling
 
-**Last Updated**: March 2026 (v0.8.0)
+**Last Updated**: March 2026 (v0.9.0)
 
 This document explains why the preload script must be bundled for sandbox compatibility.
 
