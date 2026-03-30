@@ -54,6 +54,7 @@ describe('GitWatcherService', () => {
   let service: any
   let mockWatcher: any
   let fsPromises: any
+  let WATCHER_READY_TIMEOUT_MS: number
 
   beforeEach(async () => {
     vi.useFakeTimers()
@@ -70,6 +71,7 @@ describe('GitWatcherService', () => {
     // Import service after mocks are set up
     const module = await import('./GitWatcherService')
     service = module.gitWatcherService
+    WATCHER_READY_TIMEOUT_MS = module.WATCHER_READY_TIMEOUT_MS
 
     // Create mock watcher that stores handlers for manual triggering
     const eventHandlers: Record<string, ((arg?: any) => void) | null> = {}
@@ -108,14 +110,14 @@ describe('GitWatcherService', () => {
 
   /**
    * Helper to start service and emit ready event.
-   * The service has a 5s timeout fallback, so we advance timers to trigger it.
-   * Also emits the 'ready' event for proper behavior testing.
+   * Emits 'ready' immediately after microtasks settle (before timeout fires),
+   * simulating normal chokidar behavior where ready fires quickly.
    */
   async function startServiceAndEmitReady(path: string) {
     const startPromise = service.start(path)
-    // Run pending promises/microtasks first
-    await vi.runAllTimersAsync()
-    // Now emit ready if handler exists (may have already resolved via timeout)
+    // Let the start() async work complete (stat checks, watcher creation)
+    await vi.advanceTimersByTimeAsync(0)
+    // Emit ready before the 5s timeout fires
     mockWatcher._emitReady?.()
     return startPromise
   }
@@ -172,8 +174,9 @@ describe('GitWatcherService', () => {
       mockChokidar.watch.mockReturnValue(secondMockWatcher)
 
       const startPromise = service.start('/project2')
-      // Run timers to allow the service to set up and potentially resolve via timeout
-      await vi.runAllTimersAsync()
+      // Let the start() async work complete, then emit ready
+      await vi.advanceTimersByTimeAsync(0)
+      secondMockWatcher._emitReady?.()
       await startPromise
 
       expect(firstWatcher.close).toHaveBeenCalled()
@@ -253,8 +256,12 @@ describe('GitWatcherService', () => {
 
       expect(result.success).toBe(true)
       expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('Watcher ready'),
-        expect.any(Object)
+        'GitWatcherService: Watcher ready',
+        expect.objectContaining({
+          projectPath: '/project',
+          pathCount: expect.any(Number),
+          elapsedMs: expect.any(Number)
+        })
       )
     })
 
@@ -268,6 +275,142 @@ describe('GitWatcherService', () => {
       expect(result.success).toBe(false)
       expect(result.error).toBe('Failed to watch')
       expect(mockLogger.error).toHaveBeenCalled()
+    })
+  })
+
+  describe('ready/timeout lifecycle (Issue #136)', () => {
+    it('should clear timeout when ready fires before timeout', async () => {
+      const result = await startServiceAndEmitReady('/project')
+
+      expect(result.success).toBe(true)
+
+      // Advance past the 5s timeout – should NOT produce a warn log
+      await vi.advanceTimersByTimeAsync(6000)
+
+      expect(mockLogger.warn).not.toHaveBeenCalledWith(
+        expect.stringContaining('timeout fallback'),
+        expect.any(Object)
+      )
+    })
+
+    it('should log warn with diagnostic context when timeout fires', async () => {
+      const startPromise = service.start('/project')
+      // Advance past the 5s timeout without emitting ready
+      await vi.advanceTimersByTimeAsync(5000)
+      const result = await startPromise
+
+      expect(result.success).toBe(true)
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'GitWatcherService: Watcher ready timeout fallback triggered',
+        expect.objectContaining({
+          projectPath: '/project',
+          elapsedMs: expect.any(Number),
+          timeoutMs: WATCHER_READY_TIMEOUT_MS,
+          pathCount: expect.any(Number)
+        })
+      )
+    })
+
+    it('should start health logger on timeout fallback', async () => {
+      const startPromise = service.start('/project')
+      await vi.advanceTimersByTimeAsync(5000)
+      await startPromise
+
+      // Health logger should be running – advance 5 minutes and check for health log
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
+
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'GitStatus: Health summary',
+        expect.any(Object)
+      )
+    })
+
+    it('should log late-ready event when ready fires after timeout', async () => {
+      const startPromise = service.start('/project')
+      // Let timeout fire first
+      await vi.advanceTimersByTimeAsync(5000)
+      await startPromise
+
+      // Now emit ready after timeout
+      mockWatcher._emitReady?.()
+
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'GitWatcherService: Late ready event received after timeout',
+        expect.objectContaining({
+          projectPath: '/project',
+          elapsedMs: expect.any(Number),
+          pathCount: expect.any(Number)
+        })
+      )
+    })
+
+    it('should include elapsedMs in ready log', async () => {
+      const startPromise = service.start('/project')
+      // Advance a small amount then emit ready
+      await vi.advanceTimersByTimeAsync(100)
+      mockWatcher._emitReady?.()
+      await startPromise
+
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'GitWatcherService: Watcher ready',
+        expect.objectContaining({
+          elapsedMs: expect.any(Number)
+        })
+      )
+    })
+
+    it('should resolve promise when stop() is called during timeout window', async () => {
+      const startPromise = service.start('/project')
+      await vi.advanceTimersByTimeAsync(0)
+
+      // Stop before timeout fires (simulates rapid project switch)
+      await service.stop()
+
+      // Advance past timeout – promise should resolve, no hang
+      await vi.advanceTimersByTimeAsync(WATCHER_READY_TIMEOUT_MS)
+      const result = await startPromise
+
+      expect(result.success).toBe(true)
+      // No timeout warn log since version guard triggered
+      expect(mockLogger.warn).not.toHaveBeenCalledWith(
+        expect.stringContaining('timeout fallback'),
+        expect.any(Object)
+      )
+    })
+
+    it('should ignore late ready after project switch (stale version)', async () => {
+      const startPromise = service.start('/project')
+      await vi.advanceTimersByTimeAsync(0)
+      const oldWatcher = mockWatcher
+
+      // Stop watcher (simulates project switch)
+      await service.stop()
+      await vi.advanceTimersByTimeAsync(WATCHER_READY_TIMEOUT_MS)
+      await startPromise
+
+      // Emit ready on old watcher – should be silently ignored
+      oldWatcher._emitReady?.()
+
+      expect(mockLogger.info).not.toHaveBeenCalledWith(
+        expect.stringContaining('Late ready event'),
+        expect.any(Object)
+      )
+    })
+
+    it('should bump sessionVersion on scheduleRestart to invalidate old timeout', async () => {
+      await startServiceAndEmitReady('/project')
+
+      const versionBefore = service.sessionVersion
+
+      // Trigger transient error to schedule restart
+      const errorCallback = mockWatcher._handlers['error']
+      errorCallback?.(new Error('ENOENT: no such file'))
+
+      // Advance past restart delay (800ms)
+      await vi.advanceTimersByTimeAsync(800)
+
+      // sessionVersion should have incremented
+      expect(service.sessionVersion).toBeGreaterThan(versionBefore)
     })
   })
 

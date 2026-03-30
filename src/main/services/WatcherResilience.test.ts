@@ -90,11 +90,14 @@ describe('Watcher resilience and polling fallback (#100)', () => {
   let fsPromises: any
 
   /**
-   * Helper to start GitWatcherService and emit ready event
+   * Helper to start GitWatcherService and emit ready event.
+   * Emits 'ready' immediately after microtasks settle (before timeout fires).
    */
   async function startGitWatcherAndEmitReady(path: string) {
     const startPromise = gitWatcherService.start(path)
-    await vi.runAllTimersAsync()
+    // Let the start() async work complete (stat checks, watcher creation)
+    await vi.advanceTimersByTimeAsync(0)
+    // Emit ready before the 5s timeout fires
     mockWatcher._emitReady?.()
     return startPromise
   }
