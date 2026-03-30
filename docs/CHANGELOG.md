@@ -14,8 +14,9 @@ Historical changelog entries for versions prior to current. For the latest chang
 - **Batch drag-drop filtering** – Document files filtered from batch imports with warning toast
 - **Dependency-missing modal** – Modal popup for missing LibreOffice/ImageMagick with install guidance
 - **Warning design tokens** – Added `--color-warning-bg` and `--color-warning-border` to design tokens
-- **E2E test** – Document import dialog flow test with PDF fixture
-- **Unit tests** – 68 new tests for document import store (46) and OCR language select (22)
+- **Logs folder link** – Settings overlay Logging section shows resolved logs directory path with "Open" button for native file manager (#137)
+- **E2E test** – Document import dialog flow test with PDF fixture; settings logs folder test
+- **Unit tests** – 68 new tests for document import store (46) and OCR language select (22); 7 new tests for logging IPC handlers
 - **Integration test** – LiteParseConverter real-library test against PDF fixture with CI skip guard (AC-036)
 - **Screenshot page limit hint** – Dialog shows "first 100 pages only" when screenshots enabled (FR-019)
 - **Dependency modal in drag-drop** – Missing-dependency check added to batch import path (FR-012)

@@ -93,10 +93,11 @@ src/
 │   │   ├── file-handlers.ts     # IPC handlers
 │   │   ├── file-watcher-handlers.ts  # File watching IPC
 │   │   ├── directory-watcher-handlers.ts  # Directory watching IPC
-│   │   ├── logging-handlers.ts  # Logging IPC
-│   │   ├── git-watcher-handlers.ts # Git watching IPC (v0.6.3)
-│   │   ├── project-lock-handlers.ts # Project lock IPC (v0.6.5)
-│   │   ├── transcription-handlers.ts # Transcription IPC (v0.7.3)
+│   │   ├── logging-handlers.ts  # Logging IPC (getLevel, getLogsDir, openLogsFolder)
+│   │   ├── git-watcher-handlers.ts # Git watching IPC
+│   │   ├── project-lock-handlers.ts # Project lock IPC
+│   │   ├── import-handlers.ts   # Document import IPC (LiteParse)
+│   │   ├── transcription-handlers.ts # Transcription IPC
 │   │   └── terminal-handlers.ts # Terminal emulator IPC
 │   └── utils/
 │       └── PauseController.ts   # Pause/resume with safety timeout
