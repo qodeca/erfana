@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { app } from 'electron'
 import { ErrorCode } from '../../../../shared/errors'
+import { DOCUMENT_IMPORT } from '../../../../shared/constants'
 import { validateFileForImport } from '../../../utils/fileUtils'
 import { isoToTessLang } from '../isoToTessLang'
 import { LITEPARSE_EXCLUDED_EXTENSIONS } from '../extensions'
@@ -28,25 +29,11 @@ const CONVERSION_TIMEOUT_MS = 60_000
 /** PDF extensions -- always available */
 const PDF_EXTENSIONS = ['pdf']
 
-/** Office extensions -- require LibreOffice */
-const OFFICE_EXTENSIONS = [
-  'doc',
-  'docx',
-  'docm',
-  'odt',
-  'rtf',
-  'ppt',
-  'pptx',
-  'pptm',
-  'odp',
-  'xls',
-  'xlsx',
-  'xlsm',
-  'ods'
-]
+/** Office extensions -- require LibreOffice (from shared constants) */
+const OFFICE_EXTENSIONS: readonly string[] = DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS
 
-/** Image extensions -- require ImageMagick */
-const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'tif', 'webp']
+/** Image extensions -- require ImageMagick (from shared constants) */
+const IMAGE_EXTENSIONS: readonly string[] = DOCUMENT_IMPORT.IMAGEMAGICK_EXTENSIONS
 
 /**
  * LiteParse document converter

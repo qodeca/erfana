@@ -319,6 +319,24 @@ export const VIDEO_IMPORT = {
 } as const
 
 /**
+ * Document import configuration constants
+ * Used by LiteParse document import feature for dependency checking
+ *
+ * @see LiteParseConverter.ts
+ * @see Issue #134 - LiteParse frontend UI
+ */
+export const DOCUMENT_IMPORT = {
+  /** Office document extensions that require LibreOffice for conversion */
+  LIBREOFFICE_EXTENSIONS: [
+    'doc', 'docx', 'docm', 'odt', 'rtf',
+    'ppt', 'pptx', 'pptm', 'odp',
+    'xls', 'xlsx', 'xlsm', 'ods'
+  ] as const,
+  /** Image extensions that require ImageMagick for conversion */
+  IMAGEMAGICK_EXTENSIONS: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'tif', 'webp'] as const
+} as const
+
+/**
  * PauseController safety timeout constants
  * Auto-resumes directory watcher if resume() is not called within the timeout
  *

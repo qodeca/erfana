@@ -16,47 +16,19 @@
  * Uses dependency injection for testability.
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useDialog } from '../components/Dialog/DialogContext'
 import { showSuccessToast, showErrorToast, showWarningToast } from '../utils/toastHelpers'
 import { executePromptTemplate } from '../utils/panelUtils'
 import type { PromptVariables } from '../prompts/types'
-import { IMPORT, BYTES_PER_MB, TRANSCRIPTION, VIDEO_IMPORT } from '../../../shared/constants'
+import { IMPORT, BYTES_PER_MB, DOCUMENT_IMPORT } from '../../../shared/constants'
 import { ERROR_MESSAGES, ErrorCode } from '../../../shared/errors'
 import { useTerminalPortalOptional } from '../context/TerminalPortalContext'
+import { isAudioFile, isVideoFile, isMediaFile, isDocumentFile } from '../utils/documentFileUtils'
 import { scheduleScrollIfNeeded } from '../utils/promptScrollScheduler.logic'
 import { logger } from '../utils/logger'
 import { useTranscriptionStore } from '../stores/useTranscriptionStore'
-
-/**
- * Check if a file is an audio file based on its extension.
- * Uses the canonical list from TRANSCRIPTION.SUPPORTED_EXTENSIONS.
- */
-function isAudioFile(fileName: string): boolean {
-  const dotIndex = fileName.lastIndexOf('.')
-  if (dotIndex === -1) return false
-  const ext = fileName.slice(dotIndex + 1).toLowerCase()
-  return (TRANSCRIPTION.SUPPORTED_EXTENSIONS as readonly string[]).includes(ext)
-}
-
-/**
- * Check if a file is a video file based on its extension.
- * Uses the canonical list from VIDEO_IMPORT.SUPPORTED_EXTENSIONS.
- */
-function isVideoFile(fileName: string): boolean {
-  const dotIndex = fileName.lastIndexOf('.')
-  if (dotIndex === -1) return false
-  const ext = fileName.slice(dotIndex + 1).toLowerCase()
-  return (VIDEO_IMPORT.SUPPORTED_EXTENSIONS as readonly string[]).includes(ext)
-}
-
-/**
- * Check if a file is a media file (audio or video) that requires
- * interactive transcription via TranscriptionDialog.
- */
-function isMediaFile(fileName: string): boolean {
-  return isAudioFile(fileName) || isVideoFile(fileName)
-}
+import { useDocumentImportStore } from '../stores/useDocumentImportStore'
 
 /** Size threshold for confirmation dialog (in MB) */
 const LARGE_FILE_THRESHOLD_MB = IMPORT.SIZE_WARNING_THRESHOLD / BYTES_PER_MB
@@ -129,10 +101,17 @@ interface UseImportReturn {
  */
 export function useImport(): UseImportReturn {
   const [isImporting, setIsImporting] = useState(false)
-  const { showConfirm } = useDialog()
+  const { showConfirm, showAlert } = useDialog()
 
   // Terminal portal context for scroll scheduling (issue #52)
   const terminalPortal = useTerminalPortalOptional()
+
+  // Initialize document extension cache and dependency listener (issue #134)
+  useEffect(() => {
+    useDocumentImportStore.getState().fetchExtensions()
+    const cleanup = useDocumentImportStore.getState().initDependencyListener()
+    return cleanup
+  }, [])
 
   /**
    * Process files directly - core import workflow.
@@ -188,8 +167,30 @@ export function useImport(): UseImportReturn {
       }
     }
 
-    // Use non-media files for processing (or all files if no media detected)
-    const filesToProcess = mediaFiles.length > 0 ? nonMediaFiles : files
+    // Filter document files from remaining files (documents require individual import for options)
+    const afterMediaFilter = mediaFiles.length > 0 ? nonMediaFiles : files
+    const documentFiles = afterMediaFilter.filter(f => isDocumentFile(f.name))
+    const nonDocumentFiles = afterMediaFilter.filter(f => !isDocumentFile(f.name))
+
+    if (documentFiles.length > 0) {
+      if (nonDocumentFiles.length > 0) {
+        // Mixed batch: warn about skipped documents, continue with non-documents
+        showWarningToast(
+          'Document files skipped',
+          `${documentFiles.length} document file(s) skipped. Import documents individually to configure options.`
+        )
+      } else {
+        // All-document batch: reject entirely
+        showWarningToast(
+          'Document files not supported in batch',
+          'Import documents individually to configure OCR and conversion options.'
+        )
+        return { successCount: 0, failCount: 0, skippedCount: documentFiles.length + mediaFiles.length, outputPaths: [], failures: [] }
+      }
+    }
+
+    // Use remaining files after filtering media and document files
+    const filesToProcess = documentFiles.length > 0 ? nonDocumentFiles : afterMediaFilter
 
     setIsImporting(true)
     const outputPaths: string[] = []
@@ -255,9 +256,8 @@ export function useImport(): UseImportReturn {
         }
       }
 
-      // Account for media files skipped from batch
-      const totalMediaSkipped = mediaFiles.length
-      skippedCount += totalMediaSkipped
+      // Account for files skipped from batch (media + documents)
+      skippedCount += mediaFiles.length + documentFiles.length
 
       // Summary toast
       const totalProcessed = successCount + failCount
@@ -272,7 +272,7 @@ export function useImport(): UseImportReturn {
           showErrorToast('Import failed', `Failed to import ${failCount} files`)
         }
         // Note: If all files were skipped (skippedCount === files.length), no summary needed
-      } else if (successCount === 1) {
+      } else if (successCount === 1 && filesToProcess.length > 0) {
         // Single file success
         showSuccessToast('File imported', `"${filesToProcess[0].name}" imported successfully`)
       }
@@ -336,6 +336,37 @@ export function useImport(): UseImportReturn {
       return null
     }
 
+    // Route document files to DocumentImportDialog for interactive import
+    if (isDocumentFile(selectedFile.name)) {
+      useDocumentImportStore.getState().openDialog(
+        selectedFile.path,
+        selectedFile.name,
+        selectedFile.sizeInMB,
+        selectedFile.extension
+      )
+      return null
+    }
+
+    // Check if file needs a missing dependency (show modal instead of silent failure)
+    const ext = selectedFile.extension.toLowerCase()
+    const depState = useDocumentImportStore.getState()
+
+    if ((DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasLibreOffice) {
+      await showAlert({
+        title: 'LibreOffice required',
+        message: `Importing .${ext} files requires LibreOffice.\n\nInstall LibreOffice from https://www.libreoffice.org/download and restart the application.`
+      })
+      return null
+    }
+
+    if ((DOCUMENT_IMPORT.IMAGEMAGICK_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasImageMagick) {
+      await showAlert({
+        title: 'ImageMagick required',
+        message: `Importing .${ext} files requires ImageMagick.\n\nInstall via Homebrew: brew install imagemagick\nor download from https://imagemagick.org/script/download.php`
+      })
+      return null
+    }
+
     // 2. Convert to ImportFileInfo format
     // Note: selectFile API returns sizeInMB (decimal MB), convert to bytes
     const fileInfo: ImportFileInfo = {
@@ -348,7 +379,7 @@ export function useImport(): UseImportReturn {
     const result = await processFiles([fileInfo])
 
     return result.outputPaths[0] ?? null
-  }, [processFiles])
+  }, [processFiles, showAlert])
 
   return {
     isImporting,

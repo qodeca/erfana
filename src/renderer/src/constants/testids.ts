@@ -551,6 +551,35 @@ export const TEST_IDS = {
   TRANSCRIPTION_BTN_DONE: 'transcription-btn-done',
 
   // =========================================================================
+  // Document Import Dialog (12)
+  // =========================================================================
+
+  /** Document import dialog container */
+  DOCUMENT_IMPORT_DIALOG: 'doc-import-dialog',
+  /** File info display area */
+  DOCUMENT_IMPORT_FILE_INFO: 'doc-import-file-info',
+  /** OCR toggle checkbox */
+  DOCUMENT_IMPORT_OCR_TOGGLE: 'doc-import-ocr-toggle',
+  /** OCR language select dropdown */
+  DOCUMENT_IMPORT_LANGUAGE_SELECT: 'doc-import-language-select',
+  /** Screenshots toggle checkbox */
+  DOCUMENT_IMPORT_SCREENSHOTS_TOGGLE: 'doc-import-screenshots-toggle',
+  /** DPI select dropdown */
+  DOCUMENT_IMPORT_DPI_SELECT: 'doc-import-dpi-select',
+  /** Start import button */
+  DOCUMENT_IMPORT_BTN_START: 'doc-import-btn-start',
+  /** Cancel button */
+  DOCUMENT_IMPORT_BTN_CANCEL: 'doc-import-btn-cancel',
+  /** Retry button (shown on error) */
+  DOCUMENT_IMPORT_BTN_RETRY: 'doc-import-btn-retry',
+  /** Done button (shown on success) */
+  DOCUMENT_IMPORT_BTN_DONE: 'doc-import-btn-done',
+  /** Progress section container */
+  DOCUMENT_IMPORT_PROGRESS: 'doc-import-progress',
+  /** Phase text display */
+  DOCUMENT_IMPORT_PHASE_TEXT: 'doc-import-phase-text',
+
+  // =========================================================================
   // Welcome Panel (4)
   // =========================================================================
 

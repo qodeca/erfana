@@ -116,6 +116,12 @@ describe('TEST_IDS', () => {
       expect(transcriptionIds).toHaveLength(10)
     })
 
+    it('should have 12 Document Import Dialog IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const docImportIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('DOCUMENT_IMPORT_'))
+      expect(docImportIds).toHaveLength(12)
+    })
+
     it('should have 6 Document Stats Bar IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const statsIds = Object.keys(TEST_IDS).filter(

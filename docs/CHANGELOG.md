@@ -4,6 +4,22 @@ Historical changelog entries for versions prior to current. For the latest chang
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## 0.8.3
+
+### Added
+- **Document import dialog** – DocumentImportDialog with OCR, language, screenshot, and DPI options for LiteParse document imports (#134)
+- **OCR language selection** – OcrLanguageSelect component with 31 Tesseract ISO 639-3 languages
+- **Document import store** – useDocumentImportStore (Zustand) for dialog state, import options persistence, and extension cache
+- **Document file routing** – useImport routes document files to DocumentImportDialog with extension cache
+- **Batch drag-drop filtering** – Document files filtered from batch imports with warning toast
+- **Dependency-missing modal** – Modal popup for missing LibreOffice/ImageMagick with install guidance
+- **Warning design tokens** – Added `--color-warning-bg` and `--color-warning-border` to design tokens
+- **E2E test** – Document import dialog flow test with PDF fixture
+- **Unit tests** – 68 new tests for document import store (46) and OCR language select (22)
+
+### Removed
+- PdfConverter fully removed (completed in #132) – no source references remain
+
 ## 0.8.2
 
 ### Fixed

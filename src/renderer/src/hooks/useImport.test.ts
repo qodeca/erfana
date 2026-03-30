@@ -20,9 +20,11 @@ import { IMPORT } from '../../../shared/constants'
 
 // Mock the dialog context
 const mockShowConfirm = vi.fn()
+const mockShowAlert = vi.fn().mockResolvedValue(undefined)
 vi.mock('../components/Dialog/DialogContext', () => ({
   useDialog: () => ({
-    showConfirm: mockShowConfirm
+    showConfirm: mockShowConfirm,
+    showAlert: mockShowAlert
   })
 }))
 
@@ -78,6 +80,28 @@ vi.mock('../stores/useTranscriptionStore', () => ({
   )
 }))
 
+// Mock useDocumentImportStore
+const mockDocImportOpenDialog = vi.fn()
+const mockFetchExtensions = vi.fn().mockResolvedValue(undefined)
+const mockInitDependencyListener = vi.fn().mockReturnValue(() => {})
+vi.mock('../stores/useDocumentImportStore', () => ({
+  useDocumentImportStore: Object.assign(
+    vi.fn(() => ({
+      isOpen: false,
+      documentExtensions: [],
+      openDialog: mockDocImportOpenDialog
+    })),
+    {
+      getState: vi.fn(() => ({
+        openDialog: mockDocImportOpenDialog,
+        documentExtensions: [],
+        fetchExtensions: mockFetchExtensions,
+        initDependencyListener: mockInitDependencyListener
+      }))
+    }
+  )
+}))
+
 // Mock window.api
 const mockSelectFile = vi.fn()
 const mockProcessImport = vi.fn()
@@ -89,7 +113,9 @@ Object.defineProperty(window, 'api', {
   value: {
     import: {
       selectFile: mockSelectFile,
-      process: mockProcessImport
+      process: mockProcessImport,
+      getDocumentExtensions: vi.fn().mockResolvedValue([]),
+      onDependenciesReady: vi.fn().mockReturnValue(() => {})
     },
     transcription: {
       validate: mockValidateAudio
@@ -551,7 +577,7 @@ describe('useImport', () => {
         path: '/external/file.pdf',
         name: 'file.pdf',
         sizeInMB: 5.5, // 5.5 MB
-        extension: '.pdf'
+        extension: 'pdf'
       })
 
       const { result } = renderHook(() => useImport())
@@ -570,7 +596,7 @@ describe('useImport', () => {
         path: '/external/file.pdf',
         name: 'file.pdf',
         sizeInMB: 1,
-        extension: '.pdf'
+        extension: 'pdf'
       })
       mockProcessImport.mockResolvedValue({
         success: true,
@@ -832,7 +858,7 @@ describe('useImport', () => {
         path: '/external/presentation.mp4',
         name: 'presentation.mp4',
         sizeInMB: 500,
-        extension: '.mp4'
+        extension: 'mp4'
       })
 
       const { result } = renderHook(() => useImport())
@@ -852,7 +878,7 @@ describe('useImport', () => {
         path: '/external/screencast.mov',
         name: 'screencast.mov',
         sizeInMB: 200,
-        extension: '.mov'
+        extension: 'mov'
       })
 
       const { result } = renderHook(() => useImport())
@@ -872,7 +898,7 @@ describe('useImport', () => {
         path: '/external/lecture.mkv',
         name: 'lecture.mkv',
         sizeInMB: 800,
-        extension: '.mkv'
+        extension: 'mkv'
       })
 
       const { result } = renderHook(() => useImport())
@@ -892,7 +918,7 @@ describe('useImport', () => {
         path: '/external/clip.avi',
         name: 'clip.avi',
         sizeInMB: 100,
-        extension: '.avi'
+        extension: 'avi'
       })
 
       const { result } = renderHook(() => useImport())
@@ -911,7 +937,7 @@ describe('useImport', () => {
         path: '/external/video.webm',
         name: 'video.webm',
         sizeInMB: 50,
-        extension: '.webm'
+        extension: 'webm'
       })
 
       const { result } = renderHook(() => useImport())
@@ -929,7 +955,7 @@ describe('useImport', () => {
         path: '/external/old.flv',
         name: 'old.flv',
         sizeInMB: 30,
-        extension: '.flv'
+        extension: 'flv'
       })
 
       const { result } = renderHook(() => useImport())
@@ -947,7 +973,7 @@ describe('useImport', () => {
         path: '/external/recording.wmv',
         name: 'recording.wmv',
         sizeInMB: 120,
-        extension: '.wmv'
+        extension: 'wmv'
       })
 
       const { result } = renderHook(() => useImport())
@@ -965,7 +991,7 @@ describe('useImport', () => {
         path: '/external/video.mp4',
         name: 'video.mp4',
         sizeInMB: 100,
-        extension: '.mp4'
+        extension: 'mp4'
       })
 
       const { result } = renderHook(() => useImport())
@@ -1101,7 +1127,7 @@ describe('useImport', () => {
         path: '/path/to/VIDEO.MP4',
         name: 'VIDEO.MP4',
         sizeInMB: 10,
-        extension: '.MP4'
+        extension: 'MP4'
       })
 
       const { result } = renderHook(() => useImport())
@@ -1120,7 +1146,7 @@ describe('useImport', () => {
         path: '/external/recording.mp3',
         name: 'recording.mp3',
         sizeInMB: 10,
-        extension: '.mp3'
+        extension: 'mp3'
       })
       mockValidateAudio.mockResolvedValue({ valid: true })
 
@@ -1141,7 +1167,7 @@ describe('useImport', () => {
         path: '/external/audio.ogg',
         name: 'audio.ogg',
         sizeInMB: 5,
-        extension: '.ogg'
+        extension: 'ogg'
       })
       mockValidateAudio.mockResolvedValue({ valid: true })
 
@@ -1162,7 +1188,7 @@ describe('useImport', () => {
         path: '/external/document.pdf',
         name: 'document.pdf',
         sizeInMB: 2,
-        extension: '.pdf'
+        extension: 'pdf'
       })
 
       const { result } = renderHook(() => useImport())
@@ -1182,7 +1208,7 @@ describe('useImport', () => {
         path: '/external/corrupt.mp3',
         name: 'corrupt.mp3',
         sizeInMB: 3,
-        extension: '.mp3'
+        extension: 'mp3'
       })
       mockValidateAudio.mockResolvedValue({ valid: false, error: 'File is corrupted' })
 
@@ -1239,6 +1265,175 @@ describe('useImport', () => {
       )
       expect(mockProcessImport).not.toHaveBeenCalled()
       expect(processResult?.skippedCount).toBe(2)
+    })
+  })
+
+  // Document file routing tests
+  describe('document file routing', () => {
+    it('should route document files to DocumentImportDialog', async () => {
+      // Set up extensions cache to include pdf
+      const { useDocumentImportStore } = await import('../stores/useDocumentImportStore')
+      const mockGetState = vi.mocked(useDocumentImportStore.getState)
+      mockGetState.mockReturnValue({
+        ...mockGetState(),
+        documentExtensions: ['pdf', 'docx', 'pptx'],
+        openDialog: mockDocImportOpenDialog,
+        fetchExtensions: mockFetchExtensions,
+        initDependencyListener: mockInitDependencyListener
+      } as any)
+
+      mockSelectFile.mockResolvedValueOnce({
+        path: '/test/document.pdf',
+        name: 'document.pdf',
+        sizeInMB: 1.5,
+        extension: 'pdf'
+      })
+
+      const { result } = renderHook(() => useImport())
+      let importResult: string | null = null
+      await act(async () => {
+        importResult = await result.current.importFile()
+      })
+
+      expect(mockDocImportOpenDialog).toHaveBeenCalledWith(
+        '/test/document.pdf',
+        'document.pdf',
+        1.5,
+        'pdf'
+      )
+      expect(importResult).toBeNull()
+      expect(mockProcessImport).not.toHaveBeenCalled()
+    })
+
+    it('should show LibreOffice required alert for Office files when missing', async () => {
+      const { useDocumentImportStore } = await import('../stores/useDocumentImportStore')
+      const mockGetState = vi.mocked(useDocumentImportStore.getState)
+      mockGetState.mockReturnValue({
+        ...mockGetState(),
+        documentExtensions: [],
+        hasLibreOffice: false,
+        hasImageMagick: true,
+        openDialog: mockDocImportOpenDialog,
+        fetchExtensions: mockFetchExtensions,
+        initDependencyListener: mockInitDependencyListener
+      } as any)
+
+      mockSelectFile.mockResolvedValueOnce({
+        path: '/test/report.docx',
+        name: 'report.docx',
+        sizeInMB: 2.0,
+        extension: 'docx'
+      })
+
+      const { result } = renderHook(() => useImport())
+      await act(async () => {
+        await result.current.importFile()
+      })
+
+      expect(mockShowAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'LibreOffice required'
+        })
+      )
+      expect(mockDocImportOpenDialog).not.toHaveBeenCalled()
+      expect(mockProcessImport).not.toHaveBeenCalled()
+    })
+
+    it('should show ImageMagick required alert for image files when missing', async () => {
+      const { useDocumentImportStore } = await import('../stores/useDocumentImportStore')
+      const mockGetState = vi.mocked(useDocumentImportStore.getState)
+      mockGetState.mockReturnValue({
+        ...mockGetState(),
+        documentExtensions: [],
+        hasLibreOffice: true,
+        hasImageMagick: false,
+        openDialog: mockDocImportOpenDialog,
+        fetchExtensions: mockFetchExtensions,
+        initDependencyListener: mockInitDependencyListener
+      } as any)
+
+      mockSelectFile.mockResolvedValueOnce({
+        path: '/test/scan.tiff',
+        name: 'scan.tiff',
+        sizeInMB: 5.0,
+        extension: 'tiff'
+      })
+
+      const { result } = renderHook(() => useImport())
+      await act(async () => {
+        await result.current.importFile()
+      })
+
+      expect(mockShowAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'ImageMagick required'
+        })
+      )
+    })
+
+    it('should filter document files from batch with warning toast', async () => {
+      const { useDocumentImportStore } = await import('../stores/useDocumentImportStore')
+      const mockGetState = vi.mocked(useDocumentImportStore.getState)
+      mockGetState.mockReturnValue({
+        ...mockGetState(),
+        documentExtensions: ['pdf'],
+        openDialog: mockDocImportOpenDialog,
+        fetchExtensions: mockFetchExtensions,
+        initDependencyListener: mockInitDependencyListener
+      } as any)
+
+      const files = [
+        createTestFile({ path: '/test/doc.pdf', name: 'doc.pdf' }),
+        createTestFile({ path: '/test/notes.md', name: 'notes.md' })
+      ]
+
+      mockProcessImport.mockResolvedValue({
+        success: true,
+        outputPath: '/project/import/notes.md'
+      })
+
+      const { result } = renderHook(() => useImport())
+      await act(async () => {
+        await result.current.processFiles(files)
+      })
+
+      expect(mockShowWarningToast).toHaveBeenCalledWith(
+        'Document files skipped',
+        expect.stringContaining('1 document file(s) skipped')
+      )
+      // Only the .md file should be processed
+      expect(mockProcessImport).toHaveBeenCalledTimes(1)
+      expect(mockProcessImport).toHaveBeenCalledWith('/test/notes.md')
+    })
+
+    it('should reject all-document batch with warning toast', async () => {
+      const { useDocumentImportStore } = await import('../stores/useDocumentImportStore')
+      const mockGetState = vi.mocked(useDocumentImportStore.getState)
+      mockGetState.mockReturnValue({
+        ...mockGetState(),
+        documentExtensions: ['pdf', 'docx'],
+        openDialog: mockDocImportOpenDialog,
+        fetchExtensions: mockFetchExtensions,
+        initDependencyListener: mockInitDependencyListener
+      } as any)
+
+      const files = [
+        createTestFile({ path: '/test/a.pdf', name: 'a.pdf' }),
+        createTestFile({ path: '/test/b.docx', name: 'b.docx' })
+      ]
+
+      const { result } = renderHook(() => useImport())
+      let processResult: any
+      await act(async () => {
+        processResult = await result.current.processFiles(files)
+      })
+
+      expect(mockShowWarningToast).toHaveBeenCalledWith(
+        'Document files not supported in batch',
+        expect.any(String)
+      )
+      expect(processResult.skippedCount).toBe(2)
+      expect(mockProcessImport).not.toHaveBeenCalled()
     })
   })
 })
