@@ -61,7 +61,7 @@ Protected against:
 ### CSP Compatibility
 Content Security Policy enforces:
 - Scripts from app only
-- Images from HTTPS sources
+- Images from HTTPS sources and data URIs (base64)
 - No inline event handlers
 - Controlled style sources
 
