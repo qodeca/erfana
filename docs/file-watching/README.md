@@ -195,7 +195,7 @@ Monitors git repository state files for real-time status updates in the Project 
 
 - **Library**: Chokidar (native fs events)
 - **Multi-path Watching**: Watches all git state files that affect status
-- **Ready Timeout**: 5s (`WATCHER_READY_TIMEOUT_MS`) – if chokidar doesn't emit `ready` within timeout, watcher proceeds with timeout path; `readyFired` guard prevents double-fire; diagnostic logging includes `elapsedMs`, `pathCount`, `timeoutMs`
+- **Ready Timeout**: 5s (`WATCHER_READY_TIMEOUT_MS`) – if chokidar doesn't emit `ready` within timeout, watcher proceeds with timeout path; `raceResolved` guard prevents double-fire; diagnostic logging includes `elapsedMs`, `pathCount`, `timeoutMs`
 - **Event Coalescing**: 150ms window to prevent refresh storms
 - **Auto-recovery**: Exponential backoff (800ms, 1600ms, 3200ms)
 - **Session Tokens**: Guards against stale events during project switches
