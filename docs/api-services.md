@@ -6,8 +6,6 @@ Supporting service classes for terminal emulation, file operations, file watchin
 
 ## Overview
 
-This document covers supporting services.
-
 ## TerminalService
 
 **File:** `src/main/services/TerminalService.ts`

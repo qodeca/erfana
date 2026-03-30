@@ -7,7 +7,7 @@ Historical changelog entries for versions prior to current. For the latest chang
 ## 0.8.3
 
 ### Improved
-- **GitWatcherService ready/timeout lifecycle** – Named `WATCHER_READY_TIMEOUT_MS` constant (5s), `readyFired` guard preventing double-fire, `clearTimeout` on ready, late-ready handler after timeout, diagnostic logging with `elapsedMs`/`pathCount`/`timeoutMs`, health logger starts on both ready and timeout paths (#136)
+- **GitWatcherService ready/timeout lifecycle** – Named `WATCHER_READY_TIMEOUT_MS` constant (5s), `raceResolved` guard preventing double-fire, `clearTimeout` on ready, late-ready handler after timeout, diagnostic logging with `elapsedMs`/`pathCount`/`timeoutMs`, health logger starts on both ready and timeout paths (#136)
 
 ### Added
 - **Document import dialog** – DocumentImportDialog with OCR, language, screenshot, and DPI options for LiteParse document imports (#134)

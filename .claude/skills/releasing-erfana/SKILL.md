@@ -1,6 +1,6 @@
 ---
 name: releasing-erfana
-description: Build and release new versions of the Erfana Electron app. Runs quality gates (lint, typecheck, tests, security audit), builds platform packages, generates user-friendly release notes, and creates git tags. Use when asked to "release", "build release", "prepare release", or "new version".
+description: Build and release new versions of the Erfana Electron app. Runs quality gates (lint, typecheck, tests, security audit), builds platform packages, generates user-friendly release notes, and creates git tags. Use when a new version of Erfana is ready to ship and needs a production-quality build with verified artifacts.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList
 ---
 
@@ -18,6 +18,18 @@ Activate when user says:
 - "create release"
 - "build for production"
 
+## Prerequisites
+
+| Dependency | Purpose | Check command |
+|-----------|---------|---------------|
+| `git` | Version control, tagging | `git --version` |
+| `node` (>=18) | Runtime for build tools | `node --version` |
+| `npm` | Package management, script runner | `npm --version` |
+| `codesign` | macOS code signing verification | `which codesign` |
+| `hdiutil` | macOS DMG mounting for smoke tests | `which hdiutil` |
+
+Phase 0.2 verifies these are available before proceeding.
+
 ## Agents
 
 | Agent | Purpose | Source | Used in |
@@ -25,6 +37,10 @@ Activate when user says:
 | `release-quality-runner` | Run lint, typecheck, tests, security audit | shared | Phase 1 |
 | `release-build-executor` | Build packages, verify output, smoke test | shared | Phase 2 |
 | `release-notes-drafter` | Analyze commits, draft user-focused notes | shared | Phase 3 |
+
+### Tool scope notes
+
+**Bash** is used at skill level for 6 lightweight pre-flight commands only (`pgrep`, `git status`, `git tag`, `grep package.json`, `git push`). All substantive work (quality gates, builds, release notes) is delegated to agents. A dedicated agent for these commands would add complexity without safety benefit since they are all read-only except `git tag`/`git push` which require user confirmation.
 
 ## Quick reference
 
@@ -107,7 +123,24 @@ git status --porcelain
 - [ ] No dev servers running (or user confirms kill)
 - [ ] No uncommitted changes (or user confirms proceed)
 
-### 0.2.5 Change classification (empty release guard)
+### 0.3 Validate version string (semver)
+
+Before the version flows into any path or command, validate it:
+
+```bash
+VERSION=$(node -p "require('./package.json').version")
+if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+  echo "FAIL: Version '$VERSION' is not valid semver"
+  exit 1
+fi
+```
+
+- [ ] Version matches `^[0-9]+\.[0-9]+\.[0-9]+$` (no path traversal characters, no spaces, no special chars)
+- [ ] STOP if validation fails – do not proceed with an invalid version string
+
+**Why:** The version string is interpolated into `rm -rf release/{version}/`, `git tag v{version}`, and file paths. Semver validation prevents path traversal and command injection.
+
+### 0.4 Change classification (empty release guard)
 
 ```bash
 # Get last tag
@@ -129,7 +162,7 @@ Options:
 
 This is informational, not blocking – user may have valid reasons for a maintenance release.
 
-### 0.3 Version verification
+### 0.5 Version verification
 
 ```bash
 # Get current version from package.json
@@ -143,7 +176,7 @@ git tag --list 'v*' --sort=-v:refname | head -1
 
 **If version has NOT been bumped** (equals last tag): STOP. Present the semver guide from 0.1, ask user to bump version in package.json, then re-verify. Do not proceed with a version that matches an existing tag.
 
-### 0.4 Checkpoint: confirm version
+### 0.6 Checkpoint: confirm version
 
 **Ask user:** "Ready to release version **{version}**? This will be tagged as `v{version}`."
 
@@ -152,6 +185,14 @@ Options:
 - Need to bump version first (stop and let user update package.json)
 
 **Post-checkpoint validation:** User explicitly confirmed version.
+
+**Quality gate (Phase 0):**
+- [ ] Version string passes semver validation
+- [ ] No blocking environment issues (dev servers, uncommitted changes resolved)
+- [ ] Version > last tag confirmed
+- [ ] User explicitly confirmed version at checkpoint
+
+On failure: Re-check environment, re-validate version (max 3 retries). After 3 failures, escalate to user with AskUserQuestion explaining what is blocking.
 
 ---
 
@@ -349,6 +390,13 @@ Next steps:
 - Distribute to users
 ```
 
+**Quality gate (Phase 5):**
+- [ ] All phases (0–4) completed and checkpointed
+- [ ] Todo list shows all 6 phases completed
+- [ ] Summary presented to user with all artifact paths and next steps
+
+On failure: If any phase is not marked completed in the todo list, STOP and report which phase was missed. Re-check todo list status (max 3 retries). After 3 failures, escalate to user.
+
 ---
 
 ## Anti-patterns
@@ -377,6 +425,8 @@ Next steps:
 
 ## Examples
 
+> **Note:** Examples show macOS releases (the primary target platform). For Windows or Linux builds, the same phases apply but codesign verification and DMG smoke tests are replaced with platform-specific checks – see `release-build-executor` agent for platform behavior.
+
 ### Example 1: Successful release flow
 
 **User:** "Release new version of erfana"
@@ -384,7 +434,7 @@ Next steps:
 **Skill does:**
 
 1. **Pre-flight:** Creates todo list. Asks bump type (user picks MINOR) and platform (macOS). Checks git status, compares version 0.5.0 vs tag v0.4.6.
-2. **Checkpoint 0.4:** "Ready to release v0.5.0?" → User confirms.
+2. **Checkpoint 0.6:** "Ready to release v0.5.0?" → User confirms.
 3. **Quality gates:** Delegates to `release-quality-runner`. All pass (lint clean, typecheck clean, 7200 tests pass, no critical vulnerabilities).
 4. **Checkpoint 1.4:** Shows quality summary → User confirms.
 5. **Build:** Delegates to `release-build-executor`. DMG 245 MB, codesign PASS, both smoke tests PASS.
