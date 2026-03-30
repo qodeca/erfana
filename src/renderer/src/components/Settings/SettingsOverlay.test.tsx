@@ -66,6 +66,10 @@ describe('SettingsOverlay', () => {
         deleteModel: vi.fn().mockResolvedValue({ success: true }),
         onDownloadProgress: vi.fn().mockReturnValue(vi.fn())
       },
+      logging: {
+        getLogsDir: vi.fn().mockResolvedValue('/Users/test/.erfana/logs'),
+        openLogsFolder: vi.fn().mockResolvedValue('')
+      },
       utils: {
         getPlatform: vi.fn().mockReturnValue('darwin')
       }

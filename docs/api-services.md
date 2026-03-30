@@ -462,6 +462,24 @@ Centralized logging with file persistence.
 - Auto-rolling: 10MB size limit, 100-file rotation, 7-day retention
 - 6 log levels: trace, debug, info, warn, error, fatal
 
+### Public Methods
+
+#### `getLogsDir(): string`
+Get the resolved logs directory path (e.g., `~/.erfana/logs/`).
+
+### IPC Channels
+
+| Channel | Direction | Description |
+|---------|-----------|-------------|
+| `logging:log` | Renderer → Main | Send log entry from renderer process |
+| `logging:getLogsDir` | Renderer → Main | Get resolved logs directory path |
+| `logging:openLogsFolder` | Renderer → Main | Open logs folder in native file manager |
+
+### Preload Bridge
+
+- `api.logging.getLogsDir()` – Returns logs directory path
+- `api.logging.openLogsFolder()` – Opens logs folder via `shell.openPath()`
+
 ### Usage
 ```typescript
 import { MainLogger } from './services/LoggingService'

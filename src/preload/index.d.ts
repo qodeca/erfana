@@ -319,6 +319,8 @@ declare global {
       logging: {
         log: (entry: LogEntry) => void
         getLevel: () => Promise<string>
+        getLogsDir: () => Promise<string>
+        openLogsFolder: () => Promise<string>
       }
       quit: {
         onQuitRequested: (callback: (data: { reason?: string }) => void) => () => void

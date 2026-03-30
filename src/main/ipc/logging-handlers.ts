@@ -7,7 +7,7 @@
  * @see logger.ts - renderer process logger
  * @see Issue #49 - logging layer implementation
  */
-import { ipcMain } from 'electron'
+import { ipcMain, shell } from 'electron'
 import { loggingService } from '../services/LoggingService'
 import { LogEntrySchema } from '../../shared/ipc/logging-schema'
 
@@ -37,5 +37,21 @@ export function registerLoggingHandlers(): void {
    */
   ipcMain.handle('logging:getLevel', async () => {
     return loggingService.getLevel()
+  })
+
+  /**
+   * Get logs directory path
+   * Used by renderer to display the path in settings
+   */
+  ipcMain.handle('logging:getLogsDir', async () => {
+    return loggingService.getLogsDir()
+  })
+
+  /**
+   * Open logs folder in the system file manager
+   * Returns empty string on success, error string on failure
+   */
+  ipcMain.handle('logging:openLogsFolder', async () => {
+    return shell.openPath(loggingService.getLogsDir())
   })
 }
