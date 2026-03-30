@@ -24,7 +24,7 @@ The `DocumentImportDialog` shall provide a checkbox to enable/disable OCR (defau
 
 ### FR-006: OCR language selection
 
-The dialog shall provide a language selector for OCR (reusing `LanguageSelect` component from transcription). The selected language shall be passed to LiteParse's `ocrLanguage` configuration.
+The dialog shall provide a language selector for OCR via a dedicated `OcrLanguageSelect` component (not reusing transcription's `LanguageSelect` – Tesseract requires ISO 639-3 codes while transcription uses ISO 639-1). The selected language shall be passed to LiteParse's `ocrLanguage` configuration.
 
 ### FR-007: Page screenshot generation
 
@@ -40,7 +40,7 @@ Imported documents shall include YAML frontmatter with: `source` (original filen
 
 ### FR-010: Dependency detection service
 
-A `DependencyDetector` service shall check for LibreOffice and ImageMagick at app startup and cache results for the session. Two-phase approach: `LiteParseConverter` registers synchronously with PDF-only extensions. `DependencyDetector.detect()` runs async in the background with a 5-second timeout per command. On completion, calls `converterRegistry.updateConverterExtensions('document', additionalExtensions)` to add Office/image extensions, and fires `import:dependenciesReady` IPC event to notify the renderer. Detection commands: `soffice --version` (LibreOffice), `magick --version` with fallback to `convert --version` (ImageMagick v6 compatibility). On macOS, also check `/Applications/LibreOffice.app/Contents/MacOS/soffice` directly. `ImportService` uses the shared `converterRegistry` singleton (not a private instance).
+A `DependencyDetector` service shall check for LibreOffice and ImageMagick at app startup and cache results for the session. Two-phase approach: `LiteParseConverter` registers synchronously with PDF-only extensions. `DependencyDetector.detect()` runs async in the background with a 5-second timeout per command. On completion, the app startup orchestrator (not `DependencyDetector` itself – SRP) calls `converterRegistry.updateConverterExtensions('document', additionalExtensions)` to add Office/image extensions, and fires `import:dependenciesReady` IPC event to notify the renderer. Detection commands: `soffice --version` (LibreOffice), `magick --version` with fallback to `convert --version` (ImageMagick v6 compatibility). On macOS, also check `/Applications/LibreOffice.app/Contents/MacOS/soffice` directly. `ImportService` uses the shared `converterRegistry` singleton (not a private instance).
 
 ### FR-011: Dynamic extension registration
 
@@ -56,7 +56,7 @@ A new dialog component shall open when importing document files (PDF, Office, im
 
 ### FR-014: Import progress
 
-The dialog shall display an **indeterminate** progress indicator during import (LiteParse's `parse()` API has no progress callback). The indicator shows "Parsing document..." while parsing, and "Generating screenshots..." if screenshots are enabled. The `import:documentProgress` IPC channel streams phase transitions only (not per-page). The progress schema (`ImportDocumentProgress`) shall include optional `warnings` for non-fatal OCR failures.
+The dialog shall display an **indeterminate** progress indicator during import (LiteParse's `parse()` API has no progress callback). The indicator shows "Parsing document..." while parsing, and "Generating screenshots..." if screenshots are enabled. The `import:documentProgress` IPC channel streams phase transitions only (not per-page). The progress schema (`DocumentImportProgress`) shall include optional `warnings` for non-fatal OCR failures.
 
 ### FR-015: Post-import actions
 

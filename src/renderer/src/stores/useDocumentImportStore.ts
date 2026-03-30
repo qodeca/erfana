@@ -251,7 +251,7 @@ export const useDocumentImportStore = create<DocumentImportState>((set, get) => 
     }
 
     try {
-      await window.api.import.documentCancel()
+      await window.api.import.cancelDocument()
     } catch {
       // Cancel is best-effort; the import may have already completed
     }

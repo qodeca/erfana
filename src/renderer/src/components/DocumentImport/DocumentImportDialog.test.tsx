@@ -258,6 +258,22 @@ describe('DocumentImportDialog', () => {
       expect(dpiSelect).toBeEnabled()
     })
 
+    it('shows 100-page screenshot limit hint when screenshots enabled', () => {
+      useDocumentImportStore.setState({ ...openFileState, lastScreenshots: true })
+
+      render(<DocumentImportDialog />)
+      expect(screen.getByTestId('doc-import-screenshot-hint')).toHaveTextContent(
+        'Screenshots will be generated for the first 100 pages only.'
+      )
+    })
+
+    it('hides screenshot limit hint when screenshots disabled', () => {
+      useDocumentImportStore.setState({ ...openFileState, lastScreenshots: false })
+
+      render(<DocumentImportDialog />)
+      expect(screen.queryByTestId('doc-import-screenshot-hint')).not.toBeInTheDocument()
+    })
+
     it('language select is disabled when OCR is off', () => {
       useDocumentImportStore.setState({ ...openFileState, lastOcr: false })
 
@@ -379,18 +395,18 @@ describe('DocumentImportDialog', () => {
       expect(cancelImportSpy).toHaveBeenCalledOnce()
     })
 
-    it('OCR warning banner appears when progress.warning is set', () => {
+    it('OCR warning banner appears when progress.warnings is set', () => {
       useDocumentImportStore.setState({
         ...openFileState,
         isImporting: true,
-        progress: { percent: 10, phase: 'Initializing', warning: 'Tesseract not available' }
+        progress: { percent: 10, phase: 'Initializing', warnings: 'Tesseract not available' }
       })
 
       render(<DocumentImportDialog />)
       expect(screen.getByRole('alert')).toHaveTextContent('Tesseract not available')
     })
 
-    it('no warning banner when progress.warning is absent', () => {
+    it('no warning banner when progress.warnings is absent', () => {
       useDocumentImportStore.setState({
         ...openFileState,
         isImporting: true,

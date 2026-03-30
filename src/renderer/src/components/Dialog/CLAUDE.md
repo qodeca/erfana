@@ -76,3 +76,5 @@ All dialogs MUST compose on `BaseDialog`. Never build portals, overlays, or focu
 | `ConflictDialog.tsx` | File conflict resolution |
 | `DialogContext.tsx` | Dialog stack manager (z-index) |
 | `dialogService.ts` | Imperative dialog API |
+| `../DocumentImport/DocumentImportDialog.tsx` | Multi-state: options → progress → success/error (LiteParse) |
+| `../Transcription/TranscriptionDialog.tsx` | Multi-state: options → progress → success/error (transcription) |

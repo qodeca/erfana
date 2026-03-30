@@ -62,7 +62,7 @@ import '../index'
 
 type ImportBridge = {
   documentImport: (request: unknown) => Promise<unknown>
-  documentCancel: () => Promise<unknown>
+  cancelDocument: () => Promise<unknown>
   getDocumentExtensions: () => Promise<unknown>
   onDocumentProgress: (cb: (data: unknown) => void) => () => void
   onDependenciesReady: (cb: (data: unknown) => void) => () => void
@@ -91,10 +91,10 @@ describe('api.import – document import bridge', () => {
     expect(mockInvoke).toHaveBeenCalledWith('import:document', request)
   })
 
-  it('documentCancel invokes import:documentCancel channel', async () => {
+  it('cancelDocument invokes import:documentCancel channel', async () => {
     mockInvoke.mockResolvedValueOnce({ success: true })
 
-    await getImportApi().documentCancel()
+    await getImportApi().cancelDocument()
 
     expect(mockInvoke).toHaveBeenCalledWith('import:documentCancel')
   })

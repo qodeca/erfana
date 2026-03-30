@@ -407,7 +407,7 @@ Document import converter for 50+ formats via `@llamaindex/liteparse` with local
 - `src/shared/ipc/import-channels.ts` – Channel name constants (`IMPORT_CHANNELS`)
 - `src/shared/ipc/import-schema.ts` – Zod schemas (`DocumentImportRequestSchema`, `DocumentImportOptionsSchema`) and TypeScript interfaces (`DocumentImportProgress`, `DocumentImportResult`, `DependencyReadyEvent`)
 - `src/main/ipc/import-handlers.ts` – `registerDocumentImportHandlers()` with 3 IPC handlers (`import:document`, `import:documentCancel`, `import:getDocumentExtensions`) and 2 push events (`import:documentProgress`, `import:dependenciesReady`)
-- `src/preload/index.ts` – `api.import` namespace: `documentImport(request)`, `documentCancel()`, `getDocumentExtensions()`, `onDocumentProgress(callback)`, `onDependenciesReady(callback)`
+- `src/preload/index.ts` – `api.import` namespace: `documentImport(request)`, `cancelDocument()`, `getDocumentExtensions()`, `onDocumentProgress(callback)`, `onDependenciesReady(callback)`
 - Error code: `IMPORT_BUSY` (in `src/shared/errors.ts`) – returned when import is already in progress
 
 ### Related files

@@ -190,7 +190,31 @@ export function useImport(): UseImportReturn {
     }
 
     // Use remaining files after filtering media and document files
-    const filesToProcess = documentFiles.length > 0 ? nonDocumentFiles : afterMediaFilter
+    let filesToProcess = documentFiles.length > 0 ? nonDocumentFiles : afterMediaFilter
+
+    // Check for files that need missing dependencies (e.g., dropped before detection completes)
+    const depState = useDocumentImportStore.getState()
+    const missingDepFiles = filesToProcess.filter(f => {
+      const ext = f.name.split('.').pop()?.toLowerCase() || ''
+      if ((DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasLibreOffice) return true
+      if ((DOCUMENT_IMPORT.IMAGEMAGICK_EXTENSIONS as readonly string[]).includes(ext) && !depState.hasImageMagick) return true
+      return false
+    })
+
+    if (missingDepFiles.length > 0) {
+      const ext = missingDepFiles[0].name.split('.').pop()?.toLowerCase() || ''
+      const needsLibreOffice = (DOCUMENT_IMPORT.LIBREOFFICE_EXTENSIONS as readonly string[]).includes(ext)
+      await showAlert({
+        title: needsLibreOffice ? 'LibreOffice required' : 'ImageMagick required',
+        message: needsLibreOffice
+          ? `Importing .${ext} files requires LibreOffice.\n\nInstall LibreOffice from https://www.libreoffice.org/download and restart the application.`
+          : `Importing .${ext} files requires ImageMagick.\n\nInstall via Homebrew: brew install imagemagick\nor download from https://imagemagick.org/script/download.php`
+      })
+      filesToProcess = filesToProcess.filter(f => !missingDepFiles.includes(f))
+      if (filesToProcess.length === 0) {
+        return { successCount: 0, failCount: 0, skippedCount: missingDepFiles.length + mediaFiles.length + documentFiles.length, outputPaths: [], failures: [] }
+      }
+    }
 
     setIsImporting(true)
     const outputPaths: string[] = []

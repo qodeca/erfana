@@ -234,7 +234,7 @@ declare global {
         /** Import a document via LiteParse converter with options */
         documentImport: (request: DocumentImportRequest) => Promise<DocumentImportResult>
         /** Cancel an active document import */
-        documentCancel: () => Promise<{ success: boolean; error?: string }>
+        cancelDocument: () => Promise<{ success: boolean; error?: string }>
         /** Get list of supported document extensions (depends on system tools) */
         getDocumentExtensions: () => Promise<string[]>
         /** Subscribe to document import progress events */

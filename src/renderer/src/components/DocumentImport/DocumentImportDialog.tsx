@@ -296,6 +296,13 @@ export function DocumentImportDialog(): JSX.Element | null {
                   <option value={300}>300 DPI (high)</option>
                 </select>
               </div>
+
+              {/* Screenshot page limit warning */}
+              {lastScreenshots && (
+                <div className="doc-import-screenshot-hint" data-testid="doc-import-screenshot-hint">
+                  Screenshots will be generated for the first 100 pages only.
+                </div>
+              )}
             </div>
           )}
 
@@ -340,9 +347,9 @@ export function DocumentImportDialog(): JSX.Element | null {
               </div>
 
               {/* OCR warning banner */}
-              {progress?.warning && (
+              {progress?.warnings && (
                 <div className="doc-import-warning" role="alert">
-                  {progress.warning}
+                  {progress.warnings}
                 </div>
               )}
             </div>
