@@ -273,12 +273,12 @@
       "tier": "T3",
       "slug": "liteparse-document-import",
       "name": "LiteParse document import",
-      "status": "draft",
+      "status": "archived",
       "scope": "feature",
-      "description": "Replace PdfConverter with LiteParse for enhanced document import supporting PDF, Office, and image files with OCR, spatial text output, and optional page screenshots.",
+      "description": "Replace PdfConverter with LiteParse for enhanced document import supporting PDF, Office, and image files with OCR, spatial text output, and optional page screenshots. All stages complete: backend (#132), IPC layer (#133), frontend UI (#134), compliance fixes.",
       "created": "2026-03-28T12:00:00.000Z",
-      "path": "spec-t3-021-liteparse-document-import",
-      "last_modified": "2026-03-28T21:15:00.000Z",
+      "path": "archived/spec-t3-021-liteparse-document-import",
+      "last_modified": "2026-03-30T08:00:00.000Z",
       "sections_count": 3,
       "requirements_count": 73,
       "documents": {
@@ -286,13 +286,17 @@
         "solution_adrs": [],
         "solution_specs": [],
         "designs": [
-          "specs/spec-t3-021-liteparse-document-import/design/001-liteparse-document-import-design.md"
+          "specs/archived/spec-t3-021-liteparse-document-import/design/001-liteparse-document-import-design.md"
         ],
-        "issues": []
+        "issues": [
+          "#132",
+          "#133",
+          "#134"
+        ]
       },
       "components": {
         "total": 6,
-        "implemented": 0,
+        "implemented": 6,
         "list": [
           "main-services",
           "ipc",
@@ -307,6 +311,6 @@
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2026-03-28T21:15:00.000Z"
+    "last_updated": "2026-03-30T08:00:00.000Z"
   }
 }
