@@ -69,7 +69,15 @@ async function handleExecute(id: number, projectPath: string, strategy: GitStatu
     if (strategy === 'native-git') {
       const gitPath = await resolveGitPath()
       if (gitPath) {
-        data = await executeNativeGit(projectPath, gitPath)
+        try {
+          data = await executeNativeGit(projectPath, gitPath)
+        } catch (nativeError) {
+          // Fall back to isomorphic-git on spawn failures (EBADF, EMFILE) or other errors.
+          // This prevents FD-pressure from child process spawns from triggering the circuit
+          // breaker – the worker itself is healthy, only the spawn failed.
+          console.warn('git-status.worker: native git failed, falling back to isomorphic-git:', nativeError instanceof Error ? nativeError.message : nativeError)
+          data = await executeIsomorphicGit(projectPath)
+        }
       } else {
         // FR-004 / AC-006: fall back to isomorphic-git when native git is unavailable
         console.warn('git-status.worker: native git not available, falling back to isomorphic-git')
