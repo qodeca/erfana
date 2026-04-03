@@ -6,19 +6,32 @@ Current issues and their workarounds. For historical resolved issues, see [archi
 
 ## Active Issues
 
-### Git Status: Global .gitignore Not Supported
+### Git Status: Global .gitignore not supported
 
-**Issue**: Files ignored via global gitignore (`~/.gitignore_global` or `~/.config/git/ignore`) may appear as "untracked" in the Project Tree git status indicators.
+**Issue**: Files ignored via global gitignore (`~/.gitignore_global` or `~/.config/git/ignore`) may appear as "untracked" in the project tree git status indicators.
 
-**Root Cause**: isomorphic-git only reads local `.gitignore` files. It does not support global gitignore configuration. This is a known limitation of the library.
-
-**Impact**: Low. Most ignore patterns are in the local `.gitignore`. Only users with global patterns will see unexpected "untracked" badges.
+**Root cause**: isomorphic-git only reads local `.gitignore` files. Does not support global gitignore. Known library limitation.
 
 **Workaround**: Add patterns to the project's local `.gitignore` file instead of global config.
 
 **Tracking**: https://github.com/isomorphic-git/isomorphic-git/issues/444
 
-**Files**: `src/main/services/GitStatusService.ts`
+---
+
+### Large repositories: EMFILE on repos with 50K+ files
+
+**Issue**: Repos with 50K+ tracked files (e.g., monorepos with Git LFS) can exhaust the system file descriptor limit, causing the directory watcher to hit EMFILE and freeze the app.
+
+**Root cause**: chokidar directory watcher + git watcher + terminal PTY together consume most available FDs. On large repos, this exceeds the system FD limit (~10K on macOS).
+
+**Mitigation (v0.9.0)**: Git status now runs in a worker thread (#147) and uses native `git status --porcelain` for repos with `.git/index` > 5 MB. When FD pressure causes EBADF, the worker returns a transient error instead of cascading. The EMFILE restart cascade was also fixed (#146).
+
+**Remaining**: The directory watcher itself still consumes too many FDs on very large repos. Tracked as #148.
+
+**Workaround**: Use `.erfana/settings.json` to ignore large subdirectories:
+```json
+{ "watcher": { "ignoreList": { "mode": "extend", "patterns": ["large-folder"] } } }
+```
 
 ---
 

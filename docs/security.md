@@ -483,14 +483,16 @@ The `afterSign` hook is critical: without it, macOS Sequoia+ rejects `@rpath` li
 - **Dependency isolation** – LibreOffice/ImageMagick invoked via child process with no user-controlled arguments
 - **Zod validation** – All import IPC inputs validated via Zod schemas (`import-schema.ts`)
 
+## Worker thread security (v0.9.0)
+
+Git status runs in a `worker_threads` Worker – same process memory space, no new sandbox boundary. Security: `validateProjectPath()` in IPC handler before worker; worker also rejects non-absolute paths (defense-in-depth). Native git uses `execFile` with array args (no `shell: true`). Git binary resolved via hardcoded allowlist first.
+
 ## Future enhancements
 
-1. **Code signing**: Sign macOS builds with Developer ID (requires Apple Developer account)
-2. **Notarization**: Notarize macOS builds for Gatekeeper (requires code signing)
-3. **Auto-updates**: Implement signed updates with electron-updater
-4. **Encrypted storage**: Use OS keychain for sensitive data (settings, tokens)
-5. **Permission prompts**: Ask user before destructive operations (delete project, etc.)
-6. **Universal binaries with fuses**: Use `afterAllArtifactBuild` hook for universal binaries
+1. **Code signing** + **notarization** for macOS (requires Apple Developer account)
+2. **Auto-updates**: signed updates with electron-updater
+3. **Encrypted storage**: OS keychain for sensitive data
+4. **Permission prompts**: confirmation before destructive operations
 
 ## References
 

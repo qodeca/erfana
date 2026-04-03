@@ -183,7 +183,9 @@ The DirectoryWatcherService automatically recovers from transient filesystem err
 
 After 3 failed restart attempts, the service notifies the user and stops retrying. Restart statistics are tracked in `WatcherMetrics` for debugging.
 
-**Implementation:** `DirectoryWatcherService.ts`, `WatcherMetrics.ts`
+**EMFILE log deduplication**: Uses `RateLimitedLogger` (10s cooldown) to prevent EMFILE error log spam during cascading FD exhaustion. See `src/main/utils/RateLimitedLogger.ts`.
+
+**Implementation:** `DirectoryWatcherService.ts`, `WatcherMetrics.ts`, `RateLimitedLogger.ts`
 
 ---
 

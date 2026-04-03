@@ -40,7 +40,7 @@ src/
 ├── main/           # Electron main process
 │   ├── services/   # Core: FileService, TerminalService, ProjectService, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService, GitStatusWorkerAdapter, GitStatusCircuitBreaker, GitStatusStrategySelector; Watchers: DirectoryWatcherService, FileWatcherService; Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media: ScreenshotService, CameraService, DocxService, TranscriptionService, LocalWhisperService, WhisperModelManager, AudioMetadataService, AudioExtractionService, ApiKeyService; Import: LiteParseConverter, DependencyDetector; Multi-instance: ProjectLockService, ExternalFileService; Subdirs: import/, watcher/, workers/
 │   ├── ipc/        # IPC handlers
-│   └── utils/      # PauseController (pause/resume with safety timeout)
+│   └── utils/      # PauseController (pause/resume with safety timeout), RateLimitedLogger
 ├── preload/        # Context bridge API
 ├── shared/         # Shared code (errors.ts, constants.ts, ipc schemas)
 └── renderer/       # React UI

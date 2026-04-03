@@ -109,8 +109,8 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 ## Resolved Issues
 
-All major issues resolved in recent versions. See [Known Issues](./known-issues.md) for complete history:
-
+- ✅ Git status main-thread blocking (v0.9.0, #147) – offloaded to worker_threads with native git fallback
+- ✅ EMFILE cascade in DirectoryWatcherService (v0.9.0, #146) – restart logic + RateLimitedLogger
 - ✅ Terminal Scroll Jump (v0.3.1)
 - ✅ Terminal Flickering (v0.3.2)
 - ✅ EPIPE Errors (v0.4.0)

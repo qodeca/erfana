@@ -233,6 +233,17 @@ The default log level is `info`. This captures normal operations, warnings, and 
 - **Global error handlers**: Renderer auto-captures `unhandledrejection` and `error` events
 - **Safe console**: `safeConsole` utility (`src/main/utils/safeConsole.ts`) wraps console to suppress EPIPE errors during shutdown. Installed globally on app startup via `installSafeConsole()`. See [EPIPE error handling](./epipe-error-handling.md).
 
+## Diagnostic logging (v0.9.0)
+
+Performance instrumentation added for large-project debugging (#151):
+
+- **Timing**: `GitStatus: completed` with `strategy`, `durationMs`, `fileCount`, `truncated` (info level)
+- **File operations**: `FileService: readDirectory completed` with `durationMs`, `fileCount` (info level)
+- **Project switch**: Per-stage logging with `durationMs` for failure identification
+- **Watcher health**: `DirectoryWatcherService` logs health snapshot every 120s (debug level)
+- **Buffer pressure**: `ThrottledWorker` logs at 80% and 50% buffer capacity (warn/info level)
+- **Rate-limited errors**: `RateLimitedLogger` (`src/main/utils/RateLimitedLogger.ts`) prevents log spam during cascading EMFILE errors (10s default cooldown)
+
 ## Related documentation
 
 - [IPC patterns](./ipc-patterns.md) – IPC communication patterns

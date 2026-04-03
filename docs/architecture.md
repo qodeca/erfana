@@ -74,7 +74,10 @@ src/
 │   │   ├── SettingsService.ts   # Persistent settings (electron-store)
 │   │   ├── GlobalSettingsService.ts  # App-wide settings (~/.erfana/)
 │   │   ├── LoggingService.ts    # File-based logging with rotation
-│   │   ├── GitStatusService.ts  # Git status with operation queue
+│   │   ├── GitStatusService.ts  # Git status orchestrator (delegates to worker)
+│   │   ├── GitStatusWorkerAdapter.ts  # worker_threads adapter (IGitStatusWorker)
+│   │   ├── GitStatusCircuitBreaker.ts # Per-project + global crash tracking
+│   │   ├── GitStatusStrategySelector.ts # Repo size → strategy selection
 │   │   ├── GitWatcherService.ts # Git state file watching (v0.6.3)
 │   │   ├── GitPollingService.ts # Hybrid polling fallback (v0.6.3)
 │   │   ├── ProjectLockService.ts # Multi-instance project locking (v0.6.5)
@@ -88,7 +91,11 @@ src/
 │   │   ├── AudioExtractionService.ts # Video → audio extraction (ffmpeg)
 │   │   ├── ApiKeyService.ts     # Encrypted API key storage (Electron safeStorage)
 │   │   ├── TerminalService.ts   # PTY management with node-pty
+│   │   ├── workers/             # worker_threads scripts (git-status.worker.ts)
+│   │   ├── watcher/             # ThrottledWorker (chunk-processing)
 │   │   └── import/converters/   # LiteParseConverter, Audio/VideoConverter, TextConverter (IConverter)
+│   ├── interfaces/
+│   │   └── IGitStatusWorker.ts  # Worker adapter interface
 │   ├── ipc/
 │   │   ├── file-handlers.ts     # IPC handlers
 │   │   ├── file-watcher-handlers.ts  # File watching IPC
@@ -100,7 +107,8 @@ src/
 │   │   ├── transcription-handlers.ts # Transcription IPC
 │   │   └── terminal-handlers.ts # Terminal emulator IPC
 │   └── utils/
-│       └── PauseController.ts   # Pause/resume with safety timeout
+│       ├── PauseController.ts   # Pause/resume with safety timeout
+│       └── RateLimitedLogger.ts # Cooldown-based log deduplication
 ├── preload/
 │   ├── index.ts              # contextBridge setup
 │   └── index.d.ts            # TypeScript definitions
@@ -143,8 +151,7 @@ src/
   - FileWatcherService: Auto-reload files on external changes (300ms debounce)
   - DirectoryWatcherService: Auto-refresh file tree (1000ms debounce, ignored patterns)
   - SettingsService: Persistent storage with electron-store (dynamic ES Module import)
-  
-  - TerminalService: Terminal emulator with xterm.js + node-pty (PTY lifecycle, WebGL rendering, auto-resize, traditional zsh prompt, cwd verification)
+  - TerminalService: Terminal emulator with xterm.js + node-pty (PTY lifecycle, auto-resize)
 - **Auto-Refresh**: Chokidar-based watching with pause/resume race prevention
   - Session token guards drop stale events during project switches
   - Configurable depth cap (settings-driven) to limit recursion in large projects
@@ -152,6 +159,7 @@ src/
 - **State Management**: Zustand for activity bar state (sidebar widths, active panels)
 - **Component Registry**: Splitview and Dockview use string-based component lookup
 - **Multi-model Editor**: Single Monaco instance, swap models per file
+- **Worker thread offloading**: Git status runs in a `worker_threads` Worker to keep the main thread responsive. Three-layer design: `IGitStatusWorker` (interface) → `GitStatusWorkerAdapter` (wraps worker_threads) → `git-status.worker.ts` (runs isomorphic-git or native git). Circuit breaker disables worker after repeated crashes. Strategy selector uses `.git/index` file size to choose between isomorphic-git (small repos) and native `git status --porcelain` (large repos). See [API Services – Features](./api-services-features.md) for details.
 - **Mermaid Integration**: Client-side diagram rendering (22 types) with dark theme
 - **Prompt Template System**: CSP-compliant markdown templates with Handlebars-style syntax for context menu AI prompts (see [Prompt Templates](./prompts/README.md))
 - **Line Range Tracking**: Enhanced markdown preview with `data-line-start/end` attributes for accurate source mapping
