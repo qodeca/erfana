@@ -139,7 +139,7 @@ export class GitStatusService {
       if (statusMatrixDurationMs > 2000) {
         logger.warn('GitStatus: statusMatrix completed (slow)', { durationMs: statusMatrixDurationMs, matrixRows: matrix.length })
       } else {
-        logger.info('GitStatus: statusMatrix completed', { durationMs: statusMatrixDurationMs, matrixRows: matrix.length })
+        logger.debug('GitStatus: statusMatrix completed', { durationMs: statusMatrixDurationMs, matrixRows: matrix.length })
       }
 
       const files: GitFileEntry[] = []

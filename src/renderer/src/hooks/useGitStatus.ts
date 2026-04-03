@@ -169,7 +169,7 @@ export function useGitStatus({
         setStatus(response)
 
         // Store update confirmation (moved from useGitStore to preserve store purity)
-        logger.info('[useGitStatus] Store updated', {
+        logger.debug('[useGitStatus] Store updated', {
           branch: response.branch,
           fileCount: response.files?.length ?? 0,
           truncated: response.truncated

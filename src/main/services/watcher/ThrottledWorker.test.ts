@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { ThrottledWorker, createThrottledWorker } from './ThrottledWorker'
+import { logger } from '../LoggingService'
 
 vi.mock('../LoggingService', () => ({
   logger: {
@@ -13,6 +14,7 @@ vi.mock('../LoggingService', () => ({
 describe('ThrottledWorker', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    vi.mocked(logger.warn).mockClear()
   })
 
   afterEach(() => {
@@ -428,6 +430,139 @@ describe('ThrottledWorker', () => {
       vi.advanceTimersByTime(80)
       expect(onWork).toHaveBeenCalledTimes(1)
       expect(onWork).toHaveBeenCalledWith(['post-burst-1', 'post-burst-2', 'post-burst-3'])
+    })
+  })
+
+  describe('buffer pressure hysteresis', () => {
+    it('emits warn when buffer reaches 80% via work()', () => {
+      const worker = new ThrottledWorker<number>(
+        { maxWorkChunkSize: 100, collectionDelay: 10, throttleDelay: 50, maxBufferedWork: 100 },
+        { onWork: vi.fn() }
+      )
+
+      for (let i = 0; i < 80; i++) {
+        worker.work(i)
+      }
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        'ThrottledWorker buffer pressure',
+        expect.objectContaining({ current: 80, max: 100, pct: 80 })
+      )
+    })
+
+    it('emits warn when buffer reaches 80% via workMany()', () => {
+      const worker = new ThrottledWorker<number>(
+        { maxWorkChunkSize: 100, collectionDelay: 10, throttleDelay: 50, maxBufferedWork: 100 },
+        { onWork: vi.fn() }
+      )
+
+      worker.workMany(Array.from({ length: 80 }, (_, i) => i))
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        'ThrottledWorker buffer pressure',
+        expect.objectContaining({ current: 80, max: 100, pct: 80 })
+      )
+    })
+
+    it('does not emit warn at 79% fill', () => {
+      const worker = new ThrottledWorker<number>(
+        { maxWorkChunkSize: 100, collectionDelay: 10, throttleDelay: 50, maxBufferedWork: 100 },
+        { onWork: vi.fn() }
+      )
+
+      for (let i = 0; i < 79; i++) {
+        worker.work(i)
+      }
+
+      const pressureCalls = vi.mocked(logger.warn).mock.calls.filter(
+        (args) => args[0] === 'ThrottledWorker buffer pressure'
+      )
+      expect(pressureCalls).toHaveLength(0)
+    })
+
+    it('does not re-emit warn while still above 80%', () => {
+      const worker = new ThrottledWorker<number>(
+        { maxWorkChunkSize: 100, collectionDelay: 10, throttleDelay: 50, maxBufferedWork: 100 },
+        { onWork: vi.fn() }
+      )
+
+      // Fill to 80% (warn fires once)
+      for (let i = 0; i < 80; i++) {
+        worker.work(i)
+      }
+
+      // Add 5 more items while still above 80%
+      for (let i = 80; i < 85; i++) {
+        worker.work(i)
+      }
+
+      const pressureCalls = vi.mocked(logger.warn).mock.calls.filter(
+        (args) => args[0] === 'ThrottledWorker buffer pressure'
+      )
+      expect(pressureCalls).toHaveLength(1)
+    })
+
+    it('re-enables warning after buffer drains below 50%', () => {
+      const onWork = vi.fn()
+      const worker = new ThrottledWorker<number>(
+        // maxWorkChunkSize: 60 so one chunk leaves 20 items in buffer (below 50%)
+        { maxWorkChunkSize: 60, collectionDelay: 10, throttleDelay: 50, maxBufferedWork: 100 },
+        { onWork }
+      )
+
+      // First wave: fill to 80% – warn fires (call #1)
+      for (let i = 0; i < 80; i++) {
+        worker.work(i)
+      }
+
+      // Advance past collectionDelay only, so the first 60-item chunk is processed.
+      // Buffer drops from 80 → 20 items (20% fill). The throttle timer is now pending
+      // but the second chunk has not run yet.
+      vi.advanceTimersByTime(15)
+
+      // Buffer should have 20 items remaining (80 - 60)
+      expect(worker.getBufferSize()).toBe(20)
+
+      // Second wave: adding one item at 20-item buffer (21/100 = 21% fill < 50%).
+      // checkBufferPressure sees fillRatio < 0.5 → resets pressureWarningEmitted.
+      // Then we keep adding until 80% is reached – warn fires again (call #2).
+      for (let i = 100; i < 180; i++) {
+        worker.work(i)
+      }
+
+      // Buffer is now 20 + 80 = 100 items but enforceBufferLimit caps at 100, so 100.
+      // The first work(100) call resets the flag (21/100 < 0.5), subsequent calls
+      // reach 80% and emit the second warning.
+      const pressureCalls = vi.mocked(logger.warn).mock.calls.filter(
+        (args) => args[0] === 'ThrottledWorker buffer pressure'
+      )
+      expect(pressureCalls).toHaveLength(2)
+    })
+
+    it('flush() resets the pressure flag so warn fires again after refill', () => {
+      const worker = new ThrottledWorker<number>(
+        { maxWorkChunkSize: 100, collectionDelay: 10, throttleDelay: 50, maxBufferedWork: 100 },
+        { onWork: vi.fn() }
+      )
+
+      // First wave: fill to 80% – warn fires (call #1)
+      for (let i = 0; i < 80; i++) {
+        worker.work(i)
+      }
+
+      // flush() clears buffer and resets pressureWarningEmitted
+      worker.flush()
+      expect(worker.getBufferSize()).toBe(0)
+
+      // Second wave: fill to 80% again – warn should fire again (call #2)
+      for (let i = 0; i < 80; i++) {
+        worker.work(i)
+      }
+
+      const pressureCalls = vi.mocked(logger.warn).mock.calls.filter(
+        (args) => args[0] === 'ThrottledWorker buffer pressure'
+      )
+      expect(pressureCalls).toHaveLength(2)
     })
   })
 })

@@ -89,20 +89,7 @@ export class ThrottledWorker<T> {
     if (this.isDisposed) return
     this.buffer.push(item)
     this.enforceBufferLimit()
-
-    // Threshold-crossing pattern: warn at 80%, reset at 50%
-    const fillRatio = this.buffer.length / this.options.maxBufferedWork
-    if (fillRatio >= 0.8 && !this.pressureWarningEmitted) {
-      this.pressureWarningEmitted = true
-      logger.warn('ThrottledWorker buffer pressure', {
-        current: this.buffer.length,
-        max: this.options.maxBufferedWork,
-        pct: Math.round(fillRatio * 100)
-      })
-    } else if (fillRatio < 0.5 && this.pressureWarningEmitted) {
-      this.pressureWarningEmitted = false
-    }
-
+    this.checkBufferPressure()
     this.scheduleProcessing()
   }
 
@@ -113,6 +100,7 @@ export class ThrottledWorker<T> {
     if (this.isDisposed) return
     this.buffer.push(...items)
     this.enforceBufferLimit()
+    this.checkBufferPressure()
     this.scheduleProcessing()
   }
 
@@ -164,6 +152,24 @@ export class ThrottledWorker<T> {
   /**
    * Enforce buffer limit, dropping oldest items
    */
+  /**
+   * Threshold-crossing pattern: warn at 80%, reset at 50%
+   * Prevents oscillating log spam around the threshold boundary.
+   */
+  private checkBufferPressure(): void {
+    const fillRatio = this.buffer.length / this.options.maxBufferedWork
+    if (fillRatio >= 0.8 && !this.pressureWarningEmitted) {
+      this.pressureWarningEmitted = true
+      logger.warn('ThrottledWorker buffer pressure', {
+        current: this.buffer.length,
+        max: this.options.maxBufferedWork,
+        pct: Math.round(fillRatio * 100)
+      })
+    } else if (fillRatio < 0.5 && this.pressureWarningEmitted) {
+      this.pressureWarningEmitted = false
+    }
+  }
+
   private enforceBufferLimit(): void {
     if (this.buffer.length > this.options.maxBufferedWork) {
       const droppedCount = this.buffer.length - this.options.maxBufferedWork

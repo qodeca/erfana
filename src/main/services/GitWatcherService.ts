@@ -577,16 +577,14 @@ export class GitWatcherService implements IGitWatcherService {
     this.healthLogInterval = setInterval(() => {
       const snapshot = watcherMetrics.getSnapshot()
 
-      logger.info('GitStatus: Health summary', {
+      logger.debug('GitStatus: Health summary', {
         uptimeMinutes: Math.round(snapshot.uptimeMs / 60000),
         watcherEvents: snapshot.gitWatcherEventCount,
         pollingRefreshes: snapshot.pollingRefreshCount,
         pollingSkipped: snapshot.pollingSkippedCount,
         pollingEfficiency: `${snapshot.pollingEfficiency}%`,
         restarts: snapshot.restartScheduled,
-        errors: Object.keys(snapshot.errorCounts).length > 0
-          ? snapshot.errorCounts
-          : 'none'
+        errors: snapshot.errorCounts
       })
 
       // Degraded state warnings
@@ -597,6 +595,7 @@ export class GitWatcherService implements IGitWatcherService {
         })
       }
     }, HEALTH_LOG_INTERVAL_MS)
+    this.healthLogInterval.unref()
   }
 
   /**

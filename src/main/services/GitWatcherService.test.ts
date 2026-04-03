@@ -319,7 +319,7 @@ describe('GitWatcherService', () => {
       // Health logger should be running – advance 5 minutes and check for health log
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
 
-      expect(mockLogger.info).toHaveBeenCalledWith(
+      expect(mockLogger.debug).toHaveBeenCalledWith(
         'GitStatus: Health summary',
         expect.any(Object)
       )

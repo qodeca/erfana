@@ -600,11 +600,12 @@ export class DirectoryWatcherService {
         activeWatchers: snapshot.activeWatchers,
         eventsReceived: snapshot.eventsReceived,
         bufferOverflows: snapshot.bufferOverflows,
-        errorCounts: Object.keys(snapshot.errorCounts).length > 0 ? snapshot.errorCounts : 'none',
+        errorCounts: snapshot.errorCounts,
         peakEventsPerSecond: snapshot.peakEventsPerSecond,
         resourceCount
       })
     }, 120000)
+    this.healthLogInterval.unref()
   }
 
   /**
