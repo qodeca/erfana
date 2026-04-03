@@ -312,12 +312,12 @@
       "tier": "T3",
       "slug": "git-status-offload",
       "name": "Git status thread offloading",
-      "status": "active",
+      "status": "archived",
       "scope": "improvement",
-      "description": "Move isomorphic-git statusMatrix() from Electron's main thread to a worker_threads worker, add .git/index size guard for large repos, fallback to native git status --porcelain for oversized repos, add cache parameter. Eliminates UI freezes caused by main-thread blocking during git status operations on large repositories (56K+ files).",
+      "description": "Move isomorphic-git statusMatrix() from Electron's main thread to a worker_threads worker, add .git/index size guard for large repos, fallback to native git status --porcelain for oversized repos, add cache parameter. Eliminates UI freezes caused by main-thread blocking during git status operations on large repositories (56K+ files). All stages complete: worker offloading (#147), EMFILE cascade fix (#146), diagnostic logging (#151).",
       "created": "2026-04-02T12:00:00.000Z",
-      "path": "spec-t3-022-git-status-offload",
-      "last_modified": "2026-04-03T12:00:00.000Z",
+      "path": "archived/spec-t3-022-git-status-offload",
+      "last_modified": "2026-04-03T18:20:00.000Z",
       "sections_count": 3,
       "requirements_count": 25,
       "documents": {
@@ -342,6 +342,6 @@
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2026-04-03T07:35:43.324Z"
+    "last_updated": "2026-04-03T18:20:00.000Z"
   }
 }

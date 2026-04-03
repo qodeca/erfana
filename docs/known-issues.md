@@ -26,7 +26,7 @@ Current issues and their workarounds. For historical resolved issues, see [archi
 
 **Mitigation (v0.9.0)**: Git status now runs in a worker thread (#147) and uses native `git status --porcelain` for repos with `.git/index` > 5 MB. When FD pressure causes EBADF, the worker returns a transient error instead of cascading. The EMFILE restart cascade was also fixed (#146).
 
-**Remaining**: The directory watcher itself still consumes too many FDs on very large repos. Tracked as #148.
+**Remaining**: The directory watcher itself still consumes too many FDs on very large repos. Mitigated by `.erfana/settings.json` ignore patterns.
 
 **Workaround**: Use `.erfana/settings.json` to ignore large subdirectories:
 ```json

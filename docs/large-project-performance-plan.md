@@ -1,7 +1,7 @@
 # Large-project performance – implementation plan
 
 > Created: 2026-04-03
-> Status: In progress (3 of 6 done)
+> Status: In progress (4 of 6 done)
 > Scope: Issues #146, #147, #148, #149, #150, #151
 
 ## Context
@@ -24,9 +24,9 @@ Six issues were filed. This document defines the implementation order based on d
 - **Why second:** The most actively destructive bug – 4,497 errors in 4 minutes, infinite restart loop. The fix is surgical: close watcher before scheduling restart, add cooldown. With #151's instrumentation already in place, the fix is immediately verifiable via logs.
 - **Key deliverables:** Close existing watcher on EMFILE before restart, global EMFILE cooldown, burst cap on restart scheduling.
 
-### 3. #148 – GitWatcherService silent start failure (bug)
+### 3. #148 – GitWatcherService silent start failure (bug) ✅
 
-- **Type:** Bug fix | **Risk:** Low | **Effort:** Small
+- **Type:** Bug fix | **Risk:** Low | **Effort:** Small | **Status:** Done (addressed by #136 diagnostic logging + lifecycle fixes)
 - **Why third:** Small fix (defensive logging + timeout fallback verification), closely related to #146 (both involve watcher lifecycle). After #146 fixes the EMFILE cascade, the watcher might actually start successfully for large repos – or the logs will show exactly why it doesn't.
 - **Key deliverables:** Defensive logging at `start()` call site, verify `WATCHER_READY_TIMEOUT_MS` fallback, surface start result in health summary.
 
@@ -40,7 +40,7 @@ Six issues were filed. This document defines the implementation order based on d
 
 - **Type:** Enhancement | **Risk:** High | **Effort:** Large | **Status:** Done (bee25a4, dd6dbb3, 1041497)
 - **Why fifth:** Highest-impact single change (unblocks main thread), but biggest architectural shift – new worker thread, new IPC patterns. By this point, logging (#151), stable watchers (#146, #148), and optimized renderer (#149) are in place, isolating regressions to the worker change itself.
-- **Related spec:** spec-t3-022-git-status-offload
+- **Related spec:** spec-t3-022-git-status-offload (archived)
 - **Key deliverables:** Worker thread for `statusMatrix()`, repo size guard, `filepaths` filter option.
 
 ### 6. #150 – Lazy tree loading and virtualization (largest scope)

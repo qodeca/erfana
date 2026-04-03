@@ -112,7 +112,7 @@ Feature specifications live in `specs/`. Check registry before implementing new 
 | 019 | Visual regression and CI resilience | T2 | archived | `specs/archived/spec-t2-019-visual-regression-ci` |
 | 020 | Google Drive link integration | T4 | draft | `specs/spec-t4-020-google-drive-links` |
 | 021 | LiteParse document import | T3 | archived | `specs/archived/spec-t3-021-liteparse-document-import` |
-| 022 | Git status thread offloading | T3 | implemented | `specs/spec-t3-022-git-status-offload` |
+| 022 | Git status thread offloading | T3 | archived | `specs/archived/spec-t3-022-git-status-offload` |
 
 **Registry**: `specs/registry.json`
 
