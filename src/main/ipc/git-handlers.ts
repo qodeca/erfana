@@ -27,7 +27,11 @@ export function registerGitHandlers(gitService: GitStatusService = gitStatusServ
       // Security validation: prevent path traversal and system directory access
       await validateProjectPath(trimmedPath)
 
-      return await gitService.getStatus(trimmedPath)
+      const start = performance.now()
+      const result = await gitService.getStatus(trimmedPath)
+      const durationMs = Math.round(performance.now() - start)
+      logger.info('git:getStatus IPC completed', { durationMs, fileCount: result.files.length, truncated: result.truncated })
+      return result
     } catch (error) {
       logger.error('🔀 Error in git:getStatus handler', error instanceof Error ? error : undefined)
       throw error

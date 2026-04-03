@@ -1,48 +1,50 @@
-import * as git from 'isomorphic-git'
-import fs from 'fs'
 import { join } from 'path'
 import { stat } from 'fs/promises'
-import type { GitStatusResponse, GitDisplayStatus, GitFileEntry, GitStatusCounts } from '../../shared/ipc/git-schema'
+import { createEmptyGitStatusResponse } from '../../shared/ipc/git-schema'
+import type { GitStatusResponse } from '../../shared/ipc/git-schema'
+import type { IGitStatusWorker } from '../interfaces/IGitStatusWorker'
+import { GitStatusCircuitBreaker } from './GitStatusCircuitBreaker'
+import { GitStatusStrategySelector } from './GitStatusStrategySelector'
+import { GitStatusWorkerAdapter } from './GitStatusWorkerAdapter'
 import { logger } from './LoggingService'
 
 /**
- * Cap file entries to prevent performance issues with large repositories.
- * 10,000 files × ~80 bytes per entry ≈ 800KB memory footprint.
- * Users with larger repos will see truncation warning in UI.
- */
-export const GIT_STATUS_CAP = 10000
-
-/**
- * GitStatusService - Git status detection using isomorphic-git
+ * GitStatusService - Orchestrates git status retrieval via worker thread
  *
- * Provides fast git status detection for Project Tree:
- * - Branch name and detached HEAD state
- * - File statuses (modified, untracked, deleted, staged, conflicted)
- * - Status counts for aggregation
- * - Efficient bulk operation using git.statusMatrix()
+ * Delegates all git status computation to an IGitStatusWorker implementation,
+ * keeping the main Electron thread responsive. The service handles:
+ * - Per-project operation queuing (prevents concurrent worker calls per project)
+ * - Circuit breaker (disables worker after repeated crashes)
+ * - Strategy selection (isomorphic-git vs native git based on repo size)
+ * - Timing and structured logging
  *
- * Concurrency Control:
- * Uses per-project operation queues to prevent concurrent isomorphic-git calls.
- * This prevents index.lock file conflicts that block external git operations.
+ * Concurrency control:
+ * Uses per-project operation queues to serialize requests. Different projects
+ * can query in parallel without blocking each other.
  * See: https://github.com/qodeca/erfana/issues/67
  *
- * Known Limitation:
- * Global gitignore files (~/.gitignore_global, ~/.config/git/ignore) are NOT
- * respected. This is a limitation of isomorphic-git which only reads local
- * .gitignore files. Files ignored globally may appear as "untracked".
- * See: https://github.com/isomorphic-git/isomorphic-git/issues/444
+ * @see IGitStatusWorker for the worker interface
+ * @see Spec #022 - Git status thread offloading
  */
 export class GitStatusService {
+  private readonly worker: IGitStatusWorker
+  private readonly circuitBreaker = new GitStatusCircuitBreaker()
+  private readonly strategySelector = new GitStatusStrategySelector()
+
   /**
    * Per-project operation queues - prevents concurrent git operations on same project.
    * Different projects can query in parallel without blocking each other.
    */
   private operationQueues: Map<string, Promise<GitStatusResponse>> = new Map()
 
+  constructor(worker?: IGitStatusWorker) {
+    this.worker = worker ?? new GitStatusWorkerAdapter()
+  }
+
   /**
-   * Get git status for a project directory
+   * Get git status for a project directory.
    *
-   * Operations are queued per-project to prevent concurrent isomorphic-git calls
+   * Operations are queued per-project to prevent concurrent worker calls
    * that would create conflicting index.lock files.
    *
    * @param projectPath - Absolute path to project directory
@@ -50,12 +52,12 @@ export class GitStatusService {
    */
   async getStatus(projectPath: string): Promise<GitStatusResponse> {
     // Get current queue for this project (or resolved empty promise if none)
-    const currentQueue = this.operationQueues.get(projectPath) ?? Promise.resolve(this.createEmptyResponse())
+    const currentQueue = this.operationQueues.get(projectPath) ?? Promise.resolve(createEmptyGitStatusResponse())
 
     // Chain this operation onto the queue
     // Previous failures don't block subsequent operations
     const operation = currentQueue
-      .catch(() => this.createEmptyResponse())
+      .catch(() => createEmptyGitStatusResponse())
       .then(() => this.executeGetStatus(projectPath))
 
     // Update queue reference
@@ -72,203 +74,98 @@ export class GitStatusService {
   }
 
   /**
-   * Execute the actual git status retrieval
+   * Clear the worker's statusMatrix cache for a specific project or all projects.
+   *
+   * @param projectPath - Optional path to clear; omit to clear all
+   */
+  async clearCache(projectPath?: string): Promise<void> {
+    await this.worker.clearCache(projectPath)
+  }
+
+  /**
+   * Terminate the worker thread and release all resources.
+   * Safe to call multiple times.
+   */
+  async dispose(): Promise<void> {
+    this.circuitBreaker.dispose()
+    this.operationQueues.clear()
+    await this.worker.dispose()
+  }
+
+  /**
+   * Execute the actual git status retrieval by delegating to the worker.
    *
    * @param projectPath - Absolute path to project directory
    * @returns Git status response with branch, files, and counts
    */
   private async executeGetStatus(projectPath: string): Promise<GitStatusResponse> {
+    // Quick bail-out: check if .git directory exists
+    const gitDir = join(projectPath, '.git')
     try {
-      // Check if .git directory exists
-      const gitDir = join(projectPath, '.git')
-      try {
-        const stats = await stat(gitDir)
-        if (!stats.isDirectory()) {
-          return this.createEmptyResponse()
-        }
-      } catch {
-        // .git doesn't exist, not a git repo
-        return this.createEmptyResponse()
+      const stats = await stat(gitDir)
+      if (!stats.isDirectory()) {
+        return createEmptyGitStatusResponse()
       }
+    } catch {
+      logger.trace('GitStatus: not a git repo', { projectPath })
+      return createEmptyGitStatusResponse()
+    }
 
-      // Get branch name
-      let branch: string | null = null
-      let isDetached = false
+    // Check circuit breaker - skip worker if it has crashed repeatedly
+    if (this.circuitBreaker.isOpen(projectPath)) {
+      return { ...createEmptyGitStatusResponse(), error: 'Git status disabled: worker crashed repeatedly' }
+    }
 
-      try {
-        const currentBranchName = await git.currentBranch({
-          fs,
-          dir: projectPath,
-          fullname: false
-        })
+    // Select strategy based on repository size
+    const strategy = await this.strategySelector.select(projectPath)
 
-        // Check if HEAD is detached
-        if (!currentBranchName) {
-          // currentBranch returns undefined for detached HEAD
-          isDetached = true
-          // Try to get the commit hash
-          try {
-            const head = await git.resolveRef({
-              fs,
-              dir: projectPath,
-              ref: 'HEAD'
-            })
-            branch = head.substring(0, 7) // Short hash
-          } catch {
-            branch = null
-          }
-        } else {
-          branch = currentBranchName
-        }
-      } catch (error) {
-        logger.error('Error getting branch name', error instanceof Error ? error : undefined)
-        // Continue without branch info
-      }
+    // Delegate to worker with timing
+    const startTime = performance.now()
+    try {
+      const response = await this.worker.execute({ projectPath, strategy })
+      const duration = Math.round(performance.now() - startTime)
 
-      // Get file statuses using statusMatrix (efficient bulk operation)
-      const matrix = await git.statusMatrix({
-        fs,
-        dir: projectPath
+      // Record success for circuit breaker half-open recovery
+      this.circuitBreaker.recordSuccess(projectPath)
+
+      logger.info('GitStatus: completed', {
+        strategy,
+        durationMs: duration,
+        fileCount: response.files.length,
+        truncated: response.truncated
       })
 
-      const files: GitFileEntry[] = []
-      const counts: GitStatusCounts = {
-        modified: 0,
-        untracked: 0,
-        deleted: 0,
-        staged: 0,
-        conflicted: 0
-      }
-
-      let truncated = false
-
-      for (const [filepath, HEADStatus, workdirStatus, stageStatus] of matrix) {
-        // Cap file entries to prevent performance issues
-        if (files.length >= GIT_STATUS_CAP) {
-          truncated = true
-          break
-        }
-
-        // Map statusMatrix output to GitDisplayStatus
-        // statusMatrix returns [filepath, HEADStatus, workdirStatus, stageStatus]
-        // where:
-        // - HEADStatus: 0 = absent, 1 = present
-        // - workdirStatus: 0 = absent, 1 = identical to HEAD, 2 = different from HEAD
-        // - stageStatus: 0 = absent, 1 = identical to HEAD, 2 = different from HEAD, 3 = different from both
-
-        let status: GitDisplayStatus
-        let isStaged = false
-
-        // Untracked: not in HEAD, exists in workdir
-        if (HEADStatus === 0 && workdirStatus === 2 && stageStatus === 0) {
-          status = 'untracked'
-          counts.untracked++
-        }
-        // Modified (unstaged): in HEAD, different in workdir, same in stage
-        else if (HEADStatus === 1 && workdirStatus === 2 && stageStatus === 1) {
-          status = 'modified'
-          counts.modified++
-        }
-        // Staged (new file): not in HEAD, exists in workdir and stage
-        else if (HEADStatus === 0 && workdirStatus === 2 && (stageStatus === 2 || stageStatus === 3)) {
-          status = 'staged'
-          isStaged = true
-          counts.staged++
-        }
-        // Staged (modified file): in HEAD, different in stage
-        else if (HEADStatus === 1 && workdirStatus === 2 && (stageStatus === 2 || stageStatus === 3)) {
-          status = 'staged'
-          isStaged = true
-          counts.staged++
-        }
-        // Deleted (unstaged): in HEAD, absent in workdir, present in stage
-        else if (HEADStatus === 1 && workdirStatus === 0 && stageStatus === 1) {
-          status = 'deleted'
-          counts.deleted++
-        }
-        // Deleted (staged): in HEAD, absent in workdir and stage
-        else if (HEADStatus === 1 && workdirStatus === 0 && stageStatus === 0) {
-          status = 'deleted'
-          isStaged = true
-          counts.deleted++
-        }
-        // Conflicted: different in all three (HEAD, workdir, stage)
-        else if (HEADStatus === 1 && workdirStatus === 2 && stageStatus === 3) {
-          status = 'conflicted'
-          counts.conflicted++
-        }
-        // Unmodified: identical in all locations
-        else if (HEADStatus === 1 && workdirStatus === 1 && stageStatus === 1) {
-          status = 'unmodified'
-          // Skip unmodified files (no indicator needed)
-          continue
-        }
-        // Unknown status, skip
-        else {
-          continue
-        }
-
-        files.push({
-          path: join(projectPath, filepath),
-          status,
-          staged: isStaged
-        })
-      }
-
-      logger.debug('Git status retrieved', {
-        fileCount: files.length,
-        modified: counts.modified,
-        untracked: counts.untracked,
-        deleted: counts.deleted,
-        staged: counts.staged
-      })
-
-      return {
-        isGitRepo: true,
-        branch,
-        isDetached,
-        files,
-        counts,
-        truncated
-      }
+      return response
     } catch (error) {
-      logger.error('Error getting git status', error instanceof Error ? error : undefined)
+      const duration = Math.round(performance.now() - startTime)
+
+      // Record crash for circuit breaker
+      this.circuitBreaker.recordCrash(projectPath)
+
+      logger.warn('GitStatus: worker error', {
+        strategy,
+        durationMs: duration,
+        error: error instanceof Error ? error.message : String(error)
+      })
+
       return {
-        ...this.createEmptyResponse(),
-        error: error instanceof Error ? error.message : 'Unknown error'
+        ...createEmptyGitStatusResponse(),
+        error: error instanceof Error ? error.message : String(error)
       }
     }
   }
 
-  /**
-   * Create an empty git status response (for non-git repos or errors)
-   */
-  private createEmptyResponse(): GitStatusResponse {
-    return {
-      isGitRepo: false,
-      branch: null,
-      isDetached: false,
-      files: [],
-      counts: {
-        modified: 0,
-        untracked: 0,
-        deleted: 0,
-        staged: 0,
-        conflicted: 0
-      },
-      truncated: false
-    }
-  }
 }
 
 /**
  * Factory function to create a GitStatusService instance.
  * Enables dependency injection for testing.
  *
+ * @param worker - Optional worker implementation for testing
  * @returns New GitStatusService instance
  */
-export function createGitStatusService(): GitStatusService {
-  return new GitStatusService()
+export function createGitStatusService(worker?: IGitStatusWorker): GitStatusService {
+  return new GitStatusService(worker)
 }
 
 // Default singleton instance for production use

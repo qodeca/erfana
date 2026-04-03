@@ -113,8 +113,8 @@ export function useGitStatus({
         if (timeSinceLastRefresh < COOLDOWN_DURATION) {
           const remainingCooldown = COOLDOWN_DURATION - timeSinceLastRefresh
 
-          // Trace log for cooldown block (ADR-Spec003-002)
-          logger.trace('[useGitStatus] Cooldown active, scheduling refresh', {
+          // Cooldown block log (promoted to info – low volume, high diagnostic value)
+          logger.info('[useGitStatus] Cooldown blocked refresh', {
             remainingMs: remainingCooldown,
             timeSinceLastRefresh
           })
@@ -154,7 +154,7 @@ export function useGitStatus({
 
         // CRITICAL: Ignore response if project changed during request
         if (currentProjectRef.current !== requestProjectPath) {
-          logger.info('[useGitStatus] Ignoring stale response for: ' + requestProjectPath)
+          logger.info('[useGitStatus] Ignoring stale response', { requestProjectPath })
           return
         }
 
@@ -167,6 +167,13 @@ export function useGitStatus({
         })
 
         setStatus(response)
+
+        // Store update confirmation (moved from useGitStore to preserve store purity)
+        logger.debug('[useGitStatus] Store updated', {
+          branch: response.branch,
+          fileCount: response.files?.length ?? 0,
+          truncated: response.truncated
+        })
       } catch (err) {
         // Only set error if still current project
         if (currentProjectRef.current !== requestProjectPath) return
@@ -216,6 +223,7 @@ export function useGitStatus({
    * Used for user-initiated refreshes (refresh button)
    */
   const manualRefresh = useCallback(() => {
+    logger.info('[useGitStatus] Manual refresh triggered')
     executeRefresh(true) // Bypass cooldown
   }, [executeRefresh])
 
@@ -267,6 +275,7 @@ export function useGitStatus({
     if (!projectPath || !enabled) return
 
     // Start watching .git directory for all git-related changes
+    logger.info('[useGitStatus] Git watcher start requested', { projectPath })
     window.api.gitWatcher.start(projectPath).catch(err => {
       logger.warn('[useGitStatus] Failed to start git watcher', { error: err })
     })
@@ -276,7 +285,8 @@ export function useGitStatus({
       // Only refresh if window is visible to avoid unnecessary work
       if (isWindowVisibleRef.current) {
         // Log with correlation ID for tracing (ADR-Spec003-002)
-        logger.info(`[useGitStatus] Git state changed: ${event.eventTypes.join(', ')}`, {
+        logger.info('[useGitStatus] Git state changed', {
+          eventTypes: event.eventTypes,
           projectPath: event.projectPath,
           correlationId: event.correlationId
         })
@@ -382,7 +392,9 @@ export function useGitStatus({
   // Window visibility handling - pause refreshes when window hidden
   useEffect(() => {
     const handleVisibilityChange = () => {
-      isWindowVisibleRef.current = !document.hidden
+      const visible = !document.hidden
+      isWindowVisibleRef.current = visible
+      logger.debug('[useGitStatus] Window visibility changed', { visible, action: visible ? 'refresh' : 'pause' })
 
       // Refresh when window becomes visible (catch up on missed changes)
       if (!document.hidden && projectPath && enabled) {

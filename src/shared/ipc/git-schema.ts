@@ -41,3 +41,15 @@ export const GitStatusResponseSchema = z.object({
   error: z.string().optional(),
 })
 export type GitStatusResponse = z.infer<typeof GitStatusResponseSchema>
+
+/** Create an empty git status response (non-git repo or error fallback) */
+export function createEmptyGitStatusResponse(): GitStatusResponse {
+  return {
+    isGitRepo: false,
+    branch: null,
+    isDetached: false,
+    files: [],
+    counts: { modified: 0, untracked: 0, deleted: 0, staged: 0, conflicted: 0 },
+    truncated: false
+  }
+}

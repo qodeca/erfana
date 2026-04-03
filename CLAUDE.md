@@ -38,7 +38,7 @@ resources/
 └── tessdata/       # Pre-bundled Tesseract OCR language data (eng.traineddata)
 src/
 ├── main/           # Electron main process
-│   ├── services/   # Core: FileService, TerminalService, ProjectService, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService; Watchers: DirectoryWatcherService, FileWatcherService; Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media: ScreenshotService, CameraService, DocxService, TranscriptionService, LocalWhisperService, WhisperModelManager, AudioMetadataService, AudioExtractionService, ApiKeyService; Import: LiteParseConverter, DependencyDetector; Multi-instance: ProjectLockService, ExternalFileService; Subdirs: import/, watcher/
+│   ├── services/   # Core: FileService, TerminalService, ProjectService, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService, GitStatusWorkerAdapter, GitStatusCircuitBreaker, GitStatusStrategySelector; Watchers: DirectoryWatcherService, FileWatcherService; Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media: ScreenshotService, CameraService, DocxService, TranscriptionService, LocalWhisperService, WhisperModelManager, AudioMetadataService, AudioExtractionService, ApiKeyService; Import: LiteParseConverter, DependencyDetector; Multi-instance: ProjectLockService, ExternalFileService; Subdirs: import/, watcher/, workers/
 │   ├── ipc/        # IPC handlers
 │   └── utils/      # PauseController (pause/resume with safety timeout)
 ├── preload/        # Context bridge API
@@ -52,7 +52,7 @@ src/
 
 ## Core Features
 1. **Markdown Editor** - Monaco with live preview, scroll sync, Mermaid diagrams (zoom, pan, full-screen viewer), YAML frontmatter rendering, preserve line breaks option, unified in-file search (Cmd/Ctrl+F), context menu with AI prompts
-2. **Project Tree** - File explorer with drag-drop reorganization, external file drop (move/copy/import), markdown filtering, context menu, real-time git status indicators with polling fallback, manual refresh button (Cmd/Ctrl+Alt+R)
+2. **Project Tree** - File explorer with drag-drop reorganization, external file drop (move/copy/import), markdown filtering, context menu, real-time git status indicators with worker thread offloading (isomorphic-git + native git fallback), circuit breaker, polling fallback, manual refresh button (Cmd/Ctrl+Alt+R)
 3. **Terminal** - xterm.js with PTY backend, clipboard support, file links (multi-line: xterm-wrap joining + CLI-wrap joining for tool output), scroll recovery, auto-opens on project load, drag-drop file paths, bracketed paste mode for safe multi-line input, screenshot capture (macOS: screen/window/area selection with path pasted to terminal), camera photo capture (cross-platform: captures photo from webcam with path pasted to terminal)
 4. **Prompt Templates** - AI text operations via context menu (Explain, Modify, Ask, Visualize, diagram chat); Visualize generates Mermaid diagrams from selected text with dropdown for 22 diagram types
 5. **Project Settings** - Per-project configuration via `.erfana/settings.json` (watcher ignore, tree visibility)
@@ -79,7 +79,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Testing](docs/testing/README.md) — Workspace, E2E (POM), visual regression, coverage
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [API Services](docs/api-services.md) — Service APIs (Terminal, File, Settings, Watchers)
-- [API Services – Features](docs/api-services-features.md) — Feature service APIs (GitWatcher, GitPolling, Camera, ProjectLock, ExternalFile, LiteParse, DependencyDetector, DOCX, Transcription, LocalWhisper, WhisperModelManager, AudioMetadata, AudioExtraction, ApiKey)
+- [API Services – Features](docs/api-services-features.md) — Feature service APIs (GitStatus worker architecture, GitWatcher, GitPolling, GitStatusWorkerAdapter, GitStatusCircuitBreaker, GitStatusStrategySelector, Camera, ProjectLock, ExternalFile, LiteParse, DependencyDetector, DOCX, Transcription, LocalWhisper, WhisperModelManager, AudioMetadata, AudioExtraction, ApiKey)
 - [UI Components](docs/ui-components.md) — React component architecture, activity bars, panels
 - [Prompt Templates](docs/prompts/README.md) — AI prompt system, AutoExecute, template syntax
 - [Settings](docs/settings.md) — Settings overlay sections (Editor, Git, Logging, Transcription)
@@ -111,7 +111,7 @@ Feature specifications live in `specs/`. Check registry before implementing new 
 | 019 | Visual regression and CI resilience | T2 | archived | `specs/archived/spec-t2-019-visual-regression-ci` |
 | 020 | Google Drive link integration | T4 | draft | `specs/spec-t4-020-google-drive-links` |
 | 021 | LiteParse document import | T3 | archived | `specs/archived/spec-t3-021-liteparse-document-import` |
-| 022 | Git status thread offloading | T3 | draft | `specs/spec-t3-022-git-status-offload` |
+| 022 | Git status thread offloading | T3 | implemented | `specs/spec-t3-022-git-status-offload` |
 
 **Registry**: `specs/registry.json`
 
@@ -181,4 +181,4 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 - electron-store requires dynamic import (ES module)
 - CSP configured for security (no inline scripts)
 - All dangerous HTML elements blocked in preview
-- Git status uses isomorphic-git (global `.gitignore` not supported)
+- Git status runs in a worker thread via `worker_threads` (isomorphic-git default, native `git status --porcelain` fallback for large repos); global `.gitignore` not supported by isomorphic-git

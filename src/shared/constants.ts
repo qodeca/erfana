@@ -337,6 +337,36 @@ export const DOCUMENT_IMPORT = {
 } as const
 
 /**
+ * Git status worker thread constants
+ * Used by git status offloading for strategy selection and circuit breaker
+ *
+ * @see GitStatusWorkerAdapter, GitStatusCircuitBreaker, GitStatusStrategySelector
+ * @see Spec #022 - Git status thread offloading
+ */
+export const GIT_STATUS = {
+  /** .git/index file size threshold for switching to native git (5 MB ~ 50K files) */
+  INDEX_SIZE_THRESHOLD: 5 * 1024 * 1024,
+  /** Timeout for native git execFile calls (ms) */
+  NATIVE_GIT_TIMEOUT: 10_000,
+  /** Maximum buffer size for native git output (5 MB) */
+  NATIVE_GIT_MAX_BUFFER: 5 * 1024 * 1024,
+  /** Per-request timeout for worker execute calls (ms) */
+  WORKER_REQUEST_TIMEOUT: 30_000,
+  /** Max consecutive worker crashes before circuit breaker opens */
+  CIRCUIT_BREAKER_THRESHOLD: 3,
+  /** Time window for circuit breaker crash counting (ms) */
+  CIRCUIT_BREAKER_WINDOW: 60_000,
+  /** Time after which circuit breaker resets to half-open (ms) */
+  CIRCUIT_BREAKER_RESET: 5 * 60 * 1000,
+  /** Cooldown before retrying git binary resolution after a failed attempt (ms) */
+  GIT_PATH_RETRY_COOLDOWN: 60_000,
+  /** Global crash threshold across all projects before disabling worker entirely */
+  CIRCUIT_BREAKER_GLOBAL_THRESHOLD: 10,
+  /** Time window for global crash counting (ms) */
+  CIRCUIT_BREAKER_GLOBAL_WINDOW: 120_000,
+} as const
+
+/**
  * PauseController safety timeout constants
  * Auto-resumes directory watcher if resume() is not called within the timeout
  *

@@ -391,8 +391,11 @@ export class GitPollingService {
       }
 
       return false
-    } catch {
-      // File doesn't exist or error - don't trigger refresh
+    } catch (error) {
+      logger.warn('GitPollingService: Failed to stat .git/index', {
+        indexPath,
+        error: error instanceof Error ? error.message : String(error)
+      })
       return false
     }
   }

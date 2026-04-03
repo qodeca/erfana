@@ -99,7 +99,10 @@ export function useProjectManagement(
         setFiles([]) // Clear tree to show empty state during transition
         try {
           setLoading(true)
+          const treeLoadStart = performance.now()
           const fileTree = await api.file.readDirectory(data.newPath!)
+          const treeLoadDuration = Math.round(performance.now() - treeLoadStart)
+          logger.info('[useProjectManagement] File tree loaded', { durationMs: treeLoadDuration, itemCount: fileTree.length })
           setFiles(fileTree)
           if (shouldMarkInitialLoadComplete(data.newPath, fileTree)) {
             initialLoadCompleteRef.current = true
@@ -295,7 +298,10 @@ export function useProjectManagement(
   const refreshFiles = useCallback(async (): Promise<void> => {
     if (!shouldRefreshFiles(projectPath)) return
     try {
+      const refreshStart = performance.now()
       const fileTree = await api.file.readDirectory(projectPath!)
+      const refreshDuration = Math.round(performance.now() - refreshStart)
+      logger.info('[useProjectManagement] File tree refreshed', { durationMs: refreshDuration, itemCount: fileTree.length })
       setFiles(fileTree)
     } catch (err) {
       logger.error(createRefreshErrorLog(), err instanceof Error ? err : undefined)

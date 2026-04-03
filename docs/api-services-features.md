@@ -2,7 +2,7 @@
 
 **Location:** `src/main/services/`
 
-Feature-specific services for git integration, multi-instance support, media capture, transcription, audio extraction, and file import.
+Feature-specific services for git integration (including worker thread offloading), multi-instance support, media capture, transcription, audio extraction, and file import.
 
 See [api-services.md](./api-services.md) for core services (Terminal, File, Settings, Watchers).
 
@@ -12,16 +12,76 @@ See [api-services.md](./api-services.md) for core services (Terminal, File, Sett
 
 **File:** `src/main/services/GitStatusService.ts`
 
-Git status tracking with isomorphic-git.
+Orchestrates git status retrieval via worker thread, keeping the main Electron thread responsive.
 
-### Key Features
+### Key features
 - VS Code-style status indicators (M/U/D/A/!)
 - Folder status propagation
-- Operation queue to prevent index.lock conflicts
-- Auto-refresh with debounce and cooldown
+- Delegates all computation to `IGitStatusWorker` (worker thread)
+- Per-project operation queuing (prevents concurrent worker calls per project; different projects can query in parallel)
+- Circuit breaker integration – disables worker after repeated crashes
+- Strategy selection – chooses isomorphic-git or native git based on repo size
+- Timing instrumentation with structured logging
+- Cache clearing on project switch
 
-### Known Limitations
+### Known limitations
 - Global `.gitignore` not supported (isomorphic-git limitation)
+
+---
+
+## GitStatusWorkerAdapter
+
+**File:** `src/main/services/GitStatusWorkerAdapter.ts`
+
+Implements `IGitStatusWorker` by spawning a `worker_threads` Worker running `git-status.worker.ts`.
+
+### Key features
+- Spawns and manages a `worker_threads` Worker for off-main-thread git status computation
+- Message-based request/response protocol with the worker script
+- Worker lifecycle management (spawn, terminate, restart)
+
+### Related files
+- `src/main/interfaces/IGitStatusWorker.ts` – Worker adapter interface
+- `src/main/services/workers/git-status.worker.ts` – Worker thread script (runs isomorphic-git `statusMatrix()` or native `git status --porcelain`)
+
+---
+
+## GitStatusCircuitBreaker
+
+**File:** `src/main/services/GitStatusCircuitBreaker.ts`
+
+Per-project circuit breaker preventing cascading failures when the git status worker crashes repeatedly.
+
+### Key features
+- Tracks failures per project path
+- Opens circuit after 3 crashes within 60 seconds
+- Half-open state after 5 minutes (allows a single probe request)
+- Resets on success
+
+### Public methods
+- `isOpen(projectPath)` – Check if circuit is open for a project
+- `recordFailure(projectPath)` – Record a worker failure
+- `recordSuccess(projectPath)` – Reset failure count on success
+- `reset(projectPath?)` – Manually reset one or all circuits
+
+---
+
+## GitStatusStrategySelector
+
+**File:** `src/main/services/GitStatusStrategySelector.ts`
+
+Selects the optimal git status strategy (isomorphic-git vs native git) based on repository size.
+
+### Key features
+- Checks `.git/index` file size to determine repo scale
+- Selects `isomorphic-git` for repos with index < 5 MB (default)
+- Selects native `git status --porcelain` for large repos (index >= 5 MB)
+- Caches strategy per project path
+- Cache cleared on project switch
+
+### Public methods
+- `getStrategy(projectPath)` – Returns `'isomorphic'` or `'native'`
+- `clearCache(projectPath?)` – Clear cached strategy for one or all projects
 
 ---
 

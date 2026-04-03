@@ -1,0 +1,244 @@
+{
+  "implementation_plan": {
+    "overview": "Offload isomorphic-git statusMatrix() from main Electron thread to a persistent worker_threads Worker. Add repo-size guard (.git/index > 5MB triggers native git fallback), statusMatrix cache, circuit breaker for worker crashes, and timing instrumentation. First worker_threads usage in codebase.",
+    "steps": [
+      {
+        "order": 1,
+        "description": "Create IGitStatusWorker interface with GitWorkerRequest, GitStatusStrategy types, and execute/clearCache/terminate/isAlive methods",
+        "files": ["src/main/interfaces/IGitStatusWorker.ts"],
+        "dependencies": [],
+        "rationale": "Interface-first design following codebase pattern (IGitWatcherService, IGitPollingService). Enables DI and test mocking."
+      },
+      {
+        "order": 2,
+        "description": "Add GIT_STATUS constants section to shared constants (INDEX_SIZE_THRESHOLD, NATIVE_GIT_TIMEOUT, NATIVE_GIT_MAX_BUFFER, CIRCUIT_BREAKER_MAX_CRASHES, CIRCUIT_BREAKER_WINDOW_MS)",
+        "files": ["src/shared/constants.ts"],
+        "dependencies": [],
+        "rationale": "Constants needed by both worker script and service. Follows existing SCREENSHOT/CAMERA/TRANSCRIPTION pattern."
+      },
+      {
+        "order": 3,
+        "description": "Create git-status.worker.ts with parentPort message handler, isomorphic-git strategy (statusMatrix with cache), native-git strategy (execFile + porcelain parser), and clear-cache handler. Export parsePorcelainOutput as named export for testability.",
+        "files": ["src/main/services/workers/git-status.worker.ts"],
+        "dependencies": ["src/main/interfaces/IGitStatusWorker.ts", "src/shared/constants.ts"],
+        "rationale": "Core worker that runs both strategies off main thread. Porcelain parser exported separately for unit testing without spawning workers."
+      },
+      {
+        "order": 4,
+        "description": "Add worker entry point to electron.vite.config.ts rollupOptions.input so it bundles as git-status.worker.js",
+        "files": ["electron.vite.config.ts"],
+        "dependencies": ["src/main/services/workers/git-status.worker.ts"],
+        "rationale": "NFR-006 requires worker bundled as separate entry point. Path resolves via __dirname in both dev and ASAR."
+      },
+      {
+        "order": 5,
+        "description": "Create GitStatusWorkerAdapter implementing IGitStatusWorker. Wraps worker_threads.Worker with lazy creation, request/response correlation via incrementing IDs, error/exit event handling, and restart-on-next-call semantics.",
+        "files": ["src/main/services/GitStatusWorkerAdapter.ts"],
+        "dependencies": ["src/main/interfaces/IGitStatusWorker.ts"],
+        "rationale": "Adapter pattern isolates worker_threads details. Constructor accepts optional workerPath for test injection."
+      },
+      {
+        "order": 6,
+        "description": "Refactor GitStatusService: add constructor DI for IGitStatusWorker (defaults to GitStatusWorkerAdapter), add selectStrategy() with .git/index size guard, add resolveGitPath() with which/where, add circuit breaker state (Map<string, {crashes, disabled}>), add dispose() method, update executeGetStatus() to delegate to worker, re-export GIT_INDEX_SIZE_THRESHOLD and GitStatusStrategy for spec compliance",
+        "files": ["src/main/services/GitStatusService.ts"],
+        "dependencies": [
+          "src/main/interfaces/IGitStatusWorker.ts",
+          "src/main/services/GitStatusWorkerAdapter.ts",
+          "src/shared/constants.ts"
+        ],
+        "rationale": "Core refactor. Preserves operation queue, changes only the execution path from direct isomorphic-git calls to worker delegation."
+      },
+      {
+        "order": 7,
+        "description": "Wire gitStatusService.dispose() in app before-quit handler in src/main/index.ts. Import gitStatusService singleton.",
+        "files": ["src/main/index.ts"],
+        "dependencies": ["src/main/services/GitStatusService.ts"],
+        "rationale": "AC-011: Worker cleanup on shutdown. Follows existing dispose pattern for fileWatcherService, directoryWatcherService, etc."
+      },
+      {
+        "order": 8,
+        "description": "Minor update to git-handlers.ts imports if needed (verify GitStatusService type still works for DI parameter)",
+        "files": ["src/main/ipc/git-handlers.ts"],
+        "dependencies": ["src/main/services/GitStatusService.ts"],
+        "rationale": "Ensure DI parameter type is compatible with refactored GitStatusService."
+      },
+      {
+        "order": 9,
+        "description": "Create porcelain parser unit tests in git-status.worker.test.ts. Test all XY code mappings, NUL splitting, GIT_STATUS_CAP, empty output, unknown codes.",
+        "files": ["src/main/services/workers/git-status.worker.test.ts"],
+        "dependencies": ["src/main/services/workers/git-status.worker.ts"],
+        "rationale": "Pure function tests, no worker spawning needed. High confidence in parser correctness."
+      },
+      {
+        "order": 10,
+        "description": "Create GitStatusWorkerAdapter unit tests. Mock worker_threads.Worker. Test lazy creation, message correlation, error handling, terminate, clearCache, restart semantics.",
+        "files": ["src/main/services/GitStatusWorkerAdapter.test.ts"],
+        "dependencies": ["src/main/services/GitStatusWorkerAdapter.ts"],
+        "rationale": "NFR-005: Mock worker interface for unit tests."
+      },
+      {
+        "order": 11,
+        "description": "Update GitStatusService.test.ts: replace isomorphic-git module mocks with mock IGitStatusWorker injection. Keep all existing test assertions unchanged (AC-010). Add new test sections for strategy selection, circuit breaker, dispose, and git path resolution.",
+        "files": ["src/main/services/GitStatusService.test.ts"],
+        "dependencies": ["src/main/services/GitStatusService.ts", "src/main/interfaces/IGitStatusWorker.ts"],
+        "rationale": "AC-010: Existing test assertions must pass. Test setup changes but output expectations are identical."
+      }
+    ],
+    "patterns_to_follow": [
+      "Interface in src/main/interfaces/ with JSDoc (IGitWatcherService, IGitPollingService pattern)",
+      "Constants in src/shared/constants.ts as readonly object (SCREENSHOT, CAMERA pattern)",
+      "async dispose(): Promise<void> with idempotent behavior (GitWatcherService pattern)",
+      "Constructor DI with default singleton (registerGitHandlers pattern)",
+      "execFile with array args, no shell: true (LocalWhisperService pattern)",
+      "Logger with structured context objects (logger.info('prefix:', { key: value }))",
+      "Factory function for service creation (createGitStatusService pattern)"
+    ],
+    "patterns_to_avoid": [
+      "shell: true in execFile/spawn",
+      "Module-level side effects in worker (use parentPort.on('message'))",
+      "Synchronous file I/O in main thread",
+      "Creating worker per-call (must be persistent)",
+      "Modifying git-schema.ts or preload bridge"
+    ]
+  },
+  "file_changes": [
+    {
+      "path": "src/main/interfaces/IGitStatusWorker.ts",
+      "action": "create",
+      "description": "Worker interface with execute(), clearCache(), terminate(), isAlive() methods and GitWorkerRequest/GitStatusStrategy types"
+    },
+    {
+      "path": "src/shared/constants.ts",
+      "action": "modify",
+      "description": "Add GIT_STATUS constants section (INDEX_SIZE_THRESHOLD, NATIVE_GIT_TIMEOUT, NATIVE_GIT_MAX_BUFFER, circuit breaker params)"
+    },
+    {
+      "path": "src/main/services/workers/git-status.worker.ts",
+      "action": "create",
+      "description": "Worker thread script: handles isomorphic-git and native-git strategies, porcelain parser, cache management"
+    },
+    {
+      "path": "electron.vite.config.ts",
+      "action": "modify",
+      "description": "Add rollupOptions.input with worker entry point for separate bundling"
+    },
+    {
+      "path": "src/main/services/GitStatusWorkerAdapter.ts",
+      "action": "create",
+      "description": "IGitStatusWorker implementation wrapping worker_threads.Worker with lazy creation and request correlation"
+    },
+    {
+      "path": "src/main/services/GitStatusService.ts",
+      "action": "modify",
+      "description": "Major refactor: DI constructor, strategy selection, circuit breaker, dispose(), delegate to worker"
+    },
+    {
+      "path": "src/main/index.ts",
+      "action": "modify",
+      "description": "Wire gitStatusService.dispose() in before-quit handler"
+    },
+    {
+      "path": "src/main/ipc/git-handlers.ts",
+      "action": "modify",
+      "description": "Minor import verification for refactored GitStatusService"
+    },
+    {
+      "path": "src/main/services/workers/git-status.worker.test.ts",
+      "action": "create",
+      "description": "Porcelain parser unit tests covering all XY codes, edge cases"
+    },
+    {
+      "path": "src/main/services/GitStatusWorkerAdapter.test.ts",
+      "action": "create",
+      "description": "Adapter unit tests with mocked worker_threads.Worker"
+    },
+    {
+      "path": "src/main/services/GitStatusService.test.ts",
+      "action": "modify",
+      "description": "Switch to mock IGitStatusWorker injection, preserve assertions, add strategy/circuit-breaker tests"
+    }
+  ],
+  "test_strategy": {
+    "coverage_target": 85,
+    "test_types": ["unit", "integration"],
+    "test_files": [
+      "src/main/services/workers/git-status.worker.test.ts",
+      "src/main/services/GitStatusWorkerAdapter.test.ts",
+      "src/main/services/GitStatusService.test.ts"
+    ],
+    "key_scenarios": [
+      "Porcelain parser maps all XY codes correctly (M , _M, MM, A , AM, D , _D, ??, !!, UU, AA, DD, AU, UA, DU, UD)",
+      "Porcelain parser handles NUL-delimited output and GIT_STATUS_CAP",
+      "Worker adapter creates worker lazily on first execute()",
+      "Worker adapter correlates requests/responses by ID",
+      "Worker adapter handles worker crash (error event) and marks as not alive",
+      "Worker adapter restarts worker on next execute() after crash",
+      "Worker adapter terminate() resolves pending promises with error",
+      "GitStatusService selects isomorphic-git for small repos",
+      "GitStatusService selects native-git when .git/index > 5MB and git available",
+      "GitStatusService falls back to isomorphic-git when git not available (AC-006)",
+      "GitStatusService circuit breaker activates after 3 crashes in 60s (AC-013)",
+      "GitStatusService dispose() terminates worker and clears state",
+      "GitStatusService preserves operation queue serialization",
+      "All existing GitStatusService.test.ts assertions pass unchanged (AC-010)",
+      "All existing git-handlers.test.ts assertions pass unchanged (AC-010)"
+    ]
+  },
+  "risks": [
+    {
+      "risk": "Worker bundling path resolution differs between dev and ASAR production builds",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Log resolved worker path at debug level. Test both npm run dev and npm run build:mac. Fall back to main-thread execution if worker creation fails (NFR-003)."
+    },
+    {
+      "risk": "isomorphic-git fs module in worker thread may behave differently than in main thread (ASAR patching)",
+      "likelihood": "low",
+      "impact": "high",
+      "mitigation": "Worker operates on real filesystem (.git/ directories), not ASAR contents. fs module in worker is standard Node.js fs. No ASAR conflict expected."
+    },
+    {
+      "risk": "Test migration complexity: existing tests mock isomorphic-git at module level, refactored service delegates to worker",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Mock IGitStatusWorker.execute() to return same GitStatusResponse objects. Assertion lines remain identical per AC-010."
+    },
+    {
+      "risk": "which command not available on Windows",
+      "likelihood": "medium",
+      "impact": "low",
+      "mitigation": "Add platform check: process.platform === 'win32' ? 'where' : 'which'. Low priority since codebase is macOS-focused."
+    },
+    {
+      "risk": "electron-vite externalizeDeps may not work correctly with worker entry point (isomorphic-git bundling)",
+      "likelihood": "low",
+      "impact": "medium",
+      "mitigation": "externalizeDeps defaults to true for main process. isomorphic-git is already externalized. Worker inherits same behavior. Verify with build test."
+    }
+  ],
+  "estimates": {
+    "complexity": "complex",
+    "files_affected": 11,
+    "new_files": 5,
+    "test_files": 3
+  },
+  "verification_criteria": [
+    "npm run test passes with all existing + new tests green",
+    "npm run build produces out/main/git-status.worker.js",
+    "npm run dev starts without errors, git status works in UI",
+    "Log output shows GitStatus: strategy completed in Xms format",
+    "dispose() terminates worker thread (no orphan processes)",
+    "Circuit breaker activates after 3 crashes in 60s (test verified)",
+    "No changes to src/shared/ipc/git-schema.ts or src/preload/",
+    "git-handlers.test.ts passes without any assertion changes"
+  ],
+  "design_persisted": {
+    "path": "specs/spec-t3-022-git-status-offload/sd-001-implementation.md",
+    "sequence": 1
+  },
+  "register_with_spec": {
+    "spec_id": 22,
+    "doc_type": "design",
+    "doc_path": "specs/spec-t3-022-git-status-offload/sd-001-implementation.md"
+  }
+}

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { PauseController } from '../utils/PauseController'
 import { ThrottledWorker, AtomicSaveDetector } from './watcher'
 
@@ -457,5 +457,257 @@ describe('DirectoryWatcherService Issue #59 - WebContents Cleanup', () => {
 
     // Second cleanup - should not throw
     await expect(svc.cleanupForWebContentsId(1)).resolves.not.toThrow()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Helper: build a seeded WatchedDirectory entry for EMFILE tests
+// ---------------------------------------------------------------------------
+function seedWatchedDirectory(
+  svc: any,
+  dirPath: string,
+  overrides: {
+    watcher?: any
+    pauseController?: PauseController
+    throttledWorker?: any
+    atomicSaveDetector?: any
+  } = {}
+) {
+  const fakeWatcher = overrides.watcher ?? { close: vi.fn(async () => {}) }
+  const fakeThrottledWorker = overrides.throttledWorker ?? ({
+    dispose: vi.fn(),
+    work: vi.fn(),
+    getBufferSize: vi.fn(() => 0)
+  } as unknown as ThrottledWorker<any>)
+  const fakeAtomicSaveDetector = overrides.atomicSaveDetector ?? ({
+    dispose: vi.fn()
+  } as unknown as AtomicSaveDetector)
+  const pauseController = overrides.pauseController ?? new PauseController()
+
+  svc.watchedDirectories.set(dirPath, {
+    dirPath,
+    watcher: fakeWatcher,
+    webContentsIds: new Set([1]),
+    pauseController,
+    throttledWorker: fakeThrottledWorker,
+    atomicSaveDetector: fakeAtomicSaveDetector,
+    version: svc.switchVersion
+  })
+
+  return { fakeWatcher, fakeThrottledWorker, fakeAtomicSaveDetector, pauseController }
+}
+
+describe('DirectoryWatcherService EMFILE handling', () => {
+  // Most tests do NOT need fake timers – they only call scheduleRestart synchronously
+  // and verify pendingRestarts. Tests that advance timers declare their own.
+
+  beforeEach(() => {
+    sends.length = 0
+  })
+
+  afterEach(() => {
+    // Always restore real timers even if a test forgot
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('closes watcher and disposes all resources before scheduling restart', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    svc.pendingRestarts.clear()
+    svc.restartAttempts.clear()
+
+    const { fakeWatcher, fakeThrottledWorker, fakeAtomicSaveDetector, pauseController } =
+      seedWatchedDirectory(svc, '/proj')
+    const dispatchDispose = vi.spyOn(pauseController, 'dispose')
+
+    svc.handleWatcherError('/proj', 'EMFILE: too many open files, watch')
+
+    // All three resources disposed synchronously
+    expect(dispatchDispose).toHaveBeenCalled()
+    expect(fakeThrottledWorker.dispose).toHaveBeenCalled()
+    expect(fakeAtomicSaveDetector.dispose).toHaveBeenCalled()
+
+    // Watcher.close() called (fire-and-forget – may still be in microtask queue)
+    expect(fakeWatcher.close).toHaveBeenCalled()
+
+    // Removed from map immediately
+    expect(svc.watchedDirectories.has('/proj')).toBe(false)
+
+    // Restart scheduled
+    expect(svc.pendingRestarts.has('/proj')).toBe(true)
+
+    // Cleanup
+    for (const t of svc.pendingRestarts.values()) clearTimeout(t)
+    svc.pendingRestarts.clear()
+  })
+
+  it('suppresses duplicate EMFILE errors when a restart is already pending', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    svc.pendingRestarts.clear()
+    svc.restartAttempts.clear()
+
+    const { fakeWatcher } = seedWatchedDirectory(svc, '/proj')
+
+    // First EMFILE error – tears down watcher and schedules restart
+    svc.handleWatcherError('/proj', 'EMFILE: too many open files, watch')
+    expect(svc.pendingRestarts.has('/proj')).toBe(true)
+    expect(fakeWatcher.close).toHaveBeenCalledTimes(1)
+
+    // Capture the pending timeout so we can verify it is NOT replaced
+    const firstTimeout = svc.pendingRestarts.get('/proj')
+
+    // Re-seed watchedDirectories so the outer guard (watchedDirectories.has) doesn't
+    // short-circuit – we want to exercise the pendingRestarts.has() guard at line 677
+    const { fakeWatcher: secondWatcher } = seedWatchedDirectory(svc, '/proj')
+    svc.handleWatcherError('/proj', 'EMFILE: too many open files, watch')
+
+    // Still only one pending restart – the second EMFILE was suppressed
+    expect(svc.pendingRestarts.has('/proj')).toBe(true)
+    expect(svc.pendingRestarts.get('/proj')).toBe(firstTimeout)
+    // The second watcher was NOT torn down (the guard returned early)
+    expect(secondWatcher.close).not.toHaveBeenCalled()
+
+    // Cleanup
+    for (const t of svc.pendingRestarts.values()) clearTimeout(t)
+    svc.pendingRestarts.clear()
+  })
+
+  it('ignores a late EMFILE error after watcher has already been removed', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    svc.pendingRestarts.clear()
+    svc.restartAttempts.clear()
+
+    // Dir is NOT in watchedDirectories – simulates a late/stale error event
+    svc.watchedDirectories.delete('/proj')
+
+    // Should return without throwing and without scheduling a restart
+    expect(() =>
+      svc.handleWatcherError('/proj', 'EMFILE: too many open files, watch')
+    ).not.toThrow()
+
+    expect(svc.pendingRestarts.has('/proj')).toBe(false)
+  })
+
+  it('schedules exactly one restart even when 10 EMFILE errors fire in rapid succession', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    svc.pendingRestarts.clear()
+    svc.restartAttempts.clear()
+
+    const { fakeWatcher } = seedWatchedDirectory(svc, '/proj')
+    const scheduleRestartSpy = vi.spyOn(svc, 'scheduleRestart')
+
+    // Fire 10 EMFILE errors back-to-back
+    for (let i = 0; i < 10; i++) {
+      svc.handleWatcherError('/proj', 'EMFILE: too many open files, watch')
+    }
+
+    // Only 1 restart scheduled regardless of how many errors fired
+    expect(scheduleRestartSpy).toHaveBeenCalledTimes(1)
+
+    // Watcher closed exactly once
+    expect(fakeWatcher.close).toHaveBeenCalledTimes(1)
+
+    // Exactly one entry in pendingRestarts
+    expect(svc.pendingRestarts.size).toBeGreaterThanOrEqual(1)
+
+    // Cleanup
+    for (const t of svc.pendingRestarts.values()) clearTimeout(t)
+    svc.pendingRestarts.clear()
+  })
+
+  it('restart fires after timer expires and calls restartWatcher for the same dir', async () => {
+    vi.useFakeTimers()
+
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    svc.pendingRestarts.clear()
+    svc.restartAttempts.clear()
+
+    seedWatchedDirectory(svc, '/proj')
+
+    // Spy on restartWatcher to avoid calling the real implementation
+    // (which needs chokidar and webContents)
+    const restartWatcherSpy = vi
+      .spyOn(svc, 'restartWatcher')
+      .mockResolvedValue(undefined)
+
+    svc.handleWatcherError('/proj', 'EMFILE: too many open files, watch')
+    expect(svc.pendingRestarts.has('/proj')).toBe(true)
+
+    // Advance past the base restart delay (800ms)
+    await vi.advanceTimersByTimeAsync(800)
+
+    // Pending restart should be consumed
+    expect(svc.pendingRestarts.has('/proj')).toBe(false)
+
+    // restartWatcher called with the correct dirPath
+    expect(restartWatcherSpy).toHaveBeenCalledWith('/proj', expect.any(Set))
+
+    vi.useRealTimers()
+  })
+
+  it('does not close watcher early for EACCES – follows normal transient error path', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    svc.pendingRestarts.clear()
+    svc.restartAttempts.clear()
+
+    const { fakeWatcher } = seedWatchedDirectory(svc, '/proj')
+
+    svc.handleWatcherError('/proj', 'EACCES: access denied to /proj')
+
+    // Watcher should NOT be closed early – normal transient path keeps it alive
+    // until restartWatcher tears it down
+    expect(fakeWatcher.close).not.toHaveBeenCalled()
+
+    // Dir remains in watchedDirectories (normal transient path does not remove it eagerly)
+    expect(svc.watchedDirectories.has('/proj')).toBe(true)
+
+    // Restart is still scheduled
+    expect(svc.pendingRestarts.has('/proj')).toBe(true)
+
+    // Cleanup
+    for (const t of svc.pendingRestarts.values()) clearTimeout(t)
+    svc.pendingRestarts.clear()
+  })
+
+  it('logs error but does not call stopAll when watcher.close() rejects during EMFILE recovery', async () => {
+    const mod = await import('./DirectoryWatcherService')
+    const svc: any = mod.directoryWatcherService
+
+    svc.pendingRestarts.clear()
+    svc.restartAttempts.clear()
+
+    const rejectingWatcher = {
+      close: vi.fn().mockRejectedValue(new Error('close failed'))
+    }
+    seedWatchedDirectory(svc, '/proj', { watcher: rejectingWatcher })
+
+    const stopAllSpy = vi.spyOn(svc, 'stopAll').mockResolvedValue(undefined)
+
+    svc.handleWatcherError('/proj', 'EMFILE: too many open files, watch')
+
+    // Allow the rejected promise microtask to settle
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+    // stopAll must NOT be called – it would cancel the pending restart
+    expect(stopAllSpy).not.toHaveBeenCalled()
+    // The restart should still be pending despite the close failure
+    expect(svc.pendingRestarts.has('/proj')).toBe(true)
+
+    // Cleanup
+    for (const t of svc.pendingRestarts.values()) clearTimeout(t)
+    svc.pendingRestarts.clear()
+    stopAllSpy.mockRestore()
   })
 })
