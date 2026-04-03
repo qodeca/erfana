@@ -1,6 +1,15 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { ThrottledWorker, createThrottledWorker } from './ThrottledWorker'
 
+vi.mock('../LoggingService', () => ({
+  logger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn()
+  }
+}))
+
 describe('ThrottledWorker', () => {
   beforeEach(() => {
     vi.useFakeTimers()

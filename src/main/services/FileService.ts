@@ -46,6 +46,9 @@ export class FileService implements IFileService {
   // Dynamic hidden patterns (configurable per-project via .erfana/settings.json)
   private hiddenPatterns: string[] = [...DEFAULT_TREE_HIDDEN_PATTERNS]
 
+  // One-time flag for logging active hidden patterns per project
+  private hasLoggedPatterns = false
+
   /**
    * Set custom hidden patterns (called by ProjectService after loading settings)
    */
@@ -62,6 +65,7 @@ export class FileService implements IFileService {
 
   setProjectPath(path: string): void {
     this.projectPath = path
+    this.hasLoggedPatterns = false
   }
 
   getProjectPath(): string | null {
@@ -69,6 +73,56 @@ export class FileService implements IFileService {
   }
 
   async readDirectory(dirPath: string): Promise<FileNode[]> {
+    const start = performance.now()
+    const result = await this._readDirectoryInternal(dirPath, 0)
+    const durationMs = Math.round(performance.now() - start)
+
+    // Count files and directories in result
+    const counts = this.countNodes(result)
+
+    logger.info('FileService: readDirectory completed', {
+      durationMs,
+      fileCount: counts.files,
+      dirCount: counts.dirs,
+      hiddenPatternCount: counts.hiddenPatternCount,
+      maxDepth: counts.maxDepth
+    })
+
+    // Log hidden patterns once per project
+    if (!this.hasLoggedPatterns) {
+      this.hasLoggedPatterns = true
+      logger.debug('FileService: hidden patterns active', { patterns: this.hiddenPatterns })
+    }
+
+    return result
+  }
+
+  /**
+   * Count files, directories, and max depth in a tree
+   */
+  private countNodes(nodes: FileNode[]): { files: number; dirs: number; hiddenPatternCount: number; maxDepth: number } {
+    let files = 0
+    let dirs = 0
+    let maxDepth = 0
+
+    const walk = (items: FileNode[], depth: number): void => {
+      for (const item of items) {
+        if (item.type === 'file') files++
+        else {
+          dirs++
+          if (item.children && item.children.length > 0) {
+            if (depth + 1 > maxDepth) maxDepth = depth + 1
+            walk(item.children, depth + 1)
+          }
+        }
+      }
+    }
+
+    walk(nodes, 0)
+    return { files, dirs, hiddenPatternCount: this.hiddenPatterns.length, maxDepth }
+  }
+
+  private async _readDirectoryInternal(dirPath: string, depth: number): Promise<FileNode[]> {
     const entries = await readdir(dirPath, { withFileTypes: true })
     const nodes: FileNode[] = []
 
@@ -96,11 +150,9 @@ export class FileService implements IFileService {
       // Recursively read subdirectories for markdown files
       if (node.type === 'directory') {
         try {
-          node.children = await this.readDirectory(fullPath)
+          node.children = await this._readDirectoryInternal(fullPath, depth + 1)
         } catch (error) {
-          logger.error('Error reading directory', error instanceof Error ? error : undefined, {
-            path: fullPath
-          })
+          logger.warn('FileService: readDirectory error recovered', { path: fullPath, error: error instanceof Error ? error.message : String(error) })
           node.children = []
         }
       }

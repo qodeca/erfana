@@ -578,8 +578,9 @@ describe('Watcher resilience and polling fallback (#100)', () => {
 
         // Should schedule restart
         expect(directoryWatcherService.pendingRestarts.has('/proj')).toBe(true)
-        expect(mockLogger.info).toHaveBeenCalledWith(
-          expect.stringMatching(/Scheduling watcher restart.*800ms/)
+        expect(mockLogger.debug).toHaveBeenCalledWith(
+          'Watcher restart scheduled',
+          expect.objectContaining({ dirPath: '/proj', attempt: 1, delay: 800 })
         )
       })
 
@@ -621,24 +622,27 @@ describe('Watcher resilience and polling fallback (#100)', () => {
 
         // First attempt
         directoryWatcherService.handleWatcherError('/proj', 'ENOENT: no such file')
-        expect(mockLogger.info).toHaveBeenCalledWith(
-          expect.stringMatching(/Scheduling watcher restart.*800ms/)
+        expect(mockLogger.debug).toHaveBeenCalledWith(
+          'Watcher restart scheduled',
+          expect.objectContaining({ dirPath: '/proj', attempt: 1, delay: 800 })
         )
 
         // Clear and set attempt counter for second
         directoryWatcherService.pendingRestarts.clear()
         directoryWatcherService.restartAttempts.set('/proj', 1)
         directoryWatcherService.handleWatcherError('/proj', 'ENOENT: no such file')
-        expect(mockLogger.info).toHaveBeenCalledWith(
-          expect.stringMatching(/Scheduling watcher restart.*1600ms/)
+        expect(mockLogger.debug).toHaveBeenCalledWith(
+          'Watcher restart scheduled',
+          expect.objectContaining({ dirPath: '/proj', attempt: 2, delay: 1600 })
         )
 
         // Clear and set attempt counter for third
         directoryWatcherService.pendingRestarts.clear()
         directoryWatcherService.restartAttempts.set('/proj', 2)
         directoryWatcherService.handleWatcherError('/proj', 'ENOENT: no such file')
-        expect(mockLogger.info).toHaveBeenCalledWith(
-          expect.stringMatching(/Scheduling watcher restart.*3200ms/)
+        expect(mockLogger.debug).toHaveBeenCalledWith(
+          'Watcher restart scheduled',
+          expect.objectContaining({ dirPath: '/proj', attempt: 3, delay: 3200 })
         )
       })
 

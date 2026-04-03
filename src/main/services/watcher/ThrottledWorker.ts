@@ -69,6 +69,7 @@ export class ThrottledWorker<T> {
   private throttleTimer: NodeJS.Timeout | null = null
   private isProcessing = false
   private isDisposed = false
+  private pressureWarningEmitted = false
 
   private readonly options: ThrottledWorkerOptions
   private readonly callbacks: ThrottledWorkerCallbacks<T>
@@ -88,6 +89,20 @@ export class ThrottledWorker<T> {
     if (this.isDisposed) return
     this.buffer.push(item)
     this.enforceBufferLimit()
+
+    // Threshold-crossing pattern: warn at 80%, reset at 50%
+    const fillRatio = this.buffer.length / this.options.maxBufferedWork
+    if (fillRatio >= 0.8 && !this.pressureWarningEmitted) {
+      this.pressureWarningEmitted = true
+      logger.warn('ThrottledWorker buffer pressure', {
+        current: this.buffer.length,
+        max: this.options.maxBufferedWork,
+        pct: Math.round(fillRatio * 100)
+      })
+    } else if (fillRatio < 0.5 && this.pressureWarningEmitted) {
+      this.pressureWarningEmitted = false
+    }
+
     this.scheduleProcessing()
   }
 
@@ -135,6 +150,7 @@ export class ThrottledWorker<T> {
   flush(): void {
     this.cancel()
     this.buffer = []
+    this.pressureWarningEmitted = false
   }
 
   /**
@@ -152,6 +168,11 @@ export class ThrottledWorker<T> {
     if (this.buffer.length > this.options.maxBufferedWork) {
       const droppedCount = this.buffer.length - this.options.maxBufferedWork
       this.buffer = this.buffer.slice(droppedCount)
+      logger.warn('ThrottledWorker buffer overflow', {
+        dropped: droppedCount,
+        current: this.buffer.length,
+        max: this.options.maxBufferedWork
+      })
 
       if (this.callbacks.onOverflow) {
         this.callbacks.onOverflow(droppedCount)

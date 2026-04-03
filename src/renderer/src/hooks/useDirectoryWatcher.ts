@@ -77,6 +77,8 @@ export function useDirectoryWatcher({
       if (shouldHandleDirectoryChange(isInternalOperationRef.current)) {
         logger.info(createDirectoryChangeMessage(data.eventCount))
         onRefreshRef.current()
+      } else {
+        logger.debug('[RENDERER] Directory change skipped (internal operation)')
       }
     })
 
