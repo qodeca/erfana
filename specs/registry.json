@@ -1,7 +1,7 @@
 {
   "sequence": {
-    "current": 21,
-    "next": 22
+    "current": 22,
+    "next": 23
   },
   "registry": [
     {
@@ -32,7 +32,7 @@
       "tier": "T3",
       "status": "draft",
       "scope": "feature",
-      "description": "Adds semantic search via vector embeddings using sqlite-vec extension and ONNX Runtime in worker threads. Implements hybrid search fusion combining BM25 keyword scores with vector similarity using configurable weights (\u03b1, \u03b2). Includes Settings UI for weight tuning and MCP tool `erfana_graph_related` for finding related sections. Corresponds to implementation milestone M2.",
+      "description": "Adds semantic search via vector embeddings using sqlite-vec extension and ONNX Runtime in worker threads. Implements hybrid search fusion combining BM25 keyword scores with vector similarity using configurable weights (α, β). Includes Settings UI for weight tuning and MCP tool `erfana_graph_related` for finding related sections. Corresponds to implementation milestone M2.",
       "created": "2025-12-22T22:30:00.000Z",
       "path": "spec-t3-005-vector-search",
       "last_modified": "2025-12-22T22:30:00.000Z",
@@ -306,11 +306,42 @@
           "shared-types"
         ]
       }
+    },
+    {
+      "id": 22,
+      "tier": "T3",
+      "slug": "git-status-offload",
+      "name": "Git status thread offloading",
+      "status": "active",
+      "scope": "improvement",
+      "description": "Move isomorphic-git statusMatrix() from Electron's main thread to a worker_threads worker, add .git/index size guard for large repos, fallback to native git status --porcelain for oversized repos, add cache parameter. Eliminates UI freezes caused by main-thread blocking during git status operations on large repositories (56K+ files).",
+      "created": "2026-04-02T12:00:00.000Z",
+      "path": "spec-t3-022-git-status-offload",
+      "last_modified": "2026-04-03T12:00:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 25,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": [
+          "#147",
+          "#146",
+          "#148",
+          "#105"
+        ]
+      },
+      "components": {
+        "total": 0,
+        "implemented": 0,
+        "list": []
+      }
     }
   ],
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2026-03-30T08:00:00.000Z"
+    "last_updated": "2026-04-03T07:35:43.324Z"
   }
 }
