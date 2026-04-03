@@ -36,6 +36,7 @@ import { loggingService, logger } from './services/LoggingService'
 import { gitWatcherService } from './services/GitWatcherService'
 import { gitPollingService } from './services/GitPollingService'
 import { projectLockService } from './services/ProjectLockService'
+import { gitStatusService } from './services/GitStatusService'
 import { installSafeConsole } from './utils/safeConsole'
 
 // Install safe console logging to prevent EPIPE crashes
@@ -331,6 +332,7 @@ app.on('before-quit', async () => {
   await terminalService.dispose()
   await gitWatcherService.dispose()
   gitPollingService.dispose()
+  await gitStatusService.dispose()
   await projectLockService.dispose()
 })
 
