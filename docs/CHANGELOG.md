@@ -13,6 +13,13 @@ Historical changelog entries for versions prior to current. For the latest chang
 - **Git status worker thread offloading** – Moved `isomorphic-git statusMatrix()` from main thread to `worker_threads` Worker for responsive UI during git status computation. Includes native `git status --porcelain` fallback for large repos (>.git/index 5 MB), per-project circuit breaker (3 crashes in 60 s → disable, half-open after 5 min), strategy selector based on repo size, timing instrumentation with structured logging, and cache clearing on project switch. Spec #022 implemented (#147)
   - New files: `IGitStatusWorker` interface, `git-status.worker.ts` worker script, `GitStatusWorkerAdapter`, `GitStatusCircuitBreaker`, `GitStatusStrategySelector`
   - Modified: `GitStatusService` refactored to delegate via `IGitStatusWorker`, `electron.vite.config.ts` worker entry, dispose on `before-quit`, cache clearing in file handlers, `GIT_STATUS` constants in shared
+- **Diagnostic logging instrumentation** – ~37 structured log entries across 15 files for large-project performance debugging (#151). Covers `statusMatrix()` and `readDirectory()` timing, project switch stage logging, watcher health snapshots (120s intervals), ThrottledWorker buffer pressure (80%/50% hysteresis), and EMFILE rate-limited logging via new `RateLimitedLogger` utility
+- **Large-project performance plan** – Implementation order document for issues #146–#151 based on dependency analysis of the git status → tree render pipeline
+
+### Fixed
+- **EMFILE cascade in DirectoryWatcherService** – chokidar EMFILE errors reset the restart timer indefinitely (4,497 errors in 4 min). Fix: close watcher immediately on EMFILE before scheduling restart, guard against late errors from removed watchers, increment `switchVersion` to invalidate in-flight events (#146)
+- **FD exhaustion fallback** – When native git's `execFile` fails with EBADF/EMFILE, the worker now returns a transient error instead of falling back to isomorphic-git (which opens thousands of FDs via `fs.stat()`, worsening the cascade). Non-FD errors still fall back. Status and branch `execFile` calls serialized to halve peak FD usage (#147)
+- **Diagnostic logging review fixes** – Extract `checkBufferPressure()` for ThrottledWorker `workMany()`, `.unref()` health logger intervals to prevent blocking shutdown, normalize `errorCounts` field, demote non-critical logs to debug level (#151)
 
 ### Changed
 - Version bump from 0.8.3 to 0.9.0

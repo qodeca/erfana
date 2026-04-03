@@ -1,7 +1,7 @@
 # Large-project performance – implementation plan
 
 > Created: 2026-04-03
-> Status: Not started
+> Status: In progress (3 of 6 done)
 > Scope: Issues #146, #147, #148, #149, #150, #151
 
 ## Context
@@ -12,15 +12,15 @@ Six issues were filed. This document defines the implementation order based on d
 
 ## Implementation order
 
-### 1. #151 – Diagnostic logging instrumentation (foundation)
+### 1. #151 – Diagnostic logging instrumentation (foundation) ✅
 
-- **Type:** Enhancement | **Risk:** Low | **Effort:** Medium
+- **Type:** Enhancement | **Risk:** Low | **Effort:** Medium | **Status:** Done (91c3ae6, f327623)
 - **Why first:** Touches 15 files across the entire pipeline. Every subsequent issue modifies files that #151 instruments. Doing this first provides measurable evidence for verifying all later fixes. Low risk – structured logs only, no behavior changes.
 - **Key deliverables:** ~37 structured log entries, timing instrumentation (`performance.now()`), threshold warnings, rate-limited error-path logging, periodic health snapshots.
 
-### 2. #146 – EMFILE cascade in DirectoryWatcherService (critical bug)
+### 2. #146 – EMFILE cascade in DirectoryWatcherService (critical bug) ✅
 
-- **Type:** Bug fix | **Risk:** Medium | **Effort:** Small
+- **Type:** Bug fix | **Risk:** Medium | **Effort:** Small | **Status:** Done (07a976b)
 - **Why second:** The most actively destructive bug – 4,497 errors in 4 minutes, infinite restart loop. The fix is surgical: close watcher before scheduling restart, add cooldown. With #151's instrumentation already in place, the fix is immediately verifiable via logs.
 - **Key deliverables:** Close existing watcher on EMFILE before restart, global EMFILE cooldown, burst cap on restart scheduling.
 
@@ -36,9 +36,9 @@ Six issues were filed. This document defines the implementation order based on d
 - **Why here:** Pure renderer-side work (`React.memo`, `useCallback`, Zustand selectors). Zero overlap with main-process fixes above. Gives an immediate perceived performance win by stopping the re-render cascade on every git status update.
 - **Key deliverables:** `React.memo()` on ProjectTreeNode and GitStatusBadge, `useCallback` for handlers, Zustand shallow equality for git Maps.
 
-### 5. #147 – Git status worker thread offload (major architecture)
+### 5. #147 – Git status worker thread offload (major architecture) ✅
 
-- **Type:** Enhancement | **Risk:** High | **Effort:** Large
+- **Type:** Enhancement | **Risk:** High | **Effort:** Large | **Status:** Done (bee25a4, dd6dbb3, 1041497)
 - **Why fifth:** Highest-impact single change (unblocks main thread), but biggest architectural shift – new worker thread, new IPC patterns. By this point, logging (#151), stable watchers (#146, #148), and optimized renderer (#149) are in place, isolating regressions to the worker change itself.
 - **Related spec:** spec-t3-022-git-status-offload
 - **Key deliverables:** Worker thread for `statusMatrix()`, repo size guard, `filepaths` filter option.

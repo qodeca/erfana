@@ -148,18 +148,6 @@ Request focus from the lock holder (triggers window focus via polling).
 #### `cleanupStaleLocks(): Promise<number>`
 Cleanup stale locks from dead processes or timed-out network locks.
 
-### Lock File Format
-```json
-{
-  "projectPath": "/path/to/project",
-  "pid": 12345,
-  "hostname": "machine-name",
-  "instanceId": "uuid",
-  "createdAt": "2025-12-26T00:00:00.000Z",
-  "focusRequestedAt": null
-}
-```
-
 ---
 
 ## ScreenshotService
@@ -188,11 +176,6 @@ Open crosshair tool for area selection.
 #### `getMonitors(): Promise<MonitorInfo[]>`
 Get list of available monitors for multi-monitor selection.
 
-### Related Files
-- `src/main/ipc/screenshot-handlers.ts` - IPC handlers
-- `src/shared/ipc/screenshot-schema.ts` - Zod schemas
-- `src/renderer/src/components/Panels/TerminalPanel/hooks/useScreenshotCapture.ts` - UI hook
-
 ---
 
 ## CameraService
@@ -201,37 +184,11 @@ Get list of available monitors for multi-monitor selection.
 
 Saves camera photos captured from the renderer process to the filesystem.
 
-### Key Features
-- JPEG photo saving to OS temp directory
-- Timestamped filenames (`erfana-camera-YYYY-MM-DD-HHMMSS.jpg`)
-- Base64 data URL validation
-- 20MB size limit protection
-- Singleton pattern with exported instance
-
-### Public Methods
-
-#### `save(dataUrl: string, timestamp?: number): Promise<SaveResult>`
-Save a camera photo to the temp directory.
-
-**Parameters:**
-- `dataUrl` - Base64 data URL (must be `data:image/jpeg;base64,...`)
-- `timestamp` - Optional timestamp for filename (defaults to current time)
-
-**Returns:**
-- `filePath` - Absolute path to saved file (on success)
-- `error` - Error message (on failure)
-- `errorCode` - `CAMERA_INVALID_DATA` or `CAMERA_SAVE_FAILED`
-
-**Validations:**
-- Data URL must start with `data:image/jpeg;base64,`
-- Data URL size must be under 20MB
-- Base64 decoding must succeed
-
-### Related Files
-- `src/main/ipc/camera-handlers.ts` - IPC handlers
-- `src/shared/ipc/camera-schema.ts` - Zod schemas
-- `src/renderer/src/hooks/useCameraCapture.ts` - Camera access hook
-- `src/renderer/src/components/Dialog/CameraDialog.tsx` - Dialog UI
+### Key features
+- JPEG photo saving to OS temp directory with timestamped filenames
+- Base64 data URL validation, 20MB size limit
+- `save(dataUrl, timestamp?)` → `{ filePath, error?, errorCode? }`
+- Error codes: `CAMERA_INVALID_DATA`, `CAMERA_SAVE_FAILED`
 
 ---
 
@@ -349,10 +306,8 @@ Transcribe an audio file using the local whisper.cpp backend.
 
 **Returns:** Same shape as `TranscriptionService.transcribe()` – `{ success, transcript, duration, language, error, errorCode }`
 
-### Related Files
-- `src/main/services/WhisperModelManager.ts` – Binary and model management
-- `src/main/ipc/transcription-handlers.ts` – Backend routing logic
-- `src/shared/ipc/transcription-schema.ts` – TranscriptionBackendSchema, WhisperModelSchema
+### Related files
+- `WhisperModelManager.ts` (binary/model management), `transcription-handlers.ts` (backend routing)
 
 ---
 
@@ -464,20 +419,15 @@ Document import converter for 50+ formats via `@llamaindex/liteparse` with local
 - `IMPORT_ENCRYPTED`, `IMPORT_EMPTY`, `IMPORT_PAGE_LIMIT_EXCEEDED`, `IMPORT_TIMEOUT`, `IMPORT_CONVERSION_FAILED`
 
 ### IPC layer (#133)
-- `src/shared/ipc/import-channels.ts` – Channel name constants (`IMPORT_CHANNELS`)
-- `src/shared/ipc/import-schema.ts` – Zod schemas (`DocumentImportRequestSchema`, `DocumentImportOptionsSchema`) and TypeScript interfaces (`DocumentImportProgress`, `DocumentImportResult`, `DependencyReadyEvent`)
-- `src/main/ipc/import-handlers.ts` – `registerDocumentImportHandlers()` with 3 IPC handlers (`import:document`, `import:documentCancel`, `import:getDocumentExtensions`) and 2 push events (`import:documentProgress`, `import:dependenciesReady`)
-- `src/preload/index.ts` – `api.import` namespace: `documentImport(request)`, `cancelDocument()`, `getDocumentExtensions()`, `onDocumentProgress(callback)`, `onDependenciesReady(callback)`
-- Error code: `IMPORT_BUSY` (in `src/shared/errors.ts`) – returned when import is already in progress
+- Channels: `import:document`, `import:documentCancel`, `import:getDocumentExtensions`, `import:documentProgress` (push), `import:dependenciesReady` (push)
+- Schemas: `src/shared/ipc/import-schema.ts` (Zod-validated request/options/progress/result types)
+- Preload: `api.import` namespace with 5 methods
+- Error code: `IMPORT_BUSY` – returned when import is already in progress
 
 ### Related files
-- `src/main/services/import/isoToTessLang.ts` – ISO 639-1 to 639-3 language mapping
-- `src/main/services/import/extensions.ts` – `LITEPARSE_EXCLUDED_EXTENSIONS`
+- `src/main/services/import/` – `isoToTessLang.ts`, `extensions.ts`
+- `src/renderer/src/components/DocumentImport/` – dialog and OCR language UI
 - `resources/tessdata/eng.traineddata` – Pre-bundled English OCR data
-- `src/renderer/src/components/DocumentImport/DocumentImportDialog.tsx` – Import options dialog UI (#134)
-- `src/renderer/src/components/DocumentImport/OcrLanguageSelect.tsx` – OCR language dropdown (31 languages)
-- `src/renderer/src/stores/useDocumentImportStore.ts` – Zustand store for dialog state and options persistence
-- `src/renderer/src/hooks/useImport.ts` – Document file detection and routing to DocumentImportDialog
 
 ---
 
@@ -501,14 +451,9 @@ Runtime detection of optional system tools for document import.
 ### DependencyStatus
 `{ libreOffice: boolean, imageMagick: boolean }`
 
-### IPC integration (#133)
-- DependencyDetector runs fire-and-forget at app startup (`src/main/index.ts`)
-- Detection result pushed to renderer via `import:dependenciesReady` channel
-- Renderer subscribes via `api.import.onDependenciesReady(callback)`
-
-### Related files
-- `src/main/services/import/ConverterRegistry.ts` – `updateConverterExtensions()` consumes detection result
-- `src/main/services/import/converters/LiteParseConverter.ts` – `getExtensionsForDependencies()` maps status to extensions
+### Integration
+- Fire-and-forget at app startup (`src/main/index.ts`) → pushes result via `import:dependenciesReady`
+- `ConverterRegistry.updateConverterExtensions()` consumes result to register format extensions
 
 ---
 
