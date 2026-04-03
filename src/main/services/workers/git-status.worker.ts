@@ -72,11 +72,19 @@ async function handleExecute(id: number, projectPath: string, strategy: GitStatu
         try {
           data = await executeNativeGit(projectPath, gitPath)
         } catch (nativeError) {
-          // Fall back to isomorphic-git on spawn failures (EBADF, EMFILE) or other errors.
-          // This prevents FD-pressure from child process spawns from triggering the circuit
-          // breaker – the worker itself is healthy, only the spawn failed.
-          console.warn('git-status.worker: native git failed, falling back to isomorphic-git:', nativeError instanceof Error ? nativeError.message : nativeError)
-          data = await executeIsomorphicGit(projectPath)
+          const msg = nativeError instanceof Error ? nativeError.message : String(nativeError)
+          const isFdError = msg.includes('EBADF') || msg.includes('EMFILE') || msg.includes('ENFILE')
+          if (isFdError) {
+            // FD exhaustion: do NOT fall back to isomorphic-git – statusMatrix() on a large
+            // repo opens thousands of FDs via fs.stat(), which would make the pressure worse.
+            // Return a transient error; the next poll cycle will retry when FDs are freed.
+            console.warn('git-status.worker: native git hit FD limit, returning transient error:', msg)
+            data = { ...createEmptyGitStatusResponse(), isGitRepo: true, error: `Git status temporarily unavailable (${msg})` }
+          } else {
+            // Non-FD errors (e.g., git binary crashed): fall back to isomorphic-git
+            console.warn('git-status.worker: native git failed, falling back to isomorphic-git:', msg)
+            data = await executeIsomorphicGit(projectPath)
+          }
         }
       } else {
         // FR-004 / AC-006: fall back to isomorphic-git when native git is unavailable
@@ -131,12 +139,13 @@ async function executeIsomorphicGit(projectPath: string): Promise<GitStatusRespo
 // -- Native git strategy -----------------------------------------------------
 
 async function executeNativeGit(projectPath: string, gitPath: string): Promise<GitStatusResponse> {
-  const [statusResult, branchResult] = await Promise.all([
-    execFileAsync(gitPath, ['status', '--porcelain', '-z', '--no-renames', '-unormal'], {
-      cwd: projectPath, maxBuffer: GIT_STATUS.NATIVE_GIT_MAX_BUFFER, timeout: GIT_STATUS.NATIVE_GIT_TIMEOUT
-    }),
-    execFileAsync(gitPath, ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: projectPath, timeout: BRANCH_DETECT_TIMEOUT })
-  ])
+  // Serialize execFile calls (not Promise.all) to reduce peak FD usage from 6 to 3.
+  // On large repos the directory watcher already consumes most available FDs;
+  // parallel child process spawns can tip the system into EMFILE.
+  const statusResult = await execFileAsync(gitPath, ['status', '--porcelain', '-z', '--no-renames', '-unormal'], {
+    cwd: projectPath, maxBuffer: GIT_STATUS.NATIVE_GIT_MAX_BUFFER, timeout: GIT_STATUS.NATIVE_GIT_TIMEOUT
+  })
+  const branchResult = await execFileAsync(gitPath, ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: projectPath, timeout: BRANCH_DETECT_TIMEOUT })
 
   const rawBranch = branchResult.stdout.trim()
   const isDetached = rawBranch === 'HEAD'
