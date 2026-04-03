@@ -652,6 +652,9 @@ export class DirectoryWatcherService {
    * Centralized error handling for watcher errors to keep the service recoverable
    */
   private handleWatcherError(dirPath: string, errorMessage: string): void {
+    // Guard against late error events from a watcher that was already closed
+    if (!this.watchedDirectories.has(dirPath)) return
+
     // Track error in metrics
     const errorType = this.classifyError(errorMessage)
     this.metrics.recordError(errorType)
@@ -663,6 +666,40 @@ export class DirectoryWatcherService {
         activeWatchers: this.watchedDirectories.size,
         bufferSize: this.watchedDirectories.get(dirPath)?.throttledWorker.getBufferSize() ?? 0
       })
+    }
+
+    // EMFILE-specific handling: tear down watcher immediately, then schedule restart.
+    // Chokidar emits EMFILE every ~120ms which resets scheduleRestart's timer,
+    // preventing the restart from ever firing. By closing the watcher first,
+    // we stop the error cascade and let scheduleRestart complete uninterrupted.
+    if (errorType === 'EMFILE') {
+      // Skip if a restart is already pending – the watcher is already torn down
+      if (this.pendingRestarts.has(dirPath)) return
+
+      const watched = this.watchedDirectories.get(dirPath)!
+      const webContentsIds = new Set(watched.webContentsIds)
+
+      // Dispose resources (same as restartWatcher does)
+      watched.pauseController.dispose()
+      watched.throttledWorker.dispose()
+      watched.atomicSaveDetector.dispose()
+
+      // Close watcher – fire-and-forget to keep method synchronous.
+      // Do NOT call stopAll() on failure – it would cancel the pending restart
+      // scheduled below. The watcher is already removed from the map, so a
+      // failed close is harmless (no more error events can reach us).
+      void watched.watcher.close().catch((closeErr) => {
+        logger.error(`Failed to close watcher during EMFILE recovery for ${dirPath}`, closeErr instanceof Error ? closeErr : undefined)
+      })
+
+      // Increment switchVersion to invalidate any in-flight events, then remove from map
+      this.switchVersion++
+      this.watchedDirectories.delete(dirPath)
+      this.metrics.setActiveWatchers(this.watchedDirectories.size)
+
+      logger.info(`EMFILE detected for ${dirPath} – watcher torn down, scheduling restart`)
+      this.scheduleRestart(dirPath, webContentsIds)
+      return
     }
 
     logger.debug('Watcher error classified', { errorMessage, errorType, isTransient: this.isTransientError(errorType) })
@@ -750,6 +787,8 @@ export class DirectoryWatcherService {
    * Attempt to restart a watcher after failure
    */
   private async restartWatcher(dirPath: string, webContentsIds: Set<number>): Promise<void> {
+    if (this.isDisposing) return // Don't restart during disposal
+
     const attempts = (this.restartAttempts.get(dirPath) ?? 0) + 1
     this.restartAttempts.set(dirPath, attempts)
 
