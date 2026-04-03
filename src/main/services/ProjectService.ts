@@ -177,6 +177,8 @@ export class ProjectService {
    */
   async switchProject(newProjectPath: string): Promise<ProjectSwitchResult> {
     const oldProjectPath = this.fileService.getProjectPath()
+    const switchStart = performance.now()
+    logger.info('Project switch: starting', { oldPath: oldProjectPath, newPath: newProjectPath })
 
     // 1. SECURITY: Validate path before any operations
     try {
@@ -193,6 +195,7 @@ export class ProjectService {
       }
       throw error
     }
+    logger.debug('Project switch: security validation passed')
 
     // 2. Check if same project (canonical comparison)
     if (oldProjectPath) {
@@ -250,7 +253,9 @@ export class ProjectService {
       }
 
       // 5. Stop all existing watchers before switching
+      const watcherStopStart = performance.now()
       await this.stopAllWatchers()
+      logger.debug('Project switch: watchers stopped', { durationMs: Math.round(performance.now() - watcherStopStart) })
 
       // 6. Load and validate project settings
       let projectSettings
@@ -279,9 +284,14 @@ export class ProjectService {
         }
         throw error
       }
+      logger.debug('Project switch: settings loaded', {
+        hiddenPatternCount: projectSettings.treeHiddenPatterns.length,
+        ignorePatternCount: projectSettings.watcherIgnorePatterns.length
+      })
 
       // 7. Update project path across services
       this.updateServices(newProjectPath)
+      logger.debug('Project switch: services updated')
 
       // 8. Apply project settings to services
       this.fileService.setHiddenPatterns(projectSettings.treeHiddenPatterns)
@@ -308,6 +318,9 @@ export class ProjectService {
         })
       }
 
+      const durationMs = Math.round(performance.now() - switchStart)
+      logger.info('Project switch: completed', { durationMs, note: 'git watcher/polling will be started by renderer' })
+
       return {
         success: true,
         path: newProjectPath,
@@ -326,8 +339,13 @@ export class ProjectService {
         })
       })
 
+      const stage = !this.fileService.getProjectPath() || this.fileService.getProjectPath() === oldProjectPath
+        ? 'pre-switch' : 'post-switch'
+      const durationMs = Math.round(performance.now() - switchStart)
       const message = error instanceof Error ? error.message : String(error)
-      logger.error('Open project failed', error instanceof Error ? error : undefined, {
+      logger.error('Project switch: failed', error instanceof Error ? error : undefined, {
+        stage,
+        durationMs,
         path: newProjectPath
       })
 

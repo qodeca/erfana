@@ -16,6 +16,7 @@ import { DEFAULT_WATCHER_IGNORE_PATTERNS, PAUSE_CONTROLLER } from '../../shared/
 import { logger } from './LoggingService'
 import { isSystemDirectory } from '../utils/pathSecurity'
 import { AppError, ErrorCode } from '../../shared/errors'
+import { RateLimitedLogger } from '../utils/RateLimitedLogger'
 
 interface WatchedDirectory {
   dirPath: string
@@ -55,6 +56,12 @@ export class DirectoryWatcherService {
   // Dynamic ignore patterns (configurable per-project via .erfana/settings.json)
   private ignorePatterns: string[] = [...DEFAULT_WATCHER_IGNORE_PATTERNS]
 
+  // Rate-limited EMFILE logger (max once per 10s to prevent fd feedback loop)
+  private readonly emfileLogger = new RateLimitedLogger('emfile', 10000)
+
+  // Health logger interval (120s)
+  private healthLogInterval: NodeJS.Timeout | null = null
+
   /**
    * Set custom ignore patterns (called by ProjectService after loading settings)
    */
@@ -93,6 +100,8 @@ export class DirectoryWatcherService {
    */
   async stopAll(): Promise<void> {
     this.safeLog('👁️  Stopping all directory watchers...')
+    this.stopHealthLogger()
+    this.emfileLogger.reset()
 
     // Clear pending restarts
     for (const timeout of this.pendingRestarts.values()) {
@@ -265,6 +274,9 @@ export class DirectoryWatcherService {
 
     this.watchedDirectories.set(dirPath, watched)
     this.metrics.setActiveWatchers(this.watchedDirectories.size)
+
+    // Start health logger on first watch
+    this.startHealthLogger()
   }
 
   /**
@@ -423,6 +435,7 @@ export class DirectoryWatcherService {
     if (!watched) return
     // Drop events generated for a previous session
     if (watched.version !== this.switchVersion) {
+      logger.debug('Dropping stale event from previous session', { eventType: event.type, path: event.path })
       return
     }
 
@@ -570,10 +583,48 @@ export class DirectoryWatcherService {
   }
 
   /**
+   * Start the periodic health logger (120s interval).
+   * Logs watcher health metrics and promotes to warn on stress indicators.
+   */
+  private startHealthLogger(): void {
+    if (this.healthLogInterval !== null) return
+
+    this.healthLogInterval = setInterval(() => {
+      const snapshot = this.metrics.getSnapshot()
+      const resourceCount = process.getActiveResourcesInfo().length
+
+      const isStressed = snapshot.bufferOverflows > 0 || snapshot.peakEventsPerSecond > 100
+      const level = isStressed ? 'warn' : 'debug'
+
+      logger[level]('DirectoryWatcher health', {
+        activeWatchers: snapshot.activeWatchers,
+        eventsReceived: snapshot.eventsReceived,
+        bufferOverflows: snapshot.bufferOverflows,
+        errorCounts: snapshot.errorCounts,
+        peakEventsPerSecond: snapshot.peakEventsPerSecond,
+        resourceCount
+      })
+    }, 120000)
+    this.healthLogInterval.unref()
+  }
+
+  /**
+   * Stop the periodic health logger.
+   */
+  private stopHealthLogger(): void {
+    if (this.healthLogInterval) {
+      clearInterval(this.healthLogInterval)
+      this.healthLogInterval = null
+    }
+  }
+
+  /**
    * Cleanup all watchers (on app shutdown)
    */
   async dispose(): Promise<void> {
     this.isDisposing = true // Set flag FIRST to stop all event processing
+    this.stopHealthLogger()
+    this.emfileLogger.reset()
     this.safeLog('👁️  Disposing all directory watchers...')
     this.safeLog(this.metrics.getFormattedStats()) // Log final metrics
 
@@ -604,6 +655,17 @@ export class DirectoryWatcherService {
     // Track error in metrics
     const errorType = this.classifyError(errorMessage)
     this.metrics.recordError(errorType)
+
+    // Rate-limited EMFILE logging to prevent fd feedback loop
+    if (errorType === 'EMFILE') {
+      this.emfileLogger.log('warn', 'Directory watcher EMFILE', {
+        dirPath,
+        activeWatchers: this.watchedDirectories.size,
+        bufferSize: this.watchedDirectories.get(dirPath)?.throttledWorker.getBufferSize() ?? 0
+      })
+    }
+
+    logger.debug('Watcher error classified', { errorMessage, errorType, isTransient: this.isTransientError(errorType) })
 
     // Get webContentsIds before potentially removing the watched directory
     const watched = this.watchedDirectories.get(dirPath)
@@ -662,7 +724,12 @@ export class DirectoryWatcherService {
     const attempts = this.restartAttempts.get(dirPath) ?? 0
     const delay = this.RESTART_BASE_DELAY * Math.pow(2, attempts)
 
-    logger.info(`Scheduling watcher restart for ${dirPath} in ${delay}ms (attempt ${attempts + 1}/${this.MAX_RESTART_ATTEMPTS})`)
+    logger.debug('Watcher restart scheduled', {
+      dirPath,
+      attempt: attempts + 1,
+      delay,
+      pendingRestartCount: this.pendingRestarts.size
+    })
 
     // Clear any existing pending restart
     const existingTimeout = this.pendingRestarts.get(dirPath)

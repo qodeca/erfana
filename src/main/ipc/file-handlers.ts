@@ -132,7 +132,11 @@ export function registerFileHandlers(): void {
   // Read directory structure
   ipcMain.handle('file:readDirectory', async (_event, dirPath: string) => {
     try {
-      return await fileService.readDirectory(dirPath)
+      const start = performance.now()
+      const result = await fileService.readDirectory(dirPath)
+      const durationMs = Math.round(performance.now() - start)
+      logger.info('file:readDirectory IPC completed', { durationMs, dirPath })
+      return result
     } catch (error) {
       logger.error('Error reading directory', error instanceof Error ? error : undefined)
       throw error

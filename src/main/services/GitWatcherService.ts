@@ -127,6 +127,7 @@ export class GitWatcherService implements IGitWatcherService {
 
     // Reset restart state
     this.restartAttempts = 0
+    logger.info('GitWatcherService: Starting watcher', { projectPath })
     if (this.pendingRestart) {
       clearTimeout(this.pendingRestart)
       this.pendingRestart = null
@@ -259,6 +260,12 @@ export class GitWatcherService implements IGitWatcherService {
       }
     }
 
+    logger.debug('GitWatcherService: Path filtering', {
+      total: watchPaths.length,
+      existing: existingPaths.length,
+      filtered: watchPaths.length - existingPaths.length
+    })
+
     // Must have at least .git/index
     const indexPath = join(projectPath, '.git/index')
     if (!existingPaths.includes(indexPath)) {
@@ -272,6 +279,7 @@ export class GitWatcherService implements IGitWatcherService {
     }, GIT_COALESCE_WINDOW_MS)
 
     // Create watcher
+    logger.debug('GitWatcherService: Creating chokidar watcher', { pathCount: existingPaths.length })
     const watcher = chokidar.watch(existingPaths, {
       persistent: true,
       ignoreInitial: true,
@@ -569,16 +577,14 @@ export class GitWatcherService implements IGitWatcherService {
     this.healthLogInterval = setInterval(() => {
       const snapshot = watcherMetrics.getSnapshot()
 
-      logger.info('GitStatus: Health summary', {
+      logger.debug('GitStatus: Health summary', {
         uptimeMinutes: Math.round(snapshot.uptimeMs / 60000),
         watcherEvents: snapshot.gitWatcherEventCount,
         pollingRefreshes: snapshot.pollingRefreshCount,
         pollingSkipped: snapshot.pollingSkippedCount,
         pollingEfficiency: `${snapshot.pollingEfficiency}%`,
         restarts: snapshot.restartScheduled,
-        errors: Object.keys(snapshot.errorCounts).length > 0
-          ? snapshot.errorCounts
-          : 'none'
+        errors: snapshot.errorCounts
       })
 
       // Degraded state warnings
@@ -589,6 +595,7 @@ export class GitWatcherService implements IGitWatcherService {
         })
       }
     }, HEALTH_LOG_INTERVAL_MS)
+    this.healthLogInterval.unref()
   }
 
   /**

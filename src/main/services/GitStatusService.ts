@@ -79,6 +79,8 @@ export class GitStatusService {
    */
   private async executeGetStatus(projectPath: string): Promise<GitStatusResponse> {
     try {
+      const overallStart = performance.now()
+
       // Check if .git directory exists
       const gitDir = join(projectPath, '.git')
       try {
@@ -88,6 +90,7 @@ export class GitStatusService {
         }
       } catch {
         // .git doesn't exist, not a git repo
+        logger.trace('GitStatus: not a git repo', { projectPath })
         return this.createEmptyResponse()
       }
 
@@ -126,10 +129,18 @@ export class GitStatusService {
       }
 
       // Get file statuses using statusMatrix (efficient bulk operation)
+      logger.debug('GitStatus: calling statusMatrix', { projectPath })
+      const statusMatrixStart = performance.now()
       const matrix = await git.statusMatrix({
         fs,
         dir: projectPath
       })
+      const statusMatrixDurationMs = Math.round(performance.now() - statusMatrixStart)
+      if (statusMatrixDurationMs > 2000) {
+        logger.warn('GitStatus: statusMatrix completed (slow)', { durationMs: statusMatrixDurationMs, matrixRows: matrix.length })
+      } else {
+        logger.debug('GitStatus: statusMatrix completed', { durationMs: statusMatrixDurationMs, matrixRows: matrix.length })
+      }
 
       const files: GitFileEntry[] = []
       const counts: GitStatusCounts = {
@@ -146,6 +157,7 @@ export class GitStatusService {
         // Cap file entries to prevent performance issues
         if (files.length >= GIT_STATUS_CAP) {
           truncated = true
+          logger.warn('GitStatus: truncated', { cap: GIT_STATUS_CAP, matrixLength: matrix.length })
           break
         }
 
@@ -215,13 +227,8 @@ export class GitStatusService {
         })
       }
 
-      logger.debug('Git status retrieved', {
-        fileCount: files.length,
-        modified: counts.modified,
-        untracked: counts.untracked,
-        deleted: counts.deleted,
-        staged: counts.staged
-      })
+      const durationMs = Math.round(performance.now() - overallStart)
+      logger.info('GitStatus: completed', { durationMs, strategy: 'isomorphic-git', fileCount: files.length, truncated })
 
       return {
         isGitRepo: true,
