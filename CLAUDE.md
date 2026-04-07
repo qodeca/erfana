@@ -71,7 +71,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Build](docs/build/README.md) — Build configuration, electron-builder, ASAR, fuses, troubleshooting
 - [Security](docs/security.md) — Electron 39 security hardening, fuses, sandboxing, trade-offs
 - [Drag-Drop](docs/drag-drop/README.md) — VS Code-style file reorganization, visual feedback, validation
-- [Terminal](docs/terminal/README.md) — Bootstrap pattern, scroll fixes, clipboard, file links (CLI-wrap joining), drag-drop paths, screenshot capture (macOS), camera capture (cross-platform)
+- [Terminal](docs/terminal/README.md) — Bootstrap pattern, scroll fixes, clipboard, file links (CLI-wrap joining, @-prefix, :line-line range), drag-drop paths, screenshot capture (macOS), camera capture (cross-platform)
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync, Mermaid diagrams
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens, PauseController auto-resume
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration

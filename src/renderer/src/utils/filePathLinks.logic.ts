@@ -231,6 +231,8 @@ export function normalizePath(path: string): string {
  * Supported formats:
  * - `:42` - line only
  * - `:42:10` - line and column
+ * - `:42-50` - line range (navigates to start line)
+ * - `:42-50:10` - line range with column
  * - `(15,3)` - TypeScript format (line, column)
  * - `:42:` - grep format (line with trailing colon)
  *
@@ -252,7 +254,8 @@ export function parseLineColumn(pathWithPosition: string): {
     };
   }
 
-  // Colon format: file.ts:42:10 or file.ts:42 or file.ts:42:
+  // Colon format: file.ts:42:10, file.ts:42, file.ts:42:, file.ts:42-50, file.ts:42-50:10
+  // Range end (e.g., -50 in :42-50) consumed but not captured – only start line used for navigation
   const colonMatch = pathWithPosition.match(/^(.+?):(\d+)(?:-\d+)?(?::(\d+))?:?$/);
   if (colonMatch) {
     return {
@@ -465,7 +468,7 @@ export function detectFilePaths(line: string): FilePathMatch[] {
       // TypeScript format: (line,column)
       '\\(\\d{1,6},\\d{1,6}\\)' +
       '|' +
-      // Colon format: :line:column or :line or :line:
+      // Colon format: :line, :line:col, :line:, :line-range, :line-range:col
       ':\\d{1,6}(?:-\\d{1,6})?(?::\\d{1,6})?:?' +
       ')?' +
       ')' +

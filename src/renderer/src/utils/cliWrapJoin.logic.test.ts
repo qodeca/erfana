@@ -232,6 +232,41 @@ describe('cliWrapJoin.logic', () => {
       expect(group).not.toBeNull()
       expect(group!.joinedText).toBe('@/Users/user/project/src/components/Button.tsx:22-24')
     })
+
+    it('backward scan from continuation of @/ absolute opener', () => {
+      // When target is the continuation line (not opener), backward scan should still
+      // find the @/ opener and reconstruct the group correctly
+      const lines = [
+        '@/Users/user/project/src/',
+        '  components/Button.tsx'
+      ]
+      const getLine = (i: number) => lines[i] ?? null
+      // Request from line 1 (continuation), not line 0 (opener)
+      const group = findCliWrapGroup(1, getLine)
+      expect(group).not.toBeNull()
+      expect(group!.joinedText).toBe('@/Users/user/project/src/components/Button.tsx')
+      expect(group!.groupStart).toBe(0)
+      expect(group!.groupEnd).toBe(1)
+    })
+
+    it('single-line @types/node/index.d.ts does NOT form a group (no wrapping needed)', () => {
+      // A complete @scope/package path on one line should not create a spurious group
+      const lines = ['@types/node/index.d.ts']
+      const getLine = (i: number) => lines[i] ?? null
+      const group = findCliWrapGroup(0, getLine)
+      // Pattern C opener requires path to end (no continuation), and since there is
+      // no next line with path chars, result is null
+      expect(group).toBeNull()
+    })
+
+    it('wraps @scope/package split across two lines', () => {
+      // Verifies Pattern C handles npm-scoped packages that wrap just like @word/ paths
+      const lines = ['@types/node/some-very-long-na', 'me.d.ts']
+      const getLine = (i: number) => lines[i] ?? null
+      const group = findCliWrapGroup(0, getLine)
+      expect(group).not.toBeNull()
+      expect(group!.joinedText).toBe('@types/node/some-very-long-name.d.ts')
+    })
   })
 
   // -----------------------------------------------------------------------

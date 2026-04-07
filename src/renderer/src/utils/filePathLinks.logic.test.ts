@@ -220,6 +220,37 @@ describe('filePathLinks.logic', () => {
           column: undefined,
         })
       })
+
+      it('should parse :line-line:column with trailing colon (range+col+trailing)', () => {
+        // Regex ends with :? so an extra trailing colon after the column is consumed
+        expect(parseLineColumn('file.ts:22-24:10:')).toEqual({
+          path: 'file.ts',
+          line: 22,
+          column: 10,
+        })
+      })
+
+      it('should parse :0-0 zero-line range (boundary behavior)', () => {
+        expect(parseLineColumn('file.ts:0-0')).toEqual({
+          path: 'file.ts',
+          line: 0,
+          column: undefined,
+        })
+      })
+
+      it('should parse :999999-999999 large range (max digits)', () => {
+        expect(parseLineColumn('file.ts:999999-999999')).toEqual({
+          path: 'file.ts',
+          line: 999999,
+          column: undefined,
+        })
+      })
+
+      it('should not parse :22- (invalid – missing end line number)', () => {
+        // The range suffix (?:-\d+)? requires at least one digit after the dash.
+        // ":22-" falls through to no match so the whole string is treated as path.
+        expect(parseLineColumn('file.ts:22-')).toEqual({ path: 'file.ts:22-' })
+      })
     })
 
     describe('grep format - trailing colon', () => {
@@ -1269,6 +1300,28 @@ describe('filePathLinks.logic', () => {
         expect(matches[0].path).toBe('/Users/user/project/file.md')
         expect(matches[0].line).toBe(5)
       })
+
+      it('should detect relative ./ path with :line-line range', () => {
+        const matches = detectFilePaths('./src/file.ts:22-24')
+        expect(matches.length).toBe(1)
+        expect(matches[0].path).toBe('./src/file.ts')
+        expect(matches[0].line).toBe(22)
+        expect(matches[0].column).toBeUndefined()
+      })
+
+      it('should detect path with same-start-end range :1-1', () => {
+        const matches = detectFilePaths('src/file.ts:1-1')
+        expect(matches.length).toBe(1)
+        expect(matches[0].path).toBe('src/file.ts')
+        expect(matches[0].line).toBe(1)
+      })
+
+      it('should detect path with large :line-line range', () => {
+        const matches = detectFilePaths('src/file.ts:1-100000')
+        expect(matches.length).toBe(1)
+        expect(matches[0].path).toBe('src/file.ts')
+        expect(matches[0].line).toBe(1)
+      })
     })
 
     describe('multiple paths in one line', () => {
@@ -1831,6 +1884,36 @@ describe('filePathLinks.logic', () => {
         const matches = detectFilePaths('@angular/core/src/component.ts')
         expect(matches.length).toBe(1)
         expect(matches[0].path).toBe('@angular/core/src/component.ts')
+      })
+
+      it('should detect @./relative paths (dot-relative @-prefix)', () => {
+        // @./ is matched by pattern 4 since . is in [a-zA-Z0-9_.@-]
+        const matches = detectFilePaths('@./src/file.ts')
+        expect(matches.length).toBe(1)
+        expect(matches[0].path).toBe('@./src/file.ts')
+      })
+
+      it('should detect @../parent paths (parent-relative @-prefix)', () => {
+        // @../ is also matched by pattern 4 – . and - are valid first-segment chars
+        const matches = detectFilePaths('@../parent/file.ts')
+        expect(matches.length).toBe(1)
+        expect(matches[0].path).toBe('@../parent/file.ts')
+      })
+
+      it('should detect @src/file.ts with leading spaces (embedded context)', () => {
+        // Whitespace before @-path should not prevent detection (boundary is \s)
+        const matches = detectFilePaths('  @src/file.ts')
+        expect(matches.length).toBe(1)
+        expect(matches[0].path).toBe('@src/file.ts')
+        // startIndex should point past the leading spaces
+        expect(matches[0].startIndex).toBe(2)
+      })
+
+      it('should detect @src/file.ts with :line-line after leading spaces', () => {
+        const matches = detectFilePaths('  @src/utils/helper.ts:22-24')
+        expect(matches.length).toBe(1)
+        expect(matches[0].path).toBe('@src/utils/helper.ts')
+        expect(matches[0].line).toBe(22)
       })
     })
 
