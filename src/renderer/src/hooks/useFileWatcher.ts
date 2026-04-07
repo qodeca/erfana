@@ -14,6 +14,37 @@ import { logger } from '../utils/logger'
 const INDICATOR_DURATION_MS = 1000
 
 /**
+ * Normalizes line endings to LF for cross-platform content comparison.
+ */
+function normalizeLF(content: string): string {
+  return content.replace(/\r\n/g, '\n')
+}
+
+/**
+ * Determines whether a file-watch change event is an echo of our own save.
+ *
+ * Compares the on-disk content against a set of recently saved contents.
+ * Uses a Set to handle rapid successive saves where multiple echoes may
+ * be in flight simultaneously (e.g., autosave at t=0 and t=2s, echo for
+ * t=0 arrives at t=2.5s after the ref was already updated for t=2s).
+ *
+ * @param onDiskContent - Content read from disk after watcher fired
+ * @param pendingSavedContents - Set of content strings from recent saves
+ * @returns true if the change is a self-save echo that should be ignored
+ */
+export function isEchoEvent(
+  onDiskContent: string,
+  pendingSavedContents: Set<string>
+): boolean {
+  if (pendingSavedContents.size === 0) return false
+  const normalized = normalizeLF(onDiskContent)
+  for (const saved of pendingSavedContents) {
+    if (normalized === normalizeLF(saved)) return true
+  }
+  return false
+}
+
+/**
  * File watcher state
  */
 export interface FileWatcherState {
@@ -41,6 +72,8 @@ export interface FileWatcherActions {
   markSaving: () => void
   /** Mark that a save operation has ended */
   unmarkSaving: () => void
+  /** Notify that a save completed with the given content (for self-save echo detection) */
+  notifySaveComplete: (savedContent: string) => void
 }
 
 /**
@@ -136,6 +169,18 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
   // Exposed via markSaving/unmarkSaving so parent component can coordinate saves
   const isSavingRef = useRef(false)
 
+  // Mirror hasLocalChanges as a ref to avoid stale closure issues in handleExternalChange.
+  // React state updates are batched – the ref always reflects the current value.
+  const hasLocalChangesRef = useRef(hasLocalChanges)
+  useEffect(() => {
+    hasLocalChangesRef.current = hasLocalChanges
+  }, [hasLocalChanges])
+
+  // Content strings from recent saves – used to detect self-save echo events.
+  // A Set handles rapid successive saves where multiple echoes may be in flight.
+  // Cleared on: reload, keepLocal, file switch (useEffect cleanup), and after echo match.
+  const pendingSavedContentsRef = useRef<Set<string>>(new Set())
+
   /**
    * Mark that a save operation is starting.
    * Call this before saving to prevent race conditions with file watcher.
@@ -153,15 +198,19 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
   }, [])
 
   /**
-   * Reload file content from disk
+   * Reload file content from disk.
+   *
+   * @param prefetchedContent - If provided, uses this content instead of reading from disk.
+   *   Used internally by handleExternalChange to avoid a double read.
    */
-  const reloadFromDisk = useCallback(async () => {
+  const reloadFromDisk = useCallback(async (prefetchedContent?: string) => {
     if (!filePath) return
 
     setIsReloading(true)
     try {
-      const content = await window.api.file.readFile(filePath)
+      const content = prefetchedContent ?? await window.api.file.readFile(filePath)
       onContentUpdate(content)
+      pendingSavedContentsRef.current.clear() // Disk content is now authoritative
       setExternalChangeDetected(false)
       setIsFileDeleted(false)
       onReload?.()
@@ -180,6 +229,7 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
    */
   const keepLocal = useCallback(() => {
     logger.info('User chose to keep local version')
+    pendingSavedContentsRef.current.clear() // User accepted divergence
     setExternalChangeDetected(false)
   }, [])
 
@@ -198,28 +248,75 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
   }, [])
 
   /**
-   * Handle external file change event
+   * Notify the hook that a save completed with the given content.
+   * Stores the content for self-save echo detection.
+   */
+  const notifySaveComplete = useCallback((savedContent: string) => {
+    pendingSavedContentsRef.current.add(savedContent)
+  }, [])
+
+  /**
+   * Handle external file change event.
+   *
+   * Uses three layers of defense against the autosave race condition (#124):
+   * 1. isSavingRef – drops events while save is in progress
+   * 2. Content comparison – detects self-save echoes via isEchoEvent
+   * 3. hasLocalChangesRef – always-current value (no stale closure)
+   *
+   * Reads the file once and passes prefetched content to reloadFromDisk
+   * to avoid a double-read timing gap.
    */
   const handleExternalChange = useCallback(async () => {
     logger.info('External change detected for file', { filePath })
 
-    // Ignore if we're currently saving (race condition prevention)
+    // Guard 1: Ignore if we're currently saving
     if (isSavingRef.current) {
       logger.debug('Ignoring external change (save in progress)')
       return
     }
 
-    // Check if file has unsaved changes
-    if (!hasLocalChanges) {
-      // Safe to auto-reload
-      logger.info('No local changes, auto-reloading')
-      await reloadFromDisk()
-    } else {
-      // Has unsaved changes - show conflict notification
-      logger.warn('Local changes detected, showing conflict notification')
-      setExternalChangeDetected(true)
+    if (!filePath) return
+
+    // Guard 2: Read file and compare with last saved content
+    try {
+      const diskContent = await window.api.file.readFile(filePath)
+
+      // Self-save echo detection: disk matches a recently saved content → drop
+      if (isEchoEvent(diskContent, pendingSavedContentsRef.current)) {
+        logger.debug('Ignoring self-save echo (content matches a recent save)')
+        // Remove the matched entry; keep others for pending echoes from rapid saves
+        const normalized = normalizeLF(diskContent)
+        for (const saved of pendingSavedContentsRef.current) {
+          if (normalizeLF(saved) === normalized) {
+            pendingSavedContentsRef.current.delete(saved)
+            break
+          }
+        }
+        return
+      }
+
+      // Genuine external change – decide based on local changes (via ref, not closure)
+      if (hasLocalChangesRef.current) {
+        logger.warn('Local changes detected, showing conflict notification')
+        setExternalChangeDetected(true)
+      } else {
+        // Safe to auto-reload with prefetched content (single read)
+        logger.info('No local changes, auto-reloading')
+        await reloadFromDisk(diskContent)
+      }
+    } catch (error) {
+      logger.error(
+        'Error reading file for change detection',
+        error instanceof Error ? error : undefined
+      )
+      // Fallback: decide without content comparison
+      if (hasLocalChangesRef.current) {
+        setExternalChangeDetected(true)
+      } else {
+        await reloadFromDisk()
+      }
     }
-  }, [hasLocalChanges, reloadFromDisk, filePath])
+  }, [filePath, reloadFromDisk])
 
   /**
    * Handle file deletion event
@@ -269,6 +366,7 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
       unsubscribeChanged()
       unsubscribeDeleted()
       unsubscribeError()
+      pendingSavedContentsRef.current.clear() // Clear on file switch
     }
   }, [filePath, handleExternalChange, handleFileDeleted])
 
@@ -283,7 +381,8 @@ export function useFileWatcher(options: UseFileWatcherOptions): UseFileWatcherRe
     dismissConflict,
     clearDeletedState,
     markSaving,
-    unmarkSaving
+    unmarkSaving,
+    notifySaveComplete
   }
 }
 

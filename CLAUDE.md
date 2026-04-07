@@ -3,7 +3,7 @@
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
 - **Repository**: `qodeca/erfana` (GitHub)
-- **Version**: 0.9.0
+- **Version**: 0.9.1
 - **Tech Stack**: Electron 39, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Build Toolchain**: electron-vite 5, Vite 6, vitest 3
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
@@ -166,6 +166,7 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 - Terminal initialization defers until panel is visible
 - Watchers increment session tokens on switch; stale events dropped
 - Project settings loaded and validated before project opens (invalid settings block load)
+- Autosave race condition prevention – three-layer defense in useFileWatcher: isSavingRef guard, content comparison (isEchoEvent with CRLF normalization), hasLocalChangesRef; post-save dirty re-detection in MarkdownEditorPanel checks Monaco buffer divergence (#124)
 
 ## IPC Contracts
 - Shared schemas/types: `src/shared/ipc/*.ts` (zod schemas)
