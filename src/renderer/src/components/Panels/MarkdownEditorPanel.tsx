@@ -152,6 +152,12 @@ export function MarkdownEditorPanel(
   // =========================================================================
   // File Watcher Hook
   // =========================================================================
+
+  // Stable callback for watcher content updates – uses functional updater to avoid
+  // closing over currentFile, which would cause watcher re-subscription on every keystroke.
+  const handleContentUpdateFromWatcher = useCallback((content: string) => {
+    setCurrentFile((prev) => prev ? { ...prev, content, modified: false } : prev)
+  }, [])
   const {
     externalChangeDetected,
     isFileDeleted,
@@ -161,19 +167,12 @@ export function MarkdownEditorPanel(
     dismissConflict,
     clearDeletedState,
     markSaving,
-    unmarkSaving
+    unmarkSaving,
+    notifySaveComplete
   } = useFileWatcher({
     filePath: currentFile?.path ?? null,
     hasLocalChanges: currentFile?.modified ?? false,
-    onContentUpdate: (content) => {
-      if (currentFile) {
-        setCurrentFile({
-          ...currentFile,
-          content,
-          modified: false
-        })
-      }
-    }
+    onContentUpdate: handleContentUpdateFromWatcher
   })
 
   // Create file save guard for pausing/resuming file watching during save
@@ -192,12 +191,22 @@ export function MarkdownEditorPanel(
   /**
    * Saves the current file to disk.
    *
+   * Step ordering contract (do not reorder):
+   * 1. markSaving – guard against watcher events during save
+   * 2. pauseWatch – pause chokidar (first defense layer)
+   * 3. Read content from Monaco model (authoritative source, not React state)
+   * 4. writeFile – write to disk
+   * 5. notifySaveComplete – store content for self-save echo detection
+   * 6. setCurrentFile modified: false – mark clean
+   * 7. Post-save dirty check – if editor diverged during async write, re-mark dirty
+   * 8. finally: resumeWatch + unmarkSaving
+   *
    * @param isAutoSave - Whether this is an auto-save (shows indicator) or manual save
    */
   const handleSave = useCallback(async (isAutoSave: boolean = false) => {
     if (!currentFile) return
 
-    // Mark saving via hook to prevent race conditions with file watcher
+    // Step 1: Mark saving via hook to prevent race conditions with file watcher
     markSaving()
 
     try {
@@ -205,16 +214,38 @@ export function MarkdownEditorPanel(
         setIsAutoSaving(true)
       }
 
-      // Pause file watching during save to prevent race condition
+      // Step 2: Pause file watching during save to prevent race condition
       await saveGuardRef.current?.pauseWatch()
 
-      await window.api.file.writeFile(currentFile.path, currentFile.content)
-      setCurrentFile({
-        ...currentFile,
-        modified: false
-      })
+      // Step 3: Read content from Monaco model – always reflects latest keystrokes,
+      // unlike currentFile.content which may be stale from the useCallback closure
+      const contentToSave =
+        editorRef.current?.getEditor()?.getValue() ?? currentFile.content
+
+      // Step 4: Write to disk
+      await window.api.file.writeFile(currentFile.path, contentToSave)
+
+      // Step 5: Record saved content for self-save echo detection (#124)
+      notifySaveComplete(contentToSave)
+
+      // Step 6: Mark file as clean (functional updater to avoid stale closure overwrite)
+      setCurrentFile((prev) =>
+        prev ? { ...prev, content: contentToSave, modified: false } : prev
+      )
       if (panelIdRef.current) {
         useProjectStore.getState().setEditorDirty(panelIdRef.current, false)
+      }
+
+      // Step 7: Post-save dirty detection – if user typed during the async write,
+      // the Monaco model has diverged from what we saved. Re-mark as modified.
+      const currentEditorContent = editorRef.current?.getEditor()?.getValue()
+      if (currentEditorContent !== undefined && currentEditorContent !== contentToSave) {
+        setCurrentFile((prev) =>
+          prev ? { ...prev, content: currentEditorContent, modified: true } : prev
+        )
+        if (panelIdRef.current) {
+          useProjectStore.getState().setEditorDirty(panelIdRef.current, true)
+        }
       }
 
       // Clear any external change detection since we just saved
@@ -229,19 +260,19 @@ export function MarkdownEditorPanel(
       logger.error('Error saving file', error instanceof Error ? error : undefined)
       setIsAutoSaving(false)
     } finally {
-      // Resume file watching after save completes
+      // Step 8: Resume file watching after save completes
       await saveGuardRef.current?.resumeWatch()
       unmarkSaving()
     }
-  }, [currentFile, dismissConflict, clearDeletedState, markSaving, unmarkSaving])
+  }, [currentFile, dismissConflict, clearDeletedState, markSaving, unmarkSaving, notifySaveComplete])
 
   // =========================================================================
   // Auto-Save Hook
   // =========================================================================
-  const { isAutoSaving, setIsAutoSaving } = useAutoSave(
+  const { isAutoSaving, setIsAutoSaving, signalChange } = useAutoSave(
     currentFile?.modified ?? false,
     () => handleSave(true),
-    { delay: 2000, enabled: true }
+    { delay: 2000, enabled: true, maxInterval: 30000 }
   )
 
   // =========================================================================
@@ -365,18 +396,17 @@ export function MarkdownEditorPanel(
    * @param newContent - New content from the editor
    */
   const handleContentChange = useCallback((newContent: string) => {
-    if (!currentFile) return
-
-    setCurrentFile({
-      ...currentFile,
-      content: newContent,
-      modified: true
+    setCurrentFile((prev) => {
+      if (!prev) return prev
+      return { ...prev, content: newContent, modified: true }
     })
     // Mark panel as dirty in global store
     if (panelIdRef.current) {
       useProjectStore.getState().setEditorDirty(panelIdRef.current, true)
     }
-  }, [currentFile])
+    // Reset autosave debounce timer – save fires after user stops typing
+    signalChange()
+  }, [signalChange])
 
   /**
    * Opens a markdown file from an internal link.

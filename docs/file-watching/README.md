@@ -47,8 +47,22 @@ Monitors open files for external content modifications.
 
 - **Service**: `src/main/services/FileWatcherService.ts`
 - **IPC Handlers**: `src/main/ipc/file-watcher-handlers.ts`
+- **Renderer Hook**: `src/renderer/src/hooks/useFileWatcher.ts` (echo detection, external change handling, `notifySaveComplete` action)
 - **Integration**: `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx`
 - **UI Component**: `src/renderer/src/components/FileConflictNotification/`
+
+### Self-Save Echo Detection (v0.9.1, #124)
+
+The `useFileWatcher` hook prevents autosave-triggered file change events from being treated as external modifications. Three-layer defense:
+
+1. **`isSavingRef` guard** – Set during save operations, suppresses all change events while a save is in-flight
+2. **Content comparison (`isEchoEvent`)** – Compares incoming file content against `lastSavedContentRef` with CRLF normalization to detect self-save echoes that arrive after the saving flag clears
+3. **`hasLocalChangesRef`** – Ref mirror of `hasLocalChanges` state (avoids stale closures); if the user has local changes, external reload is suppressed
+
+The `MarkdownEditorPanel` coordinates via:
+- Reading content from Monaco editor model (not React state) to avoid stale closure overwrites
+- Calling `notifySaveComplete(savedContent)` after successful write to update `lastSavedContentRef`
+- Post-save dirty re-detection: checks if Monaco buffer diverged from saved content during the save, re-marks as modified if so
 
 ### Conflict Resolution UI
 
