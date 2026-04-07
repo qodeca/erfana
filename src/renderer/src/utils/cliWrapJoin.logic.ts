@@ -59,9 +59,10 @@ interface CliWrapPattern {
 
 /**
  * Regex that matches common file extensions at end of a string,
- * optionally followed by sentence punctuation.
+ * optionally followed by position notation (:line, :line-range,
+ * :line:col) and/or sentence punctuation.
  */
-const EXTENSION_ENDING = /\.\w{1,10}[).]*$/
+const EXTENSION_ENDING = /\.\w{1,10}(?::\d{1,6}(?:-\d{1,6})?(?::\d{1,6})?)?[).]*$/
 
 /**
  * Lines that look like a new command or output – should stop continuation.
@@ -111,10 +112,10 @@ const patterns: CliWrapPattern[] = [
     maxLines: 4
   },
 
-  // Pattern C – @-prefixed file reference
+  // Pattern C – @-prefixed file reference (@scope/path and @/path absolute)
   {
     name: 'at-prefix',
-    opener: /@[a-zA-Z0-9_-]+\/[^\s]*$/,
+    opener: /@(?:[a-zA-Z0-9_-]+)?\/[^\s]*$/,
     isContinuation: (line: string) => {
       if (NEW_COMMAND_PATTERN.test(line)) return false
       const trimmed = line.trimStart()
