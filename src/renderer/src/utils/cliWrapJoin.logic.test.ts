@@ -210,6 +210,28 @@ describe('cliWrapJoin.logic', () => {
       expect(result!.joinedText).toBe('@01-kb/analysis/very-long-directory/sub-path/file.md')
       expect(result!.segments).toHaveLength(3)
     })
+
+    it('should detect @/ absolute path as opener (Pattern C)', () => {
+      const lines = [
+        '@/Users/user/project/src/',
+        '  components/Button.tsx'
+      ]
+      const getLine = (i: number) => lines[i] ?? null
+      const group = findCliWrapGroup(0, getLine)
+      expect(group).not.toBeNull()
+      expect(group!.joinedText).toBe('@/Users/user/project/src/components/Button.tsx')
+    })
+
+    it('should detect @/ path with :line-line as terminal (Pattern C)', () => {
+      const lines = [
+        '@/Users/user/project/src/',
+        '  components/Button.tsx:22-24'
+      ]
+      const getLine = (i: number) => lines[i] ?? null
+      const group = findCliWrapGroup(0, getLine)
+      expect(group).not.toBeNull()
+      expect(group!.joinedText).toBe('@/Users/user/project/src/components/Button.tsx:22-24')
+    })
   })
 
   // -----------------------------------------------------------------------

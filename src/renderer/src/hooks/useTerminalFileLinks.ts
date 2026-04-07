@@ -322,11 +322,16 @@ export function useTerminalFileLinks(
           const links: ILink[] = []
 
           for (const match of matches) {
+            // Strip @-prefix from file references (e.g., @/path or @src/path from Claude Code CLI)
+            // Keep original path for fallback (e.g., @types/node/index.d.ts is a valid npm scope)
+            const hasAtPrefix = match.path.startsWith('@')
+            const strippedPath = hasAtPrefix ? match.path.slice(1) : match.path
+
             // Resolve relative paths
-            let resolvedPath = match.path
-            if (!match.path.startsWith('/') && !match.path.match(/^[A-Za-z]:/)) {
+            let resolvedPath = strippedPath
+            if (!strippedPath.startsWith('/') && !strippedPath.match(/^[A-Za-z]:/)) {
               // Relative path - resolve against CWD or project root
-              resolvedPath = resolvePath(match.path, cwd || '', projectRoot || '')
+              resolvedPath = resolvePath(strippedPath, cwd || '', projectRoot || '')
             }
 
             // Normalize the path
@@ -370,6 +375,46 @@ export function useTerminalFileLinks(
               const validation = await validatePath(resolvedPath)
               if (validation.exists) {
                 finalPath = validation.absolutePath || resolvedPath
+              }
+            }
+
+            // For @-prefixed paths, try the original path with @ if stripped version failed
+            // This handles npm scoped packages like @types/node/index.d.ts
+            if (!finalPath && hasAtPrefix) {
+              let originalResolvedPath = match.path
+              if (!match.path.startsWith('/') && !match.path.match(/^[A-Za-z]:/)) {
+                originalResolvedPath = resolvePath(match.path, cwd || '', projectRoot || '')
+              }
+              originalResolvedPath = normalizePath(originalResolvedPath)
+
+              if (files.length > 0) {
+                const fallbackResult: SmartResolutionResult = await resolvePathSmart({
+                  path: originalResolvedPath,
+                  cwd,
+                  projectRoot,
+                  index: getIndex(),
+                  files,
+                  validateExactPath: async (p) => {
+                    const v = await validatePath(p)
+                    return v.exists
+                  }
+                })
+
+                if (fallbackResult.status === 'exact') {
+                  finalPath = fallbackResult.resolvedPath!
+                } else if (fallbackResult.status === 'single-match') {
+                  finalPath = fallbackResult.resolvedPath!
+                  wasSmartResolved = true
+                } else if (fallbackResult.status === 'multiple-matches') {
+                  pendingCandidates = fallbackResult.candidates!
+                  finalPath = fallbackResult.candidates![0].path
+                  wasSmartResolved = true
+                }
+              } else {
+                const fallbackValidation = await validatePath(originalResolvedPath)
+                if (fallbackValidation.exists) {
+                  finalPath = fallbackValidation.absolutePath || originalResolvedPath
+                }
               }
             }
 

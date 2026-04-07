@@ -69,7 +69,8 @@ Clickable file path links in terminal output with intelligent path resolution.
 
 **Base Features**:
 - Detects absolute, relative, and project-relative paths
-- Supports line:column notation (`:42:10`, `(15,3)`)
+- Supports `@`-prefixed paths from CLI tools (e.g., `@src/main/index.ts`) – the `@` is stripped and the underlying path is opened; `@scope/package` references (e.g., `@types/node`) are preserved and not treated as file paths
+- Supports line:column notation (`:42:10`, `(15,3)`) and `:line-line` range notation (e.g., `:22-24`) – navigates to the first line of the range
 - Path validation with LRU cache (100 entries, 30s TTL)
 - Click to open file in editor at specified location
 - Multi-line link ranges – links span correctly across xterm-wrapped and CLI-wrapped lines

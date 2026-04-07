@@ -196,6 +196,32 @@ describe('filePathLinks.logic', () => {
       })
     })
 
+    describe(':line-line range notation', () => {
+      it('should parse :line-line range notation', () => {
+        expect(parseLineColumn('file.ts:22-24')).toEqual({
+          path: 'file.ts',
+          line: 22,
+          column: undefined,
+        })
+      })
+
+      it('should parse :line-line:column notation', () => {
+        expect(parseLineColumn('file.ts:22-24:10')).toEqual({
+          path: 'file.ts',
+          line: 22,
+          column: 10,
+        })
+      })
+
+      it('should parse :line-line with trailing colon', () => {
+        expect(parseLineColumn('file.ts:22-24:')).toEqual({
+          path: 'file.ts',
+          line: 22,
+          column: undefined,
+        })
+      })
+    })
+
     describe('grep format - trailing colon', () => {
       it('parses grep format with trailing colon', () => {
         expect(parseLineColumn('file.ts:42:')).toEqual({ path: 'file.ts', line: 42 })
@@ -1220,6 +1246,31 @@ describe('filePathLinks.logic', () => {
       })
     })
 
+    describe(':line-line range notation', () => {
+      it('should detect path with :line-line range', () => {
+        const matches = detectFilePaths('src/utils/helper.ts:22-24')
+        expect(matches.length).toBe(1)
+        expect(matches[0].path).toBe('src/utils/helper.ts')
+        expect(matches[0].line).toBe(22)
+        expect(matches[0].column).toBeUndefined()
+      })
+
+      it('should detect path with :line-line:column', () => {
+        const matches = detectFilePaths('src/utils/helper.ts:22-24:10')
+        expect(matches.length).toBe(1)
+        expect(matches[0].path).toBe('src/utils/helper.ts')
+        expect(matches[0].line).toBe(22)
+        expect(matches[0].column).toBe(10)
+      })
+
+      it('should detect absolute path with :line-line', () => {
+        const matches = detectFilePaths('/Users/user/project/file.md:5-10')
+        expect(matches.length).toBe(1)
+        expect(matches[0].path).toBe('/Users/user/project/file.md')
+        expect(matches[0].line).toBe(5)
+      })
+    })
+
     describe('multiple paths in one line', () => {
       it('detects two paths in same line', () => {
         const matches = detectFilePaths('Move /path/to/source.ts to /path/to/dest.ts')
@@ -1740,6 +1791,46 @@ describe('filePathLinks.logic', () => {
 
       it('rejects @mention in text', () => {
         expect(detectFilePaths('@mention some text')).toHaveLength(0)
+      })
+    })
+
+    describe('@-prefixed file references', () => {
+      it('should detect @/absolute paths', () => {
+        const matches = detectFilePaths('@/Users/user/project/file.md')
+        expect(matches.length).toBe(1)
+        expect(matches[0].path).toBe('@/Users/user/project/file.md')
+      })
+
+      it('should detect @/absolute paths with :line-line', () => {
+        const matches = detectFilePaths('@/Users/user/project/file.md:22-24')
+        expect(matches.length).toBe(1)
+        expect(matches[0].path).toBe('@/Users/user/project/file.md')
+        expect(matches[0].line).toBe(22)
+      })
+
+      it('should detect @src/relative paths', () => {
+        const matches = detectFilePaths('@src/utils/helper.ts')
+        expect(matches.length).toBe(1)
+        expect(matches[0].path).toBe('@src/utils/helper.ts')
+      })
+
+      it('should detect @src/relative paths with :line-line', () => {
+        const matches = detectFilePaths('@src/utils/helper.ts:10-15')
+        expect(matches.length).toBe(1)
+        expect(matches[0].path).toBe('@src/utils/helper.ts')
+        expect(matches[0].line).toBe(10)
+      })
+
+      it('should still detect @scope/package paths (regression)', () => {
+        const matches = detectFilePaths('@types/node/index.d.ts')
+        expect(matches.length).toBe(1)
+        expect(matches[0].path).toBe('@types/node/index.d.ts')
+      })
+
+      it('should still detect @angular/core paths (regression)', () => {
+        const matches = detectFilePaths('@angular/core/src/component.ts')
+        expect(matches.length).toBe(1)
+        expect(matches[0].path).toBe('@angular/core/src/component.ts')
       })
     })
 

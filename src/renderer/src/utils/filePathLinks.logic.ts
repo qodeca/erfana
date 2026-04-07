@@ -253,7 +253,7 @@ export function parseLineColumn(pathWithPosition: string): {
   }
 
   // Colon format: file.ts:42:10 or file.ts:42 or file.ts:42:
-  const colonMatch = pathWithPosition.match(/^(.+?):(\d+)(?::(\d+))?:?$/);
+  const colonMatch = pathWithPosition.match(/^(.+?):(\d+)(?:-\d+)?(?::(\d+))?:?$/);
   if (colonMatch) {
     return {
       path: colonMatch[1],
@@ -466,7 +466,7 @@ export function detectFilePaths(line: string): FilePathMatch[] {
       '\\(\\d{1,6},\\d{1,6}\\)' +
       '|' +
       // Colon format: :line:column or :line or :line:
-      ':\\d{1,6}(?::\\d{1,6})?:?' +
+      ':\\d{1,6}(?:-\\d{1,6})?(?::\\d{1,6})?:?' +
       ')?' +
       ')' +
       // End boundary
