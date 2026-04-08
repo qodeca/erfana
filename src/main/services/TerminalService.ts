@@ -195,13 +195,21 @@ export class TerminalService extends EventEmitter {
           return null
         }
 
+        // Normalize trailing path separators – cmd.exe `/K` may parse the
+        // closing `"` of `cd /d "<cwd>\"` as an escaped quote, breaking the
+        // entire bootstrap. Drive roots like `C:\` MUST keep their trailing
+        // slash because `C:` means "current directory of drive C", not the
+        // drive root itself. PowerShell's single-quoted string handles
+        // either form correctly; we normalize uniformly for consistency.
+        const winCwd = cwd.length > 3 ? cwd.replace(/[\\/]+$/, '') : cwd
+
         const isPowerShell = /(?:^|[/\\])(pwsh(?:-preview)?|powershell)(?:\.exe)?$/i.test(shell)
         if (isPowerShell) {
           // PowerShell bootstrap. Use -LiteralPath with single-quoted string to
           // disable variable ($), wildcard, and backtick expansion. Inside a
           // single-quoted PowerShell string the only escape needed is doubling
           // single quotes (' → '').
-          const psEscapedCwd = cwd.replace(/'/g, "''")
+          const psEscapedCwd = winCwd.replace(/'/g, "''")
           const psEscapedShell = shell.replace(/'/g, "''")
           const bootstrapScript = [
             `Set-Location -LiteralPath '${psEscapedCwd}'`,
@@ -230,7 +238,7 @@ export class TerminalService extends EventEmitter {
           //
           // Bare `cd` (no args) prints the current directory, which the
           // marker handshake parses as the cwd line.
-          const bootstrapScript = `@echo off && cd /d "${cwd}" && cd && echo ${marker}`
+          const bootstrapScript = `@echo off && cd /d "${winCwd}" && cd && echo ${marker}`
           shellArgs.push('/D', '/K', bootstrapScript)
         }
       } else {

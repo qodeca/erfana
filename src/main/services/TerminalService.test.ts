@@ -974,6 +974,14 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       const { pty, args } = spawnedPTYs[0]
       const marker = args[2].match(/__ERFANA_PWD_MARKER_\d+__/)![0]
 
+      // Independent invariant pinned inline: production bootstrap MUST start
+      // with `@echo off &&`. Without it, cmd.exe would echo the bootstrap
+      // command back into the PTY and a line containing the marker substring
+      // would appear BEFORE the actual `cd` output, mis-anchoring
+      // markerDetector. The realism test below exercises the clean stream;
+      // this assertion is what guarantees production stays clean.
+      expect(args[2]).toMatch(/^@echo off &&/)
+
       // Realistic PTY stream: banner first, cwd line, marker last
       pty.emit(
         'data',
@@ -1031,8 +1039,17 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
         svc.on('error', errSpy)
         const tid = await svc.createTerminal({ cwd })
         expect(tid).toBeNull()
+        // Pin the SPECIFIC rejected character so a regression that flags
+        // the wrong char (or rejects everything via an upstream check)
+        // would fail this assertion. The validator embeds the offending
+        // character via `JSON.stringify(match[0])`.
+        const unsafeChar = cwd.match(/["&|^<>()\r\n]/)![0]
         expect(errSpy).toHaveBeenCalledWith(
-          expect.objectContaining({ error: expect.stringContaining('unsupported character') })
+          expect.objectContaining({
+            error: expect.stringContaining(
+              `unsupported character ${JSON.stringify(unsafeChar)}`
+            )
+          })
         )
         // No PTY should have been spawned
         expect(spawnedPTYs).toHaveLength(0)
@@ -1055,6 +1072,63 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       const script = spawnedPTYs[0].args[spawnedPTYs[0].args.indexOf('-Command') + 1]
       // Apostrophe doubled inside the single-quoted -LiteralPath value
       expect(script).toContain("Set-Location -LiteralPath 'C:\\Users\\me\\with''apostrophe'")
+    })
+
+    // -----------------------------------------------------------------------
+    // Issue #154 follow-up BLOCKER: trailing-separator normalization. cmd.exe
+    // `/K` may parse `\"` as an escaped quote, breaking the bootstrap.
+    // Drive roots like `C:\` MUST keep their trailing slash because `C:` is a
+    // distinct concept (current directory of drive C, not the drive root).
+    // -----------------------------------------------------------------------
+
+    it('strips trailing backslash from cmd.exe cwd (preserves drive root)', async () => {
+      const svc = await importWin32()
+      const shell = 'C:\\Windows\\System32\\cmd.exe'
+      const tid = await svc.createTerminal({ shell, cwd: 'C:\\Users\\me\\Dev\\' })
+      expect(tid).toBeTruthy()
+      const script = spawnedPTYs[0].args[2]
+      // Trailing backslash stripped – `\"` cannot occur in the bootstrap
+      expect(script).toContain('cd /d "C:\\Users\\me\\Dev"')
+      expect(script).not.toContain('cd /d "C:\\Users\\me\\Dev\\"')
+    })
+
+    it('strips trailing forward slash from cmd.exe cwd', async () => {
+      const svc = await importWin32()
+      const shell = 'C:\\Windows\\System32\\cmd.exe'
+      const tid = await svc.createTerminal({ shell, cwd: 'C:\\Users\\me\\Dev/' })
+      expect(tid).toBeTruthy()
+      const script = spawnedPTYs[0].args[2]
+      expect(script).toContain('cd /d "C:\\Users\\me\\Dev"')
+    })
+
+    it('preserves drive root `C:\\` for cmd.exe cwd', async () => {
+      const svc = await importWin32()
+      const shell = 'C:\\Windows\\System32\\cmd.exe'
+      const tid = await svc.createTerminal({ shell, cwd: 'C:\\' })
+      expect(tid).toBeTruthy()
+      const script = spawnedPTYs[0].args[2]
+      // Drive root MUST keep its trailing slash – `cd /d "C:"` would change
+      // to the *current* directory of drive C, not the root.
+      expect(script).toContain('cd /d "C:\\"')
+    })
+
+    it('strips trailing backslash from PowerShell cwd', async () => {
+      const svc = await importWin32()
+      const shell = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
+      const tid = await svc.createTerminal({ shell, cwd: 'C:\\Users\\me\\Dev\\' })
+      expect(tid).toBeTruthy()
+      const script = spawnedPTYs[0].args[spawnedPTYs[0].args.indexOf('-Command') + 1]
+      expect(script).toContain("Set-Location -LiteralPath 'C:\\Users\\me\\Dev'")
+      expect(script).not.toContain("Set-Location -LiteralPath 'C:\\Users\\me\\Dev\\'")
+    })
+
+    it('preserves drive root `C:\\` for PowerShell cwd', async () => {
+      const svc = await importWin32()
+      const shell = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
+      const tid = await svc.createTerminal({ shell, cwd: 'C:\\' })
+      expect(tid).toBeTruthy()
+      const script = spawnedPTYs[0].args[spawnedPTYs[0].args.indexOf('-Command') + 1]
+      expect(script).toContain("Set-Location -LiteralPath 'C:\\'")
     })
   })
 
