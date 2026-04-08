@@ -32,32 +32,32 @@ Changes:
 
 ## Phase 1 — Terminal parity
 
-**Tracking:** [#154](https://github.com/qodeca/erfana/issues/154) (depends on #153)
+**Tracking:** [#154](https://github.com/qodeca/erfana/issues/154) (depends on #153) — **landed in `fix/windows-terminal-parity-154`**
 
 **Why second:** The terminal is core to the app and currently silently dead on cmd.exe. Fast to fix because the existing `markerDetector` state machine can be reused as-is.
 
-Changes:
+Changes (as shipped):
 
-1. **Implement cmd.exe bootstrap** (fixes B3) — `TerminalService.ts:159-162`
-   - Build a cmd.exe bootstrap mirroring the PowerShell one:
-     ```
-     /K "cd /d "<cwd>" && cd && echo <marker>"
-     ```
-     `/K` keeps cmd.exe interactive after running the command. Bare `cd` (no args) prints the working directory — the cmd.exe analog of `pwd`. The marker triggers the same handshake at `TerminalService.ts:215-254`.
-   - Escape `"` and `%` in `cwd` (cmd.exe uses `%VAR%` for variable expansion).
-   - Push `['/K', bootstrapScript]` onto `shellArgs`.
-2. **Fix PowerShell escaping** (fixes M4) — `TerminalService.ts:150`
-   - Switch from `Set-Location -Path "<cwd>"` to `Set-Location -LiteralPath '<cwd>'` with single-quote escaping (`'` → `''`). `-LiteralPath` disables wildcard and variable expansion; single quotes disable `$` interpolation.
-   - Alternative: keep `-Path` but also escape `$` → `` `$ ``.
-3. **Harden the shell fallback** (fixes M6) — shell picker in `TerminalService.ts` (~line 507)
-   - Prefer, in order: `process.env.SHELL` (WSL / Git Bash) → `pwsh.exe` (PowerShell 7+, if resolvable) → `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe` (absolute) → `%COMSPEC%` (cmd.exe absolute).
-   - Never fall through to a bare `'powershell.exe'` string.
-4. **Verify SIGINT / Ctrl+C** — `node-pty` uses ConPTY on modern Windows and maps Ctrl+C correctly. No code change expected; add as a manual test case.
+1. **cmd.exe bootstrap** (fixes B3) — `TerminalService.ts` `createTerminal` win32 branch
+   - Spawns with `['/D', '/K', '@echo off && cd /d "<cwd>" && cd && echo <marker>']`. `/D` disables AutoRun; `/K` keeps cmd.exe interactive. **`@echo off` is critical**: without it, cmd.exe echoes the bootstrap commands back into the PTY and `markerDetector` mis-parses the echoed `echo <marker>` line as the cwd.
+   - Bare `cd` (no args) prints the working directory — the cmd.exe analog of `pwd`. The marker triggers the same handshake at `TerminalService.ts:215-254`.
+2. **PowerShell `-LiteralPath`** (fixes M4) — `TerminalService.ts` PS branch
+   - `Set-Location -LiteralPath '<single-quote-doubled cwd>'`. `-LiteralPath` disables wildcard and variable expansion; single quotes disable `$` interpolation. The marker is also single-quoted defensively (`Write-Output '<marker>'`).
+   - Shell-kind detection regex: `/(?:^|[/\\])(pwsh(?:-preview)?|powershell)(?:\.exe)?$/i` — covers forward-slash Git Bash paths and `pwsh-preview.exe`.
+3. **`resolveWindowsShell()`** (fixes M6) — replaces the bare `'powershell.exe'` fallback
+   - Ordered chain: `$SHELL` (if `existsSync`) → `%ProgramFiles%\PowerShell\7\pwsh.exe` → `%ProgramFiles(x86)%\PowerShell\7\pwsh.exe` → `<%SystemRoot%>\System32\WindowsPowerShell\v1.0\powershell.exe` → `%COMSPEC%` (validated) → `<systemRoot>\System32\cmd.exe` (validated). Never returns a bare command name. Logs `logger.warn` if nothing resolves.
+   - **Intentionally deferred to a future phase**: Microsoft Store pwsh under `%LOCALAPPDATA%\Microsoft\WindowsApps`, Git Bash auto-discovery when `$SHELL` is unset, WSL (`wsl.exe`).
+4. **cwd validation deny-list** (BLOCKER #2 from review) — `validateWindowsCwd` rejects cwds containing any of `["&|^<>()\r\n]` before constructing the bootstrap. `createTerminal` returns `null`, logs an error, and emits an `'error'` event. **This is a hard contract**: callers must surface the error to the user rather than silently swallow it.
+5. **SIGINT / Ctrl+C** — `node-pty` uses ConPTY on modern Windows and maps Ctrl+C correctly. No code change; covered by manual UAT below.
 
-**Manual validation:**
-- Open a project with `$` in its path on Windows → terminal opens cleanly in both PowerShell and cmd.exe.
-- Ctrl+C interrupts a running command (e.g. `ping -t 8.8.8.8`) in both shells.
-- The bootstrap marker handshake succeeds (no "stuck clearing" state).
+**Tech debt deferred (architecture-reviewer):** `TerminalService.createTerminal` now branches twice on Windows shell kind. Phase 2 (Git Bash, WSL) should extract a `WindowsBootstrapBuilder` strategy interface so each new shell kind *adds* a class instead of *modifying* a switch. Tracked separately.
+
+**Manual UAT (must run on a real Windows host before declaring Phase 1 done):**
+- [ ] Open a project at `C:\Users\<me>\Dev\$weird-name` → PowerShell terminal opens cleanly, prompt shows the correct cwd, no `$weird-name` expansion.
+- [ ] Open the same project with cmd.exe forced as the shell → terminal opens cleanly, `cd` shows the correct cwd, marker handshake completes (no "stuck clearing" state).
+- [ ] `ping -t 8.8.8.8` then `Ctrl+C` in both PowerShell and cmd.exe → command interrupts cleanly.
+- [ ] Try opening a project at a path containing a literal `&` (e.g. `C:\tmp\a&b`) → app surfaces a clear error rather than spawning a broken terminal. Confirms the cwd validation contract.
+- [ ] macOS terminal still opens unchanged (regression check).
 
 ---
 
