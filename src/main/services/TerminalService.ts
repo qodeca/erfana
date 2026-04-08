@@ -6,6 +6,7 @@
  */
 
 import { EventEmitter } from 'events'
+import { existsSync } from 'fs'
 import { homedir, platform as osPlatform } from 'os'
 import type { IPty } from 'node-pty'
 import { logger } from './LoggingService'
@@ -145,20 +146,35 @@ export class TerminalService extends EventEmitter {
       const shellArgs: string[] = []
 
       if (osPlatform() === 'win32') {
-        // Windows: PowerShell bootstrap then start interactive session
-        if (shell.includes('powershell')) {
-          const pwshPath = cwd.replace(/`/g, '``').replace(/"/g, '`"')
+        const isPowerShell = /(?:^|\\)(pwsh|powershell)(?:\.exe)?$/i.test(shell)
+        if (isPowerShell) {
+          // PowerShell bootstrap. Use -LiteralPath with single-quoted string to
+          // disable variable ($), wildcard, and backtick expansion. Inside a
+          // single-quoted PowerShell string the only escape needed is doubling
+          // single quotes (' → '').
+          const psEscapedCwd = cwd.replace(/'/g, "''")
+          const psEscapedShell = shell.replace(/'/g, "''")
           const bootstrapScript = [
-            `Set-Location -Path "${pwshPath}"`,
-            'Write-Output (Get-Location).Path',
+            `Set-Location -LiteralPath '${psEscapedCwd}'`,
+            '(Get-Location).Path',
             `Write-Output ${marker}`,
             // Start interactive PowerShell session (Windows doesn't have exec)
-            `& "${shell}" -NoLogo`
+            `& '${psEscapedShell}' -NoLogo`
           ].join('; ')
           shellArgs.push('-NoProfile', '-Command', bootstrapScript)
         } else {
-          // cmd.exe - no verification, just use cwd
-          // cmd.exe has no equivalent to exec
+          // cmd.exe bootstrap. /D disables AutoRun, /K keeps the shell open
+          // after the bootstrap command runs. Bare `cd` (no args) prints the
+          // current directory, which the marker handshake parses as the cwd.
+          //
+          // Limitation: cmd.exe has no portable way to escape `"` or `%` inside
+          // its command string – we strip stray double quotes (Windows paths
+          // don't allow them anyway). Paths containing `%` are passed through
+          // and may be expanded by cmd.exe; this matches native cmd.exe
+          // behavior and is documented in docs/windows/.
+          const cmdEscapedCwd = cwd.replace(/"/g, '')
+          const bootstrapScript = `cd /d "${cmdEscapedCwd}" && cd && echo ${marker}`
+          shellArgs.push('/D', '/K', bootstrapScript)
         }
       } else {
         // POSIX: Run non-interactive bootstrap, then exec into login interactive shell
@@ -499,14 +515,19 @@ export class TerminalService extends EventEmitter {
   }
 
   /**
-   * Get default shell based on platform
+   * Get default shell based on platform.
+   *
+   * Windows resolution order (never returns a bare command name):
+   *   1. $SHELL (set by WSL / Git Bash / user override) – if it exists on disk
+   *   2. PowerShell 7+ (`pwsh.exe`) under Program Files
+   *   3. Windows PowerShell 5.1 absolute path under %SystemRoot%
+   *   4. %COMSPEC% / absolute cmd.exe path
    */
   private getDefaultShell(): string {
     const platform = osPlatform()
 
     if (platform === 'win32') {
-      // Windows: prefer PowerShell, fallback to cmd
-      return process.env.SHELL || process.env.COMSPEC || 'powershell.exe'
+      return this.resolveWindowsShell()
     } else if (platform === 'darwin') {
       // macOS: prefer zsh (default since Catalina), fallback to bash
       return process.env.SHELL || '/bin/zsh'
@@ -514,6 +535,42 @@ export class TerminalService extends EventEmitter {
       // Linux/Unix: use $SHELL, fallback to bash
       return process.env.SHELL || '/bin/bash'
     }
+  }
+
+  /**
+   * Resolve a Windows shell to an absolute path. Never returns a bare name.
+   * See {@link getDefaultShell} for the resolution order.
+   *
+   * @internal exposed for testability
+   */
+  resolveWindowsShell(): string {
+    // 1. Honor explicit $SHELL (WSL, Git Bash, user override) – only if it
+    //    actually exists, otherwise fall through.
+    const envShell = process.env.SHELL
+    if (envShell && existsSync(envShell)) {
+      return envShell
+    }
+
+    // 2. PowerShell 7+ (pwsh.exe)
+    const programFiles = process.env.ProgramFiles || 'C:\\Program Files'
+    const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)'
+    const pwshCandidates = [
+      `${programFiles}\\PowerShell\\7\\pwsh.exe`,
+      `${programFilesX86}\\PowerShell\\7\\pwsh.exe`
+    ]
+    for (const candidate of pwshCandidates) {
+      if (existsSync(candidate)) return candidate
+    }
+
+    // 3. Windows PowerShell 5.1 (absolute path under %SystemRoot%)
+    const systemRoot = process.env.SystemRoot || 'C:\\Windows'
+    const winPowerShell = `${systemRoot}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`
+    if (existsSync(winPowerShell)) {
+      return winPowerShell
+    }
+
+    // 4. cmd.exe (absolute) – last-resort fallback
+    return process.env.COMSPEC || `${systemRoot}\\System32\\cmd.exe`
   }
 }
 

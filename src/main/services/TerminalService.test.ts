@@ -119,7 +119,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       expect(script).toMatch(/cd "\/tmp\/project with spaces"/)
     })
 
-    it('Windows PowerShell: generates bootstrap with Start-Process equivalent', async () => {
+    it('Windows PowerShell: generates bootstrap using -LiteralPath with single-quoted cwd', async () => {
       vi.doMock('os', async () => {
         const actual = await vi.importActual<any>('os')
         return { ...actual, platform: () => 'win32' }
@@ -136,9 +136,81 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       const scriptIdx = args.indexOf('-Command')
       const script = args[scriptIdx + 1]
 
-      expect(script).toMatch(/Set-Location -Path/)
-      expect(script).toMatch(/Write-Output.*Get-Location.*Path/)
+      // -LiteralPath with single quotes neutralizes $, backtick, wildcards
+      expect(script).toContain("Set-Location -LiteralPath 'C:\\Projects\\test'")
+      expect(script).toContain('(Get-Location).Path')
       expect(script).toMatch(/Write-Output __ERFANA_PWD_MARKER/)
+      // Issue #154 / gap M4: must NOT use -Path with double quotes (would expand $)
+      expect(script).not.toMatch(/Set-Location -Path "/)
+    })
+
+    it('Windows PowerShell: escapes $ and single quotes in cwd (issue #154 M4)', async () => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'win32' }
+      })
+
+      const { terminalService } = await import('./TerminalService')
+      const shell = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
+      // Path with literal $ (would expand under "...") and a single quote
+      await terminalService.createTerminal({
+        shell,
+        cwd: "C:\\Users\\me\\Dev\\$weird's-name"
+      })
+
+      const { args } = spawnedPTYs[0]
+      const script = args[args.indexOf('-Command') + 1]
+
+      // Single quote must be doubled, $ must appear verbatim (no expansion)
+      expect(script).toContain("Set-Location -LiteralPath 'C:\\Users\\me\\Dev\\$weird''s-name'")
+    })
+
+    it('Windows cmd.exe: generates /D /K bootstrap with cwd, cd, and marker (issue #154 B3)', async () => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'win32' }
+      })
+
+      const { terminalService } = await import('./TerminalService')
+      const shell = 'C:\\Windows\\System32\\cmd.exe'
+      const tid = await terminalService.createTerminal({ shell, cwd: 'C:\\Projects\\test' })
+
+      expect(tid).toBeTruthy()
+      expect(spawnedPTYs).toHaveLength(1)
+
+      const { args } = spawnedPTYs[0]
+      // /D disables AutoRun, /K keeps cmd.exe interactive after the bootstrap
+      expect(args[0]).toBe('/D')
+      expect(args[1]).toBe('/K')
+
+      const script = args[2]
+      expect(script).toContain('cd /d "C:\\Projects\\test"')
+      // bare `cd` (no args) prints cwd – consumed by the marker handshake
+      expect(script).toMatch(/&& cd && echo __ERFANA_PWD_MARKER_\d+__/)
+    })
+
+    it('Windows cmd.exe: marker handshake fires for cmd.exe terminals', async () => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'win32' }
+      })
+
+      const { terminalService } = await import('./TerminalService')
+      const clearSpy = vi.fn()
+      terminalService.on('clearTerminal', clearSpy)
+
+      const shell = 'C:\\Windows\\System32\\cmd.exe'
+      const tid = await terminalService.createTerminal({ shell, cwd: 'C:\\Projects\\test' })
+
+      const { pty, args } = spawnedPTYs[0]
+      const marker = args[2].match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+
+      // Simulate cmd.exe printing the cwd then the echoed marker
+      pty.emit('data', 'C:\\Projects\\test\r\n')
+      pty.emit('data', `${marker}\r\n`)
+
+      expect(clearSpy).toHaveBeenCalledWith({ terminalId: tid })
+      expect(terminalService.getTerminalInfo(tid!)?.cwd).toBe('C:\\Projects\\test')
     })
   })
 
@@ -748,6 +820,74 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.stringContaining('Cleaned up 3 terminals for webContents 5')
       )
+    })
+  })
+
+  // ===========================================================================
+  // Issue #154 M6: Windows shell fallback ordering
+  // ===========================================================================
+
+  describe('Issue #154 - resolveWindowsShell fallback ordering', () => {
+    const originalEnv = process.env
+
+    beforeEach(() => {
+      vi.resetModules()
+      process.env = { ...originalEnv }
+    })
+
+    afterEach(() => {
+      process.env = originalEnv
+      vi.doUnmock('fs')
+    })
+
+    async function loadServiceWithFs(existing: Set<string>) {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'win32' }
+      })
+      vi.doMock('fs', () => ({
+        existsSync: (p: string) => existing.has(p)
+      }))
+      const { terminalService } = await import('./TerminalService')
+      return terminalService
+    }
+
+    it('1) honors $SHELL when it exists on disk', async () => {
+      process.env.SHELL = 'C:\\Program Files\\Git\\bin\\bash.exe'
+      const svc = await loadServiceWithFs(new Set([process.env.SHELL!]))
+      expect(svc.resolveWindowsShell()).toBe('C:\\Program Files\\Git\\bin\\bash.exe')
+    })
+
+    it('2) falls through to pwsh.exe when $SHELL is unset', async () => {
+      delete process.env.SHELL
+      process.env.ProgramFiles = 'C:\\Program Files'
+      const pwsh = 'C:\\Program Files\\PowerShell\\7\\pwsh.exe'
+      const svc = await loadServiceWithFs(new Set([pwsh]))
+      expect(svc.resolveWindowsShell()).toBe(pwsh)
+    })
+
+    it('3) falls through to absolute Windows PowerShell 5.1', async () => {
+      delete process.env.SHELL
+      process.env.SystemRoot = 'C:\\Windows'
+      const ps = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
+      const svc = await loadServiceWithFs(new Set([ps]))
+      expect(svc.resolveWindowsShell()).toBe(ps)
+    })
+
+    it('4) falls through to %COMSPEC% when nothing else resolves', async () => {
+      delete process.env.SHELL
+      process.env.COMSPEC = 'C:\\Windows\\System32\\cmd.exe'
+      const svc = await loadServiceWithFs(new Set())
+      expect(svc.resolveWindowsShell()).toBe('C:\\Windows\\System32\\cmd.exe')
+    })
+
+    it('never returns a bare command name', async () => {
+      delete process.env.SHELL
+      delete process.env.COMSPEC
+      const svc = await loadServiceWithFs(new Set())
+      const resolved = svc.resolveWindowsShell()
+      // Must be an absolute path containing a backslash
+      expect(resolved).toMatch(/[\\/]/)
     })
   })
 
