@@ -139,7 +139,8 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       // -LiteralPath with single quotes neutralizes $, backtick, wildcards
       expect(script).toContain("Set-Location -LiteralPath 'C:\\Projects\\test'")
       expect(script).toContain('(Get-Location).Path')
-      expect(script).toMatch(/Write-Output __ERFANA_PWD_MARKER/)
+      // Issue #154 LOW #9: marker is single-quoted defensively
+      expect(script).toMatch(/Write-Output '__ERFANA_PWD_MARKER_\d+__'/)
       // Issue #154 / gap M4: must NOT use -Path with double quotes (would expand $)
       expect(script).not.toMatch(/Set-Location -Path "/)
     })
@@ -184,6 +185,11 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       expect(args[1]).toBe('/K')
 
       const script = args[2]
+      // Issue #154 BLOCKER #1: bootstrap MUST start with `@echo off &&` so
+      // cmd.exe does not echo the bootstrap commands back into the PTY,
+      // which would otherwise cause markerDetector to mis-parse the echoed
+      // `echo MARKER` line as the cwd.
+      expect(script).toMatch(/^@echo off &&/)
       expect(script).toContain('cd /d "C:\\Projects\\test"')
       // bare `cd` (no args) prints cwd – consumed by the marker handshake
       expect(script).toMatch(/&& cd && echo __ERFANA_PWD_MARKER_\d+__/)
@@ -824,7 +830,10 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
   })
 
   // ===========================================================================
-  // Issue #154 M6: Windows shell fallback ordering
+  // Issue #154 M6 + HIGH #4: Windows shell fallback ordering, via constructor
+  // injection. We pass a fake `existsSync` directly into the TerminalService
+  // constructor instead of `vi.doMock('fs')`, which sidesteps the static-ESM
+  // binding question entirely – the test seam is the production seam.
   // ===========================================================================
 
   describe('Issue #154 - resolveWindowsShell fallback ordering', () => {
@@ -837,32 +846,51 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
 
     afterEach(() => {
       process.env = originalEnv
-      vi.doUnmock('fs')
     })
 
-    async function loadServiceWithFs(existing: Set<string>) {
-      vi.doMock('os', async () => {
-        const actual = await vi.importActual<any>('os')
-        return { ...actual, platform: () => 'win32' }
-      })
-      vi.doMock('fs', () => ({
-        existsSync: (p: string) => existing.has(p)
-      }))
-      const { terminalService } = await import('./TerminalService')
-      return terminalService
+    async function makeService(existing: Set<string>) {
+      const mod = await import('./TerminalService')
+      return new mod.TerminalService((p: string) => existing.has(p))
     }
 
     it('1) honors $SHELL when it exists on disk', async () => {
       process.env.SHELL = 'C:\\Program Files\\Git\\bin\\bash.exe'
-      const svc = await loadServiceWithFs(new Set([process.env.SHELL!]))
+      const svc = await makeService(new Set([process.env.SHELL!]))
       expect(svc.resolveWindowsShell()).toBe('C:\\Program Files\\Git\\bin\\bash.exe')
+    })
+
+    it('1b) honors $SHELL pointing at a forward-slash Git Bash path', async () => {
+      // Git Bash sets $SHELL=/c/Program Files/Git/bin/bash.exe (POSIX style).
+      // The resolver should return it verbatim if it exists, no normalization.
+      const gitBash = '/c/Program Files/Git/bin/bash.exe'
+      process.env.SHELL = gitBash
+      const svc = await makeService(new Set([gitBash]))
+      expect(svc.resolveWindowsShell()).toBe(gitBash)
+    })
+
+    it('1c) honors $SHELL pointing at pwsh-preview.exe', async () => {
+      const pwshPreview = 'C:\\Program Files\\PowerShell\\7-preview\\pwsh-preview.exe'
+      process.env.SHELL = pwshPreview
+      const svc = await makeService(new Set([pwshPreview]))
+      expect(svc.resolveWindowsShell()).toBe(pwshPreview)
+    })
+
+    it('1d) falls through when $SHELL is set but does NOT exist on disk', async () => {
+      // A stale Git Bash uninstall leaves $SHELL pointing at a missing
+      // binary; the resolver must not return it.
+      process.env.SHELL = 'C:\\Stale\\path\\bash.exe'
+      process.env.ProgramFiles = 'C:\\Program Files'
+      const pwsh = 'C:\\Program Files\\PowerShell\\7\\pwsh.exe'
+      // Stale SHELL not in `existing`; pwsh.exe is.
+      const svc = await makeService(new Set([pwsh]))
+      expect(svc.resolveWindowsShell()).toBe(pwsh)
     })
 
     it('2) falls through to pwsh.exe when $SHELL is unset', async () => {
       delete process.env.SHELL
       process.env.ProgramFiles = 'C:\\Program Files'
       const pwsh = 'C:\\Program Files\\PowerShell\\7\\pwsh.exe'
-      const svc = await loadServiceWithFs(new Set([pwsh]))
+      const svc = await makeService(new Set([pwsh]))
       expect(svc.resolveWindowsShell()).toBe(pwsh)
     })
 
@@ -870,24 +898,215 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       delete process.env.SHELL
       process.env.SystemRoot = 'C:\\Windows'
       const ps = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
-      const svc = await loadServiceWithFs(new Set([ps]))
+      const svc = await makeService(new Set([ps]))
       expect(svc.resolveWindowsShell()).toBe(ps)
     })
 
     it('4) falls through to %COMSPEC% when nothing else resolves', async () => {
       delete process.env.SHELL
       process.env.COMSPEC = 'C:\\Windows\\System32\\cmd.exe'
-      const svc = await loadServiceWithFs(new Set())
+      const svc = await makeService(new Set([process.env.COMSPEC!]))
       expect(svc.resolveWindowsShell()).toBe('C:\\Windows\\System32\\cmd.exe')
     })
 
-    it('never returns a bare command name', async () => {
+    it('4b) falls through to absolute cmd.exe under SystemRoot when COMSPEC is stale', async () => {
+      delete process.env.SHELL
+      process.env.COMSPEC = 'C:\\Stale\\cmd.exe'
+      process.env.SystemRoot = 'C:\\Windows'
+      const cmdAbsolute = 'C:\\Windows\\System32\\cmd.exe'
+      // COMSPEC not in `existing`, hardcoded path is.
+      const svc = await makeService(new Set([cmdAbsolute]))
+      expect(svc.resolveWindowsShell()).toBe(cmdAbsolute)
+    })
+
+    it('5) never returns a bare command name; logs a warning when nothing exists', async () => {
       delete process.env.SHELL
       delete process.env.COMSPEC
-      const svc = await loadServiceWithFs(new Set())
+      process.env.SystemRoot = 'C:\\Windows'
+      mockLogger.warn.mockClear()
+
+      const svc = await makeService(new Set())
       const resolved = svc.resolveWindowsShell()
-      // Must be an absolute path containing a backslash
-      expect(resolved).toMatch(/[\\/]/)
+
+      // Issue #154 test-writer NIT: the previous assertion `/[\\/]/` matched
+      // any string with a slash anywhere. Tighten to a true Windows absolute
+      // path: drive letter + colon + separator.
+      expect(resolved).toMatch(/^[A-Za-z]:[\\/]/)
+      // logger.warn must fire so a real-world catastrophic miss is observable
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('no shell candidates exist')
+      )
+    })
+  })
+
+  // ===========================================================================
+  // Issue #154 BLOCKER #1: cmd.exe ECHO ON realism for marker handshake
+  // ===========================================================================
+
+  describe('Issue #154 - cmd.exe marker handshake under realistic PTY output', () => {
+    beforeEach(() => {
+      spawnedPTYs.length = 0
+      vi.clearAllMocks()
+      vi.resetModules()
+    })
+
+    it('parses cwd correctly when PTY emits banner + cwd + marker', async () => {
+      // This test simulates a realistic Windows cmd.exe PTY data stream:
+      // a multi-line banner (Microsoft Windows...) followed by the bare-`cd`
+      // output (the actual cwd) followed by the echoed marker. The
+      // markerDetector takes `lines[markerIdx-1]` so the cwd MUST be the
+      // line immediately before the marker – not a banner line, not an
+      // echoed-back command. With `@echo off` in the bootstrap this is
+      // guaranteed; without it, this test would catch the regression.
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'win32' }
+      })
+
+      const { terminalService } = await import('./TerminalService')
+      const clearSpy = vi.fn()
+      terminalService.on('clearTerminal', clearSpy)
+
+      const shell = 'C:\\Windows\\System32\\cmd.exe'
+      const tid = await terminalService.createTerminal({ shell, cwd: 'C:\\Projects\\test' })
+      expect(tid).toBeTruthy()
+
+      const { pty, args } = spawnedPTYs[0]
+      const marker = args[2].match(/__ERFANA_PWD_MARKER_\d+__/)![0]
+
+      // Realistic PTY stream: banner first, cwd line, marker last
+      pty.emit(
+        'data',
+        'Microsoft Windows [Version 10.0.26200.0]\r\n' +
+        '(c) Microsoft Corporation. All rights reserved.\r\n' +
+        '\r\n'
+      )
+      pty.emit('data', 'C:\\Projects\\test\r\n')
+      pty.emit('data', `${marker}\r\n`)
+
+      expect(clearSpy).toHaveBeenCalledWith({ terminalId: tid })
+      // Critical assertion: cwd is the actual path, not a banner line
+      // and not the echoed bootstrap command line.
+      expect(terminalService.getTerminalInfo(tid!)?.cwd).toBe('C:\\Projects\\test')
+    })
+  })
+
+  // ===========================================================================
+  // Issue #154 BLOCKER #2: cwd validation deny-list
+  // ===========================================================================
+
+  describe('Issue #154 - Windows cwd validation', () => {
+    beforeEach(() => {
+      spawnedPTYs.length = 0
+      vi.clearAllMocks()
+      vi.resetModules()
+    })
+
+    async function importWin32() {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'win32' }
+      })
+      return (await import('./TerminalService')).terminalService
+    }
+
+    const denyListCases: ReadonlyArray<readonly [string, string]> = [
+      ['ampersand', 'C:\\a&b'],
+      ['pipe', 'C:\\a|b'],
+      ['caret', 'C:\\a^b'],
+      ['less-than', 'C:\\a<b'],
+      ['greater-than', 'C:\\a>b'],
+      ['open-paren', 'C:\\a(b'],
+      ['close-paren', 'C:\\a)b'],
+      ['double-quote', 'C:\\a"b'],
+      ['carriage-return', 'C:\\a\rb'],
+      ['newline', 'C:\\a\nb']
+    ]
+
+    it.each(denyListCases)(
+      'rejects cwd containing %s, returns null and emits error',
+      async (_label, cwd) => {
+        const svc = await importWin32()
+        const errSpy = vi.fn()
+        svc.on('error', errSpy)
+        const tid = await svc.createTerminal({ cwd })
+        expect(tid).toBeNull()
+        expect(errSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ error: expect.stringContaining('unsupported character') })
+        )
+        // No PTY should have been spawned
+        expect(spawnedPTYs).toHaveLength(0)
+      }
+    )
+
+    it('accepts cwd containing $ (PowerShell -LiteralPath neutralizes it)', async () => {
+      const svc = await importWin32()
+      const shell = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
+      const tid = await svc.createTerminal({ shell, cwd: 'C:\\Users\\me\\Dev\\$weird-name' })
+      expect(tid).toBeTruthy()
+      expect(spawnedPTYs).toHaveLength(1)
+    })
+
+    it("accepts cwd containing apostrophe (PowerShell escapes via doubling)", async () => {
+      const svc = await importWin32()
+      const shell = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
+      const tid = await svc.createTerminal({ shell, cwd: "C:\\Users\\me\\with'apostrophe" })
+      expect(tid).toBeTruthy()
+      const script = spawnedPTYs[0].args[spawnedPTYs[0].args.indexOf('-Command') + 1]
+      // Apostrophe doubled inside the single-quoted -LiteralPath value
+      expect(script).toContain("Set-Location -LiteralPath 'C:\\Users\\me\\with''apostrophe'")
+    })
+  })
+
+  // ===========================================================================
+  // Issue #154 HIGH #3 + MEDIUM #5: shell-kind classification routing
+  // ===========================================================================
+
+  describe('Issue #154 - shell-kind classification', () => {
+    beforeEach(() => {
+      spawnedPTYs.length = 0
+      vi.clearAllMocks()
+      vi.resetModules()
+    })
+
+    async function getArgs(shell: string): Promise<string[]> {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'win32' }
+      })
+      const { terminalService } = await import('./TerminalService')
+      const tid = await terminalService.createTerminal({ shell, cwd: 'C:\\Projects\\test' })
+      expect(tid).toBeTruthy()
+      return spawnedPTYs[0].args
+    }
+
+    it('routes forward-slash pwsh.exe path to PowerShell branch (Git Bash $SHELL)', async () => {
+      // Issue #154 HIGH #3: regex must match `[/\\]` separator class
+      const args = await getArgs('/c/Program Files/PowerShell/7/pwsh.exe')
+      expect(args).toContain('-NoProfile')
+      expect(args).toContain('-Command')
+    })
+
+    it('routes pwsh-preview.exe to PowerShell branch', async () => {
+      // Issue #154 MEDIUM #5: regex must accept `pwsh-preview` variant
+      const args = await getArgs(
+        'C:\\Program Files\\PowerShell\\7-preview\\pwsh-preview.exe'
+      )
+      expect(args).toContain('-NoProfile')
+      expect(args).toContain('-Command')
+    })
+
+    it('routes bare "powershell" (no .exe extension) to PowerShell branch', async () => {
+      const args = await getArgs('powershell')
+      expect(args).toContain('-NoProfile')
+      expect(args).toContain('-Command')
+    })
+
+    it('routes absolute cmd.exe path to cmd.exe branch', async () => {
+      const args = await getArgs('C:\\Windows\\System32\\cmd.exe')
+      expect(args[0]).toBe('/D')
+      expect(args[1]).toBe('/K')
+      expect(args[2]).toMatch(/^@echo off &&/)
     })
   })
 

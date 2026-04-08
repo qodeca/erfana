@@ -63,6 +63,46 @@ export class TerminalService extends EventEmitter {
   private terminalCounter = 0
 
   /**
+   * Characters that break our Windows bootstrap quoting and must be rejected
+   * up-front. `"` cannot be portably escaped inside cmd.exe `/K` arguments;
+   * `&|^<>()` are cmd.exe metacharacters that survive `"…"` quoting and would
+   * be re-interpreted as separators by cmd.exe; `\r` and `\n` would terminate
+   * the PowerShell single-quoted string used by `Set-Location -LiteralPath`.
+   *
+   * @internal Issue #154
+   */
+  private static readonly UNSAFE_WINDOWS_CWD_CHARS = /["&|^<>()\r\n]/
+
+  /**
+   * @param fsExists - injected for `resolveWindowsShell()` testability;
+   *                   defaults to `fs.existsSync`. The exported singleton at
+   *                   the bottom of this file uses the default.
+   */
+  constructor(
+    private readonly fsExists: (p: string) => boolean = existsSync
+  ) {
+    super()
+  }
+
+  /**
+   * Validate a Windows cwd against the unsafe-character deny-list.
+   * POSIX cwds are not validated here – the existing POSIX bootstrap uses
+   * `cd "${cwd}"` which has its own escaping concerns out of scope for #154.
+   *
+   * @internal Issue #154
+   */
+  private validateWindowsCwd(cwd: string): { ok: true } | { ok: false; reason: string } {
+    const match = TerminalService.UNSAFE_WINDOWS_CWD_CHARS.exec(cwd)
+    if (match) {
+      return {
+        ok: false,
+        reason: `cwd contains unsupported character ${JSON.stringify(match[0])}`
+      }
+    }
+    return { ok: true }
+  }
+
+  /**
    * Check if node-pty is available and optionally check terminal initialization state
    */
   isAvailable(terminalId?: string): { available: boolean; initialized?: boolean } {
@@ -146,7 +186,16 @@ export class TerminalService extends EventEmitter {
       const shellArgs: string[] = []
 
       if (osPlatform() === 'win32') {
-        const isPowerShell = /(?:^|\\)(pwsh|powershell)(?:\.exe)?$/i.test(shell)
+        // Reject cwds containing characters that would break our bootstrap
+        // quoting on either Windows shell. See UNSAFE_WINDOWS_CWD_CHARS.
+        const validation = this.validateWindowsCwd(cwd)
+        if (!validation.ok) {
+          logger.error(`❌ Cannot create terminal ${terminalId}: ${validation.reason}`)
+          this.emit('error', { terminalId, error: validation.reason })
+          return null
+        }
+
+        const isPowerShell = /(?:^|[/\\])(pwsh(?:-preview)?|powershell)(?:\.exe)?$/i.test(shell)
         if (isPowerShell) {
           // PowerShell bootstrap. Use -LiteralPath with single-quoted string to
           // disable variable ($), wildcard, and backtick expansion. Inside a
@@ -157,23 +206,31 @@ export class TerminalService extends EventEmitter {
           const bootstrapScript = [
             `Set-Location -LiteralPath '${psEscapedCwd}'`,
             '(Get-Location).Path',
-            `Write-Output ${marker}`,
+            // Marker is single-quoted defensively – the current marker format
+            // contains only `[A-Za-z0-9_]`, but quoting future-proofs the
+            // bootstrap if the format ever changes.
+            `Write-Output '${marker}'`,
             // Start interactive PowerShell session (Windows doesn't have exec)
             `& '${psEscapedShell}' -NoLogo`
           ].join('; ')
           shellArgs.push('-NoProfile', '-Command', bootstrapScript)
         } else {
           // cmd.exe bootstrap. /D disables AutoRun, /K keeps the shell open
-          // after the bootstrap command runs. Bare `cd` (no args) prints the
-          // current directory, which the marker handshake parses as the cwd.
+          // after the bootstrap runs. `@echo off` is set FIRST so that the
+          // remainder of the bootstrap is not echoed back to the PTY – without
+          // it, cmd.exe would print the literal `cd /d "<cwd>"` and
+          // `echo <marker>` lines, and the marker handshake would mis-parse
+          // the echoed `echo <marker>` line as the cwd.
           //
-          // Limitation: cmd.exe has no portable way to escape `"` or `%` inside
-          // its command string – we strip stray double quotes (Windows paths
-          // don't allow them anyway). Paths containing `%` are passed through
-          // and may be expanded by cmd.exe; this matches native cmd.exe
-          // behavior and is documented in docs/windows/.
-          const cmdEscapedCwd = cwd.replace(/"/g, '')
-          const bootstrapScript = `cd /d "${cmdEscapedCwd}" && cd && echo ${marker}`
+          // `cwd` is validated above against UNSAFE_WINDOWS_CWD_CHARS, so it
+          // is safe to interpolate verbatim into the quoted argument. Paths
+          // containing `%` are still passed through and may be expanded by
+          // cmd.exe – this is a documented limitation tracked in
+          // docs/windows/.
+          //
+          // Bare `cd` (no args) prints the current directory, which the
+          // marker handshake parses as the cwd line.
+          const bootstrapScript = `@echo off && cd /d "${cwd}" && cd && echo ${marker}`
           shellArgs.push('/D', '/K', bootstrapScript)
         }
       } else {
@@ -541,13 +598,17 @@ export class TerminalService extends EventEmitter {
    * Resolve a Windows shell to an absolute path. Never returns a bare name.
    * See {@link getDefaultShell} for the resolution order.
    *
+   * Uses `this.fsExists` so tests can construct a `TerminalService` with a
+   * fake `existsSync` and assert the resolution chain deterministically
+   * without `vi.doMock('fs')` gymnastics.
+   *
    * @internal exposed for testability
    */
   resolveWindowsShell(): string {
     // 1. Honor explicit $SHELL (WSL, Git Bash, user override) – only if it
     //    actually exists, otherwise fall through.
     const envShell = process.env.SHELL
-    if (envShell && existsSync(envShell)) {
+    if (envShell && this.fsExists(envShell)) {
       return envShell
     }
 
@@ -559,18 +620,34 @@ export class TerminalService extends EventEmitter {
       `${programFilesX86}\\PowerShell\\7\\pwsh.exe`
     ]
     for (const candidate of pwshCandidates) {
-      if (existsSync(candidate)) return candidate
+      if (this.fsExists(candidate)) return candidate
     }
 
     // 3. Windows PowerShell 5.1 (absolute path under %SystemRoot%)
     const systemRoot = process.env.SystemRoot || 'C:\\Windows'
     const winPowerShell = `${systemRoot}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`
-    if (existsSync(winPowerShell)) {
+    if (this.fsExists(winPowerShell)) {
       return winPowerShell
     }
 
-    // 4. cmd.exe (absolute) – last-resort fallback
-    return process.env.COMSPEC || `${systemRoot}\\System32\\cmd.exe`
+    // 4. cmd.exe (absolute) – last-resort fallback. Validate %COMSPEC% and
+    //    the hardcoded path so we never return a stale binding.
+    const comspec = process.env.COMSPEC
+    if (comspec && this.fsExists(comspec)) {
+      return comspec
+    }
+    const cmdAbsolute = `${systemRoot}\\System32\\cmd.exe`
+    if (this.fsExists(cmdAbsolute)) {
+      return cmdAbsolute
+    }
+
+    // Truly nothing resolved – log and return the hardcoded path so the
+    // PTY spawn produces a clear, observable error rather than us throwing
+    // here from inside the resolver.
+    logger.warn(
+      '⚠️ resolveWindowsShell: no shell candidates exist; returning unvalidated cmd.exe path'
+    )
+    return cmdAbsolute
   }
 }
 
