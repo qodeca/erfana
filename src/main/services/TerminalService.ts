@@ -10,6 +10,11 @@ import { existsSync } from 'fs'
 import { homedir, platform as osPlatform } from 'os'
 import type { IPty } from 'node-pty'
 import { logger } from './LoggingService'
+import {
+  buildWindowsBootstrap,
+  normalizeWindowsCwd,
+  validateWindowsCwd
+} from './WindowsTerminalBootstrap'
 
 // Dynamic import for node-pty (optional dependency)
 type NodePtyModule = typeof import('node-pty')
@@ -63,17 +68,6 @@ export class TerminalService extends EventEmitter {
   private terminalCounter = 0
 
   /**
-   * Characters that break our Windows bootstrap quoting and must be rejected
-   * up-front. `"` cannot be portably escaped inside cmd.exe `/K` arguments;
-   * `&|^<>()` are cmd.exe metacharacters that survive `"…"` quoting and would
-   * be re-interpreted as separators by cmd.exe; `\r` and `\n` would terminate
-   * the PowerShell single-quoted string used by `Set-Location -LiteralPath`.
-   *
-   * @internal Issue #154
-   */
-  private static readonly UNSAFE_WINDOWS_CWD_CHARS = /["&|^<>()\r\n]/
-
-  /**
    * @param fsExists - injected for `resolveWindowsShell()` testability;
    *                   defaults to `fs.existsSync`. The exported singleton at
    *                   the bottom of this file uses the default.
@@ -82,24 +76,6 @@ export class TerminalService extends EventEmitter {
     private readonly fsExists: (p: string) => boolean = existsSync
   ) {
     super()
-  }
-
-  /**
-   * Validate a Windows cwd against the unsafe-character deny-list.
-   * POSIX cwds are not validated here – the existing POSIX bootstrap uses
-   * `cd "${cwd}"` which has its own escaping concerns out of scope for #154.
-   *
-   * @internal Issue #154
-   */
-  private validateWindowsCwd(cwd: string): { ok: true } | { ok: false; reason: string } {
-    const match = TerminalService.UNSAFE_WINDOWS_CWD_CHARS.exec(cwd)
-    if (match) {
-      return {
-        ok: false,
-        reason: `cwd contains unsupported character ${JSON.stringify(match[0])}`
-      }
-    }
-    return { ok: true }
   }
 
   /**
@@ -186,69 +162,42 @@ export class TerminalService extends EventEmitter {
       const shellArgs: string[] = []
 
       if (osPlatform() === 'win32') {
-        // Reject cwds containing characters that would break our bootstrap
-        // quoting on either Windows shell. See UNSAFE_WINDOWS_CWD_CHARS.
-        const validation = this.validateWindowsCwd(cwd)
+        // Validate + normalize the cwd, then dispatch to a registered
+        // WindowsBootstrapBuilder. See WindowsTerminalBootstrap.ts for the
+        // strategy interface and the dispatch chain.
+        const validation = validateWindowsCwd(cwd)
         if (!validation.ok) {
           logger.error(`❌ Cannot create terminal ${terminalId}: ${validation.reason}`)
           this.emit('error', { terminalId, error: validation.reason })
           return null
         }
-
-        // Normalize trailing path separators – cmd.exe `/K` may parse the
-        // closing `"` of `cd /d "<cwd>\"` as an escaped quote, breaking the
-        // entire bootstrap. Drive roots like `C:\` MUST keep their trailing
-        // slash because `C:` means "current directory of drive C", not the
-        // drive root itself. PowerShell's single-quoted string handles
-        // either form correctly; we normalize uniformly for consistency.
-        const winCwd = cwd.length > 3 ? cwd.replace(/[\\/]+$/, '') : cwd
-
-        const isPowerShell = /(?:^|[/\\])(pwsh(?:-preview)?|powershell)(?:\.exe)?$/i.test(shell)
-        if (isPowerShell) {
-          // PowerShell bootstrap. Use -LiteralPath with single-quoted string to
-          // disable variable ($), wildcard, and backtick expansion. Inside a
-          // single-quoted PowerShell string the only escape needed is doubling
-          // single quotes (' → '').
-          const psEscapedCwd = winCwd.replace(/'/g, "''")
-          const psEscapedShell = shell.replace(/'/g, "''")
-          const bootstrapScript = [
-            `Set-Location -LiteralPath '${psEscapedCwd}'`,
-            '(Get-Location).Path',
-            // Marker is single-quoted defensively – the current marker format
-            // contains only `[A-Za-z0-9_]`, but quoting future-proofs the
-            // bootstrap if the format ever changes.
-            `Write-Output '${marker}'`,
-            // Start interactive PowerShell session (Windows doesn't have exec)
-            `& '${psEscapedShell}' -NoLogo`
-          ].join('; ')
-          shellArgs.push('-NoProfile', '-Command', bootstrapScript)
-        } else {
-          // cmd.exe bootstrap. /D disables AutoRun, /K keeps the shell open
-          // after the bootstrap runs. `@echo off` is set FIRST so that the
-          // remainder of the bootstrap is not echoed back to the PTY – without
-          // it, cmd.exe would print the literal `cd /d "<cwd>"` and
-          // `echo <marker>` lines, and the marker handshake would mis-parse
-          // the echoed `echo <marker>` line as the cwd.
-          //
-          // `cwd` is validated above against UNSAFE_WINDOWS_CWD_CHARS, so it
-          // is safe to interpolate verbatim into the quoted argument. Paths
-          // containing `%` are still passed through and may be expanded by
-          // cmd.exe – this is a documented limitation tracked in
-          // docs/windows/.
-          //
-          // Bare `cd` (no args) prints the current directory, which the
-          // marker handshake parses as the cwd line.
-          const bootstrapScript = `@echo off && cd /d "${winCwd}" && cd && echo ${marker}`
-          shellArgs.push('/D', '/K', bootstrapScript)
-        }
+        const winCwd = normalizeWindowsCwd(cwd)
+        const { kind, shellArgs: winShellArgs } = buildWindowsBootstrap({
+          shell,
+          cwd: winCwd,
+          marker
+        })
+        logger.info(`🔵 Windows shell kind: ${kind}`)
+        shellArgs.push(...winShellArgs)
       } else {
-        // POSIX: Run non-interactive bootstrap, then exec into login interactive shell
-        // The exec replaces the process, so PTY continues but now running interactive shell
+        // POSIX bootstrap. We use a single-quoted argument so `$`, backtick,
+        // backslash and other shell metacharacters in the cwd are inert.
+        // Inside a single-quoted POSIX string the only escape is the
+        // canonical `'\''` form (close, escape, reopen) – portable across
+        // sh / bash / zsh / dash. `\r\n` would still break the script, so
+        // those are rejected up-front.
+        if (/[\r\n]/.test(cwd)) {
+          const reason = 'cwd contains unsupported newline character'
+          logger.error(`❌ Cannot create terminal ${terminalId}: ${reason}`)
+          this.emit('error', { terminalId, error: reason })
+          return null
+        }
+        const posixEscapedCwd = cwd.replace(/'/g, "'\\''")
         const bootstrapScript = [
-          `cd "${cwd}"`,           // Change to target directory
-          'pwd',                    // Print working directory (for verification)
-          `echo ${marker}`,         // Print marker (triggers clear handshake)
-          `exec -l "$SHELL" -i`     // Exec into login interactive shell (replaces process)
+          `cd '${posixEscapedCwd}'`,    // Change to target directory (literal)
+          'pwd',                          // Print working directory (for verification)
+          `echo ${marker}`,               // Print marker (triggers clear handshake)
+          `exec -l "$SHELL" -i`           // Exec into login interactive shell (replaces process)
         ].join('; ')
         shellArgs.push('-c', bootstrapScript)
       }
@@ -335,20 +284,24 @@ export class TerminalService extends EventEmitter {
       }
       ptyProcess.onData(markerDetector)
 
-      // Forward PTY output to renderer (only after initialization)
+      // Forward PTY output to renderer (only after initialization).
+      // These log lines fire on every PTY data chunk and are pure debug
+      // instrumentation – kept at `debug` level so production logs are
+      // not flooded but they are still available when chasing handshake
+      // regressions.
       ptyProcess.onData((data: string) => {
         const term = this.terminals.get(terminalId)
-        logger.info(`[PRIMARY onData] term=${!!term}, init=${term?.initializationComplete}, clearing=${term?.isClearing}, marker=${term?.hasReceivedMarker}, dataPreview=${data.substring(0, 50).replace(/\n/g, '\\n')}`)
+        logger.debug(`[PRIMARY onData] term=${!!term}, init=${term?.initializationComplete}, clearing=${term?.isClearing}, marker=${term?.hasReceivedMarker}, dataPreview=${data.substring(0, 50).replace(/\n/g, '\\n')}`)
 
         // STRICT BLOCKING: Only forward if:
         // 1. Initialization complete (clear confirmed by renderer)
         // 2. NOT currently clearing
         // 3. Marker has been received (ensures no pre-marker data leaks through)
         if (term && term.initializationComplete && !term.isClearing && term.hasReceivedMarker) {
-          logger.info(`[PRIMARY onData] FORWARDING data`)
+          logger.debug(`[PRIMARY onData] FORWARDING data`)
           this.emit('data', { terminalId, data })
         } else {
-          logger.info(`[PRIMARY onData] BLOCKING data`)
+          logger.debug(`[PRIMARY onData] BLOCKING data`)
         }
       })
 

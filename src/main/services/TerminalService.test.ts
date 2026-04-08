@@ -95,14 +95,15 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       expect(scriptIdx).toBeGreaterThanOrEqual(0)
       const script = args[scriptIdx + 1]
 
-      // Verify bootstrap script structure
-      expect(script).toMatch(/cd "\/tmp\/project"/)
+      // Issue #154 follow-up: POSIX bootstrap now single-quotes the cwd so
+      // `$`, backtick, backslash, and other shell metacharacters are inert.
+      expect(script).toMatch(/cd '\/tmp\/project'/)
       expect(script).toMatch(/pwd/)
       expect(script).toMatch(/echo __ERFANA_PWD_MARKER_\d+__/)
       expect(script).toMatch(/exec -l "\$SHELL" -i/)
     })
 
-    it('POSIX: handles paths with spaces in double quotes', async () => {
+    it('POSIX: handles paths with spaces in single quotes', async () => {
       vi.doMock('os', async () => {
         const actual = await vi.importActual<any>('os')
         return { ...actual, platform: () => 'linux' }
@@ -115,8 +116,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       const scriptIdx = args.indexOf('-c')
       const script = args[scriptIdx + 1]
 
-      // Path should be wrapped in double quotes
-      expect(script).toMatch(/cd "\/tmp\/project with spaces"/)
+      expect(script).toMatch(/cd '\/tmp\/project with spaces'/)
     })
 
     it('Windows PowerShell: generates bootstrap using -LiteralPath with single-quoted cwd', async () => {
@@ -1129,6 +1129,117 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       expect(tid).toBeTruthy()
       const script = spawnedPTYs[0].args[spawnedPTYs[0].args.indexOf('-Command') + 1]
       expect(script).toContain("Set-Location -LiteralPath 'C:\\'")
+    })
+
+    // -----------------------------------------------------------------------
+    // Issue #154 follow-up: pin the documented `%` passthrough limitation.
+    // The deny-list intentionally does NOT cover `%` because Windows users
+    // routinely have legitimate paths containing it (e.g. `100%done`). This
+    // test pins the verbatim interpolation so a future change cannot
+    // silently start escaping `%` (which would change observable behavior)
+    // without an explicit deprecation.
+    // -----------------------------------------------------------------------
+
+    it('passes through % in cwd verbatim (cmd.exe documented limitation)', async () => {
+      const svc = await importWin32()
+      const shell = 'C:\\Windows\\System32\\cmd.exe'
+      const tid = await svc.createTerminal({ shell, cwd: 'C:\\tmp\\100%done' })
+      expect(tid).toBeTruthy()
+      const script = spawnedPTYs[0].args[2]
+      expect(script).toContain('cd /d "C:\\tmp\\100%done"')
+    })
+
+    it('passes through % in cwd verbatim (PowerShell, harmless)', async () => {
+      const svc = await importWin32()
+      const shell = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
+      const tid = await svc.createTerminal({ shell, cwd: 'C:\\tmp\\100%done' })
+      expect(tid).toBeTruthy()
+      const script = spawnedPTYs[0].args[spawnedPTYs[0].args.indexOf('-Command') + 1]
+      // PowerShell does not expand `%` so this is harmless under -LiteralPath.
+      expect(script).toContain("Set-Location -LiteralPath 'C:\\tmp\\100%done'")
+    })
+  })
+
+  // ===========================================================================
+  // Issue #154 follow-up: POSIX cwd hardening (single-quote escape + \r\n
+  // rejection). Closes the validation asymmetry between Windows and POSIX
+  // flagged by solution-reviewer in round 2.
+  // ===========================================================================
+
+  describe('Issue #154 - POSIX cwd hardening', () => {
+    beforeEach(() => {
+      spawnedPTYs.length = 0
+      vi.clearAllMocks()
+      vi.resetModules()
+    })
+
+    async function importPosix() {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+      return (await import('./TerminalService')).terminalService
+    }
+
+    it('single-quote escapes a cwd containing $ (no expansion)', async () => {
+      const svc = await importPosix()
+      const tid = await svc.createTerminal({ cwd: '/Users/me/Dev/$weird-name' })
+      expect(tid).toBeTruthy()
+      const script = spawnedPTYs[0].args[spawnedPTYs[0].args.indexOf('-c') + 1]
+      // `$weird-name` appears verbatim inside `'…'` – inert under POSIX shells
+      expect(script).toContain("cd '/Users/me/Dev/$weird-name'")
+    })
+
+    it('single-quote escapes a cwd containing backtick (no command substitution)', async () => {
+      const svc = await importPosix()
+      const tid = await svc.createTerminal({ cwd: '/tmp/with`backtick' })
+      expect(tid).toBeTruthy()
+      const script = spawnedPTYs[0].args[spawnedPTYs[0].args.indexOf('-c') + 1]
+      expect(script).toContain("cd '/tmp/with`backtick'")
+    })
+
+    it("single-quote escapes a cwd containing apostrophe via the canonical '\\'' form", async () => {
+      const svc = await importPosix()
+      const tid = await svc.createTerminal({ cwd: "/tmp/with'apostrophe" })
+      expect(tid).toBeTruthy()
+      const script = spawnedPTYs[0].args[spawnedPTYs[0].args.indexOf('-c') + 1]
+      // Canonical POSIX escape: close, escape, reopen → `'\''`
+      // Result: `cd '/tmp/with'\''apostrophe'` parses as the literal
+      // string `/tmp/with'apostrophe` in any POSIX shell.
+      expect(script).toContain("cd '/tmp/with'\\''apostrophe'")
+    })
+
+    it('single-quote escapes a cwd containing double quote', async () => {
+      const svc = await importPosix()
+      const tid = await svc.createTerminal({ cwd: '/tmp/with"quote' })
+      expect(tid).toBeTruthy()
+      const script = spawnedPTYs[0].args[spawnedPTYs[0].args.indexOf('-c') + 1]
+      // `"` is literal inside POSIX `'…'` – no escape needed
+      expect(script).toContain("cd '/tmp/with\"quote'")
+    })
+
+    it('rejects POSIX cwd containing carriage return', async () => {
+      const svc = await importPosix()
+      const errSpy = vi.fn()
+      svc.on('error', errSpy)
+      const tid = await svc.createTerminal({ cwd: '/tmp/with\rreturn' })
+      expect(tid).toBeNull()
+      expect(errSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ error: expect.stringContaining('newline') })
+      )
+      expect(spawnedPTYs).toHaveLength(0)
+    })
+
+    it('rejects POSIX cwd containing newline', async () => {
+      const svc = await importPosix()
+      const errSpy = vi.fn()
+      svc.on('error', errSpy)
+      const tid = await svc.createTerminal({ cwd: '/tmp/with\nnewline' })
+      expect(tid).toBeNull()
+      expect(errSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ error: expect.stringContaining('newline') })
+      )
+      expect(spawnedPTYs).toHaveLength(0)
     })
   })
 
