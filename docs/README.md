@@ -43,6 +43,7 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 ### Development
 - [Development Tasks](./development-tasks.md) - Build, test, and deployment
 - [Build](./build/README.md) - electron-builder, ASAR, fuses, troubleshooting
+- [Windows enablement](./windows/README.md) - Gap analysis and phased implementation plan for Windows parity (planning)
 - [Testing](./testing/README.md) - Testing strategies and coverage
   - [E2E Testing](./testing/e2e-testing.md) - Playwright/Electron E2E guide
   - [E2E Selectors](./testing/e2e-selectors.md) - 211 testids catalog
