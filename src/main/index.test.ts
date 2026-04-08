@@ -42,7 +42,14 @@ describe('Main Process - Window Creation', () => {
       commandLine: {
         appendSwitch: vi.fn()
       },
-      quit: vi.fn()
+      quit: vi.fn(),
+      // Issue #156: Windows-only `app.setJumpList` is called from
+      // src/main/index.ts:293 inside a `process.platform === 'win32'`
+      // branch. On a Windows host the test runs hit that branch and the
+      // call throws TypeError without this stub, cascading 21 file /
+      // 151 test failures across the main project. Stub as a no-op
+      // since the call site does not check the return value.
+      setJumpList: vi.fn()
     }
 
     // Mock @electron-toolkit/utils
