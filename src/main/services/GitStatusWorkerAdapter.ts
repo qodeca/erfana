@@ -5,9 +5,6 @@ import { GIT_STATUS } from '../../shared/constants'
 import type { GitStatusResponse } from '../../shared/ipc/git-schema'
 import { logger } from './LoggingService'
 
-/** Timeout for cache-clear acknowledgment from worker (ms) */
-const CACHE_CLEAR_ACK_TIMEOUT = 1000
-
 /**
  * Worker thread adapter for git status computation
  *
@@ -60,31 +57,8 @@ export class GitStatusWorkerAdapter implements IGitStatusWorker {
     })
   }
 
-  /** Clear the statusMatrix cache for a specific project or all projects. */
-  async clearCache(projectPath?: string): Promise<void> {
-    if (!this.worker || !this.isAlive()) return
-
-    return new Promise<void>((resolve) => {
-      const timer = setTimeout(() => resolve(), CACHE_CLEAR_ACK_TIMEOUT)
-
-      const handler = (msg: { type: string }): void => {
-        if (msg.type === 'cache-cleared') {
-          clearTimeout(timer)
-          this.worker?.off('message', handler)
-          resolve()
-        }
-      }
-
-      this.worker!.on('message', handler)
-      this.worker!.postMessage({ type: 'clear-cache', projectPath })
-    })
-  }
-
   /** Terminate the worker thread and release resources. Safe to call multiple times. */
   async dispose(): Promise<void> {
-    if (this.isAlive()) {
-      await this.clearCache()
-    }
     await this.terminateWorker()
   }
 

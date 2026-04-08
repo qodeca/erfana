@@ -22,7 +22,7 @@ Orchestrates git status retrieval via worker thread, keeping the main Electron t
 - Circuit breaker integration – disables worker after repeated crashes
 - Strategy selection – chooses isomorphic-git or native git based on repo size
 - Timing instrumentation with structured logging
-- Cache clearing on project switch
+- Per-call fresh cache for isomorphic-git (no persistent state in worker)
 
 ### Known limitations
 - Global `.gitignore` not supported (isomorphic-git limitation)
@@ -76,12 +76,10 @@ Selects the optimal git status strategy (isomorphic-git vs native git) based on 
 - Checks `.git/index` file size to determine repo scale
 - Selects `isomorphic-git` for repos with index < 5 MB (default)
 - Selects native `git status --porcelain` for large repos (index >= 5 MB)
-- Caches strategy per project path
-- Cache cleared on project switch
+- Stateless – re-evaluates on every call (no caching)
 
 ### Public methods
-- `getStrategy(projectPath)` – Returns `'isomorphic'` or `'native'`
-- `clearCache(projectPath?)` – Clear cached strategy for one or all projects
+- `select(projectPath)` – Returns `'isomorphic-git'` or `'native-git'`
 
 ---
 
