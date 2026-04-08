@@ -25,4 +25,16 @@ The goal is **full Windows parity** — every feature that works on macOS must w
 
 ## Status
 
-Initial analysis and plan: **2026-04-08**. Implementation not yet started.
+Initial analysis and plan: **2026-04-08**. Implementation tracked via GitHub issues (filed 2026-04-08):
+
+| Phase | Issue | Status |
+|-------|-------|--------|
+| Phase 0 – unblock Windows dev loop | [#153](https://github.com/qodeca/erfana/issues/153) | Open |
+| Phase 1 – terminal parity | [#154](https://github.com/qodeca/erfana/issues/154) | Open (depends on #153) |
+| Phase 2 – file ops, deps, filenames, long paths | [#155](https://github.com/qodeca/erfana/issues/155) | Open (depends on #153) |
+| Phase 3 – screenshot parity | _not yet filed – T3 spec recommended first_ | – |
+| Phase 4 – local Whisper parity | _not yet filed_ | – |
+| Phase 5 – distribution hygiene (auto-update, signing) | _not yet filed_ | – |
+| Phase 6 – polish & DX | _not yet filed_ | – |
+
+Phases 1 and 2 can run in parallel after Phase 0 lands.

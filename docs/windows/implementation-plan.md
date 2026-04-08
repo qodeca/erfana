@@ -8,6 +8,8 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 ## Phase 0 — Unblock the Windows dev loop
 
+**Tracking:** [#153](https://github.com/qodeca/erfana/issues/153)
+
 **Why first:** Nothing else can be validated until a Windows contributor can actually run `npm install` + `npm run dev`. Fixing blockers in code you can't build is wasted effort.
 
 Changes:
@@ -29,6 +31,8 @@ Changes:
 ---
 
 ## Phase 1 — Terminal parity
+
+**Tracking:** [#154](https://github.com/qodeca/erfana/issues/154) (depends on #153)
 
 **Why second:** The terminal is core to the app and currently silently dead on cmd.exe. Fast to fix because the existing `markerDetector` state machine can be reused as-is.
 
@@ -58,6 +62,8 @@ Changes:
 ---
 
 ## Phase 2 — Build scripts / media helpers that need Windows branches
+
+**Tracking:** [#155](https://github.com/qodeca/erfana/issues/155) (depends on #153)
 
 Changes:
 
