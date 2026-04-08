@@ -45,7 +45,7 @@ export default [
   },
   // Build scripts: CommonJS Node.js environment
   {
-    files: ['scripts/**/*.js', 'scripts/**/*.cjs'],
+    files: ['scripts/**/*.js', 'scripts/**/*.cjs', 'scripts/**/*.mjs'],
     languageOptions: {
       globals: {
         require: 'readonly',

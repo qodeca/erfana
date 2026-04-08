@@ -116,6 +116,7 @@ For detailed information on specific build aspects, see:
 - **[Electron Fuses](./fuses.md)** - Security fuses configuration
 - **[Dependencies](./dependencies.md)** - Exclusions and devDependencies
 - **[Troubleshooting](./troubleshooting.md)** - Common build errors and solutions
+- **[Windows build prerequisites](./windows.md)** - Setting up a Windows 11 dev box (Phase 0 of the Windows enablement roadmap)
 
 ---
 
