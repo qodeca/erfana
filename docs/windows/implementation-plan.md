@@ -8,12 +8,13 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 ## Status snapshot (last updated 2026-04-20, v0.9.2 base)
 
-**Branch:** `windows` (ahead of `develop`). All Phase 0–1 work merged, pushed to `origin/windows`. Develop merged in at `db0dc5e` brings in the v0.9.2 cppgc-crash fix as a base.
+**Branch:** `windows` (ahead of `develop`). All Phase 0–1 work merged, pushed to `origin/windows`. Develop merged in at `db0dc5e` brings in the v0.9.2 cppgc-crash fix as a base. **Phase 0 closed (#153) after macOS regression verification on 2026-04-20.**
 
 **Recent commits on `windows` (newest → oldest):**
 
 | Commit | Description | Issue / version |
 |---|---|---|
+| `47c2e27 / 23fb537` | Fix hardcoded Unix paths in `git-status-cache.test.ts` after v0.9.2 merge + doc sync | #153 follow-up |
 | `db0dc5e` | Merge develop (v0.9.2 cppgc fix) into windows | v0.9.2 |
 | `9edb243` | Merge: docs propagation — terminal bootstrap-pattern rewrite, api-services Windows notes, CHANGELOG entry | — |
 | `7da0979 / d48c452` | Merge: comprehensive Windows status + multi-session cross-platform workflow docs | — |
@@ -34,11 +35,11 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 - `npm run test:cov` → tests pass; v8 coverage aggregator still hits the ENOENT race on Windows NTFS → tracked in [#158](https://github.com/qodeca/erfana/issues/158)
 - **Post-merge fix applied**: `src/main/services/workers/git-status-cache.test.ts` (landed in v0.9.2) used hardcoded `/test/project`, `/my/repo`, etc. — same class of bug as #157. Fixed in the v0.9.2-merge follow-up commit using `path.join(os.tmpdir(), ...)` constants. 11/11 tests now green on Windows. Demonstrates the contributor-expectation in `docs/build/windows.md` (run `test:main` locally before merging) is warranted until Phase 6 CI guard lands.
 
-**Pending on macOS host (blocks #153 closure):**
+**Verification on macOS host (Phase 0 AC #4, 2026-04-20):**
 
-- Run `npm run test:cov` on macOS — no regressions from #157 test changes (sole remaining AC)
-- Run `npm run build:mac` on macOS — confirms no regression from Phase 0 portable scripts
-- These unblock `#153` (Phase 0) final closure
+- `npm run test:cov` → **7532/7532 tests pass, 0 failures** across all three workspace projects (main, preload, renderer). Duration 32.75s. No regressions from #157 test portability changes.
+- `npm run build:mac` → both architectures produced cleanly: `erfana-0.9.2-x64.dmg` (327 MB) and `erfana-0.9.2-arm64.dmg` (320 MB). All Electron security fuses applied; ad-hoc signed; notarize correctly skipped.
+- **Test flake discovered during run** (non-blocking): `CameraDialog.test.tsx` triggers an unhandled `ReferenceError: window is not defined` after jsdom teardown because a 200 ms shutter timer in `CameraDialog.tsx:146` has no cleanup. All tests still pass, but vitest exits code 1. Pre-existing (landed in `fdfa238`), not a Phase 0 regression. Tracked in [#159](https://github.com/qodeca/erfana/issues/159).
 
 **Pending on Windows host (not blocking):**
 
@@ -48,7 +49,7 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 ## Feature status on Windows today
 
-Honest per-feature assessment — what an end user running `erfana-0.9.1-setup.exe` gets today, **after Phases 0–1 land**. Phases 2–6 are not yet implemented.
+Honest per-feature assessment — what an end user running `erfana-0.9.2-setup.exe` gets today, **after Phases 0–1 land**. Phases 2–6 are not yet implemented.
 
 ### ✅ Working
 
@@ -91,7 +92,7 @@ Honest per-feature assessment — what an end user running `erfana-0.9.1-setup.e
 
 ## Phase 0 — Unblock the Windows dev loop
 
-**Tracking:** [#153](https://github.com/qodeca/erfana/issues/153) — **substantively complete; awaiting macOS regression check**
+**Tracking:** [#153](https://github.com/qodeca/erfana/issues/153) — **closed 2026-04-20** after macOS regression verification.
 
 **Why first:** Nothing else can be validated until a Windows contributor can actually run `npm install` + `npm run dev`. Fixing blockers in code you can't build is wasted effort.
 
@@ -102,7 +103,7 @@ Honest per-feature assessment — what an end user running `erfana-0.9.1-setup.e
 | #1 `npm run test:cov` completes on Windows | ⚠️ Tests pass (238 files / 7405 tests / 0 failures); coverage aggregator hits v8 race → [#158](https://github.com/qodeca/erfana/issues/158) |
 | #2 `npm run build:win` produces NSIS installer | ✅ Met (Developer Mode required; documented) |
 | #3 `docs/build/windows.md` exists, linked, includes contributor guidance | ✅ Met |
-| #4 macOS `test:cov` + `build:mac` regression check | ⏳ **Pending — must run on macOS host next session** |
+| #4 macOS `test:cov` + `build:mac` regression check | ✅ **Met — verified 2026-04-20** (7532/7532 pass, both DMGs built; separate flake tracked in [#159](https://github.com/qodeca/erfana/issues/159)) |
 | #5 `devDependencies` includes portability packages | ✅ Met (`rimraf`, `shx`) |
 
 ### Changes landed
@@ -129,7 +130,7 @@ Honest per-feature assessment — what an end user running `erfana-0.9.1-setup.e
 
 - [x] Clean Windows 11 box → clone → `npm install` → `npm run dev` launches — **verified 2026-04-20**
 - [x] `npm run build:win` → NSIS installer produced — **verified 2026-04-20** (requires Developer Mode enabled per `docs/build/windows.md` step 4)
-- [ ] `npm run test:cov` + `npm run build:mac` on macOS — **pending**
+- [x] `npm run test:cov` + `npm run build:mac` on macOS — **verified 2026-04-20** (7532/7532 tests pass; x64 + arm64 DMGs produced)
 
 ---
 
@@ -374,7 +375,7 @@ On Windows after `git pull --ff-only origin windows`:
 
 Before merging `windows` → `develop`, confirm all of:
 
-- [ ] Phase 0 `#153` closed (all 5 ACs met, macOS regression verified)
+- [x] Phase 0 `#153` closed (all 5 ACs met, macOS regression verified 2026-04-20)
 - [ ] Phase 1 `#154` manual UAT checklist all passing on a real Windows host
 - [ ] Phase 2 `#155b` (git allowlist) merged — otherwise tree indicators silently broken for stock Windows users
 - [ ] Phase 2 `#155c` (reserved filename guard) merged — otherwise cryptic EINVAL on common filenames
