@@ -41,13 +41,13 @@ The goal is **full Windows parity** — every feature that works on macOS must w
 |---|---|---|
 | [#156](https://github.com/qodeca/erfana/issues/156) | `app.setJumpList` mock missing in `index.test.ts` | Landed in `54e8300` (`ebc3088` merge) |
 | [#157](https://github.com/qodeca/erfana/issues/157) | Hardcoded Unix paths in 20+ main-process tests | Landed in `75877a8` (`3196314` merge) |
+| [#159](https://github.com/qodeca/erfana/issues/159) | `CameraDialog.test.tsx` teardown timer → vitest `ReferenceError` | Landed in `6b59013` (`ca38d44` merge) |
 
-### New issues filed during Phase 0
+### Open issues (deferred to future phases)
 
 | Issue | Description | Priority |
 |---|---|---|
 | [#158](https://github.com/qodeca/erfana/issues/158) | v8 coverage provider ENOENT race in `test:cov` on Windows | Deferred to Phase 6 |
-| [#159](https://github.com/qodeca/erfana/issues/159) | `CameraDialog.test.tsx` teardown timer → vitest exit-1 (all tests pass) | Non-blocking test fix |
 
 Phases 1 and 2 can run in parallel. Phase 2 sub-issues (#155a–d) are independent and can be worked in any order — recommended priority: #155b (git allowlist) → #155c (filename guard) → #155a (LibreOffice) → #155d (long paths).
 
