@@ -56,7 +56,6 @@ function createTestResponse(overrides?: Partial<GitStatusResponse>): GitStatusRe
 function createMockWorker(overrides?: Partial<IGitStatusWorker>): IGitStatusWorker {
   return {
     execute: vi.fn().mockResolvedValue(createTestResponse()),
-    clearCache: vi.fn().mockResolvedValue(undefined),
     dispose: vi.fn().mockResolvedValue(undefined),
     isAlive: vi.fn().mockReturnValue(true),
     ...overrides,
@@ -406,21 +405,6 @@ describe('GitStatusService', () => {
         'GitStatus: not a git repo',
         expect.objectContaining({ projectPath: '/not-a-git-project' })
       )
-    })
-  })
-
-  // -------------------------------------------------------------------------
-  describe('clearCache', () => {
-    it('should delegate clearCache(path) to worker', async () => {
-      await service.clearCache('/project')
-
-      expect(mockWorker.clearCache).toHaveBeenCalledWith('/project')
-    })
-
-    it('should delegate clearCache() with no args to worker', async () => {
-      await service.clearCache()
-
-      expect(mockWorker.clearCache).toHaveBeenCalledWith(undefined)
     })
   })
 

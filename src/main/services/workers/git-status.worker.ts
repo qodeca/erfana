@@ -27,13 +27,10 @@ const BRANCH_DETECT_TIMEOUT = 5_000
 
 // -- Message types -----------------------------------------------------------
 
-interface ExecuteMessage { type: 'execute'; id: number; projectPath: string; strategy: GitStatusStrategy }
-interface ClearCacheMessage { type: 'clear-cache'; projectPath?: string }
-type WorkerMessage = ExecuteMessage | ClearCacheMessage
+interface WorkerMessage { type: 'execute'; id: number; projectPath: string; strategy: GitStatusStrategy }
 
 // -- Module state ------------------------------------------------------------
 
-const statusCache = new Map<string, object>()
 let nativeGitPath: string | null = null
 let gitPathResolved = false
 let gitPathResolvedAt = 0
@@ -45,13 +42,7 @@ if (!parentPort) {
 }
 
 parentPort.on('message', (msg: WorkerMessage) => {
-  if (msg.type === 'execute') {
-    handleExecute(msg.id, msg.projectPath, msg.strategy)
-  } else if (msg.type === 'clear-cache') {
-    if (msg.projectPath) statusCache.delete(msg.projectPath)
-    else statusCache.clear()
-    parentPort!.postMessage({ type: 'cache-cleared' })
-  }
+  handleExecute(msg.id, msg.projectPath, msg.strategy)
 })
 
 // -- Execute handler ---------------------------------------------------------
@@ -125,9 +116,9 @@ async function executeIsomorphicGit(projectPath: string): Promise<GitStatusRespo
       }
     } catch { /* continue without branch */ }
 
-    if (!statusCache.has(projectPath)) statusCache.set(projectPath, {})
-
-    const matrix = await git.statusMatrix({ fs, dir: projectPath, cache: statusCache.get(projectPath) })
+    // Fresh cache per call: a persistent cache accumulates isomorphic-git internal
+    // objects that trigger V8 cppgc thread-safety assertions in worker threads.
+    const matrix = await git.statusMatrix({ fs, dir: projectPath, cache: {} })
     const mapped = mapStatusMatrix(matrix, projectPath)
 
     return { isGitRepo: true, branch, isDetached, files: mapped.entries, counts: mapped.counts, truncated: mapped.truncated }

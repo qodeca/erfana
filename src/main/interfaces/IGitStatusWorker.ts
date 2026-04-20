@@ -31,13 +31,6 @@ export interface IGitStatusWorker {
   execute(request: GitWorkerRequest): Promise<GitStatusResponse>
 
   /**
-   * Clear the statusMatrix cache for a specific project or all projects.
-   *
-   * @param projectPath - Optional path to clear; omit to clear all
-   */
-  clearCache(projectPath?: string): Promise<void>
-
-  /**
    * Terminate the worker thread and release resources.
    *
    * Safe to call multiple times.

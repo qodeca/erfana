@@ -109,6 +109,7 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 ## Resolved Issues
 
+- ✅ Worker thread statusCache crash (v0.9.2) – persistent isomorphic-git cache caused V8 cppgc assertion after ~42 min; replaced with per-call cache
 - ✅ Git status main-thread blocking (v0.9.0, #147) – offloaded to worker_threads with native git fallback
 - ✅ EMFILE cascade in DirectoryWatcherService (v0.9.0, #146) – restart logic + RateLimitedLogger
 - ✅ Terminal Scroll Jump (v0.3.1)

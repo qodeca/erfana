@@ -74,15 +74,6 @@ export class GitStatusService {
   }
 
   /**
-   * Clear the worker's statusMatrix cache for a specific project or all projects.
-   *
-   * @param projectPath - Optional path to clear; omit to clear all
-   */
-  async clearCache(projectPath?: string): Promise<void> {
-    await this.worker.clearCache(projectPath)
-  }
-
-  /**
    * Terminate the worker thread and release all resources.
    * Safe to call multiple times.
    */
