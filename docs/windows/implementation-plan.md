@@ -6,30 +6,33 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 ---
 
-## Status snapshot (last updated 2026-04-20)
+## Status snapshot (last updated 2026-04-20, v0.9.2 base)
 
-**Branch:** `windows` (ahead of `develop`). All Phase 0–1 work merged, pushed to `origin/windows`.
+**Branch:** `windows` (ahead of `develop`). All Phase 0–1 work merged, pushed to `origin/windows`. Develop merged in at `db0dc5e` brings in the v0.9.2 cppgc-crash fix as a base.
 
 **Recent commits on `windows` (newest → oldest):**
 
-| Commit | Description | Issue |
+| Commit | Description | Issue / version |
 |---|---|---|
-| `370dc19` | Merge: SearchBar focus-trap fix for Windows | #153 |
-| `c5e5d61` | test(renderer): rewrite `userEvent.keyboard('{Tab}')` to direct `KeyboardEvent` dispatch | #153 |
-| `3196314` | Merge: test path portability | #157 |
-| `75877a8` | test(windows): `path.join(os.tmpdir(), ...)` across 24 test files | #157 |
-| `ebc3088` | Merge: `app.setJumpList` mock | #156 |
-| `54e8300` | test(main): mock `app.setJumpList` in `index.test.ts` | #156 |
-| `1bcedde / c5ffad8` | Merge: terminal parity + `WindowsBootstrapBuilder` extraction | #154 |
+| `db0dc5e` | Merge develop (v0.9.2 cppgc fix) into windows | v0.9.2 |
+| `9edb243` | Merge: docs propagation — terminal bootstrap-pattern rewrite, api-services Windows notes, CHANGELOG entry | — |
+| `7da0979 / d48c452` | Merge: comprehensive Windows status + multi-session cross-platform workflow docs | — |
+| `370dc19 / c5e5d61` | Merge: SearchBar focus-trap fix (`KeyboardEvent` dispatch) | #153 |
+| `3196314 / 75877a8` | Merge: test path portability (`path.join(os.tmpdir(), ...)` across 24 files) | #157 |
+| `ebc3088 / 54e8300` | Merge: `app.setJumpList` mock | #156 |
+| `1bcedde / c5ffad8` | Merge: terminal parity + `WindowsBootstrapBuilder` strategy extraction | #154 |
 | `c41303c / 7ce7fd6 / 00ee44a` | Round-by-round fixes on terminal parity | #154 |
 | `1f0ae81` | chore(windows): portable `test:cov` + `prebuild` scripts, prerequisites doc | #153 |
 | `d7d291d / 0888d0c` | Windows enablement roadmap docs | — |
 
-**Verification on Windows host (2026-04-20):**
+**Version base:** `0.9.2` (from the develop merge). Windows work will ship in `0.9.3+` or `0.10.0` when `windows` → `develop` merge lands.
 
-- `npm run test:main` → **238 files pass / 7405 tests pass / 89 skipped / 0 failures**
-- `npm run build:win` → **`release/0.9.1/erfana-0.9.1-setup.exe` (316 MB NSIS installer)** produced successfully after Developer Mode enabled; all Electron security fuses applied; signtool signed
-- `npm run test:cov` → tests pass; **v8 coverage aggregator hits an ENOENT race on Windows NTFS** → tracked separately as [#158](https://github.com/qodeca/erfana/issues/158)
+**Verification on Windows host (after v0.9.2 merge, 2026-04-20):**
+
+- `npm run test:main` → **241 files pass / 7437 tests pass / 89 skipped / 0 failures**
+- `npm run build:win` → **NSIS installer** produced successfully (requires Developer Mode enabled); all Electron security fuses applied; signtool signed
+- `npm run test:cov` → tests pass; v8 coverage aggregator still hits the ENOENT race on Windows NTFS → tracked in [#158](https://github.com/qodeca/erfana/issues/158)
+- **Post-merge fix applied**: `src/main/services/workers/git-status-cache.test.ts` (landed in v0.9.2) used hardcoded `/test/project`, `/my/repo`, etc. — same class of bug as #157. Fixed in the v0.9.2-merge follow-up commit using `path.join(os.tmpdir(), ...)` constants. 11/11 tests now green on Windows. Demonstrates the contributor-expectation in `docs/build/windows.md` (run `test:main` locally before merging) is warranted until Phase 6 CI guard lands.
 
 **Pending on macOS host (blocks #153 closure):**
 

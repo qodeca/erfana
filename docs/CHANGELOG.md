@@ -4,24 +4,28 @@ Historical changelog entries for versions prior to current. For the latest chang
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## Unreleased (on `windows` branch)
+
+### Platform support (Windows)
+
+Phase 0 (unblock Windows dev loop) and Phase 1 (terminal parity) of the Windows enablement roadmap landed on the `windows` branch but have **not yet merged to `develop`**. Will ship in a future release (0.9.3+ or 0.10.0). See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for canonical status and the full working/broken/degraded feature table. Highlights:
+
+- **Portable dev scripts** (Phase 0, #153) — `scripts/test-cov.mjs` + `scripts/prebuild.mjs`, `rimraf` + `shx` devDeps, `docs/build/windows.md` prerequisites.
+- **Test path portability** (Phase 0, #157) — 24 test files moved to `path.join(os.tmpdir(), ...)`; `os.tmpdir()` mocks passthrough via `importOriginal`. `npm run test:main` green on Windows (238 files / 7405 tests / 0 failures). Test-only, no production changes.
+- **`app.setJumpList` mock + SearchBar focus-trap fix** (Phase 0, #156, #153).
+- **Terminal parity** (Phase 1, #154) — cmd.exe `@echo off` bootstrap; PowerShell `Set-Location -LiteralPath`; `resolveWindowsShell()` fallback chain; cwd validation deny-list with `emit('error')` contract; `WindowsBootstrapBuilder` strategy in `WindowsTerminalBootstrap.ts`. 68+ tests.
+- **NSIS installer** — `npm run build:win` produces a fused, signtool-signed NSIS installer (316 MB). Requires Developer Mode on build host.
+
+Known gaps (deferred to Phases 2–6): screenshots, local Whisper, auto-updater URL, code signing, git allowlist, LibreOffice Windows detection, reserved filename guard, long-path activation.
+
+---
+
 ## 0.9.2
 
 ### Fixed
 - **App crash after ~42 minutes of use** – The git status worker thread accumulated isomorphic-git internal V8 heap objects in a persistent `statusCache` Map across polling cycles, triggering a V8 cppgc thread-safety assertion (`EXC_BREAKPOINT/SIGTRAP`) that killed the entire Electron process. Fix: replaced persistent cache with fresh `cache: {}` per `statusMatrix()` call. Removed the now-dead `clearCache` chain across `IGitStatusWorker`, `GitStatusWorkerAdapter`, `GitStatusService`, and IPC handlers. Simplified `dispose()` in adapter. Corrected pre-existing inaccuracy in `GitStatusStrategySelector` docs (described caching that never existed). Added 42 regression tests (`GitStatusWorkerAdapter.test.ts`, `git-status-cache.test.ts`).
 
 ## 0.9.1
-
-### Platform support (Windows, on `windows` branch — not yet merged to `develop`)
-
-Phase 0 (unblock Windows dev loop) and Phase 1 (terminal parity) of the Windows enablement roadmap landed on the `windows` branch. See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for canonical status and the full working/broken/degraded feature table. Highlights:
-
-- **Portable dev scripts** (Phase 0, #153) — `scripts/test-cov.mjs` + `scripts/prebuild.mjs`, `rimraf` + `shx` devDeps, `docs/build/windows.md` prerequisites.
-- **Test path portability** (Phase 0, #157) — 24 test files moved to `path.join(os.tmpdir(), ...)`; `os.tmpdir()` mocks passthrough via `importOriginal`. `npm run test:main` green on Windows (238 files / 7405 tests / 0 failures). Test-only, no production changes.
-- **`app.setJumpList` mock + SearchBar focus-trap fix** (Phase 0, #156, #153).
-- **Terminal parity** (Phase 1, #154) — cmd.exe `@echo off` bootstrap; PowerShell `Set-Location -LiteralPath`; `resolveWindowsShell()` fallback chain; cwd validation deny-list with `emit('error')` contract; `WindowsBootstrapBuilder` strategy in `WindowsTerminalBootstrap.ts`. 68+ tests.
-- **NSIS installer** — `npm run build:win` → `release/0.9.1/erfana-0.9.1-setup.exe` (316 MB, fused, signed). Requires Developer Mode on build host.
-
-Known gaps (deferred to Phases 2–6): screenshots, local Whisper, auto-updater URL, code signing, git allowlist, LibreOffice Windows detection, reserved filename guard, long-path activation.
 
 ### Fixed
 - **Autosave race condition – data loss during typing** (#124): Typing during autosave could lose keystrokes due to stale closure overwrites and self-save echo misdetection. Fix adds three-layer defense in `useFileWatcher`: `isSavingRef` guard, content comparison via `isEchoEvent()` (with CRLF normalization), and `hasLocalChangesRef` mirror. `MarkdownEditorPanel.handleSave` now reads content from Monaco editor model (not React state), calls `notifySaveComplete(savedContent)` after write, and performs post-save dirty re-detection to re-mark as modified if the buffer diverged during save. 15 new tests.
