@@ -15,6 +15,19 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import path from 'path'
+import os from 'os'
+
+// Platform-safe test project paths (Windows PATH_TRAVERSAL validator rejects
+// hardcoded Unix paths like '/test/project'). See #157 for the same pattern
+// applied across ~20 main-process test files.
+const TEST_PROJECT = path.join(os.tmpdir(), 'erfana-test', 'project')
+const TEST_PROJECT_ALPHA = path.join(os.tmpdir(), 'erfana-test', 'project-alpha')
+const TEST_PROJECT_BETA = path.join(os.tmpdir(), 'erfana-test', 'project-beta')
+const TEST_MY_REPO = path.join(os.tmpdir(), 'erfana-test', 'my', 'repo')
+const TEST_REPO = path.join(os.tmpdir(), 'erfana-test', 'repo')
+const TEST_NO_GIT_HERE = path.join(os.tmpdir(), 'erfana-test', 'no-git-here')
+const TEST_POLL_PROJECT = path.join(os.tmpdir(), 'erfana-test', 'poll-project')
 
 // ---------------------------------------------------------------------------
 // Mock setup – vi.mock is hoisted, so all top-level variables used inside
@@ -99,7 +112,7 @@ describe('git-status.worker – cache regression', () => {
   // -------------------------------------------------------------------------
   describe('fresh cache object per statusMatrix call', () => {
     it('calls git.statusMatrix with a plain object for cache (not a Map or shared ref)', async () => {
-      sendToWorker({ type: 'execute', id: 1, projectPath: '/test/project', strategy: 'isomorphic-git' })
+      sendToWorker({ type: 'execute', id: 1, projectPath: TEST_PROJECT, strategy: 'isomorphic-git' })
       await flushMicrotasks()
 
       expect(mockStatusMatrix).toHaveBeenCalledOnce()
@@ -110,10 +123,10 @@ describe('git-status.worker – cache regression', () => {
     })
 
     it('uses a distinct cache object for each consecutive statusMatrix call', async () => {
-      sendToWorker({ type: 'execute', id: 1, projectPath: '/test/project', strategy: 'isomorphic-git' })
+      sendToWorker({ type: 'execute', id: 1, projectPath: TEST_PROJECT, strategy: 'isomorphic-git' })
       await flushMicrotasks()
 
-      sendToWorker({ type: 'execute', id: 2, projectPath: '/test/project', strategy: 'isomorphic-git' })
+      sendToWorker({ type: 'execute', id: 2, projectPath: TEST_PROJECT, strategy: 'isomorphic-git' })
       await flushMicrotasks()
 
       expect(mockStatusMatrix).toHaveBeenCalledTimes(2)
@@ -125,10 +138,10 @@ describe('git-status.worker – cache regression', () => {
     })
 
     it('uses a distinct cache object for calls with different project paths', async () => {
-      sendToWorker({ type: 'execute', id: 1, projectPath: '/project-alpha', strategy: 'isomorphic-git' })
+      sendToWorker({ type: 'execute', id: 1, projectPath: TEST_PROJECT_ALPHA, strategy: 'isomorphic-git' })
       await flushMicrotasks()
 
-      sendToWorker({ type: 'execute', id: 2, projectPath: '/project-beta', strategy: 'isomorphic-git' })
+      sendToWorker({ type: 'execute', id: 2, projectPath: TEST_PROJECT_BETA, strategy: 'isomorphic-git' })
       await flushMicrotasks()
 
       const cache1 = mockStatusMatrix.mock.calls[0][0].cache
@@ -137,12 +150,12 @@ describe('git-status.worker – cache regression', () => {
     })
 
     it('passes the project dir alongside the fresh cache', async () => {
-      sendToWorker({ type: 'execute', id: 1, projectPath: '/my/repo', strategy: 'isomorphic-git' })
+      sendToWorker({ type: 'execute', id: 1, projectPath: TEST_MY_REPO, strategy: 'isomorphic-git' })
       await flushMicrotasks()
 
       const callArgs = mockStatusMatrix.mock.calls[0][0]
       expect(callArgs).toMatchObject({
-        dir: '/my/repo',
+        dir: TEST_MY_REPO,
         cache: {},
       })
     })
@@ -151,7 +164,7 @@ describe('git-status.worker – cache regression', () => {
   // -------------------------------------------------------------------------
   describe('execute results posted back correctly', () => {
     it('posts a result message for a valid isomorphic-git execution', async () => {
-      sendToWorker({ type: 'execute', id: 42, projectPath: '/test/repo', strategy: 'isomorphic-git' })
+      sendToWorker({ type: 'execute', id: 42, projectPath: TEST_REPO, strategy: 'isomorphic-git' })
       await flushMicrotasks()
 
       expect(mockParentPort.postMessage).toHaveBeenCalledWith(
@@ -181,7 +194,7 @@ describe('git-status.worker – cache regression', () => {
 
     it('posts isGitRepo: false when .git directory does not exist', async () => {
       mockGitDirMissing()
-      sendToWorker({ type: 'execute', id: 3, projectPath: '/no-git-here', strategy: 'isomorphic-git' })
+      sendToWorker({ type: 'execute', id: 3, projectPath: TEST_NO_GIT_HERE, strategy: 'isomorphic-git' })
       await flushMicrotasks()
 
       const resultCall = mockParentPort.postMessage.mock.calls.find(
@@ -204,7 +217,7 @@ describe('git-status.worker – cache regression', () => {
      */
 
     it('calls statusMatrix exactly once per execute() invocation', async () => {
-      sendToWorker({ type: 'execute', id: 1, projectPath: '/project', strategy: 'isomorphic-git' })
+      sendToWorker({ type: 'execute', id: 1, projectPath: TEST_POLL_PROJECT, strategy: 'isomorphic-git' })
       await flushMicrotasks()
 
       expect(mockStatusMatrix).toHaveBeenCalledTimes(1)
@@ -213,7 +226,7 @@ describe('git-status.worker – cache regression', () => {
     it('calls statusMatrix N times for N consecutive execute() invocations', async () => {
       const N = 10
       for (let i = 1; i <= N; i++) {
-        sendToWorker({ type: 'execute', id: i, projectPath: '/project', strategy: 'isomorphic-git' })
+        sendToWorker({ type: 'execute', id: i, projectPath: TEST_POLL_PROJECT, strategy: 'isomorphic-git' })
         await flushMicrotasks()
       }
 
@@ -223,7 +236,7 @@ describe('git-status.worker – cache regression', () => {
     it('every cache argument across N calls is a distinct plain-object reference', async () => {
       const N = 5
       for (let i = 1; i <= N; i++) {
-        sendToWorker({ type: 'execute', id: i, projectPath: '/project', strategy: 'isomorphic-git' })
+        sendToWorker({ type: 'execute', id: i, projectPath: TEST_POLL_PROJECT, strategy: 'isomorphic-git' })
         await flushMicrotasks()
       }
 
