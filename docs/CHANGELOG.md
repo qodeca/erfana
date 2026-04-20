@@ -6,6 +6,18 @@ Historical changelog entries for versions prior to current. For the latest chang
 
 ## 0.9.1
 
+### Platform support (Windows, on `windows` branch — not yet merged to `develop`)
+
+Phase 0 (unblock Windows dev loop) and Phase 1 (terminal parity) of the Windows enablement roadmap landed on the `windows` branch. See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for canonical status and the full working/broken/degraded feature table. Highlights:
+
+- **Portable dev scripts** (Phase 0, #153) — `scripts/test-cov.mjs` + `scripts/prebuild.mjs`, `rimraf` + `shx` devDeps, `docs/build/windows.md` prerequisites.
+- **Test path portability** (Phase 0, #157) — 24 test files moved to `path.join(os.tmpdir(), ...)`; `os.tmpdir()` mocks passthrough via `importOriginal`. `npm run test:main` green on Windows (238 files / 7405 tests / 0 failures). Test-only, no production changes.
+- **`app.setJumpList` mock + SearchBar focus-trap fix** (Phase 0, #156, #153).
+- **Terminal parity** (Phase 1, #154) — cmd.exe `@echo off` bootstrap; PowerShell `Set-Location -LiteralPath`; `resolveWindowsShell()` fallback chain; cwd validation deny-list with `emit('error')` contract; `WindowsBootstrapBuilder` strategy in `WindowsTerminalBootstrap.ts`. 68+ tests.
+- **NSIS installer** — `npm run build:win` → `release/0.9.1/erfana-0.9.1-setup.exe` (316 MB, fused, signed). Requires Developer Mode on build host.
+
+Known gaps (deferred to Phases 2–6): screenshots, local Whisper, auto-updater URL, code signing, git allowlist, LibreOffice Windows detection, reserved filename guard, long-path activation.
+
 ### Fixed
 - **Autosave race condition – data loss during typing** (#124): Typing during autosave could lose keystrokes due to stale closure overwrites and self-save echo misdetection. Fix adds three-layer defense in `useFileWatcher`: `isSavingRef` guard, content comparison via `isEchoEvent()` (with CRLF normalization), and `hasLocalChangesRef` mirror. `MarkdownEditorPanel.handleSave` now reads content from Monaco editor model (not React state), calls `notifySaveComplete(savedContent)` after write, and performs post-save dirty re-detection to re-mark as modified if the buffer diverged during save. 15 new tests.
 - **Terminal file links – @-prefixed paths and line ranges** (#123): Terminal now detects `@/absolute/path` and `@src/relative/path` as clickable file links (from Claude Code CLI output), stripping the `@` prefix to open the underlying file. The `:line-line` range notation (e.g., `:22-24`) is recognized, navigating to the first line of the range. CLI-wrap joining handles @-prefixed paths across multiple terminal lines. Existing `@scope/package` detection (e.g., `@types/node`) is preserved.

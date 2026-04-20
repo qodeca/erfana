@@ -10,26 +10,31 @@ Supporting service classes for terminal emulation, file operations, file watchin
 
 **File:** `src/main/services/TerminalService.ts`
 
-Manages terminal emulator instances with xterm.js + node-pty.
+Manages terminal emulator instances with xterm.js + node-pty. Cross-platform: macOS/Linux (POSIX shells), Windows (cmd.exe, PowerShell 5.1, pwsh 7+). Marker-based bootstrap with three-flag output gating — see [Terminal Bootstrap Pattern](./terminal/bootstrap-pattern.md) for platform-specific shell invocation, cwd validation contract, `WindowsBootstrapBuilder` strategy pattern, and `resolveWindowsShell()` fallback chain.
 
-**EPIPE Error Handling:** Uses `safeConsole` utility to prevent EPIPE crashes during terminal cleanup. See [EPIPE Error Handling](./epipe-error-handling.md) for details.
+**cwd validation contract (Windows)**: cwds containing `" & | ^ < > ( ) \r \n` are rejected before bootstrap; `createTerminal` returns `null` and emits `'error'`. Callers must surface this.
+
+**Constructor DI seam**: `new TerminalService(fsExists?)` — defaults to `fs.existsSync`; tests inject fakes to cover the shell fallback chain without module mocking.
+
+**EPIPE handling:** Uses `safeConsole` utility to prevent EPIPE crashes during cleanup. See [EPIPE Error Handling](./epipe-error-handling.md).
 
 ### Public Methods
 
-#### `createTerminal(id: string, cwd: string, cols: number, rows: number): Promise<void>`
-Create new PTY instance.
+#### `createTerminal(config: TerminalConfig): string | null`
+Create a new PTY instance.
 
-**Parameters:**
-- `id` - Unique terminal identifier
-- `cwd` - Working directory for terminal
-- `cols` - Terminal columns (width)
-- `rows` - Terminal rows (height)
+**Parameters** (`config`):
+- `cwd` — Working directory for terminal
+- `cols` — Terminal columns (width)
+- `rows` — Terminal rows (height)
+- `shell` — Optional shell override (defaults to platform-resolved shell)
 
-**Throws:** Error if terminal with ID already exists.
+**Returns:** Terminal ID string, or `null` if cwd validation failed (Windows deny-list) or the shell could not be resolved.
 
 **Side Effects:**
-- Spawns new PTY process (zsh shell)
-- Emits 'data' events for output
+- Spawns new PTY process (platform-resolved shell)
+- Emits `'data'` events for output (after bootstrap marker + clear confirm)
+- Emits `'error'` event on cwd rejection or spawn failure
 
 ---
 
@@ -73,17 +78,9 @@ Gracefully kill PTY process.
 
 ### Events
 
-#### `'data'`
-**Payload:** `{ id: string; data: string }`
-
-Emitted when PTY produces output.
-
----
-
-#### `'exit'`
-**Payload:** `{ id: string; code: number }`
-
-Emitted when PTY process exits.
+- `'data'` — `{ id: string; data: string }` — PTY output (after marker + clear confirm)
+- `'exit'` — `{ id: string; code: number }` — PTY process exit
+- `'error'` — cwd rejected by Windows deny-list, shell resolution failure, or spawn failure
 
 ---
 

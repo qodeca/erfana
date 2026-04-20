@@ -495,8 +495,4 @@ Generate DOCX from HTML with embedded images.
 
 ## See Also
 
-- [API Services - Core](./api-services.md) - Terminal, File, Settings, Watchers
-- [Architecture](./architecture.md) - Service class overview
-- [IPC Patterns](./ipc-patterns.md) - IPC handler integration
-- [Terminal](./terminal/README.md) - Terminal panel implementation
-- [Drag-Drop](./drag-drop/README.md) - External file drop documentation
+- [API Services - Core](./api-services.md), [Architecture](./architecture.md), [IPC Patterns](./ipc-patterns.md), [Terminal](./terminal/README.md), [Drag-Drop](./drag-drop/README.md)
