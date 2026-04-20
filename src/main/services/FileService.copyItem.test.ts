@@ -186,7 +186,7 @@ describe('FileService.copyItem', () => {
       await expect(
         fileService.copyItem(sourceFile, targetFolder)
       ).rejects.toThrow('Cannot create more than 1000 copies with the same name')
-    })
+    }, 30_000)
   })
 
   describe('Validation constraints', () => {

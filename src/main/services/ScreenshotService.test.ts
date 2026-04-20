@@ -7,8 +7,25 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import path from 'path'
+import os from 'os'
 import type { ChildProcess } from 'child_process'
 import { EventEmitter } from 'events'
+
+// Platform-safe tmpdir for assertions
+const REAL_TMPDIR = os.tmpdir()
+
+/** Escape a string for use in a RegExp */
+function escRx(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** RegExp matching an erfana-screenshot path under the given tmpdir */
+function screenshotPathRx(tmpdir: string = REAL_TMPDIR, { anchor = true } = {}): RegExp {
+  const sep = '[/\\\\]'
+  const pattern = `${escRx(tmpdir)}${sep}erfana-screenshot-\\d+\\.png`
+  return new RegExp(anchor ? `^${pattern}$` : pattern)
+}
 
 // =============================================================================
 // Mock child_process
@@ -39,11 +56,15 @@ vi.mock('fs/promises', () => ({
 // Mock os.tmpdir
 // =============================================================================
 
-const mockTmpdir = vi.fn(() => '/tmp')
+const mockTmpdir = vi.fn(() => REAL_TMPDIR)
 
-vi.mock('os', () => ({
-  tmpdir: mockTmpdir
-}))
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>()
+  return {
+    ...actual,
+    tmpdir: (...args: unknown[]) => mockTmpdir(...args)
+  }
+})
 
 // =============================================================================
 // Mock electron.screen
@@ -115,7 +136,7 @@ describe('ScreenshotService', () => {
     vi.clearAllMocks()
     vi.resetModules()
     // Reset tmpdir mock to default
-    mockTmpdir.mockReturnValue('/tmp')
+    mockTmpdir.mockReturnValue(REAL_TMPDIR)
     // Reset electron screen mocks to default (single display)
     mockGetAllDisplays.mockReturnValue([
       { id: 1, label: 'Built-in Retina Display', bounds: { x: 0, y: 0, width: 1920, height: 1080 } }
@@ -226,7 +247,7 @@ describe('ScreenshotService', () => {
       // Verify args structure: ['-x', filePath]
       const args = mockExecFile.mock.calls[0][1] as string[]
       expect(args[0]).toBe('-x')
-      expect(args[1]).toMatch(/^\/tmp\/erfana-screenshot-\d+\.png$/)
+      expect(args[1]).toMatch(screenshotPathRx())
     })
 
     it('window mode: executes screencapture with interactive window selection', async () => {
@@ -249,7 +270,7 @@ describe('ScreenshotService', () => {
       expect(args[1]).toBe('-o')
       expect(args[2]).toBe('-i')
       expect(args[3]).toBe('-w')
-      expect(args[4]).toMatch(/^\/tmp\/erfana-screenshot-\d+\.png$/)
+      expect(args[4]).toMatch(screenshotPathRx())
     })
 
     it('area mode: executes screencapture with interactive area selection', async () => {
@@ -271,7 +292,7 @@ describe('ScreenshotService', () => {
       expect(args[0]).toBe('-x')
       expect(args[1]).toBe('-i')
       expect(args[2]).toBe('-s')
-      expect(args[3]).toMatch(/^\/tmp\/erfana-screenshot-\d+\.png$/)
+      expect(args[3]).toMatch(screenshotPathRx())
     })
 
     it('returns success with absolute file path when file exists', async () => {
@@ -287,7 +308,7 @@ describe('ScreenshotService', () => {
 
       expect(result.success).toBe(true)
       expect(result.filePath).toBeDefined()
-      expect(result.filePath).toMatch(/^\/tmp\/erfana-screenshot-\d+\.png$/)
+      expect(result.filePath).toMatch(screenshotPathRx())
       expect(result.error).toBeUndefined()
       expect(result.errorCode).toBeUndefined()
     })
@@ -305,7 +326,7 @@ describe('ScreenshotService', () => {
 
       expect(mockLogger.info).toHaveBeenCalledWith(
         'Screenshot captured successfully',
-        expect.objectContaining({ filePath: expect.stringMatching(/\/tmp\/erfana-screenshot-\d+\.png/) })
+        expect.objectContaining({ filePath: expect.stringMatching(screenshotPathRx(REAL_TMPDIR, { anchor: false })) })
       )
     })
   })
@@ -553,7 +574,8 @@ describe('ScreenshotService', () => {
     })
 
     it('uses correct temp directory from os.tmpdir', async () => {
-      mockTmpdir.mockReturnValue('/var/folders/abc123')
+      const customTmp = path.join(REAL_TMPDIR, 'custom-folder')
+      mockTmpdir.mockReturnValue(customTmp)
 
       const { screenshotService } = await import('./ScreenshotService')
 
@@ -562,7 +584,7 @@ describe('ScreenshotService', () => {
       const args = mockExecFile.mock.calls[0][1] as string[]
       const filePath = args[args.length - 1]
 
-      expect(filePath).toMatch(/^\/var\/folders\/abc123\/erfana-screenshot-\d+\.png$/)
+      expect(filePath).toMatch(screenshotPathRx(customTmp))
     })
 
     it('uses correct prefix and extension', async () => {
@@ -604,7 +626,7 @@ describe('ScreenshotService', () => {
       // Note: In real use, timestamps will differ due to user interaction time
       // In tests, concurrent calls might share millisecond if they execute
       // at exactly the same time - this is acceptable behavior
-      expect(filePaths.every((path) => path?.match(/\/tmp\/erfana-screenshot-\d+\.png$/))).toBe(true)
+      expect(filePaths.every((path) => path?.match(screenshotPathRx()))).toBe(true)
     })
   })
 
@@ -657,7 +679,7 @@ describe('ScreenshotService', () => {
 
       // Path should only contain tmpdir + prefix + timestamp + extension
       // No user input, no command injection vectors
-      expect(filePath).toMatch(/^\/tmp\/erfana-screenshot-\d+\.png$/)
+      expect(filePath).toMatch(screenshotPathRx())
     })
   })
 
@@ -766,7 +788,7 @@ describe('ScreenshotService', () => {
         'Starting screenshot capture',
         expect.objectContaining({
           mode: 'window',
-          filePath: expect.stringMatching(/\/tmp\/erfana-screenshot-\d+\.png/)
+          filePath: expect.stringMatching(screenshotPathRx(REAL_TMPDIR, { anchor: false }))
         })
       )
     })
@@ -854,7 +876,7 @@ describe('ScreenshotService', () => {
     })
 
     it('handles very long tmpdir path', async () => {
-      const longPath = '/very/long/path/' + 'a'.repeat(200)
+      const longPath = path.join(REAL_TMPDIR, 'very', 'long', 'path', 'a'.repeat(200))
       mockTmpdir.mockReturnValue(longPath)
 
       mockExecFile.mockImplementation((_path, _args, _opts, callback) => {
@@ -868,7 +890,7 @@ describe('ScreenshotService', () => {
       const result = await screenshotService.capture('screen')
 
       expect(result.success).toBe(true)
-      expect(result.filePath).toMatch(new RegExp(`^${longPath}/erfana-screenshot-\\d+\\.png$`))
+      expect(result.filePath).toMatch(screenshotPathRx(longPath))
     })
   })
 
@@ -1153,7 +1175,7 @@ describe('ScreenshotService', () => {
 
       expect(result.success).toBe(true)
       expect(result.filePath).toBeDefined()
-      expect(result.filePath).toMatch(/\/tmp\/erfana-screenshot-\d+\.png$/)
+      expect(result.filePath).toMatch(screenshotPathRx())
     })
   })
 })

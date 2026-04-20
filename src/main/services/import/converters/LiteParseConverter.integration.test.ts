@@ -48,7 +48,10 @@ try {
 
 const PDF_FIXTURE = join(__dirname, '../../../../../tests/fixtures/documents/hello-world.pdf')
 
-describe.skipIf(!liteparseAvailable)('LiteParseConverter integration (real LiteParse)', () => {
+// Integration tests invoke native modules (pdfium, Sharp, Tesseract). These
+// are noticeably slower on Windows hosts than macOS – the default 5s timeout
+// is insufficient. Raise to 30s. See #157.
+describe.skipIf(!liteparseAvailable)('LiteParseConverter integration (real LiteParse)', { timeout: 30000 }, () => {
   let LiteParseConverter: typeof import('./LiteParseConverter').LiteParseConverter
 
   beforeAll(async () => {

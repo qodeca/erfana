@@ -300,7 +300,11 @@ describe('ThrottledWorker', () => {
       expect(firstChunk.length).toBe(500)
     })
 
-    it('should drop 30,000 oldest events when 60,000 events are added', () => {
+    // This test pushes 60,000 events into the buffer. Each overflow triggers
+    // a `buffer.slice(droppedCount)` on a 30001-length array, producing an
+    // O(n^2) workload (~900M ops). Default 5s timeout is sufficient on macOS
+    // but not on Windows CI hosts; raise the timeout for this pathological case.
+    it('should drop 30,000 oldest events when 60,000 events are added', { timeout: 30000 }, () => {
       const onWork = vi.fn()
       const onOverflow = vi.fn()
       const worker = new ThrottledWorker<string>(

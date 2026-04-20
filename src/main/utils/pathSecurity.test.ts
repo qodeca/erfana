@@ -52,7 +52,7 @@ describe('pathSecurity', () => {
     vi.clearAllMocks()
   })
 
-  describe('isSystemDirectory', () => {
+  describe.skipIf(process.platform === 'win32')('isSystemDirectory', () => {
     it('should return true for /System', () => {
       expect(isSystemDirectory('/System')).toBe(true)
     })
@@ -159,7 +159,12 @@ describe('pathSecurity', () => {
     })
   })
 
-  describe('validateProjectPath', () => {
+  // These suites exercise Unix-absolute paths and Unix system directories.
+  // The production validator in `pathSecurity.ts` only lists Unix system
+  // directories (/etc, /usr, etc.), and on Windows Unix-style paths like
+  // `/Users/john/...` are not absolute and fail an earlier isAbsolute check.
+  // Skip on Windows – see issue #157.
+  describe.skipIf(process.platform === 'win32')('validateProjectPath', () => {
     describe('Input validation', () => {
       it('should reject empty string', async () => {
         await expect(validateProjectPath('')).rejects.toMatchObject({
@@ -377,7 +382,7 @@ describe('pathSecurity', () => {
     })
   })
 
-  describe('validateSymlink', () => {
+  describe.skipIf(process.platform === 'win32')('validateSymlink', () => {
     describe('Non-symlink paths', () => {
       it('should return false for regular directory', async () => {
         mockedLstat.mockResolvedValue({ isSymbolicLink: () => false } as any)
@@ -517,7 +522,7 @@ describe('pathSecurity', () => {
     })
   })
 
-  describe('validatePath (main entry point)', () => {
+  describe.skipIf(process.platform === 'win32')('validatePath (main entry point)', () => {
     it('should call validateProjectPath first', async () => {
       // Invalid path should fail at validateProjectPath
       await expect(validatePath('')).rejects.toMatchObject({

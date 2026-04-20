@@ -9,6 +9,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import * as path from 'path'
+
+// Platform-safe path helpers – production code uses path.join which emits
+// backslashes on Windows. See #157.
+const WHISPER_DIR = path.join('/userData', 'whisper')
+const WHISPER_BIN = path.join(WHISPER_DIR, 'bin', 'whisper-cli')
+const MODEL_TINY = path.join(WHISPER_DIR, 'models', 'ggml-tiny.bin')
+const MODEL_BASE = path.join(WHISPER_DIR, 'models', 'ggml-base.bin')
+const MODEL_LARGE = path.join(WHISPER_DIR, 'models', 'ggml-large.bin')
 
 // =============================================================================
 // Mock electron
@@ -225,23 +234,23 @@ describe('WhisperModelManager', () => {
       const { createWhisperModelManager } = await import('./WhisperModelManager')
       const manager = createWhisperModelManager()
 
-      expect(manager.getWhisperDir()).toBe('/userData/whisper')
+      expect(manager.getWhisperDir()).toBe(WHISPER_DIR)
     })
 
     it('getBinaryPath() returns path to whisper-cli inside bin dir', async () => {
       const { createWhisperModelManager } = await import('./WhisperModelManager')
       const manager = createWhisperModelManager()
 
-      expect(manager.getBinaryPath()).toBe('/userData/whisper/bin/whisper-cli')
+      expect(manager.getBinaryPath()).toBe(WHISPER_BIN)
     })
 
     it('getModelPath() returns ggml-{model}.bin path inside models dir', async () => {
       const { createWhisperModelManager } = await import('./WhisperModelManager')
       const manager = createWhisperModelManager()
 
-      expect(manager.getModelPath('tiny')).toBe('/userData/whisper/models/ggml-tiny.bin')
-      expect(manager.getModelPath('base')).toBe('/userData/whisper/models/ggml-base.bin')
-      expect(manager.getModelPath('large')).toBe('/userData/whisper/models/ggml-large.bin')
+      expect(manager.getModelPath('tiny')).toBe(MODEL_TINY)
+      expect(manager.getModelPath('base')).toBe(MODEL_BASE)
+      expect(manager.getModelPath('large')).toBe(MODEL_LARGE)
     })
   })
 
@@ -258,7 +267,7 @@ describe('WhisperModelManager', () => {
 
       expect(await manager.isBinaryInstalled()).toBe(true)
       expect(mockAccess).toHaveBeenCalledWith(
-        '/userData/whisper/bin/whisper-cli',
+        WHISPER_BIN,
         1 // X_OK
       )
     })
@@ -299,7 +308,7 @@ describe('WhisperModelManager', () => {
 
       expect(await manager.isModelInstalled('tiny')).toBe(true)
       expect(mockAccess).toHaveBeenCalledWith(
-        '/userData/whisper/models/ggml-tiny.bin',
+        MODEL_TINY,
         4 // R_OK
       )
     })
@@ -441,7 +450,10 @@ describe('WhisperModelManager', () => {
   // ensureBinary
   // ===========================================================================
 
-  describe('ensureBinary()', () => {
+  // WhisperModelManager.getArchSuffix() throws WHISPER_UNSUPPORTED_PLATFORM
+  // on non-darwin platforms, so the download-URL tests can only run on macOS.
+  // See #157.
+  describe.skipIf(process.platform !== 'darwin')('ensureBinary()', () => {
     it('returns path immediately when binary is already installed', async () => {
       mockAccess.mockResolvedValue(undefined) // isBinaryInstalled → true
 
@@ -450,7 +462,7 @@ describe('WhisperModelManager', () => {
 
       const result = await manager.ensureBinary()
 
-      expect(result).toBe('/userData/whisper/bin/whisper-cli')
+      expect(result).toBe(WHISPER_BIN)
       expect(mockFetch).not.toHaveBeenCalled()
     })
 
@@ -486,8 +498,8 @@ describe('WhisperModelManager', () => {
         expect.arrayContaining(['-o', expect.stringContaining('.zip'), '-d', expect.any(String)]),
         expect.any(Function)
       )
-      expect(mockChmod).toHaveBeenCalledWith('/userData/whisper/bin/whisper-cli', 0o755)
-      expect(result).toBe('/userData/whisper/bin/whisper-cli')
+      expect(mockChmod).toHaveBeenCalledWith(WHISPER_BIN, 0o755)
+      expect(result).toBe(WHISPER_BIN)
     })
 
     it('builds correct download URL for arm64', async () => {
@@ -676,8 +688,8 @@ describe('WhisperModelManager', () => {
 
       const result = await manager.ensureBinary()
 
-      expect(mockChmod).toHaveBeenCalledWith('/userData/whisper/bin/whisper-cli', 0o755)
-      expect(result).toBe('/userData/whisper/bin/whisper-cli')
+      expect(mockChmod).toHaveBeenCalledWith(WHISPER_BIN, 0o755)
+      expect(result).toBe(WHISPER_BIN)
     })
 
     it('finds binary when archive uses legacy "main" binary name', async () => {
@@ -704,8 +716,8 @@ describe('WhisperModelManager', () => {
 
       const result = await manager.ensureBinary()
 
-      expect(mockChmod).toHaveBeenCalledWith('/userData/whisper/bin/whisper-cli', 0o755)
-      expect(result).toBe('/userData/whisper/bin/whisper-cli')
+      expect(mockChmod).toHaveBeenCalledWith(WHISPER_BIN, 0o755)
+      expect(result).toBe(WHISPER_BIN)
     })
   })
 
@@ -722,7 +734,7 @@ describe('WhisperModelManager', () => {
 
       const result = await manager.ensureModel('tiny')
 
-      expect(result).toBe('/userData/whisper/models/ggml-tiny.bin')
+      expect(result).toBe(MODEL_TINY)
       expect(mockFetch).not.toHaveBeenCalled()
     })
 
@@ -747,7 +759,7 @@ describe('WhisperModelManager', () => {
         expect.objectContaining({ signal: expect.any(AbortSignal) })
       )
       expect(mockRename).toHaveBeenCalled()
-      expect(result).toBe('/userData/whisper/models/ggml-tiny.bin')
+      expect(result).toBe(MODEL_TINY)
     })
 
     it('reports download progress via callback', async () => {
@@ -874,7 +886,7 @@ describe('WhisperModelManager', () => {
 
       await manager.deleteModel('tiny')
 
-      expect(mockUnlink).toHaveBeenCalledWith('/userData/whisper/models/ggml-tiny.bin')
+      expect(mockUnlink).toHaveBeenCalledWith(MODEL_TINY)
     })
 
     it('updates installed cache to false after deletion', async () => {

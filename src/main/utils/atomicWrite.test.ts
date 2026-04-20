@@ -14,7 +14,18 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import * as path from 'path'
+import * as os from 'os'
 import { atomicWriteJSON, removeIfExists } from './atomicWrite'
+
+const TEST_BASE = path.join(os.tmpdir(), 'erfana-test', '.erfana', 'locks')
+const TEST_BASE_NEW = path.join(TEST_BASE, 'new')
+const LOCK_PATH = path.join(TEST_BASE, 'test.lock')
+const LOCK_PATH_NEW = path.join(TEST_BASE_NEW, 'test.lock')
+const TMP_PATH = path.join(TEST_BASE, '.test-uuid-1234.tmp')
+const NONEXISTENT_LOCK = path.join(TEST_BASE, 'nonexistent.lock')
+const LOCK_1 = path.join(TEST_BASE, 'test1.lock')
+const LOCK_2 = path.join(TEST_BASE, 'test2.lock')
 
 // Mock fs/promises
 vi.mock('node:fs/promises', () => ({
@@ -44,7 +55,7 @@ describe('atomicWriteJSON', () => {
 
   it('creates file with correct JSON content', async () => {
     const content = { foo: 'bar', num: 42 }
-    const filePath = '/Users/test/.erfana/locks/test.lock'
+    const filePath = LOCK_PATH
 
     mockedMkdir.mockResolvedValue(undefined)
     mockedWriteFile.mockResolvedValue(undefined)
@@ -54,7 +65,7 @@ describe('atomicWriteJSON', () => {
 
     // Should write formatted JSON to temp file
     expect(mockedWriteFile).toHaveBeenCalledWith(
-      '/Users/test/.erfana/locks/.test-uuid-1234.tmp',
+      TMP_PATH,
       JSON.stringify(content, null, 2),
       {
         encoding: 'utf8',
@@ -64,14 +75,14 @@ describe('atomicWriteJSON', () => {
 
     // Should rename temp file to target
     expect(mockedRename).toHaveBeenCalledWith(
-      '/Users/test/.erfana/locks/.test-uuid-1234.tmp',
+      TMP_PATH,
       filePath
     )
   })
 
   it('creates directory if not exists with correct permissions', async () => {
     const content = { test: 'data' }
-    const filePath = '/Users/test/.erfana/locks/new/test.lock'
+    const filePath = LOCK_PATH_NEW
 
     mockedMkdir.mockResolvedValue(undefined)
     mockedWriteFile.mockResolvedValue(undefined)
@@ -79,7 +90,7 @@ describe('atomicWriteJSON', () => {
 
     await atomicWriteJSON(filePath, content)
 
-    expect(mockedMkdir).toHaveBeenCalledWith('/Users/test/.erfana/locks/new', {
+    expect(mockedMkdir).toHaveBeenCalledWith(TEST_BASE_NEW, {
       recursive: true,
       mode: 0o700
     })
@@ -87,7 +98,7 @@ describe('atomicWriteJSON', () => {
 
   it('sets owner-only permissions (0o600) for files', async () => {
     const content = { sensitive: 'data' }
-    const filePath = '/Users/test/.erfana/locks/test.lock'
+    const filePath = LOCK_PATH
 
     mockedMkdir.mockResolvedValue(undefined)
     mockedWriteFile.mockResolvedValue(undefined)
@@ -106,7 +117,7 @@ describe('atomicWriteJSON', () => {
 
   it('handles write errors and cleans up temp file', async () => {
     const content = { test: 'data' }
-    const filePath = '/Users/test/.erfana/locks/test.lock'
+    const filePath = LOCK_PATH
     const writeError = new Error('Disk full')
 
     mockedMkdir.mockResolvedValue(undefined)
@@ -116,12 +127,12 @@ describe('atomicWriteJSON', () => {
     await expect(atomicWriteJSON(filePath, content)).rejects.toThrow('Disk full')
 
     // Should attempt to clean up temp file
-    expect(mockedUnlink).toHaveBeenCalledWith('/Users/test/.erfana/locks/.test-uuid-1234.tmp')
+    expect(mockedUnlink).toHaveBeenCalledWith(TMP_PATH)
   })
 
   it('handles rename errors and cleans up temp file', async () => {
     const content = { test: 'data' }
-    const filePath = '/Users/test/.erfana/locks/test.lock'
+    const filePath = LOCK_PATH
     const renameError = new Error('Permission denied')
 
     mockedMkdir.mockResolvedValue(undefined)
@@ -132,12 +143,12 @@ describe('atomicWriteJSON', () => {
     await expect(atomicWriteJSON(filePath, content)).rejects.toThrow('Permission denied')
 
     // Should attempt to clean up temp file
-    expect(mockedUnlink).toHaveBeenCalledWith('/Users/test/.erfana/locks/.test-uuid-1234.tmp')
+    expect(mockedUnlink).toHaveBeenCalledWith(TMP_PATH)
   })
 
   it('ignores cleanup errors if temp file does not exist', async () => {
     const content = { test: 'data' }
-    const filePath = '/Users/test/.erfana/locks/test.lock'
+    const filePath = LOCK_PATH
     const renameError = new Error('Permission denied')
     const unlinkError = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
 
@@ -158,7 +169,7 @@ describe('atomicWriteJSON', () => {
         bool: true
       }
     }
-    const filePath = '/Users/test/.erfana/locks/test.lock'
+    const filePath = LOCK_PATH
 
     mockedMkdir.mockResolvedValue(undefined)
     mockedWriteFile.mockResolvedValue(undefined)
@@ -175,7 +186,7 @@ describe('atomicWriteJSON', () => {
 
   it('uses unique temp file names for concurrent writes', async () => {
     const content = { test: 'data' }
-    const filePath = '/Users/test/.erfana/locks/test.lock'
+    const filePath = LOCK_PATH
 
     mockedMkdir.mockResolvedValue(undefined)
     mockedWriteFile.mockResolvedValue(undefined)
@@ -185,7 +196,7 @@ describe('atomicWriteJSON', () => {
 
     // Temp file should use randomUUID
     expect(mockedWriteFile).toHaveBeenCalledWith(
-      '/Users/test/.erfana/locks/.test-uuid-1234.tmp',
+      TMP_PATH,
       expect.any(String),
       expect.any(Object)
     )
@@ -198,7 +209,7 @@ describe('removeIfExists', () => {
   })
 
   it('returns true when file exists and is removed', async () => {
-    const filePath = '/Users/test/.erfana/locks/test.lock'
+    const filePath = LOCK_PATH
 
     mockedUnlink.mockResolvedValue(undefined)
 
@@ -209,7 +220,7 @@ describe('removeIfExists', () => {
   })
 
   it('returns false for ENOENT (file does not exist)', async () => {
-    const filePath = '/Users/test/.erfana/locks/nonexistent.lock'
+    const filePath = NONEXISTENT_LOCK
     const enoentError = Object.assign(new Error('ENOENT: no such file or directory'), {
       code: 'ENOENT'
     }) as NodeJS.ErrnoException
@@ -222,7 +233,7 @@ describe('removeIfExists', () => {
   })
 
   it('throws on permission errors', async () => {
-    const filePath = '/Users/test/.erfana/locks/test.lock'
+    const filePath = LOCK_PATH
     const epermError = Object.assign(new Error('EPERM: operation not permitted'), {
       code: 'EPERM'
     }) as NodeJS.ErrnoException
@@ -233,7 +244,7 @@ describe('removeIfExists', () => {
   })
 
   it('throws on other filesystem errors', async () => {
-    const filePath = '/Users/test/.erfana/locks/test.lock'
+    const filePath = LOCK_PATH
     const eioError = Object.assign(new Error('EIO: input/output error'), {
       code: 'EIO'
     }) as NodeJS.ErrnoException
@@ -244,8 +255,8 @@ describe('removeIfExists', () => {
   })
 
   it('handles multiple consecutive calls', async () => {
-    const filePath1 = '/Users/test/.erfana/locks/test1.lock'
-    const filePath2 = '/Users/test/.erfana/locks/test2.lock'
+    const filePath1 = LOCK_1
+    const filePath2 = LOCK_2
 
     mockedUnlink
       .mockResolvedValueOnce(undefined) // First call succeeds

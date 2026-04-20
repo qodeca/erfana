@@ -409,13 +409,19 @@ describe('LiteParseConverter', () => {
       expect(result.content).toContain('source: "file name.pdf"')
     })
 
-    it('should escape backslashes in the source filename', async () => {
-      const converter = new LiteParseConverter(noDeps)
-      const result = await converter.convert('/path/to/file\\name.pdf')
+    // Skipped on Windows: path.basename() treats `\` as a separator, so any
+    // backslash in the input is removed before reaching the escape logic.
+    // The escape logic still works – it just has no Windows-reachable input.
+    it.skipIf(process.platform === 'win32')(
+      'should escape backslashes in the source filename',
+      async () => {
+        const converter = new LiteParseConverter(noDeps)
+        const result = await converter.convert('/path/to/file\\name.pdf')
 
-      expect(result.success).toBe(true)
-      expect(result.content).toContain('source: "file\\\\name.pdf"')
-    })
+        expect(result.success).toBe(true)
+        expect(result.content).toContain('source: "file\\\\name.pdf"')
+      }
+    )
   })
 
   // ==========================================================================
@@ -520,7 +526,9 @@ describe('LiteParseConverter', () => {
 
         const { LiteParse } = await import('@llamaindex/liteparse')
         const ctorArgs = vi.mocked(LiteParse).mock.calls.at(-1)?.[0]
-        expect(ctorArgs?.tessdataPath).toBe('/mock/resources/tessdata')
+        // Use path.join so the expected value matches the host's native separator
+        const path = await import('path')
+        expect(ctorArgs?.tessdataPath).toBe(path.join('/mock/resources', 'tessdata'))
       } finally {
         Object.defineProperty(app, 'isPackaged', { value: origIsPackaged, configurable: true })
         Object.defineProperty(process, 'resourcesPath', {
@@ -538,7 +546,9 @@ describe('LiteParseConverter', () => {
       const { LiteParse } = await import('@llamaindex/liteparse')
       const ctorArgs = vi.mocked(LiteParse).mock.calls.at(-1)?.[0]
       expect(ctorArgs?.tessdataPath).toContain('tessdata')
-      expect(ctorArgs?.tessdataPath).toContain('/mock/app/path')
+      // On Windows, path.join converts to backslashes; check platform-normalized segment
+      const path = await import('path')
+      expect(ctorArgs?.tessdataPath).toContain(path.normalize('/mock/app/path'))
     })
 
     it('should not set tessdataPath when app throws', async () => {
