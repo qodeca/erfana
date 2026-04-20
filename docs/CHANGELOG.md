@@ -15,6 +15,7 @@ Phase 0 (unblock Windows dev loop) and Phase 1 (terminal parity) of the Windows 
 - **`app.setJumpList` mock + SearchBar focus-trap fix** (Phase 0, #156, #153).
 - **Terminal parity** (Phase 1, #154) — cmd.exe `@echo off` bootstrap; PowerShell `Set-Location -LiteralPath`; `resolveWindowsShell()` fallback chain; cwd validation deny-list with `emit('error')` contract; `WindowsBootstrapBuilder` strategy in `WindowsTerminalBootstrap.ts`. 68+ tests.
 - **NSIS installer** — `npm run build:win` produces a fused, signtool-signed NSIS installer (316 MB). Requires Developer Mode on build host.
+- **CameraDialog timer cleanup** (#159) — shutter-animation `setTimeout` had no cleanup; fired against a torn-down React tree during vitest teardown → `ReferenceError` and exit-1 on macOS. Fixed by tracking timer id in a ref and clearing on unmount.
 
 Known gaps (deferred to Phases 2–6): screenshots, local Whisper, auto-updater URL, code signing, git allowlist, LibreOffice Windows detection, reserved filename guard, long-path activation.
 

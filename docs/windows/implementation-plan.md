@@ -6,44 +6,74 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 ---
 
-## Status snapshot (last updated 2026-04-20, v0.9.2 base)
+## Status snapshot (last updated 2026-04-20 evening, v0.9.2 base)
 
-**Branch:** `windows` (ahead of `develop`). All Phase 0–1 work merged, pushed to `origin/windows`. Develop merged in at `db0dc5e` brings in the v0.9.2 cppgc-crash fix as a base. **Phase 0 closed (#153) after macOS regression verification on 2026-04-20.**
+**Branch:** `windows` at `ca38d44`, synced with `origin/windows`. 24 commits ahead of `origin/develop`. Working tree clean. **Phase 0 closed (#153) after macOS regression verification.**
 
 **Recent commits on `windows` (newest → oldest):**
 
-| Commit | Description | Issue / version |
+| Commit | Description | Issue |
 |---|---|---|
-| `47c2e27 / 23fb537` | Fix hardcoded Unix paths in `git-status-cache.test.ts` after v0.9.2 merge + doc sync | #153 follow-up |
+| `ca38d44 / 6b59013` | fix: clear CameraDialog shutter timer on unmount | **#159 CLOSED** |
+| `abc6ea8` | docs: close Phase 0 after macOS verification, link #159 | #153 closed |
+| `47c2e27 / 23fb537` | test: fix hardcoded Unix paths in `git-status-cache.test.ts` after v0.9.2 merge | #153 follow-up |
 | `db0dc5e` | Merge develop (v0.9.2 cppgc fix) into windows | v0.9.2 |
-| `9edb243` | Merge: docs propagation — terminal bootstrap-pattern rewrite, api-services Windows notes, CHANGELOG entry | — |
-| `7da0979 / d48c452` | Merge: comprehensive Windows status + multi-session cross-platform workflow docs | — |
-| `370dc19 / c5e5d61` | Merge: SearchBar focus-trap fix (`KeyboardEvent` dispatch) | #153 |
-| `3196314 / 75877a8` | Merge: test path portability (`path.join(os.tmpdir(), ...)` across 24 files) | #157 |
-| `ebc3088 / 54e8300` | Merge: `app.setJumpList` mock | #156 |
-| `1bcedde / c5ffad8` | Merge: terminal parity + `WindowsBootstrapBuilder` strategy extraction | #154 |
-| `c41303c / 7ce7fd6 / 00ee44a` | Round-by-round fixes on terminal parity | #154 |
-| `1f0ae81` | chore(windows): portable `test:cov` + `prebuild` scripts, prerequisites doc | #153 |
+| `9edb243 / e21f625` | Docs propagation — terminal bootstrap, api-services, CHANGELOG | — |
+| `7da0979 / d48c452` | Multi-session cross-platform workflow docs | — |
+| `370dc19 / c5e5d61` | SearchBar focus-trap fix (`KeyboardEvent` dispatch) | #153 |
+| `3196314 / 75877a8` | Test path portability (24 files) | **#157 CLOSED** |
+| `ebc3088 / 54e8300` | `app.setJumpList` mock | **#156 CLOSED** |
+| `1bcedde / c5ffad8` | Terminal parity + `WindowsBootstrapBuilder` strategy | **#154 CLOSED** |
+| `1f0ae81` | Portable `test:cov` + `prebuild` scripts, prerequisites doc | #153 |
 | `d7d291d / 0888d0c` | Windows enablement roadmap docs | — |
 
 **Version base:** `0.9.2` (from the develop merge). Windows work will ship in `0.9.3+` or `0.10.0` when `windows` → `develop` merge lands.
 
-**Verification on Windows host (after v0.9.2 merge, 2026-04-20):**
+**Closed this session (2026-04-20):** #153 (Phase 0), #156 (setJumpList), #157 (test portability), #159 (CameraDialog timer).
+
+**Verification on Windows host (after CameraDialog fix, 2026-04-20 evening):**
 
 - `npm run test:main` → **241 files pass / 7437 tests pass / 89 skipped / 0 failures**
-- `npm run build:win` → **NSIS installer** produced successfully (requires Developer Mode enabled); all Electron security fuses applied; signtool signed
-- `npm run test:cov` → tests pass; v8 coverage aggregator still hits the ENOENT race on Windows NTFS → tracked in [#158](https://github.com/qodeca/erfana/issues/158)
-- **Post-merge fix applied**: `src/main/services/workers/git-status-cache.test.ts` (landed in v0.9.2) used hardcoded `/test/project`, `/my/repo`, etc. — same class of bug as #157. Fixed in the v0.9.2-merge follow-up commit using `path.join(os.tmpdir(), ...)` constants. 11/11 tests now green on Windows. Demonstrates the contributor-expectation in `docs/build/windows.md` (run `test:main` locally before merging) is warranted until Phase 6 CI guard lands.
+- `npm run build:win` → NSIS installer produced successfully (requires Developer Mode); all Electron security fuses applied; signtool signed
+- `npm run test:cov` → tests pass; wrapper still exits 1 on Windows due to v8 coverage provider race — now confirmed to be the **only** remaining blocker for clean `test:cov` on Windows (#159 CameraDialog fix eliminated the macOS exit-1 cause; Windows exit-1 is purely #158). Confirmed by: `npx vitest --run --config vitest.main.ts --coverage` standalone exits 0.
 
 **Verification on macOS host (Phase 0 AC #4, 2026-04-20):**
 
-- `npm run test:cov` → **7532/7532 tests pass, 0 failures** across all three workspace projects (main, preload, renderer). Duration 32.75s. No regressions from #157 test portability changes.
-- `npm run build:mac` → both architectures produced cleanly: `erfana-0.9.2-x64.dmg` (327 MB) and `erfana-0.9.2-arm64.dmg` (320 MB). All Electron security fuses applied; ad-hoc signed; notarize correctly skipped.
-- **Test flake discovered during run** (non-blocking): `CameraDialog.test.tsx` triggers an unhandled `ReferenceError: window is not defined` after jsdom teardown because a 200 ms shutter timer in `CameraDialog.tsx:146` has no cleanup. All tests still pass, but vitest exits code 1. Pre-existing (landed in `fdfa238`), not a Phase 0 regression. Tracked in [#159](https://github.com/qodeca/erfana/issues/159).
+- `npm run test:cov` → **7532/7532 tests pass, 0 failures** across main / preload / renderer. Duration 32.75s. No regressions from #157 test portability changes.
+- `npm run build:mac` → both architectures: `erfana-0.9.2-x64.dmg` (327 MB) + `erfana-0.9.2-arm64.dmg` (320 MB). Fuses + ad-hoc signed.
 
-**Pending on Windows host (not blocking):**
+## Next session — pick up here
 
-- Phase 1 manual UAT for `#154` (4-item checklist, see "Phase 1" below)
+**Nothing is in flight.** Working tree clean on both hosts. Pick any of the following:
+
+### Option A — Phase 1 manual UAT on Windows (fastest path to merging windows → develop)
+
+4-item terminal checklist in "Phase 1" section below. Required before merging `windows` → `develop` per readiness gate. Needs a real Windows host (you, not Claude) to validate:
+- Project at `C:\Users\<me>\Dev\$weird-name` → PowerShell opens clean
+- Same project with cmd.exe forced → opens clean, handshake completes
+- `ping -t 8.8.8.8` + `Ctrl+C` in both shells
+- Path containing `&` → app surfaces clear error
+
+### Option B — Start Phase 2 (highest user-impact remaining work)
+
+File #155a–d sub-issues per the split plan (see Phase 2 section), then work in priority order:
+1. **#155b** (git allowlist for `C:\Program Files\Git\*`) — smallest, unblocks stock-Windows tree indicators
+2. **#155c** (reserved filename guard: `CON.md`, `PRN.md`, etc.) — highest user-facing impact
+3. **#155a** (LibreOffice Windows detection) — import polish
+4. **#155d** (activate `isWindowsLongPath` OR delete as dead code)
+
+### Option C — Merge `windows` → `develop` now
+
+Per the readiness gate below, merging NOW means users get Phase 0–1 (dev loop, test portability, terminal parity, NSIS installer, CameraDialog fix) as part of the next release, but Phase 2 gaps remain (git status degraded, cryptic EINVAL on reserved filenames, DOCX import requires soffice in PATH). Recommend against — finish Phase 1 UAT + #155b + #155c first per the gate.
+
+### Option D — Fix #158 v8 coverage race
+
+Switch vitest coverage provider to Istanbul OR reduce parallelism on Windows (`poolOptions.threads.maxThreads: 1` gated on `process.platform === 'win32'`). See #158 for 4 proposed fixes. Closes the last piece of "test:cov works green on Windows".
+
+### Open Windows-tagged issues
+
+- [#155](https://github.com/qodeca/erfana/issues/155) — Phase 2 umbrella (needs splitting into #155a–d)
+- [#158](https://github.com/qodeca/erfana/issues/158) — v8 coverage race, deferred to Phase 6
 
 ---
 
