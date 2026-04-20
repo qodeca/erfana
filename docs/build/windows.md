@@ -147,6 +147,18 @@ This produces an NSIS installer in `release/{version}/`. The build runs `prebuil
 
 ---
 
+## Contributor expectations (pre-CI)
+
+Windows-targeted CI is deferred to Phase 6. Until it lands, **contributors on Windows are responsible for running the main-process tests locally before merging any PR that touches `src/main/` or test configuration**:
+
+```bash
+npm run test:main
+```
+
+This is the same job the future CI guard will run. Catches the common regression class of hardcoded Unix paths (`/tmp/...`, `/path/to/...`) that the project's `PATH_TRAVERSAL` validator rejects on Windows. See [#157](https://github.com/qodeca/erfana/issues/157) for the original incident.
+
+---
+
 ## See also
 
 - [Build README](README.md) — toolchain overview, macOS instructions
