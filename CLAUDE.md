@@ -88,7 +88,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Technical Debt](docs/technical-debt.md) — Known debt items and improvement opportunities
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
 - [Large-Project Performance](docs/large-project-performance-plan.md) — Implementation plan for #146–#151 (EMFILE, worker thread, diagnostics)
-- [Windows enablement](docs/windows/README.md) — Gap analysis and phased roadmap for Windows parity (planning; not yet implemented)
+- [Windows enablement](docs/windows/README.md) — Gap analysis and phased roadmap for Windows parity. **Phase 0–1 landed on `windows` branch (2026-04-20)**: portable scripts, test path portability (#157), terminal parity with cmd.exe + PowerShell (#154), `setJumpList` mock (#156). NSIS installer builds. Phases 2–6 pending: git allowlist, filename guard, LibreOffice detection, screenshots, local Whisper, auto-updater, code signing, polish. See [`docs/windows/implementation-plan.md`](docs/windows/implementation-plan.md) for canonical status and multi-session cross-platform workflow.
 - [Source Grounding](docs/future/source-grounding/README.md) — NotebookLM-style grounding research, gap analysis, strategy, implementation roadmap
 - [Roadmap](ROADMAP.md) — Implementation order for active specs with dependency analysis
 
