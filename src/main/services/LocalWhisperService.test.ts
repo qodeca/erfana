@@ -10,6 +10,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import os from 'os'
 import type { ChildProcess } from 'child_process'
 
 // =============================================================================
@@ -42,9 +43,10 @@ vi.mock('fs/promises', () => ({
 // Mock os
 // =============================================================================
 
-vi.mock('os', () => ({
-  tmpdir: () => '/tmp'
-}))
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>()
+  return { ...actual }
+})
 
 // =============================================================================
 // Mock crypto
@@ -895,7 +897,7 @@ describe('LocalWhisperService', () => {
 
       // Temp wav file should have been cleaned up
       expect(mockUnlink).toHaveBeenCalledWith(
-        expect.stringMatching(/\/tmp\/erfana-whisper-.+\.wav/)
+        expect.stringMatching(/erfana-whisper-.+\.wav/)
       )
     })
   })
@@ -1067,7 +1069,7 @@ describe('LocalWhisperService', () => {
       })
 
       expect(mockUnlink).toHaveBeenCalledWith(
-        expect.stringMatching(/\/tmp\/erfana-whisper-.+\.wav/)
+        expect.stringMatching(/erfana-whisper-.+\.wav/)
       )
     })
 
@@ -1091,7 +1093,7 @@ describe('LocalWhisperService', () => {
       expect(result.success).toBe(false)
       // Temp wav should still be cleaned up
       expect(mockUnlink).toHaveBeenCalledWith(
-        expect.stringMatching(/\/tmp\/erfana-whisper-.+\.wav/)
+        expect.stringMatching(/erfana-whisper-.+\.wav/)
       )
     })
 
@@ -1294,7 +1296,7 @@ describe('LocalWhisperService', () => {
         unlink: (...args: unknown[]) => mockUnlink(...args),
         stat: (...args: unknown[]) => mockStat(...args)
       }))
-      vi.doMock('os', () => ({ tmpdir: () => '/tmp' }))
+      vi.doMock('os', () => ({ tmpdir: () => os.tmpdir() }))
       vi.doMock('crypto', () => ({ randomUUID: () => `test-uuid-${uuidCounter++}` }))
       vi.doMock('./LoggingService', () => ({ logger: mockLogger }))
       vi.doMock('./WhisperModelManager', () => ({

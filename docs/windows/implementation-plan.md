@@ -26,6 +26,14 @@ Changes:
    - Long path support: `git config --global core.longpaths true` + Windows "Enable Win32 long paths" group policy.
    - Note: Git Bash is fine for running scripts, but PowerShell should also work after Phase 0.
 
+3. **Fix hardcoded Unix test paths** (fixes B4 cascade) — [#157](https://github.com/qodeca/erfana/issues/157) — **landed**
+   - ~20 test files used hardcoded Unix-style paths (`/path/to/doc.pdf`, `/tmp/...`) that the project's `PATH_TRAVERSAL` validator rejects on Windows.
+   - Replaced with `path.join(os.tmpdir(), ...)` inline. All changes test-only – no production code modified.
+   - Also fixed: `os.tmpdir()` mock passthrough (real tmpdir instead of `/tmp`), platform-aware regex assertions, NTFS-slow test timeout (`FileService.copyItem`), import ordering.
+   - `pathSecurity.test.ts` already had `describe.skipIf(process.platform === 'win32')` – no changes needed.
+4. **Stub `app.setJumpList`** (fixes Windows-only `TypeError`) — [#156](https://github.com/qodeca/erfana/issues/156) — **landed**
+   - `index.test.ts` mockApp lacked `setJumpList`, causing 1 file / 21 test failures on Windows hosts where `process.platform === 'win32'` branch is exercised.
+
 **Manual validation:** clean Windows 11 box → clone → `npm install` → `npm run dev` launches. `npm run test:cov` completes. `npm run build:win` produces an NSIS installer.
 
 ---

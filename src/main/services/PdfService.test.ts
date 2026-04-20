@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import path from 'path'
+import os from 'os'
 import { ErrorCode } from '../../shared/errors'
 import { PDF_EXPORT } from '../../shared/constants'
+
+// Platform-safe test paths
+const MOCK_TMP = os.tmpdir()
+const MOCK_TMPDIR = path.join(MOCK_TMP, 'erfana-pdf-xyz123')
+const MOCK_EXPORT_HTML = path.join(MOCK_TMPDIR, 'export.html')
+const MOCK_PDF_PATH = path.join(MOCK_TMP, 'test.pdf')
 
 // Mock electron
 const mockPrintToPdf = vi.fn()
@@ -47,9 +55,9 @@ vi.mock('fs/promises', () => ({
 /**
  * Setup mocks for a successful PDF export
  */
-function setupSuccessfulExport(filePath = '/tmp/test.pdf'): void {
+function setupSuccessfulExport(filePath = MOCK_PDF_PATH): void {
   mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath })
-  mockMkdtemp.mockResolvedValue('/tmp/erfana-pdf-xyz123')
+  mockMkdtemp.mockResolvedValue(MOCK_TMPDIR)
   mockWriteFile.mockResolvedValue(undefined)
   mockLoadFile.mockResolvedValue(undefined)
   mockExecuteJavaScript.mockResolvedValue(true) // Content ready
@@ -160,12 +168,12 @@ describe('PdfService', () => {
       // Should create temp directory and write HTML file
       expect(mockMkdtemp).toHaveBeenCalled()
       expect(mockWriteFile).toHaveBeenCalledWith(
-        '/tmp/erfana-pdf-xyz123/export.html',
+        MOCK_EXPORT_HTML,
         expect.stringContaining('<p>Hello World</p>'),
         'utf-8'
       )
       // Should load from temp file (not data URL)
-      expect(mockLoadFile).toHaveBeenCalledWith('/tmp/erfana-pdf-xyz123/export.html')
+      expect(mockLoadFile).toHaveBeenCalledWith(MOCK_EXPORT_HTML)
     })
 
     it('should call printToPDF with A4 page size', async () => {
@@ -188,16 +196,16 @@ describe('PdfService', () => {
 
       await pdfService.exportToPdf('<p>Test</p>', 'test')
 
-      expect(mockWriteFile).toHaveBeenCalledWith('/tmp/test.pdf', pdfBuffer)
+      expect(mockWriteFile).toHaveBeenCalledWith(MOCK_PDF_PATH, pdfBuffer)
     })
 
     it('should return success with file path on successful export', async () => {
-      setupSuccessfulExport('/tmp/exported.pdf')
+      setupSuccessfulExport(path.join(MOCK_TMP, 'exported.pdf'))
 
       const result = await pdfService.exportToPdf('<p>Test</p>', 'test')
 
       expect(result.success).toBe(true)
-      expect(result.filePath).toBe('/tmp/exported.pdf')
+      expect(result.filePath).toBe(path.join(MOCK_TMP, 'exported.pdf'))
     })
 
     it('should close hidden window after successful export', async () => {
@@ -209,8 +217,8 @@ describe('PdfService', () => {
     })
 
     it('should close hidden window on error', async () => {
-      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-      mockMkdtemp.mockResolvedValue('/tmp/erfana-pdf-xyz123')
+      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: MOCK_PDF_PATH })
+      mockMkdtemp.mockResolvedValue(MOCK_TMPDIR)
       mockWriteFile.mockResolvedValue(undefined)
       mockLoadFile.mockRejectedValue(new Error('Load failed'))
       mockIsDestroyed.mockReturnValue(false)
@@ -223,8 +231,8 @@ describe('PdfService', () => {
     })
 
     it('should not close window if already destroyed', async () => {
-      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-      mockMkdtemp.mockResolvedValue('/tmp/erfana-pdf-xyz123')
+      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: MOCK_PDF_PATH })
+      mockMkdtemp.mockResolvedValue(MOCK_TMPDIR)
       mockWriteFile.mockResolvedValue(undefined)
       mockLoadFile.mockRejectedValue(new Error('Load failed'))
       mockIsDestroyed.mockReturnValue(true)
@@ -237,8 +245,8 @@ describe('PdfService', () => {
     })
 
     it('should return error on printToPDF failure', async () => {
-      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-      mockMkdtemp.mockResolvedValue('/tmp/erfana-pdf-xyz123')
+      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: MOCK_PDF_PATH })
+      mockMkdtemp.mockResolvedValue(MOCK_TMPDIR)
       mockWriteFile.mockResolvedValue(undefined)
       mockLoadFile.mockResolvedValue(undefined)
       mockExecuteJavaScript.mockResolvedValue(true)
@@ -254,8 +262,8 @@ describe('PdfService', () => {
     })
 
     it('should return error on file write failure', async () => {
-      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-      mockMkdtemp.mockResolvedValue('/tmp/erfana-pdf-xyz123')
+      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: MOCK_PDF_PATH })
+      mockMkdtemp.mockResolvedValue(MOCK_TMPDIR)
       // First writeFile call for temp HTML succeeds, second for PDF fails
       mockWriteFile.mockResolvedValueOnce(undefined)
       mockLoadFile.mockResolvedValue(undefined)
@@ -273,21 +281,21 @@ describe('PdfService', () => {
     })
 
     it('should append .pdf extension if not present', async () => {
-      setupSuccessfulExport('/tmp/document')
+      setupSuccessfulExport(path.join(MOCK_TMP, 'document'))
 
       const result = await pdfService.exportToPdf('<p>Test</p>', 'test')
 
       expect(result.success).toBe(true)
-      expect(result.filePath).toBe('/tmp/document.pdf')
-      expect(mockWriteFile).toHaveBeenCalledWith('/tmp/document.pdf', expect.any(Buffer))
+      expect(result.filePath).toBe(path.join(MOCK_TMP, 'document.pdf'))
+      expect(mockWriteFile).toHaveBeenCalledWith(path.join(MOCK_TMP, 'document.pdf'), expect.any(Buffer))
     })
 
     it('should not duplicate .pdf extension', async () => {
-      setupSuccessfulExport('/tmp/document.pdf')
+      setupSuccessfulExport(path.join(MOCK_TMP, 'document.pdf'))
 
       const result = await pdfService.exportToPdf('<p>Test</p>', 'test')
 
-      expect(result.filePath).toBe('/tmp/document.pdf')
+      expect(result.filePath).toBe(path.join(MOCK_TMP, 'document.pdf'))
     })
 
     it('should suggest correct filename in save dialog', async () => {
@@ -304,8 +312,8 @@ describe('PdfService', () => {
     })
 
     it('should wait for content ready before generating PDF', async () => {
-      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-      mockMkdtemp.mockResolvedValue('/tmp/erfana-pdf-xyz123')
+      mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: MOCK_PDF_PATH })
+      mockMkdtemp.mockResolvedValue(MOCK_TMPDIR)
       mockWriteFile.mockResolvedValue(undefined)
       mockLoadFile.mockResolvedValue(undefined)
 
@@ -392,8 +400,8 @@ describe('PdfService', () => {
 
     describe('empty PDF buffer validation', () => {
       it('should reject empty PDF buffer', async () => {
-        mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-        mockMkdtemp.mockResolvedValue('/tmp/erfana-pdf-xyz123')
+        mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: MOCK_PDF_PATH })
+        mockMkdtemp.mockResolvedValue(MOCK_TMPDIR)
         mockWriteFile.mockResolvedValue(undefined)
         mockLoadFile.mockResolvedValue(undefined)
         mockExecuteJavaScript.mockResolvedValue(true)
@@ -431,13 +439,13 @@ describe('PdfService', () => {
         await pdfService.exportToPdf('<p>Test</p>', 'test')
 
         // Temp file and directory should be cleaned up
-        expect(mockUnlink).toHaveBeenCalledWith('/tmp/erfana-pdf-xyz123/export.html')
-        expect(mockRmdir).toHaveBeenCalledWith('/tmp/erfana-pdf-xyz123')
+        expect(mockUnlink).toHaveBeenCalledWith(MOCK_EXPORT_HTML)
+        expect(mockRmdir).toHaveBeenCalledWith(MOCK_TMPDIR)
       })
 
       it('should clean up temp files even on error', async () => {
-        mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: '/tmp/test.pdf' })
-        mockMkdtemp.mockResolvedValue('/tmp/erfana-pdf-xyz123')
+        mockShowSaveDialog.mockResolvedValue({ canceled: false, filePath: MOCK_PDF_PATH })
+        mockMkdtemp.mockResolvedValue(MOCK_TMPDIR)
         mockWriteFile.mockResolvedValue(undefined)
         mockLoadFile.mockRejectedValue(new Error('Load failed'))
         mockUnlink.mockResolvedValue(undefined)
@@ -446,8 +454,8 @@ describe('PdfService', () => {
         await pdfService.exportToPdf('<p>Test</p>', 'test')
 
         // Temp file and directory should be cleaned up even on error
-        expect(mockUnlink).toHaveBeenCalledWith('/tmp/erfana-pdf-xyz123/export.html')
-        expect(mockRmdir).toHaveBeenCalledWith('/tmp/erfana-pdf-xyz123')
+        expect(mockUnlink).toHaveBeenCalledWith(MOCK_EXPORT_HTML)
+        expect(mockRmdir).toHaveBeenCalledWith(MOCK_TMPDIR)
       })
     })
   })

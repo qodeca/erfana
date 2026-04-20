@@ -8,7 +8,18 @@
  */
 
 import { vi } from 'vitest'
+import * as path from 'path'
+import * as os from 'os'
 import type { IpcMainInvokeEvent } from 'electron'
+
+// Platform-safe absolute paths for tests. On Windows, hardcoded Unix paths
+// like `/project` fail path.isAbsolute() and trigger PATH_TRAVERSAL errors
+// before the test logic runs. Use OS tmpdir-based paths instead. See #157.
+export const TEST_PROJECT_PATH = path.join(os.tmpdir(), 'erfana-test', 'project')
+export const TEST_IMPORT_DIR = path.join(TEST_PROJECT_PATH, 'import')
+export const TEST_DOC_PATH = path.join(os.tmpdir(), 'erfana-test', 'path', 'to', 'doc.pdf')
+export const TEST_DOC_OTHER_PATH = path.join(os.tmpdir(), 'erfana-test', 'path', 'to', 'other.pdf')
+export const TEST_DOC_XYZ_PATH = path.join(os.tmpdir(), 'erfana-test', 'path', 'to', 'doc.xyz')
 
 // =============================================================================
 // Mock variable declarations
@@ -37,7 +48,7 @@ export const mockCp = vi.fn()
 export const mockChangeExtension = vi.fn((name: string) => name.replace(/\.[^.]+$/, '.md'))
 export const mockSanitizeFileName = vi.fn((name: string) => name)
 export const mockFindAvailableFileName = vi.fn((_dir: string, name: string) =>
-  `/project/import/${name}`
+  path.join(TEST_IMPORT_DIR, name)
 )
 
 export const mockIsConfigurableConverter = vi.fn()
@@ -66,7 +77,7 @@ export function createMockEvent(overrides?: { isDestroyed?: () => boolean }): Ip
 }
 
 /** Create a minimal valid import request */
-export function createValidRequest(filePath = '/path/to/doc.pdf'): { filePath: string } {
+export function createValidRequest(filePath = TEST_DOC_PATH): { filePath: string } {
   return { filePath }
 }
 
@@ -74,7 +85,7 @@ export function createValidRequest(filePath = '/path/to/doc.pdf'): { filePath: s
 export function resetMocks(): void {
   vi.clearAllMocks()
 
-  mockGetProjectPath.mockReturnValue('/project')
+  mockGetProjectPath.mockReturnValue(TEST_PROJECT_PATH)
   mockWriteFile.mockResolvedValue(undefined)
   mockMkdir.mockResolvedValue(undefined)
   mockRm.mockResolvedValue(undefined)
@@ -90,6 +101,6 @@ export function resetMocks(): void {
   mockChangeExtension.mockImplementation((name: string) => name.replace(/\.[^.]+$/, '.md'))
   mockSanitizeFileName.mockImplementation((name: string) => name)
   mockFindAvailableFileName.mockImplementation((_dir: string, name: string) =>
-    `/project/import/${name}`
+    path.join(TEST_IMPORT_DIR, name)
   )
 }
