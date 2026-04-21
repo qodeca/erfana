@@ -79,9 +79,9 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 - [HTML Rendering](./rendering/README.md) - Markdown to HTML conversion architecture
 
 ### Architecture Reviews
-- [Code Review – Drag-Drop](./architecture/code-review-drag-drop-2025-01.md) - Drag-drop refactoring review
-- [Markdown Editor Panel Refactoring](./architecture/reviews/markdown-editor-panel-refactoring-review.md) - Editor panel architecture review
-- [Terminal Panel Architecture](./architecture/reviews/terminal-panel-architecture-review.md) - Terminal panel design review
+- [Code Review – Drag-Drop](./architecture-reviews/code-review-drag-drop-2025-01.md) - Drag-drop refactoring review
+- [Markdown Editor Panel Refactoring](./architecture-reviews/reviews/markdown-editor-panel-refactoring-review.md) - Editor panel architecture review
+- [Terminal Panel Architecture](./architecture-reviews/reviews/terminal-panel-architecture-review.md) - Terminal panel design review
 
 ### Future Features (Planned)
 - [Graph Engine](./future/graph-engine.md) – SQLite + vec + FTS5 knowledge graph (not yet implemented)

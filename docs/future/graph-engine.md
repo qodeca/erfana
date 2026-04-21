@@ -1,13 +1,10 @@
 # Erfana Graph Engine (SQLite-Based)
 
-> ⚠️ **WORK IN PROGRESS - NOT READY FOR DEVELOPMENT**
+> 📐 **This is design exploration, not the live spec.** The canonical what-we're-building lives in specs [#004 Graph foundation](../../specs/spec-t4-004-graph-foundation/), [#005 Vector search](../../specs/spec-t3-005-vector-search/), [#006 Knowledge graph](../../specs/spec-t3-006-knowledge-graph/), [#007 Temporal queries](../../specs/spec-t3-007-temporal-queries/), [#008 Graph polish](../../specs/spec-t3-008-graph-polish/). This folder contains design notes, wireframes, and implementation exploration that informed those specs. **Supersession policy**: when a spec closes, the corresponding sections here are archived.
 >
-> This documentation is currently under active development and review. The Graph Engine specification, architecture, and implementation details are subject to significant changes. **DO NOT start implementation work based on these documents.**
->
-> **Status**: Draft specification being refined
-> **Expected Ready**: TBD pending architectural review and wireframe finalization
+> **Do not start implementation from this folder.** Read the specs' `requirements/02-requirements.md` for acceptance-bearing requirements.
 
-**Status:** Specification (October 2025)
+**Status:** Design exploration (October 2025). Requirements authoritative in specs #004–#008.
 **Research Validated:** ✅ Extensively validated against 2025 production practices
 
 This document provides an overview of the Erfana Graph Engine—a local-first, embedded knowledge graph and hybrid search system built on SQLite. The system combines BM25 keyword search (FTS5), vector similarity (sqlite-vec), and lightweight graph capabilities to power semantic retrieval, backlinks, and temporal queries within the ERFANA markdown IDE.

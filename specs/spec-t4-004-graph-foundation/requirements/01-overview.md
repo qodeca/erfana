@@ -1,5 +1,7 @@
 # Overview
 
+> 📐 **Design context**: historical design exploration lives at [`docs/future/graph-engine/`](../../../docs/future/graph-engine/) — data model, wireframes, ONNX worker pipelines, performance notes. This spec is the authoritative requirement source; the design folder is read-only reference.
+
 ## Summary
 
 This specification defines the Graph Engine Foundation for Erfana, delivering SQLite-based text indexing with FTS5 full-text search, BM25 keyword ranking, event-driven integration with the file watcher system, four UI components for content discovery, and an MCP server for Claude Code integration. This represents Milestone 1 (M1) of the graph engine roadmap, establishing the core infrastructure upon which vector search and knowledge graph features will be built.

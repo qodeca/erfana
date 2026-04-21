@@ -411,7 +411,7 @@ window.api.terminal = {
 - `types.ts` - TerminalState, ScreenshotCaptureMode types
 - `terminalPanel.logic.ts` - Pure functions and constants
 
-See [Terminal Architecture Review](../architecture/reviews/terminal-panel-architecture-review.md) for detailed refactoring documentation.
+See [Terminal Architecture Review](../architecture-reviews/reviews/terminal-panel-architecture-review.md) for detailed refactoring documentation.
 
 **Key Features**:
 - Visibility check before xterm initialization (prevents rendering issues)

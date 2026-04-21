@@ -1,5 +1,7 @@
 # Architecture
 
+> Live architecture overview. For past refactoring reviews and architectural retrospectives, see [`docs/architecture-reviews/`](./architecture-reviews/).
+
 ## Three-Process Model
 
 1. **Main Process** (`src/main/`): Node.js environment
