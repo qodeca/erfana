@@ -8,14 +8,21 @@ One-page cheat sheet for common tasks.
 # Development
 npm run dev              # Start dev server
 npm run build            # Production build
-npm run build:mac        # macOS package
+npm run build:mac        # macOS package (.dmg)
+npm run build:win        # Windows package (NSIS .exe; needs Developer Mode)
+npm run build:linux      # Linux package
 
 # Quality
-npm run typecheck        # Type checking
+npm run typecheck        # Type checking (node + web)
 npm run lint             # Linting
-npm run test             # All tests
-npm run test:cov         # Coverage report
-npm run test:e2e         # E2E tests
+npm run test             # All tests (vitest workspace)
+npm run test:main        # Main-process tests only (~243 files)
+npm run test:renderer    # Renderer tests (workspace; uses jsdom)
+npm run test:preload     # Preload tests
+npm run test:cov         # Coverage report (all 3 projects)
+npm run test:e2e         # E2E tests (Playwright + Electron)
+npm run test:e2e:visual            # Visual regression baselines
+npm run test:e2e:update-screenshots # Refresh visual baselines
 ```
 
 ## Keyboard Shortcuts

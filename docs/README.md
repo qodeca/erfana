@@ -51,6 +51,7 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 - [Windows Enablement](./windows/README.md) - Phases 0–2 closed; Phases 3–6 tracked under [#164–#167](https://github.com/qodeca/erfana/issues?q=label%3Awindows)
   - [Implementation Plan](./windows/implementation-plan.md) - Canonical phased roadmap + status snapshot
   - [Gap Analysis](./windows/gap-analysis.md) - Feature-parity baseline (P0/P1/P2 with file:line refs)
+  - [Contributing](./windows/contributing.md) - Branch strategy, commit scope, test expectations, reviewer checklist
   - [Deferred Work](./windows/deferred-work.md) - 8 deferred items D1–D8 from Phase 2 review (tracked in [#168](https://github.com/qodeca/erfana/issues/168))
   - [Phase 2 Closure](./windows/phase2-closure.md) - 7-stream closure plan (write-once-archive)
   - [Build Setup (Windows)](./build/windows.md) - Node 24, Python 3.12, VS 2022, Developer Mode, long paths
