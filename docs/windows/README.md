@@ -29,7 +29,7 @@ The goal is **full Windows parity** — every feature that works on macOS must w
 |-------|-------|-------|--------|
 | **Phase 0** — Unblock Windows dev loop | Portable scripts, prerequisites docs, test path portability, setJumpList mock, SearchBar fix, NSIS smoke | [#153](https://github.com/qodeca/erfana/issues/153) | ✅ **Closed 2026-04-20** — all 5 ACs met; macOS regression verified |
 | **Phase 1** — Terminal parity | cmd.exe bootstrap, PowerShell `-LiteralPath`, shell fallback chain, cwd validation, `WindowsBootstrapBuilder` strategy | [#154](https://github.com/qodeca/erfana/issues/154) | **Landed**; manual UAT pending on Windows host |
-| Phase 2 — File ops, deps, filenames, long paths | Git allowlist, reserved filename guard, LibreOffice detection, long-path activation | [#155](https://github.com/qodeca/erfana/issues/155) (umbrella) | **Open** — split into #155a–d sub-issues per 2026-04-20 plan |
+| Phase 2 — File ops, deps, filenames, long paths | Git allowlist, reserved filename guard, LibreOffice detection, long-path activation | [#155](https://github.com/qodeca/erfana/issues/155) (umbrella) | **3 of 4 sub-issues landed 2026-04-21** — #160, #161, #162 closed; #163 deferred to Phase 6 |
 | Phase 3 — Screenshot parity | `desktopCapturer` strategy + area-selection overlay | _not yet filed_ | Pending |
 | Phase 4 — Local Whisper parity | `getArchSuffix()` cross-platform, Windows binary layout | _not yet filed_ | Pending |
 | Phase 5 — Distribution hygiene | Auto-update URL, code signing, NSIS tweaks | _not yet filed_ | Pending |
@@ -42,6 +42,9 @@ The goal is **full Windows parity** — every feature that works on macOS must w
 | [#156](https://github.com/qodeca/erfana/issues/156) | `app.setJumpList` mock missing in `index.test.ts` | Landed in `54e8300` (`ebc3088` merge) |
 | [#157](https://github.com/qodeca/erfana/issues/157) | Hardcoded Unix paths in 20+ main-process tests | Landed in `75877a8` (`3196314` merge) |
 | [#159](https://github.com/qodeca/erfana/issues/159) | `CameraDialog.test.tsx` teardown timer → vitest `ReferenceError` | Landed in `6b59013` (`ca38d44` merge) |
+| [#160](https://github.com/qodeca/erfana/issues/160) | Windows git allowlist + F_OK + `git --version` liveness probe | Landed in `5e86349` |
+| [#161](https://github.com/qodeca/erfana/issues/161) | Reserved-filename guard (Windows + cross-platform util) | Landed in `612192b` |
+| [#162](https://github.com/qodeca/erfana/issues/162) | LibreOffice Windows install-path detection | Landed in `13bd3b8` |
 
 ### Open issues (deferred to future phases)
 

@@ -6,14 +6,17 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 ---
 
-## Status snapshot (last updated 2026-04-20 evening, v0.9.2 base)
+## Status snapshot (last updated 2026-04-21, v0.9.2 base)
 
-**Branch:** `windows` at `ca38d44`, synced with `origin/windows`. 24 commits ahead of `origin/develop`. Working tree clean. **Phase 0 closed (#153) after macOS regression verification.**
+**Branch:** `windows`, synced with `origin/windows`. 28+ commits ahead of `origin/develop`. **Phase 0 closed (#153). Phase 2 sub-issues #160, #161, #162 landed (2026-04-21); #163 deferred decision recorded in code.**
 
 **Recent commits on `windows` (newest → oldest):**
 
 | Commit | Description | Issue |
 |---|---|---|
+| `13bd3b8` | feat(windows): detect LibreOffice at standard install paths | **#162 CLOSED** |
+| `612192b` | feat(windows): reserved-filename guard with cross-platform validation | **#161 CLOSED** |
+| `5e86349` | feat(windows): add Program Files entries to git allowlist + liveness probe | **#160 CLOSED** |
 | `ca38d44 / 6b59013` | fix: clear CameraDialog shutter timer on unmount | **#159 CLOSED** |
 | `abc6ea8` | docs: close Phase 0 after macOS verification, link #159 | #153 closed |
 | `47c2e27 / 23fb537` | test: fix hardcoded Unix paths in `git-status-cache.test.ts` after v0.9.2 merge | #153 follow-up |
@@ -29,7 +32,8 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 **Version base:** `0.9.2` (from the develop merge). Windows work will ship in `0.9.3+` or `0.10.0` when `windows` → `develop` merge lands.
 
-**Closed this session (2026-04-20):** #153 (Phase 0), #156 (setJumpList), #157 (test portability), #159 (CameraDialog timer).
+**Closed 2026-04-20:** #153 (Phase 0), #156 (setJumpList), #157 (test portability), #159 (CameraDialog timer).
+**Closed 2026-04-21:** #160 (git allowlist), #161 (filename guard), #162 (LibreOffice detection). **#163 (long-path activation): decision-deferred to Phase 6** with promotion criteria recorded inline at `PlatformConfig.ts:172`.
 
 **Verification on Windows host (after CameraDialog fix, 2026-04-20 evening):**
 

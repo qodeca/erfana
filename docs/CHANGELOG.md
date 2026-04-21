@@ -16,8 +16,13 @@ Phase 0 (unblock Windows dev loop) and Phase 1 (terminal parity) of the Windows 
 - **Terminal parity** (Phase 1, #154) — cmd.exe `@echo off` bootstrap; PowerShell `Set-Location -LiteralPath`; `resolveWindowsShell()` fallback chain; cwd validation deny-list with `emit('error')` contract; `WindowsBootstrapBuilder` strategy in `WindowsTerminalBootstrap.ts`. 68+ tests.
 - **NSIS installer** — `npm run build:win` produces a fused, signtool-signed NSIS installer (316 MB). Requires Developer Mode on build host.
 - **CameraDialog timer cleanup** (#159) — shutter-animation `setTimeout` had no cleanup; fired against a torn-down React tree during vitest teardown → `ReferenceError` and exit-1 on macOS. Fixed by tracking timer id in a ref and clearing on unmount.
+- **Phase 2 sub-issues #160, #161, #162 landed** (2026-04-21):
+  - **#160 git allowlist** — adds `C:\Program Files\Git\cmd|bin\git.exe`, x86 variants, Chocolatey, Scoop paths to the worker's git resolver. Fixes Windows `fs.access(X_OK)` existence-only degradation with a `git --version` liveness probe. Tree status indicators now work on stock Windows without manual PATH edits.
+  - **#161 reserved-filename guard** — extracts DocxService's filename sanitizer to a shared `validateFilename` util, adds Unicode bidi-override stripping (security), wires `assertValidUserFilename` into FileService create/rename and `deriveSafeFilename` into PdfService save paths. Friendly error toast `"CON.md" is not a valid filename — try "_CON.md"` instead of cryptic EINVAL.
+  - **#162 LibreOffice Windows detection** — DependencyDetector probes `C:\Program Files\LibreOffice\program\soffice.exe` (and `(x86)`) when `soffice` is not on PATH. DOCX import works on default Windows installs.
+  - **#163 long-path activation: deferred to Phase 6** with documented promotion criteria.
 
-Known gaps (deferred to Phases 2–6): screenshots, local Whisper, auto-updater URL, code signing, git allowlist, LibreOffice Windows detection, reserved filename guard, long-path activation.
+Known gaps (deferred to Phases 3–6): screenshots, local Whisper, auto-updater URL, code signing, long-path `\\?\` activation.
 
 ---
 
