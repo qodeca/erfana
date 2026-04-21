@@ -20,3 +20,18 @@ Object.defineProperty(window, 'electron', {
   },
 })
 
+// Surface intermittent unhandled rejections / uncaught exceptions that fire
+// AFTER tests complete (during vitest worker teardown). Without this, vitest
+// reports "Errors 1 error" with no stack trace — making the flake invisible.
+// Same class as #159 (CameraDialog timer firing post-teardown).
+process.on('unhandledRejection', (reason: unknown) => {
+  // eslint-disable-next-line no-console
+  console.error(
+    '[setupTests.renderer] UNHANDLED REJECTION:',
+    reason instanceof Error ? reason.stack ?? reason.message : String(reason),
+  )
+})
+process.on('uncaughtException', (err: Error) => {
+  // eslint-disable-next-line no-console
+  console.error('[setupTests.renderer] UNCAUGHT EXCEPTION:', err.stack ?? err.message)
+})
