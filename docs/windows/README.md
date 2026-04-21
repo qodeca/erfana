@@ -9,6 +9,22 @@ This folder tracks the work to bring Erfana to full Windows parity with macOS.
 3. **On Windows host**: ensure Developer Mode + long-paths enabled per [`docs/build/windows.md`](../build/windows.md) steps 4–5.
 4. **Check open issues**: `gh issue list --repo qodeca/erfana --label windows --state open`.
 
+## First commands per host
+
+```bash
+# Windows 11 host (PowerShell or Git Bash)
+npm install
+npm run test:main        # 243 files / 7733 tests baseline
+npm run dev              # smoke-test Electron + terminal
+
+# macOS host (regression check for cross-platform changes)
+npm install
+npm run test:cov         # all 3 projects with coverage
+npm run build:mac        # produces .dmg
+```
+
+See [`contributing.md`](contributing.md) for the full pre-PR test matrix.
+
 ## Context
 
 Erfana (v0.9.2, Electron 39) is macOS-first with partial Windows awareness. The codebase already had genuine Windows hooks in several places — `CmdOrCtrl` accelerators, case-insensitive path folding in `ProjectService.ts`, `where`/`which` switching in the git worker, PowerShell shell selection in `TerminalService`, NSIS target in `electron-builder.yml`, `ffmpeg-static` (Windows binary), cross-platform chokidar config in `PlatformConfig.ts` — but several gaps were **hard blockers**, and a handful of "looks handled" areas were silently broken or dead code.

@@ -30,9 +30,9 @@ The goal is so that no review finding silently rots: every deferred item has a k
 **Severity:** MEDIUM (architecture-reviewer M1, solution-reviewer SR-005)
 **Source:** Architecture — "Extract `resolvePlatformBinary` NOW, not in Phase 4"
 **Files implicated:**
-- `src/main/services/workers/git-status.worker.ts:31-46` (`buildWin32GitPaths` + `WIN32_GIT_PATHS` + `POSIX_GIT_PATHS` + `isExecutableGit`)
-- `src/main/services/import/DependencyDetector.ts:13-22` (`WIN32_LIBREOFFICE_PATHS`)
-- `src/main/services/watcher/PlatformConfig.ts:172-201` (Phase 4 OCP comment block)
+- `src/main/services/workers/git-status.worker.ts:36-51` (`buildWin32GitPaths` + `WIN32_GIT_PATHS` + `POSIX_GIT_PATHS`) + `:204-245` (`isExecutableGit` + call site)
+- `src/main/services/import/DependencyDetector.ts:17-20` (`WIN32_LIBREOFFICE_PATHS`)
+- `src/main/services/watcher/PlatformConfig.ts:194-201` (Phase 4 OCP comment block)
 
 ### What
 
@@ -266,7 +266,7 @@ Audit log calls that propagate `AppError` objects derived from user input. Add a
 
 **Severity:** LOW (security-auditor + solution-reviewer)
 **Source:** Security + solution — "Cache is permanent for the session"
-**File:** `src/main/services/import/DependencyDetector.ts:27-53`
+**File:** `src/main/services/import/DependencyDetector.ts:38-60` (`cachedResult` field + `detectDependencies` cache check)
 
 ### What
 
@@ -301,7 +301,7 @@ Today, `cachedResult` lives forever once set. If LibreOffice is uninstalled mid-
 
 **Severity:** LOW (security-auditor)
 **Source:** Security
-**File:** `src/main/utils/validateFilename.ts:212` (`name.slice(0, 37)`)
+**File:** `src/main/utils/validateFilename.ts:215` (`name.slice(0, 37)`)
 
 ### What
 

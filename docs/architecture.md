@@ -1,6 +1,5 @@
 # Architecture
-
-> Live architecture overview. For past refactoring reviews and architectural retrospectives, see [`docs/architecture-reviews/`](./architecture-reviews/).
+*Live architecture overview. Past refactoring reviews and retrospectives → [`architecture-reviews/`](./architecture-reviews/).*
 
 ## Three-Process Model
 
