@@ -13,7 +13,7 @@ import {
   deriveSafeFilename,
   validateFilename,
 } from './validateFilename'
-import { AppError, ErrorCode } from '../../shared/errors'
+import { AppError, ErrorCode, INVALID_FILENAME_MARKER } from '../../shared/errors'
 
 const originalPlatform = process.platform
 
@@ -50,6 +50,30 @@ describe('validateFilename – #161', () => {
   // -------------------------------------------------------------------------
   // Reserved basenames × 3 extensions × 3 case variants = 126 Windows cases
   // -------------------------------------------------------------------------
+  describe('on win32 — reserved basename detection edge cases (post-review)', () => {
+    beforeEach(() => stubPlatform('win32'))
+
+    it('rejects " CON.md" (leading whitespace) — Windows strips trailing+leading whitespace at syscall layer', () => {
+      const r = validateFilename(' CON.md')
+      expect(r.valid).toBe(false)
+      if (!r.valid) expect(r.reason).toBe('reserved')
+    })
+
+    it('rejects "CON.md " (trailing whitespace) via trailing_spaces — different reason but still rejected', () => {
+      const r = validateFilename('CON.md ')
+      expect(r.valid).toBe(false)
+      if (!r.valid) {
+        // Trailing-spaces check fires first per pipeline order.
+        expect(['trailing_spaces', 'reserved']).toContain(r.reason)
+      }
+    })
+
+    it('does NOT reject "file.con.md" (CON appears as part of extension, not basename)', () => {
+      // basename.split('.')[0] = 'file' which is not reserved.
+      expect(validateFilename('file.con.md').valid).toBe(true)
+    })
+  })
+
   describe('on win32 — reserved basenames rejected', () => {
     beforeEach(() => stubPlatform('win32'))
 
@@ -243,6 +267,48 @@ describe('validateFilename – #161', () => {
         assertValidUserFilename('CON.md')
       } catch (err) {
         expect((err as Error).message).toMatch(/try.*_CON\.md/)
+      }
+    })
+
+    // SR-001 regression test: thrower and detectors share a single source of
+    // truth via INVALID_FILENAME_MARKER. If anyone reformats the message to
+    // omit the marker, this test fails — preventing silent renderer
+    // discrimination breakage.
+    it('embeds the shared INVALID_FILENAME_MARKER in every thrown message', () => {
+      stubPlatform('win32')
+      const cases = [
+        'CON.md',                  // reserved
+        'foo<bar.md',              // invalid_chars
+        'cod‮gnp.exe',        // bidi_override
+        'foo\x00bar',              // control_chars
+        'foo.',                    // trailing_dots
+        'foo ',                    // trailing_spaces
+      ]
+      for (const name of cases) {
+        try {
+          assertValidUserFilename(name)
+          expect.fail(`should have thrown for input: ${JSON.stringify(name)}`)
+        } catch (err) {
+          expect((err as Error).message).toContain(INVALID_FILENAME_MARKER)
+        }
+      }
+    })
+
+    it('embeds the marker for too_long input', () => {
+      stubPlatform('linux') // length is universal
+      try {
+        assertValidUserFilename('a'.repeat(300))
+      } catch (err) {
+        expect((err as Error).message).toContain(INVALID_FILENAME_MARKER)
+      }
+    })
+
+    it('embeds the marker for empty input', () => {
+      stubPlatform('linux')
+      try {
+        assertValidUserFilename('   ')
+      } catch (err) {
+        expect((err as Error).message).toContain(INVALID_FILENAME_MARKER)
       }
     })
   })

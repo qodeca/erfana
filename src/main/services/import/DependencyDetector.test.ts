@@ -435,45 +435,94 @@ describe('DependencyDetector', () => {
   // Windows install-path fallback (#162)
   // --------------------------------------------------------------------------
 
-  describe('Windows install-path fallback (#162)', () => {
-    it('detects libreOffice via Program Files path on win32 when soffice command fails', async () => {
+  describe('Windows install-path fallback (#162) — F_OK + liveness probe (post security review)', () => {
+    /**
+     * Updated post-security-review: the Windows fallback now uses `tryCommand`
+     * (execFile + `--version` liveness probe), not bare `fs.access(F_OK)`.
+     * Mirrors the git-resolver pattern in `git-status.worker.ts`.
+     */
+
+    const PF_GIT = 'C:\\Program Files\\LibreOffice\\program\\soffice.exe'
+    const PFx86_GIT = 'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe'
+
+    it('detects libreOffice via Program Files path on win32 when soffice command fails (liveness succeeds)', async () => {
       Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
 
-      // soffice on PATH fails, but Program Files path is accessible
-      setupExecFileMock({ magick: true })
-      mockedAccess.mockImplementation(async (path: unknown) => {
-        if (path === 'C:\\Program Files\\LibreOffice\\program\\soffice.exe') return
-        throw new Error('ENOENT')
-      })
+      // soffice on PATH fails; Program Files candidate exists AND its
+      // `--version` liveness probe succeeds.
+      mockedExecFile.mockImplementation(
+        (command: string, _args: unknown, _options: unknown, callback: unknown) => {
+          const cb = callback as (error: Error | null) => void
+          if (command === PF_GIT || command === 'magick') {
+            cb(null)
+          } else {
+            const err = new Error('ENOENT')
+            ;(err as NodeJS.ErrnoException).code = 'ENOENT'
+            cb(err)
+          }
+          return { on: vi.fn() } as unknown as ChildProcess
+        },
+      )
 
       const result = await detector.detect()
 
       expect(result.libreOffice).toBe(true)
-      expect(mockedAccess).toHaveBeenCalledWith(
-        'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
-        0, // F_OK
+      expect(mockedExecFile).toHaveBeenCalledWith(
+        PF_GIT,
+        ['--version'],
+        expect.any(Object),
+        expect.any(Function),
       )
+    })
+
+    it('rejects a candidate that exists but FAILS the --version liveness probe (security)', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+
+      // PF candidate is "present" but its --version invocation fails
+      // (simulates an attacker-planted stub that does not behave like soffice).
+      mockedExecFile.mockImplementation(
+        (command: string, _args: unknown, _options: unknown, callback: unknown) => {
+          const cb = callback as (error: Error | null) => void
+          if (command === 'magick') {
+            cb(null)
+          } else {
+            // soffice on PATH and BOTH PF candidates fail liveness.
+            const err = new Error('not a valid Win32 application')
+            cb(err)
+          }
+          return { on: vi.fn() } as unknown as ChildProcess
+        },
+      )
+
+      const result = await detector.detect()
+
+      expect(result.libreOffice).toBe(false)
     })
 
     it('detects libreOffice via Program Files (x86) path when 64-bit path is missing', async () => {
       Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
 
-      setupExecFileMock({ magick: true })
-      mockedAccess.mockImplementation(async (path: unknown) => {
-        if (path === 'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe') return
-        throw new Error('ENOENT')
-      })
+      mockedExecFile.mockImplementation(
+        (command: string, _args: unknown, _options: unknown, callback: unknown) => {
+          const cb = callback as (error: Error | null) => void
+          if (command === PFx86_GIT || command === 'magick') {
+            cb(null)
+          } else {
+            cb(new Error('ENOENT'))
+          }
+          return { on: vi.fn() } as unknown as ChildProcess
+        },
+      )
 
       const result = await detector.detect()
 
       expect(result.libreOffice).toBe(true)
     })
 
-    it('returns false when both Program Files paths are inaccessible and PATH probe fails', async () => {
+    it('returns false when both Program Files paths fail liveness and PATH probe fails', async () => {
       Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
 
-      setupExecFileMock({})
-      mockedAccess.mockRejectedValue(new Error('ENOENT'))
+      setupExecFileMock({}) // every command fails
 
       const result = await detector.detect()
 
@@ -487,7 +536,9 @@ describe('DependencyDetector', () => {
 
       await detector.detect()
 
-      expect(mockedAccess).not.toHaveBeenCalled()
+      // No Windows .exe paths should appear in execFile calls.
+      const calledCommands = mockedExecFile.mock.calls.map((c) => c[0] as string)
+      expect(calledCommands.some((cmd) => cmd.startsWith('C:\\'))).toBe(false)
     })
 
     it('prefers PATH-based soffice over Windows install paths', async () => {
@@ -499,7 +550,9 @@ describe('DependencyDetector', () => {
       const result = await detector.detect()
 
       expect(result.libreOffice).toBe(true)
-      expect(mockedAccess).not.toHaveBeenCalled()
+      // execFile should have been called for `soffice` but not for any `C:\` path.
+      const calledCommands = mockedExecFile.mock.calls.map((c) => c[0] as string)
+      expect(calledCommands.some((cmd) => cmd.startsWith('C:\\'))).toBe(false)
     })
   })
 })

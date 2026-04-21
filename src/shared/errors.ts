@@ -5,6 +5,22 @@
  * Provides type-safe error codes and structured error class
  */
 
+/**
+ * Sentinel phrase embedded in `AppError` messages thrown by
+ * `assertValidUserFilename`. Renderer formatters discriminate the
+ * `INVALID_FILENAME` error class by matching this marker in `error.message`,
+ * because Electron IPC strips `AppError.code` by default.
+ *
+ * Single source of truth for both the thrower (`validateFilename.ts`) and
+ * the detector (`useFileOperations.logic.ts`, `errorUtils.ts`). Changing
+ * this string requires updating zero call sites — they all import the
+ * constant.
+ *
+ * See #161 (Phase 2) and the architecture review note about the IPC
+ * contract bridge.
+ */
+export const INVALID_FILENAME_MARKER = 'is not a valid filename'
+
 export enum ErrorCode {
   // Path validation errors
   PATH_INVALID = 'PATH_INVALID',

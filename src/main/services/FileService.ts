@@ -242,6 +242,15 @@ export class FileService implements IFileService {
   }
 
   async createFile(dirPath: string, fileName: string): Promise<string> {
+    // Strip path separators FIRST — prevents `../../etc/passwd` style traversal
+    // before `join()`. Sibling methods `createFolder` and `rename` already do
+    // this; `createFile` was missing the strip until the Phase 2 review.
+    fileName = fileName.replace(/[/\\]/g, '')
+
+    if (!fileName) {
+      throw new Error('File name cannot be empty')
+    }
+
     // Ensure .md extension
     if (!fileName.endsWith('.md') && !fileName.endsWith('.markdown')) {
       fileName = `${fileName}.md`

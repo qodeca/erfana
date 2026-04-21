@@ -28,15 +28,26 @@ const GIT_STATUS_CAP = 10_000
 // On Windows, `fs.access(X_OK)` is *existence-only* (no POSIX execute-bit),
 // so a second `git --version` liveness probe is required to reject bad files.
 // See #160 (Windows git allowlist) for context.
-const WIN32_GIT_PATHS = [
-  'C:\\Program Files\\Git\\cmd\\git.exe',
-  'C:\\Program Files\\Git\\bin\\git.exe',
-  'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
-  'C:\\Program Files (x86)\\Git\\bin\\git.exe',
-  'C:\\ProgramData\\chocolatey\\bin\\git.exe',
-  // Scoop (per-user install)
-  `${process.env.USERPROFILE ?? ''}\\scoop\\apps\\git\\current\\cmd\\git.exe`
-]
+//
+// `USERPROFILE` is validated to start with `C:\Users\` before the Scoop path
+// is added — guards against an attacker setting a poisoned `USERPROFILE`
+// (e.g. via a malicious shortcut) to redirect the Scoop probe to an
+// arbitrary directory under their control.
+function buildWin32GitPaths(): string[] {
+  const fixed = [
+    'C:\\Program Files\\Git\\cmd\\git.exe',
+    'C:\\Program Files\\Git\\bin\\git.exe',
+    'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
+    'C:\\Program Files (x86)\\Git\\bin\\git.exe',
+    'C:\\ProgramData\\chocolatey\\bin\\git.exe',
+  ]
+  const userProfile = process.env.USERPROFILE
+  if (userProfile && /^[A-Za-z]:\\Users\\[^\\]+\\?$/i.test(userProfile.replace(/\\$/, '') + '\\')) {
+    fixed.push(`${userProfile}\\scoop\\apps\\git\\current\\cmd\\git.exe`)
+  }
+  return fixed
+}
+const WIN32_GIT_PATHS = buildWin32GitPaths()
 const POSIX_GIT_PATHS = ['/usr/bin/git', '/usr/local/bin/git', '/opt/homebrew/bin/git']
 const GIT_PATH_ALLOWLIST = process.platform === 'win32' ? WIN32_GIT_PATHS : POSIX_GIT_PATHS
 const GIT_LIVENESS_TIMEOUT = 2_000

@@ -88,7 +88,10 @@ async function freshResolver(): Promise<{
 
 describe('git-resolver – #160 Windows git allowlist', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    // resetAllMocks (not clearAllMocks) — clears BOTH call history AND
+    // mockImplementation / mockResolvedValue, so a previous test's stub
+    // can't leak into the next test's default behavior.
+    vi.resetAllMocks()
     process.env.USERPROFILE = 'C:\\Users\\testuser'
   })
 

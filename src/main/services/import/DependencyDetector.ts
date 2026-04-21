@@ -89,7 +89,12 @@ export class DependencyDetector {
       return true
     }
 
-    // macOS fallback: check the standard .app bundle path
+    // macOS fallback: check the standard .app bundle path.
+    // `X_OK` is meaningful on POSIX — verifies the user has execute
+    // permission on the binary. Combined with the system-protected
+    // `/Applications/` location, this is sufficient (no liveness probe
+    // needed; the Windows branch below adds liveness specifically because
+    // `X_OK` is existence-only on Windows).
     if (process.platform === 'darwin') {
       try {
         await access(MACOS_LIBREOFFICE_PATH, constants.X_OK)
@@ -100,15 +105,23 @@ export class DependencyDetector {
     }
 
     // Windows fallback (#162): probe standard install locations.
-    // F_OK only — `X_OK` is existence-only on Windows anyway, and we don't
-    // need a liveness probe here because LibreOffice itself will fail loudly
-    // at use-time if the binary is corrupt.
+    //
+    // Each candidate must pass BOTH `F_OK` (file exists) AND a `--version`
+    // liveness probe (binary actually runs and produces output). This
+    // mirrors the git-resolver pattern at `git-status.worker.ts:isExecutableGit`.
+    //
+    // Why not F_OK only (security review HIGH): an attacker with write
+    // access to `C:\Program Files\LibreOffice\program\soffice.exe` (e.g. a
+    // malicious installer that drops a stub) could otherwise plant a path
+    // that satisfies detection. By the time we try to `execFile(soffice,
+    // [user-supplied args])` it would be too late — attacker code would
+    // have already run. The liveness probe forces the candidate to behave
+    // like a real LibreOffice binary first.
     if (process.platform === 'win32') {
       for (const candidate of WIN32_LIBREOFFICE_PATHS) {
-        try {
-          await access(candidate, constants.F_OK)
+        if (await this.tryCommand(candidate, ['--version'])) {
           return true
-        } catch { /* try next */ }
+        }
       }
       return false
     }

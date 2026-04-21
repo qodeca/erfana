@@ -6,6 +6,7 @@
  */
 
 import type { FileNode } from '../interfaces/IProjectTreeApi'
+import { INVALID_FILENAME_MARKER } from '../../../shared/errors'
 
 /**
  * Gets the target path for file/folder operations
@@ -131,15 +132,19 @@ export function isAlreadyExistsError(message: string): boolean {
  * The main-process `assertValidUserFilename` throws `AppError(INVALID_FILENAME)`
  * with a structured message like `"CON.md" is not a valid filename — try "_CON.md"`.
  * `AppError.code` does not cross the Electron IPC boundary by default, so this
- * detector matches on the well-known phrase embedded in the message. The
- * structured message is already user-friendly, so formatters can surface it
- * verbatim after stripping the IPC prefix.
+ * detector matches on the well-known marker embedded in the message.
+ *
+ * The marker phrase is sourced from the shared `INVALID_FILENAME_MARKER`
+ * constant in `src/shared/errors.ts`, NOT a literal string here — that's the
+ * single source of truth shared with the thrower in
+ * `src/main/utils/validateFilename.ts`. Changing the marker means changing
+ * the constant; all detectors update automatically.
  *
  * @param message - Error message to check
  * @returns true if error is an invalid-filename rejection, false otherwise
  */
 export function isInvalidFilenameError(message: string): boolean {
-  return message.includes('is not a valid filename')
+  return message.includes(INVALID_FILENAME_MARKER)
 }
 
 /**

@@ -402,7 +402,7 @@ On Windows after `git pull --ff-only origin windows`:
 
 - Phase work on feature branch: `fix/windows-<phase-or-issue>-<N>` (e.g. `fix/windows-test-portability-157`)
 - Merge to `windows` (integration branch) with `--no-ff` to preserve review trail
-- Final merge `windows` → `develop` only after all Phase 0–1 manual UAT passes AND at least Phase 2 sub-issues #155b + #155c are landed
+- Final merge `windows` → `develop` only after all Phase 0–1 manual UAT passes AND at least Phase 2 sub-issues #160 + #161 are landed
 - **Do NOT** merge `windows` → `develop` before Phase 1 UAT is verified on a real Windows host
 
 ### Merge-to-develop readiness
@@ -411,8 +411,10 @@ Before merging `windows` → `develop`, confirm all of:
 
 - [x] Phase 0 `#153` closed (all 5 ACs met, macOS regression verified 2026-04-20)
 - [ ] Phase 1 `#154` manual UAT checklist all passing on a real Windows host
-- [ ] Phase 2 `#155b` (git allowlist) merged — otherwise tree indicators silently broken for stock Windows users
-- [ ] Phase 2 `#155c` (reserved filename guard) merged — otherwise cryptic EINVAL on common filenames
+- [x] Phase 2 `#160` (git allowlist + liveness) merged 2026-04-21
+- [x] Phase 2 `#161` (reserved filename guard + bidi stripping) merged 2026-04-21
+- [x] Phase 2 `#162` (LibreOffice Windows detection + liveness probe) merged 2026-04-21 (bonus — not required by gate)
+- [x] Phase 2 `#163` (long-path activation) decision-deferred to Phase 6 with promotion criteria
 - [ ] Clean `npm run test:main` + `npm run test:renderer` + `npm run test:preload` on both hosts
 - [ ] No uncommitted changes on either host
 - [ ] PR description documents what's Windows-specific and lists known gaps (Phases 3–6)

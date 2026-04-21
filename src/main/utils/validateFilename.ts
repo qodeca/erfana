@@ -17,6 +17,18 @@
  * maintainer picking between the two does not have to read JSDoc to know
  * which path throws vs. transforms.
  *
+ * **Cross-platform contract asymmetry:**
+ *
+ *   - `assertValidUserFilename` respects `process.platform` — Windows-only
+ *     rules (reserved names, `<>:"/\|?*`, trailing dots/spaces) are no-ops
+ *     on POSIX so existing macOS/Linux files like `Q4: report?.md` still
+ *     validate. Universal rules (control chars, bidi overrides, empty,
+ *     length) reject on every platform.
+ *   - `deriveSafeFilename` applies Windows-strict rules **on every platform**
+ *     by design. The output is intended to be portable to Windows even when
+ *     it is generated on POSIX (e.g. PDF/DOCX exports from a macOS dev
+ *     machine that may later be opened on a Windows box).
+ *
  * See #161 (Phase 2 Windows enablement — reserved filename guard).
  *
  * ## Operation-order invariant (pinned by `validateFilename.test.ts`)
@@ -32,14 +44,14 @@
  *   6. trim                      (whitespace around the whole name)
  *   7. handle reserved basename  (prepend `_` on Windows only)
  *   8. enforce max length        (truncate)
- *   9. fall back to 'untitled'   (empty-after-all-above)
+ *   9. fall back to caller-supplied default (empty-after-all-above)
  *
  * The original `DocxService.sanitizeFilename` at `DocxService.ts:221-244`
  * (pre-#161) used steps 1–7 above in that order; this module preserves
  * that order and adds steps 3 (bidi) and 9 (empty fallback).
  */
 
-import { AppError, ErrorCode } from '../../shared/errors'
+import { AppError, ErrorCode, INVALID_FILENAME_MARKER } from '../../shared/errors'
 
 /**
  * Reserved basenames on Windows. Case-insensitive. Apply with or without
@@ -56,21 +68,41 @@ const WINDOWS_RESERVED_NAMES = new Set([
 /** Max filename length (bytes on ext4/NTFS; chars on HFS+). Conservative common denominator. */
 const MAX_FILENAME_LENGTH = 255
 
-/** Windows-forbidden chars: reserved on all Windows filesystems. */
-// eslint-disable-next-line no-useless-escape
-const WIN_INVALID_CHARS = /[<>:"/\\|?*]/g
+/**
+ * Windows-forbidden chars: reserved on all Windows filesystems.
+ * Non-stateful (no `/g` flag) — `.test()` semantics are simple boolean,
+ * `.replace()` callers in `deriveSafeFilename` use a fresh regex literal.
+ */
+ 
+const WIN_INVALID_CHARS = /[<>:"/\\|?*]/
 
 /** Control chars (C0: 0x00-0x1F) — portable security concern on any OS. */
 // eslint-disable-next-line no-control-regex
-const CONTROL_CHARS = /[\x00-\x1f]/g
+const CONTROL_CHARS = /[\x00-\x1f]/
 
 /**
- * Unicode bidi-override chars that enable right-to-left override attacks.
- * Example: `codrlo‮gnp.exe` displays as `codexe.png` but executes.
- * See https://trojansource.codes for the canonical vulnerability class.
+ * Unicode bidi-override + direction-mark chars that enable RTL spoofing
+ * (Trojan Source vulnerability class). A filename like `cod‮gnp.exe`
+ * displays as `codexe.png` but executes as `codgnp.exe`.
+ *
+ * Covers all six classes:
+ *   - U+202A LRE   - LEFT-TO-RIGHT EMBEDDING
+ *   - U+202B RLE   - RIGHT-TO-LEFT EMBEDDING
+ *   - U+202C PDF   - POP DIRECTIONAL FORMATTING
+ *   - U+202D LRO   - LEFT-TO-RIGHT OVERRIDE
+ *   - U+202E RLO   - RIGHT-TO-LEFT OVERRIDE
+ *   - U+2066 LRI   - LEFT-TO-RIGHT ISOLATE
+ *   - U+2067 RLI   - RIGHT-TO-LEFT ISOLATE
+ *   - U+2068 FSI   - FIRST STRONG ISOLATE
+ *   - U+2069 PDI   - POP DIRECTIONAL ISOLATE
+ *   - U+200E LRM   - LEFT-TO-RIGHT MARK
+ *   - U+200F RLM   - RIGHT-TO-LEFT MARK
+ *
+ * Uses **hex escapes + `u` flag** for engine-consistent code-point matching.
+ * Without the `u` flag, JS treats supplementary-plane chars as surrogate
+ * halves and these BMP ranges may not match in some runtimes.
  */
-// eslint-disable-next-line no-misleading-character-class
-const BIDI_OVERRIDES = /[‪-‮⁦-⁩‎‏]/g
+const BIDI_OVERRIDES = /[‪-‮⁦-⁩‎‏]/u
 
 const DEFAULT_FALLBACK = 'untitled'
 
@@ -105,17 +137,13 @@ export function validateFilename(name: string): FilenameValidation {
 
   // Bidi overrides — both platforms (security).
   if (BIDI_OVERRIDES.test(name)) {
-    BIDI_OVERRIDES.lastIndex = 0 // reset stateful regex
     return { valid: false, reason: 'bidi_override' }
   }
-  BIDI_OVERRIDES.lastIndex = 0
 
   // Control chars — both platforms.
   if (CONTROL_CHARS.test(name)) {
-    CONTROL_CHARS.lastIndex = 0
     return { valid: false, reason: 'control_chars' }
   }
-  CONTROL_CHARS.lastIndex = 0
 
   // Length — both platforms.
   if (name.length > MAX_FILENAME_LENGTH) {
@@ -125,10 +153,8 @@ export function validateFilename(name: string): FilenameValidation {
   // --- Windows-only checks below ---
   if (process.platform === 'win32') {
     if (WIN_INVALID_CHARS.test(name)) {
-      WIN_INVALID_CHARS.lastIndex = 0
       return { valid: false, reason: 'invalid_chars' }
     }
-    WIN_INVALID_CHARS.lastIndex = 0
 
     if (/\.+$/.test(name)) {
       return { valid: false, reason: 'trailing_dots' }
@@ -138,9 +164,13 @@ export function validateFilename(name: string): FilenameValidation {
       return { valid: false, reason: 'trailing_spaces' }
     }
 
-    const baseName = name.split('.')[0].toUpperCase()
+    // Trim leading whitespace before reserved-name check so `' CON.md'`
+    // is correctly identified as reserved (Windows would treat it the
+    // same way at the syscall layer — surrounding whitespace is stripped).
+    const trimmed = name.trim()
+    const baseName = trimmed.split('.')[0].toUpperCase()
     if (WINDOWS_RESERVED_NAMES.has(baseName)) {
-      return { valid: false, reason: 'reserved', suggestion: `_${name}` }
+      return { valid: false, reason: 'reserved', suggestion: `_${trimmed}` }
     }
   }
 
@@ -151,6 +181,12 @@ export function validateFilename(name: string): FilenameValidation {
  * User-typed-input path. Validates per current platform; throws
  * `AppError(INVALID_FILENAME)` on invalid so the caller can surface the
  * error to the user.
+ *
+ * The thrown message starts with the well-known marker
+ * `INVALID_FILENAME_MARKER` (exported from `shared/errors.ts`) so renderer
+ * formatters can discriminate this error class without coupling to the
+ * full English phrasing. Electron IPC strips `AppError.code`, but
+ * `Error.message` survives intact — the marker is the contract bridge.
  */
 export function assertValidUserFilename(name: string): void {
   const result = validateFilename(name)
@@ -173,8 +209,14 @@ export function assertValidUserFilename(name: string): void {
                   ? ` — must be 255 characters or fewer (got ${name.length})`
                   : ' — filename must not be empty'
 
+  // Display the user's input but cap at 40 chars to prevent toast bloat.
+  // Whitespace-only inputs are shown with their original spacing for
+  // diagnostic clarity (rather than the empty-after-trim version).
   const displayName = name.length > 40 ? `${name.slice(0, 37)}...` : name
-  throw new AppError(`"${displayName}" is not a valid filename${reasonSuffix}`, ErrorCode.INVALID_FILENAME)
+  throw new AppError(
+    `"${displayName}" ${INVALID_FILENAME_MARKER}${reasonSuffix}`,
+    ErrorCode.INVALID_FILENAME,
+  )
 }
 
 /**
@@ -186,6 +228,11 @@ export function assertValidUserFilename(name: string): void {
  * transformations), returns the provided `fallback` (defaults to `'untitled'`).
  * Callers with their own canonical empty-fallback (e.g. `DocxService`'s
  * `'document'`) should pass it explicitly.
+ *
+ * **Note:** The `fallback` is returned **as-is** without sanitization.
+ * Callers MUST pass a string that is already safe (no Windows-reserved
+ * basename, no forbidden chars). Passing `'CON'` or `'foo<>'` produces
+ * unsafe output.
  */
 export function deriveSafeFilename(name: string, fallback: string = DEFAULT_FALLBACK): string {
   // Step 1: strip leading dots (Unix-hidden / Windows-problematic).
@@ -193,10 +240,13 @@ export function deriveSafeFilename(name: string, fallback: string = DEFAULT_FALL
 
   // Step 2: strip Windows-invalid chars (on all platforms — we want the
   // derived name to be portable to Windows even if we're on POSIX).
-  safe = safe.replace(WIN_INVALID_CHARS, '-')
+  // Use a fresh `/g` regex literal each time to avoid any `lastIndex` state
+  // leakage from the boolean-test regex above.
+  safe = safe.replace(/[<>:"/\\|?*]/g, '-')
 
   // Step 3: strip control chars + bidi overrides (security, both platforms).
-  safe = safe.replace(CONTROL_CHARS, '').replace(BIDI_OVERRIDES, '')
+  // eslint-disable-next-line no-control-regex
+  safe = safe.replace(/[\x00-\x1f]/g, '').replace(/[‪-‮⁦-⁩‎‏]/gu, '')
 
   // Step 4: strip trailing dots (Windows strips them anyway).
   safe = safe.replace(/\.+$/, '')
