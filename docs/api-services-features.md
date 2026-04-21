@@ -44,6 +44,14 @@ Implements `IGitStatusWorker` by spawning a `worker_threads` Worker running `git
 - `src/main/interfaces/IGitStatusWorker.ts` – Worker adapter interface
 - `src/main/services/workers/git-status.worker.ts` – Worker thread script (runs isomorphic-git `statusMatrix()` or native `git status --porcelain`)
 
+### Native git binary resolution
+
+`git-status.worker.ts` resolves the native git binary via a platform-aware allowlist before falling back to `where git` / `which git`. On Windows, `fs.access(X_OK)` is existence-only (no POSIX execute-bit), so each allowlist candidate is additionally verified via a `git --version` liveness probe to reject truncated or renamed files. POSIX retains full `X_OK` semantics and skips the liveness probe.
+
+**Windows probe order (#160):** `C:\Program Files\Git\cmd\git.exe` → `…\bin\git.exe` → `C:\Program Files (x86)\Git\cmd\git.exe` → `…\bin\git.exe` → `C:\ProgramData\chocolatey\bin\git.exe` → `%USERPROFILE%\scoop\apps\git\current\cmd\git.exe`.
+
+**POSIX probe order:** `/usr/bin/git` → `/usr/local/bin/git` → `/opt/homebrew/bin/git`.
+
 ---
 
 ## GitStatusCircuitBreaker

@@ -22,7 +22,24 @@ import { GIT_STATUS } from '../../../shared/constants'
 const execFileAsync = promisify(execFile)
 
 const GIT_STATUS_CAP = 10_000
-const GIT_PATH_ALLOWLIST = ['/usr/bin/git', '/usr/local/bin/git', '/opt/homebrew/bin/git']
+
+// Git binary allowlist – checked before falling back to `where git` / `which git`.
+// Priority order per platform: most-popular install location first.
+// On Windows, `fs.access(X_OK)` is *existence-only* (no POSIX execute-bit),
+// so a second `git --version` liveness probe is required to reject bad files.
+// See #160 (Windows git allowlist) for context.
+const WIN32_GIT_PATHS = [
+  'C:\\Program Files\\Git\\cmd\\git.exe',
+  'C:\\Program Files\\Git\\bin\\git.exe',
+  'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
+  'C:\\Program Files (x86)\\Git\\bin\\git.exe',
+  'C:\\ProgramData\\chocolatey\\bin\\git.exe',
+  // Scoop (per-user install)
+  `${process.env.USERPROFILE ?? ''}\\scoop\\apps\\git\\current\\cmd\\git.exe`
+]
+const POSIX_GIT_PATHS = ['/usr/bin/git', '/usr/local/bin/git', '/opt/homebrew/bin/git']
+const GIT_PATH_ALLOWLIST = process.platform === 'win32' ? WIN32_GIT_PATHS : POSIX_GIT_PATHS
+const GIT_LIVENESS_TIMEOUT = 2_000
 const BRANCH_DETECT_TIMEOUT = 5_000
 
 // -- Message types -----------------------------------------------------------
@@ -165,20 +182,52 @@ async function executeNativeGit(projectPath: string, gitPath: string): Promise<G
 
 // -- Git path resolution -----------------------------------------------------
 
-async function resolveGitPath(): Promise<string | null> {
+/**
+ * Verify that `candidate` is a real git binary.
+ *
+ * On Windows, `fs.access(X_OK)` degrades to existence-only (no POSIX
+ * execute-bit semantics), so a non-binary file at the expected path would
+ * pass. We add a `git --version` liveness probe to reject truncated or
+ * renamed files. POSIX retains full `X_OK` semantics.
+ */
+async function isExecutableGit(candidate: string): Promise<boolean> {
+  try {
+    if (process.platform === 'win32') {
+      await access(candidate, fs.constants.F_OK)
+      await execFileAsync(candidate, ['--version'], { timeout: GIT_LIVENESS_TIMEOUT })
+      return true
+    }
+    await access(candidate, fs.constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Exported for testing in isolation (see `git-resolver.test.ts`). Tests can
+ * call `resetGitPathCache()` + `resolveGitPath()` directly without routing
+ * through the `worker_threads` message boundary.
+ */
+export function resetGitPathCache(): void {
+  nativeGitPath = null
+  gitPathResolved = false
+  gitPathResolvedAt = 0
+}
+
+export async function resolveGitPath(): Promise<string | null> {
   // Return cached result if: successfully resolved, OR failed but cooldown hasn't elapsed
   if (gitPathResolved && (nativeGitPath !== null || Date.now() - gitPathResolvedAt < GIT_STATUS.GIT_PATH_RETRY_COOLDOWN)) {
     return nativeGitPath
   }
 
   for (const candidate of GIT_PATH_ALLOWLIST) {
-    try {
-      await access(candidate, fs.constants.X_OK)
+    if (await isExecutableGit(candidate)) {
       nativeGitPath = candidate
       gitPathResolved = true
       gitPathResolvedAt = Date.now()
       return nativeGitPath
-    } catch { /* try next */ }
+    }
   }
 
   const findCmd = process.platform === 'win32' ? 'where' : 'which'
