@@ -438,35 +438,18 @@ npm run build:mac
 
 ## Known vulnerabilities
 
-Run `npm audit` to check. **Policy**: Fix all high/critical vulnerabilities in production dependencies before release.
+Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the table below.
 
-### Current state (last audited 2026-04-21)
+**Current state** (audited 2026-04-21): production 0 high / 5 moderate / 0 low; dev-only 10 high / 1 moderate / 2 low. The 5 moderate prod advisories chain through `mermaid → langium → chevrotain`; Mermaid output is DOMPurify-sanitized in the preview, so user-reachable attack surface is nil. Dev-only advisories don't ship in production builds.
 
-| Severity | Production | Dev-only |
-|----------|-----------:|---------:|
-| Critical | 0 | 0 |
-| High | 0 | 10 |
-| Moderate | 5 | 1 |
-| Low | 0 | 2 |
+### Dependency overrides (package.json)
 
-Zero production high/critical is the release gate. The remaining 5 moderate production advisories all chain through `mermaid → langium → chevrotain`; they are tracked upstream and do not expose user-reachable attack surface (Mermaid is rendered inside a DOMPurify-sanitized preview). Dev-only advisories (vite, etc.) do not ship in production builds.
+| Package | Pin | Reason |
+|---|---|---|
+| `@electron/rebuild` | `3.7.1` | node-pty toolchain compat |
+| `lodash`, `lodash-es` | **exact** `4.18.1` | GHSA 1115805/6/9/10 (`_.template` code injection + `_.unset`/`_.omit` prototype pollution). Vulnerable range `<=4.17.23`. |
 
-### Dependency overrides for CVE mitigation
-
-The `overrides` block in `package.json` force-upgrades transitive dependencies to close production CVE exposure:
-
-| Package | Pinned version | Reason |
-|---------|----------------|--------|
-| `@electron/rebuild` | `3.7.1` | compatibility with bundled node-pty build toolchain |
-| `lodash` | `4.18.1` | GHSA advisories 1115806 (`_.template` code injection) + 1115810 (prototype pollution via `_.unset`/`_.omit`). Range `<=4.17.23` was flagged; 4.18.1 is outside the range. |
-| `lodash-es` | `4.18.1` | same advisories (1115805 + 1115809) affect the ESM variant used by `mermaid → langium → chevrotain` |
-
-**Provenance note on lodash 4.18.x**: OpenJS has not shipped a 4.18.x line; `4.18.0`/`4.18.1` were published on npm by the community maintainer `magic-akari` in October 2025 as CVE-mitigation patches after the upstream OpenJS maintainer effort went dormant on this branch. We pin to **exact** `4.18.1` (no caret) so a future 4.18.2 from any maintainer cannot auto-flow into the lockfile on `npm install`. Integrity hashes in `package-lock.json` additionally pin the specific tarball, so a registry compromise that republishes `4.18.1` under a different hash would be detected on the next `npm ci`.
-
-Before a release:
-1. Run `npm audit --omit=dev --json` and diff the result against this table.
-2. If any new advisory appears, triage: pin-via-override if a patched version exists, else document exposure and reachability.
-3. On major version bumps of Mermaid or electron-builder, retest the override chain — transitive resolution may shift.
+**Lodash 4.18.x is a community fork, not OpenJS**: `4.18.0`/`4.18.1` were published by maintainer `magic-akari` in Oct 2025 after the upstream OpenJS branch went dormant. We pin **exact** (no caret) so a future 4.18.2 from any maintainer can't auto-flow into the lockfile; `package-lock.json` integrity hashes additionally pin the tarball. On Mermaid/electron-builder major bumps, retest the override chain — transitive resolution may shift.
 
 ---
 
@@ -508,10 +491,7 @@ Git status runs in a `worker_threads` Worker – same process memory space, no n
 
 ## Future enhancements
 
-1. **Code signing** + **notarization** for macOS (requires Apple Developer account)
-2. **Auto-updates**: signed updates with electron-updater
-3. **Encrypted storage**: OS keychain for sensitive data
-4. **Permission prompts**: confirmation before destructive operations
+Code signing + notarization for macOS (Apple Developer account); auto-updates via signed electron-updater; encrypted storage via OS keychain; confirmation prompts before destructive operations.
 
 ## References
 

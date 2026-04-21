@@ -152,4 +152,4 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 ---
 
-**Last Updated**: v0.9.0 (April 2026)
+**Last Updated**: v0.9.2 + windows branch (April 2026)

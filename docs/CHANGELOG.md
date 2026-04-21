@@ -23,6 +23,13 @@ Phase 0 + Phase 1 + Phase 2 of the Windows enablement roadmap landed on the `win
 
 Known gaps (deferred to Phases 3–6): screenshots, local Whisper, auto-updater URL, code signing, long-path `\\?\` activation, structured-error IPC serialization (D4).
 
+### Post-Phase-2 hygiene (14576cd, 5a89844)
+
+- **Lint cleanup** — 11 test-file errors resolved (unused consts, `require()`→import, useless regex escapes). `playwright-report/`, `test-results/`, `coverage/` added to `eslint.config.mjs` ignores so E2E artifacts on disk don't poison lint runs.
+- **SearchBar flake harden** — first-keystroke-drop under CPU contention. `'executes search'` + `'debounces search'` tests both now gate on observable state via `await waitFor(() => expect(document.activeElement).toBe(input))`. Evidence: 10/10 consecutive runs green.
+- **Visual regression determinism** — `visualTestProject` fixture split into outer `mkdtemp('visual-')` parent + fixed inner `visual-project` leaf so tree/terminal labels are deterministic across runs (prevents random suffix from leaking into snapshots). `(b) editor-loaded` masks extended to `TERMINAL_INSTANCE` + `TOAST_CONTAINER`; mask specificity now matches `(c) terminal-open`. Cleanup wrapped in try/finally with `maxRetries:3` rm (Windows EBUSY) + symlink guard on `.e2e-temp`.
+- **Lodash CVE (GHSA-1115805/6/9/10)** — pinned `lodash`/`lodash-es` to **exact** `4.18.1` in `package.json` overrides. Production high-severity advisories 7 → 0. Provenance note in [`docs/security.md`](./security.md#dependency-overrides-packagejson) — 4.18.x is a community fork by `magic-akari`, not OpenJS.
+
 ---
 
 ## 0.9.2
@@ -463,20 +470,9 @@ Known gaps (deferred to Phases 3–6): screenshots, local Whisper, auto-updater 
   - HTML to DOCX conversion via `docx` library
   - 69 new tests
   - Closes #65
-- **PDF Export** (Dec 21, 2025):
-  - Export markdown to print-optimized PDF
-  - Vector Mermaid diagrams (not rasterized)
-  - A4 page size with print-friendly styling
-  - 35 new tests
-  - Closes #58
-- **YAML Frontmatter Rendering** (Dec 21, 2025):
-  - Styled key-value table in markdown preview
-  - Security-hardened parsing with size limits
-  - 18 new tests
-- **Git Operation Queue** (Dec 21, 2025):
-  - Prevents index.lock conflicts during concurrent git operations
-  - Sequential queue in GitStatusService
-  - Closes race conditions
+- **PDF Export** (Dec 21, 2025) — Print-optimized PDF with vector Mermaid diagrams, A4, 35 tests. Closes #58.
+- **YAML Frontmatter Rendering** (Dec 21, 2025) — Styled key-value table in preview, security-hardened parsing with size limits, 18 tests.
+- **Git Operation Queue** (Dec 21, 2025) — Sequential queue in GitStatusService prevents `index.lock` conflicts during concurrent git operations.
 
 ## Changes in v0.6.0
 - **Logging Layer** (Dec 21, 2025):
