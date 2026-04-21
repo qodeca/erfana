@@ -14,13 +14,9 @@ import type { IpcMainInvokeEvent } from 'electron'
 
 // Platform-safe absolute paths (see #157)
 const TEST_PROJECT = path.join(os.tmpdir(), 'erfana-test', 'project')
-const TEST_IMPORT = path.join(TEST_PROJECT, 'import')
 const TEST_AUDIO = path.join(os.tmpdir(), 'erfana-test', 'path', 'to', 'audio.mp3')
 const TEST_BAD_FILE = path.join(os.tmpdir(), 'erfana-test', 'path', 'to', 'bad.txt')
 const TEST_RECORDING = path.join(os.tmpdir(), 'erfana-test', 'path', 'to', 'recording.mp3')
-const TEST_WHISPER_BIN = path.join(os.tmpdir(), 'erfana-test', 'bin', 'whisper')
-const TEST_MODEL_BASE = path.join(os.tmpdir(), 'erfana-test', 'models', 'base.bin')
-const TEST_MODEL_SMALL = path.join(os.tmpdir(), 'erfana-test', 'models', 'small.bin')
 
 // =============================================================================
 // Mock electron
@@ -123,11 +119,9 @@ vi.mock('fs/promises', () => ({
 
 const mockChangeExtension = vi.fn((name: string) => name.replace(/\.[^.]+$/, '.md'))
 const mockSanitizeFileName = vi.fn((name: string) => name)
-const mockFindAvailableFileName = vi.fn((_dir: string, name: string) => {
-  const p = require('path')
-  const o = require('os')
-  return p.join(o.tmpdir(), 'erfana-test', 'project', 'import', name)
-})
+const mockFindAvailableFileName = vi.fn((_dir: string, name: string) =>
+  path.join(os.tmpdir(), 'erfana-test', 'project', 'import', name)
+)
 
 vi.mock('../utils/fileUtils', async (importOriginal) => {
   const actual = await importOriginal()

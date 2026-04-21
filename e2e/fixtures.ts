@@ -361,15 +361,20 @@ export const visualTest = base.extend<VisualTestFixtures, WorkerFixtures>({
 
   // eslint-disable-next-line no-empty-pattern
   visualTestProject: async ({}, use) => {
-    // Create isolated test project with controlled seed files in .e2e-temp (gitignored)
+    // Create isolated test project with controlled seed files in .e2e-temp (gitignored).
+    // The outer dir uses mkdtemp for worker isolation; the inner project dir has a
+    // fixed name so the tree/terminal labels are deterministic across runs (prevents
+    // random suffixes from leaking into visual snapshots).
     const e2eTempDir = path.join(__dirname, '..', '.e2e-temp')
     await fs.promises.mkdir(e2eTempDir, { recursive: true })
-    const projectPath = await fs.promises.mkdtemp(path.join(e2eTempDir, 'visual-project-'))
+    const tmpParent = await fs.promises.mkdtemp(path.join(e2eTempDir, 'visual-'))
+    const projectPath = path.join(tmpParent, 'visual-project')
+    await fs.promises.mkdir(projectPath)
     for (const [name, content] of Object.entries(VISUAL_TEST_SEED_FILES)) {
       await fs.promises.writeFile(path.join(projectPath, name), content, 'utf-8')
     }
     await use(projectPath)
-    await fs.promises.rm(projectPath, { recursive: true, force: true })
+    await fs.promises.rm(tmpParent, { recursive: true, force: true })
   },
 
   visualAppWithProject: async ({ userDataDir }, use) => {

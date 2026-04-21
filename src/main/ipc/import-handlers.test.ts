@@ -11,7 +11,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as path from 'path'
 import {
-  TEST_PROJECT_PATH,
   TEST_IMPORT_DIR,
   TEST_DOC_PATH,
   TEST_DOC_OTHER_PATH,

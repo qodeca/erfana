@@ -105,9 +105,9 @@ describe('CameraService', () => {
       const result = await cameraService.save(dataUrl, timestamp)
 
       expect(result.filePath).toBeDefined()
-      expect(result.filePath).toMatch(new RegExp(`^${REAL_TMPDIR.replace(/[\\\/]/g, '[/\\\\]')}[/\\\\]erfana-camera-\\d{4}-\\d{2}-\\d{2}-\\d{6}\\.jpg$`))
+      expect(result.filePath).toMatch(new RegExp(`^${REAL_TMPDIR.replace(/[\\/]/g, '[/\\\\]')}[/\\\\]erfana-camera-\\d{4}-\\d{2}-\\d{2}-\\d{6}\\.jpg$`))
       expect(mockWriteFile).toHaveBeenCalledWith(
-        expect.stringMatching(new RegExp(`^${REAL_TMPDIR.replace(/[\\\/]/g, '[/\\\\]')}[/\\\\]erfana-camera-\\d{4}-\\d{2}-\\d{2}-\\d{6}\\.jpg$`)),
+        expect.stringMatching(new RegExp(`^${REAL_TMPDIR.replace(/[\\/]/g, '[/\\\\]')}[/\\\\]erfana-camera-\\d{4}-\\d{2}-\\d{2}-\\d{6}\\.jpg$`)),
         expect.any(Buffer)
       )
     })
@@ -354,7 +354,7 @@ describe('CameraService', () => {
 
       const result = await cameraService.save(dataUrl)
 
-      expect(result.filePath).toMatch(new RegExp(`^${REAL_TMPDIR.replace(/[\\\/]/g, '[/\\\\]')}[/\\\\]erfana-camera-\\d{4}-\\d{2}-\\d{2}-\\d{6}\\.jpg$`))
+      expect(result.filePath).toMatch(new RegExp(`^${REAL_TMPDIR.replace(/[\\/]/g, '[/\\\\]')}[/\\\\]erfana-camera-\\d{4}-\\d{2}-\\d{2}-\\d{6}\\.jpg$`))
     })
   })
 
@@ -373,7 +373,7 @@ describe('CameraService', () => {
 
       const result = await cameraService.save(dataUrl)
 
-      expect(result.filePath).toMatch(new RegExp(`^${customTmp.replace(/[\\\/]/g, '[/\\\\]')}[/\\\\]erfana-camera-`))
+      expect(result.filePath).toMatch(new RegExp(`^${customTmp.replace(/[\\/]/g, '[/\\\\]')}[/\\\\]erfana-camera-`))
     })
   })
 

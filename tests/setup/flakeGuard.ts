@@ -42,7 +42,6 @@ export function installFlakeGuard(scope: string): void {
 
   process.on('unhandledRejection', (reason: unknown) => {
     unhandledCount++
-    // eslint-disable-next-line no-console
     console.error(
       `[flakeGuard:${scope}] UNHANDLED REJECTION (#${unhandledCount}):`,
       reason instanceof Error ? reason.stack ?? reason.message : String(reason),
@@ -51,7 +50,6 @@ export function installFlakeGuard(scope: string): void {
 
   process.on('uncaughtException', (err: Error) => {
     uncaughtCount++
-    // eslint-disable-next-line no-console
     console.error(
       `[flakeGuard:${scope}] UNCAUGHT EXCEPTION (#${uncaughtCount}):`,
       err.stack ?? err.message,

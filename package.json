@@ -114,6 +114,8 @@
     "vitest": "^3.2.4"
   },
   "overrides": {
-    "@electron/rebuild": "3.7.1"
+    "@electron/rebuild": "3.7.1",
+    "lodash": "^4.18.1",
+    "lodash-es": "^4.18.1"
   }
 }

@@ -128,7 +128,11 @@ visualTest.describe('Visual regression – with project', () => {
 
     const masks = [
       page.locator('.minimap'),
-      page.locator('.scrollbar')
+      page.locator('.scrollbar'),
+      // Terminal auto-opens on project load and shows ephemeral prompt/path.
+      byTestId(page, TEST_IDS.TERMINAL_PANEL),
+      // "Project Opened" toast shows the absolute project path (ephemeral tmpdir).
+      byTestId(page, TEST_IDS.TOAST_CONTAINER)
     ]
 
     await expect(page).toHaveScreenshot({ name: 'editor-loaded.png', mask: masks })

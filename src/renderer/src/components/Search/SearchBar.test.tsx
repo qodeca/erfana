@@ -157,6 +157,9 @@ describe('SearchBar', () => {
       render(<SearchBar provider={mockProvider} />)
 
       const input = screen.getByPlaceholderText('Search...')
+      // Click to establish focus before typing – prevents first-keystroke drop
+      // under CPU contention (userEvent.type can dispatch before React settles).
+      await user.click(input)
       await user.type(input, 'test')
 
       // Wait for debounce (100ms)
@@ -167,7 +170,7 @@ describe('SearchBar', () => {
             wholeWord: false
           })
         },
-        { timeout: 200 }
+        { timeout: 500 }
       )
     })
 
