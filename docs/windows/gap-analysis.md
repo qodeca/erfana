@@ -22,7 +22,7 @@ All file:line references are **verified by direct file reads** unless marked `(i
 
 | # | Gap | Location | Evidence / impact |
 |---|-----|----------|-------------------|
-| M1 | **`isWindowsLongPath` is dead code** | `src/main/services/watcher/PlatformConfig.ts:172-175` | Function exists but only its own file references it (confirmed by grep). Any path >260 chars will fail on older Windows without long-path opt-in, with no `\\?\` prefixing in file handlers. |
+| M1 | **`isWindowsLongPath` is dead code** | `src/main/services/watcher/PlatformConfig.ts:203-206` | Function exists but only its own file references it (confirmed by grep). Any path >260 chars will fail on older Windows without long-path opt-in, with no `\\?\` prefixing in file handlers. |
 | M2 | **Windows LibreOffice path not detected** | `src/main/services/import/DependencyDetector.ts` (~lines 74-90 inferred) | Hardcoded macOS bundle lookup with no Windows equivalent (`C:\Program Files\LibreOffice\program\soffice.exe`). Document import silently falls back to "dependency missing" for users without soffice in `PATH`. |
 | M3 | **Git binary allowlist is POSIX-only** | `src/main/services/workers/git-status.worker.ts:25` (inferred) | Hardcoded `['/usr/bin/git', '/usr/local/bin/git', '/opt/homebrew/bin/git']` — Windows always takes the slower `where git` fallback. Not broken, just wasteful. |
 | M4 | **PowerShell bootstrap escaping incomplete** | `src/main/services/TerminalService.ts:150` | Escapes backtick and double-quote in `cwd`, but **not `$`**. A cwd containing `$` (e.g. `C:\Users\me\$Recycle.Bin`) triggers PowerShell variable expansion during `Set-Location`. Use `-LiteralPath` instead. |

@@ -34,7 +34,7 @@ Phases 0–2 of Windows enablement landed on the `windows` branch (2026-04-21). 
 
 **Workaround**: Enable Win32 long paths per [`docs/build/windows.md`](./build/windows.md) step 5 + `git config --global core.longpaths true`.
 
-**Tracking**: [#163](https://github.com/qodeca/erfana/issues/163) (decision-deferred to Phase 6 with promotion criteria recorded inline at `PlatformConfig.ts:172`).
+**Tracking**: [#163](https://github.com/qodeca/erfana/issues/163) (decision-deferred to Phase 6 with promotion criteria recorded inline at `PlatformConfig.ts:194-201`).
 
 ---
 

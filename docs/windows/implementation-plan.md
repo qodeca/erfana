@@ -33,7 +33,7 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 **Version base:** `0.9.2` (from the develop merge). Windows work will ship in `0.9.3+` or `0.10.0` when `windows` → `develop` merge lands.
 
 **Closed 2026-04-20:** #153 (Phase 0), #156 (setJumpList), #157 (test portability), #159 (CameraDialog timer).
-**Closed 2026-04-21:** #160 (git allowlist), #161 (filename guard), #162 (LibreOffice detection). **#163 (long-path activation): decision-deferred to Phase 6** with promotion criteria recorded inline at `PlatformConfig.ts:172`.
+**Closed 2026-04-21:** #160 (git allowlist), #161 (filename guard), #162 (LibreOffice detection). **#163 (long-path activation): decision-deferred to Phase 6** with promotion criteria recorded inline at `PlatformConfig.ts:194-201` (comment block above `isWindowsLongPath` at `:203`).
 
 **Verification on Windows host (after CameraDialog fix, 2026-04-20 evening):**
 
@@ -163,7 +163,7 @@ Honest per-feature assessment of what an end user running an NSIS install of the
 
 1. **cmd.exe bootstrap** (fixes B3) — `TerminalService.ts` win32 branch
    - Spawns with `['/D', '/K', '@echo off && cd /d "<cwd>" && cd && echo <marker>']`. `/D` disables AutoRun; `/K` keeps cmd.exe interactive. **`@echo off` is critical**: without it, cmd.exe echoes the bootstrap commands back into the PTY and `markerDetector` mis-parses the echoed `echo <marker>` line as the cwd.
-   - Bare `cd` (no args) prints the working directory — the cmd.exe analog of `pwd`. The marker triggers the same handshake at `TerminalService.ts:215-254`.
+   - Bare `cd` (no args) prints the working directory — the cmd.exe analog of `pwd`. The marker triggers the same handshake at `TerminalService.ts:245-285`.
 2. **PowerShell `-LiteralPath`** (fixes M4) — `TerminalService.ts` PS branch
    - `Set-Location -LiteralPath '<single-quote-doubled cwd>'`. `-LiteralPath` disables wildcard and variable expansion; single quotes disable `$` interpolation. Marker is also single-quoted defensively (`Write-Output '<marker>'`).
    - Shell-kind detection regex: `/(?:^|[/\\])(pwsh(?:-preview)?|powershell)(?:\.exe)?$/i` — covers forward-slash Git Bash paths and `pwsh-preview.exe`.
@@ -205,8 +205,8 @@ Honest per-feature assessment of what an end user running an NSIS install of the
    - On `win32` after the `soffice` PATH probe, probes `C:\Program Files\LibreOffice\program\soffice.exe` and the (x86) variant via `tryCommand(--version)` liveness (mirrors #160's pattern; security review HIGH-severity finding addressed).
    - Optional registry probe (`reg query HKLM\SOFTWARE\LibreOffice\UNO\InstallPath`) deferred unless filesystem probe proves insufficient.
    - **Landed:** `13bd3b8` (5 new DependencyDetector tests).
-4. **[#163](https://github.com/qodeca/erfana/issues/163) — `isWindowsLongPath`** (P2, decision-deferred) — `PlatformConfig.ts:172`
-   - Decision recorded inline at `PlatformConfig.ts:172-201` with promotion criteria: re-activate as P1 if any real >260-char path victim surfaces in UAT, OR any Phase 3+ feature produces >200-char default paths.
+4. **[#163](https://github.com/qodeca/erfana/issues/163) — `isWindowsLongPath`** (P2, decision-deferred) — `PlatformConfig.ts:203`
+   - Decision recorded inline at `PlatformConfig.ts:194-201` (comment block) with promotion criteria: re-activate as P1 if any real >260-char path victim surfaces in UAT, OR any Phase 3+ feature produces >200-char default paths.
    - **Decision deferred to Phase 6** (`a2b5bd0`); helper kept in source (deletion would be worse churn).
 
 ### Post-Phase-2 review
@@ -426,13 +426,13 @@ Before merging `windows` → `develop`, confirm all of:
 ## Existing utilities to reuse
 
 - `window.api.getPlatform()` preload bridge (`preload/index.ts:963`) — already exists; consolidate renderer usage on it
-- `PlatformConfig.isWindowsLongPath()` (`PlatformConfig.ts:172`) — exists as dead code, activate it in #163
-- `ProjectService.ts:60-62` — case-insensitive path comparison pattern; reuse in any new path equality check
-- `file-handlers.ts:483-492` — Windows system-path blocklist pattern; reuse shape for reserved-name guard in #161
+- `PlatformConfig.isWindowsLongPath()` (`PlatformConfig.ts:203`) — exists as dead code, activate it in #163
+- `ProjectService.ts:59-63` — case-insensitive path comparison pattern; reuse in any new path equality check
+- `file-handlers.ts:464` — Windows system-path blocklist pattern; reuse shape for reserved-name guard in #161
 - `AppError` + `ErrorCode` — all new errors go through this
 - `execFile` (not `exec`) — existing pattern throughout; maintain for injection safety
 - `ffmpeg-static` / `ffprobe-static` — already cross-platform, no changes
-- Existing `markerDetector` handshake in `TerminalService.ts:215-254` — reused by the cmd.exe bootstrap (Phase 1 landed)
+- Existing `markerDetector` handshake in `TerminalService.ts:245-285` — reused by the cmd.exe bootstrap (Phase 1 landed)
 - `WindowsBootstrapBuilder` strategy (`WindowsTerminalBootstrap.ts`) — Phase 1 landed; **add new builder for Git Bash / WSL in Phase 6**, don't re-branch
 
 ---

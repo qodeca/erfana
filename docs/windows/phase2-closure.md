@@ -4,14 +4,14 @@
 
 ## Context
 
-Phase 2 implementation is substantively complete on the `windows` branch as of 2026-04-21. All four sub-issues landed: #160 (git allowlist + liveness), #161 (reserved-filename guard with bidi-override defence), #162 (LibreOffice Windows detection + liveness), #163 (long-path activation deferred to Phase 6 with promotion criteria). The 4-reviewer audit is complete; shared `flakeGuard.ts` deployed; 23+ consecutive clean `test:renderer` runs since. See the merge-readiness gate at [`implementation-plan.md:410-420`](implementation-plan.md) for the authoritative completion criteria.
+Phase 2 implementation is substantively complete on the `windows` branch as of 2026-04-21. All four sub-issues landed: #160 (git allowlist + liveness), #161 (reserved-filename guard with bidi-override defence), #162 (LibreOffice Windows detection + liveness), #163 (long-path activation deferred to Phase 6 with promotion criteria). The 4-reviewer audit is complete; shared `flakeGuard.ts` deployed; 23+ consecutive clean `test:renderer` runs since. See the merge-readiness gate at [`implementation-plan.md` § Merge-to-develop readiness](implementation-plan.md#merge-to-develop-readiness) for the authoritative completion criteria.
 
 ## Streams (A–G)
 
 ### Stream A – User-only validation (blocked on user)
 
 #### A1. Phase 1 manual UAT on Windows host
-Source: [`implementation-plan.md:64-68`](implementation-plan.md). Four checklist items (shell cwd, cmd.exe force, Ctrl+C interrupt, ampersand path error); ~15 min. Report pass/fail in PR.
+Source: [`implementation-plan.md` § Manual UAT](implementation-plan.md#manual-uat-must-run-on-a-real-windows-host-before-declaring-phase-1-done). Four checklist items (shell cwd, cmd.exe force, Ctrl+C interrupt, ampersand path error); ~15 min. Report pass/fail in PR.
 
 #### A2. macOS regression check
 Re-verify Phase 2 changes do not regress macOS: `npm run test:cov` (all 3 projects), `npm run build:mac`, dev smoke-test. Expected: test exit 0, DMGs produced. ~10 min wall clock.
@@ -71,7 +71,7 @@ A is the long pole (user Windows + macOS testing). B/C/D run in parallel.
 - **Merge style**: merge-commit — preserves per-issue commit trail + review findings
 - **Dependabot**: triage individually; trivial bumps merge before Phase 2 PR; risky ones defer with comment
 - **`windows` branch**: delete after merge; per-phase feature branches (`feature/windows-phase-3-*`) off develop
-- **Long-path activation (#163)**: deferred to Phase 6 with promotion criteria recorded at `PlatformConfig.ts:172`
+- **Long-path activation (#163)**: deferred to Phase 6 with promotion criteria recorded at `PlatformConfig.ts:194-201` (comment above `isWindowsLongPath` at `:203`)
 - **LibreOffice registry probe (#162)**: deferred unless filesystem probe proves insufficient
 - **`INVALID_FILENAME_MARKER` shared constant**: chosen over structured-error IPC serialization (D4 deferred to Phase 6)
 - **Bidi regex `u` flag (CRITICAL)**: hex-escape ranges + `u` flag for engine-consistent code-point matching
