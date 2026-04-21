@@ -1,5 +1,7 @@
 # Deferred work — Phase 2 review aftermath
 
+**GitHub-tracked under [#168](https://github.com/qodeca/erfana/issues/168)** (meta-issue indexing all D1–D8 items by target phase). Close that issue when all items here are resolved or accepted as won't-fix.
+
 This document tracks every item that surfaced during the four-reviewer audit of Phase 2 (#160–#163) and was **explicitly deferred** rather than fixed in the same commit. Each entry has:
 
 - **Severity** as flagged by the reviewer

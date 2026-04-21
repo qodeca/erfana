@@ -18,6 +18,8 @@ Phase 0 + Phase 1 + Phase 2 of the Windows enablement roadmap landed on the `win
   - **#162 LibreOffice Windows detection** — DependencyDetector probes Program Files paths with `--version` liveness.
   - **#163 long-path activation** — deferred to Phase 6 with promotion criteria recorded inline at `PlatformConfig.ts:172`.
 - **#159 CameraDialog timer cleanup** + **`flakeGuard.ts`** shared post-teardown error catcher across all 3 vitest projects (no more invisible "Errors 1 error" reports).
+- **Security**: `@xmldom/xmldom` bumped 0.8.11 → 0.8.13 (transitive via `@turbodocx/html-to-docx`, prod-reachable on DOCX export path; pre-empts Dependabot PR #145).
+- **Phase 3-6 + deferred-work tracked on GitHub**: [#164](https://github.com/qodeca/erfana/issues/164) (screenshot parity), [#165](https://github.com/qodeca/erfana/issues/165) (local Whisper Windows binary), [#166](https://github.com/qodeca/erfana/issues/166) (distribution + signing), [#167](https://github.com/qodeca/erfana/issues/167) (polish + CI guard), [#168](https://github.com/qodeca/erfana/issues/168) (D1-D8 meta), [#169](https://github.com/qodeca/erfana/issues/169) (Dependabot triage + 28 security alerts).
 
 Known gaps (deferred to Phases 3–6): screenshots, local Whisper, auto-updater URL, code signing, long-path `\\?\` activation, structured-error IPC serialization (D4).
 
