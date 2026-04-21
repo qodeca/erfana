@@ -221,28 +221,16 @@ Emitted when directory changes (after 1000ms debounce).
 
 **File:** `src/main/services/FileService.ts`
 
+**Filename validation (#161, Phase 2)**: `createFile`, `createFolder`, and `rename` invoke `assertValidUserFilename` from `src/main/utils/validateFilename.ts` after stripping path separators. Throws `AppError(INVALID_FILENAME)` for Windows-reserved names (`CON`, `PRN`, `COM1-9`, `LPT1-9`), forbidden chars (`<>:"/\|?*` on Windows), trailing dots/spaces (Windows), control chars, Unicode bidi overrides (security), empty, or > 255 chars. POSIX-only checks (control + bidi + length + empty) run on every platform.
+
+`PdfService.getSavePath` and `DocxService.sanitizeFilename` use the sister `deriveSafeFilename(name, fallback?)` total function (silent transform, never throws). See `src/main/utils/validateFilename.ts` JSDoc for full pipeline order.
+
 File operations with validation and error handling.
 
 ### Public Methods
 
-#### `readFile(filePath: string): Promise<string>`
-Read file contents.
-
-**Parameters:**
-- `filePath` - Absolute path to file
-
-**Returns:** File contents as UTF-8 string.
-
-**Throws:** Error if file not found or read fails.
-
----
-
-#### `writeFile(filePath: string, content: string): Promise<void>`
-Write file contents.
-
-**Parameters:**
-- `filePath` - Absolute path to file
-- `content` - File contents
+#### `readFile(filePath: string): Promise<string>` / `writeFile(filePath, content): Promise<void>`
+Read or write file contents (UTF-8). Throws on FS error.
 
 **Throws:** Error if write fails.
 

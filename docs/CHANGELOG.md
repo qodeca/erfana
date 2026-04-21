@@ -8,21 +8,18 @@ Historical changelog entries for versions prior to current. For the latest chang
 
 ### Platform support (Windows)
 
-Phase 0 (unblock Windows dev loop) and Phase 1 (terminal parity) of the Windows enablement roadmap landed on the `windows` branch but have **not yet merged to `develop`**. Will ship in a future release (0.9.3+ or 0.10.0). See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for canonical status and the full working/broken/degraded feature table. Highlights:
+Phase 0 + Phase 1 + Phase 2 of the Windows enablement roadmap landed on the `windows` branch (not yet merged to `develop`; will ship in 0.9.3+ or 0.10.0). See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for canonical status / [`docs/windows/deferred-work.md`](./windows/deferred-work.md) for tracked deferrals (D1–D8). Summary:
 
-- **Portable dev scripts** (Phase 0, #153) — `scripts/test-cov.mjs` + `scripts/prebuild.mjs`, `rimraf` + `shx` devDeps, `docs/build/windows.md` prerequisites.
-- **Test path portability** (Phase 0, #157) — 24 test files moved to `path.join(os.tmpdir(), ...)`; `os.tmpdir()` mocks passthrough via `importOriginal`. `npm run test:main` green on Windows (238 files / 7405 tests / 0 failures). Test-only, no production changes.
-- **`app.setJumpList` mock + SearchBar focus-trap fix** (Phase 0, #156, #153).
-- **Terminal parity** (Phase 1, #154) — cmd.exe `@echo off` bootstrap; PowerShell `Set-Location -LiteralPath`; `resolveWindowsShell()` fallback chain; cwd validation deny-list with `emit('error')` contract; `WindowsBootstrapBuilder` strategy in `WindowsTerminalBootstrap.ts`. 68+ tests.
-- **NSIS installer** — `npm run build:win` produces a fused, signtool-signed NSIS installer (316 MB). Requires Developer Mode on build host.
-- **CameraDialog timer cleanup** (#159) — shutter-animation `setTimeout` had no cleanup; fired against a torn-down React tree during vitest teardown → `ReferenceError` and exit-1 on macOS. Fixed by tracking timer id in a ref and clearing on unmount.
-- **Phase 2 sub-issues #160, #161, #162 landed** (2026-04-21):
-  - **#160 git allowlist** — adds `C:\Program Files\Git\cmd|bin\git.exe`, x86 variants, Chocolatey, Scoop paths to the worker's git resolver. Fixes Windows `fs.access(X_OK)` existence-only degradation with a `git --version` liveness probe. Tree status indicators now work on stock Windows without manual PATH edits.
-  - **#161 reserved-filename guard** — extracts DocxService's filename sanitizer to a shared `validateFilename` util, adds Unicode bidi-override stripping (security), wires `assertValidUserFilename` into FileService create/rename and `deriveSafeFilename` into PdfService save paths. Friendly error toast `"CON.md" is not a valid filename — try "_CON.md"` instead of cryptic EINVAL.
-  - **#162 LibreOffice Windows detection** — DependencyDetector probes `C:\Program Files\LibreOffice\program\soffice.exe` (and `(x86)`) when `soffice` is not on PATH. DOCX import works on default Windows installs.
-  - **#163 long-path activation: deferred to Phase 6** with documented promotion criteria.
+- **Phase 0 (#153 closed)** — portable `test:cov` + `prebuild` scripts, `docs/build/windows.md` prerequisites, test path portability (#157), `app.setJumpList` mock (#156), SearchBar focus-trap fix, NSIS installer (316 MB, fused + signed; requires Developer Mode on build host).
+- **Phase 1 (#154 closed)** — terminal parity: cmd.exe `@echo off` bootstrap, PowerShell `Set-Location -LiteralPath`, `resolveWindowsShell()` fallback chain, cwd validation deny-list, `WindowsBootstrapBuilder` strategy. 68+ tests.
+- **Phase 2 (#155 umbrella closed)** — sub-issues:
+  - **#160 git allowlist** — Program Files (64+32), Chocolatey, Scoop paths + `git --version` liveness probe (fixes Windows `fs.access(X_OK)` existence-only degradation).
+  - **#161 reserved-filename guard** — shared `validateFilename` util with Unicode bidi-override stripping (Trojan Source defence); wired into `FileService` (throws) + Pdf/DocxService (transform). Friendly error toasts via `INVALID_FILENAME_MARKER` shared constant.
+  - **#162 LibreOffice Windows detection** — DependencyDetector probes Program Files paths with `--version` liveness.
+  - **#163 long-path activation** — deferred to Phase 6 with promotion criteria recorded inline at `PlatformConfig.ts:172`.
+- **#159 CameraDialog timer cleanup** + **`flakeGuard.ts`** shared post-teardown error catcher across all 3 vitest projects (no more invisible "Errors 1 error" reports).
 
-Known gaps (deferred to Phases 3–6): screenshots, local Whisper, auto-updater URL, code signing, long-path `\\?\` activation.
+Known gaps (deferred to Phases 3–6): screenshots, local Whisper, auto-updater URL, code signing, long-path `\\?\` activation, structured-error IPC serialization (D4).
 
 ---
 
@@ -490,25 +487,10 @@ Known gaps (deferred to Phases 3–6): screenshots, local Whisper, auto-updater 
   - 182 new tests
   - **Total: 4226 tests passing** (139 test files)
   - Closes #49
-- **Global Settings Service** (Dec 21, 2025):
-  - Application-wide settings service with Zod schema validation
-  - Settings persisted to `~/.erfana/settings.json`
-  - Corruption handling: backup to `.bak`, reset to defaults
-  - 71 new tests
-  - Closes #50
-- **Visualize Prompt** (Dec 21, 2025):
-  - Added "Visualize" prompt to Preview context menu for AI-powered Mermaid diagram generation
-  - Dialog with dropdown for 22 Mermaid diagram types
-  - 4 new tests
-  - Closes #57
-- **Settings Overlay** (Dec 21, 2025):
-  - Full-screen settings overlay with keyboard navigation and focus management
-  - 26 new tests
-  - Closes #48
-- **2025 Security Hardening** (Dec 2, 2025):
-  - Electron 33.2.1 → 39.2.4 (Chromium 142, Node.js 22.20.0, V8 14.2)
-  - Process sandboxing enabled, Electron fuses implemented (3 of 6)
-  - electron-builder 26.0.0 with automated workarounds
+- **Global Settings Service** (Dec 21, 2025) — Zod-validated app-wide settings at `~/.erfana/settings.json`, `.bak` corruption recovery, 71 tests. Closes #50.
+- **Visualize Prompt** (Dec 21, 2025) — AI-powered Mermaid generation from Preview context menu, dialog with 22 diagram types, 4 tests. Closes #57.
+- **Settings Overlay** (Dec 21, 2025) — Full-screen settings with keyboard navigation + focus management, 26 tests. Closes #48.
+- **2025 Security Hardening** (Dec 2, 2025) — Electron 33.2.1 → 39.2.4 (Chromium 142, Node 22.20.0, V8 14.2), process sandboxing enabled, 3 of 6 Electron fuses, electron-builder 26.0.0.
 
 ---
 

@@ -1,10 +1,6 @@
 # API Services - Feature Services
 
-**Location:** `src/main/services/`
-
-Feature-specific services for git integration (including worker thread offloading), multi-instance support, media capture, transcription, audio extraction, and file import.
-
-See [api-services.md](./api-services.md) for core services (Terminal, File, Settings, Watchers).
+**Location:** `src/main/services/`. Feature-specific: git (worker), multi-instance, media capture, transcription, audio extraction, file import. Core services (Terminal, File, Settings, Watchers): see [api-services.md](./api-services.md).
 
 ---
 
@@ -500,6 +496,4 @@ Generate DOCX from HTML with embedded images.
 
 ---
 
-## See Also
-
-- [API Services - Core](./api-services.md), [Architecture](./architecture.md), [IPC Patterns](./ipc-patterns.md), [Terminal](./terminal/README.md), [Drag-Drop](./drag-drop/README.md)
+**See Also:** [API Services - Core](./api-services.md) · [Architecture](./architecture.md) · [IPC](./ipc-patterns.md) · [Terminal](./terminal/README.md) · [Drag-Drop](./drag-drop/README.md)

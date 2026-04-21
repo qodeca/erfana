@@ -443,13 +443,9 @@ moveItem: (sourcePath, targetParentPath, newName?) =>
 
 ### Future Enhancements
 
-- **Undo/Redo System**: Track operation history with reverse operations
-- **Multi-Select Drag**: Shift+Click range, Ctrl+Click individual selection
-- **Custom Drag Previews**: Show file icon + name, count for multi-select
-- **Auto-Open on Hover**: Expand folders during drag after 1s hover
-- **Progress Indicators**: Show progress for large operations with cancel option
+Undo/redo, multi-select drag (Shift/Ctrl+Click), custom drag previews, auto-open on hover (1s), progress indicators with cancel.
 
-See: [Drag-Drop Implementation](./drag-drop/README.md) | [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md) | [Security](./security.md) | [Testing](./testing/README.md)
+See: [Drag-Drop](./drag-drop/README.md) · [IPC](./ipc-patterns.md) · [UI](./ui-components.md) · [Security](./security.md) · [Testing](./testing/README.md)
 
 ## ProjectTree Modularization
 
@@ -474,6 +470,10 @@ See: [Drag-Drop Implementation](./drag-drop/README.md) | [IPC Patterns](./ipc-pa
 - `chatBubble.logic.ts` - Validation helpers for diagram chat (testable without React)
 - `diagramViewer.logic.ts` - Zoom/pan calculations (pure transformations)
 - `mermaidDirections.ts` - Chart type detection and direction parsing
+
+**Shared utility patterns** (cross-platform / cross-process):
+- `src/main/utils/validateFilename.ts` (#161, Phase 2) — two self-documenting entry points: `assertValidUserFilename` throws on invalid input (FileService callers); `deriveSafeFilename` is a total function that silently transforms (Pdf/DocxService callers). Single 9-step pipeline, platform-aware policy, security checks (Unicode bidi-override stripping). Renderer detects via shared `INVALID_FILENAME_MARKER` constant in `src/shared/errors.ts` since `AppError.code` does not survive Electron IPC.
+- `tests/setup/flakeGuard.ts` — surfaces post-teardown unhandled rejections / uncaught exceptions across all 3 vitest projects with scope-labeled stack traces. Exposes counters on `globalThis.__flakeGuardCount__` for future CI assertions.
 
 **SOLID Principles Applied**:
 - Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion

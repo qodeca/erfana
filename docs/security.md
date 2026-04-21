@@ -351,28 +351,19 @@ See [HTML Rendering](./markdown-editing.md#html-rendering-in-markdown) for detai
 
 ## Input Validation
 
-All IPC handlers validate inputs using **Zod schemas**:
+### Filename validation (#161, Phase 2)
 
-```typescript
-// Example: File path validation
-import { z } from 'zod';
+`src/main/utils/validateFilename.ts` provides cross-platform filename validation wired into `FileService.createFile`/`createFolder`/`rename` (throws `AppError(INVALID_FILENAME)`) and `PdfService`/`DocxService` (silent transform via `deriveSafeFilename`). Security-relevant rejections on **every platform** (not just Windows):
 
-const FilePathSchema = z.object({
-  path: z.string().min(1),
-});
+- **Unicode bidi-override chars** (U+202A–202E, U+2066–2069, U+200E, U+200F) — prevents Trojan-Source RTL extension spoofing (`cod‮gnp.exe` displaying as `codeexe.png`)
+- **C0 control chars** (0x00–0x1F)
+- **Empty / whitespace-only** filenames
 
-ipcMain.handle('files:read', async (_, args) => {
-  const { path } = FilePathSchema.parse(args);
+Windows-only rejections: reserved basenames (CON, PRN, COM1-9, LPT1-9), forbidden chars `<>:"/\|?*`, trailing dots/spaces. Path-separator strip happens BEFORE validation in `FileService.createFile`/`createFolder`/`rename` to prevent path traversal (`../../etc/passwd` → `etcpasswd`).
 
-  // Additional validation
-  if (path.includes('..')) {
-    throw new Error('Path traversal not allowed');
-  }
+### Zod schema validation
 
-  // Safe to use
-  return await fs.readFile(path, 'utf-8');
-});
-```
+All IPC handlers validate inputs using **Zod schemas** (`src/shared/ipc/*-schema.ts`). Pattern: parse args with `Schema.parse()` at handler entry, then run additional validation (e.g. path-traversal check) before any FS operation. See `src/main/ipc/file-handlers.ts` for canonical examples.
 
 ### Validation Rules:
 
