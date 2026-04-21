@@ -18,8 +18,8 @@ The goal is so that no review finding silently rots: every deferred item has a k
 |---|---|
 | **Phase 4** (whisper, OCP cleanup window) | D1 `resolvePlatformBinary` extraction, D2 `MAX_FILENAME_LENGTH` consolidation, D3 `ExportLock` deduplication |
 | **Phase 5** (distribution + signing) | D6 `DependencyDetector` cache TTL |
-| **Phase 6** (polish + CI guard) | D4 Structured-error IPC serialization, D5 Log-redaction pass for filename PII |
-| **Tracked-only** (no scheduled phase) | D7 Filename PII 40-char truncation review, D8 IPC serialization ADR |
+| **Phase 6** (polish + CI guard) | D4 Structured-error IPC serialization, D5 Log-redaction pass for filename PII, D7 Filename PII 40-char truncation review (bundled with D5) |
+| **Tracked-only** (no scheduled phase) | D8 IPC serialization ADR |
 
 ---
 

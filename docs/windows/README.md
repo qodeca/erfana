@@ -23,17 +23,17 @@ The goal is **full Windows parity** — every feature that works on macOS must w
 | [`gap-analysis.md`](gap-analysis.md) | Verified inventory of every Windows-related gap, grouped by severity (P0/P1/P2) with file:line references. |
 | [`../build/windows.md`](../build/windows.md) | Windows dev environment setup (Node 24, Python 3.12, VS 2022 Build Tools, Developer Mode, long paths, troubleshooting, contributor expectations). |
 
-## Status (as of 2026-04-20)
+## Status (as of 2026-04-21)
 
 | Phase | Scope | Issue | Status |
 |-------|-------|-------|--------|
 | **Phase 0** — Unblock Windows dev loop | Portable scripts, prerequisites docs, test path portability, setJumpList mock, SearchBar fix, NSIS smoke | [#153](https://github.com/qodeca/erfana/issues/153) | ✅ **Closed 2026-04-20** — all 5 ACs met; macOS regression verified |
 | **Phase 1** — Terminal parity | cmd.exe bootstrap, PowerShell `-LiteralPath`, shell fallback chain, cwd validation, `WindowsBootstrapBuilder` strategy | [#154](https://github.com/qodeca/erfana/issues/154) | **Landed**; manual UAT pending on Windows host |
-| Phase 2 — File ops, deps, filenames, long paths | Git allowlist, reserved filename guard, LibreOffice detection, long-path activation | [#155](https://github.com/qodeca/erfana/issues/155) (umbrella) | **3 of 4 sub-issues landed 2026-04-21** — #160, #161, #162 closed; #163 deferred to Phase 6 |
-| Phase 3 — Screenshot parity | `desktopCapturer` strategy + area-selection overlay | _not yet filed_ | Pending |
-| Phase 4 — Local Whisper parity | `getArchSuffix()` cross-platform, Windows binary layout | _not yet filed_ | Pending |
-| Phase 5 — Distribution hygiene | Auto-update URL, code signing, NSIS tweaks | _not yet filed_ | Pending |
-| Phase 6 — Polish & DX | Platform detection migration, Camera verification, known-issues doc, visual baselines, Windows CI guard, #158 v8 coverage fix | _not yet filed_ | Pending |
+| **Phase 2** — File ops, deps, filenames, long paths | Git allowlist, reserved filename guard, LibreOffice detection, long-path activation | [#155](https://github.com/qodeca/erfana/issues/155) (umbrella) | ✅ **Closed 2026-04-21** — #160, #161, #162 landed; #163 deferred to Phase 6 |
+| Phase 3 — Screenshot parity | `desktopCapturer` strategy + area-selection overlay | [#164](https://github.com/qodeca/erfana/issues/164) | Pending |
+| Phase 4 — Local Whisper parity | `getArchSuffix()` cross-platform, Windows binary layout | [#165](https://github.com/qodeca/erfana/issues/165) | Pending |
+| Phase 5 — Distribution hygiene | Auto-update URL, code signing, NSIS tweaks | [#166](https://github.com/qodeca/erfana/issues/166) | Pending |
+| Phase 6 — Polish & DX | Platform detection migration, Camera verification, known-issues doc, visual baselines, Windows CI guard, #158 v8 coverage fix | [#167](https://github.com/qodeca/erfana/issues/167) | Pending |
 
 ### Closed issues contributing to Phase 0
 
@@ -48,11 +48,12 @@ The goal is **full Windows parity** — every feature that works on macOS must w
 
 ### Open issues (deferred to future phases)
 
-| Issue | Description | Priority |
+| Issue | Description | Target |
 |---|---|---|
-| [#158](https://github.com/qodeca/erfana/issues/158) | v8 coverage provider ENOENT race in `test:cov` on Windows | Deferred to Phase 6 |
-
-Phases 1 and 2 can run in parallel. Phase 2 sub-issues (#155a–d) are independent and can be worked in any order — recommended priority: #155b (git allowlist) → #155c (filename guard) → #155a (LibreOffice) → #155d (long paths).
+| [#158](https://github.com/qodeca/erfana/issues/158) | v8 coverage provider ENOENT race in `test:cov` on Windows | Phase 6 (#167) |
+| [#163](https://github.com/qodeca/erfana/issues/163) | Long-path `\\?\` prefix activation (decision-deferred with promotion criteria) | Phase 6 (#167) |
+| [#168](https://github.com/qodeca/erfana/issues/168) | Meta: track Phase 2 deferred items D1–D8 | Phases 4-6 |
+| [#169](https://github.com/qodeca/erfana/issues/169) | Dependabot triage + 28 security alerts | Post-merge cycle |
 
 ## How the analysis was produced
 

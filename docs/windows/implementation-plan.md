@@ -384,7 +384,7 @@ On Windows after `git pull --ff-only origin windows`:
 
 - Phase work on feature branch: `fix/windows-<phase-or-issue>-<N>` (e.g. `fix/windows-test-portability-157`)
 - Merge to `windows` (integration branch) with `--no-ff` to preserve review trail
-- Final merge `windows` → `develop` only after all Phase 0–1 manual UAT passes AND at least Phase 2 sub-issues #160 + #161 are landed
+- Final merge `windows` → `develop` only after Phase 0–1 manual UAT passes AND all Phase 2 sub-issues #160, #161, #162 are landed (#163 deferred to Phase 6 with promotion criteria — does not block)
 - **Do NOT** merge `windows` → `develop` before Phase 1 UAT is verified on a real Windows host
 
 ### Merge-to-develop readiness
@@ -443,7 +443,7 @@ Target: clean Windows 11 VM, no prior Erfana install, no Python / VS Build Tools
 
 1. **Dev loop (Phase 0):** follow `docs/build/windows.md` from scratch → `npm install` → `npm run dev` → app launches.
 2. **Terminal (Phase 1):** open a project at `C:\Users\<me>\Dev\$weird-name` → PowerShell terminal opens, prompt is clean. Switch to cmd.exe → opens clean, CWD is correct, marker handshake completes, `Ctrl+C` interrupts a `ping -t` loop.
-3. **File ops (Phase 2):** create `CON.md` → user-friendly error (#161). Open a project with a >260-char path → files still open (#163 option A). Drag-drop a `.docx` → converts via LibreOffice (#162).
+3. **File ops (Phase 2):** create `CON.md` → user-friendly error toast (#161). Drag-drop a `.docx` with LibreOffice not on PATH → converts via Program Files probe (#162). (Long paths >260 chars still require user-enabled Win32 long-path GP setting per #163 deferral.)
 4. **Git status (Phase 2):** open a git repo → tree shows status indicators → manual refresh (`Ctrl+Alt+R`) works (#160).
 5. **Screenshots (Phase 3):** full-screen, window-picker, area-selection all capture; dual-monitor picks the right display; path pastes into terminal.
 6. **Whisper (Phase 4):** settings → enable local Whisper → download `tiny` model → import an MP3 → transcription succeeds offline.
