@@ -18,7 +18,7 @@ vi.mock('child_process', () => ({
 // Mock fs/promises before importing DependencyDetector
 vi.mock('fs/promises', () => ({
   access: vi.fn(),
-  constants: { X_OK: 1 }
+  constants: { X_OK: 1, F_OK: 0 }
 }))
 
 import { execFile } from 'child_process'
@@ -427,6 +427,78 @@ describe('DependencyDetector', () => {
 
       expect(result.libreOffice).toBe(true)
       // access() should not be called when PATH-based detection succeeds
+      expect(mockedAccess).not.toHaveBeenCalled()
+    })
+  })
+
+  // --------------------------------------------------------------------------
+  // Windows install-path fallback (#162)
+  // --------------------------------------------------------------------------
+
+  describe('Windows install-path fallback (#162)', () => {
+    it('detects libreOffice via Program Files path on win32 when soffice command fails', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+
+      // soffice on PATH fails, but Program Files path is accessible
+      setupExecFileMock({ magick: true })
+      mockedAccess.mockImplementation(async (path: unknown) => {
+        if (path === 'C:\\Program Files\\LibreOffice\\program\\soffice.exe') return
+        throw new Error('ENOENT')
+      })
+
+      const result = await detector.detect()
+
+      expect(result.libreOffice).toBe(true)
+      expect(mockedAccess).toHaveBeenCalledWith(
+        'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+        0, // F_OK
+      )
+    })
+
+    it('detects libreOffice via Program Files (x86) path when 64-bit path is missing', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+
+      setupExecFileMock({ magick: true })
+      mockedAccess.mockImplementation(async (path: unknown) => {
+        if (path === 'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe') return
+        throw new Error('ENOENT')
+      })
+
+      const result = await detector.detect()
+
+      expect(result.libreOffice).toBe(true)
+    })
+
+    it('returns false when both Program Files paths are inaccessible and PATH probe fails', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+
+      setupExecFileMock({})
+      mockedAccess.mockRejectedValue(new Error('ENOENT'))
+
+      const result = await detector.detect()
+
+      expect(result.libreOffice).toBe(false)
+    })
+
+    it('does NOT probe Windows paths on linux (POSIX regression)', async () => {
+      Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+
+      setupExecFileMock({})
+
+      await detector.detect()
+
+      expect(mockedAccess).not.toHaveBeenCalled()
+    })
+
+    it('prefers PATH-based soffice over Windows install paths', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+
+      // soffice on PATH succeeds – no need for install-path probe
+      setupExecFileMock({ soffice: true })
+
+      const result = await detector.detect()
+
+      expect(result.libreOffice).toBe(true)
       expect(mockedAccess).not.toHaveBeenCalled()
     })
   })

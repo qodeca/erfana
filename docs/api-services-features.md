@@ -447,7 +447,8 @@ Runtime detection of optional system tools for document import.
 - Checks LibreOffice (`soffice --version`) and ImageMagick (`magick --version`, v6 `convert` fallback)
 - 5-second timeout per command via `execFile` (no shell – safe from injection)
 - Session-level caching (single detection, concurrent calls share one promise)
-- macOS bundle path fallback for LibreOffice
+- macOS bundle path fallback for LibreOffice (`/Applications/LibreOffice.app/...`)
+- Windows install-path fallback for LibreOffice (#162): probes `C:\Program Files\LibreOffice\program\soffice.exe` and the `(x86)` 32-bit equivalent when `soffice` is not on `PATH`
 - Non-blocking – never blocks app startup
 
 ### Public methods

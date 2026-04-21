@@ -9,6 +9,17 @@ const DETECTION_TIMEOUT_MS = 5000
 const MACOS_LIBREOFFICE_PATH = '/Applications/LibreOffice.app/Contents/MacOS/soffice'
 
 /**
+ * Standard Windows install locations for LibreOffice (#162).
+ * Probed in priority order when `soffice` is not on PATH. The user-installer
+ * defaults to `Program Files\LibreOffice\program\soffice.exe`; the 32-bit
+ * installer on a 64-bit Windows lands in `Program Files (x86)`.
+ */
+const WIN32_LIBREOFFICE_PATHS = [
+  'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+  'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+]
+
+/**
  * Dependency detector service
  *
  * Checks for optional system tools (LibreOffice, ImageMagick) required
@@ -69,7 +80,8 @@ export class DependencyDetector {
    *
    * Strategy:
    * 1. Try `soffice --version` (works if soffice is on PATH)
-   * 2. On macOS, fall back to the known bundle path
+   * 2. On macOS, fall back to the known .app bundle path
+   * 3. On Windows (#162), fall back to standard Program Files locations
    */
   private async detectLibreOffice(): Promise<boolean> {
     // Try PATH-based detection first
@@ -85,6 +97,20 @@ export class DependencyDetector {
       } catch {
         return false
       }
+    }
+
+    // Windows fallback (#162): probe standard install locations.
+    // F_OK only — `X_OK` is existence-only on Windows anyway, and we don't
+    // need a liveness probe here because LibreOffice itself will fail loudly
+    // at use-time if the binary is corrupt.
+    if (process.platform === 'win32') {
+      for (const candidate of WIN32_LIBREOFFICE_PATHS) {
+        try {
+          await access(candidate, constants.F_OK)
+          return true
+        } catch { /* try next */ }
+      }
+      return false
     }
 
     return false
