@@ -4,6 +4,60 @@ Current issues and their workarounds. For historical resolved issues, see [archi
 
 ---
 
+## Windows-specific issues
+
+Phases 0–2 of Windows enablement landed on the `windows` branch (2026-04-21). The following gaps remain user-visible until Phases 3–6 ship. See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for the canonical roadmap.
+
+### SmartScreen warning on first launch
+
+**Issue**: First-time launch of the NSIS installer triggers a Windows SmartScreen warning (`Windows protected your PC`) because Erfana is not yet code-signed.
+
+**Workaround**: Right-click the `.exe` → Properties → Unblock; OR click "More info → Run anyway" in the SmartScreen dialog.
+
+**Tracking**: [#166](https://github.com/qodeca/erfana/issues/166) (Phase 5 — code-signing).
+
+---
+
+### `npm run test:cov` exits 1 on Windows
+
+**Issue**: All tests pass but vitest's v8 coverage aggregator hits an `ENOENT` race on Windows NTFS during the `coverage/.tmp` cleanup step. Wrapper exits with code 1 even though the test suite is green.
+
+**Workaround**: Run `npx vitest --run --config vitest.main.ts --coverage` directly (exits 0). On macOS the wrapper exits 0 normally.
+
+**Tracking**: [#158](https://github.com/qodeca/erfana/issues/158) (Phase 6 — switch coverage provider to Istanbul OR reduce parallelism on Windows).
+
+---
+
+### Long paths (>260 chars) require user opt-in
+
+**Issue**: File operations on paths longer than 260 chars fail unless the user enabled the Win32 long-paths group-policy setting. The `isWindowsLongPath` helper that would auto-prefix `\\?\` is dead code.
+
+**Workaround**: Enable Win32 long paths per [`docs/build/windows.md`](./build/windows.md) step 5 + `git config --global core.longpaths true`.
+
+**Tracking**: [#163](https://github.com/qodeca/erfana/issues/163) (decision-deferred to Phase 6 with promotion criteria recorded inline at `PlatformConfig.ts:172`).
+
+---
+
+### Local Whisper transcription unavailable on Windows
+
+**Issue**: `WhisperModelManager.getArchSuffix()` throws on `process.platform !== 'darwin'`. Both model download and transcription fail with a clear error.
+
+**Workaround**: Use the OpenAI API transcription backend (Settings → Transcription → Backend → OpenAI API). Cross-platform, requires API key.
+
+**Tracking**: [#165](https://github.com/qodeca/erfana/issues/165) (Phase 4 — port whisper.cpp Windows binaries).
+
+---
+
+### Screenshot capture unavailable on Windows
+
+**Issue**: `ScreenshotService.ts` is gated `process.platform !== 'darwin'`; the entire screenshot button is non-functional on Windows.
+
+**Workaround**: Use the OS-native screenshot tools (Win+Shift+S Snipping Tool); paste image path into the terminal manually.
+
+**Tracking**: [#164](https://github.com/qodeca/erfana/issues/164) (Phase 3 — Electron `desktopCapturer` strategy + area-selection overlay).
+
+---
+
 ## Active Issues
 
 ### Git Status: Global .gitignore not supported

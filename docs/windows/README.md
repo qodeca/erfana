@@ -23,37 +23,11 @@ The goal is **full Windows parity** — every feature that works on macOS must w
 | [`gap-analysis.md`](gap-analysis.md) | Verified inventory of every Windows-related gap, grouped by severity (P0/P1/P2) with file:line references. |
 | [`../build/windows.md`](../build/windows.md) | Windows dev environment setup (Node 24, Python 3.12, VS 2022 Build Tools, Developer Mode, long paths, troubleshooting, contributor expectations). |
 
-## Status (as of 2026-04-21)
+## Status
 
-| Phase | Scope | Issue | Status |
-|-------|-------|-------|--------|
-| **Phase 0** — Unblock Windows dev loop | Portable scripts, prerequisites docs, test path portability, setJumpList mock, SearchBar fix, NSIS smoke | [#153](https://github.com/qodeca/erfana/issues/153) | ✅ **Closed 2026-04-20** — all 5 ACs met; macOS regression verified |
-| **Phase 1** — Terminal parity | cmd.exe bootstrap, PowerShell `-LiteralPath`, shell fallback chain, cwd validation, `WindowsBootstrapBuilder` strategy | [#154](https://github.com/qodeca/erfana/issues/154) | **Landed**; manual UAT pending on Windows host |
-| **Phase 2** — File ops, deps, filenames, long paths | Git allowlist, reserved filename guard, LibreOffice detection, long-path activation | [#155](https://github.com/qodeca/erfana/issues/155) (umbrella) | ✅ **Closed 2026-04-21** — #160, #161, #162 landed; #163 deferred to Phase 6 |
-| Phase 3 — Screenshot parity | `desktopCapturer` strategy + area-selection overlay | [#164](https://github.com/qodeca/erfana/issues/164) | Pending |
-| Phase 4 — Local Whisper parity | `getArchSuffix()` cross-platform, Windows binary layout | [#165](https://github.com/qodeca/erfana/issues/165) | Pending |
-| Phase 5 — Distribution hygiene | Auto-update URL, code signing, NSIS tweaks | [#166](https://github.com/qodeca/erfana/issues/166) | Pending |
-| Phase 6 — Polish & DX | Platform detection migration, Camera verification, known-issues doc, visual baselines, Windows CI guard, #158 v8 coverage fix | [#167](https://github.com/qodeca/erfana/issues/167) | Pending |
+**Canonical status snapshot:** [`implementation-plan.md` § Status snapshot](implementation-plan.md#status-snapshot-last-updated-2026-04-21-v092-base) — recent commits, per-phase verification, merge-readiness gate, all live there. This file covers the document map + onboarding only.
 
-### Closed issues contributing to Phase 0
-
-| Issue | Description | Resolution |
-|---|---|---|
-| [#156](https://github.com/qodeca/erfana/issues/156) | `app.setJumpList` mock missing in `index.test.ts` | Landed in `54e8300` (`ebc3088` merge) |
-| [#157](https://github.com/qodeca/erfana/issues/157) | Hardcoded Unix paths in 20+ main-process tests | Landed in `75877a8` (`3196314` merge) |
-| [#159](https://github.com/qodeca/erfana/issues/159) | `CameraDialog.test.tsx` teardown timer → vitest `ReferenceError` | Landed in `6b59013` (`ca38d44` merge) |
-| [#160](https://github.com/qodeca/erfana/issues/160) | Windows git allowlist + F_OK + `git --version` liveness probe | Landed in `5e86349` |
-| [#161](https://github.com/qodeca/erfana/issues/161) | Reserved-filename guard (Windows + cross-platform util) | Landed in `612192b` |
-| [#162](https://github.com/qodeca/erfana/issues/162) | LibreOffice Windows install-path detection | Landed in `13bd3b8` |
-
-### Open issues (deferred to future phases)
-
-| Issue | Description | Target |
-|---|---|---|
-| [#158](https://github.com/qodeca/erfana/issues/158) | v8 coverage provider ENOENT race in `test:cov` on Windows | Phase 6 (#167) |
-| [#163](https://github.com/qodeca/erfana/issues/163) | Long-path `\\?\` prefix activation (decision-deferred with promotion criteria) | Phase 6 (#167) |
-| [#168](https://github.com/qodeca/erfana/issues/168) | Meta: track Phase 2 deferred items D1–D8 | Phases 4-6 |
-| [#169](https://github.com/qodeca/erfana/issues/169) | Dependabot triage + 28 security alerts | Post-merge cycle |
+**One-line current state (2026-04-21):** Phases 0, 1, 2 closed on `windows` branch; awaits `windows → develop` merge gated on Phase 1 manual UAT. Phases 3–6 tracked under [#164](https://github.com/qodeca/erfana/issues/164) / [#165](https://github.com/qodeca/erfana/issues/165) / [#166](https://github.com/qodeca/erfana/issues/166) / [#167](https://github.com/qodeca/erfana/issues/167). Deferred items D1–D8 → [#168](https://github.com/qodeca/erfana/issues/168). Dependabot triage → [#169](https://github.com/qodeca/erfana/issues/169).
 
 ## How the analysis was produced
 

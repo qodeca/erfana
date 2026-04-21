@@ -20,67 +20,60 @@ Manages terminal emulator instances with xterm.js + node-pty. Cross-platform: ma
 
 ### Public Methods
 
-#### `createTerminal(config: TerminalConfig): string | null`
-Create a new PTY instance.
+#### `async createTerminal(config?: TerminalConfig, webContentsId?: number): Promise<string | null>`
+Create a new PTY instance. Async because `node-pty` is dynamically imported on first call.
 
-**Parameters** (`config`):
-- `cwd` — Working directory for terminal
-- `cols` — Terminal columns (width)
-- `rows` — Terminal rows (height)
-- `shell` — Optional shell override (defaults to platform-resolved shell)
+**Parameters** (`config?: TerminalConfig`, all optional — defaults to `{}`):
+- `cwd?` — Working directory; defaults to home dir
+- `cols?` / `rows?` — Terminal dimensions
+- `shell?` — Shell override; defaults to platform-resolved shell
+- `env?: Record<string, string>` — Extra env vars (merged after `cleanEnvironment()` filtering)
 
-**Returns:** Terminal ID string, or `null` if cwd validation failed (Windows deny-list) or the shell could not be resolved.
+**Parameters** (top-level):
+- `webContentsId?: number` — Owning webContents ID; used by `cleanupForWebContentsId(id)` to kill orphaned PTYs when the window closes
+
+**Returns:** Generated terminal ID (`terminal-N`), or `null` if cwd failed Windows deny-list validation or the shell could not be resolved.
 
 **Side Effects:**
 - Spawns new PTY process (platform-resolved shell)
-- Emits `'data'` events for output (after bootstrap marker + clear confirm)
-- Emits `'error'` event on cwd rejection or spawn failure
+- Emits `'data'` events with `{ terminalId, data }` (after bootstrap marker + clear confirm)
+- Emits `'error'` event with `{ terminalId, error }` on cwd rejection or spawn failure
 
 ---
 
-#### `writeToTerminal(id: string, data: string): void`
-Write data to terminal stdin.
-
-**Parameters:**
-- `id` - Terminal identifier
-- `data` - Data to write (e.g., user input)
-
-**Throws:** Error if terminal not found.
+#### `write(terminalId: string, data: string): boolean`
+Write data to terminal stdin. Returns `false` if the terminal is not found or PTY write fails.
 
 ---
 
-#### `resizeTerminal(id: string, cols: number, rows: number): void`
-Resize PTY dimensions.
-
-**Parameters:**
-- `id` - Terminal identifier
-- `cols` - New column count
-- `rows` - New row count
-
-**Throws:** Error if terminal not found.
+#### `resize(terminalId: string, cols: number, rows: number): boolean`
+Resize PTY dimensions. Returns `false` if the terminal is not found.
 
 ---
 
-#### `killTerminal(id: string): Promise<void>`
-Gracefully kill PTY process.
+#### `killTerminal(terminalId: string): boolean`
+Synchronously kill PTY process and remove from internal map. Returns `false` if the terminal is not found. Emits `'exit'` with `{ terminalId, exitCode: 0 }` on success.
 
-**Parameters:**
-- `id` - Terminal identifier
+---
 
-**Side Effects:**
-- Removes terminal from internal map
-- Kills PTY process
+#### `getTerminalInfo(terminalId: string): { id: string; cwd: string; title: string } | null`
+Returns terminal metadata, or `null` if not found.
 
-**Events Emitted:**
-- `exit` - When process exits
+---
+
+#### `listTerminals(): Array<{ id: string; title: string }>`
+Returns metadata for all live terminals.
 
 ---
 
 ### Events
 
-- `'data'` — `{ id: string; data: string }` — PTY output (after marker + clear confirm)
-- `'exit'` — `{ id: string; code: number }` — PTY process exit
-- `'error'` — cwd rejected by Windows deny-list, shell resolution failure, or spawn failure
+| Event | Payload | When |
+|---|---|---|
+| `'data'` | `{ terminalId: string; data: string }` | PTY output (after marker handshake + clear confirm) |
+| `'exit'` | `{ terminalId: string; exitCode: number; signal?: string }` | PTY process exit |
+| `'clearTerminal'` | `{ terminalId: string }` | Bootstrap marker detected; renderer should clear and call `markClearComplete()` |
+| `'error'` | `{ terminalId: string; error: string }` | cwd deny-list rejection (Windows), shell resolution failure, or spawn failure |
 
 ---
 
@@ -259,14 +252,20 @@ Delete file.
 
 ---
 
-#### `renameFile(oldPath: string, newPath: string): Promise<void>`
-Rename/move file.
+#### `async rename(oldPath: string, newName: string): Promise<string>`
+Rename a file or folder. The second argument is a **basename**, not a full path — the new path is constructed via `join(dirname(oldPath), newName)`.
 
 **Parameters:**
-- `oldPath` - Current file path
-- `newPath` - New file path
+- `oldPath` — Current absolute path
+- `newName` — New basename (path separators stripped before validation)
 
-**Throws:** Error if file exists at newPath or rename fails.
+**Returns:** New absolute path.
+
+**Throws (all `AppError` or `Error`):**
+- Empty name (`'Name cannot be empty'`)
+- `INVALID_FILENAME` from `assertValidUserFilename` (Windows-reserved basename, forbidden chars, control chars, bidi overrides — see [Filename validation](#filename-validation-161-phase-2) above)
+- Target already exists (`'"<name>" already exists'`)
+- Path is outside the project root, or equals the project root
 
 ---
 
@@ -343,22 +342,32 @@ Reset to default (all 17 tools).
 ```typescript
 import { terminalService } from './services/TerminalService'
 
-// Create terminal
-await terminalService.createTerminal('main', '/path/to/project', 80, 24)
+// Create terminal — returns the generated ID, or null on failure
+const terminalId = await terminalService.createTerminal({
+  cwd: '/path/to/project',
+  cols: 80,
+  rows: 24,
+}, webContentsId)
 
-// Listen for output
-terminalService.on('data', ({ id, data }) => {
+if (terminalId === null) {
+  // Cwd validation failed (Windows deny-list) or shell could not be resolved.
+  // Inspect the most recent 'error' event for details.
+  return
+}
+
+// Listen for output (note: payload key is `terminalId`, not `id`)
+terminalService.on('data', ({ terminalId: id, data }) => {
   console.log(`Terminal ${id}:`, data)
 })
 
-// Write input
-terminalService.writeToTerminal('main', 'ls -la\n')
+// Write input — returns false on failure
+terminalService.write(terminalId, 'ls -la\n')
 
-// Resize
-terminalService.resizeTerminal('main', 100, 30)
+// Resize — returns false on failure
+terminalService.resize(terminalId, 100, 30)
 
-// Clean up
-await terminalService.killTerminal('main')
+// Clean up — synchronous, returns false if not found
+terminalService.killTerminal(terminalId)
 ```
 
 ### File Watching with Pause/Resume

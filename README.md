@@ -2,6 +2,10 @@
 
 An Electron-based project workspace focused on markdown editing, a project tree, and an integrated terminal.
 
+> **Version:** 0.9.2 ([changelog](docs/CHANGELOG.md)) · **Documentation:** [docs/](docs/README.md) · **Architecture:** [docs/architecture.md](docs/architecture.md)
+>
+> **Windows enablement:** Phases 0–2 landed on the [`windows` branch](https://github.com/qodeca/erfana/tree/windows) (2026-04-21). See [`docs/windows/README.md`](docs/windows/README.md) for status, and [Windows known issues](docs/known-issues.md#windows-specific-issues) for current gaps.
+
 ## Features
 
 - 🎨 **Multi-Panel IDE Layout**: Hybrid SplitviewReact + DockviewReact with resizable panels
@@ -25,8 +29,10 @@ An Electron-based project workspace focused on markdown editing, a project tree,
 
 ### Prerequisites
 
-- Node.js 18+ (with npm or pnpm)
+- Node.js 24+ (Electron 39 bundles Node 22.20.0; build toolchain needs 24+)
+- Python 3.12 (**not 3.13** — `node-pty` fails to build on 3.13)
 - Git
+- **On Windows**: VS 2022 Build Tools, Developer Mode enabled, Win32 long paths enabled. See [`docs/build/windows.md`](docs/build/windows.md) for full setup.
 
 ### Setup
 
@@ -106,10 +112,7 @@ erfana/
 6. File references include precise line numbers for context
 
 ### 2. Terminal Usage
-Open the Terminal panel from the right activity bar to run shell commands in the project context.
-5. Toggle Planning Mode for safe exploration (read-only tools only)
-6. Tool approval system for security-sensitive operations
-7. Conversation history preserved across session restarts
+Open the Terminal panel from the right activity bar to run shell commands in the project context. cmd.exe / PowerShell / pwsh 7 + POSIX shells supported (Phase 1 #154).
 
 ### 3. Markdown Editing
 1. Open markdown files in Monaco editor

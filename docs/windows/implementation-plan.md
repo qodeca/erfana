@@ -48,7 +48,7 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 ## Next session — close out Phase 2
 
-**Phase 2 is done; awaits `windows → develop` merge.** The remaining work to fully close Phase 2 is in `~/.claude/plans/abundant-finding-newt.md` (7 streams). Summary:
+**Phase 2 is done; awaits `windows → develop` merge.** The full closure plan (7 streams + dependency graph + decisions resolved) is in [`phase2-closure.md`](phase2-closure.md). Summary:
 
 - **Stream A (user)** — Phase 1 #154 manual UAT on Windows host (4-item checklist below) + macOS regression check (`test:cov` + `build:mac`)
 - **Stream B (Claude)** — doc-drift cleanup (this commit) + last-mile test sweep
