@@ -46,44 +46,28 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 - `npm run test:cov` → **7532/7532 tests pass, 0 failures** across main / preload / renderer. Duration 32.75s. No regressions from #157 test portability changes.
 - `npm run build:mac` → both architectures: `erfana-0.9.2-x64.dmg` (327 MB) + `erfana-0.9.2-arm64.dmg` (320 MB). Fuses + ad-hoc signed.
 
-## Next session — pick up here
+## Next session — close out Phase 2
 
-**Nothing is in flight.** Working tree clean on both hosts. Pick any of the following:
+**Phase 2 is done; awaits `windows → develop` merge.** The remaining work to fully close Phase 2 is in `~/.claude/plans/abundant-finding-newt.md` (7 streams). Summary:
 
-### Option A — Phase 1 manual UAT on Windows (fastest path to merging windows → develop)
-
-4-item terminal checklist in "Phase 1" section below. Required before merging `windows` → `develop` per readiness gate. Needs a real Windows host (you, not Claude) to validate:
-- Project at `C:\Users\<me>\Dev\$weird-name` → PowerShell opens clean
-- Same project with cmd.exe forced → opens clean, handshake completes
-- `ping -t 8.8.8.8` + `Ctrl+C` in both shells
-- Path containing `&` → app surfaces clear error
-
-### Option B — Start Phase 2 (highest user-impact remaining work)
-
-File #155a–d sub-issues per the split plan (see Phase 2 section), then work in priority order:
-1. **#155b** (git allowlist for `C:\Program Files\Git\*`) — smallest, unblocks stock-Windows tree indicators
-2. **#155c** (reserved filename guard: `CON.md`, `PRN.md`, etc.) — highest user-facing impact
-3. **#155a** (LibreOffice Windows detection) — import polish
-4. **#155d** (activate `isWindowsLongPath` OR delete as dead code)
-
-### Option C — Merge `windows` → `develop` now
-
-Per the readiness gate below, merging NOW means users get Phase 0–1 (dev loop, test portability, terminal parity, NSIS installer, CameraDialog fix) as part of the next release, but Phase 2 gaps remain (git status degraded, cryptic EINVAL on reserved filenames, DOCX import requires soffice in PATH). Recommend against — finish Phase 1 UAT + #155b + #155c first per the gate.
-
-### Option D — Fix #158 v8 coverage race
-
-Switch vitest coverage provider to Istanbul OR reduce parallelism on Windows (`poolOptions.threads.maxThreads: 1` gated on `process.platform === 'win32'`). See #158 for 4 proposed fixes. Closes the last piece of "test:cov works green on Windows".
+- **Stream A (user)** — Phase 1 #154 manual UAT on Windows host (4-item checklist below) + macOS regression check (`test:cov` + `build:mac`)
+- **Stream B (Claude)** — doc-drift cleanup (this commit) + last-mile test sweep
+- **Stream C (Claude)** — file Phase 3-6 tracking issues so post-merge work is visible
+- **Stream D (Claude)** — Dependabot triage of 6 open PRs (#140-#145) + audit of 28 security alerts
+- **Stream E (user-gated)** — open `windows → develop` PR; merge-commit per decision; release as `v0.9.3`
+- **Stream F (post-merge)** — bump `package.json`, promote CHANGELOG entry, mark Phase 2 shipped
+- **Stream G (post-merge)** — delete `windows` branch; Phase 3-6 work uses per-phase feature branches off `develop`
 
 ### Open Windows-tagged issues
 
-- [#155](https://github.com/qodeca/erfana/issues/155) — Phase 2 umbrella (needs splitting into #155a–d)
-- [#158](https://github.com/qodeca/erfana/issues/158) — v8 coverage race, deferred to Phase 6
+- [#158](https://github.com/qodeca/erfana/issues/158) — v8 coverage race on Windows, deferred to Phase 6
+- (Phase 3-6 tracking issues filed during Stream C — see post-update state)
 
 ---
 
 ## Feature status on Windows today
 
-Honest per-feature assessment — what an end user running `erfana-0.9.2-setup.exe` gets today, **after Phases 0–1 land**. Phases 2–6 are not yet implemented.
+Honest per-feature assessment of what an end user running an NSIS install of the `windows` branch gets today, **after Phases 0–2 land**. Phases 3–6 are tracked but not yet implemented.
 
 ### ✅ Working
 
@@ -100,27 +84,28 @@ Honest per-feature assessment — what an end user running `erfana-0.9.2-setup.e
 | Media transcription via **OpenAI API** | HTTP + ffmpeg-static (bundled, cross-platform) |
 | Document import pure-JS path (LiteParse spatial text, OCR via Tesseract.js) | LiteParse + Tesseract.js are pure JS; tessdata is bundled in `resources/tessdata` |
 | Keyboard shortcuts, quit confirmation, multi-instance project lock | Cross-platform Electron |
+| **Git status in project tree** (#160) | Auto-discovers `git.exe` at Program Files / Chocolatey / Scoop with `--version` liveness probe |
+| **Reserved filename rejection** (#161) | `CON.md`, `PRN.md`, etc. produce friendly toast `"…" is not a valid filename — try "_…"` instead of cryptic EINVAL. Bidi-override stripping defends against Trojan-Source RTL attacks |
+| **DOCX import via LibreOffice** (#162) | DependencyDetector probes `C:\Program Files\LibreOffice\program\soffice.exe` (+ x86) with `--version` liveness when not on PATH |
 
 ### ❌ Broken / non-functional on Windows
 
 | Feature | Why | Tracked |
 |---|---|---|
-| **Screenshot capture** (screen / window / area) | `ScreenshotService.ts` throws on `process.platform !== 'darwin'` — feature gated off | Phase 3 (gap B1) |
-| **Local Whisper transcription** (offline, model download) | `WhisperModelManager.getArchSuffix()` throws on non-darwin | Phase 4 (gap B2) |
-| **Auto-updater** | Publish URL is literally `https://example.com/auto-updates` | Phase 5 (gap B6) |
-| **SmartScreen-free install** | No code signing cert → SmartScreen "unrecognized app" warning | Phase 5 (gap M7) |
+| **Screenshot capture** (screen / window / area) | `ScreenshotService.ts` throws on `process.platform !== 'darwin'` — feature gated off | Phase 3 |
+| **Local Whisper transcription** (offline, model download) | `WhisperModelManager.getArchSuffix()` throws on non-darwin | Phase 4 |
+| **Auto-updater** | Publish URL is literally `https://example.com/auto-updates` | Phase 5 |
+| **SmartScreen-free install** | No code signing cert → SmartScreen "unrecognized app" warning | Phase 5 |
 
 ### ⚠️ Degraded / works only under specific conditions
 
 | Feature | Condition | Tracked |
 |---|---|---|
-| **Git status in project tree** | Only works if `git.exe` is on `PATH` (no Windows install paths in allowlist). Falls back to isomorphic-git — slower on large repos | #155b (Phase 2) |
-| **DOCX import via LibreOffice** | Only works if `soffice.exe` is on `PATH` (detector won't find `C:\Program Files\LibreOffice\...`). If not found, the "missing dependency" modal shows — graceful | #155a (Phase 2) |
-| **Reserved filenames** (`CON.md`, `PRN.md`, `COM1.md`, etc.) | Cryptic EINVAL from OS instead of friendly error | #155c (Phase 2) |
-| **Long paths (>260 chars)** | Works only if user enabled Win32 long-paths GP setting + `git config --global core.longpaths true`. `isWindowsLongPath` helper is dead code | #155d (Phase 2) |
-| **Camera photo capture** | WebRTC is cross-platform, *should* work, but unverified on Windows | Phase 6 (M9) |
-| **Stale project-lock recovery** | Force-kill + restart: untested on Windows, may leave stale lock | Phase 6 (M10) |
-| **Packaged OCR** (tessdata resolution in NSIS install) | Unverified in packaged build vs. dev | Phase 6 (m4) |
+| **Long paths (>260 chars)** | Works only if user enabled Win32 long-paths GP setting + `git config --global core.longpaths true`. `isWindowsLongPath` helper kept in source with promotion criteria | [#163](https://github.com/qodeca/erfana/issues/163) (deferred to Phase 6) |
+| **Camera photo capture** | WebRTC is cross-platform, *should* work, but unverified on Windows | Phase 6 |
+| **Stale project-lock recovery** | Force-kill + restart: untested on Windows, may leave stale lock | Phase 6 |
+| **Packaged OCR** (tessdata resolution in NSIS install) | Unverified in packaged build vs. dev | Phase 6 |
+| **`test:cov` clean exit on Windows** | Tests pass; vitest v8 coverage aggregator hits ENOENT race on NTFS | [#158](https://github.com/qodeca/erfana/issues/158) (deferred to Phase 6) |
 
 ---
 
@@ -203,44 +188,41 @@ Honest per-feature assessment — what an end user running `erfana-0.9.2-setup.e
 
 ## Phase 2 — Build scripts / media helpers that need Windows branches
 
-**Tracking:** [#155](https://github.com/qodeca/erfana/issues/155) — **umbrella**; **split into four sub-issues per 2026-04-20 plan**
+**Tracking:** [#155](https://github.com/qodeca/erfana/issues/155) (umbrella, **CLOSED**) split into four sub-issues per 2026-04-20 plan. All four landed or decision-deferred 2026-04-21.
 
-Issue #155 bundles four independent deliverables. Each has its own test surface and UAT step, so bundling slows review. **Decision (2026-04-20):** file #155a–#155d as sub-issues; start work in priority order.
+### Execution order (as shipped)
 
-### Execution order (priority)
+1. **[#160](https://github.com/qodeca/erfana/issues/160) — Git allowlist** (P1, smallest) — `workers/git-status.worker.ts:25`
+   - Added Windows entries: `C:\Program Files\Git\cmd\git.exe`, `…\bin\git.exe`, `C:\Program Files (x86)\Git\…`, `C:\ProgramData\chocolatey\bin\git.exe`, Scoop user-profile path (USERPROFILE-validated).
+   - Replaced `fs.access(X_OK)` with `F_OK` + `git --version` liveness probe on Windows (X_OK is existence-only on Windows per Node docs).
+   - **Landed:** `5e86349` (8 new tests in `git-resolver.test.ts`).
+2. **[#161](https://github.com/qodeca/erfana/issues/161) — Reserved filename guard** (P1, largest, own test surface) — new util `src/main/utils/validateFilename.ts`
+   - Three exports: `assertValidUserFilename` (throws), `deriveSafeFilename` (total transform), `validateFilename` (pure inspection with discriminated union).
+   - Cross-platform policy: Unicode bidi-override stripping + control chars + length checks on every platform; reserved names + forbidden chars + trailing dots/spaces on Windows only.
+   - Wired into `FileService.createFile`/`createFolder`/`rename` (throws), `PdfService.getSavePath` + `DocxService.sanitizeFilename` (transforms). Renderer formatters use `INVALID_FILENAME_MARKER` shared constant from `shared/errors.ts` since `AppError.code` does not survive Electron IPC.
+   - **Landed:** `612192b` (271 new validateFilename tests + 7 renderer formatter tests).
+3. **[#162](https://github.com/qodeca/erfana/issues/162) — LibreOffice Windows detection** (P2, import polish) — `DependencyDetector.ts`
+   - On `win32` after the `soffice` PATH probe, probes `C:\Program Files\LibreOffice\program\soffice.exe` and the (x86) variant via `tryCommand(--version)` liveness (mirrors #160's pattern; security review HIGH-severity finding addressed).
+   - Optional registry probe (`reg query HKLM\SOFTWARE\LibreOffice\UNO\InstallPath`) deferred unless filesystem probe proves insufficient.
+   - **Landed:** `13bd3b8` (5 new DependencyDetector tests).
+4. **[#163](https://github.com/qodeca/erfana/issues/163) — `isWindowsLongPath`** (P2, decision-deferred) — `PlatformConfig.ts:172`
+   - Decision recorded inline at `PlatformConfig.ts:172-201` with promotion criteria: re-activate as P1 if any real >260-char path victim surfaces in UAT, OR any Phase 3+ feature produces >200-char default paths.
+   - **Decision deferred to Phase 6** (`a2b5bd0`); helper kept in source (deletion would be worse churn).
 
-1. **#155b — Git allowlist** (P1, smallest) — `workers/git-status.worker.ts:25`
-   - Add Windows entries: `C:\Program Files\Git\bin\git.exe`, `C:\Program Files\Git\cmd\git.exe`, `C:\Program Files (x86)\Git\bin\git.exe`.
-   - Keep the `where git` fallback as-is.
-   - **Why first:** unblocks native-git fallback for large repos; tree indicators silently broken on stock Windows today.
-2. **#155c — Reserved filename guard** (P1, largest, own test surface) — new util `src/main/utils/validateFilename.ts`
-   - Export `validateFilenameForPlatform(name: string): { valid: boolean; reason?: string }`.
-   - On Windows, reject: reserved basenames (case-insensitive) `CON, PRN, AUX, NUL, COM1-9, LPT1-9` with or without extensions; characters `< > : " / \ | ? *`; trailing spaces or dots.
-   - Wire into `FileService` create/rename, `DocxService` save-path construction, `PdfService` save-path. Return a user-friendly error via existing `AppError` + `ErrorCode.INVALID_FILENAME` (add code if missing).
-   - **Why second:** highest user-facing impact — users get cryptic EINVAL errors today.
-3. **#155a — LibreOffice Windows detection** (P2, import polish) — `DependencyDetector.ts`
-   - After the `soffice` PATH probe, on `win32` also check standard install locations:
-     - `C:\Program Files\LibreOffice\program\soffice.exe`
-     - `C:\Program Files (x86)\LibreOffice\program\soffice.exe`
-   - Optional nice-to-have: parse `HKLM\SOFTWARE\LibreOffice\UNO\InstallPath` via `reg query`.
-   - **Why third:** current behavior gracefully shows "missing dependency" modal; functional unavailability is bounded.
-4. **#155d — Activate `isWindowsLongPath`** (P2, decision required) — `PlatformConfig.ts:172`
-   - **Option A (recommended):** wire into `FileService` read/write paths — prefix `\\?\` when `path.isAbsolute(p) && p.length > 260`. Genuine fix for users who haven't enabled the Win32 long-path GP setting.
-   - **Option B:** delete the dead code and document the long-path policy as "user must enable Win32 long paths" (already in `docs/build/windows.md` step 5).
-   - **Why last:** architectural decision — activate vs. document-only.
+### Post-Phase-2 review
 
-### Manual validation
+Four parallel reviewers (architecture, solution, code, security) audited #160-#163 and produced 15 findings (1 CRITICAL, 3 HIGH, 6 MEDIUM, 5 LOW). All addressed in `d268f72`. Notable post-review fixes: bidi regex `u` flag (CRITICAL), `FileService.createFile` path-separator strip (HIGH path-traversal), LibreOffice `--version` liveness probe (HIGH security), `INVALID_FILENAME_MARKER` shared constant for IPC contract (HIGH). 8 explicitly deferred items (D1–D8) tracked in [`deferred-work.md`](deferred-work.md).
 
-- Import a `.docx` via LibreOffice on Windows (#155a)
-- Create a file named `CON.md` → see user-friendly error (#155c)
-- Open a deeply nested project (>260 char path) → files open (#155d option A)
-- Open a git repo on stock Windows (no git in PATH but installed to Program Files) → tree shows status indicators (#155b)
+### Manual validation (post-merge)
 
-### After Phase 2 lands
+- Open a git repo on stock Windows (no git in PATH but installed to Program Files) → tree shows status indicators (#160)
+- Create a file named `CON.md` → see user-friendly error toast `"CON.md" is not a valid filename — try "_CON.md"` (#161)
+- Import a `.docx` via LibreOffice on Windows with `soffice` not on PATH (#162)
+- (Deferred) Open a deeply nested project (>260 char path) → files open per #163 promotion criteria
 
-- Close umbrella #155
-- Run full manual validation checklist (above)
-- Move to Phase 3 (screenshots) — largest remaining piece of work
+### Status
+
+All four sub-issues + umbrella closed 2026-04-21. Phase 2 is **shipped to `windows` branch**; awaits `windows → develop` merge per the readiness gate at [`Merge-to-develop readiness`](#merge-to-develop-readiness) below. Move to Phase 3 (screenshots) once that merge lands.
 
 ---
 
@@ -339,7 +321,7 @@ Erfana development happens across two hosts (Windows 11 + macOS). Each session w
 |---|---|---|---|
 | Phase 0 AC #4 (macOS regression check) | ❌ | ✅ | — |
 | Phase 1 manual UAT (4-item terminal checklist) | ✅ | ❌ (macOS regression check subsumed) | — |
-| Phase 2 implementation (#155b, #155c, #155a, #155d) | ✅ (verification) | ✅ (cross-platform work) | ✅ |
+| Phase 2 implementation (#160, #161, #162, #163) | ✅ (verification) | ✅ (cross-platform work) | ✅ |
 | Phase 3 screenshot implementation | ✅ (verification) | ✅ (development) | — |
 | Phase 4 whisper research + implementation | ✅ (research + verification) | — | ✅ (dev) |
 | Phase 5 signing / auto-update | ✅ (Windows cert) | ✅ (macOS notarization) | — |
@@ -427,11 +409,11 @@ Before merging `windows` → `develop`, confirm all of:
 - `src/main/services/WindowsTerminalBootstrap.ts` — Phase 1 (landed; new strategy file)
 - `src/main/services/ScreenshotService.ts` — Phase 3 (full rewrite, strategy pattern)
 - `src/main/services/WhisperModelManager.ts` — Phase 4 (cross-platform arch, binary layout)
-- `src/main/services/import/DependencyDetector.ts` — Phase 2 (#155a LibreOffice Windows paths)
-- `src/main/services/workers/git-status.worker.ts` — Phase 2 (#155b git allowlist)
-- `src/main/services/watcher/PlatformConfig.ts` — Phase 2 (#155d wire up `isWindowsLongPath`)
-- `src/main/services/FileService.ts`, `DocxService.ts`, `PdfService.ts` — Phase 2 (#155c filename validation, #155d long-path prefix)
-- `src/main/utils/validateFilename.ts` — Phase 2 (#155c new file)
+- `src/main/services/import/DependencyDetector.ts` — Phase 2 (#162 LibreOffice Windows paths)
+- `src/main/services/workers/git-status.worker.ts` — Phase 2 (#160 git allowlist)
+- `src/main/services/watcher/PlatformConfig.ts` — Phase 2 (#163 wire up `isWindowsLongPath`)
+- `src/main/services/FileService.ts`, `DocxService.ts`, `PdfService.ts` — Phase 2 (#161 filename validation, #163 long-path prefix)
+- `src/main/utils/validateFilename.ts` — Phase 2 (#161 new file)
 - `src/shared/constants.ts` — Phase 4 (`LOCAL_WHISPER.BINARY_NAME` per-platform)
 - `package.json` — Phase 0 (landed)
 - `scripts/test-cov.mjs`, `scripts/prebuild.mjs` — Phase 0 (landed; new files)
@@ -444,9 +426,9 @@ Before merging `windows` → `develop`, confirm all of:
 ## Existing utilities to reuse
 
 - `window.api.getPlatform()` preload bridge (`preload/index.ts:963`) — already exists; consolidate renderer usage on it
-- `PlatformConfig.isWindowsLongPath()` (`PlatformConfig.ts:172`) — exists as dead code, activate it in #155d
+- `PlatformConfig.isWindowsLongPath()` (`PlatformConfig.ts:172`) — exists as dead code, activate it in #163
 - `ProjectService.ts:60-62` — case-insensitive path comparison pattern; reuse in any new path equality check
-- `file-handlers.ts:483-492` — Windows system-path blocklist pattern; reuse shape for reserved-name guard in #155c
+- `file-handlers.ts:483-492` — Windows system-path blocklist pattern; reuse shape for reserved-name guard in #161
 - `AppError` + `ErrorCode` — all new errors go through this
 - `execFile` (not `exec`) — existing pattern throughout; maintain for injection safety
 - `ffmpeg-static` / `ffprobe-static` — already cross-platform, no changes
@@ -461,8 +443,8 @@ Target: clean Windows 11 VM, no prior Erfana install, no Python / VS Build Tools
 
 1. **Dev loop (Phase 0):** follow `docs/build/windows.md` from scratch → `npm install` → `npm run dev` → app launches.
 2. **Terminal (Phase 1):** open a project at `C:\Users\<me>\Dev\$weird-name` → PowerShell terminal opens, prompt is clean. Switch to cmd.exe → opens clean, CWD is correct, marker handshake completes, `Ctrl+C` interrupts a `ping -t` loop.
-3. **File ops (Phase 2):** create `CON.md` → user-friendly error (#155c). Open a project with a >260-char path → files still open (#155d option A). Drag-drop a `.docx` → converts via LibreOffice (#155a).
-4. **Git status (Phase 2):** open a git repo → tree shows status indicators → manual refresh (`Ctrl+Alt+R`) works (#155b).
+3. **File ops (Phase 2):** create `CON.md` → user-friendly error (#161). Open a project with a >260-char path → files still open (#163 option A). Drag-drop a `.docx` → converts via LibreOffice (#162).
+4. **Git status (Phase 2):** open a git repo → tree shows status indicators → manual refresh (`Ctrl+Alt+R`) works (#160).
 5. **Screenshots (Phase 3):** full-screen, window-picker, area-selection all capture; dual-monitor picks the right display; path pastes into terminal.
 6. **Whisper (Phase 4):** settings → enable local Whisper → download `tiny` model → import an MP3 → transcription succeeds offline.
 7. **File watching:** edit a file externally (Notepad) → tree + editor refresh. Rename a file → chokidar fires correctly, no EPERM spam.
