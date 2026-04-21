@@ -156,13 +156,17 @@ describe('SearchBar', () => {
       const user = userEvent.setup()
       render(<SearchBar provider={mockProvider} />)
 
-      const input = screen.getByPlaceholderText('Search...')
-      // Click to establish focus before typing – prevents first-keystroke drop
-      // under CPU contention (userEvent.type can dispatch before React settles).
-      await user.click(input)
+      const input = screen.getByPlaceholderText('Search...') as HTMLInputElement
+
+      // Wait for auto-focus (FOCUS_DELAY_MS = 10ms) so the first keystroke is
+      // never dropped under CPU contention.
+      await waitFor(() => {
+        expect(document.activeElement).toBe(input)
+      })
+
       await user.type(input, 'test')
 
-      // Wait for debounce (100ms)
+      // Wait for debounce (100ms) + scheduler jitter
       await waitFor(
         () => {
           expect(mockProvider.search).toHaveBeenCalledWith('test', {
@@ -178,7 +182,13 @@ describe('SearchBar', () => {
       const user = userEvent.setup()
       render(<SearchBar provider={mockProvider} />)
 
-      const input = screen.getByPlaceholderText('Search...')
+      const input = screen.getByPlaceholderText('Search...') as HTMLInputElement
+
+      // Wait for auto-focus before typing to avoid first-keystroke drop.
+      await waitFor(() => {
+        expect(document.activeElement).toBe(input)
+      })
+
       await user.type(input, 'abc')
 
       // Should not call search immediately
@@ -189,7 +199,7 @@ describe('SearchBar', () => {
         () => {
           expect(mockProvider.search).toHaveBeenCalledTimes(1)
         },
-        { timeout: 200 }
+        { timeout: 500 }
       )
     })
 

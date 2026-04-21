@@ -129,8 +129,10 @@ visualTest.describe('Visual regression – with project', () => {
     const masks = [
       page.locator('.minimap'),
       page.locator('.scrollbar'),
-      // Terminal auto-opens on project load and shows ephemeral prompt/path.
-      byTestId(page, TEST_IDS.TERMINAL_PANEL),
+      // Terminal auto-opens on project load; mask only the xterm canvas so the
+      // panel chrome (header, toolbar) remains under visual assertion. Matches
+      // the specificity used by (c) terminal open below.
+      byTestId(page, TEST_IDS.TERMINAL_INSTANCE),
       // "Project Opened" toast shows the absolute project path (ephemeral tmpdir).
       byTestId(page, TEST_IDS.TOAST_CONTAINER)
     ]
