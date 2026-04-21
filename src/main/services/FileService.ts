@@ -3,6 +3,7 @@ import { join, extname, basename, relative } from 'path'
 import type { IFileService } from '../interfaces/IFileService'
 import { SymlinkDetector } from '../utils/SymlinkDetector'
 import { RollbackHandler } from '../utils/RollbackHandler'
+import { assertValidUserFilename } from '../utils/validateFilename'
 import { DEFAULT_TREE_HIDDEN_PATTERNS } from '../../shared/constants'
 import { logger } from './LoggingService'
 
@@ -246,6 +247,12 @@ export class FileService implements IFileService {
       fileName = `${fileName}.md`
     }
 
+    // #161: reject reserved Windows names (CON, PRN, COM1-9, LPT1-9) and
+    // forbidden chars (`<>:"/\|?*` on Windows), trailing dots/spaces,
+    // control chars, bidi overrides. POSIX rejects only the universal
+    // portability-breaking classes (control chars, bidi, empty, too long).
+    assertValidUserFilename(fileName)
+
     const filePath = join(dirPath, fileName)
 
     // Check if file already exists
@@ -273,6 +280,9 @@ export class FileService implements IFileService {
     if (!folderName) {
       throw new Error('Folder name cannot be empty')
     }
+
+    // #161: validate reserved names, forbidden chars, etc. (platform-aware).
+    assertValidUserFilename(folderName)
 
     const folderPath = join(dirPath, folderName)
 
@@ -337,6 +347,9 @@ export class FileService implements IFileService {
     if (!newName) {
       throw new Error('Name cannot be empty')
     }
+
+    // #161: validate reserved names, forbidden chars, etc. (platform-aware).
+    assertValidUserFilename(newName)
 
     // Get the directory and construct new path
     const { dirname } = await import('path')

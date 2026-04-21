@@ -6,6 +6,7 @@ import { PDF_EXPORT } from '../../shared/constants'
 import { ErrorCode } from '../../shared/errors'
 import type { PdfExportResponse } from '../../shared/ipc/pdf-schema'
 import { logger } from './LoggingService'
+import { deriveSafeFilename } from '../utils/validateFilename'
 
 /**
  * Print stylesheet for PDF export
@@ -731,8 +732,12 @@ class PdfService implements IPdfService {
    * @returns Selected path or null if cancelled
    */
   private async getSavePath(fileName: string): Promise<string | null> {
-    // Sanitize filename length (edge case: very long filenames)
-    const sanitizedFileName = fileName.slice(0, PdfService.MAX_FILENAME_LENGTH)
+    // #161: sanitize Windows-reserved basenames (CON.pdf, PRN.pdf, etc.),
+    // invalid chars, control chars, bidi overrides. App-derived filename
+    // → silent transform, not user-facing error.
+    const safe = deriveSafeFilename(fileName)
+    // Truncate to leave headroom for the .pdf extension + OS path limits.
+    const sanitizedFileName = safe.slice(0, PdfService.MAX_FILENAME_LENGTH)
 
     const result = await dialog.showSaveDialog({
       title: 'Export to PDF',

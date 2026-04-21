@@ -126,6 +126,23 @@ export function isAlreadyExistsError(message: string): boolean {
 }
 
 /**
+ * Detects if error message indicates an invalid-filename rejection (#161).
+ *
+ * The main-process `assertValidUserFilename` throws `AppError(INVALID_FILENAME)`
+ * with a structured message like `"CON.md" is not a valid filename — try "_CON.md"`.
+ * `AppError.code` does not cross the Electron IPC boundary by default, so this
+ * detector matches on the well-known phrase embedded in the message. The
+ * structured message is already user-friendly, so formatters can surface it
+ * verbatim after stripping the IPC prefix.
+ *
+ * @param message - Error message to check
+ * @returns true if error is an invalid-filename rejection, false otherwise
+ */
+export function isInvalidFilenameError(message: string): boolean {
+  return message.includes('is not a valid filename')
+}
+
+/**
  * Formats error message for file creation
  *
  * @param error - Error object
@@ -136,6 +153,11 @@ export function formatCreateFileError(error: unknown): string {
     const cleaned = stripIpcErrorPrefix(error.message)
     if (isAlreadyExistsError(cleaned)) {
       return 'A file with this name already exists'
+    }
+    // #161: invalid-filename rejections already carry a friendly message
+    // like `"CON.md" is not a valid filename — try "_CON.md"`. Surface verbatim.
+    if (isInvalidFilenameError(cleaned)) {
+      return cleaned
     }
     return cleaned
   }
@@ -153,6 +175,10 @@ export function formatCreateFolderError(error: unknown): string {
     const cleaned = stripIpcErrorPrefix(error.message)
     if (isAlreadyExistsError(cleaned)) {
       return 'A folder with this name already exists'
+    }
+    // #161: invalid-filename rejections carry a friendly message verbatim.
+    if (isInvalidFilenameError(cleaned)) {
+      return cleaned
     }
     return cleaned
   }

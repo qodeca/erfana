@@ -43,6 +43,14 @@ export function formatFileOperationError(
       : 'An item with this name already exists'
   }
 
+  // #161: invalid filename (Windows reserved, forbidden chars, bidi, etc.)
+  // The main-process AppError carries a structured, user-friendly message
+  // already (e.g. `"CON.md" is not a valid filename — try "_CON.md"`).
+  // Surface it verbatim instead of running through the generic path.
+  if (baseMessage.includes('is not a valid filename')) {
+    return baseMessage
+  }
+
   if (baseMessage.includes('ENOENT') || baseMessage.includes('not found')) {
     return itemName
       ? `"${itemName}" not found`

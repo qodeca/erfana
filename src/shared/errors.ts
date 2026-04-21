@@ -14,6 +14,7 @@ export enum ErrorCode {
   PATH_TRAVERSAL = 'PATH_TRAVERSAL',
   PATH_OUTSIDE_PROJECT = 'PATH_OUTSIDE_PROJECT',
   SYMLINK_ATTACK = 'SYMLINK_ATTACK',
+  INVALID_FILENAME = 'INVALID_FILENAME',
 
   // Settings/persistence errors
   SETTINGS_READ_FAILED = 'SETTINGS_READ_FAILED',
@@ -204,6 +205,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.PATH_TRAVERSAL]: 'Invalid path: path traversal detected',
   [ErrorCode.PATH_OUTSIDE_PROJECT]: 'Cannot access directories outside the project',
   [ErrorCode.SYMLINK_ATTACK]: 'This directory link points to a protected location',
+  [ErrorCode.INVALID_FILENAME]: 'Filename is not allowed on this platform',
 
   // Settings/persistence errors
   [ErrorCode.SETTINGS_READ_FAILED]: 'Failed to read application settings',
