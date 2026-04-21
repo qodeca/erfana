@@ -14,7 +14,7 @@ This folder tracks the work to bring Erfana to full Windows parity with macOS.
 ```bash
 # Windows 11 host (PowerShell or Git Bash)
 npm install
-npm run test:main        # 243 files / 7733 tests baseline
+npm run test:main        # 243 files / 7828 tests baseline
 npm run dev              # smoke-test Electron + terminal
 
 # macOS host (regression check for cross-platform changes)

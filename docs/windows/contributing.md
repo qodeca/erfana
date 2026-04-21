@@ -63,7 +63,7 @@ On a Windows host:
 
 ```bash
 npm run typecheck
-npm run test:main        # 243 files / 7733 tests expected as of 2026-04-21
+npm run test:main        # 243 files / 7828 tests expected as of 2026-04-21
 npm run test:renderer
 npm run test:preload
 ```
