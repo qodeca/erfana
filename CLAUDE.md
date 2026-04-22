@@ -77,6 +77,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
 - [Testing](docs/testing/README.md) — Workspace, E2E (POM), visual regression, coverage
+- [Continuous Integration](docs/ci.md) — GitHub Actions workflows (`checks.yml`, `e2e.yml`), retry patterns, visual-on-CI gap
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [API Services](docs/api-services.md) — Service APIs (Terminal, File, Settings, Watchers)
 - [API Services – Features](docs/api-services-features.md) — Feature service APIs (GitStatus worker architecture, GitWatcher, GitPolling, GitStatusWorkerAdapter, GitStatusCircuitBreaker, GitStatusStrategySelector, Camera, ProjectLock, ExternalFile, LiteParse, DependencyDetector, DOCX, Transcription, LocalWhisper, WhisperModelManager, AudioMetadata, AudioExtraction, ApiKey)
@@ -157,9 +158,17 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
   - Condition-based waits preferred over `waitForTimeout` – use `waitForPrompt()`, `waitForOutput()`, Playwright auto-waiting
   - Wait helpers in `e2e/utils/wait-helpers.ts`: `waitForIpcComplete` (race-safe IPC wait helper)
   - Shared locators in `e2e/utils/locators.ts`: `byTestId`, `byDynamicTestId`, `waitForTestId`, `waitForTestIdHidden`
-- Visual regression: Playwright `toHaveScreenshot()` for 5 UI states (welcome, editor, terminal, settings, confirm dialog); baselines in `e2e/screenshots/` with platform suffix; `--project=visual` in Playwright config
+- Visual regression: Playwright `toHaveScreenshot()` for 5 UI states (welcome, editor, terminal, settings, confirm dialog); baselines in `e2e/screenshots/` with platform suffix; `--project=visual` in Playwright config; **runs locally only** – `macos-latest` CI hangs at `waitForLoadState('domcontentloaded')` ([docs/ci.md § Visual regression on CI](docs/ci.md#visual-regression-on-ci))
 - E2E env vars: Some tests require API keys via `.env` file (see `.env.example`); tests skip gracefully if not set
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
+
+## Continuous Integration
+See [docs/ci.md](docs/ci.md) for the full pipeline map. Summary:
+- **`checks.yml`** (`.github/workflows/checks.yml`) — runs on **every push to any branch**. 4 parallel jobs on `ubuntu-latest`: `lint`, `typecheck`, `test` (7887 vitest), `build` (`electron-vite build`). ~3 min wall-clock.
+- **`e2e.yml`** (`.github/workflows/e2e.yml`) — runs on push to `develop` + all PRs. `macos-latest`. Scoped to `--project=electron`; visual suite local-only.
+- **Every `npm ci` is wrapped in retry**: `npm ci || (sleep 10 && npm ci) || (sleep 20 && npm ci)` – handles transient ECONNRESET on GitHub runners.
+- **Concurrency cancellation** via `github.ref` — rapid pushes cancel in-flight runs on the same branch.
+- **Before pushing**, run the local equivalents (`npm run lint && npm run typecheck && npm run test:ci && npx electron-vite build`) to catch issues without CI minutes.
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)

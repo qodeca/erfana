@@ -87,6 +87,41 @@ const config = PROMPT_REGISTRY['mermaid-bug-report']  // Returns undefined!
 
 ---
 
+### 5. Visual regression suite disabled on CI
+
+**Severity**: Medium
+**Impact**: 5 screenshot-based tests (welcome panel, editor loaded, terminal open, settings overlay, confirm dialog) do not run on CI; visual regressions can merge undetected until a developer runs `npm run test:e2e:visual` locally.
+
+**Problem**: All 5 tests time out at `page.waitForLoadState('domcontentloaded')` (30s) on GitHub `macos-latest` runners, while passing 5/5 locally (including with `CI=true`). `.github/workflows/e2e.yml` runs only `--project=electron` as a workaround.
+
+**What's known**:
+- Electron main process launches successfully on CI; `BrowserWindow` exists; resize succeeds
+- Playwright `firstWindow()` returns a Page object
+- The `domcontentloaded` lifecycle event never propagates; `recordVideo` is not the cause (local `CI=true` runs pass)
+
+**Candidate root causes** (not isolated): GPU/renderer init hang on virtualized runners, `app.evaluate(resize)` → `firstWindow()` timing race, `--force-device-scale-factor=1` interaction.
+
+**Recommended next step**: Fixture instrumentation – capture `document.readyState` and `app.getGPUInfo('basic')` before and after `waitForLoadState`, push once, then form a targeted hypothesis.
+
+**Files**: `.github/workflows/e2e.yml`, `e2e/fixtures.ts` (lines 355–360, 406–410), `e2e/visual-regression.e2e.ts`.
+
+**Tracking**: see [docs/ci.md § Visual regression on CI](./ci.md#visual-regression-on-ci).
+
+---
+
+### 6. Monaco cursor-blink flake in `third-party-components.e2e.ts`
+
+**Severity**: Low
+**Impact**: `third-party-components.e2e.ts:38` (Monaco keyboard test) fails first attempt ~10% of runs with `expect(cursor).toBeVisible() – received "hidden"`. Passes on retry #1 reliably; classified as flaky, not failing.
+
+**Root cause**: Monaco's `.cursor` element blinks every 500ms by default. A 2s `toBeVisible` timeout can miss the visible half-cycle under CPU contention.
+
+**Fix pattern exists in codebase**: `e2e/visual-regression.e2e.ts:45` `disableCursorBlink()` helper patches `cursorBlinking: 'solid'`. Apply the same helper to the third-party-components test.
+
+**Files**: `e2e/pages/monaco.page.ts:29`, `e2e/third-party-components.e2e.ts:38`.
+
+---
+
 ## Code Quality Improvements
 
 ### Documentation Token Efficiency

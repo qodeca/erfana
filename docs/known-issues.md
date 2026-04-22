@@ -70,6 +70,23 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (merged 2026-04-22). Th
 
 ## Active Issues
 
+### Visual regression E2E suite hangs on GitHub `macos-latest` CI
+
+**Issue**: All 5 visual tests in `e2e/visual-regression.e2e.ts` time out at `page.waitForLoadState('domcontentloaded')` (30s) on GitHub `macos-latest` runners; they pass 5/5 locally (including with `CI=true` and video recording enabled).
+
+**Root cause**: Not isolated. Electron main process launches, `BrowserWindow` exists, `firstWindow()` returns a Page, but the `domcontentloaded` event never propagates. Candidate causes: GPU/renderer init hang on virtualized runners, `app.evaluate(resize)` → `firstWindow()` timing race, `--force-device-scale-factor=1` interaction. The regular `electron` project succeeds on the same runner, so the issue is specific to the visual fixture setup.
+
+**Workaround**: CI is scoped to `--project=electron` via `.github/workflows/e2e.yml`; the visual suite is run locally only.
+
+```bash
+npm run test:e2e:visual                    # Run visual regression tests locally
+npm run test:e2e:update-screenshots        # Update baselines
+```
+
+**Tracking**: See [docs/ci.md § Visual regression on CI](./ci.md#visual-regression-on-ci) and [docs/technical-debt.md § Visual regression suite disabled on CI](./technical-debt.md#5-visual-regression-suite-disabled-on-ci). Diagnostic next step is fixture instrumentation to capture `readyState` + GPU info.
+
+---
+
 ### Git Status: Global .gitignore not supported
 
 **Issue**: Files ignored via global gitignore (`~/.gitignore_global` or `~/.config/git/ignore`) may appear as "untracked" in the project tree git status indicators.

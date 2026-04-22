@@ -47,6 +47,7 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 
 ### Development
 - [Development Tasks](./development-tasks.md) - Build, test, and deployment
+- [Continuous Integration](./ci.md) - GitHub Actions workflows (`checks.yml` on every push, `e2e.yml` on develop + PRs), retry patterns, visual-on-CI gap
 - [Build](./build/README.md) - electron-builder, ASAR, fuses, troubleshooting
 - [Windows Enablement](./windows/README.md) - Phases 0–2 closed; Phases 3–6 tracked under [#164–#167](https://github.com/qodeca/erfana/issues?q=label%3Awindows)
   - [Implementation Plan](./windows/implementation-plan.md) - Canonical phased roadmap + status snapshot
