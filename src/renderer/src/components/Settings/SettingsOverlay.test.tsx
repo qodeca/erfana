@@ -71,7 +71,8 @@ describe('SettingsOverlay', () => {
         openLogsFolder: vi.fn().mockResolvedValue('')
       },
       utils: {
-        getPlatform: vi.fn().mockReturnValue('darwin')
+        getPlatform: vi.fn().mockReturnValue('darwin'),
+        getArch: vi.fn().mockReturnValue('arm64')
       }
     }
   })
@@ -1359,8 +1360,9 @@ describe('SettingsOverlay', () => {
       expect(screen.queryByTestId('settings-btn-whisper-model')).not.toBeInTheDocument()
     })
 
-    it('local option is disabled and shows "Local (macOS only)" on non-macOS platforms', () => {
+    it('local option is ENABLED on Windows x64 (Phase 4 Windows parity)', () => {
       ;(window as any).api.utils.getPlatform = vi.fn().mockReturnValue('win32')
+      ;(window as any).api.utils.getArch = vi.fn().mockReturnValue('x64')
 
       useGlobalSettingsStore.setState({
         settings: {
@@ -1393,7 +1395,85 @@ describe('SettingsOverlay', () => {
       )
 
       expect(localOption).toBeInTheDocument()
-      expect(localOption).toHaveTextContent('Local (macOS only)')
+      expect(localOption).toHaveTextContent('Local (whisper.cpp)')
+      expect(localOption).not.toBeDisabled()
+    })
+
+    it('local option is disabled on Windows ARM64 with ARM64-specific copy', () => {
+      ;(window as any).api.utils.getPlatform = vi.fn().mockReturnValue('win32')
+      ;(window as any).api.utils.getArch = vi.fn().mockReturnValue('arm64')
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const backendDropdown = screen.getByTestId('settings-select-transcription-backend')
+      const localOption = Array.from(backendDropdown.querySelectorAll('option')).find(
+        (opt) => opt.value === 'local'
+      )
+
+      expect(localOption).toBeInTheDocument()
+      expect(localOption).toHaveTextContent('ARM64 not supported')
+      expect(localOption).toBeDisabled()
+    })
+
+    it('local option is disabled on Linux with generic copy', () => {
+      ;(window as any).api.utils.getPlatform = vi.fn().mockReturnValue('linux')
+      ;(window as any).api.utils.getArch = vi.fn().mockReturnValue('x64')
+
+      useGlobalSettingsStore.setState({
+        settings: {
+          logging: { level: 'info' },
+          editor: { preserveLineBreaks: false },
+          gitStatus: { pollingEnabled: true, pollingInterval: 5000 },
+          transcription: { backend: 'openai' as const, openaiApiKeyStored: false, whisperModel: 'base' as const }
+        },
+        isLoading: false,
+        error: null,
+        isInitialized: true,
+        wasCorruptionRecovered: false,
+        loadSettings: vi.fn(),
+        updateLoggingLevel: vi.fn(),
+        updatePreserveLineBreaks: vi.fn(),
+        updateGitStatusPollingEnabled: vi.fn(),
+        updateGitStatusPollingInterval: vi.fn(),
+        resetSettings: vi.fn(),
+        clearCorruptionFlag: vi.fn(),
+        _handleSettingsChanged: vi.fn(),
+        updateTranscriptionBackend: vi.fn(),
+        updateWhisperModel: vi.fn()
+      })
+
+      render(<SettingsOverlay />)
+
+      const backendDropdown = screen.getByTestId('settings-select-transcription-backend')
+      const localOption = Array.from(backendDropdown.querySelectorAll('option')).find(
+        (opt) => opt.value === 'local'
+      )
+
+      expect(localOption).toBeInTheDocument()
+      expect(localOption).toHaveTextContent('macOS / Windows x64 only')
       expect(localOption).toBeDisabled()
     })
 

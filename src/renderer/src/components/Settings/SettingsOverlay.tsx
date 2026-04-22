@@ -69,8 +69,19 @@ export function SettingsOverlay() {
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const previousActiveElement = useRef<HTMLElement | null>(null)
 
-  // Platform check for local whisper support (macOS only)
-  const isMacOS = window.api.utils.getPlatform() === 'darwin'
+  // Platform gate for local whisper support.
+  //
+  //   - macOS (arm64 or x64) — universal binary via whisper-build release
+  //   - Windows x64 — signed-SHA-pinned zip via whisper-build release
+  //   - Windows ARM64 — upstream has no ARM64 binary; route to OpenAI API
+  //   - Linux, others — no binary shipped
+  //
+  // Mirrors `classifyPlatform()` in src/main/services/whisper-assets.ts.
+  const whisperPlatform = window.api.utils.getPlatform()
+  const whisperArch = window.api.utils.getArch()
+  const isLocalWhisperSupported =
+    whisperPlatform === 'darwin' ||
+    (whisperPlatform === 'win32' && whisperArch === 'x64')
 
   // API key state for transcription section
   const [hasApiKey, setHasApiKey] = useState(false)
@@ -453,8 +464,12 @@ export function SettingsOverlay() {
                   data-testid={TEST_IDS.SETTINGS_SELECT_TRANSCRIPTION_BACKEND}
                 >
                   <option value="openai">OpenAI</option>
-                  <option value="local" disabled={!isMacOS}>
-                    {isMacOS ? 'Local (whisper.cpp)' : 'Local (macOS only)'}
+                  <option value="local" disabled={!isLocalWhisperSupported}>
+                    {isLocalWhisperSupported
+                      ? 'Local (whisper.cpp)'
+                      : whisperPlatform === 'win32' && whisperArch === 'arm64'
+                        ? 'Local (macOS / Windows x64 only – ARM64 not supported)'
+                        : 'Local (macOS / Windows x64 only)'}
                   </option>
                 </select>
               </div>
@@ -502,7 +517,9 @@ export function SettingsOverlay() {
                         Whisper model
                       </label>
                       <p className="settings-description">
-                        Larger models are more accurate but slower and use more memory
+                        Larger models are more accurate but slower and use more memory.
+                        First-time setup downloads a small (~8 MB) verified whisper.cpp
+                        binary in addition to the selected model.
                       </p>
                     </div>
                     <select
