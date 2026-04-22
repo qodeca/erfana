@@ -6,11 +6,12 @@ Workflow for contributors working on Windows parity (Phases 0–6). Environment 
 
 ## Which branch?
 
+Phases 0–2 shipped in v0.9.3 on `develop` (2026-04-22); the historical `windows` integration branch was deleted after the merge. All remaining Windows work branches off `develop`:
+
 | Situation | Branch |
 |---|---|
-| Phase 0–2 follow-ups, still on the `windows` integration branch | Fork from `windows`, PR back to `windows` |
-| Phase 3–6 work, after `windows → develop` merges | Fork from `develop`, name branch `feature/windows-phase-<N>-<slug>`, PR to `develop` |
-| Unsure whether `windows → develop` has merged yet | Check the merge-readiness gate in [`implementation-plan.md`](implementation-plan.md#status-snapshot-last-updated-2026-04-21-v092-base) |
+| Phase 3–6 work | Fork from `develop`, name branch `feature/windows-phase-<N>-<slug>`, PR back to `develop` |
+| Phase 0–2 bugfix follow-up | Fork from `develop`, name branch `fix/windows-<issue>-<slug>`, PR back to `develop` |
 
 **Do not use git worktrees.** Use plain branches only – this project standardises on `git checkout -b` for all isolated work.
 

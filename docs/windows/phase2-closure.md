@@ -4,17 +4,17 @@
 
 ## Context
 
-Phase 2 implementation is substantively complete on the `windows` branch as of 2026-04-21. All four sub-issues landed: #160 (git allowlist + liveness), #161 (reserved-filename guard with bidi-override defence), #162 (LibreOffice Windows detection + liveness), #163 (long-path activation deferred to Phase 6 with promotion criteria). The 4-reviewer audit is complete; shared `flakeGuard.ts` deployed; 23+ consecutive clean `test:renderer` runs since. See the merge-readiness gate at [`implementation-plan.md` § Merge-to-develop readiness](implementation-plan.md#merge-to-develop-readiness) for the authoritative completion criteria.
+Phase 2 implementation completed on the `windows` branch on 2026-04-21 and **shipped to `develop` in v0.9.3 on 2026-04-22** (merge commit `c1e085d`, release `0b593a1`). All four sub-issues landed: #160 (git allowlist + liveness), #161 (reserved-filename guard with bidi-override defence), #162 (LibreOffice Windows detection + liveness), #163 (long-path activation deferred to Phase 6 with promotion criteria). The 4-reviewer audit is complete; shared `flakeGuard.ts` deployed; 23+ consecutive clean `test:renderer` runs since. The historical merge-readiness gate snapshot lives at [`implementation-plan.md` § Merge-to-develop readiness](implementation-plan.md#merge-to-develop-readiness-historical--gate-satisfied-2026-04-22).
 
 ## Streams (A–G)
 
-### Stream A – User-only validation (blocked on user)
+### Stream A – User-only validation ✅ DONE
 
-#### A1. Phase 1 manual UAT on Windows host
-Source: [`implementation-plan.md` § Manual UAT](implementation-plan.md#manual-uat-must-run-on-a-real-windows-host-before-declaring-phase-1-done). Four checklist items (shell cwd, cmd.exe force, Ctrl+C interrupt, ampersand path error); ~15 min. Report pass/fail in PR.
+#### A1. Phase 1 manual UAT on Windows host ✅
+Four checklist items (shell cwd, cmd.exe force, Ctrl+C interrupt, ampersand path error) verified during the 2026-04-21 Phase-2 UAT session on Windows 11 Pro. UAT surfaced three additional hardening items (Git Bash builder, ConPTY reflow clear, `Program Files (x86)` deny-list relax), all fixed in `c8543bf` before merge.
 
-#### A2. macOS regression check
-Re-verify Phase 2 changes do not regress macOS: `npm run test:cov` (all 3 projects), `npm run build:mac`, dev smoke-test. Expected: test exit 0, DMGs produced. ~10 min wall clock.
+#### A2. macOS regression check ✅
+`npm run test:cov` + `npm run build:mac` clean on macOS; 7887 tests / 244 files / 0 failures; both DMGs produced.
 
 ### Stream B – Code & docs cleanup ✅ DONE
 - B1: Renumber `#155b/c/a/d` → `#160/161/162/163` in [`implementation-plan.md:212-230`](implementation-plan.md); convert "Decision (2026-04-20)" block to past-tense (commit `0ab61ef`).
@@ -34,36 +34,29 @@ Re-verify Phase 2 changes do not regress macOS: `npm run test:cov` (all 3 projec
 - Merge trivial bumps (eslint, type packages, patches); defer risky ones (e.g. chokidar 4→5 major) with explicit PR comment.
 - Document outcome in Phase 2 PR description as "known security debt" if deferred.
 
-### Stream E – PR + merge orchestration (gated on Stream A)
-- E1. Draft PR description: scope (Phase 0–2 sub-issues), manual UAT results (A1), macOS regression (A2), known gaps with tracking (Phase 3–6 issues), deferred work (D1–D8 link), security note, pre-existing lint baseline, test results.
-- E2. Open PR: `git checkout windows` → `gh pr create --base develop --head windows --title "feat(windows): Phases 0-2 complete…" --body-file <(…)`
-- E3. Wait gate: user reviews, UATs if needed, user approves.
-- E4. Merge: `gh pr merge <N> --merge` (merge-commit per Q2 decision).
-- E5. Tag v0.9.3 (patch, per Q1 decision): `git tag -a v0.9.3 -m "Phase 0-2 Windows enablement: dev loop, terminal parity, file ops"`
+### Stream E – PR + merge orchestration ✅ DONE
+- E1–E4. Merge commit `c1e085d` landed on `develop` 2026-04-22 (merge-commit style, preserves per-issue trail).
+- E5. Tag `v0.9.3` created and pushed 2026-04-22 (release commit `0b593a1`).
 
-### Stream F – Post-merge cleanup (after E4)
-- F1. Bump `package.json`: `0.9.2` → `0.9.3`
-- F2. Move CHANGELOG "Unreleased" → `## 0.9.3` section, drop "(on `windows` branch)" qualifier
-- F3. Update [`implementation-plan.md`](implementation-plan.md): mark Phase 2 shipped v0.9.3, gate all-checked, add merge date/PR
-- F4. Update [`README.md`](README.md): Phase 2 row → ✅ Shipped, link to release tag
-- F5. Update root `CLAUDE.md`: version reference `0.9.2` → `0.9.3`
-- F6. Single commit on develop: `chore(windows): bump to v0.9.3 — Phase 0-2 shipped`
+### Stream F – Post-merge cleanup ✅ DONE
+- F1–F2 landed in release commit `0b593a1`: `package.json` bumped 0.9.2 → 0.9.3, CHANGELOG "Unreleased" promoted to `## 0.9.3`.
+- F3–F5. Implementation plan, README, root CLAUDE.md updated to "shipped" state (doc-update 2026-04-22).
 
-### Stream G – Branch cleanup (after F)
-- G1. Delete `windows` branch: `git branch -d windows` + `git push origin --delete windows` (per Q4 decision to use per-phase feature branches off develop, matching project convention).
-- G2. Verify: no PRs targeting windows; no outstanding issue references.
+### Stream G – Branch cleanup ✅ DONE
+- G1. `origin/windows` deleted on remote; local `windows` branch removed (confirmed by `git fetch --prune` showing `[deleted] origin/windows`).
+- G2. No open PRs target `windows`; Phase 3–6 work uses `feature/windows-phase-<N>-*` branches off `develop`.
 
-## Dependency graph
+## Dependency graph (historical, all streams closed)
 
 ```
-Stream A (user UAT) ──┐
-                      ├──► Stream E (PR+merge) ──► Stream F (post-merge) ──► Stream G (branch cleanup)
-Stream B (cleanup) ───┤   ✅ done
+Stream A (user UAT) ──┐    ✅ done
+                      ├──► Stream E (PR+merge)  ──► Stream F (post-merge)  ──► Stream G (branch cleanup)
+Stream B (cleanup) ───┤   ✅ done                    ✅ done                     ✅ done
 Stream C (issues) ────┤   ✅ done
 Stream D (deps) ──────┘   ✅ done
 ```
 
-A is the long pole (user Windows + macOS testing). B/C/D run in parallel.
+All seven streams closed by the v0.9.3 merge + release cycle (2026-04-22).
 
 ## Decisions resolved during Phase 2
 

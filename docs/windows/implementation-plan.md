@@ -6,11 +6,13 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 ---
 
-## Status snapshot (last updated 2026-04-21, v0.9.2 base)
+## Status snapshot
 
-**Branch:** `windows`, synced with `origin/windows`. 28+ commits ahead of `origin/develop`. **Phase 0 closed (#153). Phase 2 sub-issues #160, #161, #162 landed (2026-04-21); #163 deferred decision recorded in code.**
+*Last updated 2026-04-22, v0.9.3 shipped.*
 
-**Recent commits on `windows` (newest → oldest):**
+**Current state:** Phases 0, 1, 2 shipped to `develop` in **v0.9.3** (merge commit `c1e085d`, release commit `0b593a1`, tag `v0.9.3` on 2026-04-22). The `windows` integration branch was deleted after the merge. Phase 3–6 work branches off `develop` as `feature/windows-phase-<N>-*` per the project convention.
+
+**Recent commits on `windows` that landed in v0.9.3 (newest → oldest, frozen for the trail):**
 
 | Commit | Description | Issue |
 |---|---|---|
@@ -31,7 +33,7 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 | `1f0ae81` | Portable `test:cov` + `prebuild` scripts, prerequisites doc | #153 |
 | `d7d291d / 0888d0c` | Windows enablement roadmap docs | — |
 
-**Version base:** `0.9.2` (from the develop merge). Windows work will ship in `0.9.3+` or `0.10.0` when `windows` → `develop` merge lands.
+**Version shipped:** `0.9.3` — the `windows` → `develop` merge (`c1e085d`, 2026-04-22) plus release bump (`0b593a1`). Future Windows work ships in 0.9.4+ or 0.10.0 depending on scope.
 
 **Closed 2026-04-20:** #153 (Phase 0), #156 (setJumpList), #157 (test portability), #159 (CameraDialog timer).
 **Closed 2026-04-21:** #160 (git allowlist), #161 (filename guard), #162 (LibreOffice detection). **#163 (long-path activation): decision-deferred to Phase 6** with promotion criteria recorded inline at `PlatformConfig.ts:194-201` (comment block above `isWindowsLongPath` at `:203`).
@@ -47,28 +49,25 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 - `npm run test:cov` → **7532/7532 tests pass, 0 failures** across main / preload / renderer. Duration 32.75s. No regressions from #157 test portability changes.
 - `npm run build:mac` → both architectures: `erfana-0.9.2-x64.dmg` (327 MB) + `erfana-0.9.2-arm64.dmg` (320 MB). Fuses + ad-hoc signed.
 
-## Next session — close out Phase 2
+## Next session — start Phase 3
 
-**Phase 2 is done; awaits `windows → develop` merge.** The full closure plan (7 streams + dependency graph + decisions resolved) is in [`phase2-closure.md`](phase2-closure.md). Summary:
+**Phase 2 closure is complete** (all seven streams A–G executed; see [`phase2-closure.md`](phase2-closure.md) for the historical breakdown). Windows work now resumes on Phase 3 (screenshot parity, [#164](https://github.com/qodeca/erfana/issues/164)).
 
-- **Stream A (user)** — Phase 1 #154 manual UAT on Windows host (4-item checklist below) + macOS regression check (`test:cov` + `build:mac`)
-- **Stream B (Claude)** — doc-drift cleanup (this commit) + last-mile test sweep
-- **Stream C (Claude)** — file Phase 3-6 tracking issues so post-merge work is visible
-- **Stream D (Claude)** — Dependabot triage of 6 open PRs (#140-#145) + audit of 28 security alerts
-- **Stream E (user-gated)** — open `windows → develop` PR; merge-commit per decision; release as `v0.9.3`
-- **Stream F (post-merge)** — bump `package.json`, promote CHANGELOG entry, mark Phase 2 shipped
-- **Stream G (post-merge)** — delete `windows` branch; Phase 3-6 work uses per-phase feature branches off `develop`
-
-### Open Windows-tagged issues
+### Open Windows-tagged issues (post-v0.9.3)
 
 - [#158](https://github.com/qodeca/erfana/issues/158) — v8 coverage race on Windows, deferred to Phase 6
-- (Phase 3-6 tracking issues filed during Stream C — see post-update state)
+- [#164](https://github.com/qodeca/erfana/issues/164) — Phase 3: screenshot parity (next up)
+- [#165](https://github.com/qodeca/erfana/issues/165) — Phase 4: local Whisper Windows binary
+- [#166](https://github.com/qodeca/erfana/issues/166) — Phase 5: distribution + code signing + auto-updater URL
+- [#167](https://github.com/qodeca/erfana/issues/167) — Phase 6: polish, Windows CI guard, visual baselines
+- [#168](https://github.com/qodeca/erfana/issues/168) — D1–D8 deferred items meta
+- [#169](https://github.com/qodeca/erfana/issues/169) — Dependabot triage + 28 security alerts
 
 ---
 
 ## Feature status on Windows today
 
-Honest per-feature assessment of what an end user running an NSIS install of the `windows` branch gets today, **after Phases 0–2 land**. Phases 3–6 are tracked but not yet implemented.
+Honest per-feature assessment of what an end user running an NSIS install of v0.9.3 gets today. Phases 3–6 are tracked but not yet implemented.
 
 ### ✅ Working
 
@@ -223,7 +222,7 @@ Four parallel reviewers (architecture, solution, code, security) audited #160-#1
 
 ### Status
 
-All four sub-issues + umbrella closed 2026-04-21. Phase 2 is **shipped to `windows` branch**; awaits `windows → develop` merge per the readiness gate at [`Merge-to-develop readiness`](#merge-to-develop-readiness) below. Move to Phase 3 (screenshots) once that merge lands.
+All four sub-issues + umbrella closed 2026-04-21. Phase 2 **shipped in v0.9.3** on 2026-04-22 (merge `c1e085d`, release `0b593a1`). Next up: Phase 3 (screenshots, [#164](https://github.com/qodeca/erfana/issues/164)).
 
 ---
 
@@ -333,74 +332,59 @@ Erfana development happens across two hosts (Windows 11 + macOS). Each session w
 
 ### Session-start checklist (for both hosts)
 
-1. **Check current branch and drift:**
+1. **Sync with develop:**
    ```bash
-   git status && git log --oneline origin/windows..HEAD && git log --oneline HEAD..origin/windows
+   git fetch --all --prune
+   git status
+   git log --oneline HEAD..origin/develop   # commits you are missing
+   git log --oneline origin/develop..HEAD   # commits you have locally (push or stash)
    ```
-   If ahead of `origin/windows` → push or stash. If behind → `git pull --ff-only origin windows`.
+   If on a `feature/windows-phase-*` branch, rebase onto `develop` periodically to keep up.
 
-2. **Verify the branch is up to date with remote:**
-   ```bash
-   git fetch origin && git log --oneline windows..origin/windows
-   ```
-   Empty output = in sync.
+2. **On Windows: ensure Developer Mode is on** (for `build:win` NSIS step) and long-paths are enabled (for deep `node_modules`). Both documented in `docs/build/windows.md` steps 4–5.
 
-3. **On macOS: verify `develop` hasn't diverged since Phase 0 started:**
-   ```bash
-   git log --oneline origin/develop..origin/windows | head -20
-   ```
-   Shows commits that are on `windows` but not `develop`. When ready, merge `windows` → `develop` via PR.
+3. **Check open Windows issues:** `gh issue list --repo qodeca/erfana --label windows --state open`.
 
-4. **On Windows: ensure Developer Mode is on** (for `build:win` NSIS step) and long-paths are enabled (for deep `node_modules`). Both documented in `docs/build/windows.md` steps 4–5.
+4. **Read `implementation-plan.md`** (this file) for current status snapshot — it's the canonical source.
 
-5. **Check open Windows issues:** `gh issue list --repo qodeca/erfana --label windows --state open`.
+### Switching between hosts (during a single Phase)
 
-6. **Read `implementation-plan.md`** (this file) for current status snapshot — it's the canonical source.
+Before switching, push in-flight work on your feature branch:
 
-### When switching Windows → macOS
-
-Before switching:
 ```bash
 git add -A && git commit -m "wip: <what's in flight>"
-git push origin windows
+git push origin feature/windows-phase-<N>-<slug>
 ```
 
-On macOS after `git pull --ff-only origin windows`:
-- Run `npm run test:cov` → should complete cleanly (no v8 coverage race on macOS)
-- Run `npm run build:mac` → should produce `.dmg`
-- **Both passing = Phase 0 AC #4 satisfied → close #153**
+On the other host:
 
-### When switching macOS → Windows
-
-Before switching:
 ```bash
-git push origin windows
+git fetch origin && git checkout feature/windows-phase-<N>-<slug>
+git pull --ff-only
 ```
 
-On Windows after `git pull --ff-only origin windows`:
-- Run `npm run test:main` → 238 files should pass
-- If failures appear, likely a new hardcoded-Unix-path regression → fix with `path.join(os.tmpdir(), ...)` pattern (see #157 for precedent)
+- **Windows after switch:** run `npm run test:main`; on failure, look for hardcoded Unix paths (see #157 pattern).
+- **macOS after switch:** run `npm run test:cov` + `npm run build:mac` for the regression check before merging.
 
 ### Per-phase branch pattern
 
-- Phase work on feature branch: `fix/windows-<phase-or-issue>-<N>` (e.g. `fix/windows-test-portability-157`)
-- Merge to `windows` (integration branch) with `--no-ff` to preserve review trail
-- Final merge `windows` → `develop` only after Phase 0–1 manual UAT passes AND all Phase 2 sub-issues #160, #161, #162 are landed (#163 deferred to Phase 6 with promotion criteria — does not block)
-- **Do NOT** merge `windows` → `develop` before Phase 1 UAT is verified on a real Windows host
+- Phase work on feature branch: `feature/windows-phase-<N>-<slug>` off `develop` (e.g. `feature/windows-phase-3-screenshots`)
+- Merge back to `develop` via PR with `--no-ff` (or `gh pr merge --merge`) to preserve review trail
+- Phase 0–1–2 historical pattern (`fix/windows-*` → integration branch `windows` → `develop`) is retired; the `windows` integration branch was deleted after v0.9.3 (2026-04-22)
 
-### Merge-to-develop readiness
+### Merge-to-develop readiness (historical – gate satisfied 2026-04-22)
 
-Before merging `windows` → `develop`, confirm all of:
+All items below were satisfied before the `windows` → `develop` merge (`c1e085d`, 2026-04-22):
 
 - [x] Phase 0 `#153` closed (all 5 ACs met, macOS regression verified 2026-04-20)
-- [ ] Phase 1 `#154` manual UAT checklist all passing on a real Windows host
+- [x] Phase 1 `#154` manual UAT checklist all passing on Windows 11 Pro host (verified during Phase-2 UAT session 2026-04-21)
 - [x] Phase 2 `#160` (git allowlist + liveness) merged 2026-04-21
 - [x] Phase 2 `#161` (reserved filename guard + bidi stripping) merged 2026-04-21
 - [x] Phase 2 `#162` (LibreOffice Windows detection + liveness probe) merged 2026-04-21 (bonus — not required by gate)
 - [x] Phase 2 `#163` (long-path activation) decision-deferred to Phase 6 with promotion criteria
-- [ ] Clean `npm run test:main` + `npm run test:renderer` + `npm run test:preload` on both hosts
-- [ ] No uncommitted changes on either host
-- [ ] PR description documents what's Windows-specific and lists known gaps (Phases 3–6)
+- [x] Clean `npm run test:main` + `npm run test:renderer` + `npm run test:preload` on both hosts (7887 tests / 244 files / 0 failures)
+- [x] No uncommitted changes on either host
+- [x] Merge-commit captured scope, UAT results, known gaps, tracking issues (#164–#169)
 
 ---
 

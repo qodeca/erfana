@@ -3,7 +3,7 @@
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
 - **Repository**: `qodeca/erfana` (GitHub)
-- **Version**: 0.9.2
+- **Version**: 0.9.3
 - **Tech Stack**: Electron 39, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Build Toolchain**: electron-vite 5, Vite 6, vitest 3
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
@@ -88,7 +88,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Technical Debt](docs/technical-debt.md) — Known debt items and improvement opportunities
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
 - [Large-Project Performance](docs/large-project-performance-plan.md) — Implementation plan for #146–#151 (EMFILE, worker thread, diagnostics)
-- [Windows enablement](docs/windows/README.md) — Phases 0–2 closed on `windows` branch (2026-04-21); awaits `windows → develop` merge gated on Phase 1 UAT. Phase tracking: [#164](https://github.com/qodeca/erfana/issues/164) screenshots, [#165](https://github.com/qodeca/erfana/issues/165) Whisper Windows, [#166](https://github.com/qodeca/erfana/issues/166) distribution + signing, [#167](https://github.com/qodeca/erfana/issues/167) polish + CI guard. Deferred items D1–D8: [#168](https://github.com/qodeca/erfana/issues/168). Dependabot triage: [#169](https://github.com/qodeca/erfana/issues/169). Human-readable entry: [`docs/windows/README.md`](docs/windows/README.md). Canonical status + commit trail + merge-readiness gate: [`docs/windows/implementation-plan.md` § Status snapshot](docs/windows/implementation-plan.md). Contributor workflow: [`docs/windows/contributing.md`](docs/windows/contributing.md). Closure plan: [`docs/windows/phase2-closure.md`](docs/windows/phase2-closure.md). Deferred items detail: [`docs/windows/deferred-work.md`](docs/windows/deferred-work.md). Windows-specific known issues: [`docs/known-issues.md` § Windows-specific issues](docs/known-issues.md#windows-specific-issues).
+- [Windows enablement](docs/windows/README.md) — Phases 0–2 shipped in **v0.9.3** (merged `windows` → `develop` on 2026-04-22; branch deleted). Phase 3–6 work continues on `feature/windows-phase-<N>-*` branches off `develop`. Phase tracking: [#164](https://github.com/qodeca/erfana/issues/164) screenshots, [#165](https://github.com/qodeca/erfana/issues/165) Whisper Windows, [#166](https://github.com/qodeca/erfana/issues/166) distribution + signing, [#167](https://github.com/qodeca/erfana/issues/167) polish + CI guard. Deferred items D1–D8: [#168](https://github.com/qodeca/erfana/issues/168). Dependabot triage: [#169](https://github.com/qodeca/erfana/issues/169). Entry point: [`docs/windows/README.md`](docs/windows/README.md). Canonical phase roadmap + status: [`docs/windows/implementation-plan.md`](docs/windows/implementation-plan.md). Contributor workflow: [`docs/windows/contributing.md`](docs/windows/contributing.md). Closure plan (historical, retain until Phase 3 opens): [`docs/windows/phase2-closure.md`](docs/windows/phase2-closure.md). Deferred items detail: [`docs/windows/deferred-work.md`](docs/windows/deferred-work.md). Windows-specific known issues: [`docs/known-issues.md` § Windows-specific issues](docs/known-issues.md#windows-specific-issues).
 - [Source Grounding](docs/future/source-grounding/README.md) — NotebookLM-style grounding research, gap analysis, strategy, implementation roadmap
 - [Roadmap](ROADMAP.md) — Implementation order for active specs with dependency analysis
 

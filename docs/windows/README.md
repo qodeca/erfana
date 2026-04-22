@@ -5,7 +5,7 @@ This folder tracks the work to bring Erfana to full Windows parity with macOS.
 ## Quick start for a new session
 
 1. **Read the [implementation plan](implementation-plan.md) "Status snapshot"** section — canonical current state.
-2. **Check your branch**: Windows work lives on `windows` (integration branch). `git fetch && git status` first.
+2. **Branch strategy**: Phases 0–2 shipped in v0.9.3 on `develop`. Phase 3–6 work uses `feature/windows-phase-<N>-*` branches off `develop`. The historical `windows` integration branch was deleted after the 2026-04-22 merge.
 3. **On Windows host**: ensure Developer Mode + long-paths enabled per [`docs/build/windows.md`](../build/windows.md) steps 4–5.
 4. **Check open issues**: `gh issue list --repo qodeca/erfana --label windows --state open`.
 
@@ -27,9 +27,9 @@ See [`contributing.md`](contributing.md) for the full pre-PR test matrix.
 
 ## Context
 
-Erfana (v0.9.2, Electron 39) is macOS-first with partial Windows awareness. The codebase already had genuine Windows hooks in several places — `CmdOrCtrl` accelerators, case-insensitive path folding in `ProjectService.ts`, `where`/`which` switching in the git worker, PowerShell shell selection in `TerminalService`, NSIS target in `electron-builder.yml`, `ffmpeg-static` (Windows binary), cross-platform chokidar config in `PlatformConfig.ts` — but several gaps were **hard blockers**, and a handful of "looks handled" areas were silently broken or dead code.
+Erfana (v0.9.3, Electron 39) now ships with first-class Windows support for Phases 0–2: the dev loop, terminal parity, file-ops safety (reserved-filename guard), git-status discovery, and LibreOffice-backed DOCX import all work on Windows 11 Pro. The codebase started with partial Windows awareness — `CmdOrCtrl` accelerators, case-insensitive path folding in `ProjectService.ts`, `where`/`which` switching in the git worker, PowerShell shell selection in `TerminalService`, NSIS target in `electron-builder.yml`, `ffmpeg-static` (Windows binary), cross-platform chokidar config in `PlatformConfig.ts` — but several gaps were **hard blockers**, and a handful of "looks handled" areas were silently broken or dead code. Those blockers were resolved in v0.9.3.
 
-The goal is **full Windows parity** — every feature that works on macOS must work on Windows, including local Whisper transcription and screen capture.
+The goal is **full Windows parity** — every feature that works on macOS must work on Windows, including local Whisper transcription and screen capture. Phases 3–6 close the remaining gaps.
 
 ## Documents
 
@@ -42,9 +42,9 @@ The goal is **full Windows parity** — every feature that works on macOS must w
 
 ## Status
 
-**Canonical status snapshot:** [`implementation-plan.md` § Status snapshot](implementation-plan.md#status-snapshot-last-updated-2026-04-21-v092-base) — recent commits, per-phase verification, merge-readiness gate, all live there. This file covers the document map + onboarding only.
+**Canonical status snapshot:** [`implementation-plan.md` § Status snapshot](implementation-plan.md#status-snapshot) — per-phase verification, shipped features, and remaining work all live there. This file covers the document map + onboarding only.
 
-**One-line current state (2026-04-21):** Phases 0, 1, 2 closed on `windows` branch; awaits `windows → develop` merge gated on Phase 1 manual UAT. Phases 3–6 tracked under [#164](https://github.com/qodeca/erfana/issues/164) / [#165](https://github.com/qodeca/erfana/issues/165) / [#166](https://github.com/qodeca/erfana/issues/166) / [#167](https://github.com/qodeca/erfana/issues/167). Deferred items D1–D8 → [#168](https://github.com/qodeca/erfana/issues/168). Dependabot triage → [#169](https://github.com/qodeca/erfana/issues/169).
+**One-line current state (2026-04-22):** Phases 0, 1, 2 shipped in **v0.9.3** (merged from `windows` → `develop` on 2026-04-22; integration branch deleted). Phases 3–6 tracked under [#164](https://github.com/qodeca/erfana/issues/164) / [#165](https://github.com/qodeca/erfana/issues/165) / [#166](https://github.com/qodeca/erfana/issues/166) / [#167](https://github.com/qodeca/erfana/issues/167). Deferred items D1–D8 → [#168](https://github.com/qodeca/erfana/issues/168). Dependabot triage → [#169](https://github.com/qodeca/erfana/issues/169).
 
 ## How the analysis was produced
 

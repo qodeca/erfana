@@ -2,9 +2,9 @@
 
 An Electron-based project workspace focused on markdown editing, a project tree, and an integrated terminal.
 
-> **Version:** 0.9.2 ([changelog](docs/CHANGELOG.md)) · **Documentation:** [docs/](docs/README.md) · **Architecture:** [docs/architecture.md](docs/architecture.md)
+> **Version:** 0.9.3 ([changelog](docs/CHANGELOG.md)) · **Documentation:** [docs/](docs/README.md) · **Architecture:** [docs/architecture.md](docs/architecture.md)
 >
-> **Windows enablement:** Phases 0–2 landed on the [`windows` branch](https://github.com/qodeca/erfana/tree/windows) (2026-04-21). See [`docs/windows/README.md`](docs/windows/README.md) for status, and [Windows known issues](docs/known-issues.md#windows-specific-issues) for current gaps.
+> **Windows enablement:** Phases 0–2 shipped in **v0.9.3** (merged from the `windows` branch on 2026-04-22). Erfana now installs, runs, builds, and passes the full test matrix on Windows 11 Pro. See [`docs/windows/README.md`](docs/windows/README.md) for roadmap status, and [Windows known issues](docs/known-issues.md#windows-specific-issues) for current gaps (screenshots, local Whisper, code-signing — tracked under [#164–#167](https://github.com/qodeca/erfana/issues?q=label%3Awindows)).
 
 ## Features
 
