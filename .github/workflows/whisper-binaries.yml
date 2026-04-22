@@ -57,6 +57,10 @@ jobs:
     name: macOS universal build
     runs-on: macos-14
     timeout-minutes: 45
+    # Needed to access APPLE_CERT_P12 / APPLE_CERT_PASSWORD / APPLE_ID /
+    # APPLE_APP_PASSWORD / APPLE_TEAM_ID, which are scoped to this
+    # environment (not repo-wide).
+    environment: production-signing
     steps:
       - name: Checkout whisper.cpp
         uses: actions/checkout@v4
@@ -214,6 +218,10 @@ jobs:
     name: Windows x64 build
     runs-on: windows-latest
     timeout-minutes: 45
+    # Scoped to the same environment as build-macos + publish-release so
+    # Phase 5 can add WINDOWS_CERT_PFX / WINDOWS_CERT_PASSWORD here without
+    # moving the job's env context.
+    environment: production-signing
     steps:
       - name: Checkout whisper.cpp
         uses: actions/checkout@v4
