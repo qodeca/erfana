@@ -16,7 +16,7 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 | Commit | Description | Issue |
 |---|---|---|
-| _pending_ | fix(windows): terminal bootstrap hardening — Git Bash dispatch, PTY resize race, git-polling log spam, ConPTY resize-reflow leak across all three bootstrap builders, `(`/`)` allowed in cwds (unblocks `Program Files (x86)`); new `WindowsTerminalBootstrap.test.ts` (60 tests); e2e path-sep fix; ESLint ignores for `playwright-report/` + `test-results/` + `coverage/`; 11 pre-existing lint errors cleared | Phase-2 UAT |
+| `c8543bf` | fix(windows): terminal bootstrap hardening — Git Bash dispatch, PTY resize race, git-polling log spam, ConPTY resize-reflow leak across all three bootstrap builders, `(`/`)` allowed in cwds (unblocks `Program Files (x86)`); new `WindowsTerminalBootstrap.test.ts` (60 tests — vitest reporter count with `it.each()` parameterisation; raw `it()` block count is 25); e2e path-sep fix; ESLint ignores for `playwright-report/` + `test-results/` + `coverage/`; 11 pre-existing lint errors cleared | Phase-2 UAT |
 | `13bd3b8` | feat(windows): detect LibreOffice at standard install paths | **#162 CLOSED** |
 | `612192b` | feat(windows): reserved-filename guard with cross-platform validation | **#161 CLOSED** |
 | `5e86349` | feat(windows): add Program Files entries to git allowlist + liveness probe | **#160 CLOSED** |
@@ -38,13 +38,13 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 **Closed 2026-04-20:** #153 (Phase 0), #156 (setJumpList), #157 (test portability), #159 (CameraDialog timer).
 **Closed 2026-04-21:** #160 (git allowlist), #161 (filename guard), #162 (LibreOffice detection). **#163 (long-path activation): decision-deferred to Phase 6** with promotion criteria recorded inline at `PlatformConfig.ts:194-201` (comment block above `isWindowsLongPath` at `:203`).
 
-**Verification on Windows host (after CameraDialog fix, 2026-04-20 evening):**
+**Verification on Windows host (after CameraDialog fix, 2026-04-20 evening) — pre-Phase-2-UAT snapshot; post-hardening baseline is 7887 tests, see §"Merge readiness" below:**
 
 - `npm run test:main` → **241 files pass / 7437 tests pass / 89 skipped / 0 failures**
 - `npm run build:win` → NSIS installer produced successfully (requires Developer Mode); all Electron security fuses applied; signtool signed
 - `npm run test:cov` → tests pass; wrapper still exits 1 on Windows due to v8 coverage provider race — now confirmed to be the **only** remaining blocker for clean `test:cov` on Windows (#159 CameraDialog fix eliminated the macOS exit-1 cause; Windows exit-1 is purely #158). Confirmed by: `npx vitest --run --config vitest.main.ts --coverage` standalone exits 0.
 
-**Verification on macOS host (Phase 0 AC #4, 2026-04-20):**
+**Verification on macOS host (Phase 0 AC #4, 2026-04-20) — pre-Phase-2-UAT snapshot; see §"Merge readiness" for the post-hardening 7887 baseline that all current docs cite:**
 
 - `npm run test:cov` → **7532/7532 tests pass, 0 failures** across main / preload / renderer. Duration 32.75s. No regressions from #157 test portability changes.
 - `npm run build:mac` → both architectures: `erfana-0.9.2-x64.dmg` (327 MB) + `erfana-0.9.2-arm64.dmg` (320 MB). Fuses + ad-hoc signed.
@@ -250,7 +250,7 @@ Changes:
 
 ---
 
-## Phase 4 — Local Whisper parity — ✅ CLOSED (in-flight 0.9.4 on `feature/windows-phase-4-whisper`)
+## Phase 4 — Local Whisper parity — 🟡 CODE-COMPLETE (unreleased — awaiting 0.9.4 PR merge on `feature/windows-phase-4-whisper`)
 
 **Why it's harder than first imagined:** Step-zero verification uncovered that **ggml-org publishes no macOS CLI binary at any recent version** (v1.7.0–v1.8.4); only Windows zips, a macOS xcframework-for-iOS, and CUDA/BLAS variants exist. The pre-0.9.4 macOS code path referenced a filename that never existed — `Local (whisper.cpp)` had been showing as enabled on macOS but would 404 on first download. So Phase 4 became "rebuild a never-worked feature on both platforms", not "add Windows parity to a working macOS feature".
 
