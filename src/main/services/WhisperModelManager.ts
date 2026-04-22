@@ -89,6 +89,13 @@ export interface IWhisperModelManager {
   ): Promise<string>
   deleteModel(model: WhisperModel): Promise<void>
   getModelInfo(model: WhisperModel): { size: number; installed: boolean }
+  /**
+   * Re-hash every pinned file (main binary + sidecars) against its source-
+   * pinned SHA-256. Called by consumers immediately before spawning the
+   * binary to close the TOCTOU window in `{userData}/whisper/bin/`.
+   * Throws `WHISPER_BINARY_TAMPERED` on mismatch.
+   */
+  verifyInstalledBinary(): Promise<PlatformArtifactSpec>
 }
 
 /**
