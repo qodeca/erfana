@@ -86,8 +86,20 @@ jobs:
       - name: Verify universal binary contains both slices
         run: |
           set -euxo pipefail
-          BIN=$(find build -type f -name whisper-cli -o -name main | head -1)
-          test -x "$BIN" || { echo "::error::No CLI produced"; exit 1; }
+          echo "::group::All executables produced"
+          find build -type f -perm -u+x \( -name 'whisper*' -o -name 'main' \) -exec ls -la {} \;
+          echo "::endgroup::"
+          # Prefer the real CLI (whisper-cli in v1.8+, further renamed to
+          # whisper-whisper upstream at some point). `main` is a deprecation
+          # shim that only prints a warning and exits — picking it would make
+          # transcription silently fail.
+          BIN=""
+          for candidate in whisper-whisper whisper-cli main; do
+            found=$(find build -type f -name "$candidate" -print -quit)
+            if [ -n "$found" ]; then BIN="$found"; break; fi
+          done
+          [ -n "$BIN" ] || { echo "::error::No CLI produced"; exit 1; }
+          echo "Selected BIN=$BIN"
           echo "BIN=$BIN" >>"$GITHUB_ENV"
           lipo -info "$BIN" | tee lipo-info.txt
           grep -q "arm64" lipo-info.txt || { echo "::error::Missing arm64 slice"; exit 1; }
@@ -227,10 +239,21 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           New-Item -ItemType Directory -Path staging | Out-Null
-          # Whisper.cpp produces main.exe (or whisper-cli.exe on newer refs) + several DLLs.
-          $bin = Get-ChildItem -Recurse build\bin\Release -Filter *.exe | `
-                 Where-Object { $_.Name -in @("main.exe","whisper-cli.exe") } | Select-Object -First 1
+          # Diagnostic: list every .exe produced so we can triage future renames.
+          Write-Host "::group::All .exe files in build\bin\Release"
+          Get-ChildItem -Recurse build\bin\Release -Filter *.exe | Format-Table Name, Length, FullName
+          Write-Host "::endgroup::"
+          # Prefer the real CLI (whisper-cli / whisper-whisper in v1.8+). `main.exe`
+          # is a deprecation shim that only prints a warning and exits — staging it
+          # would cause silent smoke-test failure.
+          $preferredNames = @("whisper-whisper.exe", "whisper-cli.exe", "main.exe")
+          $bin = $null
+          foreach ($name in $preferredNames) {
+            $found = Get-ChildItem -Recurse build\bin\Release -Filter $name -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { $bin = $found; break }
+          }
           if (-not $bin) { throw "No whisper CLI .exe produced" }
+          Write-Host "Selected binary: $($bin.Name) from $($bin.FullName)"
           Copy-Item $bin.FullName staging\whisper.exe
           # All DLLs alongside — whisper.dll, ggml.dll, ggml-base.dll, ggml-cpu.dll, etc.
           Get-ChildItem build\bin\Release -Filter *.dll | Copy-Item -Destination staging\
