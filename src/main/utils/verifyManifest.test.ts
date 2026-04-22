@@ -16,7 +16,7 @@ import { tmpdir } from 'os'
 import { join, resolve } from 'path'
 
 import { WHISPER_PUBKEYS } from '../services/whisper-pubkeys'
-import { VerifyManifestError, verifyManifest } from './verifyManifest'
+import { verifyManifest } from './verifyManifest'
 
 /**
  * Real fixture from whisper-build-v1.8.4-erfana1 (published 2026-04-22).
