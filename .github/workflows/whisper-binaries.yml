@@ -460,6 +460,7 @@ jobs:
           EOF
           )
           gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
             --title "$TITLE" \
             --notes "$NOTES" \
             --prerelease \
