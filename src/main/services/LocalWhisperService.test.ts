@@ -1344,7 +1344,12 @@ describe('LocalWhisperService', () => {
         stat: (...args: unknown[]) => mockStat(...args),
         realpath: (...args: unknown[]) => mockRealpath(...(args as [string]))
       }))
-      vi.doMock('os', () => ({ tmpdir: () => os.tmpdir() }))
+      vi.doMock('os', () => ({
+        tmpdir: () => os.tmpdir(),
+        // Provide cpus() for the CPU probe — else the new `checkCpuSupport`
+        // call at the top of `transcribe()` throws `cpus is not a function`.
+        cpus: () => os.cpus()
+      }))
       vi.doMock('crypto', () => ({ randomUUID: () => `test-uuid-${uuidCounter++}` }))
       vi.doMock('./LoggingService', () => ({ logger: mockLogger }))
       vi.doMock('./WhisperModelManager', () => ({
@@ -1504,6 +1509,100 @@ describe('LocalWhisperService', () => {
       await expect(
         validateAudioPath('C:/Users/Test/audio.wav')
       ).resolves.toBe('C:/Users/Test/audio.wav')
+    })
+  })
+
+  // ===========================================================================
+  // CPU pre-flight probe — checkCpuSupport() (review #1 C1/M1)
+  // ===========================================================================
+
+  describe('checkCpuSupport() pre-flight probe', () => {
+    // The module-level cache has to be reset between cases because each test
+    // expects a fresh probe. We expose __resetCpuProbeForTests() from the
+    // service module specifically for this purpose.
+    beforeEach(async () => {
+      const mod = await import('./LocalWhisperService')
+      mod.__resetCpuProbeForTests()
+    })
+
+    it('returns ok=true on a modern CPU brand', async () => {
+      const osModule = await import('os')
+      vi.spyOn(osModule, 'cpus').mockReturnValue([
+        {
+          model: 'Intel(R) Core(TM) i7-8700K CPU @ 3.70 GHz',
+          speed: 3700,
+          times: { user: 0, nice: 0, sys: 0, idle: 0, irq: 0 }
+        } as never
+      ])
+      const { checkCpuSupport } = await import('./LocalWhisperService')
+      const result = checkCpuSupport()
+      expect(result.ok).toBe(true)
+    })
+
+    it('rejects Intel Core 2 Duo', async () => {
+      const osModule = await import('os')
+      vi.spyOn(osModule, 'cpus').mockReturnValue([
+        {
+          model: 'Intel(R) Core(TM)2 Duo CPU E8400 @ 3.00 GHz',
+          speed: 3000,
+          times: { user: 0, nice: 0, sys: 0, idle: 0, irq: 0 }
+        } as never
+      ])
+      const { checkCpuSupport } = await import('./LocalWhisperService')
+      const result = checkCpuSupport()
+      expect(result.ok).toBe(false)
+      if (!result.ok) {
+        expect(result.reason).toContain('OpenAI API backend')
+      }
+    })
+
+    it('rejects Pentium 4', async () => {
+      const osModule = await import('os')
+      vi.spyOn(osModule, 'cpus').mockReturnValue([
+        {
+          model: 'Intel(R) Pentium(R) 4 CPU 3.00GHz',
+          speed: 3000,
+          times: { user: 0, nice: 0, sys: 0, idle: 0, irq: 0 }
+        } as never
+      ])
+      const { checkCpuSupport } = await import('./LocalWhisperService')
+      expect(checkCpuSupport().ok).toBe(false)
+    })
+
+    it('is case-insensitive (PhENOM II)', async () => {
+      const osModule = await import('os')
+      vi.spyOn(osModule, 'cpus').mockReturnValue([
+        {
+          model: 'AMD PhENOM(tm) II X4 965',
+          speed: 3400,
+          times: { user: 0, nice: 0, sys: 0, idle: 0, irq: 0 }
+        } as never
+      ])
+      const { checkCpuSupport } = await import('./LocalWhisperService')
+      expect(checkCpuSupport().ok).toBe(false)
+    })
+
+    it('falls through (ok=true) when os.cpus() returns empty array', async () => {
+      const osModule = await import('os')
+      vi.spyOn(osModule, 'cpus').mockReturnValue([])
+      const { checkCpuSupport } = await import('./LocalWhisperService')
+      expect(checkCpuSupport().ok).toBe(true)
+    })
+
+    it('caches result across calls', async () => {
+      const osModule = await import('os')
+      const cpusSpy = vi.spyOn(osModule, 'cpus').mockReturnValue([
+        {
+          model: 'AMD Ryzen 9 5950X 16-Core Processor',
+          speed: 3400,
+          times: { user: 0, nice: 0, sys: 0, idle: 0, irq: 0 }
+        } as never
+      ])
+      const { checkCpuSupport } = await import('./LocalWhisperService')
+      checkCpuSupport()
+      checkCpuSupport()
+      checkCpuSupport()
+      expect(cpusSpy).toHaveBeenCalledTimes(1)
     })
   })
 })

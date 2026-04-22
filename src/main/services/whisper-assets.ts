@@ -147,6 +147,17 @@ export const MODEL_MAX_BYTES = 2 * 1024 * 1024 * 1024
 export const SCHEMA_SENTINEL_FILENAME = '.schema-version'
 
 /**
+ * Name of the monotonic-revision sentinel under `{userData}/whisper/`.
+ *
+ * Persists the highest `manifest.revisionIndex` ever successfully installed.
+ * `ensureBinary()` refuses to accept a manifest whose `revisionIndex` is
+ * strictly lower than the stored value — this defeats manifest replay, where
+ * an attacker hands the client a legitimately-signed but superseded manifest
+ * to force downgrade to a known-exploitable whisper.cpp version.
+ */
+export const LAST_SEEN_REVISION_FILENAME = '.last-seen-revision'
+
+/**
  * Classify the current process for binary-resolution purposes.
  *
  * Returns one of the supported `WhisperPlatform` values, or an object

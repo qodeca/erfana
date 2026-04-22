@@ -47,6 +47,7 @@ import { logger } from './LoggingService'
 import {
   ARTIFACTS,
   BINARY_ARCHIVE_MAX_BYTES,
+  LAST_SEEN_REVISION_FILENAME,
   MANIFEST_MAX_BYTES,
   MANIFEST_SIG_MAX_BYTES,
   MANIFEST_SIG_URL,
@@ -157,8 +158,15 @@ class WhisperModelManager implements IWhisperModelManager {
 
   /**
    * Ensure binary + all pinned sidecars exist AND match their pinned SHAs.
-   * Treats a missing sidecar or SHA drift as "not installed" so the next
-   * `ensureBinary()` re-downloads.
+   *
+   * Contract: returns `true` only when every pinned file (main + sidecars)
+   * exists AND hashes match source-pinned SHA-256s AND the schema sentinel
+   * is current. Any deviation returns `false`, which makes `ensureBinary()`
+   * treat the bin/ dir as unverified and re-download.
+   *
+   * Cost: reads ~2.3 MB (win32: main + 4 DLLs) through a streaming SHA-256
+   * pipe once per session. Measured <50 ms on modern hardware — acceptable
+   * for startup.
    */
   async isBinaryInstalled(): Promise<boolean> {
     const spec = this.safeSpec()
@@ -173,6 +181,10 @@ class WhisperModelManager implements IWhisperModelManager {
       // broken URL that never produced a verified binary).
       const sentinel = await this.readSchemaVersion()
       if (sentinel !== SCHEMA_VERSION) return false
+      // Full SHA re-verify — closes the "corrupted file, sentinel intact"
+      // gap. `verifyAllFiles` throws on any mismatch; we convert the throw
+      // to a `false` return so the caller triggers a fresh install.
+      await this.verifyAllFiles(spec)
       return true
     } catch {
       return false
@@ -271,10 +283,21 @@ class WhisperModelManager implements IWhisperModelManager {
 
       const manifest = JSON.parse(await readFile(tempManifest, 'utf8')) as WhisperManifest
 
-      // Downgrade protection: revisionIndex must meet our minimum.
-      if (manifest.revisionIndex < MIN_REVISION_INDEX) {
+      // Downgrade protection — two-layer:
+      //   1. Source floor `MIN_REVISION_INDEX` hard-codes the lowest revision
+      //      this app version will EVER accept. Bumping the code pin here is
+      //      a deliberate irreversible decision.
+      //   2. Persistent monotonic floor `lastSeenRevision` — records the
+      //      highest revisionIndex this install has ever successfully fetched.
+      //      Defeats manifest-replay where a compromised delivery path hands
+      //      back a legitimately-signed but superseded manifest to roll the
+      //      user back to a known-exploitable whisper.cpp version.
+      const lastSeenRevision = await this.readLastSeenRevision()
+      const effectiveFloor = Math.max(MIN_REVISION_INDEX, lastSeenRevision ?? 0)
+      if (manifest.revisionIndex < effectiveFloor) {
         throw new AppError(
-          `Whisper manifest revisionIndex ${manifest.revisionIndex} is below minimum ${MIN_REVISION_INDEX} — possible downgrade attack`,
+          `Whisper manifest revisionIndex ${manifest.revisionIndex} is below floor ${effectiveFloor} ` +
+            `(source minimum ${MIN_REVISION_INDEX}, lastSeen ${lastSeenRevision ?? 'unset'}) — possible downgrade / replay attack`,
           ErrorCode.WHISPER_BINARY_DOWNLOAD_FAILED
         )
       }
@@ -338,7 +361,19 @@ class WhisperModelManager implements IWhisperModelManager {
       // Schema sentinel — gates fast-path for subsequent launches.
       await this.writeSchemaVersion(SCHEMA_VERSION)
 
-      logger.info('Whisper binary installed', { binDir: this.binDir })
+      // Bump persistent revision floor — strictly monotonic, so a future
+      // replayed-older manifest is rejected by the downgrade guard above.
+      await this.writeLastSeenRevision(
+        Math.max(manifest.revisionIndex, lastSeenRevision ?? 0)
+      )
+
+      logger.info('Whisper binary installed', {
+        binDir: this.binDir,
+        manifestRevision: manifest.revisionIndex,
+        signingKeyRole: verifyResult.signingKeyRole,
+        upstreamSha: manifest.upstream.sha,
+        upstreamLabel: manifest.upstream.label
+      })
       return this.getBinaryPath()
     } catch (error) {
       // On failure, wipe bin/ so isBinaryInstalled() doesn't return true on a
@@ -499,7 +534,11 @@ class WhisperModelManager implements IWhisperModelManager {
         } catch (e) {
           // ENOENT = no MOTW on this file, fine.
           if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
-            logger.debug('Could not strip Zone.Identifier', {
+            // Non-ENOENT failure usually means permission denied — if
+            // bin/ ownership is wrong SmartScreen will keep prompting.
+            // Surface at warn so operators can notice in production logs
+            // rather than only during local debug.
+            logger.warn('Could not strip Zone.Identifier', {
               path: adsPath,
               error: (e as Error).message
             })
@@ -527,13 +566,23 @@ class WhisperModelManager implements IWhisperModelManager {
   /**
    * Re-hash every pinned file under `binDir` and assert equality with the
    * source pin. Throws `WHISPER_BINARY_TAMPERED` on any mismatch.
+   *
+   * Streaming implementation — avoids slurping the whole file into memory so
+   * future additions (e.g. GPU kernel blobs) don't balloon RSS on every
+   * spawn.
    */
   private async verifyAllFiles(spec: PlatformArtifactSpec): Promise<void> {
     const pins: FilePin[] = [spec.files.main, ...spec.files.sidecars]
+    const { createReadStream } = await import('fs')
     for (const pin of pins) {
       const p = join(this.binDir, pin.filename)
-      const buf = await readFile(p)
-      const actual = createHash('sha256').update(buf).digest('hex')
+      const actual = await new Promise<string>((resolve, reject) => {
+        const hash = createHash('sha256')
+        const stream = createReadStream(p)
+        stream.on('data', (c) => hash.update(c))
+        stream.on('error', reject)
+        stream.on('end', () => resolve(hash.digest('hex')))
+      })
       if (actual.toLowerCase() !== pin.sha256.toLowerCase()) {
         throw new AppError(
           `Whisper file "${pin.filename}" SHA-256 mismatch: expected ${pin.sha256}, got ${actual}`,
@@ -555,6 +604,33 @@ class WhisperModelManager implements IWhisperModelManager {
 
   private async writeSchemaVersion(n: number): Promise<void> {
     await writeFile(join(this.whisperDir, SCHEMA_SENTINEL_FILENAME), String(n), 'utf8')
+  }
+
+  /**
+   * Read the persistent monotonic-revision floor. Returns `null` when the
+   * sentinel is absent (fresh install) or unparseable (corrupt — treated as
+   * "no floor yet", `MIN_REVISION_INDEX` takes over).
+   */
+  private async readLastSeenRevision(): Promise<number | null> {
+    try {
+      const raw = await readFile(
+        join(this.whisperDir, LAST_SEEN_REVISION_FILENAME),
+        'utf8'
+      )
+      const n = Number.parseInt(raw.trim(), 10)
+      return Number.isFinite(n) ? n : null
+    } catch {
+      return null
+    }
+  }
+
+  private async writeLastSeenRevision(n: number): Promise<void> {
+    await this.ensureDir(this.whisperDir)
+    await writeFile(
+      join(this.whisperDir, LAST_SEEN_REVISION_FILENAME),
+      String(n),
+      'utf8'
+    )
   }
 
   /**

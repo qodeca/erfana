@@ -17,7 +17,7 @@
  */
 import { spawn, execFile } from 'child_process'
 import { realpath, stat, readFile, unlink } from 'fs/promises'
-import { tmpdir } from 'os'
+import { cpus, tmpdir } from 'os'
 import { join, extname, basename, dirname } from 'path'
 import { randomUUID } from 'crypto'
 import ffmpegPath from 'ffmpeg-static'
@@ -100,6 +100,90 @@ const POSIX_CPU_UNSUPPORTED_EXIT_CODES = new Set([
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * CPU-model regexes for hardware older than SSE4.2 / AVX. Whisper.cpp
+ * compiled with `-DGGML_NATIVE=OFF` still emits SSE4.2-era intrinsics by
+ * default — these CPUs crash with SIGILL at first inference.
+ *
+ * We match tokens with optional `(tm)`, `(r)`, or whitespace in between so
+ * real brand strings like `Intel(R) Pentium(R) 4 CPU` match `pentium 4`.
+ *
+ * We accept a false-positive (rejecting a supported CPU we don't recognise)
+ * over a false-negative (letting an unsupported CPU through) — the cost of a
+ * wrong rejection is one user running the OpenAI API backend instead; the
+ * cost of a wrong acceptance is downloading ~200 MB + crashing mid-import.
+ *
+ * Specifically rejected (non-exhaustive): Intel Core 2 / Core 2 Duo (Conroe,
+ * Wolfdale, Merom, Yorkfield), Pentium 4 / Pentium D / Celeron D / Pentium M,
+ * AMD K8 / K10 / Phenom / Athlon 64 / Sempron / Turion pre-Bulldozer.
+ */
+// Matches `(r)`, `(tm)`, `®`, `™`, or whitespace between adjacent tokens.
+const TRADEMARK_SEP = '(?:\\s*(?:\\(r\\)|\\(tm\\)|\\(c\\)|®|™|\\s)\\s*)+'
+const CPU_MODEL_DENYLIST: readonly RegExp[] = [
+  new RegExp(`\\bcore${TRADEMARK_SEP}?2\\b`, 'i'),
+  new RegExp(`\\bpentium${TRADEMARK_SEP}?4\\b`, 'i'),
+  new RegExp(`\\bpentium${TRADEMARK_SEP}?d\\b`, 'i'),
+  new RegExp(`\\bpentium${TRADEMARK_SEP}?iii\\b`, 'i'),
+  new RegExp(`\\bpentium${TRADEMARK_SEP}?m\\b`, 'i'),
+  new RegExp(`\\bceleron${TRADEMARK_SEP}?d\\b`, 'i'),
+  new RegExp(`\\bathlon${TRADEMARK_SEP}?64\\b`, 'i'),
+  new RegExp(`\\bathlon${TRADEMARK_SEP}?ii\\b`, 'i'),
+  new RegExp(`\\bsempron\\b`, 'i'),
+  new RegExp(`\\bturion${TRADEMARK_SEP}?64\\b`, 'i'),
+  new RegExp(`\\bphenom\\b`, 'i'),
+  new RegExp(`\\bopteron${TRADEMARK_SEP}?2\\b`, 'i')
+]
+
+/**
+ * Cached result of the CPU-feature probe. We run the check once per process
+ * lifetime and memoise the result — per-transcribe probing is wasteful (the
+ * CPU doesn't change) and would add a small but needless latency to every
+ * call.
+ */
+let cpuProbeResult: { ok: true } | { ok: false; reason: string } | null = null
+
+/**
+ * Pre-flight CPU-feature check. Runs before the first spawn so unsupported
+ * hardware gets a fast, actionable error instead of a full binary+model
+ * download followed by a SIGILL crash.
+ *
+ * Heuristic: examine the CPU brand string from `os.cpus()`. Node exposes the
+ * OS-supplied brand (e.g. `Intel(R) Core(TM) i7-8700K CPU @ 3.70 GHz`).
+ * Anything matching a known pre-SSE4.2 family is rejected hard. Anything
+ * else is optimistically allowed — the runtime SIGILL handler in
+ * `runWhisper()` is the final safety net that catches the long-tail cases
+ * we didn't anticipate (embedded x86, non-standard brand strings).
+ *
+ * Exported for direct unit testing.
+ */
+export function checkCpuSupport(): { ok: true } | { ok: false; reason: string } {
+  if (cpuProbeResult) return cpuProbeResult
+  const info = cpus()
+  if (!info || info.length === 0) {
+    // Pathological environment — sandbox, container without /proc/cpuinfo,
+    // etc. Fall through to the runtime SIGILL handler rather than block.
+    cpuProbeResult = { ok: true }
+    return cpuProbeResult
+  }
+  const model = info[0].model || ''
+  for (const bad of CPU_MODEL_DENYLIST) {
+    if (bad.test(model)) {
+      cpuProbeResult = {
+        ok: false,
+        reason: `Local Whisper is not supported on this CPU (${info[0].model}). Use the OpenAI API backend, or run Erfana on a CPU with SSE4.2 support (Intel Nehalem or newer, AMD Bulldozer or newer).`
+      }
+      return cpuProbeResult
+    }
+  }
+  cpuProbeResult = { ok: true }
+  return cpuProbeResult
+}
+
+/** Test-only hook for resetting the probe cache between cases. */
+export function __resetCpuProbeForTests(): void {
+  cpuProbeResult = null
+}
 
 /**
  * Validate + canonicalize the user-supplied audio path before passing it to
@@ -216,6 +300,19 @@ export class LocalWhisperService {
           success: false,
           error: 'Transcription was cancelled',
           errorCode: ErrorCode.TRANSCRIPTION_CANCELLED
+        }
+      }
+
+      // Pre-flight CPU probe — fast-fail on pre-SSE4.2 CPUs BEFORE we
+      // download ~200 MB of binary + model only to SIGILL on first inference.
+      // Runtime SIGILL handler in `runWhisper()` is the final safety net;
+      // this check catches the common cases up front.
+      const cpu = checkCpuSupport()
+      if (!cpu.ok) {
+        return {
+          success: false,
+          error: cpu.reason,
+          errorCode: ErrorCode.WHISPER_CPU_UNSUPPORTED
         }
       }
 
