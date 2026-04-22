@@ -304,7 +304,7 @@ See [Scroll Fixes](./scroll-fixes.md) for related scroll preservation features.
 
 ### Core Capabilities
 
-- **Native Shell**: Spawns real PTY process (zsh on macOS, bash on Linux)
+- **Native Shell**: Spawns real PTY process (zsh on macOS, bash on Linux, Git Bash / PowerShell 7 / Windows PowerShell 5.1 / cmd.exe on Windows – resolved by `TerminalService.resolveWindowsShell()` in precedence order, honoring `$SHELL` first)
 - **Auto-Resize**: Terminal automatically resizes when panel is dragged
 - **WebGL Rendering**: Hardware acceleration with canvas fallback
 - **Bold Font Support**: Renders bold text with proper font weight

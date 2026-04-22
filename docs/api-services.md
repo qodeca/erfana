@@ -10,9 +10,11 @@ Supporting service classes for terminal emulation, file operations, file watchin
 
 **File:** `src/main/services/TerminalService.ts`
 
-Manages terminal emulator instances with xterm.js + node-pty. Cross-platform: macOS/Linux (POSIX shells), Windows (cmd.exe, PowerShell 5.1, pwsh 7+). Marker-based bootstrap with three-flag output gating — see [Terminal Bootstrap Pattern](./terminal/bootstrap-pattern.md) for platform-specific shell invocation, cwd validation contract, `WindowsBootstrapBuilder` strategy pattern, and `resolveWindowsShell()` fallback chain.
+Manages terminal emulator instances with xterm.js + node-pty. Cross-platform: macOS/Linux (POSIX shells), Windows (Git Bash, PowerShell 7 / pwsh, Windows PowerShell 5.1, cmd.exe). Marker-based bootstrap with three-flag output gating — see [Terminal Bootstrap Pattern](./terminal/bootstrap-pattern.md) for platform-specific shell invocation, cwd validation contract, `WindowsBootstrapBuilder` strategy pattern, `resolveWindowsShell()` fallback chain, and Windows ConPTY resize-reflow mitigation.
 
-**cwd validation contract (Windows)**: cwds containing `" & | ^ < > ( ) \r \n` are rejected before bootstrap; `createTerminal` returns `null` and emits `'error'`. Callers must surface this.
+**cwd validation contract (Windows)**: cwds containing `" & | ^ < > \r \n` are rejected before bootstrap; `createTerminal` returns `null` and emits `'error'`. Callers must surface this. `(` and `)` are intentionally allowed (unblocks `C:\Program Files (x86)\…`).
+
+**Resize race safety (Windows)**: `resize()` silently no-ops when the underlying node-pty process has exited between the `resize()` call and the deferred Windows resize execution — the method returns `false` and the stale terminal entry is dropped from the map.
 
 **Constructor DI seam**: `new TerminalService(fsExists?)` — defaults to `fs.existsSync`; tests inject fakes to cover the shell fallback chain without module mocking.
 

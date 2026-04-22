@@ -77,7 +77,7 @@ Honest per-feature assessment of what an end user running an NSIS install of the
 | App launches, renders, fuses applied | Electron packaging correct |
 | Markdown editor (Monaco, live preview, Mermaid, scroll sync, frontmatter, in-file search) | Pure renderer, no platform branches |
 | Project tree (file explorer, drag-drop, context menu, markdown filter) | Cross-platform FS APIs |
-| **Terminal** (cmd.exe + PowerShell, cwd handshake, Ctrl+C, file links, drag-drop) | **Phase 1 (#154) landed** |
+| **Terminal** (Git Bash + PowerShell 7 / Windows PowerShell 5.1 + cmd.exe, cwd handshake, Ctrl+C, file links, drag-drop) | **Phase 1 (#154) landed; Git Bash added + ConPTY reflow fixed during Phase-2 UAT hardening** |
 | Prompt templates, settings overlay, project settings (`.erfana/settings.json`) | Pure web / JSON I/O |
 | PDF export | Electron's headless print API is cross-platform |
 | Image preview (PNG, JPG, SVG, etc.) | Pure renderer |
@@ -171,9 +171,9 @@ Honest per-feature assessment of what an end user running an NSIS install of the
 3. **`resolveWindowsShell()`** (fixes M6) — replaces the bare `'powershell.exe'` fallback
    - Ordered chain: `$SHELL` (if `existsSync`) → `%ProgramFiles%\PowerShell\7\pwsh.exe` → `%ProgramFiles(x86)%\PowerShell\7\pwsh.exe` → `<%SystemRoot%>\System32\WindowsPowerShell\v1.0\powershell.exe` → `%COMSPEC%` (validated) → `<systemRoot>\System32\cmd.exe` (validated). Never returns a bare command name. Logs `logger.warn` if nothing resolves.
    - **Intentionally deferred to a future phase**: Microsoft Store pwsh under `%LOCALAPPDATA%\Microsoft\WindowsApps`, Git Bash auto-discovery when `$SHELL` is unset, WSL (`wsl.exe`).
-4. **cwd validation deny-list** (BLOCKER #2 from review) — `validateWindowsCwd` rejects cwds containing any of `["&|^<>()\r\n]` before constructing the bootstrap. `createTerminal` returns `null`, logs an error, and emits an `'error'` event. **Hard contract**: callers must surface the error to the user.
+4. **cwd validation deny-list** (BLOCKER #2 from review) — `validateWindowsCwd` rejects cwds containing any of `["&|^<>\r\n]` before constructing the bootstrap. `createTerminal` returns `null`, logs an error, and emits an `'error'` event. **Hard contract**: callers must surface the error to the user. **(Phase-2 UAT update)**: `(` and `)` were removed from the deny-list so paths under `C:\Program Files (x86)\…` are accepted; parens are cmd metacharacters only outside quotes and are literal inside `cd /d "<cwd>"`.
 5. **Trailing-backslash normalization** (BLOCKER from round 2) — `normalizeWindowsCwd` strips trailing separators (preserving drive roots like `C:\`) so `cd /d "C:\path\"` doesn't parse as escaped-quote.
-6. **`WindowsBootstrapBuilder` strategy extraction** (architecture-reviewer finding) — `src/main/services/WindowsTerminalBootstrap.ts` (~180 LOC). Strategy pattern with `PowerShellBootstrapBuilder` + `CmdExeBootstrapBuilder` so Phase 2 (Git Bash, WSL) *adds* a class instead of *modifying* a switch.
+6. **`WindowsBootstrapBuilder` strategy extraction** (architecture-reviewer finding) — `src/main/services/WindowsTerminalBootstrap.ts` (~240 LOC). Strategy pattern: `PowerShellBootstrapBuilder` → `GitBashBootstrapBuilder` → `CmdExeBootstrapBuilder` (precedence order). Git Bash was added during Phase-2 UAT when dev-build testing surfaced that a `$SHELL=…\bash.exe` value fell through to the cmd.exe catch-all and exited with code 126. WSL is still deferred. Each builder also emits a ConPTY screen-clear step (CSI 2J/3J/H) after the marker to wipe the Windows screen-buffer before the interactive shell takes over — without it, a subsequent terminal resize replays the pwd+marker lines through the ConPTY reflow.
 7. **POSIX bootstrap hardening** — `cwd` single-quote escape (`'` → `'\''`) + newline rejection for parity.
 8. **SIGINT / Ctrl+C** — `node-pty` uses ConPTY on modern Windows and maps Ctrl+C correctly. No code change; covered by manual UAT.
 
@@ -434,7 +434,7 @@ Before merging `windows` → `develop`, confirm all of:
 - `execFile` (not `exec`) — existing pattern throughout; maintain for injection safety
 - `ffmpeg-static` / `ffprobe-static` — already cross-platform, no changes
 - Existing `markerDetector` handshake in `TerminalService.ts:245-285` — reused by the cmd.exe bootstrap (Phase 1 landed)
-- `WindowsBootstrapBuilder` strategy (`WindowsTerminalBootstrap.ts`) — Phase 1 landed; **add new builder for Git Bash / WSL in Phase 6**, don't re-branch
+- `WindowsBootstrapBuilder` strategy (`WindowsTerminalBootstrap.ts`) — Phase 1 landed; Git Bash builder added during Phase-2 UAT hardening; **add new builder for WSL (`wsl.exe`) in Phase 6**, don't re-branch
 
 ---
 
