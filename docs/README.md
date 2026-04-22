@@ -58,7 +58,7 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 - [Large Project Performance Plan](./large-project-performance-plan.md) - EMFILE mitigation, worker threads, diagnostics
 - [Testing](./testing/README.md) - Testing strategies and coverage
   - [E2E Testing](./testing/e2e-testing.md) - Playwright/Electron E2E guide
-  - [E2E Selectors](./testing/e2e-selectors.md) - 211 testids catalog
+  - [E2E Selectors](./testing/e2e-selectors.md) - 225 testids catalog
   - [E2E Helpers](./testing/e2e-helpers.md) - Test utility functions
   - [E2E Third-Party](./testing/e2e-third-party.md) - Monaco, xterm.js, Mermaid patterns
   - [E2E Debugging](./testing/e2e-debugging.md) - Debugging and CI/CD
