@@ -473,6 +473,37 @@ jobs:
             exit 1
           }
 
+      - name: Pattern-scan job output for leaked credential patterns
+        # B5c / audit I2 — Plan §"CI workflow" step 4 originally said "grep
+        # workflow logs for leaked APPLE_APP_PASSWORD / WINDOWS_CERT_PASSWORD
+        # / MANIFEST_SIGNING_KEY patterns". Grepping the live GitHub runner
+        # log from inside the job is infeasible (the log streams out of the
+        # runner to GitHub storage; the job doesn't have read access to its
+        # own rendered log). This step approximates the intent by grepping
+        # the files the job DOES produce: the step-summary markdown and the
+        # manifest JSON we wrote to disk. Paired with GitHub's built-in
+        # `::add-mask::` (primary defense) this is belt-and-suspenders for
+        # materials that bypass masking — e.g. a secret transformed through
+        # `jq` into a different shape before being echoed.
+        if: always()
+        run: |
+          set -euo pipefail
+          SCAN_TARGETS=()
+          [ -n "${GITHUB_STEP_SUMMARY:-}" ] && [ -f "$GITHUB_STEP_SUMMARY" ] && SCAN_TARGETS+=("$GITHUB_STEP_SUMMARY")
+          [ -f manifest.json ] && SCAN_TARGETS+=(manifest.json)
+          if [ ${#SCAN_TARGETS[@]} -eq 0 ]; then
+            echo "No scannable output files produced — nothing to scan."
+            exit 0
+          fi
+          PATTERN='APPLE_APP_PASSWORD=|APPLE_CERT_PASSWORD=|WINDOWS_CERT_PASSWORD=|MANIFEST_SIGNING_KEY=|MANIFEST_SIGNING_KEY_PASSWORD=|-----BEGIN [A-Z ]*PRIVATE KEY-----|untrusted comment:.*minisign encrypted secret key'
+          for target in "${SCAN_TARGETS[@]}"; do
+            if grep -iE "$PATTERN" "$target"; then
+              echo "::error::Credential pattern leaked in job output: $target"
+              exit 1
+            fi
+          done
+          echo "No credential patterns detected in scanned job outputs (${SCAN_TARGETS[*]})."
+
       - name: Refuse overwrite of existing release / tag
         env:
           GH_TOKEN: ${{ github.token }}

@@ -166,18 +166,15 @@ If any item surfaces something suspicious, escalate or pin to an earlier SHA.
 
 No rebuild possible during the outage. Existing `whisper-build-*` releases remain reachable via their published asset URLs. Document the acceptable-outage window in the release-freeze policy; typically not actionable (wait it out).
 
-## Scheduled canary (Phase 5 follow-up)
+## Scheduled canary (wired — runs monthly)
 
-A separate `.github/workflows/whisper-binaries-canary.yml` runs monthly and validates credentials haven't silently rotated out:
+`.github/workflows/whisper-binaries-canary.yml` runs automatically on the 1st of every month at 09:00 UTC. Two jobs:
 
-```
-xcrun notarytool history --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID"
-signtool verify /pa /v <last published whisper.exe>
-```
+- **`macos-notarization-canary`** — calls `xcrun notarytool history` with the same Apple ID / app-specific password / team ID the main workflow uses for `notarytool submit`. Non-zero exit = credentials can no longer authenticate. Catches the silent-rotation failure where an Apple app-specific password expires after ~6 months of inactivity.
+- **`windows-signtool-canary`** — currently a **resolvability** probe only (`Get-Command signtool.exe`). Phase 4 ships unsigned on Windows, so there's no cert chain to verify yet. Phase 5 grows this into a real `signtool verify` once the Windows cert is procured.
+- **`notify-on-failure`** — on any probe failure, creates (or comments on) a GitHub issue with the failure date + run URL + link to the cert-revocation runbook. Label: `canary`.
 
-Emits a failure notification if credentials are invalid. Catches app-specific-password rotation silent failures.
-
-_Canary workflow not yet authored — Phase-5 scope._
+Manual trigger: `gh workflow run whisper-binaries-canary.yml`.
 
 ## Non-reproducibility caveat
 
