@@ -148,6 +148,12 @@ export enum ErrorCode {
   WHISPER_PROCESS_TIMEOUT = 'WHISPER_PROCESS_TIMEOUT',
   WHISPER_OUTPUT_PARSE_FAILED = 'WHISPER_OUTPUT_PARSE_FAILED',
   WHISPER_UNSUPPORTED_PLATFORM = 'WHISPER_UNSUPPORTED_PLATFORM',
+  /** A pinned whisper artifact's on-disk SHA-256 doesn't match source pin. */
+  WHISPER_BINARY_TAMPERED = 'WHISPER_BINARY_TAMPERED',
+  /** The audio file path failed argv-hardening validation. */
+  WHISPER_INVALID_PATH = 'WHISPER_INVALID_PATH',
+  /** The current CPU lacks the minimum required instruction-set features. */
+  WHISPER_CPU_UNSUPPORTED = 'WHISPER_CPU_UNSUPPORTED',
 
   // Video import errors (Issue #110)
   VIDEO_NO_AUDIO_TRACK = 'VIDEO_NO_AUDIO_TRACK',
@@ -337,6 +343,9 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.WHISPER_PROCESS_TIMEOUT]: 'Local transcription timed out. Try a smaller model or shorter file.',
   [ErrorCode.WHISPER_OUTPUT_PARSE_FAILED]: 'Failed to parse transcription output. Please try again.',
   [ErrorCode.WHISPER_UNSUPPORTED_PLATFORM]: 'Local Whisper is not supported on this platform.',
+  [ErrorCode.WHISPER_BINARY_TAMPERED]: 'The local Whisper binary on disk has been modified or corrupted. Re-download it from Settings.',
+  [ErrorCode.WHISPER_INVALID_PATH]: 'The audio file path is not supported by local Whisper. Use a regular local file path (no UNC, no Windows reserved names).',
+  [ErrorCode.WHISPER_CPU_UNSUPPORTED]: 'Your CPU lacks the instruction-set features local Whisper requires. Use the OpenAI API backend instead.',
 
   // Video import errors (Issue #110)
   [ErrorCode.VIDEO_NO_AUDIO_TRACK]: 'This video file contains no audio track to transcribe.',
