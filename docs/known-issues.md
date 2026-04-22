@@ -38,13 +38,55 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (merged 2026-04-22). Th
 
 ---
 
-### Local Whisper transcription unavailable on Windows
+### Local Whisper: Windows ARM64 not supported
 
-**Issue**: `WhisperModelManager.getArchSuffix()` throws on `process.platform !== 'darwin'`. Both model download and transcription fail with a clear error.
+**Issue**: Windows ARM64 machines cannot use the local whisper.cpp backend. Upstream whisper.cpp has no ARM64 Windows binary at any recent version, and building one in CI requires MSVC ARM64 cross-compile support plus an ARM64 signing certificate — neither currently in scope.
 
-**Workaround**: Use the OpenAI API transcription backend (Settings → Transcription → Backend → OpenAI API). Cross-platform, requires API key.
+**Symptom**: In Settings → Transcription → Backend, the "Local (whisper.cpp)" option is disabled with copy "Local (macOS / Windows x64 only – ARM64 not supported)".
 
-**Tracking**: [#165](https://github.com/qodeca/erfana/issues/165) (Phase 4 — port whisper.cpp Windows binaries).
+**Workaround**: Use the OpenAI API transcription backend (cross-platform, requires API key).
+
+**Tracking**: Not tracked — deferred indefinitely pending upstream ARM64 Windows binary + ARM64 code-signing costs falling out of our Apple Silicon universal-build workflow.
+
+---
+
+### Local Whisper: Windows binary is unsigned (0.9.4)
+
+**Issue**: The Windows `whisper.exe` + sidecar DLLs shipped in 0.9.4 are not code-signed. SmartScreen may prompt on first launch.
+
+**Workaround**: SHA-256 pinning + MOTW strip in `WhisperModelManager` means the binary has the same integrity guarantee as a signed one for Erfana's trust chain; only SmartScreen's UX-layer prompt is affected. Click "Run anyway" once. Erfana's own installer is signed, so this affects only the whisper subprocess.
+
+**Tracking**: [Phase 5](https://github.com/qodeca/erfana/issues/166) — procure Windows code-sign cert and add a signtool step to `.github/workflows/whisper-binaries.yml`.
+
+---
+
+### Local Whisper: pre-SSE4.2 CPUs rejected
+
+**Issue**: Whisper.cpp compiled with `-DGGML_NATIVE=OFF` still emits SSE4.2 intrinsics by default. Erfana fast-fails with `WHISPER_CPU_UNSUPPORTED` on pre-Haswell Intel (Core 2, Pentium 4/D/III/M, Celeron D) and pre-Zen AMD (Phenom, Athlon 64/II, Sempron, Turion 64, early Opteron).
+
+**Workaround**: Use the OpenAI API transcription backend. These CPUs are ~12+ years old; all modern desktops and laptops are unaffected.
+
+**Tracking**: Not a bug. Runtime SIGILL / STATUS_ILLEGAL_INSTRUCTION detection is the final safety net for unrecognised CPUs that slip past the pre-flight probe.
+
+---
+
+### Local Whisper: cancellation on Windows is abrupt
+
+**Issue**: On Windows, `child.kill('SIGTERM')` maps to `TerminateProcess` — no graceful shutdown. Any partially-written `${audioPath}.txt` from whisper.cpp's `-otxt` flag may be corrupted.
+
+**Workaround**: `LocalWhisperService` deletes `${audioPath}.txt` in the post-close handler on any non-success exit. User-visible: the transcript simply isn't produced. Re-run if desired.
+
+**Tracking**: Platform limitation, not a bug.
+
+---
+
+### Local Whisper: updates are manual
+
+**Issue**: Whisper binary pin in `src/main/services/whisper-assets.ts` updates only when a new Erfana app release ships with a bumped `RELEASE_TAG`. There is no in-app auto-update loop.
+
+**Workaround**: Whisper.cpp minor bumps are infrequent (~4–6/yr). Erfana maintainers re-run `.github/workflows/whisper-binaries.yml`, bump the pin, and ship a patch release.
+
+**Tracking**: Not planned — auto-update for a security-critical subprocess adds significant design surface for little benefit. See [`docs/build/whisper-binaries.md`](./build/whisper-binaries.md) for the manual rebuild procedure.
 
 ---
 

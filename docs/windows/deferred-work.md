@@ -18,7 +18,7 @@ The goal is so that no review finding silently rots: every deferred item has a k
 
 | Phase | Items |
 |---|---|
-| **Phase 4** (whisper, OCP cleanup window) | D1 `resolvePlatformBinary` extraction, D2 `MAX_FILENAME_LENGTH` consolidation, D3 `ExportLock` deduplication |
+| **Phase 4** (whisper, OCP cleanup window) | ~~D1 `resolvePlatformBinary` extraction~~ (amended 2026-04-21 — whisper is not a probe-style caller; see D1 for revised promotion rule), D2 `MAX_FILENAME_LENGTH` consolidation, D3 `ExportLock` deduplication |
 | **Phase 5** (distribution + signing) | D6 `DependencyDetector` cache TTL |
 | **Phase 6** (polish + CI guard) | D4 Structured-error IPC serialization, D5 Log-redaction pass for filename PII, D7 Filename PII 40-char truncation review (bundled with D5) |
 | **Tracked-only** (no scheduled phase) | D8 IPC serialization ADR |
@@ -55,7 +55,20 @@ The two current callers diverge in non-trivial ways:
 - **git resolver**: 60-second cooldown cache, `--version` liveness probe, FD-pressure-aware error handling
 - **LibreOffice detector**: per-app-launch cache, `--version` liveness probe (added in review fix), parallel detect with `imageMagick`
 
-Premature extraction risks a leaky abstraction where the helper grows ad-hoc options. The Rule of Three says extract on the **third** caller — Phase 4 (whisper-cli) is that trigger.
+Premature extraction risks a leaky abstraction where the helper grows ad-hoc options. The Rule of Three says extract on the **third** caller.
+
+### 2026-04-21 amendment — Phase 4 (whisper) did NOT become the third caller
+
+Phase 4 landed on `feature/windows-phase-4-whisper` without needing `resolvePlatformBinary`. Whisper-cli resolution is a **one-shot, SHA-pinned, signed-manifest download** — the binary path is a `join(binDir, pinned-filename)` expression at `WhisperModelManager.getBinaryPath()`. There is no:
+
+- **Probe-style discovery** (no candidate-list search across Program Files / Chocolatey / Scoop paths).
+- **Fallback command** (no `where` / `which` to try).
+- **Liveness probe** (the pre-spawn SHA re-hash IS the integrity check, it doesn't exercise behavior).
+- **Cooldown cache** (the pin is source-constant, not something to rediscover on failure).
+
+These are the three load-bearing features `resolvePlatformBinary` was designed for. Applying it to whisper would be a category error — fit the tool to a problem that doesn't have those dimensions.
+
+**Promotion rule updated:** extract on the **third PROBE-STYLE caller with fallback / liveness / cooldown needs**, not merely the third caller that touches `process.platform`. Whisper's pin-and-join does not count.
 
 ### Cost when promoted
 
@@ -63,20 +76,20 @@ Premature extraction risks a leaky abstraction where the helper grows ad-hoc opt
 - Extract `resolvePlatformBinary` to `src/main/utils/platformBinary.ts` with full unit tests
 - Migrate git-status.worker.ts (preserve cooldown semantics via opts)
 - Migrate DependencyDetector.ts
-- Land whisper-cli detection as the third caller
+- Land the actual third probe-style caller
 
-### Promotion criteria
+### Promotion criteria (revised)
 
 **Mandatory** when **any** of these triggers:
 
-1. Phase 4 begins implementation of `WhisperModelManager` cross-platform binary resolution (third caller)
-2. Either of the two existing callers needs a non-trivial change (e.g. registry probe, allowlist mutation) — extracting first prevents the change from happening twice
-3. A new platform (linux ARM64, win32 ARM64) joins the matrix
+1. A third **probe-style** caller appears — i.e. needs candidate-path discovery AND a fallback command AND (cooldown or liveness) — e.g. Phase 5 scanning for installed signtool across Visual Studio drops, or a future Pandoc / Tesseract / ImageMagick binary probe that isn't already handled by `DependencyDetector`.
+2. Either of the two existing callers needs a non-trivial change (e.g. registry probe, allowlist mutation) — extracting first prevents the change from happening twice.
+3. A new platform (linux ARM64, win32 ARM64) joins the matrix and adds probe-style resolution needs.
 
 ### Risks if forgotten
 
-- LOW currently (only 2 divergent callers)
-- HIGH if Phase 4 lands without extraction → 3 sites of git/probe/cache logic, drift continues, OCP violation locks in
+- LOW currently (only 2 divergent callers; Phase 4 did not add a third).
+- HIGH only if a genuine third probe-style caller lands without extraction.
 
 ---
 

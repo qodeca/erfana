@@ -4,6 +4,48 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## 0.9.4 (in-flight, `feature/windows-phase-4-whisper`)
+
+### Local Whisper transcription on macOS + Windows x64 (Phase 4, [#165](https://github.com/qodeca/erfana/issues/165))
+
+Unlock the offline whisper.cpp transcription backend on both macOS and Windows x64. Previously the macOS code path referenced a ggml-org GitHub Release filename that **never existed** (ggml-org publishes Windows zips and a macOS xcframework-for-iOS only — no macOS CLI binary at any recent version), so `Local (whisper.cpp)` had been gated to macOS-only and would 404 on first download. 0.9.4 rebuilds the feature end-to-end by self-hosting signed binaries via a dedicated CI workflow.
+
+**Release streams**
+- **App releases** — `v{semver}` tags as usual.
+- **Whisper binary releases** — new `whisper-build-<label>-erfana<N>` pre-release tags on the same `qodeca/erfana` repo. Marked pre-release so electron-updater ignores them. Cadence: manual, triggered on whisper.cpp minor bumps (4–6/yr) + security-driven rebuilds.
+
+**Trust chain**
+1. **Manifest signature verification** — `manifest.json` at each whisper-build release is minisign Ed25519-signed. Dual embedded pubkeys (primary in CI, rotation offline on hardware token); client accepts either so a single-key compromise is recoverable by ship-patch without a gap. `verifyManifest` supports both legacy Ed25519 (`Ed`) and prehashed BLAKE2b-512 (`ED`) minisign variants.
+2. **Artifact SHA-256 pin** — `src/main/services/whisper-assets.ts` pins the release tag + per-platform filename + SHA-256 + per-file sidecar DLL SHAs. Manifest's SHA is cross-checked against the source pin as a source-drift guard.
+3. **Pre-spawn re-hash (TOCTOU close)** — `LocalWhisperService.runWhisper()` calls `WhisperModelManager.verifyInstalledBinary()` before every `spawn()`, re-hashing main + all sidecars (<50 ms). Closes the gap where local write access to `{userData}/whisper/bin/` could swap the binary between install-time verification and spawn-time execution.
+4. **Monotonic downgrade protection** — `manifest.revisionIndex` enforced against both a source floor (`MIN_REVISION_INDEX`) **and** a persisted `lastSeenRevision` in `{userData}/whisper/.last-seen-revision`. Defeats manifest-replay where an attacker serves a legitimately-signed but superseded manifest.
+5. **Pre-flight CPU probe** — `checkCpuSupport()` inspects `os.cpus()[0].model` against pre-SSE4.2 Intel / AMD families (Core 2, Pentium 4/D/III/M, Phenom, Athlon 64, etc.). Fast-fails on unsupported hardware before any download. Runtime SIGILL / STATUS_ILLEGAL_INSTRUCTION detection is the final safety net.
+6. **Argv hardening** — `validateAudioPath()` rejects UNC paths, Windows reserved device names (CON/PRN/AUX/NUL/COM1-9/LPT1-9), NTFS alternate-data-stream colons in basenames; canonicalises via `fs.realpath` so ffmpeg/whisper run against the actual target, not a symlink / name-mangled alias.
+7. **DLL sideload mitigation** — on Windows, spawn uses `cwd: dirname(binaryPath)` so `LoadLibrary` prefers pinned sidecar DLLs over PATH.
+8. **Legacy cruft migration** — one-time cleanup of pre-0.9.4 `{userData}/whisper/bin/` content (broken ggml-org download path left partial artifacts on v0.8.0–v0.9.3 macOS users). Gated by schema-version sentinel.
+
+**CI workflow** — `.github/workflows/whisper-binaries.yml` (`workflow_dispatch` only, gated on `production-signing` GitHub Environment requiring repo-admin approval before any signing secrets are attached). Inputs are regex-validated (`upstream_sha` = 40 lowercase hex, `upstream_label` = `[A-Za-z0-9._-]{1,64}`, `erfana_revision` = non-negative integer) to prevent JSON-injection via crafted inputs. Concurrency group serializes dispatches; `gh release view` pre-check rejects overwrites. macOS: universal build (arm64 + x86_64 via `lipo`), Developer ID signed, notarized (`notarytool submit --wait`), stapled. Windows: x64 MSVC build, **unsigned in 0.9.4** (Phase 5 procures a code-sign cert). Smoke-transcribes a JFK fixture on both platforms before publishing.
+
+**Utility modules** — new `src/main/utils/` helpers with SRP boundaries:
+- `zipArchive.ts` / `tarArchive.ts` — split by archive format; both reject traversal, UNC, drive-letter, symlinks, NTFS ADS colons via exported `assertSafeEntry` / tar `filter`.
+- `secureDownloader.ts` — hostname allowlist (`github.com`, `huggingface.co`, etc.), `redirect: 'manual'` with 5-hop max, dual Content-Length + live-byte size caps, streaming SHA-256 verification.
+- `verifyManifest.ts` — minisign Ed25519 verifier (legacy + prehashed BLAKE2b-512 variants), dual-pubkey acceptance.
+
+**Settings UI**
+- Transcription → Backend → "Local (whisper.cpp)" now enabled on macOS (all archs via universal) and Windows x64.
+- Windows ARM64 shows a disabled option with ARM64-specific copy directing users to the OpenAI API backend. Upstream whisper.cpp has no ARM64 Windows binary.
+- First-use disclosure updated to reflect ~8 MB verified whisper.cpp binary download on first transcription (in addition to the selected model).
+- New `api.utils.getArch()` preload helper exposes `process.arch` to the renderer for arch-based gating.
+
+**Known limitations (0.9.4)**
+- Windows binary is **unsigned**. SHA-256 + MOTW-strip are the current trust anchors; Phase 5 procures a code-sign cert.
+- Windows ARM64 unsupported — OpenAI API only.
+- Pre-SSE4.2 CPUs (Intel pre-Haswell / AMD pre-Zen) rejected with `WHISPER_CPU_UNSUPPORTED`.
+- Cancellation on Windows is abrupt (TerminateProcess); `${audioPath}.txt` orphans are cleaned up post-close.
+- Whisper updates are manual — no in-app auto-update loop. Cadence ~4–6 rebuilds/yr.
+
+See [`docs/build/whisper-binaries.md`](./build/whisper-binaries.md) for the operational runbook, cert-revocation procedures, and upstream-SHA diff-review checklist.
+
 ## 0.9.3
 
 ### Platform support (Windows)

@@ -8,9 +8,9 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 ## Status snapshot
 
-*Last updated 2026-04-22, v0.9.3 shipped.*
+*Last updated 2026-04-21, Phase 4 code-complete on `feature/windows-phase-4-whisper` (awaiting PR merge for 0.9.4).*
 
-**Current state:** Phases 0, 1, 2 shipped to `develop` in **v0.9.3** (merge commit `c1e085d`, release commit `0b593a1`, tag `v0.9.3` on 2026-04-22). The `windows` integration branch was deleted after the merge. Phase 3–6 work branches off `develop` as `feature/windows-phase-<N>-*` per the project convention.
+**Current state:** Phases 0, 1, 2 shipped to `develop` in **v0.9.3** (merge commit `c1e085d`, release commit `0b593a1`, tag `v0.9.3` on 2026-04-22). Phase 4 (local Whisper parity, [#165](https://github.com/qodeca/erfana/issues/165)) is code-complete on `feature/windows-phase-4-whisper`; see the Phase 4 section below and `docs/build/whisper-binaries.md`. Phase 3 (screenshot parity, [#164](https://github.com/qodeca/erfana/issues/164)) remains the next unstarted item. Phase 5–6 work branches off `develop` as `feature/windows-phase-<N>-*` per the project convention.
 
 **Recent commits on `windows` that landed in v0.9.3 (newest → oldest, frozen for the trail):**
 
@@ -250,30 +250,39 @@ Changes:
 
 ---
 
-## Phase 4 — Local Whisper parity
+## Phase 4 — Local Whisper parity — ✅ CLOSED (in-flight 0.9.4 on `feature/windows-phase-4-whisper`)
 
-**Why:** Straightforward — whisper.cpp has official Windows releases on GitHub.
+**Why it's harder than first imagined:** Step-zero verification uncovered that **ggml-org publishes no macOS CLI binary at any recent version** (v1.7.0–v1.8.4); only Windows zips, a macOS xcframework-for-iOS, and CUDA/BLAS variants exist. The pre-0.9.4 macOS code path referenced a filename that never existed — `Local (whisper.cpp)` had been showing as enabled on macOS but would 404 on first download. So Phase 4 became "rebuild a never-worked feature on both platforms", not "add Windows parity to a working macOS feature".
 
-Changes:
+**What shipped (merged to `feature/windows-phase-4-whisper`, queued for 0.9.4):**
 
-1. **Extend `getArchSuffix()`** (fixes B2) — `WhisperModelManager.ts:77`
-   - Delete the `process.platform !== 'darwin'` throw.
-   - Return per-platform suffix:
-     - darwin + arm64 → `arm64`
-     - darwin + x64 → `x86_64`
-     - win32 + x64 → `bin-x64` (verify against latest release asset naming)
-     - win32 + arm64 → `bin-arm64`
-     - linux + x64 → `bin-linux-x64`
-2. **Binary naming** — `LOCAL_WHISPER.BINARY_NAME` in `src/shared/constants.ts`
-   - Per-platform: `whisper-cli.exe` on Windows, `whisper-cli` on POSIX.
-   - Update `getBinaryPath()` accordingly.
-3. **Download & extraction**
-   - Pipeline likely fetches `.zip` + extracts. On Windows may need to unpack bundled DLLs (`ggml.dll`, `whisper.dll`, possibly Intel MKL runtime) alongside the `.exe`.
-   - Verify whether Windows binaries ship dependency-free or require VC++ Redistributable. If redistributable needed → document in known-issues + detect at runtime and show a dialog.
-4. **Binary chmod** — `fs/promises.chmod` is effectively a no-op on Windows. Skip on `win32` to avoid surprises.
-5. **Research step (do before implementing):** `WebSearch` for the current whisper.cpp Windows release asset naming and DLL dependencies. Asset names have changed across releases (`whisper-blas-bin-Win64.zip`, `whisper-bin-x64.zip`, etc.) — don't cache stale URLs.
+**Option A — self-host signed binaries via dedicated CI workflow.** Rejected Option B (pin ggml-org releases) because of the macOS gap. All Phase 4 work lives across two commit streams:
 
-**Manual validation:** download `tiny` model on Windows → transcribe a sample MP3 → output matches expected text.
+**Branch A (`chore/whisper-binaries-ci`)** — CI infrastructure:
+- `.github/workflows/whisper-binaries.yml` — 3-job workflow (build-macos, build-windows, publish-release) gated on `production-signing` GitHub Environment.
+- `docs/build/whisper-binaries.md` — ops runbook with diff-review checklist + cert-revocation procedures.
+- First release published as pre-release tag `whisper-build-v1.8.4-erfana1` with minisign-signed `manifest.json`, SHAs recorded in `docs/windows/phase4-binary-spec.md`.
+
+**Branch B (`feature/windows-phase-4-whisper`)** — app-side integration:
+- `B1` — `src/main/utils/zipArchive.ts` + `tarArchive.ts` + `secureDownloader.ts` + `verifyManifest.ts` (minisign Ed25519 + BLAKE2b-512 prehashed variants, dual-pubkey acceptance).
+- `B2a` — `WhisperModelManager` 9-step install flow (manifest-sig → revision-floor → source-drift guard → SHA-verified download → platform-extract → MOTW/quarantine strip → per-file SHA integrity → schema sentinel); legacy-cruft migration for pre-0.9.4 users.
+- `B2b` — `LocalWhisperService` argv hardening (`validateAudioPath` rejects UNC, reserved names, NTFS ADS), TOCTOU close via pre-spawn `verifyInstalledBinary()`, DLL-sideload mitigation (`cwd: binDir` on Windows), SIGILL → `WHISPER_CPU_UNSUPPORTED` detection, orphan `${audioPath}.txt` cleanup.
+- `B2c` — merge-blocker fixes from 3-reviewer audit: persistent `lastSeenRevision` (manifest replay defense), pre-flight `checkCpuSupport()` probe, streaming SHA re-verify in `isBinaryInstalled()`, workflow input regex validation + concurrency guard + tag-collision pre-check, Zone.Identifier strip log at warn.
+- `B3` — `SettingsOverlay` gate: `isLocalWhisperSupported = darwin || (win32 && x64)`; ARM64-specific disabled copy; `api.utils.getArch()` preload helper; first-use disclosure corrected to ~8 MB.
+- `B4` (this doc commit) — CHANGELOG 0.9.4, known-issues, implementation-plan closure, `deferred-work.md` D1 amendment.
+
+**Known limitations carried into 0.9.4:**
+- Windows binary is **unsigned** (Phase 5 procures cert).
+- Windows ARM64 unsupported (upstream gap).
+- Pre-SSE4.2 CPUs rejected with `WHISPER_CPU_UNSUPPORTED`.
+- Cancellation on Windows is abrupt (TerminateProcess).
+- Whisper updates are manual (no in-app auto-update for the subprocess).
+
+**Deferred to Phase 5+ as follow-up tickets (tracked via commit comment):**
+- Forensic logging shape expansion (plan §"Modified modules" bullet).
+- Tagged-union purity — `WhisperPlatform` discriminator refactor (arch-reviewer S3).
+- 5 `.skip()` tests in `WhisperModelManager.test.ts` (arch-reviewer S4).
+- ISP split of `IWhisperModelManager` (arch-reviewer S2).
 
 ---
 
