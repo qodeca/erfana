@@ -315,7 +315,22 @@ describe('LocalWhisperService', () => {
 
     mockEnsureBinary.mockResolvedValue('/userData/whisper/bin/whisper-cli')
     mockEnsureModel.mockResolvedValue('/userData/whisper/models/ggml-tiny.bin')
-    mockVerifyInstalledBinary.mockResolvedValue(undefined)
+    // `verifyInstalledBinary` returns the `VerifiedBinary` shape consumed
+    // by `LocalWhisperService.runWhisper` for the spawn-path forensic log.
+    mockVerifyInstalledBinary.mockResolvedValue({
+      spec: {
+        filename: 'whisper-test.tar.gz',
+        archiveFormat: 'tar.gz',
+        sha256: 'aabbcc',
+        sizeBytes: 1,
+        files: {
+          main: { filename: 'whisper-cli', sizeBytes: 1, sha256: 'aabbcc' },
+          sidecars: []
+        }
+      },
+      mainSha: 'aabbcc',
+      revisionIndex: 1
+    })
     mockReadFile.mockResolvedValue('Hello world transcription.')
     mockUnlink.mockResolvedValue(undefined)
     mockStat.mockResolvedValue({ size: 32_000 })
@@ -381,6 +396,50 @@ describe('LocalWhisperService', () => {
           '-f', '/audio/test.wav'
         ]),
         expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] })
+      )
+    })
+
+    it('emits forensic INFO log with {spawnedPath, computedSha, signatureValid, manifestRevision, binaryVersion} before spawning', async () => {
+      setupDualExecFileMock('0:01:00.00')
+      mockSpawn.mockImplementation(() => makeWhisperSpawnChild(0))
+      mockVerifyInstalledBinary.mockResolvedValueOnce({
+        spec: {
+          filename: 'whisper-macos-universal-v1.8.4-erfana1.tar.gz',
+          archiveFormat: 'tar.gz',
+          sha256: 'aabbcc',
+          sizeBytes: 1,
+          files: {
+            main: { filename: 'whisper-cli', sizeBytes: 1, sha256: 'ff6de29f7a5581bea65a87c2437aabc8' },
+            sidecars: []
+          }
+        },
+        mainSha: 'ff6de29f7a5581bea65a87c2437aabc8',
+        revisionIndex: 7
+      })
+
+      const { createLocalWhisperService } = await import('./LocalWhisperService')
+      const service = createLocalWhisperService({
+        ensureBinary: mockEnsureBinary,
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
+      } as never)
+
+      await service.transcribe({
+        filePath: '/audio/test.wav',
+        language: 'en',
+        model: 'tiny',
+        onProgress
+      })
+
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Whisper spawn',
+        expect.objectContaining({
+          spawnedPath: '/userData/whisper/bin/whisper-cli',
+          computedSha: 'ff6de29f7a5581bea65a87c2437aabc8',
+          signatureValid: true,
+          manifestRevision: 7,
+          binaryVersion: 'whisper-cli'
+        })
       )
     })
 

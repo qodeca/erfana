@@ -73,6 +73,26 @@ export type ProgressCallback = (progress: {
   totalBytes: number
 }) => void
 
+/**
+ * Forensic-logging context returned by `verifyInstalledBinary()`. Used by
+ * `LocalWhisperService.runWhisper()` to emit a single INFO log per spawn
+ * containing `{spawnedPath, manifestRevision, computedSha, signatureValid,
+ * binaryVersion}`. `signatureValid` is implicit — a non-tampered install
+ * necessarily passed signature verification at ensureBinary() time.
+ */
+export interface VerifiedBinary {
+  spec: PlatformArtifactSpec
+  /** Freshly-computed SHA-256 of the main binary. Lower-case hex. */
+  mainSha: string
+  /**
+   * The `revisionIndex` persisted in `{userData}/whisper/.last-seen-revision`
+   * at the moment of verification, or `null` if the sentinel is absent.
+   * A fresh install that has not yet been through `ensureBinary()` will have
+   * no sentinel; that case is legal only during the very first install.
+   */
+  revisionIndex: number | null
+}
+
 export interface IWhisperModelManager {
   getWhisperDir(): string
   getBinaryPath(): string
@@ -94,9 +114,16 @@ export interface IWhisperModelManager {
    * Re-hash every pinned file (main binary + sidecars) against its source-
    * pinned SHA-256. Called by consumers immediately before spawning the
    * binary to close the TOCTOU window in `{userData}/whisper/bin/`.
+   *
    * Throws `WHISPER_BINARY_TAMPERED` on mismatch.
+   *
+   * Returns the verified platform spec plus forensic-logging context:
+   *  - `mainSha` — the freshly-computed SHA-256 of the main binary.
+   *  - `revisionIndex` — the `lastSeenRevision` on-disk sentinel at the
+   *    moment of verification, or `null` if no install has completed.
+   *    Used by `LocalWhisperService` for the spawn-path INFO log.
    */
-  verifyInstalledBinary(): Promise<PlatformArtifactSpec>
+  verifyInstalledBinary(): Promise<VerifiedBinary>
 }
 
 /**
@@ -298,7 +325,7 @@ class WhisperModelManager implements IWhisperModelManager {
         throw new AppError(
           `Whisper manifest revisionIndex ${manifest.revisionIndex} is below floor ${effectiveFloor} ` +
             `(source minimum ${MIN_REVISION_INDEX}, lastSeen ${lastSeenRevision ?? 'unset'}) — possible downgrade / replay attack`,
-          ErrorCode.WHISPER_BINARY_DOWNLOAD_FAILED
+          ErrorCode.WHISPER_DOWNGRADE_BLOCKED
         )
       }
 
@@ -311,7 +338,7 @@ class WhisperModelManager implements IWhisperModelManager {
       if (manifestSha !== spec.sha256.toLowerCase()) {
         throw new AppError(
           `Whisper manifest SHA-256 for ${platformKey} (${manifestSha}) does not match source pin (${spec.sha256}). Update src/main/services/whisper-assets.ts.`,
-          ErrorCode.WHISPER_BINARY_DOWNLOAD_FAILED
+          ErrorCode.WHISPER_SOURCE_PIN_DRIFT
         )
       }
 
@@ -385,7 +412,26 @@ class WhisperModelManager implements IWhisperModelManager {
           ErrorCode.WHISPER_BINARY_DOWNLOAD_FAILED
         )
       }
-      if (error instanceof VerifyManifestError || error instanceof SecureDownloaderError) {
+      // Route the specific trust-chain failure classes to granular codes so
+      // user-facing copy + forensic logs can distinguish them. Pass-through
+      // errors that already use granular codes (raised from downgrade /
+      // source-pin-drift guards above).
+      if (error instanceof AppError) {
+        throw error
+      }
+      if (error instanceof VerifyManifestError) {
+        // Signature-verify failures or malformed-signature structure land here.
+        throw new AppError(error.message, ErrorCode.WHISPER_MANIFEST_INVALID)
+      }
+      if (error instanceof SyntaxError) {
+        // Manifest JSON parse failure after signature check — malformed payload.
+        throw new AppError(
+          `Whisper manifest JSON parse failed: ${error.message}`,
+          ErrorCode.WHISPER_MANIFEST_INVALID
+        )
+      }
+      if (error instanceof SecureDownloaderError) {
+        // Network / hostname-allowlist / SHA-mismatch at download time.
         throw new AppError(error.message, ErrorCode.WHISPER_BINARY_DOWNLOAD_FAILED)
       }
       throw AppError.from(error, ErrorCode.WHISPER_BINARY_DOWNLOAD_FAILED)
@@ -473,12 +519,16 @@ class WhisperModelManager implements IWhisperModelManager {
    * Re-hash every pinned file against its SHA. Used by `LocalWhisperService`
    * before every spawn to close the TOCTOU window.
    *
-   * @returns The platform spec that was verified, for caller correlation.
+   * Also reads `.last-seen-revision` so the caller can log forensic context
+   * alongside the spawn (which manifest revision the binary came from).
+   *
+   * @returns Spec, main-binary SHA, and persisted revision sentinel.
    */
-  async verifyInstalledBinary(): Promise<PlatformArtifactSpec> {
+  async verifyInstalledBinary(): Promise<VerifiedBinary> {
     const spec = this.getSpecOrThrow()
-    await this.verifyAllFiles(spec)
-    return spec
+    const mainSha = await this.verifyAllFiles(spec)
+    const revisionIndex = await this.readLastSeenRevision()
+    return { spec, mainSha, revisionIndex }
   }
 
   // ---------------------------------------------------------------------------
@@ -570,10 +620,15 @@ class WhisperModelManager implements IWhisperModelManager {
    * Streaming implementation — avoids slurping the whole file into memory so
    * future additions (e.g. GPU kernel blobs) don't balloon RSS on every
    * spawn.
+   *
+   * Returns the main-binary SHA for forensic-logging reuse. Sidecar SHAs
+   * are not returned (they're derivable from the spec + still in the
+   * denylist at the call site).
    */
-  private async verifyAllFiles(spec: PlatformArtifactSpec): Promise<void> {
+  private async verifyAllFiles(spec: PlatformArtifactSpec): Promise<string> {
     const pins: FilePin[] = [spec.files.main, ...spec.files.sidecars]
     const { createReadStream } = await import('fs')
+    let mainSha = ''
     for (const pin of pins) {
       const p = join(this.binDir, pin.filename)
       const actual = await new Promise<string>((resolve, reject) => {
@@ -589,7 +644,12 @@ class WhisperModelManager implements IWhisperModelManager {
           ErrorCode.WHISPER_BINARY_TAMPERED
         )
       }
+      // First pin is always the main binary by convention (see `PlatformArtifactSpec.files.main`).
+      if (pin === spec.files.main) {
+        mainSha = actual.toLowerCase()
+      }
     }
+    return mainSha
   }
 
   private async readSchemaVersion(): Promise<number | null> {

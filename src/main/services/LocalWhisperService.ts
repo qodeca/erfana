@@ -736,7 +736,27 @@ export class LocalWhisperService {
     // with local write access could swap the binary between install-time
     // verification and spawn-time execution. Hashing 2.3 MB (binary + 4 DLLs
     // on Windows) is <50 ms on modern hardware — acceptable per-chunk.
-    await this.modelManager.verifyInstalledBinary()
+    const verified = await this.modelManager.verifyInstalledBinary()
+
+    // Forensic-logging shape, spawn-path half of the 7-tuple the plan commits
+    // to (install-time keys `url` + `expectedSha` are logged separately in
+    // `WhisperModelManager.ensureBinary`; keeping install-time keys off the
+    // spawn log avoids echoing URLs on every chunk of a chunked transcription).
+    //   - `spawnedPath` — absolute path we're about to exec
+    //   - `computedSha` — fresh SHA re-hashed by verifyInstalledBinary
+    //   - `signatureValid: true` is implicit (we wouldn't be here otherwise)
+    //   - `manifestRevision` — which release-revision the binary came from
+    //   - `binaryVersion` — pinned filename (proxy; the real version string
+    //     would require `whisper-cli --version` on every spawn, which is
+    //     wasteful — the filename is sufficient forensic attribution since
+    //     it's SHA-locked to a single release).
+    logger.info('Whisper spawn', {
+      spawnedPath: binaryPath,
+      computedSha: verified.mainSha,
+      signatureValid: true,
+      manifestRevision: verified.revisionIndex,
+      binaryVersion: verified.spec.files.main.filename
+    })
 
     return new Promise<string>((resolve, reject) => {
       const args = [
