@@ -361,15 +361,38 @@ export const visualTest = base.extend<VisualTestFixtures, WorkerFixtures>({
 
   // eslint-disable-next-line no-empty-pattern
   visualTestProject: async ({}, use) => {
-    // Create isolated test project with controlled seed files in .e2e-temp (gitignored)
+    // Create isolated test project with controlled seed files in .e2e-temp (gitignored).
+    // The outer dir uses mkdtemp for worker isolation; the inner project dir has a
+    // fixed name so the tree/terminal labels are deterministic across runs (prevents
+    // random suffixes from leaking into visual snapshots).
     const e2eTempDir = path.join(__dirname, '..', '.e2e-temp')
     await fs.promises.mkdir(e2eTempDir, { recursive: true })
-    const projectPath = await fs.promises.mkdtemp(path.join(e2eTempDir, 'visual-project-'))
-    for (const [name, content] of Object.entries(VISUAL_TEST_SEED_FILES)) {
-      await fs.promises.writeFile(path.join(projectPath, name), content, 'utf-8')
+
+    // Reject if .e2e-temp is a symlink – mkdtemp would resolve through it and
+    // subsequent rm -rf would operate on the real target, outside the repo tree.
+    const stat = await fs.promises.lstat(e2eTempDir)
+    if (stat.isSymbolicLink()) {
+      throw new Error(
+        `.e2e-temp is a symlink – refusing to create fixture project. ` +
+          `Remove or replace with a real directory to continue.`
+      )
     }
-    await use(projectPath)
-    await fs.promises.rm(projectPath, { recursive: true, force: true })
+
+    const tmpParent = await fs.promises.mkdtemp(path.join(e2eTempDir, 'visual-'))
+    try {
+      const projectPath = path.join(tmpParent, 'visual-project')
+      await fs.promises.mkdir(projectPath)
+      for (const [name, content] of Object.entries(VISUAL_TEST_SEED_FILES)) {
+        await fs.promises.writeFile(path.join(projectPath, name), content, 'utf-8')
+      }
+      await use(projectPath)
+    } finally {
+      // Always clean up, even if use() threw. On Windows, swallow EBUSY –
+      // Electron may still be releasing file handles when the fixture unwinds.
+      await fs.promises.rm(tmpParent, { recursive: true, force: true, maxRetries: 3 }).catch(() => {
+        // ignore – leftover dirs under .e2e-temp are gitignored
+      })
+    }
   },
 
   visualAppWithProject: async ({ userDataDir }, use) => {

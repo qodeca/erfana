@@ -9,6 +9,17 @@ const DETECTION_TIMEOUT_MS = 5000
 const MACOS_LIBREOFFICE_PATH = '/Applications/LibreOffice.app/Contents/MacOS/soffice'
 
 /**
+ * Standard Windows install locations for LibreOffice (#162).
+ * Probed in priority order when `soffice` is not on PATH. The user-installer
+ * defaults to `Program Files\LibreOffice\program\soffice.exe`; the 32-bit
+ * installer on a 64-bit Windows lands in `Program Files (x86)`.
+ */
+const WIN32_LIBREOFFICE_PATHS = [
+  'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+  'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+]
+
+/**
  * Dependency detector service
  *
  * Checks for optional system tools (LibreOffice, ImageMagick) required
@@ -69,7 +80,8 @@ export class DependencyDetector {
    *
    * Strategy:
    * 1. Try `soffice --version` (works if soffice is on PATH)
-   * 2. On macOS, fall back to the known bundle path
+   * 2. On macOS, fall back to the known .app bundle path
+   * 3. On Windows (#162), fall back to standard Program Files locations
    */
   private async detectLibreOffice(): Promise<boolean> {
     // Try PATH-based detection first
@@ -77,7 +89,12 @@ export class DependencyDetector {
       return true
     }
 
-    // macOS fallback: check the standard .app bundle path
+    // macOS fallback: check the standard .app bundle path.
+    // `X_OK` is meaningful on POSIX — verifies the user has execute
+    // permission on the binary. Combined with the system-protected
+    // `/Applications/` location, this is sufficient (no liveness probe
+    // needed; the Windows branch below adds liveness specifically because
+    // `X_OK` is existence-only on Windows).
     if (process.platform === 'darwin') {
       try {
         await access(MACOS_LIBREOFFICE_PATH, constants.X_OK)
@@ -85,6 +102,28 @@ export class DependencyDetector {
       } catch {
         return false
       }
+    }
+
+    // Windows fallback (#162): probe standard install locations.
+    //
+    // Each candidate must pass BOTH `F_OK` (file exists) AND a `--version`
+    // liveness probe (binary actually runs and produces output). This
+    // mirrors the git-resolver pattern at `git-status.worker.ts:isExecutableGit`.
+    //
+    // Why not F_OK only (security review HIGH): an attacker with write
+    // access to `C:\Program Files\LibreOffice\program\soffice.exe` (e.g. a
+    // malicious installer that drops a stub) could otherwise plant a path
+    // that satisfies detection. By the time we try to `execFile(soffice,
+    // [user-supplied args])` it would be too late — attacker code would
+    // have already run. The liveness probe forces the candidate to behave
+    // like a real LibreOffice binary first.
+    if (process.platform === 'win32') {
+      for (const candidate of WIN32_LIBREOFFICE_PATHS) {
+        if (await this.tryCommand(candidate, ['--version'])) {
+          return true
+        }
+      }
+      return false
     }
 
     return false

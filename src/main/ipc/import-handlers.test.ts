@@ -9,7 +9,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import * as path from 'path'
 import {
+  TEST_IMPORT_DIR,
+  TEST_DOC_PATH,
+  TEST_DOC_OTHER_PATH,
+  TEST_DOC_XYZ_PATH,
   mockGetConverter,
   mockGetExtensionsByConversionType,
   mockGetSupportedExtensions,
@@ -239,13 +244,13 @@ describe('registerDocumentImportHandlers', () => {
       mockGetConverter.mockReturnValue(mockConverter)
 
       // Start first import (intentionally not awaited)
-      const firstImportPromise = handler!(mockEvent, { filePath: '/path/to/doc.pdf' })
+      const firstImportPromise = handler!(mockEvent, { filePath: TEST_DOC_PATH })
 
       // Allow event loop to tick so the first handler sets activeDocumentController
       await Promise.resolve()
 
       // Second import should be rejected immediately
-      const secondResult = (await handler!(mockEvent, { filePath: '/path/to/other.pdf' })) as {
+      const secondResult = (await handler!(mockEvent, { filePath: TEST_DOC_OTHER_PATH })) as {
         success: boolean
         error?: string
         errorCode?: string
@@ -269,7 +274,7 @@ describe('registerDocumentImportHandlers', () => {
       registerDocumentImportHandlers()
 
       const handler = h('import:document')
-      const result = (await handler!(createMockEvent(), { filePath: '/path/to/doc.pdf' })) as {
+      const result = (await handler!(createMockEvent(), { filePath: TEST_DOC_PATH })) as {
         success: boolean
         error?: string
       }
@@ -287,7 +292,7 @@ describe('registerDocumentImportHandlers', () => {
       registerDocumentImportHandlers()
 
       const handler = h('import:document')
-      const result = (await handler!(createMockEvent(), { filePath: '/path/to/doc.xyz' })) as {
+      const result = (await handler!(createMockEvent(), { filePath: TEST_DOC_XYZ_PATH })) as {
         success: boolean
         error?: string
         errorCode?: string
@@ -313,7 +318,7 @@ describe('registerDocumentImportHandlers', () => {
       registerDocumentImportHandlers()
 
       const handler = h('import:document')
-      const result = (await handler!(createMockEvent(), { filePath: '/path/to/doc.pdf' })) as {
+      const result = (await handler!(createMockEvent(), { filePath: TEST_DOC_PATH })) as {
         success: boolean
         outputPath?: string
       }
@@ -321,7 +326,7 @@ describe('registerDocumentImportHandlers', () => {
       expect(result.success).toBe(true)
       expect(result.outputPath).toBeDefined()
       expect(mockWriteFile).toHaveBeenCalledWith(
-        expect.stringContaining('/project/import/'),
+        expect.stringContaining(TEST_IMPORT_DIR + path.sep),
         '# Document\n\nConverted content.',
         'utf-8'
       )
@@ -337,9 +342,9 @@ describe('registerDocumentImportHandlers', () => {
       registerDocumentImportHandlers()
 
       const handler = h('import:document')
-      await handler!(createMockEvent(), { filePath: '/path/to/doc.pdf' })
+      await handler!(createMockEvent(), { filePath: TEST_DOC_PATH })
 
-      expect(mockMkdir).toHaveBeenCalledWith('/project/import', { recursive: true })
+      expect(mockMkdir).toHaveBeenCalledWith(TEST_IMPORT_DIR, { recursive: true })
     })
 
     it('streams progress events to renderer', async () => {
@@ -353,7 +358,7 @@ describe('registerDocumentImportHandlers', () => {
 
       const handler = h('import:document')
       const mockEvent = createMockEvent()
-      await handler!(mockEvent, { filePath: '/path/to/doc.pdf' })
+      await handler!(mockEvent, { filePath: TEST_DOC_PATH })
 
       const sender = (mockEvent as { sender: { send: ReturnType<typeof vi.fn> } }).sender
       expect(sender.send).toHaveBeenCalledWith(
@@ -382,7 +387,7 @@ describe('registerDocumentImportHandlers', () => {
       registerDocumentImportHandlers()
 
       const handler = h('import:document')
-      const result = (await handler!(createMockEvent(), { filePath: '/path/to/doc.pdf' })) as {
+      const result = (await handler!(createMockEvent(), { filePath: TEST_DOC_PATH })) as {
         success: boolean
         error?: string
         errorCode?: string
@@ -404,7 +409,7 @@ describe('registerDocumentImportHandlers', () => {
       registerDocumentImportHandlers()
 
       const handler = h('import:document')
-      const result = (await handler!(createMockEvent(), { filePath: '/path/to/doc.pdf' })) as {
+      const result = (await handler!(createMockEvent(), { filePath: TEST_DOC_PATH })) as {
         success: boolean
         errorCode?: string
       }
@@ -423,7 +428,7 @@ describe('registerDocumentImportHandlers', () => {
       registerDocumentImportHandlers()
 
       const handler = h('import:document')
-      const result = (await handler!(createMockEvent(), { filePath: '/path/to/doc.pdf' })) as {
+      const result = (await handler!(createMockEvent(), { filePath: TEST_DOC_PATH })) as {
         success: boolean
         errorCode?: string
       }
@@ -452,13 +457,13 @@ describe('registerDocumentImportHandlers', () => {
 
       const handler = h('import:document')
       const result = (await handler!(createMockEvent(), {
-        filePath: '/path/to/doc.pdf',
+        filePath: TEST_DOC_PATH,
         options: { ocr: true, dpi: 300 }
       })) as { success: boolean }
 
       expect(result.success).toBe(true)
       expect(mockConverter.createConfigured).toHaveBeenCalledWith({ ocr: true, dpi: 300 })
-      expect(configuredConverter.convert).toHaveBeenCalledWith('/path/to/doc.pdf')
+      expect(configuredConverter.convert).toHaveBeenCalledWith(TEST_DOC_PATH)
     })
 
     it('uses base converter when no options provided', async () => {
@@ -473,10 +478,10 @@ describe('registerDocumentImportHandlers', () => {
       registerDocumentImportHandlers()
 
       const handler = h('import:document')
-      await handler!(createMockEvent(), { filePath: '/path/to/doc.pdf' })
+      await handler!(createMockEvent(), { filePath: TEST_DOC_PATH })
 
       expect(mockConverter.createConfigured).not.toHaveBeenCalled()
-      expect(mockConverter.convert).toHaveBeenCalledWith('/path/to/doc.pdf')
+      expect(mockConverter.convert).toHaveBeenCalledWith(TEST_DOC_PATH)
     })
   })
 

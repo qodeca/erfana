@@ -102,6 +102,7 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 **Remaining**:
 - Consolidate troubleshooting files (troubleshooting.md + troubleshooting-advanced.md)
 - Reduce code example verbosity across remaining files
+- Evaluate inlining of small editor stubs — `docs/editor/{toolbar.md, scroll-sync.md, monaco-configuration.md}` (40/53/60 lines). Deferred from Sprint 3: external inbound refs to `scroll-sync.md` from `docs/archive/resolved-issues.md:70` and `docs/rendering/README.md:42` would require anchor repointing; benefit (single file) vs cost (README bloat + link-break risk) currently balanced. Promotion criteria: when touching editor docs for any other reason (Phase 3+ UI work), re-evaluate the consolidation cost.
 
 **Note**: docs/future/ (8,604 lines) preserved for future graph-engine implementation.
 
@@ -151,4 +152,4 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 ---
 
-**Last Updated**: v0.9.0 (April 2026)
+**Last Updated**: v0.9.2 + windows branch (April 2026)

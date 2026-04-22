@@ -9,7 +9,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import * as path from 'path'
+import * as os from 'os'
 import {
+  TEST_DOC_PATH,
+  TEST_IMPORT_DIR,
   mockGetConverter,
   mockGetExtensionsByConversionType,
   mockGetSupportedExtensions,
@@ -27,6 +31,9 @@ import {
   createMockEvent,
   resetMocks
 } from './__test-helpers__/import-handlers-mocks'
+
+const TEST_SCREENSHOT_DIR = path.join(os.tmpdir(), 'erfana-test', 'screenshots')
+const TEST_DOC_MD = path.join(TEST_IMPORT_DIR, 'doc.md')
 
 // =============================================================================
 // Mock electron
@@ -169,17 +176,17 @@ describe('registerDocumentImportHandlers – advanced', () => {
         convert: vi.fn().mockResolvedValue({
           success: true,
           content: '# test',
-          screenshotDir: '/tmp/screenshots'
+          screenshotDir: TEST_SCREENSHOT_DIR
         })
       }
       mockGetConverter.mockReturnValue(mockConverter)
-      mockFindAvailableFileName.mockResolvedValue('/project/import/doc.md')
+      mockFindAvailableFileName.mockResolvedValue(TEST_DOC_MD)
 
       const { registerDocumentImportHandlers } = await import('./import-handlers')
       registerDocumentImportHandlers()
 
       const handler = h('import:document')
-      const result = (await handler!(createMockEvent(), { filePath: '/path/to/doc.pdf' })) as {
+      const result = (await handler!(createMockEvent(), { filePath: TEST_DOC_PATH })) as {
         success: boolean
       }
 
@@ -189,7 +196,7 @@ describe('registerDocumentImportHandlers – advanced', () => {
         { recursive: true }
       )
       expect(mockCp).toHaveBeenCalledWith(
-        '/tmp/screenshots',
+        TEST_SCREENSHOT_DIR,
         expect.stringContaining('screenshots'),
         { recursive: true }
       )
@@ -200,7 +207,7 @@ describe('registerDocumentImportHandlers – advanced', () => {
         convert: vi.fn().mockResolvedValue({
           success: true,
           content: '# test',
-          screenshotDir: '/tmp/screenshots'
+          screenshotDir: TEST_SCREENSHOT_DIR
         })
       }
       mockGetConverter.mockReturnValue(mockConverter)
@@ -210,7 +217,7 @@ describe('registerDocumentImportHandlers – advanced', () => {
       registerDocumentImportHandlers()
 
       const handler = h('import:document')
-      const result = (await handler!(createMockEvent(), { filePath: '/path/to/doc.pdf' })) as {
+      const result = (await handler!(createMockEvent(), { filePath: TEST_DOC_PATH })) as {
         success: boolean
       }
 
@@ -226,7 +233,7 @@ describe('registerDocumentImportHandlers – advanced', () => {
         convert: vi.fn().mockResolvedValue({
           success: true,
           content: '# test',
-          screenshotDir: '/tmp/screenshots'
+          screenshotDir: TEST_SCREENSHOT_DIR
         })
       }
       mockGetConverter.mockReturnValue(mockConverter)
@@ -235,12 +242,12 @@ describe('registerDocumentImportHandlers – advanced', () => {
       registerDocumentImportHandlers()
 
       const handler = h('import:document')
-      await handler!(createMockEvent(), { filePath: '/path/to/doc.pdf' })
+      await handler!(createMockEvent(), { filePath: TEST_DOC_PATH })
 
       // rm is called via .catch() so we need to wait a tick for it to settle
       await Promise.resolve()
 
-      expect(mockRm).toHaveBeenCalledWith('/tmp/screenshots', { recursive: true, force: true })
+      expect(mockRm).toHaveBeenCalledWith(TEST_SCREENSHOT_DIR, { recursive: true, force: true })
     })
 
     it('cleans up temp screenshotDir even when copy fails', async () => {
@@ -248,7 +255,7 @@ describe('registerDocumentImportHandlers – advanced', () => {
         convert: vi.fn().mockResolvedValue({
           success: true,
           content: '# test',
-          screenshotDir: '/tmp/screenshots'
+          screenshotDir: TEST_SCREENSHOT_DIR
         })
       }
       mockGetConverter.mockReturnValue(mockConverter)
@@ -258,11 +265,11 @@ describe('registerDocumentImportHandlers – advanced', () => {
       registerDocumentImportHandlers()
 
       const handler = h('import:document')
-      await handler!(createMockEvent(), { filePath: '/path/to/doc.pdf' })
+      await handler!(createMockEvent(), { filePath: TEST_DOC_PATH })
 
       await Promise.resolve()
 
-      expect(mockRm).toHaveBeenCalledWith('/tmp/screenshots', { recursive: true, force: true })
+      expect(mockRm).toHaveBeenCalledWith(TEST_SCREENSHOT_DIR, { recursive: true, force: true })
     })
   })
 
@@ -287,7 +294,7 @@ describe('registerDocumentImportHandlers – advanced', () => {
       const mockEvent = createMockEvent()
 
       // Start import (don't await)
-      const importPromise = importHandler!(mockEvent, { filePath: '/path/to/doc.pdf' })
+      const importPromise = importHandler!(mockEvent, { filePath: TEST_DOC_PATH })
 
       // Allow event loop to tick so the handler sets activeDocumentController
       await Promise.resolve()
@@ -323,7 +330,7 @@ describe('registerDocumentImportHandlers – advanced', () => {
 
       const handler = h('import:document')
       const mockEvent = createMockEvent({ isDestroyed: () => true })
-      await handler!(mockEvent, { filePath: '/path/to/doc.pdf' })
+      await handler!(mockEvent, { filePath: TEST_DOC_PATH })
 
       const sender = (mockEvent as { sender: { send: ReturnType<typeof vi.fn> } }).sender
       expect(sender.send).not.toHaveBeenCalled()
@@ -362,7 +369,7 @@ describe('registerDocumentImportHandlers – advanced', () => {
       const mockEvent = createMockEvent()
 
       // Start import (don't await)
-      const importPromise = importHandler!(mockEvent, { filePath: '/path/to/doc.pdf' })
+      const importPromise = importHandler!(mockEvent, { filePath: TEST_DOC_PATH })
 
       // Allow event loop to tick so the handler sets activeDocumentController
       await Promise.resolve()

@@ -167,7 +167,38 @@ export function isPlatformExcluded(filePath: string): boolean {
 }
 
 /**
- * Check if path is a Windows long path (>260 chars)
+ * Check if path is a Windows long path (> 260 chars).
+ *
+ * **Status: deferred to Phase 6 (#163, Phase 2 Windows enablement).**
+ *
+ * This helper is intentionally unused as of #163. The Phase 2 plan deferred
+ * activating long-path support because:
+ *
+ *   1. No active victims — `docs/build/windows.md` step 5 already instructs
+ *      users to enable Win32 long-path group policy, which is the same
+ *      mitigation `\\?\` prefixing would apply at the syscall layer.
+ *   2. Activation surface is large — wiring this into the ~12 FileService
+ *      I/O entry points + every other path-touching service is substantial
+ *      test churn for unclear payoff.
+ *   3. Better fit for Phase 6 — bundles cleanly with tessdata packaged-build
+ *      verification + Windows CI guard.
+ *
+ * **Promotion criteria — re-activate as P1 if either:**
+ *   - Phase 2 UAT surfaces a single real-world Windows path > 260 chars
+ *     from `npm run dev`, an installed build, or a user bug report, OR
+ *   - Any Phase 3+ feature (transcription output directories, screenshot
+ *     dump paths, OCR tmpdir) starts producing paths > 200 chars by
+ *     default — at that point the headroom is gone and we are one nested
+ *     folder away from breakage.
+ *
+ * **Future consolidation note (Phase 4, OCP extraction trigger):** Phase 2
+ * adds two platform-branched binary-resolution sites (#160 git resolver,
+ * #162 LibreOffice detector). Phase 4 will add a third (whisper-cli). At
+ * that point, extract a shared `resolvePlatformBinary(candidates: Record<
+ * NodeJS.Platform, string[]>, fallback): Promise<string|null>` helper and
+ * migrate all three callers.
+ *
+ * @see https://github.com/qodeca/erfana/issues/163
  */
 export function isWindowsLongPath(filePath: string): boolean {
   if (platform() !== 'win32') return false

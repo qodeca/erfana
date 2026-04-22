@@ -5,6 +5,22 @@
  * Provides type-safe error codes and structured error class
  */
 
+/**
+ * Sentinel phrase embedded in `AppError` messages thrown by
+ * `assertValidUserFilename`. Renderer formatters discriminate the
+ * `INVALID_FILENAME` error class by matching this marker in `error.message`,
+ * because Electron IPC strips `AppError.code` by default.
+ *
+ * Single source of truth for both the thrower (`validateFilename.ts`) and
+ * the detector (`useFileOperations.logic.ts`, `errorUtils.ts`). Changing
+ * this string requires updating zero call sites — they all import the
+ * constant.
+ *
+ * See #161 (Phase 2) and the architecture review note about the IPC
+ * contract bridge.
+ */
+export const INVALID_FILENAME_MARKER = 'is not a valid filename'
+
 export enum ErrorCode {
   // Path validation errors
   PATH_INVALID = 'PATH_INVALID',
@@ -14,6 +30,7 @@ export enum ErrorCode {
   PATH_TRAVERSAL = 'PATH_TRAVERSAL',
   PATH_OUTSIDE_PROJECT = 'PATH_OUTSIDE_PROJECT',
   SYMLINK_ATTACK = 'SYMLINK_ATTACK',
+  INVALID_FILENAME = 'INVALID_FILENAME',
 
   // Settings/persistence errors
   SETTINGS_READ_FAILED = 'SETTINGS_READ_FAILED',
@@ -204,6 +221,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.PATH_TRAVERSAL]: 'Invalid path: path traversal detected',
   [ErrorCode.PATH_OUTSIDE_PROJECT]: 'Cannot access directories outside the project',
   [ErrorCode.SYMLINK_ATTACK]: 'This directory link points to a protected location',
+  [ErrorCode.INVALID_FILENAME]: 'Filename is not allowed on this platform',
 
   // Settings/persistence errors
   [ErrorCode.SETTINGS_READ_FAILED]: 'Failed to read application settings',

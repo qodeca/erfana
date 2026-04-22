@@ -14,6 +14,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import path from 'path'
 import { ErrorCode, AppError } from '../../../shared/errors'
 
 // Mock fs/promises
@@ -406,8 +407,8 @@ describe('ImportService', () => {
   // ==========================================================================
 
   describe('importFile', () => {
-    const projectPath = '/project/root'
-    const importDir = '/project/root/import'
+    const projectPath = path.join('/project', 'root')
+    const importDir = path.join('/project', 'root', 'import')
 
     beforeEach(() => {
       mockedMkdir.mockResolvedValue(undefined)
@@ -669,7 +670,7 @@ describe('ImportService', () => {
 
         await service.importFile('/path/to/file.txt', projectPath)
 
-        expect(mockedMkdir).toHaveBeenCalledWith('/project/root/import', { recursive: true })
+        expect(mockedMkdir).toHaveBeenCalledWith(importDir, { recursive: true })
       })
 
       it('should return error if mkdir fails', async () => {
@@ -736,7 +737,7 @@ describe('ImportService', () => {
         const result = await service.importFile('/path/to/file.txt', projectPath)
 
         expect(mockedFindAvailableFileName).toHaveBeenCalledWith(
-          '/project/root/import',
+          importDir,
           'file.txt'
         )
         expect(result.success).toBe(true)
@@ -894,7 +895,7 @@ describe('ImportService', () => {
   // ==========================================================================
 
   describe('importFile with ImportOptions', () => {
-    const projectPath = '/project/root'
+    const projectPath = path.join('/project', 'root')
 
     // Build a configurable converter whose createConfigured returns a distinct
     // converter with its own convert mock so we can assert which one ran.
@@ -1003,7 +1004,7 @@ describe('ImportService', () => {
   // ==========================================================================
 
   describe('screenshot handling', () => {
-    const projectPath = '/project/root'
+    const projectPath = path.join('/project', 'root')
 
     function setupSuccessfulImport(screenshotDir?: string): void {
       mockedGetExtension.mockReturnValue('pdf')

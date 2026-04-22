@@ -1,8 +1,41 @@
 # Erfana Changelog
 
-Historical changelog entries for versions prior to current. For the latest changes, see [CLAUDE.md](../CLAUDE.md).
+Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/changelog-v03-v05.md](./archive/changelog-v03-v05.md)). For in-flight Windows enablement work not yet released, see [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) "Status snapshot".
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
+
+## Unreleased (on `windows` branch)
+
+### Platform support (Windows)
+
+Phase 0 + Phase 1 + Phase 2 of the Windows enablement roadmap landed on the `windows` branch (not yet merged to `develop`; will ship in 0.9.3+ or 0.10.0). See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for canonical status / [`docs/windows/deferred-work.md`](./windows/deferred-work.md) for tracked deferrals (D1–D8). Summary:
+
+- **Phase 0 (#153 closed)** — portable `test:cov` + `prebuild` scripts, `docs/build/windows.md` prerequisites, test path portability (#157), `app.setJumpList` mock (#156), SearchBar focus-trap fix, NSIS installer (316 MB, fused + signed; requires Developer Mode on build host).
+- **Phase 1 (#154 closed)** — terminal parity: cmd.exe `@echo off` bootstrap, PowerShell `Set-Location -LiteralPath`, `resolveWindowsShell()` fallback chain, cwd validation deny-list, `WindowsBootstrapBuilder` strategy. 128+ tests (Phase-2 UAT hardening added a dedicated `WindowsTerminalBootstrap.test.ts` with 60 unit tests for the strategy layer).
+- **Phase 2 (#155 umbrella closed)** — sub-issues:
+  - **#160 git allowlist** — Program Files (64+32), Chocolatey, Scoop paths + `git --version` liveness probe (fixes Windows `fs.access(X_OK)` existence-only degradation).
+  - **#161 reserved-filename guard** — shared `validateFilename` util with Unicode bidi-override stripping (Trojan Source defence); wired into `FileService` (throws) + Pdf/DocxService (transform). Friendly error toasts via `INVALID_FILENAME_MARKER` shared constant.
+  - **#162 LibreOffice Windows detection** — DependencyDetector probes Program Files paths with `--version` liveness.
+  - **#163 long-path activation** — deferred to Phase 6 with promotion criteria recorded inline at `PlatformConfig.ts:194-201` (comment block above `isWindowsLongPath` at `:203`).
+- **#159 CameraDialog timer cleanup** + **`flakeGuard.ts`** shared post-teardown error catcher across all 3 vitest projects (no more invisible "Errors 1 error" reports).
+- **Phase-2 UAT hardening (2026-04-21 session)** — surfaced and closed during dev-build UAT on the `windows` host:
+  - **Windows terminal bootstrap parity (Git Bash support + ConPTY reflow fix).** `resolveWindowsShell` already honored `$SHELL=…\bash.exe`, but the dispatcher had no Git Bash builder — bash fell through to the cmd.exe catch-all and exited with code 126. New `GitBashBootstrapBuilder` emits the POSIX bootstrap and is registered ahead of the cmd.exe fallback. Separately, Windows ConPTY re-emits its screen-buffer contents through the PTY on every resize; the marker handshake cleared xterm.js but not ConPTY's own buffer, so resizes replayed pre-bootstrap `pwd`+marker as a "phantom header". Each of the three builders now appends a post-marker screen-clear (`printf '\033[2J\033[3J\033[H'` / `[Console]::Write([char]27 + '[2J' …)` / `cls`) so ConPTY is wiped before the interactive shell takes over. cmd.exe can only clear the viewport (not scrollback) from a bootstrap script – documented caveat in `known-issues.md`.
+  - **Log-spam cleanup (two Windows-specific noisy paths).** `TerminalService.resize()` swallows the node-pty `"Cannot resize a pty that has already exited"` race (demotes `!terminal` missing-id path to debug); `GitPollingService.hasIndexChanged()` detects `ENOENT` explicitly and logs once at debug on non-git projects (polling continues so a mid-session `git init` is still caught).
+  - **`C:\Program Files (x86)\…` project paths are no longer rejected as unsafe.** `UNSAFE_WINDOWS_CWD_CHARS` dropped `(` and `)` — parens are cmd metacharacters only outside quotes and are literal inside `cd /d "<cwd>"`. 8-entry deny-list still covers every real injection vector.
+  - **Test-suite additions** — new `WindowsTerminalBootstrap.test.ts` (60 cases: `canHandle` patterns, dispatch precedence, script shape per builder including the ConPTY clear, escape rules, loosened deny-list, `normalizeWindowsCwd`); fixed `e2e/settings-logs.e2e.ts` path-sep assertion so both Windows `\` and POSIX `/` hosts pass.
+- **Security**: `@xmldom/xmldom` bumped 0.8.11 → 0.8.13 (transitive via `@turbodocx/html-to-docx`, prod-reachable on DOCX export path; pre-empts Dependabot PR #145).
+- **Phase 3-6 + deferred-work tracked on GitHub**: [#164](https://github.com/qodeca/erfana/issues/164) (screenshot parity), [#165](https://github.com/qodeca/erfana/issues/165) (local Whisper Windows binary), [#166](https://github.com/qodeca/erfana/issues/166) (distribution + signing), [#167](https://github.com/qodeca/erfana/issues/167) (polish + CI guard), [#168](https://github.com/qodeca/erfana/issues/168) (D1-D8 meta), [#169](https://github.com/qodeca/erfana/issues/169) (Dependabot triage + 28 security alerts).
+
+Known gaps (deferred to Phases 3–6): screenshots, local Whisper, auto-updater URL, code signing, long-path `\\?\` activation, structured-error IPC serialization (D4).
+
+### Post-Phase-2 hygiene (14576cd, 5a89844)
+
+- **Lint cleanup** — 11 test-file errors resolved (unused consts, `require()`→import, useless regex escapes). `playwright-report/`, `test-results/`, `coverage/` added to `eslint.config.mjs` ignores so E2E artifacts on disk don't poison lint runs.
+- **SearchBar flake harden** — first-keystroke-drop under CPU contention. `'executes search'` + `'debounces search'` tests both now gate on observable state via `await waitFor(() => expect(document.activeElement).toBe(input))`. Evidence: 10/10 consecutive runs green.
+- **Visual regression determinism** — `visualTestProject` fixture split into outer `mkdtemp('visual-')` parent + fixed inner `visual-project` leaf so tree/terminal labels are deterministic across runs (prevents random suffix from leaking into snapshots). `(b) editor-loaded` masks extended to `TERMINAL_INSTANCE` + `TOAST_CONTAINER`; mask specificity now matches `(c) terminal-open`. Cleanup wrapped in try/finally with `maxRetries:3` rm (Windows EBUSY) + symlink guard on `.e2e-temp`.
+- **Lodash CVE (GHSA-1115805/6/9/10)** — pinned `lodash`/`lodash-es` to **exact** `4.18.1` in `package.json` overrides. Production high-severity advisories 7 → 0. Provenance note in [`docs/security.md`](./security.md#dependency-overrides-packagejson) — 4.18.x is a community fork by `magic-akari`, not OpenJS.
+
+---
 
 ## 0.9.2
 
@@ -442,20 +475,9 @@ Historical changelog entries for versions prior to current. For the latest chang
   - HTML to DOCX conversion via `docx` library
   - 69 new tests
   - Closes #65
-- **PDF Export** (Dec 21, 2025):
-  - Export markdown to print-optimized PDF
-  - Vector Mermaid diagrams (not rasterized)
-  - A4 page size with print-friendly styling
-  - 35 new tests
-  - Closes #58
-- **YAML Frontmatter Rendering** (Dec 21, 2025):
-  - Styled key-value table in markdown preview
-  - Security-hardened parsing with size limits
-  - 18 new tests
-- **Git Operation Queue** (Dec 21, 2025):
-  - Prevents index.lock conflicts during concurrent git operations
-  - Sequential queue in GitStatusService
-  - Closes race conditions
+- **PDF Export** (Dec 21, 2025) — Print-optimized PDF with vector Mermaid diagrams, A4, 35 tests. Closes #58.
+- **YAML Frontmatter Rendering** (Dec 21, 2025) — Styled key-value table in preview, security-hardened parsing with size limits, 18 tests.
+- **Git Operation Queue** (Dec 21, 2025) — Sequential queue in GitStatusService prevents `index.lock` conflicts during concurrent git operations.
 
 ## Changes in v0.6.0
 - **Logging Layer** (Dec 21, 2025):
@@ -468,25 +490,10 @@ Historical changelog entries for versions prior to current. For the latest chang
   - 182 new tests
   - **Total: 4226 tests passing** (139 test files)
   - Closes #49
-- **Global Settings Service** (Dec 21, 2025):
-  - Application-wide settings service with Zod schema validation
-  - Settings persisted to `~/.erfana/settings.json`
-  - Corruption handling: backup to `.bak`, reset to defaults
-  - 71 new tests
-  - Closes #50
-- **Visualize Prompt** (Dec 21, 2025):
-  - Added "Visualize" prompt to Preview context menu for AI-powered Mermaid diagram generation
-  - Dialog with dropdown for 22 Mermaid diagram types
-  - 4 new tests
-  - Closes #57
-- **Settings Overlay** (Dec 21, 2025):
-  - Full-screen settings overlay with keyboard navigation and focus management
-  - 26 new tests
-  - Closes #48
-- **2025 Security Hardening** (Dec 2, 2025):
-  - Electron 33.2.1 → 39.2.4 (Chromium 142, Node.js 22.20.0, V8 14.2)
-  - Process sandboxing enabled, Electron fuses implemented (3 of 6)
-  - electron-builder 26.0.0 with automated workarounds
+- **Global Settings Service** (Dec 21, 2025) — Zod-validated app-wide settings at `~/.erfana/settings.json`, `.bak` corruption recovery, 71 tests. Closes #50.
+- **Visualize Prompt** (Dec 21, 2025) — AI-powered Mermaid generation from Preview context menu, dialog with 22 diagram types, 4 tests. Closes #57.
+- **Settings Overlay** (Dec 21, 2025) — Full-screen settings with keyboard navigation + focus management, 26 tests. Closes #48.
+- **2025 Security Hardening** (Dec 2, 2025) — Electron 33.2.1 → 39.2.4 (Chromium 142, Node 22.20.0, V8 14.2), process sandboxing enabled, 3 of 6 Electron fuses, electron-builder 26.0.0.
 
 ---
 

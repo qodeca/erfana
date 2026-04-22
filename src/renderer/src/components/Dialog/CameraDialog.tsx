@@ -65,6 +65,10 @@ export const CameraDialog = memo(function CameraDialog({
 }: CameraDialogProps) {
   // Video element ref for capture
   const videoRef = useRef<HTMLVideoElement>(null)
+  // Shutter-animation timer id. Tracked so the effect below can clear it on
+  // unmount — otherwise the 200ms callback fires on a disposed React tree
+  // (see #159: vitest teardown produced "ReferenceError: window is not defined").
+  const shutterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Shutter animation state
   const [isShutterActive, setIsShutterActive] = useState(false)
@@ -142,14 +146,33 @@ export const CameraDialog = memo(function CameraDialog({
 
     const filePath = await capturePhoto(videoRef.current)
 
-    // Reset shutter animation
-    setTimeout(() => setIsShutterActive(false), 200)
+    // Reset shutter animation. Clear any pending timer first (rapid re-capture)
+    // and store the new id so the unmount cleanup below can cancel it.
+    if (shutterTimerRef.current !== null) {
+      clearTimeout(shutterTimerRef.current)
+    }
+    shutterTimerRef.current = setTimeout(() => {
+      setIsShutterActive(false)
+      shutterTimerRef.current = null
+    }, 200)
 
     if (filePath) {
       logger.info('Camera photo captured', { filePath })
       onCapture(filePath)
     }
   }, [isPreviewActive, capturePhoto, onCapture])
+
+  // Cancel the shutter-reset timer on unmount so it can't fire against a
+  // torn-down React tree (prevents the test-env `window is not defined`
+  // crash and also the React "state update on unmounted component" warning).
+  useEffect(() => {
+    return () => {
+      if (shutterTimerRef.current !== null) {
+        clearTimeout(shutterTimerRef.current)
+        shutterTimerRef.current = null
+      }
+    }
+  }, [])
 
   /**
    * Handle device selection change.

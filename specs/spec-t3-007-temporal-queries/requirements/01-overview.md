@@ -1,5 +1,7 @@
 # Overview
 
+> 📐 **Design context**: historical design exploration lives at [`docs/future/graph-engine/`](../../../docs/future/graph-engine/) — temporal data model, timeline UI wireframes, time-travel queries. This spec is the authoritative requirement source.
+
 ## Summary
 
 Spec #007 implements temporal query capabilities and timeline visualization for the Graph Engine, enabling time-travel queries to reconstruct historical knowledge graph states and track documentation evolution over time.

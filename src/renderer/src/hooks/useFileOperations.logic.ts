@@ -6,6 +6,7 @@
  */
 
 import type { FileNode } from '../interfaces/IProjectTreeApi'
+import { INVALID_FILENAME_MARKER } from '../../../shared/errors'
 
 /**
  * Gets the target path for file/folder operations
@@ -126,6 +127,27 @@ export function isAlreadyExistsError(message: string): boolean {
 }
 
 /**
+ * Detects if error message indicates an invalid-filename rejection (#161).
+ *
+ * The main-process `assertValidUserFilename` throws `AppError(INVALID_FILENAME)`
+ * with a structured message like `"CON.md" is not a valid filename — try "_CON.md"`.
+ * `AppError.code` does not cross the Electron IPC boundary by default, so this
+ * detector matches on the well-known marker embedded in the message.
+ *
+ * The marker phrase is sourced from the shared `INVALID_FILENAME_MARKER`
+ * constant in `src/shared/errors.ts`, NOT a literal string here — that's the
+ * single source of truth shared with the thrower in
+ * `src/main/utils/validateFilename.ts`. Changing the marker means changing
+ * the constant; all detectors update automatically.
+ *
+ * @param message - Error message to check
+ * @returns true if error is an invalid-filename rejection, false otherwise
+ */
+export function isInvalidFilenameError(message: string): boolean {
+  return message.includes(INVALID_FILENAME_MARKER)
+}
+
+/**
  * Formats error message for file creation
  *
  * @param error - Error object
@@ -136,6 +158,11 @@ export function formatCreateFileError(error: unknown): string {
     const cleaned = stripIpcErrorPrefix(error.message)
     if (isAlreadyExistsError(cleaned)) {
       return 'A file with this name already exists'
+    }
+    // #161: invalid-filename rejections already carry a friendly message
+    // like `"CON.md" is not a valid filename — try "_CON.md"`. Surface verbatim.
+    if (isInvalidFilenameError(cleaned)) {
+      return cleaned
     }
     return cleaned
   }
@@ -153,6 +180,10 @@ export function formatCreateFolderError(error: unknown): string {
     const cleaned = stripIpcErrorPrefix(error.message)
     if (isAlreadyExistsError(cleaned)) {
       return 'A folder with this name already exists'
+    }
+    // #161: invalid-filename rejections carry a friendly message verbatim.
+    if (isInvalidFilenameError(cleaned)) {
+      return cleaned
     }
     return cleaned
   }

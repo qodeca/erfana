@@ -7,6 +7,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import path from 'path'
+import os from 'os'
+
+// =============================================================================
+// Test constants – platform-safe home directory for assertions
+// =============================================================================
+
+const MOCK_HOME = path.join(os.tmpdir(), 'erfana-test-home')
 
 // =============================================================================
 // Mock electron
@@ -44,9 +52,14 @@ vi.mock('fs/promises', () => ({
 // Mock os
 // =============================================================================
 
-vi.mock('os', () => ({
-  homedir: () => '/Users/test'
-}))
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>()
+  const { join } = await import('path')
+  return {
+    ...actual,
+    homedir: () => join(actual.tmpdir(), 'erfana-test-home')
+  }
+})
 
 // =============================================================================
 // Mock LoggingService
@@ -92,7 +105,7 @@ describe('ApiKeyService', () => {
 
       expect(mockSafeStorage.encryptString).toHaveBeenCalledWith('sk-test-key-123')
       expect(mockWriteFile).toHaveBeenCalledWith(
-        '/Users/test/.erfana/openai-api-key.enc',
+        path.join(MOCK_HOME, '.erfana', 'openai-api-key.enc'),
         expect.any(Buffer),
         { mode: 0o600 }
       )
@@ -104,7 +117,7 @@ describe('ApiKeyService', () => {
 
       await service.storeKey('openai', 'sk-test-key')
 
-      expect(mockMkdir).toHaveBeenCalledWith('/Users/test/.erfana', { recursive: true, mode: 0o700 })
+      expect(mockMkdir).toHaveBeenCalledWith(path.join(MOCK_HOME, '.erfana'), { recursive: true, mode: 0o700 })
     })
 
     it('should fall back to plaintext when safeStorage unavailable', async () => {
@@ -117,7 +130,7 @@ describe('ApiKeyService', () => {
 
       expect(mockSafeStorage.encryptString).not.toHaveBeenCalled()
       expect(mockWriteFile).toHaveBeenCalledWith(
-        '/Users/test/.erfana/openai-api-key.enc',
+        path.join(MOCK_HOME, '.erfana', 'openai-api-key.enc'),
         'sk-test-key',
         { encoding: 'utf-8', mode: 0o600 }
       )
@@ -243,7 +256,7 @@ describe('ApiKeyService', () => {
 
       await service.clearKey('openai')
 
-      expect(mockUnlink).toHaveBeenCalledWith('/Users/test/.erfana/openai-api-key.enc')
+      expect(mockUnlink).toHaveBeenCalledWith(path.join(MOCK_HOME, '.erfana', 'openai-api-key.enc'))
     })
 
     it('should handle ENOENT gracefully (file does not exist)', async () => {
@@ -383,12 +396,12 @@ describe('ApiKeyService', () => {
       expect(service.hasKey('anthropic')).toBe(true)
 
       expect(mockWriteFile).toHaveBeenCalledWith(
-        '/Users/test/.erfana/openai-api-key.enc',
+        path.join(MOCK_HOME, '.erfana', 'openai-api-key.enc'),
         expect.any(Buffer),
         { mode: 0o600 }
       )
       expect(mockWriteFile).toHaveBeenCalledWith(
-        '/Users/test/.erfana/anthropic-api-key.enc',
+        path.join(MOCK_HOME, '.erfana', 'anthropic-api-key.enc'),
         expect.any(Buffer),
         { mode: 0o600 }
       )

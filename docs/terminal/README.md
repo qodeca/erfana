@@ -304,7 +304,7 @@ See [Scroll Fixes](./scroll-fixes.md) for related scroll preservation features.
 
 ### Core Capabilities
 
-- **Native Shell**: Spawns real PTY process (zsh on macOS, bash on Linux)
+- **Native Shell**: Spawns real PTY process (zsh on macOS, bash on Linux, Git Bash / PowerShell 7 / Windows PowerShell 5.1 / cmd.exe on Windows – resolved by `TerminalService.resolveWindowsShell()` in precedence order, honoring `$SHELL` first)
 - **Auto-Resize**: Terminal automatically resizes when panel is dragged
 - **WebGL Rendering**: Hardware acceleration with canvas fallback
 - **Bold Font Support**: Renders bold text with proper font weight
@@ -411,7 +411,7 @@ window.api.terminal = {
 - `types.ts` - TerminalState, ScreenshotCaptureMode types
 - `terminalPanel.logic.ts` - Pure functions and constants
 
-See [Terminal Architecture Review](../architecture/reviews/terminal-panel-architecture-review.md) for detailed refactoring documentation.
+See [Terminal Architecture Review](../architecture-reviews/reviews/terminal-panel-architecture-review.md) for detailed refactoring documentation.
 
 **Key Features**:
 - Visibility check before xterm initialization (prevents rendering issues)

@@ -1,6 +1,6 @@
 # Transcription components
 
-Media import dialog for audio/video transcription – dual backend: OpenAI API (cloud) or local whisper.cpp (offline, macOS only).
+Media import dialog for audio/video transcription – dual backend: OpenAI API (cloud) or local whisper.cpp (offline, macOS only today; Windows parity tracked under Phase 4 [#165](https://github.com/qodeca/erfana/issues/165) – avoid hardcoding `darwin`-only assumptions in new code).
 
 ## Architecture
 
@@ -64,7 +64,7 @@ renderer                          main
 - `src/shared/ipc/transcription-channels.ts` – IPC channel constants (transcription + whisper model management)
 - `src/shared/constants.ts` – `VIDEO_IMPORT.SUPPORTED_EXTENSIONS`, `LOCAL_WHISPER` (version, model sizes, timeouts)
 - `src/main/services/TranscriptionService.ts` – OpenAI backend transcription
-- `src/main/services/LocalWhisperService.ts` – Local whisper.cpp backend (macOS only)
+- `src/main/services/LocalWhisperService.ts` – Local whisper.cpp backend (macOS only today; Phase 4 [#165](https://github.com/qodeca/erfana/issues/165) adds Windows)
 - `src/main/services/WhisperModelManager.ts` – Binary and model download management
 - `src/main/services/AudioExtractionService.ts` – Video → audio extraction
 - `src/main/ipc/transcription-handlers.ts` – IPC handlers (backend routing, whisper model management)

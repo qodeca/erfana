@@ -8,7 +8,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import * as path from 'path'
+import * as os from 'os'
 import type { IpcMainInvokeEvent } from 'electron'
+
+// Platform-safe absolute paths (see #157)
+const TEST_PROJECT = path.join(os.tmpdir(), 'erfana-test', 'project')
+const TEST_AUDIO = path.join(os.tmpdir(), 'erfana-test', 'path', 'to', 'audio.mp3')
+const TEST_BAD_FILE = path.join(os.tmpdir(), 'erfana-test', 'path', 'to', 'bad.txt')
+const TEST_RECORDING = path.join(os.tmpdir(), 'erfana-test', 'path', 'to', 'recording.mp3')
 
 // =============================================================================
 // Mock electron
@@ -18,7 +26,7 @@ const mockIpcMainHandle = vi.fn()
 
 vi.mock('electron', () => ({
   app: {
-    getPath: vi.fn(() => '/mock/userData')
+    getPath: vi.fn(() => 'mock-userData')
   },
   ipcMain: {
     handle: mockIpcMainHandle
@@ -112,7 +120,7 @@ vi.mock('fs/promises', () => ({
 const mockChangeExtension = vi.fn((name: string) => name.replace(/\.[^.]+$/, '.md'))
 const mockSanitizeFileName = vi.fn((name: string) => name)
 const mockFindAvailableFileName = vi.fn((_dir: string, name: string) =>
-  `/project/import/${name}`
+  path.join(os.tmpdir(), 'erfana-test', 'project', 'import', name)
 )
 
 vi.mock('../utils/fileUtils', async (importOriginal) => {
@@ -184,7 +192,7 @@ describe('transcription-handlers', () => {
     mockApiKeyGetKey.mockResolvedValue('sk-test-key')
     mockApiKeyStoreKey.mockResolvedValue(undefined)
     mockApiKeyClearKey.mockResolvedValue(undefined)
-    mockGetProjectPath.mockReturnValue('/project')
+    mockGetProjectPath.mockReturnValue(TEST_PROJECT)
     mockGetSetting.mockReturnValue({ backend: 'openai', openaiApiKeyStored: false })
     mockSetSetting.mockResolvedValue(undefined)
     mockWriteFile.mockResolvedValue(undefined)
@@ -240,7 +248,7 @@ describe('transcription-handlers', () => {
       const handler = getHandler('transcription:import')
       expect(handler).toBeDefined()
 
-      const request = { filePath: '/path/to/audio.mp3', language: 'en' }
+      const request = { filePath: TEST_AUDIO, language: 'en' }
       const result = await handler!(mockEvent, request) as { success: boolean; outputPath?: string }
 
       expect(result.success).toBe(true)
@@ -267,7 +275,7 @@ describe('transcription-handlers', () => {
       registerTranscriptionHandlers()
 
       const handler = getHandler('transcription:import')
-      const request = { filePath: '/path/to/audio.mp3', language: 'en' }
+      const request = { filePath: TEST_AUDIO, language: 'en' }
       const result = await handler!(mockEvent, request) as { success: boolean; errorCode?: string }
 
       expect(result.success).toBe(false)
@@ -281,7 +289,7 @@ describe('transcription-handlers', () => {
       registerTranscriptionHandlers()
 
       const handler = getHandler('transcription:import')
-      const request = { filePath: '/path/to/audio.mp3', language: 'en' }
+      const request = { filePath: TEST_AUDIO, language: 'en' }
       const result = await handler!(mockEvent, request) as { success: boolean; error?: string }
 
       expect(result.success).toBe(false)
@@ -306,7 +314,7 @@ describe('transcription-handlers', () => {
       registerTranscriptionHandlers()
 
       const handler = getHandler('transcription:import')
-      const request = { filePath: '/path/to/audio.mp3', language: 'en' }
+      const request = { filePath: TEST_AUDIO, language: 'en' }
       await handler!(mockEvent, request)
 
       const sender = (mockEvent as { sender: { send: ReturnType<typeof vi.fn> } }).sender
@@ -344,7 +352,7 @@ describe('transcription-handlers', () => {
       registerTranscriptionHandlers()
 
       const handler = getHandler('transcription:validate')
-      const result = await handler!(mockEvent, '/path/to/audio.mp3') as { valid: boolean; durationSeconds?: number }
+      const result = await handler!(mockEvent, TEST_AUDIO) as { valid: boolean; durationSeconds?: number }
 
       expect(result.valid).toBe(true)
       expect(result.durationSeconds).toBe(60)
@@ -372,7 +380,7 @@ describe('transcription-handlers', () => {
       registerTranscriptionHandlers()
 
       const handler = getHandler('transcription:validate')
-      const result = await handler!(mockEvent, '/path/to/bad.txt') as { valid: boolean; error?: string }
+      const result = await handler!(mockEvent, TEST_BAD_FILE) as { valid: boolean; error?: string }
 
       expect(result.valid).toBe(false)
       expect(result.error).toBe('Invalid audio')
@@ -729,13 +737,13 @@ describe('transcription-handlers', () => {
       registerTranscriptionHandlers()
 
       const handler = getHandler('transcription:import')
-      const request = { filePath: '/path/to/audio.mp3', language: 'en' }
+      const request = { filePath: TEST_AUDIO, language: 'en' }
       const result = await handler!(mockEvent, request) as { success: boolean; outputPath?: string }
 
       expect(result.success).toBe(true)
       expect(mockLocalWhisperTranscribe).toHaveBeenCalledWith(
         expect.objectContaining({
-          filePath: '/path/to/audio.mp3',
+          filePath: TEST_AUDIO,
           language: 'en',
           model: 'small'
         })
@@ -756,7 +764,7 @@ describe('transcription-handlers', () => {
       registerTranscriptionHandlers()
 
       const handler = getHandler('transcription:import')
-      const request = { filePath: '/path/to/recording.mp3', language: 'fr' }
+      const request = { filePath: TEST_RECORDING, language: 'fr' }
       await handler!(mockEvent, request)
 
       expect(mockLocalWhisperTranscribe).toHaveBeenCalledWith(
@@ -777,7 +785,7 @@ describe('transcription-handlers', () => {
       registerTranscriptionHandlers()
 
       const handler = getHandler('transcription:import')
-      const request = { filePath: '/path/to/recording.mp3', language: 'en' }
+      const request = { filePath: TEST_RECORDING, language: 'en' }
       await handler!(mockEvent, request)
 
       expect(mockLocalWhisperTranscribe).toHaveBeenCalledWith(
@@ -792,7 +800,7 @@ describe('transcription-handlers', () => {
       registerTranscriptionHandlers()
 
       const handler = getHandler('transcription:import')
-      const request = { filePath: '/path/to/audio.mp3', language: 'en' }
+      const request = { filePath: TEST_AUDIO, language: 'en' }
       const result = await handler!(mockEvent, request) as { success: boolean }
 
       expect(result.success).toBe(true)
@@ -814,7 +822,7 @@ describe('transcription-handlers', () => {
       registerTranscriptionHandlers()
 
       const handler = getHandler('transcription:import')
-      const request = { filePath: '/path/to/audio.mp3', language: 'en' }
+      const request = { filePath: TEST_AUDIO, language: 'en' }
       const result = await handler!(mockEvent, request) as { success: boolean; errorCode?: string }
 
       expect(result.success).toBe(true)

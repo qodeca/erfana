@@ -88,6 +88,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Technical Debt](docs/technical-debt.md) — Known debt items and improvement opportunities
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
 - [Large-Project Performance](docs/large-project-performance-plan.md) — Implementation plan for #146–#151 (EMFILE, worker thread, diagnostics)
+- [Windows enablement](docs/windows/README.md) — Phases 0–2 closed on `windows` branch (2026-04-21); awaits `windows → develop` merge gated on Phase 1 UAT. Phase tracking: [#164](https://github.com/qodeca/erfana/issues/164) screenshots, [#165](https://github.com/qodeca/erfana/issues/165) Whisper Windows, [#166](https://github.com/qodeca/erfana/issues/166) distribution + signing, [#167](https://github.com/qodeca/erfana/issues/167) polish + CI guard. Deferred items D1–D8: [#168](https://github.com/qodeca/erfana/issues/168). Dependabot triage: [#169](https://github.com/qodeca/erfana/issues/169). Human-readable entry: [`docs/windows/README.md`](docs/windows/README.md). Canonical status + commit trail + merge-readiness gate: [`docs/windows/implementation-plan.md` § Status snapshot](docs/windows/implementation-plan.md). Contributor workflow: [`docs/windows/contributing.md`](docs/windows/contributing.md). Closure plan: [`docs/windows/phase2-closure.md`](docs/windows/phase2-closure.md). Deferred items detail: [`docs/windows/deferred-work.md`](docs/windows/deferred-work.md). Windows-specific known issues: [`docs/known-issues.md` § Windows-specific issues](docs/known-issues.md#windows-specific-issues).
 - [Source Grounding](docs/future/source-grounding/README.md) — NotebookLM-style grounding research, gap analysis, strategy, implementation roadmap
 - [Roadmap](ROADMAP.md) — Implementation order for active specs with dependency analysis
 
@@ -140,6 +141,10 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 - `src/renderer/src/components/` - UI components
 - `src/main/services/` - Backend services
 - `docs/` - Documentation files
+
+### Nested CLAUDE.md (component-specific patterns)
+- [`src/renderer/src/components/Dialog/CLAUDE.md`](src/renderer/src/components/Dialog/CLAUDE.md) - BaseDialog API, focus trap, ESC/backdrop handling
+- [`src/renderer/src/components/Transcription/CLAUDE.md`](src/renderer/src/components/Transcription/CLAUDE.md) - Dual-backend transcription (OpenAI + local whisper.cpp), IPC flow, store
 
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))

@@ -103,7 +103,20 @@ Project-specific terminology used in Erfana documentation and code.
 | **EPIPE** | Error when writing to closed pipe |
 | **ESRCH** | Error when process not found |
 | **ENOENT** | Error when file not found |
+| **UAT** | User Acceptance Testing |
+
+## Windows parity (Phase 2)
+
+| Term | Definition |
+|------|------------|
+| **flakeGuard** | Shared vitest setup helper (`tests/setup/flakeGuard.ts`) loaded by all three projects – surfaces post-teardown unhandled rejections / uncaught exceptions with scope label + stack trace so flaky tests point at the true source |
+| **validateFilename** | Two-contract filename validation module (`src/main/utils/validateFilename.ts`) – `assertValidUserFilename` throws on invalid input (user-facing), `deriveSafeFilename` is total (never throws, returns safe fallback) |
+| **deriveSafeFilename** | Pure function from `validateFilename.ts` that sanitises strings for use as filenames without throwing – used by `DocxService` and `PdfService` for generated export filenames |
+| **INVALID_FILENAME_MARKER** | Shared sentinel string exported from `src/shared/errors.ts` – embedded in every `AppError` message thrown by `assertValidUserFilename`; renderer tests match on this marker instead of the human-readable message text so UX copy changes do not break IPC contract tests |
+| **WindowsBootstrapBuilder** | Strategy interface in `src/main/services/WindowsTerminalBootstrap.ts` that abstracts the shell-specific bootstrap handshake on Windows. Current implementations (precedence order): `PowerShellBootstrapBuilder` → `GitBashBootstrapBuilder` → `CmdExeBootstrapBuilder`. Each has a `canHandle(shell)` predicate and `build({shell, cwd, marker})` that emits the `shellArgs` for node-pty plus a Windows-specific ConPTY buffer clear (CSI 2J/3J/H via `printf`, `[Console]::Write`, or `cls`). WSL adds a new builder instead of branching in `TerminalService` |
+| **markerDetector** | Local function inside `TerminalService.createTerminal` that parses PTY output for the bootstrap handshake marker and flips the terminal to "ready" once detected – the reason bootstrap output stays invisible to the user |
+| **PauseController** | Utility in `src/main/utils/PauseController.ts` providing pause/resume with a safety-timeout auto-resume so a paused file-watcher cannot stall indefinitely if the consumer forgets to resume |
 
 ---
 
-See: [Architecture](./architecture.md) | [Getting Started](./getting-started.md)
+See: [Architecture](./architecture.md) | [Getting Started](./getting-started.md) | [Windows enablement](./windows/README.md)

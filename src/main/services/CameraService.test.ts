@@ -8,6 +8,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import path from 'path'
+import os from 'os'
+
+// =============================================================================
+// Test constants – platform-safe tmpdir for assertions
+// =============================================================================
+
+const REAL_TMPDIR = os.tmpdir()
 
 // =============================================================================
 // Mock fs/promises
@@ -23,11 +31,15 @@ vi.mock('fs/promises', () => ({
 // Mock os.tmpdir
 // =============================================================================
 
-const mockTmpdir = vi.fn(() => '/tmp')
+const mockTmpdir = vi.fn()
 
-vi.mock('os', () => ({
-  tmpdir: mockTmpdir
-}))
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>()
+  return {
+    ...actual,
+    tmpdir: (...args: unknown[]) => mockTmpdir(...args)
+  }
+})
 
 // =============================================================================
 // Mock LoggingService
@@ -75,7 +87,7 @@ vi.mock('../../shared/errors', () => ({
 describe('CameraService', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockTmpdir.mockReturnValue('/tmp')
+    mockTmpdir.mockReturnValue(REAL_TMPDIR)
     mockWriteFile.mockResolvedValue(undefined)
   })
 
@@ -93,9 +105,9 @@ describe('CameraService', () => {
       const result = await cameraService.save(dataUrl, timestamp)
 
       expect(result.filePath).toBeDefined()
-      expect(result.filePath).toMatch(/^\/tmp\/erfana-camera-\d{4}-\d{2}-\d{2}-\d{6}\.jpg$/)
+      expect(result.filePath).toMatch(new RegExp(`^${REAL_TMPDIR.replace(/[\\/]/g, '[/\\\\]')}[/\\\\]erfana-camera-\\d{4}-\\d{2}-\\d{2}-\\d{6}\\.jpg$`))
       expect(mockWriteFile).toHaveBeenCalledWith(
-        expect.stringMatching(/^\/tmp\/erfana-camera-\d{4}-\d{2}-\d{2}-\d{6}\.jpg$/),
+        expect.stringMatching(new RegExp(`^${REAL_TMPDIR.replace(/[\\/]/g, '[/\\\\]')}[/\\\\]erfana-camera-\\d{4}-\\d{2}-\\d{2}-\\d{6}\\.jpg$`)),
         expect.any(Buffer)
       )
     })
@@ -342,7 +354,7 @@ describe('CameraService', () => {
 
       const result = await cameraService.save(dataUrl)
 
-      expect(result.filePath).toMatch(/^\/tmp\/erfana-camera-\d{4}-\d{2}-\d{2}-\d{6}\.jpg$/)
+      expect(result.filePath).toMatch(new RegExp(`^${REAL_TMPDIR.replace(/[\\/]/g, '[/\\\\]')}[/\\\\]erfana-camera-\\d{4}-\\d{2}-\\d{2}-\\d{6}\\.jpg$`))
     })
   })
 
@@ -352,7 +364,8 @@ describe('CameraService', () => {
 
   describe('temp directory', () => {
     it('should use system temp directory from os.tmpdir', async () => {
-      mockTmpdir.mockReturnValue('/var/folders/custom')
+      const customTmp = path.join(REAL_TMPDIR, 'custom-folder')
+      mockTmpdir.mockReturnValue(customTmp)
 
       const { cameraService } = await import('./CameraService')
 
@@ -360,7 +373,7 @@ describe('CameraService', () => {
 
       const result = await cameraService.save(dataUrl)
 
-      expect(result.filePath).toMatch(/^\/var\/folders\/custom\/erfana-camera-/)
+      expect(result.filePath).toMatch(new RegExp(`^${customTmp.replace(/[\\/]/g, '[/\\\\]')}[/\\\\]erfana-camera-`))
     })
   })
 
@@ -379,7 +392,7 @@ describe('CameraService', () => {
       expect(mockLogger.debug).toHaveBeenCalledWith(
         'Camera save: writing photo',
         expect.objectContaining({
-          filePath: expect.stringMatching(/\/tmp\/erfana-camera-/),
+          filePath: expect.stringContaining('erfana-camera-'),
           size: expect.any(Number)
         })
       )
@@ -395,7 +408,7 @@ describe('CameraService', () => {
       expect(mockLogger.info).toHaveBeenCalledWith(
         'Camera photo saved successfully',
         expect.objectContaining({
-          filePath: expect.stringMatching(/\/tmp\/erfana-camera-/)
+          filePath: expect.stringContaining('erfana-camera-')
         })
       )
     })

@@ -5,6 +5,8 @@
  * and provides an "Open" button to reveal the folder.
  */
 
+import { sep } from 'node:path'
+
 import { test, expect } from './fixtures/index'
 import { TEST_IDS } from '../src/renderer/src/constants/testids'
 import { byTestId } from './utils/locators'
@@ -21,7 +23,9 @@ test.describe('Settings overlay – Logs folder', () => {
     // Verify the logs folder path is displayed and contains the expected path segment
     const logsFolderPath = byTestId(window, TEST_IDS.SETTINGS_LOGS_FOLDER_PATH)
     await expect(logsFolderPath).toBeVisible()
-    await expect(logsFolderPath).toContainText('.erfana/logs')
+    // Use platform separator – macOS/Linux render `.erfana/logs`,
+    // Windows renders `.erfana\logs`.
+    await expect(logsFolderPath).toContainText(`.erfana${sep}logs`)
   })
 
   test('should display a clickable Open button for logs folder', async ({ window }) => {

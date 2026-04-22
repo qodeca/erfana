@@ -7,6 +7,7 @@ Quick onboarding guide for new developers working on Erfana.
 - **Node.js**: 24+ (Electron 39 bundles Node.js 22.20.0)
 - **Python**: 3.12 (node-pty fails on 3.13)
 - **Git**: For version control
+- **On Windows**: VS 2022 Build Tools, Developer Mode enabled, Win32 long paths enabled. Skipping these breaks `node-pty` build + `npm run build:win`. Full setup: [`docs/build/windows.md`](./build/windows.md).
 
 ## Day 1 Checklist
 

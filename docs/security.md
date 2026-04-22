@@ -1,6 +1,6 @@
 # Security Guidelines
 
-**Last Updated**: March 2026 (v0.9.0, Electron 39)
+**Last Updated**: April 2026 (v0.9.2, Electron 39)
 
 ## Security Posture Summary
 
@@ -351,28 +351,19 @@ See [HTML Rendering](./markdown-editing.md#html-rendering-in-markdown) for detai
 
 ## Input Validation
 
-All IPC handlers validate inputs using **Zod schemas**:
+### Filename validation (#161, Phase 2)
 
-```typescript
-// Example: File path validation
-import { z } from 'zod';
+`src/main/utils/validateFilename.ts` provides cross-platform filename validation wired into `FileService.createFile`/`createFolder`/`rename` (throws `AppError(INVALID_FILENAME)`) and `PdfService`/`DocxService` (silent transform via `deriveSafeFilename`). Security-relevant rejections on **every platform** (not just Windows):
 
-const FilePathSchema = z.object({
-  path: z.string().min(1),
-});
+- **Unicode bidi-override chars** (U+202A–202E, U+2066–2069, U+200E, U+200F) — prevents Trojan-Source RTL extension spoofing (`cod‮gnp.exe` displaying as `codeexe.png`)
+- **C0 control chars** (0x00–0x1F)
+- **Empty / whitespace-only** filenames
 
-ipcMain.handle('files:read', async (_, args) => {
-  const { path } = FilePathSchema.parse(args);
+Windows-only rejections: reserved basenames (CON, PRN, COM1-9, LPT1-9), forbidden chars `<>:"/\|?*`, trailing dots/spaces. Path-separator strip happens BEFORE validation in `FileService.createFile`/`createFolder`/`rename` to prevent path traversal (`../../etc/passwd` → `etcpasswd`).
 
-  // Additional validation
-  if (path.includes('..')) {
-    throw new Error('Path traversal not allowed');
-  }
+### Zod schema validation
 
-  // Safe to use
-  return await fs.readFile(path, 'utf-8');
-});
-```
+All IPC handlers validate inputs using **Zod schemas** (`src/shared/ipc/*-schema.ts`). Pattern: parse args with `Schema.parse()` at handler entry, then run additional validation (e.g. path-traversal check) before any FS operation. See `src/main/ipc/file-handlers.ts` for canonical examples.
 
 ### Validation Rules:
 
@@ -447,7 +438,18 @@ npm run build:mac
 
 ## Known vulnerabilities
 
-Run `npm audit` to check. **Policy**: Fix all high/critical vulnerabilities in production dependencies before release.
+Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the table below.
+
+**Current state** (audited 2026-04-21): production 0 high / 5 moderate / 0 low; dev-only 10 high / 1 moderate / 2 low. The 5 moderate prod advisories chain through `mermaid → langium → chevrotain`; Mermaid output is DOMPurify-sanitized in the preview, so user-reachable attack surface is nil. Dev-only advisories don't ship in production builds.
+
+### Dependency overrides (package.json)
+
+| Package | Pin | Reason |
+|---|---|---|
+| `@electron/rebuild` | `3.7.1` | node-pty toolchain compat |
+| `lodash`, `lodash-es` | **exact** `4.18.1` | GHSA 1115805/6/9/10 (`_.template` code injection + `_.unset`/`_.omit` prototype pollution). Vulnerable range `<=4.17.23`. |
+
+**Lodash 4.18.x is a community fork, not OpenJS**: `4.18.0`/`4.18.1` were published by maintainer `magic-akari` in Oct 2025 after the upstream OpenJS branch went dormant. We pin **exact** (no caret) so a future 4.18.2 from any maintainer can't auto-flow into the lockfile; `package-lock.json` integrity hashes additionally pin the tarball. On Mermaid/electron-builder major bumps, retest the override chain — transitive resolution may shift.
 
 ---
 
@@ -489,10 +491,7 @@ Git status runs in a `worker_threads` Worker – same process memory space, no n
 
 ## Future enhancements
 
-1. **Code signing** + **notarization** for macOS (requires Apple Developer account)
-2. **Auto-updates**: signed updates with electron-updater
-3. **Encrypted storage**: OS keychain for sensitive data
-4. **Permission prompts**: confirmation before destructive operations
+Code signing + notarization for macOS (Apple Developer account); auto-updates via signed electron-updater; encrypted storage via OS keychain; confirmation prompts before destructive operations.
 
 ## References
 

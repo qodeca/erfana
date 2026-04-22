@@ -10,80 +10,72 @@ Supporting service classes for terminal emulation, file operations, file watchin
 
 **File:** `src/main/services/TerminalService.ts`
 
-Manages terminal emulator instances with xterm.js + node-pty.
+Manages terminal emulator instances with xterm.js + node-pty. Cross-platform: macOS/Linux (POSIX shells), Windows (Git Bash, PowerShell 7 / pwsh, Windows PowerShell 5.1, cmd.exe). Marker-based bootstrap with three-flag output gating — see [Terminal Bootstrap Pattern](./terminal/bootstrap-pattern.md) for platform-specific shell invocation, cwd validation contract, `WindowsBootstrapBuilder` strategy pattern, `resolveWindowsShell()` fallback chain, and Windows ConPTY resize-reflow mitigation.
 
-**EPIPE Error Handling:** Uses `safeConsole` utility to prevent EPIPE crashes during terminal cleanup. See [EPIPE Error Handling](./epipe-error-handling.md) for details.
+**cwd validation contract (Windows)**: cwds containing `" & | ^ < > \r \n` are rejected before bootstrap; `createTerminal` returns `null` and emits `'error'`. Callers must surface this. `(` and `)` are intentionally allowed (unblocks `C:\Program Files (x86)\…`).
+
+**Resize race safety (Windows)**: `resize()` silently no-ops when the underlying node-pty process has exited between the `resize()` call and the deferred Windows resize execution — the method returns `false` and the stale terminal entry is dropped from the map.
+
+**Constructor DI seam**: `new TerminalService(fsExists?)` — defaults to `fs.existsSync`; tests inject fakes to cover the shell fallback chain without module mocking.
+
+**EPIPE handling:** Uses `safeConsole` utility to prevent EPIPE crashes during cleanup. See [EPIPE Error Handling](./epipe-error-handling.md).
 
 ### Public Methods
 
-#### `createTerminal(id: string, cwd: string, cols: number, rows: number): Promise<void>`
-Create new PTY instance.
+#### `async createTerminal(config?: TerminalConfig, webContentsId?: number): Promise<string | null>`
+Create a new PTY instance. Async because `node-pty` is dynamically imported on first call.
 
-**Parameters:**
-- `id` - Unique terminal identifier
-- `cwd` - Working directory for terminal
-- `cols` - Terminal columns (width)
-- `rows` - Terminal rows (height)
+**Parameters** (`config?: TerminalConfig`, all optional — defaults to `{}`):
+- `cwd?` — Working directory; defaults to home dir
+- `cols?` / `rows?` — Terminal dimensions
+- `shell?` — Shell override; defaults to platform-resolved shell
+- `env?: Record<string, string>` — Extra env vars (merged after `cleanEnvironment()` filtering)
 
-**Throws:** Error if terminal with ID already exists.
+**Parameters** (top-level):
+- `webContentsId?: number` — Owning webContents ID; used by `cleanupForWebContentsId(id)` to kill orphaned PTYs when the window closes
 
-**Side Effects:**
-- Spawns new PTY process (zsh shell)
-- Emits 'data' events for output
-
----
-
-#### `writeToTerminal(id: string, data: string): void`
-Write data to terminal stdin.
-
-**Parameters:**
-- `id` - Terminal identifier
-- `data` - Data to write (e.g., user input)
-
-**Throws:** Error if terminal not found.
-
----
-
-#### `resizeTerminal(id: string, cols: number, rows: number): void`
-Resize PTY dimensions.
-
-**Parameters:**
-- `id` - Terminal identifier
-- `cols` - New column count
-- `rows` - New row count
-
-**Throws:** Error if terminal not found.
-
----
-
-#### `killTerminal(id: string): Promise<void>`
-Gracefully kill PTY process.
-
-**Parameters:**
-- `id` - Terminal identifier
+**Returns:** Generated terminal ID (`terminal-N`), or `null` if cwd failed Windows deny-list validation or the shell could not be resolved.
 
 **Side Effects:**
-- Removes terminal from internal map
-- Kills PTY process
+- Spawns new PTY process (platform-resolved shell)
+- Emits `'data'` events with `{ terminalId, data }` (after bootstrap marker + clear confirm)
+- Emits `'error'` event with `{ terminalId, error }` on cwd rejection or spawn failure
 
-**Events Emitted:**
-- `exit` - When process exits
+---
+
+#### `write(terminalId: string, data: string): boolean`
+Write data to terminal stdin. Returns `false` if the terminal is not found or PTY write fails.
+
+---
+
+#### `resize(terminalId: string, cols: number, rows: number): boolean`
+Resize PTY dimensions. Returns `false` if the terminal is not found.
+
+---
+
+#### `killTerminal(terminalId: string): boolean`
+Synchronously kill PTY process and remove from internal map. Returns `false` if the terminal is not found. Emits `'exit'` with `{ terminalId, exitCode: 0 }` on success.
+
+---
+
+#### `getTerminalInfo(terminalId: string): { id: string; cwd: string; title: string } | null`
+Returns terminal metadata, or `null` if not found.
+
+---
+
+#### `listTerminals(): Array<{ id: string; title: string }>`
+Returns metadata for all live terminals.
 
 ---
 
 ### Events
 
-#### `'data'`
-**Payload:** `{ id: string; data: string }`
-
-Emitted when PTY produces output.
-
----
-
-#### `'exit'`
-**Payload:** `{ id: string; code: number }`
-
-Emitted when PTY process exits.
+| Event | Payload | When |
+|---|---|---|
+| `'data'` | `{ terminalId: string; data: string }` | PTY output (after marker handshake + clear confirm) |
+| `'exit'` | `{ terminalId: string; exitCode: number; signal?: string }` | PTY process exit |
+| `'clearTerminal'` | `{ terminalId: string }` | Bootstrap marker detected; renderer should clear and call `markClearComplete()` |
+| `'error'` | `{ terminalId: string; error: string }` | cwd deny-list rejection (Windows), shell resolution failure, or spawn failure |
 
 ---
 
@@ -224,28 +216,16 @@ Emitted when directory changes (after 1000ms debounce).
 
 **File:** `src/main/services/FileService.ts`
 
+**Filename validation (#161, Phase 2)**: `createFile`, `createFolder`, and `rename` invoke `assertValidUserFilename` from `src/main/utils/validateFilename.ts` after stripping path separators. Throws `AppError(INVALID_FILENAME)` for Windows-reserved names (`CON`, `PRN`, `COM1-9`, `LPT1-9`), forbidden chars (`<>:"/\|?*` on Windows), trailing dots/spaces (Windows), control chars, Unicode bidi overrides (security), empty, or > 255 chars. POSIX-only checks (control + bidi + length + empty) run on every platform.
+
+`PdfService.getSavePath` and `DocxService.sanitizeFilename` use the sister `deriveSafeFilename(name, fallback?)` total function (silent transform, never throws). See `src/main/utils/validateFilename.ts` JSDoc for full pipeline order.
+
 File operations with validation and error handling.
 
 ### Public Methods
 
-#### `readFile(filePath: string): Promise<string>`
-Read file contents.
-
-**Parameters:**
-- `filePath` - Absolute path to file
-
-**Returns:** File contents as UTF-8 string.
-
-**Throws:** Error if file not found or read fails.
-
----
-
-#### `writeFile(filePath: string, content: string): Promise<void>`
-Write file contents.
-
-**Parameters:**
-- `filePath` - Absolute path to file
-- `content` - File contents
+#### `readFile(filePath: string): Promise<string>` / `writeFile(filePath, content): Promise<void>`
+Read or write file contents (UTF-8). Throws on FS error.
 
 **Throws:** Error if write fails.
 
@@ -274,14 +254,20 @@ Delete file.
 
 ---
 
-#### `renameFile(oldPath: string, newPath: string): Promise<void>`
-Rename/move file.
+#### `async rename(oldPath: string, newName: string): Promise<string>`
+Rename a file or folder. The second argument is a **basename**, not a full path — the new path is constructed via `join(dirname(oldPath), newName)`.
 
 **Parameters:**
-- `oldPath` - Current file path
-- `newPath` - New file path
+- `oldPath` — Current absolute path
+- `newName` — New basename (path separators stripped before validation)
 
-**Throws:** Error if file exists at newPath or rename fails.
+**Returns:** New absolute path.
+
+**Throws (all `AppError` or `Error`):**
+- Empty name (`'Name cannot be empty'`)
+- `INVALID_FILENAME` from `assertValidUserFilename` (Windows-reserved basename, forbidden chars, control chars, bidi overrides — see [Filename validation](#filename-validation-161-phase-2) above)
+- Target already exists (`'"<name>" already exists'`)
+- Path is outside the project root, or equals the project root
 
 ---
 
@@ -358,22 +344,32 @@ Reset to default (all 17 tools).
 ```typescript
 import { terminalService } from './services/TerminalService'
 
-// Create terminal
-await terminalService.createTerminal('main', '/path/to/project', 80, 24)
+// Create terminal — returns the generated ID, or null on failure
+const terminalId = await terminalService.createTerminal({
+  cwd: '/path/to/project',
+  cols: 80,
+  rows: 24,
+}, webContentsId)
 
-// Listen for output
-terminalService.on('data', ({ id, data }) => {
+if (terminalId === null) {
+  // Cwd validation failed (Windows deny-list) or shell could not be resolved.
+  // Inspect the most recent 'error' event for details.
+  return
+}
+
+// Listen for output (note: payload key is `terminalId`, not `id`)
+terminalService.on('data', ({ terminalId: id, data }) => {
   console.log(`Terminal ${id}:`, data)
 })
 
-// Write input
-terminalService.writeToTerminal('main', 'ls -la\n')
+// Write input — returns false on failure
+terminalService.write(terminalId, 'ls -la\n')
 
-// Resize
-terminalService.resizeTerminal('main', 100, 30)
+// Resize — returns false on failure
+terminalService.resize(terminalId, 100, 30)
 
-// Clean up
-await terminalService.killTerminal('main')
+// Clean up — synchronous, returns false if not found
+terminalService.killTerminal(terminalId)
 ```
 
 ### File Watching with Pause/Resume

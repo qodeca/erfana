@@ -13,8 +13,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import * as path from 'path'
+import * as os from 'os'
 import { ErrorCode } from '../../shared/errors'
 import { IMPORT } from '../../shared/constants'
+
+const TEST_DIR = path.join(os.tmpdir(), 'erfana-test', 'dir')
 
 // Mock fs/promises
 vi.mock('fs/promises', () => ({
@@ -195,14 +199,14 @@ describe('fileUtils', () => {
     describe('no conflict scenarios', () => {
       it('should return original name when no conflict exists', async () => {
         mockedAccess.mockRejectedValue(new Error('ENOENT'))
-        const result = await findAvailableFileName('/dir', 'document.md')
-        expect(result).toBe('/dir/document.md')
+        const result = await findAvailableFileName(TEST_DIR, 'document.md')
+        expect(result).toBe(path.join(TEST_DIR, 'document.md'))
       })
 
       it('should return original name for file without extension', async () => {
         mockedAccess.mockRejectedValue(new Error('ENOENT'))
-        const result = await findAvailableFileName('/dir', 'README')
-        expect(result).toBe('/dir/README')
+        const result = await findAvailableFileName(TEST_DIR, 'README')
+        expect(result).toBe(path.join(TEST_DIR, 'README'))
       })
     })
 
@@ -212,8 +216,8 @@ describe('fileUtils', () => {
         mockedAccess
           .mockResolvedValueOnce(undefined) // document.md exists
           .mockRejectedValueOnce(new Error('ENOENT')) // document (1).md doesn't exist
-        const result = await findAvailableFileName('/dir', 'document.md')
-        expect(result).toBe('/dir/document (1).md')
+        const result = await findAvailableFileName(TEST_DIR, 'document.md')
+        expect(result).toBe(path.join(TEST_DIR, 'document (1).md'))
       })
 
       it('should increment number until available slot found', async () => {
@@ -222,24 +226,24 @@ describe('fileUtils', () => {
           .mockResolvedValueOnce(undefined) // document (1).md exists
           .mockResolvedValueOnce(undefined) // document (2).md exists
           .mockRejectedValueOnce(new Error('ENOENT')) // document (3).md doesn't exist
-        const result = await findAvailableFileName('/dir', 'document.md')
-        expect(result).toBe('/dir/document (3).md')
+        const result = await findAvailableFileName(TEST_DIR, 'document.md')
+        expect(result).toBe(path.join(TEST_DIR, 'document (3).md'))
       })
 
       it('should handle file without extension when incrementing', async () => {
         mockedAccess
           .mockResolvedValueOnce(undefined) // README exists
           .mockRejectedValueOnce(new Error('ENOENT')) // README (1) doesn't exist
-        const result = await findAvailableFileName('/dir', 'README')
-        expect(result).toBe('/dir/README (1)')
+        const result = await findAvailableFileName(TEST_DIR, 'README')
+        expect(result).toBe(path.join(TEST_DIR, 'README (1)'))
       })
 
       it('should handle extension with multiple dots', async () => {
         mockedAccess
           .mockResolvedValueOnce(undefined) // file.test.md exists
           .mockRejectedValueOnce(new Error('ENOENT')) // file.test (1).md doesn't exist
-        const result = await findAvailableFileName('/dir', 'file.test.md')
-        expect(result).toBe('/dir/file.test (1).md')
+        const result = await findAvailableFileName(TEST_DIR, 'file.test.md')
+        expect(result).toBe(path.join(TEST_DIR, 'file.test (1).md'))
       })
     })
 
@@ -247,7 +251,7 @@ describe('fileUtils', () => {
       it('should throw AppError when max attempts exceeded', async () => {
         // All calls return exists (file exists)
         mockedAccess.mockResolvedValue(undefined)
-        await expect(findAvailableFileName('/dir', 'document.md', 3)).rejects.toMatchObject({
+        await expect(findAvailableFileName(TEST_DIR, 'document.md', 3)).rejects.toMatchObject({
           code: ErrorCode.IMPORT_WRITE_FAILED,
           message: expect.stringContaining('Cannot create more than 3 copies')
         })
@@ -255,14 +259,14 @@ describe('fileUtils', () => {
 
       it('should use default max attempts from IMPORT constant', async () => {
         mockedAccess.mockResolvedValue(undefined)
-        await expect(findAvailableFileName('/dir', 'document.md')).rejects.toMatchObject({
+        await expect(findAvailableFileName(TEST_DIR, 'document.md')).rejects.toMatchObject({
           message: expect.stringContaining(`Cannot create more than ${IMPORT.MAX_COPY_ATTEMPTS} copies`)
         })
       })
 
       it('should respect custom max attempts parameter', async () => {
         mockedAccess.mockResolvedValue(undefined)
-        await expect(findAvailableFileName('/dir', 'file.md', 5)).rejects.toMatchObject({
+        await expect(findAvailableFileName(TEST_DIR, 'file.md', 5)).rejects.toMatchObject({
           message: expect.stringContaining('Cannot create more than 5 copies')
         })
       })
