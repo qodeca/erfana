@@ -16,16 +16,22 @@
  */
 
 /**
- * Characters forbidden in Windows cwds. `"` is rejected because cmd.exe has
- * no portable in-quote escape; `&|^<>()` are cmd.exe metacharacters that
- * survive `"…"` quoting in `/K` arguments and would otherwise allow a
- * malicious cwd to break out of the quoted argument and run extra commands;
- * `\r\n` would terminate the PowerShell single-quoted string used by
- * `Set-Location -LiteralPath '<cwd>'`.
+ * Characters forbidden in Windows cwds. `"` is the only character that can
+ * break out of `cd /d "<cwd>"` in cmd.exe; `&|^<>` are cmd.exe metacharacters
+ * that only take effect *outside* double-quotes, but we reject them as
+ * defense-in-depth in case a future bootstrap pathway passes the cwd outside
+ * a quoted argument. `\r\n` would terminate the PowerShell / bash
+ * single-quoted string used by `Set-Location -LiteralPath '<cwd>'` and
+ * `cd '<cwd>'`.
+ *
+ * `(` and `)` are *not* rejected – they are cmd command-grouping
+ * metacharacters only outside quotes, they are literal inside `"…"`, and
+ * rejecting them would lock out every path under `C:\Program Files (x86)\…`
+ * (issue surfaced during Phase-2 UAT).
  *
  * @internal Issue #154 (cmd.exe metachar deny-list)
  */
-export const UNSAFE_WINDOWS_CWD_CHARS = /["&|^<>()\r\n]/
+export const UNSAFE_WINDOWS_CWD_CHARS = /["&|^<>\r\n]/
 
 export type CwdValidationResult =
   | { ok: true }
@@ -96,6 +102,9 @@ export interface WindowsBootstrapBuilder {
  * - `(Get-Location).Path` prints the resolved cwd.
  * - `Write-Output '<marker>'` prints the marker (single-quoted defensively
  *   in case the marker format ever changes).
+ * - `[Console]::Write(...)` wipes ConPTY's screen buffer – see the matching
+ *   comment on `GitBashBootstrapBuilder.build` below for the reflow-leak
+ *   rationale.
  * - `& '<shell>' -NoLogo` starts the interactive PowerShell session.
  */
 export class PowerShellBootstrapBuilder implements WindowsBootstrapBuilder {
@@ -118,9 +127,59 @@ export class PowerShellBootstrapBuilder implements WindowsBootstrapBuilder {
       `Set-Location -LiteralPath '${psEscapedCwd}'`,
       '(Get-Location).Path',
       `Write-Output '${marker}'`,
+      `[Console]::Write([char]27 + '[2J' + [char]27 + '[3J' + [char]27 + '[H')`,
       `& '${psEscapedShell}' -NoLogo`
     ].join('; ')
     return ['-NoProfile', '-Command', script]
+  }
+}
+
+/**
+ * Git Bash bootstrap builder (bash.exe shipped with Git for Windows, plus
+ * any other POSIX-style bash on PATH).
+ *
+ * Uses the same bootstrap script as macOS/Linux (see TerminalService POSIX
+ * branch): `cd '<cwd>'; pwd; echo <marker>; exec -l '<shell>' -i`. Windows
+ * paths with backslashes are kept inside a POSIX single-quoted literal –
+ * MSYS (Git Bash's runtime) accepts `C:\...` and `/c/...` forms, and inside
+ * `'…'` backslash is never an escape character, so the path is passed
+ * through verbatim.
+ *
+ * We reference the absolute shell path rather than `$SHELL` because when
+ * node-pty spawns `bash -c '<script>'`, `$SHELL` is not reliably set yet.
+ */
+export class GitBashBootstrapBuilder implements WindowsBootstrapBuilder {
+  readonly kind = 'git-bash'
+
+  // Match `bash.exe` (or bare `bash`) after a path separator. Both native
+  // Windows backslashes and POSIX forward slashes are accepted so a $SHELL
+  // value like `/usr/bin/bash` dispatches the same as
+  // `C:\Program Files\Git\usr\bin\bash.exe`.
+  private static readonly PATTERN = /(?:^|[/\\])bash(?:\.exe)?$/i
+
+  canHandle(shell: string): boolean {
+    return GitBashBootstrapBuilder.PATTERN.test(shell)
+  }
+
+  build({ shell, cwd, marker }: { shell: string; cwd: string; marker: string }): string[] {
+    const posixEscapedCwd = cwd.replace(/'/g, "'\\''")
+    const posixEscapedShell = shell.replace(/'/g, "'\\''")
+    // The `printf` step is Windows-specific but harmless on other platforms:
+    // Windows ConPTY keeps its own screen buffer and re-emits the full buffer
+    // contents back through the PTY stream on every resize. Without this
+    // clear, the pwd + marker lines above linger in ConPTY's buffer and get
+    // replayed *after* the handshake completes, so they leak past our
+    // forwarding gate onto xterm.js. Writing CSI 2J (erase display), CSI 3J
+    // (erase scrollback), and CSI H (cursor home) forces ConPTY to reset its
+    // buffer before `exec` hands off to the interactive shell.
+    const bootstrapScript = [
+      `cd '${posixEscapedCwd}'`,
+      'pwd',
+      `echo ${marker}`,
+      `printf '\\033[2J\\033[3J\\033[H'`,
+      `exec -l '${posixEscapedShell}' -i`
+    ].join('; ')
+    return ['-c', bootstrapScript]
   }
 }
 
@@ -136,6 +195,13 @@ export class PowerShellBootstrapBuilder implements WindowsBootstrapBuilder {
  * - Bare `cd` (no args) prints the current directory – cmd.exe's analog of
  *   POSIX `pwd`.
  * - `echo <marker>` prints the marker.
+ * - `cls` wipes ConPTY's visible viewport before the interactive prompt
+ *   takes over. See `GitBashBootstrapBuilder.build` for the reflow-leak
+ *   rationale. Note: on Windows 10 ≥ 1809 ConPTY `cls` emits `CSI 2J` +
+ *   `CSI H` but *not* `CSI 3J`, so scrollback is not cleared – this is a
+ *   known limitation (see `docs/known-issues.md` Windows section); users
+ *   hitting scrollback-reflow can switch $SHELL to pwsh or Git Bash, both
+ *   of which emit the full three-sequence clear.
  *
  * Documented limitation: cwds containing `%` may have `%VAR%`-style
  * substrings expanded by cmd.exe. The deny-list does not cover `%` because
@@ -151,7 +217,7 @@ export class CmdExeBootstrapBuilder implements WindowsBootstrapBuilder {
   }
 
   build({ cwd, marker }: { shell: string; cwd: string; marker: string }): string[] {
-    const script = `@echo off && cd /d "${cwd}" && cd && echo ${marker}`
+    const script = `@echo off && cd /d "${cwd}" && cd && echo ${marker} && cls`
     return ['/D', '/K', script]
   }
 }
@@ -163,6 +229,7 @@ export class CmdExeBootstrapBuilder implements WindowsBootstrapBuilder {
  */
 export const DEFAULT_WINDOWS_BOOTSTRAP_BUILDERS: ReadonlyArray<WindowsBootstrapBuilder> = [
   new PowerShellBootstrapBuilder(),
+  new GitBashBootstrapBuilder(),
   new CmdExeBootstrapBuilder()
 ]
 

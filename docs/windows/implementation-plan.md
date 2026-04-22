@@ -14,6 +14,7 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 | Commit | Description | Issue |
 |---|---|---|
+| _pending_ | fix(windows): terminal bootstrap hardening — Git Bash dispatch, PTY resize race, git-polling log spam, ConPTY resize-reflow leak across all three bootstrap builders, `(`/`)` allowed in cwds (unblocks `Program Files (x86)`); new `WindowsTerminalBootstrap.test.ts` (60 tests); e2e path-sep fix; ESLint ignores for `playwright-report/` + `test-results/` + `coverage/`; 11 pre-existing lint errors cleared | Phase-2 UAT |
 | `13bd3b8` | feat(windows): detect LibreOffice at standard install paths | **#162 CLOSED** |
 | `612192b` | feat(windows): reserved-filename guard with cross-platform validation | **#161 CLOSED** |
 | `5e86349` | feat(windows): add Program Files entries to git allowlist + liveness probe | **#160 CLOSED** |

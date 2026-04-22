@@ -5,7 +5,9 @@ import * as tseslint from 'typescript-eslint'
 import eslintConfigPrettier from 'eslint-config-prettier'
 
 export default [
-  // Ignore build outputs and vendored folders
+  // Ignore build outputs and vendored folders. `playwright-report/`,
+  // `test-results/`, and `coverage/` are test-run artifacts containing
+  // minified bundles that ESLint must not try to parse.
   {
     ignores: [
       'node_modules/**',

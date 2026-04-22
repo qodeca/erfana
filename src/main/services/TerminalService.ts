@@ -390,7 +390,8 @@ export class TerminalService extends EventEmitter {
     const terminal = this.terminals.get(terminalId)
 
     if (!terminal) {
-      logger.error(`❌ Terminal ${terminalId} not found`)
+      // Benign race: renderer's fit addon flushes a resize after the tab closed.
+      logger.debug(`Terminal ${terminalId} not found for resize (likely exited)`)
       return false
     }
 
@@ -399,8 +400,20 @@ export class TerminalService extends EventEmitter {
       logger.info(`📏 Terminal ${terminalId} resized to ${cols}x${rows}`)
       return true
     } catch (error) {
-      logger.error(`❌ Failed to resize terminal ${terminalId}`, error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
+
+      // Windows-specific: node-pty's WindowsTerminal.resize() defers via
+      // _deferNoArgs, so a resize can fire after the pty has already exited
+      // (e.g. user typed `exit`, onExit hasn't propagated yet). Treat as a
+      // benign race — drop the dead terminal and return silently instead of
+      // emitting an 'error' event the renderer would surface.
+      if (message.includes('already exited')) {
+        logger.debug(`Terminal ${terminalId} resize ignored (pty already exited)`)
+        this.terminals.delete(terminalId)
+        return false
+      }
+
+      logger.error(`❌ Failed to resize terminal ${terminalId}`, error instanceof Error ? error : undefined)
       this.emit('error', { terminalId, error: message })
       return false
     }

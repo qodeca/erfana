@@ -48,6 +48,16 @@ Phases 0–2 of Windows enablement landed on the `windows` branch (2026-04-21). 
 
 ---
 
+### cmd.exe terminals can leak pre-bootstrap text into scrollback after aggressive resizing
+
+**Issue**: On Windows, ConPTY keeps its own screen buffer and re-emits the buffer contents back through the PTY stream on every terminal resize. The Git Bash and PowerShell bootstraps emit a full CSI 2J / CSI 3J / CSI H sequence after the startup marker so ConPTY's buffer is wiped before the interactive shell takes over, leaving nothing for a later reflow to replay. cmd.exe can only clear the visible viewport (`cls` → CSI 2J + CSI H); `CSI 3J` (scrollback clear) isn't available from cmd without spawning a child process. In rare cases, a user who opens a fresh cmd.exe terminal and immediately drags the panel splitter may see faint reflowed pwd / marker text appear in scrollback history (not the visible viewport).
+
+**Workaround**: Set `$env:SHELL` to `pwsh.exe` or Git Bash (`C:\Program Files\Git\usr\bin\bash.exe`) before launching Erfana — both emit the full three-sequence clear and have no scrollback-reflow leak.
+
+**Tracking**: Known limitation; not tracked as a bug. Could be closed by invoking `powershell.exe -NoProfile -Command "[Console]::Write(...)"` from the cmd bootstrap, at the cost of one extra process spawn per terminal creation.
+
+---
+
 ### Screenshot capture unavailable on Windows
 
 **Issue**: `ScreenshotService.ts` is gated `process.platform !== 'darwin'`; the entire screenshot button is non-functional on Windows.

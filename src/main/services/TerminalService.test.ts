@@ -1024,8 +1024,6 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       ['caret', 'C:\\a^b'],
       ['less-than', 'C:\\a<b'],
       ['greater-than', 'C:\\a>b'],
-      ['open-paren', 'C:\\a(b'],
-      ['close-paren', 'C:\\a)b'],
       ['double-quote', 'C:\\a"b'],
       ['carriage-return', 'C:\\a\rb'],
       ['newline', 'C:\\a\nb']
@@ -1043,7 +1041,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
         // the wrong char (or rejects everything via an upstream check)
         // would fail this assertion. The validator embeds the offending
         // character via `JSON.stringify(match[0])`.
-        const unsafeChar = cwd.match(/["&|^<>()\r\n]/)![0]
+        const unsafeChar = cwd.match(/["&|^<>\r\n]/)![0]
         expect(errSpy).toHaveBeenCalledWith(
           expect.objectContaining({
             error: expect.stringContaining(
@@ -1055,6 +1053,22 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
         expect(spawnedPTYs).toHaveLength(0)
       }
     )
+
+    // Phase-2 UAT regression: paths under `C:\Program Files (x86)\…` MUST
+    // be accepted. The deny-list used to include `()` defensively; it no
+    // longer does, because `(` and `)` are cmd metacharacters only OUTSIDE
+    // double-quotes and our bootstrap always passes the cwd via
+    // `cd /d "<cwd>"`. See WindowsTerminalBootstrap.ts deny-list JSDoc.
+    it('accepts cwd containing parentheses (Program Files (x86) regression)', async () => {
+      const svc = await importWin32()
+      const shell = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
+      const tid = await svc.createTerminal({
+        shell,
+        cwd: 'C:\\Program Files (x86)\\MyApp\\project'
+      })
+      expect(tid).toBeTruthy()
+      expect(spawnedPTYs).toHaveLength(1)
+    })
 
     it('accepts cwd containing $ (PowerShell -LiteralPath neutralizes it)', async () => {
       const svc = await importWin32()
