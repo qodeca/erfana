@@ -19,7 +19,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SettingsOverlay } from './SettingsOverlay'
 import { useSettingsStore } from '../../stores/useSettingsStore'
@@ -215,25 +215,35 @@ describe('SettingsOverlay', () => {
   })
 
   describe('Focus management', () => {
+    // The production component sets focus via `setTimeout(() => ..., 10)` to
+    // wait for overlay mount. Previous wall-clock `waitFor({ timeout: 100 })`
+    // assertions were Windows-flaky — worker pre-emption could push the 10 ms
+    // timer past the 100 ms budget. Fake timers + `vi.advanceTimersByTime(11)`
+    // make the assertion deterministic; `act()` wrapping is defensive against
+    // React 18 microtask scheduling around the focus call.
     beforeEach(() => {
       useSettingsStore.setState({ isOpen: true })
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     })
 
-    it('focuses close button when opened', async () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('focuses close button when opened', () => {
       render(<SettingsOverlay />)
 
       const closeButton = screen.getByRole('button', { name: 'Close settings' })
 
-      // Wait for focus to be set (uses 10ms delay in component)
-      await waitFor(
-        () => {
-          expect(closeButton).toHaveFocus()
-        },
-        { timeout: 100 }
-      )
+      // Deterministically advance past the component's 10 ms FOCUS_DELAY_MS.
+      act(() => {
+        vi.advanceTimersByTime(11)
+      })
+
+      expect(closeButton).toHaveFocus()
     })
 
-    it('restores focus when closed', async () => {
+    it('restores focus when closed', () => {
       // Create a button to have focus before opening overlay
       const testButton = document.createElement('button')
       testButton.textContent = 'Test Button'
@@ -244,23 +254,24 @@ describe('SettingsOverlay', () => {
 
       const { rerender } = render(<SettingsOverlay />)
 
-      // Wait for close button to be focused
-      const closeButton = screen.getByRole('button', { name: 'Close settings' })
-      await waitFor(
-        () => {
-          expect(closeButton).toHaveFocus()
-        },
-        { timeout: 100 }
-      )
+      // Advance past the focus-on-open timer.
+      act(() => {
+        vi.advanceTimersByTime(11)
+      })
 
-      // Close the overlay
+      const closeButton = screen.getByRole('button', { name: 'Close settings' })
+      expect(closeButton).toHaveFocus()
+
+      // Close the overlay — cleanup runs synchronously on re-render.
       useSettingsStore.setState({ isOpen: false })
       rerender(<SettingsOverlay />)
 
-      // Focus should be restored to the test button
-      await waitFor(() => {
-        expect(document.activeElement).toBe(testButton)
+      // Flush any close-side timers (harmless no-op if none registered).
+      act(() => {
+        vi.advanceTimersByTime(11)
       })
+
+      expect(document.activeElement).toBe(testButton)
 
       // Clean up
       document.body.removeChild(testButton)
