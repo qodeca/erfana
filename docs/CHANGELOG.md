@@ -4,7 +4,7 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
-## 0.9.4 (in-flight, `develop@1d733ad`)
+## 0.9.4 (in-flight on `develop`)
 
 ### Windows-host test-flake remediation ([#172](https://github.com/qodeca/erfana/issues/172), [#173](https://github.com/qodeca/erfana/issues/173))
 
