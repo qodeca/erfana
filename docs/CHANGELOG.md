@@ -4,7 +4,19 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
-## 0.9.4 (in-flight, `feature/windows-phase-4-whisper`)
+## 0.9.4 (in-flight, `develop@1d733ad`)
+
+### Windows-host test-flake remediation ([#172](https://github.com/qodeca/erfana/issues/172), [#173](https://github.com/qodeca/erfana/issues/173))
+
+Merged 2026-04-23 (`c3cc005`). Clears 5 tests that consistently failed on Windows under Defender + NTFS + V8 GC pressure, while green on Linux/macOS CI. The pool includes one real production perf bug alongside three test-quality issues.
+
+- **`ThrottledWorker` offset-based deque** (production code, closes [#173](https://github.com/qodeca/erfana/issues/173)) — Replaced `this.buffer = this.buffer.slice(droppedCount)` with an offset-based deque (`buffer: T[]` + `bufferOffset: number`). Push + eviction + chunk consumption now amortized O(1) via offset advance; periodic compaction reclaims wasted slots (floor = 1024 or ≥50 % waste). 60 k-event stress test: **31 s → 831 ms on Windows (37×)**. Nulls consumed/evicted slots before offset advance so V8 can GC payloads before the next compaction. Production side-effect: directory-watcher bursts during `npm install` / `git checkout` no longer interrupt the Electron main loop via GC sweeps.
+- **`FileService.copyItem` MAX_COPY_ATTEMPTS split** — Moved the 1000-conflict boundary test from real-disk I/O (25 s on NTFS + Defender) to mocked-fs in a new `FileService.copyItem.limit.test.ts`. Runs in <200 ms cross-platform. `MAX_COPY_ATTEMPTS` now exported as the source-of-truth constant (test asserts against the import, not a hardcoded `1000` literal).
+- **`directory-watcher.e2e.ts` platform-aware budget** — Per-platform timeout: 6000 ms Windows / 2000 ms POSIX. Added `test.describe.configure({ retries: 0 })` so budget regressions can't be masked by a fast retry (same discipline as `visual-regression.e2e.ts`). `test.info().attach('latency-trend', ...)` emits structured JSON for trend tracking.
+- **500 ms NFR-001 signal preserved** — New `016-NFR-001: Main-process pipeline latency budget` describe block in `DirectoryWatcherService.pipeline.test.ts` asserts <200 ms virtual latency for single add + atomic-save flows via fake timers. Isolates main-process latency from chokidar + Defender + UI noise.
+- **`SettingsOverlay` focus tests** — Replaced wall-clock `waitFor({ timeout: 100 })` with `vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })` + `vi.advanceTimersByTime(11)` wrapped in `act()`. Deterministic cross-platform; ~10× faster.
+- **`docs/windows/known-flakes.md`** — New register for Windows-host test flakes with status legend (✅/🟡/🔴/🚫), issue links, remediation-patterns cheat-sheet (fake timers, mocked-fs splits, per-platform e2e budgets, offset-deque), and follow-up audit candidates. Seeded with the 4 fixes + 6 pool entries observed during verification.
+- **`.gitattributes`** — Force LF endings on the minisign trust-chain fixtures (`manifest.fixture.json` + `.minisig`) so Windows `core.autocrlf=true` checkouts don't CRLF-corrupt the signed bytes. Makes `verifyManifest.test.ts` pass locally on Windows.
 
 ### Local Whisper transcription on macOS + Windows x64 (Phase 4, [#165](https://github.com/qodeca/erfana/issues/165))
 
