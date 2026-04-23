@@ -75,7 +75,7 @@ The install-time keys `url` and `expectedSha` are logged once by `WhisperModelMa
 ### Log 7-tuple verbatim on every spawn
 
 - **Pros**: exact plan compliance.
-- **Cons**: `url` + `expectedSha` are immutable install-time facts; echoing them on every chunk is log noise. Grouping by correlation ID (future D9) is the right answer.
+- **Cons**: `url` + `expectedSha` are immutable install-time facts; echoing them on every chunk is log noise. Grouping by correlation ID (future work — see [D9 in `deferred-work-phase4.md`](../windows/deferred-work-phase4.md#d9--forensic-logging-tuple-expansion-beyond-spawn-5-tuple)) is the right answer.
 - **Verdict**: rejected for per-spawn log; install-time keys live in the `ensureBinary()` log instead.
 
 ### Real `whisper-cli --version` instead of pinned filename as `binaryVersion`

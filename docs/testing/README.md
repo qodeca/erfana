@@ -32,7 +32,7 @@ Run `npm run test` for current totals (~7,887 tests across 244 files as of v0.9.
 | Transcription pipeline | Tests across `main/`, `renderer/`, `shared/` (spec 009) | [Transcription CLAUDE.md](../../src/renderer/src/components/Transcription/CLAUDE.md) |
 | Document import | `LiteParseConverter.test.ts`, `DependencyDetector.test.ts`, `DocumentImportDialog.test.tsx`, `useDocumentImportStore.test.ts`, `import-handlers*.test.ts`, `LiteParseConverter.integration.test.ts` | [API services – features](../api-services-features.md) |
 | ProjectTree & watchers | `*.logic.test.ts`, `*.pipeline.test.ts`, `*.switching.test.ts` | [Architecture – ProjectTree](../architecture.md#projecttree-modularization) |
-| Local whisper | `LocalWhisperService.test.ts`, `WhisperModelManager.test.ts` | [API services – features](../api-services-features.md) |
+| Local whisper (Phase 4) | `LocalWhisperService.test.ts`, `WhisperModelManager.test.ts`, `WhisperModelManager.downgrade.test.ts` + utility tests (`zipArchive`, `tarArchive`, `secureDownloader`, `verifyManifest`) | [Phase 4 test inventory](../windows/implementation-plan.md#phase-4-test-inventory) · [Trust chain](../windows/whisper-trust-chain.md) · [API services – features](../api-services-features.md) |
 | Settings overlay | `SettingsOverlay.test.tsx` | [Settings](../settings.md) |
 
 **Testing patterns used**:
@@ -43,6 +43,9 @@ Run `npm run test` for current totals (~7,887 tests across 244 files as of v0.9.
 - **`flakeGuard`** (`tests/setup/flakeGuard.ts`) — installed in all 3 setup files; surfaces unhandled rejections / uncaught exceptions firing post-teardown with full stack trace + scope label. If you see `[flakeGuard:<scope>] UNHANDLED REJECTION:` in stderr, fix the source (track + cancel the timer/promise on unmount, same pattern as #159)
 - **Platform overrides** in tests use `Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })` + restore in `afterEach` (NOT `describe.runIf` — that gates by host platform and skips on macOS CI)
 - **Cross-platform paths** in test fixtures use `path.join(os.tmpdir(), 'erfana-test', ...)` (per #157) — hardcoded `/tmp/...` or `/path/to/...` strings break Windows `PATH_TRAVERSAL` validation
+- **Test-file split policy** (when to split `<Source>.test.ts` into a second file) — see [`../windows/contributing.md`](../windows/contributing.md) §"Test-file split policy". Reference implementation: `WhisperModelManager.downgrade.test.ts` alongside `WhisperModelManager.test.ts`
+- **Crypto fixture pattern** — `verifyManifest.test.ts` uses a real published manifest + signature as fixture. Don't synthesise test manifests with test keypairs; refresh the fixture when the whisper pin advances. See [ADR 0002](../adrs/0002-minisign-over-cosign-sigstore.md)
+- **CPU probe mocking** — simulate pre-SSE4.2 CPUs in UI tests via `vi.spyOn(os, 'cpus').mockReturnValue([...])` + `__resetCpuProbeForTests()` before import. Pattern lives in `LocalWhisperService.test.ts` `describe('checkCpuSupport() pre-flight probe')`
 
 ---
 

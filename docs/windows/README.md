@@ -38,7 +38,8 @@ The goal is **full Windows parity** — every feature that works on macOS must w
 | [`implementation-plan.md`](implementation-plan.md) | **Canonical status + phased roadmap** (Phase 0–6) with current state snapshot, per-feature Windows status, execution order, and multi-session cross-platform workflow guidance. |
 | [`gap-analysis.md`](gap-analysis.md) | Verified inventory of every Windows-related gap, grouped by severity (P0/P1/P2) with file:line references. |
 | [`contributing.md`](contributing.md) | Contributor workflow for Windows parity work – branch strategy, issue labels, commit scope, test expectations, reviewer checklist. |
-| [`deferred-work.md`](deferred-work.md) | D1–D12 deferred items with severity, promotion criteria, risk-if-forgotten (D1–D8 from Phase 2 review; D9–D12 from Phase 4 audit). |
+| [`deferred-work.md`](deferred-work.md) | D1–D8 deferred items (Phase 2 review aftermath) with severity, promotion criteria, risk-if-forgotten. |
+| [`deferred-work-phase4.md`](deferred-work-phase4.md) | D9–D12 deferred items (Phase 4 audit aftermath). Same template as D1-D8; split for file-size compliance (500-line cap). |
 | [`phase4-binary-spec.md`](phase4-binary-spec.md) | Pinned SHAs for the first published `whisper-build-v1.8.4-erfana1` release (source-of-truth cross-checked against `src/main/services/whisper-assets.ts`). |
 | [`phase2-closure.md`](phase2-closure.md) | Historical 7-stream closure plan for Phase 2 — write-once-archive, retained for reference. |
 | [`../build/windows.md`](../build/windows.md) | Windows dev environment setup (Node 24, Python 3.12, VS 2022 Build Tools, Developer Mode, long paths, troubleshooting, contributor expectations). |

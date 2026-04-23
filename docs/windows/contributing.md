@@ -154,7 +154,7 @@ Default: **one test file per source file** matching the `<Source>.test.ts` patte
 2. **The new tests target a code path the existing file hasn't covered** and the existing file is already large (>500 lines — the same cap as doc files).
 3. **The split aligns with a code review boundary**. If the new tests are "regression tests for finding X from audit Y", keeping them in a named file (`<Source>.<concern>.test.ts`) aids future reviewer discoverability.
 
-**Reference implementation**: `src/main/services/WhisperModelManager.downgrade.test.ts` sits alongside `WhisperModelManager.test.ts`. The older file uses `mockFetch` at global level (pre-Phase-4 code path); the new file mocks at `secureDownloader` + `verifyManifest` module boundaries. Merging would require rewriting either side, which wasn't the scope of the Phase 4 audit fix. The split is tracked as [D12 in `deferred-work.md`](deferred-work.md#d12--rewrite-remaining-5-skip-tests-in-whispermodelmanagertests).
+**Reference implementation**: `src/main/services/WhisperModelManager.downgrade.test.ts` sits alongside `WhisperModelManager.test.ts`. The older file uses `mockFetch` at global level (pre-Phase-4 code path); the new file mocks at `secureDownloader` + `verifyManifest` module boundaries. Merging would require rewriting either side, which wasn't the scope of the Phase 4 audit fix. The split is tracked as [D12 in `deferred-work-phase4.md`](deferred-work-phase4.md#d12--rewrite-remaining-5-skip-tests-in-whispermodelmanagertests).
 
 **Naming**: `<Source>.test.ts` for baseline, `<Source>.<concern>.test.ts` for splits. The `<concern>` should be the narrowest label that makes the split obvious at `ls` time (`downgrade`, `timeout`, `e2e`, etc.).
 
@@ -188,7 +188,7 @@ When a new utility module is a real peer to one of these, add a short JSDoc head
 - [`README.md`](README.md) – document map and status pointer
 - [`implementation-plan.md`](implementation-plan.md) – canonical phase status, verification log, multi-session workflow
 - [`gap-analysis.md`](gap-analysis.md) – B/M/m-rated inventory referenced by phase descriptions
-- [`deferred-work.md`](deferred-work.md) – D1–D12 ledger this doc's "Amendment discipline" section refers to
+- [`deferred-work.md`](deferred-work.md) – D1–D8 ledger (Phase 2 origin); [`deferred-work-phase4.md`](deferred-work-phase4.md) – D9–D12 ledger (Phase 4 origin). Amendment discipline in both files follows the template from this doc's "Amendment discipline" section.
 - [`whisper-trust-chain.md`](whisper-trust-chain.md) – 4-layer architecture referenced by test-split reasoning
 - [`whisper-support-runbook.md`](whisper-support-runbook.md) – operator playbook for Phase 4 error codes
 - [`../build/windows.md`](../build/windows.md) – environment setup (Node 24, Python 3.12, VS 2022 Build Tools, Developer Mode, long paths)

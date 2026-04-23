@@ -55,7 +55,7 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
   - [Implementation Plan](./windows/implementation-plan.md) - Canonical phased roadmap + status snapshot + Phase 4 test inventory
   - [Gap Analysis](./windows/gap-analysis.md) - Feature-parity baseline (P0/P1/P2 with file:line refs)
   - [Contributing](./windows/contributing.md) - Branch strategy, commit scope, test expectations, reviewer checklist, **amendment-not-drop discipline**, **test-file split policy**, **`src/main/utils/` tier rules**
-  - [Deferred Work](./windows/deferred-work.md) - 12 deferred items D1–D12 (D1–D8 from Phase 2 review, D9–D12 from Phase 4 audit); tracked in [#168](https://github.com/qodeca/erfana/issues/168)
+  - [Deferred Work](./windows/deferred-work.md) - D1–D8 ledger (Phase 2 review aftermath); [Deferred Work — Phase 4](./windows/deferred-work-phase4.md) - D9–D12 (Phase 4 audit aftermath). Both tracked in [#168](https://github.com/qodeca/erfana/issues/168)
   - [Whisper Trust Chain](./windows/whisper-trust-chain.md) - **4-layer client-side trust model with composition diagram and attacker model**
   - [Whisper Support Runbook](./windows/whisper-support-runbook.md) - **Operator playbook for Phase 4 error codes** (`WHISPER_MANIFEST_INVALID`, `WHISPER_DOWNGRADE_BLOCKED`, `WHISPER_CPU_UNSUPPORTED`, etc.) with diagnostic trails + stuck-user procedures
   - [Phase 4 binary spec](./windows/phase4-binary-spec.md) - Pinned SHAs for `whisper-build-v1.8.4-erfana1`

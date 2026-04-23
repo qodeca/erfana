@@ -135,7 +135,7 @@ See [`docs/error-codes.md`](../error-codes.md) §"Local Whisper" for the full en
 
 ## Future work
 
-- **Correlation-ID grouping** between install-time and spawn-time forensic logs. Tracked as D9 in [`deferred-work.md`](deferred-work.md). Today the 7-tuple plan commitment is split into install-time keys (logged once at install-complete) and spawn-time keys (logged every spawn). Correlation ID would let operators join the two events.
+- **Correlation-ID grouping** between install-time and spawn-time forensic logs. Tracked as D9 in [`deferred-work-phase4.md`](deferred-work-phase4.md). Today the 7-tuple plan commitment is split into install-time keys (logged once at install-complete) and spawn-time keys (logged every spawn). Correlation ID would let operators join the two events.
 - **Windows code-signing** for `whisper.exe` + DLLs — Phase 5, [#166](https://github.com/qodeca/erfana/issues/166). SHA-256 pin is the current trust anchor; Authenticode + SmartScreen become the UX-layer reinforcement.
 - **OIDC-backed CI signing** — tracked as Phase 5 follow-up in [`docs/build/whisper-binaries.md`](../build/whisper-binaries.md). Would replace the primary-key-as-secret pattern with short-lived GitHub OIDC tokens.
 

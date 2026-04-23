@@ -51,8 +51,14 @@ Project-specific terminology used in Erfana documentation and code.
 | **GlobalSettingsService** | Application-wide settings in `~/.erfana/` |
 | **ProjectLockService** | File-based locking for multi-instance support |
 | **TranscriptionService** | Audio-to-text transcription via OpenAI API (GPT-4o-transcribe, Whisper-1 fallback) |
-| **LocalWhisperService** | Offline transcription via whisper.cpp child process (macOS only), format conversion, chunking with overlap |
-| **WhisperModelManager** | Downloads/manages whisper.cpp binary and GGML models, stored in `{userData}/whisper/` |
+| **LocalWhisperService** | Offline transcription via whisper.cpp child process. Phase 4: macOS universal + Windows x64. Argv hardening (`validateAudioPath`), pre-flight CPU probe (`checkCpuSupport`), TOCTOU close via pre-spawn `verifyInstalledBinary()`, forensic INFO log per spawn |
+| **WhisperModelManager** | Downloads/manages whisper.cpp binary and GGML models under `{userData}/whisper/`. Phase 4: 9-step install flow (manifest sig → SHA pin → downgrade block → verify), `verifyInstalledBinary()` returns `VerifiedBinary` `{spec, mainSha, revisionIndex}` |
+| **whisper-assets** | `src/main/services/whisper-assets.ts` — pinned `whisper-build-*` release tag, per-platform SHAs, `classifyPlatform()`, `LAST_SEEN_REVISION_FILENAME` |
+| **whisper-pubkeys** | `src/main/services/whisper-pubkeys.ts` — two embedded minisign pubkeys (primary + offline rotation); dual-pubkey trust chain per [ADR 0003](./adrs/0003-dual-pubkey-trust-primary-rotation.md) |
+| **verifyManifest / secureDownloader / zipArchive / tarArchive** | Phase 4 main-process utilities under `src/main/utils/`. Trust-chain building blocks — see [`windows/whisper-trust-chain.md`](./windows/whisper-trust-chain.md) |
+| **VerifiedBinary** | Return type of `verifyInstalledBinary()`: `{spec, mainSha, revisionIndex}`. Consumed by `LocalWhisperService.runWhisper()` for the forensic spawn log |
+| **lastSeenRevision** | Monotonic sentinel in `{userData}/whisper/.last-seen-revision`. Phase 4 downgrade-block defense; see [`windows/whisper-trust-chain.md`](./windows/whisper-trust-chain.md) Layer 4 |
+| **TOCTOU close** | Time-Of-Check To Time-Of-Use race mitigation. Per-spawn binary + sidecar re-hash in `LocalWhisperService.runWhisper()` ([ADR 0004](./adrs/0004-per-spawn-toctou-rehash.md)) |
 | **AudioMetadataService** | Extracts duration, format, bitrate from audio files using music-metadata |
 | **AudioExtractionService** | Extracts audio tracks from video files using ffmpeg for transcription pipeline input |
 | **ApiKeyService** | Encrypts/decrypts API keys using Electron safeStorage |
