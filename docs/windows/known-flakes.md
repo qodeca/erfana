@@ -13,7 +13,9 @@ CI) recognise known patterns and apply proven remediations.
 
 **Scope**: tests that pass on Linux / macOS CI but fail or flake on Windows
 specifically. Cross-platform flakes (e.g. network-dependent tests) go in
-`docs/known-issues.md` instead.
+`docs/known-issues.md` instead. A single macOS-CI-only flake row is included
+below until a dedicated macOS register exists — rows are marked in the
+**Notes** column when they are not Windows-host.
 
 ## Status legend
 
@@ -34,6 +36,9 @@ specifically. Cross-platform flakes (e.g. network-dependent tests) go in
 | `src/renderer/src/utils/panelUtils.test.ts` (`waitForTerminalReady` custom interval) | 335 ms wall-clock on 2026-04-23 (prior run 151 ms) for a 100 ms timing test. Consistently above budget on Windows. | 2026-04-22 | 🔴 actively flaking | — | Same pattern as SettingsOverlay focus — worker pre-emption on tight timer. Apply fake-timer remediation. |
 | `src/renderer/src/components/Editor/MarkdownPreview.prompt.test.tsx` | 8.8 s timeout on "should handle very long content" (Windows local, 2026-04-23). | 2026-04-23 | 🟡 under observation | — | Large-content rendering test; likely Monaco / markdown-parse cost + Defender scanning. First occurrence — needs second observation before fix design. |
 | `src/renderer/src/components/Search/SearchBar.test.tsx` | 815 ms timeout on "auto-focuses input on mount" (Windows local, 2026-04-23). | 2026-04-23 | 🟡 under observation | — | Focus race matching SettingsOverlay (P4) pattern. Apply same `vi.useFakeTimers` + `act()` remediation if it reproduces. |
+| `src/main/services/DirectoryWatcherService.test.ts:25` (`ENOENT handling > sends project-deleted and remains recoverable (stopAll instead of dispose) after max restart attempts`) | 5000 ms testTimeout exceeded on Windows local (2026-04-23, commit `5769d49`). Passes clean on ubuntu CI (250/250 files, 7955 tests green). | 2026-04-23 | 🟡 under observation | — | Tight restart-attempt loop sensitive to worker pre-emption under Defender. Same family as SettingsOverlay (P4). Apply `vi.useFakeTimers` + `vi.advanceTimersByTime` for the restart-scheduler timer. |
+| `src/main/services/DirectoryWatcherService.test.ts:105` (`ENOENT handling > schedules restart on first transient error (ENOENT)`) | `expect(sends.some(s => s.channel === 'directory-watch:project-deleted')).toBe(false)` — got `true` (Windows local, 2026-04-23, commit `5769d49`). Passes clean on ubuntu CI. | 2026-04-23 | 🟡 under observation | — | Race: on Windows, the `project-deleted` broadcast fires before the assertion inspects the send buffer; on POSIX the restart scheduler pre-empts first. Pair-fix with the sibling row above using fake timers so scheduler order is deterministic. |
+| `e2e/third-party-components.e2e.ts:38` (`Monaco editor: Set content via keyboard and verify in preview`) | macOS CI (`macos-latest`) flake on 2026-04-23 (commit `5769d49`, run [24852814922](https://github.com/qodeca/erfana/actions/runs/24852814922)). Marked flaky by Playwright retry — passed on second attempt. Not observed on Windows local. | 2026-04-23 | 🟡 under observation | — | **macOS-host**, not Windows — recorded here because no macOS register exists yet. Likely Monaco keyboard-input focus race. Needs second CI observation before remediation; candidate fix is `MonacoPage.waitForReady()` before `page.keyboard.type()`. |
 
 ## Follow-up audit candidates
 
