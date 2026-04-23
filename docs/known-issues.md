@@ -110,6 +110,18 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (merged 2026-04-22). Th
 
 ---
 
+### Downgrading Erfana from 0.9.4 back to 0.9.3 is safe but leaves stale whisper sentinels
+
+**Issue**: An IT admin or user rolling Erfana back from a future 0.9.4 install to 0.9.3 will have `{userData}/whisper/.schema-version` (value `1`) and `{userData}/whisper/.last-seen-revision` sentinels on disk. These files don't exist pre-0.9.4 and are silently ignored by 0.9.3 code — 0.9.3's `WhisperModelManager` checks for the binary at the old ggml-org path (which never worked on macOS; Windows was never wired up pre-0.9.4).
+
+**Symptom**: User downgrades, tries Local Whisper, sees the pre-0.9.4 "binary not installed / download fails" flow. Their downloaded models in `{userData}/whisper/models/` are preserved.
+
+**Workaround (if ever they re-upgrade)**: the 0.9.4+ install will read the lingering `.last-seen-revision` sentinel and use it as the monotonic floor — this is **safe** (sentinel value can only be higher than-or-equal-to `MIN_REVISION_INDEX`), but if the user downgraded specifically because a 0.9.4 whisper release was broken, see [`docs/windows/whisper-support-runbook.md`](./windows/whisper-support-runbook.md) §`WHISPER_DOWNGRADE_BLOCKED` for the stuck-user procedure.
+
+**Tracking**: Not a bug. Documented for IT admins performing bulk rollback.
+
+---
+
 ## Active Issues
 
 ### Visual regression E2E suite hangs on GitHub `macos-latest` CI

@@ -252,6 +252,15 @@ Changes:
 
 ## Phase 4 — Local Whisper parity — 🟡 CODE-COMPLETE (unreleased — awaiting 0.9.4 PR merge on `feature/windows-phase-4-whisper`)
 
+> **Post-mortem: the pre-0.9.4 macOS code path was broken, not just Windows.**
+>
+> Phase 4 started as a feature-add ("port local Whisper to Windows"). Step-zero verification surfaced that `ggml-org/whisper.cpp` has never published a macOS CLI binary at any recent version (v1.7.0–v1.8.4). The pre-0.9.4 macOS code path constructed a URL that would 404 on first download — `Local (whisper.cpp)` had been showing as enabled on macOS for the entire v0.6–v0.9.3 window but would never have worked.
+>
+> No user had reported it because: (a) the feature was gated to macOS-only, (b) macOS users would download whisper via `brew` or other means and never exercise Erfana's built-in path, (c) the binary download happens lazily on first transcription, not on app launch. Silent failure mode.
+>
+> Consequence: Phase 4 became "rebuild a never-worked feature on both platforms" rather than "add Windows parity to a working macOS feature". Scope expanded accordingly — see [ADR 0001](../adrs/0001-self-host-whisper-binaries.md) for the Option A (self-host) vs Option B (pin ggml-org) decision.
+
+
 **Why it's harder than first imagined:** Step-zero verification uncovered that **ggml-org publishes no macOS CLI binary at any recent version** (v1.7.0–v1.8.4); only Windows zips, a macOS xcframework-for-iOS, and CUDA/BLAS variants exist. The pre-0.9.4 macOS code path referenced a filename that never existed — `Local (whisper.cpp)` had been showing as enabled on macOS but would 404 on first download. So Phase 4 became "rebuild a never-worked feature on both platforms", not "add Windows parity to a working macOS feature".
 
 **What shipped (merged to `feature/windows-phase-4-whisper`, queued for 0.9.4):**
@@ -283,6 +292,28 @@ Changes:
 - Tagged-union purity — `WhisperPlatform` discriminator refactor (arch-reviewer S3).
 - 5 `.skip()` tests in `WhisperModelManager.test.ts` (arch-reviewer S4).
 - ISP split of `IWhisperModelManager` (arch-reviewer S2).
+
+### Phase 4 test inventory
+
+Phase 4's ~55 new tests span 8 files. Table below is the authoritative coverage map as of 2026-04-23. When adding tests for future Phase 4 follow-ups, update this table.
+
+| File | Total | Skipped | Covers |
+|------|-------|---------|--------|
+| `src/main/utils/zipArchive.test.ts` | ~10 | 0 | `assertSafeEntry` — zip-slip, UNC, drive letters, NTFS ADS colons, absolute paths, `..` traversal |
+| `src/main/utils/tarArchive.test.ts` | ~8 | 0 | Symlink/hardlink rejection, `..` traversal rejection, happy path |
+| `src/main/utils/secureDownloader.test.ts` | ~12 | 0 | Hostname allowlist, manual-redirect 5-hop max, size caps (Content-Length + live-byte), streaming SHA-256, abort handling |
+| `src/main/utils/verifyManifest.test.ts` | ~10 | 0 | `Ed` legacy + `ED` prehashed variant detection, dual-pubkey accept, malformed sig rejection, wrong key-id rejection. **Fixture = real published `whisper-build-v1.8.4-erfana1` manifest.** |
+| `src/main/services/WhisperModelManager.test.ts` | 41 | 16 | Path helpers, isModelInstalled, listInstalledModels, getModelInfo, pre-Phase-4 ensureBinary (16 skipped — tracked as D12) |
+| `src/main/services/WhisperModelManager.downgrade.test.ts` | 5 | 0 | **B5b regression tests**: revisionIndex below `MIN_REVISION_INDEX`, below persisted `lastSeenRevision`, boundary `===`, `WHISPER_SOURCE_PIN_DRIFT`, `verifyManifest` failure → `WHISPER_MANIFEST_INVALID` |
+| `src/main/services/LocalWhisperService.test.ts` | 55 | 0 | 40 pre-existing + 9 `validateAudioPath` argv-hardening + 6 `checkCpuSupport` cases + 1 spawn-path INFO log shape assertion |
+| `src/renderer/src/components/Settings/SettingsOverlay.test.tsx` | 74 | 0 | 71 pre-existing + 3 platform-gate tests (Windows x64 enabled, Windows ARM64 disabled with specific copy, Linux disabled with generic copy) |
+
+**Test infrastructure notes**:
+- `WhisperModelManager.downgrade.test.ts` is a **separate file** from `WhisperModelManager.test.ts` because the mock layers diverged (`fetch`-level mocks vs `secureDownloader`+`verifyManifest` module-boundary mocks). Policy documented in [`contributing.md`](contributing.md) §"Test-file split policy".
+- `verifyManifest.test.ts` uses a real published manifest as fixture. Policy: don't synthesise test manifests with test keypairs — see [ADR 0002](../adrs/0002-minisign-over-cosign-sigstore.md) "Ed/ED variant detection" note.
+- `checkCpuSupport` is mockable via `vi.spyOn(os, 'cpus')` + `__resetCpuProbeForTests()` — see `LocalWhisperService.test.ts` `describe('checkCpuSupport() pre-flight probe')` for the pattern.
+
+**Full workspace total** (Phase 4 branch): 249 files / 7852 passed / 94 skipped / 0 failed.
 
 ---
 

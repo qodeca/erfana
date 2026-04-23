@@ -16,6 +16,8 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 - [API Services – Features](./api-services-features.md) - Feature service implementations (Git, Transcription, Camera, etc.)
 - [IPC Patterns](./ipc-patterns.md) - Inter-process communication patterns
 - [Security](./security.md) - Security considerations and implementations
+- [Error Codes](./error-codes.md) - Project-wide `ErrorCode` enum index (~100 codes grouped by category; operator actions for the most-visible ones)
+- [Architecture Decision Records](./adrs/README.md) - Durable rationale for load-bearing design choices (ADR 0001 self-host whisper, 0002 minisign, 0003 dual-pubkey, 0004 TOCTOU close)
 - [Technical Debt](./technical-debt.md) - Technical debt tracking and priorities
 
 ### Feature Documentation
@@ -50,14 +52,16 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 - [Continuous Integration](./ci.md) - GitHub Actions workflows (`checks.yml` on every push, `e2e.yml` on develop + PRs), retry patterns, visual-on-CI gap
 - [Build](./build/README.md) - electron-builder, ASAR, fuses, troubleshooting
 - [Windows Enablement](./windows/README.md) - Phases 0–2 shipped in v0.9.3; **Phase 4 (local Whisper, [#165](https://github.com/qodeca/erfana/issues/165)) code-complete on `feature/windows-phase-4-whisper` for 0.9.4**; Phase 3 (screenshots, [#164](https://github.com/qodeca/erfana/issues/164)) unstarted; Phases 5–6 tracked under [#166–#167](https://github.com/qodeca/erfana/issues?q=label%3Awindows)
-  - [Implementation Plan](./windows/implementation-plan.md) - Canonical phased roadmap + status snapshot
+  - [Implementation Plan](./windows/implementation-plan.md) - Canonical phased roadmap + status snapshot + Phase 4 test inventory
   - [Gap Analysis](./windows/gap-analysis.md) - Feature-parity baseline (P0/P1/P2 with file:line refs)
-  - [Contributing](./windows/contributing.md) - Branch strategy, commit scope, test expectations, reviewer checklist
+  - [Contributing](./windows/contributing.md) - Branch strategy, commit scope, test expectations, reviewer checklist, **amendment-not-drop discipline**, **test-file split policy**, **`src/main/utils/` tier rules**
   - [Deferred Work](./windows/deferred-work.md) - 12 deferred items D1–D12 (D1–D8 from Phase 2 review, D9–D12 from Phase 4 audit); tracked in [#168](https://github.com/qodeca/erfana/issues/168)
+  - [Whisper Trust Chain](./windows/whisper-trust-chain.md) - **4-layer client-side trust model with composition diagram and attacker model**
+  - [Whisper Support Runbook](./windows/whisper-support-runbook.md) - **Operator playbook for Phase 4 error codes** (`WHISPER_MANIFEST_INVALID`, `WHISPER_DOWNGRADE_BLOCKED`, `WHISPER_CPU_UNSUPPORTED`, etc.) with diagnostic trails + stuck-user procedures
   - [Phase 4 binary spec](./windows/phase4-binary-spec.md) - Pinned SHAs for `whisper-build-v1.8.4-erfana1`
   - [Phase 2 Closure](./windows/phase2-closure.md) - 7-stream closure plan (write-once-archive)
   - [Build Setup (Windows)](./build/windows.md) - Node 24, Python 3.12, VS 2022, Developer Mode, long paths
-  - [Whisper-binaries CI runbook](./build/whisper-binaries.md) - Ops procedure for self-hosted whisper.cpp rebuilds + cert-revocation + monthly canary
+  - [Whisper-binaries CI runbook](./build/whisper-binaries.md) - Ops procedure for self-hosted whisper.cpp rebuilds + cert-revocation + monthly canary + **app-side pin-bump checklist** + **minisign gotchas** + **rejected approaches**
 - [Large Project Performance Plan](./large-project-performance-plan.md) - EMFILE mitigation, worker threads, diagnostics
 - [Testing](./testing/README.md) - Testing strategies and coverage
   - [E2E Testing](./testing/e2e-testing.md) - Playwright/Electron E2E guide
