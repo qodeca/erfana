@@ -10,8 +10,9 @@ Cross-cutting discipline (amendment-not-drop, triage cadence) is documented in t
 
 | Phase | Items |
 |-------|-------|
-| **Phase 6** (polish + CI guard) | D11 ISP split of `IWhisperModelManager`, D12 rewrite of the 5 skipped `WhisperModelManager.test.ts` cases (or as pre-0.9.4 merge task — see D12 promotion criteria) |
+| **Phase 6** (polish + CI guard) | D11 ISP split of `IWhisperModelManager` |
 | **Tracked-only** (no scheduled phase) | D9 forensic-logging correlation ID, D10 `WhisperPlatform` tagged-union refactor (triggers when a 3rd platform lands) |
+| **✅ Resolved** | D12 (2026-04-23) — `WhisperModelManager.test.ts` rewrite, 41 tests cross-platform |
 
 ---
 
@@ -115,10 +116,24 @@ Plan §"LocalWhisperService" §"Modified modules" commits to logging `{url, expe
 
 ---
 
-## D12 — Rewrite remaining 5 `.skip()` tests in `WhisperModelManager.test.ts`
+## D12 — Rewrite remaining 5 `.skip()` tests in `WhisperModelManager.test.ts` — ✅ RESOLVED 2026-04-23
 
 **Severity:** SHOULD-FIX (architecture-reviewer S4 + solution-reviewer I7 post-B1+B2 audit)
 **Source:** Architecture / Solution — "5 skipped tests need tracking; `describe.skipIf(darwin)` hides entire ensureBinary suite on Windows/Linux CI"
+
+### 2026-04-23 RESOLVED
+
+Delivered via full-file rewrite of `src/main/services/WhisperModelManager.test.ts`. All 16 skipped / platform-gated tests replaced with Phase 4-aware equivalents using the module-boundary mock layer established in `WhisperModelManager.downgrade.test.ts`.
+
+**Final shape**: 41 tests, 0 skipped, 0 platform-gated. Runs cross-platform on ubuntu-latest CI. Workspace total advanced from 7852 passed / 94 skipped → 7868 passed / 78 skipped (Δ matches the 16-test swap exactly).
+
+**Coverage delta**:
+- `ensureBinary()` 9-step install flow — now end-to-end asserted (manifest download, sig verify, downgrade block, source-pin check, archive download with SHA pin, extraction (zip + tar.gz parametrised), MOTW/chmod, sentinel writes).
+- `isBinaryInstalled()` — full verification chain covered (access + schema sentinel + streaming per-file SHA via `createReadStream` mock yielding bytes whose real SHA-256 matches the test spec).
+- `ensureModel()` — happy path via `downloadToFile` + rename, progress callback, cleanup-on-failure, cache update, abort handling.
+- Legacy-cruft migration, unsupported-platform rejection, SecureDownloaderError wrapping — all now covered.
+
+Error-code paths (`WHISPER_DOWNGRADE_BLOCKED` / `WHISPER_SOURCE_PIN_DRIFT` / `WHISPER_MANIFEST_INVALID`) remain in `WhisperModelManager.downgrade.test.ts` per the test-file split policy — not duplicated here.
 
 ### What
 

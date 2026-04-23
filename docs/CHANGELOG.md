@@ -46,6 +46,8 @@ Unlock the offline whisper.cpp transcription backend on both macOS and Windows x
 
 See [`docs/build/whisper-binaries.md`](./build/whisper-binaries.md) for the operational runbook, cert-revocation procedures, and upstream-SHA diff-review checklist.
 
+**Test coverage pre-merge** — D12 resolved 2026-04-23: `WhisperModelManager.test.ts` rewritten from scratch against Phase 4 mock boundaries (`downloadToFile`, `verifyManifest`, `zipArchive`, `tarArchive`). 41 tests, 0 skipped, 0 platform-gated. Removes the pre-Phase-4 `describe.skipIf(darwin)` block that hid the entire `ensureBinary()` suite on ubuntu-latest CI. Workspace total: 7852 → 7868 passed, 94 → 78 skipped. See [`docs/windows/deferred-work-phase4.md`](./windows/deferred-work-phase4.md) §D12 for the resolution note.
+
 ## 0.9.3
 
 ### Platform support (Windows)
