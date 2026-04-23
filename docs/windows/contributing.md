@@ -154,9 +154,13 @@ Default: **one test file per source file** matching the `<Source>.test.ts` patte
 2. **The new tests target a code path the existing file hasn't covered** and the existing file is already large (>500 lines — the same cap as doc files).
 3. **The split aligns with a code review boundary**. If the new tests are "regression tests for finding X from audit Y", keeping them in a named file (`<Source>.<concern>.test.ts`) aids future reviewer discoverability.
 
-**Reference implementation**: `src/main/services/WhisperModelManager.downgrade.test.ts` sits alongside `WhisperModelManager.test.ts`. The older file uses `mockFetch` at global level (pre-Phase-4 code path); the new file mocks at `secureDownloader` + `verifyManifest` module boundaries. Merging would require rewriting either side, which wasn't the scope of the Phase 4 audit fix. The split is tracked as [D12 in `deferred-work-phase4.md`](deferred-work-phase4.md#d12--rewrite-remaining-5-skip-tests-in-whispermodelmanagertests).
+**Reference implementations**:
+- `src/main/services/WhisperModelManager.downgrade.test.ts` sits alongside `WhisperModelManager.test.ts`. The older file uses `mockFetch` at global level (pre-Phase-4 code path); the new file mocks at `secureDownloader` + `verifyManifest` module boundaries. Merging would require rewriting either side, which wasn't the scope of the Phase 4 audit fix. The split is tracked as [D12 in `deferred-work-phase4.md`](deferred-work-phase4.md#d12--rewrite-remaining-5-skip-tests-in-whispermodelmanagertests).
+- `src/main/services/FileService.copyItem.limit.test.ts` sits alongside `FileService.copyItem.test.ts`. The older file exercises real disk I/O via `mkdtemp`/`writeFile` in each test — appropriate for happy-path conflict resolution. The `.limit.test.ts` file mocks `fs/promises` at module level to test the `MAX_COPY_ATTEMPTS` safety guard without creating 1001 real files (25+ s on NTFS + Defender). Landed as part of the Windows flake remediation pool (#172).
 
-**Naming**: `<Source>.test.ts` for baseline, `<Source>.<concern>.test.ts` for splits. The `<concern>` should be the narrowest label that makes the split obvious at `ls` time (`downgrade`, `timeout`, `e2e`, etc.).
+**Naming**: `<Source>.test.ts` for baseline, `<Source>.<concern>.test.ts` for splits. The `<concern>` should be the narrowest label that makes the split obvious at `ls` time (`downgrade`, `limit`, `timeout`, `e2e`, etc.).
+
+**Decision rule (added 2026-04-23 during flake remediation)**: split into a new file when the mock setup must hoist to module scope (e.g. `vi.mock('fs/promises')`, `vi.mock('node:crypto')`). Keep in-file when the fakes are per-describe-scoped (e.g. `vi.useFakeTimers()` inside one describe block) — splitting for per-describe fakes creates avoidable fragmentation.
 
 ---
 

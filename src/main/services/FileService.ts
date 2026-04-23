@@ -37,7 +37,7 @@ export interface FileNode {
 }
 
 // Maximum number of auto-numbered copies before rejecting operation (e.g., file.md, file (1).md, ... file (999).md)
-const MAX_COPY_ATTEMPTS = 1000
+export const MAX_COPY_ATTEMPTS = 1000
 
 export class FileService implements IFileService {
   private projectPath: string | null = null
