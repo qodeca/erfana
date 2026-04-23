@@ -650,10 +650,9 @@ describe('WhisperModelManager', () => {
       // Note: `stripDownloadMarks()` branches on the REAL `process.platform`
       // (not the mocked `classifyPlatform`), so xattr (darwin) vs ADS unlink
       // (win32) depends on the test-host OS. Covered implicitly by the
-      // no-throw happy path above. `chmod` is unix-only (posix host):
-      if (process.platform !== 'win32') {
-        expect(mockChmod).toHaveBeenCalledWith(WHISPER_BIN_DARWIN, 0o755)
-      }
+      // no-throw happy path above. `chmod` is gated on `spec.archiveFormat`
+      // in production, so this assertion is host-agnostic for tar.gz targets.
+      expect(mockChmod).toHaveBeenCalledWith(WHISPER_BIN_DARWIN, 0o755)
       // Returns the path
       expect(result).toBe(WHISPER_BIN_DARWIN)
     })

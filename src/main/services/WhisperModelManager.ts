@@ -380,8 +380,11 @@ class WhisperModelManager implements IWhisperModelManager {
       // Sidecar + main-binary integrity check post-extraction.
       await this.verifyAllFiles(spec)
 
-      // Unix exec-bit — Windows doesn't need this.
-      if (process.platform !== 'win32') {
+      // Unix exec-bit — gated on the target binary's archive format, not the
+      // real host OS. zip = Windows binary, no exec-bit needed; tar.gz = posix
+      // binary, needs 0o755. This keeps the test suite host-agnostic (cross-
+      // platform extraction tests previously coupled to test-host platform).
+      if (spec.archiveFormat !== 'zip') {
         await chmod(this.getBinaryPath(), 0o755)
       }
 
