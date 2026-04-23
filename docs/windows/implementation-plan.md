@@ -287,11 +287,11 @@ Changes:
 - Cancellation on Windows is abrupt (TerminateProcess).
 - Whisper updates are manual (no in-app auto-update for the subprocess).
 
-**Deferred to Phase 5+ as follow-up tickets (tracked via commit comment):**
-- Forensic logging shape expansion (plan §"Modified modules" bullet).
-- Tagged-union purity — `WhisperPlatform` discriminator refactor (arch-reviewer S3).
-- 5 `.skip()` tests in `WhisperModelManager.test.ts` (arch-reviewer S4).
-- ISP split of `IWhisperModelManager` (arch-reviewer S2).
+**Deferred to Phase 5+ as follow-up tickets (tracked in [`deferred-work-phase4.md`](deferred-work-phase4.md)):**
+- D9 forensic logging correlation-ID grouping.
+- D10 tagged-union purity — `WhisperPlatform` discriminator refactor.
+- D11 ISP split of `IWhisperModelManager`.
+- ~~D12 rewrite of `WhisperModelManager.test.ts` skipped tests~~ — ✅ resolved 2026-04-23 (commit `fb3365e`); see test inventory table below.
 
 ### Phase 4 test inventory
 
@@ -313,7 +313,7 @@ Phase 4's ~55 new tests span 8 files. Table below is the authoritative coverage 
 - `verifyManifest.test.ts` uses a real published manifest as fixture. Policy: don't synthesise test manifests with test keypairs — see [ADR 0002](../adrs/0002-minisign-over-cosign-sigstore.md) "Ed/ED variant detection" note.
 - `checkCpuSupport` is mockable via `vi.spyOn(os, 'cpus')` + `__resetCpuProbeForTests()` — see `LocalWhisperService.test.ts` `describe('checkCpuSupport() pre-flight probe')` for the pattern.
 
-**Full workspace total** (Phase 4 branch): 249 files / 7852 passed / 94 skipped / 0 failed.
+**Full workspace total** (Phase 4 branch, post-D12 rewrite 2026-04-23): 249 files / 7868 passed / 78 skipped / 0 failed. The 78 remaining skips are all correct platform-gates (77 POSIX-only `pathSecurity.test.ts` cases that skip on Windows, 1 macOS-only `LiteParseConverter.test.ts` path case). Zero tech-debt skips remain.
 
 ---
 
