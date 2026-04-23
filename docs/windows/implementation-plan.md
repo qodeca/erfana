@@ -8,9 +8,9 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 ## Status snapshot
 
-*Last updated 2026-04-21, Phase 4 code-complete on `feature/windows-phase-4-whisper` (awaiting PR merge for 0.9.4).*
+*Last updated 2026-04-23, Phase 4 merged to `develop` (`110f1b9`) for 0.9.4.*
 
-**Current state:** Phases 0, 1, 2 shipped to `develop` in **v0.9.3** (merge commit `c1e085d`, release commit `0b593a1`, tag `v0.9.3` on 2026-04-22). Phase 4 (local Whisper parity, [#165](https://github.com/qodeca/erfana/issues/165)) is code-complete on `feature/windows-phase-4-whisper`; see the Phase 4 section below and `docs/build/whisper-binaries.md`. Phase 3 (screenshot parity, [#164](https://github.com/qodeca/erfana/issues/164)) remains the next unstarted item. Phase 5–6 work branches off `develop` as `feature/windows-phase-<N>-*` per the project convention.
+**Current state:** Phases 0, 1, 2 shipped to `develop` in **v0.9.3** (merge commit `c1e085d`, release commit `0b593a1`, tag `v0.9.3` on 2026-04-22). **Phase 4 (local Whisper parity, [#165](https://github.com/qodeca/erfana/issues/165)) merged to `develop` on 2026-04-23 (`110f1b9`) for 0.9.4** — see the Phase 4 section below and [`docs/build/whisper-binaries.md`](../build/whisper-binaries.md). In parallel, the Windows-host test-flake remediation pool ([#172](https://github.com/qodeca/erfana/issues/172)) + ThrottledWorker offset-deque refactor ([#173](https://github.com/qodeca/erfana/issues/173)) merged the same day (`c3cc005`). Phase 3 (screenshot parity, [#164](https://github.com/qodeca/erfana/issues/164)) remains the next unstarted item. Phase 5–6 work branches off `develop` as `feature/windows-phase-<N>-*` per the project convention.
 
 **Recent commits on `windows` that landed in v0.9.3 (newest → oldest, frozen for the trail):**
 
@@ -51,7 +51,7 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 ## Next session — start Phase 3
 
-**Phase 2 closure is complete** (all seven streams A–G executed; see [`phase2-closure.md`](phase2-closure.md) for the historical breakdown). Windows work now resumes on Phase 3 (screenshot parity, [#164](https://github.com/qodeca/erfana/issues/164)).
+**Phase 2 closure is complete** (all seven streams A–G executed; see [`phase2-closure.md`](phase2-closure.md) for the historical breakdown). **Phase 4 (local Whisper) subsequently merged to `develop` on 2026-04-23 ahead of Phase 3** — the order was driven by [#165](https://github.com/qodeca/erfana/issues/165) scope becoming urgent once step-zero verification surfaced the ggml-org macOS gap. Windows work now resumes on Phase 3 (screenshot parity, [#164](https://github.com/qodeca/erfana/issues/164)), still the next unstarted phase.
 
 ### Open Windows-tagged issues (post-v0.9.3)
 
@@ -250,7 +250,7 @@ Changes:
 
 ---
 
-## Phase 4 — Local Whisper parity — 🟡 CODE-COMPLETE (unreleased — awaiting 0.9.4 PR merge on `feature/windows-phase-4-whisper`)
+## Phase 4 — Local Whisper parity — ✅ MERGED to `develop` on 2026-04-23 (`110f1b9`) for 0.9.4
 
 > **Post-mortem: the pre-0.9.4 macOS code path was broken, not just Windows.**
 >
@@ -263,7 +263,7 @@ Changes:
 
 **Why it's harder than first imagined:** Step-zero verification uncovered that **ggml-org publishes no macOS CLI binary at any recent version** (v1.7.0–v1.8.4); only Windows zips, a macOS xcframework-for-iOS, and CUDA/BLAS variants exist. The pre-0.9.4 macOS code path referenced a filename that never existed — `Local (whisper.cpp)` had been showing as enabled on macOS but would 404 on first download. So Phase 4 became "rebuild a never-worked feature on both platforms", not "add Windows parity to a working macOS feature".
 
-**What shipped (merged to `feature/windows-phase-4-whisper`, queued for 0.9.4):**
+**What shipped (merged to `develop` on 2026-04-23, `110f1b9`, for 0.9.4):**
 
 **Option A — self-host signed binaries via dedicated CI workflow.** Rejected Option B (pin ggml-org releases) because of the macOS gap. All Phase 4 work lives across two commit streams:
 
