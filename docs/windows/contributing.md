@@ -121,10 +121,76 @@ afterEach(() => {
 
 ---
 
+## Amendment discipline for deferred items
+
+When a deferred-work item's promotion criteria are met (or demonstrably no longer apply), **amend the ledger entry rather than silently drop it**. The 2026-04-21 D1 update in [`deferred-work.md`](deferred-work.md) is the template: the item's original "third caller triggers promotion" rule was narrowed to "third probe-style caller" when Phase 4 (whisper) turned out not to be a probe-style caller. The entry stays in the ledger with a dated amendment note and revised promotion criteria.
+
+**Why amendment-not-drop**:
+- **Audit trail** — future reviewers asking "why didn't Phase 4 trigger D1?" find the answer inline instead of discovering the omission during a code audit.
+- **Legitimises the design** — the amendment documents that we considered promotion and consciously rejected it with reasoning; silent drop reads as oversight.
+- **Preserves promotion criteria** — the item isn't "done", it's "still valid under a narrower rule". A future probe-style caller (e.g. a second Pandoc / Tesseract detection) correctly re-triggers.
+
+**How to amend**:
+
+```markdown
+### 2026-MM-DD amendment — <what changed>
+
+<1-2 sentences explaining the real-world observation>
+
+**Promotion rule updated:** <new rule text in one sentence>
+```
+
+Apply amendments to any D-entry where the original promotion criteria turn out to be either too narrow or too broad. Don't rewrite the original "Why deferred" / "Cost when promoted" sections — layer the amendment on top so the thread of reasoning is preserved.
+
+---
+
+## Test-file split policy
+
+Default: **one test file per source file** matching the `<Source>.test.ts` pattern. This is the baseline used for ~95% of tests in the codebase.
+
+**Split into a second file** when:
+
+1. **Mock infrastructure diverges**. The existing file established a specific mocking layer (e.g. global `fetch`, a process-spawn helper) that the new tests cannot reuse without breaking the existing ones.
+2. **The new tests target a code path the existing file hasn't covered** and the existing file is already large (>500 lines — the same cap as doc files).
+3. **The split aligns with a code review boundary**. If the new tests are "regression tests for finding X from audit Y", keeping them in a named file (`<Source>.<concern>.test.ts`) aids future reviewer discoverability.
+
+**Reference implementation**: `src/main/services/WhisperModelManager.downgrade.test.ts` sits alongside `WhisperModelManager.test.ts`. The older file uses `mockFetch` at global level (pre-Phase-4 code path); the new file mocks at `secureDownloader` + `verifyManifest` module boundaries. Merging would require rewriting either side, which wasn't the scope of the Phase 4 audit fix. The split is tracked as [D12 in `deferred-work-phase4.md`](deferred-work-phase4.md#d12--rewrite-remaining-5-skip-tests-in-whispermodelmanagertests).
+
+**Naming**: `<Source>.test.ts` for baseline, `<Source>.<concern>.test.ts` for splits. The `<concern>` should be the narrowest label that makes the split obvious at `ls` time (`downgrade`, `timeout`, `e2e`, etc.).
+
+---
+
+## `src/main/utils/` tier rules
+
+The `src/main/utils/` directory holds main-process-only helpers that:
+
+- Are **pure or near-pure functions** (no Electron API dependencies, no IPC).
+- Are **narrow in scope** (one responsibility per module; SRP).
+- May have **1 direct external dependency** each (e.g. `tar`, `yauzl`, `@noble/ed25519`) plus transitives.
+- Are **consumed by services in `src/main/services/`** — not directly by the renderer (that would go through IPC).
+
+**Examples (Phase 4, B1)**:
+- `zipArchive.ts` + `tarArchive.ts` — split by archive format (SRP); unified `archive.ts` was rejected because zip-slip and tar-slip validators differ.
+- `secureDownloader.ts` — hostname allowlist, manual redirect, streaming SHA-256. Pure except for `fetch`.
+- `verifyManifest.ts` — minisign Ed25519 verifier. Pure.
+
+**Where NOT to put things**:
+- Requires `app.getPath(...)` or `BrowserWindow` → belongs in `services/`.
+- Wraps an IPC handler → belongs in `ipc/`.
+- Shared between main + renderer → belongs in `src/shared/`.
+
+When a new utility module is a real peer to one of these, add a short JSDoc header explaining what it's a peer of and why it's not inside the service it serves. `verifyManifest.ts` is a good example — it's a peer of `secureDownloader.ts`, not a method of `WhisperModelManager.ts`, because manifest verification is reusable outside the whisper flow.
+
+---
+
 ## See also
 
 - [`README.md`](README.md) – document map and status pointer
 - [`implementation-plan.md`](implementation-plan.md) – canonical phase status, verification log, multi-session workflow
 - [`gap-analysis.md`](gap-analysis.md) – B/M/m-rated inventory referenced by phase descriptions
+- [`deferred-work.md`](deferred-work.md) – D1–D8 ledger (Phase 2 origin); [`deferred-work-phase4.md`](deferred-work-phase4.md) – D9–D12 ledger (Phase 4 origin). Amendment discipline in both files follows the template from this doc's "Amendment discipline" section.
+- [`whisper-trust-chain.md`](whisper-trust-chain.md) – 4-layer architecture referenced by test-split reasoning
+- [`whisper-support-runbook.md`](whisper-support-runbook.md) – operator playbook for Phase 4 error codes
 - [`../build/windows.md`](../build/windows.md) – environment setup (Node 24, Python 3.12, VS 2022 Build Tools, Developer Mode, long paths)
+- [`../adrs/README.md`](../adrs/README.md) – ADR index + format
 - [Glossary](../glossary.md#windows-parity-phase-2) – Phase 2 terms (`flakeGuard`, `WindowsBootstrapBuilder`, `INVALID_FILENAME_MARKER`, …)

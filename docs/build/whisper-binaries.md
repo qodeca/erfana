@@ -166,18 +166,15 @@ If any item surfaces something suspicious, escalate or pin to an earlier SHA.
 
 No rebuild possible during the outage. Existing `whisper-build-*` releases remain reachable via their published asset URLs. Document the acceptable-outage window in the release-freeze policy; typically not actionable (wait it out).
 
-## Scheduled canary (Phase 5 follow-up)
+## Scheduled canary (wired — runs monthly)
 
-A separate `.github/workflows/whisper-binaries-canary.yml` runs monthly and validates credentials haven't silently rotated out:
+`.github/workflows/whisper-binaries-canary.yml` runs automatically on the 1st of every month at 09:00 UTC. Two jobs:
 
-```
-xcrun notarytool history --apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID"
-signtool verify /pa /v <last published whisper.exe>
-```
+- **`macos-notarization-canary`** — calls `xcrun notarytool history` with the same Apple ID / app-specific password / team ID the main workflow uses for `notarytool submit`. Non-zero exit = credentials can no longer authenticate. Catches the silent-rotation failure where an Apple app-specific password expires after ~6 months of inactivity.
+- **`windows-signtool-canary`** — currently a **resolvability** probe only (`Get-Command signtool.exe`). Phase 4 ships unsigned on Windows, so there's no cert chain to verify yet. Phase 5 grows this into a real `signtool verify` once the Windows cert is procured.
+- **`notify-on-failure`** — on any probe failure, creates (or comments on) a GitHub issue with the failure date + run URL + link to the cert-revocation runbook. Label: `canary`.
 
-Emits a failure notification if credentials are invalid. Catches app-specific-password rotation silent failures.
-
-_Canary workflow not yet authored — Phase-5 scope._
+Manual trigger: `gh workflow run whisper-binaries-canary.yml`.
 
 ## Non-reproducibility caveat
 
@@ -194,6 +191,87 @@ Per rebuild on GitHub-hosted runners (private repo billing):
 - `ubuntu-latest` publish × ~2 min = **~$0.02**
 
 Total **~$24 per rebuild**. At a typical cadence of 4–6 rebuilds per year, **annual budget ceiling ≈ $150**.
+
+## Bumping the app-side pin
+
+After CI publishes a new `whisper-build-<label>-erfana<N>` release, the app-side pin (`src/main/services/whisper-assets.ts`) must be updated in lock-step before the next Erfana app release ships. Skipping any step below leaves the trust chain in an inconsistent state and will throw `WHISPER_SOURCE_PIN_DRIFT` on end-user machines.
+
+### Checklist (~15 minutes)
+
+1. **Open the new release's `manifest.json`** in the GitHub Releases UI or via:
+   ```bash
+   gh release download whisper-build-<label>-erfana<N> --repo qodeca/erfana --pattern 'manifest.json'
+   cat manifest.json | jq .
+   ```
+2. **Extract the per-platform SHAs and sizes** from the manifest. You need:
+   - `artifacts.macosUniversal.{filename, sha256, size}`
+   - `artifacts.win64.{filename, sha256, size}`
+   - Per-file SHAs for main binary + sidecars (computed at build time — download the artifact and `shasum -a 256 <extracted_file>` for each).
+3. **Update `src/main/services/whisper-assets.ts`**:
+   - `RELEASE_TAG` → new tag string (e.g. `'whisper-build-v1.9.0-erfana1'`)
+   - `RELEASE_URL_BASE` → `https://github.com/qodeca/erfana/releases/download/<RELEASE_TAG>`
+   - `MIN_REVISION_INDEX` → bump to match `manifest.revisionIndex` (**monotonic — never decrease**)
+   - `ARTIFACTS['darwin-universal']` + `ARTIFACTS['win32-x64']` → new filenames, SHAs, sizes, per-file pins
+4. **Update `docs/windows/phase4-binary-spec.md`**:
+   - Append a new entry to the history table with all SHAs.
+   - Keep previous entries for retention / forensic reference.
+5. **Update `docs/CHANGELOG.md`** with a new in-flight / next-version section noting the pin bump + the upstream whisper.cpp version.
+6. **Bump `SCHEMA_VERSION` only if the on-disk layout changed** — e.g. a new sidecar DLL appeared, an existing one was renamed. Bumping `SCHEMA_VERSION` triggers legacy-cruft migration on end-user machines.
+7. **Run the pre-commit verification**:
+   ```bash
+   npm run lint
+   npm run typecheck
+   npm run test:main -- src/main/services/WhisperModelManager.test.ts src/main/services/WhisperModelManager.downgrade.test.ts src/main/services/LocalWhisperService.test.ts src/main/utils/
+   ```
+8. **Local smoke test** (on at least one of macOS / Windows, or both):
+   - Delete `{userData}/whisper/` to force a fresh install.
+   - Launch Erfana → Settings → Transcription → Backend = Local → Download model → transcribe a test audio file.
+   - Expected log: `INFO: Whisper binary installed` with the new `manifestRevision` value.
+9. **Commit** with a conventional message: `feat(whisper): pin whisper-build-<label>-erfana<N> (upstream <whisper.cpp version>)`.
+10. **PR review** — reviewer should confirm: (a) SHAs match manifest, (b) `MIN_REVISION_INDEX` monotonic, (c) `CHANGELOG.md` mentions the security-relevant upstream changes (diff-review checklist — see below).
+
+### Security pre-check before the PR merge
+
+Read the upstream whisper.cpp commit range between the previous pin and the new one:
+
+```bash
+git -C <path-to-cloned-whisper.cpp> log --oneline <old_upstream_sha>..<new_upstream_sha>
+```
+
+Flag any commit that:
+- adds a new network syscall (`socket`, `connect`, `getaddrinfo` appearances in diff).
+- adds new filesystem syscalls that write outside the expected working dir.
+- adds new `CMakeLists.txt` dependency entries.
+- touches signature / crypto primitives in surprising places.
+
+If any red flag — treat as a security review, don't auto-merge. This is the standard upstream-diff-review checklist for bumping any security-critical pin.
+
+## Minisign manifest-signing keys
+
+### Why minisign (not cosign / Sigstore)
+
+See [ADR 0002](../adrs/0002-minisign-over-cosign-sigstore.md) for the full decision and alternatives. Short version: minisign gives us offline verification (no Rekor dependency), tiny verifier surface (`verifyManifest.ts` ~170 lines), and no CA chain.
+
+### Dual-pubkey architecture (primary + rotation)
+
+See [ADR 0003](../adrs/0003-dual-pubkey-trust-primary-rotation.md). Primary key lives in the `production-signing` GitHub Environment secret `MANIFEST_SIGNING_KEY`; rotation key lives **offline on a hardware token** and is only used during an incident. Both pubkeys are embedded in `src/main/services/whisper-pubkeys.ts`.
+
+### Known minisign gotchas
+
+Hard-won knowledge from Phase 4 implementation — documented here so future maintainers don't re-derive them:
+
+1. **Key-ID byte order is reversed for display.** The on-wire key ID in the signature file header is 8 bytes in little-endian order. `minisign` CLI displays the hex reversed (big-endian). `verifyManifest.ts:84-88` reverses the bytes before comparison. Future maintainers comparing hex dumps of `.pub` files vs `.minisig` payload: the bytes are reversed.
+2. **Two signature algorithm variants**: `Ed` (legacy, raw Ed25519 over manifest bytes) and `ED` (prehashed via BLAKE2b-512, then Ed25519 over the 64-byte digest). Detected via magic bytes `0x45 0x44` in the signature file header. `verifyManifest.ts:91-97` handles both; future test signers must produce one of these two variants — check `minisign --version` first.
+3. **Pure-JS verifier via `@noble/ed25519`.** We chose this over `sodium-native` to keep the verifier a pure-function with no native bindings. Tradeoff: ~100µs per verify vs ~10µs native — negligible for once-per-install use.
+4. **Test fixture pattern**: `src/main/utils/verifyManifest.test.ts` uses a real published manifest + signature from `whisper-build-v1.8.4-erfana1` as fixture bytes. When the pin advances, either (a) the fixture stays pointing at the old release (still cryptographically valid) or (b) refresh the fixture to the new release. Do NOT generate synthetic manifests with test keypairs — that would miss the `Ed`/`ED` variant-detection path.
+
+## Rejected approaches (don't re-propose without reading this section)
+
+1. **PowerShell `Compress-Archive` for Windows zips**. Produces stream-format zips that Node's `extract-zip` (via `yauzl`) rejects on long or non-ASCII paths. Use `7z a -tzip -mx=9 ...` as currently. A cleanup PR removing 7z as "redundant since Windows has native zip" would break every Erfana Windows install silently — the round-trip extract-zip check in the workflow catches it at CI time, but only if the check isn't removed too. **Leave 7z + extract-zip round-trip test in place.**
+2. **Live-log grep for leaked secrets from inside the runner job.** Infeasible — the runner doesn't have read access to its own rendered log (logs stream out to GitHub storage). The current impl scans `$GITHUB_STEP_SUMMARY` + `manifest.json` for credential patterns as a belt-and-suspenders check; the primary defense is GitHub's built-in `::add-mask::` redaction.
+3. **"Latest" Xcode on `macos-14` runner.** The runner image ships a specific Xcode version; `latest` is a moving target that can break notarization or cmake detection. `macos-14` currently ships 16.2 as latest (16.3 is NOT available as of 2026-04-22). Bump carefully when the runner image updates — check the `runner-images` repo release notes first.
+4. **Pin to ggml-org releases (Option B).** Never worked for macOS — no CLI binary published. See [ADR 0001](../adrs/0001-self-host-whisper-binaries.md) for the full rejection.
+5. **Bundle whisper inside the Erfana installer.** Rejected in ADR 0001 — balloons installer size by ~8 MB for users who never turn on local transcription. The current lazy-download UX is better.
 
 ## Related
 

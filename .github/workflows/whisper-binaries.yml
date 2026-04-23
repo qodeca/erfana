@@ -44,6 +44,14 @@ on:
 permissions:
   contents: write   # required to create/upload release assets
 
+# Serialize dispatches targeting the same tag to prevent a tag-collision /
+# asset-overwrite race. `cancel-in-progress: false` so an in-flight build
+# finishes before a second one starts — safer than mid-run cancel for
+# notarization / signtool streams.
+concurrency:
+  group: whisper-build-${{ inputs.upstream_label }}-erfana${{ inputs.erfana_revision }}
+  cancel-in-progress: false
+
 env:
   UPSTREAM_REPO: ggml-org/whisper.cpp
   FIXTURE_MODEL_URL: https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
@@ -53,8 +61,44 @@ env:
   FIXTURE_ASSERT_PHRASE: "ask not what your country"
 
 jobs:
+  # Validate workflow_dispatch inputs early. These values flow into shell
+  # heredocs that produce `manifest.json` later, so a crafted dispatch could
+  # inject extra JSON fields or break the heredoc entirely. Rather than
+  # defending the heredoc (fragile), we reject any input that doesn't match
+  # the expected alphabet up front.
+  validate-inputs:
+    name: Validate dispatch inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Reject malformed inputs
+        env:
+          U_SHA: ${{ inputs.upstream_sha }}
+          U_LABEL: ${{ inputs.upstream_label }}
+          E_REV: ${{ inputs.erfana_revision }}
+        run: |
+          set -euo pipefail
+          # 40-char lowercase hex, nothing else.
+          printf '%s' "$U_SHA" | grep -Eq '^[a-f0-9]{40}$' || {
+            echo "::error::upstream_sha must be a 40-char lowercase hex commit SHA (got: ${U_SHA})"
+            exit 1
+          }
+          # Conservative label alphabet: letters, digits, dot, underscore, hyphen.
+          # Long enough to cover `v1.8.4-patch`, short enough to reject injection.
+          printf '%s' "$U_LABEL" | grep -Eq '^[A-Za-z0-9._-]{1,64}$' || {
+            echo "::error::upstream_label must match [A-Za-z0-9._-]{1,64} (got: ${U_LABEL})"
+            exit 1
+          }
+          # Non-negative integer only (workflow_dispatch passes all inputs as
+          # strings even when type: number).
+          printf '%s' "$E_REV" | grep -Eq '^(0|[1-9][0-9]{0,6})$' || {
+            echo "::error::erfana_revision must be a non-negative integer (got: ${E_REV})"
+            exit 1
+          }
+
   build-macos:
     name: macOS universal build
+    needs: [validate-inputs]
     runs-on: macos-14
     timeout-minutes: 45
     # Needed to access APPLE_CERT_P12 / APPLE_CERT_PASSWORD / APPLE_ID /
@@ -216,6 +260,7 @@ jobs:
 
   build-windows:
     name: Windows x64 build
+    needs: [validate-inputs]
     runs-on: windows-latest
     timeout-minutes: 45
     # Scoped to the same environment as build-macos + publish-release so
@@ -427,6 +472,52 @@ jobs:
             echo "::error::Secret key file left on disk"
             exit 1
           }
+
+      - name: Pattern-scan job output for leaked credential patterns
+        # B5c / audit I2 — Plan §"CI workflow" step 4 originally said "grep
+        # workflow logs for leaked APPLE_APP_PASSWORD / WINDOWS_CERT_PASSWORD
+        # / MANIFEST_SIGNING_KEY patterns". Grepping the live GitHub runner
+        # log from inside the job is infeasible (the log streams out of the
+        # runner to GitHub storage; the job doesn't have read access to its
+        # own rendered log). This step approximates the intent by grepping
+        # the files the job DOES produce: the step-summary markdown and the
+        # manifest JSON we wrote to disk. Paired with GitHub's built-in
+        # `::add-mask::` (primary defense) this is belt-and-suspenders for
+        # materials that bypass masking — e.g. a secret transformed through
+        # `jq` into a different shape before being echoed.
+        if: always()
+        run: |
+          set -euo pipefail
+          SCAN_TARGETS=()
+          [ -n "${GITHUB_STEP_SUMMARY:-}" ] && [ -f "$GITHUB_STEP_SUMMARY" ] && SCAN_TARGETS+=("$GITHUB_STEP_SUMMARY")
+          [ -f manifest.json ] && SCAN_TARGETS+=(manifest.json)
+          if [ ${#SCAN_TARGETS[@]} -eq 0 ]; then
+            echo "No scannable output files produced — nothing to scan."
+            exit 0
+          fi
+          PATTERN='APPLE_APP_PASSWORD=|APPLE_CERT_PASSWORD=|WINDOWS_CERT_PASSWORD=|MANIFEST_SIGNING_KEY=|MANIFEST_SIGNING_KEY_PASSWORD=|-----BEGIN [A-Z ]*PRIVATE KEY-----|untrusted comment:.*minisign encrypted secret key'
+          for target in "${SCAN_TARGETS[@]}"; do
+            if grep -iE "$PATTERN" "$target"; then
+              echo "::error::Credential pattern leaked in job output: $target"
+              exit 1
+            fi
+          done
+          echo "No credential patterns detected in scanned job outputs (${SCAN_TARGETS[*]})."
+
+      - name: Refuse overwrite of existing release / tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="whisper-build-${{ inputs.upstream_label }}-erfana${{ inputs.erfana_revision }}"
+          # `gh release view` exits 0 when the release exists, non-zero otherwise.
+          # We deliberately fail the run if it already exists — increment
+          # `erfana_revision` to create a new release, never overwrite.
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "::error::Release $TAG already exists. Bump erfana_revision to publish a new build."
+            exit 1
+          fi
+          echo "Release tag $TAG is free to create."
 
       - name: Create release
         env:

@@ -426,13 +426,7 @@ npm run build:mac
 
 ## IPC Security Checklist
 
-- [x] contextBridge used for all IPC
-- [x] Input validation (Zod schemas) in all handlers
-- [x] Path traversal prevention
-- [x] Type safety (TypeScript + Zod)
-- [x] Error handling with proper messages
-- [ ] Rate limiting (future enhancement)
-- [ ] Permission system for destructive operations (future)
+Shipped: contextBridge on all IPC, Zod input validation in all handlers, path-traversal prevention, TypeScript + Zod type safety, error messages sanitised at the IPC boundary. Pending: rate limiting; permission system for destructive operations.
 
 ---
 
@@ -489,12 +483,14 @@ The `afterSign` hook is critical: without it, macOS Sequoia+ rejects `@rpath` li
 
 Git status runs in a `worker_threads` Worker – same process memory space, no new sandbox boundary. Security: `validateProjectPath()` in IPC handler before worker; worker also rejects non-absolute paths (defense-in-depth). Native git uses `execFile` with array args (no `shell: true`). Git binary resolved via hardcoded allowlist first.
 
+## Local Whisper trust chain (Phase 4, v0.9.4)
+
+4-layer client-side trust model for the whisper.cpp subprocess (manifest Ed25519 sig + artifact SHA pin + per-spawn re-hash for TOCTOU + monotonic revision floor). Composition + attacker model: [`windows/whisper-trust-chain.md`](./windows/whisper-trust-chain.md). Decisions: [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)–[ADR 0004](./adrs/0004-per-spawn-toctou-rehash.md). Operator runbook: [`windows/whisper-support-runbook.md`](./windows/whisper-support-runbook.md).
 ## Future enhancements
 
-Code signing + notarization for macOS (Apple Developer account); auto-updates via signed electron-updater; encrypted storage via OS keychain; confirmation prompts before destructive operations.
+Code signing for Windows (Phase 5, [#166](https://github.com/qodeca/erfana/issues/166)); auto-updates via signed electron-updater (Phase 5); encrypted storage via OS keychain; confirmation prompts before destructive operations.
 
 ## References
 
-- Electron: [Security](https://www.electronjs.org/docs/latest/tutorial/security) | [Sandboxing](https://www.electronjs.org/docs/latest/tutorial/sandbox) | [Fuses](https://www.electronjs.org/docs/latest/tutorial/fuses) | [Context Isolation](https://www.electronjs.org/docs/latest/tutorial/context-isolation)
-- Packages: [@electron/fuses](https://www.npmjs.com/package/@electron/fuses) | [electron-builder](https://www.electron.build/)
+Electron: [Security](https://www.electronjs.org/docs/latest/tutorial/security) · [Sandboxing](https://www.electronjs.org/docs/latest/tutorial/sandbox) · [Fuses](https://www.electronjs.org/docs/latest/tutorial/fuses) · [Context Isolation](https://www.electronjs.org/docs/latest/tutorial/context-isolation). Packages: [@electron/fuses](https://www.npmjs.com/package/@electron/fuses) · [electron-builder](https://www.electron.build/).
 - See also: [IPC Patterns](./ipc-patterns.md) | [Architecture](./architecture.md) | [Testing](./testing/README.md)

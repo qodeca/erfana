@@ -8,15 +8,15 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 ## Status snapshot
 
-*Last updated 2026-04-22, v0.9.3 shipped.*
+*Last updated 2026-04-21, Phase 4 code-complete on `feature/windows-phase-4-whisper` (awaiting PR merge for 0.9.4).*
 
-**Current state:** Phases 0, 1, 2 shipped to `develop` in **v0.9.3** (merge commit `c1e085d`, release commit `0b593a1`, tag `v0.9.3` on 2026-04-22). The `windows` integration branch was deleted after the merge. Phase 3–6 work branches off `develop` as `feature/windows-phase-<N>-*` per the project convention.
+**Current state:** Phases 0, 1, 2 shipped to `develop` in **v0.9.3** (merge commit `c1e085d`, release commit `0b593a1`, tag `v0.9.3` on 2026-04-22). Phase 4 (local Whisper parity, [#165](https://github.com/qodeca/erfana/issues/165)) is code-complete on `feature/windows-phase-4-whisper`; see the Phase 4 section below and `docs/build/whisper-binaries.md`. Phase 3 (screenshot parity, [#164](https://github.com/qodeca/erfana/issues/164)) remains the next unstarted item. Phase 5–6 work branches off `develop` as `feature/windows-phase-<N>-*` per the project convention.
 
 **Recent commits on `windows` that landed in v0.9.3 (newest → oldest, frozen for the trail):**
 
 | Commit | Description | Issue |
 |---|---|---|
-| _pending_ | fix(windows): terminal bootstrap hardening — Git Bash dispatch, PTY resize race, git-polling log spam, ConPTY resize-reflow leak across all three bootstrap builders, `(`/`)` allowed in cwds (unblocks `Program Files (x86)`); new `WindowsTerminalBootstrap.test.ts` (60 tests); e2e path-sep fix; ESLint ignores for `playwright-report/` + `test-results/` + `coverage/`; 11 pre-existing lint errors cleared | Phase-2 UAT |
+| `c8543bf` | fix(windows): terminal bootstrap hardening — Git Bash dispatch, PTY resize race, git-polling log spam, ConPTY resize-reflow leak across all three bootstrap builders, `(`/`)` allowed in cwds (unblocks `Program Files (x86)`); new `WindowsTerminalBootstrap.test.ts` (60 tests — vitest reporter count with `it.each()` parameterisation; raw `it()` block count is 25); e2e path-sep fix; ESLint ignores for `playwright-report/` + `test-results/` + `coverage/`; 11 pre-existing lint errors cleared | Phase-2 UAT |
 | `13bd3b8` | feat(windows): detect LibreOffice at standard install paths | **#162 CLOSED** |
 | `612192b` | feat(windows): reserved-filename guard with cross-platform validation | **#161 CLOSED** |
 | `5e86349` | feat(windows): add Program Files entries to git allowlist + liveness probe | **#160 CLOSED** |
@@ -38,13 +38,13 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 **Closed 2026-04-20:** #153 (Phase 0), #156 (setJumpList), #157 (test portability), #159 (CameraDialog timer).
 **Closed 2026-04-21:** #160 (git allowlist), #161 (filename guard), #162 (LibreOffice detection). **#163 (long-path activation): decision-deferred to Phase 6** with promotion criteria recorded inline at `PlatformConfig.ts:194-201` (comment block above `isWindowsLongPath` at `:203`).
 
-**Verification on Windows host (after CameraDialog fix, 2026-04-20 evening):**
+**Verification on Windows host (after CameraDialog fix, 2026-04-20 evening) — pre-Phase-2-UAT snapshot; post-hardening baseline is 7887 tests, see §"Merge readiness" below:**
 
 - `npm run test:main` → **241 files pass / 7437 tests pass / 89 skipped / 0 failures**
 - `npm run build:win` → NSIS installer produced successfully (requires Developer Mode); all Electron security fuses applied; signtool signed
 - `npm run test:cov` → tests pass; wrapper still exits 1 on Windows due to v8 coverage provider race — now confirmed to be the **only** remaining blocker for clean `test:cov` on Windows (#159 CameraDialog fix eliminated the macOS exit-1 cause; Windows exit-1 is purely #158). Confirmed by: `npx vitest --run --config vitest.main.ts --coverage` standalone exits 0.
 
-**Verification on macOS host (Phase 0 AC #4, 2026-04-20):**
+**Verification on macOS host (Phase 0 AC #4, 2026-04-20) — pre-Phase-2-UAT snapshot; see §"Merge readiness" for the post-hardening 7887 baseline that all current docs cite:**
 
 - `npm run test:cov` → **7532/7532 tests pass, 0 failures** across main / preload / renderer. Duration 32.75s. No regressions from #157 test portability changes.
 - `npm run build:mac` → both architectures: `erfana-0.9.2-x64.dmg` (327 MB) + `erfana-0.9.2-arm64.dmg` (320 MB). Fuses + ad-hoc signed.
@@ -250,30 +250,70 @@ Changes:
 
 ---
 
-## Phase 4 — Local Whisper parity
+## Phase 4 — Local Whisper parity — 🟡 CODE-COMPLETE (unreleased — awaiting 0.9.4 PR merge on `feature/windows-phase-4-whisper`)
 
-**Why:** Straightforward — whisper.cpp has official Windows releases on GitHub.
+> **Post-mortem: the pre-0.9.4 macOS code path was broken, not just Windows.**
+>
+> Phase 4 started as a feature-add ("port local Whisper to Windows"). Step-zero verification surfaced that `ggml-org/whisper.cpp` has never published a macOS CLI binary at any recent version (v1.7.0–v1.8.4). The pre-0.9.4 macOS code path constructed a URL that would 404 on first download — `Local (whisper.cpp)` had been showing as enabled on macOS for the entire v0.6–v0.9.3 window but would never have worked.
+>
+> No user had reported it because: (a) the feature was gated to macOS-only, (b) macOS users would download whisper via `brew` or other means and never exercise Erfana's built-in path, (c) the binary download happens lazily on first transcription, not on app launch. Silent failure mode.
+>
+> Consequence: Phase 4 became "rebuild a never-worked feature on both platforms" rather than "add Windows parity to a working macOS feature". Scope expanded accordingly — see [ADR 0001](../adrs/0001-self-host-whisper-binaries.md) for the Option A (self-host) vs Option B (pin ggml-org) decision.
 
-Changes:
 
-1. **Extend `getArchSuffix()`** (fixes B2) — `WhisperModelManager.ts:77`
-   - Delete the `process.platform !== 'darwin'` throw.
-   - Return per-platform suffix:
-     - darwin + arm64 → `arm64`
-     - darwin + x64 → `x86_64`
-     - win32 + x64 → `bin-x64` (verify against latest release asset naming)
-     - win32 + arm64 → `bin-arm64`
-     - linux + x64 → `bin-linux-x64`
-2. **Binary naming** — `LOCAL_WHISPER.BINARY_NAME` in `src/shared/constants.ts`
-   - Per-platform: `whisper-cli.exe` on Windows, `whisper-cli` on POSIX.
-   - Update `getBinaryPath()` accordingly.
-3. **Download & extraction**
-   - Pipeline likely fetches `.zip` + extracts. On Windows may need to unpack bundled DLLs (`ggml.dll`, `whisper.dll`, possibly Intel MKL runtime) alongside the `.exe`.
-   - Verify whether Windows binaries ship dependency-free or require VC++ Redistributable. If redistributable needed → document in known-issues + detect at runtime and show a dialog.
-4. **Binary chmod** — `fs/promises.chmod` is effectively a no-op on Windows. Skip on `win32` to avoid surprises.
-5. **Research step (do before implementing):** `WebSearch` for the current whisper.cpp Windows release asset naming and DLL dependencies. Asset names have changed across releases (`whisper-blas-bin-Win64.zip`, `whisper-bin-x64.zip`, etc.) — don't cache stale URLs.
+**Why it's harder than first imagined:** Step-zero verification uncovered that **ggml-org publishes no macOS CLI binary at any recent version** (v1.7.0–v1.8.4); only Windows zips, a macOS xcframework-for-iOS, and CUDA/BLAS variants exist. The pre-0.9.4 macOS code path referenced a filename that never existed — `Local (whisper.cpp)` had been showing as enabled on macOS but would 404 on first download. So Phase 4 became "rebuild a never-worked feature on both platforms", not "add Windows parity to a working macOS feature".
 
-**Manual validation:** download `tiny` model on Windows → transcribe a sample MP3 → output matches expected text.
+**What shipped (merged to `feature/windows-phase-4-whisper`, queued for 0.9.4):**
+
+**Option A — self-host signed binaries via dedicated CI workflow.** Rejected Option B (pin ggml-org releases) because of the macOS gap. All Phase 4 work lives across two commit streams:
+
+**Branch A (`chore/whisper-binaries-ci`)** — CI infrastructure:
+- `.github/workflows/whisper-binaries.yml` — 3-job workflow (build-macos, build-windows, publish-release) gated on `production-signing` GitHub Environment.
+- `docs/build/whisper-binaries.md` — ops runbook with diff-review checklist + cert-revocation procedures.
+- First release published as pre-release tag `whisper-build-v1.8.4-erfana1` with minisign-signed `manifest.json`, SHAs recorded in `docs/windows/phase4-binary-spec.md`.
+
+**Branch B (`feature/windows-phase-4-whisper`)** — app-side integration:
+- `B1` — `src/main/utils/zipArchive.ts` + `tarArchive.ts` + `secureDownloader.ts` + `verifyManifest.ts` (minisign Ed25519 + BLAKE2b-512 prehashed variants, dual-pubkey acceptance).
+- `B2a` — `WhisperModelManager` 9-step install flow (manifest-sig → revision-floor → source-drift guard → SHA-verified download → platform-extract → MOTW/quarantine strip → per-file SHA integrity → schema sentinel); legacy-cruft migration for pre-0.9.4 users.
+- `B2b` — `LocalWhisperService` argv hardening (`validateAudioPath` rejects UNC, reserved names, NTFS ADS), TOCTOU close via pre-spawn `verifyInstalledBinary()`, DLL-sideload mitigation (`cwd: binDir` on Windows), SIGILL → `WHISPER_CPU_UNSUPPORTED` detection, orphan `${audioPath}.txt` cleanup.
+- `B2c` — merge-blocker fixes from 3-reviewer audit: persistent `lastSeenRevision` (manifest replay defense), pre-flight `checkCpuSupport()` probe, streaming SHA re-verify in `isBinaryInstalled()`, workflow input regex validation + concurrency guard + tag-collision pre-check, Zone.Identifier strip log at warn.
+- `B3` — `SettingsOverlay` gate: `isLocalWhisperSupported = darwin || (win32 && x64)`; ARM64-specific disabled copy; `api.utils.getArch()` preload helper; first-use disclosure corrected to ~8 MB.
+- `B4` (this doc commit) — CHANGELOG 0.9.4, known-issues, implementation-plan closure, `deferred-work.md` D1 amendment.
+
+**Known limitations carried into 0.9.4:**
+- Windows binary is **unsigned** (Phase 5 procures cert).
+- Windows ARM64 unsupported (upstream gap).
+- Pre-SSE4.2 CPUs rejected with `WHISPER_CPU_UNSUPPORTED`.
+- Cancellation on Windows is abrupt (TerminateProcess).
+- Whisper updates are manual (no in-app auto-update for the subprocess).
+
+**Deferred to Phase 5+ as follow-up tickets (tracked in [`deferred-work-phase4.md`](deferred-work-phase4.md)):**
+- D9 forensic logging correlation-ID grouping.
+- D10 tagged-union purity — `WhisperPlatform` discriminator refactor.
+- D11 ISP split of `IWhisperModelManager`.
+- ~~D12 rewrite of `WhisperModelManager.test.ts` skipped tests~~ — ✅ resolved 2026-04-23 (commit `fb3365e`); see test inventory table below.
+
+### Phase 4 test inventory
+
+Phase 4's ~55 new tests span 8 files. Table below is the authoritative coverage map as of 2026-04-23. When adding tests for future Phase 4 follow-ups, update this table.
+
+| File | Total | Skipped | Covers |
+|------|-------|---------|--------|
+| `src/main/utils/zipArchive.test.ts` | ~10 | 0 | `assertSafeEntry` — zip-slip, UNC, drive letters, NTFS ADS colons, absolute paths, `..` traversal |
+| `src/main/utils/tarArchive.test.ts` | ~8 | 0 | Symlink/hardlink rejection, `..` traversal rejection, happy path |
+| `src/main/utils/secureDownloader.test.ts` | ~12 | 0 | Hostname allowlist, manual-redirect 5-hop max, size caps (Content-Length + live-byte), streaming SHA-256, abort handling |
+| `src/main/utils/verifyManifest.test.ts` | ~10 | 0 | `Ed` legacy + `ED` prehashed variant detection, dual-pubkey accept, malformed sig rejection, wrong key-id rejection. **Fixture = real published `whisper-build-v1.8.4-erfana1` manifest.** |
+| `src/main/services/WhisperModelManager.test.ts` | 41 | 0 | Path helpers (platform-aware), `isBinaryInstalled()` full verification chain, `isModelInstalled` + cache, `listInstalledModels`, `getModelInfo`, `ensureBinary()` fast-path + 9-step install flow + legacy-cruft migration + error paths (unsupported platform, SecureDownloaderError, abort), `ensureModel()` via downloadToFile, `deleteModel`, singleton/factory. D12 resolved 2026-04-23 via full rewrite against Phase 4 mock boundaries. |
+| `src/main/services/WhisperModelManager.downgrade.test.ts` | 5 | 0 | **B5b regression tests**: revisionIndex below `MIN_REVISION_INDEX`, below persisted `lastSeenRevision`, boundary `===`, `WHISPER_SOURCE_PIN_DRIFT`, `verifyManifest` failure → `WHISPER_MANIFEST_INVALID` |
+| `src/main/services/LocalWhisperService.test.ts` | 55 | 0 | 40 pre-existing + 9 `validateAudioPath` argv-hardening + 6 `checkCpuSupport` cases + 1 spawn-path INFO log shape assertion |
+| `src/renderer/src/components/Settings/SettingsOverlay.test.tsx` | 74 | 0 | 71 pre-existing + 3 platform-gate tests (Windows x64 enabled, Windows ARM64 disabled with specific copy, Linux disabled with generic copy) |
+
+**Test infrastructure notes**:
+- `WhisperModelManager.downgrade.test.ts` is a **separate file** from `WhisperModelManager.test.ts` because the mock layers diverged (`fetch`-level mocks vs `secureDownloader`+`verifyManifest` module-boundary mocks). Policy documented in [`contributing.md`](contributing.md) §"Test-file split policy".
+- `verifyManifest.test.ts` uses a real published manifest as fixture. Policy: don't synthesise test manifests with test keypairs — see [ADR 0002](../adrs/0002-minisign-over-cosign-sigstore.md) "Ed/ED variant detection" note.
+- `checkCpuSupport` is mockable via `vi.spyOn(os, 'cpus')` + `__resetCpuProbeForTests()` — see `LocalWhisperService.test.ts` `describe('checkCpuSupport() pre-flight probe')` for the pattern.
+
+**Full workspace total** (Phase 4 branch, post-D12 rewrite 2026-04-23): 249 files / 7868 passed / 78 skipped / 0 failed. The 78 remaining skips are all correct platform-gates (77 POSIX-only `pathSecurity.test.ts` cases that skip on Windows, 1 macOS-only `LiteParseConverter.test.ts` path case). Zero tech-debt skips remain.
 
 ---
 

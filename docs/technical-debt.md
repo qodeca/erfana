@@ -178,13 +178,23 @@ Ongoing effort to keep `docs/` concise and high-value for Claude Code.
 
 ---
 
+## Deferred-work ledgers (Windows)
+
+This doc covers project-wide non-Windows technical debt. For phase-structured deferred items with promotion criteria + risk-if-forgotten:
+
+- [`windows/deferred-work.md`](./windows/deferred-work.md) — D1-D8 (Phase 2 review aftermath, tracked in [#168](https://github.com/qodeca/erfana/issues/168))
+- [`windows/deferred-work-phase4.md`](./windows/deferred-work-phase4.md) — D9-D12 (Phase 4 audit aftermath; same issue)
+
+Amendment discipline + promotion-rule conventions in [`windows/contributing.md`](./windows/contributing.md) §"Amendment discipline".
+
 ## Related Documentation
 
 - [Known Issues](./known-issues.md) - Complete issue history with solutions
 - [Troubleshooting](./troubleshooting.md) - Common problems and fixes
 - [Architecture](./architecture.md) - System design and patterns
 - [Testing](./testing/README.md) - Test coverage and strategies
+- [ADRs](./adrs/README.md) - Architecture Decision Records (Phase 4: 0001 self-host whisper, 0002 minisign, 0003 dual-pubkey, 0004 TOCTOU close)
 
 ---
 
-**Last Updated**: v0.9.3 (April 2026)
+**Last Updated**: v0.9.4 in-flight (April 2026, Phase 4 doc-sweep)

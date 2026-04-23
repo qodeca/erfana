@@ -148,6 +148,30 @@ export enum ErrorCode {
   WHISPER_PROCESS_TIMEOUT = 'WHISPER_PROCESS_TIMEOUT',
   WHISPER_OUTPUT_PARSE_FAILED = 'WHISPER_OUTPUT_PARSE_FAILED',
   WHISPER_UNSUPPORTED_PLATFORM = 'WHISPER_UNSUPPORTED_PLATFORM',
+  /** A pinned whisper artifact's on-disk SHA-256 doesn't match source pin. */
+  WHISPER_BINARY_TAMPERED = 'WHISPER_BINARY_TAMPERED',
+  /** The audio file path failed argv-hardening validation. */
+  WHISPER_INVALID_PATH = 'WHISPER_INVALID_PATH',
+  /** The current CPU lacks the minimum required instruction-set features. */
+  WHISPER_CPU_UNSUPPORTED = 'WHISPER_CPU_UNSUPPORTED',
+  /**
+   * Manifest signature verification failed, manifest JSON is malformed, or
+   * dual-pubkey trust chain is broken. Distinct from download-I/O failure.
+   */
+  WHISPER_MANIFEST_INVALID = 'WHISPER_MANIFEST_INVALID',
+  /**
+   * Manifest's `revisionIndex` is strictly below the effective monotonic
+   * floor (`max(MIN_REVISION_INDEX, lastSeenRevision)`). Defeats replay
+   * of a legitimately-signed but superseded manifest.
+   */
+  WHISPER_DOWNGRADE_BLOCKED = 'WHISPER_DOWNGRADE_BLOCKED',
+  /**
+   * Manifest is signature-valid but its per-platform SHA doesn't match our
+   * hard-coded source pin in `whisper-assets.ts`. Signals the source pin
+   * was not bumped in lock-step with a new whisper binary release, OR the
+   * release contents drifted after manifest generation. Fail-closed.
+   */
+  WHISPER_SOURCE_PIN_DRIFT = 'WHISPER_SOURCE_PIN_DRIFT',
 
   // Video import errors (Issue #110)
   VIDEO_NO_AUDIO_TRACK = 'VIDEO_NO_AUDIO_TRACK',
@@ -337,6 +361,12 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.WHISPER_PROCESS_TIMEOUT]: 'Local transcription timed out. Try a smaller model or shorter file.',
   [ErrorCode.WHISPER_OUTPUT_PARSE_FAILED]: 'Failed to parse transcription output. Please try again.',
   [ErrorCode.WHISPER_UNSUPPORTED_PLATFORM]: 'Local Whisper is not supported on this platform.',
+  [ErrorCode.WHISPER_BINARY_TAMPERED]: 'The local Whisper binary on disk has been modified or corrupted. Re-download it from Settings.',
+  [ErrorCode.WHISPER_INVALID_PATH]: 'The audio file path is not supported by local Whisper. Use a regular local file path (no UNC, no Windows reserved names).',
+  [ErrorCode.WHISPER_CPU_UNSUPPORTED]: 'Your CPU lacks the instruction-set features local Whisper requires. Use the OpenAI API backend instead.',
+  [ErrorCode.WHISPER_MANIFEST_INVALID]: 'The local Whisper release manifest could not be verified. The download is blocked to protect integrity — please try again later or update Erfana.',
+  [ErrorCode.WHISPER_DOWNGRADE_BLOCKED]: 'A newer local Whisper build was already installed here; refusing to replace it with an older one. Update Erfana to pick up the newest release.',
+  [ErrorCode.WHISPER_SOURCE_PIN_DRIFT]: 'The local Whisper release on GitHub does not match the version Erfana expects. Update Erfana — this typically means your app is outdated.',
 
   // Video import errors (Issue #110)
   [ErrorCode.VIDEO_NO_AUDIO_TRACK]: 'This video file contains no audio track to transcribe.',

@@ -960,7 +960,19 @@ const api = {
      * @returns Platform identifier ('darwin', 'win32', 'linux', etc.)
      * @see Issue #86 - Screenshot capture buttons for terminal panel
      */
-    getPlatform: (): NodeJS.Platform => process.platform
+    getPlatform: (): NodeJS.Platform => process.platform,
+
+    /**
+     * Get the current CPU architecture
+     *
+     * Returns Node.js process.arch value.
+     * Used to gate features by arch (e.g., local Whisper on Windows x64 only,
+     * ARM64 Windows falls back to OpenAI API).
+     *
+     * @returns Architecture identifier ('x64', 'arm64', 'ia32', etc.)
+     * @see Issue #165 - Local Whisper Windows binary
+     */
+    getArch: (): NodeJS.Architecture => process.arch
   }
 }
 
