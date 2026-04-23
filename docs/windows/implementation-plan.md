@@ -344,6 +344,7 @@ Changes:
 2. **Verify `CameraService`** (fixes M9) — read the file, confirm pure WebRTC, add a `win32` manual test.
 3. **Verify `ProjectLockService`** (fixes M10) — force-kill an Erfana process mid-edit on Windows, reopen, confirm stale lock recovers. If broken, add PID-liveness check.
 4. **Write Windows section in `docs/known-issues.md`** (fixes m3) — SmartScreen on unsigned builds, long paths requiring opt-in, OneDrive / AV EPERM storms.
+   - ✅ 2026-04-23: Windows test-flake remediation pool landed (#172). Fixes ThrottledWorker O(n²) eviction, FileService.copyItem 1000-conflict, directory-watcher e2e budget, SettingsOverlay focus race. See [`known-flakes.md`](known-flakes.md) for the register + follow-up audit candidates.
 5. **Verify Tesseract `tessdata` path** on packaged Windows build (fixes m4).
 6. **Generate `-win32.png` visual baselines** (fixes m6) — run `npm run test:e2e:update-screenshots` on Windows, commit. Enables local visual regression runs; not blocking since CI is deferred.
 7. **Windows CI guard** (deferred from Phase 0) — minimal `windows-latest` workflow running `typecheck + test:main`. Also wire visual regression once `-win32.png` baselines exist. File as part of Phase 6.

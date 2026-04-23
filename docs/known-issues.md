@@ -90,6 +90,22 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (merged 2026-04-22). Th
 
 ---
 
+### Directory watcher latency on Windows
+
+**Issue**: End-to-end file-creation notification latency (terminal `touch` → Project Tree shows the new file) is 1500–2500 ms on Windows versus 200–600 ms on macOS/Linux. The difference is not an Erfana bug — it's the cost of the underlying OS primitives.
+
+Pipeline contributors on Windows:
+- **chokidar `ReadDirectoryChangesW`** — 100–500 ms callback latency (vs. <5 ms for POSIX inotify).
+- **Windows Defender on-access scanning** — 200–800 ms scan of the new file before the FS notification fires. Enabled by default in Windows 11.
+- **ThrottledWorker collection delay** — 75 ms (VS Code value, deterministic).
+- **IPC main → renderer + React reconcile** — ~50 ms.
+
+**Workaround**: None for end users — this is the Windows FS notification floor. Developers running the E2E suite on Windows see `e2e/directory-watcher.e2e.ts` use a platform-specific 6 s budget to accommodate this reality (macOS/Linux stays at 2 s). The 500 ms NFR-001 target is still asserted deterministically in the main-process integration test (`DirectoryWatcherService.pipeline.test.ts`, 016-NFR-001 describe block).
+
+**Tracking**: Not a bug — platform-inherent latency. Exposed as a budget in `e2e/directory-watcher.e2e.ts`; integration-test regression guard lives in `DirectoryWatcherService.pipeline.test.ts`. See `docs/windows/known-flakes.md` for the flake-remediation history.
+
+---
+
 ### cmd.exe terminals can leak pre-bootstrap text into scrollback after aggressive resizing
 
 **Issue**: On Windows, ConPTY keeps its own screen buffer and re-emits the buffer contents back through the PTY stream on every terminal resize. The Git Bash and PowerShell bootstraps emit a full CSI 2J / CSI 3J / CSI H sequence after the startup marker so ConPTY's buffer is wiped before the interactive shell takes over, leaving nothing for a later reflow to replay. cmd.exe can only clear the visible viewport (`cls` → CSI 2J + CSI H); `CSI 3J` (scrollback clear) isn't available from cmd without spawning a child process. In rare cases, a user who opens a fresh cmd.exe terminal and immediately drags the panel splitter may see faint reflowed pwd / marker text appear in scrollback history (not the visible viewport).
