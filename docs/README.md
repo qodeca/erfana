@@ -49,13 +49,15 @@ ERFANA is an Electron-based IDE focused on markdown editing with integrated term
 - [Development Tasks](./development-tasks.md) - Build, test, and deployment
 - [Continuous Integration](./ci.md) - GitHub Actions workflows (`checks.yml` on every push, `e2e.yml` on develop + PRs), retry patterns, visual-on-CI gap
 - [Build](./build/README.md) - electron-builder, ASAR, fuses, troubleshooting
-- [Windows Enablement](./windows/README.md) - Phases 0–2 closed; Phases 3–6 tracked under [#164–#167](https://github.com/qodeca/erfana/issues?q=label%3Awindows)
+- [Windows Enablement](./windows/README.md) - Phases 0–2 shipped in v0.9.3; **Phase 4 (local Whisper, [#165](https://github.com/qodeca/erfana/issues/165)) code-complete on `feature/windows-phase-4-whisper` for 0.9.4**; Phase 3 (screenshots, [#164](https://github.com/qodeca/erfana/issues/164)) unstarted; Phases 5–6 tracked under [#166–#167](https://github.com/qodeca/erfana/issues?q=label%3Awindows)
   - [Implementation Plan](./windows/implementation-plan.md) - Canonical phased roadmap + status snapshot
   - [Gap Analysis](./windows/gap-analysis.md) - Feature-parity baseline (P0/P1/P2 with file:line refs)
   - [Contributing](./windows/contributing.md) - Branch strategy, commit scope, test expectations, reviewer checklist
-  - [Deferred Work](./windows/deferred-work.md) - 8 deferred items D1–D8 from Phase 2 review (tracked in [#168](https://github.com/qodeca/erfana/issues/168))
+  - [Deferred Work](./windows/deferred-work.md) - 12 deferred items D1–D12 (D1–D8 from Phase 2 review, D9–D12 from Phase 4 audit); tracked in [#168](https://github.com/qodeca/erfana/issues/168)
+  - [Phase 4 binary spec](./windows/phase4-binary-spec.md) - Pinned SHAs for `whisper-build-v1.8.4-erfana1`
   - [Phase 2 Closure](./windows/phase2-closure.md) - 7-stream closure plan (write-once-archive)
   - [Build Setup (Windows)](./build/windows.md) - Node 24, Python 3.12, VS 2022, Developer Mode, long paths
+  - [Whisper-binaries CI runbook](./build/whisper-binaries.md) - Ops procedure for self-hosted whisper.cpp rebuilds + cert-revocation + monthly canary
 - [Large Project Performance Plan](./large-project-performance-plan.md) - EMFILE mitigation, worker threads, diagnostics
 - [Testing](./testing/README.md) - Testing strategies and coverage
   - [E2E Testing](./testing/e2e-testing.md) - Playwright/Electron E2E guide
