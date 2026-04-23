@@ -63,8 +63,28 @@ const DEFAULT_OPTIONS: ThrottledWorkerOptions = {
   collectionDelay: 75
 }
 
+/**
+ * Compaction threshold — when the head offset exceeds this absolute count
+ * AND exceeds half the underlying array length, we compact by slicing.
+ * Prevents runaway memory (old array slots holding references) while avoiding
+ * thrash for small-burst workloads.
+ */
+const COMPACT_ABSOLUTE_FLOOR = 1024
+
 export class ThrottledWorker<T> {
+  // Amortized-O(1) deque implemented as `T[]` + `bufferOffset`.
+  //
+  // Invariant: live items are `buffer[bufferOffset .. buffer.length)`.
+  // - push: `buffer.push(item)` — O(1) amortized
+  // - evict/consume from head: `bufferOffset += n` — O(1)
+  // - periodic compaction reclaims memory when half the array is wasted
+  //
+  // This shape replaces the previous `buffer = buffer.slice(n)` pattern which
+  // allocated a fresh N-element array on every front-drop. That pattern turned
+  // a 60 k-event burst into ~14 GB of garbage + ~31 s wall-clock on Windows
+  // (Defender + V8 GC interaction). See #173 for the perf story.
   private buffer: T[] = []
+  private bufferOffset = 0
   private collectionTimer: NodeJS.Timeout | null = null
   private throttleTimer: NodeJS.Timeout | null = null
   private isProcessing = false
@@ -105,10 +125,10 @@ export class ThrottledWorker<T> {
   }
 
   /**
-   * Get current buffer size
+   * Get current buffer size (number of live items, not underlying array length)
    */
   getBufferSize(): number {
-    return this.buffer.length
+    return this.buffer.length - this.bufferOffset
   }
 
   /**
@@ -138,6 +158,7 @@ export class ThrottledWorker<T> {
   flush(): void {
     this.cancel()
     this.buffer = []
+    this.bufferOffset = 0
     this.pressureWarningEmitted = false
   }
 
@@ -150,18 +171,16 @@ export class ThrottledWorker<T> {
   }
 
   /**
-   * Enforce buffer limit, dropping oldest items
-   */
-  /**
    * Threshold-crossing pattern: warn at 80%, reset at 50%
    * Prevents oscillating log spam around the threshold boundary.
    */
   private checkBufferPressure(): void {
-    const fillRatio = this.buffer.length / this.options.maxBufferedWork
+    const liveCount = this.getBufferSize()
+    const fillRatio = liveCount / this.options.maxBufferedWork
     if (fillRatio >= 0.8 && !this.pressureWarningEmitted) {
       this.pressureWarningEmitted = true
       logger.warn('ThrottledWorker buffer pressure', {
-        current: this.buffer.length,
+        current: liveCount,
         max: this.options.maxBufferedWork,
         pct: Math.round(fillRatio * 100)
       })
@@ -170,19 +189,52 @@ export class ThrottledWorker<T> {
     }
   }
 
+  /**
+   * Enforce buffer limit, dropping oldest items.
+   *
+   * O(1) per call: `bufferOffset += droppedCount` advances the head pointer,
+   * dereferencing the dropped elements so V8 can GC them as the backing array
+   * grows. Periodic compaction via {@link compactIfWasted} reclaims the
+   * underlying array memory.
+   */
   private enforceBufferLimit(): void {
-    if (this.buffer.length > this.options.maxBufferedWork) {
-      const droppedCount = this.buffer.length - this.options.maxBufferedWork
-      this.buffer = this.buffer.slice(droppedCount)
+    const liveCount = this.buffer.length - this.bufferOffset
+    if (liveCount > this.options.maxBufferedWork) {
+      const droppedCount = liveCount - this.options.maxBufferedWork
+      // Null out dropped slots so V8 can GC them before the next compaction.
+      // Without this, references linger in the backing array for the life of
+      // the deque, which matters for large/long-lived event payloads.
+      for (let i = this.bufferOffset; i < this.bufferOffset + droppedCount; i++) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (this.buffer as any)[i] = undefined
+      }
+      this.bufferOffset += droppedCount
       logger.warn('ThrottledWorker buffer overflow', {
         dropped: droppedCount,
-        current: this.buffer.length,
+        current: this.buffer.length - this.bufferOffset,
         max: this.options.maxBufferedWork
       })
 
       if (this.callbacks.onOverflow) {
         this.callbacks.onOverflow(droppedCount)
       }
+
+      this.compactIfWasted()
+    }
+  }
+
+  /**
+   * Compact the underlying array when >= half its length is wasted head slots.
+   * O(n) per compaction; amortized O(1) per push because compactions are
+   * spaced by at least N/2 pushes.
+   */
+  private compactIfWasted(): void {
+    if (
+      this.bufferOffset >= COMPACT_ABSOLUTE_FLOOR &&
+      this.bufferOffset >= this.buffer.length / 2
+    ) {
+      this.buffer = this.buffer.slice(this.bufferOffset)
+      this.bufferOffset = 0
     }
   }
 
@@ -205,15 +257,25 @@ export class ThrottledWorker<T> {
    * Process the next chunk of work
    */
   private processNextChunk(): void {
-    if (this.isDisposed || this.buffer.length === 0) {
+    const liveCount = this.buffer.length - this.bufferOffset
+    if (this.isDisposed || liveCount === 0) {
       this.isProcessing = false
       return
     }
 
     this.isProcessing = true
 
-    // Extract chunk
-    const chunk = this.buffer.splice(0, this.options.maxWorkChunkSize)
+    // Extract chunk via offset advance — O(chunk size) for the slice,
+    // O(1) for the offset bump. No backing-array shift.
+    const chunkSize = Math.min(this.options.maxWorkChunkSize, liveCount)
+    const chunk = this.buffer.slice(this.bufferOffset, this.bufferOffset + chunkSize)
+    // Null out consumed slots so V8 can GC them before the next compaction.
+    for (let i = this.bufferOffset; i < this.bufferOffset + chunkSize; i++) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (this.buffer as any)[i] = undefined
+    }
+    this.bufferOffset += chunkSize
+    this.compactIfWasted()
 
     // Process chunk
     try {
@@ -223,7 +285,7 @@ export class ThrottledWorker<T> {
     }
 
     // If more work, schedule next chunk after throttle delay
-    if (this.buffer.length > 0) {
+    if (this.buffer.length - this.bufferOffset > 0) {
       this.throttleTimer = setTimeout(() => {
         this.throttleTimer = null
         this.processNextChunk()

@@ -319,4 +319,57 @@ describe('DirectoryWatcherService pipeline integration', () => {
       expect(sends.length).toBe(1)
     })
   })
+
+  // -------------------------------------------------------------------------
+  // 016-NFR-001: Main-process-only latency budget (< 200 ms, virtual clock)
+  //
+  // The e2e counterpart (`e2e/directory-watcher.e2e.ts`) asserts a wider
+  // platform-dependent ceiling (6 s on Windows, 2 s on POSIX) because the
+  // real pipeline includes chokidar + Defender + UI reconciliation + IPC.
+  // This integration test isolates the main-process portion under fake
+  // timers so the NFR-001 regression signal is preserved even when the
+  // e2e test's wider ceiling masks incremental slowdowns.
+  // -------------------------------------------------------------------------
+  describe('016-NFR-001: Main-process pipeline latency budget', () => {
+    it('single file-add event reaches IPC within 200 ms virtual latency', () => {
+      const NFR_001_MAIN_PROCESS_BUDGET_MS = 200
+      seedWatchedDirectory(svc, '/proj')
+
+      const startVirtual = Date.now()
+      svc.queueEvent('/proj', { type: 'add', path: '/proj/file.md' })
+
+      // Collection delay (75 ms) gates the first IPC send. Advance the
+      // virtual clock in small increments to detect the exact crossing.
+      let latencyMs = 0
+      while (sends.length === 0 && latencyMs <= NFR_001_MAIN_PROCESS_BUDGET_MS) {
+        vi.advanceTimersByTime(1)
+        latencyMs = Date.now() - startVirtual
+      }
+
+      expect(sends.length).toBe(1)
+      expect(latencyMs).toBeLessThan(NFR_001_MAIN_PROCESS_BUDGET_MS)
+      // Typical pass: ~75-80 ms (ThrottledWorker collection delay + microtasks).
+    })
+
+    it('atomic-save detection (unlink→exists) reaches IPC within 200 ms virtual latency', async () => {
+      const NFR_001_MAIN_PROCESS_BUDGET_MS = 200
+      mockStatResult = 'exists'
+      seedWatchedDirectory(svc, '/proj')
+
+      const startVirtual = Date.now()
+      svc.queueEvent('/proj', { type: 'unlink', path: '/proj/file.md' })
+
+      // AtomicSaveDetector + ThrottledWorker = ~175 ms expected.
+      // Advance in chunks until first IPC or budget exhaustion.
+      let latencyMs = 0
+      while (sends.length === 0 && latencyMs <= NFR_001_MAIN_PROCESS_BUDGET_MS) {
+        await vi.advanceTimersByTimeAsync(5)
+        latencyMs = Date.now() - startVirtual
+      }
+
+      expect(sends.length).toBe(1)
+      expect(latencyMs).toBeLessThan(NFR_001_MAIN_PROCESS_BUDGET_MS)
+      // Typical pass: ~175-185 ms (100 ms AtomicSave + 75 ms ThrottledWorker).
+    })
+  })
 })

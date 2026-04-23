@@ -31,6 +31,30 @@ import {
 // =============================================================================
 
 test.describe('Directory watcher pipeline', () => {
+  // Budget assertions must not be retried — a transient slow run silently
+  // hidden by a fast retry masks real performance regressions. Same discipline
+  // as `visual-regression.e2e.ts` (spec-019-FR-003).
+  test.describe.configure({ retries: 0 })
+
+  // Platform-specific latency budget:
+  // - POSIX (macOS, Linux): inotify-class notifications, typical 200-600 ms.
+  //   The 2000 ms ceiling catches a regression (2-3× slowdown) while leaving
+  //   headroom for UI reconciliation + IPC overhead.
+  // - Windows: chokidar uses `ReadDirectoryChangesW` with larger latencies;
+  //   Defender on-access scanning of the new file adds another 200-800 ms
+  //   before the FS notification fires. Observed end-to-end 1500-2500 ms on
+  //   local dev; `windows-latest` GHA VMs are typically 1.5-2× slower due
+  //   to shared disk I/O and Defender-by-default, so 6000 ms leaves safety
+  //   margin without masking a 4× regression.
+  // See `docs/known-issues.md` "Directory watcher latency on Windows".
+  //
+  // Architectural note: per-platform branching in test body is tactical, not
+  // architecturally clean — the right long-term home is Playwright `projects:`
+  // metadata in `playwright.config.ts`. Follows the existing precedent at
+  // `e2e/visual-regression.e2e.ts:35-37` rather than promoting to config,
+  // which would be a separate refactor with broader scope.
+  const LATENCY_BUDGET_MS = process.platform === 'win32' ? 6000 : 2000
+
   test('file created via terminal appears in Project Tree within latency budget', async () => {
     const { projectPath, cleanup: cleanupProject } = await createTestProject({
       'test.md': '# Test\n'
@@ -79,13 +103,13 @@ test.describe('Directory watcher pipeline', () => {
         .locator(`[data-testid^="${TEST_IDS.PROJECT_TREE_NODE_FILE}-"]`)
         .filter({ hasText: fileName })
 
-      await fileLocator.waitFor({ state: 'visible', timeout: 2000 })
+      await fileLocator.waitFor({ state: 'visible', timeout: LATENCY_BUDGET_MS })
       const endTime = Date.now()
       const elapsed = endTime - startTime
 
       // Log timing for monitoring
       console.log(
-        `Directory watcher pipeline latency: ${elapsed}ms (target: 500ms, threshold: 2000ms)`
+        `Directory watcher pipeline latency: ${elapsed}ms (target: 500ms, threshold: ${LATENCY_BUDGET_MS}ms, platform: ${process.platform})`
       )
       if (elapsed <= 500) {
         console.log('Within 016-NFR-001 target (500ms)')
@@ -95,7 +119,21 @@ test.describe('Directory watcher pipeline', () => {
         )
       }
 
-      expect(elapsed).toBeLessThan(2000)
+      // Emit structured data for trend tracking (picked up by Playwright trace /
+      // CI log analysis). The 500 ms NFR-001 target is asserted in the
+      // integration test at `src/main/services/DirectoryWatcherService.pipeline.test.ts`
+      // where mocked chokidar isolates from Defender + UI noise.
+      await test.info().attach('latency-trend', {
+        body: JSON.stringify({
+          elapsedMs: elapsed,
+          budgetMs: LATENCY_BUDGET_MS,
+          platform: process.platform,
+          nfr001TargetMs: 500
+        }),
+        contentType: 'application/json'
+      })
+
+      expect(elapsed).toBeLessThan(LATENCY_BUDGET_MS)
     } finally {
       // Cleanup: close app first, then remove dirs
       if (electronApp && window) {
