@@ -40,6 +40,7 @@ The goal is **full Windows parity** — every feature that works on macOS must w
 | [`contributing.md`](contributing.md) | Contributor workflow for Windows parity work – branch strategy, issue labels, commit scope, test expectations, reviewer checklist. |
 | [`deferred-work.md`](deferred-work.md) | D1–D8 deferred items (Phase 2 review aftermath) with severity, promotion criteria, risk-if-forgotten. |
 | [`deferred-work-phase4.md`](deferred-work-phase4.md) | D9–D12 deferred items (Phase 4 audit aftermath). Same template as D1-D8; split for file-size compliance (500-line cap). |
+| [`known-flakes.md`](known-flakes.md) | Windows test-flake remediation register — symptom, status, issue link per test. Includes remediation patterns cheat-sheet and follow-up audit candidates. |
 | [`phase4-binary-spec.md`](phase4-binary-spec.md) | Pinned SHAs for the first published `whisper-build-v1.8.4-erfana1` release (source-of-truth cross-checked against `src/main/services/whisper-assets.ts`). |
 | [`phase2-closure.md`](phase2-closure.md) | Historical 7-stream closure plan for Phase 2 — write-once-archive, retained for reference. |
 | [`../build/windows.md`](../build/windows.md) | Windows dev environment setup (Node 24, Python 3.12, VS 2022 Build Tools, Developer Mode, long paths, troubleshooting, contributor expectations). |
