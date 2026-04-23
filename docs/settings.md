@@ -47,7 +47,7 @@ Full-screen settings dialog for app-wide configuration.
 
 **API key security**: Keys are encrypted using platform-native keychain (macOS Keychain, Linux libsecret, Windows DPAPI). The global settings JSON only stores a boolean `openaiApiKeyStored` flag, never the key itself. Plaintext fallback with warning if safeStorage unavailable.
 
-**Local backend** (macOS only): When backend is set to 'local', transcription runs entirely offline via whisper.cpp child process. The binary and model files are stored in the Electron `userData` directory. Model download (which also downloads the whisper-cli binary) is required before first use – progress is shown in the settings UI. On non-macOS platforms the "Local" option is disabled with a "(macOS only)" label. Downloads have a 10-minute timeout to prevent indefinite hangs.
+**Local backend** (macOS universal + Windows x64 since Phase 4, [#165](https://github.com/qodeca/erfana/issues/165), merged 2026-04-23 for 0.9.4): When backend is set to 'local', transcription runs entirely offline via whisper.cpp child process. The binary and model files are stored in the Electron `userData` directory. Binary + model downloads run through the Phase 4 trust chain — minisign-signed manifest (dual-pubkey), SHA-256 pin in `whisper-assets.ts`, pre-spawn TOCTOU re-hash, and monotonic `lastSeenRevision` downgrade block — progress is shown in the settings UI. Windows ARM64 shows a disabled "Local" option with ARM64-specific copy (upstream whisper.cpp has no ARM64 Windows binary). Downloads have a 10-minute timeout to prevent indefinite hangs. See [Whisper Trust Chain](./windows/whisper-trust-chain.md) for the full trust model.
 
 ## Storage
 
