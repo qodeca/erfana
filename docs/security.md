@@ -496,7 +496,7 @@ Trust anchors:
 - **macOS**: Developer ID Application certificate + notarytool (user-auth mode: Apple ID + app-specific password + Team ID). Ticket stapled.
 - **Windows**: Azure Artifact Signing (formerly Azure Trusted Signing) via OIDC federation (no long-lived client secret). Both NSIS installer and portable `.exe` are signed independently. Timestamped via `http://timestamp.digicert.com`.
 - **Linux**: aggregate `SHA256SUMS` signed with a **dedicated release minisign keypair** (separate from the whisper-binaries key — blast-radius isolation per ADR 0003 pattern).
-- **Per-artifact provenance**: SLSA Build L2 `actions/attest-build-provenance` attestations. Verifiable via `gh attestation verify --repo qodeca/erfana <artifact>`.
+- **Per-artifact provenance**: SLSA Build L2 attestations are currently **not enabled** — GitHub gates `actions/attest-build-provenance` to Enterprise Cloud for private repos. The minisign signature on the aggregate `SHA256SUMS` (Linux) + per-platform Developer ID / Azure Artifact Signing already provide artifact authenticity without requiring GitHub as a trust anchor. Revisit if Erfana goes public or moves to Enterprise.
 
 ### Release minisign public keys (dual-key, ADR-0003 style)
 
@@ -519,9 +519,6 @@ Mirrored copies for offline retrieval: `README.md` § Release verification, `doc
 ### End-user verification
 
 ```bash
-# Provenance attestation (any artifact)
-gh attestation verify <artifact> --repo qodeca/erfana
-
 # Integrity + aggregate signature (Linux packages)
 minisign -V -P "$(cat docs/release-pubkey.txt)" -m SHA256SUMS -x SHA256SUMS.minisig
 sha256sum -c SHA256SUMS

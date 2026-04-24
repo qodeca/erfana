@@ -135,8 +135,6 @@ jobs:
       is-dry-run: ${{ needs.prepare.outputs.is_dry_run == 'true' }}
     permissions:
       contents: write
-      id-token: write
-      attestations: write
 
   build_mac:
     name: Build macOS
@@ -149,8 +147,6 @@ jobs:
     secrets: inherit
     permissions:
       contents: write
-      id-token: write
-      attestations: write
 
   build_win:
     name: Build Windows
@@ -164,7 +160,6 @@ jobs:
     permissions:
       contents: write
       id-token: write
-      attestations: write
 
   finalize:
     name: Finalize draft
@@ -177,8 +172,6 @@ jobs:
     if: github.repository == 'qodeca/erfana'
     permissions:
       contents: write
-      id-token: write
-      attestations: read
     outputs:
       sha256sums: ${{ steps.sign.outputs.sha256sums }}
     steps:
@@ -275,25 +268,6 @@ jobs:
             cat SHA256SUMS
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
-
-      - name: Verify every attestation
-        if: needs.prepare.outputs.is_dry_run != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.prepare.outputs.tag }}
-        run: |
-          set -euo pipefail
-          cd dl
-          for f in *; do
-            case "$f" in
-              SHA256SUMS|SHA256SUMS.minisig) continue ;;
-            esac
-            echo "Verifying attestation for $f"
-            # gh attestation verify queries the attestations store; attestations
-            # are NOT release assets. This is the correct model for
-            # actions/attest-build-provenance@v2.
-            gh attestation verify "$f" --repo "${GITHUB_REPOSITORY}"
-          done
 
       - name: Publish SHA256SUMS as workflow artifact (tamper-check for skill Phase 4)
         if: needs.prepare.outputs.is_dry_run != 'true'

@@ -20,8 +20,6 @@ on:
 
 permissions:
   contents: write
-  id-token: write
-  attestations: write
 
 jobs:
   build:
@@ -128,7 +126,35 @@ jobs:
           echo "dir=$DIR" >> "$GITHUB_OUTPUT"
           ls -la "$DIR"
 
-      - name: Verify signatures (codesign / spctl / stapler)
+      - name: Notarize + staple DMGs
+        # electron-builder's `mac.notarize: true` notarizes the .app bundle
+        # inside each DMG but NOT the DMG container itself. spctl assesses
+        # the DMG as "no usable signature" until the DMG is separately
+        # submitted to notarytool and stapled.
+        #
+        # notarytool --wait blocks until Apple's service returns Accepted
+        # (or Rejected; exits non-zero in that case). Typical wait 1-5 min
+        # per DMG, occasionally longer during Apple server load.
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          DIR="${{ steps.art.outputs.dir }}"
+          for DMG in "$DIR"/*.dmg; do
+            [ -e "$DMG" ] || continue
+            echo "Notarizing: $DMG"
+            xcrun notarytool submit "$DMG" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --wait
+            echo "Stapling: $DMG"
+            xcrun stapler staple "$DMG"
+          done
+
+      - name: Verify signatures (codesign / stapler / spctl)
         run: |
           set -euo pipefail
           DIR="${{ steps.art.outputs.dir }}"
@@ -138,29 +164,25 @@ jobs:
             codesign --verify --deep --strict --verbose=2 "$APP"
           done < <(find "$DIR" -maxdepth 3 -name 'Erfana.app' -print0)
 
-          # Every DMG must pass Gatekeeper assessment and have a stapled ticket.
+          # Every DMG must have a stapled notarization ticket AND pass
+          # Gatekeeper. Order: stapler FIRST (offline check for the
+          # ticket we just attached), then spctl (online/cached check).
+          # Previously spctl was called first and rejected with "no
+          # usable signature" because the DMG wasn't notarized yet.
           for DMG in "$DIR"/*.dmg; do
             [ -e "$DMG" ] || continue
-            echo "spctl assessing: $DMG"
-            spctl -a -vvv -t install "$DMG"
             echo "stapler validating: $DMG"
             xcrun stapler validate "$DMG"
+            echo "spctl assessing: $DMG"
+            spctl -a -vvv -t install "$DMG"
           done
 
-          # Stapled ZIPs (notarization tickets ride inside the .app inside the zip).
+          # ZIPs carry the stapled ticket on the .app inside them.
           for Z in "$DIR"/*.zip; do
             [ -e "$Z" ] || continue
             echo "stapler validating: $Z"
             xcrun stapler validate "$Z"
           done
-
-      # actions/attest-build-provenance v2.2.3
-      - name: Attest build provenance
-        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2
-        with:
-          subject-path: |
-            ${{ steps.art.outputs.dir }}/*.dmg
-            ${{ steps.art.outputs.dir }}/*.zip
 
       - name: Upload to draft release
         if: ${{ !inputs.is-dry-run }}

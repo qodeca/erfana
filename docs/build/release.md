@@ -4,7 +4,9 @@ This document is the operator reference for the Erfana multi-platform release pi
 
 > **Service name note:** Microsoft has renamed "Azure Trusted Signing" to "Azure Artifact Signing". This doc uses the new name; the Azure CLI verb is still `az trustedsigning` and the electron-builder config key remains `win.azureSignOptions`. It covers topology, secrets, rotation calendar, end-user verification, failure recovery, and incident response.
 
-Design summary: one `v*.*.*` tag push from `main` produces one GitHub draft release containing signed, notarized, attested artifacts for Windows + macOS + Linux, plus a minisign-signed `SHA256SUMS` and SLSA Build L2 provenance attestations. The local [`releasing-erfana`](../../.claude/skills/releasing-erfana/SKILL.md) skill handles pre-tag sanity, tag push, CI polling, cryptographic verification, and human approval. CI owns build, sign, notarize, verify, and draft upload.
+Design summary: one `v*.*.*` tag push from `main` produces one GitHub draft release containing signed, notarized artifacts for Windows + macOS + Linux, plus a minisign-signed `SHA256SUMS`. The local [`releasing-erfana`](../../.claude/skills/releasing-erfana/SKILL.md) skill handles pre-tag sanity, tag push, CI polling, cryptographic verification, and human approval. CI owns build, sign, notarize, verify, and draft upload.
+
+> **SLSA Build L2 attestations are not used.** GitHub gates `actions/attest-build-provenance` to Enterprise Cloud for private repos; qodeca is on Free tier, so this layer is disabled. The minisign signature on the aggregate `SHA256SUMS` + per-platform OS signing (Developer ID notarization on macOS, Azure Artifact Signing Authenticode on Windows) are the authenticity anchors. The trust model is equivalent for end-user verification; attacker must compromise either the release-signing minisign key OR a platform signing credential to forge, independent of any GitHub-specific trust anchor.
 
 ## Topology
 
@@ -154,15 +156,7 @@ Linux arm64 is out of scope for v1. Revisit when user demand surfaces.
 
 An end user downloading from the release page should run the following to confirm they got bytes we produced.
 
-### 1. Provenance attestation (all artifacts)
-
-```bash
-gh attestation verify <artifact> --repo qodeca/erfana
-```
-
-This checks SLSA Build L2 provenance. The attestation proves the artifact was built by the `qodeca/erfana` release workflow from a specific commit SHA.
-
-### 2. Integrity + aggregate signature (Linux packages)
+### 1. Integrity + aggregate signature (Linux packages)
 
 ```bash
 curl -LO https://github.com/qodeca/erfana/releases/download/v0.9.5/SHA256SUMS
@@ -177,7 +171,7 @@ sha256sum -c SHA256SUMS
 
 > The minisign release pubkey is a **dedicated release-signing key**, separate from the `whisper-binaries` key. Using a second key isolates blast radius — a compromise of one does not invalidate the other.
 
-### 3. Code signature (macOS DMG / ZIP)
+### 2. Code signature (macOS DMG / ZIP)
 
 ```bash
 codesign --verify --deep --strict --verbose=2 /Applications/Erfana.app
@@ -185,7 +179,7 @@ spctl -a -vvv -t install /path/to/Erfana-*.dmg
 xcrun stapler validate /path/to/Erfana-*.dmg
 ```
 
-### 4. Authenticode signature (Windows .exe)
+### 3. Authenticode signature (Windows .exe)
 
 ```powershell
 # Both signatures must verify independently.

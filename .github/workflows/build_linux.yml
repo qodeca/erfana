@@ -20,8 +20,6 @@ on:
 
 permissions:
   contents: write
-  id-token: write
-  attestations: write
 
 jobs:
   build:
@@ -80,8 +78,10 @@ jobs:
           ls -la "$DIR"
 
       - name: Verify SHA256 for each artifact
-        # Pre-attestation local integrity check. Proves the file we attest
-        # has the same bytes the checksum step will eventually publish.
+        # Local integrity check. Authoritative end-user verification is the
+        # minisign signature on SHA256SUMS produced by the finalize job;
+        # GitHub attestations are not used (private-repo + Free tier = not
+        # available without Enterprise Cloud upgrade).
         run: |
           set -euo pipefail
           cd "${{ steps.art.outputs.dir }}"
@@ -89,15 +89,6 @@ jobs:
             [ -e "$f" ] || continue
             sha256sum "$f"
           done
-
-      # actions/attest-build-provenance v2.2.3
-      - name: Attest build provenance
-        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2
-        with:
-          subject-path: |
-            ${{ steps.art.outputs.dir }}/*.AppImage
-            ${{ steps.art.outputs.dir }}/*.deb
-            ${{ steps.art.outputs.dir }}/*.rpm
 
       - name: Upload to draft release
         if: ${{ !inputs.is-dry-run }}

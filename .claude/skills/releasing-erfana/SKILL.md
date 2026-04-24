@@ -55,7 +55,7 @@ All external credentials (Apple Developer, Azure Artifact Signing, minisign rele
 | Release notes path | `docs/release-notes/v{version}.md` (two-tier with `<details>`) |
 | CI workflow | `.github/workflows/release.yml` |
 | Expected release assets | 9 binaries + `SHA256SUMS` + `SHA256SUMS.minisig` (11 total) |
-| Provenance attestations | One per binary, stored in GitHub's attestations store (NOT as release assets); retrieved via `gh attestation verify` |
+| Provenance attestations | **Not used** — GitHub Artifact Attestations are Enterprise-only for private repos. Authenticity covered by minisign + per-platform OS signing. |
 | Minisign release pubkey | `docs/security.md` § Release signing |
 
 ## Critical enforcement rules (NON-NEGOTIABLE)
@@ -63,7 +63,7 @@ All external credentials (Apple Developer, Azure Artifact Signing, minisign rele
 1. **Main only.** Phase 0 aborts if `git branch --show-current` is not `main`.
 2. **Strict semver.** Phase 0 rejects anything other than `v[0-9]+.[0-9]+.[0-9]+`.
 3. **Signed tags only.** Protected-tag rule on the remote enforces this; skill surfaces actionable errors if tag push is rejected.
-4. **Verify before publish.** Phase 4 must complete minisign + per-file sha256 + per-file attestation verification before the operator approval prompt is shown.
+4. **Verify before publish.** Phase 4 must complete minisign + per-file sha256 verification before the operator approval prompt is shown.
 5. **No auto-publish.** Marking the draft as `--latest` requires explicit operator approval after verification is green.
 6. **No bypass.** A verification failure in Phase 4 aborts — do not prompt for approval, do not suggest manual overrides. The release is burned; bump the patch.
 7. **Delegate wherever possible.** The quality checklist (Phase 0) and release notes drafting (Phase 1) go through agents.
@@ -406,21 +406,11 @@ Why this gate matters: the minisign signature at 4.3 proves the *original* SHA25
 
 *If any verification step in 4.3–4.5 fails: abort. Do not prompt for approval.*
 
-### 4.6 Verify per-asset attestations
-
-```bash
-for f in $(ls "$WORK" | grep -v -E '^SHA256SUMS(\.minisig)?$|^release\.pub$|\.local$'); do
-  gh attestation verify "$WORK/$f" --repo "${GITHUB_REPOSITORY}"
-done
-```
-
-- [ ] Every asset verifies
-
-### 4.7 Operator approval — MANDATORY
+### 4.6 Operator approval — MANDATORY
 
 Only now may the skill prompt the operator. Present:
 - Number of assets
-- Expected set (9 binaries + SHA256SUMS + SHA256SUMS.minisig + per-binary `.intoto.jsonl`)
+- Expected set (9 binaries + SHA256SUMS + SHA256SUMS.minisig = 11 total)
 - Verification summary (all green)
 - Release URL
 
@@ -446,13 +436,11 @@ Ask via `AskUserQuestion`:
 ### 5.1 Re-verify the now-public release
 
 ```bash
-# Attestation verify on the published (non-draft) release URL.
+# Re-download and re-verify minisign on the published release URL.
 PUBLISHED=$(gh release view "v${VERSION}" --json url --jq .url)
-for f in $(gh release view "v${VERSION}" --json assets --jq '.assets[].name'); do
-  case "$f" in SHA256SUMS|SHA256SUMS.minisig) continue ;; esac
-  gh release download "v${VERSION}" --pattern "$f" --clobber -D "$WORK"
-  gh attestation verify "$WORK/$f" --repo "${GITHUB_REPOSITORY}"
-done
+gh release download "v${VERSION}" --pattern 'SHA256SUMS*' --clobber -D "$WORK/published"
+minisign -V -P "$(cat "$WORK/release.pub")" \
+  -m "$WORK/published/SHA256SUMS" -x "$WORK/published/SHA256SUMS.minisig"
 ```
 
 ### 5.2 Final summary
