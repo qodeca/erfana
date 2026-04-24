@@ -73,6 +73,10 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Assert release notes file exists
+        # Skipped in dry-run (workflow_dispatch from a branch — GITHUB_REF_NAME
+        # is the branch name, not a semver tag, so docs/release-notes/<branch>.md
+        # would never exist). Real tag pushes still hit this gate.
+        if: steps.meta.outputs.is_dry_run != 'true'
         env:
           TAG: ${{ steps.meta.outputs.tag }}
         run: |
@@ -88,6 +92,9 @@ jobs:
         # Lockfile-drift guard: if the tagged commit never produced a green
         # checks.yml run, its lint/typecheck/tests/build/audit-signatures/
         # release-guards have never been validated. Abort before signing.
+        # Skipped in dry-run — caller is validating the signing pipeline
+        # itself, not gating on pre-merge CI state.
+        if: steps.meta.outputs.is_dry_run != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
