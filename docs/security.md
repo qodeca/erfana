@@ -345,7 +345,7 @@ Markdown preview allows HTML rendering with strict sanitization:
 - `data:` URI images are allowed – required by ImageViewerPanel (renders local images as base64 via `FileService.readFileAsBase64`) and DOCX export (SVG-to-PNG canvas pipeline in `svgToImage.ts`). The sandboxed renderer cannot access `file://` URLs, so base64 data URIs are the secure transport mechanism for local image data from the main process.
 - Dangerous tags/attributes sanitized by DOMPurify + rehype-sanitize
 
-See [HTML Rendering](./markdown-editing.md#html-rendering-in-markdown) for details.
+See [HTML Rendering](./rendering/README.md) for details.
 
 ---
 

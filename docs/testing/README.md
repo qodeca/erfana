@@ -22,7 +22,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 #### Key test areas
 
-Run `npm run test` for current totals (~7,871 passed / 78 skipped across 250 files as of v0.9.4 — the Phase-2 UAT hardening merged in v0.9.3 added `WindowsTerminalBootstrap.test.ts` with 60 strategy-layer unit tests; v0.9.4 added Phase 4 whisper trust-chain tests and the D12 `WhisperModelManager.test.ts` rewrite).
+Run `npm run test` for current totals (~7,955 tests across 250 files as of v0.9.4 on macOS — 78 cases platform-gate on Windows (77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`), so Windows sees 7,877 pass / 78 skip and Linux sees 7,954 pass / 1 skip; invariant total stays 7,955. The Phase-2 UAT hardening merged in v0.9.3 added `WindowsTerminalBootstrap.test.ts` with 60 strategy-layer unit tests; v0.9.4 added Phase 4 whisper trust-chain tests and the D12 `WhisperModelManager.test.ts` rewrite).
 
 | Area | Key files | Docs |
 |------|-----------|------|

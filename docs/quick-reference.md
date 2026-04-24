@@ -16,7 +16,7 @@ npm run build:linux      # Linux package
 npm run typecheck        # Type checking (node + web)
 npm run lint             # Linting
 npm run test             # All tests (vitest workspace)
-npm run test:main        # Main-process tests only (~243 files)
+npm run test:main        # Main-process tests only (~90 files)
 npm run test:renderer    # Renderer tests (workspace; uses jsdom)
 npm run test:preload     # Preload tests
 npm run test:cov         # Coverage report (all 3 projects)

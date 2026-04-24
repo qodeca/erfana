@@ -245,7 +245,7 @@ Single Responsibility, Open/Closed, Testable (87 tests), Maintainable, Flexible
 
 **Auto-Refresh**: Directory watcher detects changes, updates tree
 
-See: [Architecture - ProjectTree](./architecture.md#projecttree-modularization) | [File Watching](./file-watching.md)
+See: [Architecture - ProjectTree](./architecture.md#projecttree-modularization) | [File Watching](./file-watching/README.md)
 
 ## Directory Watching
 
@@ -297,7 +297,7 @@ const handleDirectoryChanged = async () => {
 
 **Benefits**: External changes (git, npm, IDE) don't collapse folders
 
-See: [File Watching](./file-watching.md#directory-watching)
+See: [File Watching](./file-watching/README.md#directory-watching)
 
 ## File Opening
 
@@ -350,5 +350,5 @@ See: [UI Components](./ui-components.md#panel-communication-pattern)
 - [Architecture](./architecture.md) - Hybrid layout, ProjectTree modularization
 - [UI Components](./ui-components.md) - Activity bars, panel system
 - [IPC Patterns](./ipc-patterns.md) - File operations, settings
-- [File Watching](./file-watching.md) - Auto-refresh system
+- [File Watching](./file-watching/README.md) - Auto-refresh system
 - [Development Tasks](./development-tasks.md) - Common patterns

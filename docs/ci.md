@@ -17,7 +17,7 @@ Four jobs run in parallel:
 |-----|---------|------------------|
 | `lint` | `npm run lint` | 1–2 min |
 | `typecheck` | `npm run typecheck` (tsc node + web) | 1–2 min |
-| `test` | `npm run test:ci` (vitest workspace, ~7887 tests) | 2–3 min |
+| `test` | `npm run test:ci` (vitest workspace, ~7,955 tests across 250 files) | 2–3 min |
 | `build` | `npx electron-vite build` | 2–3 min |
 
 **Design notes**:

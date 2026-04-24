@@ -371,7 +371,7 @@ export const terminalService = new TerminalService()
 
 **Pattern**: OOP service with singleton instance (follows FileService pattern)
 
-**v0.3.3 Enhancement**: The `write()` method now returns a Promise that resolves when the write operation completes. This enables reliable autoExecute behavior for prompt templates, preventing race conditions between text write and Enter key. See [Prompt Templates - Implementation Guide](../prompts/implementation.md) for details.
+**v0.3.3 Enhancement**: The `write()` method now returns a Promise that resolves when the write operation completes. This enables reliable autoExecute behavior for prompt templates, preventing race conditions between text write and Enter key. See [AutoExecute Reference](../prompts/autoexecute-reference.md) for details.
 
 ### IPC Handlers
 
@@ -436,7 +436,7 @@ interface TerminalStore {
 
 **Purpose**: Cross-component communication (PreviewContextMenu → Terminal Panel)
 
-**v0.3.3 Enhancement**: `sendToTerminal()` now supports `autoExecute` parameter to automatically send Enter key after text. Includes initialization polling (5s timeout, 50ms intervals) to prevent race conditions. See [Prompt Templates - Implementation Guide](../prompts/implementation.md).
+**v0.3.3 Enhancement**: `sendToTerminal()` now supports `autoExecute` parameter to automatically send Enter key after text. Includes initialization polling (5s timeout, 50ms intervals) to prevent race conditions. See [AutoExecute Reference](../prompts/autoexecute-reference.md).
 
 ### Bracketed Paste Mode (v0.7.2+, #108)
 

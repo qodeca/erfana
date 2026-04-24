@@ -169,7 +169,7 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ## Continuous Integration
 See [docs/ci.md](docs/ci.md) for the full pipeline map. Summary:
-- **`checks.yml`** (`.github/workflows/checks.yml`) — runs on **every push to any branch**. 4 parallel jobs on `ubuntu-latest`: `lint`, `typecheck`, `test` (7887 vitest), `build` (`electron-vite build`). ~3 min wall-clock.
+- **`checks.yml`** (`.github/workflows/checks.yml`) — runs on **every push to any branch**. 4 parallel jobs on `ubuntu-latest`: `lint`, `typecheck`, `test` (~7,955 vitest across 250 files), `build` (`electron-vite build`). ~3 min wall-clock.
 - **`e2e.yml`** (`.github/workflows/e2e.yml`) — runs on push to `develop` + all PRs. `macos-latest`. Scoped to `--project=electron`; visual suite local-only.
 - **Every `npm ci` is wrapped in retry**: `npm ci || (sleep 10 && npm ci) || (sleep 20 && npm ci)` – handles transient ECONNRESET on GitHub runners.
 - **Concurrency cancellation** via `github.ref` — rapid pushes cancel in-flight runs on the same branch.

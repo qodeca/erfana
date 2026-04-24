@@ -84,7 +84,7 @@ if (!writeResult.success) {
 - Guarantees operation completion before proceeding
 - Prevents race conditions (e.g., sending Enter before text is written)
 - Enables reliable sequential operations
-- See [Prompt Templates - Implementation Guide](../prompts/implementation.md) for full autoExecute implementation
+- See [AutoExecute Reference](./prompts/autoexecute-reference.md) for full autoExecute implementation
 
 ## Adding New IPC Channel
 
@@ -162,7 +162,7 @@ if (!writeResult.success) {
 
 Use event-based IPC for watchers and terminal events (e.g., `terminal:data`, `directory-watch:changed`).
 
-See: [Architecture](./architecture.md) | [Security](./security.md) | [File Watching](./file-watching.md)
+See: [Architecture](./architecture.md) | [Security](./security.md) | [File Watching](./file-watching/README.md)
 
 ## Shared Schemas (Type Safety)
 
