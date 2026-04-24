@@ -8,9 +8,9 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 ## Status snapshot
 
-*Last updated 2026-04-23, Phase 4 merged to `develop` (`110f1b9`) for 0.9.4.*
+*Last updated 2026-04-23, Phase 4 merged to `develop` (`110f1b9`) and released as [`v0.9.4`](https://github.com/qodeca/erfana/releases/tag/v0.9.4).*
 
-**Current state:** Phases 0, 1, 2 shipped to `develop` in **v0.9.3** (merge commit `c1e085d`, release commit `0b593a1`, tag `v0.9.3` on 2026-04-22). **Phase 4 (local Whisper parity, [#165](https://github.com/qodeca/erfana/issues/165)) merged to `develop` on 2026-04-23 (`110f1b9`) for 0.9.4** — see the Phase 4 section below and [`docs/build/whisper-binaries.md`](../build/whisper-binaries.md). In parallel, the Windows-host test-flake remediation pool ([#172](https://github.com/qodeca/erfana/issues/172)) + ThrottledWorker offset-deque refactor ([#173](https://github.com/qodeca/erfana/issues/173)) merged the same day (`c3cc005`). Phase 3 (screenshot parity, [#164](https://github.com/qodeca/erfana/issues/164)) remains the next unstarted item. Phase 5–6 work branches off `develop` as `feature/windows-phase-<N>-*` per the project convention.
+**Current state:** Phases 0, 1, 2 shipped to `develop` in **v0.9.3** (merge commit `c1e085d`, release commit `0b593a1`, tag `v0.9.3` on 2026-04-22). **Phase 4 (local Whisper parity, [#165](https://github.com/qodeca/erfana/issues/165)) shipped in [v0.9.4](https://github.com/qodeca/erfana/releases/tag/v0.9.4)** (merge `110f1b9`, tag cut 2026-04-23) — see the Phase 4 section below and [`docs/build/whisper-binaries.md`](../build/whisper-binaries.md). In parallel, the Windows-host test-flake remediation pool ([#172](https://github.com/qodeca/erfana/issues/172)) + ThrottledWorker offset-deque refactor ([#173](https://github.com/qodeca/erfana/issues/173)) shipped the same day (`c3cc005`). The v0.9.4 release cut a Windows NSIS installer; macOS + Linux builds follow on native build hosts. Phase 3 (screenshot parity, [#164](https://github.com/qodeca/erfana/issues/164)) remains the next unstarted item. Phase 5–6 work branches off `develop` as `feature/windows-phase-<N>-*` per the project convention.
 
 **Recent commits on `windows` that landed in v0.9.3 (newest → oldest, frozen for the trail):**
 

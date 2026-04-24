@@ -1,6 +1,6 @@
 # Transcription components
 
-Media import dialog for audio/video transcription – dual backend: OpenAI API (cloud) or local whisper.cpp (offline). Local whisper is available on **macOS universal + Windows x64** (Phase 4, [#165](https://github.com/qodeca/erfana/issues/165) — merged on `develop` 2026-04-23 for 0.9.4). Windows ARM64 is explicitly disabled in the Backend dropdown with ARM64-specific copy.
+Media import dialog for audio/video transcription – dual backend: OpenAI API (cloud) or local whisper.cpp (offline). Local whisper is available on **macOS universal + Windows x64** (Phase 4, [#165](https://github.com/qodeca/erfana/issues/165) — shipped in [v0.9.4](https://github.com/qodeca/erfana/releases/tag/v0.9.4), merge `110f1b9` 2026-04-23). Windows ARM64 is explicitly disabled in the Backend dropdown with ARM64-specific copy.
 
 ## Architecture
 

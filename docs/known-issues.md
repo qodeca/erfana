@@ -128,7 +128,7 @@ Pipeline contributors on Windows:
 
 ### Downgrading Erfana from 0.9.4 back to 0.9.3 is safe but leaves stale whisper sentinels
 
-**Issue**: An IT admin or user rolling Erfana back from a future 0.9.4 install to 0.9.3 will have `{userData}/whisper/.schema-version` (value `1`) and `{userData}/whisper/.last-seen-revision` sentinels on disk. These files don't exist pre-0.9.4 and are silently ignored by 0.9.3 code — 0.9.3's `WhisperModelManager` checks for the binary at the old ggml-org path (which never worked on macOS; Windows was never wired up pre-0.9.4).
+**Issue**: An IT admin or user rolling Erfana back from a 0.9.4+ install to 0.9.3 will have `{userData}/whisper/.schema-version` (value `1`) and `{userData}/whisper/.last-seen-revision` sentinels on disk. These files don't exist pre-0.9.4 and are silently ignored by 0.9.3 code — 0.9.3's `WhisperModelManager` checks for the binary at the old ggml-org path (which never worked on macOS; Windows was never wired up pre-0.9.4).
 
 **Symptom**: User downgrades, tries Local Whisper, sees the pre-0.9.4 "binary not installed / download fails" flow. Their downloaded models in `{userData}/whisper/models/` are preserved.
 

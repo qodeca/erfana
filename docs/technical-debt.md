@@ -197,4 +197,4 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 
 ---
 
-**Last Updated**: v0.9.4 in-flight (April 2026, Phase 4 doc-sweep)
+**Last Updated**: v0.9.4 (released 2026-04-23, post-Phase-4)
