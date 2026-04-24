@@ -106,7 +106,9 @@ All secrets live in the GitHub repo `qodeca/erfana` (Settings → Secrets and va
 | `MAC_CERT_P12_BASE64` | secret | Developer ID Application cert, base64 | Before cert expiry (max 459 days since 2026-02-15) |
 | `MAC_CERT_PASSWORD` | secret | `.p12` password | With the cert |
 | `AZURE_TENANT_ID` | secret | Qodeca tenant | Never |
-| `AZURE_CLIENT_ID` | secret | Federated app-registration client ID (OIDC) | Only on SP rotation |
+| `AZURE_CLIENT_ID` | secret | App-registration client ID (`erfana-github-ci`) | Only on SP rotation |
+| `AZURE_CLIENT_CERTIFICATE_BASE64` | secret | Base64-encoded PFX bundling the app-reg signing cert private key | Before cert expiry (2-year validity) |
+| `AZURE_CLIENT_CERTIFICATE_PASSWORD` | secret | PFX password (32-char random) | With the cert |
 | `AZURE_SIGNING_ENDPOINT` | secret | e.g. `https://plc.codesigning.azure.net` | Never |
 | `AZURE_SIGNING_ACCOUNT_NAME` | secret | Azure Artifact Signing account | Never |
 | `AZURE_CERT_PROFILE_NAME` | secret | Certificate profile | On profile rotation |
@@ -116,7 +118,9 @@ All secrets live in the GitHub repo `qodeca/erfana` (Settings → Secrets and va
 
 **Notarization note:** this project uses the **user-auth mode of notarytool** (Apple ID + app-specific password + Team ID). The `.p8` App Store Connect API key path is also supported by electron-builder 26 but not used here because the app-specific password was already provisioned before the release pipeline was built. Only the **altool CLI** was deprecated by Apple; notarytool itself accepts both auth modes.
 
-**`AZ_CLIENT_SECRET` is explicitly excluded.** OIDC federation via `azure/login` replaces it. June 2023 CA/B rules forbid EV code-signing cert material in a GitHub Secret. `checks.yml` has a guard that fails the build if any workflow references `AZ_CLIENT_SECRET` or `altool`.
+**Azure auth note:** this project uses **certificate-based auth** against the app registration, not OIDC federation. electron-builder 26.8.1's `WindowsSignAzureManager.initialize()` hard-rejects `AZURE_FEDERATED_TOKEN_FILE` — its pre-flight validator only accepts `AZURE_CLIENT_SECRET`, `AZURE_CLIENT_CERTIFICATE_PATH`, or `AZURE_USERNAME`+`AZURE_PASSWORD`. Certificate auth is the security-equivalent of OIDC here: no shared secret in transit (only the public cert lives on the app registration); the private key is a rotatable GitHub Secret. Revisit OIDC when upstream adds `AZURE_FEDERATED_TOKEN_FILE` support.
+
+**`AZ_CLIENT_SECRET` is explicitly excluded.** This is the legacy Azure CLI 1.x env var name; `checks.yml` has a guard that fails the build if any workflow references it or `altool`. The modern `AZURE_CLIENT_SECRET` (used by `@azure/identity`) is permitted as a fallback auth path but unused here.
 
 ### Rotation calendar
 
@@ -135,7 +139,7 @@ Owner: release engineer on rotation (currently documented under repo owner email
 |---|---|---|---|
 | Linux | `ubuntu-latest` (x64) | ~20 min | No external signing deps. Integrity via aggregate `SHA256SUMS` + minisign. |
 | macOS | `macos-latest` (arm64 default) | ~60 min | Builds both arm64 + x64 via `--arm64 --x64`. Rosetta 2 preflight for cross-arch native modules. |
-| Windows | `windows-latest` (x64) | ~45 min | Azure Artifact Signing via OIDC. Both NSIS + portable `.exe` signed independently. |
+| Windows | `windows-latest` (x64) | ~45 min | Azure Artifact Signing via app-reg certificate auth (OIDC unsupported by electron-builder 26). Both NSIS + portable `.exe` signed independently. |
 
 No self-hosted runners for release. Self-hosted Windows with a `.pfx` on disk is explicitly out of scope — side-doors outlive the rationale for creating them.
 
@@ -217,10 +221,11 @@ Each trust anchor has a revocation + communication procedure.
 
 ### B. Azure identity compromise
 
-1. Disable the federated credential on the Azure app registration (Azure Portal → App registrations → <ID> → Certificates & secrets → Federated credentials).
-2. Rotate the signing cert profile.
-3. Audit recent signing operations via Azure activity log.
-4. Re-issue federated credential with stricter subject if possible (e.g., restrict to specific tag ranges rather than `ref:refs/tags/v*`).
+1. Remove the compromised certificate credential on the Azure app registration (Azure Portal → App registrations → `erfana-github-ci` → Certificates & secrets → Certificates → delete the entry).
+2. Generate a fresh X.509 keypair locally (`openssl req -x509 -nodes -newkey rsa:2048 …`), upload the public `.crt` via `az ad app credential reset --append`.
+3. Replace the GitHub Secrets `AZURE_CLIENT_CERTIFICATE_BASE64` and `AZURE_CLIENT_CERTIFICATE_PASSWORD` with the new PFX.
+4. Rotate the Azure Artifact Signing certificate profile (signing cert on the service, separate from the app-reg auth cert).
+5. Audit recent signing operations via Azure activity log.
 
 ### C. Minisign key compromise
 
