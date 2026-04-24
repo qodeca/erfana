@@ -63,29 +63,60 @@ jobs:
           allow-no-subscriptions: true
 
       - name: Write OIDC token file for electron-builder EnvironmentCredential
-        # electron-builder 26's WindowsSignAzureManager instantiates
-        # @azure/identity's EnvironmentCredential. That credential class
-        # needs BOTH AZURE_TENANT_ID + AZURE_CLIENT_ID AND one of:
-        #   (a) AZURE_CLIENT_SECRET        — rejected (CA/B rules + not OIDC)
-        #   (b) AZURE_CLIENT_CERTIFICATE_PATH
-        #   (c) AZURE_FEDERATED_TOKEN_FILE — OIDC path; what we use
-        # azure/login@v2 authenticates via OIDC internally but does not
-        # expose the federated token as a file for downstream steps, so we
-        # fetch it ourselves via GitHub's Actions OIDC endpoint and export
-        # the file path.
-        shell: pwsh
+        # electron-builder 26's WindowsSignAzureManager uses @azure/identity's
+        # EnvironmentCredential, which needs:
+        #   - AZURE_TENANT_ID
+        #   - AZURE_CLIENT_ID
+        #   - ONE OF: AZURE_CLIENT_SECRET / AZURE_CLIENT_CERTIFICATE_PATH
+        #             / AZURE_FEDERATED_TOKEN_FILE
+        # We use the federated-token-file path (OIDC). azure/login@v2 does
+        # NOT expose the token as a file for downstream steps, so we fetch
+        # it ourselves via GitHub's Actions OIDC endpoint.
+        #
+        # Using bash + node instead of pwsh — more predictable GITHUB_ENV
+        # append semantics on windows-latest (pwsh Out-File can introduce
+        # UTF-8 BOM or encoding surprises).
+        shell: bash
+        env:
+          ACTIONS_ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
+          ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
         run: |
-          $audience = "api://AzureADTokenExchange"
-          $url = "$env:ACTIONS_ID_TOKEN_REQUEST_URL&audience=$audience"
-          $hdr = @{ Authorization = "bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" }
-          $response = Invoke-RestMethod -Uri $url -Headers $hdr
-          $tokenPath = Join-Path $env:RUNNER_TEMP "azure_oidc_token"
-          [IO.File]::WriteAllText($tokenPath, $response.value)
-          "AZURE_FEDERATED_TOKEN_FILE=$tokenPath" | Out-File -Append `
-            -FilePath $env:GITHUB_ENV -Encoding utf8
-          "AZURE_AUTHORITY_HOST=https://login.microsoftonline.com" | `
-            Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
-          Write-Host "OIDC token written; AZURE_FEDERATED_TOKEN_FILE exported"
+          set -euo pipefail
+          TOKEN_PATH="${RUNNER_TEMP}/azure_oidc_token"
+          RESPONSE_PATH="${RUNNER_TEMP}/azure_oidc_response.json"
+          curl -sSf -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=api://AzureADTokenExchange" \
+            -o "$RESPONSE_PATH"
+          # Use node to extract .value — guaranteed available after setup-node.
+          node -e "const j=require(process.env.RESPONSE_PATH);require('fs').writeFileSync(process.env.TOKEN_PATH, j.value)" \
+            RESPONSE_PATH="$RESPONSE_PATH" TOKEN_PATH="$TOKEN_PATH"
+          rm -f "$RESPONSE_PATH"
+          # Basic sanity — JWT header starts with eyJ
+          HEAD=$(head -c 3 "$TOKEN_PATH")
+          if [ "$HEAD" != "eyJ" ]; then
+            echo "::error::OIDC token file does not start with JWT header 'eyJ'"
+            exit 1
+          fi
+          SIZE=$(wc -c < "$TOKEN_PATH")
+          echo "Token file: $TOKEN_PATH (${SIZE} bytes, starts 'eyJ')"
+          echo "AZURE_FEDERATED_TOKEN_FILE=$TOKEN_PATH" >> "$GITHUB_ENV"
+          echo "AZURE_AUTHORITY_HOST=https://login.microsoftonline.com" >> "$GITHUB_ENV"
+
+      - name: Verify AZURE_* env reaches the build step
+        # Quick diagnostic — if this shows blanks, next step will also
+        # fail the same way. Helps disambiguate env-propagation vs
+        # credential-validity bugs on future debug runs.
+        shell: bash
+        run: |
+          echo "AZURE_TENANT_ID=${AZURE_TENANT_ID:+SET}"
+          echo "AZURE_CLIENT_ID=${AZURE_CLIENT_ID:+SET}"
+          echo "AZURE_FEDERATED_TOKEN_FILE=${AZURE_FEDERATED_TOKEN_FILE:-UNSET}"
+          echo "AZURE_AUTHORITY_HOST=${AZURE_AUTHORITY_HOST:-UNSET}"
+          if [ -n "${AZURE_FEDERATED_TOKEN_FILE:-}" ] && [ -s "$AZURE_FEDERATED_TOKEN_FILE" ]; then
+            echo "Token file present + non-empty"
+          else
+            echo "::warning::Token file missing or empty"
+          fi
 
       - name: Bundle sources (electron-vite)
         # electron-builder packages prebuilt bundles from out/; it does NOT
