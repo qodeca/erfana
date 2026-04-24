@@ -39,9 +39,13 @@ win:
   target:
     - target: nsis
     - target: portable
-  signingHashAlgorithms:
-    - sha256
-  rfc3161TimeStampServer: http://timestamp.digicert.com
+  # signingHashAlgorithms + rfc3161TimeStampServer moved into signtoolOptions
+  # as a nested block in electron-builder 26 (flat fields were removed from
+  # the win schema). azureSignOptions stays at win level.
+  signtoolOptions:
+    signingHashAlgorithms:
+      - sha256
+    rfc3161TimeStampServer: http://timestamp.digicert.com
   # Azure Artifact Signing (formerly Azure Trusted Signing). Values are
   # injected from CI env vars (OIDC-auth,
   # no long-lived client secret). publisherName MUST exactly match the cert
