@@ -228,12 +228,16 @@ jobs:
             xcrun stapler validate "$DMG"
           done
 
-          # ZIPs carry the stapled ticket on the .app inside them.
-          for Z in "$DIR"/*.zip; do
-            [ -e "$Z" ] || continue
-            echo "stapler validating: $Z"
-            xcrun stapler validate "$Z"
-          done
+          # ZIPs are NOT stapler-validatable: the ZIP container has no
+          # extended-attribute storage, so `xcrun stapler validate <zip>`
+          # exits 66 ("incapable of working with ZIP archive files").
+          # The stapled ticket lives inside each archive's .app bundle
+          # (electron-builder notarizes + staples the .app BEFORE zipping
+          # it), and that same .app was already codesign-verified above
+          # from the unzipped mac/ and mac-arm64/ directories. End-users
+          # get the ticket preserved when they unzip, and Gatekeeper
+          # reads it from the .app bundle on first open.
+          echo "skipping stapler validate on ZIPs (not supported; ticket lives on the .app inside)"
 
       - name: Upload to draft release
         if: ${{ !inputs.is-dry-run }}
