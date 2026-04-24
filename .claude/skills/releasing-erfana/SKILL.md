@@ -1,69 +1,73 @@
 ---
 name: releasing-erfana
-description: Build and release new versions of the Erfana Electron app. Runs quality gates (lint, typecheck, tests, security audit), builds platform packages, generates user-friendly release notes, and creates git tags. Use when a new version of Erfana is ready to ship and needs a production-quality build with verified artifacts.
+description: Build and release a new version of Erfana via the multi-platform CI release workflow. Enforces main-branch discipline, assembles two-tier release notes, pushes a signed tag, polls the release pipeline in GitHub Actions, cryptographically verifies every artifact, and gates the final publish on explicit operator approval. Use when Erfana is ready to ship.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList
 ---
 
 # Releasing Erfana
 
-This skill orchestrates the complete release process for Erfana, an Electron-based markdown IDE. All execution is delegated to agents – the skill manages workflow progression, user interaction, and checkpoints.
+Orchestrates the Erfana release flow that ends with **one GitHub release containing signed, notarized, attested artifacts for Windows + macOS + Linux**. The CI matrix (`.github/workflows/release.yml`) does all build, sign, notarize, verify, and draft-upload work. This skill handles pre-tag sanity, tag push, CI polling, local cryptographic verification, and the human approval checkpoint.
+
+Detailed ops reference: [docs/build/release.md](../../../docs/build/release.md).
+Design anchor: [#174](https://github.com/qodeca/erfana/issues/174).
 
 ## When this skill applies
 
-Activate when user says:
-- "release new version"
-- "build release"
+Activate when the user says:
+
+- "release Erfana"
 - "prepare release"
-- "release erfana"
-- "create release"
-- "build for production"
+- "cut a release"
+- "ship v0.9.5" (or similar version)
+- "new release"
+
+Activate only when the working copy can reasonably be released — do not activate for build/test troubleshooting, dev-only tagging, or non-release `v*` tags.
 
 ## Prerequisites
 
-| Dependency | Purpose | Check command |
-|-----------|---------|---------------|
-| `git` | Version control, tagging | `git --version` |
-| `node` (>=18) | Runtime for build tools | `node --version` |
-| `npm` | Package management, script runner | `npm --version` |
-| `codesign` | macOS code signing verification | `which codesign` |
-| `hdiutil` | macOS DMG mounting for smoke tests | `which hdiutil` |
+| Dependency | Purpose | Check |
+|-----------|---------|-------|
+| `git` | Signed tag, push | `git --version` |
+| `node` (≥24) | Read package.json, run git-cliff if installed via npx | `node --version` |
+| `gh` | Release polling, asset download, draft publish | `gh --version` |
+| `git cliff` | Technical section for release notes | `git cliff --version` (skill will fall back to `npx git-cliff` if needed) |
+| `minisign` | Verify `SHA256SUMS.minisig` | `minisign -v` |
+| `sha256sum` | Recompute asset hashes locally | `command -v sha256sum` |
 
-Phase 0.2 verifies these are available before proceeding.
+All external credentials (Apple Developer, Azure Artifact Signing, minisign release keypair) live in **GitHub secrets** and never flow through the local machine.
 
 ## Agents
 
 | Agent | Purpose | Source | Used in |
 |-------|---------|--------|---------|
-| `release-quality-runner` | Run lint, typecheck, tests, security audit | shared | Phase 1 |
-| `release-build-executor` | Build packages, verify output, smoke test | shared | Phase 2 |
-| `release-notes-drafter` | Analyze commits, draft user-focused notes | shared | Phase 3 |
+| `release-quality-runner` | Enforce Phase 0 local pre-flight checklist | shared (project override) | Phase 0 |
+| `release-notes-drafter` | Emit two-tier release-notes markdown via `git cliff` + operator summary | shared (project override) | Phase 1 |
 
-### Tool scope notes
-
-**Bash** is used at skill level for 6 lightweight pre-flight commands only (`pgrep`, `git status`, `git tag`, `grep package.json`, `git push`). All substantive work (quality gates, builds, release notes) is delegated to agents. A dedicated agent for these commands would add complexity without safety benefit since they are all read-only except `git tag`/`git push` which require user confirmation.
+**`release-build-executor` is retired.** CI owns the build. The skill watches, verifies, and publishes.
 
 ## Quick reference
 
 | Item | Value |
 |------|-------|
-| Version source | `package.json` → `"version"` field |
-| Tag format | `v{major}.{minor}.{patch}` (e.g., `v0.4.5`) |
-| Release folder | `release/{version}/` |
-| DMG naming | `erfana-{version}.dmg` |
-| Release notes | `erfana-{version}-release-notes.md` (in release folder) |
-| Expected DMG size | 230–290 MB (per-arch macOS) |
+| Release branch | `main` (skill refuses elsewhere) |
+| Tag pattern | `v[0-9]+.[0-9]+.[0-9]+` (strict; pre-release suffixes rejected) |
+| Version source | `package.json` → `"version"` |
+| Release notes path | `docs/release-notes/v{version}.md` (two-tier with `<details>`) |
+| CI workflow | `.github/workflows/release.yml` |
+| Expected release assets | 9 binaries + `SHA256SUMS` + `SHA256SUMS.minisig` (11 total) |
+| Provenance attestations | One per binary, stored in GitHub's attestations store (NOT as release assets); retrieved via `gh attestation verify` |
+| Minisign release pubkey | `docs/security.md` § Release signing |
 
-## CRITICAL ENFORCEMENT RULES
+## Critical enforcement rules (NON-NEGOTIABLE)
 
-**These rules are NON-NEGOTIABLE. Violations are automatic failures.**
-
-1. **NO PHASE SKIPPING** – ALL phases (0–5) MUST execute every time. No exceptions.
-2. **NO CHECKPOINT SKIPPING** – Every checkpoint MUST present options to user.
-3. **SEQUENTIAL EXECUTION** – Phase N cannot start until Phase N-1 checkpoint passes.
-4. **"Already done" is NOT a valid skip reason** – Re-execute phases. Prior state may be stale.
-5. **Smoke test crash = STOP** – A crash during any smoke test blocks the release. NEVER dismiss a crash.
-6. **User confirms every checkpoint** – Do not auto-approve on behalf of the user.
-7. **Delegate, don't execute** – All quality gates, builds, and note drafting go through agents.
+1. **Main only.** Phase 0 aborts if `git branch --show-current` is not `main`.
+2. **Strict semver.** Phase 0 rejects anything other than `v[0-9]+.[0-9]+.[0-9]+`.
+3. **Signed tags only.** Protected-tag rule on the remote enforces this; skill surfaces actionable errors if tag push is rejected.
+4. **Verify before publish.** Phase 4 must complete minisign + per-file sha256 + per-file attestation verification before the operator approval prompt is shown.
+5. **No auto-publish.** Marking the draft as `--latest` requires explicit operator approval after verification is green.
+6. **No bypass.** A verification failure in Phase 4 aborts — do not prompt for approval, do not suggest manual overrides. The release is burned; bump the patch.
+7. **Delegate wherever possible.** The quality checklist (Phase 0) and release notes drafting (Phase 1) go through agents.
+8. **Idempotency with honesty.** If a tag is already pushed, Phase 0 offers resume-to-Phase-3 (non-destructive) or delete-and-retry (destructive, explicit operator confirmation).
 
 ---
 
@@ -72,330 +76,393 @@ Phase 0.2 verifies these are available before proceeding.
 At release start, create a todo list tracking all phases:
 
 ```
-TaskCreate: "Phase 0: Pre-flight checks" (pending)
-TaskCreate: "Phase 1: Quality gates" (pending)
-TaskCreate: "Phase 2: Build and smoke test" (pending)
-TaskCreate: "Phase 3: Release notes" (pending)
-TaskCreate: "Phase 4: Git tag" (pending)
-TaskCreate: "Phase 5: Summary" (pending)
+TaskCreate: "Phase 0: Pre-flight (main-branch + semver + CHANGELOG)"
+TaskCreate: "Phase 1: Release notes (two-tier)"
+TaskCreate: "Phase 2: Signed tag + push"
+TaskCreate: "Phase 3: Watch release workflow"
+TaskCreate: "Phase 4: Verify + publish checkpoint"
+TaskCreate: "Phase 5: Post-publish verification + summary"
 ```
 
-Update each task to `in_progress` before starting and `completed` after checkpoint passes.
+Update each task to `in_progress` before starting and `completed` after its checkpoint passes.
 
 ---
 
-## Phase 0: Pre-flight checks
+## Phase 0: Pre-flight
 
-**Input conditions:** None (first phase).
-
-### 0.1 Requirements gathering
-
-Ask user with structured options (AskUserQuestion):
-
-**Version bump type:**
-
-| Option | Description | Recommended |
-|--------|-------------|-------------|
-| PATCH | Bug fixes only, no new features | ✓ (for bug-fix-only releases) |
-| MINOR | New features, backward compatible | |
-| MAJOR | Breaking changes, major rewrites | |
-
-**Target platform:**
-
-| Option | Description | Recommended |
-|--------|-------------|-------------|
-| macOS | Default platform | ✓ |
-| Windows | Windows build | |
-| Linux | Linux build | |
-| All | All platforms | |
-
-### 0.2 Check environment
-
-Run directly (lightweight pre-flight, not worth agent delegation):
+### 0.1 Branch gate
 
 ```bash
-# Check for running dev servers
-pgrep -f "electron-vite" || echo "No dev servers running"
-# Check git status
-git status --porcelain
-```
-
-- [ ] No dev servers running (or user confirms kill)
-- [ ] No uncommitted changes (or user confirms proceed)
-
-### 0.3 Validate version string (semver)
-
-Before the version flows into any path or command, validate it:
-
-```bash
-VERSION=$(node -p "require('./package.json').version")
-if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-  echo "FAIL: Version '$VERSION' is not valid semver"
+BR=$(git branch --show-current)
+if [ "$BR" != "main" ]; then
+  echo "FAIL: Release must run from main, got: $BR"
   exit 1
 fi
 ```
 
-- [ ] Version matches `^[0-9]+\.[0-9]+\.[0-9]+$` (no path traversal characters, no spaces, no special chars)
-- [ ] STOP if validation fails – do not proceed with an invalid version string
+- [ ] Current branch is exactly `main` (no exceptions)
 
-**Why:** The version string is interpolated into `rm -rf release/{version}/`, `git tag v{version}`, and file paths. Semver validation prevents path traversal and command injection.
-
-### 0.4 Change classification (empty release guard)
+### 0.2 Working tree is clean
 
 ```bash
-# Get last tag
+git fetch origin
+git status --porcelain
+```
+
+- [ ] No uncommitted or untracked files (skill aborts otherwise)
+- [ ] Local `main` is not behind `origin/main` (skill surfaces a clear message if so)
+
+### 0.3 Version + CHANGELOG gate
+
+Ask the operator (AskUserQuestion) for the **bump type** (patch / minor / major). The skill computes the proposed version from `package.json`. Then:
+
+```bash
+VERSION=$(node -p "require('./package.json').version")
+if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+  echo "FAIL: version '$VERSION' is not strict semver"
+  exit 1
+fi
 LAST_TAG=$(git tag --list 'v*' --sort=-v:refname | head -1)
-# List commits since last tag with conventional commit prefixes
-git log ${LAST_TAG}..HEAD --pretty=format:"%s"
+# CHANGELOG must already contain a "## {version}" section for this release.
+grep -q "^## $VERSION" docs/CHANGELOG.md || {
+  echo "FAIL: docs/CHANGELOG.md is missing a '## $VERSION' section"
+  exit 1
+}
 ```
 
-Classify commits using conventional commit prefixes:
-- **User-facing:** `feat:`, `fix:`, `perf:` – these produce release note content
-- **Developer-only:** `chore:`, `docs:`, `refactor:`, `test:`, `ci:`, `build:`, `style:`
+- [ ] `package.json` version is strict semver
+- [ ] `docs/CHANGELOG.md` contains `## {version}` heading
+- [ ] Proposed version > last tag
 
-**If ALL commits are developer-only:** Present warning via AskUserQuestion:
-> "No user-facing changes detected since {last_tag}. All {N} commits are developer-only ({list prefixes}). This would be a maintenance-only release. Continue anyway?"
-
-Options:
-- Continue (maintenance release)
-- Abort release
-
-This is informational, not blocking – user may have valid reasons for a maintenance release.
-
-### 0.5 Version verification
+### 0.4 Idempotency check: does the tag already exist?
 
 ```bash
-# Get current version from package.json
-grep '"version"' package.json | head -1
-# Get last git tag
-git tag --list 'v*' --sort=-v:refname | head -1
+if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+  # Local tag exists
+  if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null; then
+    echo "Tag v$VERSION is already on origin"
+  fi
+fi
 ```
 
-- [ ] Current version > last tag
-- [ ] Version matches user's bump type selection
+If a tag already exists locally or on `origin`:
 
-**If version has NOT been bumped** (equals last tag): STOP. Present the semver guide from 0.1, ask user to bump version in package.json, then re-verify. Do not proceed with a version that matches an existing tag.
+Present options via `AskUserQuestion`:
 
-### 0.6 Checkpoint: confirm version
+| Option | Meaning | Risk |
+|--------|---------|------|
+| Resume at Phase 3 | Assume tag is valid; watch CI and verify. | Low |
+| Delete remote tag and restart | `git push --delete origin v${VERSION}` and start again from Phase 1. | **DESTRUCTIVE** — will void any in-flight signed artifact. Require explicit confirmation. |
+| Abort | Exit the skill. | None |
 
-**Ask user:** "Ready to release version **{version}**? This will be tagged as `v{version}`."
-
-Options:
-- Proceed with {version}
-- Need to bump version first (stop and let user update package.json)
-
-**Post-checkpoint validation:** User explicitly confirmed version.
-
-**Quality gate (Phase 0):**
-- [ ] Version string passes semver validation
-- [ ] No blocking environment issues (dev servers, uncommitted changes resolved)
-- [ ] Version > last tag confirmed
-- [ ] User explicitly confirmed version at checkpoint
-
-On failure: Re-check environment, re-validate version (max 3 retries). After 3 failures, escalate to user with AskUserQuestion explaining what is blocking.
-
----
-
-## Phase 1: Quality gates
-
-**Input conditions:**
-- [ ] Phase 0 checkpoint passed
-- [ ] Version confirmed by user
-
-### 1.1 Delegate to release-quality-runner
+### 0.5 Delegate the rest of the checklist to `release-quality-runner`
 
 ```
 Agent(subagent_type: "release-quality-runner")
-Prompt: "Run all quality gates for the Erfana project at {project_path}. Return structured pass/fail results."
+Prompt: "Run the Phase 0 release-readiness checklist for Erfana at {project_path}
+         on branch main. Return structured pass/fail for:
+         - running dev servers
+         - uncommitted changes (should be none after our gate)
+         - node version
+         - gh authenticated
+         - minisign installed
+         Return: { overall: 'pass'|'fail', failures: string[], warnings: string[] }"
 ```
 
-### 1.2 Process results
+Any `fail` stops the skill. Warnings are surfaced to the operator, who can continue.
 
-Parse agent results. Present summary:
+### Checkpoint 0.A
 
-```
-Quality gates:
-- [ ] Lint: PASSED / FAILED
-- [ ] TypeScript: PASSED / FAILED
-- [ ] Security: X vulnerabilities (Y critical, Z high)
-- [ ] Tests: N tests passed
-```
+**Ask operator:** "All pre-flight gates passed for v{version}. Proceed to draft the release notes?"
 
-### 1.3 Retry logic
-
-If any gate fails:
-- **Attempt 1:** Report failure, ask user to fix
-- **Attempt 2:** After user fixes, re-delegate to agent
-- **Attempt 3:** If still failing, escalate – ask user whether to override or abort
-
-Max retries: 3 per gate. After 3 failures, STOP and ask user for direction.
-
-### 1.4 Checkpoint: quality summary
-
-Only proceed if lint, typecheck, and tests all pass. Security audit allows user override for non-critical findings.
-
-**Post-checkpoint validation:** All 4 gates have PASS or explicit user override.
+Options: **Proceed** / **Abort**.
 
 ---
 
-## Phase 2: Build and smoke test
+## Phase 1: Two-tier release notes
 
-**Input conditions:**
-- [ ] Phase 1 checkpoint passed
-- [ ] All quality gates PASS (or user override documented)
-
-### 2.1 Clean current version folder (optional)
-
-Only if rebuilding same version. Ask user first:
+### 1.1 Generate the technical section
 
 ```bash
-# Only if rebuilding same version
-rm -rf release/{version}/
+# Requires cliff.toml at repo root.
+git cliff --tag "v${VERSION}" --unreleased > .release-notes-technical.tmp.md
 ```
 
-**IMPORTANT:** Only clean the specific version folder, NEVER the entire release/ directory.
+If `git cliff` is not installed, fall back:
 
-### 2.2 Delegate to release-build-executor
-
-```
-Agent(subagent_type: "release-build-executor")
-Prompt: "Build version {version} for {platform}. Project path: {project_path}. App name: Erfana. Release dir: release/{version}. Mac arch: mac-arm64. Expected DMG size: 230-290 MB. Verify build output and run smoke tests."
+```bash
+npx -y git-cliff --tag "v${VERSION}" --unreleased > .release-notes-technical.tmp.md
 ```
 
-### 2.3 Process results
+### 1.2 Collect the user-facing summary from the operator (SKILL-LEVEL)
 
-Parse agent results. Present summary:
+Subagents cannot call `AskUserQuestion` — it must be called from the skill. Use it now to collect 3–5 bullet points that describe the release in user-facing terms.
 
-```
-Build artifacts:
-- [ ] DMG: erfana-{version}.dmg ({size} MB)
-- [ ] Size check: PASS / WARN / FAIL
-- [ ] Code signature: PASS / FAIL
-- [ ] Smoke test (app): PASS / FAIL
-- [ ] Smoke test (DMG): PASS / FAIL
-```
+Present via `AskUserQuestion`: ask for 3–5 brief bullet points summarising what changed from the end user's perspective. Prompt text example:
 
-### 2.4 Retry logic
+> "Summarise v{VERSION} in 3–5 bullets for end users. Examples: 'Releases are now cryptographically signed on macOS, Windows, and Linux' / 'Fixed a bug where terminal scroll lost the last line'. Skip developer-internal changes — the technical section below covers those from commit history."
 
-If build fails:
-- **Attempt 1:** Report error, ask user to fix source issue
-- **Attempt 2:** Re-delegate to agent after user fix
-- **Attempt 3:** Escalate – present full error log, ask user for direction
+Persist the operator's reply into a variable (e.g., `$USER_SUMMARY`) as a single markdown string containing the bullets. Do NOT invent bullets if the operator's reply is too short — re-prompt instead.
 
-If smoke test fails (crash):
-- **NO RETRIES** – A crash blocks the release. Present crash indicators and STOP.
-
-### 2.5 Checkpoint: build success
-
-**Post-checkpoint validation:** Build PASS, codesign PASS, both smoke tests PASS.
-
----
-
-## Phase 3: Release notes – MANDATORY
-
-**This phase MUST execute even if release notes exist from a prior attempt. Prior notes may be stale.**
-
-**Input conditions:**
-- [ ] Phase 2 checkpoint passed
-- [ ] Build artifacts verified
-
-### 3.1 Delegate to release-notes-drafter
+### 1.3 Delegate composition to the agent
 
 ```
 Agent(subagent_type: "release-notes-drafter")
-Prompt: "Draft release notes for Erfana version {version}. Last tag: {last_tag}. Template: {skill_path}/templates/release-notes.md. Output: release/{version}/erfana-{version}-release-notes.md"
+Prompt: "Compose two-tier release notes for Erfana v${VERSION}.
+         Inputs:
+           - version: ${VERSION}
+           - technical_section_path: .release-notes-technical.tmp.md
+           - user_summary: <pasted $USER_SUMMARY verbatim>
+           - output_path: docs/release-notes/v${VERSION}.md
+         Write the file with the exact template:
+           # Erfana v${VERSION}
+           _Released: <UTC YYYY-MM-DD>_
+           ${user_summary}
+           <details><summary>Technical changes</summary>
+           <technical section contents>
+           </details>
+         Do NOT invent content beyond inputs. Do NOT call AskUserQuestion.
+         Return the composed content + output path."
 ```
 
-### 3.2 Checkpoint: user reviews release notes
+### 1.4 Operator review
 
-**MANDATORY: This checkpoint requires explicit user approval. Do not skip even if notes exist from a prior release attempt.**
+Present the generated `docs/release-notes/v${VERSION}.md` and ask whether to accept, edit, or re-draft.
 
-Present the draft and ask:
-> "Please review these release notes. They will be saved as `erfana-{version}-release-notes.md` in the release folder."
+- [ ] Two sections present: user-facing summary and collapsible technical section
+- [ ] Operator explicitly approved
 
-Options:
-- Approve as-is
-- Request changes (provide feedback, re-delegate to agent)
-- Edit directly
-
-### 3.3 Retry logic
-
-If user requests changes:
-- Re-delegate to agent with user feedback (max 3 rounds)
-- After 3 rounds, let user edit directly
-
-**Post-checkpoint validation:** User explicitly approved release notes.
-
----
-
-## Phase 4: Git tag – MANDATORY CHECKPOINT
-
-**This checkpoint MUST be presented even if a tag already exists.**
-
-**Input conditions:**
-- [ ] Phase 3 checkpoint passed
-- [ ] Release notes approved by user
-
-### 4.1 Checkpoint: confirm tagging
-
-**Ask user:**
-> "Create git tag `v{version}` for this release?"
-
-Options:
-- Yes, create tag
-- No, skip tagging
-- Yes, and push to remote
-
-### 4.2 Execute tag (directly – simple command)
+### 1.5 Single-commit bundle
 
 ```bash
-git tag v{version}
-# If user requested push:
-git push origin v{version}
+# One commit bundles: package.json bump (already done pre-skill or done here),
+# CHANGELOG append (pre-skill), release notes file.
+git add package.json docs/CHANGELOG.md "docs/release-notes/v${VERSION}.md"
+git commit -S -m "chore(release): bump version to ${VERSION}"
+git push origin main
 ```
 
-**Post-checkpoint validation:** Tag created (or user chose to skip).
+If `main` has new commits on `origin` (raced), re-fetch and confirm with operator before retrying.
+
+### Checkpoint 1.A
+
+- [ ] Commit for `chore(release): bump version to {version}` is on `origin/main`
+- [ ] `checks.yml` has been triggered for this commit (skill prints the URL)
+
+The release workflow's `prepare` job asserts a green `checks.yml` for the tagged commit, so we must wait for `checks.yml` to turn green before tagging.
+
+```bash
+TIP_SHA=$(git rev-parse HEAD)
+gh run list --workflow=checks.yml --branch=main --commit="$TIP_SHA" --limit=1
+# Poll until conclusion = success (max 10 min, 15 s interval). If failure:
+# abort, direct operator to fix the failure before re-running.
+```
 
 ---
 
-## Phase 5: Summary
+## Phase 2: Signed tag + push
 
-**Input conditions:**
-- [ ] All prior phases completed
+### 2.1 Create the signed tag
 
-### 5.1 Release checklist
-
-Present final summary:
-
-```
-Release v{version} complete
-
-Artifacts:
-- DMG: release/{version}/erfana-{version}.dmg
-- Notes: release/{version}/erfana-{version}-release-notes.md
-
-Quality:
-- Lint: PASSED
-- TypeScript: PASSED
-- Tests: {count} passed
-- Security: {summary}
-
-Git:
-- Tag: v{version} (created / not created)
-- Pushed: yes / no
-
-Next steps:
-- Test DMG installation manually
-- Create GitHub release (if applicable)
-- Distribute to users
+```bash
+git tag -s "v${VERSION}" -m "Release v${VERSION}"
 ```
 
-**Quality gate (Phase 5):**
-- [ ] All phases (0–4) completed and checkpointed
-- [ ] Todo list shows all 6 phases completed
-- [ ] Summary presented to user with all artifact paths and next steps
+If tag creation fails because no signing key is configured: **stop**. Direct the operator to configure SSH/GPG signing (`git config user.signingkey`, `commit.gpgsign true`, `tag.gpgsign true`).
 
-On failure: If any phase is not marked completed in the todo list, STOP and report which phase was missed. Re-check todo list status (max 3 retries). After 3 failures, escalate to user.
+### 2.2 Push the tag
+
+```bash
+# One tag at a time — not `git push --tags`. Only the first tag on a
+# bulk push reliably fires the release workflow (actions/runner#3644).
+git push origin "v${VERSION}"
+```
+
+If the push is rejected by the protected-tag rule, surface the exact rejection message and stop.
+
+### Checkpoint 2.A
+
+- [ ] Tag `v{version}` exists on `origin` and is signature-verified
+
+---
+
+## Phase 3: Watch release workflow
+
+### 3.1 Resolve run ID
+
+```bash
+# ^{} dereferences an annotated tag to its commit SHA. Required because
+# workflow-run queries are keyed on commit SHA, not tag-object SHA.
+TAG_SHA=$(git rev-parse "v${VERSION}^{}")
+
+# Retry loop: the workflow may take up to 60 s to appear.
+for i in $(seq 1 12); do
+  RUN_ID=$(gh run list --workflow=release.yml \
+    --commit="$TAG_SHA" --limit=1 --json databaseId --jq '.[0].databaseId')
+  if [ -n "$RUN_ID" ]; then break; fi
+  sleep 5
+done
+if [ -z "$RUN_ID" ]; then
+  echo "FAIL: release.yml did not pick up tag ${VERSION} within 60 s"
+  exit 1
+fi
+echo "Release run: https://github.com/qodeca/erfana/actions/runs/${RUN_ID}"
+```
+
+### 3.2 Watch with a wall-clock ceiling
+
+```bash
+# --exit-status propagates workflow success/failure.
+# Wall-clock ceiling 90 min covers: prepare + 3 matrix legs + finalize.
+timeout 90m gh run watch "$RUN_ID" --exit-status --interval 10
+RC=$?
+
+if [ "$RC" -ne 0 ]; then
+  gh run view "$RUN_ID" --log-failed | head -n 200
+  echo "Release run failed. URL: https://github.com/qodeca/erfana/actions/runs/${RUN_ID}"
+  exit 1
+fi
+```
+
+### Checkpoint 3.A
+
+- [ ] Release run succeeded
+- [ ] Draft release `v{version}` exists on GitHub (`gh release view v{version} --json isDraft --jq .isDraft` = `true`)
+
+---
+
+## Phase 4: Verify + publish checkpoint (CRITICAL)
+
+### 4.1 Fetch draft state
+
+```bash
+gh release view "v${VERSION}" --json isDraft,assets \
+  | tee /tmp/release-meta.json
+DRAFT=$(jq -r '.isDraft' /tmp/release-meta.json)
+if [ "$DRAFT" != "true" ]; then
+  echo "FAIL: Release is not a draft — expected a draft produced by release.yml"
+  exit 1
+fi
+```
+
+### 4.2 Download SHA256SUMS + every asset
+
+```bash
+WORK=$(mktemp -d)
+cd "$WORK"
+gh release download "v${VERSION}" --pattern '*' --clobber
+ls -la
+```
+
+### 4.3 Verify minisign signature
+
+The dedicated release minisign public key is published in [docs/security.md § Release signing](../../../docs/security.md) and mirrored in `README.md`. Load it, then:
+
+```bash
+PUBKEY_PATH="$WORK/release.pub"
+# Write the pubkey from docs/security.md verbatim (skill extracts the
+# marked block by fencing).
+minisign -V -P "$(cat "$PUBKEY_PATH")" -m SHA256SUMS -x SHA256SUMS.minisig
+```
+
+- [ ] `minisign -V` exits 0
+
+### 4.4 Recompute per-asset hashes locally
+
+```bash
+ACTUAL="$WORK/SHA256SUMS.local"
+# Hash every asset except the sums and its signature themselves.
+(cd "$WORK" && for f in *; do
+  case "$f" in SHA256SUMS|SHA256SUMS.minisig|SHA256SUMS.local) continue ;; esac
+  sha256sum "$f"
+done) | sort > "$ACTUAL"
+
+# Compare against the sum list we just verified.
+diff <(sort SHA256SUMS) "$ACTUAL" || {
+  echo "FAIL: Local hashes differ from signed SHA256SUMS"
+  exit 1
+}
+```
+
+### 4.5 Compare against the `finalize` job's recorded SHA256SUMS
+
+This catches tampering between `finalize` completion and the moment the operator downloads the draft asset. `finalize` publishes the exact bytes of `SHA256SUMS` it signed as a workflow artifact named `sha256sums-digest` (30-day retention). The skill downloads the artifact and byte-compares against the asset on the release.
+
+```bash
+# Download finalize's recorded SHA256SUMS as a workflow artifact.
+ART_DIR="$WORK/ci-digest"
+gh run download "$RUN_ID" --name sha256sums-digest --dir "$ART_DIR"
+
+# Byte-for-byte comparison. diff exits non-zero on any difference and
+# prints the delta for forensics.
+if ! diff -q "$WORK/SHA256SUMS" "$ART_DIR/SHA256SUMS"; then
+  echo "FAIL: Draft SHA256SUMS differs from CI-recorded SHA256SUMS"
+  diff "$WORK/SHA256SUMS" "$ART_DIR/SHA256SUMS" || true
+  exit 1
+fi
+```
+
+Why this gate matters: the minisign signature at 4.3 proves the *original* SHA256SUMS was signed by the release key. But after `finalize` publishes, anyone with write access to the repo could use `gh release upload --clobber` to replace `SHA256SUMS` on the draft (and provide a forged minisign replacement if they also held the key). This gate catches that scenario — the workflow artifact is write-once from the run and cannot be substituted without re-running the workflow.
+
+*If any verification step in 4.3–4.5 fails: abort. Do not prompt for approval.*
+
+### 4.6 Verify per-asset attestations
+
+```bash
+for f in $(ls "$WORK" | grep -v -E '^SHA256SUMS(\.minisig)?$|^release\.pub$|\.local$'); do
+  gh attestation verify "$WORK/$f" --repo "${GITHUB_REPOSITORY}"
+done
+```
+
+- [ ] Every asset verifies
+
+### 4.7 Operator approval — MANDATORY
+
+Only now may the skill prompt the operator. Present:
+- Number of assets
+- Expected set (9 binaries + SHA256SUMS + SHA256SUMS.minisig + per-binary `.intoto.jsonl`)
+- Verification summary (all green)
+- Release URL
+
+Ask via `AskUserQuestion`:
+
+> "All cryptographic verifications passed for v{version}. Publish the release and mark it as latest?"
+
+| Option | Action |
+|--------|--------|
+| Publish + mark latest | `gh release edit "v${VERSION}" --draft=false --latest` |
+| Leave as draft | Skip final edit; instruct operator to publish manually after additional review |
+| Abort and delete | `gh release delete "v${VERSION}" --yes --cleanup-tag=false` and exit |
+
+### Checkpoint 4.A
+
+- [ ] Operator explicitly chose Publish or Leave-as-draft
+- [ ] Release visibility matches operator's choice
+
+---
+
+## Phase 5: Post-publish verification + summary
+
+### 5.1 Re-verify the now-public release
+
+```bash
+# Attestation verify on the published (non-draft) release URL.
+PUBLISHED=$(gh release view "v${VERSION}" --json url --jq .url)
+for f in $(gh release view "v${VERSION}" --json assets --jq '.assets[].name'); do
+  case "$f" in SHA256SUMS|SHA256SUMS.minisig) continue ;; esac
+  gh release download "v${VERSION}" --pattern "$f" --clobber -D "$WORK"
+  gh attestation verify "$WORK/$f" --repo "${GITHUB_REPOSITORY}"
+done
+```
+
+### 5.2 Final summary
+
+Present:
+- Published URL
+- Artifact list with sizes
+- Verification log (all green)
+- Rotation reminder if any of Apple API key / Azure cert / minisign key are within 60 days of expiry (skill reads the calendar stored alongside the secrets table in `docs/build/release.md`)
+- Next steps: announce internally, update release tracker, etc.
 
 ---
 
@@ -403,65 +470,55 @@ On failure: If any phase is not marked completed in the todo list, STOP and repo
 
 | Don't | Do instead |
 |-------|------------|
-| Delete entire `release/` folder | Only clean `release/{version}/` |
-| Include test counts in release notes | Keep notes user-focused |
-| Include commit hashes in notes | Describe changes in plain language |
-| Skip quality gates | All gates must pass |
-| Auto-push git tags | Always confirm with user first |
-| Build without version check | Verify version > last tag |
-| Dismiss a crash as "expected" | A crash during smoke test ALWAYS blocks the release |
-| Skip a phase because "already done" | Re-execute every phase – prior state may be stale |
-| Auto-approve a checkpoint | Always present checkpoint to user for explicit confirmation |
-| Run commands directly instead of delegating | Use agents for quality gates, builds, and notes |
+| Run from `develop` | Run only from `main` |
+| Push with `git push --tags` | Push one tag at a time |
+| `git rev-parse v${TAG}` for annotated tags | `git rev-parse v${TAG}^{}` |
+| Skip the minisign verification because "assets look right" | Always verify minisign → sha256 → attestations |
+| Re-tag the same version after any signed artifact shipped | Bump to next patch — the tag is burned |
+| Auto-mark the draft as latest | Explicit operator approval required |
+| Manually `gh release upload` to fix a missing asset | Delete the draft, bump the patch, re-run |
+| Edit an already-published release's assets | Cut a hotfix |
 
 ---
 
 ## Reference files
 
-- `templates/release-notes.md` – Release notes template
-- `guides/troubleshooting.md` – Troubleshooting and rollback procedures
+- [`templates/release-notes.md`](templates/release-notes.md) — two-tier release-notes template
+- [`guides/troubleshooting.md`](guides/troubleshooting.md) — failure recovery and rollback procedures
+- [`docs/build/release.md`](../../../docs/build/release.md) — full operator reference (matrix, secrets, incident response)
 
 ---
 
 ## Examples
 
-> **Note:** Examples show macOS releases (the primary target platform). For Windows or Linux builds, the same phases apply but codesign verification and DMG smoke tests are replaced with platform-specific checks – see `release-build-executor` agent for platform behavior.
+### Example 1: Successful release (v0.9.5)
 
-### Example 1: Successful release flow
+Operator checks out `main`, bumps `package.json` to `0.9.5`, appends CHANGELOG entry, and invokes the skill.
 
-**User:** "Release new version of erfana"
+1. Phase 0: branch ok, tree clean, version valid, CHANGELOG contains `## 0.9.5`.
+2. Phase 1: `git cliff` emits technical section; operator supplies 4 bullet points for the summary; single commit pushed.
+3. `checks.yml` turns green within ~3 min.
+4. Phase 2: signed tag pushed.
+5. Phase 3: `release.yml` runs for ~60 min. `gh run watch` returns exit 0.
+6. Phase 4: minisign verifies; per-asset sha256 matches signed SHA256SUMS; workflow-output digest matches; per-asset attestations all verify.
+7. Operator approves publish.
+8. Phase 5: post-publish verification clean. Release URL surfaced.
 
-**Skill does:**
+### Example 2: Lockfile-drift abort
 
-1. **Pre-flight:** Creates todo list. Asks bump type (user picks MINOR) and platform (macOS). Checks git status, compares version 0.5.0 vs tag v0.4.6.
-2. **Checkpoint 0.6:** "Ready to release v0.5.0?" → User confirms.
-3. **Quality gates:** Delegates to `release-quality-runner`. All pass (lint clean, typecheck clean, 7200 tests pass, no critical vulnerabilities).
-4. **Checkpoint 1.4:** Shows quality summary → User confirms.
-5. **Build:** Delegates to `release-build-executor`. DMG 245 MB, codesign PASS, both smoke tests PASS.
-6. **Checkpoint 2.5:** Shows build artifacts → User confirms.
-7. **Release notes:** Delegates to `release-notes-drafter`. Finds 3 features, 2 bug fixes. Drafts user-focused notes.
-8. **Checkpoint 3.2:** User reviews notes, requests one edit. Re-delegates with feedback. User approves.
-9. **Git tag:** Asks user → creates v0.5.0, pushes to remote.
-10. **Summary:** All artifacts, quality results, and next steps.
+Operator tags a commit that never produced a green `checks.yml` run.
 
-### Example 2: Quality gate failure and recovery
+1. Phase 0–2 run normally.
+2. Phase 3: `release.yml` starts. `prepare` job fails the lockfile-drift guard (`No green checks.yml run for <sha>`).
+3. `cleanup` deletes the draft and exits red.
+4. Skill surfaces the run URL and the `prepare` failure log.
+5. Operator re-runs `checks.yml` on the commit; once green, operator re-invokes the skill from Phase 3 (idempotent resume).
 
-**User:** "Build release"
+### Example 3: Hash mismatch in Phase 4
 
-**Skill does:**
+Malicious or accidental tampering with a draft asset after `finalize`.
 
-1. **Pre-flight:** Asks bump type (PATCH), platform (macOS). Version 0.4.7 confirmed.
-2. **Quality gates:** Delegates to `release-quality-runner`. Tests fail (2 failures in renderer suite).
-3. **Attempt 1:** Reports failures with details. User fixes the tests.
-4. **Attempt 2:** Re-delegates to agent. All gates pass.
-5. **Checkpoint 1.4:** Shows quality summary → User confirms.
-6. **Build through summary:** Proceeds normally.
-
-### Example 3: Smoke test crash blocks release
-
-**User:** "Prepare release"
-
-1. **Pre-flight through quality gates:** All pass normally.
-2. **Build:** Delegates to `release-build-executor`. Build succeeds (240 MB). Codesign PASS. App launch smoke test detects `SIGABRT` in stderr.
-3. **STOP:** "Smoke test detected a crash (SIGABRT). Release blocked. See `guides/troubleshooting.md` for rollback procedures."
-4. Release does NOT proceed. User must fix the crash and restart.
+1. Phase 0–3 run normally.
+2. Phase 4: `diff SHA256SUMS SHA256SUMS.local` surfaces a mismatch for one asset.
+3. Skill aborts without prompting for approval. Prints the diff, the asset, and the run URL. Deletes the draft after operator confirmation.
+4. Operator escalates to the incident-response flow in `docs/build/release.md`.

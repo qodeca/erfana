@@ -486,9 +486,52 @@ Git status runs in a `worker_threads` Worker – same process memory space, no n
 ## Local Whisper trust chain (Phase 4, v0.9.4)
 
 4-layer client-side trust model for the whisper.cpp subprocess (manifest Ed25519 sig + artifact SHA pin + per-spawn re-hash for TOCTOU + monotonic revision floor). Composition + attacker model: [`windows/whisper-trust-chain.md`](./windows/whisper-trust-chain.md). Decisions: [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)–[ADR 0004](./adrs/0004-per-spawn-toctou-rehash.md). Operator runbook: [`windows/whisper-support-runbook.md`](./windows/whisper-support-runbook.md).
+
+## Release signing (v0.9.5+, [#174](https://github.com/qodeca/erfana/issues/174))
+
+End-to-end signed multi-platform release pipeline. Full operator reference: [`build/release.md`](./build/release.md).
+
+Trust anchors:
+
+- **macOS**: Developer ID Application certificate + notarytool (user-auth mode: Apple ID + app-specific password + Team ID). Ticket stapled.
+- **Windows**: Azure Artifact Signing (formerly Azure Trusted Signing) via OIDC federation (no long-lived client secret). Both NSIS installer and portable `.exe` are signed independently. Timestamped via `http://timestamp.digicert.com`.
+- **Linux**: aggregate `SHA256SUMS` signed with a **dedicated release minisign keypair** (separate from the whisper-binaries key — blast-radius isolation per ADR 0003 pattern).
+- **Per-artifact provenance**: SLSA Build L2 `actions/attest-build-provenance` attestations. Verifiable via `gh attestation verify --repo qodeca/erfana <artifact>`.
+
+### Release minisign public keys (dual-key, ADR-0003 style)
+
+Two keys are published. End-user tooling should accept a signature from either. This lets us rotate the active signer without re-signing historical releases.
+
+**PRIMARY (active signer):** `4AEBCE8499845646`
+
+```text
+RWRGVoSZhM7rShmOHr5lmt6v6wH8Tjm/nXItCg46Co+hxgvJFLWkv0fC
+```
+
+**ROTATION (standby successor, private half held offline):** `E8E4B205269790F1`
+
+```text
+RWTxkJcmBbLk6J2eWEDWHYcAmgpKfRqO5PR8oRRLUpgn5rgCaWmTvd9w
+```
+
+Mirrored copies for offline retrieval: `README.md` § Release verification, `docs/release-pubkey.txt`. These keys are **separate** from the whisper-binaries minisign key — a compromise of one does not invalidate the other.
+
+### End-user verification
+
+```bash
+# Provenance attestation (any artifact)
+gh attestation verify <artifact> --repo qodeca/erfana
+
+# Integrity + aggregate signature (Linux packages)
+minisign -V -P "$(cat docs/release-pubkey.txt)" -m SHA256SUMS -x SHA256SUMS.minisig
+sha256sum -c SHA256SUMS
+```
+
+Full verification recipes (macOS `codesign`, Windows `signtool`) are in [`build/release.md` § End-user verification](./build/release.md#end-user-verification).
+
 ## Future enhancements
 
-Code signing for Windows (Phase 5, [#166](https://github.com/qodeca/erfana/issues/166)); auto-updates via signed electron-updater (Phase 5); encrypted storage via OS keychain; confirmation prompts before destructive operations.
+Branch-protection on `main` with required signed-tag rule (Phase I of #174). Auto-updates via signed electron-updater (deferred — not shipped with #174 per non-goals). Encrypted storage via OS keychain. Confirmation prompts before destructive operations. **Windows code signing is now covered by #174; [#166](https://github.com/qodeca/erfana/issues/166) narrows to NSIS installer UX.**
 
 ## References
 

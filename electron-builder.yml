@@ -29,23 +29,51 @@ files:
   - '!node_modules/@mapbox/node-pre-gyp/**'
 asar: false
 npmRebuild: false
+# Explicitly disable auto-updater metadata.
+# Using 'publish: null' (not 'provider: github') so electron-builder does NOT
+# emit latest.yml / latest-mac.yml / latest-linux.yml. The release workflow's
+# `finalize` job also deletes any such file that leaks into the draft.
+publish: null
 win:
   executableName: Erfana
   target:
-    - nsis
+    - target: nsis
+    - target: portable
+  signingHashAlgorithms:
+    - sha256
+  rfc3161TimeStampServer: http://timestamp.digicert.com
+  # Azure Artifact Signing (formerly Azure Trusted Signing). Values are
+  # injected from CI env vars (OIDC-auth,
+  # no long-lived client secret). publisherName MUST exactly match the cert
+  # subject CN. See docs/build/release.md § Secrets.
+  azureSignOptions:
+    publisherName: ${env.AZURE_PUBLISHER_NAME}
+    endpoint: ${env.AZURE_SIGNING_ENDPOINT}
+    codeSigningAccountName: ${env.AZURE_SIGNING_ACCOUNT_NAME}
+    certificateProfileName: ${env.AZURE_CERT_PROFILE_NAME}
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+portable:
+  artifactName: ${name}-${version}-portable.${ext}
 mac:
-  entitlementsInherit: build/entitlements.mac.plist
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.inherit.plist
   extendInfo:
-    - NSCameraUsageDescription: Application requests access to device's camera.
-    - NSMicrophoneUsageDescription: Application requests access to device's microphone.
-    - NSDocumentsFolderUsageDescription: Application requests access to user's Documents folder.
-    - NSDownloadsFolderUsageDescription: Application requests access to user's Downloads folder.
-  notarize: false
+    - NSCameraUsageDescription: Erfana uses the camera to capture photos you insert into notes.
+    - NSMicrophoneUsageDescription: Erfana uses the microphone for audio transcription you request.
+    - NSDocumentsFolderUsageDescription: Erfana reads and writes project files in folders you open.
+    - NSDownloadsFolderUsageDescription: Erfana writes exported files (PDF, DOCX) to folders you choose.
+  # Notarization is auto-invoked by electron-builder 26 when either:
+  #   (a) APPLE_API_KEY triad is set (.p8 ASC API key path), or
+  #   (b) APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID are set
+  #       (notarytool user-auth path — this project's choice).
+  # Either way it's notarytool (not altool), and the ticket is auto-stapled.
+  notarize: true
   target:
     - target: dmg
       arch:
@@ -60,12 +88,9 @@ dmg:
 linux:
   target:
     - AppImage
-    - snap
     - deb
+    - rpm
   maintainer: electronjs.org
   category: Utility
 appImage:
   artifactName: ${name}-${version}.${ext}
-publish:
-  provider: generic
-  url: https://example.com/auto-updates

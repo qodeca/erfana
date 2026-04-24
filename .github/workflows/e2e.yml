@@ -1,8 +1,12 @@
 name: E2E Tests
 
+# Runs on develop + main (branch-protected) and every PR.
+# main must be included so branch-protection required-status-checks can see
+# a run; otherwise the release workflow will never satisfy branch protection.
+
 on:
   push:
-    branches: [develop]
+    branches: [develop, main]
   pull_request:
 
 permissions:
@@ -12,17 +16,16 @@ jobs:
   e2e:
     runs-on: macos-latest
     timeout-minutes: 30
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      # actions/checkout v4.2.2 — MUST run before the local composite action.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: ./.github/actions/setup-node-with-retry
         with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        # Retry to tolerate transient registry ECONNRESET on GitHub runners.
-        run: npm ci || (sleep 10 && npm ci) || (sleep 20 && npm ci)
+          # Playwright launches Erfana (real Electron binary) in the e2e
+          # suite; `--ignore-scripts` blocked electron's postinstall.
+          # Rebuild the allowlisted natives so electron + node-pty load.
+          run-postinstall: "true"
 
       - name: Build app
         run: npx electron-vite build
@@ -44,20 +47,22 @@ jobs:
       # for the new platform before relying on CI visual regression.
 
       - name: Upload test artifacts
-        uses: actions/upload-artifact@v4
+        # actions/upload-artifact v4.4.3
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
         if: always()
         with:
           name: e2e-test-results
           path: |
             test-results/
             playwright-report/
-          retention-days: ${{ github.ref == 'refs/heads/develop' && 30 || 14 }}
+          retention-days: ${{ (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') && 30 || 14 }}
 
       - name: Upload visual diffs
-        uses: actions/upload-artifact@v4
+        # actions/upload-artifact v4.4.3
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
         if: failure()
         with:
           name: visual-regression-diffs
           path: test-results/**/*-diff.png
           if-no-files-found: ignore
-          retention-days: ${{ github.ref == 'refs/heads/develop' && 30 || 14 }}
+          retention-days: ${{ (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') && 30 || 14 }}

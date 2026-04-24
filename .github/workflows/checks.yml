@@ -1,11 +1,13 @@
 name: Quality checks
 
 # Fast, platform-independent quality gates that run on every push to every
-# branch. Complements e2e.yml (slow, macOS-only, develop+PR only) by giving
-# feature branches fast-feedback CI on lint / typecheck / unit tests / build.
+# branch. Complements e2e.yml (slow, macOS-only, develop/main/PR) by giving
+# feature branches fast-feedback CI on lint / typecheck / unit tests / build
+# plus supply-chain and release-readiness guards.
 #
 # Runner: ubuntu-latest (~10x cheaper than macos-latest; none of these
-# checks need macOS). Node version matches e2e.yml (24). npm cache enabled.
+# checks need macOS). Node version matches e2e.yml (24). npm download cache
+# enabled via setup-node-with-retry.
 
 on:
   push:
@@ -24,20 +26,12 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        # Retry npm ci to tolerate transient registry ECONNRESET on GitHub runners.
-        # Each job runs its own install; cold npm cache on a fresh runner makes
-        # the first call network-dependent. Three attempts w/ backoff.
-        run: npm ci || (sleep 10 && npm ci) || (sleep 20 && npm ci)
-
+      # actions/checkout v4.2.2 — MUST run before the local composite action
+      # below so the action.yml file can be loaded from the workspace.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: ./.github/actions/setup-node-with-retry
       - name: Lint
         run: npm run lint
 
@@ -45,20 +39,12 @@ jobs:
     name: Typecheck
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        # Retry npm ci to tolerate transient registry ECONNRESET on GitHub runners.
-        # Each job runs its own install; cold npm cache on a fresh runner makes
-        # the first call network-dependent. Three attempts w/ backoff.
-        run: npm ci || (sleep 10 && npm ci) || (sleep 20 && npm ci)
-
+      # actions/checkout v4.2.2 — MUST run before the local composite action
+      # below so the action.yml file can be loaded from the workspace.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: ./.github/actions/setup-node-with-retry
       - name: Typecheck
         run: npm run typecheck
 
@@ -66,20 +52,18 @@ jobs:
     name: Unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      # actions/checkout v4.2.2 — MUST run before the local composite action
+      # below so the action.yml file can be loaded from the workspace.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: ./.github/actions/setup-node-with-retry
         with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        # Retry npm ci to tolerate transient registry ECONNRESET on GitHub runners.
-        # Each job runs its own install; cold npm cache on a fresh runner makes
-        # the first call network-dependent. Three attempts w/ backoff.
-        run: npm ci || (sleep 10 && npm ci) || (sleep 20 && npm ci)
-
+          # ConverterRegistry.test.ts + other electron-aware tests import
+          # the electron binary; `--ignore-scripts` skipped electron's
+          # postinstall download. Rebuild the allowlisted natives so the
+          # binary + node-pty are present for vitest.
+          run-postinstall: "true"
       - name: Unit tests
         run: npm run test:ci
 
@@ -87,19 +71,98 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      # actions/checkout v4.2.2 — MUST run before the local composite action
+      # below so the action.yml file can be loaded from the workspace.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: ./.github/actions/setup-node-with-retry
         with:
-          node-version: 24
-          cache: npm
-
-      - name: Install dependencies
-        # Retry npm ci to tolerate transient registry ECONNRESET on GitHub runners.
-        # Each job runs its own install; cold npm cache on a fresh runner makes
-        # the first call network-dependent. Three attempts w/ backoff.
-        run: npm ci || (sleep 10 && npm ci) || (sleep 20 && npm ci)
-
+          # electron-vite build imports native modules at config resolution
+          # time; run the allowlisted postinstall to avoid import errors.
+          run-postinstall: "true"
       - name: Build
         run: npx electron-vite build
+
+  audit-signatures:
+    name: npm audit signatures
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
+    steps:
+      # actions/checkout v4.2.2 — MUST run before the local composite action
+      # below so the action.yml file can be loaded from the workspace.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: ./.github/actions/setup-node-with-retry
+      - name: Verify npm registry signatures
+        # Asserts every package in package-lock.json is signed by npm's
+        # registry key. Detects lockfile tampering / sidecar attacks.
+        # Plain `npm audit` is not required here because vulnerability
+        # fixes flow through Dependabot PRs (also gated by this workflow).
+        run: npm audit signatures
+
+  release-guards:
+    name: Release readiness guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      # Guard 1: no pull_request_target triggers anywhere.
+      # Fork exfiltration vector: pull_request_target runs with base-repo
+      # write permissions on code from an untrusted PR.
+      #
+      # Exclude checks.yml from the scan — this file contains the literal
+      # string `pull_request_target:` inside the grep pattern below, which
+      # would otherwise cause a self-referential match.
+      - name: Guard - no pull_request_target
+        run: |
+          set -euo pipefail
+          if grep -Rn --include='*.yml' --include='*.yaml' \
+              --exclude=checks.yml \
+              'pull_request_target:' .github/workflows/; then
+            echo "::error::pull_request_target found — fork exfiltration vector"
+            exit 1
+          fi
+
+      # Guard 2: forbidden entitlements must not appear in any plist.
+      # cs.disable-library-validation weakens hardened runtime by allowing
+      # unsigned libraries to load. cs.allow-dyld-environment-variables lets
+      # DYLD_* env vars inject code into the app at launch.
+      #
+      # Match only the XML <key>...</key> form so our own plist comments
+      # documenting the rule don't trigger a self-referential match.
+      - name: Guard - no forbidden entitlements
+        run: |
+          set -euo pipefail
+          if grep -Rn --include='*.plist' \
+              -E '<key>com\.apple\.security\.cs\.(disable-library-validation|allow-dyld-environment-variables)</key>' \
+              build/; then
+            echo "::error::forbidden entitlement found"
+            exit 1
+          fi
+
+      # Guard 3: legacy and forbidden signing credentials must not appear
+      # in any workflow.
+      # - `altool`: the deprecated Apple notarization CLI (replaced by notarytool).
+      # - `AZ_CLIENT_SECRET`: the non-OIDC Azure auth we explicitly reject in
+      #   favour of federated OIDC credentials.
+      # Note: APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD are PERMITTED. notarytool
+      # accepts both the API-key and user-auth modes; only the altool CLI
+      # binding was deprecated. This project uses the user-auth mode for
+      # simplicity since the app-specific password is already provisioned.
+      # Exclude checks.yml (this file) to avoid matching the literal tokens
+      # inside the grep pattern itself. We keep the scan scoped to
+      # .github/workflows/ so allow-lists in other docs/scripts aren't
+      # reported as violations.
+      - name: Guard - no legacy/forbidden credentials
+        run: |
+          set -euo pipefail
+          if grep -REn --include='*.yml' --include='*.yaml' \
+              --exclude=checks.yml \
+              '\bAZ_CLIENT_SECRET\b|\baltool\b' \
+              .github/workflows/; then
+            echo "::error::forbidden credential reference in workflow"
+            exit 1
+          fi

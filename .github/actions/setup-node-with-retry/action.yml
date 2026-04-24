@@ -1,0 +1,65 @@
+name: Setup Node with retry
+description: |
+  Installs Node.js 24, caches ~/.npm (never node_modules), and runs
+  `npm ci --ignore-scripts` with retry on transient ECONNRESET. Optional
+  postinstall step runs only allowlisted native-module builds.
+
+  The caller MUST run `actions/checkout` before calling this composite.
+  Local composite actions cannot check out on behalf of the caller, because
+  their own YAML file can't be loaded until the workspace is checked out.
+
+  Why no node_modules cache: an install tree cache poisoned by a compromised
+  postinstall script would persist indefinitely. Caching the download cache
+  (~/.npm) is supply-chain-safe because a fresh `npm ci --ignore-scripts`
+  still runs every time.
+
+inputs:
+  node-version:
+    description: Node.js version. Matches project target.
+    required: false
+    default: "24"
+  run-postinstall:
+    description: Run allowlisted postinstall for electron, node-pty, node-addon-api.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node
+      # actions/setup-node v4.1.0
+      uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Cache ~/.npm (download cache only)
+      # actions/cache v4.2.0
+      uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57
+      with:
+        path: ~/.npm
+        key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+        restore-keys: |
+          npm-${{ runner.os }}-
+
+    - name: Install dependencies (npm ci, no scripts, retry x3)
+      shell: bash
+      run: |
+        set -euo pipefail
+        npm ci --ignore-scripts \
+          || (sleep 10 && npm ci --ignore-scripts) \
+          || (sleep 20 && npm ci --ignore-scripts)
+
+    - name: Run allowlisted postinstall (electron, node-pty, node-addon-api)
+      if: ${{ inputs.run-postinstall == 'true' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Only rebuild native modules we explicitly trust. Any other package
+        # with a postinstall script was blocked by --ignore-scripts above and
+        # stays blocked.
+        for pkg in electron node-pty node-addon-api; do
+          if [ -d "node_modules/$pkg" ]; then
+            echo "Rebuilding $pkg"
+            npm rebuild "$pkg"
+          fi
+        done

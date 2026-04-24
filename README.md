@@ -138,6 +138,26 @@ Open the Terminal panel from the right activity bar to run shell commands in the
 - Content Security Policy (CSP) headers
 - Input validation on all IPC channels
 
+Details: [`docs/security.md`](docs/security.md). Release-artifact trust chain (minisign-signed `SHA256SUMS`, SLSA Build L2 provenance attestations per artifact, macOS notarization, Windows Azure Artifact Signing): [`docs/build/release.md`](docs/build/release.md).
+
+## Release verification
+
+Every release on or after `v0.9.5` ships signed + attested artifacts. End users should verify downloads before installing:
+
+```bash
+# Any artifact (provenance)
+gh attestation verify <file> --repo qodeca/erfana
+
+# Linux integrity + aggregate minisign signature (accept PRIMARY or ROTATION key)
+PRIMARY="RWRGVoSZhM7rShmOHr5lmt6v6wH8Tjm/nXItCg46Co+hxgvJFLWkv0fC"
+ROTATION="RWTxkJcmBbLk6J2eWEDWHYcAmgpKfRqO5PR8oRRLUpgn5rgCaWmTvd9w"
+minisign -V -P "$PRIMARY"  -m SHA256SUMS -x SHA256SUMS.minisig \
+  || minisign -V -P "$ROTATION" -m SHA256SUMS -x SHA256SUMS.minisig
+sha256sum -c SHA256SUMS
+```
+
+The dedicated release-signing minisign public keys (primary + rotation) are published at [`docs/release-pubkey.txt`](docs/release-pubkey.txt) and mirrored in [`docs/security.md § Release signing`](docs/security.md#release-signing-v095-174). These keys are **separate** from the `whisper-binaries` key — compromising one does not weaken the other.
+
 ## License
 
 MIT

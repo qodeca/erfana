@@ -1,0 +1,137 @@
+name: Build Windows (reusable)
+
+# Reusable workflow callable from release.yml. Signs with Azure Artifact
+# Signing (formerly Azure Trusted Signing) via OIDC federation (no
+# long-lived client secret). Verifies Authenticode signature on both
+# NSIS installer and portable .exe.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag name (e.g. v0.9.5)
+        required: true
+        type: string
+      is-dry-run:
+        description: Skip gh release upload
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build:
+    name: Build Windows artifacts
+    runs-on: windows-latest
+    timeout-minutes: 45
+    if: github.repository == 'qodeca/erfana'
+    environment: production-signing
+    env:
+      EP_GH_IGNORE_TIME: "true"
+      # electron-builder.yml references these env vars inside
+      # win.azureSignOptions via ${env.VAR} interpolation.
+      AZURE_PUBLISHER_NAME: ${{ vars.AZURE_PUBLISHER_NAME }}
+      AZURE_SIGNING_ENDPOINT: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+      AZURE_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
+      AZURE_CERT_PROFILE_NAME: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
+    steps:
+      # actions/checkout v4.2.2 — MUST run before the local composite action.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Setup Node + install
+        uses: ./.github/actions/setup-node-with-retry
+        with:
+          run-postinstall: "true"
+
+      # azure/login v2.2.0
+      # OIDC federated credential — no long-lived client secret is stored.
+      - name: Azure login (OIDC)
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Build + sign (electron-builder / Azure Artifact Signing)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx electron-builder --win --publish never
+
+      - name: Resolve artifact dir
+        id: art
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          DIR="release/${VERSION}"
+          [ -d "$DIR" ] || { echo "::error::Missing $DIR"; exit 1; }
+          # compgen -G has cleaner semantics than `ls` for existence testing.
+          if compgen -G "$DIR/latest*.yml" >/dev/null; then
+            echo "::error::Auto-updater file leaked into $DIR"
+            compgen -G "$DIR/latest*.yml" || true
+            exit 1
+          fi
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+          ls -la "$DIR"
+
+      - name: Verify Authenticode signatures (signtool)
+        shell: pwsh
+        # signtool ships with Windows SDK; resolve the latest SDK bin dir
+        # to avoid hardcoding a versioned path.
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sdkRoot = "C:\Program Files (x86)\Windows Kits\10\bin"
+          $sdkBin = Get-ChildItem $sdkRoot -Directory `
+            | Where-Object { $_.Name -match '^10\.' } `
+            | Sort-Object Name -Descending `
+            | Select-Object -First 1
+          $signtool = Join-Path $sdkBin.FullName "x64\signtool.exe"
+          if (-not (Test-Path $signtool)) {
+            throw "signtool.exe not found under $sdkRoot"
+          }
+          $dir = "${{ steps.art.outputs.dir }}"
+          # Both NSIS installer and portable .exe must verify independently.
+          foreach ($pattern in @('*-setup.exe', '*-portable.exe')) {
+            Get-ChildItem -Path $dir -Filter $pattern | ForEach-Object {
+              Write-Host "signtool verifying: $($_.FullName)"
+              & $signtool verify /pa /all /tw $_.FullName
+              if ($LASTEXITCODE -ne 0) {
+                throw "signtool verify failed for $($_.FullName)"
+              }
+            }
+          }
+
+      # actions/attest-build-provenance v2.2.3
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2
+        with:
+          subject-path: |
+            ${{ steps.art.outputs.dir }}/*-setup.exe
+            ${{ steps.art.outputs.dir }}/*-portable.exe
+
+      - name: Upload to draft release
+        if: ${{ !inputs.is-dry-run }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          ART_DIR: ${{ steps.art.outputs.dir }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" \
+            "$ART_DIR"/*-setup.exe \
+            "$ART_DIR"/*-portable.exe \
+            --clobber
+
+      - name: Upload workflow-run artifacts (dry-run)
+        if: ${{ inputs.is-dry-run }}
+        # actions/upload-artifact v4.4.3
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+        with:
+          name: win-dry-run
+          path: ${{ steps.art.outputs.dir }}
+          retention-days: 7

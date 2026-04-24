@@ -117,6 +117,8 @@ For detailed information on specific build aspects, see:
 - **[Dependencies](./dependencies.md)** - Exclusions and devDependencies
 - **[Troubleshooting](./troubleshooting.md)** - Common build errors and solutions
 - **[Windows build prerequisites](./windows.md)** - Setting up a Windows 11 dev box (Phase 0 of the Windows enablement roadmap)
+- **[Release pipeline](./release.md)** - Multi-platform release workflow (`.github/workflows/release.yml`), secrets + rotation calendar, end-user verification, incident response
+- **[Whisper binaries build pipeline](./whisper-binaries.md)** - Self-hosted signed whisper.cpp build (reference pattern, separate minisign key from releases)
 
 ---
 

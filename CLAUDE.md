@@ -69,6 +69,7 @@ src/
 See `docs/` for details (keep Claude's context focused):
 - [Architecture](docs/architecture.md) — System design patterns, SOLID principles, DI
 - [Build](docs/build/README.md) — Build configuration, electron-builder, ASAR, fuses, troubleshooting, whisper-binaries CI ops runbook (self-hosted Phase 4 release flow)
+- [Release pipeline](docs/build/release.md) — Multi-platform release workflow (`.github/workflows/release.yml`: prepare → {build_linux, build_mac, build_win} → finalize → cleanup), secrets + rotation calendar, minisign/attestation verification, incident response. Skill entry: `.claude/skills/releasing-erfana/SKILL.md` (v0.9.5+, superseded the tag-only flow in [#174](https://github.com/qodeca/erfana/issues/174))
 - [Security](docs/security.md) — Electron 39 security hardening, fuses, sandboxing, trade-offs
 - [Drag-Drop](docs/drag-drop/README.md) — VS Code-style file reorganization, visual feedback, validation
 - [Terminal](docs/terminal/README.md) — Bootstrap pattern, scroll fixes, clipboard, file links (CLI-wrap joining, @-prefix, :line-line range), drag-drop paths, screenshot capture (macOS), camera capture (cross-platform)

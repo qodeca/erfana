@@ -319,20 +319,17 @@ Phase 4's ~55 new tests span 8 files. Table below is the authoritative coverage 
 
 ## Phase 5 — Distribution hygiene
 
-Changes:
+> **Superseded in part by [#174](https://github.com/qodeca/erfana/issues/174) (release pipeline).** The auto-updater URL problem (B6) and Windows signing (M7) are now handled by the multi-platform release workflow shipped with v0.9.5. `electron-builder.yml` uses `publish: null` (auto-updater explicitly disabled per #174 non-goals). Windows signing moved from `.pfx`-in-secret to **Azure Trusted Signing via OIDC** (no client secret). See [`docs/build/release.md`](../build/release.md). What remains of Phase 5 here narrows to NSIS UX tweaks.
 
-1. **Fix auto-updater URL** (fixes B6) — `electron-builder.yml:69-71`
-   - Replace `https://example.com/auto-updates` with the real update channel. Options:
-     - `provider: github` pointing at `qodeca/erfana` releases (simplest; free; cross-platform). **Recommended.**
-     - Keep `provider: generic` with a real URL.
-2. **Code signing config** (fixes M7) — `electron-builder.yml`
-   - Add `win.certificateFile`, `certificatePassword` (via env vars `CSC_LINK` / `CSC_KEY_PASSWORD` — electron-builder standard), `signingHashAlgorithms: [sha256]`, `rfc3161TimeStampServer: http://timestamp.digicert.com`.
-   - If no cert yet, document in `docs/build/windows.md` that unsigned Windows builds trigger SmartScreen and how users should proceed (right-click → Properties → Unblock; or "More info → Run anyway").
-3. **NSIS tweaks** — `electron-builder.yml:36-40`
+Remaining changes:
+
+1. ~~Fix auto-updater URL~~ — **DONE** via #174: `publish: null`; no auto-updater metadata.
+2. ~~Code signing config~~ — **DONE** via #174: Azure Artifact Signing (formerly Azure Trusted Signing) configured in `electron-builder.yml` `win.azureSignOptions`. `.pfx` path abandoned.
+3. **NSIS tweaks** — `electron-builder.yml`
    - Consider `oneClick: false` + `allowToChangeInstallationDirectory: true` for a better first-run UX.
    - `perMachine: false` (default) to install per-user and avoid UAC.
 
-**Manual validation:** `npm run build:win` → NSIS installs cleanly on Windows 11 → launches → auto-update check points at the real URL.
+**Manual validation:** `npm run build:win` locally still produces unsigned output (signing happens in CI); NSIS installs cleanly on Windows 11; end-to-end signed flow verified via `release.yml` dry-run on `develop`.
 
 ---
 

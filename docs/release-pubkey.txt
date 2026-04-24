@@ -1,0 +1,36 @@
+# Erfana release-signing minisign public keys (dual-key, ADR-0003 style)
+#
+# This file publishes BOTH the active primary signing key AND the standby
+# rotation key. End-user verification tooling should accept either — a
+# SHA256SUMS.minisig that verifies under either key is valid. This allows
+# us to rotate the primary-to-rotation without re-signing old releases,
+# and without a flag-day where either an old signature or a new one would
+# fail to verify against a single published pubkey.
+#
+# Active signer at release time:   PRIMARY (ID 4AEBCE8499845646)
+# Standby successor (held offline): ROTATION (ID E8E4B205269790F1)
+#
+# To verify a release:
+#
+#   # Accept EITHER the primary or the rotation key.
+#   minisign -V -P RWRGVoSZhM7rShmOHr5lmt6v6wH8Tjm/nXItCg46Co+hxgvJFLWkv0fC \
+#            -m SHA256SUMS -x SHA256SUMS.minisig \
+#     || minisign -V -P RWTxkJcmBbLk6J2eWEDWHYcAmgpKfRqO5PR8oRRLUpgn5rgCaWmTvd9w \
+#                 -m SHA256SUMS -x SHA256SUMS.minisig
+#   sha256sum -c SHA256SUMS
+#
+# Full verification guide: docs/build/release.md § End-user verification.
+# Mirrored copies: docs/security.md § Release signing, README.md § Release verification.
+#
+# These keys are DEDICATED to release signing. They are SEPARATE from the
+# whisper-binaries minisign key (ADR 0003 blast-radius isolation — a
+# compromise of one does not invalidate the other).
+#
+# -----------------------------------------------------------------------
+# PRIMARY (active signer; private half in GitHub secret MINISIGN_SECRET_KEY_BASE64)
+# minisign public key ID 4AEBCE8499845646
+RWRGVoSZhM7rShmOHr5lmt6v6wH8Tjm/nXItCg46Co+hxgvJFLWkv0fC
+
+# ROTATION (standby successor; private half held OFFLINE in 1Password/Bitwarden)
+# minisign public key ID E8E4B205269790F1
+RWTxkJcmBbLk6J2eWEDWHYcAmgpKfRqO5PR8oRRLUpgn5rgCaWmTvd9w
