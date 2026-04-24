@@ -494,7 +494,7 @@ End-to-end signed multi-platform release pipeline. Full operator reference: [`bu
 Trust anchors:
 
 - **macOS**: Developer ID Application certificate + notarytool (user-auth mode: Apple ID + app-specific password + Team ID). Ticket stapled.
-- **Windows**: Azure Artifact Signing (formerly Azure Trusted Signing) via OIDC federation (no long-lived client secret). Both NSIS installer and portable `.exe` are signed independently. Timestamped via `http://timestamp.digicert.com`.
+- **Windows**: Azure Artifact Signing (formerly Azure Trusted Signing) via app-registration X.509 certificate auth (electron-builder 26's `WindowsSignAzureManager` does not support OIDC `AZURE_FEDERATED_TOKEN_FILE`, so we use a rotatable cert instead — public key lives on the app registration, private key is a GitHub Secret). Both NSIS installer and portable `.exe` are signed independently. Timestamped via `http://timestamp.digicert.com`.
 - **Linux**: aggregate `SHA256SUMS` signed with a **dedicated release minisign keypair** (separate from the whisper-binaries key — blast-radius isolation per ADR 0003 pattern).
 - **Per-artifact provenance**: SLSA Build L2 attestations are currently **not enabled** — GitHub gates `actions/attest-build-provenance` to Enterprise Cloud for private repos. The minisign signature on the aggregate `SHA256SUMS` (Linux) + per-platform Developer ID / Azure Artifact Signing already provide artifact authenticity without requiring GitHub as a trust anchor. Revisit if Erfana goes public or moves to Enterprise.
 
