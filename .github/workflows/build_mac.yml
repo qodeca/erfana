@@ -97,6 +97,12 @@ jobs:
           # Visible check (no secret output): identity present?
           security find-identity -v -p codesigning "$KC_FILE"
 
+      - name: Bundle sources (electron-vite)
+        # electron-builder packages prebuilt bundles from out/; it does NOT
+        # invoke electron-vite itself. Must run before electron-builder or
+        # packaging fails the sanity check for out/main/index.js.
+        run: npx electron-vite build
+
       - name: Build + sign + notarize + staple (electron-builder)
         # electron-builder 26 auto-invokes notarytool when either the
         # APPLE_API_KEY triad or the APPLE_ID+APPLE_APP_SPECIFIC_PASSWORD+

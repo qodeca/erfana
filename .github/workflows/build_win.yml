@@ -55,6 +55,13 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           allow-no-subscriptions: true
 
+      - name: Bundle sources (electron-vite)
+        # electron-builder packages prebuilt bundles from out/; it does NOT
+        # invoke electron-vite itself. Must run before electron-builder or
+        # packaging fails the sanity check for out/main/index.js.
+        shell: bash
+        run: npx electron-vite build
+
       - name: Build + sign (electron-builder / Azure Artifact Signing)
         shell: bash
         run: |

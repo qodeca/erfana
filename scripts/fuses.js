@@ -81,17 +81,34 @@ function renameTestBuildApp(appOutDir, originalName, platform) {
 }
 
 module.exports = async function afterPack(context) {
-  // Determine the Electron binary path based on platform
+  // Determine the Electron binary path based on platform.
+  // On Linux, electron-builder produces a lowercased binary (the default
+  // executableName); on macOS / Windows the binary uses productFilename's
+  // case. Try the case-preserved path first, fall back to lowercase, and
+  // finally to the explicit executableName if the packager set one.
   const ext = {
     darwin: '.app',
     win32: '.exe',
     linux: ''
   }[context.electronPlatformName];
 
-  let electronBinaryPath = path.join(
-    context.appOutDir,
-    `${context.packager.appInfo.productFilename}${ext}`
-  );
+  const productFilename = context.packager.appInfo.productFilename;
+  const candidates = [
+    path.join(context.appOutDir, `${productFilename}${ext}`),
+    path.join(context.appOutDir, `${productFilename.toLowerCase()}${ext}`),
+  ];
+  if (context.packager.executableName) {
+    candidates.push(
+      path.join(context.appOutDir, `${context.packager.executableName}${ext}`)
+    );
+  }
+
+  let electronBinaryPath = candidates.find((p) => fs.existsSync(p));
+  if (!electronBinaryPath) {
+    throw new Error(
+      `Electron binary not found. Tried: ${candidates.join(', ')}`
+    );
+  }
 
   // Log build mode and apply test build modifications
   if (isTestBuild) {

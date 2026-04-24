@@ -42,6 +42,13 @@ jobs:
         with:
           run-postinstall: "true"
 
+      - name: Bundle sources (electron-vite)
+        # electron-builder packages prebuilt main/preload/renderer bundles
+        # from out/; it does NOT invoke electron-vite itself. Must run
+        # before electron-builder or packaging fails the sanity check
+        # for out/main/index.js.
+        run: npx electron-vite build
+
       - name: Build Linux targets
         run: |
           set -euo pipefail
