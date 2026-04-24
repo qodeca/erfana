@@ -62,6 +62,31 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           allow-no-subscriptions: true
 
+      - name: Write OIDC token file for electron-builder EnvironmentCredential
+        # electron-builder 26's WindowsSignAzureManager instantiates
+        # @azure/identity's EnvironmentCredential. That credential class
+        # needs BOTH AZURE_TENANT_ID + AZURE_CLIENT_ID AND one of:
+        #   (a) AZURE_CLIENT_SECRET        — rejected (CA/B rules + not OIDC)
+        #   (b) AZURE_CLIENT_CERTIFICATE_PATH
+        #   (c) AZURE_FEDERATED_TOKEN_FILE — OIDC path; what we use
+        # azure/login@v2 authenticates via OIDC internally but does not
+        # expose the federated token as a file for downstream steps, so we
+        # fetch it ourselves via GitHub's Actions OIDC endpoint and export
+        # the file path.
+        shell: pwsh
+        run: |
+          $audience = "api://AzureADTokenExchange"
+          $url = "$env:ACTIONS_ID_TOKEN_REQUEST_URL&audience=$audience"
+          $hdr = @{ Authorization = "bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" }
+          $response = Invoke-RestMethod -Uri $url -Headers $hdr
+          $tokenPath = Join-Path $env:RUNNER_TEMP "azure_oidc_token"
+          [IO.File]::WriteAllText($tokenPath, $response.value)
+          "AZURE_FEDERATED_TOKEN_FILE=$tokenPath" | Out-File -Append `
+            -FilePath $env:GITHUB_ENV -Encoding utf8
+          "AZURE_AUTHORITY_HOST=https://login.microsoftonline.com" | `
+            Out-File -Append -FilePath $env:GITHUB_ENV -Encoding utf8
+          Write-Host "OIDC token written; AZURE_FEDERATED_TOKEN_FILE exported"
+
       - name: Bundle sources (electron-vite)
         # electron-builder packages prebuilt bundles from out/; it does NOT
         # invoke electron-vite itself. Must run before electron-builder or
