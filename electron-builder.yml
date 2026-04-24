@@ -47,9 +47,8 @@ win:
       - sha256
     rfc3161TimeStampServer: http://timestamp.digicert.com
   # Azure Artifact Signing (formerly Azure Trusted Signing). Values are
-  # injected at CLI invocation via --config.win.azureSignOptions.* flags
-  # from build_win.yml. publisherName MUST exactly match the cert
-  # subject CN. See docs/build/release.md § Secrets.
+  # overridden at CLI invocation via --config.win.azureSignOptions.*
+  # flags from build_win.yml.
   #
   # DO NOT put ${env.X} macros here — electron-builder's macro expander
   # (util/macroExpander.ts) is only applied to pattern-based fields like
@@ -57,11 +56,19 @@ win:
   # `${env.AZURE_SIGNING_ENDPOINT}` reaches Invoke-TrustedSigning
   # unchanged and SignTool's Azure.CodeSigning.Dlib throws
   # System.UriFormatException when it tries to parse it as a URI.
-  # Confirmed via electron-builder 26.8.1 WindowsSignAzureManager.signFile
-  # source — it destructures azureSignOptions directly with no expansion.
-  # A non-empty placeholder object is required; the CLI flags populate
-  # the real values at build time.
-  azureSignOptions: {}
+  #
+  # The placeholders below exist ONLY to satisfy the JSON-schema validator
+  # run by Packager.validateConfig() (app-builder-lib/src/packager.ts:398).
+  # Validation fires on every build — including linux/mac legs that never
+  # actually invoke signtool — so the four required fields must be
+  # present as string-typed values. CLI --config overrides replace them
+  # at bootstrap (before the actual signtool call), so the placeholders
+  # never reach the Azure signing backend.
+  azureSignOptions:
+    publisherName: placeholder-overridden-at-runtime
+    endpoint: https://placeholder.example/
+    codeSigningAccountName: placeholder
+    certificateProfileName: placeholder
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
