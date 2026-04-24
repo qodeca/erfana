@@ -209,12 +209,23 @@ jobs:
           # ticket we just attached), then spctl (online/cached check).
           # Previously spctl was called first and rejected with "no
           # usable signature" because the DMG wasn't notarized yet.
+          #
+          # spctl flag note: `-t install` is for .pkg installers, NOT
+          # .dmg containers. Using it on a DMG returns "no usable
+          # signature" even for a valid notarized+stapled DMG, because
+          # spctl refuses to evaluate the DMG as if it were a pkg.
+          # Per Apple DTS engineer in
+          # https://developer.apple.com/forums/thread/128683, the
+          # DMG-specific invocation is:
+          #   spctl -a -t open --context context:primary-signature -vvv <dmg>
+          # which evaluates the DMG's own Gatekeeper signature (what
+          # happens when the user double-clicks the DMG to mount it).
           for DMG in "$DIR"/*.dmg; do
             [ -e "$DMG" ] || continue
             echo "stapler validating: $DMG"
             xcrun stapler validate "$DMG"
-            echo "spctl assessing: $DMG"
-            spctl -a -vvv -t install "$DMG"
+            echo "spctl assessing (DMG as open): $DMG"
+            spctl -a -t open --context context:primary-signature -vvv "$DMG"
           done
 
           # ZIPs carry the stapled ticket on the .app inside them.
