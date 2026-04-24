@@ -146,8 +146,13 @@ jobs:
       # Guard 3: legacy and forbidden signing credentials must not appear
       # in any workflow.
       # - `altool`: the deprecated Apple notarization CLI (replaced by notarytool).
-      # - `AZ_CLIENT_SECRET`: the non-OIDC Azure auth we explicitly reject in
-      #   favour of federated OIDC credentials.
+      # - `AZ_CLIENT_SECRET`: the pre-Azure-CLI-2.x env var name used with
+      #   cascading auth in older Azure pipelines. We specifically reject
+      #   this legacy form; the modern `AZURE_CLIENT_SECRET` (used by
+      #   @azure/identity) is PERMITTED as a fallback credential path,
+      #   though this project uses AZURE_CLIENT_CERTIFICATE_* since
+      #   electron-builder 26's WindowsSignAzureManager rejects OIDC
+      #   federated tokens (no AZURE_FEDERATED_TOKEN_FILE support upstream).
       # Note: APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD are PERMITTED. notarytool
       # accepts both the API-key and user-auth modes; only the altool CLI
       # binding was deprecated. This project uses the user-auth mode for
