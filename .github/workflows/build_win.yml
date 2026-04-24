@@ -82,14 +82,38 @@ jobs:
           echo "AZURE_CLIENT_CERTIFICATE_PATH=$WIN_PATH" >> "$GITHUB_ENV"
 
       - name: Verify AZURE_* env reaches the build step
-        # Diagnostic — blanks here would confirm env-propagation issue
-        # rather than credential-validity issue on future debug runs.
+        # Diagnostic — prints byte lengths (safe, not value) so empty env
+        # vars are visible. Signing metadata's Endpoint field gets parsed
+        # as System.Uri; if AZURE_SIGNING_ENDPOINT ever lands empty the
+        # sign step throws UriFormatException. Same class of check for
+        # publisher / account / profile.
         shell: bash
         run: |
-          echo "AZURE_TENANT_ID=${AZURE_TENANT_ID:+SET}"
-          echo "AZURE_CLIENT_ID=${AZURE_CLIENT_ID:+SET}"
-          echo "AZURE_CLIENT_CERTIFICATE_PATH=${AZURE_CLIENT_CERTIFICATE_PATH:-UNSET}"
-          echo "AZURE_CLIENT_CERTIFICATE_PASSWORD=${AZURE_CLIENT_CERTIFICATE_PASSWORD:+SET}"
+          len() {
+            # Print "set(NN)" if non-empty, "UNSET" if empty — safe to log.
+            local val="${1:-}"
+            if [ -n "$val" ]; then
+              printf 'set(%d)\n' "${#val}"
+            else
+              printf 'UNSET\n'
+            fi
+          }
+          echo "AZURE_TENANT_ID: $(len "$AZURE_TENANT_ID")"
+          echo "AZURE_CLIENT_ID: $(len "$AZURE_CLIENT_ID")"
+          echo "AZURE_CLIENT_CERTIFICATE_PATH: ${AZURE_CLIENT_CERTIFICATE_PATH:-UNSET}"
+          echo "AZURE_CLIENT_CERTIFICATE_PASSWORD: $(len "$AZURE_CLIENT_CERTIFICATE_PASSWORD")"
+          echo "AZURE_SIGNING_ENDPOINT: $(len "$AZURE_SIGNING_ENDPOINT")"
+          echo "AZURE_SIGNING_ACCOUNT_NAME: $(len "$AZURE_SIGNING_ACCOUNT_NAME")"
+          echo "AZURE_CERT_PROFILE_NAME: $(len "$AZURE_CERT_PROFILE_NAME")"
+          echo "AZURE_PUBLISHER_NAME: $(len "$AZURE_PUBLISHER_NAME")"
+          # Also verify Endpoint has a proper URL shape without revealing the
+          # full host: print first 8 bytes and last 4 bytes with a mask in
+          # the middle. Should start with 'https://' and end with '.net/' or '.net'.
+          if [ -n "${AZURE_SIGNING_ENDPOINT:-}" ]; then
+            head=$(printf '%s' "$AZURE_SIGNING_ENDPOINT" | head -c 8)
+            tail=$(printf '%s' "$AZURE_SIGNING_ENDPOINT" | tail -c 4)
+            echo "AZURE_SIGNING_ENDPOINT shape: '${head}...${tail}'"
+          fi
 
       - name: Bundle sources (electron-vite)
         # electron-builder packages prebuilt bundles from out/; it does NOT
@@ -97,6 +121,28 @@ jobs:
         # packaging fails the sanity check for out/main/index.js.
         shell: bash
         run: npx electron-vite build
+
+      - name: Normalize AZURE_SIGNING_ENDPOINT (trim CR/LF/whitespace)
+        # GitHub Secrets preserve any trailing whitespace / CRLF from the
+        # `gh secret set` source. Azure.CodeSigning.Dlib's DigestSigner
+        # constructs a System.Uri directly from the JSON; a stray '\r\n'
+        # causes UriFormatException. Normalize before electron-builder
+        # macro-expands ${env.AZURE_SIGNING_ENDPOINT} into the metadata.
+        shell: bash
+        run: |
+          set -euo pipefail
+          clean=$(printf '%s' "${AZURE_SIGNING_ENDPOINT:-}" | tr -d '\r\n' | awk '{$1=$1;print}')
+          if [ -z "$clean" ]; then
+            echo "::error::AZURE_SIGNING_ENDPOINT is empty"
+            exit 1
+          fi
+          # Must start with https:// — a bare hostname triggers UriFormatException.
+          case "$clean" in
+            https://*) ;;
+            *) echo "::error::AZURE_SIGNING_ENDPOINT must start with 'https://' (got '${clean:0:8}...')"; exit 1 ;;
+          esac
+          echo "AZURE_SIGNING_ENDPOINT=$clean" >> "$GITHUB_ENV"
+          echo "endpoint length after normalize: ${#clean}"
 
       - name: Build + sign (electron-builder / Azure Artifact Signing)
         shell: bash
