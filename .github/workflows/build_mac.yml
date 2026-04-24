@@ -132,9 +132,10 @@ jobs:
         # the DMG as "no usable signature" until the DMG is separately
         # submitted to notarytool and stapled.
         #
-        # notarytool --wait blocks until Apple's service returns Accepted
-        # (or Rejected; exits non-zero in that case). Typical wait 1-5 min
-        # per DMG, occasionally longer during Apple server load.
+        # notarytool --wait blocks until Apple's service returns Accepted.
+        # However Apple's ticket database has an indexing lag (observed
+        # ~1-3 min) between notarytool returning Accepted and stapler
+        # being able to fetch the ticket. Retry stapler with backoff.
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -150,8 +151,19 @@ jobs:
               --password "$APPLE_APP_SPECIFIC_PASSWORD" \
               --team-id "$APPLE_TEAM_ID" \
               --wait
-            echo "Stapling: $DMG"
-            xcrun stapler staple "$DMG"
+            echo "Stapling: $DMG (with retry for Apple ticket-DB indexing lag)"
+            for attempt in 1 2 3 4 5 6; do
+              if xcrun stapler staple "$DMG"; then
+                echo "Stapled on attempt $attempt"
+                break
+              fi
+              if [ "$attempt" -eq 6 ]; then
+                echo "::error::stapler staple failed after 6 attempts"
+                exit 1
+              fi
+              echo "Stapler attempt $attempt failed; Apple ticket DB lag — waiting 30s"
+              sleep 30
+            done
           done
 
       - name: Verify signatures (codesign / stapler / spctl)
