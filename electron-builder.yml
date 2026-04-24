@@ -47,14 +47,21 @@ win:
       - sha256
     rfc3161TimeStampServer: http://timestamp.digicert.com
   # Azure Artifact Signing (formerly Azure Trusted Signing). Values are
-  # injected from CI env vars (OIDC-auth,
-  # no long-lived client secret). publisherName MUST exactly match the cert
+  # injected at CLI invocation via --config.win.azureSignOptions.* flags
+  # from build_win.yml. publisherName MUST exactly match the cert
   # subject CN. See docs/build/release.md § Secrets.
-  azureSignOptions:
-    publisherName: ${env.AZURE_PUBLISHER_NAME}
-    endpoint: ${env.AZURE_SIGNING_ENDPOINT}
-    codeSigningAccountName: ${env.AZURE_SIGNING_ACCOUNT_NAME}
-    certificateProfileName: ${env.AZURE_CERT_PROFILE_NAME}
+  #
+  # DO NOT put ${env.X} macros here — electron-builder's macro expander
+  # (util/macroExpander.ts) is only applied to pattern-based fields like
+  # artifactName; it is NOT applied to azureSignOptions. Literal
+  # `${env.AZURE_SIGNING_ENDPOINT}` reaches Invoke-TrustedSigning
+  # unchanged and SignTool's Azure.CodeSigning.Dlib throws
+  # System.UriFormatException when it tries to parse it as a URI.
+  # Confirmed via electron-builder 26.8.1 WindowsSignAzureManager.signFile
+  # source — it destructures azureSignOptions directly with no expansion.
+  # A non-empty placeholder object is required; the CLI flags populate
+  # the real values at build time.
+  azureSignOptions: {}
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}

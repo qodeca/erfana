@@ -146,9 +146,25 @@ jobs:
 
       - name: Build + sign (electron-builder / Azure Artifact Signing)
         shell: bash
+        # Azure signing config is injected via --config flags rather than
+        # YAML `${env.X}` macros, because electron-builder 26's macro
+        # expander (util/macroExpander.ts) is only applied to pattern
+        # fields (artifactName, etc.) and NOT to azureSignOptions. If
+        # these values lived in electron-builder.yml as `${env.FOO}`,
+        # the literal string "${env.FOO}" would reach signtool and cause
+        # System.UriFormatException in Azure.CodeSigning.Dlib. This was
+        # confirmed by inspecting WindowsSignAzureManager.signFile source.
+        #
+        # CLI --config.KEY=VALUE overrides ARE evaluated at electron-builder
+        # bootstrap time after full config merge, so they carry the real
+        # env-var values into the underlying Invoke-TrustedSigning call.
         run: |
           set -euo pipefail
-          npx electron-builder --win --publish never
+          npx electron-builder --win --publish never \
+            --config.win.azureSignOptions.endpoint="$AZURE_SIGNING_ENDPOINT" \
+            --config.win.azureSignOptions.publisherName="$AZURE_PUBLISHER_NAME" \
+            --config.win.azureSignOptions.codeSigningAccountName="$AZURE_SIGNING_ACCOUNT_NAME" \
+            --config.win.azureSignOptions.certificateProfileName="$AZURE_CERT_PROFILE_NAME"
 
       - name: Resolve artifact dir
         id: art
