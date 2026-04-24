@@ -204,28 +204,28 @@ jobs:
             codesign --verify --deep --strict --verbose=2 "$APP"
           done < <(find "$DIR" -maxdepth 3 -name 'Erfana.app' -print0)
 
-          # Every DMG must have a stapled notarization ticket AND pass
-          # Gatekeeper. Order: stapler FIRST (offline check for the
-          # ticket we just attached), then spctl (online/cached check).
-          # Previously spctl was called first and rejected with "no
-          # usable signature" because the DMG wasn't notarized yet.
+          # DMGs only need their stapled notarization ticket verified.
+          # spctl is intentionally NOT run here for DMGs:
           #
-          # spctl flag note: `-t install` is for .pkg installers, NOT
-          # .dmg containers. Using it on a DMG returns "no usable
-          # signature" even for a valid notarized+stapled DMG, because
-          # spctl refuses to evaluate the DMG as if it were a pkg.
-          # Per Apple DTS engineer in
-          # https://developer.apple.com/forums/thread/128683, the
-          # DMG-specific invocation is:
-          #   spctl -a -t open --context context:primary-signature -vvv <dmg>
-          # which evaluates the DMG's own Gatekeeper signature (what
-          # happens when the user double-clicks the DMG to mount it).
+          # Neither `-t install` (for .pkg) nor `-t open --context
+          # context:primary-signature` succeeds against an unsigned DMG
+          # container, and electron-builder does not codesign the DMG
+          # itself (only the .app bundles inside get Developer ID +
+          # hardenedRuntime + notarization). For CI verification,
+          # Apple's own DTS guidance in
+          # https://developer.apple.com/forums/thread/128683 is:
+          #   "spctl is a poor way to check for that. Use codesign with
+          #    --check-notarization."
+          # We already ran `codesign --verify --deep --strict` on every
+          # .app above and `xcrun stapler validate` below, which together
+          # cover the offline verification path Gatekeeper uses on first
+          # open. End-user Gatekeeper behaviour is verified out-of-band
+          # via manual DMG-download smoke tests documented in
+          # docs/build/release.md.
           for DMG in "$DIR"/*.dmg; do
             [ -e "$DMG" ] || continue
             echo "stapler validating: $DMG"
             xcrun stapler validate "$DMG"
-            echo "spctl assessing (DMG as open): $DMG"
-            spctl -a -t open --context context:primary-signature -vvv "$DMG"
           done
 
           # ZIPs carry the stapled ticket on the .app inside them.
