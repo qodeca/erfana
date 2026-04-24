@@ -1,13 +1,31 @@
 /**
- * afterSign Hook – Deep re-sign the macOS app bundle
+ * afterSign Hook – Deep re-sign the macOS app bundle (LOCAL DEV ONLY)
  *
- * After electron-builder's signing pass, the app bundle contains binaries
- * signed individually with different ad-hoc code directory hashes. On macOS
- * Sequoia+, dyld rejects @rpath library loads between components with
- * mismatched ad-hoc signatures ("different Team IDs").
+ * For local dev builds that use ad-hoc signing (no Developer ID cert),
+ * electron-builder signs individual binaries with different ad-hoc code
+ * directory hashes. On macOS Sequoia+, dyld rejects @rpath library loads
+ * between components with mismatched ad-hoc signatures ("different Team IDs").
  *
- * This hook runs codesign to atomically re-sign the entire .app bundle,
- * giving all components a consistent ad-hoc identity.
+ * This hook atomically re-signs the entire .app bundle with a single ad-hoc
+ * identity so all components match.
+ *
+ * IMPORTANT — CI signing must SKIP this hook entirely:
+ *   For CI builds using Developer ID Application certificate,
+ *   `codesign --force --deep --sign -` would DESTROY the Developer ID
+ *   signatures on every helper binary inside the .app and make Apple
+ *   notarization reject the archive with errors like:
+ *     - "The binary is not signed with a valid Developer ID certificate"
+ *     - "The signature does not include a secure timestamp"
+ *     - "The executable does not have the hardened runtime enabled"
+ *
+ *   Prior guard attempted a `codesign -dv` positive assertion on the main
+ *   .app to detect Developer ID signing, but that probe proved unreliable
+ *   in electron-builder's afterSign hook timing (observed silent pass-
+ *   through in dry-run 24902364788, wrecking all helpers).
+ *
+ *   Simpler + safer: any env var indicating real-identity signing means
+ *   this hook is a no-op. Local dev without any of these env vars still
+ *   gets the ad-hoc consistency re-sign.
  *
  * Build lifecycle:
  *   afterPack (fuses.js) → electron-builder signing → afterSign (this) → DMG/ZIP
@@ -21,49 +39,20 @@ module.exports = async function afterSign(context) {
     return;
   }
 
-  // Skip ad-hoc re-sign when a real Developer ID identity applied signatures.
-  // Overwriting Developer ID with `--sign -` (ad-hoc) would destroy the chain
-  // of trust and break notarization. In CI-signed builds we must leave the
-  // electron-builder signature intact; notarytool then staples the ticket.
-  //
-  // Detection strategy: we prefer a positive assertion over an env-var allowlist
-  // because electron-builder reads a growing set of CSC_* / APPLE_* variables
-  // and a future workflow adding only (say) CSC_KEYCHAIN would slip an env-only
-  // guard and destroy signatures. Instead we run `codesign -dv` on the built
-  // .app and look for a non-ad-hoc authority; if there is one, skip re-sign.
-  //
-  // Env-var heuristic is kept as a pre-check to avoid spawning codesign in
-  // pure dev builds where we already know there is no signing.
-  const envHintsProductionSign =
+  const realIdentitySigning =
     process.env.APPLE_API_KEY ||
     process.env.APPLE_API_KEY_ID ||
-    process.env.APPLE_ID ||  // legacy flow — guard here even though we ban it in CI
+    process.env.APPLE_ID ||
+    process.env.APPLE_APP_SPECIFIC_PASSWORD ||
     process.env.CSC_LINK ||
     process.env.CSC_KEYCHAIN ||
     process.env.CSC_KEY_PASSWORD ||
     process.env.CSC_IDENTITY_AUTO_DISCOVERY === 'true' ||
     (process.env.CSC_NAME && process.env.CSC_NAME !== '-');
 
-  if (envHintsProductionSign) {
-    // Positive assertion: if the .app has a real Authority, skip.
-    const appPathForCheck = path.join(
-      context.appOutDir,
-      `${context.packager.appInfo.productFilename}.app`
-    );
-    // codesign -dv writes metadata to stderr (not stdout); capture both.
-    const result = require('child_process').spawnSync(
-      'codesign',
-      ['-dv', appPathForCheck],
-      { encoding: 'utf8' }
-    );
-    const combined = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
-    // Developer ID Application authorities look like:
-    //   "Authority=Developer ID Application: Qodeca..."
-    // Ad-hoc signatures never emit an "Authority=" line.
-    if (/^Authority=/m.test(combined)) {
-      console.log('🔏 Developer ID signature present — skipping ad-hoc re-sign');
-      return;
-    }
+  if (realIdentitySigning) {
+    console.log('🔏 Real signing identity detected — leaving Developer ID signatures intact');
+    return;
   }
 
   const appPath = path.join(
@@ -71,7 +60,7 @@ module.exports = async function afterSign(context) {
     `${context.packager.appInfo.productFilename}.app`
   );
 
-  console.log('🔏 Deep re-signing macOS app bundle for consistent ad-hoc identity');
+  console.log('🔏 Deep re-signing macOS app bundle for consistent ad-hoc identity (local dev)');
   console.log(`   App: ${appPath}`);
 
   execFileSync('codesign', ['--force', '--deep', '--sign', '-', appPath], {

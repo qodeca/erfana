@@ -82,14 +82,15 @@ jobs:
           ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${{ env.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
         run: |
           set -euo pipefail
-          TOKEN_PATH="${RUNNER_TEMP}/azure_oidc_token"
-          RESPONSE_PATH="${RUNNER_TEMP}/azure_oidc_response.json"
+          export TOKEN_PATH="${RUNNER_TEMP}/azure_oidc_token"
+          export RESPONSE_PATH="${RUNNER_TEMP}/azure_oidc_response.json"
           curl -sSf -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=api://AzureADTokenExchange" \
             -o "$RESPONSE_PATH"
           # Use node to extract .value — guaranteed available after setup-node.
-          node -e "const j=require(process.env.RESPONSE_PATH);require('fs').writeFileSync(process.env.TOKEN_PATH, j.value)" \
-            RESPONSE_PATH="$RESPONSE_PATH" TOKEN_PATH="$TOKEN_PATH"
+          # Env vars must be exported (as above) before the node call; a trailing
+          # `VAR=... VAR=...` would be treated as positional args to node, not env.
+          node -e "const j = require(process.env.RESPONSE_PATH); require('fs').writeFileSync(process.env.TOKEN_PATH, j.value);"
           rm -f "$RESPONSE_PATH"
           # Basic sanity — JWT header starts with eyJ
           HEAD=$(head -c 3 "$TOKEN_PATH")
