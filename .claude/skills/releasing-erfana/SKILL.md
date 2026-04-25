@@ -40,8 +40,9 @@ All external credentials (Apple Developer, Azure Artifact Signing, minisign rele
 
 | Agent | Purpose | Source | Used in |
 |-------|---------|--------|---------|
-| `release-quality-runner` | Enforce Phase 0 local pre-flight checklist | shared (project override) | Phase 0 |
+| `release-quality-runner` | Enforce Phase 0 pre-flight checklist (branch, version, secrets, workflow lint, electron-builder schema) | shared (project override) | Phase 0 |
 | `release-notes-drafter` | Emit two-tier release-notes markdown via `git cliff` + operator summary | shared (project override) | Phase 1 |
+| `release-failure-analyzer` | On Phase 3 CI failure: identify failed leg, match log against the troubleshooting cookbook, write structured incident memo to `docs/release-incidents/` | shared (project-local) | Phase 3 (failure path) |
 
 **`release-build-executor` is retired.** CI owns the build. The skill watches, verifies, and publishes.
 
@@ -316,12 +317,51 @@ echo "Release run: https://github.com/qodeca/erfana/actions/runs/${RUN_ID}"
 # Wall-clock ceiling 90 min covers: prepare + 3 matrix legs + finalize.
 timeout 90m gh run watch "$RUN_ID" --exit-status --interval 10
 RC=$?
+```
 
-if [ "$RC" -ne 0 ]; then
-  gh run view "$RUN_ID" --log-failed | head -n 200
-  echo "Release run failed. URL: https://github.com/qodeca/erfana/actions/runs/${RUN_ID}"
-  exit 1
-fi
+### 3.3 On failure → invoke release-failure-analyzer
+
+If `RC` is non-zero, **do NOT just dump 200 log lines and exit.** Delegate to the failure analyzer so the diagnostic capture is structured and reusable.
+
+```
+Agent(subagent_type: "release-failure-analyzer")
+Prompt: "Analyse failed release.yml run.
+         Inputs:
+           - run_id: ${RUN_ID}
+           - version: ${VERSION}
+           - attempt_number: <Nth attempt for this version, see docs/release-incidents/index.md>
+           - project_path: <repo root>
+         Identify failed leg(s), match log against the troubleshooting cookbook,
+         write incident memo to docs/release-incidents/v${VERSION}-attempt-{N}.md,
+         append index entry. Return structured JSON per agent contract."
+```
+
+The agent writes the memo and returns:
+- Matched cookbook row (if any) with the suggested fix verbatim.
+- Run URL.
+- Memo path (e.g., `docs/release-incidents/v0.9.5-attempt-2.md`).
+- Last 100 log lines for context.
+
+**Skill action after analyzer returns:**
+
+1. Display the matched fix prominently to the operator.
+2. Surface the memo path so they can read full context.
+3. Use `AskUserQuestion` to decide next step:
+
+| Option | Action |
+|--------|--------|
+| Apply fix + bump patch + re-run | Operator commits the fix; skill bumps version, restarts from Phase 0 |
+| Investigate further | Skill exits; operator reviews memo manually |
+| Mark as unknown signature | Operator commits to update the cookbook with a new row before retry |
+
+**Tag is burned regardless** — every retry must use a new patch version. This is non-negotiable per the enforcement rules.
+
+```bash
+# After the analyzer returns, surface its output and stop the skill.
+# Subsequent attempts re-enter the skill at Phase 0 with the bumped version.
+echo "Release run failed. URL: https://github.com/qodeca/erfana/actions/runs/${RUN_ID}"
+echo "Incident memo: ${MEMO_PATH}"
+exit 1
 ```
 
 ### Checkpoint 3.A
@@ -333,100 +373,23 @@ fi
 
 ## Phase 4: Verify + publish checkpoint (CRITICAL)
 
-### 4.1 Fetch draft state
+Full instructions live in [`phases/phase-4-verify.md`](phases/phase-4-verify.md). Summary:
 
-```bash
-gh release view "v${VERSION}" --json isDraft,assets \
-  | tee /tmp/release-meta.json
-DRAFT=$(jq -r '.isDraft' /tmp/release-meta.json)
-if [ "$DRAFT" != "true" ]; then
-  echo "FAIL: Release is not a draft — expected a draft produced by release.yml"
-  exit 1
-fi
-```
+| Step | What | Why it's required |
+|---|---|---|
+| 4.1 | `gh release view --json isDraft` returns `true` | Sanity: `release.yml` produced a draft, not a published release |
+| 4.2 | `gh release download` all assets to a temp dir | Local material for verification |
+| 4.3 | `minisign -V` over `SHA256SUMS` + `.minisig` | Proves the sums were signed by the release minisign key |
+| 4.4 | `sha256sum` every asset, `diff` against `SHA256SUMS` | Proves each asset matches what was signed |
+| 4.5 | `gh run download --name sha256sums-digest` + `diff -q` against the asset | Catches post-`finalize` tampering of the draft asset |
+| 4.6 | `AskUserQuestion` — Publish + mark latest / Leave as draft / Abort and delete | Explicit operator approval; no auto-publish |
 
-### 4.2 Download SHA256SUMS + every asset
-
-```bash
-WORK=$(mktemp -d)
-cd "$WORK"
-gh release download "v${VERSION}" --pattern '*' --clobber
-ls -la
-```
-
-### 4.3 Verify minisign signature
-
-The dedicated release minisign public key is published in [docs/security.md § Release signing](../../../docs/security.md) and mirrored in `README.md`. Load it, then:
-
-```bash
-PUBKEY_PATH="$WORK/release.pub"
-# Write the pubkey from docs/security.md verbatim (skill extracts the
-# marked block by fencing).
-minisign -V -P "$(cat "$PUBKEY_PATH")" -m SHA256SUMS -x SHA256SUMS.minisig
-```
-
-- [ ] `minisign -V` exits 0
-
-### 4.4 Recompute per-asset hashes locally
-
-```bash
-ACTUAL="$WORK/SHA256SUMS.local"
-# Hash every asset except the sums and its signature themselves.
-(cd "$WORK" && for f in *; do
-  case "$f" in SHA256SUMS|SHA256SUMS.minisig|SHA256SUMS.local) continue ;; esac
-  sha256sum "$f"
-done) | sort > "$ACTUAL"
-
-# Compare against the sum list we just verified.
-diff <(sort SHA256SUMS) "$ACTUAL" || {
-  echo "FAIL: Local hashes differ from signed SHA256SUMS"
-  exit 1
-}
-```
-
-### 4.5 Compare against the `finalize` job's recorded SHA256SUMS
-
-This catches tampering between `finalize` completion and the moment the operator downloads the draft asset. `finalize` publishes the exact bytes of `SHA256SUMS` it signed as a workflow artifact named `sha256sums-digest` (30-day retention). The skill downloads the artifact and byte-compares against the asset on the release.
-
-```bash
-# Download finalize's recorded SHA256SUMS as a workflow artifact.
-ART_DIR="$WORK/ci-digest"
-gh run download "$RUN_ID" --name sha256sums-digest --dir "$ART_DIR"
-
-# Byte-for-byte comparison. diff exits non-zero on any difference and
-# prints the delta for forensics.
-if ! diff -q "$WORK/SHA256SUMS" "$ART_DIR/SHA256SUMS"; then
-  echo "FAIL: Draft SHA256SUMS differs from CI-recorded SHA256SUMS"
-  diff "$WORK/SHA256SUMS" "$ART_DIR/SHA256SUMS" || true
-  exit 1
-fi
-```
-
-Why this gate matters: the minisign signature at 4.3 proves the *original* SHA256SUMS was signed by the release key. But after `finalize` publishes, anyone with write access to the repo could use `gh release upload --clobber` to replace `SHA256SUMS` on the draft (and provide a forged minisign replacement if they also held the key). This gate catches that scenario — the workflow artifact is write-once from the run and cannot be substituted without re-running the workflow.
-
-*If any verification step in 4.3–4.5 fails: abort. Do not prompt for approval.*
-
-### 4.6 Operator approval — MANDATORY
-
-Only now may the skill prompt the operator. Present:
-- Number of assets
-- Expected set (9 binaries + SHA256SUMS + SHA256SUMS.minisig = 11 total)
-- Verification summary (all green)
-- Release URL
-
-Ask via `AskUserQuestion`:
-
-> "All cryptographic verifications passed for v{version}. Publish the release and mark it as latest?"
-
-| Option | Action |
-|--------|--------|
-| Publish + mark latest | `gh release edit "v${VERSION}" --draft=false --latest` |
-| Leave as draft | Skip final edit; instruct operator to publish manually after additional review |
-| Abort and delete | `gh release delete "v${VERSION}" --yes --cleanup-tag=false` and exit |
+⛔ **Any failure in 4.3–4.5 aborts before the operator is asked.** Do not prompt for approval, do not suggest manual override. The release is burned; bump the patch.
 
 ### Checkpoint 4.A
 
-- [ ] Operator explicitly chose Publish or Leave-as-draft
+- [ ] Steps 4.1–4.5 all green per `phases/phase-4-verify.md`
+- [ ] Operator explicitly chose Publish or Leave-as-draft via `AskUserQuestion`
 - [ ] Release visibility matches operator's choice
 
 ---

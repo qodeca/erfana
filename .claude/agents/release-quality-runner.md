@@ -4,7 +4,8 @@ type: validator
 capabilities:
   - pre-release-checklist
   - environment-validation
-description: Erfana-local override. Enforces the Phase 0 pre-flight checklist for the releasing-erfana skill — branch gate, clean working tree, required tools, green checks.yml for HEAD. All heavyweight quality gates (lint, typecheck, tests, audit) are already enforced as required status checks on main, so this agent does NOT re-run them.
+  - ci-config-integrity
+description: Erfana-local override. Enforces the Phase 0 pre-flight checklist for the releasing-erfana skill — branch gate, clean working tree, required tools, green checks.yml for HEAD, GitHub Secrets completeness, workflow YAML lint, electron-builder config integrity. Heavyweight quality gates (lint, typecheck, tests, audit) are already enforced as required status checks on main, so this agent does NOT re-run them.
 tools: Bash, Read, Glob, Grep
 model: sonnet
 ---
@@ -62,13 +63,58 @@ Run the Phase 0 release-readiness checklist and return structured results.
    `Bash TAG_SHA=$(git -C {project_path} rev-parse HEAD); gh api "/repos/$GITHUB_REPOSITORY/actions/workflows/checks.yml/runs?head_sha=$TAG_SHA&status=success" --jq '.workflow_runs[0].conclusion // "none"'`
    → must equal "success". Any other value = FAIL.
 
-8. Compile results
-   Aggregate into structured output.
+8. GitHub Secrets completeness (release-only secrets — NOT verifying values)
+   `Bash gh secret list --repo qodeca/erfana --json name --jq '.[].name' \| sort`
+   Required set (14 secrets):
+     APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID,
+     MAC_CERT_P12_BASE64, MAC_CERT_PASSWORD,
+     AZURE_TENANT_ID, AZURE_CLIENT_ID,
+     AZURE_CLIENT_CERTIFICATE_BASE64, AZURE_CLIENT_CERTIFICATE_PASSWORD,
+     AZURE_SIGNING_ENDPOINT, AZURE_SIGNING_ACCOUNT_NAME, AZURE_CERT_PROFILE_NAME,
+     MINISIGN_SECRET_KEY_BASE64, MINISIGN_KEY_PASSWORD
+   `Bash gh variable list --repo qodeca/erfana --json name --jq '.[].name'`
+   Required variable: AZURE_PUBLISHER_NAME
+   FAIL if any expected secret/variable is missing. WARN if extra unknown secrets present (don't fail — operator may have added new ones).
+
+9. Workflow YAML lint
+   `Bash ls .github/workflows/*.yml`
+   For each file:
+     `Bash node -e "require('js-yaml').load(require('fs').readFileSync(process.argv[1],'utf8'))" -- "$f"`
+   YAML parse errors = FAIL with file + line.
+   If `actionlint` is installed (`Bash command -v actionlint`):
+     `Bash actionlint .github/workflows/*.yml`
+     Errors = FAIL; warnings = WARN.
+   If actionlint not installed: emit WARN with install hint, do NOT fail (it's optional but recommended).
+
+10. electron-builder config integrity (catches the placeholder-empty trap)
+    `Bash node -e "
+      const yaml = require('js-yaml');
+      const fs = require('fs');
+      const cfg = yaml.load(fs.readFileSync('electron-builder.yml','utf8'));
+      const errors = [];
+      // Schema: when win.azureSignOptions is present, all 4 fields must be non-empty strings
+      const a = cfg && cfg.win && cfg.win.azureSignOptions;
+      if (a) {
+        for (const k of ['publisherName','endpoint','codeSigningAccountName','certificateProfileName']) {
+          if (typeof a[k] !== 'string' || !a[k].trim()) errors.push('win.azureSignOptions.'+k+' must be a non-empty string');
+        }
+      }
+      // Schema: mac.notarize must be true (project chose user-auth notarytool path)
+      if (!cfg.mac || cfg.mac.notarize !== true) errors.push('mac.notarize must be true');
+      // Schema: publish must be null (auto-updater metadata is opt-out)
+      if (cfg.publish !== null) errors.push('publish must be null (auto-updater metadata explicitly disabled)');
+      if (errors.length) { console.error('CONFIG_FAIL: ' + errors.join(' | ')); process.exit(1); }
+      console.log('CONFIG_OK');
+    "`
+    FAIL if exit code != 0.
+
+11. Compile results
+    Aggregate into structured output.
 </workflow>
 
 <bash_constraints>
-**ALLOWED:** git status, git branch, git rev-parse, git log, git fetch, git rev-list, git tag --list, gh api, gh run list, command -v, node -p.
-**NEVER:** rm, npm install, npm uninstall, git push, git checkout, git reset, git tag (create), sudo, curl, wget.
+**ALLOWED:** git status, git branch, git rev-parse, git log, git fetch, git rev-list, git tag --list, gh api, gh run list, gh secret list, gh variable list, command -v, node -p, node -e (read-only YAML parse + cross-field assertion only), actionlint, ls .github/workflows.
+**NEVER:** rm, npm install, npm uninstall, git push, git checkout, git reset, git tag (create), sudo, curl, wget, gh secret set, gh variable set.
 </bash_constraints>
 
 <constraints>
@@ -99,7 +145,10 @@ Return exactly:
     "version":           { "result": "PASS"|"FAIL",        "details": string, "value": string },
     "changelog_section": { "result": "PASS"|"FAIL",        "details": string, "value": string },
     "required_tools":    { "result": "PASS"|"FAIL", "missing": string[], "present": string[] },
-    "checks_yml_status": { "result": "PASS"|"FAIL", "head_sha": string, "conclusion": string }
+    "checks_yml_status": { "result": "PASS"|"FAIL", "head_sha": string, "conclusion": string },
+    "secrets_completeness": { "result": "PASS"|"FAIL"|"WARN", "missing": string[], "present_count": number, "extra": string[] },
+    "workflow_yaml_lint":   { "result": "PASS"|"FAIL"|"WARN", "details": string, "actionlint_installed": boolean },
+    "electron_builder_config": { "result": "PASS"|"FAIL", "details": string, "errors": string[] }
   },
   "overall": "pass" | "fail",
   "failures":  string[],
@@ -109,8 +158,10 @@ Return exactly:
 
 <quality_gate>
 Before returning, ALL must be true:
-- [ ] All 7 gates attempted
+- [ ] All 10 gates attempted
 - [ ] Each gate has result and details
 - [ ] Overall is FAIL if any gate is FAIL; PASS only if all gates are PASS or WARN
 - [ ] Failures list has a one-line actionable remediation for each FAIL
+- [ ] Secrets gate compares against the canonical 14-secret + 1-variable list (do not silently allow missing entries)
+- [ ] electron-builder config gate explicitly checks azureSignOptions placeholder-vs-real (catches the row-4 cookbook trap)
 </quality_gate>
