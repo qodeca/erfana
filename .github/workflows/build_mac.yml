@@ -175,23 +175,14 @@ jobs:
               --output-format json 2>/dev/null)
             echo "$out"
 
-            local id status
-            # Robust JSON extraction: find the first '{' and matching last
-            # '}' in the raw output (handles arbitrary leading non-JSON
-            # warning lines AND nested braces inside the payload, which the
-            # previous sed-range prefilter would have truncated). Then parse
-            # both fields in a single python invocation.
-            parsed=$(printf '%s' "$out" | python3 -c "
-import json, sys
-text = sys.stdin.read()
-start = text.find('{')
-end = text.rfind('}')
-if start < 0 or end < 0 or end <= start:
-    sys.exit('no JSON object found')
-obj = json.loads(text[start:end + 1])
-print(obj.get('id', ''))
-print(obj.get('status', ''))
-" 2>/dev/null || echo "")
+            local id status parsed
+            # Robust JSON extraction: locate first '{' and last '}' in the
+            # raw output, parse the slice, print id + status. Handles
+            # arbitrary leading non-JSON warning lines AND nested braces
+            # inside the payload (the previous sed-range prefilter would
+            # have truncated on the first '^}' it saw). Single-line python
+            # so the YAML run-block indentation stays simple.
+            parsed=$(printf '%s' "$out" | python3 -c 'import json,sys; t=sys.stdin.read(); s=t.find("{"); e=t.rfind("}"); sys.exit("no JSON object") if s<0 or e<=s else None; o=json.loads(t[s:e+1]); print(o.get("id","")); print(o.get("status",""))' 2>/dev/null || echo "")
             id=$(printf '%s\n' "$parsed" | sed -n '1p')
             status=$(printf '%s\n' "$parsed" | sed -n '2p')
             if [ -z "$id" ] || [ -z "$status" ]; then
