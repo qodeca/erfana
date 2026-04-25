@@ -350,9 +350,22 @@ The agent writes the memo and returns:
 
 | Option | Action |
 |--------|--------|
-| Apply fix + bump patch + re-run | Operator commits the fix; skill bumps version, restarts from Phase 0 |
-| Investigate further | Skill exits; operator reviews memo manually |
-| Mark as unknown signature | Operator commits to update the cookbook with a new row before retry |
+| Apply fix + bump patch + re-run | Operator commits the fix; skill bumps version, restarts from Phase 0. |
+| Investigate further | Skill exits; operator reviews memo manually. |
+| Mark as unknown signature → cookbook update + retry | **Gated path** (see below). Skill verifies the cookbook gained a new row matching the unmatched signature before allowing re-entry to Phase 0. |
+
+**Unknown-signature gate (option 3):** if `matched.found=false`, the skill MUST verify the cookbook gained a new row before re-entering Phase 0 — preventing repeated identical failures on the same unmatched signature.
+
+```bash
+# Pick a distinctive 8-12 word phrase from the unmatched log fragment.
+DISTINCTIVE="<phrase>"
+# AskUserQuestion: "Have you added a new cookbook row for this signature?"
+# If "Yes": grep cookbook for the distinctive phrase. If absent → fail.
+grep -qF "$DISTINCTIVE" .claude/skills/releasing-erfana/guides/troubleshooting.md || {
+  echo "::error::Cookbook update claimed but distinctive phrase not found"
+  exit 1
+}
+```
 
 **Tag is burned regardless** — every retry must use a new patch version. This is non-negotiable per the enforcement rules.
 

@@ -124,12 +124,13 @@ All secrets live in the GitHub repo `qodeca/erfana` (Settings → Secrets and va
 
 ### Rotation calendar
 
-| Anchor | Source of truth | Calendar reminder |
-|---|---|---|
-| `APPLE_APP_SPECIFIC_PASSWORD` | appleid.apple.com | Event-driven (account compromise, key leak) — no fixed expiry |
-| `MAC_CERT_P12_BASE64` | Apple Developer | 60 days before cert expiry |
-| `AZURE_CERT_PROFILE_NAME` | Azure Artifact Signing profile | 60 days before certificate-profile expiry |
-| `MINISIGN_SECRET_KEY_BASE64` (primary) | Internal ops vault | Scheduled annually or on compromise; rotation key published alongside primary so end users can verify both |
+| Anchor | Source of truth | Calendar reminder | Next due |
+|---|---|---|---|
+| `APPLE_APP_SPECIFIC_PASSWORD` | appleid.apple.com | Event-driven (account compromise, key leak) — no fixed expiry | — |
+| `MAC_CERT_P12_BASE64` | Apple Developer | 60 days before cert expiry | per cert exp date |
+| `AZURE_CLIENT_CERTIFICATE_BASE64` (auth cert — app registration credential) | `az ad app credential list --id $AZURE_CLIENT_ID --cert` | 60 days before cert expiry (currently 2028-04-23) — i.e. **2028-02-22** | 2028-02-22 |
+| `AZURE_CERT_PROFILE_NAME` (signing cert — service-side, separate from auth cert above) | Azure Artifact Signing profile | 60 days before certificate-profile expiry | per profile exp date |
+| `MINISIGN_SECRET_KEY_BASE64` (primary) | Internal ops vault | Scheduled annually or on compromise; rotation key published alongside primary so end users can verify both | annual |
 
 Owner: release engineer on rotation (currently documented under repo owner email).
 

@@ -150,17 +150,32 @@ jobs:
             local dmg="$1"
             echo "Notarizing: $dmg"
             local out
+            # Capture stdout only — Apple's xcrun notarytool occasionally
+            # prepends a deprecation warning to stderr (and very rarely to
+            # stdout). We isolate stderr so it doesn't corrupt JSON parse.
             out=$(xcrun notarytool submit "$dmg" \
               --apple-id "$APPLE_ID" \
               --password "$APPLE_APP_SPECIFIC_PASSWORD" \
               --team-id "$APPLE_TEAM_ID" \
               --wait \
-              --output-format json)
+              --output-format json 2>/dev/null)
             echo "$out"
 
-            local id status
-            id=$(printf '%s' "$out" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))")
-            status=$(printf '%s' "$out" | python3 -c "import json,sys; print(json.load(sys.stdin).get('status',''))")
+            local id status json
+            # Defensive prefilter: strip any non-JSON lines that may precede
+            # the {...} payload. sed range pattern from first '{' to first
+            # '}' captures only the JSON object. If notarytool ever adds a
+            # warning line before the JSON, this guarantees a clean parse.
+            json=$(printf '%s' "$out" | sed -n '/^{/,/^}/p')
+            id=$(printf '%s' "$json" | python3 -c "import json,sys; d=json.load(sys.stdin) if sys.stdin.read else {}; print(d.get('id','') if isinstance(d,dict) else '')" 2>/dev/null || echo "")
+            # Re-run python on the same prefiltered JSON for status. Fall
+            # back to grep on the raw out only as a last resort.
+            status=$(printf '%s' "$json" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('status',''))" 2>/dev/null || echo "")
+            if [ -z "$id" ] || [ -z "$status" ]; then
+              echo "::error::Failed to parse notarytool JSON output. Raw:"
+              printf '%s\n' "$out"
+              return 1
+            fi
 
             if [ "$status" != "Accepted" ]; then
               echo "::error::Notarization returned status=$status (expected Accepted) for $dmg"

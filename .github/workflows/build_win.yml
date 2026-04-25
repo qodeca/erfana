@@ -140,7 +140,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          clean=$(printf '%s' "${AZURE_SIGNING_ENDPOINT:-}" | tr -d '\r\n' | awk '{$1=$1;print}')
+          # Strip leading/trailing whitespace only — DO NOT use awk
+          # '{$1=$1;print}' which re-splits on any whitespace run and would
+          # silently collapse internal whitespace if a misconfigured
+          # endpoint somehow contained spaces. sed strips edges only.
+          clean=$(printf '%s' "${AZURE_SIGNING_ENDPOINT:-}" | tr -d '\r\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
           if [ -z "$clean" ]; then
             echo "::error::AZURE_SIGNING_ENDPOINT is empty"
             exit 1
