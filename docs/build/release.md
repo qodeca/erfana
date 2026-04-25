@@ -6,7 +6,7 @@ This document is the operator reference for the Erfana multi-platform release pi
 
 Design summary: one `v*.*.*` tag push from `main` produces one GitHub draft release containing signed, notarized artifacts for Windows + macOS + Linux, plus a minisign-signed `SHA256SUMS`. The local [`releasing-erfana`](../../.claude/skills/releasing-erfana/SKILL.md) skill handles pre-tag sanity, tag push, CI polling, cryptographic verification, and human approval. CI owns build, sign, notarize, verify, and draft upload.
 
-> **SLSA Build L2 attestations are not used.** GitHub gates `actions/attest-build-provenance` to Enterprise Cloud for private repos; qodeca is on Free tier, so this layer is disabled. The minisign signature on the aggregate `SHA256SUMS` + per-platform OS signing (Developer ID notarization on macOS, Azure Artifact Signing Authenticode on Windows) are the authenticity anchors. The trust model is equivalent for end-user verification; attacker must compromise either the release-signing minisign key OR a platform signing credential to forge, independent of any GitHub-specific trust anchor.
+> **SLSA Build L2 attestations are not used.** GitHub gates `actions/attest-build-provenance` to Enterprise Cloud for private repos. qodeca is on the **Team plan**, which still does not enable attestations for private repos (Enterprise required), so this layer is disabled. The minisign signature on the aggregate `SHA256SUMS` + per-platform OS signing (Developer ID notarization on macOS, Azure Artifact Signing Authenticode on Windows) are the authenticity anchors. The trust model is equivalent for end-user verification; attacker must compromise either the release-signing minisign key OR a platform signing credential to forge, independent of any GitHub-specific trust anchor. Trigger to re-enable: org upgrades to Enterprise Cloud, or the repo is made public.
 
 ## Topology
 
@@ -321,14 +321,30 @@ This is A + C simultaneously. Trigger both. Additionally: open an urgent advisor
 - **[#165](https://github.com/qodeca/erfana/issues/165)** (Phase 4 whisper): shipped in v0.9.4. Its minisign dual-pubkey trust chain is a pattern reference, not a shared keypair.
 - **`whisper-binaries.yml`**: template for keychain setup, minisign signing, and signed-artifact upload. We mine it; we do not reuse its signing key.
 
-## Branch-protection plan (Phase I — do last)
+## Branch protection (Phase I — done 2026-04-25)
 
-Only flip branch protection on `main` **after** the new workflow has run green on `develop` at least once and `checks.yml` guards have been validated.
+Phase I configuration was applied after dry-run [`24925269258`](https://github.com/qodeca/erfana/actions/runs/24925269258) validated all 5 jobs end-to-end on the new pipeline.
 
-Required settings:
-- Required status checks: `checks.yml` (all jobs incl. `audit-signatures` and `release-guards`) + `e2e.yml`.
-- Require a pull request before merging; include administrators.
-- Protected tags rule `v*.*.*` with signature enforcement (SSH or GPG).
-- Enable secret scanning + push protection repo-wide.
+**`main` branch protection** ([`gh api repos/qodeca/erfana/branches/main/protection`](https://api.github.com/repos/qodeca/erfana/branches/main/protection)):
 
-Rationale: flipping branch protection before the new `checks.yml` guards are green would green-lock the repo; no one would be able to merge.
+- Required status checks (strict mode — branch must be up to date before merge): `Lint`, `Typecheck`, `Unit tests`, `Build`, `npm audit signatures`, `Release readiness guards`.
+- Required PR reviews: 1 approving review, dismiss stale reviews on push, conversation resolution required.
+- `enforce_admins: true` — administrators included.
+- `allow_force_pushes: false`, `allow_deletions: false`.
+
+**Protected tag ruleset** (id [`15540259`](https://github.com/qodeca/erfana/rules/15540259)):
+
+- Pattern: `refs/tags/v*.*.*`.
+- Rules: `deletion` blocked, `non_fast_forward` blocked, `required_signatures` enforced (SSH or GPG signed tags only).
+- `bypass_actors: []` — no exceptions.
+
+**Deliberate exclusion: `e2e`** is **not** in the required-checks list. As of 2026-04-25 the `e2e` workflow has been red on develop for several consecutive runs; including it would green-lock the repo. Add it back once stable:
+
+```bash
+gh api -X PATCH repos/qodeca/erfana/branches/main/protection/required_status_checks \
+  -F 'contexts[]=Lint' -F 'contexts[]=Typecheck' -F 'contexts[]=Unit tests' \
+  -F 'contexts[]=Build' -F 'contexts[]=npm audit signatures' \
+  -F 'contexts[]=Release readiness guards' -F 'contexts[]=e2e'
+```
+
+Rationale (kept for archaeology): flipping branch protection before the new `checks.yml` guards landed green on `develop` would have green-locked the repo. The dry-run gate above served as that validation.

@@ -496,7 +496,7 @@ Trust anchors:
 - **macOS**: Developer ID Application certificate + notarytool (user-auth mode: Apple ID + app-specific password + Team ID). Ticket stapled.
 - **Windows**: Azure Artifact Signing (formerly Azure Trusted Signing) via app-registration X.509 certificate auth (electron-builder 26's `WindowsSignAzureManager` does not support OIDC `AZURE_FEDERATED_TOKEN_FILE`, so we use a rotatable cert instead — public key lives on the app registration, private key is a GitHub Secret). Both NSIS installer and portable `.exe` are signed independently. Timestamped via `http://timestamp.digicert.com`.
 - **Linux**: aggregate `SHA256SUMS` signed with a **dedicated release minisign keypair** (separate from the whisper-binaries key — blast-radius isolation per ADR 0003 pattern).
-- **Per-artifact provenance**: SLSA Build L2 attestations are currently **not enabled** — GitHub gates `actions/attest-build-provenance` to Enterprise Cloud for private repos. The minisign signature on the aggregate `SHA256SUMS` (Linux) + per-platform Developer ID / Azure Artifact Signing already provide artifact authenticity without requiring GitHub as a trust anchor. Revisit if Erfana goes public or moves to Enterprise.
+- **Per-artifact provenance**: SLSA Build L2 attestations are currently **not enabled** — GitHub gates `actions/attest-build-provenance` to Enterprise Cloud for private repos. qodeca is on the **Team plan**, which still does not include attestations for private repos. The minisign signature on the aggregate `SHA256SUMS` (Linux) + per-platform Developer ID / Azure Artifact Signing already provide artifact authenticity without requiring GitHub as a trust anchor. Revisit if Erfana goes public or moves to Enterprise.
 
 ### Release minisign public keys (dual-key, ADR-0003 style)
 
@@ -534,7 +534,7 @@ Full verification recipes (macOS `codesign`, Windows `signtool`) are in [`build/
 
 ## Future enhancements
 
-Branch-protection on `main` with required signed-tag rule (Phase I of #174). Auto-updates via signed electron-updater (deferred — not shipped with #174 per non-goals). Encrypted storage via OS keychain. Confirmation prompts before destructive operations. **Windows code signing is now covered by #174; [#166](https://github.com/qodeca/erfana/issues/166) narrows to NSIS installer UX.**
+Auto-updates via signed electron-updater (deferred — not shipped with #174 per non-goals). Encrypted storage via OS keychain. Confirmation prompts before destructive operations. SLSA Build L2 attestations (re-enable when Erfana moves to Enterprise Cloud or repo goes public). **Windows code signing is now covered by #174; [#166](https://github.com/qodeca/erfana/issues/166) narrows to NSIS installer UX. Branch protection on `main` + protected `v*.*.*` tag ruleset are live as of 2026-04-25 — see [`build/release.md` § Branch protection](./build/release.md#branch-protection-phase-i--done-2026-04-25).**
 
 ## References
 
