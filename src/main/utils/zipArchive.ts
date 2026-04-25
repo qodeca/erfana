@@ -50,8 +50,17 @@ function validateEntries(src: string, resolvedDest: string): Promise<void> {
         rejectP(err ?? new Error('yauzl.open returned no zipfile'))
         return
       }
-      zipfile.on('error', rejectP)
-      zipfile.on('end', () => resolveP())
+      // `zipfile.close()` is idempotent in yauzl, so calling it on every
+      // terminal path (success / error / entry-rejection) is safe and prevents
+      // FD leaks under retry loops or repeated unzip invocations.
+      zipfile.on('error', (e) => {
+        zipfile.close()
+        rejectP(e)
+      })
+      zipfile.on('end', () => {
+        zipfile.close()
+        resolveP()
+      })
       zipfile.on('entry', (entry: yauzl.Entry) => {
         try {
           assertSafeEntry(entry.fileName, resolvedDest)
