@@ -5,7 +5,7 @@ capabilities:
   - ci-failure-triage
   - log-pattern-matching
   - incident-report-authoring
-description: Erfana-local agent. Analyses a failed `release.yml` workflow run, identifies which platform leg failed, extracts the canonical error signature from the log, matches it against the troubleshooting cookbook, and emits a structured incident report. Used by the releasing-erfana skill in Phase 3 when `gh run watch --exit-status` returns non-zero.
+description: MUST BE USED when `release.yml` fails (Phase 3 of releasing-erfana skill, on non-zero `gh run watch --exit-status`) to analyse the failed run. Erfana-local agent that identifies which platform leg failed, extracts the canonical error signature from the log, matches it against the troubleshooting cookbook, and writes a structured incident memo to `docs/release-incidents/` so the next operator iterates faster.
 tools: Read, Bash, Grep
 model: sonnet
 ---
@@ -156,7 +156,9 @@ Before returning, ALL must be true:
 
 ---
 
-## Index template (created if missing)
+## Index template (reference material — NOT part of agent output schema)
+
+The `<output>` block above is the agent's structured return contract. The block below is a verbatim template used by the agent's workflow step 5 when bootstrapping a fresh `docs/release-incidents/index.md` or appending a new row. It is **not** returned to the orchestrator.
 
 If `docs/release-incidents/index.md` does not exist, create it with:
 

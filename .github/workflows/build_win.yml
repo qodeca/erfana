@@ -69,7 +69,11 @@ jobs:
           # -d on windows-latest (git-for-windows bash) supports the same
           # flags as GNU base64 via busybox/openssl shim. Using openssl is
           # portable across all runner images.
-          printf '%s' "$AZURE_CLIENT_CERTIFICATE_BASE64" | openssl base64 -d -A > "$CERT_PATH"
+          # tr -d '\r\n' strips CR/LF that `gh secret set <file>` retains —
+          # openssl base64 -d -A truncates silently on mid-string \r,
+          # producing a corrupted PFX that passes the size check but fails
+          # deep inside @azure/identity with a cryptic PKCS#12 parse error.
+          printf '%s' "$AZURE_CLIENT_CERTIFICATE_BASE64" | tr -d '\r\n' | openssl base64 -d -A > "$CERT_PATH"
           SIZE=$(wc -c < "$CERT_PATH")
           if [ "$SIZE" -lt 100 ]; then
             echo "::error::Decoded PFX is implausibly small ($SIZE bytes)"
@@ -77,9 +81,14 @@ jobs:
           fi
           echo "PFX written: $CERT_PATH (${SIZE} bytes)"
           # Convert to a Windows-style path for AZURE_CLIENT_CERTIFICATE_PATH —
-          # @azure/identity running under pwsh expects backslashes.
+          # @azure/identity running under pwsh expects backslashes. We
+          # also export AZURE_SIGNING_PFX_POSIX_PATH (POSIX form) for the
+          # cleanup step: bash `[ -e "C:\..." ]` does NOT resolve Windows
+          # paths under Git Bash, so the Windows-form path can't be used
+          # for `rm -f` on the cleanup step. Track both forms.
           WIN_PATH=$(cygpath -w "$CERT_PATH")
           echo "AZURE_CLIENT_CERTIFICATE_PATH=$WIN_PATH" >> "$GITHUB_ENV"
+          echo "AZURE_SIGNING_PFX_POSIX_PATH=$CERT_PATH" >> "$GITHUB_ENV"
 
       - name: Verify AZURE_* env reaches the build step
         # Diagnostic — prints byte lengths (safe, not value) so empty env
@@ -212,12 +221,19 @@ jobs:
 
       - name: Clean up PFX
         # Ensure the private key file never outlives the job even on
-        # failure paths above.
+        # failure paths above. Use the POSIX-form path for cleanup —
+        # bash `[ -e "C:\..." ]` does NOT resolve Windows-form paths
+        # under Git Bash on windows-latest, so the cleanup would silently
+        # no-op against the AZURE_CLIENT_CERTIFICATE_PATH (Windows form)
+        # and the PFX would leak to RUNNER_TEMP for the rest of the job.
         if: always()
         shell: bash
         run: |
-          if [ -n "${AZURE_CLIENT_CERTIFICATE_PATH:-}" ] && [ -e "$AZURE_CLIENT_CERTIFICATE_PATH" ]; then
-            rm -f "$AZURE_CLIENT_CERTIFICATE_PATH" || true
+          if [ -n "${AZURE_SIGNING_PFX_POSIX_PATH:-}" ] && [ -e "$AZURE_SIGNING_PFX_POSIX_PATH" ]; then
+            rm -f "$AZURE_SIGNING_PFX_POSIX_PATH" || true
+            echo "PFX private key removed: $AZURE_SIGNING_PFX_POSIX_PATH"
+          else
+            echo "PFX cleanup: no POSIX path available (decode step likely failed before export)"
           fi
 
       - name: Upload to draft release

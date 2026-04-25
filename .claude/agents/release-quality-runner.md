@@ -5,7 +5,7 @@ capabilities:
   - pre-release-checklist
   - environment-validation
   - ci-config-integrity
-description: Erfana-local override. Enforces the Phase 0 pre-flight checklist for the releasing-erfana skill — branch gate, clean working tree, required tools, green checks.yml for HEAD, GitHub Secrets completeness, workflow YAML lint, electron-builder config integrity. Heavyweight quality gates (lint, typecheck, tests, audit) are already enforced as required status checks on main, so this agent does NOT re-run them.
+description: MUST BE USED in Phase 0 of the releasing-erfana skill to enforce the pre-flight checklist before any release tag is pushed. Erfana-local override. Validates: branch gate, clean working tree, required tools, green checks.yml for HEAD, GitHub Secrets completeness, workflow YAML lint, electron-builder config integrity. Heavyweight quality gates (lint, typecheck, tests, audit) are already enforced as required status checks on main, so this agent does NOT re-run them.
 tools: Bash, Read, Glob, Grep
 model: sonnet
 ---
@@ -76,10 +76,11 @@ Run the Phase 0 release-readiness checklist and return structured results.
    Required variable: AZURE_PUBLISHER_NAME
    FAIL if any expected secret/variable is missing. WARN if extra unknown secrets present (don't fail — operator may have added new ones).
 
-9. Workflow YAML lint
-   `Bash ls .github/workflows/*.yml`
+9. Workflow YAML lint (assumes cwd = project_path so `node` resolves project-local node_modules)
+   `Bash cd {project_path} && ls .github/workflows/*.yml`
    For each file:
-     `Bash node -e "require('js-yaml').load(require('fs').readFileSync(process.argv[1],'utf8'))" -- "$f"`
+     `Bash cd {project_path} && node -e "require('js-yaml').load(require('fs').readFileSync(process.argv[1],'utf8'))" -- "$f"`
+   `js-yaml` is a direct runtime dependency of Erfana (package.json), so `require('js-yaml')` is guaranteed to resolve when run from project_path.
    YAML parse errors = FAIL with file + line.
    If `actionlint` is installed (`Bash command -v actionlint`):
      `Bash actionlint .github/workflows/*.yml`

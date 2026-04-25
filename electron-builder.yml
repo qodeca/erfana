@@ -66,7 +66,12 @@ win:
   # never reach the Azure signing backend.
   azureSignOptions:
     publisherName: placeholder-overridden-at-runtime
-    endpoint: https://placeholder.example/
+    # IANA-reserved .invalid TLD (RFC 6761) — guaranteed not to resolve via DNS.
+    # If --config.win.azureSignOptions.endpoint=$AZURE_SIGNING_ENDPOINT injection
+    # silently fails for any reason, electron-builder will attempt outbound TLS
+    # to this host, which fails fast at DNS resolution rather than connecting
+    # to a third-party-registered placeholder.example domain.
+    endpoint: https://placeholder.invalid/
     codeSigningAccountName: placeholder
     certificateProfileName: placeholder
 nsis:
