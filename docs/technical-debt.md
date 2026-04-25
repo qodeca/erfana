@@ -122,6 +122,25 @@ const config = PROMPT_REGISTRY['mermaid-bug-report']  // Returns undefined!
 
 ---
 
+### 7. `docs/security.md` exceeds /doc-update soft cap (541 lines)
+
+**Severity**: Low
+**Impact**: `/doc-update` protocol prefers ≤500-line doc files; `security.md` sits 41 lines over.
+
+**Problem**: Largest natural extraction candidate (`Release signing (v0.9.5+, #174)`, L490–L533) is structurally pinned. The pubkey block contains `<!-- minisign-pubkey-{primary,rotation}-{begin,end} -->` fence markers that are actively grepped by:
+
+- `.github/workflows/checks.yml:214–241` — release-pubkey drift detector (a required `Release readiness guards` status check on `main`)
+- `.claude/skills/releasing-erfana/phases/phase-4-verify.md:45` — operator-facing canonical-source note
+- `README.md:156` — direct `#release-signing-v095-174` anchor
+
+Moving the block would require synchronized edits to checks.yml + skill + README anchor. High blast-radius for cosmetic gain.
+
+**Recommended Solution** (if cap-compliance is wanted later): extract the lower-risk `Test Builds (ERFANA_TEST_BUILD)` section (L134–L198, ~65 lines) to `docs/security/test-builds.md` instead. Single internal cross-ref at L24; no CI implications. Drops `security.md` to ~476 lines.
+
+**Status**: Accepted constraint. Re-evaluate only if `security.md` grows further or if the CI drift detector is rewritten.
+
+---
+
 ## Code Quality Improvements
 
 ### Documentation Token Efficiency
@@ -197,4 +216,4 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 
 ---
 
-**Last Updated**: v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day)
+**Last Updated**: v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
