@@ -159,8 +159,8 @@ The dedicated release-signing minisign public keys (primary + rotation) are publ
 
 ## License
 
-MIT
+Proprietary — see [LICENSE](LICENSE). Copyright (c) 2025-2026 Qodeca sp. z o.o. All rights reserved.
 
 ## Author
 
-Marcin Obel
+Qodeca sp. z o.o.
