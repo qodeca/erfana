@@ -18,6 +18,14 @@ Internal-only refactor of `.claude/skills/releasing-erfana/`. No user-visible ch
 
 Out of scope (deferred): `release-pretag-runner` agent; CI guard for cookbook-format invariants.
 
+### Project ops
+
+Three operational/metadata shifts on 2026-04-25 with no runtime impact:
+
+- **License switched MIT → proprietary** ([`34fd829`](https://github.com/qodeca/erfana/commit/34fd829)) — `LICENSE` now reads "All rights reserved" with Polish governing-law clause; `package.json` set to `license: UNLICENSED` + `private: true`; copyright holder is **Qodeca sp. z o.o.**, not the individual developer. Erfana is a closed-source freemium product; references to MIT in code or docs were corrected. The earlier `d259442` (added MIT `LICENSE`) was reverted by this commit.
+- **Workflow display names → Title Case** ([`9848451`](https://github.com/qodeca/erfana/commit/9848451), preceded by [`2bc4ab2`](https://github.com/qodeca/erfana/commit/2bc4ab2)) — Author-controlled GitHub Actions workflows now use Title Case for the `name:` field (e.g. `Quality Checks`, `Build Linux (Reusable)`, `Whisper Binaries (Canary)`). Project-specific override of the global Sentence-case style rule for `name:` fields only; filenames and `workflow_call` references untouched. Documented in `CLAUDE.md` § Continuous integration.
+- **E2E Tests workflow disabled** ([`997ba65`](https://github.com/qodeca/erfana/commit/997ba65)) — `gh workflow disable "E2E Tests"`. Playwright + Electron tests are unreliable on `macos-latest` hosted runners; the visual suite hangs at `waitForLoadState('domcontentloaded')`. E2E was already excluded from branch-protection required checks, so disabling does not block any merges or releases. Local-only path remains: `npm run test:e2e` / `npm run test:e2e:visual`. Re-enable with `gh workflow enable "E2E Tests"`. Full root-cause analysis in `docs/ci.md` § Visual regression on CI.
+
 ## 0.9.5
 
 *Released 2026-04-25. Tag [`v0.9.5`](https://github.com/qodeca/erfana/releases/tag/v0.9.5).*
