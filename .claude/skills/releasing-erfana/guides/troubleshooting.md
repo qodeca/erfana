@@ -167,41 +167,63 @@ npm run typecheck:node
 npm run typecheck:web
 ```
 
+## Local signature verification
+
+### Symptom: `git log --show-signature` reports "No signature" for an SSH-signed commit or tag
+
+**Cause**: `gpg.format=ssh` is set, but `gpg.ssh.allowedSignersFile` is not configured. Git can sign with the SSH key, but cannot locally verify because it has no allowed-signers entry to map the public key to an identity. **Server-side verification (GitHub) succeeds regardless** — only `git log --show-signature` and `git verify-commit` are affected. Skill Phase 1.5 emits a WARN when this state is detected.
+
+**Verify the commit really was signed** (independent of allowed-signers):
+
+```bash
+gh api repos/qodeca/erfana/commits/$(git rev-parse HEAD) --jq '.commit.verification'
+# {"verified": true, "reason": "valid", ...}
+```
+
+**Fix** — write an allowed-signers file mapping your email to your SSH public key:
+
+```bash
+printf '%s namespaces="git" %s\n' \
+  "$(git config --get user.email)" \
+  "$(cat $(git config --get user.signingkey))" \
+  > ~/.config/git/allowed_signers
+git config --global gpg.ssh.allowedSignersFile ~/.config/git/allowed_signers
+```
+
+After this, `git log --show-signature` displays "Good signature" for both commits and tags signed with the configured SSH key.
+
 ## Rollback procedures
 
-### If build fails mid-process
+### If `release.yml` fails
 
-1. Check error messages in terminal
-2. Fix the issue (usually in source code)
-3. Clean the failed build: `rm -rf release/{version}/`
-4. Restart from Phase 1 (quality gates)
+The skill no longer builds locally — every binary is produced by `release.yml` on GitHub-hosted runners. There is no local `release/{version}/` directory to clean.
 
-### If critical bug found post-release
+1. Read the `release-failure-analyzer` incident memo at `docs/release-incidents/v{version}-attempt-{N}.md`.
+2. Match the failure signature against the cookbook above (Rows 1–10) using the typed regex field. Apply the matched fix verbatim.
+3. If no row matches, follow the diagnostic habits and **add a new row** using the template — preserves the next operator's discovery cost.
+4. Bump the patch version (`v{N}` is burned regardless of `release.yml` outcome) and re-invoke the skill from Phase 0.
 
-1. **Do NOT delete the release folder** (keep for reference)
-2. Create hotfix branch: `git checkout -b hotfix/{version}`
-3. Fix the bug
-4. Bump patch version in package.json
-5. Run full release process for new version
-6. If git tag was pushed:
-   ```bash
-   # Delete remote tag (use with caution)
-   git push --delete origin v{version}
-   # Delete local tag
-   git tag -d v{version}
-   ```
+### If a critical bug ships in a published release
 
-### If GitHub release was created
+1. Bump the patch version in `package.json` and append the hotfix entry to `docs/CHANGELOG.md`.
+2. Re-invoke the skill — the new release becomes "latest" and update mechanisms route to it.
+3. **Do not delete published releases.** Users may have download URLs cached; deletion breaks those. Leave the buggy release on GitHub as a historical record.
+4. If the bug is a security vulnerability, also publish a GitHub Security Advisory referencing the affected version.
 
-1. Go to GitHub Releases page
-2. Edit the release and mark as "Pre-release" or delete draft
-3. Add note explaining the issue
-4. Create new release with fixed version
+### If a draft (unpublished) release needs to be discarded
+
+```bash
+gh release delete "v${VERSION}" --yes --cleanup-tag=false
+git push --delete origin "v${VERSION}"
+git tag -d "v${VERSION}"
+# Bump patch and re-invoke the skill from Phase 0.
+```
+
+The tag is **burned regardless** — even after deleting a draft, the next attempt MUST use a fresh patch version. Re-using a tag that ever shipped a signed artifact is forbidden.
 
 ### Recovery checklist
 
-- [ ] Identify what went wrong
-- [ ] Document the issue for future reference
-- [ ] Clean up any partial artifacts
-- [ ] Communicate with users if release was distributed
-- [ ] Create new release with fix
+- [ ] Incident memo written under `docs/release-incidents/`
+- [ ] Cookbook updated if the failure signature was new
+- [ ] Patch version bumped (next release uses `v{N+1}`, never re-uses `v{N}`)
+- [ ] Stakeholders notified if the buggy release was distributed

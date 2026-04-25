@@ -29,7 +29,7 @@ Activate only when the working copy can reasonably be released — do not activa
 |-----------|---------|-------|
 | `git` | Signed tag, push | `git --version` |
 | `node` (≥24) | Read package.json, run git-cliff if installed via npx | `node --version` |
-| `gh` | Release polling, asset download, draft publish | `gh --version` |
+| `gh` ≥ 2.55.0 | Release polling, asset download, draft publish | `gh --version` (verified with 2.91.0; older versions may be missing JSON fields used in Phases 3–5 — fall back to `gh api` if needed) |
 | `git cliff` | Technical section for release notes | `git cliff --version` (skill will fall back to `npx git-cliff` if needed) |
 | `minisign` | Verify `SHA256SUMS.minisig` | `minisign -v` |
 | `sha256sum` | Recompute asset hashes locally | `command -v sha256sum` |
@@ -200,6 +200,25 @@ exit 0
 
 No options — exit cleanly. Re-running the skill on a published tag means the operator already approved publication; the only follow-up is a hotfix at the next patch version.
 
+### 0.4.5 Branch protection allows direct push
+
+The skill assumes a solo-developer direct-push workflow. If branch protection on `main` requires PRs, `git push origin main` (Phase 1.5) will be rejected and the skill cannot proceed. Detect this at Phase 0 rather than at tag-time.
+
+```bash
+PROT=$(gh api repos/qodeca/erfana/branches/main/protection 2>/dev/null || echo '{}')
+PR_REQ=$(printf '%s' "$PROT" | jq -r '.required_pull_request_reviews // {} | keys | length')
+if [ "${PR_REQ:-0}" -gt 0 ]; then
+  echo "FAIL: main requires PR; skill assumes direct push (single-developer workflow)" >&2
+  echo "Remediation (one-time admin action):" >&2
+  echo "  gh api -X DELETE \\" >&2
+  echo "    repos/qodeca/erfana/branches/main/protection/required_pull_request_reviews" >&2
+  echo "Other protection rules (signed tags, required status checks) stay intact." >&2
+  exit 1
+fi
+```
+
+- [ ] `required_pull_request_reviews` is unset on the `main` branch protection rule
+
 ### 0.5 Delegate the rest of the checklist to `release-quality-runner`
 
 ```
@@ -297,10 +316,37 @@ if ! git config --get user.signingkey >/dev/null 2>&1 \
   exit 1
 fi
 
+# When gpg.format=ssh, local verification (git log --show-signature,
+# git verify-commit) requires gpg.ssh.allowedSignersFile. Without it,
+# git reports "No signature" for a verifiably signed commit — a confusing
+# red herring in the middle of Phase 2. Soft-warn (don't abort) since
+# server-side verification still works.
+if [ "$(git config --get gpg.format)" = "ssh" ] \
+   && ! git config --get gpg.ssh.allowedSignersFile >/dev/null 2>&1; then
+  echo "WARN: gpg.format=ssh but gpg.ssh.allowedSignersFile is unset." >&2
+  echo "Server-side verification (GitHub) will work; local verification" >&2
+  echo "(git log --show-signature) will report 'No signature' anyway." >&2
+  echo "To fix:" >&2
+  echo "  printf '%s namespaces=\"git\" %s\\n' \\" >&2
+  echo "    \"\$(git config --get user.email)\" \"\$(cat \$(git config --get user.signingkey))\" \\" >&2
+  echo "    > ~/.config/git/allowed_signers" >&2
+  echo "  git config --global gpg.ssh.allowedSignersFile ~/.config/git/allowed_signers" >&2
+fi
+
 # One commit bundles: package.json bump (already done pre-skill or done here),
 # CHANGELOG append (pre-skill), release notes file.
 git add package.json docs/CHANGELOG.md "docs/release-notes/v${VERSION}.md"
-git commit -S -m "chore(release): bump version to ${VERSION}"
+
+# Pick the commit message based on what is actually staged. If the bump
+# already shipped earlier (e.g., develop→main merge), this commit only
+# adds the release-notes file — labelling it "bump version" would be a
+# false description of the diff.
+if git diff --cached --name-only | grep -qx 'package.json'; then
+  COMMIT_MSG="chore(release): bump version to ${VERSION}"
+else
+  COMMIT_MSG="docs(release): add release notes for v${VERSION}"
+fi
+git commit -S -m "$COMMIT_MSG"
 git push origin main
 ```
 
@@ -308,7 +354,7 @@ If `main` has new commits on `origin` (raced), re-fetch and confirm with operato
 
 ### Checkpoint 1.A
 
-- [ ] Commit for `chore(release): bump version to {version}` is on `origin/main`
+- [ ] Commit is on `origin/main` (`chore(release): bump version to {version}` if `package.json` was in the staged diff, else `docs(release): add release notes for v{version}`)
 - [ ] `checks.yml` has been triggered for this commit (skill prints the URL)
 
 The release workflow's `prepare` job asserts a green `checks.yml` for the tagged commit, so we must wait for `checks.yml` to turn green before tagging.
@@ -348,100 +394,26 @@ If the push is rejected by the protected-tag rule, surface the exact rejection m
 
 ---
 
-## Phase 3: Watch release workflow
+## Phase 3: Watch release.yml
 
-### 3.1 Resolve run ID
+Full instructions live in [`phases/phase-3-watch.md`](phases/phase-3-watch.md) — Phase 3 spans up to 88 minutes wall-clock and uses a polling pattern (4-minute cadence, 22-poll ceiling) rather than a foreground `gh run watch`. Reasons: `timeout` is GNU-only (missing on macOS by default), and the orchestrator's per-tool budget cannot span the full pipeline anyway.
 
-```bash
-# ^{} dereferences an annotated tag to its commit SHA. Required because
-# workflow-run queries are keyed on commit SHA, not tag-object SHA.
-TAG_SHA=$(git rev-parse "v${VERSION}^{}")
+Summary table:
 
-# Retry loop: the workflow may take up to 60 s to appear.
-for i in $(seq 1 12); do
-  RUN_ID=$(gh run list --workflow=release.yml \
-    --commit="$TAG_SHA" --limit=1 --json databaseId --jq '.[0].databaseId')
-  if [ -n "$RUN_ID" ]; then break; fi
-  sleep 5
-done
-if [ -z "$RUN_ID" ]; then
-  echo "FAIL: release.yml did not pick up tag ${VERSION} within 60 s"
-  exit 1
-fi
-echo "Release run: https://github.com/qodeca/erfana/actions/runs/${RUN_ID}"
-```
+| Step | What | Why it's required |
+|---|---|---|
+| 3.1 | Resolve `RUN_ID` from the tag's dereferenced commit SHA, with retry loop | `release.yml` may take up to 60 s to appear after the push |
+| 3.2 | Poll `gh run view --json status,conclusion` every 240 s, hard ceiling 22 polls | Foreground watch exceeds the orchestrator's 600 s Bash budget; 240 s polls keep the prompt cache warm |
+| 3.3 | On non-success terminal state, dispatch `release-failure-analyzer` with run id + memo path | Structured incident memo to `docs/release-incidents/`; cookbook-driven fix |
 
-### 3.2 Watch with a wall-clock ceiling
-
-```bash
-# --exit-status propagates workflow success/failure.
-# Wall-clock ceiling 90 min covers: prepare + 3 matrix legs + finalize.
-timeout 90m gh run watch "$RUN_ID" --exit-status --interval 10
-RC=$?
-```
-
-### 3.3 On failure → invoke release-failure-analyzer
-
-If `RC` is non-zero, **do NOT just dump 200 log lines and exit.** Delegate to the failure analyzer so the diagnostic capture is structured and reusable.
-
-```
-Agent(subagent_type: "release-failure-analyzer")
-Prompt: "Analyse failed release.yml run.
-         Inputs:
-           - run_id: ${RUN_ID}
-           - version: ${VERSION}
-           - attempt_number: <Nth attempt for this version, see docs/release-incidents/index.md>
-           - project_path: <repo root>
-         Identify failed leg(s), match log against the troubleshooting cookbook,
-         write incident memo to docs/release-incidents/v${VERSION}-attempt-{N}.md,
-         append index entry. Return structured JSON per agent contract."
-```
-
-The agent writes the memo and returns:
-- Matched cookbook row (if any) with the suggested fix verbatim.
-- Run URL.
-- Memo path (e.g., `docs/release-incidents/v0.9.5-attempt-2.md`).
-- Last 100 log lines for context.
-
-**Skill action after analyzer returns:**
-
-1. Display the matched fix prominently to the operator.
-2. Surface the memo path so they can read full context.
-3. Use `AskUserQuestion` to decide next step:
-
-| Option | Action |
-|--------|--------|
-| Apply fix + bump patch + re-run | Operator commits the fix; skill bumps version, restarts from Phase 0. |
-| Investigate further | Skill exits; operator reviews memo manually. |
-| Mark as unknown signature → cookbook update + retry | **Gated path** (see below). Skill verifies the cookbook gained a new row matching the unmatched signature before allowing re-entry to Phase 0. |
-
-**Unknown-signature gate (option 3):** if `matched.found=false`, the skill MUST verify the cookbook gained a new row before re-entering Phase 0 — preventing repeated identical failures on the same unmatched signature.
-
-```bash
-# Pick a distinctive 8-12 word phrase from the unmatched log fragment.
-DISTINCTIVE="<phrase>"
-# AskUserQuestion: "Have you added a new cookbook row for this signature?"
-# If "Yes": grep cookbook for the distinctive phrase. If absent → fail.
-grep -qF "$DISTINCTIVE" .claude/skills/releasing-erfana/guides/troubleshooting.md || {
-  echo "::error::Cookbook update claimed but distinctive phrase not found"
-  exit 1
-}
-```
-
-**Tag is burned regardless** — every retry must use a new patch version. This is non-negotiable per the enforcement rules.
-
-```bash
-# After the analyzer returns, surface its output and stop the skill.
-# Subsequent attempts re-enter the skill at Phase 0 with the bumped version.
-echo "Release run failed. URL: https://github.com/qodeca/erfana/actions/runs/${RUN_ID}"
-echo "Incident memo: ${MEMO_PATH}"
-exit 1
-```
+⛔ **Failure aborts.** A failed `release.yml` burns the tag — next attempt requires a patch bump.
 
 ### Checkpoint 3.A
 
-- [ ] Release run succeeded
-- [ ] Draft release `v{version}` exists on GitHub (`gh release view v{version} --json isDraft --jq .isDraft` = `true`)
+- [ ] `RUN_ID` resolved per `phases/phase-3-watch.md` §3.1
+- [ ] Polling reached `completed/success`, OR
+- [ ] Failure handed to `release-failure-analyzer` with run id + memo path
+- [ ] Tag-burn rule observed on retries (new patch version)
 
 ---
 
@@ -477,7 +449,7 @@ Summary table:
 ```bash
 # Re-download and re-verify minisign on the published release URL.
 PUBLISHED=$(gh release view "v${VERSION}" --json url --jq .url)
-gh release download "v${VERSION}" --pattern 'SHA256SUMS*' --clobber -D "$WORK/published"
+gh release download "v${VERSION}" --repo qodeca/erfana --pattern 'SHA256SUMS*' --clobber --dir "$WORK/published"
 minisign -V -P "$(cat "$WORK/release.pub")" \
   -m "$WORK/published/SHA256SUMS" -x "$WORK/published/SHA256SUMS.minisig"
 ```

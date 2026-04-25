@@ -18,14 +18,27 @@ if [ "$DRAFT" != "true" ]; then
 fi
 ```
 
+> **Note**: GitHub draft releases use opaque URLs like `releases/tag/untagged-<hash>` until publish (`--draft=false`). Operators inspecting the URL may briefly mistake this for a misconfigured tag. After publish the URL canonicalises to `releases/tag/v${VERSION}`.
+
 ## 4.2 Download SHA256SUMS + every asset
 
 ```bash
+# I7: capture repo root BEFORE creating the temp dir so we can resolve
+# docs/release-pubkey.txt later as an absolute path. A bare relative
+# path would otherwise resolve against the temp dir and the gate would
+# abort with "no minisign pubkeys extracted".
+REPO_ROOT=$(git rev-parse --show-toplevel)
 WORK=$(mktemp -d)
-cd "$WORK"
-gh release download "v${VERSION}" --pattern '*' --clobber
-ls -la
+
+# I6: --repo is required because gh release download otherwise reads
+# remote.origin.url from the current directory, which is not a git repo
+# (we are about to cd into a temp dir). Use --dir for the destination
+# instead of cd-ing — keeps cwd context portable across the script.
+gh release download "v${VERSION}" --repo qodeca/erfana --pattern '*' --clobber --dir "$WORK"
+ls -la "$WORK"
 ```
+
+> Run the §4.2–§4.5 script via `bash` (not `zsh`) — array constructs and `<( ... )` process substitution differ between shells. The first `#!` line of any extracted script should be `#!/usr/bin/env bash`.
 
 ## 4.3 Verify minisign signature
 
@@ -34,14 +47,24 @@ The dedicated release minisign public keys (PRIMARY active signer + ROTATION sta
 Verification accepts either key (a SHA256SUMS.minisig that verifies under the primary OR the rotation key is valid). This lets the team rotate primary→rotation without re-signing old releases.
 
 ```bash
-PUBKEY_FILE="docs/release-pubkey.txt"
+# I7: use $REPO_ROOT (captured before cd) so this resolves correctly
+# regardless of cwd. Without this, the path would resolve against $WORK
+# (a temp dir with no docs/ subtree) and abort the gate.
+PUBKEY_FILE="$REPO_ROOT/docs/release-pubkey.txt"
 PRIMARY_PATH="$WORK/release-primary.pub"
 ROTATION_PATH="$WORK/release-rotation.pub"
 
 # Extract every base64 minisign pubkey from the canonical file. Lines
 # starting with "RW" are minisign pubkey magic; comments and blank lines
 # are skipped. We expect exactly two: PRIMARY (first) + ROTATION (second).
-mapfile -t PUBKEYS < <(grep -E '^RW[A-Za-z0-9+/=]+$' "$PUBKEY_FILE")
+#
+# I1: portable while-read loop. macOS default shell is zsh, which has no
+# `mapfile` (`readarray`) builtin. The loop below works in both bash 3.2+
+# and zsh.
+PUBKEYS=()
+while IFS= read -r line; do
+  PUBKEYS+=("$line")
+done < <(grep -E '^RW[A-Za-z0-9+/=]+$' "$PUBKEY_FILE")
 if [ "${#PUBKEYS[@]}" -lt 1 ]; then
   echo "FAIL: no minisign pubkeys extracted from $PUBKEY_FILE"
   exit 1
