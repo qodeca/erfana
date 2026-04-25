@@ -504,15 +504,21 @@ Two keys are published. End-user tooling should accept a signature from either. 
 
 **PRIMARY (active signer):** `4AEBCE8499845646`
 
+<!-- minisign-pubkey-primary-begin -->
 ```text
 RWRGVoSZhM7rShmOHr5lmt6v6wH8Tjm/nXItCg46Co+hxgvJFLWkv0fC
 ```
+<!-- minisign-pubkey-primary-end -->
 
 **ROTATION (standby successor, private half held offline):** `E8E4B205269790F1`
 
+<!-- minisign-pubkey-rotation-begin -->
 ```text
 RWTxkJcmBbLk6J2eWEDWHYcAmgpKfRqO5PR8oRRLUpgn5rgCaWmTvd9w
 ```
+<!-- minisign-pubkey-rotation-end -->
+
+The fence markers above are load-bearing — `releasing-erfana` skill Phase 4 extracts the primary pubkey by `awk` between these markers. Do NOT remove or rename them without updating `phases/phase-4-verify.md` accordingly.
 
 Mirrored copies for offline retrieval: `README.md` § Release verification, `docs/release-pubkey.txt`. These keys are **separate** from the whisper-binaries minisign key — a compromise of one does not invalidate the other.
 

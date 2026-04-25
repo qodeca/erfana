@@ -29,15 +29,38 @@ ls -la
 
 ## 4.3 Verify minisign signature
 
-The dedicated release minisign public key is published in [docs/security.md § Release signing](../../../../docs/security.md) and mirrored in `README.md`. Load it, then:
+The dedicated release minisign public key is published in [docs/security.md § Release signing](../../../../docs/security.md), fenced by HTML comments so this step can extract it deterministically:
+
+```text
+<!-- minisign-pubkey-primary-begin -->
+```text
+RW...
+```
+<!-- minisign-pubkey-primary-end -->
+```
+
+Extract the pubkey block between those markers, then verify:
 
 ```bash
+SECURITY_MD="docs/security.md"
 PUBKEY_PATH="$WORK/release.pub"
-# Write the pubkey from docs/security.md verbatim (skill extracts the
-# marked block by fencing).
+
+# Extract the line between the primary fence markers, strip the markdown
+# code-fence backticks. The awk range pattern operates between the
+# begin/end markers (exclusive of the markers themselves).
+awk '
+  /^<!-- minisign-pubkey-primary-begin -->$/   { in_block=1; next }
+  /^<!-- minisign-pubkey-primary-end -->$/     { in_block=0; next }
+  in_block && /^[A-Za-z0-9+\/=]+$/             { print }
+' "$SECURITY_MD" > "$PUBKEY_PATH"
+
+# Sanity: pubkey must be 56-byte base64 (minisign convention).
+[ -s "$PUBKEY_PATH" ] || { echo "FAIL: pubkey extraction returned empty"; exit 1; }
+
 minisign -V -P "$(cat "$PUBKEY_PATH")" -m SHA256SUMS -x SHA256SUMS.minisig
 ```
 
+- [ ] Pubkey extracted between fence markers (non-empty)
 - [ ] `minisign -V` exits 0
 
 ## 4.4 Recompute per-asset hashes locally

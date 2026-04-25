@@ -178,10 +178,24 @@ sha256sum -c SHA256SUMS
 ### 2. Code signature (macOS DMG / ZIP)
 
 ```bash
+# 2a. Verify the .app bundle's Developer ID signature (after mounting + copying).
 codesign --verify --deep --strict --verbose=2 /Applications/Erfana.app
-spctl -a -vvv -t install /path/to/Erfana-*.dmg
+
+# 2b. Verify the DMG's stapled notarization ticket (offline check — works
+# even with no network).
 xcrun stapler validate /path/to/Erfana-*.dmg
 ```
+
+> `spctl -a -vvv -t install <dmg>` is intentionally NOT recommended here.
+> `-t install` is for `.pkg` installer packages, not DMG containers; on
+> a correctly notarized + stapled DMG it returns `rejected, source=no
+> usable signature` because electron-builder doesn't codesign the DMG
+> container itself (only the `.app` inside it). Apple's DTS guidance
+> ([thread/128683](https://developer.apple.com/forums/thread/128683)):
+> "spctl is a poor way to check for that. Use codesign with
+> `--check-notarization`." The `codesign --verify --deep --strict` +
+> `xcrun stapler validate` pair above matches what Gatekeeper does
+> offline on first open.
 
 ### 3. Authenticode signature (Windows .exe)
 
