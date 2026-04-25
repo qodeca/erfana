@@ -69,7 +69,8 @@ Clickable file path links in terminal output with intelligent path resolution.
 
 **Base Features**:
 - Detects absolute, relative, and project-relative paths
-- Supports line:column notation (`:42:10`, `(15,3)`)
+- Supports `@`-prefixed paths from CLI tools (e.g., `@src/main/index.ts`) – the `@` is stripped and the underlying path is opened; `@scope/package` references (e.g., `@types/node`) are preserved and not treated as file paths
+- Supports line:column notation (`:42:10`, `(15,3)`) and `:line-line` range notation (e.g., `:22-24`) – navigates to the first line of the range
 - Path validation with LRU cache (100 entries, 30s TTL)
 - Click to open file in editor at specified location
 - Multi-line link ranges – links span correctly across xterm-wrapped and CLI-wrapped lines
@@ -303,7 +304,7 @@ See [Scroll Fixes](./scroll-fixes.md) for related scroll preservation features.
 
 ### Core Capabilities
 
-- **Native Shell**: Spawns real PTY process (zsh on macOS, bash on Linux)
+- **Native Shell**: Spawns real PTY process (zsh on macOS, bash on Linux, Git Bash / PowerShell 7 / Windows PowerShell 5.1 / cmd.exe on Windows – resolved by `TerminalService.resolveWindowsShell()` in precedence order, honoring `$SHELL` first)
 - **Auto-Resize**: Terminal automatically resizes when panel is dragged
 - **WebGL Rendering**: Hardware acceleration with canvas fallback
 - **Bold Font Support**: Renders bold text with proper font weight
@@ -370,7 +371,7 @@ export const terminalService = new TerminalService()
 
 **Pattern**: OOP service with singleton instance (follows FileService pattern)
 
-**v0.3.3 Enhancement**: The `write()` method now returns a Promise that resolves when the write operation completes. This enables reliable autoExecute behavior for prompt templates, preventing race conditions between text write and Enter key. See [Prompt Templates - Implementation Guide](../prompts/implementation.md) for details.
+**v0.3.3 Enhancement**: The `write()` method now returns a Promise that resolves when the write operation completes. This enables reliable autoExecute behavior for prompt templates, preventing race conditions between text write and Enter key. See [AutoExecute Reference](../prompts/autoexecute-reference.md) for details.
 
 ### IPC Handlers
 
@@ -410,7 +411,7 @@ window.api.terminal = {
 - `types.ts` - TerminalState, ScreenshotCaptureMode types
 - `terminalPanel.logic.ts` - Pure functions and constants
 
-See [Terminal Architecture Review](../architecture/reviews/terminal-panel-architecture-review.md) for detailed refactoring documentation.
+See [Terminal Architecture Review](../architecture-reviews/reviews/terminal-panel-architecture-review.md) for detailed refactoring documentation.
 
 **Key Features**:
 - Visibility check before xterm initialization (prevents rendering issues)
@@ -435,7 +436,7 @@ interface TerminalStore {
 
 **Purpose**: Cross-component communication (PreviewContextMenu → Terminal Panel)
 
-**v0.3.3 Enhancement**: `sendToTerminal()` now supports `autoExecute` parameter to automatically send Enter key after text. Includes initialization polling (5s timeout, 50ms intervals) to prevent race conditions. See [Prompt Templates - Implementation Guide](../prompts/implementation.md).
+**v0.3.3 Enhancement**: `sendToTerminal()` now supports `autoExecute` parameter to automatically send Enter key after text. Includes initialization polling (5s timeout, 50ms intervals) to prevent race conditions. See [AutoExecute Reference](../prompts/autoexecute-reference.md).
 
 ### Bracketed Paste Mode (v0.7.2+, #108)
 

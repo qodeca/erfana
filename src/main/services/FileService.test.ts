@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest'
 import type * as FsProm from 'fs/promises'
 import { FileService } from './FileService'
 
@@ -81,6 +81,63 @@ describe('FileService', () => {
       ;(fs.rm as unknown as Mock).mockResolvedValueOnce(undefined)
       await expect(svc.deleteFolder('/proj/tmp/cache')).resolves.toBeUndefined()
       expect(fs.rm).toHaveBeenCalledWith('/proj/tmp/cache', { recursive: true, force: true })
+    })
+  })
+
+  // ---------------------------------------------------------------------------
+  // #161 + post-review H1 — input validation on create/rename
+  // ---------------------------------------------------------------------------
+  describe('createFile path-traversal protection (post security review)', () => {
+    it('strips path separators from fileName before join (prevents ../../etc/passwd traversal)', async () => {
+      // stat must reject (file doesn't exist yet)
+      ;(fs.stat as unknown as Mock).mockRejectedValueOnce(
+        Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
+      )
+      ;(fs.writeFile as unknown as Mock).mockResolvedValueOnce(undefined)
+
+      const result = await svc.createFile('/proj', '../../etc/passwd')
+
+      // Separators (forward + back) stripped first → '....etcpasswd' → '.md' appended.
+      // The dots remain as part of the filename — what matters for security is
+      // that the result CANNOT escape `/proj`. Use platform-aware path
+      // normalization to assert the parent directory.
+      const writtenPath = (fs.writeFile as unknown as Mock).mock.calls[0][0] as string
+      expect(writtenPath.endsWith('etcpasswd.md')).toBe(true)
+      // Critical assertion: the written path is INSIDE /proj, never outside.
+      expect(writtenPath).toMatch(/[/\\]proj[/\\][^/\\]+\.md$/)
+      expect(result).toBe(writtenPath)
+    })
+
+    it('throws when fileName collapses to empty after separator strip', async () => {
+      await expect(svc.createFile('/proj', '/////'))
+        .rejects.toThrow('File name cannot be empty')
+    })
+  })
+
+  describe('createFile + createFolder + rename validate filename via assertValidUserFilename', () => {
+    let originalPlatform: PropertyDescriptor | undefined
+
+    beforeEach(() => {
+      originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+    })
+
+    afterEach(() => {
+      if (originalPlatform) Object.defineProperty(process, 'platform', originalPlatform)
+    })
+
+    it('createFile throws on Windows-reserved basename CON.md', async () => {
+      await expect(svc.createFile('/proj', 'CON')).rejects.toThrow(/CON.*not a valid filename/)
+      expect(fs.writeFile).not.toHaveBeenCalled()
+    })
+
+    it('createFolder throws on Windows-reserved basename PRN', async () => {
+      await expect(svc.createFolder('/proj', 'PRN')).rejects.toThrow(/PRN.*not a valid filename/)
+      expect(fs.mkdir).not.toHaveBeenCalled()
+    })
+
+    it('rename throws on Windows-reserved basename COM1.md', async () => {
+      await expect(svc.rename('/proj/foo.md', 'COM1.md')).rejects.toThrow(/COM1.*not a valid filename/)
     })
   })
 })

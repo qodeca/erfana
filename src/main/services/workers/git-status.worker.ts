@@ -22,18 +22,43 @@ import { GIT_STATUS } from '../../../shared/constants'
 const execFileAsync = promisify(execFile)
 
 const GIT_STATUS_CAP = 10_000
-const GIT_PATH_ALLOWLIST = ['/usr/bin/git', '/usr/local/bin/git', '/opt/homebrew/bin/git']
+
+// Git binary allowlist – checked before falling back to `where git` / `which git`.
+// Priority order per platform: most-popular install location first.
+// On Windows, `fs.access(X_OK)` is *existence-only* (no POSIX execute-bit),
+// so a second `git --version` liveness probe is required to reject bad files.
+// See #160 (Windows git allowlist) for context.
+//
+// `USERPROFILE` is validated to start with `C:\Users\` before the Scoop path
+// is added — guards against an attacker setting a poisoned `USERPROFILE`
+// (e.g. via a malicious shortcut) to redirect the Scoop probe to an
+// arbitrary directory under their control.
+function buildWin32GitPaths(): string[] {
+  const fixed = [
+    'C:\\Program Files\\Git\\cmd\\git.exe',
+    'C:\\Program Files\\Git\\bin\\git.exe',
+    'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
+    'C:\\Program Files (x86)\\Git\\bin\\git.exe',
+    'C:\\ProgramData\\chocolatey\\bin\\git.exe',
+  ]
+  const userProfile = process.env.USERPROFILE
+  if (userProfile && /^[A-Za-z]:\\Users\\[^\\]+\\?$/i.test(userProfile.replace(/\\$/, '') + '\\')) {
+    fixed.push(`${userProfile}\\scoop\\apps\\git\\current\\cmd\\git.exe`)
+  }
+  return fixed
+}
+const WIN32_GIT_PATHS = buildWin32GitPaths()
+const POSIX_GIT_PATHS = ['/usr/bin/git', '/usr/local/bin/git', '/opt/homebrew/bin/git']
+const GIT_PATH_ALLOWLIST = process.platform === 'win32' ? WIN32_GIT_PATHS : POSIX_GIT_PATHS
+const GIT_LIVENESS_TIMEOUT = 2_000
 const BRANCH_DETECT_TIMEOUT = 5_000
 
 // -- Message types -----------------------------------------------------------
 
-interface ExecuteMessage { type: 'execute'; id: number; projectPath: string; strategy: GitStatusStrategy }
-interface ClearCacheMessage { type: 'clear-cache'; projectPath?: string }
-type WorkerMessage = ExecuteMessage | ClearCacheMessage
+interface WorkerMessage { type: 'execute'; id: number; projectPath: string; strategy: GitStatusStrategy }
 
 // -- Module state ------------------------------------------------------------
 
-const statusCache = new Map<string, object>()
 let nativeGitPath: string | null = null
 let gitPathResolved = false
 let gitPathResolvedAt = 0
@@ -45,13 +70,7 @@ if (!parentPort) {
 }
 
 parentPort.on('message', (msg: WorkerMessage) => {
-  if (msg.type === 'execute') {
-    handleExecute(msg.id, msg.projectPath, msg.strategy)
-  } else if (msg.type === 'clear-cache') {
-    if (msg.projectPath) statusCache.delete(msg.projectPath)
-    else statusCache.clear()
-    parentPort!.postMessage({ type: 'cache-cleared' })
-  }
+  handleExecute(msg.id, msg.projectPath, msg.strategy)
 })
 
 // -- Execute handler ---------------------------------------------------------
@@ -125,9 +144,9 @@ async function executeIsomorphicGit(projectPath: string): Promise<GitStatusRespo
       }
     } catch { /* continue without branch */ }
 
-    if (!statusCache.has(projectPath)) statusCache.set(projectPath, {})
-
-    const matrix = await git.statusMatrix({ fs, dir: projectPath, cache: statusCache.get(projectPath) })
+    // Fresh cache per call: a persistent cache accumulates isomorphic-git internal
+    // objects that trigger V8 cppgc thread-safety assertions in worker threads.
+    const matrix = await git.statusMatrix({ fs, dir: projectPath, cache: {} })
     const mapped = mapStatusMatrix(matrix, projectPath)
 
     return { isGitRepo: true, branch, isDetached, files: mapped.entries, counts: mapped.counts, truncated: mapped.truncated }
@@ -174,20 +193,52 @@ async function executeNativeGit(projectPath: string, gitPath: string): Promise<G
 
 // -- Git path resolution -----------------------------------------------------
 
-async function resolveGitPath(): Promise<string | null> {
+/**
+ * Verify that `candidate` is a real git binary.
+ *
+ * On Windows, `fs.access(X_OK)` degrades to existence-only (no POSIX
+ * execute-bit semantics), so a non-binary file at the expected path would
+ * pass. We add a `git --version` liveness probe to reject truncated or
+ * renamed files. POSIX retains full `X_OK` semantics.
+ */
+async function isExecutableGit(candidate: string): Promise<boolean> {
+  try {
+    if (process.platform === 'win32') {
+      await access(candidate, fs.constants.F_OK)
+      await execFileAsync(candidate, ['--version'], { timeout: GIT_LIVENESS_TIMEOUT })
+      return true
+    }
+    await access(candidate, fs.constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Exported for testing in isolation (see `git-resolver.test.ts`). Tests can
+ * call `resetGitPathCache()` + `resolveGitPath()` directly without routing
+ * through the `worker_threads` message boundary.
+ */
+export function resetGitPathCache(): void {
+  nativeGitPath = null
+  gitPathResolved = false
+  gitPathResolvedAt = 0
+}
+
+export async function resolveGitPath(): Promise<string | null> {
   // Return cached result if: successfully resolved, OR failed but cooldown hasn't elapsed
   if (gitPathResolved && (nativeGitPath !== null || Date.now() - gitPathResolvedAt < GIT_STATUS.GIT_PATH_RETRY_COOLDOWN)) {
     return nativeGitPath
   }
 
   for (const candidate of GIT_PATH_ALLOWLIST) {
-    try {
-      await access(candidate, fs.constants.X_OK)
+    if (await isExecutableGit(candidate)) {
       nativeGitPath = candidate
       gitPathResolved = true
       gitPathResolvedAt = Date.now()
       return nativeGitPath
-    } catch { /* try next */ }
+    }
   }
 
   const findCmd = process.platform === 'win32' ? 'where' : 'which'

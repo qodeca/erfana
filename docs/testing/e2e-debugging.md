@@ -100,22 +100,15 @@ npx playwright test --headed
 
 ## CI/CD integration
 
-### GitHub Actions workflow
+Full CI pipeline documentation is in [docs/ci.md](../ci.md). Quick E2E-specific summary:
 
-The CI workflow (`.github/workflows/e2e.yml`) runs on `push` to `develop` and on all PRs:
-1. Installs dependencies (`npm ci`)
-2. Builds the app (`npx electron-vite build`)
-3. Runs both `electron` and `visual` Playwright projects (`npx playwright test`)
-4. Uploads `test-results/` and `playwright-report/` as artifacts (30-day retention on develop, 14-day on PRs)
+- **`e2e.yml`** runs on `push` to `develop` and all PRs: `npm ci` → `electron-vite build` → `playwright test --project=electron` → upload `test-results/` and `playwright-report/` (30-day retention on develop, 14-day on PRs)
+- **Scoped to `--project=electron`** — visual suite is skipped on CI because of a macos-latest-specific `waitForLoadState('domcontentloaded')` hang; see [docs/ci.md § Visual regression on CI](../ci.md#visual-regression-on-ci) for root-cause notes
+- **`checks.yml`** (separate workflow) runs lint / typecheck / unit tests / build on every push to any branch — see [docs/ci.md § Quality checks](../ci.md#quality-checks-checksyml)
 
-Visual tests skip gracefully in CI when no baseline exists for the runner platform (macOS). Video is recorded on failure for visual test debugging.
+### E2E-specific CI notes
 
-See `.github/workflows/e2e.yml` for the full workflow.
-
-### CI best practices
-
-- Upload traces and screenshots as artifacts on failure
-- Use `npm ci` instead of `npm install` for consistent dependencies
-- Cache `node_modules` to speed up builds
-- Set reasonable timeouts (30 min for the full job)
-- Visual regression baselines are platform-specific – generate separately per OS
+- Traces captured on failure (`trace: 'retain-on-failure'`); screenshots on failure only
+- Playwright `retries: 1` for `electron` project, `retries: 0` for `visual` (visual diffs should be investigated, not retried — spec 019-FR-003)
+- Timeout budget: 30 min for the full job (set in `e2e.yml`)
+- Video recording wraps `electron.launch()` only when `process.env.CI` is set – see `e2e/fixtures.ts:buildVisualLaunchOptions`

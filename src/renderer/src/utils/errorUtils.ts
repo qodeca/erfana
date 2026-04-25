@@ -2,6 +2,8 @@
  * Error handling utilities for consistent error message formatting
  */
 
+import { INVALID_FILENAME_MARKER } from '../../../shared/errors'
+
 /**
  * Sanitizes IPC error messages by removing Electron's remote method invocation prefix
  *
@@ -41,6 +43,15 @@ export function formatFileOperationError(
     return itemName
       ? `An item named "${itemName}" already exists`
       : 'An item with this name already exists'
+  }
+
+  // #161: invalid filename (Windows reserved, forbidden chars, bidi, etc.)
+  // The main-process AppError carries a structured, user-friendly message
+  // already (e.g. `"CON.md" is not a valid filename — try "_CON.md"`).
+  // Detect via the shared INVALID_FILENAME_MARKER constant so the
+  // thrower (validateFilename.ts) and detector stay in sync.
+  if (baseMessage.includes(INVALID_FILENAME_MARKER)) {
+    return baseMessage
   }
 
   if (baseMessage.includes('ENOENT') || baseMessage.includes('not found')) {

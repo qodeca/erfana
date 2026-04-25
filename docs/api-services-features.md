@@ -1,10 +1,6 @@
 # API Services - Feature Services
 
-**Location:** `src/main/services/`
-
-Feature-specific services for git integration (including worker thread offloading), multi-instance support, media capture, transcription, audio extraction, and file import.
-
-See [api-services.md](./api-services.md) for core services (Terminal, File, Settings, Watchers).
+**Location:** `src/main/services/`. Feature-specific: git (worker), multi-instance, media capture, transcription, audio extraction, file import. Core services (Terminal, File, Settings, Watchers): see [api-services.md](./api-services.md).
 
 ---
 
@@ -22,7 +18,7 @@ Orchestrates git status retrieval via worker thread, keeping the main Electron t
 - Circuit breaker integration – disables worker after repeated crashes
 - Strategy selection – chooses isomorphic-git or native git based on repo size
 - Timing instrumentation with structured logging
-- Cache clearing on project switch
+- Per-call fresh cache for isomorphic-git (no persistent state in worker)
 
 ### Known limitations
 - Global `.gitignore` not supported (isomorphic-git limitation)
@@ -43,6 +39,14 @@ Implements `IGitStatusWorker` by spawning a `worker_threads` Worker running `git
 ### Related files
 - `src/main/interfaces/IGitStatusWorker.ts` – Worker adapter interface
 - `src/main/services/workers/git-status.worker.ts` – Worker thread script (runs isomorphic-git `statusMatrix()` or native `git status --porcelain`)
+
+### Native git binary resolution
+
+`git-status.worker.ts` resolves the native git binary via a platform-aware allowlist before falling back to `where git` / `which git`. On Windows, `fs.access(X_OK)` is existence-only (no POSIX execute-bit), so each allowlist candidate is additionally verified via a `git --version` liveness probe to reject truncated or renamed files. POSIX retains full `X_OK` semantics and skips the liveness probe.
+
+**Windows probe order (#160):** `C:\Program Files\Git\cmd\git.exe` → `…\bin\git.exe` → `C:\Program Files (x86)\Git\cmd\git.exe` → `…\bin\git.exe` → `C:\ProgramData\chocolatey\bin\git.exe` → `%USERPROFILE%\scoop\apps\git\current\cmd\git.exe`.
+
+**POSIX probe order:** `/usr/bin/git` → `/usr/local/bin/git` → `/opt/homebrew/bin/git`.
 
 ---
 
@@ -76,12 +80,10 @@ Selects the optimal git status strategy (isomorphic-git vs native git) based on 
 - Checks `.git/index` file size to determine repo scale
 - Selects `isomorphic-git` for repos with index < 5 MB (default)
 - Selects native `git status --porcelain` for large repos (index >= 5 MB)
-- Caches strategy per project path
-- Cache cleared on project switch
+- Stateless – re-evaluates on every call (no caching)
 
 ### Public methods
-- `getStrategy(projectPath)` – Returns `'isomorphic'` or `'native'`
-- `clearCache(projectPath?)` – Clear cached strategy for one or all projects
+- `select(projectPath)` – Returns `'isomorphic-git'` or `'native-git'`
 
 ---
 
@@ -254,27 +256,29 @@ Transcribe audio to text. Accepts MP3/WAV/M4A/OGG/FLAC, language code or `'auto'
 
 ## WhisperModelManager
 
-**File:** `src/main/services/WhisperModelManager.ts`
+**File:** `src/main/services/WhisperModelManager.ts`. **Pinned spec:** `src/main/services/whisper-assets.ts`. **Trust-chain pubkeys:** `src/main/services/whisper-pubkeys.ts`.
 
-Manages whisper.cpp binary and model downloads for local transcription. Stores assets in the Electron `userData` directory.
+Manages whisper.cpp binary + GGML models under `{userData}/whisper/`. Ships on **macOS universal + Windows x64** (Phase 4, issue #165). Phase 4 replaces the broken ggml-org URL dependency with self-hosted signed releases (`whisper-build-<label>-erfana<N>` tags on `qodeca/erfana`, marked pre-release).
 
-### Key Features
-- Downloads whisper.cpp binary and GGML model files
-- Model sizes: tiny, base, small, medium, large (sizes from `LOCAL_WHISPER.MODEL_SIZES`)
-- Download progress reporting via callback (`{ percent, downloadedBytes, totalBytes }`)
-- Download timeout via `AbortSignal.timeout(LOCAL_WHISPER.DOWNLOAD_TIMEOUT)` (10 min)
-- Binary and model availability checks
-- Storage in `{userData}/whisper/` directory
-- Version managed via `LOCAL_WHISPER.VERSION` in shared constants
-- macOS only – rejects on other platforms with `WHISPER_UNSUPPORTED_PLATFORM`
+### 9-step install flow (`ensureBinary()`)
+1. Fetch `manifest.json` + `.minisig` via `secureDownloader` (hostname allowlist + 64 KB cap).
+2. Verify signature with `verifyManifest` — dual-pubkey trust (primary CI + offline rotation; accept either).
+3. **Downgrade block**: `manifest.revisionIndex ≥ max(MIN_REVISION_INDEX, persisted lastSeenRevision)` → `WHISPER_DOWNGRADE_BLOCKED` (replay defense).
+4. **Source-drift guard**: manifest per-platform SHA must match source pin in `whisper-assets.ts` → `WHISPER_SOURCE_PIN_DRIFT`.
+5. Download archive via `secureDownloader` with streaming SHA-256 verify.
+6. Extract via `zipArchive.unzip` (Windows) / `tarArchive.untarGz` (macOS).
+7. Strip MOTW (`:Zone.Identifier` NTFS ADS) / `com.apple.quarantine` xattr.
+8. Re-hash every pinned file (main + sidecars) → `WHISPER_BINARY_TAMPERED` on mismatch. Streaming via `createReadStream.pipe(createHash)`.
+9. Write `.schema-version` + `.last-seen-revision` (monotonic) sentinels; legacy-cruft migration wipes pre-0.9.4 `bin/` once on sentinel mismatch.
 
-### Public Methods
-- `ensureBinary(onProgress?, signal?)` – Download binary if missing (returns path)
-- `ensureModel(model, onProgress?, signal?)` – Download model if missing (returns path)
-- `isModelDownloaded(model)` / `isBinaryAvailable()` – Availability checks
-- `listInstalledModels()` / `getModelInfo(model)` – Installed model queries
-- `deleteModel(model)` – Remove a downloaded model
-- `getModelPath(model)` / `getBinaryPath()` – Filesystem path getters
+### Public methods
+- `ensureBinary({onProgress?, signal?})` / `ensureModel(model, {onProgress?, signal?})` — download if missing.
+- `isBinaryInstalled()` / `isModelInstalled(model)` — **include streaming SHA re-verify** (not just `access(R_OK)`); drift triggers redownload.
+- `verifyInstalledBinary(): Promise<VerifiedBinary>` — TOCTOU close re-hash called by `LocalWhisperService` pre-spawn. Returns `{ spec, mainSha, revisionIndex }` for forensic-log correlation.
+- `listInstalledModels()` / `getModelInfo(model)` / `deleteModel(model)` / `getModelPath(model)` / `getBinaryPath()` / `getWhisperDir()`.
+
+### Error codes (granular, Phase 4 B5a)
+`WHISPER_MANIFEST_INVALID` (sig-verify / JSON parse), `WHISPER_DOWNGRADE_BLOCKED`, `WHISPER_SOURCE_PIN_DRIFT`, `WHISPER_BINARY_TAMPERED`, `WHISPER_UNSUPPORTED_PLATFORM`, `WHISPER_BINARY_DOWNLOAD_FAILED` (generic network / extraction).
 
 ---
 
@@ -282,32 +286,30 @@ Manages whisper.cpp binary and model downloads for local transcription. Stores a
 
 **File:** `src/main/services/LocalWhisperService.ts`
 
-Local audio transcription using whisper.cpp as a child process. Provides offline transcription without API dependencies.
+Local audio transcription via whisper.cpp child process. Offline, no API dependencies. Phase 4 hardening adds pre-flight CPU probe, argv validation, TOCTOU close, DLL-sideload mitigation, and forensic spawn-log.
 
-### Key Features
-- Runs whisper.cpp as a child process (no native bindings)
-- Format conversion for non-WAV input files (MP3 always converted via ffmpeg for reliability)
-- File chunking for long recordings with `CHUNK_OVERLAP_SECONDS` (0.5s) at boundaries to prevent word loss
-- Progress reporting via callback
-- AbortSignal cancellation support
-- Process timeout via `WHISPER_PROCESS_TIMEOUT`
+### `transcribe()` flow
+1. **Pre-flight CPU probe** via `checkCpuSupport()` — rejects pre-SSE4.2 CPUs (Core 2, Pentium 4/D/III/M, Phenom, Athlon 64/II, etc.) with `WHISPER_CPU_UNSUPPORTED` before any download. Cached per-process.
+2. **Argv hardening** via `validateAudioPath()` — rejects UNC paths, Windows reserved device names (CON/PRN/AUX/NUL/COM1-9/LPT1-9), NTFS ADS colons in basenames; canonicalises via `fs.realpath`. Throws `WHISPER_INVALID_PATH`.
+3. `ensureBinary()` + `ensureModel()`.
+4. Convert non-WAV input to 16 kHz mono PCM via ffmpeg.
+5. Chunk files >8 min (`CHUNK_BOUNDARY_SECONDS=480`) with 0.5s overlap.
+6. For each chunk, `runWhisper()` does:
+   - Pre-spawn `modelManager.verifyInstalledBinary()` — TOCTOU close.
+   - Emit `logger.info('Whisper spawn', { spawnedPath, computedSha, signatureValid, manifestRevision, binaryVersion })`.
+   - On Windows, `cwd: dirname(binaryPath)` (DLL sideload mitigation; harmless on macOS).
+   - SIGILL / STATUS_ILLEGAL_INSTRUCTION (0xC000001D / 132) → `WHISPER_CPU_UNSUPPORTED`.
+   - Post-close cleanup of orphan `${audioPath}.txt` on any non-success exit (Windows `TerminateProcess` leaves partial output).
 
-### Public Methods
+### Exports (beyond the service class)
+- `validateAudioPath(filePath)` returns canonical realpath; `checkCpuSupport()` returns `{ok} | {ok:false, reason}` memoised; `__resetCpuProbeForTests()` test hook.
 
-#### `transcribe(filePath: string, language: TranscriptionLanguage, model: WhisperModel, onProgress: (progress: TranscriptionProgress) => void, signal?: AbortSignal): Promise<TranscriptionResult>`
-Transcribe an audio file using the local whisper.cpp backend.
-
-**Parameters:**
-- `filePath` – Absolute path to the audio file
-- `language` – Language code or `'auto'` for detection
-- `model` – Whisper model size (tiny/base/small/medium/large)
-- `onProgress` – Callback for UI progress updates
-- `signal` – Optional AbortSignal for cancellation
-
-**Returns:** Same shape as `TranscriptionService.transcribe()` – `{ success, transcript, duration, language, error, errorCode }`
+### Public method
+`transcribe({ filePath, language, model, signal?, onProgress? }): Promise<TranscriptionResult>` — returns `{ success, transcript, duration, language, error?, errorCode? }`.
 
 ### Related files
-- `WhisperModelManager.ts` (binary/model management), `transcription-handlers.ts` (backend routing)
+- `WhisperModelManager.ts` (install + verify), `transcription-handlers.ts` (backend routing), `whisper-assets.ts` (pinned release), `whisper-pubkeys.ts` (trust keys).
+- Main-process utilities: `zipArchive`, `tarArchive`, `secureDownloader`, `verifyManifest` in `src/main/utils/` — see [Build – whisper-binaries runbook](./build/whisper-binaries.md) for the CI side.
 
 ---
 
@@ -441,7 +443,8 @@ Runtime detection of optional system tools for document import.
 - Checks LibreOffice (`soffice --version`) and ImageMagick (`magick --version`, v6 `convert` fallback)
 - 5-second timeout per command via `execFile` (no shell – safe from injection)
 - Session-level caching (single detection, concurrent calls share one promise)
-- macOS bundle path fallback for LibreOffice
+- macOS bundle path fallback for LibreOffice (`/Applications/LibreOffice.app/...`)
+- Windows install-path fallback for LibreOffice (#162): probes `C:\Program Files\LibreOffice\program\soffice.exe` and the `(x86)` 32-bit equivalent when `soffice` is not on `PATH`
 - Non-blocking – never blocks app startup
 
 ### Public methods
@@ -493,10 +496,4 @@ Generate DOCX from HTML with embedded images.
 
 ---
 
-## See Also
-
-- [API Services - Core](./api-services.md) - Terminal, File, Settings, Watchers
-- [Architecture](./architecture.md) - Service class overview
-- [IPC Patterns](./ipc-patterns.md) - IPC handler integration
-- [Terminal](./terminal/README.md) - Terminal panel implementation
-- [Drag-Drop](./drag-drop/README.md) - External file drop documentation
+**See Also:** [API Services - Core](./api-services.md) · [Architecture](./architecture.md) · [IPC](./ipc-patterns.md) · [Terminal](./terminal/README.md) · [Drag-Drop](./drag-drop/README.md)

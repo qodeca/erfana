@@ -258,4 +258,265 @@ describe('useAutoSave', () => {
       expect(onSave).toHaveBeenCalledTimes(1)
     })
   })
+
+  describe('signalChange (true debounce)', () => {
+    it('should expose signalChange function', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() => useAutoSave(true, onSave))
+
+      expect(result.current.signalChange).toBeDefined()
+      expect(typeof result.current.signalChange).toBe('function')
+    })
+
+    it('should reset debounce timer on each signalChange call', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() => useAutoSave(true, onSave, { delay: 2000 }))
+
+      // Advance 1500ms (initial debounce started by useEffect)
+      act(() => {
+        vi.advanceTimersByTime(1500)
+      })
+      expect(onSave).not.toHaveBeenCalled()
+
+      // Signal a change – resets debounce to 2000ms from now
+      act(() => {
+        result.current.signalChange()
+      })
+
+      // Advance 1500ms more (total 3000ms from start, but only 1500ms from signalChange)
+      act(() => {
+        vi.advanceTimersByTime(1500)
+      })
+      expect(onSave).not.toHaveBeenCalled()
+
+      // Advance 500ms more (2000ms from signalChange) – should fire now
+      act(() => {
+        vi.advanceTimersByTime(500)
+      })
+      expect(onSave).toHaveBeenCalledTimes(1)
+    })
+
+    it('should save after delay from last signalChange during continuous typing', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() => useAutoSave(true, onSave, { delay: 2000 }))
+
+      // Simulate continuous typing: signal every 500ms for 3 seconds
+      for (let i = 0; i < 6; i++) {
+        act(() => {
+          vi.advanceTimersByTime(500)
+          result.current.signalChange()
+        })
+      }
+      // At t=3000: no save yet (debounce resets each time)
+      expect(onSave).not.toHaveBeenCalled()
+
+      // Stop typing, wait for debounce
+      act(() => {
+        vi.advanceTimersByTime(2000)
+      })
+      expect(onSave).toHaveBeenCalledTimes(1)
+    })
+
+    it('should be a no-op when disabled', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() =>
+        useAutoSave(true, onSave, { delay: 2000, enabled: false })
+      )
+
+      act(() => {
+        result.current.signalChange()
+      })
+
+      act(() => {
+        vi.advanceTimersByTime(5000)
+      })
+
+      expect(onSave).not.toHaveBeenCalled()
+    })
+
+    it('should be a no-op when isModified is false', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() =>
+        useAutoSave(false, onSave, { delay: 2000 })
+      )
+
+      act(() => {
+        result.current.signalChange()
+      })
+
+      act(() => {
+        vi.advanceTimersByTime(5000)
+      })
+
+      expect(onSave).not.toHaveBeenCalled()
+    })
+
+    it('should have stable identity across re-renders', () => {
+      const onSave = vi.fn()
+      const { result, rerender } = renderHook(
+        ({ isModified }) => useAutoSave(isModified, onSave, { delay: 2000 }),
+        { initialProps: { isModified: true } }
+      )
+
+      const firstSignalChange = result.current.signalChange
+
+      // Rerender with different isModified
+      rerender({ isModified: false })
+      rerender({ isModified: true })
+
+      expect(result.current.signalChange).toBe(firstSignalChange)
+    })
+  })
+
+  describe('maxInterval (failsafe)', () => {
+    it('should save at maxInterval during continuous signalChange calls', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() =>
+        useAutoSave(true, onSave, { delay: 2000, maxInterval: 5000 })
+      )
+
+      // Continuous typing: signal every 1000ms (keeps debounce resetting)
+      for (let i = 0; i < 4; i++) {
+        act(() => {
+          vi.advanceTimersByTime(1000)
+          result.current.signalChange()
+        })
+      }
+      // At t=4000: no save yet (debounce keeps resetting)
+      expect(onSave).not.toHaveBeenCalled()
+
+      // At t=5000: max interval fires
+      act(() => {
+        vi.advanceTimersByTime(1000)
+      })
+      expect(onSave).toHaveBeenCalledTimes(1)
+    })
+
+    it('should not use maxInterval when set to 0', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() =>
+        useAutoSave(true, onSave, { delay: 2000, maxInterval: 0 })
+      )
+
+      // Continuous typing for 60s
+      for (let i = 0; i < 60; i++) {
+        act(() => {
+          vi.advanceTimersByTime(1000)
+          result.current.signalChange()
+        })
+      }
+      // At t=60000: no save (no max interval, debounce keeps resetting)
+      expect(onSave).not.toHaveBeenCalled()
+
+      // Stop typing, wait for debounce
+      act(() => {
+        vi.advanceTimersByTime(2000)
+      })
+      expect(onSave).toHaveBeenCalledTimes(1)
+    })
+
+    it('should use default maxInterval of 30000ms', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() =>
+        useAutoSave(true, onSave, { delay: 2000 })
+      )
+
+      // Continuous typing: signal every 1000ms for 29s
+      for (let i = 0; i < 29; i++) {
+        act(() => {
+          vi.advanceTimersByTime(1000)
+          result.current.signalChange()
+        })
+      }
+      expect(onSave).not.toHaveBeenCalled()
+
+      // At t=30000: max interval fires
+      act(() => {
+        vi.advanceTimersByTime(1000)
+      })
+      expect(onSave).toHaveBeenCalledTimes(1)
+    })
+
+    it('should clear both timers when isModified becomes false', () => {
+      const onSave = vi.fn()
+      const { result, rerender } = renderHook(
+        ({ isModified }) =>
+          useAutoSave(isModified, onSave, { delay: 2000, maxInterval: 5000 }),
+        { initialProps: { isModified: true } }
+      )
+
+      // Signal some changes
+      act(() => {
+        vi.advanceTimersByTime(1000)
+        result.current.signalChange()
+      })
+
+      // Modified becomes false (e.g., manual save)
+      rerender({ isModified: false })
+
+      // Advance past both timers
+      act(() => {
+        vi.advanceTimersByTime(10000)
+      })
+
+      // No save should have fired
+      expect(onSave).not.toHaveBeenCalled()
+    })
+
+    it('should not double-save when both timers would fire at the same time', () => {
+      const onSave = vi.fn()
+      renderHook(() =>
+        useAutoSave(true, onSave, { delay: 2000, maxInterval: 2000 })
+      )
+
+      // Both timers set for 2000ms
+      act(() => {
+        vi.advanceTimersByTime(2000)
+      })
+
+      // triggerSave clears both timers – should only save once
+      expect(onSave).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('backward compatibility', () => {
+    it('should still fire after delay without signalChange calls', () => {
+      const onSave = vi.fn()
+
+      // Consumer does not call signalChange – old behavior
+      renderHook(() => useAutoSave(true, onSave, { delay: 2000 }))
+
+      act(() => {
+        vi.advanceTimersByTime(2000)
+      })
+
+      expect(onSave).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('cancelAutoSave with maxInterval', () => {
+    it('should clear both debounce and maxInterval timers', () => {
+      const onSave = vi.fn()
+      const { result } = renderHook(() =>
+        useAutoSave(true, onSave, { delay: 2000, maxInterval: 5000 })
+      )
+
+      act(() => {
+        vi.advanceTimersByTime(1000)
+        result.current.signalChange()
+      })
+
+      // Cancel everything
+      act(() => {
+        result.current.cancelAutoSave()
+      })
+
+      // Advance past both timers
+      act(() => {
+        vi.advanceTimersByTime(10000)
+      })
+
+      expect(onSave).not.toHaveBeenCalled()
+    })
+  })
 })

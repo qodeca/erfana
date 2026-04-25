@@ -1,5 +1,7 @@
 # Overview
 
+> 📐 **Design context**: historical design exploration lives at [`docs/future/graph-engine/`](../../../docs/future/graph-engine/) — entity extraction, graph traversal, wireframes. This spec is the authoritative requirement source.
+
 ## Summary
 
 Spec #006 delivers a knowledge graph system that extracts entities from markdown content using rule-based pattern matching (wikilinks, tags, mentions, technical terms), builds a graph database with entities, edges, and mentions tables, and enables Obsidian-like backlink navigation for discovering connections between documents.

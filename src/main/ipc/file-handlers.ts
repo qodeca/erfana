@@ -8,7 +8,6 @@ import { directoryWatcherService } from '../services/DirectoryWatcherService'
 import { settingsService } from '../services/SettingsService'
 import { projectSettingsService } from '../services/ProjectSettingsService'
 import { projectLockService } from '../services/ProjectLockService'
-import { gitStatusService } from '../services/GitStatusService'
 import type { ProjectChanged } from '../../shared/ipc/schema'
 import { logger } from '../services/LoggingService'
 
@@ -47,7 +46,6 @@ const projectService = new ProjectService(
  * REFACTORING (todo017): Simplified to thin adapter delegating to ProjectService
  */
 async function openProjectByPath(newProjectPath: string): Promise<string> {
-  const oldPath = fileService.getProjectPath()
   const result = await projectService.switchProject(newProjectPath)
 
   if (!result.success) {
@@ -57,16 +55,6 @@ async function openProjectByPath(newProjectPath: string): Promise<string> {
       return result.path
     }
     throw new Error(result.error || 'Unknown error')
-  }
-
-  // Clear git status cache for old project after successful switch
-  if (oldPath && result.action === 'switched') {
-    gitStatusService.clearCache(oldPath).catch((err) => {
-      logger.warn('Failed to clear git status cache for old project', {
-        projectPath: oldPath,
-        error: err instanceof Error ? err.message : String(err)
-      })
-    })
   }
 
   return result.path
@@ -208,14 +196,6 @@ export function registerFileHandlers(): void {
     // Stop all watchers
     await fileWatcherService.stopAll()
     await directoryWatcherService.stopAll()
-
-    // Clear git status cache for closed project
-    gitStatusService.clearCache(oldProjectPath).catch((err) => {
-      logger.warn('Failed to clear git status cache on project close', {
-        projectPath: oldProjectPath,
-        error: err instanceof Error ? err.message : String(err)
-      })
-    })
 
     // Clear project path in services
     fileService.setProjectPath('')

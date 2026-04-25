@@ -300,6 +300,10 @@ describe('ThrottledWorker', () => {
       expect(firstChunk.length).toBe(500)
     })
 
+    // Pushes 60,000 events into the buffer. Historically this was O(n^2)
+    // because every front-drop re-allocated the array; now runs in <1s on
+    // Windows thanks to the offset-based deque (see #173 / ThrottledWorker.ts).
+    // The default 5s vitest timeout is sufficient cross-platform.
     it('should drop 30,000 oldest events when 60,000 events are added', () => {
       const onWork = vi.fn()
       const onOverflow = vi.fn()

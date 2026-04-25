@@ -29,23 +29,74 @@ files:
   - '!node_modules/@mapbox/node-pre-gyp/**'
 asar: false
 npmRebuild: false
+# Explicitly disable auto-updater metadata.
+# Using 'publish: null' (not 'provider: github') so electron-builder does NOT
+# emit latest.yml / latest-mac.yml / latest-linux.yml. The release workflow's
+# `finalize` job also deletes any such file that leaks into the draft.
+publish: null
 win:
   executableName: Erfana
   target:
-    - nsis
+    - target: nsis
+    - target: portable
+  # signingHashAlgorithms + rfc3161TimeStampServer moved into signtoolOptions
+  # as a nested block in electron-builder 26 (flat fields were removed from
+  # the win schema). azureSignOptions stays at win level.
+  signtoolOptions:
+    signingHashAlgorithms:
+      - sha256
+    rfc3161TimeStampServer: http://timestamp.digicert.com
+  # Azure Artifact Signing (formerly Azure Trusted Signing). Values are
+  # overridden at CLI invocation via --config.win.azureSignOptions.*
+  # flags from build_win.yml.
+  #
+  # DO NOT put ${env.X} macros here — electron-builder's macro expander
+  # (util/macroExpander.ts) is only applied to pattern-based fields like
+  # artifactName; it is NOT applied to azureSignOptions. Literal
+  # `${env.AZURE_SIGNING_ENDPOINT}` reaches Invoke-TrustedSigning
+  # unchanged and SignTool's Azure.CodeSigning.Dlib throws
+  # System.UriFormatException when it tries to parse it as a URI.
+  #
+  # The placeholders below exist ONLY to satisfy the JSON-schema validator
+  # run by Packager.validateConfig() (app-builder-lib/src/packager.ts:398).
+  # Validation fires on every build — including linux/mac legs that never
+  # actually invoke signtool — so the four required fields must be
+  # present as string-typed values. CLI --config overrides replace them
+  # at bootstrap (before the actual signtool call), so the placeholders
+  # never reach the Azure signing backend.
+  azureSignOptions:
+    publisherName: placeholder-overridden-at-runtime
+    # IANA-reserved .invalid TLD (RFC 6761) — guaranteed not to resolve via DNS.
+    # If --config.win.azureSignOptions.endpoint=$AZURE_SIGNING_ENDPOINT injection
+    # silently fails for any reason, electron-builder will attempt outbound TLS
+    # to this host, which fails fast at DNS resolution rather than connecting
+    # to a third-party-registered placeholder.example domain.
+    endpoint: https://placeholder.invalid/
+    codeSigningAccountName: placeholder
+    certificateProfileName: placeholder
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+portable:
+  artifactName: ${name}-${version}-portable.${ext}
 mac:
-  entitlementsInherit: build/entitlements.mac.plist
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.inherit.plist
   extendInfo:
-    - NSCameraUsageDescription: Application requests access to device's camera.
-    - NSMicrophoneUsageDescription: Application requests access to device's microphone.
-    - NSDocumentsFolderUsageDescription: Application requests access to user's Documents folder.
-    - NSDownloadsFolderUsageDescription: Application requests access to user's Downloads folder.
-  notarize: false
+    - NSCameraUsageDescription: Erfana uses the camera to capture photos you insert into notes.
+    - NSMicrophoneUsageDescription: Erfana uses the microphone for audio transcription you request.
+    - NSDocumentsFolderUsageDescription: Erfana reads and writes project files in folders you open.
+    - NSDownloadsFolderUsageDescription: Erfana writes exported files (PDF, DOCX) to folders you choose.
+  # Notarization is auto-invoked by electron-builder 26 when either:
+  #   (a) APPLE_API_KEY triad is set (.p8 ASC API key path), or
+  #   (b) APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID are set
+  #       (notarytool user-auth path — this project's choice).
+  # Either way it's notarytool (not altool), and the ticket is auto-stapled.
+  notarize: true
   target:
     - target: dmg
       arch:
@@ -60,12 +111,9 @@ dmg:
 linux:
   target:
     - AppImage
-    - snap
     - deb
+    - rpm
   maintainer: electronjs.org
   category: Utility
 appImage:
   artifactName: ${name}-${version}.${ext}
-publish:
-  provider: generic
-  url: https://example.com/auto-updates

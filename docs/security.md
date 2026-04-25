@@ -1,6 +1,6 @@
 # Security Guidelines
 
-**Last Updated**: March 2026 (v0.9.0, Electron 39)
+**Last Updated**: April 2026 (v0.9.4, Electron 39)
 
 ## Security Posture Summary
 
@@ -345,34 +345,25 @@ Markdown preview allows HTML rendering with strict sanitization:
 - `data:` URI images are allowed – required by ImageViewerPanel (renders local images as base64 via `FileService.readFileAsBase64`) and DOCX export (SVG-to-PNG canvas pipeline in `svgToImage.ts`). The sandboxed renderer cannot access `file://` URLs, so base64 data URIs are the secure transport mechanism for local image data from the main process.
 - Dangerous tags/attributes sanitized by DOMPurify + rehype-sanitize
 
-See [HTML Rendering](./markdown-editing.md#html-rendering-in-markdown) for details.
+See [HTML Rendering](./rendering/README.md) for details.
 
 ---
 
 ## Input Validation
 
-All IPC handlers validate inputs using **Zod schemas**:
+### Filename validation (#161, Phase 2)
 
-```typescript
-// Example: File path validation
-import { z } from 'zod';
+`src/main/utils/validateFilename.ts` provides cross-platform filename validation wired into `FileService.createFile`/`createFolder`/`rename` (throws `AppError(INVALID_FILENAME)`) and `PdfService`/`DocxService` (silent transform via `deriveSafeFilename`). Security-relevant rejections on **every platform** (not just Windows):
 
-const FilePathSchema = z.object({
-  path: z.string().min(1),
-});
+- **Unicode bidi-override chars** (U+202A–202E, U+2066–2069, U+200E, U+200F) — prevents Trojan-Source RTL extension spoofing (`cod‮gnp.exe` displaying as `codeexe.png`)
+- **C0 control chars** (0x00–0x1F)
+- **Empty / whitespace-only** filenames
 
-ipcMain.handle('files:read', async (_, args) => {
-  const { path } = FilePathSchema.parse(args);
+Windows-only rejections: reserved basenames (CON, PRN, COM1-9, LPT1-9), forbidden chars `<>:"/\|?*`, trailing dots/spaces. Path-separator strip happens BEFORE validation in `FileService.createFile`/`createFolder`/`rename` to prevent path traversal (`../../etc/passwd` → `etcpasswd`).
 
-  // Additional validation
-  if (path.includes('..')) {
-    throw new Error('Path traversal not allowed');
-  }
+### Zod schema validation
 
-  // Safe to use
-  return await fs.readFile(path, 'utf-8');
-});
-```
+All IPC handlers validate inputs using **Zod schemas** (`src/shared/ipc/*-schema.ts`). Pattern: parse args with `Schema.parse()` at handler entry, then run additional validation (e.g. path-traversal check) before any FS operation. See `src/main/ipc/file-handlers.ts` for canonical examples.
 
 ### Validation Rules:
 
@@ -435,19 +426,24 @@ npm run build:mac
 
 ## IPC Security Checklist
 
-- [x] contextBridge used for all IPC
-- [x] Input validation (Zod schemas) in all handlers
-- [x] Path traversal prevention
-- [x] Type safety (TypeScript + Zod)
-- [x] Error handling with proper messages
-- [ ] Rate limiting (future enhancement)
-- [ ] Permission system for destructive operations (future)
+Shipped: contextBridge on all IPC, Zod input validation in all handlers, path-traversal prevention, TypeScript + Zod type safety, error messages sanitised at the IPC boundary. Pending: rate limiting; permission system for destructive operations.
 
 ---
 
 ## Known vulnerabilities
 
-Run `npm audit` to check. **Policy**: Fix all high/critical vulnerabilities in production dependencies before release.
+Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the table below.
+
+**Current state** (audited 2026-04-21): production 0 high / 5 moderate / 0 low; dev-only 10 high / 1 moderate / 2 low. The 5 moderate prod advisories chain through `mermaid → langium → chevrotain`; Mermaid output is DOMPurify-sanitized in the preview, so user-reachable attack surface is nil. Dev-only advisories don't ship in production builds.
+
+### Dependency overrides (package.json)
+
+| Package | Pin | Reason |
+|---|---|---|
+| `@electron/rebuild` | `3.7.1` | node-pty toolchain compat |
+| `lodash`, `lodash-es` | **exact** `4.18.1` | GHSA 1115805/6/9/10 (`_.template` code injection + `_.unset`/`_.omit` prototype pollution). Vulnerable range `<=4.17.23`. |
+
+**Lodash 4.18.x is a community fork, not OpenJS**: `4.18.0`/`4.18.1` were published by maintainer `magic-akari` in Oct 2025 after the upstream OpenJS branch went dormant. We pin **exact** (no caret) so a future 4.18.2 from any maintainer can't auto-flow into the lockfile; `package-lock.json` integrity hashes additionally pin the tarball. On Mermaid/electron-builder major bumps, retest the override chain — transitive resolution may shift.
 
 ---
 
@@ -487,15 +483,60 @@ The `afterSign` hook is critical: without it, macOS Sequoia+ rejects `@rpath` li
 
 Git status runs in a `worker_threads` Worker – same process memory space, no new sandbox boundary. Security: `validateProjectPath()` in IPC handler before worker; worker also rejects non-absolute paths (defense-in-depth). Native git uses `execFile` with array args (no `shell: true`). Git binary resolved via hardcoded allowlist first.
 
+## Local Whisper trust chain (Phase 4, v0.9.4)
+
+4-layer client-side trust model for the whisper.cpp subprocess (manifest Ed25519 sig + artifact SHA pin + per-spawn re-hash for TOCTOU + monotonic revision floor). Composition + attacker model: [`windows/whisper-trust-chain.md`](./windows/whisper-trust-chain.md). Decisions: [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)–[ADR 0004](./adrs/0004-per-spawn-toctou-rehash.md). Operator runbook: [`windows/whisper-support-runbook.md`](./windows/whisper-support-runbook.md).
+
+## Release signing (v0.9.5+, [#174](https://github.com/qodeca/erfana/issues/174))
+
+End-to-end signed multi-platform release pipeline. Full operator reference: [`build/release.md`](./build/release.md).
+
+Trust anchors:
+
+- **macOS**: Developer ID Application certificate + notarytool (user-auth mode: Apple ID + app-specific password + Team ID). Ticket stapled.
+- **Windows**: Azure Artifact Signing (formerly Azure Trusted Signing) via app-registration X.509 certificate auth (electron-builder 26's `WindowsSignAzureManager` does not support OIDC `AZURE_FEDERATED_TOKEN_FILE`, so we use a rotatable cert instead — public key lives on the app registration, private key is a GitHub Secret). Both NSIS installer and portable `.exe` are signed independently. Timestamped via `http://timestamp.digicert.com`.
+- **Linux**: aggregate `SHA256SUMS` signed with a **dedicated release minisign keypair** (separate from the whisper-binaries key — blast-radius isolation per ADR 0003 pattern).
+- **Per-artifact provenance**: SLSA Build L2 attestations are currently **not enabled** — GitHub gates `actions/attest-build-provenance` to Enterprise Cloud for private repos. qodeca is on the **Team plan**, which still does not include attestations for private repos. The minisign signature on the aggregate `SHA256SUMS` (Linux) + per-platform Developer ID / Azure Artifact Signing already provide artifact authenticity without requiring GitHub as a trust anchor. Revisit if Erfana goes public or moves to Enterprise.
+
+### Release minisign public keys (dual-key, ADR-0003 style)
+
+Two keys are published. End-user tooling should accept a signature from either. This lets us rotate the active signer without re-signing historical releases.
+
+**PRIMARY (active signer):** `4AEBCE8499845646`
+
+<!-- minisign-pubkey-primary-begin -->
+```text
+RWRGVoSZhM7rShmOHr5lmt6v6wH8Tjm/nXItCg46Co+hxgvJFLWkv0fC
+```
+<!-- minisign-pubkey-primary-end -->
+
+**ROTATION (standby successor, private half held offline):** `E8E4B205269790F1`
+
+<!-- minisign-pubkey-rotation-begin -->
+```text
+RWTxkJcmBbLk6J2eWEDWHYcAmgpKfRqO5PR8oRRLUpgn5rgCaWmTvd9w
+```
+<!-- minisign-pubkey-rotation-end -->
+
+The fence markers above are load-bearing — `releasing-erfana` skill Phase 4 extracts the primary pubkey by `awk` between these markers. Do NOT remove or rename them without updating `phases/phase-4-verify.md` accordingly.
+
+Mirrored copies for offline retrieval: `README.md` § Release verification, `docs/release-pubkey.txt`. These keys are **separate** from the whisper-binaries minisign key — a compromise of one does not invalidate the other.
+
+### End-user verification
+
+```bash
+# Integrity + aggregate signature (Linux packages)
+minisign -V -P "$(cat docs/release-pubkey.txt)" -m SHA256SUMS -x SHA256SUMS.minisig
+sha256sum -c SHA256SUMS
+```
+
+Full verification recipes (macOS `codesign`, Windows `signtool`) are in [`build/release.md` § End-user verification](./build/release.md#end-user-verification).
+
 ## Future enhancements
 
-1. **Code signing** + **notarization** for macOS (requires Apple Developer account)
-2. **Auto-updates**: signed updates with electron-updater
-3. **Encrypted storage**: OS keychain for sensitive data
-4. **Permission prompts**: confirmation before destructive operations
+Auto-updates via signed electron-updater (deferred — not shipped with #174 per non-goals). Encrypted storage via OS keychain. Confirmation prompts before destructive operations. SLSA Build L2 attestations (re-enable when Erfana moves to Enterprise Cloud or repo goes public). **Windows code signing is now covered by #174; [#166](https://github.com/qodeca/erfana/issues/166) narrows to NSIS installer UX. Branch protection on `main` + protected `v*.*.*` tag ruleset are live as of 2026-04-25 — see [`build/release.md` § Branch protection](./build/release.md#branch-protection-phase-i--done-2026-04-25).**
 
 ## References
 
-- Electron: [Security](https://www.electronjs.org/docs/latest/tutorial/security) | [Sandboxing](https://www.electronjs.org/docs/latest/tutorial/sandbox) | [Fuses](https://www.electronjs.org/docs/latest/tutorial/fuses) | [Context Isolation](https://www.electronjs.org/docs/latest/tutorial/context-isolation)
-- Packages: [@electron/fuses](https://www.npmjs.com/package/@electron/fuses) | [electron-builder](https://www.electron.build/)
+Electron: [Security](https://www.electronjs.org/docs/latest/tutorial/security) · [Sandboxing](https://www.electronjs.org/docs/latest/tutorial/sandbox) · [Fuses](https://www.electronjs.org/docs/latest/tutorial/fuses) · [Context Isolation](https://www.electronjs.org/docs/latest/tutorial/context-isolation). Packages: [@electron/fuses](https://www.npmjs.com/package/@electron/fuses) · [electron-builder](https://www.electron.build/).
 - See also: [IPC Patterns](./ipc-patterns.md) | [Architecture](./architecture.md) | [Testing](./testing/README.md)

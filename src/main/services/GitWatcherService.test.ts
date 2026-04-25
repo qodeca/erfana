@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import path from 'path'
 
 // Mock modules before imports
 const mockChokidar = {
@@ -130,9 +131,9 @@ describe('GitWatcherService', () => {
       expect(mockChokidar.watch).toHaveBeenCalled()
 
       const watchedPaths = mockChokidar.watch.mock.calls[0][0]
-      expect(watchedPaths).toContain('/project/.git/index')
-      expect(watchedPaths).toContain('/project/.git/HEAD')
-      expect(watchedPaths).toContain('/project/.git/refs/heads')
+      expect(watchedPaths).toContain(path.join('/project', '.git', 'index'))
+      expect(watchedPaths).toContain(path.join('/project', '.git', 'HEAD'))
+      expect(watchedPaths).toContain(path.join('/project', '.git', 'refs', 'heads'))
     })
 
     it('should return success without starting if no .git directory', async () => {
@@ -210,8 +211,8 @@ describe('GitWatcherService', () => {
 
       const watchedPaths = mockChokidar.watch.mock.calls[0][0]
       expect(watchedPaths).toHaveLength(2)
-      expect(watchedPaths).toContain('/project/.git/index')
-      expect(watchedPaths).toContain('/project/.git/HEAD')
+      expect(watchedPaths).toContain(path.join('/project', '.git', 'index'))
+      expect(watchedPaths).toContain(path.join('/project', '.git', 'HEAD'))
     })
 
     it('should return success if .git/index not found (bare repo)', async () => {

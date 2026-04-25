@@ -1,8 +1,10 @@
 # Build Documentation
 
-**Last Updated**: March 2026 (v0.9.0)
+**Last Updated**: April 2026 (v0.9.4)
 
 This directory contains detailed documentation for Erfana's production build configuration.
+
+> **Releasing Erfana?** This README covers local builds. For the multi-platform CI release pipeline (`release.yml` → signed/notarized macOS + Windows + Linux artifacts via the `releasing-erfana` skill), see [release.md](release.md). Whisper binary build runbook (separate signed release stream) lives in [whisper-binaries.md](whisper-binaries.md).
 
 ---
 
@@ -116,6 +118,9 @@ For detailed information on specific build aspects, see:
 - **[Electron Fuses](./fuses.md)** - Security fuses configuration
 - **[Dependencies](./dependencies.md)** - Exclusions and devDependencies
 - **[Troubleshooting](./troubleshooting.md)** - Common build errors and solutions
+- **[Windows build prerequisites](./windows.md)** - Setting up a Windows 11 dev box (Phase 0 of the Windows enablement roadmap)
+- **[Release pipeline](./release.md)** - Multi-platform release workflow (`.github/workflows/release.yml`), secrets + rotation calendar, end-user verification, incident response
+- **[Whisper binaries build pipeline](./whisper-binaries.md)** - Self-hosted signed whisper.cpp build (reference pattern, separate minisign key from releases)
 
 ---
 

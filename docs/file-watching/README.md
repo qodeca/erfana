@@ -47,8 +47,22 @@ Monitors open files for external content modifications.
 
 - **Service**: `src/main/services/FileWatcherService.ts`
 - **IPC Handlers**: `src/main/ipc/file-watcher-handlers.ts`
+- **Renderer Hook**: `src/renderer/src/hooks/useFileWatcher.ts` (echo detection, external change handling, `notifySaveComplete` action)
 - **Integration**: `src/renderer/src/components/Panels/MarkdownEditorPanel.tsx`
 - **UI Component**: `src/renderer/src/components/FileConflictNotification/`
+
+### Self-Save Echo Detection (v0.9.1, #124)
+
+The `useFileWatcher` hook prevents autosave-triggered file change events from being treated as external modifications. Three-layer defense:
+
+1. **`isSavingRef` guard** – Set during save operations, suppresses all change events while a save is in-flight
+2. **Content comparison (`isEchoEvent`)** – Compares incoming file content against `lastSavedContentRef` with CRLF normalization to detect self-save echoes that arrive after the saving flag clears
+3. **`hasLocalChangesRef`** – Ref mirror of `hasLocalChanges` state (avoids stale closures); if the user has local changes, external reload is suppressed
+
+The `MarkdownEditorPanel` coordinates via:
+- Reading content from Monaco editor model (not React state) to avoid stale closure overwrites
+- Calling `notifySaveComplete(savedContent)` after successful write to update `lastSavedContentRef`
+- Post-save dirty re-detection: checks if Monaco buffer diverged from saved content during the save, re-marks as modified if so
 
 ### Conflict Resolution UI
 
@@ -346,7 +360,8 @@ Located in `src/main/services/watcher/`:
 - 75ms collection window for batching events
 - 200ms throttle between processing rounds
 - 500-event chunks to prevent UI blocking
-- Queue management with size limits
+- Queue management with 30,000-event buffer cap + FIFO overflow
+- **Backing structure**: offset-based deque (`buffer: T[]` + `bufferOffset: number`). Push + evict + chunk consumption are amortized O(1). Periodic compaction reclaims underlying array memory when ≥half of slots are wasted head (floor 1024 to avoid thrash). Prior implementation used `this.buffer = this.buffer.slice(n)` which allocated a fresh array per eviction — fine at low burst rate but O(n²) + heavy GC under sustained overflow (30 k × 30 k element copies during a 60 k-event stress burst). See #173 / `docs/windows/known-flakes.md` for the story.
 
 **AtomicSaveDetector** (`AtomicSaveDetector.ts`)
 - Detects write-to-temp-then-rename save patterns
@@ -385,8 +400,11 @@ The service integrates these components:
   - AC-011 (polling fallback), AC-015 (redundant polling suppression), AC-016 (exponential backoff restart)
 - Window visibility gating tests in `src/renderer/src/hooks/useGitStatus.test.ts` (5 tests, #102)
   - AC-012: git status refreshes dropped while hidden, single catch-up on restore, cooldown respected
-- Event buffer overflow tests in `src/main/services/watcher/ThrottledWorker.test.ts` (6 tests, #102)
+- Event buffer overflow tests in `src/main/services/watcher/ThrottledWorker.test.ts` (24 tests, #102 + #173)
   - AC-017: 30,000-event cap, FIFO eviction, no crash/hang, post-burst recovery
+  - Offset-deque coverage: 60 k-event stress burst runs in <1 s cross-platform after the refactor
+- 016-NFR-001 main-process latency integration tests in `DirectoryWatcherService.pipeline.test.ts`
+  - Isolates chokidar + Defender noise via fake timers; asserts <200 ms virtual latency for single add + atomic-save flows
 - Hook tests in `src/renderer/src/hooks/useDirectoryWatcher.test.ts` (11 tests)
 - Pause/resume tests in `src/renderer/src/components/ProjectTree/withWatcherPause.test.ts` (17 tests)
 - Project switching tests in `src/main/services/ProjectService.switching.test.ts` (20 tests, #101)

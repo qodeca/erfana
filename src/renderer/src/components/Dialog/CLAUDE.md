@@ -71,10 +71,15 @@ All dialogs MUST compose on `BaseDialog`. Never build portals, overlays, or focu
 | `ConfirmDialog.tsx` | Yes/No confirmation |
 | `FilePickerDialog.tsx` | List selection with keyboard nav |
 | `PromptDialog.tsx` | Text input with validation |
+| `NewFileDialog.tsx` / `NewFolderDialog.tsx` | Thin wrappers on PromptDialog, preset with filename validation |
 | `RenameDialog.tsx` | File rename with validation |
+| `FileSystemDialog.tsx` | Shared base for file-creation dialogs (SOLID refactor) |
 | `DropModeDialog.tsx` | Mode selection (move/copy/import) |
 | `ConflictDialog.tsx` | File conflict resolution |
+| `CameraDialog.tsx` | Webcam photo capture with shutter + review states |
+| `ScreenSelectDialog.tsx` | macOS screen/window/area picker (behind feature gate) |
 | `DialogContext.tsx` | Dialog stack manager (z-index) |
+| `DialogManager.tsx` | Imperative stack renderer (mounts dialogs from `dialogService`) |
 | `dialogService.ts` | Imperative dialog API |
 | `../DocumentImport/DocumentImportDialog.tsx` | Multi-state: options → progress → success/error (LiteParse) |
 | `../Transcription/TranscriptionDialog.tsx` | Multi-state: options → progress → success/error (transcription) |

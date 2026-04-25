@@ -3,6 +3,7 @@ import { join, extname, basename, relative } from 'path'
 import type { IFileService } from '../interfaces/IFileService'
 import { SymlinkDetector } from '../utils/SymlinkDetector'
 import { RollbackHandler } from '../utils/RollbackHandler'
+import { assertValidUserFilename } from '../utils/validateFilename'
 import { DEFAULT_TREE_HIDDEN_PATTERNS } from '../../shared/constants'
 import { logger } from './LoggingService'
 
@@ -36,7 +37,7 @@ export interface FileNode {
 }
 
 // Maximum number of auto-numbered copies before rejecting operation (e.g., file.md, file (1).md, ... file (999).md)
-const MAX_COPY_ATTEMPTS = 1000
+export const MAX_COPY_ATTEMPTS = 1000
 
 export class FileService implements IFileService {
   private projectPath: string | null = null
@@ -241,10 +242,25 @@ export class FileService implements IFileService {
   }
 
   async createFile(dirPath: string, fileName: string): Promise<string> {
+    // Strip path separators FIRST — prevents `../../etc/passwd` style traversal
+    // before `join()`. Sibling methods `createFolder` and `rename` already do
+    // this; `createFile` was missing the strip until the Phase 2 review.
+    fileName = fileName.replace(/[/\\]/g, '')
+
+    if (!fileName) {
+      throw new Error('File name cannot be empty')
+    }
+
     // Ensure .md extension
     if (!fileName.endsWith('.md') && !fileName.endsWith('.markdown')) {
       fileName = `${fileName}.md`
     }
+
+    // #161: reject reserved Windows names (CON, PRN, COM1-9, LPT1-9) and
+    // forbidden chars (`<>:"/\|?*` on Windows), trailing dots/spaces,
+    // control chars, bidi overrides. POSIX rejects only the universal
+    // portability-breaking classes (control chars, bidi, empty, too long).
+    assertValidUserFilename(fileName)
 
     const filePath = join(dirPath, fileName)
 
@@ -273,6 +289,9 @@ export class FileService implements IFileService {
     if (!folderName) {
       throw new Error('Folder name cannot be empty')
     }
+
+    // #161: validate reserved names, forbidden chars, etc. (platform-aware).
+    assertValidUserFilename(folderName)
 
     const folderPath = join(dirPath, folderName)
 
@@ -337,6 +356,9 @@ export class FileService implements IFileService {
     if (!newName) {
       throw new Error('Name cannot be empty')
     }
+
+    // #161: validate reserved names, forbidden chars, etc. (platform-aware).
+    assertValidUserFilename(newName)
 
     // Get the directory and construct new path
     const { dirname } = await import('path')

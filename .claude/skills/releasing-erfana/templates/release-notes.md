@@ -1,89 +1,58 @@
-# ERFANA v{version}
+# Erfana v{version}
 
-**Release Date:** {month} {day}, {year}
+_Released: {YYYY-MM-DD}_
 
----
+{user-facing summary — 3-5 bullets supplied by the operator via AskUserQuestion in Phase 1.2. Examples:}
 
-## Highlights
+- {What end users can do that they couldn't before, in plain language}
+- {Bug fix users would notice, framed in terms of the symptom}
+- {Performance / quality-of-life improvement that's user-visible}
+- {Optional: platform expansion, new format support, etc.}
 
-- **{Highlight 1}** — Brief user-friendly description
-- **{Highlight 2}** — Brief user-friendly description
+<details>
+<summary>Technical changes</summary>
 
----
+{Output of `git cliff --tag "v{version}" --unreleased` — auto-generated from commit history, grouped by Conventional Commits type. Operator does NOT edit this section; it's the canonical changelog from git history.}
 
-## New Features
-
-### {Feature Name}
-
-{Description of what users can now do. Focus on benefits, not implementation.}
-
-**{Optional subsection}:**
-- Item 1
-- Item 2
-
-**How it works:**
-- Step 1
-- Step 2
+</details>
 
 ---
 
-## Bug Fixes
+## Verification
 
-- **{Fix Title}** — {What was broken and how it's now fixed, in user terms}
+```bash
+# Linux: minisign signature over aggregate hashes
+minisign -V -P "$(cat docs/release-pubkey.txt)" -m SHA256SUMS -x SHA256SUMS.minisig
+sha256sum -c SHA256SUMS
 
-- **{Fix Title}** — {Description}
+# macOS: codesign + stapled notarization ticket
+codesign --verify --deep --strict --verbose=2 /Applications/Erfana.app
+xcrun stapler validate /path/to/Erfana-*.dmg
 
----
+# Windows: Authenticode signature on installer + portable
+signtool verify /pa /all /tw C:\Path\To\erfana-{version}-setup.exe
+```
 
-<!-- OPTIONAL: Include only for MAJOR releases or if there are breaking changes
-## Breaking Changes
-
-- **{Change}** — {What changed and how to adapt}
--->
-
-<!-- OPTIONAL: Include only if there are known limitations
-## Known Issues
-
-- **{Issue}** — {Description and workaround if available}
--->
-
----
-
-## Installation
-
-1. Mount `erfana-{version}.dmg`
-2. Drag **Erfana** to your Applications folder
-3. If prompted to replace the existing version, click **Replace**
-4. On first launch, right-click the app and select "Open" (required for macOS security)
-
----
-
-## System Requirements
-
-- macOS 10.15 (Catalina) or later
-- Works on both Apple Silicon and Intel Macs
+Full verification recipe: [docs/build/release.md § End-user verification](../../../../docs/build/release.md#end-user-verification).
 
 <!--
-TEMPLATE INSTRUCTIONS (delete this section in final notes):
+Template guidance for the operator (delete in final notes):
 
-INCLUDE:
-- Features users interact with
-- Bugs that affected user experience
-- UI/UX changes
-- Performance improvements users would notice
+PHASE 1.2 — operator supplies the user-facing summary via AskUserQuestion. Aim for 3-5 bullets that describe what END USERS can now do or what FRUSTRATION is now resolved. Plain language, no internal terms.
 
-EXCLUDE:
+PHASE 1.3 — release-notes-drafter agent fills the technical section from `git cliff --tag "v{version}" --unreleased`. Do not hand-edit; if cliff output is wrong, fix the underlying commits or cliff.toml.
+
+EXCLUDE from the user-facing section:
 - Test coverage numbers
 - Refactoring without user impact
-- Developer tooling changes
-- Skill/agent updates
+- Developer tooling / skill / agent updates
 - Commit hashes
-- Technical architecture changes
 - Issue numbers (unless describing a user-reported bug)
+- Architecture / code-organization changes invisible to users
 
-TONE:
-- Write for end users, not developers
-- Use plain language
-- Focus on "what you can do now" not "what we changed"
-- Keep highlights to 2-3 items max
+INCLUDE in the user-facing section:
+- Features users interact with
+- Bugs that affected user experience (framed as the SYMPTOM users saw, not the implementation)
+- UI/UX changes
+- Performance improvements users would notice
 -->

@@ -169,24 +169,10 @@ describe('FileService.copyItem', () => {
       expect(stats.isFile()).toBe(true)
     })
 
-    it('should throw error when copy limit (1000) is exceeded', async () => {
-      // Setup: Create 1001 files with same name
-      const sourceFile = join(testDir, 'file.md')
-      const targetFolder = join(testDir, 'folder')
-      await writeFile(sourceFile, 'source', 'utf-8')
-      await mkdir(targetFolder)
-
-      // Create original + 1000 numbered copies
-      await writeFile(join(targetFolder, 'file.md'), 'existing', 'utf-8')
-      for (let i = 1; i <= 1000; i++) {
-        await writeFile(join(targetFolder, `file (${i}).md`), `copy${i}`, 'utf-8')
-      }
-
-      // Execute & Verify: Should hit overflow limit
-      await expect(
-        fileService.copyItem(sourceFile, targetFolder)
-      ).rejects.toThrow('Cannot create more than 1000 copies with the same name')
-    })
+    // NOTE: the MAX_COPY_ATTEMPTS boundary test was moved to
+    // `FileService.copyItem.limit.test.ts` with mocked fs so it runs in <100 ms
+    // cross-platform instead of 25+ s on Windows NTFS. See docs/windows/contributing.md
+    // "Test-file split policy".
   })
 
   describe('Validation constraints', () => {

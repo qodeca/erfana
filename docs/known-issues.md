@@ -4,7 +4,158 @@ Current issues and their workarounds. For historical resolved issues, see [archi
 
 ---
 
+## Windows-specific issues
+
+Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in **v0.9.4** (2026-04-24). The following gaps remain user-visible until Phases 3, 5, and 6 ship. See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for the canonical roadmap.
+
+### SmartScreen warning on first launch
+
+**Issue**: First-time launch of the NSIS installer triggers a Windows SmartScreen warning (`Windows protected your PC`) because Erfana is not yet code-signed.
+
+**Workaround**: Right-click the `.exe` → Properties → Unblock; OR click "More info → Run anyway" in the SmartScreen dialog.
+
+**Tracking**: [#166](https://github.com/qodeca/erfana/issues/166) (Phase 5 — code-signing).
+
+---
+
+### `npm run test:cov` exits 1 on Windows
+
+**Issue**: All tests pass but vitest's v8 coverage aggregator hits an `ENOENT` race on Windows NTFS during the `coverage/.tmp` cleanup step. Wrapper exits with code 1 even though the test suite is green.
+
+**Workaround**: Run `npx vitest --run --config vitest.main.ts --coverage` directly (exits 0). On macOS the wrapper exits 0 normally.
+
+**Tracking**: [#158](https://github.com/qodeca/erfana/issues/158) (Phase 6 — switch coverage provider to Istanbul OR reduce parallelism on Windows).
+
+---
+
+### Long paths (>260 chars) require user opt-in
+
+**Issue**: File operations on paths longer than 260 chars fail unless the user enabled the Win32 long-paths group-policy setting. The `isWindowsLongPath` helper that would auto-prefix `\\?\` is dead code.
+
+**Workaround**: Enable Win32 long paths per [`docs/build/windows.md`](./build/windows.md) step 5 + `git config --global core.longpaths true`.
+
+**Tracking**: [#163](https://github.com/qodeca/erfana/issues/163) (decision-deferred to Phase 6 with promotion criteria recorded inline at `PlatformConfig.ts:194-201`).
+
+---
+
+### Local Whisper: Windows ARM64 not supported
+
+**Issue**: Windows ARM64 machines cannot use the local whisper.cpp backend. Upstream whisper.cpp has no ARM64 Windows binary at any recent version, and building one in CI requires MSVC ARM64 cross-compile support plus an ARM64 signing certificate — neither currently in scope.
+
+**Symptom**: In Settings → Transcription → Backend, the "Local (whisper.cpp)" option is disabled with copy "Local (macOS / Windows x64 only – ARM64 not supported)".
+
+**Workaround**: Use the OpenAI API transcription backend (cross-platform, requires API key).
+
+**Tracking**: Not tracked — deferred indefinitely pending upstream ARM64 Windows binary + ARM64 code-signing costs falling out of our Apple Silicon universal-build workflow.
+
+---
+
+### Local Whisper: Windows binary is unsigned (0.9.4)
+
+**Issue**: The Windows `whisper.exe` + sidecar DLLs shipped in 0.9.4 are not code-signed. SmartScreen may prompt on first launch.
+
+**Workaround**: SHA-256 pinning + MOTW strip in `WhisperModelManager` means the binary has the same integrity guarantee as a signed one for Erfana's trust chain; only SmartScreen's UX-layer prompt is affected. Click "Run anyway" once. Erfana's own installer is signed, so this affects only the whisper subprocess.
+
+**Tracking**: [Phase 5](https://github.com/qodeca/erfana/issues/166) — procure Windows code-sign cert and add a signtool step to `.github/workflows/whisper-binaries.yml`.
+
+---
+
+### Local Whisper: pre-SSE4.2 CPUs rejected
+
+**Issue**: Whisper.cpp compiled with `-DGGML_NATIVE=OFF` still emits SSE4.2 intrinsics by default. Erfana fast-fails with `WHISPER_CPU_UNSUPPORTED` on pre-Haswell Intel (Core 2, Pentium 4/D/III/M, Celeron D) and pre-Zen AMD (Phenom, Athlon 64/II, Sempron, Turion 64, early Opteron).
+
+**Workaround**: Use the OpenAI API transcription backend. These CPUs are ~12+ years old; all modern desktops and laptops are unaffected.
+
+**Tracking**: Not a bug. Runtime SIGILL / STATUS_ILLEGAL_INSTRUCTION detection is the final safety net for unrecognised CPUs that slip past the pre-flight probe.
+
+---
+
+### Local Whisper: cancellation on Windows is abrupt
+
+**Issue**: On Windows, `child.kill('SIGTERM')` maps to `TerminateProcess` — no graceful shutdown. Any partially-written `${audioPath}.txt` from whisper.cpp's `-otxt` flag may be corrupted.
+
+**Workaround**: `LocalWhisperService` deletes `${audioPath}.txt` in the post-close handler on any non-success exit. User-visible: the transcript simply isn't produced. Re-run if desired.
+
+**Tracking**: Platform limitation, not a bug.
+
+---
+
+### Local Whisper: updates are manual
+
+**Issue**: Whisper binary pin in `src/main/services/whisper-assets.ts` updates only when a new Erfana app release ships with a bumped `RELEASE_TAG`. There is no in-app auto-update loop.
+
+**Workaround**: Whisper.cpp minor bumps are infrequent (~4–6/yr). Erfana maintainers re-run `.github/workflows/whisper-binaries.yml`, bump the pin, and ship a patch release.
+
+**Tracking**: Not planned — auto-update for a security-critical subprocess adds significant design surface for little benefit. See [`docs/build/whisper-binaries.md`](./build/whisper-binaries.md) for the manual rebuild procedure.
+
+---
+
+### Directory watcher latency on Windows
+
+**Issue**: End-to-end file-creation notification latency (terminal `touch` → Project Tree shows the new file) is 1500–2500 ms on Windows versus 200–600 ms on macOS/Linux. The difference is not an Erfana bug — it's the cost of the underlying OS primitives.
+
+Pipeline contributors on Windows:
+- **chokidar `ReadDirectoryChangesW`** — 100–500 ms callback latency (vs. <5 ms for POSIX inotify).
+- **Windows Defender on-access scanning** — 200–800 ms scan of the new file before the FS notification fires. Enabled by default in Windows 11.
+- **ThrottledWorker collection delay** — 75 ms (VS Code value, deterministic).
+- **IPC main → renderer + React reconcile** — ~50 ms.
+
+**Workaround**: None for end users — this is the Windows FS notification floor. Developers running the E2E suite on Windows see `e2e/directory-watcher.e2e.ts` use a platform-specific 6 s budget to accommodate this reality (macOS/Linux stays at 2 s). The 500 ms NFR-001 target is still asserted deterministically in the main-process integration test (`DirectoryWatcherService.pipeline.test.ts`, 016-NFR-001 describe block).
+
+**Tracking**: Not a bug — platform-inherent latency. Exposed as a budget in `e2e/directory-watcher.e2e.ts`; integration-test regression guard lives in `DirectoryWatcherService.pipeline.test.ts`. See `docs/windows/known-flakes.md` for the flake-remediation history.
+
+---
+
+### cmd.exe terminals can leak pre-bootstrap text into scrollback after aggressive resizing
+
+**Issue**: On Windows, ConPTY keeps its own screen buffer and re-emits the buffer contents back through the PTY stream on every terminal resize. The Git Bash and PowerShell bootstraps emit a full CSI 2J / CSI 3J / CSI H sequence after the startup marker so ConPTY's buffer is wiped before the interactive shell takes over, leaving nothing for a later reflow to replay. cmd.exe can only clear the visible viewport (`cls` → CSI 2J + CSI H); `CSI 3J` (scrollback clear) isn't available from cmd without spawning a child process. In rare cases, a user who opens a fresh cmd.exe terminal and immediately drags the panel splitter may see faint reflowed pwd / marker text appear in scrollback history (not the visible viewport).
+
+**Workaround**: Set `$env:SHELL` to `pwsh.exe` or Git Bash (`C:\Program Files\Git\usr\bin\bash.exe`) before launching Erfana — both emit the full three-sequence clear and have no scrollback-reflow leak.
+
+**Tracking**: Known limitation; not tracked as a bug. Could be closed by invoking `powershell.exe -NoProfile -Command "[Console]::Write(...)"` from the cmd bootstrap, at the cost of one extra process spawn per terminal creation.
+
+---
+
+### Screenshot capture unavailable on Windows
+
+**Issue**: `ScreenshotService.ts` is gated `process.platform !== 'darwin'`; the entire screenshot button is non-functional on Windows.
+
+**Workaround**: Use the OS-native screenshot tools (Win+Shift+S Snipping Tool); paste image path into the terminal manually.
+
+**Tracking**: [#164](https://github.com/qodeca/erfana/issues/164) (Phase 3 — Electron `desktopCapturer` strategy + area-selection overlay).
+
+---
+
+### Downgrading Erfana from 0.9.4 back to 0.9.3 is safe but leaves stale whisper sentinels
+
+**Issue**: An IT admin or user rolling Erfana back from a 0.9.4+ install to 0.9.3 will have `{userData}/whisper/.schema-version` (value `1`) and `{userData}/whisper/.last-seen-revision` sentinels on disk. These files don't exist pre-0.9.4 and are silently ignored by 0.9.3 code — 0.9.3's `WhisperModelManager` checks for the binary at the old ggml-org path (which never worked on macOS; Windows was never wired up pre-0.9.4).
+
+**Symptom**: User downgrades, tries Local Whisper, sees the pre-0.9.4 "binary not installed / download fails" flow. Their downloaded models in `{userData}/whisper/models/` are preserved.
+
+**Workaround (if ever they re-upgrade)**: the 0.9.4+ install will read the lingering `.last-seen-revision` sentinel and use it as the monotonic floor — this is **safe** (sentinel value can only be higher than-or-equal-to `MIN_REVISION_INDEX`), but if the user downgraded specifically because a 0.9.4 whisper release was broken, see [`docs/windows/whisper-support-runbook.md`](./windows/whisper-support-runbook.md) §`WHISPER_DOWNGRADE_BLOCKED` for the stuck-user procedure.
+
+**Tracking**: Not a bug. Documented for IT admins performing bulk rollback.
+
+---
+
 ## Active Issues
+
+### Visual regression E2E suite hangs on GitHub `macos-latest` CI
+
+**Issue**: All 5 visual tests in `e2e/visual-regression.e2e.ts` time out at `page.waitForLoadState('domcontentloaded')` (30s) on GitHub `macos-latest` runners; they pass 5/5 locally (including with `CI=true` and video recording enabled).
+
+**Root cause**: Not isolated. Electron main process launches, `BrowserWindow` exists, `firstWindow()` returns a Page, but the `domcontentloaded` event never propagates. Candidate causes: GPU/renderer init hang on virtualized runners, `app.evaluate(resize)` → `firstWindow()` timing race, `--force-device-scale-factor=1` interaction. The regular `electron` project succeeds on the same runner, so the issue is specific to the visual fixture setup.
+
+**Workaround**: CI is scoped to `--project=electron` via `.github/workflows/e2e.yml`; the visual suite is run locally only.
+
+```bash
+npm run test:e2e:visual                    # Run visual regression tests locally
+npm run test:e2e:update-screenshots        # Update baselines
+```
+
+**Tracking**: See [docs/ci.md § Visual regression on CI](./ci.md#visual-regression-on-ci) and [docs/technical-debt.md § Visual regression suite disabled on CI](./technical-debt.md#5-visual-regression-suite-disabled-on-ci). Diagnostic next step is fixture instrumentation to capture `readyState` + GPU info.
+
+---
 
 ### Git Status: Global .gitignore not supported
 

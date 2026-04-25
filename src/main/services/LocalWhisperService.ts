@@ -16,9 +16,9 @@
  * @see Issue #111 - Local Whisper transcription backend
  */
 import { spawn, execFile } from 'child_process'
-import { stat, readFile, unlink } from 'fs/promises'
-import { tmpdir } from 'os'
-import { join, extname, basename } from 'path'
+import { realpath, stat, readFile, unlink } from 'fs/promises'
+import { cpus, tmpdir } from 'os'
+import { join, extname, basename, dirname } from 'path'
 import { randomUUID } from 'crypto'
 import ffmpegPath from 'ffmpeg-static'
 import { LOCAL_WHISPER, TRANSCRIPTION } from '../../shared/constants'
@@ -69,9 +69,190 @@ const FFMPEG_PROBE_TIMEOUT = 30_000
 /** Regex to parse whisper.cpp progress output from stderr */
 const PROGRESS_REGEX = /progress\s*=\s*(\d+)%/
 
+/**
+ * Windows reserved basenames (case-insensitive), with or without extension.
+ * Passing these to CreateProcess or CreateFile has OS-specific behaviour
+ * that can confuse ffmpeg/whisper.exe's argv handling — reject at the entry.
+ *
+ * @see https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file
+ */
+const WIN32_RESERVED_BASENAMES = new Set([
+  'CON', 'PRN', 'AUX', 'NUL',
+  'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
+  'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'
+])
+
+/**
+ * Node child.kill('SIGTERM') on Windows maps to TerminateProcess — abrupt, not
+ * graceful. Callers must clean up any partially-written output files that
+ * whisper.cpp's -otxt writer was in the middle of producing.
+ */
+const WIN32_CPU_UNSUPPORTED_EXIT_CODES = new Set([
+  // STATUS_ILLEGAL_INSTRUCTION — Windows exit code when SIGILL-equivalent fires.
+  0xc000001d,
+  3221225501
+])
+const POSIX_CPU_UNSUPPORTED_EXIT_CODES = new Set([
+  // SIGILL exit code convention on Unix: 128 + signal(4) = 132.
+  132
+])
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * CPU-model regexes for hardware older than SSE4.2 / AVX. Whisper.cpp
+ * compiled with `-DGGML_NATIVE=OFF` still emits SSE4.2-era intrinsics by
+ * default — these CPUs crash with SIGILL at first inference.
+ *
+ * We match tokens with optional `(tm)`, `(r)`, or whitespace in between so
+ * real brand strings like `Intel(R) Pentium(R) 4 CPU` match `pentium 4`.
+ *
+ * We accept a false-positive (rejecting a supported CPU we don't recognise)
+ * over a false-negative (letting an unsupported CPU through) — the cost of a
+ * wrong rejection is one user running the OpenAI API backend instead; the
+ * cost of a wrong acceptance is downloading ~200 MB + crashing mid-import.
+ *
+ * Specifically rejected (non-exhaustive): Intel Core 2 / Core 2 Duo (Conroe,
+ * Wolfdale, Merom, Yorkfield), Pentium 4 / Pentium D / Celeron D / Pentium M,
+ * AMD K8 / K10 / Phenom / Athlon 64 / Sempron / Turion pre-Bulldozer.
+ */
+// Matches `(r)`, `(tm)`, `®`, `™`, or whitespace between adjacent tokens.
+const TRADEMARK_SEP = '(?:\\s*(?:\\(r\\)|\\(tm\\)|\\(c\\)|®|™|\\s)\\s*)+'
+const CPU_MODEL_DENYLIST: readonly RegExp[] = [
+  new RegExp(`\\bcore${TRADEMARK_SEP}?2\\b`, 'i'),
+  new RegExp(`\\bpentium${TRADEMARK_SEP}?4\\b`, 'i'),
+  new RegExp(`\\bpentium${TRADEMARK_SEP}?d\\b`, 'i'),
+  new RegExp(`\\bpentium${TRADEMARK_SEP}?iii\\b`, 'i'),
+  new RegExp(`\\bpentium${TRADEMARK_SEP}?m\\b`, 'i'),
+  new RegExp(`\\bceleron${TRADEMARK_SEP}?d\\b`, 'i'),
+  new RegExp(`\\bathlon${TRADEMARK_SEP}?64\\b`, 'i'),
+  new RegExp(`\\bathlon${TRADEMARK_SEP}?ii\\b`, 'i'),
+  new RegExp(`\\bsempron\\b`, 'i'),
+  new RegExp(`\\bturion${TRADEMARK_SEP}?64\\b`, 'i'),
+  new RegExp(`\\bphenom\\b`, 'i'),
+  new RegExp(`\\bopteron${TRADEMARK_SEP}?2\\b`, 'i')
+]
+
+/**
+ * Cached result of the CPU-feature probe. We run the check once per process
+ * lifetime and memoise the result — per-transcribe probing is wasteful (the
+ * CPU doesn't change) and would add a small but needless latency to every
+ * call.
+ */
+let cpuProbeResult: { ok: true } | { ok: false; reason: string } | null = null
+
+/**
+ * Pre-flight CPU-feature check. Runs before the first spawn so unsupported
+ * hardware gets a fast, actionable error instead of a full binary+model
+ * download followed by a SIGILL crash.
+ *
+ * Heuristic: examine the CPU brand string from `os.cpus()`. Node exposes the
+ * OS-supplied brand (e.g. `Intel(R) Core(TM) i7-8700K CPU @ 3.70 GHz`).
+ * Anything matching a known pre-SSE4.2 family is rejected hard. Anything
+ * else is optimistically allowed — the runtime SIGILL handler in
+ * `runWhisper()` is the final safety net that catches the long-tail cases
+ * we didn't anticipate (embedded x86, non-standard brand strings).
+ *
+ * Exported for direct unit testing.
+ */
+export function checkCpuSupport(): { ok: true } | { ok: false; reason: string } {
+  if (cpuProbeResult) return cpuProbeResult
+  const info = cpus()
+  if (!info || info.length === 0) {
+    // Pathological environment — sandbox, container without /proc/cpuinfo,
+    // etc. Fall through to the runtime SIGILL handler rather than block.
+    cpuProbeResult = { ok: true }
+    return cpuProbeResult
+  }
+  const model = info[0].model || ''
+  for (const bad of CPU_MODEL_DENYLIST) {
+    if (bad.test(model)) {
+      cpuProbeResult = {
+        ok: false,
+        reason: `Local Whisper is not supported on this CPU (${info[0].model}). Use the OpenAI API backend, or run Erfana on a CPU with SSE4.2 support (Intel Nehalem or newer, AMD Bulldozer or newer).`
+      }
+      return cpuProbeResult
+    }
+  }
+  cpuProbeResult = { ok: true }
+  return cpuProbeResult
+}
+
+/** Test-only hook for resetting the probe cache between cases. */
+export function __resetCpuProbeForTests(): void {
+  cpuProbeResult = null
+}
+
+/**
+ * Validate + canonicalize the user-supplied audio path before passing it to
+ * ffmpeg / whisper-cli as a CLI argument.
+ *
+ * Rejects:
+ *  - UNC paths (`\\?\`, `\\server\share\...`) — these confuse some argv
+ *    parsers and bypass normal path-length guards.
+ *  - Windows reserved device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`,
+ *    `LPT1-9`), with or without extension.
+ *  - NTFS alternate-data-stream colons in the basename (`file.wav:evil`).
+ *  - Paths whose `realpath` resolves to something other than the input
+ *    (case-normalisation is allowed; every other divergence is suspicious).
+ *
+ * Intentionally does NOT reject forward-slash paths on Windows (npm
+ * convention + common in Electron).
+ */
+export async function validateAudioPath(filePath: string): Promise<string> {
+  // Absolute requirement — whisper-cli doesn't accept relative paths
+  // consistently across platforms anyway.
+  if (!filePath || typeof filePath !== 'string') {
+    throw new AppError(
+      'Audio path is empty or not a string',
+      ErrorCode.WHISPER_INVALID_PATH
+    )
+  }
+
+  // UNC detection — both Windows forms. Keep it strict: anything starting
+  // with \\\\ or //... is rejected even on POSIX (it's weird input).
+  if (/^(\\\\|\/\/)/.test(filePath)) {
+    throw new AppError(
+      `Audio path is a UNC path, which is not supported: ${filePath}`,
+      ErrorCode.WHISPER_INVALID_PATH
+    )
+  }
+
+  // NTFS ADS colon in basename only (drive-letter colon in position 1 is OK).
+  const base = basename(filePath)
+  if (base.includes(':')) {
+    throw new AppError(
+      `Audio file basename contains a colon (NTFS ADS not allowed): ${base}`,
+      ErrorCode.WHISPER_INVALID_PATH
+    )
+  }
+
+  // Windows reserved device names — check the name WITHOUT extension (e.g.
+  // both `CON` and `CON.wav` must be rejected).
+  const nameSansExt = base.replace(/\.[^.]*$/, '').toUpperCase()
+  if (WIN32_RESERVED_BASENAMES.has(nameSansExt)) {
+    throw new AppError(
+      `Audio filename "${base}" is a Windows reserved device name`,
+      ErrorCode.WHISPER_INVALID_PATH
+    )
+  }
+
+  // Canonicalise via realpath — this resolves symlinks and case-normalises.
+  // Divergence beyond case-only is suspicious.
+  let resolved: string
+  try {
+    resolved = await realpath(filePath)
+  } catch (e) {
+    throw new AppError(
+      `Audio file could not be resolved: ${(e as Error).message}`,
+      ErrorCode.WHISPER_INVALID_PATH,
+      e instanceof Error ? e : undefined
+    )
+  }
+  return resolved
+}
 
 /**
  * Resolve the ffmpeg binary path.
@@ -107,7 +288,7 @@ export class LocalWhisperService {
    * @returns Transcription result with text, language, and duration
    */
   async transcribe(options: LocalTranscribeOptions): Promise<TranscriptionResult> {
-    const { filePath, language, model, signal, onProgress } = options
+    const { language, model, signal, onProgress } = options
     const tempFiles = new Set<string>()
 
     const progress = onProgress ?? ((): void => {})
@@ -121,6 +302,24 @@ export class LocalWhisperService {
           errorCode: ErrorCode.TRANSCRIPTION_CANCELLED
         }
       }
+
+      // Pre-flight CPU probe — fast-fail on pre-SSE4.2 CPUs BEFORE we
+      // download ~200 MB of binary + model only to SIGILL on first inference.
+      // Runtime SIGILL handler in `runWhisper()` is the final safety net;
+      // this check catches the common cases up front.
+      const cpu = checkCpuSupport()
+      if (!cpu.ok) {
+        return {
+          success: false,
+          error: cpu.reason,
+          errorCode: ErrorCode.WHISPER_CPU_UNSUPPORTED
+        }
+      }
+
+      // Argv hardening — reject UNC paths, Windows reserved names, NTFS ADS
+      // colons; canonicalise via fs.realpath so we execute ffmpeg/whisper
+      // against the ACTUAL target file and not a symlink / name-mangled alias.
+      const filePath = await validateAudioPath(options.filePath)
 
       progress({ percent: 0, phase: 'Preparing' })
 
@@ -524,7 +723,7 @@ export class LocalWhisperService {
    * Parses progress from stderr and reads the output text file
    * that whisper.cpp produces with the -otxt flag.
    */
-  private runWhisper(
+  private async runWhisper(
     audioPath: string,
     binaryPath: string,
     modelPath: string,
@@ -532,6 +731,33 @@ export class LocalWhisperService {
     onWhisperProgress: (percent: number) => void,
     signal?: AbortSignal
   ): Promise<string> {
+    // TOCTOU close: re-verify pinned binary + sidecars immediately before
+    // every spawn. `{userData}/whisper/bin/` is user-writable, so an attacker
+    // with local write access could swap the binary between install-time
+    // verification and spawn-time execution. Hashing 2.3 MB (binary + 4 DLLs
+    // on Windows) is <50 ms on modern hardware — acceptable per-chunk.
+    const verified = await this.modelManager.verifyInstalledBinary()
+
+    // Forensic-logging shape, spawn-path half of the 7-tuple the plan commits
+    // to (install-time keys `url` + `expectedSha` are logged separately in
+    // `WhisperModelManager.ensureBinary`; keeping install-time keys off the
+    // spawn log avoids echoing URLs on every chunk of a chunked transcription).
+    //   - `spawnedPath` — absolute path we're about to exec
+    //   - `computedSha` — fresh SHA re-hashed by verifyInstalledBinary
+    //   - `signatureValid: true` is implicit (we wouldn't be here otherwise)
+    //   - `manifestRevision` — which release-revision the binary came from
+    //   - `binaryVersion` — pinned filename (proxy; the real version string
+    //     would require `whisper-cli --version` on every spawn, which is
+    //     wasteful — the filename is sufficient forensic attribution since
+    //     it's SHA-locked to a single release).
+    logger.info('Whisper spawn', {
+      spawnedPath: binaryPath,
+      computedSha: verified.mainSha,
+      signatureValid: true,
+      manifestRevision: verified.revisionIndex,
+      binaryVersion: verified.spec.files.main.filename
+    })
+
     return new Promise<string>((resolve, reject) => {
       const args = [
         '-m', modelPath,
@@ -541,10 +767,16 @@ export class LocalWhisperService {
         '-f', audioPath
       ]
 
-      logger.debug('Spawning whisper-cli', { binaryPath, args })
+      // DLL sideload mitigation: set cwd to the bin dir on Windows so
+      // LoadLibrary prefers our pinned DLLs over anything elsewhere on PATH.
+      // Harmless on macOS (dylib loading uses @rpath, not cwd).
+      const spawnCwd = process.platform === 'win32' ? dirname(binaryPath) : undefined
+
+      logger.debug('Spawning whisper-cli', { binaryPath, args, cwd: spawnCwd })
 
       const child = spawn(binaryPath, args, {
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['ignore', 'pipe', 'pipe'],
+        cwd: spawnCwd
       })
 
       let stderr = ''
@@ -585,7 +817,16 @@ export class LocalWhisperService {
       child.on('close', async (code) => {
         if (settled) return
 
+        // Partially-written .txt from -otxt can linger if the process died
+        // abruptly (cancel on Windows = TerminateProcess = no graceful
+        // shutdown). Best-effort delete on any non-success path.
+        const outputTxtPath = `${audioPath}.txt`
+        const cleanupOrphan = async (): Promise<void> => {
+          try { await unlink(outputTxtPath) } catch { /* ENOENT ok */ }
+        }
+
         if (signal?.aborted) {
+          await cleanupOrphan()
           settle(reject, new AppError(
             'Transcription was cancelled',
             ErrorCode.TRANSCRIPTION_CANCELLED
@@ -594,6 +835,18 @@ export class LocalWhisperService {
         }
 
         if (code !== 0) {
+          await cleanupOrphan()
+          const unsupportedCpu =
+            process.platform === 'win32'
+              ? code !== null && WIN32_CPU_UNSUPPORTED_EXIT_CODES.has(code >>> 0)
+              : code !== null && POSIX_CPU_UNSUPPORTED_EXIT_CODES.has(code)
+          if (unsupportedCpu) {
+            settle(reject, new AppError(
+              `Whisper crashed with SIGILL/STATUS_ILLEGAL_INSTRUCTION (exit ${code}) — CPU lacks required instruction-set features`,
+              ErrorCode.WHISPER_CPU_UNSUPPORTED
+            ))
+            return
+          }
           const detail = stderr.slice(-500).trim()
           settle(reject, new AppError(
             `Whisper process exited with code ${code}: ${detail}`,
@@ -602,12 +855,8 @@ export class LocalWhisperService {
           return
         }
 
-        // whisper.cpp with -otxt creates a .txt file next to the input
-        const outputTxtPath = `${audioPath}.txt`
-
         try {
           const text = await readFile(outputTxtPath, 'utf-8')
-          // Clean up the output file
           await unlink(outputTxtPath).catch(() => {})
           settle(resolve, text.trim())
         } catch {

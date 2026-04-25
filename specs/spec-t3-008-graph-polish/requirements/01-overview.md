@@ -1,5 +1,7 @@
 # Overview
 
+> 📐 **Design context**: historical design exploration lives at [`docs/future/graph-engine/`](../../../docs/future/graph-engine/) — production-readiness checklist, performance notes, Mermaid visualization. This spec is the authoritative requirement source.
+
 ## Summary
 
 Graph Engine Polish & Maintenance (Spec #008) delivers production-ready features for the Graph Engine ecosystem, including Mermaid diagram visualization of entity neighborhoods, comprehensive reindex/reembed user experience with progress tracking, safe model migration for switching embedding models, binary quantization for large datasets exceeding 100K documents, and monitoring/health checks for database integrity, worker status, and disk space.

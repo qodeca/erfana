@@ -18,6 +18,7 @@ import {
   createRenameSuccessMessage,
   stripIpcErrorPrefix,
   isAlreadyExistsError,
+  isInvalidFilenameError,
   formatCreateFileError,
   formatCreateFolderError,
   formatDeleteError,
@@ -208,6 +209,44 @@ describe('useFileOperations.logic', () => {
     it('should be case-sensitive', () => {
       expect(isAlreadyExistsError('Already Exists')).toBe(false)
       expect(isAlreadyExistsError('file already exists')).toBe(true)
+    })
+  })
+
+  describe('isInvalidFilenameError (#161)', () => {
+    it('detects the canonical phrase from main-process AppError', () => {
+      expect(
+        isInvalidFilenameError('"CON.md" is not a valid filename — try "_CON.md"'),
+      ).toBe(true)
+    })
+
+    it('returns false for unrelated errors', () => {
+      expect(isInvalidFilenameError('Permission denied')).toBe(false)
+      expect(isInvalidFilenameError('File already exists')).toBe(false)
+    })
+
+    it('detects the phrase even after IPC prefix stripping', () => {
+      const raw = 'Error invoking remote method \'file:createFile\': Error: "CON.md" is not a valid filename — try "_CON.md"'
+      const stripped = stripIpcErrorPrefix(raw)
+      expect(isInvalidFilenameError(stripped)).toBe(true)
+    })
+  })
+
+  describe('formatCreateFileError #161 invalid-filename branch', () => {
+    it('surfaces the structured AppError message verbatim for reserved names', () => {
+      const error = new Error('Error invoking remote method: Error: "CON.md" is not a valid filename — try "_CON.md"')
+      expect(formatCreateFileError(error)).toBe('"CON.md" is not a valid filename — try "_CON.md"')
+    })
+
+    it('surfaces the structured message for forbidden characters', () => {
+      const error = new Error('Error invoking remote method: Error: "foo:bar" is not a valid filename — remove the characters < > : " / \\ | ? *')
+      expect(formatCreateFileError(error)).toContain('"foo:bar" is not a valid filename')
+    })
+  })
+
+  describe('formatCreateFolderError #161 invalid-filename branch', () => {
+    it('surfaces the structured AppError message verbatim for reserved names', () => {
+      const error = new Error('Error invoking remote method: Error: "PRN" is not a valid filename — try "_PRN"')
+      expect(formatCreateFolderError(error)).toBe('"PRN" is not a valid filename — try "_PRN"')
     })
   })
 

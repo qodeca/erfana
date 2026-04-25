@@ -318,29 +318,21 @@ export function useTerminalFileLinks(
           // Get CWD for relative path resolution
           const cwd = await fetchCwd()
 
-          // Convert matches to ILinks
-          const links: ILink[] = []
-
-          for (const match of matches) {
-            // Resolve relative paths
-            let resolvedPath = match.path
-            if (!match.path.startsWith('/') && !match.path.match(/^[A-Za-z]:/)) {
-              // Relative path - resolve against CWD or project root
-              resolvedPath = resolvePath(match.path, cwd || '', projectRoot || '')
-            }
-
-            // Normalize the path
-            resolvedPath = normalizePath(resolvedPath)
-
-            // Try smart resolution (includes exact path validation as first step)
+          // Resolve a candidate path via smart resolution (with file tree) or simple validation
+          const tryResolveCandidate = async (
+            candidatePath: string
+          ): Promise<{
+            finalPath: string | null
+            wasSmartResolved: boolean
+            pendingCandidates: PathScore[] | null
+          }> => {
             let finalPath: string | null = null
             let wasSmartResolved = false
             let pendingCandidates: PathScore[] | null = null
 
-            // Use smart resolution if files are available
             if (files.length > 0) {
               const smartResult: SmartResolutionResult = await resolvePathSmart({
-                path: resolvedPath,
+                path: candidatePath,
                 cwd,
                 projectRoot,
                 index: getIndex(),
@@ -353,23 +345,60 @@ export function useTerminalFileLinks(
 
               if (smartResult.status === 'exact') {
                 finalPath = smartResult.resolvedPath!
-                wasSmartResolved = false
               } else if (smartResult.status === 'single-match') {
                 finalPath = smartResult.resolvedPath!
                 wasSmartResolved = true
               } else if (smartResult.status === 'multiple-matches') {
-                // Store candidates for picker - will be shown on click
                 pendingCandidates = smartResult.candidates!
-                // Use the best-ranked candidate as default
                 finalPath = smartResult.candidates![0].path
                 wasSmartResolved = true
               }
-              // status === 'no-match' leaves finalPath as null
             } else {
-              // Fallback to simple validation (original behavior)
-              const validation = await validatePath(resolvedPath)
+              const validation = await validatePath(candidatePath)
               if (validation.exists) {
-                finalPath = validation.absolutePath || resolvedPath
+                finalPath = validation.absolutePath || candidatePath
+              }
+            }
+
+            return { finalPath, wasSmartResolved, pendingCandidates }
+          }
+
+          // Convert matches to ILinks
+          const links: ILink[] = []
+
+          for (const match of matches) {
+            // Strip @-prefix from file references (e.g., @/path or @src/path from Claude Code CLI)
+            // Keep original path for fallback (e.g., @types/node/index.d.ts is a valid npm scope)
+            const hasAtPrefix = match.path.startsWith('@')
+            const strippedPath = hasAtPrefix ? match.path.slice(1) : match.path
+
+            // Resolve relative paths
+            let resolvedPath = strippedPath
+            if (!strippedPath.startsWith('/') && !strippedPath.match(/^[A-Za-z]:/)) {
+              // Relative path - resolve against CWD or project root
+              resolvedPath = resolvePath(strippedPath, cwd || '', projectRoot || '')
+            }
+
+            // Normalize the path
+            resolvedPath = normalizePath(resolvedPath)
+
+            // Try smart resolution (includes exact path validation as first step)
+            const { finalPath: resolvedFinalPath, wasSmartResolved, pendingCandidates } =
+              await tryResolveCandidate(resolvedPath)
+            let finalPath = resolvedFinalPath
+
+            // For @-prefixed paths, try the original path with @ if stripped version failed
+            // This handles npm scoped packages like @types/node/index.d.ts
+            if (!finalPath && hasAtPrefix) {
+              let originalResolvedPath = match.path
+              if (!match.path.startsWith('/') && !match.path.match(/^[A-Za-z]:/)) {
+                originalResolvedPath = resolvePath(match.path, cwd || '', projectRoot || '')
+              }
+              originalResolvedPath = normalizePath(originalResolvedPath)
+
+              const fallbackValidation = await validatePath(originalResolvedPath)
+              if (fallbackValidation.exists) {
+                finalPath = fallbackValidation.absolutePath || originalResolvedPath
               }
             }
 
@@ -391,7 +420,7 @@ export function useTerminalFileLinks(
                 start: rangeStart,
                 end: rangeEnd
               },
-              text: match.fullMatch,
+              text: match.fullMatch, // includes @ prefix intentionally – shows CLI tool reference context
               decorations: wasSmartResolved ? SMART_LINK_DECORATIONS : undefined,
               activate: async () => {
                 // If multiple candidates and picker available, show picker

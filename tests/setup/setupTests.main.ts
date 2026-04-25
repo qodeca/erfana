@@ -9,6 +9,12 @@ import { rm } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import { afterAll } from 'vitest'
+import { installFlakeGuard } from './flakeGuard'
+
+// Surface intermittent unhandled rejections / uncaught exceptions firing
+// after teardown (e.g. async `worker_threads` cleanup races, leaked
+// `setTimeout` from production code). See `flakeGuard.ts` for rationale.
+installFlakeGuard('main')
 
 afterAll(async () => {
   try {

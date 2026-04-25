@@ -1,5 +1,7 @@
 # Overview
 
+> 📐 **Design context**: historical design exploration lives at [`docs/future/graph-engine/`](../../../docs/future/graph-engine/) — ONNX worker pipelines, embedding architecture, vector search internals. This spec is the authoritative requirement source.
+
 ## Summary
 
 Vector Search & Hybrid Retrieval extends the Graph Engine with semantic search capabilities through vector embeddings. This feature enables finding conceptually related content even when exact keywords differ, by computing similarity between document embeddings using the all-MiniLM-L6-v2 model and sqlite-vec extension.

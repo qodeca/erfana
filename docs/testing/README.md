@@ -22,7 +22,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 #### Key test areas
 
-Run `npm run test` for current totals (~7,335 tests across 237 files as of v0.9.0).
+Run `npm run test` for current totals (~7,955 tests across 250 files as of v0.9.4 on macOS — 78 cases platform-gate on Windows (77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`), so Windows sees 7,877 pass / 78 skip and Linux sees 7,954 pass / 1 skip; invariant total stays 7,955. The Phase-2 UAT hardening merged in v0.9.3 added `WindowsTerminalBootstrap.test.ts` with 60 strategy-layer unit tests; v0.9.4 added Phase 4 whisper trust-chain tests and the D12 `WhisperModelManager.test.ts` rewrite).
 
 | Area | Key files | Docs |
 |------|-----------|------|
@@ -32,7 +32,7 @@ Run `npm run test` for current totals (~7,335 tests across 237 files as of v0.9.
 | Transcription pipeline | Tests across `main/`, `renderer/`, `shared/` (spec 009) | [Transcription CLAUDE.md](../../src/renderer/src/components/Transcription/CLAUDE.md) |
 | Document import | `LiteParseConverter.test.ts`, `DependencyDetector.test.ts`, `DocumentImportDialog.test.tsx`, `useDocumentImportStore.test.ts`, `import-handlers*.test.ts`, `LiteParseConverter.integration.test.ts` | [API services – features](../api-services-features.md) |
 | ProjectTree & watchers | `*.logic.test.ts`, `*.pipeline.test.ts`, `*.switching.test.ts` | [Architecture – ProjectTree](../architecture.md#projecttree-modularization) |
-| Local whisper | `LocalWhisperService.test.ts`, `WhisperModelManager.test.ts` | [API services – features](../api-services-features.md) |
+| Local whisper (Phase 4) | `LocalWhisperService.test.ts`, `WhisperModelManager.test.ts`, `WhisperModelManager.downgrade.test.ts` + utility tests (`zipArchive`, `tarArchive`, `secureDownloader`, `verifyManifest`) | [Phase 4 test inventory](../windows/implementation-plan.md#phase-4-test-inventory) · [Trust chain](../windows/whisper-trust-chain.md) · [API services – features](../api-services-features.md) |
 | Settings overlay | `SettingsOverlay.test.tsx` | [Settings](../settings.md) |
 
 **Testing patterns used**:
@@ -40,6 +40,13 @@ Run `npm run test` for current totals (~7,335 tests across 237 files as of v0.9.
 - Factory functions for test data (`__test-utils__/`)
 - jsdom + portal-root for modal/dialog component tests
 - Mock `window.api` and `navigator.clipboard` for IPC/clipboard operations
+- **`flakeGuard`** (`tests/setup/flakeGuard.ts`) — installed in all 3 setup files; surfaces unhandled rejections / uncaught exceptions firing post-teardown with full stack trace + scope label. If you see `[flakeGuard:<scope>] UNHANDLED REJECTION:` in stderr, fix the source (track + cancel the timer/promise on unmount, same pattern as #159)
+- **Platform overrides** in tests use `Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })` + restore in `afterEach` (NOT `describe.runIf` — that gates by host platform and skips on macOS CI)
+- **Cross-platform paths** in test fixtures use `path.join(os.tmpdir(), 'erfana-test', ...)` (per #157) — hardcoded `/tmp/...` or `/path/to/...` strings break Windows `PATH_TRAVERSAL` validation
+- **Test-file split policy** (when to split `<Source>.test.ts` into a second file) — see [`../windows/contributing.md`](../windows/contributing.md) §"Test-file split policy". Reference implementations: `WhisperModelManager.downgrade.test.ts` + `FileService.copyItem.limit.test.ts`. Rule: split when mocks hoist to module scope; keep in-file when fakes are per-describe-scoped
+- **Windows-host flake register** — see [`../windows/known-flakes.md`](../windows/known-flakes.md) for symptom catalog, status, and remediation patterns (fake timers, mocked-fs splits, per-platform e2e budgets, offset-deque)
+- **Crypto fixture pattern** — `verifyManifest.test.ts` uses a real published manifest + signature as fixture. Don't synthesise test manifests with test keypairs; refresh the fixture when the whisper pin advances. See [ADR 0002](../adrs/0002-minisign-over-cosign-sigstore.md)
+- **CPU probe mocking** — simulate pre-SSE4.2 CPUs in UI tests via `vi.spyOn(os, 'cpus').mockReturnValue([...])` + `__resetCpuProbeForTests()` before import. Pattern lives in `LocalWhisperService.test.ts` `describe('checkCpuSupport() pre-flight probe')`
 
 ---
 
@@ -49,14 +56,16 @@ Run `npm run test` for current totals (~7,335 tests across 237 files as of v0.9.
 
 - Playwright setup and configuration for Electron (two projects: `electron` functional, `visual` regression)
 - Testing patterns for third-party components (Monaco, xterm.js, Mermaid)
-- Complete selector catalog (211 testids) – see [e2e-selectors.md](./e2e-selectors.md)
+- Complete selector catalog (225 testids) – see [e2e-selectors.md](./e2e-selectors.md)
 - Test helper utilities documentation
 - Troubleshooting guide
 
+**CI runs only `--project=electron`** — visual suite is local-only until the `macos-latest` `waitForLoadState` hang is root-caused. See [docs/ci.md](../ci.md) for the full CI pipeline map.
+
 **Commands**:
 ```bash
-npm run test:e2e                   # Functional E2E tests (electron project)
-npm run test:e2e:visual            # Visual regression tests (visual project)
+npm run test:e2e                   # Functional E2E tests (electron project) – same as CI
+npm run test:e2e:visual            # Visual regression tests (visual project) – local only
 npm run test:e2e:update-screenshots  # Update visual baselines
 ```
 

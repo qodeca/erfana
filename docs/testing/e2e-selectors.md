@@ -1,6 +1,6 @@
 # E2E selector catalog
 
-All `data-testid` attributes available for E2E testing – **211 testids** across 28 sections.
+All `data-testid` attributes available for E2E testing – **225 testids** across 33 sections.
 
 **Related documentation**:
 - [E2E Testing Guide](./e2e-testing.md) – Main E2E documentation
@@ -388,7 +388,7 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Settings overlay (18 testids)
+## Settings overlay (20 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -402,6 +402,8 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 | `settings-toggle-polling` | Git polling toggle | static |
 | `settings-select-polling-interval` | Polling interval select | static |
 | `settings-select-log-level` | Log level select | static |
+| `settings-logs-folder-path` | Logs folder path display | static |
+| `settings-btn-open-logs` | Open logs folder button | static |
 | `settings-section-transcription` | Transcription settings section | static |
 | `settings-select-transcription-backend` | Backend selector | static |
 | `settings-input-api-key` | API key input | static |
@@ -410,6 +412,25 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 | `settings-btn-whisper-model` | Whisper model download/status | static |
 | `settings-whisper-model-status` | Whisper model status text | static |
 | `settings-whisper-download-error` | Whisper download error | static |
+
+---
+
+## Document import dialog (12 testids)
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `doc-import-dialog` | Dialog container | static |
+| `doc-import-file-info` | File info display area | static |
+| `doc-import-ocr-toggle` | OCR toggle checkbox | static |
+| `doc-import-language-select` | OCR language select dropdown | static |
+| `doc-import-screenshots-toggle` | Screenshots toggle checkbox | static |
+| `doc-import-dpi-select` | DPI select dropdown | static |
+| `doc-import-btn-start` | Start import button | static |
+| `doc-import-btn-cancel` | Cancel button | static |
+| `doc-import-btn-retry` | Retry button (on error) | static |
+| `doc-import-btn-done` | Done button (on success) | static |
+| `doc-import-progress` | Progress section container | static |
+| `doc-import-phase-text` | Phase text display | static |
 
 ---
 

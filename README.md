@@ -2,6 +2,10 @@
 
 An Electron-based project workspace focused on markdown editing, a project tree, and an integrated terminal.
 
+> **Version:** 0.9.5 ([changelog](docs/CHANGELOG.md)) · **Documentation:** [docs/](docs/README.md) · **Architecture:** [docs/architecture.md](docs/architecture.md)
+>
+> **Windows enablement:** Phases 0–2 originally shipped in **v0.9.3** (merged from the `windows` branch on 2026-04-22). Erfana now installs, runs, builds, and passes the full test matrix on Windows 11 Pro. See [`docs/windows/README.md`](docs/windows/README.md) for roadmap status, and [Windows known issues](docs/known-issues.md#windows-specific-issues) for current gaps (screenshots, local Whisper, code-signing — tracked under [#164–#167](https://github.com/qodeca/erfana/issues?q=label%3Awindows)).
+
 ## Features
 
 - 🎨 **Multi-Panel IDE Layout**: Hybrid SplitviewReact + DockviewReact with resizable panels
@@ -25,8 +29,10 @@ An Electron-based project workspace focused on markdown editing, a project tree,
 
 ### Prerequisites
 
-- Node.js 18+ (with npm or pnpm)
+- Node.js 24+ (Electron 39 bundles Node 22.20.0; build toolchain needs 24+)
+- Python 3.12 (**not 3.13** — `node-pty` fails to build on 3.13)
 - Git
+- **On Windows**: VS 2022 Build Tools, Developer Mode enabled, Win32 long paths enabled. See [`docs/build/windows.md`](docs/build/windows.md) for full setup.
 
 ### Setup
 
@@ -106,10 +112,7 @@ erfana/
 6. File references include precise line numbers for context
 
 ### 2. Terminal Usage
-Open the Terminal panel from the right activity bar to run shell commands in the project context.
-5. Toggle Planning Mode for safe exploration (read-only tools only)
-6. Tool approval system for security-sensitive operations
-7. Conversation history preserved across session restarts
+Open the Terminal panel from the right activity bar to run shell commands in the project context. cmd.exe / PowerShell / pwsh 7 + POSIX shells supported (Phase 1 #154).
 
 ### 3. Markdown Editing
 1. Open markdown files in Monaco editor
@@ -134,6 +137,25 @@ Open the Terminal panel from the right activity bar to run shell commands in the
 - Secure IPC via contextBridge
 - Content Security Policy (CSP) headers
 - Input validation on all IPC channels
+
+Details: [`docs/security.md`](docs/security.md). Release-artifact trust chain (minisign-signed `SHA256SUMS`, macOS notarization, Windows Azure Artifact Signing): [`docs/build/release.md`](docs/build/release.md).
+
+## Release verification
+
+Every release on or after `v0.9.5` ships signed artifacts. End users should verify downloads before installing:
+
+```bash
+# Linux integrity + aggregate minisign signature (accept PRIMARY or ROTATION key)
+PRIMARY="RWRGVoSZhM7rShmOHr5lmt6v6wH8Tjm/nXItCg46Co+hxgvJFLWkv0fC"
+ROTATION="RWTxkJcmBbLk6J2eWEDWHYcAmgpKfRqO5PR8oRRLUpgn5rgCaWmTvd9w"
+minisign -V -P "$PRIMARY"  -m SHA256SUMS -x SHA256SUMS.minisig \
+  || minisign -V -P "$ROTATION" -m SHA256SUMS -x SHA256SUMS.minisig
+sha256sum -c SHA256SUMS
+```
+
+The dedicated release-signing minisign public keys (primary + rotation) are published at [`docs/release-pubkey.txt`](docs/release-pubkey.txt) and mirrored in [`docs/security.md § Release signing`](docs/security.md#release-signing-v095-174). These keys are **separate** from the `whisper-binaries` key — compromising one does not weaken the other.
+
+> **Note on SLSA provenance:** GitHub-hosted Artifact Attestations (SLSA Build L2) are [only available on Enterprise Cloud for private repositories](https://docs.github.com/en/actions/concepts/security/artifact-attestations). Erfana's trust chain relies on minisign (Linux aggregate) + codesign-notarization (macOS) + Authenticode (Windows) instead; these provide equivalent authenticity guarantees without the Enterprise plan.
 
 ## License
 

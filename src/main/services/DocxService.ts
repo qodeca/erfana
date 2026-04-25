@@ -5,6 +5,7 @@ import { ErrorCode } from '../../shared/errors'
 import type { DocxExportResponse } from '../../shared/ipc/docx-schema'
 import { htmlToDocxConverter } from './HtmlToDocxConverter'
 import { logger } from './LoggingService'
+import { deriveSafeFilename } from '../utils/validateFilename'
 
 // ============================================================================
 // Value Objects
@@ -206,41 +207,18 @@ class DocxService implements IDocxService {
   }
 
   /**
-   * Windows reserved filenames that cannot be used
-   * See: https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file
-   */
-  private static readonly WINDOWS_RESERVED_NAMES = new Set([
-    'CON', 'PRN', 'AUX', 'NUL',
-    'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
-    'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'
-  ])
-
-  /**
-   * Sanitize filename for filesystem
+   * Sanitize filename for filesystem. Delegates to the shared
+   * `deriveSafeFilename` util (see #161) with `''` as fallback so the
+   * existing `sanitized || DOCX_EXPORT.DEFAULT_FILENAME` pattern at
+   * line ~185 still applies the DOCX-specific default. DocxService applies
+   * an additional 200-char truncation (`MAX_FILENAME_LENGTH`) to leave
+   * headroom for the `.docx` extension and OS path-length constraints.
    */
   private sanitizeFilename(name: string): string {
-    // Remove or replace invalid characters
-    let sanitized = name
-      .replace(/[<>:"/\\|?*]/g, '-') // Invalid on Windows
-      // eslint-disable-next-line no-control-regex
-      .replace(/[\x00-\x1f]/g, '') // Control characters (C0 control codes)
-      .replace(/^\.+/, '') // Leading dots (hidden files on Unix, problematic on Windows)
-      .replace(/\.+$/, '') // Trailing dots (Windows strips them)
-      .replace(/\s+$/, '') // Trailing spaces (Windows strips them)
-      .trim()
-
-    // Check for Windows reserved names (case-insensitive, with or without extension)
-    const baseName = sanitized.split('.')[0].toUpperCase()
-    if (DocxService.WINDOWS_RESERVED_NAMES.has(baseName)) {
-      sanitized = `_${sanitized}`
-    }
-
-    // Truncate if too long
-    if (sanitized.length > DocxService.MAX_FILENAME_LENGTH) {
-      sanitized = sanitized.substring(0, DocxService.MAX_FILENAME_LENGTH)
-    }
-
-    return sanitized
+    const safe = deriveSafeFilename(name, '')
+    return safe.length > DocxService.MAX_FILENAME_LENGTH
+      ? safe.substring(0, DocxService.MAX_FILENAME_LENGTH)
+      : safe
   }
 }
 

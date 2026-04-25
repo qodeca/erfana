@@ -30,9 +30,10 @@ vi.mock('fs/promises', () => ({
 // Mock os
 // =============================================================================
 
-vi.mock('os', () => ({
-  tmpdir: () => '/tmp'
-}))
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>()
+  return { ...actual }
+})
 
 // =============================================================================
 // Mock ApiKeyService
@@ -303,7 +304,7 @@ describe('TranscriptionService', () => {
       // Should have written 2 temp files
       expect(mockWriteFile).toHaveBeenCalledTimes(2)
       for (const call of mockWriteFile.mock.calls) {
-        expect(call[0]).toMatch(/\/tmp\/erfana-transcription-chunk-/)
+        expect(call[0]).toMatch(/erfana-transcription-chunk-/)
       }
 
       // Should have cleaned up 2 temp files

@@ -3,7 +3,7 @@
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
 - **Repository**: `qodeca/erfana` (GitHub)
-- **Version**: 0.9.0
+- **Version**: 0.9.4
 - **Tech Stack**: Electron 39, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Build Toolchain**: electron-vite 5, Vite 6, vitest 3
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
@@ -38,9 +38,9 @@ resources/
 └── tessdata/       # Pre-bundled Tesseract OCR language data (eng.traineddata)
 src/
 ├── main/           # Electron main process
-│   ├── services/   # Core: FileService, TerminalService, ProjectService, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService, GitStatusWorkerAdapter, GitStatusCircuitBreaker, GitStatusStrategySelector; Watchers: DirectoryWatcherService, FileWatcherService; Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media: ScreenshotService, CameraService, DocxService, TranscriptionService, LocalWhisperService, WhisperModelManager, AudioMetadataService, AudioExtractionService, ApiKeyService; Import: LiteParseConverter, DependencyDetector; Multi-instance: ProjectLockService, ExternalFileService; Subdirs: import/, watcher/, workers/
+│   ├── services/   # Core: FileService, TerminalService, ProjectService, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService, GitStatusWorkerAdapter, GitStatusCircuitBreaker, GitStatusStrategySelector; Watchers: DirectoryWatcherService, FileWatcherService; Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media: ScreenshotService, CameraService, DocxService, TranscriptionService, LocalWhisperService, WhisperModelManager, whisper-assets (pinned release + classifyPlatform), whisper-pubkeys (dual minisign keys), AudioMetadataService, AudioExtractionService, ApiKeyService; Import: LiteParseConverter, DependencyDetector; Multi-instance: ProjectLockService, ExternalFileService; Subdirs: import/, watcher/, workers/
 │   ├── ipc/        # IPC handlers
-│   └── utils/      # PauseController (pause/resume with safety timeout), RateLimitedLogger
+│   └── utils/      # PauseController (pause/resume with safety timeout), RateLimitedLogger; Phase 4 trust-chain: zipArchive (yauzl + assertSafeEntry), tarArchive (tar@7.4.0 filter), secureDownloader (hostname allowlist + streaming SHA-256), verifyManifest (minisign Ed25519 dual-key)
 ├── preload/        # Context bridge API
 ├── shared/         # Shared code (errors.ts, constants.ts, ipc schemas)
 └── renderer/       # React UI
@@ -53,7 +53,7 @@ src/
 ## Core Features
 1. **Markdown Editor** - Monaco with live preview, scroll sync, Mermaid diagrams (zoom, pan, full-screen viewer), YAML frontmatter rendering, preserve line breaks option, unified in-file search (Cmd/Ctrl+F), context menu with AI prompts
 2. **Project Tree** - File explorer with drag-drop reorganization, external file drop (move/copy/import), markdown filtering, context menu, real-time git status indicators with worker thread offloading (isomorphic-git + native git fallback), circuit breaker, polling fallback, manual refresh button (Cmd/Ctrl+Alt+R)
-3. **Terminal** - xterm.js with PTY backend, clipboard support, file links (multi-line: xterm-wrap joining + CLI-wrap joining for tool output), scroll recovery, auto-opens on project load, drag-drop file paths, bracketed paste mode for safe multi-line input, screenshot capture (macOS: screen/window/area selection with path pasted to terminal), camera photo capture (cross-platform: captures photo from webcam with path pasted to terminal)
+3. **Terminal** - xterm.js with PTY backend, clipboard support, file links (multi-line: xterm-wrap joining + CLI-wrap joining for tool output, @-prefixed paths from CLI tools, `:line-line` range notation), scroll recovery, auto-opens on project load, drag-drop file paths, bracketed paste mode for safe multi-line input, screenshot capture (macOS: screen/window/area selection with path pasted to terminal), camera photo capture (cross-platform: captures photo from webcam with path pasted to terminal)
 4. **Prompt Templates** - AI text operations via context menu (Explain, Modify, Ask, Visualize, diagram chat); Visualize generates Mermaid diagrams from selected text with dropdown for 22 diagram types
 5. **Project Settings** - Per-project configuration via `.erfana/settings.json` (watcher ignore, tree visibility)
 6. **PDF Export** - Export markdown to print-optimized PDF with vector Mermaid diagrams, A4 page size, print-friendly styling
@@ -63,23 +63,29 @@ src/
 10. **Quit Confirmation** - Prompts before quitting with unsaved changes or active terminal sessions
 11. **Multi-Instance** - Multiple independent instances with file-based project locking, duplicate opens focus existing window
 12. **Image Preview** - Viewer for PNG, JPG, GIF, WebP, SVG, BMP, ICO with zoom, pan, fit controls, keyboard shortcuts (arrow keys, +/-, Home, F for fullscreen), and full-screen mode
-13. **Media Transcription** - Import audio (MP3, WAV, M4A, OGG, FLAC) and video (MP4, MOV, AVI, MKV, WebM, FLV, WMV) files with dual backend transcription: OpenAI API (GPT-4o-transcribe primary, Whisper-1 fallback) or local whisper.cpp (offline, model selection: tiny/base/small/medium/large with download management), video audio extraction via ffmpeg (fluent-ffmpeg), file chunking for long recordings (>8 min), TranscriptionDialog with language selection (persists within session) and progress, pre-validation before dialog opens, batch import rejects media with toast, API key management via Electron safeStorage, video-specific frontmatter (type, resolution, video_codec), dynamic `transcription_backend` frontmatter, post-transcription auto-open of transcript file and organize-import prompt
+13. **Media Transcription** - Import audio (MP3, WAV, M4A, OGG, FLAC) and video (MP4, MOV, AVI, MKV, WebM, FLV, WMV) files with dual backend transcription: OpenAI API (GPT-4o-transcribe primary, Whisper-1 fallback) or local whisper.cpp (offline, model selection: tiny/base/small/medium/large with download management), video audio extraction via ffmpeg (fluent-ffmpeg), file chunking for long recordings (>8 min), TranscriptionDialog with language selection (persists within session) and progress, pre-validation before dialog opens, batch import rejects media with toast, API key management via Electron safeStorage, video-specific frontmatter (type, resolution, video_codec), dynamic `transcription_backend` frontmatter, post-transcription auto-open of transcript file and organize-import prompt. **Local whisper.cpp** (Phase 4, shipped in [v0.9.4](https://github.com/qodeca/erfana/releases/tag/v0.9.4), merge `110f1b9` 2026-04-23) ships on macOS (universal) + Windows x64 via self-hosted `whisper-build-*` release tags; trust chain = minisign-signed manifest (dual-pubkey) + artifact SHA-256 pin + pre-spawn re-hash (TOCTOU close) + monotonic `lastSeenRevision` downgrade block + pre-flight `checkCpuSupport()` + argv hardening (`validateAudioPath` — UNC / reserved names / NTFS ADS). Windows ARM64 unsupported (OpenAI API only).
 
 ## Documentation
 See `docs/` for details (keep Claude's context focused):
 - [Architecture](docs/architecture.md) — System design patterns, SOLID principles, DI
-- [Build](docs/build/README.md) — Build configuration, electron-builder, ASAR, fuses, troubleshooting
+- [Build](docs/build/README.md) — Build configuration, electron-builder, ASAR, fuses, troubleshooting, whisper-binaries CI ops runbook (self-hosted Phase 4 release flow)
+- [Release pipeline](docs/build/release.md) — Multi-platform release workflow (`.github/workflows/release.yml`: prepare → {build_linux, build_mac, build_win} → finalize → cleanup), secrets + rotation calendar, minisign verification, incident response (B.1 federated-cred cleanup, B.2 cert workstation-loss DR, B.3 PFX hygiene). Windows signs via Azure Artifact Signing **certificate auth** (X.509 against app registration — electron-builder 26 doesn't support OIDC). Skill entry: [`.claude/skills/releasing-erfana/SKILL.md`](.claude/skills/releasing-erfana/SKILL.md) with [`guides/troubleshooting.md`](.claude/skills/releasing-erfana/guides/troubleshooting.md) (typed-regex CI failure cookbook) + [`docs/release-incidents/`](docs/release-incidents/) (auto-appended incident memos). Supersedes the tag-only flow in [#174](https://github.com/qodeca/erfana/issues/174) (closed 2026-04-25). Dry-run [`24925269258`](https://github.com/qodeca/erfana/actions/runs/24925269258) validated all 5 jobs; **Phase I branch protection on `main` + protected `v*.*.*` tag ruleset (id 15540259) live**. `e2e` is intentionally excluded from required checks until stable.
 - [Security](docs/security.md) — Electron 39 security hardening, fuses, sandboxing, trade-offs
 - [Drag-Drop](docs/drag-drop/README.md) — VS Code-style file reorganization, visual feedback, validation
-- [Terminal](docs/terminal/README.md) — Bootstrap pattern, scroll fixes, clipboard, file links (CLI-wrap joining), drag-drop paths, screenshot capture (macOS), camera capture (cross-platform)
+- [Terminal](docs/terminal/README.md) — Bootstrap pattern, scroll fixes, clipboard, file links (CLI-wrap joining, @-prefix, :line-line range), drag-drop paths, screenshot capture (macOS), camera capture (cross-platform)
 - [Editor](docs/editor/README.md) — Monaco, preview, scroll sync, Mermaid diagrams
 - [File Watching](docs/file-watching/README.md) — Auto-refresh, recoverable ENOENT, session tokens, PauseController auto-resume
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
 - [Testing](docs/testing/README.md) — Workspace, E2E (POM), visual regression, coverage
+- [Continuous Integration](docs/ci.md) — GitHub Actions workflows (`checks.yml`, `e2e.yml`), retry patterns, visual-on-CI gap
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [API Services](docs/api-services.md) — Service APIs (Terminal, File, Settings, Watchers)
 - [API Services – Features](docs/api-services-features.md) — Feature service APIs (GitStatus worker architecture, GitWatcher, GitPolling, GitStatusWorkerAdapter, GitStatusCircuitBreaker, GitStatusStrategySelector, Camera, ProjectLock, ExternalFile, LiteParse, DependencyDetector, DOCX, Transcription, LocalWhisper, WhisperModelManager, AudioMetadata, AudioExtraction, ApiKey)
+- [Error Codes](docs/error-codes.md) — Project-wide `ErrorCode` enum index (~100 codes grouped by category; operator actions for whisper + transcription codes)
+- [ADRs](docs/adrs/README.md) — Architecture Decision Records. Current: 0001 self-host whisper binaries, 0002 minisign over cosign/Sigstore, 0003 dual-pubkey trust, 0004 per-spawn TOCTOU re-hash
+- [Whisper Trust Chain](docs/windows/whisper-trust-chain.md) — 4-layer client-side trust model with composition diagram + attacker model
+- [Whisper Support Runbook](docs/windows/whisper-support-runbook.md) — Operator playbook for `WHISPER_*` error codes with diagnostic trails + stuck-user procedures
 - [UI Components](docs/ui-components.md) — React component architecture, activity bars, panels
 - [Prompt Templates](docs/prompts/README.md) — AI prompt system, AutoExecute, template syntax
 - [Settings](docs/settings.md) — Settings overlay sections (Editor, Git, Logging, Transcription)
@@ -88,6 +94,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Technical Debt](docs/technical-debt.md) — Known debt items and improvement opportunities
 - [GitHub Issues Protocol](docs/claude-code/github-issues-protocol.md) — When/how Claude Code uses `gh` CLI
 - [Large-Project Performance](docs/large-project-performance-plan.md) — Implementation plan for #146–#151 (EMFILE, worker thread, diagnostics)
+- [Windows enablement](docs/windows/README.md) — Phases 0–2 shipped in **v0.9.3**. Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in **[v0.9.4](https://github.com/qodeca/erfana/releases/tag/v0.9.4)** (tag cut 2026-04-23; Windows installer produced, macOS + Linux follow on native hosts); Windows-host test-flake remediation pool ([#172](https://github.com/qodeca/erfana/issues/172)) + ThrottledWorker offset-deque refactor ([#173](https://github.com/qodeca/erfana/issues/173)) also shipped in v0.9.4. Phase 3 (screenshots) remains unstarted. Phase 3–6 work continues on `feature/windows-phase-<N>-*` branches off `develop`. Phase tracking: [#164](https://github.com/qodeca/erfana/issues/164) screenshots, [#165](https://github.com/qodeca/erfana/issues/165) Whisper (Phase 4, merged), [#166](https://github.com/qodeca/erfana/issues/166) distribution + signing (Phase 5 — will also sign Windows whisper binary), [#167](https://github.com/qodeca/erfana/issues/167) polish + CI guard. Deferred items D1–D12 tracked in [#168](https://github.com/qodeca/erfana/issues/168): D1-D8 in [`docs/windows/deferred-work.md`](docs/windows/deferred-work.md) (Phase 2 origin), D9-D12 in [`docs/windows/deferred-work-phase4.md`](docs/windows/deferred-work-phase4.md) (Phase 4 audit origin). Dependabot triage: [#169](https://github.com/qodeca/erfana/issues/169). **Windows test-flake register** at [`docs/windows/known-flakes.md`](docs/windows/known-flakes.md) catalogues symptom → status → remediation pattern (fake timers, mocked-fs split, per-platform e2e budget, offset-deque). Entry point: [`docs/windows/README.md`](docs/windows/README.md). Canonical phase roadmap + status: [`docs/windows/implementation-plan.md`](docs/windows/implementation-plan.md). Contributor workflow: [`docs/windows/contributing.md`](docs/windows/contributing.md). Whisper binary build runbook: [`docs/build/whisper-binaries.md`](docs/build/whisper-binaries.md). Windows-specific known issues: [`docs/known-issues.md` § Windows-specific issues](docs/known-issues.md#windows-specific-issues).
 - [Source Grounding](docs/future/source-grounding/README.md) — NotebookLM-style grounding research, gap analysis, strategy, implementation roadmap
 - [Roadmap](ROADMAP.md) — Implementation order for active specs with dependency analysis
 
@@ -141,6 +148,10 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 - `src/main/services/` - Backend services
 - `docs/` - Documentation files
 
+### Nested CLAUDE.md (component-specific patterns)
+- [`src/renderer/src/components/Dialog/CLAUDE.md`](src/renderer/src/components/Dialog/CLAUDE.md) - BaseDialog API, focus trap, ESC/backdrop handling
+- [`src/renderer/src/components/Transcription/CLAUDE.md`](src/renderer/src/components/Transcription/CLAUDE.md) - Dual-backend transcription (OpenAI + local whisper.cpp), IPC flow, store
+
 ## Testing
 - Unit/Integration: Vitest workspace across renderer, main, preload (see [docs/testing/README.md](docs/testing/README.md))
 - E2E: Playwright with Electron, Page Object Model pattern (see [docs/testing/e2e-testing.md](docs/testing/e2e-testing.md))
@@ -152,9 +163,18 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
   - Condition-based waits preferred over `waitForTimeout` – use `waitForPrompt()`, `waitForOutput()`, Playwright auto-waiting
   - Wait helpers in `e2e/utils/wait-helpers.ts`: `waitForIpcComplete` (race-safe IPC wait helper)
   - Shared locators in `e2e/utils/locators.ts`: `byTestId`, `byDynamicTestId`, `waitForTestId`, `waitForTestIdHidden`
-- Visual regression: Playwright `toHaveScreenshot()` for 5 UI states (welcome, editor, terminal, settings, confirm dialog); baselines in `e2e/screenshots/` with platform suffix; `--project=visual` in Playwright config
+- Visual regression: Playwright `toHaveScreenshot()` for 5 UI states (welcome, editor, terminal, settings, confirm dialog); baselines in `e2e/screenshots/` with platform suffix; `--project=visual` in Playwright config; **runs locally only** – `macos-latest` CI hangs at `waitForLoadState('domcontentloaded')` ([docs/ci.md § Visual regression on CI](docs/ci.md#visual-regression-on-ci))
 - E2E env vars: Some tests require API keys via `.env` file (see `.env.example`); tests skip gracefully if not set
 - Coverage: `npm run test:cov` (text + lcov + HTML under `coverage/<project>/`)
+- Windows-host flakes: catalogued in [`docs/windows/known-flakes.md`](docs/windows/known-flakes.md) with status legend + remediation-patterns cheat-sheet. Test-file split policy in [`docs/windows/contributing.md`](docs/windows/contributing.md) §"Test-file split policy" — split when mocks hoist to module scope (reference: `FileService.copyItem.limit.test.ts`, `WhisperModelManager.downgrade.test.ts`); keep in-file for per-describe `vi.useFakeTimers` (reference: `SettingsOverlay.test.tsx` Focus management)
+
+## Continuous Integration
+See [docs/ci.md](docs/ci.md) for the full pipeline map. Summary:
+- **`checks.yml`** (`.github/workflows/checks.yml`) — runs on **every push to any branch**. 4 parallel jobs on `ubuntu-latest`: `lint`, `typecheck`, `test` (~7,955 vitest across 250 files), `build` (`electron-vite build`). ~3 min wall-clock.
+- **`e2e.yml`** (`.github/workflows/e2e.yml`) — runs on push to `develop` + all PRs. `macos-latest`. Scoped to `--project=electron`; visual suite local-only.
+- **Every `npm ci` is wrapped in retry**: `npm ci || (sleep 10 && npm ci) || (sleep 20 && npm ci)` – handles transient ECONNRESET on GitHub runners.
+- **Concurrency cancellation** via `github.ref` — rapid pushes cancel in-flight runs on the same branch.
+- **Before pushing**, run the local equivalents (`npm run lint && npm run typecheck && npm run test:ci && npx electron-vite build`) to catch issues without CI minutes.
 
 ## Project Switching Safeguards
 - Unsaved editor prompt on open/close (Discard/Cancel)
@@ -166,6 +186,7 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 - Terminal initialization defers until panel is visible
 - Watchers increment session tokens on switch; stale events dropped
 - Project settings loaded and validated before project opens (invalid settings block load)
+- Autosave race condition prevention – three-layer defense in useFileWatcher: isSavingRef guard, content comparison (isEchoEvent with CRLF normalization), hasLocalChangesRef; post-save dirty re-detection in MarkdownEditorPanel checks Monaco buffer divergence (#124)
 
 ## IPC Contracts
 - Shared schemas/types: `src/shared/ipc/*.ts` (zod schemas)

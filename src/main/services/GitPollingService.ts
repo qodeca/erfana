@@ -93,6 +93,14 @@ export class GitPollingService {
   /** Mutex to prevent concurrent interval changes (Issue #74 review fix) */
   private intervalChangeInProgress: boolean = false
 
+  /**
+   * Latched when `.git/index` is missing, so we log the condition once per
+   * project instead of every poll interval. Cleared when the index reappears
+   * (e.g. user runs `git init` in-session) or when `start()` is called for a
+   * new project.
+   */
+  private missingIndexLogged: boolean = false
+
   /** Provider for last watcher event timestamp (injected) */
   private getLastWatcherEventTimestamp: TimestampProvider = () => null
 
@@ -135,6 +143,7 @@ export class GitPollingService {
     // Reset index tracking
     this.lastIndexMtime = 0
     this.lastIndexSize = 0
+    this.missingIndexLogged = false
 
     // Reset metrics
     this.metrics = {
@@ -384,6 +393,10 @@ export class GitPollingService {
     try {
       const indexStat = await stat(indexPath)
 
+      // Index reappeared (or existed all along) – allow future disappearances
+      // to log again instead of staying silent for the session.
+      this.missingIndexLogged = false
+
       if (indexStat.mtimeMs !== this.lastIndexMtime || indexStat.size !== this.lastIndexSize) {
         this.lastIndexMtime = indexStat.mtimeMs
         this.lastIndexSize = indexStat.size
@@ -392,6 +405,21 @@ export class GitPollingService {
 
       return false
     } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+
+      // ENOENT is the expected case for non-git folders. Log once at debug
+      // and stay silent for subsequent polls – polling is cheap and must keep
+      // running so we notice if the user later runs `git init`.
+      if (code === 'ENOENT') {
+        if (!this.missingIndexLogged) {
+          logger.debug('GitPollingService: .git/index not found (non-repo); polling silently', {
+            indexPath
+          })
+          this.missingIndexLogged = true
+        }
+        return false
+      }
+
       logger.warn('GitPollingService: Failed to stat .git/index', {
         indexPath,
         error: error instanceof Error ? error.message : String(error)

@@ -10,6 +10,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import os from 'os'
 import type { ChildProcess } from 'child_process'
 
 // =============================================================================
@@ -32,19 +33,26 @@ const mockReadFile = vi.fn()
 const mockUnlink = vi.fn()
 const mockStat = vi.fn()
 
+// `realpath` is mocked to act as an identity — the existing tests pass
+// fictional paths and the Phase 4 argv validator would otherwise trip on
+// them. Individual argv-validator tests override this.
+const mockRealpath = vi.fn((p: string) => Promise.resolve(p))
+
 vi.mock('fs/promises', () => ({
   readFile: (...args: unknown[]) => mockReadFile(...args),
   unlink: (...args: unknown[]) => mockUnlink(...args),
-  stat: (...args: unknown[]) => mockStat(...args)
+  stat: (...args: unknown[]) => mockStat(...args),
+  realpath: (...args: unknown[]) => mockRealpath(...(args as [string]))
 }))
 
 // =============================================================================
 // Mock os
 // =============================================================================
 
-vi.mock('os', () => ({
-  tmpdir: () => '/tmp'
-}))
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>()
+  return { ...actual }
+})
 
 // =============================================================================
 // Mock crypto
@@ -133,15 +141,18 @@ vi.mock('../../shared/errors', async () => {
 
 const mockEnsureBinary = vi.fn()
 const mockEnsureModel = vi.fn()
+const mockVerifyInstalledBinary = vi.fn()
 
 vi.mock('./WhisperModelManager', () => ({
   whisperModelManager: {
     ensureBinary: (...args: unknown[]) => mockEnsureBinary(...args),
-    ensureModel: (...args: unknown[]) => mockEnsureModel(...args)
+    ensureModel: (...args: unknown[]) => mockEnsureModel(...args),
+    verifyInstalledBinary: (...args: unknown[]) => mockVerifyInstalledBinary(...args)
   },
   createWhisperModelManager: () => ({
     ensureBinary: (...args: unknown[]) => mockEnsureBinary(...args),
-    ensureModel: (...args: unknown[]) => mockEnsureModel(...args)
+    ensureModel: (...args: unknown[]) => mockEnsureModel(...args),
+    verifyInstalledBinary: (...args: unknown[]) => mockVerifyInstalledBinary(...args)
   })
 }))
 
@@ -304,9 +315,26 @@ describe('LocalWhisperService', () => {
 
     mockEnsureBinary.mockResolvedValue('/userData/whisper/bin/whisper-cli')
     mockEnsureModel.mockResolvedValue('/userData/whisper/models/ggml-tiny.bin')
+    // `verifyInstalledBinary` returns the `VerifiedBinary` shape consumed
+    // by `LocalWhisperService.runWhisper` for the spawn-path forensic log.
+    mockVerifyInstalledBinary.mockResolvedValue({
+      spec: {
+        filename: 'whisper-test.tar.gz',
+        archiveFormat: 'tar.gz',
+        sha256: 'aabbcc',
+        sizeBytes: 1,
+        files: {
+          main: { filename: 'whisper-cli', sizeBytes: 1, sha256: 'aabbcc' },
+          sidecars: []
+        }
+      },
+      mainSha: 'aabbcc',
+      revisionIndex: 1
+    })
     mockReadFile.mockResolvedValue('Hello world transcription.')
     mockUnlink.mockResolvedValue(undefined)
     mockStat.mockResolvedValue({ size: 32_000 })
+    mockRealpath.mockImplementation((p: string) => Promise.resolve(p))
   })
 
   afterEach(() => {
@@ -325,7 +353,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       await service.transcribe({
@@ -346,7 +375,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       await service.transcribe({
@@ -369,6 +399,50 @@ describe('LocalWhisperService', () => {
       )
     })
 
+    it('emits forensic INFO log with {spawnedPath, computedSha, signatureValid, manifestRevision, binaryVersion} before spawning', async () => {
+      setupDualExecFileMock('0:01:00.00')
+      mockSpawn.mockImplementation(() => makeWhisperSpawnChild(0))
+      mockVerifyInstalledBinary.mockResolvedValueOnce({
+        spec: {
+          filename: 'whisper-macos-universal-v1.8.4-erfana1.tar.gz',
+          archiveFormat: 'tar.gz',
+          sha256: 'aabbcc',
+          sizeBytes: 1,
+          files: {
+            main: { filename: 'whisper-cli', sizeBytes: 1, sha256: 'ff6de29f7a5581bea65a87c2437aabc8' },
+            sidecars: []
+          }
+        },
+        mainSha: 'ff6de29f7a5581bea65a87c2437aabc8',
+        revisionIndex: 7
+      })
+
+      const { createLocalWhisperService } = await import('./LocalWhisperService')
+      const service = createLocalWhisperService({
+        ensureBinary: mockEnsureBinary,
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
+      } as never)
+
+      await service.transcribe({
+        filePath: '/audio/test.wav',
+        language: 'en',
+        model: 'tiny',
+        onProgress
+      })
+
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Whisper spawn',
+        expect.objectContaining({
+          spawnedPath: '/userData/whisper/bin/whisper-cli',
+          computedSha: 'ff6de29f7a5581bea65a87c2437aabc8',
+          signatureValid: true,
+          manifestRevision: 7,
+          binaryVersion: 'whisper-cli'
+        })
+      )
+    })
+
     it('reads output text file and returns transcript', async () => {
       setupDualExecFileMock('0:01:00.00')
       mockSpawn.mockImplementation(() => makeWhisperSpawnChild(0))
@@ -377,7 +451,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -399,7 +474,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -420,7 +496,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -441,7 +518,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -468,7 +546,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       await service.transcribe({
@@ -500,7 +579,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       await service.transcribe({
@@ -523,7 +603,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       await service.transcribe({
@@ -549,7 +630,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -572,7 +654,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -597,7 +680,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -620,7 +704,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -647,7 +732,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -674,7 +760,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -719,7 +806,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const transcribePromise = service.transcribe({
@@ -755,7 +843,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       await service.transcribe({
@@ -780,7 +869,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       await service.transcribe({
@@ -804,7 +894,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -833,7 +924,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -858,7 +950,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -883,7 +976,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       await service.transcribe({
@@ -895,7 +989,7 @@ describe('LocalWhisperService', () => {
 
       // Temp wav file should have been cleaned up
       expect(mockUnlink).toHaveBeenCalledWith(
-        expect.stringMatching(/\/tmp\/erfana-whisper-.+\.wav/)
+        expect.stringMatching(/erfana-whisper-.+\.wav/)
       )
     })
   })
@@ -918,7 +1012,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       await service.transcribe({
@@ -945,7 +1040,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -968,7 +1064,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       await service.transcribe({
@@ -990,7 +1087,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       await service.transcribe({
@@ -1028,7 +1126,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -1056,7 +1155,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       await service.transcribe({
@@ -1067,7 +1167,7 @@ describe('LocalWhisperService', () => {
       })
 
       expect(mockUnlink).toHaveBeenCalledWith(
-        expect.stringMatching(/\/tmp\/erfana-whisper-.+\.wav/)
+        expect.stringMatching(/erfana-whisper-.+\.wav/)
       )
     })
 
@@ -1078,7 +1178,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -1091,7 +1192,7 @@ describe('LocalWhisperService', () => {
       expect(result.success).toBe(false)
       // Temp wav should still be cleaned up
       expect(mockUnlink).toHaveBeenCalledWith(
-        expect.stringMatching(/\/tmp\/erfana-whisper-.+\.wav/)
+        expect.stringMatching(/erfana-whisper-.+\.wav/)
       )
     })
 
@@ -1106,7 +1207,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       // Should not throw despite cleanup failing
@@ -1127,7 +1229,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       await service.transcribe({
@@ -1159,7 +1262,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -1182,7 +1286,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -1211,7 +1316,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -1234,7 +1340,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       const result = await service.transcribe({
@@ -1265,7 +1372,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService, localWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       expect(service).not.toBe(localWhisperService)
@@ -1292,19 +1400,27 @@ describe('LocalWhisperService', () => {
       vi.doMock('fs/promises', () => ({
         readFile: (...args: unknown[]) => mockReadFile(...args),
         unlink: (...args: unknown[]) => mockUnlink(...args),
-        stat: (...args: unknown[]) => mockStat(...args)
+        stat: (...args: unknown[]) => mockStat(...args),
+        realpath: (...args: unknown[]) => mockRealpath(...(args as [string]))
       }))
-      vi.doMock('os', () => ({ tmpdir: () => '/tmp' }))
+      vi.doMock('os', () => ({
+        tmpdir: () => os.tmpdir(),
+        // Provide cpus() for the CPU probe — else the new `checkCpuSupport`
+        // call at the top of `transcribe()` throws `cpus is not a function`.
+        cpus: () => os.cpus()
+      }))
       vi.doMock('crypto', () => ({ randomUUID: () => `test-uuid-${uuidCounter++}` }))
       vi.doMock('./LoggingService', () => ({ logger: mockLogger }))
       vi.doMock('./WhisperModelManager', () => ({
         whisperModelManager: {
           ensureBinary: (...args: unknown[]) => mockEnsureBinary(...args),
-          ensureModel: (...args: unknown[]) => mockEnsureModel(...args)
+          ensureModel: (...args: unknown[]) => mockEnsureModel(...args),
+          verifyInstalledBinary: (...args: unknown[]) => mockVerifyInstalledBinary(...args)
         },
         createWhisperModelManager: () => ({
           ensureBinary: (...args: unknown[]) => mockEnsureBinary(...args),
-          ensureModel: (...args: unknown[]) => mockEnsureModel(...args)
+          ensureModel: (...args: unknown[]) => mockEnsureModel(...args),
+          verifyInstalledBinary: (...args: unknown[]) => mockVerifyInstalledBinary(...args)
         })
       }))
       vi.doMock('../../shared/constants', () => ({
@@ -1351,7 +1467,8 @@ describe('LocalWhisperService', () => {
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
         ensureBinary: mockEnsureBinary,
-        ensureModel: mockEnsureModel
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
       } as never)
 
       await service.transcribe({
@@ -1371,6 +1488,180 @@ describe('LocalWhisperService', () => {
         expect(call[0]).toContain('.asar.unpacked')
         expect(call[0]).not.toMatch(/\.asar\//)
       }
+    })
+  })
+
+  // ===========================================================================
+  // Argv hardening — validateAudioPath() (Phase 4 / #165)
+  // ===========================================================================
+
+  describe('validateAudioPath() argv hardening', () => {
+    it('rejects empty string', async () => {
+      const { validateAudioPath } = await import('./LocalWhisperService')
+      await expect(validateAudioPath('')).rejects.toMatchObject({
+        code: 'WHISPER_INVALID_PATH'
+      })
+    })
+
+    it('rejects UNC path with backslashes', async () => {
+      const { validateAudioPath } = await import('./LocalWhisperService')
+      await expect(
+        validateAudioPath('\\\\server\\share\\audio.wav')
+      ).rejects.toMatchObject({ code: 'WHISPER_INVALID_PATH' })
+    })
+
+    it('rejects UNC path with forward slashes', async () => {
+      const { validateAudioPath } = await import('./LocalWhisperService')
+      await expect(
+        validateAudioPath('//server/share/audio.wav')
+      ).rejects.toMatchObject({ code: 'WHISPER_INVALID_PATH' })
+    })
+
+    it('rejects NTFS alternate-data-stream colon in basename', async () => {
+      const { validateAudioPath } = await import('./LocalWhisperService')
+      await expect(
+        validateAudioPath('C:/audio/test.wav:evil')
+      ).rejects.toMatchObject({ code: 'WHISPER_INVALID_PATH' })
+    })
+
+    it('rejects Windows reserved device name (CON)', async () => {
+      const { validateAudioPath } = await import('./LocalWhisperService')
+      await expect(
+        validateAudioPath('/tmp/CON.wav')
+      ).rejects.toMatchObject({ code: 'WHISPER_INVALID_PATH' })
+    })
+
+    it('rejects Windows reserved device name with extension variant (COM1.wav)', async () => {
+      const { validateAudioPath } = await import('./LocalWhisperService')
+      await expect(
+        validateAudioPath('/tmp/COM1.wav')
+      ).rejects.toMatchObject({ code: 'WHISPER_INVALID_PATH' })
+    })
+
+    it('rejects Windows reserved device name case-insensitive (nul)', async () => {
+      const { validateAudioPath } = await import('./LocalWhisperService')
+      await expect(
+        validateAudioPath('/tmp/nul.wav')
+      ).rejects.toMatchObject({ code: 'WHISPER_INVALID_PATH' })
+    })
+
+    it('rejects when realpath throws (e.g. ENOENT)', async () => {
+      const { validateAudioPath } = await import('./LocalWhisperService')
+      mockRealpath.mockRejectedValueOnce(
+        Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+      )
+      await expect(
+        validateAudioPath('/tmp/missing.wav')
+      ).rejects.toMatchObject({ code: 'WHISPER_INVALID_PATH' })
+    })
+
+    it('returns canonical path when validation passes', async () => {
+      const { validateAudioPath } = await import('./LocalWhisperService')
+      mockRealpath.mockResolvedValueOnce('/resolved/tmp/audio.wav')
+      await expect(validateAudioPath('/tmp/audio.wav')).resolves.toBe(
+        '/resolved/tmp/audio.wav'
+      )
+    })
+
+    it('accepts a plain POSIX absolute path (drive-letter colon still ok)', async () => {
+      const { validateAudioPath } = await import('./LocalWhisperService')
+      await expect(
+        validateAudioPath('C:/Users/Test/audio.wav')
+      ).resolves.toBe('C:/Users/Test/audio.wav')
+    })
+  })
+
+  // ===========================================================================
+  // CPU pre-flight probe — checkCpuSupport() (review #1 C1/M1)
+  // ===========================================================================
+
+  describe('checkCpuSupport() pre-flight probe', () => {
+    // The module-level cache has to be reset between cases because each test
+    // expects a fresh probe. We expose __resetCpuProbeForTests() from the
+    // service module specifically for this purpose.
+    beforeEach(async () => {
+      const mod = await import('./LocalWhisperService')
+      mod.__resetCpuProbeForTests()
+    })
+
+    it('returns ok=true on a modern CPU brand', async () => {
+      const osModule = await import('os')
+      vi.spyOn(osModule, 'cpus').mockReturnValue([
+        {
+          model: 'Intel(R) Core(TM) i7-8700K CPU @ 3.70 GHz',
+          speed: 3700,
+          times: { user: 0, nice: 0, sys: 0, idle: 0, irq: 0 }
+        } as never
+      ])
+      const { checkCpuSupport } = await import('./LocalWhisperService')
+      const result = checkCpuSupport()
+      expect(result.ok).toBe(true)
+    })
+
+    it('rejects Intel Core 2 Duo', async () => {
+      const osModule = await import('os')
+      vi.spyOn(osModule, 'cpus').mockReturnValue([
+        {
+          model: 'Intel(R) Core(TM)2 Duo CPU E8400 @ 3.00 GHz',
+          speed: 3000,
+          times: { user: 0, nice: 0, sys: 0, idle: 0, irq: 0 }
+        } as never
+      ])
+      const { checkCpuSupport } = await import('./LocalWhisperService')
+      const result = checkCpuSupport()
+      expect(result.ok).toBe(false)
+      if (!result.ok) {
+        expect(result.reason).toContain('OpenAI API backend')
+      }
+    })
+
+    it('rejects Pentium 4', async () => {
+      const osModule = await import('os')
+      vi.spyOn(osModule, 'cpus').mockReturnValue([
+        {
+          model: 'Intel(R) Pentium(R) 4 CPU 3.00GHz',
+          speed: 3000,
+          times: { user: 0, nice: 0, sys: 0, idle: 0, irq: 0 }
+        } as never
+      ])
+      const { checkCpuSupport } = await import('./LocalWhisperService')
+      expect(checkCpuSupport().ok).toBe(false)
+    })
+
+    it('is case-insensitive (PhENOM II)', async () => {
+      const osModule = await import('os')
+      vi.spyOn(osModule, 'cpus').mockReturnValue([
+        {
+          model: 'AMD PhENOM(tm) II X4 965',
+          speed: 3400,
+          times: { user: 0, nice: 0, sys: 0, idle: 0, irq: 0 }
+        } as never
+      ])
+      const { checkCpuSupport } = await import('./LocalWhisperService')
+      expect(checkCpuSupport().ok).toBe(false)
+    })
+
+    it('falls through (ok=true) when os.cpus() returns empty array', async () => {
+      const osModule = await import('os')
+      vi.spyOn(osModule, 'cpus').mockReturnValue([])
+      const { checkCpuSupport } = await import('./LocalWhisperService')
+      expect(checkCpuSupport().ok).toBe(true)
+    })
+
+    it('caches result across calls', async () => {
+      const osModule = await import('os')
+      const cpusSpy = vi.spyOn(osModule, 'cpus').mockReturnValue([
+        {
+          model: 'AMD Ryzen 9 5950X 16-Core Processor',
+          speed: 3400,
+          times: { user: 0, nice: 0, sys: 0, idle: 0, irq: 0 }
+        } as never
+      ])
+      const { checkCpuSupport } = await import('./LocalWhisperService')
+      checkCpuSupport()
+      checkCpuSupport()
+      checkCpuSupport()
+      expect(cpusSpy).toHaveBeenCalledTimes(1)
     })
   })
 })

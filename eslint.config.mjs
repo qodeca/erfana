@@ -5,8 +5,21 @@ import * as tseslint from 'typescript-eslint'
 import eslintConfigPrettier from 'eslint-config-prettier'
 
 export default [
-  // Ignore build outputs and vendored folders
-  { ignores: ['node_modules/**', 'out/**', 'dist/**', 'release/**', 'temp/**'] },
+  // Ignore build outputs and vendored folders. `playwright-report/`,
+  // `test-results/`, and `coverage/` are test-run artifacts containing
+  // minified bundles that ESLint must not try to parse.
+  {
+    ignores: [
+      'node_modules/**',
+      'out/**',
+      'dist/**',
+      'release/**',
+      'temp/**',
+      'playwright-report/**',
+      'test-results/**',
+      'coverage/**'
+    ]
+  },
   { files: ['**/*.{js,mjs,cjs,ts,jsx,tsx}'] },
   pluginJs.configs.recommended,
   ...tseslint.configs.recommended,
@@ -45,7 +58,7 @@ export default [
   },
   // Build scripts: CommonJS Node.js environment
   {
-    files: ['scripts/**/*.js', 'scripts/**/*.cjs'],
+    files: ['scripts/**/*.js', 'scripts/**/*.cjs', 'scripts/**/*.mjs'],
     languageOptions: {
       globals: {
         require: 'readonly',

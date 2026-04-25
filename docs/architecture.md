@@ -1,4 +1,5 @@
 # Architecture
+*Live architecture overview. Past refactoring reviews and retrospectives → [`architecture-reviews/`](./architecture-reviews/).*
 
 ## Three-Process Model
 
@@ -85,14 +86,16 @@ src/
 │   │   ├── PdfService.ts        # PDF export
 │   │   ├── DocxService.ts       # DOCX export
 │   │   ├── TranscriptionService.ts  # OpenAI audio transcription with chunking
-│   │   ├── LocalWhisperService.ts   # Local whisper.cpp transcription (macOS)
-│   │   ├── WhisperModelManager.ts   # Whisper binary and model downloads
+│   │   ├── LocalWhisperService.ts   # Local whisper.cpp transcription (macOS universal + Windows x64, Phase 4 #165)
+│   │   ├── WhisperModelManager.ts   # Whisper binary + model downloads; 9-step install flow with trust chain
+│   │   ├── whisper-assets.ts        # Pinned release spec + classifyPlatform (Phase 4)
+│   │   ├── whisper-pubkeys.ts       # Dual minisign pubkeys: primary (CI) + rotation (offline) (Phase 4)
 │   │   ├── AudioMetadataService.ts  # Audio metadata extraction (music-metadata)
 │   │   ├── AudioExtractionService.ts # Video → audio extraction (ffmpeg)
 │   │   ├── ApiKeyService.ts     # Encrypted API key storage (Electron safeStorage)
 │   │   ├── TerminalService.ts   # PTY management with node-pty
 │   │   ├── workers/             # worker_threads scripts (git-status.worker.ts)
-│   │   ├── watcher/             # ThrottledWorker (chunk-processing)
+│   │   ├── watcher/             # ThrottledWorker (offset-deque, #173), EventCoalescer, AtomicSaveDetector, WatcherMetrics
 │   │   └── import/converters/   # LiteParseConverter, Audio/VideoConverter, TextConverter (IConverter)
 │   ├── interfaces/
 │   │   └── IGitStatusWorker.ts  # Worker adapter interface
@@ -108,7 +111,9 @@ src/
 │   │   └── terminal-handlers.ts # Terminal emulator IPC
 │   └── utils/
 │       ├── PauseController.ts   # Pause/resume with safety timeout
-│       └── RateLimitedLogger.ts # Cooldown-based log deduplication
+│       ├── RateLimitedLogger.ts # Cooldown-based log deduplication
+│       ├── validateFilename.ts  # Phase 2 #161: assertValid + deriveSafe, Unicode bidi-strip
+│       └── {zipArchive,tarArchive,secureDownloader,verifyManifest}.ts  # Phase 4 trust chain (#165)
 ├── preload/
 │   ├── index.ts              # contextBridge setup
 │   └── index.d.ts            # TypeScript definitions
@@ -170,13 +175,8 @@ src/
 
 Dual vertical activity bars (VS Code-style):
 
-**Left Activity Bar**:
-- Project panel toggle
-- Keyboard: `Cmd/Ctrl+B`
-
-**Right Activity Bar**:
- 
-- Terminal toggle (`Cmd/Ctrl+J`)
+**Left Activity Bar**: Project panel toggle — `Cmd/Ctrl+B`.
+**Right Activity Bar**: Terminal toggle — `Cmd/Ctrl+J`.
 
 **Components**:
 - `ActivityBar.tsx` - Container component
@@ -443,13 +443,9 @@ moveItem: (sourcePath, targetParentPath, newName?) =>
 
 ### Future Enhancements
 
-- **Undo/Redo System**: Track operation history with reverse operations
-- **Multi-Select Drag**: Shift+Click range, Ctrl+Click individual selection
-- **Custom Drag Previews**: Show file icon + name, count for multi-select
-- **Auto-Open on Hover**: Expand folders during drag after 1s hover
-- **Progress Indicators**: Show progress for large operations with cancel option
+Undo/redo, multi-select drag (Shift/Ctrl+Click), custom drag previews, auto-open on hover (1s), progress indicators with cancel.
 
-See: [Drag-Drop Implementation](./drag-drop/README.md) | [IPC Patterns](./ipc-patterns.md) | [UI Components](./ui-components.md) | [Security](./security.md) | [Testing](./testing/README.md)
+See: [Drag-Drop](./drag-drop/README.md) · [IPC](./ipc-patterns.md) · [UI](./ui-components.md) · [Security](./security.md) · [Testing](./testing/README.md)
 
 ## ProjectTree Modularization
 
@@ -469,11 +465,13 @@ See: [Drag-Drop Implementation](./drag-drop/README.md) | [IPC Patterns](./ipc-pa
 - **Pure Logic**: 57 functions extracted to `.logic.ts` files for fast, deterministic testing
 
 **Pure Logic Pattern Examples** (v0.6.3):
-- `markdownEditorPanel.logic.ts` - Stats calculation, scroll sync algorithms, utilities (591 lines, 83 tests)
+- `markdownEditorPanel.logic.ts` - Stats calculation, scroll sync algorithms (591 lines, 83 tests)
 - `promptScrollScheduler.logic.ts` - Timestamp-based scroll scheduling with user intent detection (141 lines, 66 tests)
-- `chatBubble.logic.ts` - Validation helpers for diagram chat (testable without React)
-- `diagramViewer.logic.ts` - Zoom/pan calculations (pure transformations)
-- `mermaidDirections.ts` - Chart type detection and direction parsing
+- `chatBubble.logic.ts` / `diagramViewer.logic.ts` / `mermaidDirections.ts` - Validation helpers, zoom/pan math, chart-type detection — all testable without React
+
+**Shared utility patterns** (cross-platform / cross-process):
+- `src/main/utils/validateFilename.ts` (#161, Phase 2) — two self-documenting entry points: `assertValidUserFilename` throws on invalid input (FileService callers); `deriveSafeFilename` is a total function that silently transforms (Pdf/DocxService callers). Single 9-step pipeline, platform-aware policy, security checks (Unicode bidi-override stripping). Renderer detects via shared `INVALID_FILENAME_MARKER` constant in `src/shared/errors.ts` since `AppError.code` does not survive Electron IPC.
+- `tests/setup/flakeGuard.ts` — surfaces post-teardown unhandled rejections / uncaught exceptions across all 3 vitest projects with scope-labeled stack traces. Exposes counters on `globalThis.__flakeGuardCount__` for future CI assertions.
 
 **SOLID Principles Applied**:
 - Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion

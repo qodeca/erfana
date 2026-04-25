@@ -1,5 +1,10 @@
 // Renderer test setup for Vitest + React Testing Library
 import '@testing-library/jest-dom/vitest'
+import { installFlakeGuard } from './flakeGuard'
+
+// Surface intermittent unhandled rejections / uncaught exceptions firing
+// after teardown. See `flakeGuard.ts` for full rationale.
+installFlakeGuard('renderer')
 
 // Polyfills commonly needed by JSDOM + React
 class MockResizeObserver {
@@ -19,4 +24,3 @@ Object.defineProperty(window, 'electron', {
     return undefined
   },
 })
-

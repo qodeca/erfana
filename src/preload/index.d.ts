@@ -363,6 +363,11 @@ declare global {
          * Used for platform-specific UI features
          */
         getPlatform: () => NodeJS.Platform
+        /**
+         * Get the current CPU architecture
+         * Used to gate features by arch (e.g., local Whisper on Windows x64 only)
+         */
+        getArch: () => NodeJS.Architecture
       }
     }
   }

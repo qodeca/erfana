@@ -13,6 +13,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import path from 'path'
+import os from 'os'
 import { ProjectService } from './ProjectService'
 import type { IFileService } from '../interfaces/IFileService'
 import type { IFileWatcherService } from '../interfaces/IFileWatcherService'
@@ -379,17 +381,22 @@ describe('ProjectService integration with ProjectLockService', () => {
     })
 
     it('should handle symlink resolution in same project detection', async () => {
-      const symlinkPath = '/Users/test/projects/symlink'
-      const realPath = '/Users/test/projects/actual-project'
+      const symlinkPath = path.join(os.tmpdir(), 'erfana-test', 'symlink')
+      const realPathValue = path.join(os.tmpdir(), 'erfana-test', 'actual-project')
 
-      mockFileService.getProjectPath.mockReturnValue(realPath)
+      // Return canonicalized form that matches what canonicalizePath produces
+      const canonicalized = process.platform === 'win32'
+        ? realPathValue.toLowerCase()
+        : realPathValue
+      mockFileService.getProjectPath.mockReturnValue(canonicalized)
 
-      // Mock realpath to resolve symlink
-      mockedRealpath.mockImplementation((path) => {
-        if (path === symlinkPath) {
-          return Promise.resolve(realPath)
+      // Mock realpath to resolve symlink – receives normalized path
+      mockedRealpath.mockImplementation((p) => {
+        const normalized = path.normalize(p.toString())
+        if (normalized === path.normalize(symlinkPath)) {
+          return Promise.resolve(realPathValue)
         }
-        return Promise.resolve(path.toString())
+        return Promise.resolve(p.toString())
       })
 
       const result = await projectService.switchProject(symlinkPath)

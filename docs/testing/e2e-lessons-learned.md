@@ -193,3 +193,42 @@ await page.keyboard.insertText('# Hello\n\nWorld')  // Single input event, like 
 ```
 
 **Lesson**: `insertText()` dispatches the entire text as a single input event (equivalent to a paste operation). This bypasses Monaco's per-keystroke re-layout and is 100% reliable.
+
+---
+
+## 15. Determinism beats masking; observable state beats side effects
+
+Two convergent patterns that surfaced while stabilizing a visual-regression flake and a `userEvent.type()` flake (post-Phase-2 hygiene, 2026-04-21):
+
+**15a. Prefer deterministic fixture data over masking ephemeral content.**
+
+The `visualTestProject` fixture originally did `mkdtemp(path.join(tmp, 'visual-project-'))`, producing paths like `.e2e-temp/visual-project-kb339w`. The random suffix leaked into the project tree label, terminal title, and toast path — causing ~2 % pixel drift in the `(b) editor-loaded` snapshot.
+
+Fix: split into outer random parent + fixed inner leaf.
+
+```ts
+const tmpParent = await fs.promises.mkdtemp(path.join(e2eTempDir, 'visual-'))
+const projectPath = path.join(tmpParent, 'visual-project')   // deterministic leaf
+```
+
+Isolation preserved (outer parent unique per worker); visible labels stable. Masking the ephemeral regions would have worked too, but every future UI element placed in those regions would be untested. Prefer determinism at the source.
+
+**15b. Gate `userEvent.type()` on observable state, not side-effect ordering.**
+
+`userEvent.type(input, 'test')` can drop the first keystroke under CPU contention if React hasn't finished settling the initial render. Two fixes compared:
+
+```ts
+// Side-effect gate — works but fragile; depends on click dispatching focus
+await user.click(input)
+await user.type(input, 'test')
+
+// Observable-state gate — deterministic; waits for the actual signal
+await waitFor(() => expect(document.activeElement).toBe(input))
+await user.type(input, 'test')
+```
+
+The observable-state gate is strictly more robust: it waits for the specific DOM state the next line depends on, instead of relying on a side-effect chain. Same pattern applies to `toHaveFocus()` and any other "is the UI ready?" check.
+
+**Related**: mask specificity matters — pick the narrowest element that covers ephemeral content. In this codebase, `(b) editor-loaded` and `(c) terminal-open` now both mask `TERMINAL_INSTANCE` (xterm canvas only), not the full `TERMINAL_PANEL`, so panel-chrome regressions still register.
+
+**Lesson**: flakes are usually a signal that the test is expressing *timing* instead of *causality*. Find the observable signal the test actually depends on and wait for that; remove ephemeral content at the source rather than papering over it with masks.

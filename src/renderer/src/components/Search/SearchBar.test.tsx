@@ -156,10 +156,17 @@ describe('SearchBar', () => {
       const user = userEvent.setup()
       render(<SearchBar provider={mockProvider} />)
 
-      const input = screen.getByPlaceholderText('Search...')
+      const input = screen.getByPlaceholderText('Search...') as HTMLInputElement
+
+      // Wait for auto-focus (FOCUS_DELAY_MS = 10ms) so the first keystroke is
+      // never dropped under CPU contention.
+      await waitFor(() => {
+        expect(document.activeElement).toBe(input)
+      })
+
       await user.type(input, 'test')
 
-      // Wait for debounce (100ms)
+      // Wait for debounce (100ms) + scheduler jitter
       await waitFor(
         () => {
           expect(mockProvider.search).toHaveBeenCalledWith('test', {
@@ -167,7 +174,7 @@ describe('SearchBar', () => {
             wholeWord: false
           })
         },
-        { timeout: 200 }
+        { timeout: 500 }
       )
     })
 
@@ -175,7 +182,13 @@ describe('SearchBar', () => {
       const user = userEvent.setup()
       render(<SearchBar provider={mockProvider} />)
 
-      const input = screen.getByPlaceholderText('Search...')
+      const input = screen.getByPlaceholderText('Search...') as HTMLInputElement
+
+      // Wait for auto-focus before typing to avoid first-keystroke drop.
+      await waitFor(() => {
+        expect(document.activeElement).toBe(input)
+      })
+
       await user.type(input, 'abc')
 
       // Should not call search immediately
@@ -186,7 +199,7 @@ describe('SearchBar', () => {
         () => {
           expect(mockProvider.search).toHaveBeenCalledTimes(1)
         },
-        { timeout: 200 }
+        { timeout: 500 }
       )
     })
 
@@ -546,20 +559,30 @@ describe('SearchBar', () => {
       expect(preventDefaultSpy).toHaveBeenCalled()
     })
 
-    it('implements focus trap with Tab key wrapping forward', async () => {
-      const user = userEvent.setup()
-
+    it('implements focus trap with Tab key wrapping forward', () => {
       render(<SearchBar provider={mockProvider} />)
 
       const input = screen.getByPlaceholderText('Search...')
       const closeButton = screen.getByRole('button', { name: /close search/i })
+      const container = screen.getByRole('search')
 
       // Focus the close button directly (last focusable element when nav buttons disabled)
       closeButton.focus()
       expect(closeButton).toHaveFocus()
 
+      // Dispatch Tab keydown event on container (where the handler is attached).
+      // Uses direct KeyboardEvent dispatch (matching the Shift+Tab test below)
+      // instead of userEvent.keyboard('{Tab}') because userEvent's Tab
+      // simulation relies on jsdom's tabindex walk, which is platform-dependent
+      // and unreliable on Windows CI runners.
+      const tabEvent = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        bubbles: true,
+        cancelable: true
+      })
+      container.dispatchEvent(tabEvent)
+
       // Tab from last element should wrap to first (input)
-      await user.keyboard('{Tab}')
       expect(input).toHaveFocus()
     })
 
