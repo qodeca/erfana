@@ -171,3 +171,19 @@ jobs:
             echo "::error::forbidden credential reference in workflow"
             exit 1
           fi
+
+      # Guard 4 (advisory, non-failing): warn if AZURE_CLIENT_SECRET appears
+      # in any workflow. The modern AZURE_CLIENT_SECRET is permitted as a
+      # fallback @azure/identity auth path, but this project uses
+      # AZURE_CLIENT_CERTIFICATE_* exclusively. A future contributor adding
+      # AZURE_CLIENT_SECRET would silently downgrade the auth path; surface
+      # it for review without failing the run.
+      - name: Guard - warn on AZURE_CLIENT_SECRET (advisory)
+        run: |
+          set -euo pipefail
+          if grep -REn --include='*.yml' --include='*.yaml' \
+              --exclude=checks.yml \
+              '\bAZURE_CLIENT_SECRET\b' \
+              .github/workflows/; then
+            echo "::warning::AZURE_CLIENT_SECRET found in workflow — this project uses certificate auth (AZURE_CLIENT_CERTIFICATE_*); confirm this is intentional"
+          fi

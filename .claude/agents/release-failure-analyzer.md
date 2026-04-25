@@ -28,20 +28,25 @@ Given a failed GitHub Actions run ID for `release.yml`, identify the failure cau
 | Input | Type | Required | Validation |
 |-------|------|----------|------------|
 | run_id | string | Yes | Numeric GitHub run ID. `gh run view <run_id>` must succeed. |
-| version | string | Yes | The release version this run was attempting (e.g., `0.9.5`). |
+| version | string | Yes | The release version this run was attempting (e.g., `0.9.5` OR `v0.9.5`). The agent normalizes by stripping a leading `v` so output paths never accidentally produce `vv0.9.5-attempt-1.md`. |
 | attempt_number | number | Yes | Sequential attempt within this version (1, 2, 3, …). |
 | project_path | string | No | Default: cwd. Used to locate cookbook + write incident memo. |
+
+**Version normalization:** the agent's first step after input validation is `version=${version#v}` — strips one optional leading `v` so the canonical internal form is the bare semver (`0.9.5`). All output paths use `v${version}` so the file ends up at `v0.9.5-attempt-N.md` regardless of whether the operator passed `0.9.5` or `v0.9.5`.
 
 ⛔ STOP if `run_id` is invalid, the run is still in progress, or the run did not fail.
 </input_contract>
 
 <workflow>
 1. Verify run is complete and failed
-   `Bash gh run view {run_id} --repo qodeca/erfana --json status,conclusion --jq '.status + ":" + (.conclusion // "null")'`
+   Resolve the GitHub repo from `$GITHUB_REPOSITORY` (set by `gh auth status`'s context, OR derived from `git remote get-url origin`); fall back to `qodeca/erfana` only if neither is available. Operators on a fork should ensure their `gh auth` context points at their fork.
+   `Bash REPO="${GITHUB_REPOSITORY:-$(git config --get remote.origin.url | sed -E 's#.*[:/]([^/]+/[^/]+)\.git$#\1#')}"`
+   `Bash REPO="${REPO:-qodeca/erfana}"`
+   `Bash gh run view {run_id} --repo "$REPO" --json status,conclusion --jq '.status + ":" + (.conclusion // "null")'`
    Expected: `completed:failure`. Any other value → return error status.
 
 2. Identify the failed leg(s)
-   `Bash gh run view {run_id} --repo qodeca/erfana --json jobs --jq '.jobs[] | select(.conclusion=="failure") | {name: .name, id: .databaseId, failedSteps: [.steps[] | select(.conclusion=="failure") | .name]}'`
+   `Bash gh run view {run_id} --repo "$REPO" --json jobs --jq '.jobs[] | select(.conclusion=="failure") | {name: .name, id: .databaseId, failedSteps: [.steps[] | select(.conclusion=="failure") | .name]}'`
    Capture each failed job's name + databaseId + which step failed.
    Classify the leg: Linux | macOS | Windows | Prepare | Finalize | Cleanup.
 

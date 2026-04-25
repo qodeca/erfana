@@ -464,7 +464,7 @@ Operator checks out `main`, bumps `package.json` to `0.9.5`, appends CHANGELOG e
 3. `checks.yml` turns green within ~3 min.
 4. Phase 2: signed tag pushed.
 5. Phase 3: `release.yml` runs for ~60 min. `gh run watch` returns exit 0.
-6. Phase 4: minisign verifies; per-asset sha256 matches signed SHA256SUMS; workflow-output digest matches; per-asset attestations all verify.
+6. Phase 4: minisign verifies; per-asset sha256 matches signed SHA256SUMS; workflow-output digest matches.
 7. Operator approves publish.
 8. Phase 5: post-publish verification clean. Release URL surfaced.
 
