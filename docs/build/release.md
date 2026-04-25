@@ -328,11 +328,26 @@ Phase I configuration was applied after dry-run [`24925269258`](https://github.c
 **`main` branch protection** ([`gh api repos/qodeca/erfana/branches/main/protection`](https://api.github.com/repos/qodeca/erfana/branches/main/protection)):
 
 - Required status checks (strict mode — branch must be up to date before merge): `Lint`, `Typecheck`, `Unit tests`, `Build`, `npm audit signatures`, `Release readiness guards`.
-- Required PR reviews: PR required to land any change on `main`; **`required_approving_review_count: 0`** (deliberate solo-dev calibration — see § Solo-dev calibration below). Dismiss stale reviews on push, conversation resolution required.
+- **No PR review requirement** (`required_pull_request_reviews: null`) — direct push to `main` is the intended solo-developer workflow. The release skill verifies this at Phase 0.4.5 and aborts if the rule is reinstated.
 - `enforce_admins: true` — administrators included.
 - `allow_force_pushes: false`, `allow_deletions: false`.
+- Conversation resolution required.
 
-> **Solo-dev calibration (2026-04-25):** `required_approving_review_count` was set to `0` on 2026-04-25. Erfana has one developer; `count=1` cannot be satisfied because GitHub blocks self-approval and Copilot reviews are always `COMMENTED`, never `APPROVED`. The PR requirement itself remains in place (the rule is present, just with `count=0`), so the release-skill `Phase 1.5` bump commit on `main` must go through a PR rather than a direct push. Bump back to `1` if a second developer joins the team. All other Phase I gates — signed-tag ruleset, 6 required status checks, `enforce_admins=true`, conversation resolution, no force pushes, no deletions — remain intact.
+> **Solo-dev calibration history (all on 2026-04-25):** Phase I initially shipped with `required_approving_review_count: 1`. That was reduced to `0` during v0.9.5 release prep because GitHub blocks self-approval and Copilot reviews are always `COMMENTED`, never `APPROVED`. After the v0.9.5 release actually shipped via PR #190, the friction was real — every release would re-pay the same PR detour — so `required_pull_request_reviews` was removed entirely the same day:
+>
+> ```bash
+> gh api -X DELETE repos/qodeca/erfana/branches/main/protection/required_pull_request_reviews
+> ```
+>
+> If a second developer joins the team, restore the rule and update the release skill's Phase 0.4.5 check to allow PR mode:
+>
+> ```bash
+> gh api -X PATCH repos/qodeca/erfana/branches/main/protection \
+>   -F 'required_pull_request_reviews[required_approving_review_count]=1' \
+>   -F 'required_pull_request_reviews[dismiss_stale_reviews]=true'
+> ```
+>
+> All other Phase I gates — signed-tag ruleset, 6 required status checks, `enforce_admins=true`, conversation resolution, no force pushes, no deletions — remain intact throughout.
 
 **Protected tag ruleset** (id [`15540259`](https://github.com/qodeca/erfana/rules/15540259)):
 

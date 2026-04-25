@@ -197,4 +197,4 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 
 ---
 
-**Last Updated**: v0.9.4 + post-#174 release-pipeline final pass + Phase I branch protection (2026-04-25)
+**Last Updated**: v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day)

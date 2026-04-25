@@ -6,7 +6,7 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 ## 0.9.5
 
-*Release in progress — published date set when the GitHub release is finalized.*
+*Released 2026-04-25. Tag [`v0.9.5`](https://github.com/qodeca/erfana/releases/tag/v0.9.5).*
 
 ### Multi-platform signed release pipeline ([#174](https://github.com/qodeca/erfana/issues/174))
 
@@ -24,7 +24,7 @@ Single GitHub Actions workflow (`.github/workflows/release.yml`) now produces si
 
 Both protections went live on `qodeca/erfana`:
 
-- **`main` branch protection** — 1 approving PR review, 6 required status checks (`Lint`, `Typecheck`, `Unit tests`, `Build`, `npm audit signatures`, `Release readiness guards`), `enforce_admins: true`, no force pushes, no deletions, conversation resolution required, stale reviews dismissed on push.
+- **`main` branch protection** — 6 required status checks (`Lint`, `Typecheck`, `Unit tests`, `Build`, `npm audit signatures`, `Release readiness guards`), `enforce_admins: true`, no force pushes, no deletions, conversation resolution required. **No PR review requirement** (solo-developer workflow — Phase I initially shipped with `count=1`, was reduced to `count=0` during release prep, and was removed entirely on 2026-04-25 after the v0.9.5 release exposed the friction; the release skill verifies the no-PR state at Phase 0.4.5).
 - **Protected release tags** (ruleset id `15540259`) — `v*.*.*` semver pattern, signed-tag enforcement, deletion blocked.
 - `e2e` is intentionally excluded from required checks until the `macos-latest` hang in `waitForLoadState('domcontentloaded')` is resolved (see `docs/ci.md` § "Visual regression on CI").
 
