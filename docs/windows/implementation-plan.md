@@ -319,7 +319,7 @@ Phase 4's ~55 new tests span 8 files. Table below is the authoritative coverage 
 
 ## Phase 5 — Distribution hygiene
 
-> **Superseded in part by [#174](https://github.com/qodeca/erfana/issues/174) (release pipeline).** The auto-updater URL problem (B6) and Windows signing (M7) are now handled by the multi-platform release workflow shipped with v0.9.5. `electron-builder.yml` uses `publish: null` (auto-updater explicitly disabled per #174 non-goals). Windows signing moved from `.pfx`-in-secret to **Azure Trusted Signing via OIDC** (no client secret). See [`docs/build/release.md`](../build/release.md). What remains of Phase 5 here narrows to NSIS UX tweaks.
+> **Superseded in part by [#174](https://github.com/qodeca/erfana/issues/174) (release pipeline).** The auto-updater URL problem (B6) and Windows signing (M7) are now handled by the multi-platform release workflow shipped with v0.9.5. `electron-builder.yml` uses `publish: null` (auto-updater explicitly disabled per #174 non-goals). Windows signing moved from `.pfx`-in-secret to **Azure Artifact Signing via X.509 certificate auth against the app registration** (electron-builder 26 doesn't support OIDC `AZURE_FEDERATED_TOKEN_FILE`; cert auth is the security-equivalent substitute — public cert on the app reg, rotatable PFX in GitHub Secrets). See [`docs/build/release.md`](../build/release.md). What remains of Phase 5 here narrows to NSIS UX tweaks.
 
 Remaining changes:
 

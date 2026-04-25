@@ -31,7 +31,6 @@ Design summary: one `v*.*.*` tag push from `main` produces one GitHub draft rele
       │                    │               │  electron-builder       │
       │                    │               │    --publish never      │
       │                    │               │  verify sigs locally    │
-      │                    │               │  attest-build-provenance│
       │                    │               │  gh release upload      │
       │                    │               └────────────┬────────────┘
       │                    │                            │
@@ -41,7 +40,6 @@ Design summary: one `v*.*.*` tag push from `main` produces one GitHub draft rele
       │                    │              strip leaked latest*.yml
       │                    │              sha256sum *  →  SHA256SUMS
       │                    │              minisign sign  →  SHA256SUMS.minisig
-      │                    │              gh attestation verify each asset
       │                    │              export sha256sums as workflow output
       │                    │
       │  gh run watch      │
@@ -53,7 +51,6 @@ Design summary: one `v*.*.*` tag push from `main` produces one GitHub draft rele
       │  local verify:
       │    minisign -V SHA256SUMS.minisig
       │    sha256sum each asset == SHA256SUMS entry
-      │    gh attestation verify each asset
       │    equality against workflow-output digest
       │
       │  operator approval
@@ -78,15 +75,15 @@ sequenceDiagram
   GH->>CI: trigger release.yml
   CI->>GH: gh release create --draft
   par matrix
-    CI->>GH: build_linux uploads .AppImage/.deb/.rpm + attestations
-    CI->>GH: build_mac uploads .dmg/.zip + attestations
-    CI->>GH: build_win uploads .exe + attestations
+    CI->>GH: build_linux uploads .AppImage/.deb/.rpm
+    CI->>GH: build_mac uploads .dmg/.zip (notarized + stapled)
+    CI->>GH: build_win uploads .exe (Authenticode signed)
   end
-  CI->>GH: finalize signs SHA256SUMS, verifies each attestation
+  CI->>GH: finalize signs SHA256SUMS with minisign
   S-->>GH: gh run watch --exit-status
   GH-->>S: success
   S->>GH: download draft assets
-  S->>S: minisign -V, sha256 compare, attestation verify x N
+  S->>S: minisign -V, sha256 compare, workflow-output digest equality
   S->>O: AskUserQuestion: publish + mark latest?
   O-->>S: approve
   S->>GH: gh release edit v0.9.5 --draft=false --latest
