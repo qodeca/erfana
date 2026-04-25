@@ -1,8 +1,10 @@
 # Build Documentation
 
-**Last Updated**: March 2026 (v0.9.0)
+**Last Updated**: April 2026 (v0.9.4)
 
 This directory contains detailed documentation for Erfana's production build configuration.
+
+> **Releasing Erfana?** This README covers local builds. For the multi-platform CI release pipeline (`release.yml` → signed/notarized macOS + Windows + Linux artifacts via the `releasing-erfana` skill), see [release.md](release.md). Whisper binary build runbook (separate signed release stream) lives in [whisper-binaries.md](whisper-binaries.md).
 
 ---
 

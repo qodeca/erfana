@@ -101,6 +101,25 @@ jobs:
         # fixes flow through Dependabot PRs (also gated by this workflow).
         run: npm audit signatures
 
+      - name: Record package-lock.json digest
+        # release.yml prepare downloads this artifact from the matching
+        # green checks.yml run and asserts byte-equality with the
+        # package-lock.json present at tag time. Defense against lockfile
+        # substitution between "checks green" and "tag pushed".
+        run: |
+          set -euo pipefail
+          sha256sum package-lock.json | cut -d' ' -f1 > package-lock.sha256
+          echo "package-lock.json digest: $(cat package-lock.sha256)"
+
+      - name: Upload package-lock digest artifact
+        # actions/upload-artifact v4.4.3 — keep SHA aligned with build_*.yml
+        # (Dependabot will keep these in lockstep once #B2 lands).
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+        with:
+          name: package-lock-digest
+          path: package-lock.sha256
+          retention-days: 90
+
   release-guards:
     name: Release readiness guards
     runs-on: ubuntu-latest
@@ -187,3 +206,36 @@ jobs:
               .github/workflows/; then
             echo "::warning::AZURE_CLIENT_SECRET found in workflow — this project uses certificate auth (AZURE_CLIENT_CERTIFICATE_*); confirm this is intentional"
           fi
+
+      # Guard 5: minisign release-pubkey drift detector.
+      # The release-signing minisign pubkeys (PRIMARY + ROTATION, dual-key
+      # per ADR-0003) MUST be byte-equal across three published locations:
+      #   - docs/release-pubkey.txt  (canonical, consumed by skill Phase 4)
+      #   - docs/security.md         (between minisign-pubkey-{primary,rotation}-{begin,end} fences)
+      #   - README.md                (mirrored in verification recipe)
+      # If they drift, end-user verification will fail in confusing ways.
+      # This guard extracts the keys from each source and asserts equality.
+      - name: Guard - release pubkey drift across docs
+        run: |
+          set -euo pipefail
+          # Sorted set of all RW... lines in the canonical file.
+          CANONICAL=$(grep -E '^RW[A-Za-z0-9+/=]+$' docs/release-pubkey.txt | sort -u)
+          # Every base64 line between any minisign-pubkey-*-begin / -end pair.
+          SECURITY_MD=$(awk '
+            /^<!-- minisign-pubkey-(primary|rotation)-begin -->$/ { in_block=1; next }
+            /^<!-- minisign-pubkey-(primary|rotation)-end -->$/   { in_block=0; next }
+            in_block && /^RW[A-Za-z0-9+\/=]+$/                    { print }
+          ' docs/security.md | sort -u)
+          # README mirror — match RW... lines on their own (e.g. inside `text` fences).
+          README=$(grep -E '^RW[A-Za-z0-9+/=]+$' README.md | sort -u || true)
+          if [ "$CANONICAL" != "$SECURITY_MD" ]; then
+            echo "::error::release pubkey drift between docs/release-pubkey.txt and docs/security.md"
+            diff <(printf '%s\n' "$CANONICAL") <(printf '%s\n' "$SECURITY_MD") || true
+            exit 1
+          fi
+          if [ -n "$README" ] && [ "$CANONICAL" != "$README" ]; then
+            echo "::error::release pubkey drift between docs/release-pubkey.txt and README.md"
+            diff <(printf '%s\n' "$CANONICAL") <(printf '%s\n' "$README") || true
+            exit 1
+          fi
+          echo "release pubkeys consistent across docs/release-pubkey.txt, docs/security.md$( [ -n "$README" ] && echo ', README.md')"

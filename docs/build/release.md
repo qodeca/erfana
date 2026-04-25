@@ -124,12 +124,12 @@ All secrets live in the GitHub repo `qodeca/erfana` (Settings → Secrets and va
 | Anchor | Source of truth | Calendar reminder | Next due |
 |---|---|---|---|
 | `APPLE_APP_SPECIFIC_PASSWORD` | appleid.apple.com | Event-driven (account compromise, key leak) — no fixed expiry | — |
-| `MAC_CERT_P12_BASE64` | Apple Developer | 60 days before cert expiry | per cert exp date |
+| `MAC_CERT_P12_BASE64` | Apple Developer | 60 days before cert expiry | **2027-04-15** (current cert expires 2027-06-14 — verify with `security find-certificate -c "Developer ID Application" -p \| openssl x509 -noout -enddate` and refresh this date when the cert is rotated) |
 | `AZURE_CLIENT_CERTIFICATE_BASE64` (auth cert — app registration credential) | `az ad app credential list --id $AZURE_CLIENT_ID --cert` | 60 days before cert expiry (currently 2028-04-23) — i.e. **2028-02-22** | 2028-02-22 |
-| `AZURE_CERT_PROFILE_NAME` (signing cert — service-side, separate from auth cert above) | Azure Artifact Signing profile | 60 days before certificate-profile expiry | per profile exp date |
-| `MINISIGN_SECRET_KEY_BASE64` (primary) | Internal ops vault | Scheduled annually or on compromise; rotation key published alongside primary so end users can verify both | annual |
+| `AZURE_CERT_PROFILE_NAME` (signing cert — service-side, separate from auth cert above) | Azure Artifact Signing profile | 60 days before certificate-profile expiry — current cert profile rotation hooks into Azure portal alerts | **2027-08-22** (assumes 2-year cert profile from initial 2025-10-22 provisioning; verify in Azure portal Trusted Signing → Certificate profiles → expiry date and refresh) |
+| `MINISIGN_SECRET_KEY_BASE64` (primary) | Internal ops vault | Scheduled annually + event-driven (compromise); rotation key published alongside primary so end users can verify both | **2027-04-25** |
 
-Owner: release engineer on rotation (currently documented under repo owner email).
+Owner: release engineer on rotation (currently documented under repo owner email). Concrete dates above must be re-verified against the actual cert expiries on each rotation event — they are documented best-effort anchors, not authoritative.
 
 ## Runner strategy
 
@@ -142,6 +142,14 @@ Owner: release engineer on rotation (currently documented under repo owner email
 No self-hosted runners for release. Self-hosted Windows with a `.pfx` on disk is explicitly out of scope — side-doors outlive the rationale for creating them.
 
 Linux arm64 is out of scope for v1. Revisit when user demand surfaces.
+
+## Hardened-runtime entitlements (known gap)
+
+The main app plist (`build/entitlements.mac.plist`) contains the strictly-required keys: `cs.allow-jit`, `cs.allow-unsigned-executable-memory` (V8 requirement), `device.camera`, `device.audio-input`. The CI guard at `checks.yml:136-144` fails the build if `cs.disable-library-validation` or `cs.allow-dyld-environment-variables` ever leak into either plist.
+
+The inherit plist (`build/entitlements.mac.inherit.plist`) grants `cs.allow-jit` and `cs.allow-unsigned-executable-memory` to **all helper processes** (Renderer + GPU + Plugin), not just Renderer. This is an upstream-imposed over-grant: electron-builder 26.8.1's `mac.entitlementsInherit` field is a **single plist applied uniformly** to every helper bundle — there is no built-in per-helper-type configuration. The Renderer helper structurally requires both keys for V8 JIT to function; granting them to GPU and Plugin helpers is the unavoidable side-effect.
+
+**Trigger to revisit**: electron-builder ships per-helper-type entitlement support (`mac.binaries[].entitlements` or equivalent), or we adopt a custom `signFn` callback that signs each helper bundle with a tighter plist. Until then, the over-grant is documented and the CI guard prevents it from getting worse.
 
 ## Non-goals
 

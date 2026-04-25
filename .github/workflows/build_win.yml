@@ -18,6 +18,24 @@ on:
         required: false
         type: boolean
         default: false
+    # Explicit secrets declaration so the caller (release.yml) can pass an
+    # explicit per-secret allowlist instead of `secrets: inherit` — keeps
+    # the Windows leg blind to Apple / minisign credentials it never uses.
+    secrets:
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_CLIENT_CERTIFICATE_BASE64:
+        required: true
+      AZURE_CLIENT_CERTIFICATE_PASSWORD:
+        required: true
+      AZURE_SIGNING_ENDPOINT:
+        required: true
+      AZURE_SIGNING_ACCOUNT_NAME:
+        required: true
+      AZURE_CERT_PROFILE_NAME:
+        required: true
 
 permissions:
   contents: write

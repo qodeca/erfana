@@ -70,6 +70,10 @@ jobs:
     name: Validate dispatch inputs
     runs-on: ubuntu-latest
     timeout-minutes: 2
+    # Fork exfiltration guard — applied to every job in this workflow for
+    # consistency with release.yml + build_*.yml. workflow_dispatch from
+    # forks is already blocked by GitHub default, but defense-in-depth.
+    if: github.repository == 'qodeca/erfana'
     steps:
       - name: Reject malformed inputs
         env:
@@ -101,13 +105,17 @@ jobs:
     needs: [validate-inputs]
     runs-on: macos-14
     timeout-minutes: 45
+    # Fork exfiltration guard — defense-in-depth alongside the
+    # production-signing environment gate.
+    if: github.repository == 'qodeca/erfana'
     # Needed to access APPLE_CERT_P12 / APPLE_CERT_PASSWORD / APPLE_ID /
     # APPLE_APP_PASSWORD / APPLE_TEAM_ID, which are scoped to this
     # environment (not repo-wide).
     environment: production-signing
     steps:
       - name: Checkout whisper.cpp
-        uses: actions/checkout@v4
+        # actions/checkout v4.2.2 — keep aligned with release.yml + checks.yml
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: ${{ env.UPSTREAM_REPO }}
           ref: ${{ inputs.upstream_sha }}
@@ -116,7 +124,10 @@ jobs:
       - name: Pin Xcode version
         # macos-14 runner currently ships 16.2 as latest; 16.3 is not
         # available as of 2026-04-22. Bump when the runner image updates.
-        uses: maxim-lobanov/setup-xcode@v1
+        # maxim-lobanov/setup-xcode v1 (resolved 2026-04-25 to commit
+        # 1242409711ff5721add51979e9e11e23ebb7e5a4). Third-party action;
+        # SHA-pin is a hard requirement for any step in the signing path.
+        uses: maxim-lobanov/setup-xcode@1242409711ff5721add51979e9e11e23ebb7e5a4
         with:
           xcode-version: "16.2"
 
@@ -133,7 +144,7 @@ jobs:
 
       - name: Verify universal binary contains both slices
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           echo "::group::All executables produced"
           find build -type f -perm -u+x \( -name 'whisper*' -o -name 'main' \) -exec ls -la {} \;
           echo "::endgroup::"
@@ -155,7 +166,7 @@ jobs:
 
       - name: Stage artifact dir
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           mkdir -p staging
           cp "$BIN" staging/whisper-cli
           cp LICENSE staging/LICENSE.whisper-cpp
@@ -183,7 +194,11 @@ jobs:
           EOF
 
       - name: Configure signing keychain
-        uses: apple-actions/import-codesign-certs@v3
+        # apple-actions/import-codesign-certs v3 (resolved 2026-04-25 to
+        # commit 63fff01cd422d4b7b855d40ca1e9d34d2de9427d). This action
+        # consumes APPLE_CERT_P12 directly — SHA-pin is mandatory; a
+        # tag-move would be a credential-handling supply-chain incident.
+        uses: apple-actions/import-codesign-certs@63fff01cd422d4b7b855d40ca1e9d34d2de9427d
         with:
           p12-file-base64: ${{ secrets.APPLE_CERT_P12 }}
           p12-password: ${{ secrets.APPLE_CERT_PASSWORD }}
@@ -192,7 +207,7 @@ jobs:
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           IDENTITY="Developer ID Application: ${APPLE_TEAM_ID}"
           # Use substring-match against the imported identity — works
           # regardless of the owner's legal-name formatting.
@@ -207,7 +222,7 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           ditto -c -k --keepParent staging/whisper-cli notarize.zip
           xcrun notarytool submit notarize.zip \
             --apple-id "$APPLE_ID" \
@@ -222,7 +237,7 @@ jobs:
 
       - name: Smoke test (transcribe JFK sample)
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           curl -fsSL "$FIXTURE_MODEL_URL" -o ggml-tiny.bin
           curl -fsSL "$FIXTURE_AUDIO_URL" -o jfk.wav
           staging/whisper-cli -m ggml-tiny.bin -l en -otxt --no-timestamps -f jfk.wav
@@ -234,7 +249,7 @@ jobs:
 
       - name: Package reproducibly
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           # GNU tar flags for reproducibility; macOS bsdtar on macos-14 supports --options
           # but we install GNU tar to keep flags consistent with what the Erfana
           # client expects. Reproducibility is best-effort; see ops runbook.
@@ -249,7 +264,8 @@ jobs:
           shasum -a 256 "$PKG" | tee "$PKG.sha256"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        # actions/upload-artifact v4.4.3 — keep aligned with build_*.yml + checks.yml
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
         with:
           name: whisper-macos-universal
           path: |
@@ -263,13 +279,17 @@ jobs:
     needs: [validate-inputs]
     runs-on: windows-latest
     timeout-minutes: 45
+    # Fork exfiltration guard — defense-in-depth alongside the
+    # production-signing environment gate.
+    if: github.repository == 'qodeca/erfana'
     # Scoped to the same environment as build-macos + publish-release so
     # Phase 5 can add WINDOWS_CERT_PFX / WINDOWS_CERT_PASSWORD here without
     # moving the job's env context.
     environment: production-signing
     steps:
       - name: Checkout whisper.cpp
-        uses: actions/checkout@v4
+        # actions/checkout v4.2.2 — keep aligned with release.yml + checks.yml
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: ${{ env.UPSTREAM_REPO }}
           ref: ${{ inputs.upstream_sha }}
@@ -355,7 +375,7 @@ jobs:
       - name: Round-trip compatibility check (extract-zip)
         shell: bash
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           # Smoke-test that the Erfana client's zip extractor can read the
           # artifact. Catches Compress-Archive-style format issues before publish.
           npm init -y >/dev/null
@@ -367,7 +387,8 @@ jobs:
           ls roundtrip/*.dll | grep -E "(whisper|ggml)" >/dev/null
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        # actions/upload-artifact v4.4.3 — keep aligned with build_*.yml + checks.yml
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
         with:
           name: whisper-win-x64
           path: |
@@ -381,6 +402,9 @@ jobs:
     needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Fork exfiltration guard — defense-in-depth alongside the
+    # production-signing environment gate.
+    if: github.repository == 'qodeca/erfana'
     # Required-reviewer gate lives on the Environment configuration in repo
     # settings. Secrets (signing + notarization + manifest key) are scoped to
     # this environment only; PRs cannot exfiltrate them.
@@ -393,13 +417,16 @@ jobs:
           exit 1
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        # actions/download-artifact v4 (resolved 2026-04-25 to commit
+        # d3f86a106a0bac45b974a628896c90dbdf5c8093). Dependabot github-actions
+        # ecosystem (.github/dependabot.yml) keeps this fresh.
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           path: artifacts
 
       - name: Gather checksums + compose manifest
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           MAC_PKG=$(ls artifacts/whisper-macos-universal/whisper-macos-universal-*.tar.gz)
           WIN_PKG=$(ls artifacts/whisper-win-x64/whisper-win-x64-*.zip)
           MAC_SHA=$(cut -d' ' -f1 < "${MAC_PKG}.sha256")
@@ -440,7 +467,7 @@ jobs:
 
       - name: Install minisign
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y minisign
 
@@ -449,7 +476,7 @@ jobs:
           MANIFEST_SIGNING_KEY: ${{ secrets.MANIFEST_SIGNING_KEY }}
           MANIFEST_SIGNING_KEY_PASSWORD: ${{ secrets.MANIFEST_SIGNING_KEY_PASSWORD }}
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           echo "::add-mask::${MANIFEST_SIGNING_KEY}"
           echo "::add-mask::${MANIFEST_SIGNING_KEY_PASSWORD}"
           # minisign reads the key from a file; pipe via /dev/shm (tmpfs) so it
@@ -465,7 +492,7 @@ jobs:
       - name: Scan workflow output for leaked secrets
         # Defense-in-depth — if a previous step echoed a secret, fail the job.
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           # We cannot scan the GitHub runner logs from inside the job; instead,
           # verify the runner has not left any secret material on disk.
           test ! -f /dev/shm/minisign-key.* || {
@@ -523,7 +550,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -euxo pipefail
+          set -euo pipefail
           TAG="whisper-build-${{ inputs.upstream_label }}-erfana${{ inputs.erfana_revision }}"
           TITLE="whisper.cpp ${{ inputs.upstream_label }} (erfana build ${{ inputs.erfana_revision }})"
           NOTES=$(cat <<EOF

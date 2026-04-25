@@ -17,6 +17,20 @@ on:
         required: false
         type: boolean
         default: false
+    # Explicit secrets declaration so the caller (release.yml) can pass an
+    # explicit per-secret allowlist instead of `secrets: inherit` — keeps
+    # the macOS leg blind to Azure / minisign credentials it never uses.
+    secrets:
+      APPLE_ID:
+        required: true
+      APPLE_APP_SPECIFIC_PASSWORD:
+        required: true
+      APPLE_TEAM_ID:
+        required: true
+      MAC_CERT_P12_BASE64:
+        required: true
+      MAC_CERT_PASSWORD:
+        required: true
 
 permissions:
   contents: write
@@ -161,16 +175,25 @@ jobs:
               --output-format json 2>/dev/null)
             echo "$out"
 
-            local id status json
-            # Defensive prefilter: strip any non-JSON lines that may precede
-            # the {...} payload. sed range pattern from first '{' to first
-            # '}' captures only the JSON object. If notarytool ever adds a
-            # warning line before the JSON, this guarantees a clean parse.
-            json=$(printf '%s' "$out" | sed -n '/^{/,/^}/p')
-            id=$(printf '%s' "$json" | python3 -c "import json,sys; d=json.load(sys.stdin) if sys.stdin.read else {}; print(d.get('id','') if isinstance(d,dict) else '')" 2>/dev/null || echo "")
-            # Re-run python on the same prefiltered JSON for status. Fall
-            # back to grep on the raw out only as a last resort.
-            status=$(printf '%s' "$json" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('status',''))" 2>/dev/null || echo "")
+            local id status
+            # Robust JSON extraction: find the first '{' and matching last
+            # '}' in the raw output (handles arbitrary leading non-JSON
+            # warning lines AND nested braces inside the payload, which the
+            # previous sed-range prefilter would have truncated). Then parse
+            # both fields in a single python invocation.
+            parsed=$(printf '%s' "$out" | python3 -c "
+import json, sys
+text = sys.stdin.read()
+start = text.find('{')
+end = text.rfind('}')
+if start < 0 or end < 0 or end <= start:
+    sys.exit('no JSON object found')
+obj = json.loads(text[start:end + 1])
+print(obj.get('id', ''))
+print(obj.get('status', ''))
+" 2>/dev/null || echo "")
+            id=$(printf '%s\n' "$parsed" | sed -n '1p')
+            status=$(printf '%s\n' "$parsed" | sed -n '2p')
             if [ -z "$id" ] || [ -z "$status" ]; then
               echo "::error::Failed to parse notarytool JSON output. Raw:"
               printf '%s\n' "$out"

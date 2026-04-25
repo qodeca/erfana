@@ -136,23 +136,69 @@ grep -q "^## $VERSION" docs/CHANGELOG.md || {
 ### 0.4 Idempotency check: does the tag already exist?
 
 ```bash
+TAG_EXISTS_LOCAL=false
+TAG_EXISTS_REMOTE=false
+RELEASE_STATE="none"  # one of: none | draft-empty | draft-ready | published
+
 if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
-  # Local tag exists
-  if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null; then
-    echo "Tag v$VERSION is already on origin"
+  TAG_EXISTS_LOCAL=true
+fi
+if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" >/dev/null; then
+  TAG_EXISTS_REMOTE=true
+fi
+
+# If the remote tag is already pushed, classify the GitHub release state so
+# we can pick the correct resume point (per spec issue #174 §Idempotency).
+if [ "$TAG_EXISTS_REMOTE" = "true" ]; then
+  RELEASE_JSON=$(gh release view "v${VERSION}" --json isDraft,assets 2>/dev/null || echo "")
+  if [ -z "$RELEASE_JSON" ]; then
+    RELEASE_STATE="none"  # tag pushed but release doesn't exist yet — run probably in flight
+  else
+    IS_DRAFT=$(printf '%s' "$RELEASE_JSON" | jq -r '.isDraft')
+    ASSET_COUNT=$(printf '%s' "$RELEASE_JSON" | jq -r '.assets | length')
+    if [ "$IS_DRAFT" = "false" ]; then
+      RELEASE_STATE="published"
+    elif [ "$ASSET_COUNT" -ge 11 ]; then
+      RELEASE_STATE="draft-ready"   # 9 binaries + SHA256SUMS + .minisig = 11
+    else
+      RELEASE_STATE="draft-empty"   # finalize hasn't yet sealed the draft
+    fi
   fi
 fi
 ```
 
-If a tag already exists locally or on `origin`:
+If a tag already exists, branch on `RELEASE_STATE` and present options via `AskUserQuestion`:
 
-Present options via `AskUserQuestion`:
+**Case A — `RELEASE_STATE=none`** (tag on origin, no draft yet → run probably in flight):
 
 | Option | Meaning | Risk |
 |--------|---------|------|
-| Resume at Phase 3 | Assume tag is valid; watch CI and verify. | Low |
-| Delete remote tag and restart | `git push --delete origin v${VERSION}` and start again from Phase 1. | **DESTRUCTIVE** — will void any in-flight signed artifact. Require explicit confirmation. |
+| Resume at Phase 3 | Wait for CI run to finish, then verify. | Low |
+| Delete remote tag and restart | `git push --delete origin v${VERSION}` and re-enter from Phase 1. | **DESTRUCTIVE** — voids any in-flight signed artifact. Require explicit confirmation. |
 | Abort | Exit the skill. | None |
+
+**Case B — `RELEASE_STATE=draft-empty`** (draft exists but `finalize` not yet complete):
+
+Same as Case A — finalize is still in flight. Resume at Phase 3.
+
+**Case C — `RELEASE_STATE=draft-ready`** (draft has all 11 expected assets, finalize completed):
+
+| Option | Meaning | Risk |
+|--------|---------|------|
+| Resume at Phase 4 (verify + approve) | Skip Phase 3 polling; jump straight to cryptographic verification of the existing draft. | Low — Phase 4 is structurally re-entrant and idempotent (read-only verification, then operator approval). |
+| Delete draft and restart | `gh release delete "v${VERSION}" --yes --cleanup-tag=false` then `git push --delete origin v${VERSION}` and re-enter from Phase 1. | **DESTRUCTIVE** — voids the signed artifacts. Require explicit confirmation. |
+| Abort | Exit the skill. | None |
+
+**Case D — `RELEASE_STATE=published`** (release already published as latest):
+
+```bash
+URL=$(gh release view "v${VERSION}" --json url --jq .url)
+echo "Release v${VERSION} is already published and marked latest: $URL"
+echo "Nothing to do. Exiting."
+exit 0
+```
+
+No options — exit cleanly. Re-running the skill on a published tag means the operator already approved publication; the only follow-up is a hotfix at the next patch version.
 
 ### 0.5 Delegate the rest of the checklist to `release-quality-runner`
 
@@ -233,7 +279,24 @@ Present the generated `docs/release-notes/v${VERSION}.md` and ask whether to acc
 
 ### 1.5 Single-commit bundle
 
+Pre-flight check (added per #174 reviewer finding): `git commit -S` fails silently if `user.signingkey` and `gpg.format` aren't configured. Surface a clear error before attempting.
+
 ```bash
+# Pre-flight: commit signing must be configured. The protected-tag rule
+# (Phase I) only enforces signed TAGS, not signed commits — but our
+# release commit uses -S, so a missing config is a hard fail here.
+if ! git config --get user.signingkey >/dev/null 2>&1 \
+   || ! git config --get gpg.format >/dev/null 2>&1; then
+  echo "ERROR: commit signing not configured." >&2
+  echo "Set user.signingkey and gpg.format (ssh|gpg) before re-running." >&2
+  echo "Example (SSH):" >&2
+  echo "  git config --global user.signingkey '/Users/<you>/.ssh/id_ed25519.pub'" >&2
+  echo "  git config --global gpg.format ssh" >&2
+  echo "  git config --global commit.gpgsign true" >&2
+  echo "  git config --global tag.gpgsign true" >&2
+  exit 1
+fi
+
 # One commit bundles: package.json bump (already done pre-skill or done here),
 # CHANGELOG append (pre-skill), release notes file.
 git add package.json docs/CHANGELOG.md "docs/release-notes/v${VERSION}.md"

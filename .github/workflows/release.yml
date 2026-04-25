@@ -89,24 +89,58 @@ jobs:
           fi
 
       - name: Assert checks.yml has a green run for this commit
-        # Lockfile-drift guard: if the tagged commit never produced a green
-        # checks.yml run, its lint/typecheck/tests/build/audit-signatures/
-        # release-guards have never been validated. Abort before signing.
+        # Lockfile-drift guard, layer 1 (existence check): if the tagged
+        # commit never produced a green checks.yml run, its lint /
+        # typecheck / tests / build / audit-signatures / release-guards
+        # have never been validated. Abort before signing.
         # Skipped in dry-run — caller is validating the signing pipeline
         # itself, not gating on pre-merge CI state.
+        id: green_run
         if: steps.meta.outputs.is_dry_run != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           TAG_SHA=$(git rev-parse HEAD)
+          RUN_ID=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/workflows/checks.yml/runs?head_sha=${TAG_SHA}&status=success" \
+            --jq '.workflow_runs[0].id // "none"')
           STATUS=$(gh api \
             "/repos/${GITHUB_REPOSITORY}/actions/workflows/checks.yml/runs?head_sha=${TAG_SHA}&status=success" \
             --jq '.workflow_runs[0].conclusion // "none"')
-          if [ "$STATUS" != "success" ]; then
+          if [ "$STATUS" != "success" ] || [ "$RUN_ID" = "none" ]; then
             echo "::error::No green checks.yml run for ${TAG_SHA}"
             exit 1
           fi
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Verify package-lock.json byte-equality vs checks.yml digest
+        # Lockfile-drift guard, layer 2 (content check): downloads the
+        # package-lock-digest artifact recorded by the green checks.yml run
+        # and asserts the local package-lock.json hashes to the same value.
+        # Closes the gap where checks.yml saw lockfile A but release.yml
+        # gets lockfile B at the same SHA (cache poisoning, mid-flight tag
+        # repoint, etc.). Acceptance criterion behind issue #174 §Security
+        # architecture row 8.
+        if: steps.meta.outputs.is_dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.green_run.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            -n package-lock-digest \
+            -D /tmp/lock-digest
+          EXPECTED=$(tr -d '[:space:]' < /tmp/lock-digest/package-lock.sha256)
+          ACTUAL=$(sha256sum package-lock.json | cut -d' ' -f1)
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "::error::package-lock.json drift detected"
+            echo "expected (from checks.yml run $RUN_ID): $EXPECTED" >&2
+            echo "actual   (this commit):                 $ACTUAL"   >&2
+            exit 1
+          fi
+          echo "package-lock.json byte-equal vs checks.yml run $RUN_ID"
 
       - name: Create draft release
         if: steps.meta.outputs.is_dry_run != 'true'
@@ -144,7 +178,16 @@ jobs:
     with:
       tag: ${{ needs.prepare.outputs.tag }}
       is-dry-run: ${{ needs.prepare.outputs.is_dry_run == 'true' }}
-    secrets: inherit
+    # Explicit per-secret allowlist (replaces `secrets: inherit`) so the
+    # macOS leg cannot see Azure or minisign secrets it never uses. Reduces
+    # blast radius if the runner is compromised. Reusable workflow declares
+    # these in its on.workflow_call.secrets block.
+    secrets:
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+      MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
     permissions:
       contents: write
 
@@ -156,10 +199,23 @@ jobs:
     with:
       tag: ${{ needs.prepare.outputs.tag }}
       is-dry-run: ${{ needs.prepare.outputs.is_dry_run == 'true' }}
-    secrets: inherit
+    # Explicit per-secret allowlist (replaces `secrets: inherit`) so the
+    # Windows leg cannot see Apple or minisign secrets it never uses.
+    secrets:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_CERTIFICATE_BASE64: ${{ secrets.AZURE_CLIENT_CERTIFICATE_BASE64 }}
+      AZURE_CLIENT_CERTIFICATE_PASSWORD: ${{ secrets.AZURE_CLIENT_CERTIFICATE_PASSWORD }}
+      AZURE_SIGNING_ENDPOINT: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+      AZURE_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
+      AZURE_CERT_PROFILE_NAME: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
+    # id-token: write was previously declared here for an OIDC-federated
+    # azure/login attempt. electron-builder 26 WindowsSignAzureManager does
+    # not yet support AZURE_FEDERATED_TOKEN_FILE so we use cert-auth
+    # instead. Re-add id-token: write here AND in build_win.yml when
+    # upstream OIDC support lands and we migrate off the PFX credential.
     permissions:
       contents: write
-      id-token: write
 
   finalize:
     name: Finalize draft
@@ -211,6 +267,10 @@ jobs:
             PREV=$COUNT
             sleep 5
           done
+          if [ "$STABLE" -lt 3 ]; then
+            echo "ERROR: asset count never stabilized within 2 min (last=$COUNT)" >&2
+            exit 1
+          fi
 
       - name: Delete leaked auto-updater files
         # electron-builder is configured with publish:null so these should

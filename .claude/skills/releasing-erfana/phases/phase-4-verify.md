@@ -29,39 +29,56 @@ ls -la
 
 ## 4.3 Verify minisign signature
 
-The dedicated release minisign public key is published in [docs/security.md § Release signing](../../../../docs/security.md), fenced by HTML comments so this step can extract it deterministically:
+The dedicated release minisign public keys (PRIMARY active signer + ROTATION standby successor — dual-key per ADR-0003) are published in `docs/release-pubkey.txt` as the canonical source. `docs/security.md` § Release signing and `README.md` mirror them for end-user discovery; checks.yml has a drift detector (introduced with #174) that fails the build if the three locations disagree.
 
-```text
-<!-- minisign-pubkey-primary-begin -->
-```text
-RW...
-```
-<!-- minisign-pubkey-primary-end -->
-```
-
-Extract the pubkey block between those markers, then verify:
+Verification accepts either key (a SHA256SUMS.minisig that verifies under the primary OR the rotation key is valid). This lets the team rotate primary→rotation without re-signing old releases.
 
 ```bash
-SECURITY_MD="docs/security.md"
-PUBKEY_PATH="$WORK/release.pub"
+PUBKEY_FILE="docs/release-pubkey.txt"
+PRIMARY_PATH="$WORK/release-primary.pub"
+ROTATION_PATH="$WORK/release-rotation.pub"
 
-# Extract the line between the primary fence markers, strip the markdown
-# code-fence backticks. The awk range pattern operates between the
-# begin/end markers (exclusive of the markers themselves).
-awk '
-  /^<!-- minisign-pubkey-primary-begin -->$/   { in_block=1; next }
-  /^<!-- minisign-pubkey-primary-end -->$/     { in_block=0; next }
-  in_block && /^[A-Za-z0-9+\/=]+$/             { print }
-' "$SECURITY_MD" > "$PUBKEY_PATH"
+# Extract every base64 minisign pubkey from the canonical file. Lines
+# starting with "RW" are minisign pubkey magic; comments and blank lines
+# are skipped. We expect exactly two: PRIMARY (first) + ROTATION (second).
+mapfile -t PUBKEYS < <(grep -E '^RW[A-Za-z0-9+/=]+$' "$PUBKEY_FILE")
+if [ "${#PUBKEYS[@]}" -lt 1 ]; then
+  echo "FAIL: no minisign pubkeys extracted from $PUBKEY_FILE"
+  exit 1
+fi
 
-# Sanity: pubkey must be 56-byte base64 (minisign convention).
-[ -s "$PUBKEY_PATH" ] || { echo "FAIL: pubkey extraction returned empty"; exit 1; }
+# Sanity-validate each extracted key: minisign pubkeys are exactly 56
+# characters of base64 starting with "RW" (2-byte algorithm magic +
+# 8-byte key ID + 32-byte Ed25519 public key).
+for KEY in "${PUBKEYS[@]}"; do
+  if [ "${KEY:0:2}" != "RW" ]; then
+    echo "FAIL: extracted pubkey does not start with RW magic: $KEY"
+    exit 1
+  fi
+  if [ "${#KEY}" -ne 56 ]; then
+    echo "FAIL: extracted pubkey length ${#KEY}, expected 56: $KEY"
+    exit 1
+  fi
+done
 
-minisign -V -P "$(cat "$PUBKEY_PATH")" -m SHA256SUMS -x SHA256SUMS.minisig
+PRIMARY="${PUBKEYS[0]}"
+ROTATION="${PUBKEYS[1]:-}"
+
+# Try primary first; on failure (verification, not extraction), retry
+# under the rotation key. Both must succeed-or-fail loudly so a malformed
+# .minisig file cannot silently slip through.
+if minisign -V -P "$PRIMARY" -m SHA256SUMS -x SHA256SUMS.minisig; then
+  echo "minisign verify: OK (PRIMARY key)"
+elif [ -n "$ROTATION" ] && minisign -V -P "$ROTATION" -m SHA256SUMS -x SHA256SUMS.minisig; then
+  echo "minisign verify: OK (ROTATION key — primary may be in flight rotating)"
+else
+  echo "FAIL: minisign verification failed under both PRIMARY and ROTATION keys"
+  exit 1
+fi
 ```
 
-- [ ] Pubkey extracted between fence markers (non-empty)
-- [ ] `minisign -V` exits 0
+- [ ] At least one pubkey extracted with valid format (RW prefix, 56 chars)
+- [ ] `minisign -V` exits 0 under primary OR rotation
 
 ## 4.4 Recompute per-asset hashes locally
 
