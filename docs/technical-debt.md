@@ -87,25 +87,25 @@ const config = PROMPT_REGISTRY['mermaid-bug-report']  // Returns undefined!
 
 ---
 
-### 5. Visual regression suite disabled on CI
+### 5. E2E workflow disabled on CI
 
 **Severity**: Medium
-**Impact**: 5 screenshot-based tests (welcome panel, editor loaded, terminal open, settings overlay, confirm dialog) do not run on CI; visual regressions can merge undetected until a developer runs `npm run test:e2e:visual` locally.
+**Impact**: The entire `e2e.yml` workflow is disabled (2026-04-25, commit `997ba65`). Neither the functional `electron` suite nor the 5 visual screenshot tests run on CI; both regression classes can merge undetected until a developer runs `npm run test:e2e` / `npm run test:e2e:visual` locally. E2E was already excluded from branch-protection required checks, so disabling does not block any merges or releases — but it removes a safety net.
 
-**Problem**: All 5 tests time out at `page.waitForLoadState('domcontentloaded')` (30s) on GitHub `macos-latest` runners, while passing 5/5 locally (including with `CI=true`). `.github/workflows/e2e.yml` runs only `--project=electron` as a workaround.
+**Problem**: The visual suite was the original blocker — all 5 tests time out at `page.waitForLoadState('domcontentloaded')` (30s) on GitHub `macos-latest` runners while passing 5/5 locally (including with `CI=true`). The earlier workaround scoped CI to `--project=electron` only, but the functional suite is also unstable on hosted runners; full disable is now the working state until the root cause is isolated.
 
-**What's known**:
+**What's known about the visual hang**:
 - Electron main process launches successfully on CI; `BrowserWindow` exists; resize succeeds
 - Playwright `firstWindow()` returns a Page object
 - The `domcontentloaded` lifecycle event never propagates; `recordVideo` is not the cause (local `CI=true` runs pass)
 
 **Candidate root causes** (not isolated): GPU/renderer init hang on virtualized runners, `app.evaluate(resize)` → `firstWindow()` timing race, `--force-device-scale-factor=1` interaction.
 
-**Recommended next step**: Fixture instrumentation – capture `document.readyState` and `app.getGPUInfo('basic')` before and after `waitForLoadState`, push once, then form a targeted hypothesis.
+**Recommended next step**: Fixture instrumentation – capture `document.readyState` and `app.getGPUInfo('basic')` before and after `waitForLoadState`, push once on a temporary re-enable (`gh workflow enable "E2E Tests"`), then form a targeted hypothesis. Re-disable until a fix is in.
 
 **Files**: `.github/workflows/e2e.yml`, `e2e/fixtures.ts` (lines 355–360, 406–410), `e2e/visual-regression.e2e.ts`.
 
-**Tracking**: see [docs/ci.md § Visual regression on CI](./ci.md#visual-regression-on-ci).
+**Tracking**: see [docs/ci.md § E2E Tests (disabled)](./ci.md#e2e-tests-e2eyml-disabled) and [docs/known-issues.md § Visual regression E2E suite hangs on GitHub `macos-latest` CI](./known-issues.md#visual-regression-e2e-suite-hangs-on-github-macos-latest-ci).
 
 ---
 

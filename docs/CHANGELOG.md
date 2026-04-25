@@ -119,11 +119,13 @@ See [`docs/build/whisper-binaries.md`](./build/whisper-binaries.md) for the oper
 
 **Test coverage pre-merge** — D12 resolved 2026-04-23: `WhisperModelManager.test.ts` rewritten from scratch against Phase 4 mock boundaries (`downloadToFile`, `verifyManifest`, `zipArchive`, `tarArchive`). 41 tests, 0 skipped, 0 platform-gated. Removes the pre-Phase-4 `describe.skipIf(darwin)` block that hid the entire `ensureBinary()` suite on ubuntu-latest CI. Workspace total: 7852 → 7868 passed, 94 → 78 skipped. See [`docs/windows/deferred-work-phase4.md`](./windows/deferred-work-phase4.md) §D12 for the resolution note.
 
-## 0.9.3
+## 0.9.3 (test build, never publicly released)
+
+> **Status note (2026-04-25):** `v0.9.3` was a test build — the GitHub release artifact and `v0.9.3` git tag were deleted on 2026-04-25 because the binary distribution was a dry-run for the multi-platform release pipeline, not a customer-facing release. The Phase 0–2 codebase work documented below is real and shipped to `develop` on 2026-04-22; **the first publicly released Windows-capable version is [v0.9.4](https://github.com/qodeca/erfana/releases/tag/v0.9.4)** (which contains Phase 0–2 + Phase 4). This entry is preserved for development-history continuity.
 
 ### Platform support (Windows)
 
-Phase 0 + Phase 1 + Phase 2 of the Windows enablement roadmap shipped in 0.9.3 (merged from `windows` branch on 2026-04-22). See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for canonical status / [`docs/windows/deferred-work.md`](./windows/deferred-work.md) for tracked deferrals (D1–D8). Summary:
+Phase 0 + Phase 1 + Phase 2 of the Windows enablement roadmap landed on `develop` in the 0.9.3 development cycle (merged from `windows` branch on 2026-04-22). See [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md) for canonical status / [`docs/windows/deferred-work.md`](./windows/deferred-work.md) for tracked deferrals (D1–D8). Summary:
 
 - **Phase 0 (#153 closed)** — portable `test:cov` + `prebuild` scripts, `docs/build/windows.md` prerequisites, test path portability (#157), `app.setJumpList` mock (#156), SearchBar focus-trap fix, NSIS installer (316 MB, fused + signed; requires Developer Mode on build host).
 - **Phase 1 (#154 closed)** — terminal parity: cmd.exe `@echo off` bootstrap, PowerShell `Set-Location -LiteralPath`, `resolveWindowsShell()` fallback chain, cwd validation deny-list, `WindowsBootstrapBuilder` strategy. 128+ tests (Phase-2 UAT hardening added a dedicated `WindowsTerminalBootstrap.test.ts` with 60 unit tests for the strategy layer).

@@ -60,12 +60,12 @@ Run `npm run test` for current totals (~7,955 tests across 250 files as of v0.9.
 - Test helper utilities documentation
 - Troubleshooting guide
 
-**CI runs only `--project=electron`** — visual suite is local-only until the `macos-latest` `waitForLoadState` hang is root-caused. See [docs/ci.md](../ci.md) for the full CI pipeline map.
+**E2E workflow is currently disabled on CI** (2026-04-25, commit `997ba65`) — both the functional `electron` and `visual` suites run locally only until the `macos-latest` instability is root-caused. See [docs/ci.md § E2E Tests (disabled)](../ci.md#e2e-tests-e2eyml-disabled) for the disable rationale and re-enable command.
 
 **Commands**:
 ```bash
-npm run test:e2e                   # Functional E2E tests (electron project) – same as CI
-npm run test:e2e:visual            # Visual regression tests (visual project) – local only
+npm run test:e2e                   # Functional E2E tests (electron project) – local-only today
+npm run test:e2e:visual            # Visual regression tests (visual project) – local-only
 npm run test:e2e:update-screenshots  # Update visual baselines
 ```
 

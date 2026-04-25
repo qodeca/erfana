@@ -1,11 +1,14 @@
 # Continuous integration
 
-Erfana runs two GitHub Actions workflows on pushes. They target different concerns with different cost/latency trade-offs.
+Erfana runs GitHub Actions workflows on pushes. The author-controlled workflows are listed below; vendor-installed workflows (Claude Code, Dependabot, Copilot review, Security Risk Assessment) are managed by their respective GitHub Apps and not covered here.
 
-| Workflow | File | Trigger | Runner | Wall-clock | Purpose |
-|----------|------|---------|--------|-----------|---------|
-| Quality checks | `.github/workflows/checks.yml` | push to **any branch** | `ubuntu-latest` | ~3 min | Fast feedback on lint / types / unit tests / build |
-| E2E Tests | `.github/workflows/e2e.yml` | push to `develop` + PRs | `macos-latest` | ~5–8 min | Electron integration tests (Playwright) |
+| Workflow | File | Status | Trigger | Runner | Wall-clock | Purpose |
+|----------|------|--------|---------|--------|-----------|---------|
+| Quality Checks | `.github/workflows/checks.yml` | active | push to **any branch** | `ubuntu-latest` | ~3 min | Fast feedback on lint / types / unit tests / build |
+| E2E Tests | `.github/workflows/e2e.yml` | **disabled** (2026-04-25) | (would be: push to `develop` + PRs) | `macos-latest` | ~5–8 min | Electron integration tests (Playwright) — see [E2E Tests (disabled)](#e2e-tests-e2eyml-disabled) below |
+| Release | `.github/workflows/release.yml` | active | tag push `v*.*.*` | matrix (linux/mac/win) | ~25–40 min | Multi-platform release build → `prepare`/`build_*`/`finalize`/`cleanup` (calls `build_linux.yml`, `build_mac.yml`, `build_win.yml` reusables) |
+| Whisper Binaries | `.github/workflows/whisper-binaries.yml` | active | `workflow_dispatch` only | `macos-14` + `windows-latest` | ~25 min | Self-hosted whisper.cpp build, sign, notarize, publish (see [`build/whisper-binaries.md`](./build/whisper-binaries.md)) |
+| Whisper Binaries (Canary) | `.github/workflows/whisper-binaries-canary.yml` | active | monthly schedule | `macos-14` | ~3 min | Credential-health check (Apple notarization, Windows signing) |
 
 Node 24, `actions/setup-node@v4` with `cache: npm`, `permissions: contents: read`.
 
@@ -30,29 +33,29 @@ Four jobs run in parallel:
   npm ci || (sleep 10 && npm ci) || (sleep 20 && npm ci)
   ```
 
-## E2E Tests (`e2e.yml`)
+## E2E Tests (`e2e.yml`) — disabled
 
-Runs on `push` to `develop` and all pull requests.
+**Disabled 2026-04-25** via `gh workflow disable "E2E Tests"` (see commit `997ba65`). The disabled state is also documented inline at the top of `e2e.yml` so it's visible without the Actions UI.
 
-| Step | Command |
-|------|---------|
-| Install | `npm ci` (with retry) |
-| Build | `npx electron-vite build` |
-| Test | `npx playwright test --project=electron` |
-| Upload | `test-results/`, `playwright-report/` (30-day retention on develop, 14 on PRs) |
-| Upload visual diffs | `test-results/**/*-diff.png` on failure (currently no-op – visual suite is not run on CI) |
+**Why disabled**: Playwright + Electron tests do not run reliably on `macos-latest` hosted runners. The visual suite hangs at `page.waitForLoadState('domcontentloaded')` (root-cause analysis below); the functional `--project=electron` suite was previously the workaround, but is also unstable on hosted runners. E2E was already excluded from branch-protection required checks, so disabling does not block any merges or releases.
 
-**Scoped to `--project=electron`** because the `visual` project fails 5/5 on `macos-latest` with `page.waitForLoadState('domcontentloaded')` timeouts while passing 5/5 locally (including with `CI=true`). See [Known issues](./known-issues.md) and [Visual regression on CI](#visual-regression-on-ci) below.
-
-Run the `visual` suite manually:
+**E2E remains the local-only verification path**:
 ```bash
-npm run test:e2e:visual                  # Run visual regression tests
-npm run test:e2e:update-screenshots      # Update baselines
+npm run test:e2e                  # Functional electron suite
+npm run test:e2e:visual           # Visual regression suite
+npm run test:e2e:update-screenshots  # Update visual baselines
 ```
+
+**Re-enable when stable**:
+```bash
+gh workflow enable "E2E Tests"
+```
+
+For historical reference, when the workflow was active it ran on `push` to `develop` + all PRs on `macos-latest`, executed `npm ci` (retry-wrapped) → `npx electron-vite build` → `npx playwright test --project=electron`, and uploaded `test-results/` + `playwright-report/` (30-day retention on develop, 14 on PRs). The original root-cause analysis for the visual-suite hang is preserved below since it remains an open investigation.
 
 ## Visual regression on CI
 
-**Status**: disabled on CI (scoped out via `--project=electron`), runs locally only.
+**Status**: not running on CI — the entire `e2e.yml` workflow is disabled (see [E2E Tests (disabled)](#e2e-tests-e2eyml-disabled) above). Even when re-enabled, the visual suite would still need to be scoped out via `--project=electron` until the root cause below is resolved. Runs locally only today.
 
 **Symptom**: `page.waitForLoadState('domcontentloaded')` times out at 30s in `e2e/fixtures.ts:357` (`visualWindow`) and `:408` (`visualWindowWithProject`).
 
@@ -77,10 +80,10 @@ All CI checks are runnable locally (commands match exactly what CI executes):
 ```bash
 npm run lint
 npm run typecheck
-npm run test:ci           # same as CI – basic reporter
+npm run test:ci           # same as Quality Checks job – basic reporter
 npx electron-vite build
-npm run test:e2e          # electron project only (same as CI)
-npm run test:e2e:visual   # visual project (CI skips this)
+npm run test:e2e          # electron project — local-only today (e2e.yml is disabled)
+npm run test:e2e:visual   # visual project — local-only today (visual hang on macos-latest)
 ```
 
 ## Troubleshooting
@@ -89,8 +92,9 @@ npm run test:e2e:visual   # visual project (CI skips this)
 |---------|--------------|-----|
 | `npm error code EUSAGE` + "Missing: X from lock file" | Lockfile out of sync with package.json (often after merge) | `rm -rf node_modules package-lock.json && npm install`, commit the new lockfile |
 | `npm error code ECONNRESET` / "network aborted" | Transient GitHub runner → npmjs.org | Retry wrapper usually recovers it. If persistent, escalate to `nick-fields/retry` action. |
-| E2E electron passes locally, fails on CI | Usually flake (Monaco cursor blink, timing). Playwright retries once; see flaky count in run summary | Fix with `disableCursorBlink()` / condition-based waits |
-| Visual test fails on CI only | See [Visual regression on CI](#visual-regression-on-ci) above | Run locally; CI visual coverage is a known gap |
+| E2E never appears in PR checks | Workflow is intentionally disabled (see [E2E Tests (disabled)](#e2e-tests-e2eyml-disabled)) | Run E2E locally before merging anything sensitive: `npm run test:e2e` |
+| E2E electron passes locally, fails on CI (historical) | Usually flake (Monaco cursor blink, timing). Playwright retries once; see flaky count in run summary | Fix with `disableCursorBlink()` / condition-based waits — applies if the workflow is re-enabled |
+| Visual test fails on CI only (historical) | See [Visual regression on CI](#visual-regression-on-ci) above | Run locally; CI visual coverage is a known gap |
 
 ## Related documentation
 

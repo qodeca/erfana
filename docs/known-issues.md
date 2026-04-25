@@ -146,14 +146,17 @@ Pipeline contributors on Windows:
 
 **Root cause**: Not isolated. Electron main process launches, `BrowserWindow` exists, `firstWindow()` returns a Page, but the `domcontentloaded` event never propagates. Candidate causes: GPU/renderer init hang on virtualized runners, `app.evaluate(resize)` → `firstWindow()` timing race, `--force-device-scale-factor=1` interaction. The regular `electron` project succeeds on the same runner, so the issue is specific to the visual fixture setup.
 
-**Workaround**: CI is scoped to `--project=electron` via `.github/workflows/e2e.yml`; the visual suite is run locally only.
+**Workaround**: The entire `e2e.yml` workflow is currently **disabled** (2026-04-25, commit `997ba65`); the full E2E suite — both `electron` and `visual` projects — runs locally only.
 
 ```bash
-npm run test:e2e:visual                    # Run visual regression tests locally
-npm run test:e2e:update-screenshots        # Update baselines
+npm run test:e2e                          # Functional electron suite
+npm run test:e2e:visual                   # Visual regression suite
+npm run test:e2e:update-screenshots       # Update visual baselines
 ```
 
-**Tracking**: See [docs/ci.md § Visual regression on CI](./ci.md#visual-regression-on-ci) and [docs/technical-debt.md § Visual regression suite disabled on CI](./technical-debt.md#5-visual-regression-suite-disabled-on-ci). Diagnostic next step is fixture instrumentation to capture `readyState` + GPU info.
+Re-enable with `gh workflow enable "E2E Tests"` once the root cause is isolated.
+
+**Tracking**: See [docs/ci.md § E2E Tests (disabled)](./ci.md#e2e-tests-e2eyml-disabled) and [docs/technical-debt.md § E2E workflow disabled on CI](./technical-debt.md). Diagnostic next step is fixture instrumentation to capture `readyState` + GPU info.
 
 ---
 
