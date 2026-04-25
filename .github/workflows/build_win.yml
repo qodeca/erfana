@@ -1,4 +1,4 @@
-name: Build Windows (reusable)
+name: Build Windows (Reusable)
 
 # Reusable workflow callable from release.yml. Signs with Azure Artifact
 # Signing (formerly Azure Trusted Signing) via certificate-based auth

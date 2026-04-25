@@ -1,4 +1,4 @@
-name: Build Linux (reusable)
+name: Build Linux (Reusable)
 
 # Reusable workflow callable from release.yml. No external signing deps —
 # Linux artifacts are integrity-verified via the aggregate SHA256SUMS

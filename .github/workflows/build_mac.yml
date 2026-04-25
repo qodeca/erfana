@@ -1,4 +1,4 @@
-name: Build macOS (reusable)
+name: Build macOS (Reusable)
 
 # Reusable workflow callable from release.yml. Signs with Developer ID
 # Application cert + notarizes via notarytool (user-auth mode: Apple ID +

@@ -16,7 +16,7 @@
 # See `docs/build/whisper-binaries.md` for the operational runbook,
 # diff-review checklist, and cert-revocation procedures.
 
-name: Whisper binaries
+name: Whisper Binaries
 run-name: whisper-build ${{ inputs.upstream_label }}-erfana${{ inputs.erfana_revision }} (${{ inputs.upstream_sha }})
 
 on:

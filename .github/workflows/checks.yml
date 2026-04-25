@@ -1,4 +1,4 @@
-name: Quality checks
+name: Quality Checks
 
 # Fast, platform-independent quality gates that run on every push to every
 # branch. Complements e2e.yml (slow, macOS-only, develop/main/PR) by giving
