@@ -1,6 +1,6 @@
 # Continuous integration
 
-Erfana runs GitHub Actions workflows on pushes. The author-controlled workflows are listed below; vendor-installed workflows (Claude Code, Dependabot, Copilot review, Security Risk Assessment) are managed by their respective GitHub Apps and not covered here.
+Erfana runs GitHub Actions workflows on pushes. The author-controlled workflows are listed below; vendor-installed workflows (Dependabot, Copilot review, Security Risk Assessment) are managed by their respective GitHub Apps and not covered here.
 
 | Workflow | File | Status | Trigger | Runner | Wall-clock | Purpose |
 |----------|------|--------|---------|--------|-----------|---------|
@@ -9,6 +9,8 @@ Erfana runs GitHub Actions workflows on pushes. The author-controlled workflows 
 | Release | `.github/workflows/release.yml` | active | tag push `v*.*.*` | matrix (linux/mac/win) | ~25–40 min | Multi-platform release build → `prepare`/`build_*`/`finalize`/`cleanup` (calls `build_linux.yml`, `build_mac.yml`, `build_win.yml` reusables) |
 | Whisper Binaries | `.github/workflows/whisper-binaries.yml` | active | `workflow_dispatch` only | `macos-14` + `windows-latest` | ~25 min | Self-hosted whisper.cpp build, sign, notarize, publish (see [`build/whisper-binaries.md`](./build/whisper-binaries.md)) |
 | Whisper Binaries (Canary) | `.github/workflows/whisper-binaries-canary.yml` | active | monthly schedule | `macos-14` | ~3 min | Credential-health check (Apple notarization, Windows signing) |
+| Claude Code Review | `.github/workflows/claude-code-review.yml` | active (allows `dependabot`) | `pull_request` opened/synchronize | `ubuntu-latest` | ~1 min | Auto-review on every PR; **non-blocking** (not in branch-protection required checks). `allowed_bots: 'dependabot'` since [#192](https://github.com/qodeca/erfana/pull/192) so Dependabot PRs get a real pass/fail instead of "non-human actor" abort |
+| Claude Code (interactive) | `.github/workflows/claude.yml` | active | `@claude` mention on issue/PR comment | `ubuntu-latest` | varies | Interactive code agent for follow-up commits and review-comment threads |
 
 Node 24, `actions/setup-node@v4` with `cache: npm`, `permissions: contents: read`.
 

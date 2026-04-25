@@ -41,7 +41,7 @@ src/
 ├── main/           # Electron main process
 │   ├── services/   # Core: FileService, TerminalService, ProjectService, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService, GitStatusWorkerAdapter, GitStatusCircuitBreaker, GitStatusStrategySelector; Watchers: DirectoryWatcherService, FileWatcherService; Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media: ScreenshotService, CameraService, DocxService, TranscriptionService, LocalWhisperService, WhisperModelManager, whisper-assets (pinned release + classifyPlatform), whisper-pubkeys (dual minisign keys), AudioMetadataService, AudioExtractionService, ApiKeyService; Import: LiteParseConverter, DependencyDetector; Multi-instance: ProjectLockService, ExternalFileService; Subdirs: import/, watcher/, workers/
 │   ├── ipc/        # IPC handlers
-│   └── utils/      # PauseController (pause/resume with safety timeout), RateLimitedLogger; Phase 4 trust-chain: zipArchive (yauzl + assertSafeEntry), tarArchive (tar@7.4.0 filter), secureDownloader (hostname allowlist + streaming SHA-256), verifyManifest (minisign Ed25519 dual-key)
+│   └── utils/      # PauseController (pause/resume with safety timeout), RateLimitedLogger; Phase 4 trust-chain: zipArchive (yauzl + assertSafeEntry), tarArchive (tar@7.5.11 filter), secureDownloader (hostname allowlist + streaming SHA-256), verifyManifest (minisign Ed25519 dual-key)
 ├── preload/        # Context bridge API
 ├── shared/         # Shared code (errors.ts, constants.ts, ipc schemas)
 └── renderer/       # React UI

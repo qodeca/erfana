@@ -1,7 +1,7 @@
 /**
  * Tar.gz archive extraction with tar-slip + symlink protection.
  *
- * Thin wrapper over `tar@7.4.0`. The `filter` callback rejects anything
+ * Thin wrapper over `tar@7.5.11`. The `filter` callback rejects anything
  * that isn't a regular file or directory (symlinks + hardlinks are the
  * classic tar-slip vector), plus any entry whose resolved path escapes
  * `destDir`.
