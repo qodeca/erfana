@@ -4,6 +4,49 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## 0.9.5
+
+*Release in progress — published date set when the GitHub release is finalized.*
+
+### Multi-platform signed release pipeline ([#174](https://github.com/qodeca/erfana/issues/174))
+
+Single GitHub Actions workflow (`.github/workflows/release.yml`) now produces signed, notarized artifacts for macOS, Windows, and Linux on a single tag push. Replaces the prior tag-only flow used through v0.9.4.
+
+- **Pipeline shape** — `prepare → {build_linux, build_mac, build_win} → finalize → cleanup`. `prepare` asserts a green `checks.yml` run for the tagged commit (lockfile-drift guard). Matrix legs run in parallel on native runners. `finalize` collects sha256s, signs them with minisign, uploads draft assets. `cleanup` deletes the draft if any leg failed (no orphaned half-releases).
+- **macOS signing** — Developer ID + notarization via `notarytool submit --wait`, stapled DMG + ZIP. ZIPs are notarized but `xcrun stapler validate` is skipped on them (unsupported by `stapler`). DMG verification uses `spctl -t open` (not `-t install`); standalone `spctl verify` dropped for DMGs in favour of `stapler` + `codesign`.
+- **Windows signing** — Azure Trusted Signing via **certificate auth** (X.509 against an app registration). electron-builder 26 doesn't yet support OIDC for Trusted Signing. `signingHashAlgorithms` + `rfc3161TimeStampServer` configured under `win.signtoolOptions`. Signing endpoint trimmed + structural env diagnostics before `electron-builder` invocation.
+- **Linux** — AppImage / DEB / RPM ship unsigned; cross-platform authenticity is covered by minisign over `SHA256SUMS`.
+- **Trust chain** — `SHA256SUMS` + `SHA256SUMS.minisig` ship with every release. Dual-key minisign acceptance (primary in CI, rotation key offline). Operator verifies via `minisign -V -P <pubkey> -m SHA256SUMS -x SHA256SUMS.minisig`, then re-hashes each asset and diffs against the signed sums.
+- **No GitHub Artifact Attestations** — Enterprise-only for private repos. Authenticity is fully covered by minisign + per-platform OS signing.
+- **Operator skill** — `.claude/skills/releasing-erfana/` orchestrates pre-flight, tag push, CI polling, cryptographic verification, and the publish checkpoint. The `release-failure-analyzer` agent writes structured incident memos to `docs/release-incidents/` on CI failure, matched against the typed-regex troubleshooting cookbook (`.claude/skills/releasing-erfana/guides/troubleshooting.md`).
+
+### Phase I: branch protection + protected tag ruleset
+
+Both protections went live on `qodeca/erfana`:
+
+- **`main` branch protection** — 1 approving PR review, 6 required status checks (`Lint`, `Typecheck`, `Unit tests`, `Build`, `npm audit signatures`, `Release readiness guards`), `enforce_admins: true`, no force pushes, no deletions, conversation resolution required, stale reviews dismissed on push.
+- **Protected release tags** (ruleset id `15540259`) — `v*.*.*` semver pattern, signed-tag enforcement, deletion blocked.
+- `e2e` is intentionally excluded from required checks until the `macos-latest` hang in `waitForLoadState('domcontentloaded')` is resolved (see `docs/ci.md` § "Visual regression on CI").
+
+### Documentation
+
+- New `docs/build/release.md` — full operator reference (matrix, secrets + rotation calendar, minisign verification, incident response: B.1 federated-cred cleanup, B.2 cert workstation-loss DR, B.3 PFX hygiene).
+- New `docs/release-incidents/` — auto-appended incident memos written by the failure analyzer.
+- New ADRs under `docs/adrs/` covering the trust-chain decisions inherited from Phase 4 (whisper) and now applied to the release pipeline.
+
+### Notable fixes absorbed from triple review
+
+Three rounds of pre-merge review on the release pipeline produced eight batches of fixes (TIER A blocking, TIER B robustness + cookbook gate, TIER C cleanup, TIER D nits — batches 8.1 through 8.9):
+
+- macOS notarytool JSON parser collapsed to a single-line `python -c` so log-buffer pagination doesn't break parsing.
+- Windows env injection moved from YAML macros to `electron-builder --config` CLI to handle empty-string Azure secrets correctly.
+- `resign.js` is a no-op on CI (CI signs in-band; resign was a local-dev artefact).
+- Stapler retry loop against Apple's ticket-DB lag.
+- Multiple Bash-env scoping fixes for OIDC token export paths.
+- Pubkey fence markers + spctl correction in the security docs.
+
+Supersedes the tag-only release flow used through v0.9.4. v0.9.5 is the first release cut by the new pipeline.
+
 ## 0.9.4
 
 *Released 2026-04-23 (Windows installer; macOS + Linux builds follow on native build hosts). Tag [`v0.9.4`](https://github.com/qodeca/erfana/releases/tag/v0.9.4).*
