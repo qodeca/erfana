@@ -1,5 +1,12 @@
 name: E2E Tests
 
+# DISABLED 2026-04-25 via `gh workflow disable "E2E Tests"`.
+# Reason: Playwright + Electron tests do not run reliably on `macos-latest`
+#   (visual suite hangs at `waitForLoadState('domcontentloaded')`); the
+#   functional `--project=electron` suite is also unstable on hosted runners.
+# Background + remediation tracking: docs/ci.md § Visual regression on CI.
+# Re-enable when stable:  gh workflow enable "E2E Tests"
+#
 # Runs on develop + main (branch-protected) and every PR.
 # main must be included so branch-protection required-status-checks can see
 # a run; otherwise the release workflow will never satisfy branch protection.
