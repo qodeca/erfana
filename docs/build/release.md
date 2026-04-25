@@ -241,6 +241,64 @@ Each trust anchor has a revocation + communication procedure.
 4. Rotate the Azure Artifact Signing certificate profile (signing cert on the service, separate from the app-reg auth cert).
 5. Audit recent signing operations via Azure activity log.
 
+#### B.1 Routine cleanup of unused federated credentials
+
+Independent of compromise: if the app registration `erfana-github-ci` has any federated credentials left over from the abandoned OIDC path (electron-builder 26 doesn't support OIDC; we use cert auth instead), they're dead code that's a live attack surface. Remove them:
+
+```bash
+APP_ID=45f70db0-2163-4ac6-80b6-1580d7c45b00  # erfana-github-ci
+
+# List federated credentials
+az ad app federated-credential list --id "$APP_ID" -o table
+
+# Delete each unused credential by ID. Cert auth uses a separate credential
+# type (key-based), so this does NOT affect the active signing path.
+az ad app federated-credential delete --id "$APP_ID" --federated-credential-id <cred-id-1>
+az ad app federated-credential delete --id "$APP_ID" --federated-credential-id <cred-id-2>
+
+# Verify (the cert credential remains, the federated ones are gone).
+az ad app federated-credential list --id "$APP_ID" -o table
+az ad app credential list --id "$APP_ID" --cert -o table
+```
+
+#### B.2 Workstation lost — disaster recovery for Azure cert
+
+The Azure auth cert private key (PFX + password) lives in 1Password / Bitwarden, **not** on disk. If the operator workstation is lost:
+
+1. On a clean machine, install Azure CLI + openssl: `winget install Microsoft.AzureCLI` (Windows) or `brew install azure-cli openssl` (macOS).
+2. `az login` (interactive browser flow). Confirm tenant `32ad6264-7454-4a6b-82d8-3aedd2e0867c` (Qodeca).
+3. Generate a fresh keypair locally:
+   ```bash
+   PFX_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)
+   openssl req -x509 -nodes -newkey rsa:2048 \
+     -keyout private.key -out public.crt -days 730 \
+     -subj "/CN=erfana-github-ci"
+   openssl pkcs12 -export -out azure-signing.pfx \
+     -inkey private.key -in public.crt \
+     -passout "pass:$PFX_PW"
+   ```
+4. Upload public cert (preserves any other credentials on the app reg via `--append`):
+   ```bash
+   az ad app credential reset --id "$APP_ID" --cert "@public.crt" --append --years 2
+   ```
+5. Replace GitHub Secrets:
+   ```bash
+   openssl base64 -A -in azure-signing.pfx | gh secret set AZURE_CLIENT_CERTIFICATE_BASE64 --repo qodeca/erfana
+   printf '%s' "$PFX_PW" | gh secret set AZURE_CLIENT_CERTIFICATE_PASSWORD --repo qodeca/erfana
+   ```
+6. Store the new PFX + password in 1Password (NOT on disk — see § Secret hygiene below).
+7. Dispatch a dry-run release to confirm signing still works.
+8. Once confirmed, remove the OLD certificate credential entry from the app registration via Portal or `az ad app credential delete` (otherwise both old + new accept tokens for the next 2 years until expiry).
+
+The cert is short-lived (2 years) so this DR path is straightforward — the procedure above takes ~15 minutes on a clean machine.
+
+#### B.3 Secret hygiene — Azure cert PFX + password
+
+- **Storage:** the PFX and its password live ONLY in 1Password (or equivalent password manager). They are NEVER on disk for longer than the seconds it takes to base64-encode and `gh secret set`.
+- **Anti-pattern (do NOT use):** `~/Documents/erfana-signing-backup/` or any path under `~/Documents`, `~/Downloads`, OneDrive-synced folders, iCloud Drive, or any cloud-synced location. OneDrive auto-syncs and the PFX would land in Microsoft's cloud + version history; even after deletion the OneDrive Recycle Bin retains it for 30+ days.
+- **Migration of any existing on-disk PFX backup:** copy to 1Password as a secure-note attachment named "Erfana Azure signing cert (expires <YYYY-MM-DD>)", verify the entry, then securely delete the on-disk copy (`sdelete` on Windows, `shred` on POSIX). Inspect OneDrive Recycle Bin and version history; purge any cloud copies.
+- **Rotation reminder:** add a calendar entry 60 days before the cert's expiry date — see the rotation calendar table above.
+
 ### C. Minisign key compromise
 
 1. Immediately publish the successor pubkey alongside a revocation notice in `docs/security.md` and pinned in the repo README.

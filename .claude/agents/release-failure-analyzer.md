@@ -58,7 +58,36 @@ Given a failed GitHub Actions run ID for `release.yml`, identify the failure cau
    If multiple rows match, prefer the most-specific one (longest unique substring match wins).
    If no rows match, mark as `unknown_signature` and capture the most distinctive log fragment for cookbook addition.
 
-5. Compose the incident memo
+5. Redact secrets from the captured log fragment
+
+   **CRITICAL:** the log fragment will be committed to the repo as a Markdown
+   memo. If any CI step accidentally echoes a secret, that secret becomes
+   permanently version-controlled. Scrub before write.
+
+   Apply these regex substitutions to the log fragment, replacing each match
+   with `[REDACTED-<bytes>-bytes-<reason>]`:
+
+   | Pattern | Reason |
+   |---|---|
+   | `[A-Za-z0-9+/]{40,}={0,2}` (long base64 / hex strings) | Secret-shape — covers PFX b64, minisign keys, Apple cert b64 |
+   | `eyJ[A-Za-z0-9_-]{20,}` (JWT shape — header starts `eyJ`) | OIDC tokens, JWT bearer tokens |
+   | `gh[pousr]_[A-Za-z0-9]{36,}` | GitHub PAT/OAuth/refresh tokens |
+   | `xox[baprs]-[A-Za-z0-9-]{10,}` | Slack tokens |
+   | `AKIA[A-Z0-9]{16}` | AWS access key IDs |
+   | `[A-Fa-f0-9]{32,}` (long hex — guard against false positives by requiring length ≥ 32) | API keys, hashes-but-better-safe |
+
+   Notes:
+   - GitHub Actions already masks repository-secret values in logs, but the
+     pattern matchers above protect against (a) operator mistakes that print
+     a secret outside Actions' awareness, (b) third-party CLI tools that
+     output secrets to stderr in non-standard formats, and (c) future
+     diagnostic steps added without security review.
+   - Replace the byte count + reason in the redaction marker so the operator
+     can spot which class of secret was scrubbed without exposing the value.
+   - Apply substitutions in ALL CAPS regex order above — earlier patterns
+     win if a string matches multiple.
+
+6. Compose the incident memo
    Write to `{project_path}/docs/release-incidents/v{version}-attempt-{attempt_number}.md`:
    ```markdown
    # Release incident: v{version} attempt #{attempt_number}
@@ -72,9 +101,9 @@ Given a failed GitHub Actions run ID for `release.yml`, identify the failure cau
    {if matched: row N from cookbook — "<symptom>" — root cause + suggested fix}
    {if no match: NEW SIGNATURE — log fragment captured for cookbook addition}
 
-   ## Last 100 lines of failed log
+   ## Last 100 lines of failed log (redacted per agent step 5)
    ```
-   {fenced log fragment}
+   {redacted log fragment from step 5}
    ```
 
    ## Suggested next action
@@ -83,6 +112,12 @@ Given a failed GitHub Actions run ID for `release.yml`, identify the failure cau
      if not: instruct operator to (a) diagnose using docs/build/release.md § Failure recovery,
              (b) add a new row to the cookbook once root cause found
    }
+
+   ---
+   **Operator review checklist** (before `git add` / commit):
+   - [ ] No raw secret values visible (look for unredacted long base64, JWT, gh*_, AKIA, hex)
+   - [ ] Redaction markers `[REDACTED-...]` indicate where scrubbing happened
+   - [ ] If unfamiliar workflow code triggered the failure, manually inspect for novel secret shapes the regex set didn't catch
    ```
 
    Append to `docs/release-incidents/index.md` (create if missing) — see template at bottom of this agent file.
@@ -147,11 +182,13 @@ Before returning, ALL must be true:
 - [ ] Run is verified completed:failure (not in_progress, not success)
 - [ ] At least one failed leg identified with job ID and step name
 - [ ] Last ~100 log lines captured (not 5; not 500)
+- [ ] **Log fragment redacted per workflow step 5** (regex set applied; no raw long-base64 / JWT / gh*_ / AKIA / long-hex strings remain)
 - [ ] Cookbook lookup attempted against EVERY row's symptom
-- [ ] Incident memo written to `docs/release-incidents/v{version}-attempt-{N}.md`
+- [ ] Incident memo written to `docs/release-incidents/v{version}-attempt-{N}.md` (REDACTED fragment, not raw)
 - [ ] Index entry appended to `docs/release-incidents/index.md`
 - [ ] If no match: explicitly marked `unknown_signature` (do not guess)
 - [ ] Output JSON includes the verbatim run URL
+- [ ] Operator-review checklist included in the memo body
 </quality_gate>
 
 ---
