@@ -88,10 +88,17 @@ Run the Phase 0 release-readiness checklist and return structured results.
    If actionlint not installed: emit WARN with install hint, do NOT fail (it's optional but recommended).
 
 10. electron-builder config integrity (catches the placeholder-empty trap)
-    `Bash node -e "
+
+    Always run from the project root. The script reads `electron-builder.yml`
+    via an absolute path constructed from `project_path` so cwd drift can't
+    cause false ENOENT failures.
+
+    `Bash cd {project_path} && node -e "
+      const path = require('path');
       const yaml = require('js-yaml');
       const fs = require('fs');
-      const cfg = yaml.load(fs.readFileSync('electron-builder.yml','utf8'));
+      const cfgPath = path.join(process.argv[1] || process.cwd(), 'electron-builder.yml');
+      const cfg = yaml.load(fs.readFileSync(cfgPath,'utf8'));
       const errors = [];
       // Schema: when win.azureSignOptions is present, all 4 fields must be non-empty strings
       const a = cfg && cfg.win && cfg.win.azureSignOptions;
@@ -106,7 +113,7 @@ Run the Phase 0 release-readiness checklist and return structured results.
       if (cfg.publish !== null) errors.push('publish must be null (auto-updater metadata explicitly disabled)');
       if (errors.length) { console.error('CONFIG_FAIL: ' + errors.join(' | ')); process.exit(1); }
       console.log('CONFIG_OK');
-    "`
+    " -- "{project_path}"`
     FAIL if exit code != 0.
 
 11. Compile results

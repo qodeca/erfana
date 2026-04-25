@@ -42,7 +42,7 @@ All external credentials (Apple Developer, Azure Artifact Signing, minisign rele
 |-------|---------|--------|---------|
 | `release-quality-runner` | Enforce Phase 0 pre-flight checklist (branch, version, secrets, workflow lint, electron-builder schema) | shared (project override) | Phase 0 |
 | `release-notes-drafter` | Emit two-tier release-notes markdown via `git cliff` + operator summary | shared (project override) | Phase 1 |
-| `release-failure-analyzer` | On Phase 3 CI failure: identify failed leg, match log against the troubleshooting cookbook, write structured incident memo to `docs/release-incidents/` | shared (project-local) | Phase 3 (failure path) |
+| `release-failure-analyzer` | On Phase 3 CI failure: identify failed leg, match log against the troubleshooting cookbook, write structured incident memo to `docs/release-incidents/` | project-local | Phase 3 (failure path) |
 
 **`release-build-executor` is retired.** CI owns the build. The skill watches, verifies, and publishes.
 
@@ -74,18 +74,16 @@ All external credentials (Apple Developer, Azure Artifact Signing, minisign rele
 
 ## Todo list (MANDATORY)
 
-At release start, create a todo list tracking all phases:
+At release start, the skill MUST call the `TaskCreate` tool once per phase to register six tracking tasks:
 
-```
-TaskCreate: "Phase 0: Pre-flight (main-branch + semver + CHANGELOG)"
-TaskCreate: "Phase 1: Release notes (two-tier)"
-TaskCreate: "Phase 2: Signed tag + push"
-TaskCreate: "Phase 3: Watch release workflow"
-TaskCreate: "Phase 4: Verify + publish checkpoint"
-TaskCreate: "Phase 5: Post-publish verification + summary"
-```
+- **Phase 0:** Pre-flight (main-branch + semver + CHANGELOG)
+- **Phase 1:** Release notes (two-tier)
+- **Phase 2:** Signed tag + push
+- **Phase 3:** Watch release workflow
+- **Phase 4:** Verify + publish checkpoint
+- **Phase 5:** Post-publish verification + summary
 
-Update each task to `in_progress` before starting and `completed` after its checkpoint passes.
+Update each task via `TaskUpdate` to `in_progress` before starting and `completed` after its checkpoint passes. The list above is content for the `subject` field of each `TaskCreate` call — not literal source code.
 
 ---
 

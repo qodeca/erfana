@@ -42,6 +42,7 @@ module.exports = async function afterSign(context) {
   const realIdentitySigning =
     process.env.APPLE_API_KEY ||
     process.env.APPLE_API_KEY_ID ||
+    process.env.APPLE_API_KEY_PATH ||
     process.env.APPLE_ID ||
     process.env.APPLE_APP_SPECIFIC_PASSWORD ||
     process.env.CSC_LINK ||

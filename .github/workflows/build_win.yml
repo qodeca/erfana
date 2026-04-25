@@ -79,7 +79,19 @@ jobs:
             echo "::error::Decoded PFX is implausibly small ($SIZE bytes)"
             exit 1
           fi
-          echo "PFX written: $CERT_PATH (${SIZE} bytes)"
+          # PKCS#12 envelope sanity check — catches a corrupted PFX
+          # (e.g., truncation from mid-string CR/LF) that's larger than
+          # the 100-byte floor but still won't load. Without this, the
+          # error surfaces 20+ minutes later inside @azure/identity
+          # with a cryptic message. `-noout` suppresses output;
+          # 2>/dev/null hides openssl's verbose error output (we just
+          # want exit code).
+          if ! openssl pkcs12 -info -in "$CERT_PATH" -noout \
+              -password "pass:$AZURE_CLIENT_CERTIFICATE_PASSWORD" >/dev/null 2>&1; then
+            echo "::error::Decoded file is not a valid PKCS#12 envelope or password is wrong"
+            exit 1
+          fi
+          echo "PFX written: $CERT_PATH (${SIZE} bytes, PKCS#12 envelope valid)"
           # Convert to a Windows-style path for AZURE_CLIENT_CERTIFICATE_PATH —
           # @azure/identity running under pwsh expects backslashes. We
           # also export AZURE_SIGNING_PFX_POSIX_PATH (POSIX form) for the

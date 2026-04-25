@@ -128,21 +128,19 @@ The fastest lessons from the v0.9.5 bring-up. Skill operators should adopt these
 - **GitHub Actions `macos-latest` is 10× billing.** A single mac dry-run is ~$0.80 against the included minutes; two parallel macOS runs (e.g., a queued canary + a freshly dispatched fix run) burn $1.60 with overlap. Cancel one before dispatching the next.
 - **The dry-run mode (`workflow_dispatch -f dry-run=true`) skips `gh release upload` but still signs + notarizes.** Use it to validate workflow changes without burning a tag. Real releases consume real Apple notary minutes; dry-runs do too, but you don't need to bump the patch on failure.
 
-### How to use this table
+### How to use this cookbook
 
 1. CI just failed — open the failed-step log via `gh run view <ID> --log-failed`.
-2. Skim the last ~50 lines for any string in the **Symptom** column. Match the most distinctive error fragment.
-3. Read the matching row's **Root cause** and **Fix that worked**.
+2. For each row above, run `grep -E -i '<row-regex>'` against the log. Match → row found.
+3. Read the matching row's **Root cause** and **Fix**.
 4. Apply the fix (most are one-file YAML edits) and re-dispatch.
-5. If the symptom is *not* in the table, follow the diagnostic habits above. After the fix lands, **add a new row** documenting the new signature so the next operator skips the discovery step.
+5. If no row matches, follow the diagnostic habits above. After the fix lands, **add a new row** using the template at the end of the row list so the next operator skips the discovery step.
 
 ---
 
-## General troubleshooting
+## Other troubleshooting
 
-
-
-## Build size too large (>300 MB)
+### Build size too large (>300 MB)
 
 Check electron-builder.yml excludes:
 ```yaml

@@ -6,7 +6,7 @@ capabilities:
   - log-pattern-matching
   - incident-report-authoring
 description: MUST BE USED when `release.yml` fails (Phase 3 of releasing-erfana skill, on non-zero `gh run watch --exit-status`) to analyse the failed run. Erfana-local agent that identifies which platform leg failed, extracts the canonical error signature from the log, matches it against the troubleshooting cookbook, and writes a structured incident memo to `docs/release-incidents/` so the next operator iterates faster.
-tools: Read, Bash, Grep
+tools: Read, Write, Bash, Grep
 model: sonnet
 ---
 
@@ -101,7 +101,22 @@ Given a failed GitHub Actions run ID for `release.yml`, identify the failure cau
      win if a string matches multiple.
 
 6. Compose the incident memo
-   Write to `{project_path}/docs/release-incidents/v{version}-attempt-{attempt_number}.md`:
+
+   **Memo collision handling:** if `{project_path}/docs/release-incidents/v{version}-attempt-{attempt_number}.md` already exists (operator re-invoked the agent for the same version+attempt), do NOT overwrite. Instead, append a new section to the existing file:
+
+   ```markdown
+   ---
+
+   ## Re-analysis at {ISO8601 UTC}
+
+   - **Re-run via:** {tool / human operator}
+   - **Match status:** {as below}
+   - **Last 100 lines (redacted):** {as below}
+   ```
+
+   This preserves the original log fragment + matched signature, which often contains earlier-cycle context the second invocation may have lost (CI log retention is 30 days; logs from the first invocation may have aged out).
+
+   Otherwise (memo doesn't exist), write to `{project_path}/docs/release-incidents/v{version}-attempt-{attempt_number}.md`:
    ```markdown
    # Release incident: v{version} attempt #{attempt_number}
 
@@ -141,7 +156,8 @@ Given a failed GitHub Actions run ID for `release.yml`, identify the failure cau
 
 <bash_constraints>
 **ALLOWED:** gh run view, gh api (read-only — `repos/.../actions/jobs/.../logs`, `repos/.../actions/runs/...`), gh run list, grep, head, tail, awk, sed (read-only print), date, mkdir.
-**NEVER:** gh run cancel, gh run rerun, gh release edit, gh release delete, gh release upload, git tag, git push, git commit, rm, mv, cp (except: create the incident memo file, create docs/release-incidents/ directory, create/update docs/release-incidents/index.md). Never modify any file outside `docs/release-incidents/`.
+**NEVER:** gh run cancel, gh run rerun, gh release edit, gh release delete, gh release upload, git tag, git push, git commit, rm, mv, cp.
+Memo creation uses the `Write` tool (not Bash heredoc), restricted by tool grant to filesystem paths only. The orchestrator enforces that paths begin with `docs/release-incidents/` before approving any Write call.
 </bash_constraints>
 
 <constraints>
