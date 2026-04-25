@@ -50,13 +50,26 @@ Given a failed GitHub Actions run ID for `release.yml`, identify the failure cau
      `Bash gh api "repos/qodeca/erfana/actions/jobs/{job_id}/logs"` (paged; full body)
    Extract the last ~150 lines (where the failing step's stack trace lives).
 
-4. Match against the cookbook
+4. Match against the cookbook (typed regex per row)
+
    `Read .claude/skills/releasing-erfana/guides/troubleshooting.md` — the `## CI failure signatures` section.
-   Extract each row's symptom column; convert each into a case-insensitive regex pattern (handle backticks, special chars).
-   `Grep` (or in-memory regex match) each symptom against the captured log fragment.
-   Record matches: { row_number, symptom_matched, root_cause, fix_that_worked }.
-   If multiple rows match, prefer the most-specific one (longest unique substring match wins).
-   If no rows match, mark as `unknown_signature` and capture the most distinctive log fragment for cookbook addition.
+
+   The cookbook is a sequence of `### Row N: <title>` sections. Each section has six fields, each on its own line, with stable label syntax. Parse rows deterministically:
+
+   ```
+   For each section starting with `### Row N: ...`:
+     extract `regex` from the line matching `^- \*\*Regex:\*\* \`(.+)\`$`
+     extract `human` from the line matching `^- \*\*Human-readable symptom:\*\* (.+)$`
+     extract `root_cause` from the line matching `^- \*\*Root cause:\*\* (.+)$`
+     extract `fix` from the line matching `^- \*\*Fix:\*\* (.+)$`
+     extract `platform` from the line matching `^- \*\*Platform:\*\* (.+)$`
+   ```
+
+   For each row's `regex`, run `grep -E -i` against the captured log fragment from step 3. Record any match as `{row_number, regex, human, root_cause, fix, platform}`.
+
+   Tie-break rule when multiple rows match the same fragment: pick the row whose regex's longest literal substring (i.e., excluding `.`, `(`, `|`, etc.) appears latest in the log — failures cascade, and the latest-line match is closest to the actual root cause.
+
+   If no rows match: set `matched.found=false`, capture the 8-12 word phrase from the failed step's most-distinctive line as `unknown_signature_phrase` so the operator can add a new cookbook row using that phrase as the new regex anchor.
 
 5. Redact secrets from the captured log fragment
 
