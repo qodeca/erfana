@@ -15,7 +15,7 @@
 # cadence). Can also be triggered manually via `workflow_dispatch` for a dry
 # run. Fails fast if any credential is unusable; on failure posts an issue to
 # the repo so the incident is tracked.
-name: whisper-binaries-canary
+name: Whisper binaries (canary)
 
 on:
   schedule:
