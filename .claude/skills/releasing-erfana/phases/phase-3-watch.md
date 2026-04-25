@@ -31,7 +31,11 @@ echo "Release run: https://github.com/qodeca/erfana/actions/runs/${RUN_ID}"
 
 The orchestrator polls every **240 s** (4 min) — under the 5-min Anthropic prompt-cache TTL so the cache stays warm — with a hard ceiling of **22 polls (~88 min)**. Foreground `gh run watch` is intentionally not used: `timeout 90m` is GNU-only (missing on macOS by default), and the Bash tool's 600 s ceiling cannot span the full pipeline anyway.
 
+A **per-leg stuck-leg early warning** fires at 45 min (2700 s) — see Constants table in `SKILL.md`. The aggregate 88-min ceiling can mask a single leg hung at notarization while others completed normally. Detection uses each leg's job-level `startedAt` timestamp from `gh run view --json jobs`, computes wall time, and surfaces a warning + abort prompt if any leg crosses the threshold.
+
 ```bash
+STUCK_LEG_THRESHOLD=2700   # 45 min in seconds (per SKILL.md ## Constants)
+
 for poll in $(seq 1 22); do
   STATE=$(gh run view "$RUN_ID" \
     --json status,conclusion \
@@ -49,6 +53,29 @@ for poll in $(seq 1 22); do
       ;;
     *)
       echo "poll $poll/22: $STATE"
+
+      # Per-leg stuck-leg detection. Each leg's job-level startedAt is
+      # authoritative — wall time from poll-loop start would over-count
+      # legs that started after the run was queued.
+      NOW=$(date -u +%s)
+      while IFS=$'\t' read -r JOB_NAME JOB_STATUS JOB_STARTED; do
+        [ "$JOB_STATUS" = "in_progress" ] || continue
+        [ -n "$JOB_STARTED" ] || continue
+        # macOS date and GNU date both accept ISO-8601 with -d/-j; use python
+        # for portable epoch conversion.
+        STARTED_EPOCH=$(python3 -c "import datetime,sys; print(int(datetime.datetime.fromisoformat(sys.argv[1].replace('Z','+00:00')).timestamp()))" "$JOB_STARTED" 2>/dev/null || echo 0)
+        [ "$STARTED_EPOCH" -gt 0 ] || continue
+        ELAPSED=$((NOW - STARTED_EPOCH))
+        if [ "$ELAPSED" -gt "$STUCK_LEG_THRESHOLD" ]; then
+          MIN=$((ELAPSED / 60))
+          echo "::warning::Leg '$JOB_NAME' has been in_progress for ${MIN} min (>45 min threshold)"
+          # AskUserQuestion: "Abort polling and treat as stuck?" — operator
+          # may know notarization typically takes 50 min for this build and
+          # choose to continue. Gate is advisory, not blocking.
+        fi
+      done < <(gh run view "$RUN_ID" --json jobs \
+        --jq '.jobs[] | [.name, .status, (.startedAt // "")] | @tsv')
+
       sleep 240
       ;;
   esac
@@ -69,16 +96,16 @@ The orchestrator is expected to surface progress between polls (number completed
 If `RC` is non-zero, **do NOT just dump 200 log lines and exit.** Delegate to the failure analyzer so the diagnostic capture is structured and reusable.
 
 ```
-Agent(subagent_type: "release-failure-analyzer")
-Prompt: "Analyse failed release.yml run.
-         Inputs:
-           - run_id: ${RUN_ID}
-           - version: ${VERSION}
-           - attempt_number: <Nth attempt for this version, see docs/release-incidents/index.md>
-           - project_path: <repo root>
-         Identify failed leg(s), match log against the troubleshooting cookbook,
-         write incident memo to docs/release-incidents/v${VERSION}-attempt-{N}.md,
-         append index entry. Return structured JSON per agent contract."
+Task(subagent_type: "release-failure-analyzer",
+     prompt: "Analyse failed release.yml run.
+              Inputs:
+                - run_id: ${RUN_ID}
+                - version: ${VERSION}
+                - attempt_number: <Nth attempt for this version, see docs/release-incidents/index.md>
+                - project_path: <repo root>
+              Identify failed leg(s), match log against the troubleshooting cookbook,
+              write incident memo to docs/release-incidents/v${VERSION}-attempt-{N}.md,
+              append index entry. Return structured JSON per agent contract.")
 ```
 
 The agent writes the memo and returns:
@@ -99,17 +126,28 @@ The agent writes the memo and returns:
 | Investigate further | Skill exits; operator reviews memo manually. |
 | Mark as unknown signature → cookbook update + retry | **Gated path** (see below). Skill verifies the cookbook gained a new row matching the unmatched signature before allowing re-entry to Phase 0. |
 
-**Unknown-signature gate (option 3):** if `matched.found=false`, the skill MUST verify the cookbook gained a new row before re-entering Phase 0 — preventing repeated identical failures on the same unmatched signature.
+**Unknown-signature gate (option 3):** if `matched.found=false`, the skill MUST verify the cookbook gained a new row before re-entering Phase 0 — preventing repeated identical failures on the same unmatched signature. Two strict checks: distinctive phrase must be ≥8 words AND match exactly one cookbook row.
 
 ```bash
 # Pick a distinctive 8-12 word phrase from the unmatched log fragment.
 DISTINCTIVE="<phrase>"
-# AskUserQuestion: "Have you added a new cookbook row for this signature?"
-# If "Yes": grep cookbook for the distinctive phrase. If absent → fail.
-grep -qF "$DISTINCTIVE" .claude/skills/releasing-erfana/guides/troubleshooting.md || {
-  echo "::error::Cookbook update claimed but distinctive phrase not found"
+
+# Gate 1: Word-count floor — single-word "release" or "error" trivially
+# pass against any cookbook and bypass the intended verification.
+WORDS=$(echo "$DISTINCTIVE" | wc -w | tr -d ' ')
+if [ "$WORDS" -lt 8 ]; then
+  echo "::error::Distinctive phrase must be ≥8 words (got $WORDS)"
   exit 1
-}
+fi
+
+# Gate 2: Exactly-one-match — multi-match implies the phrase isn't
+# distinctive enough; zero-match implies the cookbook update wasn't
+# actually performed despite the operator claim.
+MATCHES=$(grep -Fc "$DISTINCTIVE" .claude/skills/releasing-erfana/guides/troubleshooting.md || true)
+if [ "$MATCHES" -ne 1 ]; then
+  echo "::error::Phrase must match exactly one cookbook row (got $MATCHES)"
+  exit 1
+fi
 ```
 
 **Tag is burned regardless** — every retry must use a new patch version. This is non-negotiable per the enforcement rules.

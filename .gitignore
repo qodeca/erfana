@@ -36,6 +36,10 @@ coverage/
 .auto-claude/
 .claude/scheduled_tasks.lock
 
+# Skill modification backups (ms-modifier)
+.claude/skills/*.backup.*
+.claude/skills/**/*.backup.*
+
 # TypeScript build info
 *.tsbuildinfo
 test-results/

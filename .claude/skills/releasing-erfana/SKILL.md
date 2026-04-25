@@ -1,7 +1,13 @@
 ---
 name: releasing-erfana
 description: Build and release a new version of Erfana via the multi-platform CI release workflow. Enforces main-branch discipline, assembles two-tier release notes, pushes a signed tag, polls the release pipeline in GitHub Actions, cryptographically verifies every artifact, and gates the final publish on explicit operator approval. Use when Erfana is ready to ship.
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent, AskUserQuestion, TaskCreate, TaskUpdate, TaskList
+allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Task, AskUserQuestion, TodoWrite
+capabilities:
+  - release-orchestration
+  - ci-monitoring
+  - artifact-verification
+model: opus
+user-invocable: true
 ---
 
 # Releasing Erfana
@@ -10,6 +16,8 @@ Orchestrates the Erfana release flow that ends with **one GitHub release contain
 
 Detailed ops reference: [docs/build/release.md](../../../docs/build/release.md).
 Design anchor: [#174](https://github.com/qodeca/erfana/issues/174).
+
+> **Note**: This skill is project-scope-only. The relative path `../../../docs/build/release.md` is intentional — moving the skill to user-scope (`~/.claude/skills/`) would break the doc reference and orphan the project-local `release-failure-analyzer` agent. See "Architectural exception" below.
 
 ## When this skill applies
 
@@ -21,7 +29,16 @@ Activate when the user says:
 - "ship v0.9.5" (or similar version)
 - "new release"
 
-Activate only when the working copy can reasonably be released — do not activate for build/test troubleshooting, dev-only tagging, or non-release `v*` tags.
+Activate only when the working copy can reasonably be released.
+
+**Anti-triggers — do NOT activate for:**
+- Build/test troubleshooting (no signed tag involved)
+- Dev-only tagging (e.g., `v0.0.0-dev`, internal milestones)
+- Hotfix work to a version that hasn't been released
+- Investigating CI without intent to ship
+- Tag deletion or rollback of a published release (separate ops, not in skill scope)
+
+> **Shell requirement**: Phase 4–5 bash uses array constructs and `<( ... )` process substitution. Run via `bash` (not `zsh`) — `#!/usr/bin/env bash` shebang. See `phases/phase-4-verify.md` §4.2 note.
 
 ## Prerequisites
 
@@ -34,7 +51,18 @@ Activate only when the working copy can reasonably be released — do not activa
 | `minisign` | Verify `SHA256SUMS.minisig` | `minisign -v` |
 | `sha256sum` | Recompute asset hashes locally | `command -v sha256sum` |
 
-All external credentials (Apple Developer, Azure Artifact Signing, minisign release keypair) live in **GitHub secrets** and never flow through the local machine.
+All external credentials (Apple Developer, Azure Artifact Signing, minisign release keypair) live in **GitHub secrets** and never flow through the local machine. See [docs/build/release.md § Secrets and rotation calendar](../../../docs/build/release.md#secrets-and-rotation-calendar).
+
+## Constants
+
+These values appear in multiple places. Update here first, then `EXPECTED_ASSETS=11` in §0.4 and the count comment in `phase-4-verify.md` §4.5 will reference this table.
+
+| Constant | Value | Note |
+|---|---|---|
+| Expected binary count | 9 | macOS-x64, macOS-arm64, macOS-universal, win-x64, win-arm64, linux-x64-deb, linux-x64-rpm, linux-x64-AppImage, linux-arm64-AppImage |
+| Expected total asset count | 11 | 9 binaries + `SHA256SUMS` + `SHA256SUMS.minisig` |
+| Phase 3 polling cadence | 240 s × 22 polls | 88 min ceiling for `release.yml` completion |
+| Per-leg stuck-leg threshold | 2700 s (45 min) | Single leg in_progress beyond this triggers warning |
 
 ## Agents
 
@@ -44,7 +72,7 @@ All external credentials (Apple Developer, Azure Artifact Signing, minisign rele
 | `release-notes-drafter` | Emit two-tier release-notes markdown via `git cliff` + operator summary | shared (project override) | Phase 1 |
 | `release-failure-analyzer` | On Phase 3 CI failure: identify failed leg, match log against the troubleshooting cookbook, write structured incident memo to `docs/release-incidents/` | project-local | Phase 3 (failure path) |
 
-**`release-build-executor` is retired.** CI owns the build. The skill watches, verifies, and publishes.
+**`release-build-executor` is retired** (removed in [#174](https://github.com/qodeca/erfana/issues/174)). CI owns the build. The skill watches, verifies, and publishes.
 
 ## Quick reference
 
@@ -55,7 +83,7 @@ All external credentials (Apple Developer, Azure Artifact Signing, minisign rele
 | Version source | `package.json` → `"version"` |
 | Release notes path | `docs/release-notes/v{version}.md` (two-tier with `<details>`) |
 | CI workflow | `.github/workflows/release.yml` |
-| Expected release assets | 9 binaries + `SHA256SUMS` + `SHA256SUMS.minisig` (11 total) |
+| Expected release assets | See `## Constants` above (9 binaries + 2 = 11 total) |
 | Provenance attestations | **Not used** — GitHub Artifact Attestations are Enterprise-only for private repos. Authenticity covered by minisign + per-platform OS signing. |
 | Minisign release pubkey | `docs/security.md` § Release signing |
 
@@ -67,14 +95,18 @@ All external credentials (Apple Developer, Azure Artifact Signing, minisign rele
 4. **Verify before publish.** Phase 4 must complete minisign + per-file sha256 verification before the operator approval prompt is shown.
 5. **No auto-publish.** Marking the draft as `--latest` requires explicit operator approval after verification is green.
 6. **No bypass.** A verification failure in Phase 4 aborts — do not prompt for approval, do not suggest manual overrides. The release is burned; bump the patch.
-7. **Delegate wherever possible.** The quality checklist (Phase 0) and release notes drafting (Phase 1) go through agents.
+7. **MUST delegate every executor step.** The quality checklist (Phase 0) and release notes drafting (Phase 1) go through agents. Documented exceptions (e.g., Phase 5.1 minisign re-verify) must be explicitly justified in-place with a `Rule #7 exception` comment block.
 8. **Idempotency with honesty.** If a tag is already pushed, Phase 0 offers resume-to-Phase-3 (non-destructive) or delete-and-retry (destructive, explicit operator confirmation).
+
+### Architectural exception (Rule #2 — project-local agent)
+
+`release-failure-analyzer` is intentionally project-local at `.claude/agents/release-failure-analyzer.md` rather than `~/.claude/agents/`. Rationale: the agent's `<workflow>` step 4 has a hard structural contract with `guides/troubleshooting.md` (Erfana-specific cookbook format, six typed labels per row, platform classification, signature samples). Promoting it to user-scope without splitting the cookbook would require parameterizing a format invariant — a worse abstraction than today's honest project-local agent. Promoting it *with* the cookbook would scatter project-specific operational knowledge across user-scope, breaking the principle that a project skill is the single source of truth for project-specific operational knowledge. This exception is bounded to project skills with bundled domain cookbooks and should be revisited only if a second project develops a structurally-identical cookbook.
 
 ---
 
 ## Todo list (MANDATORY)
 
-At release start, the skill MUST call the `TaskCreate` tool once per phase to register six tracking tasks:
+At release start, the skill MUST call `TodoWrite` once with all six phase entries pre-registered, each in `pending` status. The six entries are:
 
 - **Phase 0:** Pre-flight (main-branch + semver + CHANGELOG)
 - **Phase 1:** Release notes (two-tier)
@@ -83,7 +115,7 @@ At release start, the skill MUST call the `TaskCreate` tool once per phase to re
 - **Phase 4:** Verify + publish checkpoint
 - **Phase 5:** Post-publish verification + summary
 
-Update each task via `TaskUpdate` to `in_progress` before starting and `completed` after its checkpoint passes. The list above is content for the `subject` field of each `TaskCreate` call — not literal source code.
+Each entry is one object in the `TodoWrite` array with `{content: "<phase summary>", status: "pending", activeForm: "<present-continuous form>"}`. As each phase begins, call `TodoWrite` again with that entry's status set to `in_progress`; on checkpoint pass, set it to `completed`. The list above provides the `content` field text — not literal source code.
 
 ---
 
@@ -140,6 +172,9 @@ TAG_EXISTS_LOCAL=false
 TAG_EXISTS_REMOTE=false
 RELEASE_STATE="none"  # one of: none | draft-empty | draft-ready | published
 
+# Expected total asset count: see SKILL.md `## Constants` table
+EXPECTED_ASSETS=11
+
 if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
   TAG_EXISTS_LOCAL=true
 fi
@@ -158,7 +193,7 @@ if [ "$TAG_EXISTS_REMOTE" = "true" ]; then
     ASSET_COUNT=$(printf '%s' "$RELEASE_JSON" | jq -r '.assets | length')
     if [ "$IS_DRAFT" = "false" ]; then
       RELEASE_STATE="published"
-    elif [ "$ASSET_COUNT" -ge 11 ]; then
+    elif [ "$ASSET_COUNT" -ge "$EXPECTED_ASSETS" ]; then
       RELEASE_STATE="draft-ready"   # 9 binaries + SHA256SUMS + .minisig = 11
     else
       RELEASE_STATE="draft-empty"   # finalize hasn't yet sealed the draft
@@ -222,15 +257,21 @@ fi
 ### 0.5 Delegate the rest of the checklist to `release-quality-runner`
 
 ```
-Agent(subagent_type: "release-quality-runner")
-Prompt: "Run the Phase 0 release-readiness checklist for Erfana at {project_path}
-         on branch main. Return structured pass/fail for:
-         - running dev servers
-         - uncommitted changes (should be none after our gate)
-         - node version
-         - gh authenticated
-         - minisign installed
-         Return: { overall: 'pass'|'fail', failures: string[], warnings: string[] }"
+Task(subagent_type: "release-quality-runner",
+     prompt: "Run the Phase 0 release-readiness checklist for Erfana at {project_path}
+              on branch main. Run all four quality gates (gates: ['lint', 'typecheck', 'test', 'audit'])
+              and the pre-flight checklist:
+              - running dev servers
+              - uncommitted changes (should be none after our gate)
+              - node version
+              - gh authenticated
+              - minisign installed
+              Return: {
+                overall: 'pass'|'fail',
+                failures: string[],
+                warnings: string[],
+                gates_run: string[]
+              }")
 ```
 
 Any `fail` stops the skill. Warnings are surfaced to the operator, who can continue.
@@ -258,7 +299,7 @@ If `git cliff` is not installed, fall back:
 npx -y git-cliff --tag "v${VERSION}" --unreleased > .release-notes-technical.tmp.md
 ```
 
-### 1.2 Collect the user-facing summary from the operator (SKILL-LEVEL)
+### 1.2 Collect the user-facing summary from the operator
 
 Subagents cannot call `AskUserQuestion` — it must be called from the skill. Use it now to collect 3–5 bullet points that describe the release in user-facing terms.
 
@@ -271,22 +312,22 @@ Persist the operator's reply into a variable (e.g., `$USER_SUMMARY`) as a single
 ### 1.3 Delegate composition to the agent
 
 ```
-Agent(subagent_type: "release-notes-drafter")
-Prompt: "Compose two-tier release notes for Erfana v${VERSION}.
-         Inputs:
-           - version: ${VERSION}
-           - technical_section_path: .release-notes-technical.tmp.md
-           - user_summary: <pasted $USER_SUMMARY verbatim>
-           - output_path: docs/release-notes/v${VERSION}.md
-         Write the file with the exact template:
-           # Erfana v${VERSION}
-           _Released: <UTC YYYY-MM-DD>_
-           ${user_summary}
-           <details><summary>Technical changes</summary>
-           <technical section contents>
-           </details>
-         Do NOT invent content beyond inputs. Do NOT call AskUserQuestion.
-         Return the composed content + output path."
+Task(subagent_type: "release-notes-drafter",
+     prompt: "Compose two-tier release notes for Erfana v${VERSION}.
+              Inputs:
+                - version: ${VERSION}
+                - technical_section_path: .release-notes-technical.tmp.md
+                - user_summary: <pasted $USER_SUMMARY verbatim>
+                - output_path: docs/release-notes/v${VERSION}.md
+              Write the file with the exact template:
+                # Erfana v${VERSION}
+                _Released: <UTC YYYY-MM-DD>_
+                ${user_summary}
+                <details><summary>Technical changes</summary>
+                <technical section contents>
+                </details>
+              Do NOT invent content beyond inputs. Do NOT call AskUserQuestion.
+              Return the composed content + output path.")
 ```
 
 ### 1.4 Operator review
@@ -298,41 +339,9 @@ Present the generated `docs/release-notes/v${VERSION}.md` and ask whether to acc
 
 ### 1.5 Single-commit bundle
 
-Pre-flight check (added per #174 reviewer finding): `git commit -S` fails silently if `user.signingkey` and `gpg.format` aren't configured. Surface a clear error before attempting.
+Pre-flight check before §1.5 commit bundle: see [`./guides/git-signing.md`](./guides/git-signing.md) (added per #174 reviewer finding — verifies `user.signingkey` and `gpg.format`; soft-warns on missing `gpg.ssh.allowedSignersFile`).
 
 ```bash
-# Pre-flight: commit signing must be configured. The protected-tag rule
-# (Phase I) only enforces signed TAGS, not signed commits — but our
-# release commit uses -S, so a missing config is a hard fail here.
-if ! git config --get user.signingkey >/dev/null 2>&1 \
-   || ! git config --get gpg.format >/dev/null 2>&1; then
-  echo "ERROR: commit signing not configured." >&2
-  echo "Set user.signingkey and gpg.format (ssh|gpg) before re-running." >&2
-  echo "Example (SSH):" >&2
-  echo "  git config --global user.signingkey '/Users/<you>/.ssh/id_ed25519.pub'" >&2
-  echo "  git config --global gpg.format ssh" >&2
-  echo "  git config --global commit.gpgsign true" >&2
-  echo "  git config --global tag.gpgsign true" >&2
-  exit 1
-fi
-
-# When gpg.format=ssh, local verification (git log --show-signature,
-# git verify-commit) requires gpg.ssh.allowedSignersFile. Without it,
-# git reports "No signature" for a verifiably signed commit — a confusing
-# red herring in the middle of Phase 2. Soft-warn (don't abort) since
-# server-side verification still works.
-if [ "$(git config --get gpg.format)" = "ssh" ] \
-   && ! git config --get gpg.ssh.allowedSignersFile >/dev/null 2>&1; then
-  echo "WARN: gpg.format=ssh but gpg.ssh.allowedSignersFile is unset." >&2
-  echo "Server-side verification (GitHub) will work; local verification" >&2
-  echo "(git log --show-signature) will report 'No signature' anyway." >&2
-  echo "To fix:" >&2
-  echo "  printf '%s namespaces=\"git\" %s\\n' \\" >&2
-  echo "    \"\$(git config --get user.email)\" \"\$(cat \$(git config --get user.signingkey))\" \\" >&2
-  echo "    > ~/.config/git/allowed_signers" >&2
-  echo "  git config --global gpg.ssh.allowedSignersFile ~/.config/git/allowed_signers" >&2
-fi
-
 # One commit bundles: package.json bump (already done pre-skill or done here),
 # CHANGELOG append (pre-skill), release notes file.
 git add package.json docs/CHANGELOG.md "docs/release-notes/v${VERSION}.md"
@@ -446,11 +455,13 @@ Summary table:
 
 ### 5.1 Re-verify the now-public release
 
+> **Rule #7 exception (inline executor work).** The 3 commands below are intentionally inline rather than delegated to an agent. They re-run the Phase 4.3 minisign check against the now-public URL — pure read+verify, zero mutations, identical crypto operation to the agent-delegated check just performed. Wrapping in a new agent for 3 commands adds maintenance burden without diagnostic improvement.
+
 ```bash
 # Re-download and re-verify minisign on the published release URL.
 PUBLISHED=$(gh release view "v${VERSION}" --json url --jq .url)
 gh release download "v${VERSION}" --repo qodeca/erfana --pattern 'SHA256SUMS*' --clobber --dir "$WORK/published"
-minisign -V -P "$(cat "$WORK/release.pub")" \
+minisign -V -P "$(cat "$WORK/release-primary.pub")" \
   -m "$WORK/published/SHA256SUMS" -x "$WORK/published/SHA256SUMS.minisig"
 ```
 
@@ -467,57 +478,21 @@ Present:
 
 ## Anti-patterns
 
-| Don't | Do instead |
-|-------|------------|
-| Run from `develop` | Run only from `main` |
-| Push with `git push --tags` | Push one tag at a time |
-| `git rev-parse v${TAG}` for annotated tags | `git rev-parse v${TAG}^{}` |
-| Skip the minisign verification because "assets look right" | Always verify minisign → sha256 → attestations |
-| Re-tag the same version after any signed artifact shipped | Bump to next patch — the tag is burned |
-| Auto-mark the draft as latest | Explicit operator approval required |
-| Manually `gh release upload` to fix a missing asset | Delete the draft, bump the patch, re-run |
-| Edit an already-published release's assets | Cut a hotfix |
+See [`./guides/anti-patterns.md`](./guides/anti-patterns.md) for the full Don't/Do table.
 
 ---
 
 ## Reference files
 
-- [`templates/release-notes.md`](templates/release-notes.md) — two-tier release-notes template
+- [`guides/anti-patterns.md`](guides/anti-patterns.md) — Don't/Do table for release-day patterns
+- [`guides/examples.md`](guides/examples.md) — Worked examples (success, lockfile-drift, hash-mismatch)
+- [`guides/git-signing.md`](guides/git-signing.md) — Pre-flight git signing check (Phase 1.5)
 - [`guides/troubleshooting.md`](guides/troubleshooting.md) — failure recovery and rollback procedures
+- [`templates/release-notes.md`](templates/release-notes.md) — two-tier release-notes template
 - [`docs/build/release.md`](../../../docs/build/release.md) — full operator reference (matrix, secrets, incident response)
 
 ---
 
 ## Examples
 
-### Example 1: Successful release (v0.9.5)
-
-Operator checks out `main`, bumps `package.json` to `0.9.5`, appends CHANGELOG entry, and invokes the skill.
-
-1. Phase 0: branch ok, tree clean, version valid, CHANGELOG contains `## 0.9.5`.
-2. Phase 1: `git cliff` emits technical section; operator supplies 4 bullet points for the summary; single commit pushed.
-3. `checks.yml` turns green within ~3 min.
-4. Phase 2: signed tag pushed.
-5. Phase 3: `release.yml` runs for ~60 min. `gh run watch` returns exit 0.
-6. Phase 4: minisign verifies; per-asset sha256 matches signed SHA256SUMS; workflow-output digest matches.
-7. Operator approves publish.
-8. Phase 5: post-publish verification clean. Release URL surfaced.
-
-### Example 2: Lockfile-drift abort
-
-Operator tags a commit that never produced a green `checks.yml` run.
-
-1. Phase 0–2 run normally.
-2. Phase 3: `release.yml` starts. `prepare` job fails the lockfile-drift guard (`No green checks.yml run for <sha>`).
-3. `cleanup` deletes the draft and exits red.
-4. Skill surfaces the run URL and the `prepare` failure log.
-5. Operator re-runs `checks.yml` on the commit; once green, operator re-invokes the skill from Phase 3 (idempotent resume).
-
-### Example 3: Hash mismatch in Phase 4
-
-Malicious or accidental tampering with a draft asset after `finalize`.
-
-1. Phase 0–3 run normally.
-2. Phase 4: `diff SHA256SUMS SHA256SUMS.local` surfaces a mismatch for one asset.
-3. Skill aborts without prompting for approval. Prints the diff, the asset, and the run URL. Deletes the draft after operator confirmation.
-4. Operator escalates to the incident-response flow in `docs/build/release.md`.
+See [`./guides/examples.md`](./guides/examples.md) for worked examples (successful release, lockfile-drift abort, hash mismatch).

@@ -4,6 +4,20 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## Unreleased
+
+### Internal tooling – `releasing-erfana` skill cleanup
+
+Internal-only refactor of `.claude/skills/releasing-erfana/`. No user-visible changes.
+
+- **Mechanical fixes** — `allowed-tools` corrected (`Agent`→`Task`, `TaskCreate/Update/List`→`TodoWrite`); 3 `Agent(...)` pseudocode call sites replaced with `Task(...)`; frontmatter completed with `capabilities`, `model: opus`, `user-invocable`. Skill is now properly gateable and discoverable.
+- **Structure** — `SKILL.md` reduced from 524 to ≤500 lines (Rule #16 BLOCKING resolved); Examples + Anti-patterns + Phase 1.5 git-signing pre-flight extracted to `guides/`. Constants table added as single source of truth for asset count / polling cadence / stuck-leg threshold.
+- **Logic hardening** — Phase 3 unknown-signature gate now requires ≥8 words AND `grep -Fc=1` (single-word-bypass closed). Phase 3 polling gains per-leg stuck-leg early warning at 45 min (catches macOS notarize hangs that would otherwise burn the full 88-min ceiling). Phase 4.5 `sha256sums-digest` fetch gains expiry fallback with operator-ack for late audits.
+- **Architectural exception** — `release-failure-analyzer` is intentionally project-local; managing-skills Rule #2 exception now formally documented with cookbook-format-contract rationale.
+- **Runtime fix** — Phase 5.1 minisign re-verify referenced a nonexistent `$WORK/release.pub`; corrected to `$WORK/release-primary.pub` matching Phase 4.3.
+
+Out of scope (deferred): `release-pretag-runner` agent; CI guard for cookbook-format invariants.
+
 ## 0.9.5
 
 *Released 2026-04-25. Tag [`v0.9.5`](https://github.com/qodeca/erfana/releases/tag/v0.9.5).*

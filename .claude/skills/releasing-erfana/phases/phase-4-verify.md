@@ -38,7 +38,7 @@ gh release download "v${VERSION}" --repo qodeca/erfana --pattern '*' --clobber -
 ls -la "$WORK"
 ```
 
-> Run the §4.2–§4.5 script via `bash` (not `zsh`) — array constructs and `<( ... )` process substitution differ between shells. The first `#!` line of any extracted script should be `#!/usr/bin/env bash`.
+> Run the §4.2–§4.5 script via `bash` (not `zsh`) — see SKILL.md preamble "Shell requirement" note. The first `#!` line of any extracted script should be `#!/usr/bin/env bash`.
 
 ## 4.3 Verify minisign signature
 
@@ -127,26 +127,52 @@ This catches tampering between `finalize` completion and the moment the operator
 ```bash
 # Download finalize's recorded SHA256SUMS as a workflow artifact.
 ART_DIR="$WORK/ci-digest"
-gh run download "$RUN_ID" --name sha256sums-digest --dir "$ART_DIR"
+SKIP_DIGEST_DIFF=0
 
-# Byte-for-byte comparison. diff exits non-zero on any difference and
-# prints the delta for forensics.
-if ! diff -q "$WORK/SHA256SUMS" "$ART_DIR/SHA256SUMS"; then
-  echo "FAIL: Draft SHA256SUMS differs from CI-recorded SHA256SUMS"
-  diff "$WORK/SHA256SUMS" "$ART_DIR/SHA256SUMS" || true
-  exit 1
+if ! gh run download "$RUN_ID" --name sha256sums-digest --dir "$ART_DIR" 2>"$WORK/digest-err.log"; then
+  # Distinguish artifact-expired (>30 days retention) from genuine errors.
+  # GitHub's error wording: "expired" or "no artifact named" or "404".
+  if grep -qiE 'expired|not found|404|no artifact' "$WORK/digest-err.log"; then
+    echo "WARN: sha256sums-digest artifact unavailable (>30 days retention?)."
+    cat "$WORK/digest-err.log" >&2
+    # AskUserQuestion (orchestrator): "Proceed with degraded verification
+    # gate? Minisign + per-asset SHA-256 still apply (4.3 + 4.4); only the
+    # finalize-recorded digest comparison is skipped." Operator must
+    # explicitly acknowledge before continuing.
+    DEGRADED_OK="<operator-ack-from-AskUserQuestion>"  # "yes"/"no"
+    if [ "$DEGRADED_OK" != "yes" ]; then
+      echo "FAIL: operator declined degraded gate"
+      exit 1
+    fi
+    SKIP_DIGEST_DIFF=1
+  else
+    echo "FAIL: sha256sums-digest fetch failed (non-expiry error)"
+    cat "$WORK/digest-err.log" >&2
+    exit 1
+  fi
+fi
+
+# Byte-for-byte comparison (skipped if artifact expired and operator ack'd).
+if [ "$SKIP_DIGEST_DIFF" -eq 0 ]; then
+  if ! diff -q "$WORK/SHA256SUMS" "$ART_DIR/SHA256SUMS"; then
+    echo "FAIL: Draft SHA256SUMS differs from CI-recorded SHA256SUMS"
+    diff "$WORK/SHA256SUMS" "$ART_DIR/SHA256SUMS" || true
+    exit 1
+  fi
 fi
 ```
 
 Why this gate matters: the minisign signature at 4.3 proves the *original* SHA256SUMS was signed by the release key. But after `finalize` publishes, anyone with write access to the repo could use `gh release upload --clobber` to replace `SHA256SUMS` on the draft (and provide a forged minisign replacement if they also held the key). This gate catches that scenario — the workflow artifact is write-once from the run and cannot be substituted without re-running the workflow.
 
-*If any verification step in 4.3–4.5 fails: abort. Do not prompt for approval.*
+**Artifact expiry**: GitHub workflow artifacts retain for 30 days. Late audits (re-verification of an old release) may find this gate degraded. The 4.3 minisign + 4.4 per-asset SHA-256 gates remain enforceable indefinitely — only the §4.5 substitution-detection gate weakens after 30 days. The skill prompts the operator to explicitly acknowledge degraded operation rather than failing closed for a benign timing condition.
+
+*If any verification step in 4.3–4.5 fails (without operator-ack of the §4.5 degradation): abort. Do not prompt for approval.*
 
 ## 4.6 Operator approval — MANDATORY
 
 Only now may the skill prompt the operator. Present:
 - Number of assets
-- Expected set (9 binaries + SHA256SUMS + SHA256SUMS.minisig = 11 total)
+- Expected set per `SKILL.md ## Constants` table (9 binaries + 2 = 11 total)
 - Verification summary (all green)
 - Release URL
 
