@@ -384,7 +384,9 @@ exit 1
 
 ## Phase 4: Verify + publish checkpoint (CRITICAL)
 
-Full instructions live in [`phases/phase-4-verify.md`](phases/phase-4-verify.md). Summary:
+Full instructions live in [`phases/phase-4-verify.md`](phases/phase-4-verify.md) — Phase 4 is the longest phase, contains the three independent cryptographic gates that are the entire point of this skill, and is the most likely to be read standalone (during release audits, post-incident forensics, or by an operator who only needs to verify a draft). Other phases are short enough to live inline in this file.
+
+Summary table:
 
 | Step | What | Why it's required |
 |---|---|---|
