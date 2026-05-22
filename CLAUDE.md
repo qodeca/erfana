@@ -171,7 +171,7 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ## Continuous Integration
 See [docs/ci.md](docs/ci.md) for the full pipeline map. Summary:
-- **`checks.yml`** (`.github/workflows/checks.yml`) — runs on **every push to any branch**. 4 parallel jobs on `ubuntu-latest`: `lint`, `typecheck`, `test` (~7,955 vitest across 250 files), `build` (`electron-vite build`). ~3 min wall-clock.
+- **`checks.yml`** (`.github/workflows/checks.yml`) — runs on **every push to any branch**. 4 parallel jobs on `ubuntu-latest`: `lint`, `typecheck`, `test` (~7,964 vitest across 251 files — v0.9.6 added `scripts/fuses.test.mjs` covering the `afterPack` chmod-helper), `build` (`electron-vite build`). ~3 min wall-clock.
 - **`e2e.yml`** (`.github/workflows/e2e.yml`) — **disabled 2026-04-25** via `gh workflow disable "E2E Tests"` (commit `997ba65`). Both functional `electron` and `visual` suites run locally only until macos-latest instability is root-caused. Re-enable with `gh workflow enable "E2E Tests"`. E2E was already excluded from branch-protection required checks, so disabling does not block any merges.
 - **`release.yml`** — fires on `v*.*.*` tag push, calls `build_linux.yml` / `build_mac.yml` / `build_win.yml` reusables (matrix-style multi-platform build). See [docs/build/release.md](docs/build/release.md).
 - **`whisper-binaries.yml` + `whisper-binaries-canary.yml`** — `workflow_dispatch` only and monthly schedule respectively. See [docs/build/whisper-binaries.md](docs/build/whisper-binaries.md).

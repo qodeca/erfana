@@ -22,7 +22,7 @@ Complete guide for testing Erfana. This covers both automated tests (Vitest/Play
 
 #### Key test areas
 
-Run `npm run test` for current totals (~7,955 tests across 250 files as of v0.9.4 on macOS — 78 cases platform-gate on Windows (77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`), so Windows sees 7,877 pass / 78 skip and Linux sees 7,954 pass / 1 skip; invariant total stays 7,955. The Phase-2 UAT hardening merged in v0.9.3 added `WindowsTerminalBootstrap.test.ts` with 60 strategy-layer unit tests; v0.9.4 added Phase 4 whisper trust-chain tests and the D12 `WhisperModelManager.test.ts` rewrite).
+Run `npm run test` for current totals (~7,964 tests across 251 files as of v0.9.6 on macOS — 78 cases platform-gate on Windows (77 POSIX-only `pathSecurity.test.ts` + 1 macOS-only `LiteParseConverter.test.ts`), so Windows sees 7,886 pass / 78 skip and Linux sees 7,963 pass / 1 skip; invariant total stays 7,964. The Phase-2 UAT hardening merged in v0.9.3 added `WindowsTerminalBootstrap.test.ts` with 60 strategy-layer unit tests; v0.9.4 added Phase 4 whisper trust-chain tests and the D12 `WhisperModelManager.test.ts` rewrite; v0.9.6 added `scripts/fuses.test.mjs` with 9 cases covering the `afterPack` chmod helper that restores the executable bit on bundled `node-pty` `spawn-helper` binaries — `vitest.main.ts` `include` now extends to `scripts/**/*.test.{js,mjs,ts}`).
 
 | Area | Key files | Docs |
 |------|-----------|------|
@@ -34,6 +34,7 @@ Run `npm run test` for current totals (~7,955 tests across 250 files as of v0.9.
 | ProjectTree & watchers | `*.logic.test.ts`, `*.pipeline.test.ts`, `*.switching.test.ts` | [Architecture – ProjectTree](../architecture.md#projecttree-modularization) |
 | Local whisper (Phase 4) | `LocalWhisperService.test.ts`, `WhisperModelManager.test.ts`, `WhisperModelManager.downgrade.test.ts` + utility tests (`zipArchive`, `tarArchive`, `secureDownloader`, `verifyManifest`) | [Phase 4 test inventory](../windows/implementation-plan.md#phase-4-test-inventory) · [Trust chain](../windows/whisper-trust-chain.md) · [API services – features](../api-services-features.md) |
 | Settings overlay | `SettingsOverlay.test.tsx` | [Settings](../settings.md) |
+| Build tooling | `scripts/fuses.test.mjs` (afterPack chmod helper — 9 cases: happy / idempotent / multi-arch / missing / empty+requireMatch / empty+lenient / symlink / dir / EROFS) | [Build – Fuses](../build/fuses.md#afterpack-also-chmods-node-pty-spawn-helper) |
 
 **Testing patterns used**:
 - "Extract Pure Logic" – business logic in `.logic.ts` files, tested without React overhead
