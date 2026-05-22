@@ -6,6 +6,14 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 ## Unreleased
 
+## 0.9.6
+
+*Released 2026-05-22. Tag [`v0.9.6`](https://github.com/qodeca/erfana/releases/tag/v0.9.6).*
+
+### Critical fix – terminal restored on macOS
+
+- **Terminal works again in macOS builds** ([`ea3eaf1`](https://github.com/qodeca/erfana/commit/ea3eaf1)) — v0.9.5 shipped with node-pty's `spawn-helper` binary at mode `0644` because `electron-builder` preserves npm-tarball permissions of prebuilt binaries and `npmRebuild: false` skipped the source rebuild that would have produced an executable copy. `pty.fork()` then called `posix_spawnp` against the un-executable helper, returning `EACCES`, so every terminal-spawn in the v0.9.5 macOS DMG failed with `Error: posix_spawnp failed.`. The `afterPack` hook in `scripts/fuses.js` now `chmod 0755`'s every spawn-helper under `node-pty/prebuilds/*/` before code-signing, so the signed bundle carries the executable bit. `requireMatch: true` on the platform-host match fails the build if zero helpers are found, blocking ship of a broken DMG. Dev builds were unaffected because `electron-vite` rebuilds node-pty via `node-gyp` and writes `spawn-helper` at `0755`. Nine new tests in `scripts/fuses.test.mjs` cover happy/idempotent/multi-arch/missing/empty/symlink/EROFS cases. **Anyone on v0.9.5 macOS must upgrade to use the terminal.**
+
 ### Internal tooling – `releasing-erfana` skill cleanup
 
 Internal-only refactor of `.claude/skills/releasing-erfana/`. No user-visible changes.
