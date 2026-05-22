@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     name: 'main',
     environment: 'node',
-    include: ['src/main/**/*.test.{ts,tsx}', 'src/shared/**/*.test.{ts,tsx}'],
+    include: ['src/main/**/*.test.{ts,tsx}', 'src/shared/**/*.test.{ts,tsx}', 'scripts/**/*.test.{js,mjs,ts}'],
     exclude: ['node_modules', 'dist', 'out', 'e2e', 'tests/fixtures'],
     globals: true,
     setupFiles: ['tests/setup/setupTests.main.ts'],

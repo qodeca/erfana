@@ -1,15 +1,23 @@
 /**
- * Electron Fuses Configuration
+ * Electron `afterPack` Hook
  *
- * Fuses are compile-time feature toggles that disable unused Electron features
- * to prevent "Living Off The Land" (LOTL) attacks.
+ * Single entry point for electron-builder's afterPack lifecycle stage.
+ * Runs once per packaged target, before code-signing (lifecycle:
+ * afterPack → electron-builder signing → afterSign → DMG/ZIP).
  *
- * Security hardening following 2025 best practices.
+ * Responsibilities:
+ *   1. Restore node-pty's spawn-helper execute bit (Unix only).
+ *      See chmodNodePtySpawnHelper below for the bug it works around.
+ *   2. Flip Electron security fuses (compile-time feature toggles that
+ *      disable unused Electron features to prevent "Living Off The
+ *      Land" attacks). 2025 security hardening best practices.
+ *   3. Optionally rename the app bundle for test builds (visual
+ *      differentiation; test builds enable the Node CLI inspector).
  *
  * Build Modes:
  * - Production (default): All security fuses enabled, inspector disabled
  * - Test build: Inspector enabled for Playwright E2E testing
- *   - App name includes "(TEST BUILD)" suffix for visual differentiation
+ *   - App name includes "(TEST BUILD)" suffix
  *   - Build artifacts placed in release/test/ directory
  *   - Prominent warnings displayed during build
  *
@@ -25,6 +33,12 @@
 const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses');
 const path = require('path');
 const fs = require('fs');
+
+/**
+ * POSIX mode bits applied to node-pty's spawn-helper. 0755 = rwxr-xr-x
+ * matches what node-gyp emits at build/Release/spawn-helper in dev mode.
+ */
+const SPAWN_HELPER_MODE = 0o755;
 
 /**
  * Check if this is a test build.
@@ -55,6 +69,105 @@ function displayTestBuildWarning() {
 }
 
 /**
+ * Restore the executable bit on node-pty's spawn-helper binaries.
+ *
+ * Why: electron-builder copies prebuilt node-pty binaries with the
+ * permissions npm assigned when extracting the tarball. spawn-helper is
+ * not listed in node-pty's package.json "bin" field, so npm strips its
+ * execute bit (file mode ends up at 0644). With `npmRebuild: false` in
+ * electron-builder.yml the source rebuild that would have produced an
+ * executable copy under build/Release/ never runs, so node-pty's
+ * loadNativeModule falls through to prebuilds/<platform-arch>/ — and
+ * pty.fork() then calls posix_spawnp(spawn-helper) against an un-
+ * executable file, which the kernel rejects with EACCES. Production
+ * users see "Error: posix_spawnp failed." every time they open a
+ * project; dev never hits this because electron-vite rebuilds node-pty
+ * via node-gyp and writes spawn-helper to build/Release/ at 0755.
+ *
+ * Symlink guard: `fs.chmodSync` follows symlinks. A compromised dep
+ * could theoretically replace spawn-helper with a symlink pointing
+ * outside the bundle; we refuse to chmod through that.
+ *
+ * @param {string} resourcesDir - Directory containing `app/node_modules/`
+ *   (e.g. `<bundle>/Contents/Resources` on macOS,
+ *   `<appOutDir>/resources` on Linux).
+ * @param {object} [options]
+ * @param {boolean} [options.requireMatch=false] - When true, throws if no
+ *   spawn-helper binaries are found. Caller passes `true` on platforms
+ *   where a missing helper means the build would ship broken.
+ * @returns {{ chmodCount: number, skipped: number }} - Counts of chmoded
+ *   files and skipped (symlink / non-file) entries.
+ * @throws {Error} If any chmod fails, or if `requireMatch` is set and
+ *   no helpers were found.
+ */
+function chmodNodePtySpawnHelper(resourcesDir, { requireMatch = false } = {}) {
+  const prebuildsDir = path.join(
+    resourcesDir,
+    'app',
+    'node_modules',
+    'node-pty',
+    'prebuilds'
+  );
+
+  if (!fs.existsSync(prebuildsDir)) {
+    console.warn(`⚠️  node-pty prebuilds not found at ${prebuildsDir} — skipping spawn-helper chmod`);
+    return { chmodCount: 0, skipped: 0 };
+  }
+
+  let chmodCount = 0;
+  let skipped = 0;
+  const failures = [];
+
+  for (const entry of fs.readdirSync(prebuildsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const helperPath = path.join(prebuildsDir, entry.name, 'spawn-helper');
+
+    let st;
+    try {
+      st = fs.lstatSync(helperPath);
+    } catch {
+      // Missing file (ENOENT) is fine — not every arch ships spawn-helper.
+      continue;
+    }
+
+    if (st.isSymbolicLink() || !st.isFile()) {
+      console.warn(
+        `⚠️  Refusing to chmod non-regular file: ${helperPath} ` +
+        `(symlink=${st.isSymbolicLink()}, file=${st.isFile()})`
+      );
+      skipped++;
+      continue;
+    }
+
+    try {
+      fs.chmodSync(helperPath, SPAWN_HELPER_MODE);
+      console.log(`   chmod 0755 ${path.relative(resourcesDir, helperPath)}`);
+      chmodCount++;
+    } catch (err) {
+      failures.push({ path: helperPath, code: err.code, message: err.message });
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new Error(
+      `Failed to chmod ${failures.length} spawn-helper binary(ies):\n` +
+      failures.map((f) => `  ${f.path} (${f.code}): ${f.message}`).join('\n')
+    );
+  }
+  if (chmodCount === 0 && requireMatch) {
+    throw new Error(
+      `No spawn-helper binaries found under ${prebuildsDir}. ` +
+      `Refusing to ship a broken bundle.`
+    );
+  }
+  if (chmodCount === 0) {
+    console.warn(`⚠️  No spawn-helper binaries under ${prebuildsDir}`);
+  }
+
+  return { chmodCount, skipped };
+}
+
+/**
  * Rename app bundle to include test suffix for visual differentiation.
  * This helps prevent accidental distribution of test builds.
  *
@@ -80,7 +193,7 @@ function renameTestBuildApp(appOutDir, originalName, platform) {
   return originalPath;
 }
 
-module.exports = async function afterPack(context) {
+async function afterPack(context) {
   // Determine the Electron binary path based on platform.
   // On Linux, electron-builder produces a lowercased binary (the default
   // executableName); on macOS / Windows the binary uses productFilename's
@@ -127,6 +240,24 @@ module.exports = async function afterPack(context) {
   } else {
     console.log('🔒 PRODUCTION BUILD: All security fuses enabled');
   }
+
+  // Restore execute bit on node-pty's spawn-helper before code-signing so
+  // the signed bundle ships with mode 0755. Windows uses ConPTY /
+  // winpty-agent.exe — no spawn-helper to fix.
+  const spawnHelperResolvers = {
+    darwin: () => path.join(electronBinaryPath, 'Contents', 'Resources'),
+    linux: () => path.join(context.appOutDir, 'resources'),
+  };
+  const resolveResources = spawnHelperResolvers[context.electronPlatformName];
+  if (resolveResources) {
+    console.log(`🔧 Restoring spawn-helper execute bit (${context.electronPlatformName})`);
+    // Only require a match when packing for the host platform — protects
+    // against cross-builds where the foreign-platform prebuild may be
+    // intentionally absent.
+    const requireMatch = context.electronPlatformName === process.platform;
+    chmodNodePtySpawnHelper(resolveResources(), { requireMatch });
+  }
+
   console.log(`   Applying fuses to: ${electronBinaryPath}`);
 
   await flipFuses(electronBinaryPath, {
@@ -173,4 +304,8 @@ module.exports = async function afterPack(context) {
   if (isTestBuild) {
     displayTestBuildWarning();
   }
-};
+}
+
+module.exports = afterPack;
+module.exports.chmodNodePtySpawnHelper = chmodNodePtySpawnHelper;
+module.exports.SPAWN_HELPER_MODE = SPAWN_HELPER_MODE;
