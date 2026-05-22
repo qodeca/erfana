@@ -224,6 +224,7 @@ First-time Windows installs will see a SmartScreen warning on a newly provisione
 | Draft published (`--draft=false --latest`); content bug reported | Cut hotfix `v${version+patch}` with the fix. Old release stays visible but is no longer Latest. Never edit assets in place. |
 | Azure Artifact Signing outage | Hold the release. No unsigned fallback. |
 | Apple notarization outage (multi-hour Apple server issue) | `gh run watch` 90-min timeout surfaces it. Operator chooses wait or abort. |
+| Phase 4.2 download (operator-side): transient TCP timeout from GitHub/Fastly CDN mid-stream (`read tcp ...185.199.x.x:443: read: operation timed out`) | Use `curl -C -` per-file resume against `.assets[].apiUrl` (`-H "Accept: application/octet-stream"`, `-H "Authorization: Bearer $(gh auth token)"`, parallel) instead of `gh release download --clobber` from scratch — `gh` re-downloads completed files; curl resumes from the existing byte position. Tag is **not** burned: gates 4.3–4.5 haven't run, no signed bytes were touched. See [`docs/release-incidents/v0.9.6-cdn-recovery.md`](../release-incidents/v0.9.6-cdn-recovery.md). |
 
 ## Incident response
 

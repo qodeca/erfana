@@ -1,8 +1,8 @@
 # Electron Fuses
 
-**Last Updated**: March 2026 (v0.9.0)
+**Last Updated**: May 2026 (v0.9.6)
 
-This document explains the Electron fuses configuration and security decisions.
+This document explains the Electron fuses configuration and security decisions. The `scripts/fuses.js` `afterPack` hook also restores the executable bit on bundled `node-pty` `spawn-helper` binaries — see [afterPack also chmods node-pty spawn-helper](#afterpack-also-chmods-node-pty-spawn-helper).
 
 ---
 
@@ -32,7 +32,33 @@ afterPack: ./scripts/fuses.js
 afterSign: ./scripts/resign.js
 ```
 
-**Hook sequencing**: `afterPack` runs first (applies fuses, resets main binary signature), then `afterSign` runs (deep re-signs the entire `.app` bundle). The `afterSign` step is critical because `flipFuses` modifies the main binary's code directory hash, creating a mismatch with helper processes. Without deep re-signing, macOS Sequoia+ rejects `@rpath` library loads. See [electron-builder.md](./electron-builder.md) for details.
+**Hook sequencing**: `afterPack` runs first (applies fuses, resets main binary signature, restores spawn-helper executable bit), then `afterSign` runs (deep re-signs the entire `.app` bundle). The `afterSign` step is critical because `flipFuses` modifies the main binary's code directory hash, creating a mismatch with helper processes. Without deep re-signing, macOS Sequoia+ rejects `@rpath` library loads. See [electron-builder.md](./electron-builder.md) for details.
+
+---
+
+## afterPack also chmods node-pty spawn-helper
+
+Since v0.9.6 ([`ea3eaf1`](https://github.com/qodeca/erfana/commit/ea3eaf1)), the same `scripts/fuses.js` `afterPack` hook restores the executable bit (`0755`) on every node-pty `spawn-helper` binary under `node_modules/node-pty/prebuilds/<platform>-<arch>/Release/` before code-signing runs. **Without this step, terminal-spawn fails on every signed build** — see the regression history below.
+
+### Why this is needed
+
+`electron-builder` preserves npm-tarball file modes when packaging prebuilt binaries. node-pty publishes its `spawn-helper` binary with mode `0644` in the tarball, and `npmRebuild: false` (set in `electron-builder.yml`) skips the source rebuild that would normally produce a `0755` copy via `node-gyp`. `pty.fork()` calls `posix_spawnp` against `spawn-helper`, which returns `EACCES` if the file isn't executable, surfacing as `Error: posix_spawnp failed.` at runtime.
+
+Dev builds were unaffected because `electron-vite`'s rebuild path runs `node-gyp` and writes `spawn-helper` to `build/Release/` at `0755`.
+
+### Implementation
+
+The helper is dispatched by platform — Darwin and Linux both have node-pty prebuilds with the same `prebuilds/<platform>-<arch>/Release/spawn-helper` layout. Windows uses `winpty-agent.exe` (which IS already `0755`-equivalent on NTFS) so no action there.
+
+Hardening — three guarantees baked into the helper:
+
+1. **Symlink / non-regular-file guard** — `chmodSync` is only called after `lstatSync().isFile()` confirms a regular file. Prevents acting on stray symlinks.
+2. **`requireMatch: true` on platform-host match** — if zero spawn-helper paths are found for the current platform-arch, the build fails loud. Blocks shipping a broken DMG even if a future refactor accidentally drops the helper from the prebuilds tree.
+3. **Aggregated `try/catch` with errno** — failures name the exact path + errno so CI logs are diagnostic, not silent.
+
+### Regression history
+
+v0.9.5 shipped without this step. The macOS DMG was effectively unusable — every terminal-spawn failed. v0.9.6 is the patch. See [`docs/known-issues.md` § v0.9.5 macOS — terminal does not work in the signed DMG](../known-issues.md) for the user-facing entry, and `scripts/fuses.test.mjs` (9 cases: happy / idempotent / multi-arch / missing dir / empty+requireMatch / empty+lenient / symlink / dir / EROFS) for the regression-prevention test suite.
 
 ---
 

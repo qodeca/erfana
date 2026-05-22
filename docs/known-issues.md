@@ -140,6 +140,18 @@ Pipeline contributors on Windows:
 
 ## Active Issues
 
+### v0.9.5 macOS — terminal does not work in the signed DMG (fixed in v0.9.6)
+
+**Issue**: The signed v0.9.5 macOS DMG shipped node-pty's prebuilt `spawn-helper` binary at mode `0644`. `pty.fork()` calls `posix_spawnp` on the helper, which returns `EACCES` because the helper is not executable. Every terminal-spawn fails with `Error: posix_spawnp failed.`. Dev builds were unaffected because `electron-vite` rebuilds node-pty via `node-gyp` and writes `spawn-helper` to `build/Release/` at `0755`.
+
+**Affected versions**: v0.9.5 macOS only. Windows + Linux + dev builds unaffected.
+
+**Workaround**: None — the user must upgrade to v0.9.6 or later. Manual `chmod 755 <app>.app/Contents/Resources/app.asar.unpacked/node_modules/node-pty/prebuilds/darwin-*/Release/spawn-helper` would also work but invalidates the codesign envelope.
+
+**Fix**: [`ea3eaf1`](https://github.com/qodeca/erfana/commit/ea3eaf1) — `scripts/fuses.js` `afterPack` hook now `chmod 0755`'s every `spawn-helper` under `node-pty/prebuilds/*/` before code-signing. `requireMatch: true` on platform-host match fails the build if zero helpers are found, blocking ship of a broken DMG. Documented in [`docs/build/fuses.md`](./build/fuses.md#afterpack-also-chmods-node-pty-spawn-helper).
+
+---
+
 ### Visual regression E2E suite hangs on GitHub `macos-latest` CI
 
 **Issue**: All 5 visual tests in `e2e/visual-regression.e2e.ts` time out at `page.waitForLoadState('domcontentloaded')` (30s) on GitHub `macos-latest` runners; they pass 5/5 locally (including with `CI=true` and video recording enabled).
