@@ -1,6 +1,6 @@
 # Build Documentation
 
-**Last Updated**: May 2026 (v0.9.6)
+**Last Updated**: May 2026 (v0.10.0)
 
 This directory contains detailed documentation for Erfana's production build configuration.
 
@@ -88,11 +88,12 @@ npm install
    - Worker thread: ~5 kB (`git-status.worker.js`, separate entry via `rollupOptions.input`)
    - Preload script: ~30 kB (bundled dependencies)
    - Renderer: ~10.9 MB (Monaco, Mermaid, xterm.js included)
-4. **electron-builder Package**: Create platform packages (includes `extraResources` – tessdata for offline OCR)
-5. **afterPack Hook**: Apply Electron fuses (`scripts/fuses.js`)
-6. **Code Signing**: electron-builder ad-hoc signs all binaries
-7. **afterSign Hook**: Deep re-sign bundle for consistent identity (`scripts/resign.js`)
-8. **DMG/ZIP Creation**: Package for distribution
+4. **beforePack hook (v0.10.0)**: `scripts/ensure-media-binaries.js` resolves the host's `ffmpeg-static` binary via the shared `src/main/utils/mediaBinaries.ts` resolver and stages a per-architecture copy into `extraResources` so the packaged app ships the correct `ffmpeg` for its architecture rather than one bundled-at-install. Replaces the single-arch download-at-install pattern that produced the v0.9.6 video-transcription ENOENT.
+5. **electron-builder Package**: Create platform packages (includes `extraResources` – tessdata for offline OCR, per-arch ffmpeg)
+6. **afterPack Hook**: Apply Electron fuses (`scripts/fuses.js`); verify per-arch ffmpeg binary is present and executable
+7. **Code Signing**: electron-builder ad-hoc signs all binaries
+8. **afterSign Hook**: Deep re-sign bundle for consistent identity (`scripts/resign.js`)
+9. **DMG/ZIP Creation**: Package for distribution
 
 **Build Output**:
 ```

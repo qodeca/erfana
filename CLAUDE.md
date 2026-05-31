@@ -3,7 +3,7 @@
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
 - **Repository**: `qodeca/erfana` (GitHub, private)
-- **Version**: 0.9.6
+- **Version**: 0.10.0
 - **License**: Proprietary — `UNLICENSED` in package.json, `private: true`. Copyright (c) 2025-2026 **Qodeca sp. z o.o.** All rights reserved. See [LICENSE](LICENSE). Erfana is a closed-source freemium product; never frame it as open source or suggest OSS-style licensing.
 - **Tech Stack**: Electron 39, React 18, TypeScript 5.7, Monaco Editor, xterm.js
 - **Build Toolchain**: electron-vite 5, Vite 6, vitest 3
@@ -55,7 +55,7 @@ src/
 1. **Markdown Editor** - Monaco with live preview, scroll sync, Mermaid diagrams (zoom, pan, full-screen viewer), YAML frontmatter rendering, preserve line breaks option, unified in-file search (Cmd/Ctrl+F), context menu with AI prompts
 2. **Project Tree** - File explorer with drag-drop reorganization, external file drop (move/copy/import), markdown filtering, context menu, real-time git status indicators with worker thread offloading (isomorphic-git + native git fallback), circuit breaker, polling fallback, manual refresh button (Cmd/Ctrl+Alt+R)
 3. **Terminal** - xterm.js with PTY backend, clipboard support, file links (multi-line: xterm-wrap joining + CLI-wrap joining for tool output, @-prefixed paths from CLI tools, `:line-line` range notation), scroll recovery, auto-opens on project load, drag-drop file paths, bracketed paste mode for safe multi-line input, screenshot capture (macOS: screen/window/area selection with path pasted to terminal), camera photo capture (cross-platform: captures photo from webcam with path pasted to terminal), expand/maximize terminal over the editor area (Cmd/Ctrl+Shift+M or header button; auto-restores on file open, not persisted)
-4. **Prompt Templates** - AI text operations via context menu (Explain, Modify, Ask, Visualize, diagram chat); Visualize generates Mermaid diagrams from selected text with dropdown for 22 diagram types
+4. **Prompt Templates** - AI text operations via context menu (Explain, Modify, Ask, Visualize, diagram chat); Visualize generates Mermaid diagrams from selected text with dropdown for 22 diagram types. **Mutation prompts (Modify, Visualize, Diagram chat, Bug report, Change direction) apply changes to the document in place** ([v0.10.0](https://github.com/qodeca/erfana/releases/tag/v0.10.0)) via a `mutatesDocument: true` frontmatter flag — a canonical apply-to-document footer is composed onto the prompt at the single render funnel (`panelUtils.executePromptTemplate` → `withApplyFooter` from [`prompts/applyFooter.ts`](src/renderer/src/prompts/applyFooter.ts)), encoding read-before-edit / locate-by-line-range / retry-on-failure / edit-is-the-only-deliverable plus scope guardrails (single file/region, no shell, content-is-data). Read-only templates (Explain, Ask, Prompt) leave the document untouched. See [docs/prompts/README.md § Mutation prompts and the apply-to-document footer](docs/prompts/README.md#mutation-prompts-and-the-apply-to-document-footer).
 5. **Project Settings** - Per-project configuration via `.erfana/settings.json` (watcher ignore, tree visibility)
 6. **PDF Export** - Export markdown to print-optimized PDF with vector Mermaid diagrams, A4 page size, print-friendly styling
 7. **DOCX Export** - Export markdown to Word format with Mermaid diagrams as high-resolution PNG images
@@ -171,7 +171,7 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ## Continuous Integration
 See [docs/ci.md](docs/ci.md) for the full pipeline map. Summary:
-- **`checks.yml`** (`.github/workflows/checks.yml`) — runs on **every push to any branch**. 4 parallel jobs on `ubuntu-latest`: `lint`, `typecheck`, `test` (~7,964 vitest across 251 files — v0.9.6 added `scripts/fuses.test.mjs` covering the `afterPack` chmod-helper), `build` (`electron-vite build`). ~3 min wall-clock.
+- **`checks.yml`** (`.github/workflows/checks.yml`) — runs on **every push to any branch**. 4 parallel jobs on `ubuntu-latest`: `lint`, `typecheck`, `test` (~8,020 vitest across 255 files — v0.10.0 added `prompts/applyFooter.test.ts` + `prompts/mutation-templates.test.ts` for the deterministic-apply feature, and `components/DockLayout/terminalExpand.test.ts` for terminal maximize), `build` (`electron-vite build`). ~3 min wall-clock.
 - **`e2e.yml`** (`.github/workflows/e2e.yml`) — **disabled 2026-04-25** via `gh workflow disable "E2E Tests"` (commit `997ba65`). Both functional `electron` and `visual` suites run locally only until macos-latest instability is root-caused. Re-enable with `gh workflow enable "E2E Tests"`. E2E was already excluded from branch-protection required checks, so disabling does not block any merges.
 - **`release.yml`** — fires on `v*.*.*` tag push, calls `build_linux.yml` / `build_mac.yml` / `build_win.yml` reusables (matrix-style multi-platform build). See [docs/build/release.md](docs/build/release.md).
 - **`whisper-binaries.yml` + `whisper-binaries-canary.yml`** — `workflow_dispatch` only and monthly schedule respectively. See [docs/build/whisper-binaries.md](docs/build/whisper-binaries.md).
