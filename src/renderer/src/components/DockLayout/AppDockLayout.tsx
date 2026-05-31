@@ -150,7 +150,10 @@ export function AppDockLayout() {
   const leftActivePanel = useActivityBarStore((s) => s.leftActivePanel)
   const rightActivePanel = useActivityBarStore((s) => s.rightActivePanel)
   const leftWidth = useActivityBarStore((s) => s.leftWidth)
-  const rightWidth = useActivityBarStore((s) => s.rightWidth)
+  // rightWidth is intentionally NOT subscribed here. Reading it reactively would re-render
+  // AppDockLayout on every drag tick (the persist callback writes the new width to the store),
+  // and re-running the dynamic-add useEffect during a drag interrupts the sash via
+  // splitview.setViewVisible's layout cascade. Read non-reactively via getState() at use sites.
   const terminalExpanded = useActivityBarStore((s) => s.terminalExpanded)
   const togglePanel = useActivityBarStore((s) => s.togglePanel)
   const setSidebarWidth = useActivityBarStore((s) => s.setSidebarWidth)
@@ -280,7 +283,12 @@ export function AppDockLayout() {
           minimumSize: MIN_SIZES.rightSidebar,
           maximumSize: TERMINAL_MAX
         })
-        terminalPanel.api.setSize({ size: rightWidth })
+        // Read rightWidth non-reactively so persisting a drag (onDidDimensionsChange →
+        // setSidebarWidth) does not re-trigger this effect — calling setVisible on the
+        // already-visible terminal mid-drag invokes splitview.setViewVisible, whose
+        // unconditional distributeEmptySpace + layoutViews + saveProportions tail steals
+        // the sash from the user's pointer. See PR #200 expand-effect for the same fix.
+        terminalPanel.api.setSize({ size: useActivityBarStore.getState().rightWidth })
         terminalPanel.api.setVisible(rightActivePanel === 'terminal')
 
         // Listen to resize events for the new panel
@@ -321,7 +329,7 @@ export function AppDockLayout() {
         splitviewApiRef.current.removePanel(existingPanel)
       }
     }
-  }, [isSplitviewReady, projectPath, rightActivePanel, rightWidth, setSidebarWidth])
+  }, [isSplitviewReady, projectPath, rightActivePanel, setSidebarWidth])
 
   // Apply terminal-expand: hide the editor and let the terminal fill the main area.
   // MUST be declared AFTER the dynamic terminal add/remove effect so 'terminal-panel' exists.
