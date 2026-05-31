@@ -6,9 +6,22 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 ## Unreleased
 
+## 0.10.0
+
+*Released 2026-05-31. Tag [`v0.10.0`](https://github.com/qodeca/erfana/releases/tag/v0.10.0).*
+
 ### Terminal maximize
 
 - **Expand the terminal over the editor** — a new toggle maximizes the terminal panel to cover the editor/tabs area, leaving only the project panel and terminal visible (hide the project panel with Cmd/Ctrl+B for a full-screen terminal). Trigger with **Cmd/Ctrl+Shift+M** or the maximize/restore button in the terminal header. Opening any file automatically restores the editor; maximizing moves focus to the terminal and announces the change to screen readers. Built for heavy terminal work on small screens. Not persisted — every launch and project switch starts collapsed.
+
+### In-app AI prompts apply directly to the document
+
+- **Modify, Visualize, and the diagram prompts now edit your file instead of printing to the terminal** ([#202](https://github.com/qodeca/erfana/pull/202)) — the in-app AI prompts previously printed their result into the terminal non-deterministically, forcing manual copy-paste. They now reliably apply the change in place: Modify replaces the selection with the edited version, Visualize inserts the new Mermaid diagram immediately after the selection, and the diagram prompts (Diagram Chat, Bug Report, Change Direction) edit the diagram block directly. Read-only prompts (Explain, Ask) are unchanged.
+
+### Fixes
+
+- **Video transcription works in installed builds** ([#199](https://github.com/qodeca/erfana/pull/199)) — packaged builds shipped a single-architecture ffmpeg that failed with ENOENT on video import; ffmpeg is now bundled per-architecture with an integrity-pinned binary, so video audio extraction works on both Intel and Apple Silicon.
+- **Quieter, more accurate logging** ([#199](https://github.com/qodeca/erfana/pull/199)) — broken markdown links are no longer recorded as errors (~186 false error lines removed per session), and test runs no longer write to the real application log.
 
 ## 0.9.6
 

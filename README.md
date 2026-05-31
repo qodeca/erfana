@@ -2,7 +2,9 @@
 
 An Electron-based project workspace focused on markdown editing, a project tree, and an integrated terminal.
 
-> **Version:** 0.9.5 ([changelog](docs/CHANGELOG.md)) · **Documentation:** [docs/](docs/README.md) · **Architecture:** [docs/architecture.md](docs/architecture.md)
+> **Version:** 0.9.6 ([changelog](docs/CHANGELOG.md)) · **Documentation:** [docs/](docs/README.md) · **Architecture:** [docs/architecture.md](docs/architecture.md)
+>
+> **macOS patch — upgrade required from v0.9.5:** v0.9.6 restores the integrated terminal on macOS. The v0.9.5 signed DMG shipped node-pty's `spawn-helper` at mode `0644`, causing every terminal-spawn to fail with `posix_spawnp: EACCES`. The `scripts/fuses.js` `afterPack` hook now `chmod 0755`'s the helper before code-signing. See [CHANGELOG § 0.9.6](docs/CHANGELOG.md#096), [build/fuses.md § afterPack also chmods node-pty spawn-helper](docs/build/fuses.md#afterpack-also-chmods-node-pty-spawn-helper).
 >
 > **Windows enablement:** Phases 0–2 shipped in **v0.9.3** (merged from the `windows` branch on 2026-04-22); Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in [**v0.9.4**](https://github.com/qodeca/erfana/releases/tag/v0.9.4) on 2026-04-23. Erfana now installs, runs, builds, and passes the full test matrix on Windows 11 Pro, with offline transcription supported on Windows x64. See [`docs/windows/README.md`](docs/windows/README.md) for roadmap status, and [Windows known issues](docs/known-issues.md#windows-specific-issues) for remaining gaps — screenshots ([#164](https://github.com/qodeca/erfana/issues/164)), code-signing ([#166](https://github.com/qodeca/erfana/issues/166)), polish ([#167](https://github.com/qodeca/erfana/issues/167)).
 
