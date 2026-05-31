@@ -6,6 +6,10 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 ## Unreleased
 
+### Terminal maximize
+
+- **Expand the terminal over the editor** — a new toggle maximizes the terminal panel to cover the editor/tabs area, leaving only the project panel and terminal visible (hide the project panel with Cmd/Ctrl+B for a full-screen terminal). Trigger with **Cmd/Ctrl+Shift+M** or the maximize/restore button in the terminal header. Opening any file automatically restores the editor; maximizing moves focus to the terminal and announces the change to screen readers. Built for heavy terminal work on small screens. Not persisted — every launch and project switch starts collapsed.
+
 ## 0.9.6
 
 *Released 2026-05-22. Tag [`v0.9.6`](https://github.com/qodeca/erfana/releases/tag/v0.9.6).*

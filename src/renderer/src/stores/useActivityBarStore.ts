@@ -24,6 +24,12 @@ interface ActivityBarState {
    */
   terminalUserClosed: boolean
 
+  /**
+   * Ephemeral flag: terminal is maximized over the editor area.
+   * NOT persisted (excluded from partialize) so it resets to false on every launch.
+   */
+  terminalExpanded: boolean
+
   // Actions
   togglePanel: (panelId: string, side: 'left' | 'right') => void
   setActivePanel: (panelId: string | null, side: 'left' | 'right') => void
@@ -50,11 +56,34 @@ interface ActivityBarState {
    * @see Issue #55 - auto-open terminal panel feature
    */
   openTerminalOnProjectLoad: () => void
+
+  /**
+   * Sets the terminal-expand (maximize-over-editor) flag.
+   * No-op when the value is unchanged.
+   */
+  setTerminalExpanded: (expanded: boolean) => void
+
+  /**
+   * Toggles terminal expand. Turning ON force-opens the terminal so the
+   * shortcut works from a closed state.
+   */
+  toggleTerminalExpanded: () => void
 }
 
 export const useActivityBarStore = create<ActivityBarState>()(
   persist(
-    (set, get) => ({
+    (set, get) => {
+      // Single choke point for the right panel: any change clears terminal-expand
+      // unless the panel stays 'terminal'. Keeps the invariant in one place.
+      const applyRightPanel = (panelId: string | null): void => {
+        set(
+          panelId === 'terminal'
+            ? { rightActivePanel: panelId }
+            : { rightActivePanel: panelId, terminalExpanded: false }
+        )
+      }
+
+      return {
       // Default state: Project panel open on left, nothing on right
       leftActivePanel: 'project',
       rightActivePanel: null,
@@ -63,28 +92,32 @@ export const useActivityBarStore = create<ActivityBarState>()(
 
       // Ephemeral state (excluded from persistence via partialize below)
       terminalUserClosed: false,
+      terminalExpanded: false,
 
       togglePanel: (panelId, side) => {
-        const key = `${side}ActivePanel` as 'leftActivePanel' | 'rightActivePanel'
-        const current = get()[key]
-
-        // If clicking active panel, hide sidebar
-        if (current === panelId) {
-          set({ [key]: null })
-
-          // Track when user explicitly closes terminal
-          if (panelId === 'terminal' && side === 'right') {
-            set({ terminalUserClosed: true })
+        if (side === 'right') {
+          const current = get().rightActivePanel
+          if (current === panelId) {
+            applyRightPanel(null)
+            // Track when user explicitly closes the terminal.
+            if (panelId === 'terminal') {
+              set({ terminalUserClosed: true })
+            }
+          } else {
+            applyRightPanel(panelId)
           }
-        } else {
-          // Switch to clicked panel
-          set({ [key]: panelId })
+          return
         }
+        const current = get().leftActivePanel
+        set({ leftActivePanel: current === panelId ? null : panelId })
       },
 
       setActivePanel: (panelId, side) => {
-        const key = `${side}ActivePanel` as 'leftActivePanel' | 'rightActivePanel'
-        set({ [key]: panelId })
+        if (side === 'right') {
+          applyRightPanel(panelId)
+          return
+        }
+        set({ leftActivePanel: panelId })
       },
 
       setSidebarWidth: (width, side) => {
@@ -117,8 +150,26 @@ export const useActivityBarStore = create<ActivityBarState>()(
         // This prevents race conditions between separate set() calls
         // See issue #55 for feature context
         set({ terminalUserClosed: false, rightActivePanel: 'terminal' })
+      },
+
+      setTerminalExpanded: (expanded) => {
+        if (get().terminalExpanded !== expanded) {
+          set({ terminalExpanded: expanded })
+        }
+      },
+
+      toggleTerminalExpanded: () => {
+        if (get().terminalExpanded) {
+          set({ terminalExpanded: false })
+        } else {
+          // Expand: force the terminal open so the shortcut works from a closed state.
+          // Clearing terminalUserClosed intentionally re-arms auto-open for the next
+          // project load — matches the "expand opens the terminal" decision; do not "fix" it.
+          set({ terminalExpanded: true, rightActivePanel: 'terminal', terminalUserClosed: false })
+        }
       }
-    }),
+      }
+    },
     {
       name: 'erfana-activity-bar-state',
       // Exclude ephemeral state from persistence
