@@ -70,7 +70,15 @@ export const PromptFrontmatterSchema = z.object({
   dropdown: DropdownSchema.optional(),
 
   /** Whether textarea is optional (allows submission with empty text when dropdown is present) */
-  textareaOptional: z.boolean().optional()
+  textareaOptional: z.boolean().optional(),
+
+  /**
+   * Whether this prompt mutates the source document.
+   * When true, a canonical "apply to document" footer is composed onto the
+   * rendered prompt (see prompts/applyFooter.ts), instructing the CLI agent to
+   * edit the file in place rather than print the result to the terminal.
+   */
+  mutatesDocument: z.boolean().optional().default(false)
 })
 
 /**

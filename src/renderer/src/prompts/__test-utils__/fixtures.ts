@@ -65,6 +65,7 @@ export function mockPromptFrontmatter(
     order: 0,
     enabled: true,
     requiresInput: false,
+    mutatesDocument: false,
     ...overrides
   }
 }

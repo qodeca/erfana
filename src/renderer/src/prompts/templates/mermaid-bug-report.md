@@ -5,6 +5,7 @@ name: Mermaid Bug Report
 icon: bug
 targetPanel: terminal
 autoExecute: true
+mutatesDocument: true
 ---
 <context>
 {{#if fileRef}}{{fileRef}}
@@ -12,29 +13,20 @@ Location: {{lineRange}}
 {{/if}}
 </context>
 
-<input name="error">
+<reference_input name="error">
 {{mermaidError}}
-</input>
+</reference_input>
 
-<input name="code">
-```mermaid
+<reference_input name="code">
+The diagram's current on-disk content (for locating and matching only):
 {{mermaidCode}}
-```
-</input>
+</reference_input>
 
 <task>
-Fix the Mermaid diagram syntax error.
+Fix the Mermaid syntax error by editing the diagram block in the file in place.
 </task>
 
-<constraints>
-- Brief explanation of the issue (1-2 sentences)
-- Provide corrected diagram code
-</constraints>
-
-<output_format>
-**Issue**: [Brief explanation]
-
-```mermaid
-... corrected diagram ...
-```
-</output_format>
+<instructions>
+- Correct only what is needed to resolve the error; keep all other content unchanged
+- Produce valid Mermaid syntax
+</instructions>

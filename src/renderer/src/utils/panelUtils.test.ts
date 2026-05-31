@@ -347,7 +347,7 @@ describe('panelUtils.ts', () => {
         'diagram-chat',
         {
           selectedText: '',
-          filePath: '',
+          filePath: '/path/file.md',
           fullDocument: '',
           mermaidCode: 'graph TD; A-->B',
           userInstruction: 'Add node C'

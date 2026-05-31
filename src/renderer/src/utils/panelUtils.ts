@@ -15,6 +15,7 @@
 
 import { PROMPT_REGISTRY } from '../prompts/registry'
 import { promptRenderer } from '../prompts/renderer'
+import { withApplyFooter } from '../prompts/applyFooter'
 import { validateVariables } from '../prompts/validation'
 import { createDefaultManagers } from './panelManager.factory'
 import { showErrorToast } from './toastHelpers'
@@ -238,8 +239,13 @@ export async function executePromptTemplate(
     return { success: false, error }
   }
 
-  // Render template with variables
-  const renderedPrompt = promptRenderer.render(config.template, variables)
+  // Render template with variables.
+  // For mutation prompts, compose the apply-to-document footer onto the
+  // template BEFORE rendering so the footer can interpolate {{fileRef}}.
+  const renderedPrompt = promptRenderer.render(
+    withApplyFooter(config.template, !!config.mutatesDocument),
+    variables
+  )
 
   // Determine target panel (Copilot removed; default to terminal)
   const targetPanel = 'terminal' as const

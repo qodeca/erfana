@@ -119,4 +119,7 @@ export interface PromptConfig {
 
   /** Whether textarea is optional (allows submission with empty text when dropdown is present) */
   textareaOptional?: boolean
+
+  /** Whether this prompt mutates the source document (composes the apply-to-document footer) */
+  mutatesDocument?: boolean
 }

@@ -68,7 +68,8 @@ export const PROMPT_REGISTRY: Record<string, PromptConfig> = parsedTemplates.red
       dropdownOptions: parsed.frontmatter.dropdown?.options,
       dropdownLabel: parsed.frontmatter.dropdown?.label,
       defaultDropdownValue: parsed.frontmatter.dropdown?.defaultValue,
-      textareaOptional: parsed.frontmatter.textareaOptional || false
+      textareaOptional: parsed.frontmatter.textareaOptional || false,
+      mutatesDocument: parsed.frontmatter.mutatesDocument || false
     }
     acc[parsed.id] = config
     return acc
