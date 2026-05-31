@@ -9,7 +9,7 @@ Dual vertical activity bars on left and right edges (VS Code-style).
 ### Left & Right Bars
 
 **Left**: Project icon (Cmd/Ctrl+B) toggles project tree
-**Right**: Terminal icon (Cmd/Ctrl+J) toggles terminal panel
+**Right**: Terminal icon (Cmd/Ctrl+J) toggles terminal panel; maximize/restore button in the terminal header (Cmd/Ctrl+Shift+M) expands the terminal over the editor
 **Dimensions**: 48px fixed width, 48x48px click targets
 
 ### Components
@@ -141,6 +141,7 @@ Work **anywhere** in app:
 |----------|--------|
 | `Cmd/Ctrl+B` | Toggle left sidebar (Project) |
 | `Cmd/Ctrl+J` | Toggle right panel (Terminal) |
+| `Cmd/Ctrl+Shift+M` | Maximize terminal over the editor |
 
 **Implementation**: `AppDockLayout.tsx` keydown listener
 **Note**: Overrides Monaco shortcuts with same keys

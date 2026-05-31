@@ -8,6 +8,7 @@ Work anywhere, override editor shortcuts:
 |----------|--------|
 | `Cmd/Ctrl+B` | Toggle left sidebar (Project) |
 | `Cmd/Ctrl+J` | Toggle terminal panel |
+| `Cmd/Ctrl+Shift+M` | Maximize terminal over the editor (opens it if closed; opening a file restores the editor) |
 | `Cmd/Ctrl+,` | Open settings |
 
 ## Monaco Editor
@@ -199,6 +200,7 @@ When image viewer panel is focused:
 | Palette | `F1` |
 | Sidebar | `Cmd/Ctrl+B` |
 | Terminal | `Cmd/Ctrl+J` |
+| Maximize terminal | `Cmd/Ctrl+Shift+M` |
 | Comment | `Cmd/Ctrl+/` |
 | Multi-cursor | `Alt+Click` |
 
