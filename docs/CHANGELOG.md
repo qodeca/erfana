@@ -6,6 +6,14 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 ## Unreleased
 
+## 0.10.1
+
+*Released 2026-05-31. Tag [`v0.10.1`](https://github.com/qodeca/erfana/releases/tag/v0.10.1).*
+
+### Fixes
+
+- **Restored dragging the editor/terminal divider to resize the panels** — the terminal-maximize feature shipped in v0.10.0 inadvertently broke the sash between the editor and terminal: the divider still highlighted on hover but could not be dragged. Resizing now works again. Added an end-to-end regression test that performs a real sash drag so this can't silently break again.
+
 ## 0.10.0
 
 *Released 2026-05-31. Tag [`v0.10.0`](https://github.com/qodeca/erfana/releases/tag/v0.10.0).*
