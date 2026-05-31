@@ -1,5 +1,6 @@
 appId: com.erfana.app
 productName: Erfana
+beforePack: ./scripts/ensure-media-binaries.js
 afterPack: ./scripts/fuses.js
 afterSign: ./scripts/resign.js
 extraResources:

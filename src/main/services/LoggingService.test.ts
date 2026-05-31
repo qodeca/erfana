@@ -146,6 +146,28 @@ describe('LoggingService', () => {
     consoleErrorSpy.mockRestore()
   })
 
+  describe('test-mode transports', () => {
+    // Config-level guard: electron-log is mocked here, so the end-to-end
+    // "no real file is written" behaviour can't be observed in this unit test —
+    // it is verified by the suite-level regression check (run test:main, then
+    // assert ~/Library/Logs/erfana/main.log stays empty). Here we assert the
+    // constructor disabled both transports on all three loggers, and that
+    // logging still executes without throwing once disabled.
+    it('disables file and console transports under VITEST', () => {
+      for (const l of [mockCombinedLogger, mockMainLogger, mockRendererLogger]) {
+        expect(l.transports.file.level).toBe(false)
+        expect(l.transports.console.level).toBe(false)
+      }
+    })
+
+    it('still logs without error once transports are disabled', () => {
+      expect(() => {
+        service.error('disabled-transport probe')
+        service.info('disabled-transport probe')
+      }).not.toThrow()
+    })
+  })
+
   describe('initialize()', () => {
     it('configures electron-log file transport for all three loggers', async () => {
       await service.initialize()

@@ -10,6 +10,7 @@ import { projectSettingsService } from '../services/ProjectSettingsService'
 import { projectLockService } from '../services/ProjectLockService'
 import type { ProjectChanged } from '../../shared/ipc/schema'
 import { logger } from '../services/LoggingService'
+import { fileExists } from '../utils/fileUtils'
 
 /**
  * Broadcast project change to all renderer processes
@@ -174,9 +175,26 @@ export function registerFileHandlers(): void {
         created: stats.birthtime
       }
     } catch (error) {
-      logger.error('Error getting file stats', error instanceof Error ? error : undefined)
+      // ENOENT is an expected caller condition (e.g. a markdown link whose
+      // target doesn't exist). Log at debug; surface real failures at error.
+      // NOTE: this shared handler only debug-logs ENOENT — callers that treat a
+      // missing file as a real problem must log their own severity at the call
+      // site (e.g. ImageViewerPanel and ProjectTree warn; link checks use
+      // file:exists instead).
+      if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+        logger.debug('file:getStats target not found', { filePath, code: 'ENOENT' })
+      } else {
+        logger.error('Error getting file stats', error instanceof Error ? error : undefined)
+      }
       throw error
     }
+  })
+
+  // Existence check that never throws (fs.access). Used by callers that only
+  // need a boolean (e.g. markdown link resolution) — avoids the noise and
+  // fragile error-string parsing of catching file:getStats' ENOENT.
+  ipcMain.handle('file:exists', async (_event, filePath: string): Promise<boolean> => {
+    return fileExists(filePath)
   })
 
   // Get current project path

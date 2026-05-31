@@ -64,11 +64,13 @@ vi.mock('crypto', () => ({
 }))
 
 // =============================================================================
-// Mock ffmpeg-static
+// Mock the shared media-binaries resolver
 // =============================================================================
 
-vi.mock('ffmpeg-static', () => ({
-  default: '/usr/local/bin/ffmpeg'
+vi.mock('../utils/mediaBinaries', () => ({
+  ffmpegPath: '/usr/local/bin/ffmpeg',
+  ffprobePath: '/usr/local/bin/ffprobe',
+  mediaBinariesAvailable: () => true
 }))
 
 // =============================================================================
@@ -1384,15 +1386,15 @@ describe('LocalWhisperService', () => {
   // resolveFfmpegPath() asar path rewrite
   // ===========================================================================
 
-  describe('resolveFfmpegPath() asar path rewrite', () => {
-    it('rewrites .asar path to .asar.unpacked when ffmpeg is inside an asar archive', async () => {
-      vi.resetModules()
-
-      vi.doMock('ffmpeg-static', () => ({
-        default: '/app.asar/node_modules/ffmpeg-static/ffmpeg'
+  describe('resolveFfmpegPath() uses the shared media-binaries path', () => {
+    // Re-apply every mock cleared by resetModules, parameterised by the
+    // ffmpeg path the shared resolver should report (undefined = "unavailable").
+    const applyTranscribeMocks = (ffmpegPathValue: string | undefined): void => {
+      vi.doMock('../utils/mediaBinaries', () => ({
+        ffmpegPath: ffmpegPathValue,
+        ffprobePath: ffmpegPathValue ? '/opt/ffmpeg/ffprobe' : undefined,
+        mediaBinariesAvailable: () => !!ffmpegPathValue
       }))
-
-      // Re-apply all other mocks that will be cleared by resetModules
       vi.doMock('child_process', () => ({
         spawn: (...args: unknown[]) => mockSpawn(...args),
         execFile: (...args: unknown[]) => mockExecFile(...args)
@@ -1463,6 +1465,11 @@ describe('LocalWhisperService', () => {
 
       setupDualExecFileMock('0:01:00.00')
       mockSpawn.mockImplementation(() => makeWhisperSpawnChild(0))
+    }
+
+    it('passes the resolved ffmpeg binary path through unchanged', async () => {
+      vi.resetModules()
+      applyTranscribeMocks('/opt/ffmpeg/ffmpeg')
 
       const { createLocalWhisperService } = await import('./LocalWhisperService')
       const service = createLocalWhisperService({
@@ -1478,16 +1485,41 @@ describe('LocalWhisperService', () => {
         onProgress
       })
 
-      // All execFile calls that use ffmpeg should use the .asar.unpacked path
+      // All ffmpeg execFile calls should use the resolved path as-is
       const ffmpegCalls = mockExecFile.mock.calls.filter((call) => {
         const cmd = call[0] as string
         return cmd.includes('ffmpeg')
       })
       expect(ffmpegCalls.length).toBeGreaterThan(0)
       for (const call of ffmpegCalls) {
-        expect(call[0]).toContain('.asar.unpacked')
-        expect(call[0]).not.toMatch(/\.asar\//)
+        expect(call[0]).toBe('/opt/ffmpeg/ffmpeg')
+        expect(call[0]).not.toMatch(/\.asar/)
       }
+    })
+
+    it('rejects without invoking ffmpeg when no ffmpeg binary is available', async () => {
+      vi.resetModules()
+      applyTranscribeMocks(undefined)
+
+      const { createLocalWhisperService } = await import('./LocalWhisperService')
+      const service = createLocalWhisperService({
+        ensureBinary: mockEnsureBinary,
+        ensureModel: mockEnsureModel,
+        verifyInstalledBinary: mockVerifyInstalledBinary
+      } as never)
+
+      // resolveFfmpegPath() throws before any ffmpeg spawn; transcribe() maps
+      // the AppError to a typed failure result.
+      const result = await service.transcribe({
+        filePath: '/audio/test.mp3',
+        language: 'en',
+        model: 'tiny',
+        onProgress
+      })
+      expect(result.success).toBe(false)
+      expect(result.errorCode).toBe('WHISPER_PROCESS_FAILED')
+      const ffmpegCalls = mockExecFile.mock.calls.filter((call) => String(call[0]).includes('ffmpeg'))
+      expect(ffmpegCalls.length).toBe(0)
     })
   })
 

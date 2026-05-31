@@ -20,7 +20,7 @@ import { realpath, stat, readFile, unlink } from 'fs/promises'
 import { cpus, tmpdir } from 'os'
 import { join, extname, basename, dirname } from 'path'
 import { randomUUID } from 'crypto'
-import ffmpegPath from 'ffmpeg-static'
+import { ffmpegPath } from '../utils/mediaBinaries'
 import { LOCAL_WHISPER, TRANSCRIPTION } from '../../shared/constants'
 import { AppError, ErrorCode } from '../../shared/errors'
 import type {
@@ -257,20 +257,14 @@ export async function validateAudioPath(filePath: string): Promise<string> {
 /**
  * Resolve the ffmpeg binary path.
  *
- * ffmpeg-static may return a path inside the asar archive during production
- * builds. Electron cannot exec binaries from inside asar, so we replace
- * `.asar` with `.asar.unpacked` when detected.
+ * ffmpegPath comes from the shared media-binaries util (ffmpeg-static), which
+ * is a path string or undefined and never throws at import. The app builds
+ * with `asar: false`, so no `.asar` rewriting is needed.
  */
 function resolveFfmpegPath(): string {
   if (!ffmpegPath) {
     throw new AppError('ffmpeg binary not available', ErrorCode.WHISPER_PROCESS_FAILED)
   }
-
-  // Handle asar-packed path
-  if (ffmpegPath.includes('.asar')) {
-    return ffmpegPath.replace('.asar', '.asar.unpacked')
-  }
-
   return ffmpegPath
 }
 

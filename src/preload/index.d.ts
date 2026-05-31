@@ -51,6 +51,7 @@ declare global {
         readFile: (filePath: string) => Promise<string>
         writeFile: (filePath: string, content: string) => Promise<boolean>
         getStats: (filePath: string) => Promise<FileStats>
+        exists: (filePath: string) => Promise<boolean>
         getProjectPath: () => Promise<string | null>
         createFile: (dirPath: string, fileName: string) => Promise<string>
         createFolder: (dirPath: string, folderName: string) => Promise<string>
