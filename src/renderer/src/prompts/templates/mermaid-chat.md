@@ -5,6 +5,7 @@ name: Diagram Chat
 icon: message-circle
 targetPanel: terminal
 autoExecute: true
+mutatesDocument: true
 ---
 <context>
 {{#if fileRef}}{{fileRef}}
@@ -12,23 +13,16 @@ autoExecute: true
 Location: {{lineRange}}
 </context>
 
-<input>
-```mermaid
+<reference_input>
+The diagram's current on-disk content (for locating and matching only):
 {{mermaidCode}}
-```
-</input>
+</reference_input>
 
 <task>
-Modify the diagram according to this request: {{userInstruction}}
+Apply this change to the existing Mermaid diagram block in place: {{userInstruction}}
 </task>
 
-<constraints>
-- Return only the complete modified Mermaid code
-- No explanations or commentary
-</constraints>
-
-<output_format>
-```mermaid
-... modified diagram ...
-```
-</output_format>
+<instructions>
+- Modify only the existing diagram block; keep all other content unchanged
+- Produce valid Mermaid syntax
+</instructions>

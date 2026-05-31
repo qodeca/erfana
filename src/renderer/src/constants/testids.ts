@@ -102,7 +102,7 @@ export const TEST_IDS = {
   GIT_SYNC_INDICATOR: 'git-sync-indicator',
 
   // =========================================================================
-  // Terminal Panel (13)
+  // Terminal Panel (14)
   // =========================================================================
 
   /** Terminal panel container */
@@ -131,6 +131,8 @@ export const TEST_IDS = {
   TERMINAL_BTN_CAPTURE_AREA: 'terminal-btn-capture-area',
   /** Capture camera photo button (cross-platform) */
   TERMINAL_BTN_CAMERA: 'terminal-btn-camera',
+  /** Expand/restore terminal to cover the editor area */
+  TERMINAL_BTN_EXPAND: 'terminal-btn-expand',
 
   // =========================================================================
   // UI Blocker (1)
@@ -160,9 +162,11 @@ export const TEST_IDS = {
   FILE_CONFLICT_BTN_DISMISS: 'file-conflict-btn-dismiss',
 
   // =========================================================================
-  // Editor Content Layout (5)
+  // Editor Content Layout (6)
   // =========================================================================
 
+  /** Editor area wrapper (the center dockview region; collapses when terminal is maximized) */
+  EDITOR_AREA: 'editor-area',
   /** Editor content container (includes editor and preview) */
   EDITOR_CONTENT: 'editor-content',
   /** Editor pane wrapper (left side in split view) */

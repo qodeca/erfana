@@ -15,8 +15,11 @@ describe('useActivityBarStore', () => {
       rightActivePanel: null,
       leftWidth: 300,
       rightWidth: 300,
-      terminalUserClosed: false
+      terminalUserClosed: false,
+      terminalExpanded: false
     })
+    // Isolate persistence assertions across tests
+    localStorage.clear()
   })
 
   describe('initial state', () => {
@@ -326,6 +329,77 @@ describe('useActivityBarStore', () => {
 
       // This should be ephemeral (not persisted via partialize)
       expect(state).toHaveProperty('terminalUserClosed')
+    })
+  })
+
+  describe('terminalExpanded', () => {
+    it('defaults to false', () => {
+      expect(useActivityBarStore.getState().terminalExpanded).toBe(false)
+    })
+
+    it('toggleTerminalExpanded expands and force-opens the terminal', () => {
+      useActivityBarStore.setState({ rightActivePanel: null, terminalUserClosed: true })
+      useActivityBarStore.getState().toggleTerminalExpanded()
+      const s = useActivityBarStore.getState()
+      expect(s.terminalExpanded).toBe(true)
+      expect(s.rightActivePanel).toBe('terminal')
+      expect(s.terminalUserClosed).toBe(false)
+    })
+
+    it('toggleTerminalExpanded collapses without changing terminal visibility', () => {
+      useActivityBarStore.setState({ terminalExpanded: true, rightActivePanel: 'terminal' })
+      useActivityBarStore.getState().toggleTerminalExpanded()
+      const s = useActivityBarStore.getState()
+      expect(s.terminalExpanded).toBe(false)
+      expect(s.rightActivePanel).toBe('terminal')
+    })
+
+    it('setTerminalExpanded(false) is a no-op when already false', () => {
+      useActivityBarStore.setState({ terminalExpanded: false })
+      useActivityBarStore.getState().setTerminalExpanded(false)
+      expect(useActivityBarStore.getState().terminalExpanded).toBe(false)
+    })
+
+    it('closing the terminal via togglePanel clears terminalExpanded', () => {
+      useActivityBarStore.setState({ rightActivePanel: 'terminal', terminalExpanded: true })
+      useActivityBarStore.getState().togglePanel('terminal', 'right')
+      expect(useActivityBarStore.getState().terminalExpanded).toBe(false)
+    })
+
+    it('setActivePanel(null, right) clears terminalExpanded', () => {
+      useActivityBarStore.setState({ rightActivePanel: 'terminal', terminalExpanded: true })
+      useActivityBarStore.getState().setActivePanel(null, 'right')
+      expect(useActivityBarStore.getState().terminalExpanded).toBe(false)
+    })
+
+    it('setActivePanel("terminal","right") preserves terminalExpanded', () => {
+      useActivityBarStore.setState({ rightActivePanel: 'terminal', terminalExpanded: true })
+      useActivityBarStore.getState().setActivePanel('terminal', 'right')
+      expect(useActivityBarStore.getState().terminalExpanded).toBe(true)
+    })
+
+    it('switching the right panel away from terminal clears terminalExpanded', () => {
+      useActivityBarStore.setState({ rightActivePanel: 'terminal', terminalExpanded: true })
+      useActivityBarStore.getState().setActivePanel('git', 'right')
+      expect(useActivityBarStore.getState().terminalExpanded).toBe(false)
+    })
+
+    it('re-arms auto-open when expanding after a manual close', () => {
+      useActivityBarStore.setState({ rightActivePanel: 'terminal' })
+      useActivityBarStore.getState().togglePanel('terminal', 'right') // user close
+      expect(useActivityBarStore.getState().terminalUserClosed).toBe(true)
+      useActivityBarStore.getState().toggleTerminalExpanded() // expand re-arms
+      useActivityBarStore.setState({ rightActivePanel: null })
+      useActivityBarStore.getState().autoOpenTerminal()
+      expect(useActivityBarStore.getState().rightActivePanel).toBe('terminal')
+    })
+
+    it('does not persist terminalExpanded (excluded from partialize)', () => {
+      useActivityBarStore.setState({ terminalExpanded: true })
+      // Trigger a persisted write by changing a persisted field
+      useActivityBarStore.getState().setSidebarWidth(321, 'left')
+      const persisted = JSON.parse(localStorage.getItem('erfana-activity-bar-state') ?? '{}')
+      expect(persisted.state ?? {}).not.toHaveProperty('terminalExpanded')
     })
   })
 })

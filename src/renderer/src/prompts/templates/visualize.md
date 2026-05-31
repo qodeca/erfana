@@ -10,6 +10,7 @@ textareaOptional: true
 inputLabel: Additional instructions
 inputPlaceholder: e.g., focus on the main flow, highlight decision points, show only the key steps...
 order: 2.5
+mutatesDocument: true
 dropdown:
   label: Diagram type
   defaultValue: flowchart
@@ -71,7 +72,7 @@ Diagram type: {{diagramType}}
 </input>
 
 <task>
-Think hard about how to best represent this content visually, then create a Mermaid {{diagramType}} diagram.
+Think hard about how to best represent this content visually, then create a Mermaid {{diagramType}} diagram and insert it into the document immediately after the selected text. Insert a blank line, the mermaid fenced code block, then a trailing blank line, directly after the last line of the selection; leave the selected text and everything else unchanged.
 {{#if userInput}}
 
 Additional instructions: {{userInput}}
@@ -84,15 +85,3 @@ Additional instructions: {{userInput}}
 - Focus on key concepts and relationships
 - Use meaningful labels and descriptions
 </instructions>
-
-<constraints>
-- Return ONLY the Mermaid code block
-- No explanations or commentary
-</constraints>
-
-<output_format>
-```mermaid
-{{diagramType}}
-    ... diagram content ...
-```
-</output_format>

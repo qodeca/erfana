@@ -15,11 +15,34 @@ The Terminal Panel provides a full-featured terminal emulator using:
 
 - **Activity Bar**: Terminal icon in right sidebar (bottom)
 - **Keyboard**: `Cmd/Ctrl+J` - Toggle terminal panel
+- **Maximize**: ⛶ button in panel header / `Cmd/Ctrl+Shift+M` - Expand the terminal over the editor
 - **Scroll to Bottom**: ⬇️ button in panel header - Jump to latest output
 - **Scroll Lock**: 🔒 button in panel header - Lock scroll to always stay at bottom
 - **Restart**: 🔄 button in panel header - Kill and restart terminal session
 
 ## Features
+
+### Maximize Over Editor
+
+A toggle maximizes the terminal to cover the editor/tabs area, leaving only the project panel and terminal visible (hide the project panel with `Cmd/Ctrl+B` for a full-screen terminal). Built for heavy terminal work on small screens.
+
+**Behavior**:
+- Trigger with `Cmd/Ctrl+Shift+M` or the maximize/restore button in the panel header
+- From a closed terminal, the shortcut opens it and maximizes in one action
+- Opening any file (project tree, terminal file links, dialogs, markdown links) auto-restores the editor
+- Maximizing moves focus to the terminal and announces the change to screen readers; restoring returns focus to the editor
+- Independent of the project panel — both your scenarios (project + terminal, terminal-only) fall out of `Cmd/Ctrl+B`
+- Not persisted: every launch and project switch starts collapsed
+
+**Implementation**:
+- Store: `useActivityBarStore.terminalExpanded` (ephemeral; `toggleTerminalExpanded`, `setTerminalExpanded`)
+- Layout: `AppDockLayout` hides the `center-editor` splitview panel and relaxes the terminal's max-size cap on a transition; pure decision helpers in `terminalExpand.ts` (unit-tested)
+- Auto-collapse: editor dockview `onDidActivePanelChange` hook
+
+**Files**:
+- `src/renderer/src/components/DockLayout/AppDockLayout.tsx`
+- `src/renderer/src/components/DockLayout/terminalExpand.ts`
+- `src/renderer/src/stores/useActivityBarStore.ts`
 
 ### Auto-Open on Project Load (v0.6.3)
 

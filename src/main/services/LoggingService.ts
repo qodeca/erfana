@@ -148,6 +148,24 @@ export class LoggingService {
   constructor() {
     this.fullInstanceId = randomUUID()
     this.instanceId = this.fullInstanceId.slice(0, 8)
+    this.applyTestTransportPolicy()
+  }
+
+  /**
+   * Under Vitest, initialize() is never called, so the file transport would
+   * otherwise fall back to electron-log's DEFAULT path
+   * (~/Library/Logs/erfana/main.log) and pollute real user logs with the
+   * expected errors that negative-path tests deliberately trigger. Silence the
+   * file + console transports on all three loggers during test runs.
+   * (initialize() -> configureLogger re-enables them with proper levels in
+   * production, so this only affects test processes.)
+   */
+  private applyTestTransportPolicy(): void {
+    if (!process.env.VITEST) return
+    for (const l of [this.combinedLogger, this.mainLogger, this.rendererLogger]) {
+      l.transports.file.level = false
+      l.transports.console.level = false
+    }
   }
 
   // Three independent logger instances

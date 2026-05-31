@@ -11,17 +11,16 @@ import { join, basename } from 'path'
 import { unlink } from 'fs/promises'
 import { randomUUID } from 'crypto'
 import Ffmpeg from 'fluent-ffmpeg'
-import ffmpegPath from 'ffmpeg-static'
-import ffprobePath from 'ffprobe-static'
+import { ffmpegPath, ffprobePath } from '../utils/mediaBinaries'
 import { VIDEO_IMPORT, TRANSCRIPTION } from '../../shared/constants'
 import { logger } from './LoggingService'
 
-// Configure ffmpeg binary paths
+// Configure ffmpeg binary paths (resolved from the shared media-binaries util)
 if (ffmpegPath) {
   Ffmpeg.setFfmpegPath(ffmpegPath)
 }
-if (ffprobePath?.path) {
-  Ffmpeg.setFfprobePath(ffprobePath.path)
+if (ffprobePath) {
+  Ffmpeg.setFfprobePath(ffprobePath)
 }
 
 /** Video metadata from ffprobe */
@@ -71,7 +70,7 @@ export class AudioExtractionService {
    * Check if ffmpeg is available
    */
   isAvailable(): boolean {
-    return !!ffmpegPath && !!ffprobePath?.path
+    return !!ffmpegPath && !!ffprobePath
   }
 
   /**

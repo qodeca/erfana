@@ -21,7 +21,8 @@ describe('Prompt Frontmatter Schema', () => {
         enabled: true,
         requiresInput: true,
         inputLabel: 'Enter input',
-        inputPlaceholder: 'Type here...'
+        inputPlaceholder: 'Type here...',
+        mutatesDocument: false
       }
 
       const result = validateFrontmatter(data)
@@ -57,6 +58,7 @@ describe('Prompt Frontmatter Schema', () => {
       expect(result.order).toBe(0)
       expect(result.enabled).toBe(true)
       expect(result.requiresInput).toBe(false)
+      expect(result.mutatesDocument).toBe(false)
     })
   })
 

@@ -63,24 +63,14 @@ export function isPathWithinProject(filePath: string, projectRoot: string): bool
  * @throws Error for non-ENOENT errors (permission denied, IPC failure, etc.)
  */
 async function checkFileExists(filePath: string): Promise<boolean> {
-  try {
-    await window.api.file.getStats(filePath)
-    return true
-  } catch (error: unknown) {
-    // Return false for ENOENT (file not found) or generic Error with ENOENT message
-    if (error && typeof error === 'object') {
-      if ('code' in error && error.code === 'ENOENT') {
-        return false
-      }
-      // For test mocks that just throw Error('ENOENT')
-      if ('message' in error && typeof error.message === 'string' && error.message === 'ENOENT') {
-        return false
-      }
-    }
-    // Log unexpected errors but don't throw to avoid breaking the UI
-    logger.error('[MarkdownLinkResolver] Unexpected error checking file existence', error instanceof Error ? error : undefined)
-    return false
+  // Uses the dedicated file:exists IPC channel (fs.access, never throws), so a
+  // missing target is a plain `false` with no error-log noise and no fragile
+  // error-message parsing.
+  const exists = await window.api.file.exists(filePath)
+  if (!exists) {
+    logger.debug('[MarkdownLinkResolver] link target missing', { filePath })
   }
+  return exists
 }
 
 /**

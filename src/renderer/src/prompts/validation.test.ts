@@ -29,11 +29,11 @@ function createValidVariables(templateId: string): Partial<PromptVariables> {
     case 'editor-visualize':
       return { selectedText: 'Some text', filePath: '/path/file.md', diagramType: 'flowchart' }
     case 'diagram-chat':
-      return { mermaidCode: 'graph TD; A-->B', userInstruction: 'Add a node' }
+      return { mermaidCode: 'graph TD; A-->B', userInstruction: 'Add a node', filePath: '/path/file.md' }
     case 'change-mermaid-direction':
-      return { mermaidCode: 'graph TD; A-->B', targetDirection: 'LR', directionLabel: 'Left to Right' }
+      return { mermaidCode: 'graph TD; A-->B', targetDirection: 'LR', directionLabel: 'Left to Right', filePath: '/path/file.md' }
     case 'mermaid-bug-report':
-      return { mermaidError: 'Syntax error', mermaidCode: 'graph TD A-->B' }
+      return { mermaidError: 'Syntax error', mermaidCode: 'graph TD A-->B', filePath: '/path/file.md' }
     case 'organize-import':
       return { importedFilePath: '/imports/file.pdf' }
     default:
@@ -119,7 +119,7 @@ describe('validation.ts', () => {
       it('should return valid for diagram-chat with required variables', () => {
         const result = validateVariables('diagram-chat', {
           selectedText: '',
-          filePath: '',
+          filePath: '/path/diagram.md',
           fullDocument: '',
           mermaidCode: 'graph TD; A-->B',
           userInstruction: 'Add a new node C'
@@ -194,14 +194,15 @@ describe('validation.ts', () => {
           selectedText: '',
           filePath: '',
           fullDocument: ''
-          // Missing: mermaidCode, targetDirection, directionLabel
+          // Missing: mermaidCode, targetDirection, directionLabel, filePath
         })
 
         expect(result.valid).toBe(false)
-        expect(result.missingVariables).toHaveLength(3)
+        expect(result.missingVariables).toHaveLength(4)
         expect(result.missingVariables).toContain('mermaidCode')
         expect(result.missingVariables).toContain('targetDirection')
         expect(result.missingVariables).toContain('directionLabel')
+        expect(result.missingVariables).toContain('filePath')
       })
     })
 
@@ -289,7 +290,7 @@ describe('validation.ts', () => {
 
     it('should return correct requirements for each template', () => {
       expect(getRequiredVariables('modify')).toEqual(['selectedText', 'filePath', 'userInput'])
-      expect(getRequiredVariables('diagram-chat')).toEqual(['mermaidCode', 'userInstruction'])
+      expect(getRequiredVariables('diagram-chat')).toEqual(['mermaidCode', 'userInstruction', 'filePath'])
       expect(getRequiredVariables('organize-import')).toEqual(['importedFilePath'])
     })
   })

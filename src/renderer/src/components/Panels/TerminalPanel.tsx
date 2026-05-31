@@ -10,13 +10,14 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import { ISplitviewPanelProps } from 'dockview'
-import { Terminal as TerminalIcon, RotateCw, ArrowDownToLine, LockKeyhole, LockKeyholeOpen, Camera, AppWindow, BoxSelect, Webcam } from 'lucide-react'
+import { Terminal as TerminalIcon, RotateCw, ArrowDownToLine, LockKeyhole, LockKeyholeOpen, Camera, AppWindow, BoxSelect, Webcam, Maximize2, Minimize2 } from 'lucide-react'
 import type { DisplayInfo } from '../../../../shared/ipc/screenshot-schema'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import { useProjectStore } from '../../stores/useProjectStore'
+import { useActivityBarStore } from '../../stores/useActivityBarStore'
 import { showWarningToast, showErrorToast, showSuccessToast, showInfoToast } from '../../utils/toastHelpers'
 import { useScrollAnomalyRecovery } from '../../hooks/useScrollAnomalyRecovery'
 import { useTerminalParserHooks } from '../../hooks/useTerminalParserHooks'
@@ -164,6 +165,10 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   // Scroll lock for proactive scroll protection (issue #60)
   const scrollLocked = useTerminalStore((state) => state.scrollLocked)
   const setScrollLocked = useTerminalStore((state) => state.setScrollLocked)
+
+  // Terminal expand (maximize over editor area)
+  const terminalExpanded = useActivityBarStore((state) => state.terminalExpanded)
+  const toggleTerminalExpanded = useActivityBarStore((state) => state.toggleTerminalExpanded)
 
   // DIP: Inject state accessor instead of coupling hook to store (SOLID compliance)
   // Memoized to avoid recreating closure on every render (stable reference for hook dependencies)
@@ -1232,11 +1237,21 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                   className={`icon-btn${scrollLocked ? ' icon-btn--active' : ''}`}
                   onClick={handleToggleScrollLock}
                   title={scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom'}
-                  aria-label={scrollLocked ? 'Disable scroll lock' : 'Lock scroll to bottom'}
+                  aria-label="Lock scroll to bottom"
                   aria-pressed={scrollLocked}
                   data-testid={TEST_IDS.TERMINAL_BTN_LOCK}
                 >
                   {scrollLocked ? <LockKeyhole size={14} /> : <LockKeyholeOpen size={14} />}
+                </button>
+                <button
+                  className={`icon-btn${terminalExpanded ? ' icon-btn--active' : ''}`}
+                  onClick={toggleTerminalExpanded}
+                  title="Maximize terminal (⌘⇧M)"
+                  aria-label="Maximize terminal over the editor"
+                  aria-pressed={terminalExpanded}
+                  data-testid={TEST_IDS.TERMINAL_BTN_EXPAND}
+                >
+                  {terminalExpanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
                 </button>
               </>
             )}

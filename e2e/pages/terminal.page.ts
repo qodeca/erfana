@@ -148,6 +148,16 @@ export class TerminalPage {
     await byTestId(this.page, TEST_IDS.TERMINAL_BTN_LOCK).click()
   }
 
+  /** The expand/restore (maximize-over-editor) toolbar button. */
+  expandButton(): Locator {
+    return byTestId(this.page, TEST_IDS.TERMINAL_BTN_EXPAND)
+  }
+
+  /** Click the expand/restore button to toggle terminal maximize. */
+  async toggleExpand(): Promise<void> {
+    await this.expandButton().click()
+  }
+
   async waitForReady(): Promise<void> {
     await expect(byTestId(this.page, TEST_IDS.TERMINAL_INSTANCE)).toBeVisible()
     // Wait for PTY initialization

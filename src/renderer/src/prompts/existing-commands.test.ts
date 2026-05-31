@@ -193,6 +193,10 @@ describe('Existing Commands - Regression Tests', () => {
 
       expect(result).toContain('graph TD')
       expect(result).toContain('Syntax error at line 2')
+      // The template now mutates the document: it must edit in place, not print.
+      expect(mermaid!.mutatesDocument).toBe(true)
+      // The old print-style "**Issue**:" output block must be gone.
+      expect(result).not.toContain('**Issue**')
     })
 
     it('should be in correct area and subArea', () => {

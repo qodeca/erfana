@@ -9,6 +9,7 @@ requiresInput: true
 inputLabel: How should this be modified?
 inputPlaceholder: e.g., make more concise, add examples, use simpler language...
 order: 1
+mutatesDocument: true
 ---
 <context>
 {{#if fileRef}}{{fileRef}}
@@ -21,7 +22,7 @@ Source: {{basename filePath}} ({{formatLineRange startLine endLine}})
 </input>
 
 <task>
-You MUST edit the source file directly to apply the following modification: {{userInput}}
+Replace the selected text in place with a modified version that applies: {{userInput}}
 </task>
 
 <instructions>
@@ -30,11 +31,6 @@ You MUST edit the source file directly to apply the following modification: {{us
 </instructions>
 
 <constraints>
-- 200-300 words maximum
+- Keep the modified text roughly 200-300 words unless the change requires otherwise
 - Preserve original meaning unless change is requested
-- No preamble or explanation
 </constraints>
-
-<output_format>
-You MUST edit the file directly using the file reference above. Replace the selected text with the modified version. No commentary.
-</output_format>

@@ -29,8 +29,10 @@ describe('TEST_IDS', () => {
 
       // Terminal
       expect(TEST_IDS.TERMINAL_PANEL).toBe('terminal-panel')
+      expect(TEST_IDS.TERMINAL_BTN_EXPAND).toBe('terminal-btn-expand')
 
       // Editor
+      expect(TEST_IDS.EDITOR_AREA).toBe('editor-area')
       expect(TEST_IDS.EDITOR_MONACO).toBe('editor-monaco')
       expect(TEST_IDS.EDITOR_PREVIEW).toBe('editor-preview')
 
@@ -80,10 +82,10 @@ describe('TEST_IDS', () => {
       expect(projectTreeIds).toHaveLength(15)
     })
 
-    it('should have 13 Terminal Panel IDs', async () => {
+    it('should have 14 Terminal Panel IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const terminalIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('TERMINAL_'))
-      expect(terminalIds).toHaveLength(13)
+      expect(terminalIds).toHaveLength(14)
     })
 
     it('should have 8 Camera Dialog IDs', async () => {
@@ -282,17 +284,18 @@ describe('TEST_IDS', () => {
       expect(ids).toHaveLength(4)
     })
 
-    it('should have 5 Editor Content Layout IDs', async () => {
+    it('should have 6 Editor Content Layout IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const ids = Object.keys(TEST_IDS).filter(
         (k) =>
+          k === 'EDITOR_AREA' ||
           k === 'EDITOR_CONTENT' ||
           k === 'EDITOR_PANE' ||
           k === 'PREVIEW_PANE' ||
           k === 'EDITOR_MONACO' ||
           k === 'EDITOR_PREVIEW'
       )
-      expect(ids).toHaveLength(5)
+      expect(ids).toHaveLength(6)
     })
 
     it('should have 20 Markdown Toolbar IDs', async () => {

@@ -5,31 +5,45 @@ import {
   getLinkTooltip
 } from './markdownLinkResolver'
 
-// Mock the window.api.file.getStats function
-const mockGetStats = vi.fn()
+vi.mock('./logger', () => ({
+  logger: { trace: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), fatal: vi.fn() }
+}))
+import { logger } from './logger'
+
+// Mock the window.api.file.exists function (resolver uses file:exists)
+const mockExists = vi.fn()
 
 beforeEach(() => {
   // Setup window.api mock
   global.window = {
     api: {
       file: {
-        getStats: mockGetStats
+        exists: mockExists
       }
     }
   } as unknown as Window & typeof globalThis
 
   // Reset mock
-  mockGetStats.mockReset()
+  mockExists.mockReset()
 })
 
 describe('markdownLinkResolver', () => {
   const projectRoot = '/Users/test/project'
   const currentFile = '/Users/test/project/docs/README.md'
 
+  describe('broken-link logging', () => {
+    it('reports a missing target as exists:false without logging an error', async () => {
+      mockExists.mockResolvedValue(false)
+      const result = await resolveMarkdownLink('./missing.md', currentFile, projectRoot)
+      expect(result?.exists).toBe(false)
+      expect(logger.error).not.toHaveBeenCalled()
+    })
+  })
+
   describe('resolveMarkdownLink', () => {
     describe('Relative links', () => {
       it('should resolve ./file.md relative to current directory', async () => {
-        mockGetStats.mockResolvedValue({ isFile: () => true })
+        mockExists.mockResolvedValue(true)
 
         const result = await resolveMarkdownLink('./api.md', currentFile, projectRoot)
 
@@ -41,7 +55,7 @@ describe('markdownLinkResolver', () => {
       })
 
       it('should resolve ../file.md going up one directory', async () => {
-        mockGetStats.mockResolvedValue({ isFile: () => true })
+        mockExists.mockResolvedValue(true)
 
         const result = await resolveMarkdownLink('../guide.md', currentFile, projectRoot)
 
@@ -54,7 +68,7 @@ describe('markdownLinkResolver', () => {
 
       it('should resolve ../../file.md going up two directories', async () => {
         const deepFile = '/Users/test/project/docs/api/endpoints.md'
-        mockGetStats.mockResolvedValue({ isFile: () => true })
+        mockExists.mockResolvedValue(true)
 
         const result = await resolveMarkdownLink('../../README.md', deepFile, projectRoot)
 
@@ -66,7 +80,7 @@ describe('markdownLinkResolver', () => {
       })
 
       it('should resolve ./sub/file.md going down into subdirectory', async () => {
-        mockGetStats.mockResolvedValue({ isFile: () => true })
+        mockExists.mockResolvedValue(true)
 
         const result = await resolveMarkdownLink('./api/endpoints.md', currentFile, projectRoot)
 
@@ -80,7 +94,7 @@ describe('markdownLinkResolver', () => {
 
     describe('Absolute from project root', () => {
       it('should resolve /docs/file.md from project root', async () => {
-        mockGetStats.mockResolvedValue({ isFile: () => true })
+        mockExists.mockResolvedValue(true)
 
         const result = await resolveMarkdownLink('/docs/api.md', currentFile, projectRoot)
 
@@ -92,7 +106,7 @@ describe('markdownLinkResolver', () => {
       })
 
       it('should resolve /file.md from project root', async () => {
-        mockGetStats.mockResolvedValue({ isFile: () => true })
+        mockExists.mockResolvedValue(true)
 
         const result = await resolveMarkdownLink('/README.md', currentFile, projectRoot)
 
@@ -104,7 +118,7 @@ describe('markdownLinkResolver', () => {
       })
 
       it('should resolve nested absolute paths', async () => {
-        mockGetStats.mockResolvedValue({ isFile: () => true })
+        mockExists.mockResolvedValue(true)
 
         const result = await resolveMarkdownLink(
           '/docs/api/endpoints.md',
@@ -122,8 +136,10 @@ describe('markdownLinkResolver', () => {
 
     describe('Filename only', () => {
       it('should find file in current directory', async () => {
-        // First call (current dir) - file exists
-        mockGetStats.mockResolvedValueOnce({ isFile: () => true })
+        // Only the current-directory candidate exists
+        mockExists.mockImplementation((p: string) =>
+          Promise.resolve(p === '/Users/test/project/docs/api.md')
+        )
 
         const result = await resolveMarkdownLink('api.md', currentFile, projectRoot)
 
@@ -132,14 +148,14 @@ describe('markdownLinkResolver', () => {
           anchor: undefined,
           exists: true
         })
-        expect(mockGetStats).toHaveBeenCalledWith('/Users/test/project/docs/api.md')
+        expect(mockExists).toHaveBeenCalledWith('/Users/test/project/docs/api.md')
       })
 
       it('should fall back to project root if not in current directory', async () => {
-        // First call (current dir) - file doesn't exist
-        mockGetStats.mockRejectedValueOnce(new Error('ENOENT'))
-        // Second call (project root) - file exists
-        mockGetStats.mockResolvedValueOnce({ isFile: () => true })
+        // Only the project-root candidate exists (current dir does not)
+        mockExists.mockImplementation((p: string) =>
+          Promise.resolve(p === '/Users/test/project/README.md')
+        )
 
         const result = await resolveMarkdownLink('README.md', currentFile, projectRoot)
 
@@ -148,13 +164,13 @@ describe('markdownLinkResolver', () => {
           anchor: undefined,
           exists: true
         })
-        expect(mockGetStats).toHaveBeenCalledWith('/Users/test/project/docs/README.md')
-        expect(mockGetStats).toHaveBeenCalledWith('/Users/test/project/README.md')
+        expect(mockExists).toHaveBeenCalledWith('/Users/test/project/docs/README.md')
+        expect(mockExists).toHaveBeenCalledWith('/Users/test/project/README.md')
       })
 
       it('should return current directory path if file not found anywhere', async () => {
         // Both calls fail
-        mockGetStats.mockRejectedValue(new Error('ENOENT'))
+        mockExists.mockResolvedValue(false)
 
         const result = await resolveMarkdownLink('missing.md', currentFile, projectRoot)
 
@@ -168,7 +184,7 @@ describe('markdownLinkResolver', () => {
 
     describe('Anchors/Fragments', () => {
       it('should parse anchor from relative link', async () => {
-        mockGetStats.mockResolvedValue({ isFile: () => true })
+        mockExists.mockResolvedValue(true)
 
         const result = await resolveMarkdownLink('./api.md#endpoints', currentFile, projectRoot)
 
@@ -180,7 +196,7 @@ describe('markdownLinkResolver', () => {
       })
 
       it('should parse anchor from absolute link', async () => {
-        mockGetStats.mockResolvedValue({ isFile: () => true })
+        mockExists.mockResolvedValue(true)
 
         const result = await resolveMarkdownLink(
           '/docs/api.md#section-name',
@@ -196,7 +212,7 @@ describe('markdownLinkResolver', () => {
       })
 
       it('should parse anchor from filename-only link', async () => {
-        mockGetStats.mockResolvedValue({ isFile: () => true })
+        mockExists.mockResolvedValue(true)
 
         const result = await resolveMarkdownLink('api.md#intro', currentFile, projectRoot)
 
@@ -226,7 +242,7 @@ describe('markdownLinkResolver', () => {
       })
 
       it('should treat /etc/passwd as relative to project root (not absolute system path)', async () => {
-        mockGetStats.mockResolvedValue({ isFile: () => true })
+        mockExists.mockResolvedValue(true)
 
         const result = await resolveMarkdownLink('/etc/passwd', currentFile, projectRoot)
 
@@ -239,7 +255,7 @@ describe('markdownLinkResolver', () => {
       })
 
       it('should allow links within nested project directories', async () => {
-        mockGetStats.mockResolvedValue({ isFile: () => true })
+        mockExists.mockResolvedValue(true)
 
         const result = await resolveMarkdownLink(
           '../../docs/README.md',
@@ -279,7 +295,7 @@ describe('markdownLinkResolver', () => {
 
     describe('File existence', () => {
       it('should mark existing files as exists: true', async () => {
-        mockGetStats.mockResolvedValue({ isFile: () => true })
+        mockExists.mockResolvedValue(true)
 
         const result = await resolveMarkdownLink('./api.md', currentFile, projectRoot)
 
@@ -287,7 +303,7 @@ describe('markdownLinkResolver', () => {
       })
 
       it('should mark non-existing files as exists: false', async () => {
-        mockGetStats.mockRejectedValue(new Error('ENOENT'))
+        mockExists.mockResolvedValue(false)
 
         const result = await resolveMarkdownLink('./missing.md', currentFile, projectRoot)
 
@@ -297,7 +313,7 @@ describe('markdownLinkResolver', () => {
 
     describe('Edge cases', () => {
       it('should handle paths with multiple consecutive slashes', async () => {
-        mockGetStats.mockResolvedValue({ isFile: () => true })
+        mockExists.mockResolvedValue(true)
 
         const result = await resolveMarkdownLink('./docs//api.md', currentFile, projectRoot)
 
@@ -305,7 +321,7 @@ describe('markdownLinkResolver', () => {
       })
 
       it('should handle paths with trailing slashes', async () => {
-        mockGetStats.mockResolvedValue({ isFile: () => true })
+        mockExists.mockResolvedValue(true)
 
         const result = await resolveMarkdownLink('./api/', currentFile, projectRoot)
 
@@ -313,7 +329,7 @@ describe('markdownLinkResolver', () => {
       })
 
       it('should handle Windows-style backslashes', async () => {
-        mockGetStats.mockResolvedValue({ isFile: () => true })
+        mockExists.mockResolvedValue(true)
 
         const result = await resolveMarkdownLink('.\\api.md', currentFile, projectRoot)
 

@@ -51,15 +51,23 @@ module.exports = async function afterSign(context) {
     process.env.CSC_IDENTITY_AUTO_DISCOVERY === 'true' ||
     (process.env.CSC_NAME && process.env.CSC_NAME !== '-');
 
-  if (realIdentitySigning) {
-    console.log('🔏 Real signing identity detected — leaving Developer ID signatures intact');
-    return;
-  }
-
   const appPath = path.join(
     context.appOutDir,
     `${context.packager.appInfo.productFilename}.app`
   );
+
+  if (realIdentitySigning) {
+    console.log('🔏 Real signing identity detected — leaving Developer ID signatures intact');
+    // Verify the freshly-signed bundle before notary upload so a partial
+    // signature (e.g. on the per-arch ffmpeg chmod'd in afterPack) is caught
+    // locally rather than by Apple's notary service.
+    console.log('🔍 Verifying Developer ID signature (--deep --strict)...');
+    execFileSync('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath], {
+      stdio: 'inherit'
+    });
+    console.log('✅ Developer ID signature verified');
+    return;
+  }
 
   console.log('🔏 Deep re-signing macOS app bundle for consistent ad-hoc identity (local dev)');
   console.log(`   App: ${appPath}`);

@@ -69,6 +69,8 @@ const api = {
       ipcRenderer.invoke('file:writeFile', filePath, content),
     getStats: (filePath: string): Promise<FileStats> =>
       ipcRenderer.invoke('file:getStats', filePath),
+    exists: (filePath: string): Promise<boolean> =>
+      ipcRenderer.invoke('file:exists', filePath),
     getProjectPath: (): Promise<string | null> => ipcRenderer.invoke('file:getProjectPath'),
     createFile: (dirPath: string, fileName: string): Promise<string> =>
       ipcRenderer.invoke('file:createFile', dirPath, fileName),

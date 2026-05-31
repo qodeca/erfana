@@ -34,6 +34,7 @@ npm run test:e2e:update-screenshots # Refresh visual baselines
 | Command palette | `F1` | `F1` |
 | Toggle sidebar | `Cmd+B` | `Ctrl+B` |
 | Toggle terminal | `Cmd+J` | `Ctrl+J` |
+| Maximize terminal | `Cmd+Shift+M` | `Ctrl+Shift+M` |
 | Settings | `Cmd+,` | `Ctrl+,` |
 | Comment line | `Cmd+/` | `Ctrl+/` |
 | Multi-cursor | `Option+Click` | `Alt+Click` |

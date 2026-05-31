@@ -74,15 +74,13 @@ vi.mock('fluent-ffmpeg', () => ({
 }))
 
 // =============================================================================
-// Mock ffmpeg-static and ffprobe-static
+// Mock the shared media-binaries resolver
 // =============================================================================
 
-vi.mock('ffmpeg-static', () => ({
-  default: '/path/to/ffmpeg'
-}))
-
-vi.mock('ffprobe-static', () => ({
-  default: { path: '/path/to/ffprobe' }
+vi.mock('../utils/mediaBinaries', () => ({
+  ffmpegPath: '/path/to/ffmpeg',
+  ffprobePath: '/path/to/ffprobe',
+  mediaBinariesAvailable: () => true
 }))
 
 // =============================================================================

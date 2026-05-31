@@ -31,8 +31,17 @@
  */
 
 const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses');
+const { Arch } = require('electron-builder');
 const path = require('path');
 const fs = require('fs');
+// Shared with the beforePack hook so the size floor + integrity pins + cache
+// location have a single source of truth.
+const {
+  verifyBinary,
+  MEDIA_BINARY_MIN_BYTES,
+  FFMPEG_SHA256,
+  CACHE_ROOT,
+} = require('./ensure-media-binaries.js');
 
 /**
  * POSIX mode bits applied to node-pty's spawn-helper. 0755 = rwxr-xr-x
@@ -168,6 +177,79 @@ function chmodNodePtySpawnHelper(resourcesDir, { requireMatch = false } = {}) {
 }
 
 /**
+ * Place the correct-arch ffmpeg into THIS pack's bundle and restore the execute
+ * bit on the packed ffmpeg + ffprobe-static binaries.
+ *
+ * beforePack (scripts/ensure-media-binaries.js) caches each target arch's
+ * ffmpeg-static binary under CACHE_ROOT, size- and SHA-256-verified. Here we
+ * copy the arch matching this pack over the bundle's
+ * `node_modules/ffmpeg-static/ffmpeg` (electron-builder copied the host arch in
+ * for both bundles), re-verify, and chmod. So each dmg ships exactly its own
+ * current, integrity-checked ffmpeg — no foreign-arch bloat, no network here,
+ * and a build that lacks the correct binary fails loudly instead of shipping a
+ * `spawn … ffmpeg ENOENT` regression.
+ *
+ * @param {string} resourcesDir - dir containing `app/node_modules`
+ * @param {string} platform - context.electronPlatformName ('darwin'|'linux'|'win32')
+ * @param {number} archEnum - electron-builder Arch enum value (context.arch)
+ * @param {object} [options]
+ * @param {boolean} [options.requireMatch=false] - throw if the cached binary is absent
+ */
+function ensurePackedMediaBinaries(resourcesDir, platform, archEnum, { requireMatch = false } = {}) {
+  const arch = Arch[archEnum]; // 'ia32' | 'x64' | 'armv7l' | 'arm64' | 'universal'
+  if (arch === 'universal' || arch === 'armv7l' || arch === 'ia32') {
+    // ffmpeg-static publishes x64 / arm64 builds; these targets are not shipped.
+    if (requireMatch) {
+      throw new Error(`ensurePackedMediaBinaries: unsupported ffmpeg target arch '${arch}'`);
+    }
+    console.warn(`⚠️  arch '${arch}' is not a supported ffmpeg target — skipping`);
+    return;
+  }
+
+  const key = `${platform}-${arch}`;
+  const binName = platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+  const cached = path.join(CACHE_ROOT, key, binName);
+  const dest = path.join(resourcesDir, 'app', 'node_modules', 'ffmpeg-static', binName);
+
+  if (!fs.existsSync(cached)) {
+    if (requireMatch) {
+      throw new Error(`Cached ffmpeg missing for ${key} at ${cached}. Did beforePack run?`);
+    }
+    console.warn(`⚠️  No cached ffmpeg for ${key} (cross-platform pack?) — skipping`);
+    return;
+  }
+
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.copyFileSync(cached, dest);
+  verifyBinary(dest, key, MEDIA_BINARY_MIN_BYTES, FFMPEG_SHA256[key]);
+
+  // Restore execute bits (Unix). Windows ignores POSIX modes.
+  if (platform !== 'win32') {
+    fs.chmodSync(dest, SPAWN_HELPER_MODE);
+    console.log(`   chmod 0755 ${path.relative(resourcesDir, dest)}`);
+
+    const probeRoot = path.join(resourcesDir, 'app', 'node_modules', 'ffprobe-static', 'bin');
+    if (fs.existsSync(probeRoot)) {
+      const stack = [probeRoot];
+      while (stack.length) {
+        const dir = stack.pop();
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const full = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            stack.push(full);
+          } else if (entry.name === 'ffprobe' && !fs.lstatSync(full).isSymbolicLink()) {
+            // Intentional symlink skip: never chmod through a symlink (could
+            // point outside the bundle — defence in depth).
+            fs.chmodSync(full, SPAWN_HELPER_MODE);
+          }
+        }
+      }
+    }
+  }
+  console.log(`✅ Packed media binaries verified (${key})`);
+}
+
+/**
  * Rename app bundle to include test suffix for visual differentiation.
  * This helps prevent accidental distribution of test builds.
  *
@@ -258,6 +340,24 @@ async function afterPack(context) {
     chmodNodePtySpawnHelper(resolveResources(), { requireMatch });
   }
 
+  // Verify + chmod the packed media binaries. Separate resolver from the
+  // spawn-helper one because Windows ships ffmpeg.exe (no node-pty spawn-helper).
+  const mediaResources = {
+    darwin: () => path.join(electronBinaryPath, 'Contents', 'Resources'),
+    linux: () => path.join(context.appOutDir, 'resources'),
+    win32: () => path.join(context.appOutDir, 'resources'),
+  }[context.electronPlatformName];
+  if (mediaResources) {
+    console.log(`🔧 Verifying packed media binaries (${context.electronPlatformName})`);
+    const requireMatch = context.electronPlatformName === process.platform;
+    ensurePackedMediaBinaries(
+      mediaResources(),
+      context.electronPlatformName,
+      context.arch,
+      { requireMatch }
+    );
+  }
+
   console.log(`   Applying fuses to: ${electronBinaryPath}`);
 
   await flipFuses(electronBinaryPath, {
@@ -308,4 +408,6 @@ async function afterPack(context) {
 
 module.exports = afterPack;
 module.exports.chmodNodePtySpawnHelper = chmodNodePtySpawnHelper;
+module.exports.ensurePackedMediaBinaries = ensurePackedMediaBinaries;
 module.exports.SPAWN_HELPER_MODE = SPAWN_HELPER_MODE;
+module.exports.MEDIA_BINARY_MIN_BYTES = MEDIA_BINARY_MIN_BYTES;

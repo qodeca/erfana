@@ -24,10 +24,11 @@ export const PROMPT_REQUIREMENTS: Record<string, (keyof PromptVariables)[]> = {
   'editor-visualize': ['selectedText', 'filePath', 'diagramType'],
   'editor-prompt': ['selectedText', 'filePath', 'userInput'],
 
-  // Mermaid diagram prompts
-  'diagram-chat': ['mermaidCode', 'userInstruction'],
-  'change-mermaid-direction': ['mermaidCode', 'targetDirection', 'directionLabel'],
-  'mermaid-bug-report': ['mermaidError', 'mermaidCode'],
+  // Mermaid diagram prompts (mutate the document — filePath required so the
+  // apply-to-document footer's {{fileRef}} can never render empty)
+  'diagram-chat': ['mermaidCode', 'userInstruction', 'filePath'],
+  'change-mermaid-direction': ['mermaidCode', 'targetDirection', 'directionLabel', 'filePath'],
+  'mermaid-bug-report': ['mermaidError', 'mermaidCode', 'filePath'],
 
   // Global prompts
   'organize-import': ['importedFilePath']
