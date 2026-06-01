@@ -4,7 +4,14 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
-## Unreleased
+## 0.11.0
+
+*Released 2026-06-01. Tag [`v0.11.0`](https://github.com/qodeca/erfana/releases/tag/v0.11.0).*
+
+### Changes
+
+- **Smaller download** — the installed macOS app is roughly 40% smaller (about 1.0 GB → 610 MB) after pruning bundled dependencies and foreign-architecture binaries. No features were removed.
+- **Linux builds discontinued** ([#206](https://github.com/qodeca/erfana/pull/206)) — Erfana no longer ships Linux packages (AppImage / deb / rpm); releases now target macOS and Windows only. Linux remains usable for local development (`npm run dev`).
 
 ### Fixes
 
@@ -13,6 +20,7 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 ### Internal
 
 - **Central text-clipboard service** ([#203](https://github.com/qodeca/erfana/issues/203)) — Every in-scope text surface now routes clipboard read/write through one renderer service (`textClipboard`) over a new async, Zod-validated IPC bridge (`clipboard:readText` / `clipboard:writeText`, `api.clipboard`) to Electron's main-process `clipboard` module. The service is the single transport-error chokepoint (retry-once + debounced, screen-reader-announced error toast); the main handler validates the sender frame and bounds writes to 5 MB. Monaco's keybinding/context-menu overrides extracted to the pure `monacoClipboardCommands.ts`; the per-surface dupes in PromptDialog/FileSystemDialog/ChatBubble were removed (`useTextareaClipboard` rebuilt). Over-limit textarea paste now truncates-and-inserts instead of silently rejecting. The terminal SIGINT-vs-copy decision table (`terminalClipboard.logic.ts`, #28/#122) is unchanged. Project-tree file clipboard (`useClipboardStore`) is out of scope and untouched.
+- **Package-size reduction** ([#206](https://github.com/qodeca/erfana/pull/206)) — Moved renderer-only libraries (Monaco, Mermaid, xterm, dockview, dnd-kit, markdown plugins) to `devDependencies` so Vite still bundles them but electron-builder no longer copies their raw sources into the packaged app; removed unused runtime dependencies; and pruned foreign-architecture binaries (ffprobe-static, node-pty prebuilds) plus Windows `.pdb` debug files in the `afterPack` hook. ASAR stays disabled (isomorphic-git's transitive `require()` tree). The macOS `Resources/app` payload dropped ~56% (791 MB → 347 MB).
 
 ## 0.10.1
 
