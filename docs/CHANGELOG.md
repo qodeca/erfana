@@ -4,14 +4,19 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
-## 0.11.0
+## 0.11.1
 
-*Released 2026-06-01. Tag [`v0.11.0`](https://github.com/qodeca/erfana/releases/tag/v0.11.0).*
+*Released 2026-06-01. Tag [`v0.11.1`](https://github.com/qodeca/erfana/releases/tag/v0.11.1).*
 
 ### Changes
 
+- **Single build per platform** — macOS now ships only an Apple Silicon (arm64) `.dmg` and Windows only the NSIS installer (`setup.exe`). The Intel (x64) macOS build, the macOS `.zip`, and the Windows portable `.exe` were dropped — auto-update is disabled, so the `.zip` and portable variants served no purpose. **Intel Macs are no longer supported.**
 - **Smaller download** — the installed macOS app is roughly 40% smaller (about 1.0 GB → 610 MB) after pruning bundled dependencies and foreign-architecture binaries. No features were removed.
 - **Linux builds discontinued** ([#206](https://github.com/qodeca/erfana/pull/206)) — Erfana no longer ships Linux packages (AppImage / deb / rpm); releases now target macOS and Windows only. Linux remains usable for local development (`npm run dev`).
+
+### Security
+
+- **Patched axios and fast-uri** — updated `axios` to 1.16.1 (GHSA-pjwm-pj3p-43mv, GHSA-898c-q2cr-xwhg, GHSA-654m-c8p4-x5fp, GHSA-35jp-ww65-95wh: proxy bypass, prototype-pollution DoS / header injection, MITM) and `fast-uri` to 3.1.2 (GHSA-q3j6-qgpj-74h6, GHSA-v39h-62p7-jpjc: path traversal, host confusion). Both are transitive dependencies (document import/export, settings storage); production `npm audit` is now clean.
 
 ### Fixes
 
