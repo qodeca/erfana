@@ -12,6 +12,7 @@ import type { PromptDialogResult } from '../Dialog/PromptDialog'
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { scheduleScrollIfNeeded } from '../../utils/promptScrollScheduler.logic'
 import { logger } from '../../utils/logger'
+import { textClipboard } from '../../services/textClipboard'
 
 /**
  * Maps prompt IDs to their corresponding test IDs.
@@ -208,14 +209,11 @@ export function PreviewContextMenu({
     onClose()
   }
 
-  const handleCopySelection = async () => {
-    try {
-      await navigator.clipboard.writeText(selectedText)
-    } catch (error) {
-      logger.error('Failed to copy text to clipboard', error instanceof Error ? error : undefined)
-    } finally {
-      onClose()
-    }
+  const handleCopySelection = () => {
+    // Transport errors (incl. logging) are owned by the textClipboard service
+    // (issue #203). Result intentionally ignored — copy has nothing to roll back.
+    void textClipboard.writeText(selectedText)
+    onClose()
   }
 
   // Build context menu items from prompt registry

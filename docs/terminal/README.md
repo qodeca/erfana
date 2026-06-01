@@ -81,10 +81,13 @@ Full copy/paste operations with keyboard shortcuts and context menu.
 - Toast notification on copy success
 - Pure logic extraction pattern: `terminalClipboard.logic.ts` for testability
 
+**Central clipboard service (#203)**: terminal copy/paste now reads and writes through the shared renderer `textClipboard` service (`src/renderer/src/services/textClipboard.ts` → main-process `clipboard` module over IPC), the single transport-error chokepoint for all text surfaces. The SIGINT-vs-copy decision table in `terminalClipboard.logic.ts` (#28/#122) is **unchanged** — only the underlying read/write transport moved. See [API Services § Clipboard service](../api-services.md#clipboard-service-203).
+
 **Files**:
 - `src/renderer/src/components/Panels/Terminal/terminalClipboard.logic.ts`
 - `src/renderer/src/components/Panels/Terminal/useTerminalClipboard.ts`
 - `src/renderer/src/components/Panels/Terminal/TerminalContextMenu.tsx`
+- `src/renderer/src/services/textClipboard.ts` (shared transport)
 
 ### Smart File Path Links (v0.5.0)
 

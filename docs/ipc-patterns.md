@@ -157,6 +157,14 @@ if (!writeResult.success) {
 | `import:documentCancel` | import-handlers | Cancel active document import |
 | `import:getDocumentExtensions` | import-handlers | Query available document extensions |
 | `import:dependenciesReady` | import-handlers | Event: Dependency detection complete (main → renderer) |
+| `clipboard:readText` | clipboard-handlers | Read plain text from OS clipboard → `Promise<string>` |
+| `clipboard:writeText` | clipboard-handlers | Write plain text to OS clipboard (Zod-validated, 5 MB cap) → `Promise<boolean>` |
+
+## Clipboard Channels – async invoke + sender validation (#203)
+
+The central text-clipboard service ([#203](https://github.com/qodeca/erfana/issues/203)) deliberately uses **async `ipcMain.handle`/`ipcRenderer.invoke`** rather than a synchronous `sendSync` bridge: `sendSync` blocks the renderer, and Monaco's paste override can simply `await` the async read. Channels backed by Electron's **main-process `clipboard` module** — the renderer is sandboxed, so neither `navigator.clipboard` nor the `clipboard` module is reachable in preload, and every read/write must cross IPC.
+
+Both handlers (`src/main/ipc/clipboard-handlers.ts`) apply the standard security rules plus a **sender-frame check**: each request must originate from the app's own top-level frame (the electron-vite dev origin, or the bundled `file://` index). Sub-frames and other origins get the safe value (`''`/`false`) and a logged warning. `writeText` is additionally Zod-validated (`ClipboardWriteTextSchema = z.string().max(CLIPBOARD_MAX_TEXT_LENGTH)`, 5 MB) — oversize or non-string payloads return `false`. Renderer consumers go through the `textClipboard` singleton, never `window.api.clipboard` directly.
 
 ## Event-Based IPC Pattern
 
@@ -174,6 +182,7 @@ To keep IPC payloads consistent across processes, shared zod schemas live at `sr
 - Terminal event schemas — `TerminalDataSchema`, `TerminalExitSchema`, `TerminalErrorSchema`
 - Transcription schemas — `TranscriptionImportRequestSchema`, `TranscriptionProgress`, `TranscriptionImportResult`, `TranscriptionSettingsSchema` (see `src/shared/ipc/transcription-schema.ts`)
 - Document import schemas — `DocumentImportRequestSchema`, `DocumentImportOptionsSchema`, `DocumentImportProgress`, `DocumentImportResult`, `DependencyReadyEvent` (see `src/shared/ipc/import-schema.ts`); channel constants in `src/shared/ipc/import-channels.ts`
+- Clipboard schemas — `ClipboardWriteTextSchema`, `CLIPBOARD_MAX_TEXT_LENGTH`, and the `ClipboardBridge` contract shared by the preload bridge and renderer service (see `src/shared/ipc/clipboard-schema.ts`); channel constants in `src/shared/ipc/clipboard-channels.ts`
 
 Recommended:
 - Validate payloads in tests using these schemas (see contract tests under `src/preload/__tests__/`)

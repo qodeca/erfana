@@ -278,10 +278,10 @@ describe('TEST_IDS', () => {
       expect(ids).toHaveLength(8)
     })
 
-    it('should have 4 Toast Notification IDs', async () => {
+    it('should have 6 Toast Notification IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const ids = Object.keys(TEST_IDS).filter((k) => k.startsWith('TOAST'))
-      expect(ids).toHaveLength(4)
+      expect(ids).toHaveLength(6)
     })
 
     it('should have 6 Editor Content Layout IDs', async () => {

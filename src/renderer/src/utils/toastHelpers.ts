@@ -12,7 +12,7 @@ import { TOAST_DURATION } from '../../../shared/constants'
 /**
  * Show an error toast notification
  */
-export function showErrorToast(title: string, message: string, duration = TOAST_DURATION.ERROR): void {
+export function showErrorToast(title: string, message: string, duration: number = TOAST_DURATION.ERROR): void {
   showGlobalToast({ title, message, type: 'error', duration })
 }
 

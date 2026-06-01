@@ -4,6 +4,7 @@ import * as monaco from 'monaco-editor'
 import { useSearchStore } from '../../stores/useSearchStore'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
+import { registerClipboardActions } from '../../utils/monacoClipboardCommands'
 import './MonacoMarkdownEditor.css'
 
 // Configure Monaco to use local files instead of CDN
@@ -51,6 +52,14 @@ export interface MonacoEditorHandle {
   // Direct editor access for advanced operations
   getEditor: () => monaco.editor.IStandaloneCodeEditor | null
 
+  /**
+   * Access the Monaco namespace captured at mount.
+   * Lets non-editor code (e.g. the context-menu hook) build clipboard deps
+   * without importing `monaco-editor` as a value (which doesn't resolve in the
+   * renderer test env). Returns null before the editor has mounted.
+   */
+  getMonaco: () => typeof monaco | null
+
   // Scroll synchronization methods
   getScrollTop: () => number
   setScrollTop: (offset: number) => void
@@ -68,6 +77,7 @@ export interface MonacoEditorHandle {
 export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdownEditorProps>(
   ({ value, onChange, filePath, onSelectionChange, onEditorMount, onContextMenu }, ref) => {
     const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
+    const monacoRef = useRef<typeof monaco | null>(null)
 
     // Debug logging
     logger.debug('MonacoMarkdownEditor render', {
@@ -79,6 +89,7 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
     const handleEditorDidMount: OnMount = (editor, monaco) => {
       logger.debug('Monaco mounted, setting value', { valuePreview: value?.substring(0, 50) })
       editorRef.current = editor
+      monacoRef.current = monaco
 
       // Configure markdown-specific options
       editor.updateOptions({
@@ -136,6 +147,12 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
           useSearchStore.getState().previousMatch()
         }
       )
+
+      // Route Cmd/Ctrl+C/X/V through the central clipboard service (fixes the
+      // browser-clipboard NotAllowedError). See registerClipboardActions for
+      // why addAction is used (chord ownership + built-in suppression) and why
+      // no contextMenu group/order is set.
+      registerClipboardActions(editor, monaco)
 
       // Handle right-click context menu (always show our menu for Paste support)
       editor.onContextMenu((e: monaco.editor.IEditorMouseEvent) => {
@@ -363,6 +380,10 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
       return editorRef.current
     }
 
+    const getMonaco = (): typeof monaco | null => {
+      return monacoRef.current
+    }
+
     // Expose methods via ref
     useImperativeHandle(ref, () => ({
       // Formatting methods
@@ -378,6 +399,7 @@ export const MonacoMarkdownEditor = forwardRef<MonacoEditorHandle, MonacoMarkdow
 
       // Direct editor access
       getEditor,
+      getMonaco,
 
       // Scroll synchronization methods
       getScrollTop,

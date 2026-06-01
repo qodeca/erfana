@@ -34,6 +34,7 @@ import type {
   DocumentImportProgress,
   DependencyReadyEvent
 } from '../shared/ipc/import-schema'
+import type { ClipboardBridge } from '../shared/ipc/clipboard-schema'
 
 declare global {
   interface Window {
@@ -323,6 +324,11 @@ declare global {
         getLogsDir: () => Promise<string>
         openLogsFolder: () => Promise<string>
       }
+      /**
+       * Central text-clipboard bridge
+       * @see Issue #203 - Central text-clipboard service
+       */
+      clipboard: ClipboardBridge
       quit: {
         onQuitRequested: (callback: (data: { reason?: string }) => void) => () => void
         sendQuitResponse: (proceed: boolean) => void

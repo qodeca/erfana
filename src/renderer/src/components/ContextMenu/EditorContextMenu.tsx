@@ -44,6 +44,8 @@ interface EditorContextMenuProps {
   endLine: number
   /** Callback invoked when menu should close */
   onClose: () => void
+  /** Callback to copy selection (writes the live selection to the clipboard) */
+  onCopy?: () => void
   /** Callback to cut selection (copies to clipboard and deletes from editor) */
   onCut?: () => void
   /** Callback to paste from clipboard (inserts at current cursor/selection) */
@@ -83,6 +85,7 @@ export function EditorContextMenu({
   startLine,
   endLine,
   onClose,
+  onCopy,
   onCut,
   onPaste
 }: EditorContextMenuProps) {
@@ -227,36 +230,38 @@ export function EditorContextMenu({
   }
 
   /**
-   * Cuts the selected text (copy to clipboard + delete from editor).
+   * Cuts the selected text. The full write-guards-delete invariant lives in the
+   * shared pure `clipboardCut` (invoked via `onCut` → `handleEditorCut`), so the
+   * menu path and keybinding path cannot diverge: the menu only triggers the
+   * action and closes; the clipboard write + conditional delete happen in the
+   * hook against the live editor.
    */
-  const handleCut = async () => {
-    try {
-      await navigator.clipboard.writeText(selectedText)
-      onCut?.()
-    } catch (error) {
-      logger.error('Failed to cut text to clipboard', error instanceof Error ? error : undefined)
-    } finally {
-      onClose()
-    }
+  const handleCut = () => {
+    onCut?.()
+    onClose()
   }
 
   /**
-   * Copies the selected text to clipboard.
+   * Copies the selection. Mirrors `handleCut`/`handlePaste`: the menu only
+   * triggers the action (`onCopy` → `handleEditorCopy`) and closes; the real
+   * copy — reading the LIVE selection range and writing it via the central
+   * service — lives in the shared pure `clipboardCopy` against the live editor,
+   * so the menu path and keybinding path cannot diverge (no stale `selectedText`
+   * snapshot, and the same collapsed-selection guard).
    */
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(selectedText)
-    } catch (error) {
-      logger.error('Failed to copy text to clipboard', error instanceof Error ? error : undefined)
-    } finally {
-      onClose()
-    }
+  const handleCopy = () => {
+    onCopy?.()
+    onClose()
   }
 
   /**
-   * Pastes text from clipboard at current cursor position.
+   * Pastes text from the clipboard. Mirrors `handleCut`: the menu only triggers
+   * the action (`onPaste` → `handleEditorPaste`) and closes; the real paste —
+   * clipboard read, read-only/empty guards, and the deterministic post-edit
+   * caret — lives in the shared pure `clipboardPaste` against the live editor,
+   * so the menu path and keybinding path cannot diverge.
    */
-  const handlePaste = async () => {
+  const handlePaste = () => {
     onPaste?.()
     onClose()
   }

@@ -22,6 +22,7 @@ import { showWarningToast, showErrorToast, showSuccessToast, showInfoToast } fro
 import { useScrollAnomalyRecovery } from '../../hooks/useScrollAnomalyRecovery'
 import { useTerminalParserHooks } from '../../hooks/useTerminalParserHooks'
 import { useTerminalClipboard } from '../../hooks/useTerminalClipboard'
+import { textClipboard } from '../../services/textClipboard'
 import { useScrollLock, ScrollLockStateAccessor } from '../../hooks/useScrollLock'
 import { useTerminalFileLinks } from '../../hooks/useTerminalFileLinks'
 import { useFilePicker } from '../../hooks/useFilePicker'
@@ -155,12 +156,10 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   )
 
-  // Clipboard support for copy/paste operations (issue #28)
-  const { hasSelection, copy, paste, handleKeyEvent } = useTerminalClipboard(xtermRef, {
-    onError: (error) => {
-      logger.warn('Clipboard operation failed', error instanceof Error ? { error: error.message, stack: error.stack } : { error: String(error) })
-    }
-  })
+  // Clipboard support for copy/paste operations (issue #28).
+  // Clipboard transport failures are logged + toasted centrally by the
+  // textClipboard service (issue #203), so no onError handler is needed here.
+  const { hasSelection, copy, paste, handleKeyEvent } = useTerminalClipboard(xtermRef)
 
   // Scroll lock for proactive scroll protection (issue #60)
   const scrollLocked = useTerminalStore((state) => state.scrollLocked)
@@ -317,11 +316,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
   const handleCopyFix = async () => {
     const cmd = 'npm rebuild node-pty --build-from-source'
-    try {
-      await navigator.clipboard.writeText(cmd)
-    } catch (e) {
-      logger.warn('Clipboard write failed', e instanceof Error ? { error: e.message, stack: e.stack } : { error: String(e) })
-    }
+    // Transport failures are logged + toasted centrally by the service (#203).
+    await textClipboard.writeText(cmd)
   }
 
   const initializeTerminal = async () => {

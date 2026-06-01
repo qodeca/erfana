@@ -1,3 +1,19 @@
+/*
+ * Visually-hidden live regions (standard clip-rect sr-only). They announce
+ * toast text to assistive tech without affecting layout or visuals.
+ */
+.toast-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
 .toast-container {
   position: fixed;
   bottom: var(--space-8);
@@ -99,6 +115,6 @@
 }
 
 .toast-close:focus {
-  outline: 2px solid #007acc;
+  outline: 2px solid var(--color-border-focus);
   outline-offset: 2px;
 }

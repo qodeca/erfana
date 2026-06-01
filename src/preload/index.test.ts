@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { CLIPBOARD_CHANNELS } from '../shared/ipc/clipboard-channels'
 
 // Mock electron + toolkit before importing preload
 const listeners: Record<string, Array<(e: unknown, d: any) => void>> = {}
@@ -149,6 +150,41 @@ describe('preload api exposure', () => {
         undefined
       ])
     })
+  })
+})
+
+/**
+ * Tests for the central text-clipboard bridge.
+ *
+ * Asserts api.clipboard.readText/writeText route to ipcRenderer.invoke with the
+ * CLIPBOARD_CHANNELS names and pass the payload through unchanged.
+ *
+ * @see Issue #203 - Central text-clipboard service
+ */
+describe('clipboard bridge', () => {
+  it('exposes clipboard namespace with readText/writeText', () => {
+    expect(window.api.clipboard).toBeDefined()
+    expect(typeof window.api.clipboard.readText).toBe('function')
+    expect(typeof window.api.clipboard.writeText).toBe('function')
+  })
+
+  it('readText invokes the readText channel with no payload', async () => {
+    const { ipcRenderer } = await import('electron')
+
+    await window.api.clipboard.readText()
+
+    expect((ipcRenderer.invoke as any)).toHaveBeenCalledWith(CLIPBOARD_CHANNELS.readText)
+  })
+
+  it('writeText invokes the writeText channel and passes the text through', async () => {
+    const { ipcRenderer } = await import('electron')
+
+    await window.api.clipboard.writeText('hello clipboard')
+
+    expect((ipcRenderer.invoke as any)).toHaveBeenCalledWith(
+      CLIPBOARD_CHANNELS.writeText,
+      'hello clipboard'
+    )
   })
 })
 

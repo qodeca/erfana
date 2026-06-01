@@ -19,6 +19,16 @@ const { mockLogger } = vi.hoisted(() => ({
 }))
 vi.mock('../../utils/logger', () => ({ logger: mockLogger }))
 
+// Copy selection routes through the central textClipboard service (issue #203),
+// not navigator.clipboard.
+const { mockWriteText } = vi.hoisted(() => ({ mockWriteText: vi.fn() }))
+vi.mock('../../services/textClipboard', () => ({
+  textClipboard: {
+    writeText: (text: string) => mockWriteText(text),
+    readText: vi.fn()
+  }
+}))
+
 /**
  * PreviewContextMenu Component Tests
  *
@@ -42,7 +52,6 @@ describe('PreviewContextMenu Component', () => {
 
   // Mock window.api.file.readFile
   const mockReadFile = vi.fn()
-  const mockWriteText = vi.fn()
   const mockShowPrompt = vi.fn()
 
   beforeEach(() => {
@@ -50,7 +59,7 @@ describe('PreviewContextMenu Component', () => {
 
     // Mock file reads - by default return empty content
     mockReadFile.mockResolvedValue('')
-    mockWriteText.mockResolvedValue(undefined)
+    mockWriteText.mockResolvedValue(true)
     // Mock showPrompt to return null by default (user cancelled)
     mockShowPrompt.mockResolvedValue(null)
 
@@ -69,15 +78,6 @@ describe('PreviewContextMenu Component', () => {
       showConfirm: vi.fn(),
       showPrompt: mockShowPrompt,
       showAlert: vi.fn()
-    })
-
-    // Mock clipboard API
-    Object.defineProperty(navigator, 'clipboard', {
-      value: {
-        writeText: mockWriteText
-      },
-      writable: true,
-      configurable: true
     })
 
     // Create portal-root div for ContextMenu (uses createPortal)

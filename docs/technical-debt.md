@@ -141,6 +141,12 @@ Moving the block would require synchronized edits to checks.yml + skill + README
 
 ---
 
+### 8. Renderer components exceed the 500-line guideline
+
+**Severity**: Low — `MarkdownPreview.tsx` (~989 lines) and `ChatBubble.tsx` (~639 lines) exceed the 500-line-per-file guideline (pre-existing; out of scope for the issue #203 clipboard change). Candidates for a future decomposition pass.
+
+---
+
 ## Code Quality Improvements
 
 ### Documentation Token Efficiency

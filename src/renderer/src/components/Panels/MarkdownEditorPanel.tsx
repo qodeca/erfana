@@ -335,6 +335,7 @@ export function MarkdownEditorPanel(
     editorContextMenu,
     handleEditorContextMenu,
     handleCloseEditorContextMenu,
+    handleEditorCopy,
     handleEditorCut,
     handleEditorPaste
   } = useEditorContextMenu({ editorRef })
@@ -598,6 +599,7 @@ export function MarkdownEditorPanel(
           startLine={editorContextMenu.startLine}
           endLine={editorContextMenu.endLine}
           onClose={handleCloseEditorContextMenu}
+          onCopy={handleEditorCopy}
           onCut={handleEditorCut}
           onPaste={handleEditorPaste}
         />

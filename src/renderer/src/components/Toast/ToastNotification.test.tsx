@@ -162,6 +162,106 @@ describe('ToastNotification', () => {
       expect(closeButton).toHaveAttribute('aria-label', 'Close')
     })
 
+    it('mounts the two persistent, empty live regions before any toast (UX-003)', () => {
+      // Decoupled live-region pattern: TWO always-mounted, visually-hidden live
+      // regions exist in the DOM even with zero toasts so assistive tech can
+      // observe later text injections (MDN: a region mounted together with its
+      // text is unreliable). They start empty; the visual container carries NO
+      // live role (no nested live regions).
+      render(
+        <ToastProvider>
+          <ToastNotification />
+        </ToastProvider>
+      )
+
+      const polite = screen.getByTestId('toast-live-polite')
+      expect(polite).toBeInTheDocument()
+      expect(polite).toHaveAttribute('role', 'status')
+      expect(polite).toHaveTextContent('')
+
+      const alert = screen.getByTestId('toast-live-alert')
+      expect(alert).toBeInTheDocument()
+      expect(alert).toHaveAttribute('role', 'alert')
+      expect(alert).toHaveTextContent('')
+
+      // The visual container is no longer a live region.
+      const container = screen.getByTestId('toast-container')
+      expect(container).not.toHaveAttribute('role')
+      expect(container).not.toHaveAttribute('aria-live')
+
+      // No toast items yet.
+      expect(screen.queryByTestId('toast-success')).not.toBeInTheDocument()
+    })
+
+    it('role=alert implies assertive and carries no redundant aria-live (UX-003)', () => {
+      render(
+        <ToastProvider>
+          <ToastNotification />
+        </ToastProvider>
+      )
+
+      const alert = screen.getByTestId('toast-live-alert')
+      expect(alert).toHaveAttribute('role', 'alert')
+      // role="alert" already implies assertive — do NOT add aria-live.
+      expect(alert).not.toHaveAttribute('aria-live')
+    })
+
+    it('routes error toast text to the alert region, not the polite region (UX-003)', async () => {
+      render(
+        <ToastProvider>
+          <ToastNotification />
+        </ToastProvider>
+      )
+
+      showGlobalToast({ title: 'Clipboard error', message: 'Boom', type: 'error', duration: 60000 })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('toast-live-alert')).toHaveTextContent('Clipboard error')
+      })
+      expect(screen.getByTestId('toast-live-alert')).toHaveTextContent('Boom')
+      // The polite region stays empty for an error.
+      expect(screen.getByTestId('toast-live-polite')).toHaveTextContent('')
+    })
+
+    it('routes non-error toast text to the polite region, not the alert region (UX-003)', async () => {
+      render(
+        <ToastProvider>
+          <ToastNotification />
+        </ToastProvider>
+      )
+
+      showGlobalToast({ title: 'Saved', message: 'OK', type: 'success', duration: 60000 })
+
+      await waitFor(() => {
+        expect(screen.getByTestId('toast-live-polite')).toHaveTextContent('Saved')
+      })
+      expect(screen.getByTestId('toast-live-polite')).toHaveTextContent('OK')
+      // The alert region stays empty for a non-error.
+      expect(screen.getByTestId('toast-live-alert')).toHaveTextContent('')
+    })
+
+    it('visual toast items carry no live role; Close button stays focusable (UX-003)', async () => {
+      render(
+        <ToastProvider>
+          <ToastNotification />
+        </ToastProvider>
+      )
+
+      showGlobalToast({ title: 'Saved', message: 'OK', type: 'success', duration: 60000 })
+
+      const item = await screen.findByTestId('toast-success')
+      // No live role on the visual item — announcements are owned by the hidden
+      // regions. The item must NOT be aria-hidden so the Close button stays
+      // reachable by assistive tech.
+      expect(item).not.toHaveAttribute('role')
+      expect(item).not.toHaveAttribute('aria-live')
+      expect(item).not.toHaveAttribute('aria-hidden')
+
+      const closeButton = screen.getByRole('button', { name: 'Close' })
+      expect(closeButton).toBeInTheDocument()
+      expect(closeButton).toHaveAttribute('tabIndex', '0')
+    })
+
     it('can close multiple toasts individually', async () => {
       const user = userEvent.setup()
 

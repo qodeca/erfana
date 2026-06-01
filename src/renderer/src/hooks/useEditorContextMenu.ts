@@ -8,7 +8,12 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { logger } from '../utils/logger'
+import {
+  clipboardCopy,
+  clipboardCut,
+  clipboardPaste,
+  buildMonacoClipboardDeps
+} from '../utils/monacoClipboardCommands'
 import type { MonacoEditorHandle } from '../components/Editor/MonacoMarkdownEditor'
 
 /**
@@ -45,8 +50,10 @@ export interface UseEditorContextMenuReturn {
   handleEditorContextMenu: (event: EditorContextMenuState) => void
   /** Handler to close the context menu */
   handleCloseEditorContextMenu: () => void
-  /** Handler for cut action (deletes selection after copy) */
-  handleEditorCut: () => void
+  /** Handler for copy action (writes the live selection to the clipboard) */
+  handleEditorCopy: () => Promise<void>
+  /** Handler for cut action (deletes selection only after a successful copy) */
+  handleEditorCut: () => Promise<void>
   /** Handler for paste action (inserts clipboard content) */
   handleEditorPaste: () => Promise<void>
 }
@@ -55,8 +62,9 @@ export interface UseEditorContextMenuReturn {
  * Hook for managing Monaco editor context menu state and actions.
  *
  * Provides handlers for opening/closing the context menu and for
- * cut/paste operations. Copy is handled directly by EditorContextMenu
- * using the selectedText from the menu state.
+ * copy/cut/paste operations. All three clipboard actions delegate to the shared
+ * pure commands in `monacoClipboardCommands.ts` against the LIVE editor, so the
+ * menu path and the keybinding path cannot diverge.
  *
  * @param options - Configuration options including editor ref
  * @returns Context menu state and action handlers
@@ -133,50 +141,57 @@ export function useEditorContextMenu(
   }, [])
 
   /**
-   * Handle cut action from context menu.
-   * Deletes the current selection (clipboard copy is done by EditorContextMenu).
+   * Handle copy action from the context menu.
+   *
+   * Delegates to the shared pure `clipboardCopy` so copy uses the LIVE selection
+   * range (`getValueInRange`) and the same collapsed-selection guard as the
+   * keybinding path — no stale `selectedText` snapshot. Transport errors
+   * (logging/toast) are owned by the central clipboard service.
    */
-  const handleEditorCut = useCallback(() => {
+  const handleEditorCopy = useCallback(async () => {
     const editor = editorRef.current?.getEditor()
-    if (!editor) return
+    const monaco = editorRef.current?.getMonaco()
+    if (!editor || !monaco) return
 
-    const selection = editor.getSelection()
-    if (!selection || selection.isEmpty()) return
-
-    // Delete selected text by replacing with empty string
-    editor.executeEdits('context-menu-cut', [
-      { range: selection, text: '' }
-    ])
+    await clipboardCopy(buildMonacoClipboardDeps(editor, monaco))
   }, [editorRef])
 
   /**
-   * Handle paste action from context menu.
-   * Reads clipboard and inserts at current cursor/selection.
+   * Handle cut action from the context menu.
+   *
+   * Delegates to the shared pure `clipboardCut` so the write-guards-delete
+   * invariant (selection is deleted ONLY when the clipboard write succeeds) is
+   * identical to the keybinding path. Transport errors (logging/toast) are
+   * owned by the central clipboard service.
+   */
+  const handleEditorCut = useCallback(async () => {
+    const editor = editorRef.current?.getEditor()
+    const monaco = editorRef.current?.getMonaco()
+    if (!editor || !monaco) return
+
+    await clipboardCut(buildMonacoClipboardDeps(editor, monaco))
+  }, [editorRef])
+
+  /**
+   * Handle paste action from the context menu.
+   *
+   * Delegates to the shared pure `clipboardPaste` so cursor/read-only/empty
+   * semantics match the keybinding path. The service resolves `''` on failure,
+   * which is treated as a no-op; transport errors are owned by the service.
    */
   const handleEditorPaste = useCallback(async () => {
     const editor = editorRef.current?.getEditor()
-    if (!editor) return
+    const monaco = editorRef.current?.getMonaco()
+    if (!editor || !monaco) return
 
-    try {
-      const clipboardText = await navigator.clipboard.readText()
-      if (!clipboardText) return
-
-      const selection = editor.getSelection()
-      if (!selection) return
-
-      // Replace selection (or insert at cursor) with clipboard content
-      editor.executeEdits('context-menu-paste', [
-        { range: selection, text: clipboardText }
-      ])
-    } catch (error) {
-      logger.error('Failed to paste from clipboard', error instanceof Error ? error : undefined)
-    }
+    await clipboardPaste(buildMonacoClipboardDeps(editor, monaco))
   }, [editorRef])
 
   return {
     editorContextMenu,
     handleEditorContextMenu,
     handleCloseEditorContextMenu,
+    handleEditorCopy,
     handleEditorCut,
     handleEditorPaste
   }

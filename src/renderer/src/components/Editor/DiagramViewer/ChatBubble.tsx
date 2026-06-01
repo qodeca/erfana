@@ -38,6 +38,7 @@ import {
 } from './chatBubble.logic'
 import { formatZoomLevel } from './diagramViewer.logic'
 import { TextareaContextMenu } from '../../ContextMenu/TextareaContextMenu'
+import { useTextareaClipboard } from '../../../hooks/useTextareaClipboard'
 import { CharacterCount } from '../../shared'
 import { scheduleScrollIfNeeded } from '../../../utils/promptScrollScheduler.logic'
 import { logger } from '../../../utils/logger'
@@ -349,65 +350,19 @@ export function ChatBubble({
 
   // Note: Terminal context menu is handled globally by TerminalPanel via xterm.element listener
 
-  const handleCutText = useCallback(async () => {
-    if (!textareaRef.current) return
-    const textarea = textareaRef.current
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const selectedText = textarea.value.substring(start, end)
-
-    if (selectedText) {
-      try {
-        // Copy to clipboard
-        await navigator.clipboard.writeText(selectedText)
-        // Remove selected text
-        const newValue = message.substring(0, start) + message.substring(end)
-        setMessage(newValue)
-        // Set cursor position at cut location
-        requestAnimationFrame(() => {
-          textarea.focus()
-          textarea.setSelectionRange(start, start)
-        })
-      } catch {
-        // Silently fail
-      }
-    }
-  }, [message])
-
-  const handleCopyText = useCallback(async () => {
-    if (!textareaRef.current) return
-    const textarea = textareaRef.current
-    const selectedText = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd)
-    if (selectedText) {
-      try {
-        await navigator.clipboard.writeText(selectedText)
-      } catch {
-        // Silently fail
-      }
-    }
-  }, [])
-
-  const handlePasteText = useCallback(async () => {
-    if (!textareaRef.current) return
-    const textarea = textareaRef.current
-    try {
-      const clipboardText = await navigator.clipboard.readText()
-      const start = textarea.selectionStart
-      const end = textarea.selectionEnd
-      const newValue = message.substring(0, start) + clipboardText + message.substring(end)
-      // Silently reject if exceeds max length
-      if (newValue.length <= CHAT_LIMITS.MAX_LENGTH) {
-        setMessage(newValue)
-        // Set cursor position after paste
-        requestAnimationFrame(() => {
-          textarea.focus()
-          textarea.setSelectionRange(start + clipboardText.length, start + clipboardText.length)
-        })
-      }
-    } catch {
-      // Silently fail
-    }
-  }, [message])
+  // Clipboard operations via the central textClipboard service (issue #203).
+  // CHAT_LIMITS.MAX_LENGTH stays a silent paste-reject rule (no toast);
+  // transport errors are handled centrally by the service.
+  const {
+    handleCut: handleCutText,
+    handleCopy: handleCopyText,
+    handlePaste: handlePasteText
+  } = useTextareaClipboard({
+    textareaRef,
+    value: message,
+    setValue: setMessage,
+    maxLength: CHAT_LIMITS.MAX_LENGTH
+  })
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

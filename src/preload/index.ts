@@ -24,6 +24,7 @@ import type {
 } from '../shared/ipc/transcription-schema'
 import { TRANSCRIPTION_CHANNELS } from '../shared/ipc/transcription-channels'
 import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
+import { CLIPBOARD_CHANNELS } from '../shared/ipc/clipboard-channels'
 import type {
   DocumentImportRequest,
   DocumentImportResult,
@@ -828,6 +829,18 @@ const api = {
      * Returns empty string on success, error string on failure
      */
     openLogsFolder: (): Promise<string> => ipcRenderer.invoke('logging:openLogsFolder')
+  },
+
+  /**
+   * Central text-clipboard bridge (sandbox-safe, async)
+   * @see Issue #203 - Central text-clipboard service
+   */
+  clipboard: {
+    /** Read plain text from the OS clipboard ('' on failure) */
+    readText: (): Promise<string> => ipcRenderer.invoke(CLIPBOARD_CHANNELS.readText),
+    /** Write plain text to the OS clipboard (false on failure/reject) */
+    writeText: (text: string): Promise<boolean> =>
+      ipcRenderer.invoke(CLIPBOARD_CHANNELS.writeText, text)
   },
 
   // Quit confirmation operations

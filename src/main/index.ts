@@ -22,6 +22,7 @@ import { registerQuitHandlers } from './ipc/quit-handlers'
 import { registerProjectLockHandlers } from './ipc/project-lock-handlers'
 import { registerExternalFileHandlers } from './ipc/external-file-handlers'
 import { registerTranscriptionHandlers } from './ipc/transcription-handlers'
+import { registerClipboardHandlers } from './ipc/clipboard-handlers'
 import { DependencyDetector, converterRegistry, getExtensionsForDependencies } from './services/import'
 import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
 import type { DependencyReadyEvent } from '../shared/ipc/import-schema'
@@ -219,6 +220,7 @@ app.whenReady().then(async () => {
   registerProjectLockHandlers()
   registerExternalFileHandlers()
   registerTranscriptionHandlers()
+  registerClipboardHandlers()
 
   // RELIABILITY FIX (todo012): Clean up stale projects on startup
   // This runs asynchronously but doesn't block window creation

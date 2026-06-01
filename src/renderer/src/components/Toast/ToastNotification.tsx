@@ -10,17 +10,56 @@ const ICON_MAP = {
   info: Info
 }
 
+/** Compose the announced text for a toast (title + message). */
+function toastAnnouncement(toast: Toast): string {
+  return toast.message ? `${toast.title}: ${toast.message}` : toast.title
+}
+
 export function ToastNotification() {
   const { toasts, removeToast } = useToast()
 
-  if (toasts.length === 0) return null
+  // Decoupled live-region pattern (UX-003 / AC#4): TWO always-mounted,
+  // visually-hidden live regions exist in the DOM with zero toasts so assistive
+  // tech can observe later text injections (a region mounted together with its
+  // text is unreliable — MDN). The visual container/items carry NO live role,
+  // which avoids nested live regions (adding a toast would otherwise re-read the
+  // whole stack) and the polite/assertive race.
+  //
+  // - `role="status"` (implicit aria-live="polite") for info/success/warning.
+  // - `role="alert"` (implicit aria-live="assertive") for errors — do NOT add a
+  //   redundant aria-live, role="alert" already implies assertive.
+  //
+  // The newest toast's text is written into the matching hidden region so the
+  // screen reader announces it once. The visual toasts stay normal focusable
+  // elements (NOT aria-hidden) so the Close button remains reachable by AT.
+  const newest = toasts.length > 0 ? toasts[toasts.length - 1] : null
+  const politeText = newest && newest.type !== 'error' ? toastAnnouncement(newest) : ''
+  const alertText = newest && newest.type === 'error' ? toastAnnouncement(newest) : ''
 
   return (
-    <div className="toast-container" data-testid={TEST_IDS.TOAST_CONTAINER}>
-      {toasts.map((toast) => (
-        <ToastItem key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
-      ))}
-    </div>
+    <>
+      <div
+        className="toast-sr-only"
+        role="status"
+        aria-atomic="true"
+        data-testid={TEST_IDS.TOAST_LIVE_POLITE}
+      >
+        {politeText}
+      </div>
+      <div
+        className="toast-sr-only"
+        role="alert"
+        aria-atomic="true"
+        data-testid={TEST_IDS.TOAST_LIVE_ALERT}
+      >
+        {alertText}
+      </div>
+      <div className="toast-container" data-testid={TEST_IDS.TOAST_CONTAINER}>
+        {toasts.map((toast) => (
+          <ToastItem key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
+        ))}
+      </div>
+    </>
   )
 }
 
@@ -34,6 +73,9 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
     }
   }
 
+  // No live role on the visual item: announcements are owned by the two hidden
+  // live regions (see ToastNotification). The item stays a normal focusable
+  // element so its Close button is reachable by assistive tech.
   return (
     <div className={`toast toast-${toast.type}`} data-testid={`${TEST_IDS.TOAST}-${toast.type}`}>
       <div className="toast-icon">

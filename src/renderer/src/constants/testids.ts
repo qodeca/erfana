@@ -476,7 +476,7 @@ export const TEST_IDS = {
   SEARCH_BAR_COUNT: 'search-bar-count',
 
   // =========================================================================
-  // Toast Notification (4)
+  // Toast Notification (6)
   // =========================================================================
 
   /** Toast notifications container */
@@ -487,6 +487,10 @@ export const TEST_IDS = {
   TOAST_MESSAGE: 'toast-message',
   /** Toast dismiss button */
   TOAST_BTN_DISMISS: 'toast-btn-dismiss',
+  /** Persistent visually-hidden polite live region (info/success/warning) */
+  TOAST_LIVE_POLITE: 'toast-live-polite',
+  /** Persistent visually-hidden alert live region (errors) */
+  TOAST_LIVE_ALERT: 'toast-live-alert',
 
   // =========================================================================
   // Settings Overlay (20)

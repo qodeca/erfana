@@ -19,6 +19,18 @@ const { mockLogger } = vi.hoisted(() => ({
 }))
 vi.mock('../../utils/logger', () => ({ logger: mockLogger }))
 
+// Mock the central clipboard service (copy/cut route via textClipboard.writeText)
+const { mockClipboardWriteText, mockClipboardReadText } = vi.hoisted(() => ({
+  mockClipboardWriteText: vi.fn(),
+  mockClipboardReadText: vi.fn()
+}))
+vi.mock('../../services/textClipboard', () => ({
+  textClipboard: {
+    writeText: mockClipboardWriteText,
+    readText: mockClipboardReadText
+  }
+}))
+
 // Mock prompt registry to ensure code-editor prompts are available
 // This avoids issues with import.meta.glob not picking up new template files in tests
 vi.mock('../../prompts/registry', async (importOriginal) => {
@@ -161,13 +173,14 @@ describe('EditorContextMenu Component', () => {
     return render(<DialogProvider>{ui}</DialogProvider>)
   }
 
-  const mockWriteText = vi.fn()
   const mockShowPrompt = vi.fn()
 
   beforeEach(() => {
     vi.clearAllMocks()
 
-    mockWriteText.mockResolvedValue(undefined)
+    // Central clipboard service: write succeeds by default
+    mockClipboardWriteText.mockResolvedValue(true)
+    mockClipboardReadText.mockResolvedValue('')
     // Mock showPrompt to return null by default (user cancelled)
     mockShowPrompt.mockResolvedValue(null)
 
@@ -179,15 +192,6 @@ describe('EditorContextMenu Component', () => {
       showConfirm: vi.fn(),
       showPrompt: mockShowPrompt,
       showAlert: vi.fn()
-    })
-
-    // Mock clipboard API
-    Object.defineProperty(navigator, 'clipboard', {
-      value: {
-        writeText: mockWriteText
-      },
-      writable: true,
-      configurable: true
     })
 
     // Create portal-root div for ContextMenu (uses createPortal)
@@ -494,33 +498,37 @@ describe('EditorContextMenu Component', () => {
   })
 
   describe('Clipboard Actions', () => {
-    it('should attempt to copy selected text to clipboard', async () => {
+    it('should delegate copy to onCopy and close the menu (shared command path)', async () => {
       const user = userEvent.setup()
       const onClose = vi.fn()
+      const onCopy = vi.fn()
 
       renderWithProvider(
-        <EditorContextMenu {...defaultProps} selectedText="function test() {}" onClose={onClose} />
+        <EditorContextMenu
+          {...defaultProps}
+          selectedText="function test() {}"
+          onClose={onClose}
+          onCopy={onCopy}
+        />
       )
 
       const copyBtn = screen.getByText('Copy')
-
-      // Click copy button
       await user.click(copyBtn)
 
-      // Menu should close after click
+      // Copy now routes through the shared clipboardCopy (live getValueInRange)
+      // via onCopy → handleEditorCopy, NOT a direct textClipboard.writeText with
+      // a stale selectedText snapshot. The menu only triggers and closes.
+      expect(onCopy).toHaveBeenCalled()
+      expect(mockClipboardWriteText).not.toHaveBeenCalled()
       expect(onClose).toHaveBeenCalled()
-
-      // Note: We cannot reliably test that clipboard.writeText was called
-      // because ContextMenu closes immediately after calling the action,
-      // which unmounts the component before the async operation completes.
-      // This is a known limitation of the async clipboard API timing.
     })
 
     it('should close context menu after copying', async () => {
       const user = userEvent.setup()
       const onClose = vi.fn()
+      const onCopy = vi.fn()
 
-      renderWithProvider(<EditorContextMenu {...defaultProps} onClose={onClose} />)
+      renderWithProvider(<EditorContextMenu {...defaultProps} onClose={onClose} onCopy={onCopy} />)
 
       const copyBtn = screen.getByText('Copy')
       await user.click(copyBtn)
@@ -529,7 +537,7 @@ describe('EditorContextMenu Component', () => {
       expect(onClose).toHaveBeenCalled()
     })
 
-    it('should call onCut callback and close menu on Cut click', async () => {
+    it('should delegate cut to onCut and close the menu', async () => {
       const user = userEvent.setup()
       const onClose = vi.fn()
       const onCut = vi.fn()
@@ -541,10 +549,11 @@ describe('EditorContextMenu Component', () => {
       const cutBtn = screen.getByText('Cut')
       await user.click(cutBtn)
 
-      // onCut should be called
+      // The write-guards-delete invariant lives in the shared pure clipboardCut
+      // (invoked via onCut → handleEditorCut), NOT in this component. The menu
+      // only triggers the action and closes; it does not write directly.
       expect(onCut).toHaveBeenCalled()
-
-      // Menu should close after click
+      expect(mockClipboardWriteText).not.toHaveBeenCalled()
       expect(onClose).toHaveBeenCalled()
     })
 

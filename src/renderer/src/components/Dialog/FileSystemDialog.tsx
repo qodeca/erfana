@@ -3,7 +3,11 @@ import { Info } from 'lucide-react'
 import { BaseDialog } from './BaseDialog'
 import { CharacterCount } from '../shared'
 import { TextareaContextMenu } from '../ContextMenu/TextareaContextMenu'
+import { useTextareaClipboard } from '../../hooks/useTextareaClipboard'
 import { validateFileSystemName, ValidationErrorCode } from '../../utils/fileValidation'
+
+/** Max length for file/folder names (silent paste reject rule). */
+const FILE_NAME_MAX_LENGTH = 255
 
 interface FileSystemDialogProps {
   id?: string
@@ -165,72 +169,15 @@ export function FileSystemDialog({
     setContextMenu(null)
   }, [])
 
-  // Clipboard operations
-  const handleCut = useCallback(async () => {
-    if (!inputRef.current) return
-    const input = inputRef.current
-    const start = input.selectionStart ?? 0
-    const end = input.selectionEnd ?? 0
-    const selectedText = input.value.substring(start, end)
-
-    if (selectedText) {
-      try {
-        await navigator.clipboard.writeText(selectedText)
-        const newValue = input.value.substring(0, start) + input.value.substring(end)
-        setInputValue(newValue)
-
-        // Restore cursor position
-        requestAnimationFrame(() => {
-          input.focus()
-          input.setSelectionRange(start, start)
-        })
-      } catch {
-        // Silently fail
-      }
-    }
-  }, [])
-
-  const handleCopy = useCallback(async () => {
-    if (!inputRef.current) return
-    const input = inputRef.current
-    const start = input.selectionStart ?? 0
-    const end = input.selectionEnd ?? 0
-    const selectedText = input.value.substring(start, end)
-
-    if (selectedText) {
-      try {
-        await navigator.clipboard.writeText(selectedText)
-      } catch {
-        // Silently fail
-      }
-    }
-  }, [])
-
-  const handlePaste = useCallback(async () => {
-    if (!inputRef.current) return
-    const input = inputRef.current
-
-    try {
-      const clipboardText = await navigator.clipboard.readText()
-      const start = input.selectionStart ?? 0
-      const end = input.selectionEnd ?? 0
-      const newValue = input.value.substring(0, start) + clipboardText + input.value.substring(end)
-
-      // Respect maxLength (255 for file names) - silently reject if exceeds
-      if (newValue.length <= 255) {
-        setInputValue(newValue)
-
-        // Position cursor after pasted text
-        requestAnimationFrame(() => {
-          input.focus()
-          const newCursorPos = start + clipboardText.length
-          input.setSelectionRange(newCursorPos, newCursorPos)
-        })
-      }
-    } catch {
-      // Silently fail
-    }
-  }, [])
+  // Clipboard operations via the central textClipboard service (issue #203).
+  // The hook supports HTMLInputElement and preserves cursor position; the
+  // 255-char limit stays a silent product rule (no toast).
+  const { handleCut, handleCopy, handlePaste } = useTextareaClipboard({
+    textareaRef: inputRef,
+    value: inputValue,
+    setValue: setInputValue,
+    maxLength: FILE_NAME_MAX_LENGTH
+  })
 
   // Derive labels and text based on operation and item type
   const inputLabel = operation === 'rename' ? 'New name:' : `${itemType === 'file' ? 'File' : 'Folder'} name:`

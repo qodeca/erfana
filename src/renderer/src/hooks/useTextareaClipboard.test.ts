@@ -1,24 +1,45 @@
 /**
  * Tests for useTextareaClipboard Hook
  *
- * Tests clipboard operations (cut/copy/paste) with error handling
- * and character limit enforcement.
+ * The hook routes clipboard operations through the central `textClipboard`
+ * service (issue #203): copy/cut via `writeText`, paste via `readText`.
+ * Transport failures (and any toast/log) are owned by the service, so the hook
+ * adds no catch/toast. The `maxLength` over-limit paste remains a SILENT product
+ * rule (no toast). These tests assert the routing, value mutation, cursor
+ * restore, and the silent no-ops.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { useTextareaClipboard } from './useTextareaClipboard'
+import { showErrorToast } from '../utils/toastHelpers'
+
+// Mock the central clipboard service: copy/cut write via writeText, paste reads
+// via readText (issue #203).
+const mockWriteText = vi.fn()
+const mockReadText = vi.fn()
+vi.mock('../services/textClipboard', () => ({
+  textClipboard: {
+    writeText: (text: string) => mockWriteText(text),
+    readText: () => mockReadText()
+  }
+}))
+
+// Spy on the toast helper to assert silent no-ops never surface a toast.
+vi.mock('../utils/toastHelpers', () => ({
+  showErrorToast: vi.fn()
+}))
 
 describe('useTextareaClipboard', () => {
   let mockRef: { current: HTMLTextAreaElement | HTMLInputElement | null }
   let mockSetValue: ReturnType<typeof vi.fn>
-  let mockClipboard: {
-    writeText: ReturnType<typeof vi.fn>
-    readText: ReturnType<typeof vi.fn>
-  }
 
   beforeEach(() => {
     vi.clearAllMocks()
+
+    // Service is success-by-default.
+    mockWriteText.mockReset().mockResolvedValue(true)
+    mockReadText.mockReset().mockResolvedValue('pasted text')
 
     // Create mock element
     mockRef = {
@@ -32,18 +53,6 @@ describe('useTextareaClipboard', () => {
 
     mockSetValue = vi.fn()
 
-    // Mock clipboard API
-    mockClipboard = {
-      writeText: vi.fn().mockResolvedValue(undefined),
-      readText: vi.fn().mockResolvedValue('pasted text')
-    }
-
-    Object.defineProperty(navigator, 'clipboard', {
-      value: mockClipboard,
-      writable: true,
-      configurable: true
-    })
-
     // Mock requestAnimationFrame
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
       cb(0)
@@ -52,7 +61,7 @@ describe('useTextareaClipboard', () => {
   })
 
   describe('handleCopy', () => {
-    it('should copy selected text to clipboard', async () => {
+    it('routes copy through textClipboard.writeText with the selection', async () => {
       mockRef.current!.selectionStart = 0
       mockRef.current!.selectionEnd = 5
 
@@ -68,10 +77,10 @@ describe('useTextareaClipboard', () => {
         await result.current.handleCopy()
       })
 
-      expect(mockClipboard.writeText).toHaveBeenCalledWith('hello')
+      expect(mockWriteText).toHaveBeenCalledWith('hello')
     })
 
-    it('should not copy when no selection', async () => {
+    it('does not copy or toast when there is no selection', async () => {
       mockRef.current!.selectionStart = 5
       mockRef.current!.selectionEnd = 5
 
@@ -87,31 +96,11 @@ describe('useTextareaClipboard', () => {
         await result.current.handleCopy()
       })
 
-      expect(mockClipboard.writeText).not.toHaveBeenCalled()
+      expect(mockWriteText).not.toHaveBeenCalled()
+      expect(showErrorToast).not.toHaveBeenCalled()
     })
 
-    it('should silently fail on clipboard error', async () => {
-      mockRef.current!.selectionStart = 0
-      mockRef.current!.selectionEnd = 5
-      mockClipboard.writeText.mockRejectedValueOnce(new Error('Permission denied'))
-
-      const { result } = renderHook(() =>
-        useTextareaClipboard({
-          textareaRef: mockRef as React.RefObject<HTMLTextAreaElement>,
-          value: 'hello world',
-          setValue: mockSetValue
-        })
-      )
-
-      await act(async () => {
-        await result.current.handleCopy()
-      })
-
-      // Should not throw, just silently fail
-      expect(mockClipboard.writeText).toHaveBeenCalled()
-    })
-
-    it('should do nothing when ref is null', async () => {
+    it('does nothing when ref is null', async () => {
       mockRef.current = null
 
       const { result } = renderHook(() =>
@@ -126,12 +115,12 @@ describe('useTextareaClipboard', () => {
         await result.current.handleCopy()
       })
 
-      expect(mockClipboard.writeText).not.toHaveBeenCalled()
+      expect(mockWriteText).not.toHaveBeenCalled()
     })
   })
 
   describe('handleCut', () => {
-    it('should cut selected text to clipboard and update value', async () => {
+    it('routes cut through textClipboard.writeText and updates value', async () => {
       mockRef.current!.selectionStart = 0
       mockRef.current!.selectionEnd = 6
 
@@ -147,11 +136,11 @@ describe('useTextareaClipboard', () => {
         await result.current.handleCut()
       })
 
-      expect(mockClipboard.writeText).toHaveBeenCalledWith('hello ')
+      expect(mockWriteText).toHaveBeenCalledWith('hello ')
       expect(mockSetValue).toHaveBeenCalledWith('world')
     })
 
-    it('should set cursor position after cut', async () => {
+    it('restores the cursor to the cut location after cut', async () => {
       mockRef.current!.selectionStart = 6
       mockRef.current!.selectionEnd = 11
 
@@ -173,10 +162,10 @@ describe('useTextareaClipboard', () => {
       })
     })
 
-    it('should silently fail on clipboard error without updating value', async () => {
+    it('does not mutate the value when the write fails (transport failure)', async () => {
       mockRef.current!.selectionStart = 0
       mockRef.current!.selectionEnd = 5
-      mockClipboard.writeText.mockRejectedValueOnce(new Error('Permission denied'))
+      mockWriteText.mockResolvedValueOnce(false)
 
       const { result } = renderHook(() =>
         useTextareaClipboard({
@@ -190,13 +179,13 @@ describe('useTextareaClipboard', () => {
         await result.current.handleCut()
       })
 
-      // Should not update value if clipboard failed
+      // Value untouched; the service (not the hook) owns the failure toast/log.
       expect(mockSetValue).not.toHaveBeenCalled()
     })
   })
 
   describe('handlePaste', () => {
-    it('should paste text from clipboard', async () => {
+    it('routes paste through textClipboard.readText', async () => {
       mockRef.current!.selectionStart = 6
       mockRef.current!.selectionEnd = 6
 
@@ -212,10 +201,11 @@ describe('useTextareaClipboard', () => {
         await result.current.handlePaste()
       })
 
+      expect(mockReadText).toHaveBeenCalled()
       expect(mockSetValue).toHaveBeenCalledWith('hello pasted textworld')
     })
 
-    it('should replace selected text when pasting', async () => {
+    it('replaces the selected text when pasting', async () => {
       mockRef.current!.selectionStart = 0
       mockRef.current!.selectionEnd = 5
 
@@ -234,10 +224,10 @@ describe('useTextareaClipboard', () => {
       expect(mockSetValue).toHaveBeenCalledWith('pasted text world')
     })
 
-    it('should set cursor position after paste', async () => {
+    it('positions the cursor after the pasted text', async () => {
       mockRef.current!.selectionStart = 0
       mockRef.current!.selectionEnd = 0
-      mockClipboard.readText.mockResolvedValueOnce('test')
+      mockReadText.mockResolvedValueOnce('test')
 
       const { result } = renderHook(() =>
         useTextareaClipboard({
@@ -257,10 +247,10 @@ describe('useTextareaClipboard', () => {
       })
     })
 
-    it('should silently reject paste exceeding maxLength', async () => {
+    it('truncates an over-limit paste, inserting only what fits (no toast)', async () => {
       mockRef.current!.selectionStart = 0
       mockRef.current!.selectionEnd = 0
-      mockClipboard.readText.mockResolvedValueOnce('very long text that exceeds limit')
+      mockReadText.mockResolvedValueOnce('very long text that exceeds limit')
 
       const { result } = renderHook(() =>
         useTextareaClipboard({
@@ -275,14 +265,114 @@ describe('useTextareaClipboard', () => {
         await result.current.handlePaste()
       })
 
-      // Should not update value if exceeds maxLength
-      expect(mockSetValue).not.toHaveBeenCalled()
+      // value 'hello' (5) + remaining capacity 5 → insert first 5 chars 'very '.
+      // Truncate-and-insert: silent product rule, still no toast.
+      expect(mockSetValue).toHaveBeenCalledWith('very hello')
+      expect(showErrorToast).not.toHaveBeenCalled()
+      await waitFor(() => {
+        expect(mockRef.current!.setSelectionRange).toHaveBeenCalledWith(5, 5)
+      })
     })
 
-    it('should allow paste when within maxLength', async () => {
+    it('truncates against the selection it replaces when computing capacity', async () => {
+      // Selecting 'hello' (5 chars) frees capacity: limit 10 - (5 - 5) = 10.
+      mockRef.current!.selectionStart = 0
+      mockRef.current!.selectionEnd = 5
+      mockReadText.mockResolvedValueOnce('0123456789ABCDEF')
+
+      const { result } = renderHook(() =>
+        useTextareaClipboard({
+          textareaRef: mockRef as React.RefObject<HTMLTextAreaElement>,
+          value: 'hello',
+          setValue: mockSetValue,
+          maxLength: 10
+        })
+      )
+
+      await act(async () => {
+        await result.current.handlePaste()
+      })
+
+      // Whole value selected → capacity = 10; insert first 10 chars.
+      expect(mockSetValue).toHaveBeenCalledWith('0123456789')
+    })
+
+    it('does not split a surrogate pair when truncation lands mid-emoji (drops the partial char)', async () => {
+      // '😀' is U+1F600 = two UTF-16 units (😀). With remaining capacity
+      // of 1 unit, a naive slice would insert a lone high surrogate; surrogate-
+      // safe truncation drops the whole char instead.
+      mockRef.current!.selectionStart = 1
+      mockRef.current!.selectionEnd = 1
+      mockReadText.mockResolvedValueOnce('😀')
+
+      const { result } = renderHook(() =>
+        useTextareaClipboard({
+          textareaRef: mockRef as React.RefObject<HTMLTextAreaElement>,
+          value: 'X',
+          setValue: mockSetValue,
+          maxLength: 2 // remaining = 2 - (1 - 0) = 1 unit → cannot fit the emoji
+        })
+      )
+
+      await act(async () => {
+        await result.current.handlePaste()
+      })
+
+      // Nothing fits whole → value unchanged, no lone surrogate inserted.
+      expect(mockSetValue).toHaveBeenCalledWith('X')
+      // The kept string contains no unpaired surrogate.
+      const inserted = (mockSetValue.mock.calls[0][0] as string).slice(1)
+      expect(inserted).toBe('')
+    })
+
+    it('keeps a complete emoji when it fits within the remaining capacity', async () => {
+      mockRef.current!.selectionStart = 1
+      mockRef.current!.selectionEnd = 1
+      mockReadText.mockResolvedValueOnce('😀b')
+
+      const { result } = renderHook(() =>
+        useTextareaClipboard({
+          textareaRef: mockRef as React.RefObject<HTMLTextAreaElement>,
+          value: 'X',
+          setValue: mockSetValue,
+          maxLength: 3 // remaining = 2 units → the 2-unit emoji fits, 'b' does not
+        })
+      )
+
+      await act(async () => {
+        await result.current.handlePaste()
+      })
+
+      expect(mockSetValue).toHaveBeenCalledWith('X😀')
+    })
+
+    it('is a no-op when there is no remaining capacity', async () => {
       mockRef.current!.selectionStart = 0
       mockRef.current!.selectionEnd = 0
-      mockClipboard.readText.mockResolvedValueOnce('hi')
+      mockReadText.mockResolvedValueOnce('x')
+
+      const { result } = renderHook(() =>
+        useTextareaClipboard({
+          textareaRef: mockRef as React.RefObject<HTMLTextAreaElement>,
+          value: 'fulltext!!',
+          setValue: mockSetValue,
+          maxLength: 10
+        })
+      )
+
+      await act(async () => {
+        await result.current.handlePaste()
+      })
+
+      // Already at the limit and nothing selected → nothing fits, no mutation.
+      expect(mockSetValue).not.toHaveBeenCalled()
+      expect(showErrorToast).not.toHaveBeenCalled()
+    })
+
+    it('allows a paste that stays within maxLength', async () => {
+      mockRef.current!.selectionStart = 0
+      mockRef.current!.selectionEnd = 0
+      mockReadText.mockResolvedValueOnce('hi')
 
       const { result } = renderHook(() =>
         useTextareaClipboard({
@@ -300,8 +390,8 @@ describe('useTextareaClipboard', () => {
       expect(mockSetValue).toHaveBeenCalledWith('hihello')
     })
 
-    it('should silently fail on clipboard read error', async () => {
-      mockClipboard.readText.mockRejectedValueOnce(new Error('Permission denied'))
+    it('is a no-op when the clipboard is empty', async () => {
+      mockReadText.mockResolvedValueOnce('')
 
       const { result } = renderHook(() =>
         useTextareaClipboard({
@@ -315,13 +405,13 @@ describe('useTextareaClipboard', () => {
         await result.current.handlePaste()
       })
 
-      // Should not update value if clipboard read failed
       expect(mockSetValue).not.toHaveBeenCalled()
+      expect(showErrorToast).not.toHaveBeenCalled()
     })
   })
 
   describe('hasSelection', () => {
-    it('should return true when text is selected', () => {
+    it('returns true when text is selected', () => {
       mockRef.current!.selectionStart = 0
       mockRef.current!.selectionEnd = 5
 
@@ -336,7 +426,7 @@ describe('useTextareaClipboard', () => {
       expect(result.current.hasSelection()).toBe(true)
     })
 
-    it('should return false when no text is selected', () => {
+    it('returns false when no text is selected', () => {
       mockRef.current!.selectionStart = 5
       mockRef.current!.selectionEnd = 5
 
@@ -351,7 +441,7 @@ describe('useTextareaClipboard', () => {
       expect(result.current.hasSelection()).toBe(false)
     })
 
-    it('should return false when ref is null', () => {
+    it('returns false when ref is null', () => {
       mockRef.current = null
 
       const { result } = renderHook(() =>
@@ -367,29 +457,33 @@ describe('useTextareaClipboard', () => {
   })
 
   describe('input element support', () => {
-    it('should work with HTMLInputElement', async () => {
+    it('works with HTMLInputElement and preserves cursor position', async () => {
       const inputRef = {
         current: {
           selectionStart: 0,
-          selectionEnd: 5,
+          selectionEnd: 0,
           focus: vi.fn(),
           setSelectionRange: vi.fn()
         } as unknown as HTMLInputElement
       }
+      mockReadText.mockResolvedValueOnce('ab')
 
       const { result } = renderHook(() =>
         useTextareaClipboard({
           textareaRef: inputRef,
-          value: 'hello world',
+          value: 'hello',
           setValue: mockSetValue
         })
       )
 
       await act(async () => {
-        await result.current.handleCopy()
+        await result.current.handlePaste()
       })
 
-      expect(mockClipboard.writeText).toHaveBeenCalledWith('hello')
+      expect(mockSetValue).toHaveBeenCalledWith('abhello')
+      await waitFor(() => {
+        expect(inputRef.current!.setSelectionRange).toHaveBeenCalledWith(2, 2)
+      })
     })
   })
 })

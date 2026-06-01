@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { FilePickerDialog } from './FilePickerDialog'
 import type { PathScore } from '../../utils/pathScoring'
+import { showErrorToast } from '../../utils/toastHelpers'
 
 // Mock createPortal to render in the same container
 vi.mock('react-dom', async () => {
@@ -18,6 +19,21 @@ vi.mock('react-dom', async () => {
     createPortal: (node: React.ReactNode) => node
   }
 })
+
+// Copy-path routes through the central textClipboard service (issue #203),
+// not navigator.clipboard.
+const mockWriteText = vi.fn()
+vi.mock('../../services/textClipboard', () => ({
+  textClipboard: {
+    writeText: (text: string) => mockWriteText(text),
+    readText: vi.fn()
+  }
+}))
+
+// Spy on the toast helper to assert the copy never surfaces a toast.
+vi.mock('../../utils/toastHelpers', () => ({
+  showErrorToast: vi.fn()
+}))
 
 describe('FilePickerDialog', () => {
   const mockCandidates: PathScore[] = [
@@ -44,15 +60,7 @@ describe('FilePickerDialog', () => {
       document.body.appendChild(portalRoot)
     }
 
-    // Mock clipboard API
-    Object.defineProperty(navigator, 'clipboard', {
-      value: {
-        writeText: vi.fn().mockResolvedValue(undefined),
-        readText: vi.fn().mockResolvedValue('')
-      },
-      writable: true,
-      configurable: true
-    })
+    mockWriteText.mockReset().mockResolvedValue(true)
   })
 
   describe('rendering', () => {
@@ -282,7 +290,7 @@ describe('FilePickerDialog', () => {
 
       fireEvent.keyDown(content, { key: 'c', metaKey: true })
 
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('/project/src/components/Button.tsx')
+      expect(mockWriteText).toHaveBeenCalledWith('/project/src/components/Button.tsx')
     })
 
     it('should copy selected file path with Ctrl+C', () => {
@@ -293,19 +301,23 @@ describe('FilePickerDialog', () => {
 
       fireEvent.keyDown(content, { key: 'c', ctrlKey: true })
 
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('/project/src/components/Button.tsx')
+      expect(mockWriteText).toHaveBeenCalledWith('/project/src/components/Button.tsx')
     })
 
-    it('should copy without showing toast notification', () => {
+    it('should copy without showing toast notification', async () => {
       render(<FilePickerDialog {...defaultProps} />)
 
       const dialog = screen.getByRole('dialog')
       const content = dialog.querySelector('.dialog-content')!
 
       fireEvent.keyDown(content, { key: 'c', metaKey: true })
+      // Flush the awaited writeText microtask.
+      await Promise.resolve()
 
-      // Just verify clipboard was called - no toast assertion
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('/project/src/components/Button.tsx')
+      expect(mockWriteText).toHaveBeenCalledWith('/project/src/components/Button.tsx')
+      // A successful copy is silent — no toast (transport errors are the
+      // service's concern, and there are none here).
+      expect(showErrorToast).not.toHaveBeenCalled()
     })
 
     it('should copy the currently selected item path', () => {
@@ -320,7 +332,7 @@ describe('FilePickerDialog', () => {
       // Copy
       fireEvent.keyDown(content, { key: 'c', metaKey: true })
 
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('/project/src/ui/Button.tsx')
+      expect(mockWriteText).toHaveBeenCalledWith('/project/src/ui/Button.tsx')
     })
 
     it('should copy the item path after mouse hover selection', () => {
@@ -338,7 +350,7 @@ describe('FilePickerDialog', () => {
       // Copy
       fireEvent.keyDown(content, { key: 'c', metaKey: true })
 
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('/project/legacy/Button.tsx')
+      expect(mockWriteText).toHaveBeenCalledWith('/project/legacy/Button.tsx')
     })
 
     it('should not interfere with other keyboard shortcuts', () => {

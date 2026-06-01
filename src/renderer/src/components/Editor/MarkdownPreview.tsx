@@ -24,6 +24,7 @@ import {
   cleanTelLink
 } from '../../utils/linkProtocols'
 import { logger } from '../../utils/logger'
+import { textClipboard } from '../../services/textClipboard'
 import { TEST_IDS } from '../../constants/testids'
 import './MarkdownPreview.css'
 
@@ -929,11 +930,8 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
             const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null
             if (range && previewRef.current.contains(range.commonAncestorContainer)) {
               e.preventDefault()
-              try {
-                await navigator.clipboard.writeText(sel.toString())
-              } catch {
-                // Silently fail
-              }
+              // Transport errors handled centrally by the service (issue #203).
+              await textClipboard.writeText(sel.toString())
             }
           }
         }

@@ -3,9 +3,12 @@
  *
  * Tests for the terminal clipboard hook:
  * - Selection state tracking via xterm's onSelectionChange
- * - copy(): getSelection() -> clipboard.writeText() (keeps selection)
- * - paste(): clipboard.readText() -> terminal.paste()
+ * - copy(): getSelection() -> textClipboard.writeText() (keeps selection)
+ * - paste(): textClipboard.readText() -> terminal.paste() (unmodified text)
  * - handleKeyEvent(): Keyboard shortcut handling with SIGINT pass-through
+ *
+ * Clipboard transport failures are handled centrally by the textClipboard
+ * service (issue #203); the hook surfaces no failure callback of its own.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -13,11 +16,18 @@ import { renderHook, act, waitFor } from '@testing-library/react'
 import { useTerminalClipboard } from './useTerminalClipboard'
 import type { Terminal } from '@xterm/xterm'
 
-describe('useTerminalClipboard', () => {
-  // Mock clipboard API
-  const mockWriteText = vi.fn()
-  const mockReadText = vi.fn()
+// Mock the central clipboard service: copy writes via textClipboard.writeText
+// and paste reads via textClipboard.readText (issue #203).
+const mockWriteText = vi.fn()
+const mockReadText = vi.fn()
+vi.mock('../services/textClipboard', () => ({
+  textClipboard: {
+    writeText: (text: string) => mockWriteText(text),
+    readText: () => mockReadText()
+  }
+}))
 
+describe('useTerminalClipboard', () => {
   // Mock xterm Terminal
   const createMockXterm = (hasSelection = false, selection = ''): Terminal => {
     const mockDisposable = { dispose: vi.fn() }
@@ -35,17 +45,9 @@ describe('useTerminalClipboard', () => {
   beforeEach(() => {
     originalPlatform = navigator.platform
 
-    // Reset mocks and set default implementations
-    mockWriteText.mockReset().mockResolvedValue(undefined)
+    // Reset service mocks: success-by-default
+    mockWriteText.mockReset().mockResolvedValue(true)
     mockReadText.mockReset().mockResolvedValue('clipboard text')
-
-    // Mock clipboard API
-    Object.assign(navigator, {
-      clipboard: {
-        writeText: mockWriteText,
-        readText: mockReadText
-      }
-    })
 
     // Default to macOS
     Object.defineProperty(navigator, 'platform', {
@@ -147,7 +149,7 @@ describe('useTerminalClipboard', () => {
   })
 
   describe('copy()', () => {
-    it('copies selected text to clipboard', async () => {
+    it('routes copy through textClipboard.writeText with the selection', async () => {
       const mockXterm = createMockXterm(true, 'selected text')
       const xtermRef = { current: mockXterm }
 
@@ -158,10 +160,11 @@ describe('useTerminalClipboard', () => {
       })
 
       expect(mockXterm.getSelection).toHaveBeenCalledTimes(1)
+      expect(mockWriteText).toHaveBeenCalledTimes(1)
       expect(mockWriteText).toHaveBeenCalledWith('selected text')
     })
 
-    it('keeps selection after copy (VS Code terminal behavior)', async () => {
+    it('keeps the xterm selection after copy (VS Code terminal behavior)', async () => {
       const mockXterm = createMockXterm(true, 'selected text')
       const xtermRef = { current: mockXterm }
 
@@ -171,7 +174,7 @@ describe('useTerminalClipboard', () => {
         await result.current.copy()
       })
 
-      // Selection should NOT be cleared - matches VS Code terminal behavior
+      // Selection must NOT be cleared - matches VS Code terminal behavior
       expect(mockXterm.clearSelection).not.toHaveBeenCalled()
     })
 
@@ -191,7 +194,22 @@ describe('useTerminalClipboard', () => {
       })
     })
 
-    it('does nothing if no selection', async () => {
+    it('does not call onCopy when the service write fails', async () => {
+      const mockXterm = createMockXterm(true, 'selected text')
+      const xtermRef = { current: mockXterm }
+      const onCopy = vi.fn()
+      mockWriteText.mockResolvedValueOnce(false)
+
+      const { result } = renderHook(() => useTerminalClipboard(xtermRef, { onCopy }))
+
+      await act(async () => {
+        await result.current.copy()
+      })
+
+      expect(onCopy).not.toHaveBeenCalled()
+    })
+
+    it('is a no-op when there is no selection (no writeText)', async () => {
       const mockXterm = createMockXterm(false, '')
       const xtermRef = { current: mockXterm }
 
@@ -216,51 +234,15 @@ describe('useTerminalClipboard', () => {
 
       expect(mockWriteText).not.toHaveBeenCalled()
     })
-
-    it('calls onError callback on clipboard failure', async () => {
-      const mockXterm = createMockXterm(true, 'selected text')
-      const xtermRef = { current: mockXterm }
-      const onError = vi.fn()
-      const clipboardError = new Error('Clipboard access denied')
-      mockWriteText.mockRejectedValueOnce(clipboardError)
-
-      const { result } = renderHook(() => useTerminalClipboard(xtermRef, { onError }))
-
-      await act(async () => {
-        await result.current.copy()
-      })
-
-      await waitFor(() => {
-        expect(onError).toHaveBeenCalledTimes(1)
-        expect(onError).toHaveBeenCalledWith(clipboardError)
-      })
-    })
-
-    it('converts non-Error to Error in onError callback', async () => {
-      const mockXterm = createMockXterm(true, 'selected text')
-      const xtermRef = { current: mockXterm }
-      const onError = vi.fn()
-      mockWriteText.mockRejectedValueOnce('string error')
-
-      const { result } = renderHook(() => useTerminalClipboard(xtermRef, { onError }))
-
-      await act(async () => {
-        await result.current.copy()
-      })
-
-      await waitFor(() => {
-        expect(onError).toHaveBeenCalledTimes(1)
-        expect(onError.mock.calls[0][0]).toBeInstanceOf(Error)
-        expect(onError.mock.calls[0][0].message).toBe('string error')
-      })
-    })
   })
 
   describe('paste()', () => {
-    it('reads from clipboard and pastes to terminal', async () => {
+    it('pastes the exact string returned by textClipboard.readText, unmodified', async () => {
       const mockXterm = createMockXterm()
       const xtermRef = { current: mockXterm }
-      mockReadText.mockResolvedValueOnce('clipboard content')
+      // Contains CRLF: must be passed through verbatim (xterm owns normalization).
+      const clipboardText = 'line one\r\nline two'
+      mockReadText.mockResolvedValueOnce(clipboardText)
 
       const { result } = renderHook(() => useTerminalClipboard(xtermRef))
 
@@ -269,7 +251,8 @@ describe('useTerminalClipboard', () => {
       })
 
       expect(mockReadText).toHaveBeenCalledTimes(1)
-      expect(mockXterm.paste).toHaveBeenCalledWith('clipboard content')
+      expect(mockXterm.paste).toHaveBeenCalledTimes(1)
+      expect(mockXterm.paste).toHaveBeenCalledWith(clipboardText)
     })
 
     it('calls onPaste callback on success', async () => {
@@ -314,44 +297,6 @@ describe('useTerminalClipboard', () => {
       })
 
       expect(mockReadText).not.toHaveBeenCalled()
-    })
-
-    it('calls onError callback on clipboard failure', async () => {
-      const mockXterm = createMockXterm()
-      const xtermRef = { current: mockXterm }
-      const onError = vi.fn()
-      const clipboardError = new Error('Clipboard read denied')
-      mockReadText.mockRejectedValueOnce(clipboardError)
-
-      const { result } = renderHook(() => useTerminalClipboard(xtermRef, { onError }))
-
-      await act(async () => {
-        await result.current.paste()
-      })
-
-      await waitFor(() => {
-        expect(onError).toHaveBeenCalledTimes(1)
-        expect(onError).toHaveBeenCalledWith(clipboardError)
-      })
-    })
-
-    it('converts non-Error to Error in onError callback', async () => {
-      const mockXterm = createMockXterm()
-      const xtermRef = { current: mockXterm }
-      const onError = vi.fn()
-      mockReadText.mockRejectedValueOnce('string error')
-
-      const { result } = renderHook(() => useTerminalClipboard(xtermRef, { onError }))
-
-      await act(async () => {
-        await result.current.paste()
-      })
-
-      await waitFor(() => {
-        expect(onError).toHaveBeenCalledTimes(1)
-        expect(onError.mock.calls[0][0]).toBeInstanceOf(Error)
-        expect(onError.mock.calls[0][0].message).toBe('string error')
-      })
     })
   })
 
@@ -568,6 +513,8 @@ describe('useTerminalClipboard', () => {
         await waitFor(() => {
           expect(mockXterm.paste).toHaveBeenCalledWith('paste content')
         })
+        // Single paste only — the explicit shortcut must not double-fire.
+        expect(mockXterm.paste).toHaveBeenCalledTimes(1)
       })
     })
 

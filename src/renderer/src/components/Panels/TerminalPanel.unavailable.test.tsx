@@ -30,6 +30,16 @@ vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit() {} } }))
 vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: class {} }))
 vi.mock('@xterm/addon-webgl', () => ({ WebglAddon: class { onContextLoss() {}; dispose() {} } }))
 
+// Mock the central clipboard service (issue #203): the "copy fix command"
+// button routes through textClipboard.writeText, not navigator.clipboard.
+const mockWriteText = vi.fn()
+vi.mock('../../services/textClipboard', () => ({
+  textClipboard: {
+    writeText: (text: string) => mockWriteText(text),
+    readText: vi.fn()
+  }
+}))
+
 describe('TerminalPanel unavailable flow', () => {
   beforeEach(() => {
     ;(window as any).api = {
@@ -57,42 +67,40 @@ describe('TerminalPanel unavailable flow', () => {
         capture: vi.fn().mockResolvedValue({ success: true, filePath: '/tmp/screenshot.png' })
       }
     }
-    // Mock clipboard
-    Object.assign(navigator, {
-      clipboard: {
-        writeText: vi.fn().mockResolvedValue(undefined)
-      }
-    })
+    mockWriteText.mockReset().mockResolvedValue(true)
   })
 
   it('shows unavailable message with actions and recheck debounces', async () => {
-    const { TerminalPanel } = await import('./TerminalPanel')
-    render(<TerminalPanel /> as any)
-
-    // Wait for unavailable header (uses real timers, fine for async rendering)
-    await waitFor(() => {
-      expect(screen.getByText('Terminal not available')).toBeInTheDocument()
-    })
-
-    const recheckBtn = screen.getByRole('button', { name: /recheck/i })
-    expect(recheckBtn).toBeEnabled()
-
-    // Click recheck triggers cooldown
-    fireEvent.click(recheckBtn)
-    expect(recheckBtn).toBeDisabled()
-
-    // NOW switch to fake timers for the cooldown part
+    // Install fake timers BEFORE the click that starts the cooldown so the timer
+    // is both started and advanced under fake timers. Starting a timer under
+    // real timers and advancing it under fake ones is the flake this guards.
     vi.useFakeTimers()
+    try {
+      const { TerminalPanel } = await import('./TerminalPanel')
+      render(<TerminalPanel /> as any)
 
-    // Advance fake timers to release cooldown (1000ms cooldown + buffer)
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1100)
-    })
+      // Drive the async unavailable-header render under fake timers.
+      await vi.waitFor(() => {
+        expect(screen.getByText('Terminal not available')).toBeInTheDocument()
+      })
 
-    // Button should be enabled after cooldown
-    expect(recheckBtn).toBeEnabled()
+      const recheckBtn = screen.getByRole('button', { name: /recheck/i })
+      expect(recheckBtn).toBeEnabled()
 
-    vi.useRealTimers()
+      // Click recheck triggers the cooldown timer (now under fake timers).
+      fireEvent.click(recheckBtn)
+      expect(recheckBtn).toBeDisabled()
+
+      // Advance fake timers to release cooldown (1000ms cooldown + buffer).
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1100)
+      })
+
+      // Button should be enabled after cooldown.
+      expect(recheckBtn).toBeEnabled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('copies fix command to clipboard', async () => {
@@ -105,6 +113,6 @@ describe('TerminalPanel unavailable flow', () => {
 
     const copyBtn = screen.getByRole('button', { name: /copy fix command/i })
     fireEvent.click(copyBtn)
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('npm rebuild node-pty --build-from-source')
+    expect(mockWriteText).toHaveBeenCalledWith('npm rebuild node-pty --build-from-source')
   })
 })

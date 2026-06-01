@@ -4,6 +4,7 @@ import { BaseDialog } from './BaseDialog'
 import { TextareaContextMenu } from '../ContextMenu/TextareaContextMenu'
 import { CharacterCount } from '../shared'
 import { validateTextInput } from '../../utils/textInputValidation'
+import { useTextareaClipboard } from '../../hooks/useTextareaClipboard'
 import { TEXT_INPUT_LIMITS } from '../../../../shared/constants'
 import { TEST_IDS } from '../../constants/testids'
 import type { PromptDialogConfig } from './types'
@@ -25,6 +26,12 @@ interface PromptDialogProps {
   onSubmit: (value: string) => void
   onCancel: () => void
 }
+
+/**
+ * Max characters of selected text rendered in the preview. Longer selections are
+ * truncated (still scrollable up to this limit) to avoid layout/perf issues.
+ */
+const SELECTED_TEXT_DISPLAY_MAX = 10000
 
 /**
  * PromptDialog - Input dialog with validation
@@ -196,78 +203,22 @@ export function PromptDialog({ config, zIndex, onSubmit, onCancel }: PromptDialo
     setContextMenu(null)
   }, [])
 
-  // Clipboard operations
-  const handleCut = useCallback(async () => {
-    if (!textareaRef.current) return
-    const textarea = textareaRef.current
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const selectedText = textarea.value.substring(start, end)
-
-    if (selectedText) {
-      try {
-        await navigator.clipboard.writeText(selectedText)
-        const newValue = textarea.value.substring(0, start) + textarea.value.substring(end)
-        setInputValue(newValue)
-
-        // Restore cursor position
-        requestAnimationFrame(() => {
-          textarea.focus()
-          textarea.setSelectionRange(start, start)
-        })
-      } catch {
-        // Silently fail
-      }
-    }
-  }, [])
-
-  const handleCopy = useCallback(async () => {
-    if (!textareaRef.current) return
-    const textarea = textareaRef.current
-    const selectedText = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd)
-
-    if (selectedText) {
-      try {
-        await navigator.clipboard.writeText(selectedText)
-      } catch {
-        // Silently fail
-      }
-    }
-  }, [])
-
-  const handlePaste = useCallback(async () => {
-    if (!textareaRef.current) return
-    const textarea = textareaRef.current
-
-    try {
-      const clipboardText = await navigator.clipboard.readText()
-      const start = textarea.selectionStart
-      const end = textarea.selectionEnd
-      const newValue = textarea.value.substring(0, start) + clipboardText + textarea.value.substring(end)
-
-      // Respect maxLength - silently reject if exceeds
-      if (newValue.length <= maxLength) {
-        setInputValue(newValue)
-
-        // Position cursor after pasted text
-        requestAnimationFrame(() => {
-          textarea.focus()
-          const newCursorPos = start + clipboardText.length
-          textarea.setSelectionRange(newCursorPos, newCursorPos)
-        })
-      }
-    } catch {
-      // Silently fail
-    }
-  }, [maxLength])
+  // Clipboard operations via the central textClipboard service (issue #203).
+  // maxLength reject stays a silent product rule (no toast); transport errors
+  // are handled centrally by the service.
+  const { handleCut, handleCopy, handlePaste } = useTextareaClipboard({
+    textareaRef,
+    value: inputValue,
+    setValue: setInputValue,
+    maxLength
+  })
 
   // Use validation result for UI state
   const { charCount, canSubmit, state: validationState } = validationResult
 
-  // Truncate very long selectedText to prevent performance issues
-  // Max 10,000 characters for display (still scrollable up to this limit)
-  const displayText = selectedText && selectedText.length > 10000
-    ? selectedText.substring(0, 10000) + '\n\n... (text truncated for performance)'
+  // Truncate very long selectedText to prevent performance issues.
+  const displayText = selectedText && selectedText.length > SELECTED_TEXT_DISPLAY_MAX
+    ? selectedText.substring(0, SELECTED_TEXT_DISPLAY_MAX) + '\n\n... (text truncated for performance)'
     : selectedText
 
   return (

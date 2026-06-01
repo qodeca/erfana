@@ -6,6 +6,14 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 ## Unreleased
 
+### Fixes
+
+- **Copy and paste work again in the editor** ([#203](https://github.com/qodeca/erfana/issues/203)) — Electron's security sandbox blocked the browser clipboard, so Cmd/Ctrl+C/X/V in the Monaco editor failed silently with a `NotAllowedError`. All clipboard access now goes through a single central service backed by the app's own (main-process) clipboard, so copy, cut, and paste work reliably in the editor, terminal, dialog text fields, the markdown preview, and the file-picker "copy path" action — without weakening the sandbox.
+
+### Internal
+
+- **Central text-clipboard service** ([#203](https://github.com/qodeca/erfana/issues/203)) — Every in-scope text surface now routes clipboard read/write through one renderer service (`textClipboard`) over a new async, Zod-validated IPC bridge (`clipboard:readText` / `clipboard:writeText`, `api.clipboard`) to Electron's main-process `clipboard` module. The service is the single transport-error chokepoint (retry-once + debounced, screen-reader-announced error toast); the main handler validates the sender frame and bounds writes to 5 MB. Monaco's keybinding/context-menu overrides extracted to the pure `monacoClipboardCommands.ts`; the per-surface dupes in PromptDialog/FileSystemDialog/ChatBubble were removed (`useTextareaClipboard` rebuilt). Over-limit textarea paste now truncates-and-inserts instead of silently rejecting. The terminal SIGINT-vs-copy decision table (`terminalClipboard.logic.ts`, #28/#122) is unchanged. Project-tree file clipboard (`useClipboardStore`) is out of scope and untouched.
+
 ## 0.10.1
 
 *Released 2026-05-31. Tag [`v0.10.1`](https://github.com/qodeca/erfana/releases/tag/v0.10.1).*

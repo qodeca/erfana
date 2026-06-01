@@ -8,11 +8,20 @@
  * - Initial state (2 tests)
  * - Opening context menu (3 tests)
  * - Closing context menu (2 tests)
+ * - Copy action (2 tests)
  * - Cut action (4 tests)
- * - Paste action (5 tests)
+ * - Paste action (4 tests)
  * - Cleanup on unmount (1 test)
  *
+ * Copy, cut, and paste now delegate to the shared pure commands in
+ * `monacoClipboardCommands.ts` via `buildMonacoClipboardDeps`, so the menu path
+ * and the keybinding path cannot diverge (issue #203 review). Transport
+ * failures (logging/toast) are owned by the central clipboard service, so the
+ * hook never logs — that assertion lives in the service's own test. Cut deletes
+ * ONLY after a successful clipboard write (write-guards-delete).
+ *
  * @see Spec #002 - Editor context menu with AI prompts
+ * @see docs/design/issue-203-clipboard-service.md §10
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -20,10 +29,14 @@ import { renderHook, act } from '@testing-library/react'
 import { useEditorContextMenu, type EditorContextMenuState } from './useEditorContextMenu'
 import type { MonacoEditorHandle } from '../components/Editor/MonacoMarkdownEditor'
 
-// Mock logger
-vi.mock('../utils/logger', () => ({
-  logger: {
-    error: vi.fn()
+// Mock the central clipboard service. Cut writes via writeText (and deletes
+// only on success); paste reads via readText (issue #203).
+const mockReadText = vi.fn()
+const mockWriteText = vi.fn()
+vi.mock('../services/textClipboard', () => ({
+  textClipboard: {
+    readText: () => mockReadText(),
+    writeText: (text: string) => mockWriteText(text)
   }
 }))
 
@@ -31,7 +44,44 @@ vi.mock('../utils/logger', () => ({
 const mockGetEditor = vi.fn()
 const mockGetSelection = vi.fn()
 const mockExecuteEdits = vi.fn()
+const mockGetValueInRange = vi.fn()
 const mockIsEmpty = vi.fn()
+
+/**
+ * Build a mock editor compatible with `buildMonacoClipboardDeps`, which calls
+ * `getSelection`, `getModel().getValueInRange`, `getOption(readOnly)`,
+ * `executeEdits`, plus `monaco.Range.lift(sel).isEmpty()` / `new
+ * monaco.Selection(...)` / `monaco.editor.EditorOption.readOnly`.
+ */
+function makeEditor(readOnly = false): unknown {
+  return {
+    getSelection: mockGetSelection,
+    getModel: () => ({ getValueInRange: mockGetValueInRange }),
+    getOption: () => readOnly,
+    executeEdits: mockExecuteEdits
+  }
+}
+
+/**
+ * Minimal fake monaco namespace returned by the handle's getMonaco(). Provides
+ * the pieces buildMonacoClipboardDeps uses at runtime.
+ */
+const fakeMonaco = {
+  Range: {
+    lift: (r: { startLineNumber: number; startColumn: number; endLineNumber: number; endColumn: number }) => ({
+      isEmpty: () => r.startLineNumber === r.endLineNumber && r.startColumn === r.endColumn
+    })
+  },
+  Selection: class {
+    constructor(
+      public startLineNumber: number,
+      public startColumn: number,
+      public endLineNumber: number,
+      public endColumn: number
+    ) {}
+  },
+  editor: { EditorOption: { readOnly: 91 } }
+}
 
 describe('useEditorContextMenu', () => {
   let mockEditorRef: React.RefObject<MonacoEditorHandle | null>
@@ -39,29 +89,27 @@ describe('useEditorContextMenu', () => {
   beforeEach(() => {
     vi.clearAllMocks()
 
-    // Reset clipboard mock
-    Object.assign(navigator, {
-      clipboard: {
-        readText: vi.fn()
-      }
-    })
+    // Defaults: read resolves empty, write succeeds, selection has text.
+    mockReadText.mockResolvedValue('')
+    mockWriteText.mockResolvedValue(true)
+    mockGetValueInRange.mockReturnValue('selected text')
 
     // Setup mock editor ref
     mockEditorRef = {
       current: {
-        getEditor: mockGetEditor
+        getEditor: mockGetEditor,
+        getMonaco: () => fakeMonaco
       } as unknown as MonacoEditorHandle
     }
 
     // Default mock implementations
-    mockGetEditor.mockReturnValue({
-      getSelection: mockGetSelection,
-      executeEdits: mockExecuteEdits
-    })
+    mockGetEditor.mockReturnValue(makeEditor())
     mockGetSelection.mockReturnValue({
       isEmpty: mockIsEmpty,
       startLineNumber: 1,
-      endLineNumber: 1
+      startColumn: 1,
+      endLineNumber: 1,
+      endColumn: 6
     })
     mockIsEmpty.mockReturnValue(false)
   })
@@ -191,72 +239,95 @@ describe('useEditorContextMenu', () => {
     })
   })
 
-  describe('cut action', () => {
-    it('deletes selected text from editor', () => {
+  describe('copy action', () => {
+    it('writes the live selection via the shared command without mutating the doc', async () => {
       const { result } = renderHook(() => useEditorContextMenu({ editorRef: mockEditorRef }))
 
-      const mockSelection = {
-        isEmpty: () => false,
-        startLineNumber: 1,
-        endLineNumber: 1
-      }
-      mockGetSelection.mockReturnValue(mockSelection)
-
-      act(() => {
-        result.current.handleEditorCut()
+      await act(async () => {
+        await result.current.handleEditorCopy()
       })
 
-      expect(mockExecuteEdits).toHaveBeenCalledWith('context-menu-cut', [
-        { range: mockSelection, text: '' }
-      ])
+      // Copy routes through the shared clipboardCopy → getValueInRange (live
+      // selection), writes via the service, and never edits the document.
+      expect(mockWriteText).toHaveBeenCalledWith('selected text')
+      expect(mockExecuteEdits).not.toHaveBeenCalled()
     })
 
-    it('does nothing if editor ref is null', () => {
+    it('does nothing if editor ref is null', async () => {
       const nullRef = { current: null }
       const { result } = renderHook(() => useEditorContextMenu({ editorRef: nullRef }))
 
-      act(() => {
-        result.current.handleEditorCut()
+      await act(async () => {
+        await result.current.handleEditorCopy()
       })
 
-      expect(mockExecuteEdits).not.toHaveBeenCalled()
+      expect(mockWriteText).not.toHaveBeenCalled()
     })
+  })
 
-    it('does nothing if getEditor returns null', () => {
-      mockGetEditor.mockReturnValue(null)
+  describe('cut action', () => {
+    it('writes the selection then deletes it via executeEdits on success', async () => {
       const { result } = renderHook(() => useEditorContextMenu({ editorRef: mockEditorRef }))
 
-      act(() => {
-        result.current.handleEditorCut()
+      await act(async () => {
+        await result.current.handleEditorCut()
       })
 
+      expect(mockWriteText).toHaveBeenCalledWith('selected text')
+      // The shared command supplies an endCursorState as the 3rd executeEdits arg.
+      expect(mockExecuteEdits).toHaveBeenCalledTimes(1)
+      const [source, edits] = mockExecuteEdits.mock.calls[0]
+      expect(source).toBe('erfana-clipboard')
+      expect(edits).toEqual([{ range: expect.anything(), text: '' }])
+    })
+
+    it('does NOT delete when the clipboard write fails', async () => {
+      mockWriteText.mockResolvedValue(false)
+      const { result } = renderHook(() => useEditorContextMenu({ editorRef: mockEditorRef }))
+
+      await act(async () => {
+        await result.current.handleEditorCut()
+      })
+
+      expect(mockWriteText).toHaveBeenCalledTimes(1)
       expect(mockExecuteEdits).not.toHaveBeenCalled()
     })
 
-    it('does nothing if selection is empty', () => {
+    it('does nothing if editor ref is null', async () => {
+      const nullRef = { current: null }
+      const { result } = renderHook(() => useEditorContextMenu({ editorRef: nullRef }))
+
+      await act(async () => {
+        await result.current.handleEditorCut()
+      })
+
+      expect(mockWriteText).not.toHaveBeenCalled()
+      expect(mockExecuteEdits).not.toHaveBeenCalled()
+    })
+
+    it('does nothing if selection is empty', async () => {
+      // start === end → Range.lift(...).isEmpty() is true.
       mockGetSelection.mockReturnValue({
-        isEmpty: () => true
+        startLineNumber: 1,
+        startColumn: 1,
+        endLineNumber: 1,
+        endColumn: 1
       })
       const { result } = renderHook(() => useEditorContextMenu({ editorRef: mockEditorRef }))
 
-      act(() => {
-        result.current.handleEditorCut()
+      await act(async () => {
+        await result.current.handleEditorCut()
       })
 
+      expect(mockWriteText).not.toHaveBeenCalled()
       expect(mockExecuteEdits).not.toHaveBeenCalled()
     })
   })
 
   describe('paste action', () => {
-    it('inserts clipboard content at selection', async () => {
+    it('inserts clipboard content from the service at selection', async () => {
       const clipboardText = 'pasted content'
-      ;(navigator.clipboard.readText as ReturnType<typeof vi.fn>).mockResolvedValue(clipboardText)
-
-      const mockSelection = {
-        startLineNumber: 1,
-        endLineNumber: 1
-      }
-      mockGetSelection.mockReturnValue(mockSelection)
+      mockReadText.mockResolvedValue(clipboardText)
 
       const { result } = renderHook(() => useEditorContextMenu({ editorRef: mockEditorRef }))
 
@@ -264,10 +335,12 @@ describe('useEditorContextMenu', () => {
         await result.current.handleEditorPaste()
       })
 
-      expect(navigator.clipboard.readText).toHaveBeenCalled()
-      expect(mockExecuteEdits).toHaveBeenCalledWith('context-menu-paste', [
-        { range: mockSelection, text: clipboardText }
-      ])
+      // Paste must await the SERVICE, not navigator.clipboard
+      expect(mockReadText).toHaveBeenCalledTimes(1)
+      expect(mockExecuteEdits).toHaveBeenCalledTimes(1)
+      const [source, edits] = mockExecuteEdits.mock.calls[0]
+      expect(source).toBe('erfana-clipboard')
+      expect(edits).toEqual([{ range: expect.anything(), text: clipboardText }])
     })
 
     it('does nothing if editor ref is null', async () => {
@@ -278,12 +351,12 @@ describe('useEditorContextMenu', () => {
         await result.current.handleEditorPaste()
       })
 
-      expect(navigator.clipboard.readText).not.toHaveBeenCalled()
+      expect(mockReadText).not.toHaveBeenCalled()
       expect(mockExecuteEdits).not.toHaveBeenCalled()
     })
 
     it('does nothing if clipboard is empty', async () => {
-      ;(navigator.clipboard.readText as ReturnType<typeof vi.fn>).mockResolvedValue('')
+      mockReadText.mockResolvedValue('')
 
       const { result } = renderHook(() => useEditorContextMenu({ editorRef: mockEditorRef }))
 
@@ -291,11 +364,12 @@ describe('useEditorContextMenu', () => {
         await result.current.handleEditorPaste()
       })
 
+      expect(mockReadText).toHaveBeenCalledTimes(1)
       expect(mockExecuteEdits).not.toHaveBeenCalled()
     })
 
     it('does nothing if no selection', async () => {
-      ;(navigator.clipboard.readText as ReturnType<typeof vi.fn>).mockResolvedValue('content')
+      mockReadText.mockResolvedValue('content')
       mockGetSelection.mockReturnValue(null)
 
       const { result } = renderHook(() => useEditorContextMenu({ editorRef: mockEditorRef }))
@@ -304,24 +378,10 @@ describe('useEditorContextMenu', () => {
         await result.current.handleEditorPaste()
       })
 
+      // Read-before-mutation order lock at the hook seam: with no insertion
+      // target the clipboard is never read (no wasted IPC round-trip).
+      expect(mockReadText).not.toHaveBeenCalled()
       expect(mockExecuteEdits).not.toHaveBeenCalled()
-    })
-
-    it('logs error if clipboard read fails', async () => {
-      const { logger } = await import('../utils/logger')
-      const clipboardError = new Error('Clipboard access denied')
-      ;(navigator.clipboard.readText as ReturnType<typeof vi.fn>).mockRejectedValue(clipboardError)
-
-      const { result } = renderHook(() => useEditorContextMenu({ editorRef: mockEditorRef }))
-
-      await act(async () => {
-        await result.current.handleEditorPaste()
-      })
-
-      expect(logger.error).toHaveBeenCalledWith(
-        'Failed to paste from clipboard',
-        clipboardError
-      )
     })
   })
 

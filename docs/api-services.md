@@ -486,6 +486,45 @@ See [Logging Documentation](./logging.md) for details.
 
 ---
 
+## Clipboard service (#203)
+
+Unlike the other entries on this page, the clipboard service lives in the **renderer** (`src/renderer/src/services/textClipboard.ts`); the main process only hosts a thin IPC bridge. It exists because Electron's sandbox blocks `navigator.clipboard` (Monaco copy/paste threw `NotAllowedError`), so all clipboard access is routed through the main-process `clipboard` module over IPC.
+
+### Renderer: `textClipboard` singleton
+
+**File:** `src/renderer/src/services/textClipboard.ts`
+
+The single chokepoint every in-scope text surface (Monaco editor + context menu, terminal, dialog textareas, markdown preview, file-picker copy-path) routes through.
+
+#### `writeText(text: string): Promise<boolean>`
+Write plain text to the OS clipboard. Returns `true` on success, `false` on failure.
+
+#### `readText(): Promise<string>`
+Read plain text from the OS clipboard. Returns the text, or `''` on failure. **Returned text is untrusted** — consumers must treat it as data only (no `innerHTML`/`eval`/`dangerouslySetInnerHTML`).
+
+**Transport-error chokepoint:** a failed `invoke` (throw, or a `false` write) is retried once after ~50 ms; on continued failure the service ALWAYS `logger.error`s and surfaces a **debounced** error toast (a burst of failures coalesces into one). Clipboard *semantics* — empty selection, empty clipboard, over-limit — stay per-surface by design. The error toast is screen-reader announced (`aria-live`).
+
+Monaco's Cmd/Ctrl+C/X/V overrides and paste-end-position math live in the pure module `src/renderer/src/utils/monacoClipboardCommands.ts` (`clipboardCopy`/`Cut`/`Paste`, `computePasteEndPosition`, `buildMonacoClipboardDeps`, `registerClipboardActions`). The terminal copy/paste decision table (`terminalClipboard.logic.ts`, #28/#122) is unchanged — it now writes/reads through this service.
+
+### Main: clipboard IPC bridge
+
+**File:** `src/main/ipc/clipboard-handlers.ts` (register via `registerClipboardHandlers()` at startup)
+
+Async `ipcMain.handle` over Electron's main-process `clipboard` module. Each handler validates the sender frame (`event.senderFrame` — top-level frame from the dev origin or bundled `file://` index; sub-frames/other origins return the safe value and log a warning). `writeText` is Zod-validated (`ClipboardWriteTextSchema = z.string().max(CLIPBOARD_MAX_TEXT_LENGTH)`, 5 MB).
+
+| Channel | Direction | Description |
+|---------|-----------|-------------|
+| `clipboard:readText` | Renderer → Main | Read plain text → `Promise<string>` (`''` on failure/untrusted) |
+| `clipboard:writeText` | Renderer → Main | Write plain text → `Promise<boolean>` (`false` on failure/reject/untrusted) |
+
+**Preload bridge** (`api.clipboard`, typed via the shared `ClipboardBridge` contract):
+- `api.clipboard.readText()` → `Promise<string>`
+- `api.clipboard.writeText(text)` → `Promise<boolean>`
+
+See [IPC Patterns § Clipboard channels](./ipc-patterns.md#clipboard-channels--async-invoke--sender-validation-203).
+
+---
+
 ## See Also
 
 - [API Services - Feature Services](./api-services-features.md) - Git, Lock, Screenshot, Camera, External, PDF, DOCX, Transcription, AudioMetadata, ApiKey

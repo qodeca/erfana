@@ -18,6 +18,7 @@ import { BaseDialog } from './BaseDialog'
 import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
 import type { PathScore } from '../../utils/pathScoring'
 import { getRelativePath } from '../../utils/pathScoring'
+import { textClipboard } from '../../services/textClipboard'
 import './FilePickerDialog.css'
 
 export interface FilePickerDialogProps {
@@ -74,14 +75,12 @@ export function FilePickerDialog({
   }, [selectedIndex, isOpen])
 
   // Copy selected file path to clipboard
-  const handleCopyPath = useCallback(async () => {
+  const handleCopyPath = useCallback(() => {
     if (candidates[selectedIndex]) {
       const path = candidates[selectedIndex].path
-      try {
-        await navigator.clipboard.writeText(path)
-      } catch {
-        // Silently fail
-      }
+      // Transport errors handled centrally by the service (issue #203). Result
+      // intentionally ignored — copy has nothing to roll back.
+      void textClipboard.writeText(path)
     }
   }, [candidates, selectedIndex])
 
