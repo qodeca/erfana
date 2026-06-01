@@ -99,18 +99,16 @@ npm install
    - Each prune is keep-then-verify (fails the build rather than shipping a binary-less bundle)
 7. **Code Signing**: electron-builder ad-hoc signs all binaries
 8. **afterSign Hook**: Deep re-sign bundle for consistent identity (`scripts/resign.js`)
-9. **DMG/ZIP Creation**: Package for distribution
+9. **DMG Creation**: Package for distribution (arm64 only; the `.zip` target was dropped with auto-update disabled)
 
-**Build Output**:
+**Build Output** (macOS leg):
 ```
 release/{version}/
-├── erfana-{version}-x64.dmg
-├── erfana-{version}-arm64.dmg
-├── Erfana-{version}-mac.zip
-├── Erfana-{version}-arm64-mac.zip
-├── *.blockmap                        (for updates)
-└── mac/ and mac-arm64/              (build directories)
+├── erfana-{version}-arm64.dmg          (macOS, Apple Silicon only)
+├── erfana-{version}-arm64.dmg.blockmap
+└── mac-arm64/                          (build directory)
 ```
+The Windows leg builds on its own runner and produces `erfana-{version}-setup.exe`.
 
 ---
 

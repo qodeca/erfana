@@ -134,8 +134,8 @@ Owner: release engineer on rotation (currently documented under repo owner email
 
 | Platform | Runner | Time budget | Notes |
 |---|---|---|---|
-| macOS | `macos-latest` (arm64 default) | ~60 min | Builds both arm64 + x64 via `--arm64 --x64`. Rosetta 2 preflight for cross-arch native modules. |
-| Windows | `windows-latest` (x64) | ~45 min | Azure Artifact Signing via app-reg certificate auth (OIDC unsupported by electron-builder 26). Both NSIS + portable `.exe` signed independently. |
+| macOS | `macos-latest` (arm64 default) | ~60 min | Builds arm64 only (`--arm64`) — Apple Silicon is the sole macOS target. Intel (x64) and the `.zip` target were dropped. |
+| Windows | `windows-latest` (x64) | ~45 min | Azure Artifact Signing via app-reg certificate auth (OIDC unsupported by electron-builder 26). The NSIS installer `.exe` is signed. |
 
 No self-hosted runners for release. Self-hosted Windows with a `.pfx` on disk is explicitly out of scope — side-doors outlive the rationale for creating them.
 

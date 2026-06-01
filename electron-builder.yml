@@ -39,7 +39,6 @@ win:
   executableName: Erfana
   target:
     - target: nsis
-    - target: portable
   # signingHashAlgorithms + rfc3161TimeStampServer moved into signtoolOptions
   # as a nested block in electron-builder 26 (flat fields were removed from
   # the win schema). azureSignOptions stays at win level.
@@ -80,8 +79,6 @@ nsis:
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
-portable:
-  artifactName: ${name}-${version}-portable.${ext}
 mac:
   hardenedRuntime: true
   gatekeeperAssess: false
@@ -98,14 +95,12 @@ mac:
   #       (notarytool user-auth path — this project's choice).
   # Either way it's notarytool (not altool), and the ticket is auto-stapled.
   notarize: true
+  # Apple Silicon only — Erfana ships a single arm64 .dmg. The .zip target was
+  # dropped because auto-update is disabled (publish: null), so the Squirrel.Mac
+  # update feed that consumes the .zip does not exist.
   target:
     - target: dmg
       arch:
-        - x64
-        - arm64
-    - target: zip
-      arch:
-        - x64
         - arm64
 dmg:
   artifactName: ${name}-${version}-${arch}.${ext}
