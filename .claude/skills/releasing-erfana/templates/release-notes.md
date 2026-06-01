@@ -29,7 +29,7 @@ sha256sum -c SHA256SUMS
 codesign --verify --deep --strict --verbose=2 /Applications/Erfana.app
 xcrun stapler validate /path/to/Erfana-*.dmg
 
-# Windows: Authenticode signature on installer + portable
+# Windows: Authenticode signature on the NSIS installer
 signtool verify /pa /all /tw C:\Path\To\erfana-{version}-setup.exe
 ```
 

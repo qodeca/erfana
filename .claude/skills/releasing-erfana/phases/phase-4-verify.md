@@ -172,7 +172,7 @@ Why this gate matters: the minisign signature at 4.3 proves the *original* SHA25
 
 Only now may the skill prompt the operator. Present:
 - Number of assets
-- Expected set per `SKILL.md ## Constants` table (5 binaries + 2 = 7 total)
+- Expected set per `SKILL.md ## Constants` table (2 binaries + 2 = 4 total)
 - Verification summary (all green)
 - Release URL
 

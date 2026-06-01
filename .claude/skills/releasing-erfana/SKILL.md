@@ -55,12 +55,12 @@ All external credentials (Apple Developer, Azure Artifact Signing, minisign rele
 
 ## Constants
 
-These values appear in multiple places. Update here first, then `EXPECTED_ASSETS=7` in §0.4 and the count comment in `phase-4-verify.md` §4.5 will reference this table.
+These values appear in multiple places. Update here first, then `EXPECTED_ASSETS=4` in §0.4 and the count comment in `phase-4-verify.md` §4.5 will reference this table.
 
 | Constant | Value | Note |
 |---|---|---|
-| Expected binary count | 5 | macOS-x64, macOS-arm64, macOS-universal, win-x64, win-arm64 |
-| Expected total asset count | 7 | 5 binaries + `SHA256SUMS` + `SHA256SUMS.minisig` |
+| Expected binary count | 2 | macOS-arm64 (`erfana-{version}-arm64.dmg`), Windows x64 NSIS (`erfana-{version}-setup.exe`) |
+| Expected total asset count | 4 | 2 binaries + `SHA256SUMS` + `SHA256SUMS.minisig` |
 | Phase 3 polling cadence | 240 s × 22 polls | 88 min ceiling for `release.yml` completion |
 | Per-leg stuck-leg threshold | 2700 s (45 min) | Single leg in_progress beyond this triggers warning |
 
@@ -83,7 +83,7 @@ These values appear in multiple places. Update here first, then `EXPECTED_ASSETS
 | Version source | `package.json` → `"version"` |
 | Release notes path | `docs/release-notes/v{version}.md` (two-tier with `<details>`) |
 | CI workflow | `.github/workflows/release.yml` |
-| Expected release assets | See `## Constants` above (5 binaries + 2 = 7 total) |
+| Expected release assets | See `## Constants` above (2 binaries + 2 = 4 total) |
 | Provenance attestations | **Not used** — GitHub Artifact Attestations are Enterprise-only for private repos. Authenticity covered by minisign + per-platform OS signing. |
 | Minisign release pubkey | `docs/security.md` § Release signing |
 
@@ -173,7 +173,7 @@ TAG_EXISTS_REMOTE=false
 RELEASE_STATE="none"  # one of: none | draft-empty | draft-ready | published
 
 # Expected total asset count: see SKILL.md `## Constants` table
-EXPECTED_ASSETS=7
+EXPECTED_ASSETS=4
 
 if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
   TAG_EXISTS_LOCAL=true
@@ -194,7 +194,7 @@ if [ "$TAG_EXISTS_REMOTE" = "true" ]; then
     if [ "$IS_DRAFT" = "false" ]; then
       RELEASE_STATE="published"
     elif [ "$ASSET_COUNT" -ge "$EXPECTED_ASSETS" ]; then
-      RELEASE_STATE="draft-ready"   # 5 binaries + SHA256SUMS + .minisig = 7
+      RELEASE_STATE="draft-ready"   # 2 binaries + SHA256SUMS + .minisig = 4
     else
       RELEASE_STATE="draft-empty"   # finalize hasn't yet sealed the draft
     fi
@@ -216,7 +216,7 @@ If a tag already exists, branch on `RELEASE_STATE` and present options via `AskU
 
 Same as Case A — finalize is still in flight. Resume at Phase 3.
 
-**Case C — `RELEASE_STATE=draft-ready`** (draft has all 7 expected assets, finalize completed):
+**Case C — `RELEASE_STATE=draft-ready`** (draft has all 4 expected assets, finalize completed):
 
 | Option | Meaning | Risk |
 |--------|---------|------|
