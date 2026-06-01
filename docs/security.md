@@ -410,17 +410,15 @@ npm run build:mac
 
 ### Architecture Builds
 
-**Current Strategy**: Separate x64 and arm64 binaries (not universal)
+**Current strategy**: macOS ships a single Apple Silicon (arm64) DMG. Intel (x64), the `.zip` target, and the Windows portable `.exe` were dropped in v0.11.2.
 
-**Why?**: Electron fuses modify the code signature, which must be identical for universal binaries. The `afterPack` hook applies fuses to each architecture separately, causing signature mismatches during universal binary creation.
+**Why arm64 only?**: Apple Silicon is the sole macOS target; the `.zip` only fed the disabled Squirrel.Mac auto-updater (`publish: null`). A universal binary was never adopted because per-architecture fuses (applied in `afterPack`) rewrite each slice's code signature, and electron-builder's universal merge requires byte-identical files across slices.
 
 **Artifacts**:
-- `erfana-0.6.0-x64.dmg` - x64 DMG (173 MB) - End-user distribution
-- `erfana-0.6.0-arm64.dmg` - arm64 DMG (167 MB) - End-user distribution
-- `Erfana-0.6.0-mac.zip` - x64 ZIP (167 MB) - Auto-updates/Development
-- `Erfana-0.6.0-arm64-mac.zip` - arm64 ZIP (160 MB) - Auto-updates/Development
+- `erfana-{version}-arm64.dmg` – Apple Silicon DMG – end-user distribution
+- `erfana-{version}-setup.exe` – Windows NSIS installer – end-user distribution
 
-**Future**: Use `afterAllArtifactBuild` hook to apply fuses AFTER universal binary creation (not currently implemented).
+See [`build/architectures.md`](./build/architectures.md) for the full rationale.
 
 ---
 
@@ -434,7 +432,7 @@ Shipped: contextBridge on all IPC, Zod input validation in all handlers, path-tr
 
 Run `npm audit` to check. **Policy**: zero high/critical production advisories at release. Pre-release: `npm audit --omit=dev --json` and diff against the table below.
 
-**Current state** (audited 2026-04-21): production 0 high / 5 moderate / 0 low; dev-only 10 high / 1 moderate / 2 low. The 5 moderate prod advisories chain through `mermaid → langium → chevrotain`; Mermaid output is DOMPurify-sanitized in the preview, so user-reachable attack surface is nil. Dev-only advisories don't ship in production builds.
+**Current state** (audited 2026-06-02): production **0 vulnerabilities** (`npm audit --omit=dev`). The former `mermaid → langium → chevrotain` moderate advisories no longer count against production because Monaco and Mermaid moved to `devDependencies` in v0.11.0 ([#206](https://github.com/qodeca/erfana/pull/206)); `axios` and `fast-uri` high-severity advisories were patched in v0.11.2. Dev-only advisories remain (notably a `vitest` UI-server critical that needs a breaking 3→4 bump) but do not ship in production builds.
 
 ### Dependency overrides (package.json)
 
@@ -494,9 +492,9 @@ End-to-end signed multi-platform release pipeline. Full operator reference: [`bu
 Trust anchors:
 
 - **macOS**: Developer ID Application certificate + notarytool (user-auth mode: Apple ID + app-specific password + Team ID). Ticket stapled.
-- **Windows**: Azure Artifact Signing (formerly Azure Trusted Signing) via app-registration X.509 certificate auth (electron-builder 26's `WindowsSignAzureManager` does not support OIDC `AZURE_FEDERATED_TOKEN_FILE`, so we use a rotatable cert instead — public key lives on the app registration, private key is a GitHub Secret). Both NSIS installer and portable `.exe` are signed independently. Timestamped via `http://timestamp.digicert.com`.
-- **Linux**: aggregate `SHA256SUMS` signed with a **dedicated release minisign keypair** (separate from the whisper-binaries key — blast-radius isolation per ADR 0003 pattern).
-- **Per-artifact provenance**: SLSA Build L2 attestations are currently **not enabled** — GitHub gates `actions/attest-build-provenance` to Enterprise Cloud for private repos. qodeca is on the **Team plan**, which still does not include attestations for private repos. The minisign signature on the aggregate `SHA256SUMS` (Linux) + per-platform Developer ID / Azure Artifact Signing already provide artifact authenticity without requiring GitHub as a trust anchor. Revisit if Erfana goes public or moves to Enterprise.
+- **Windows**: Azure Artifact Signing (formerly Azure Trusted Signing) via app-registration X.509 certificate auth (electron-builder 26's `WindowsSignAzureManager` does not support OIDC `AZURE_FEDERATED_TOKEN_FILE`, so we use a rotatable cert instead — public key lives on the app registration, private key is a GitHub Secret). The NSIS installer `.exe` is signed and timestamped via `http://timestamp.digicert.com`.
+- **Aggregate `SHA256SUMS`**: signed with a **dedicated release minisign keypair** (separate from the whisper-binaries key — blast-radius isolation per ADR 0003 pattern), covering every release artifact across macOS + Windows.
+- **Per-artifact provenance**: SLSA Build L2 attestations are currently **not enabled** — GitHub gates `actions/attest-build-provenance` to Enterprise Cloud for private repos. qodeca is on the **Team plan**, which still does not include attestations for private repos. The minisign signature on the aggregate `SHA256SUMS` + per-platform Developer ID / Azure Artifact Signing already provide artifact authenticity without requiring GitHub as a trust anchor. Revisit if Erfana goes public or moves to Enterprise.
 
 ### Release minisign public keys (dual-key, ADR-0003 style)
 
@@ -525,7 +523,7 @@ Mirrored copies for offline retrieval: `README.md` § Release verification, `doc
 ### End-user verification
 
 ```bash
-# Integrity + aggregate signature (Linux packages)
+# Integrity + aggregate signature (all platforms)
 minisign -V -P "$(cat docs/release-pubkey.txt)" -m SHA256SUMS -x SHA256SUMS.minisig
 sha256sum -c SHA256SUMS
 ```

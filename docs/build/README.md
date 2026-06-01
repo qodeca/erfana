@@ -14,11 +14,11 @@ This directory contains detailed documentation for Erfana's production build con
 ```bash
 # Prerequisites: macOS 12+, Node.js 24+, Python 3.12, npm install completed
 
-# Build both x64 and arm64 (workaround runs automatically via prebuild script)
+# Build the macOS arm64 DMG (Apple Silicon only)
 npm run build:mac
 ```
 
-**Output**: `release/{version}/erfana-{version}-{x64,arm64}.dmg` + ZIP files
+**Output**: `release/{version}/erfana-{version}-arm64.dmg`
 
 **Duration**: ~2-3 minutes on modern Mac
 
@@ -138,9 +138,8 @@ For detailed information on specific build aspects, see:
    ls -lh release/${npm_package_version}/*.dmg
    ```
 
-2. **Verify file sizes** (approximately):
-   - x64 DMG: ~179 MB
-   - arm64 DMG: ~172 MB
+2. **Verify file size** (approximately):
+   - arm64 DMG: ~214 MB
 
 ### Post-Installation Verification
 
