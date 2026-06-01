@@ -4,7 +4,7 @@ name: Build Windows (Reusable)
 # Signing (formerly Azure Trusted Signing) via certificate-based auth
 # against the app registration (electron-builder 26's WindowsSignAzureManager
 # rejects AZURE_FEDERATED_TOKEN_FILE — OIDC is not supported upstream).
-# Verifies Authenticode signature on both NSIS installer and portable .exe.
+# Verifies Authenticode signature on the NSIS installer.
 
 on:
   workflow_call:
@@ -242,8 +242,8 @@ jobs:
             throw "signtool.exe not found under $sdkRoot"
           }
           $dir = "${{ steps.art.outputs.dir }}"
-          # Both NSIS installer and portable .exe must verify independently.
-          foreach ($pattern in @('*-setup.exe', '*-portable.exe')) {
+          # The NSIS installer must verify.
+          foreach ($pattern in @('*-setup.exe')) {
             Get-ChildItem -Path $dir -Filter $pattern | ForEach-Object {
               Write-Host "signtool verifying: $($_.FullName)"
               & $signtool verify /pa /all /tw $_.FullName
@@ -281,7 +281,6 @@ jobs:
           set -euo pipefail
           gh release upload "$TAG" \
             "$ART_DIR"/*-setup.exe \
-            "$ART_DIR"/*-portable.exe \
             --clobber
 
       - name: Upload workflow-run artifacts (dry-run)
