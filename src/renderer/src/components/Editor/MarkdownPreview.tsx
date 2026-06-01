@@ -66,18 +66,18 @@ export interface MarkdownPreviewHandle {
  * - DOM clobbering via id/name attributes → PREFIXED with 'user-content-'
  *
  * CUSTOMIZATION: To extend this schema (e.g., allow inline styles or custom elements),
- * create a new schema by merging with defaultSchema. Example:
+ * build a new schema by spreading defaultSchema (the same pattern used below), e.g.:
  *
  * ```typescript
- * import deepmerge from 'deepmerge'
- *
- * const customSchema = deepmerge(defaultSchema, {
+ * const customSchema = {
+ *   ...defaultSchema,
  *   attributes: {
- *     '*': ['style'],  // Allow inline styles (RISKY - review CSS carefully)
- *     div: ['data-custom']  // Allow custom data attributes
+ *     ...defaultSchema.attributes,
+ *     '*': [...(defaultSchema.attributes?.['*'] ?? []), 'style'],  // inline styles (RISKY)
+ *     div: ['data-custom']  // custom data attributes
  *   },
- *   tagNames: [...defaultSchema.tagNames, 'button']  // Add button element
- * })
+ *   tagNames: [...(defaultSchema.tagNames ?? []), 'button']  // add button element
+ * }
  *
  * rehypeSanitize as [rehypeSanitize, customSchema]
  * ```

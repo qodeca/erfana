@@ -21,7 +21,7 @@ _Released: {YYYY-MM-DD}_
 ## Verification
 
 ```bash
-# Linux: minisign signature over aggregate hashes
+# Aggregate integrity: minisign signature over the SHA256SUMS hash list (all platforms)
 minisign -V -P "$(cat docs/release-pubkey.txt)" -m SHA256SUMS -x SHA256SUMS.minisig
 sha256sum -c SHA256SUMS
 

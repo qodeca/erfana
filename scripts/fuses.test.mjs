@@ -11,7 +11,14 @@ process.env.ERFANA_MEDIA_CACHE = fs.mkdtempSync(path.join(os.tmpdir(), 'erfana-m
 
 // fuses.js is CommonJS — use createRequire to import it from this ESM test.
 const require = createRequire(import.meta.url);
-const { chmodNodePtySpawnHelper, SPAWN_HELPER_MODE, ensurePackedMediaBinaries, MEDIA_BINARY_MIN_BYTES } = require('./fuses.js');
+const {
+  chmodNodePtySpawnHelper,
+  SPAWN_HELPER_MODE,
+  ensurePackedMediaBinaries,
+  MEDIA_BINARY_MIN_BYTES,
+  pruneForeignFfprobeBinaries,
+  pruneForeignNodePtyPrebuilds,
+} = require('./fuses.js');
 const { Arch } = require('electron-builder');
 
 /**
@@ -218,5 +225,219 @@ describe('ensurePackedMediaBinaries', () => {
     expect(() =>
       ensurePackedMediaBinaries(tmpRoot, 'darwin', Arch.universal, { requireMatch: true })
     ).toThrow(/unsupported/i);
+  });
+});
+
+// ---- Shared fixtures for the foreign-arch prune tests ----------------------
+
+function lsdirs(p) {
+  return fs.existsSync(p) ? fs.readdirSync(p).sort() : [];
+}
+
+function ffprobeBin(root) {
+  return path.join(root, 'app', 'node_modules', 'ffprobe-static', 'bin');
+}
+
+function makeFfprobe(root, plat, arch, { exe = false } = {}) {
+  const dir = path.join(ffprobeBin(root), plat, arch);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, exe ? 'ffprobe.exe' : 'ffprobe'), 'probe');
+  return dir;
+}
+
+// Mirror ffprobe-static's full vendored layout (every platform/arch).
+function seedFullFfprobe(root) {
+  makeFfprobe(root, 'darwin', 'x64');
+  makeFfprobe(root, 'darwin', 'arm64');
+  makeFfprobe(root, 'linux', 'ia32');
+  makeFfprobe(root, 'linux', 'x64');
+  makeFfprobe(root, 'win32', 'ia32', { exe: true });
+  makeFfprobe(root, 'win32', 'x64', { exe: true });
+}
+
+function prebuildsDir(root) {
+  return path.join(root, 'app', 'node_modules', 'node-pty', 'prebuilds');
+}
+
+function makePrebuild(root, name, { pdb = false, dll = false } = {}) {
+  const dir = path.join(prebuildsDir(root), name);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'pty.node'), 'addon');
+  if (dll) {
+    fs.writeFileSync(path.join(dir, 'winpty.dll'), 'dll');
+    fs.writeFileSync(path.join(dir, 'winpty-agent.exe'), 'exe');
+  }
+  if (pdb) {
+    fs.writeFileSync(path.join(dir, 'pty.pdb'), 'sym');
+    fs.writeFileSync(path.join(dir, 'winpty.pdb'), 'sym');
+  }
+  return dir;
+}
+
+describe('pruneForeignFfprobeBinaries', () => {
+  let tmpRoot;
+  beforeEach(() => {
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ffprobe-prune-'));
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('keeps only the target platform/arch on a darwin/arm64 build', () => {
+    seedFullFfprobe(tmpRoot);
+    pruneForeignFfprobeBinaries(tmpRoot, 'darwin', Arch.arm64, { requireMatch: true });
+    const bin = ffprobeBin(tmpRoot);
+    expect(lsdirs(bin)).toEqual(['darwin']);
+    expect(lsdirs(path.join(bin, 'darwin'))).toEqual(['arm64']);
+    expect(fs.existsSync(path.join(bin, 'darwin', 'arm64', 'ffprobe'))).toBe(true);
+  });
+
+  it('keeps only win32/x64 (ffprobe.exe) on a win32/x64 build', () => {
+    seedFullFfprobe(tmpRoot);
+    pruneForeignFfprobeBinaries(tmpRoot, 'win32', Arch.x64, { requireMatch: true });
+    const bin = ffprobeBin(tmpRoot);
+    expect(lsdirs(bin)).toEqual(['win32']);
+    expect(lsdirs(path.join(bin, 'win32'))).toEqual(['x64']);
+    expect(fs.existsSync(path.join(bin, 'win32', 'x64', 'ffprobe.exe'))).toBe(true);
+  });
+
+  it('on a universal mac target drops foreign platforms but keeps both darwin arches', () => {
+    seedFullFfprobe(tmpRoot);
+    pruneForeignFfprobeBinaries(tmpRoot, 'darwin', Arch.universal, { requireMatch: true });
+    const bin = ffprobeBin(tmpRoot);
+    expect(lsdirs(bin)).toEqual(['darwin']);
+    expect(lsdirs(path.join(bin, 'darwin'))).toEqual(['arm64', 'x64']);
+  });
+
+  it('skips entirely for armv7l (no deletion)', () => {
+    seedFullFfprobe(tmpRoot);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    pruneForeignFfprobeBinaries(tmpRoot, 'linux', Arch.armv7l, { requireMatch: false });
+    expect(lsdirs(ffprobeBin(tmpRoot))).toEqual(['darwin', 'linux', 'win32']);
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it('skips (warns) when ffprobe-static/bin is missing', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() =>
+      pruneForeignFfprobeBinaries(tmpRoot, 'darwin', Arch.arm64, { requireMatch: true })
+    ).not.toThrow();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ffprobe-static/bin not found'));
+  });
+
+  it('throws under requireMatch when the target arch is absent', () => {
+    makeFfprobe(tmpRoot, 'darwin', 'x64'); // only x64 present; build arm64
+    expect(() =>
+      pruneForeignFfprobeBinaries(tmpRoot, 'darwin', Arch.arm64, { requireMatch: true })
+    ).toThrow(/no usable binary/i);
+  });
+
+  it('only warns (no throw) when the target is absent and requireMatch is false', () => {
+    makeFfprobe(tmpRoot, 'linux', 'x64'); // cross-platform pack for darwin/arm64
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() =>
+      pruneForeignFfprobeBinaries(tmpRoot, 'darwin', Arch.arm64, { requireMatch: false })
+    ).not.toThrow();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('absent after prune'));
+  });
+
+  it('does not delete through a symlinked platform directory', () => {
+    seedFullFfprobe(tmpRoot);
+    const external = path.join(tmpRoot, 'external-dir');
+    fs.mkdirSync(external);
+    fs.writeFileSync(path.join(external, 'keep'), 'x');
+    // Replace the win32 platform dir with a symlink pointing outside the tree.
+    fs.rmSync(path.join(ffprobeBin(tmpRoot), 'win32'), { recursive: true, force: true });
+    fs.symlinkSync(external, path.join(ffprobeBin(tmpRoot), 'win32'));
+
+    pruneForeignFfprobeBinaries(tmpRoot, 'darwin', Arch.arm64, { requireMatch: true });
+
+    // The symlink was skipped, so the external target's contents are untouched.
+    expect(fs.existsSync(path.join(external, 'keep'))).toBe(true);
+  });
+});
+
+describe('pruneForeignNodePtyPrebuilds', () => {
+  let tmpRoot;
+  beforeEach(() => {
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'nodepty-prune-'));
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('keeps only the target prebuild on a darwin/arm64 build', () => {
+    ['darwin-arm64', 'darwin-x64', 'win32-x64', 'win32-arm64'].forEach((n) => makePrebuild(tmpRoot, n));
+    pruneForeignNodePtyPrebuilds(tmpRoot, 'darwin', Arch.arm64, { requireMatch: true });
+    expect(lsdirs(prebuildsDir(tmpRoot))).toEqual(['darwin-arm64']);
+  });
+
+  it('on a universal mac target keeps both darwin prebuilds and drops win32', () => {
+    ['darwin-arm64', 'darwin-x64', 'win32-x64', 'win32-arm64'].forEach((n) => makePrebuild(tmpRoot, n));
+    pruneForeignNodePtyPrebuilds(tmpRoot, 'darwin', Arch.universal, { requireMatch: true });
+    expect(lsdirs(prebuildsDir(tmpRoot))).toEqual(['darwin-arm64', 'darwin-x64']);
+  });
+
+  it('strips .pdb from the kept win32 prebuild but keeps pty.node and runtime helpers', () => {
+    makePrebuild(tmpRoot, 'win32-x64', { pdb: true, dll: true });
+    makePrebuild(tmpRoot, 'darwin-arm64');
+    pruneForeignNodePtyPrebuilds(tmpRoot, 'win32', Arch.x64, { requireMatch: true });
+    const kept = path.join(prebuildsDir(tmpRoot), 'win32-x64');
+    expect(lsdirs(prebuildsDir(tmpRoot))).toEqual(['win32-x64']);
+    expect(fs.existsSync(path.join(kept, 'pty.node'))).toBe(true);
+    expect(fs.existsSync(path.join(kept, 'winpty.dll'))).toBe(true);
+    expect(fs.existsSync(path.join(kept, 'winpty-agent.exe'))).toBe(true);
+    expect(fs.existsSync(path.join(kept, 'pty.pdb'))).toBe(false);
+    expect(fs.existsSync(path.join(kept, 'winpty.pdb'))).toBe(false);
+  });
+
+  it('does NOT strip .pdb on a non-win32 target', () => {
+    const dir = makePrebuild(tmpRoot, 'darwin-arm64');
+    fs.writeFileSync(path.join(dir, 'extra.pdb'), 'sym');
+    pruneForeignNodePtyPrebuilds(tmpRoot, 'darwin', Arch.arm64, { requireMatch: true });
+    expect(fs.existsSync(path.join(dir, 'extra.pdb'))).toBe(true);
+  });
+
+  it('skips entirely for armv7l (no deletion)', () => {
+    ['darwin-arm64', 'win32-x64'].forEach((n) => makePrebuild(tmpRoot, n));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    pruneForeignNodePtyPrebuilds(tmpRoot, 'linux', Arch.armv7l, { requireMatch: false });
+    expect(lsdirs(prebuildsDir(tmpRoot))).toEqual(['darwin-arm64', 'win32-x64']);
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it('skips (warns) when prebuilds/ is missing', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() =>
+      pruneForeignNodePtyPrebuilds(tmpRoot, 'darwin', Arch.arm64, { requireMatch: true })
+    ).not.toThrow();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('node-pty prebuilds not found'));
+  });
+
+  it('throws under requireMatch when no target prebuild survives', () => {
+    makePrebuild(tmpRoot, 'win32-x64'); // building darwin/arm64
+    expect(() =>
+      pruneForeignNodePtyPrebuilds(tmpRoot, 'darwin', Arch.arm64, { requireMatch: true })
+    ).toThrow(/no prebuild for/i);
+  });
+
+  it('only warns (no throw) when target absent and requireMatch is false', () => {
+    makePrebuild(tmpRoot, 'win32-x64');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() =>
+      pruneForeignNodePtyPrebuilds(tmpRoot, 'darwin', Arch.arm64, { requireMatch: false })
+    ).not.toThrow();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('absent after prune'));
+  });
+
+  it('throws when the .pdb strip would leave no pty.node under requireMatch', () => {
+    const dir = path.join(prebuildsDir(tmpRoot), 'win32-x64');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'pty.pdb'), 'sym'); // .pdb only, no pty.node
+    expect(() =>
+      pruneForeignNodePtyPrebuilds(tmpRoot, 'win32', Arch.x64, { requireMatch: true })
+    ).toThrow(/pty\.node missing/i);
   });
 });

@@ -7,7 +7,7 @@
  * - Development mode: npm run dev with shell and cwd
  * - Production macOS: open -n -a with app bundle discovery
  * - Production Windows: direct exe spawn
- * - Production Linux: AppImage detection and fallback
+ * - Production other platforms (dev fallback): direct exe spawn
  * - getSpawnConfig returns correct config for each platform
  * - spawnNewInstance spawns process with correct configuration
  * - Error handling: spawn failures and exceptions
@@ -311,80 +311,46 @@ describe('getSpawnConfig', () => {
     })
   })
 
-  describe('production mode - Linux', () => {
+  describe('production mode - other platforms (dev fallback)', () => {
+    // Erfana ships macOS + Windows only. On any other platform (e.g. a Linux
+    // dev machine running a production build) getSpawnConfig falls back to
+    // spawning the executable directly — no AppImage handling.
     beforeEach(() => {
       mockIs.dev = false
       Object.defineProperty(process, 'platform', { value: 'linux' })
       delete process.env.APPIMAGE
     })
 
-    it('uses AppImage path when APPIMAGE env var is set', () => {
+    it('falls back to the exe path with --new-window', () => {
+      mockGetPath.mockReturnValue('/usr/local/bin/erfana')
+
+      const config = getSpawnConfig()
+
+      expect(config.command).toBe('/usr/local/bin/erfana')
+      expect(config.args).toEqual(['--new-window'])
+    })
+
+    it('ignores the APPIMAGE env var (no AppImage handling)', () => {
       process.env.APPIMAGE = '/tmp/.mount_erfanaXXXXXX/erfana.AppImage'
       mockGetPath.mockReturnValue('/usr/local/bin/erfana')
 
       const config = getSpawnConfig()
 
-      expect(config.command).toBe('/tmp/.mount_erfanaXXXXXX/erfana.AppImage')
-      expect(config.args).toEqual(['--new-window'])
-    })
-
-    it('falls back to exe path when APPIMAGE is not set', () => {
-      delete process.env.APPIMAGE
-      mockGetPath.mockReturnValue('/usr/local/bin/erfana')
-
-      const config = getSpawnConfig()
-
       expect(config.command).toBe('/usr/local/bin/erfana')
-      expect(config.args).toEqual(['--new-window'])
+      expect(mockLoggerDebug).not.toHaveBeenCalledWith(
+        'Linux AppImage detected',
+        expect.any(Object)
+      )
     })
 
-    it('falls back to exe path when APPIMAGE is empty string', () => {
-      process.env.APPIMAGE = ''
-      mockGetPath.mockReturnValue('/usr/local/bin/erfana')
-
-      const config = getSpawnConfig()
-
-      expect(config.command).toBe('/usr/local/bin/erfana')
-    })
-
-    it('uses detached: true and stdio: ignore', () => {
+    it('uses detached: true, stdio: ignore, and no shell', () => {
       mockGetPath.mockReturnValue('/usr/local/bin/erfana')
 
       const config = getSpawnConfig()
 
       expect(config.options.detached).toBe(true)
       expect(config.options.stdio).toBe('ignore')
-    })
-
-    it('does not use shell option', () => {
-      mockGetPath.mockReturnValue('/usr/local/bin/erfana')
-
-      const config = getSpawnConfig()
-
       expect(config.options.shell).toBeUndefined()
-    })
-
-    it('logs debug message when AppImage detected', () => {
-      process.env.APPIMAGE = '/tmp/.mount_erfanaXXXXXX/erfana.AppImage'
-      mockGetPath.mockReturnValue('/usr/local/bin/erfana')
-
-      getSpawnConfig()
-
-      expect(mockLoggerDebug).toHaveBeenCalledWith('Linux AppImage detected', {
-        appImagePath: '/tmp/.mount_erfanaXXXXXX/erfana.AppImage'
-      })
-    })
-
-    it('does not log AppImage message when not using AppImage', () => {
-      delete process.env.APPIMAGE
-      mockGetPath.mockReturnValue('/usr/local/bin/erfana')
-
-      getSpawnConfig()
-
-      expect(mockLoggerDebug).not.toHaveBeenCalledWith(
-        'Linux AppImage detected',
-        expect.any(Object)
-      )
     })
 
     it('logs debug message with platform and exePath', () => {
@@ -489,21 +455,7 @@ describe('spawnNewInstance', () => {
       )
     })
 
-    it('calls spawn with correct config for Linux production with AppImage', () => {
-      mockIs.dev = false
-      Object.defineProperty(process, 'platform', { value: 'linux' })
-      process.env.APPIMAGE = '/tmp/erfana.AppImage'
-      mockGetPath.mockReturnValue('/usr/local/bin/erfana')
-
-      spawnNewInstance()
-
-      expect(mockSpawn).toHaveBeenCalledWith('/tmp/erfana.AppImage', ['--new-window'], {
-        detached: true,
-        stdio: 'ignore'
-      })
-    })
-
-    it('calls spawn with correct config for Linux production without AppImage', () => {
+    it('calls spawn with the exe fallback on non-darwin/non-win32 platforms', () => {
       mockIs.dev = false
       Object.defineProperty(process, 'platform', { value: 'linux' })
       delete process.env.APPIMAGE

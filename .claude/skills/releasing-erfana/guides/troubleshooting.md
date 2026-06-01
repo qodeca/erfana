@@ -42,7 +42,7 @@ This is the canonical cookbook for `release.yml` failures. Each row below is a r
 ### Row 4: Schema validator demands non-empty azureSignOptions
 
 - **Regex:** `(configuration\.win\.azureSignOptions|win\.azureSignOptions).+(misses the property|required)`
-- **Human-readable symptom:** `configuration.win.azureSignOptions misses the property 'publisherName'` — fires even on Linux/macOS legs that don't actually call signtool.
+- **Human-readable symptom:** `configuration.win.azureSignOptions misses the property 'publisherName'` — fires even on the macOS leg that doesn't actually call signtool.
 - **Root cause:** electron-builder's JSON schema validator runs on **every** platform leg, not just `--win`. An empty `azureSignOptions: {}` fails the required-fields check before the build leg even starts.
 - **Fix:** Replace empty object with valid placeholder strings in YAML so the schema passes; CLI `--config` overrides supply real values at runtime. Use `endpoint: https://placeholder.invalid/` (RFC 6761 reserved TLD) so misconfigured local builds fail fast at DNS instead of probing a third-party-registrable domain.
 - **Platform:** All (schema validation cross-cuts)

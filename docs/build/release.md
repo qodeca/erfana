@@ -4,7 +4,7 @@ This document is the operator reference for the Erfana multi-platform release pi
 
 > **Service name note:** Microsoft has renamed "Azure Trusted Signing" to "Azure Artifact Signing". This doc uses the new name; the Azure CLI verb is still `az trustedsigning` and the electron-builder config key remains `win.azureSignOptions`. It covers topology, secrets, rotation calendar, end-user verification, failure recovery, and incident response.
 
-Design summary: one `v*.*.*` tag push from `main` produces one GitHub draft release containing signed, notarized artifacts for Windows + macOS + Linux, plus a minisign-signed `SHA256SUMS`. The local [`releasing-erfana`](../../.claude/skills/releasing-erfana/SKILL.md) skill handles pre-tag sanity, tag push, CI polling, cryptographic verification, and human approval. CI owns build, sign, notarize, verify, and draft upload.
+Design summary: one `v*.*.*` tag push from `main` produces one GitHub draft release containing signed, notarized artifacts for Windows + macOS (the Linux distribution target was dropped), plus a minisign-signed `SHA256SUMS`. The local [`releasing-erfana`](../../.claude/skills/releasing-erfana/SKILL.md) skill handles pre-tag sanity, tag push, CI polling, cryptographic verification, and human approval. CI owns build, sign, notarize, verify, and draft upload.
 
 > **SLSA Build L2 attestations are not used.** GitHub gates `actions/attest-build-provenance` to Enterprise Cloud for private repos. qodeca is on the **Team plan**, which still does not enable attestations for private repos (Enterprise required), so this layer is disabled. The minisign signature on the aggregate `SHA256SUMS` + per-platform OS signing (Developer ID notarization on macOS, Azure Artifact Signing Authenticode on Windows) are the authenticity anchors. The trust model is equivalent for end-user verification; attacker must compromise either the release-signing minisign key OR a platform signing credential to forge, independent of any GitHub-specific trust anchor. Trigger to re-enable: org upgrades to Enterprise Cloud, or the repo is made public.
 
@@ -24,10 +24,10 @@ Design summary: one `v*.*.*` tag push from `main` produces one GitHub draft rele
       │                    │                            ├── assert checks.yml green for SHA
       │                    │                            └── gh release create --draft
       │                    │                            │
-      │                    │               ┌────────────┼────────────┐
-      │                    │               │            │            │
-      │                    │           build_linux  build_mac    build_win
-      │                    │               │            │            │
+      │                    │                    ┌───────┴───────┐
+      │                    │                    │               │
+      │                    │                build_mac       build_win
+      │                    │                    │               │
       │                    │               │  electron-builder       │
       │                    │               │    --publish never      │
       │                    │               │  verify sigs locally    │
@@ -75,7 +75,6 @@ sequenceDiagram
   GH->>CI: trigger release.yml
   CI->>GH: gh release create --draft
   par matrix
-    CI->>GH: build_linux uploads .AppImage/.deb/.rpm
     CI->>GH: build_mac uploads .dmg/.zip (notarized + stapled)
     CI->>GH: build_win uploads .exe (Authenticode signed)
   end
@@ -135,13 +134,12 @@ Owner: release engineer on rotation (currently documented under repo owner email
 
 | Platform | Runner | Time budget | Notes |
 |---|---|---|---|
-| Linux | `ubuntu-latest` (x64) | ~20 min | No external signing deps. Integrity via aggregate `SHA256SUMS` + minisign. |
 | macOS | `macos-latest` (arm64 default) | ~60 min | Builds both arm64 + x64 via `--arm64 --x64`. Rosetta 2 preflight for cross-arch native modules. |
 | Windows | `windows-latest` (x64) | ~45 min | Azure Artifact Signing via app-reg certificate auth (OIDC unsupported by electron-builder 26). Both NSIS + portable `.exe` signed independently. |
 
 No self-hosted runners for release. Self-hosted Windows with a `.pfx` on disk is explicitly out of scope — side-doors outlive the rationale for creating them.
 
-Linux arm64 is out of scope for v1. Revisit when user demand surfaces.
+The Linux distribution target (AppImage/deb/rpm) was dropped — Erfana ships on macOS + Windows only. Linux remains a supported dev environment and CI test runner.
 
 ## Hardened-runtime entitlements (known gap)
 
@@ -153,20 +151,19 @@ The inherit plist (`build/entitlements.mac.inherit.plist`) grants `cs.allow-jit`
 
 ## Non-goals
 
-- Auto-updater metadata (`latest.yml` / `latest-mac.yml` / `latest-linux.yml`). `electron-builder.yml` sets `publish: null`. `finalize` deletes any leaked `latest*.yml`.
+- Auto-updater metadata (`latest.yml` / `latest-mac.yml`). `electron-builder.yml` sets `publish: null`. `finalize` deletes any leaked `latest*.yml`.
 - Backfilling `v0.9.4`. First release on the new workflow is `v0.9.5`.
 - `release-please` / changesets / `semantic-release`.
 - Dedicated `release/*` branches.
-- Linux snap target.
+- Linux distribution (AppImage/deb/rpm/snap). Dropped — macOS + Windows only.
 - Sigstore/cosign per-binary signing.
-- Per-artifact `.deb` / `.rpm` signing. Aggregate `SHA256SUMS` is the documented model.
 - Reproducible builds. Electron's V8 snapshot + native module timestamps make it impractical in 2026.
 
 ## End-user verification
 
 An end user downloading from the release page should run the following to confirm they got bytes we produced.
 
-### 1. Integrity + aggregate signature (Linux packages)
+### 1. Integrity + aggregate signature (all platforms)
 
 ```bash
 curl -LO https://github.com/qodeca/erfana/releases/download/v0.9.5/SHA256SUMS

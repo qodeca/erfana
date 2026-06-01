@@ -1,7 +1,6 @@
 import { app, shell, BrowserWindow, Menu } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
 import { spawnNewInstance } from './utils/spawnNewInstance'
 import { registerFileHandlers } from './ipc/file-handlers'
 import { registerFileWatcherHandlers } from './ipc/file-watcher-handlers'
@@ -74,7 +73,6 @@ function createWindow(): BrowserWindow {
     autoHideMenuBar: true,
     title: windowTitle,
     roundedCorners: false,
-    ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       // sandbox: true is the default since Electron 20 (2022)

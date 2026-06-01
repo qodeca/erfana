@@ -7,7 +7,7 @@ name: Release
 # Detailed ops doc: docs/build/release.md
 #
 # Flow:
-#   prepare → {build_linux, build_mac, build_win} → finalize → operator
+#   prepare → {build_mac, build_win} → finalize → operator
 #                 │
 #                 └─ any failure → cleanup (deletes draft, fails workflow red)
 #
@@ -157,19 +157,6 @@ jobs:
             --title "$TAG" \
             --notes-file "docs/release-notes/${TAG}.md"
 
-  build_linux:
-    name: Build Linux
-    needs: [prepare]
-    # Fork guard on caller too — defense-in-depth. The inner reusable
-    # workflow also carries this guard; belt AND suspenders.
-    if: github.repository == 'qodeca/erfana'
-    uses: ./.github/workflows/build_linux.yml
-    with:
-      tag: ${{ needs.prepare.outputs.tag }}
-      is-dry-run: ${{ needs.prepare.outputs.is_dry_run == 'true' }}
-    permissions:
-      contents: write
-
   build_mac:
     name: Build macOS
     needs: [prepare]
@@ -222,7 +209,7 @@ jobs:
     # Default GHA semantics: runs only when ALL `needs` succeeded and no
     # cancellation occurred. Do NOT add `if: always()` — that would run
     # finalize on failures and crash partway through verification.
-    needs: [prepare, build_linux, build_mac, build_win]
+    needs: [prepare, build_mac, build_win]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     if: github.repository == 'qodeca/erfana'
@@ -284,7 +271,7 @@ jobs:
           TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           set -euo pipefail
-          for f in latest.yml latest-mac.yml latest-linux.yml; do
+          for f in latest.yml latest-mac.yml; do
             if gh release view "$TAG" --json assets --jq '.assets[].name' \
                  | grep -qx "$f"; then
               echo "Deleting leaked $f"
@@ -351,12 +338,11 @@ jobs:
     # even if the whole thing was cancelled (always()) so leaked drafts
     # don't survive. Final `exit 1` turns the workflow red so operators
     # aren't fooled by a green cleanup.
-    needs: [prepare, build_linux, build_mac, build_win]
+    needs: [prepare, build_mac, build_win]
     if: >-
       always()
       && github.repository == 'qodeca/erfana'
       && (needs.prepare.result != 'success'
-          || needs.build_linux.result != 'success'
           || needs.build_mac.result != 'success'
           || needs.build_win.result != 'success')
     runs-on: ubuntu-latest

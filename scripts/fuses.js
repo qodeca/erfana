@@ -250,6 +250,175 @@ function ensurePackedMediaBinaries(resourcesDir, platform, archEnum, { requireMa
 }
 
 /**
+ * Delete foreign-platform/arch ffprobe-static binaries from the packed bundle.
+ *
+ * ffprobe-static vendors a binary for every platform/arch under
+ * `node_modules/ffprobe-static/bin/<plat>/<arch>` (darwin, linux, win32 ×
+ * x64/arm64/ia32 — ~335 MB total). A single-arch bundle only ever resolves its
+ * own (ffprobe-static/index.js uses `os.platform()`/`os.arch()`), so the other
+ * binaries are dead weight (~260 MB on a mac build). Delete every `<plat>/<arch>`
+ * except the build target, then verify the target survived (keep-then-verify).
+ *
+ * Runs in afterPack (before signing) so the pruned tree is what gets signed.
+ *
+ * @param {string} resourcesDir - dir containing `app/node_modules`
+ * @param {string} platform - context.electronPlatformName ('darwin'|'linux'|'win32')
+ * @param {number} archEnum - electron-builder Arch enum value (context.arch)
+ * @param {object} [options]
+ * @param {boolean} [options.requireMatch=false] - throw if the target binary is absent
+ */
+function pruneForeignFfprobeBinaries(resourcesDir, platform, archEnum, { requireMatch = false } = {}) {
+  const arch = Arch[archEnum];
+  if (arch === 'armv7l') {
+    console.warn(`⚠️  ffprobe prune: arch '${arch}' is not a shipped target — skipping`);
+    return;
+  }
+  // 'universal' (a possible future multi-arch mac target) cannot narrow the arch,
+  // but we still drop foreign *platforms* so the universal bundle is not re-bloated.
+  const narrowArch = arch !== 'universal';
+
+  const probeRoot = path.join(resourcesDir, 'app', 'node_modules', 'ffprobe-static', 'bin');
+  if (!fs.existsSync(probeRoot)) {
+    console.warn(`⚠️  ffprobe-static/bin not found at ${probeRoot} — skipping prune`);
+    return;
+  }
+
+  const binName = platform === 'win32' ? 'ffprobe.exe' : 'ffprobe';
+  let removed = 0;
+
+  for (const platEntry of fs.readdirSync(probeRoot, { withFileTypes: true })) {
+    // isDirectory() is false for a directory symlink (lstat semantics), so a
+    // symlinked entry is skipped here and never deleted-through — same bar as
+    // the sibling spawn-helper/ffprobe chmod code.
+    if (!platEntry.isDirectory() || platEntry.isSymbolicLink()) continue;
+    const platDir = path.join(probeRoot, platEntry.name);
+    if (platEntry.name !== platform) {
+      // Foreign platform — drop the whole tree.
+      fs.rmSync(platDir, { recursive: true, force: true });
+      removed++;
+      continue;
+    }
+    if (!narrowArch) continue; // universal: keep every arch of the target platform
+    // Target platform — keep only the target arch subdir.
+    for (const archEntry of fs.readdirSync(platDir, { withFileTypes: true })) {
+      if (!archEntry.isDirectory() || archEntry.isSymbolicLink() || archEntry.name === arch) continue;
+      fs.rmSync(path.join(platDir, archEntry.name), { recursive: true, force: true });
+      removed++;
+    }
+  }
+
+  // Keep-then-verify: a usable ffprobe for the target MUST survive the prune.
+  const platDir = path.join(probeRoot, platform);
+  const survived = narrowArch
+    ? fs.existsSync(path.join(platDir, arch, binName))
+    : fs.existsSync(platDir) && fs.readdirSync(platDir).length > 0;
+  if (!survived) {
+    if (requireMatch) {
+      throw new Error(
+        `ffprobe prune left no usable binary for ${platform}/${narrowArch ? arch : '*'}. ` +
+        `Refusing to ship a bundle with no ffprobe.`
+      );
+    }
+    console.warn(`⚠️  ffprobe target for ${platform} absent after prune (cross-platform pack?)`);
+    return;
+  }
+  console.log(`✅ Pruned ${removed} foreign ffprobe path(s); kept ${platform}/${narrowArch ? arch : '*'}`);
+}
+
+/**
+ * Delete foreign-platform/arch node-pty prebuilds from the packed bundle.
+ *
+ * node-pty ships `prebuilds/<platform>-<arch>` for every supported target; a
+ * single-arch bundle loads only its own (node-pty resolves
+ * `process.platform-process.arch`). The Windows prebuilds are large (~28–30 MB
+ * each, dominated by `.pdb`). Delete every prebuild dir except the build target,
+ * then verify the target survived. On a `win32` target, also strip `.pdb` debug
+ * symbols from the kept prebuild (not loaded at runtime). Runs before
+ * chmodNodePtySpawnHelper so only the target spawn-helper is chmoded.
+ *
+ * @param {string} resourcesDir - dir containing `app/node_modules`
+ * @param {string} platform - context.electronPlatformName ('darwin'|'linux'|'win32')
+ * @param {number} archEnum - electron-builder Arch enum value (context.arch)
+ * @param {object} [options]
+ * @param {boolean} [options.requireMatch=false] - throw if the target prebuild is absent
+ */
+function pruneForeignNodePtyPrebuilds(resourcesDir, platform, archEnum, { requireMatch = false } = {}) {
+  const arch = Arch[archEnum];
+  if (arch === 'armv7l') {
+    console.warn(`⚠️  node-pty prune: arch '${arch}' is not a shipped target — skipping`);
+    return;
+  }
+  // 'universal' keeps every arch of the target platform ('<platform>-*'); a
+  // narrow build keeps exactly '<platform>-<arch>'.
+  const narrowArch = arch !== 'universal';
+
+  const prebuildsDir = path.join(resourcesDir, 'app', 'node_modules', 'node-pty', 'prebuilds');
+  if (!fs.existsSync(prebuildsDir)) {
+    console.warn(`⚠️  node-pty prebuilds not found at ${prebuildsDir} — skipping prune`);
+    return;
+  }
+
+  const keep = (name) =>
+    narrowArch ? name === `${platform}-${arch}` : name.startsWith(`${platform}-`);
+  let removed = 0;
+
+  for (const entry of fs.readdirSync(prebuildsDir, { withFileTypes: true })) {
+    // Directory symlinks report isDirectory() === false (lstat semantics) and
+    // are skipped — never deleted-through.
+    if (!entry.isDirectory() || entry.isSymbolicLink() || keep(entry.name)) continue;
+    fs.rmSync(path.join(prebuildsDir, entry.name), { recursive: true, force: true });
+    removed++;
+  }
+
+  // Keep-then-verify: a target prebuild MUST survive the prune.
+  const kept = fs.readdirSync(prebuildsDir).filter(keep);
+  if (kept.length === 0) {
+    if (requireMatch) {
+      throw new Error(
+        `node-pty prune left no prebuild for ${platform}-${narrowArch ? arch : '*'}. ` +
+        `Refusing to ship a broken bundle.`
+      );
+    }
+    console.warn(`⚠️  node-pty target for ${platform} absent after prune (cross-platform pack?)`);
+    return;
+  }
+
+  // Windows-only in-arch trim: strip .pdb debug symbols from the kept prebuild(s).
+  // PDBs are never loaded at runtime (node-pty loads pty.node + the .dll/.exe
+  // helpers), so deleting them shrinks the installer with no behavior change.
+  // Keep-then-verify: the pty.node addon must survive the strip.
+  let pdbRemoved = 0;
+  if (platform === 'win32') {
+    for (const name of kept) {
+      const root = path.join(prebuildsDir, name);
+      let hasAddon = false;
+      const stack = [root];
+      while (stack.length) {
+        const dir = stack.pop();
+        for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
+          if (f.isSymbolicLink()) continue;
+          const full = path.join(dir, f.name);
+          if (f.isDirectory()) {
+            stack.push(full);
+          } else if (f.name.toLowerCase().endsWith('.pdb')) {
+            fs.rmSync(full, { force: true });
+            pdbRemoved++;
+          } else if (f.name === 'pty.node') {
+            hasAddon = true;
+          }
+        }
+      }
+      if (!hasAddon && requireMatch) {
+        throw new Error(`node-pty .pdb strip: pty.node missing under ${root}. Aborting.`);
+      }
+    }
+  }
+
+  const pdbNote = pdbRemoved ? `, stripped ${pdbRemoved} .pdb` : '';
+  console.log(`✅ Pruned ${removed} foreign node-pty prebuild(s); kept ${kept.join(', ')}${pdbNote}`);
+}
+
+/**
  * Rename app bundle to include test suffix for visual differentiation.
  * This helps prevent accidental distribution of test builds.
  *
@@ -321,6 +490,27 @@ async function afterPack(context) {
     );
   } else {
     console.log('🔒 PRODUCTION BUILD: All security fuses enabled');
+  }
+
+  // Prune foreign-platform/arch native binaries before signing so the signed
+  // bundle ships only its own arch (ffprobe-static ~260 MB, node-pty Windows
+  // prebuilds ~58 MB of dead weight on a mac build). Runs for all platforms;
+  // resolves to the same Resources/resources dir as the media-binary step.
+  const pruneResources = {
+    darwin: () => path.join(electronBinaryPath, 'Contents', 'Resources'),
+    linux: () => path.join(context.appOutDir, 'resources'),
+    win32: () => path.join(context.appOutDir, 'resources'),
+  }[context.electronPlatformName];
+  if (pruneResources) {
+    console.log(`🔧 Pruning foreign-arch native binaries (${context.electronPlatformName}/${Arch[context.arch]})`);
+    // Require the target binary to survive whenever we pack for the host platform.
+    // On macOS that covers BOTH the arm64 and x64 legs (the host vends both, so
+    // each leg must keep its own binary). Only a true cross-PLATFORM pack — which
+    // never happens in CI, where each OS builds on its own runner — relaxes this
+    // to a warning instead of a hard failure.
+    const requireMatch = context.electronPlatformName === process.platform;
+    pruneForeignFfprobeBinaries(pruneResources(), context.electronPlatformName, context.arch, { requireMatch });
+    pruneForeignNodePtyPrebuilds(pruneResources(), context.electronPlatformName, context.arch, { requireMatch });
   }
 
   // Restore execute bit on node-pty's spawn-helper before code-signing so
@@ -409,5 +599,7 @@ async function afterPack(context) {
 module.exports = afterPack;
 module.exports.chmodNodePtySpawnHelper = chmodNodePtySpawnHelper;
 module.exports.ensurePackedMediaBinaries = ensurePackedMediaBinaries;
+module.exports.pruneForeignFfprobeBinaries = pruneForeignFfprobeBinaries;
+module.exports.pruneForeignNodePtyPrebuilds = pruneForeignNodePtyPrebuilds;
 module.exports.SPAWN_HELPER_MODE = SPAWN_HELPER_MODE;
 module.exports.MEDIA_BINARY_MIN_BYTES = MEDIA_BINARY_MIN_BYTES;

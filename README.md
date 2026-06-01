@@ -55,7 +55,6 @@ npm run build
 # Package for distribution
 npm run build:mac   # macOS
 npm run build:win   # Windows
-npm run build:linux # Linux
 ```
 
 ### Project Structure
@@ -151,7 +150,7 @@ Details: [`docs/security.md`](docs/security.md). Release-artifact trust chain (m
 Every release on or after `v0.9.5` ships signed artifacts. End users should verify downloads before installing:
 
 ```bash
-# Linux integrity + aggregate minisign signature (accept PRIMARY or ROTATION key)
+# Aggregate integrity + minisign signature over SHA256SUMS (accept PRIMARY or ROTATION key)
 PRIMARY="RWRGVoSZhM7rShmOHr5lmt6v6wH8Tjm/nXItCg46Co+hxgvJFLWkv0fC"
 ROTATION="RWTxkJcmBbLk6J2eWEDWHYcAmgpKfRqO5PR8oRRLUpgn5rgCaWmTvd9w"
 minisign -V -P "$PRIMARY"  -m SHA256SUMS -x SHA256SUMS.minisig \
@@ -161,7 +160,7 @@ sha256sum -c SHA256SUMS
 
 The dedicated release-signing minisign public keys (primary + rotation) are published at [`docs/release-pubkey.txt`](docs/release-pubkey.txt) and mirrored in [`docs/security.md § Release signing`](docs/security.md#release-signing-v095-174). These keys are **separate** from the `whisper-binaries` key — compromising one does not weaken the other.
 
-> **Note on SLSA provenance:** GitHub-hosted Artifact Attestations (SLSA Build L2) are [only available on Enterprise Cloud for private repositories](https://docs.github.com/en/actions/concepts/security/artifact-attestations). Erfana's trust chain relies on minisign (Linux aggregate) + codesign-notarization (macOS) + Authenticode (Windows) instead; these provide equivalent authenticity guarantees without the Enterprise plan.
+> **Note on SLSA provenance:** GitHub-hosted Artifact Attestations (SLSA Build L2) are [only available on Enterprise Cloud for private repositories](https://docs.github.com/en/actions/concepts/security/artifact-attestations). Erfana's trust chain relies on minisign (aggregate `SHA256SUMS`) + codesign-notarization (macOS) + Authenticode (Windows) instead; these provide equivalent authenticity guarantees without the Enterprise plan.
 
 ## License
 

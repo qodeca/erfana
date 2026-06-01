@@ -4,7 +4,7 @@
 
 This directory contains detailed documentation for Erfana's production build configuration.
 
-> **Releasing Erfana?** This README covers local builds. For the multi-platform CI release pipeline (`release.yml` → signed/notarized macOS + Windows + Linux artifacts via the `releasing-erfana` skill), see [release.md](release.md). Whisper binary build runbook (separate signed release stream) lives in [whisper-binaries.md](whisper-binaries.md).
+> **Releasing Erfana?** This README covers local builds. For the multi-platform CI release pipeline (`release.yml` → signed/notarized macOS + Windows artifacts via the `releasing-erfana` skill), see [release.md](release.md). Whisper binary build runbook (separate signed release stream) lives in [whisper-binaries.md](whisper-binaries.md).
 
 ---
 
@@ -90,7 +90,13 @@ npm install
    - Renderer: ~10.9 MB (Monaco, Mermaid, xterm.js included)
 4. **beforePack hook (v0.10.0)**: `scripts/ensure-media-binaries.js` resolves the host's `ffmpeg-static` binary via the shared `src/main/utils/mediaBinaries.ts` resolver and stages a per-architecture copy into `extraResources` so the packaged app ships the correct `ffmpeg` for its architecture rather than one bundled-at-install. Replaces the single-arch download-at-install pattern that produced the v0.9.6 video-transcription ENOENT.
 5. **electron-builder Package**: Create platform packages (includes `extraResources` – tessdata for offline OCR, per-arch ffmpeg)
-6. **afterPack Hook**: Apply Electron fuses (`scripts/fuses.js`); verify per-arch ffmpeg binary is present and executable
+6. **afterPack Hook** (`scripts/fuses.js`, before signing):
+   - Apply Electron security fuses
+   - Restore node-pty `spawn-helper` executable bit (`0755`)
+   - Verify the per-arch ffmpeg binary is present and executable
+   - Prune foreign-platform/arch `ffprobe-static` binaries (keeps only the target, ~260 MB saved on mac)
+   - Prune foreign node-pty prebuilds, and strip `.pdb` debug symbols from the kept Windows prebuild
+   - Each prune is keep-then-verify (fails the build rather than shipping a binary-less bundle)
 7. **Code Signing**: electron-builder ad-hoc signs all binaries
 8. **afterSign Hook**: Deep re-sign bundle for consistent identity (`scripts/resign.js`)
 9. **DMG/ZIP Creation**: Package for distribution

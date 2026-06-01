@@ -62,6 +62,25 @@ v0.9.5 shipped without this step. The macOS DMG was effectively unusable — eve
 
 ---
 
+## afterPack also prunes foreign-arch native binaries
+
+The same `scripts/fuses.js` `afterPack` hook deletes binaries for platforms/arches the current bundle can never run, **before code-signing** (so the signed tree is the pruned tree). Two packages ship multi-platform payloads by default:
+
+- **`ffprobe-static`** vendors a binary for every platform/arch under `bin/<plat>/<arch>` (~335 MB). `pruneForeignFfprobeBinaries` keeps only the build target's `<plat>/<arch>` (e.g. `darwin/arm64`, ~74 MB) and deletes the rest — ~260 MB off a mac build.
+- **`node-pty`** ships `prebuilds/<platform>-<arch>` for every target (the Windows prebuilds are ~28–30 MB each, dominated by `.pdb`). `pruneForeignNodePtyPrebuilds` keeps only the target prebuild and, on a `win32` target, also strips `.pdb` debug symbols from the kept prebuild (never loaded at runtime).
+
+Runtime resolution is platform-native (`ffprobe-static` resolves `bin/<os.platform()>/<os.arch()>`; node-pty loads `prebuilds/<process.platform>-<process.arch>`), so deleting foreign arches cannot affect resolution.
+
+**Hardening:**
+
+1. **Keep-then-verify** — both functions confirm the target binary/prebuild survives the prune; under `requireMatch` (packing for the host platform, including each mac arch) a missing target throws rather than shipping an empty binary dir. Only true cross-**platform** packs (never in CI) relax this to a warning.
+2. **Symlink guard** — directory entries are deleted only when `isDirectory() && !isSymbolicLink()`, so a symlinked entry is never deleted-through (same bar as the spawn-helper / ffprobe chmod code).
+3. **Universal-target safety** — a future `universal` mac target still prunes foreign *platforms* (it cannot narrow the arch), so the bundle is not re-bloated; `armv7l` is skipped.
+
+Test coverage: `scripts/fuses.test.mjs` (`pruneForeignFfprobeBinaries` / `pruneForeignNodePtyPrebuilds` describe blocks — target keep, universal-platform prune, `.pdb` strip, missing-dir skip, and the `requireMatch` throw/warn fork).
+
+---
+
 ## Fuse decisions
 
 | Fuse | Value | Reason |

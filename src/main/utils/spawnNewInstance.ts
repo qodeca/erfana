@@ -47,7 +47,7 @@ export interface SpawnConfig {
  * - Development: Uses `npm run dev` in the project root
  * - macOS production: Uses `open -n -a` to launch the .app bundle
  * - Windows production: Directly spawns the .exe
- * - Linux production: Uses AppImage path if available, otherwise the executable
+ * - Other platforms (dev only — Erfana ships macOS + Windows): spawns the executable directly
  *
  * @returns SpawnConfig object with command, args, and options
  *
@@ -121,16 +121,10 @@ export function getSpawnConfig(): SpawnConfig {
     }
   }
 
-  // Linux: Check for AppImage, otherwise use exe path
-  const appImagePath = process.env.APPIMAGE
-  const linuxExePath = appImagePath || exePath
-
-  if (appImagePath) {
-    logger.debug('Linux AppImage detected', { appImagePath })
-  }
-
+  // Other platforms (dev only — Erfana ships macOS + Windows): spawn the
+  // executable directly with the --new-window flag.
   return {
-    command: linuxExePath,
+    command: exePath,
     args: ['--new-window'],
     options: {
       detached: true,

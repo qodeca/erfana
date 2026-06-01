@@ -109,12 +109,5 @@ mac:
         - arm64
 dmg:
   artifactName: ${name}-${version}-${arch}.${ext}
-linux:
-  target:
-    - AppImage
-    - deb
-    - rpm
-  maintainer: electronjs.org
-  category: Utility
-appImage:
-  artifactName: ${name}-${version}.${ext}
+# Linux distribution target removed — Erfana ships on macOS + Windows only.
+# Linux remains supported as a dev environment (npm run dev) and CI test runner.

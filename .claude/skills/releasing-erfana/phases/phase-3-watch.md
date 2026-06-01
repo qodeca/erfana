@@ -1,6 +1,6 @@
 # Phase 3: Watch release.yml
 
-This phase polls the `release.yml` CI run started by the Phase 2 tag push. The pipeline takes 25–60 minutes wall-clock (Linux + Windows ~8 min each in parallel; macOS notarize is the long pole at 20–45 min). The skill **polls** rather than foreground-watches because the orchestrator's per-tool execution budget is bounded — `gh run watch` cannot span the full pipeline.
+This phase polls the `release.yml` CI run started by the Phase 2 tag push. The pipeline takes 25–60 minutes wall-clock (Windows ~8 min in parallel; macOS notarize is the long pole at 20–45 min). The skill **polls** rather than foreground-watches because the orchestrator's per-tool execution budget is bounded — `gh run watch` cannot span the full pipeline.
 
 **Pre-condition**: tag `v${VERSION}` exists on origin, dereferences to a commit on `main`, and that commit has a green `checks.yml` run (asserted by the workflow's `prepare` job).
 
