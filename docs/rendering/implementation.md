@@ -86,15 +86,16 @@ img: ({ src, alt, title, width, height, ...props }) => (
 
 ### Extending Schema
 ```typescript
-import deepmerge from 'deepmerge'
-
-const customSchema = deepmerge(defaultSchema, {
+// Build a new schema by spreading defaultSchema (no extra deps needed).
+const customSchema = {
+  ...defaultSchema,
   attributes: {
-    '*': ['style'],  // Allow styles
+    ...defaultSchema.attributes,
+    '*': [...(defaultSchema.attributes?.['*'] ?? []), 'style'],  // Allow styles
     div: ['data-custom']  // Custom attrs
   },
-  tagNames: [...defaultSchema.tagNames, 'button']
-})
+  tagNames: [...(defaultSchema.tagNames ?? []), 'button']
+}
 ```
 
 ⚠️ **Security Warning**: Review all schema changes carefully.

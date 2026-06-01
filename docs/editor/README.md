@@ -117,7 +117,7 @@ Real-time metrics in bottom status bar:
 
 ### Main Process Services (`src/main/services/`)
 - `PdfService.ts` - PDF generation via Electron's printToPDF
-- `DocxService.ts` - DOCX generation via `docx` library
+- `DocxService.ts` - DOCX generation via `@turbodocx/html-to-docx`
 
 ### Pure Logic (`src/renderer/src/components/Editor/`)
 - `markdownEditorPanel.logic.ts` - Pure functions (stats, scroll sync) - 591 lines, 83 tests

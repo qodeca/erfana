@@ -343,7 +343,7 @@ Markdown preview allows HTML rendering with strict sanitization:
 - `<img>` tags can load from HTTPS sources (Unsplash, CDNs, etc.)
 - HTTP images are blocked by CSP (security)
 - `data:` URI images are allowed – required by ImageViewerPanel (renders local images as base64 via `FileService.readFileAsBase64`) and DOCX export (SVG-to-PNG canvas pipeline in `svgToImage.ts`). The sandboxed renderer cannot access `file://` URLs, so base64 data URIs are the secure transport mechanism for local image data from the main process.
-- Dangerous tags/attributes sanitized by DOMPurify + rehype-sanitize
+- Dangerous tags/attributes sanitized by `rehype-sanitize` + `hast-util-sanitize` (allowlist schema); Mermaid sanitizes its own SVG output via its bundled DOMPurify. The app does not import DOMPurify directly.
 
 See [HTML Rendering](./rendering/README.md) for details.
 

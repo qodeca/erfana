@@ -487,7 +487,7 @@ DOCX generation from HTML content.
 ### Key Features
 - Word format export
 - Mermaid diagrams as high-resolution PNG
-- Uses `docx` npm package
+- Uses the `@turbodocx/html-to-docx` npm package
 
 ### Public Methods
 

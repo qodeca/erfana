@@ -10,7 +10,6 @@ npm run dev              # Start dev server
 npm run build            # Production build
 npm run build:mac        # macOS package (.dmg)
 npm run build:win        # Windows package (NSIS .exe; needs Developer Mode)
-npm run build:linux      # Linux package
 
 # Quality
 npm run typecheck        # Type checking (node + web)
