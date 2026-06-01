@@ -2,7 +2,9 @@
 
 An Electron-based project workspace focused on markdown editing, a project tree, and an integrated terminal.
 
-> **Version:** 0.10.0 ([changelog](docs/CHANGELOG.md) · [release notes](docs/release-notes/v0.10.0.md)) · **Documentation:** [docs/](docs/README.md) · **Architecture:** [docs/architecture.md](docs/architecture.md)
+> **Version:** 0.10.1 ([changelog](docs/CHANGELOG.md) · [release notes](docs/release-notes/v0.10.1.md)) · **Documentation:** [docs/](docs/README.md) · **Architecture:** [docs/architecture.md](docs/architecture.md)
+>
+> **v0.10.1 patch:** Restored dragging the divider between the editor and terminal panels — a regression introduced by v0.10.0's terminal-maximize feature. The sash highlighted on hover but could not be dragged. Added an end-to-end regression test (`e2e/terminal-resize.e2e.ts`) that performs a real mouse drag to guard against silent recurrence.
 >
 > **v0.10.0 highlights:** In-app AI prompts (Modify, Visualize, the three Mermaid prompts) now **deterministically apply changes to the document** instead of printing to the terminal — see [docs/prompts/README.md § Mutation prompts and the apply-to-document footer](docs/prompts/README.md#mutation-prompts-and-the-apply-to-document-footer). Terminal maximize over the editor (Cmd/Ctrl+Shift+M). Video transcription works in installed builds (per-architecture ffmpeg) with quieter logging.
 >
