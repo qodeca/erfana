@@ -1,6 +1,6 @@
-# Dependency Exclusions
+# Dependency exclusions
 
-**Last Updated**: December 2025 (v0.6.0)
+**Last verified**: 2026-06-03 against v0.11.2 (`electron-builder.yml:28-30`).
 
 This document explains which dependencies are excluded from production builds and why.
 
@@ -62,10 +62,11 @@ files:
 
 ## Benefits
 
-### Smaller App Size
+### Smaller app size
 
-- **Saved**: ~50 MB
-- **Total app size**: 172-179 MB (would be 222-229 MB without exclusions)
+- **Saved by these exclusions**: ~50 MB.
+- **Total app size**: figures below are from the v0.6.0 measurement and have not been re-measured against v0.11.2 (which dropped the macOS x64 + `.zip` + Windows portable artifacts; see `docs/CHANGELOG.md` v0.11.2). Re-measure on the next packaged build if a current figure is needed; the exclusions list itself is still correct.
+  - *v0.6.0 reference*: 172-179 MB (vs 222-229 MB without exclusions).
 
 ### Faster Builds
 
