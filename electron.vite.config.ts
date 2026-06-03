@@ -21,6 +21,14 @@ export default defineConfig({
     build: {
       externalizeDeps: false,
       rollupOptions: {
+        // Multi-entry preload (#164 lens-review F[6]): the main editor window
+        // loads `index.js`, while each per-display area-select overlay window
+        // loads `screenshotOverlay.js`. Splitting the surface area keeps the
+        // overlay-only IPC verbs out of the main renderer's bridge.
+        input: {
+          index: resolve('src/preload/index.ts'),
+          screenshotOverlay: resolve('src/preload/screenshotOverlay.ts')
+        },
         output: {
           format: 'cjs'
         }

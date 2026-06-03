@@ -10,7 +10,10 @@ import type { LockResult, LockStatus } from '../shared/ipc/project-lock-schema'
 import type {
   ScreenshotCaptureRequest,
   ScreenshotCaptureResponse,
-  GetDisplaysResponse
+  GetDisplaysResponse,
+  EnumerateWindowsRequest,
+  EnumerateWindowsResponse,
+  ScreenshotCapabilities
 } from '../shared/ipc/screenshot-schema'
 import type {
   CameraSaveRequest,
@@ -385,15 +388,23 @@ const api = {
     isAvailable: (terminalId?: string): Promise<{ success: boolean; available: boolean; initialized?: boolean }> =>
       ipcRenderer.invoke('terminal:isAvailable', terminalId),
 
-    // Create terminal
+    /**
+     * Create a terminal. The response includes `shellKind` so the renderer
+     * can quote pasted paths correctly without a follow-up IPC round-trip
+     * (#164 round-2 F#1).
+     */
     create: (config?: {
       shell?: string
       cwd?: string
       env?: Record<string, string>
       cols?: number
       rows?: number
-    }): Promise<{ success: boolean; terminalId?: string; error?: string }> =>
-      ipcRenderer.invoke('terminal:create', config),
+    }): Promise<{
+      success: boolean
+      terminalId?: string
+      shellKind?: 'posix' | 'cmd' | 'powershell'
+      error?: string
+    }> => ipcRenderer.invoke('terminal:create', config),
 
     // Write to terminal
     write: (terminalId: string, data: string): Promise<{ success: boolean; error?: string }> =>
@@ -582,29 +593,58 @@ const api = {
   },
 
   /**
-   * Screenshot capture operations (macOS only)
+   * Screenshot capture operations.
+   *
+   * Cross-platform as of #164: macOS uses the native screencapture binary,
+   * Windows + Linux fallback use Electron's desktopCapturer + an in-app
+   * area-select overlay window.
    *
    * Captures screen, window, or selected area and saves to temp directory.
-   * @see Issue #86 - Screenshot capture buttons for terminal panel
+   * @see Issue #86 - original macOS screenshot capture
+   * @see Issue #164 - Windows Phase 3 parity
    */
   screenshot: {
     /**
-     * Get available displays for multi-monitor support
+     * Get available displays for multi-monitor support.
      *
-     * @returns Array of display information (id, label, isPrimary, bounds)
-     * @see Issue #86 enhancement - multi-monitor support
+     * @returns Array of display information (id, label, isPrimary, bounds).
      */
     getDisplays: (): Promise<GetDisplaysResponse> =>
       ipcRenderer.invoke('screenshot:getDisplays'),
 
     /**
-     * Capture a screenshot
+     * Enumerate capturable windows for the in-app picker dialog.
      *
-     * @param request - { mode: 'screen' | 'window' | 'area', displayId?: number }
-     * @returns Capture result with file path or error
+     * On macOS this returns an empty list (`screencapture -iw` handles the
+     * picker natively). On Windows / Linux it returns one entry per visible
+     * window with a thumbnail data URL.
+     */
+    enumerateWindows: (request?: EnumerateWindowsRequest): Promise<EnumerateWindowsResponse> =>
+      ipcRenderer.invoke('screenshot:enumerateWindows', request),
+
+    /**
+     * Capture a screenshot.
+     *
+     * @param request - `{ mode, displayId?, windowId? }`
+     * @returns Capture result with file path or error.
      */
     capture: (request: ScreenshotCaptureRequest): Promise<ScreenshotCaptureResponse> =>
-      ipcRenderer.invoke('screenshot:capture', request)
+      ipcRenderer.invoke('screenshot:capture', request),
+
+    /**
+     * Describe what the running platform can do (#164 lens-review F[31]).
+     * The renderer hook calls this on mount instead of branching on
+     * `getPlatform()` so platform routing stays single-sourced in main.
+     */
+    getCapabilities: (): Promise<ScreenshotCapabilities> =>
+      ipcRenderer.invoke('screenshot:getCapabilities')
+
+    // Note (#164 lens-review F[6]): the overlay-only verbs
+    // (`areaSelected` / `areaCancelled`) are intentionally NOT exposed here.
+    // They live in `src/preload/screenshotOverlay.ts`, which is loaded only
+    // by the per-display area-select overlay BrowserWindows. Exposing them
+    // to every renderer would let any compromised window forge a selection
+    // or DoS an active capture.
   },
 
   /**

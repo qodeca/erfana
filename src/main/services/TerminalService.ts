@@ -9,6 +9,7 @@ import { EventEmitter } from 'events'
 import { existsSync } from 'fs'
 import { homedir, platform as osPlatform } from 'os'
 import type { IPty } from 'node-pty'
+import type { ShellKind } from '../../shared/shellKind'
 import { logger } from './LoggingService'
 import {
   buildWindowsBootstrap,
@@ -50,6 +51,7 @@ interface TerminalInstance {
   clearFallbackTimeout?: NodeJS.Timeout // Safety timeout for clear confirmation
   hasReceivedMarker: boolean // Track if marker was detected (prevents late data forwarding)
   webContentsId: number // Track owning webContents for cleanup on window close
+  shellKind: ShellKind // Quoting flavour resolved at create time (#164)
 }
 
 /**
@@ -126,11 +128,20 @@ export class TerminalService extends EventEmitter {
   }
 
   /**
-   * Create a new terminal instance
+   * Create a new terminal instance.
+   *
+   * Returns the new terminal id alongside the resolved {@link ShellKind} so
+   * the renderer can quote pasted paths correctly without a follow-up IPC
+   * round-trip (#164 round-2 F#1). Returns `null` if node-pty is unavailable
+   * or the cwd fails validation.
+   *
    * @param config - Terminal configuration
    * @param webContentsId - ID of the webContents that owns this terminal (for cleanup on window close)
    */
-  async createTerminal(config: TerminalConfig = {}, webContentsId?: number): Promise<string | null> {
+  async createTerminal(
+    config: TerminalConfig = {},
+    webContentsId?: number
+  ): Promise<{ terminalId: string; shellKind: ShellKind } | null> {
     if (!pty) {
       try {
         pty = await import('node-pty')
@@ -160,6 +171,10 @@ export class TerminalService extends EventEmitter {
       // Build bootstrap script that verifies CWD non-interactively, then execs into interactive shell
       // This prevents TTY echo of verification commands (no interactive input = no echo)
       const shellArgs: string[] = []
+      // `shellKind` is recorded on the TerminalInstance AND returned to the
+      // renderer via the create response so renderer-side path-quoting can
+      // pick the right flavour per terminal (#164 round-2 F#1).
+      let shellKind: ShellKind = 'posix'
 
       if (osPlatform() === 'win32') {
         // Validate + normalize the cwd, then dispatch to a registered
@@ -172,13 +187,14 @@ export class TerminalService extends EventEmitter {
           return null
         }
         const winCwd = normalizeWindowsCwd(cwd)
-        const { kind, shellArgs: winShellArgs } = buildWindowsBootstrap({
+        const { kind, shellKind: winShellKind, shellArgs: winShellArgs } = buildWindowsBootstrap({
           shell,
           cwd: winCwd,
           marker
         })
-        logger.info(`🔵 Windows shell kind: ${kind}`)
+        logger.info(`🔵 Windows shell kind: ${kind} (quoting=${winShellKind})`)
         shellArgs.push(...winShellArgs)
+        shellKind = winShellKind
       } else {
         // POSIX bootstrap. We use a single-quoted argument so `$`, backtick,
         // backslash and other shell metacharacters in the cwd are inert.
@@ -234,7 +250,8 @@ export class TerminalService extends EventEmitter {
         // Track owning webContents for cleanup on window close (issue #59)
         // Sentinel value -1 means "no owner" - terminals with -1 won't be cleaned up
         // during window destruction (used in tests and manual terminal creation)
-        webContentsId: webContentsId ?? -1
+        webContentsId: webContentsId ?? -1,
+        shellKind
       }
 
       this.terminals.set(terminalId, terminal)
@@ -313,7 +330,7 @@ export class TerminalService extends EventEmitter {
       })
 
       logger.info(`✅ Terminal ${terminalId} created (bootstrap pattern - no interactive echo)`)
-      return terminalId
+      return { terminalId, shellKind }
     } catch (error) {
       logger.error(`❌ Failed to create terminal`, error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)

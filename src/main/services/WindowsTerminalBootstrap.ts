@@ -13,7 +13,14 @@
  * `shellArgs` array such that, when the spawned shell runs, the FIRST line
  * before the marker (after splitting on `\r?\n` and filtering empty lines)
  * is the actual current working directory.
+ *
+ * Each builder also carries the `ShellKind` that its dispatched shell
+ * speaks, so callers (notably `TerminalService.createTerminal`) can plumb
+ * the kind into renderer-side path quoting without a fragile string
+ * mapping (#164 round-2 F#1).
  */
+
+import type { ShellKind } from '../../shared/shellKind'
 
 /**
  * Characters forbidden in Windows cwds. `"` is the only character that can
@@ -66,6 +73,13 @@ export function normalizeWindowsCwd(cwd: string): string {
 }
 
 /**
+ * Stable identifier per builder (#164 round-2 F#28). A typed literal union
+ * instead of `string` so a `switch` on `kind` is exhaustively typechecked
+ * and a future builder can't ship without updating downstream call sites.
+ */
+export type WindowsBootstrapKind = 'powershell' | 'git-bash' | 'cmd.exe'
+
+/**
  * Strategy interface for building a node-pty `shellArgs` array for a
  * particular Windows shell kind. Implementations are walked in order; the
  * first one whose `canHandle(shell)` returns `true` is used. The dispatch
@@ -75,7 +89,14 @@ export interface WindowsBootstrapBuilder {
   /**
    * Stable identifier for logging / diagnostics. Not user-visible.
    */
-  readonly kind: string
+  readonly kind: WindowsBootstrapKind
+
+  /**
+   * Quoting flavour the builder's spawned shell speaks. Surfaced through
+   * `buildWindowsBootstrap` and recorded on each `TerminalInstance` so the
+   * renderer can quote pasted paths correctly (#164 round-2 F#1).
+   */
+  readonly shellKind: ShellKind
 
   /**
    * Returns `true` iff this builder should handle the given shell path.
@@ -108,7 +129,8 @@ export interface WindowsBootstrapBuilder {
  * - `& '<shell>' -NoLogo` starts the interactive PowerShell session.
  */
 export class PowerShellBootstrapBuilder implements WindowsBootstrapBuilder {
-  readonly kind = 'powershell'
+  readonly kind = 'powershell' as const
+  readonly shellKind: ShellKind = 'powershell'
 
   // Match `pwsh.exe`, `pwsh-preview.exe`, or `powershell.exe` after a path
   // separator (forward slash for Git Bash $SHELL, backslash for native
@@ -149,7 +171,8 @@ export class PowerShellBootstrapBuilder implements WindowsBootstrapBuilder {
  * node-pty spawns `bash -c '<script>'`, `$SHELL` is not reliably set yet.
  */
 export class GitBashBootstrapBuilder implements WindowsBootstrapBuilder {
-  readonly kind = 'git-bash'
+  readonly kind = 'git-bash' as const
+  readonly shellKind: ShellKind = 'posix'
 
   // Match `bash.exe` (or bare `bash`) after a path separator. Both native
   // Windows backslashes and POSIX forward slashes are accepted so a $SHELL
@@ -210,7 +233,8 @@ export class GitBashBootstrapBuilder implements WindowsBootstrapBuilder {
  * `docs/windows/implementation-plan.md`.
  */
 export class CmdExeBootstrapBuilder implements WindowsBootstrapBuilder {
-  readonly kind = 'cmd.exe'
+  readonly kind = 'cmd.exe' as const
+  readonly shellKind: ShellKind = 'cmd'
 
   canHandle(_shell: string): boolean {
     return true
@@ -235,7 +259,8 @@ export const DEFAULT_WINDOWS_BOOTSTRAP_BUILDERS: ReadonlyArray<WindowsBootstrapB
 
 /**
  * Walk the dispatch chain and build `shellArgs` for the first builder that
- * accepts the given shell.
+ * accepts the given shell. Returns both the diagnostic `kind` and the
+ * `shellKind` quoting flavour the resulting PTY will speak (#164 round-2 F#1).
  *
  * @throws if no builder matches – this only happens if the chain is
  *         misconfigured (no catch-all at the end).
@@ -243,10 +268,14 @@ export const DEFAULT_WINDOWS_BOOTSTRAP_BUILDERS: ReadonlyArray<WindowsBootstrapB
 export function buildWindowsBootstrap(
   args: { shell: string; cwd: string; marker: string },
   builders: ReadonlyArray<WindowsBootstrapBuilder> = DEFAULT_WINDOWS_BOOTSTRAP_BUILDERS
-): { kind: string; shellArgs: string[] } {
+): { kind: WindowsBootstrapKind; shellKind: ShellKind; shellArgs: string[] } {
   for (const builder of builders) {
     if (builder.canHandle(args.shell)) {
-      return { kind: builder.kind, shellArgs: builder.build(args) }
+      return {
+        kind: builder.kind,
+        shellKind: builder.shellKind,
+        shellArgs: builder.build(args)
+      }
     }
   }
   throw new Error(

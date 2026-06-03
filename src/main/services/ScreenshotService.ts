@@ -1,264 +1,144 @@
-import { execFile } from 'child_process'
-import { screen } from 'electron'
-import { access } from 'fs/promises'
-import { tmpdir } from 'os'
-import { join } from 'path'
-import { SCREENSHOT } from '../../shared/constants'
-import { ErrorCode } from '../../shared/errors'
-import type { ScreenshotMode, ScreenshotCaptureResponse, DisplayInfo } from '../../shared/ipc/screenshot-schema'
-import { logger } from './LoggingService'
-
-/**
- * Screenshot Service Interface
- *
- * Defines the public API for screenshot capture functionality.
- * Follows the interface pattern established by PdfService and DocxService.
- *
- * @see Issue #86 - screenshot capture for terminal panel
- */
-interface IScreenshotService {
-  /**
-   * Get all available displays for multi-monitor support
-   */
-  getDisplays(): DisplayInfo[]
-
-  /**
-   * Capture a screenshot using macOS screencapture
-   *
-   * @param mode - Capture mode: 'screen', 'window', or 'area'
-   * @param displayId - Optional display ID for 'screen' mode
-   */
-  capture(mode: ScreenshotMode, displayId?: number): Promise<ScreenshotCaptureResponse>
-}
-
 /**
  * Screenshot Service
  *
- * Handles screenshot capture using macOS screencapture command.
- * Supports three capture modes: screen, window, and area selection.
+ * Thin dispatcher: picks a platform-appropriate `IScreenshotCapturer` at
+ * construction time and routes every method through it. The interesting
+ * code lives in `screenshot/MacScreenshotCapturer` (native /usr/sbin/screencapture)
+ * and `screenshot/DesktopCapturerScreenshotCapturer` (Electron desktopCapturer
+ * + overlay window for area selection).
  *
- * Security considerations:
- * - Uses execFile (not exec!) to prevent command injection
- * - Uses absolute path to screencapture binary
- * - Only available on macOS
+ * Platform routing (#164 Phase 3):
+ * - `darwin` → MacScreenshotCapturer (preserves the polished native UX)
+ * - `win32` → DesktopCapturerScreenshotCapturer
+ * - other → `UnsupportedCapturer` (Linux has been dropped from Erfana per
+ *   CHANGELOG v0.11.2; macOS x64 was retired in v0.11.2).
  *
- * @see Issue #86 - screenshot capture for terminal panel
+ * Use `createScreenshotService(capturer?)` instead of the previous module-eval
+ * singleton so:
+ * - Tests inject a stub `IScreenshotCapturer` without `vi.mock('process')`.
+ * - The IPC handler registration accepts the service as a parameter, matching
+ *   the project's `register*Handlers(service?)` convention (cf. `registerProjectLockHandlers`).
+ *
+ * @see Issue #86 - original macOS implementation
+ * @see Issue #164 - Windows Phase 3 parity
+ * @see Issue #164 lens-review F[8], F[10], F[16], F[31] - Phase 3 refactor
  */
-class ScreenshotService implements IScreenshotService {
-  /**
-   * Delay before checking if file exists (filesystem sync)
-   */
-  private static readonly FILE_CHECK_DELAY_MS = 50
 
-  /**
-   * Get all available displays for multi-monitor support
-   *
-   * @returns Array of display information
-   * @see Issue #86 enhancement - multi-monitor support
-   */
-  getDisplays(): DisplayInfo[] {
-    const displays = screen.getAllDisplays()
-    const primaryId = screen.getPrimaryDisplay().id
+import { ErrorCode } from '../../shared/errors'
+import { WINDOW_PICKER } from '../../shared/constants'
+import type {
+  DisplayInfo,
+  EnumerateWindowsRequest,
+  EnumerateWindowsResponse,
+  ScreenshotCapabilities,
+  ScreenshotCaptureRequest,
+  ScreenshotCaptureResponse,
+  WindowSource
+} from '../../shared/ipc/screenshot-schema'
+import { DesktopCapturerScreenshotCapturer } from './screenshot/DesktopCapturerScreenshotCapturer'
+import { MacScreenshotCapturer } from './screenshot/MacScreenshotCapturer'
+import { listDisplays } from './screenshot/sharedHelpers'
+import type { IScreenshotCapturer } from './screenshot/types'
 
-    return displays.map((display, index) => ({
-      id: display.id,
-      label: display.label || `Display ${index + 1}`,
-      isPrimary: display.id === primaryId,
-      bounds: display.bounds
-    }))
+/**
+ * Sentinel capturer used on unsupported platforms (Linux, and anything else
+ * that isn't darwin or win32). Every method short-circuits with
+ * `SCREENSHOT_NOT_SUPPORTED` so the renderer cannot accidentally invoke a
+ * capture that can never succeed (#164 F[16]).
+ */
+class UnsupportedCapturer implements IScreenshotCapturer {
+  getCapabilities(): ScreenshotCapabilities {
+    return { supported: false, hasNativeWindowPicker: false, areaCaptureMode: 'unsupported' }
   }
-
-  /**
-   * Capture a screenshot using macOS screencapture
-   *
-   * @param mode - Capture mode: 'screen', 'window', or 'area'
-   * @param displayId - Optional display ID for 'screen' mode (maps to -D flag)
-   * @returns Capture result with file path or error
-   */
-  async capture(mode: ScreenshotMode, displayId?: number): Promise<ScreenshotCaptureResponse> {
-    // Check platform
-    if (process.platform !== 'darwin') {
-      return {
-        success: false,
-        error: 'Screenshot capture is only available on macOS',
-        errorCode: ErrorCode.SCREENSHOT_NOT_SUPPORTED
-      }
-    }
-
-    // Generate temp file path with timestamp
-    const filePath = join(
-      tmpdir(),
-      `${SCREENSHOT.TEMP_PREFIX}${Date.now()}${SCREENSHOT.FILE_EXTENSION}`
-    )
-
-    // Build args based on mode (and optional displayId for screen mode)
-    const args = this.buildArgs(mode, filePath, displayId)
-
-    logger.debug('Starting screenshot capture', { mode, filePath })
-
-    try {
-      await this.executeCapture(args)
-
-      // Wait for filesystem sync
-      await this.sleep(ScreenshotService.FILE_CHECK_DELAY_MS)
-
-      // Check if file exists (user may have cancelled)
-      const exists = await this.fileExists(filePath)
-      if (!exists) {
-        logger.debug('Screenshot cancelled - file not created')
-        return {
-          success: false,
-          errorCode: ErrorCode.SCREENSHOT_CANCELLED
-        }
-      }
-
-      logger.info('Screenshot captured successfully', { filePath })
-      return {
-        success: true,
-        filePath
-      }
-    } catch (error) {
-      return this.handleError(error)
-    }
+  async enumerateWindowsRaw(): Promise<WindowSource[]> {
+    return []
   }
-
-  /**
-   * Build command arguments based on capture mode
-   *
-   * @param mode - Capture mode
-   * @param filePath - Output file path
-   * @param displayId - Optional display ID for screen mode (maps to -D flag)
-   * @returns Array of command arguments
-   */
-  private buildArgs(mode: ScreenshotMode, filePath: string, displayId?: number): string[] {
-    // -x: No sound
-    // -o: In window mode, exclude window shadow
-    // -i: Interactive mode (enables window/area selection)
-    // -w: Window capture mode (with -i)
-    // -s: Selection mode (with -i) - this is the default for -i, so we omit it for area
-    // -D: Display number (1-based index for screencapture)
-
-    // For screen mode with specific display
-    if (mode === 'screen' && displayId !== undefined) {
-      // Need to find display index (1-based for screencapture -D flag)
-      const displays = screen.getAllDisplays()
-      const displayIndex = displays.findIndex((d) => d.id === displayId) + 1
-      if (displayIndex > 0) {
-        return ['-x', '-D', String(displayIndex), filePath]
-      }
-      // Fall through to default screen capture if display not found
-    }
-
-    switch (mode) {
-      case 'screen':
-        // Capture primary display silently
-        return ['-x', filePath]
-      case 'window':
-        // Interactive window selection (space to toggle window mode)
-        return ['-x', '-o', '-i', '-w', filePath]
-      case 'area':
-        // Interactive area selection (draw rectangle)
-        return ['-x', '-i', '-s', filePath]
-    }
-  }
-
-  /**
-   * Execute screencapture command
-   *
-   * @param args - Command arguments
-   * @returns Promise that resolves when capture completes
-   */
-  private executeCapture(args: string[]): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const child = execFile(
-        SCREENSHOT.BINARY_PATH,
-        args,
-        { timeout: SCREENSHOT.TIMEOUT_MS },
-        (error, _stdout, stderr) => {
-          if (error) {
-            // Exit code 1 can mean cancelled OR permission denied
-            // We check file existence later to distinguish
-            if (error.killed) {
-              reject(new Error('timeout'))
-            } else if (stderr.includes('cannot capture')) {
-              reject(new Error('permission_denied'))
-            } else if (error.code === 1) {
-              // Exit code 1 is ambiguous - could be cancelled or error
-              // Resolve and let file existence check handle it
-              resolve()
-            } else {
-              reject(error)
-            }
-          } else {
-            resolve()
-          }
-        }
-      )
-
-      // Handle process errors
-      child.on('error', (err) => {
-        reject(err)
-      })
-    })
-  }
-
-  /**
-   * Check if file exists
-   *
-   * @param filePath - Path to check
-   * @returns true if file exists
-   */
-  private async fileExists(filePath: string): Promise<boolean> {
-    try {
-      await access(filePath)
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  /**
-   * Handle capture errors and return appropriate response
-   *
-   * @param error - Error from capture attempt
-   * @returns Error response with appropriate code
-   */
-  private handleError(error: unknown): ScreenshotCaptureResponse {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-
-    if (errorMessage === 'timeout') {
-      logger.warn('Screenshot capture timed out')
-      return {
-        success: false,
-        error: 'Screenshot capture timed out',
-        errorCode: ErrorCode.SCREENSHOT_TIMEOUT
-      }
-    }
-
-    if (errorMessage === 'permission_denied') {
-      logger.warn('Screenshot permission denied')
-      return {
-        success: false,
-        error: 'Screen recording permission required',
-        errorCode: ErrorCode.SCREENSHOT_PERMISSION_DENIED
-      }
-    }
-
-    logger.error('Screenshot capture failed', error instanceof Error ? error : undefined)
+  async capture(_request: ScreenshotCaptureRequest): Promise<ScreenshotCaptureResponse> {
     return {
       success: false,
-      error: errorMessage,
-      errorCode: ErrorCode.SCREENSHOT_FAILED
+      error: 'Screenshot capture is not supported on this platform',
+      errorCode: ErrorCode.SCREENSHOT_NOT_SUPPORTED
     }
-  }
-
-  /**
-   * Sleep for specified milliseconds
-   */
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms))
   }
 }
 
-// Singleton instance
-export const screenshotService = new ScreenshotService()
+export interface IScreenshotService {
+  getDisplays(): DisplayInfo[]
+  getCapabilities(): ScreenshotCapabilities
+  enumerateWindows(options?: EnumerateWindowsRequest): Promise<EnumerateWindowsResponse>
+  capture(request: ScreenshotCaptureRequest): Promise<ScreenshotCaptureResponse>
+}
+
+class ScreenshotService implements IScreenshotService {
+  constructor(private readonly capturer: IScreenshotCapturer) {}
+
+  getDisplays(): DisplayInfo[] {
+    return listDisplays()
+  }
+
+  /**
+   * Delegates straight to the capturer (#164 round-2 F#6). Pre-round-2 this
+   * called a separate `computeCapabilities(process.platform)` which made
+   * `process.platform` reachable from two code paths (here and `pickCapturer`).
+   * Now the capturer owns its own capability description; the factory is the
+   * only platform-routing site.
+   */
+  getCapabilities(): ScreenshotCapabilities {
+    return this.capturer.getCapabilities()
+  }
+
+  /**
+   * Apply pagination, the `includeThumbnails` opt-out, and the
+   * availability discriminator at the service layer (#164 round-2 F#8).
+   * Capturers stay focused on producing the raw list; policy lives here.
+   */
+  async enumerateWindows(options?: EnumerateWindowsRequest): Promise<EnumerateWindowsResponse> {
+    const capabilities = this.capturer.getCapabilities()
+    if (!capabilities.supported) {
+      return { availability: 'unsupported', sources: [], truncated: false }
+    }
+    if (capabilities.hasNativeWindowPicker) {
+      // macOS — `screencapture -iw` handles selection inside the binary.
+      return { availability: 'native-picker', sources: [], truncated: false }
+    }
+
+    const includeThumbnails = options?.includeThumbnails ?? true
+    const cap = options?.maxSources ?? WINDOW_PICKER.MAX_SOURCES
+
+    const raw = await this.capturer.enumerateWindowsRaw()
+    const truncated = raw.length > cap
+    const limited = truncated ? raw.slice(0, cap) : raw
+    const sources = includeThumbnails
+      ? limited
+      : limited.map((s) => ({ ...s, thumbnailDataUrl: '' }))
+
+    return { availability: 'enumerable', sources, truncated }
+  }
+
+  capture(request: ScreenshotCaptureRequest): Promise<ScreenshotCaptureResponse> {
+    return this.capturer.capture(request)
+  }
+}
+
+/**
+ * Pick the right capturer for the running platform. Exported separately so
+ * tests can inspect the choice without re-implementing the switch.
+ */
+export function pickCapturer(platform: NodeJS.Platform): IScreenshotCapturer {
+  if (platform === 'darwin') return new MacScreenshotCapturer()
+  if (platform === 'win32') return new DesktopCapturerScreenshotCapturer()
+  return new UnsupportedCapturer()
+}
+
+/**
+ * Factory: build a service either with an explicit capturer (tests) or by
+ * picking based on `process.platform` (production).
+ *
+ * Replaces the module-eval singleton that previously froze the platform
+ * choice at import time (#164 F[8]).
+ */
+export function createScreenshotService(capturer?: IScreenshotCapturer): IScreenshotService {
+  return new ScreenshotService(capturer ?? pickCapturer(process.platform))
+}
+
+export { ScreenshotService }

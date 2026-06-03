@@ -7,14 +7,20 @@
  * @module TerminalPanel/types
  */
 
-// Re-export DisplayInfo from shared schema for screenshot functionality
-export type { DisplayInfo } from '../../../../../shared/ipc/screenshot-schema'
+// Re-export DisplayInfo + WindowSource from shared schema for screenshot functionality
+export type {
+  DisplayInfo,
+  WindowSource
+} from '../../../../../shared/ipc/screenshot-schema'
 
 /**
- * Screenshot capture mode for macOS screen recording.
- * - 'screen': Full screen capture
- * - 'window': Single window capture
- * - 'area': User-selected area capture
+ * Screenshot capture mode.
+ *
+ * Was macOS-only at #86; #164 generalised to cross-platform
+ * (`darwin` + `win32` + Linux fallback). Behaviour per mode:
+ * - 'screen': full display capture (with optional display picker for multi-monitor)
+ * - 'window': single window capture (in-app picker on Windows / Linux, native picker on macOS)
+ * - 'area': user-selected rectangle (native screencapture on macOS, overlay window otherwise)
  */
 export type ScreenshotCaptureMode = 'screen' | 'window' | 'area'
 

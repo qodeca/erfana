@@ -187,20 +187,49 @@ export const DOCX_EXPORT = {
 
 /**
  * Screenshot capture constants
- * Used by ScreenshotService for macOS screencapture
  *
- * @see ScreenshotService.ts
- * @see Issue #86 - screenshot capture for terminal panel
+ * Used by the macOS capturer (native screencapture binary) and the
+ * cross-platform desktopCapturer capturer (Windows / fallback).
+ *
+ * @see Issue #86 - initial macOS screenshot capture
+ * @see Issue #164 - Windows Phase 3 parity (desktopCapturer + overlay)
  */
 export const SCREENSHOT = {
-  /** Timeout for screencapture command in ms */
+  /** Timeout for the macOS screencapture command in ms */
   TIMEOUT_MS: 30_000,
   /** Prefix for temp file names */
   TEMP_PREFIX: 'erfana-screenshot-',
   /** File extension for screenshots */
   FILE_EXTENSION: '.png',
   /** Path to macOS screencapture binary */
-  BINARY_PATH: '/usr/sbin/screencapture'
+  BINARY_PATH: '/usr/sbin/screencapture',
+  /** Delay before checking if the screencapture file was created (filesystem sync) */
+  FILE_CHECK_DELAY_MS: 50,
+  /** Timeout for area-selection overlay (user inactivity) in ms */
+  OVERLAY_TIMEOUT_MS: 60_000
+} as const
+
+/**
+ * Window-picker thumbnail constraints for the cross-platform window-capture flow.
+ *
+ * The thumbnails are produced by Electron's `desktopCapturer.getSources({thumbnailSize})`
+ * call and sent across IPC as `data:image/png;base64,...` URLs. Keeping the size
+ * bounded keeps the IPC payload modest (a 320x180 PNG is ~30 KB; ten windows ≈ 300 KB).
+ *
+ * @see Issue #164 - window-picker modal
+ */
+export const WINDOW_PICKER = {
+  THUMB_WIDTH: 320,
+  THUMB_HEIGHT: 180,
+  /**
+   * Soft cap on the number of capturable windows the picker enumerates per
+   * round. A session with a busy desktop (browser windows + Slack + Teams +
+   * IDE per project) can produce 30–60 sources; at ~30 KB per data URL
+   * that's a meaningful IPC payload. 64 covers every reasonable session
+   * with margin; anything beyond is returned with `truncated: true` so
+   * the renderer can hint that the list was clipped (#164 lens-review F[11]).
+   */
+  MAX_SOURCES: 64
 } as const
 
 /**

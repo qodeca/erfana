@@ -99,7 +99,8 @@ describe('TerminalPanel scroll position preservation', () => {
         isAvailable: vi.fn().mockResolvedValue({ success: true, available: true }),
         create: vi.fn().mockResolvedValue({
           success: true,
-          terminalId: 'test-terminal-1'
+          terminalId: 'test-terminal-1',
+          shellKind: 'posix'
         }),
         write: vi.fn(),
         resize: vi.fn(),
@@ -115,6 +116,8 @@ describe('TerminalPanel scroll position preservation', () => {
           return vi.fn() // unsubscribe function
         }),
         markClearComplete: vi.fn()
+        // #164 round-2 F#1: `terminal:getShellKind` was deleted; `shellKind`
+        // ships with the `terminal:create` response (see `create` above).
       },
       file: {
         getProjectPath: vi.fn().mockResolvedValue('/test/project'),
@@ -126,7 +129,13 @@ describe('TerminalPanel scroll position preservation', () => {
       },
       screenshot: {
         getDisplays: vi.fn().mockResolvedValue({ displays: [] }),
-        capture: vi.fn().mockResolvedValue({ success: true, filePath: '/tmp/screenshot.png' })
+        enumerateWindows: vi.fn().mockResolvedValue({ sources: [], truncated: false, availability: 'native-picker' }),
+        capture: vi.fn().mockResolvedValue({ success: true, filePath: '/tmp/screenshot.png' }),
+        getCapabilities: vi.fn().mockResolvedValue({
+          supported: true,
+          hasNativeWindowPicker: true,
+          areaCaptureMode: 'native'
+        })
       }
     }
   })

@@ -8,17 +8,17 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 ## Status snapshot
 
-*Last updated 2026-06-03, anchored on v0.11.2 (Windows NSIS installer + macOS arm64 DMG).*
+*Last updated 2026-06-03, anchored on v0.11.2 (Windows NSIS installer + macOS arm64 DMG). Phase 3 implementation now in flight on `feature/windows-phase-3-screenshots`.*
 
 **Current state:** Phases 0, 1, 2 shipped to `develop` in **v0.9.3** (merge `c1e085d`, release `0b593a1`, tag `v0.9.3` on 2026-04-22). **Phase 4 (local Whisper parity, [#165](https://github.com/qodeca/erfana/issues/165)) shipped in [v0.9.4](https://github.com/qodeca/erfana/releases/tag/v0.9.4)** (merge `110f1b9`, tag 2026-04-23) — see the Phase 4 section below and [`docs/build/whisper-binaries.md`](../build/whisper-binaries.md). In parallel, the Windows-host test-flake remediation pool ([#172](https://github.com/qodeca/erfana/issues/172)) + ThrottledWorker offset-deque refactor ([#173](https://github.com/qodeca/erfana/issues/173)) shipped the same day (`c3cc005`).
 
-Since v0.9.4 the project has shipped five non-Windows-phase releases without advancing the Windows roadmap: **v0.9.5** (multi-platform signed release pipeline via [#174](https://github.com/qodeca/erfana/issues/174) — Azure Artifact Signing for Windows, macOS notarization; SmartScreen reputation tracked in [#177](https://github.com/qodeca/erfana/issues/177)), **v0.9.6** (`spawn-helper` `chmod 0755` fix in `afterPack`), **v0.10.0–v0.10.1** (apply-to-document footer for mutation prompts, 22-diagram Visualize, terminal expand), and **v0.11.0–v0.11.2** (Linux distribution discontinued via [#206](https://github.com/qodeca/erfana/pull/206); macOS now arm64-only; clipboard service via [#203](https://github.com/qodeca/erfana/issues/203); chokidar v3 pin against FD exhaustion in `1139bf2`). Phase 3 (screenshot parity, [#164](https://github.com/qodeca/erfana/issues/164)) is still the next unstarted phase. Phase 5 (#166) is now narrowed to NSIS UX only — auto-updater and Windows signing both shipped via #174 in v0.9.5. Phase 6 (#167) work continues on `feature/windows-phase-6-*` branches off `develop`.
+Since v0.9.4 the project has shipped five non-Windows-phase releases without advancing the Windows roadmap: **v0.9.5** (multi-platform signed release pipeline via [#174](https://github.com/qodeca/erfana/issues/174) — Azure Artifact Signing for Windows, macOS notarization; SmartScreen reputation tracked in [#177](https://github.com/qodeca/erfana/issues/177)), **v0.9.6** (`spawn-helper` `chmod 0755` fix in `afterPack`), **v0.10.0–v0.10.1** (apply-to-document footer for mutation prompts, 22-diagram Visualize, terminal expand), and **v0.11.0–v0.11.2** (Linux distribution discontinued via [#206](https://github.com/qodeca/erfana/pull/206); macOS now arm64-only; clipboard service via [#203](https://github.com/qodeca/erfana/issues/203); chokidar v3 pin against FD exhaustion in `1139bf2`). **Phase 3 (screenshot parity, [#164](https://github.com/qodeca/erfana/issues/164))** is now implemented on `feature/windows-phase-3-screenshots`: `ScreenshotService` became a thin dispatcher selecting `MacScreenshotCapturer` (existing `screencapture` flow) or `DesktopCapturerScreenshotCapturer` (new — Electron `desktopCapturer` + `nativeImage` + an in-app `ScreenshotOverlayWindow` for area selection), and the renderer hook + UI gate were renamed from `isMacOS` → `isScreenshotSupported`. Branch pending merge + UAT verification on Windows. Phase 5 (#166) remains narrowed to NSIS UX only — auto-updater and Windows signing both shipped via #174 in v0.9.5. Phase 6 (#167) work continues on `feature/windows-phase-6-*` branches off `develop`.
 
 **Phase issue state (canonical, refreshed 2026-06-03):**
 
 | Phase | Issue | State | Notes |
 |---|---|---|---|
-| 3 | [#164](https://github.com/qodeca/erfana/issues/164) | OPEN, unstarted | `ScreenshotService.ts:80` still throws on non-darwin |
+| 3 | [#164](https://github.com/qodeca/erfana/issues/164) | OPEN, branch in flight | strategy pattern landed on `feature/windows-phase-3-screenshots`; UAT + merge pending |
 | 4 | [#165](https://github.com/qodeca/erfana/issues/165) | Shipped v0.9.4 (`110f1b9`) | Issue closure pending in alignment pass |
 | 5 | [#166](https://github.com/qodeca/erfana/issues/166) | OPEN, narrowed to NSIS UX only | Auto-updater + signing landed via #174 in v0.9.5 |
 | 6 | [#167](https://github.com/qodeca/erfana/issues/167) | OPEN | `#158` reference dropped (#158 closed 2026-04-22); D6 owned by Phase 5 not Phase 6 |
@@ -109,7 +109,7 @@ Honest per-feature assessment of what an end user running an NSIS install of v0.
 
 | Feature | Why | Tracked |
 |---|---|---|
-| **Screenshot capture** (screen / window / area) | `ScreenshotService.ts` throws on `process.platform !== 'darwin'` — feature gated off | Phase 3 |
+| **Screenshot capture** (screen / window / area) | Was: `ScreenshotService.ts` threw on non-darwin. Fixed on `feature/windows-phase-3-screenshots`: dispatcher selects `DesktopCapturerScreenshotCapturer` on Windows | Phase 3 |
 | **Local Whisper transcription** (offline, model download) | `WhisperModelManager.getArchSuffix()` throws on non-darwin | Phase 4 |
 | **Auto-updater** | Publish URL is literally `https://example.com/auto-updates` | Phase 5 |
 | **SmartScreen-free install** | No code signing cert → SmartScreen "unrecognized app" warning | Phase 5 |

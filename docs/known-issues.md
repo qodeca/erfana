@@ -116,13 +116,9 @@ Pipeline contributors on Windows:
 
 ---
 
-### Screenshot capture unavailable on Windows
+### Screenshot capture on Windows
 
-**Issue**: `ScreenshotService.ts` is gated `process.platform !== 'darwin'`; the entire screenshot button is non-functional on Windows.
-
-**Workaround**: Use the OS-native screenshot tools (Win+Shift+S Snipping Tool); paste image path into the terminal manually.
-
-**Tracking**: [#164](https://github.com/qodeca/erfana/issues/164) (Phase 3 — Electron `desktopCapturer` strategy + area-selection overlay).
+**Status**: ✅ Resolved by [#164](https://github.com/qodeca/erfana/issues/164) (Phase 3) — `ScreenshotService` now picks `MacScreenshotCapturer` on `darwin` and `DesktopCapturerScreenshotCapturer` on Windows + Linux. All three modes (screen / window / area) work cross-platform via Electron's `desktopCapturer` and an in-app overlay window. Area selection currently spawns the overlay on the **primary display only**; multi-display area-select is a deferred polish item.
 
 ---
 

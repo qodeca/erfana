@@ -2,7 +2,8 @@
  * Terminal Toolbar Component
  *
  * Header bar for the terminal panel with control buttons.
- * Includes screenshot capture (macOS), scroll controls, restart, and scroll lock.
+ * Includes cross-platform screenshot capture, scroll controls, restart, and
+ * scroll lock.
  *
  * @module TerminalPanel/components/TerminalToolbar
  */
@@ -17,9 +18,9 @@ import {
   AppWindow,
   BoxSelect
 } from 'lucide-react'
-import { ScreenSelectDialog } from '../../../Dialog'
+import { ScreenSelectDialog, WindowPickerDialog } from '../../../Dialog'
 import { TEST_IDS } from '../../../../constants/testids'
-import type { ScreenshotCaptureMode, DisplayInfo } from '../types'
+import type { ScreenshotCaptureMode, DisplayInfo, WindowSource } from '../types'
 import './TerminalToolbar.css'
 
 /**
@@ -28,16 +29,27 @@ import './TerminalToolbar.css'
 export interface TerminalToolbarProps {
   /** Whether the terminal is ready (controls are enabled) */
   isTerminalReady: boolean
-  /** Whether running on macOS (shows screenshot buttons) */
-  isMacOS: boolean
+  /**
+   * Whether the runtime platform supports screenshot capture.
+   * (Was `isMacOS` pre-#164; renamed when Windows shipped.)
+   */
+  isScreenshotSupported: boolean
+  /** True on platforms with an OS-level window picker (macOS). */
+  hasNativeWindowPicker: boolean
   /** Current capture mode in progress, or null */
   capturingMode: ScreenshotCaptureMode | null
   /** Whether scroll lock is enabled */
   scrollLocked: boolean
   /** Available displays for multi-monitor selection */
   displays: DisplayInfo[]
+  /** Enumerated capturable windows (for the in-app picker on Windows / Linux) */
+  windowSources: WindowSource[]
   /** Whether the screen selection dialog is open */
   showScreenSelectDialog: boolean
+  /** Whether the window picker dialog is open */
+  showWindowPickerDialog: boolean
+  /** Whether the window picker is currently loading sources */
+  isLoadingWindowSources: boolean
   /** Handle screen capture button click */
   onCaptureScreen: () => void
   /** Handle window capture button click */
@@ -48,6 +60,10 @@ export interface TerminalToolbarProps {
   onDisplaySelect: (displayId: number) => void
   /** Handle display selection dialog cancel */
   onDisplaySelectCancel: () => void
+  /** Handle window selection from the in-app picker */
+  onWindowSelect: (windowId: string) => void
+  /** Handle window picker cancel */
+  onWindowPickerCancel: () => void
   /** Handle scroll to bottom button click */
   onScrollToBottom: () => void
   /** Handle scroll lock toggle */
@@ -60,7 +76,7 @@ export interface TerminalToolbarProps {
  * Toolbar for the terminal panel header.
  *
  * Features:
- * - Screenshot capture buttons (macOS only)
+ * - Cross-platform screenshot capture buttons (screen / window / area)
  * - Scroll to bottom button
  * - Restart terminal button
  * - Scroll lock toggle
@@ -70,16 +86,22 @@ export interface TerminalToolbarProps {
  */
 export function TerminalToolbar({
   isTerminalReady,
-  isMacOS,
+  isScreenshotSupported,
+  hasNativeWindowPicker,
   capturingMode,
   scrollLocked,
   displays,
+  windowSources,
   showScreenSelectDialog,
+  showWindowPickerDialog,
+  isLoadingWindowSources,
   onCaptureScreen,
   onCaptureWindow,
   onCaptureArea,
   onDisplaySelect,
   onDisplaySelectCancel,
+  onWindowSelect,
+  onWindowPickerCancel,
   onScrollToBottom,
   onToggleScrollLock,
   onRestart
@@ -91,10 +113,9 @@ export function TerminalToolbar({
 
       {isTerminalReady && (
         <>
-          {/* Screenshot capture buttons - macOS only (issue #86) */}
-          {isMacOS && (
+          {/* Screenshot capture buttons (#86 macOS → #164 cross-platform) */}
+          {isScreenshotSupported && (
             <>
-              {/* Screen capture: checks for multi-monitor at click time */}
               <button
                 className={`icon-btn${capturingMode === 'screen' ? ' icon-btn--loading' : ''}`}
                 onClick={onCaptureScreen}
@@ -122,6 +143,16 @@ export function TerminalToolbar({
               >
                 <AppWindow size={14} />
               </button>
+              {!hasNativeWindowPicker && (
+                <WindowPickerDialog
+                  isOpen={showWindowPickerDialog}
+                  sources={windowSources}
+                  isLoading={isLoadingWindowSources}
+                  zIndex={10000}
+                  onSelect={onWindowSelect}
+                  onCancel={onWindowPickerCancel}
+                />
+              )}
               <button
                 className={`icon-btn${capturingMode === 'area' ? ' icon-btn--loading' : ''}`}
                 onClick={onCaptureArea}
