@@ -1,8 +1,8 @@
 # Windows build prerequisites
 
-**Status**: Phase 0 of the [Windows enablement roadmap](../windows/README.md). This document covers what you need to install on a clean Windows 11 machine before `npm install` and `npm run dev` will work. Phases 1+ (terminal, dependency detection, filename validation, etc.) are tracked separately.
+**Status**: Build prerequisites for Windows hosts. Phases 0–2 + 4 of [Windows enablement](../windows/README.md) have shipped (v0.9.3 + v0.9.4); Phase 3 ([#164](https://github.com/qodeca/erfana/issues/164) — screenshots) + Phase 5 ([#166](https://github.com/qodeca/erfana/issues/166) — NSIS UX) + Phase 6 ([#167](https://github.com/qodeca/erfana/issues/167) — polish) remain open. See [`docs/windows/implementation-plan.md`](../windows/implementation-plan.md) for the canonical current status.
 
-> **Scope of Phase 0**: portable npm scripts and build prerequisites only. Runtime code changes for Windows live in later phases.
+> **Scope of this doc**: portable npm scripts and build prerequisites only. Runtime feature status for Windows is in [`implementation-plan.md`](../windows/implementation-plan.md) §"Feature status on Windows today".
 
 ---
 
@@ -121,7 +121,7 @@ npm run build:win
 
 This produces an NSIS installer in `release/{version}/`. The build runs `prebuild` (the aproba shim) and `electron-builder --win` automatically.
 
-> **Phase 0 boundary**: `build:win` should produce an installer, but the resulting app will still hit Phase 1+ runtime issues (terminal initialization, dependency detection, etc.). Those are tracked in [#154](https://github.com/qodeca/erfana/issues/154) and [#155](https://github.com/qodeca/erfana/issues/155).
+> Phases 1–2 + 4 runtime features (terminal parity, dependency detection, reserved-filename guard, local Whisper) all shipped in v0.9.3 / v0.9.4; the installer produced here runs the full feature surface. Phase 3 screenshot capture ([#164](https://github.com/qodeca/erfana/issues/164)) is the only user-visible feature still gated off on Windows.
 
 ---
 
@@ -141,9 +141,6 @@ This produces an NSIS installer in `release/{version}/`. The build runs `prebuil
 
 **`npm run test:cov` complains about missing `out/` directory**
 - Run `npm run build` once first. The script preserves an existing `out/` between runs but expects either none or a valid one.
-
-**`npm run dev` launches but the terminal panel is dead**
-- Expected on Phase 0. Terminal cmd.exe/PowerShell parity is Phase 1 ([#154](https://github.com/qodeca/erfana/issues/154)).
 
 ---
 

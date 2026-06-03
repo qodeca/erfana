@@ -30,11 +30,12 @@ Phase umbrellas (filed post-Phase-2):
 | Phase | Issue | Scope |
 |---|---|---|
 | Phase 3 | [#164](https://github.com/qodeca/erfana/issues/164) | Screenshot capture parity (`desktopCapturer`, area-select overlay) |
-| Phase 4 | [#165](https://github.com/qodeca/erfana/issues/165) | Local Whisper Windows binary |
-| Phase 5 | [#166](https://github.com/qodeca/erfana/issues/166) | Auto-updater URL, code signing, NSIS tweaks |
+| Phase 4 | [#165](https://github.com/qodeca/erfana/issues/165) | Local Whisper Windows binary — **shipped v0.9.4** (`110f1b9`, 2026-04-23) |
+| Phase 5 | [#166](https://github.com/qodeca/erfana/issues/166) | NSIS UX tweaks (`oneClick`, `perMachine`); auto-updater + Windows signing already shipped via #174 in v0.9.5 |
 | Phase 6 | [#167](https://github.com/qodeca/erfana/issues/167) | Polish, Windows CI guard, visual baselines |
 | Deferred | [#168](https://github.com/qodeca/erfana/issues/168) | D1–D8 deferred items from Phase 2 review |
-| Security | [#169](https://github.com/qodeca/erfana/issues/169) | Dependabot triage |
+| Security | [#169](https://github.com/qodeca/erfana/issues/169) | Dependabot triage — production `npm audit` clean as of v0.11.2 per CHANGELOG; issue closure pending re-verification |
+| Reputation | [#177](https://github.com/qodeca/erfana/issues/177) | SmartScreen reputation monitoring during initial Azure Artifact Signing ramp |
 
 Pick an issue (or open one) before cutting a branch. A one-line comment claiming the issue is enough – no assignment handshake required.
 
@@ -64,7 +65,7 @@ On a Windows host:
 
 ```bash
 npm run typecheck
-npm run test:main        # 243 files / ~7887 tests expected as of 2026-04-21 (Phase-2 UAT)
+npm run test:main        # baseline drifts per release — see docs/ci.md for current count (~8,087 / 259 files as of v0.11.2)
 npm run test:renderer
 npm run test:preload
 ```
