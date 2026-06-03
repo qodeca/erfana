@@ -199,6 +199,12 @@ export class DirectoryWatcherService {
       ignoreInitial: true, // Don't fire events for existing files
       ignored: (path) => this.shouldIgnorePath(path), // Function-based ignore (more reliable than regex)
       usePolling: false, // Use native fs events (faster)
+      // chokidar is pinned to ^3.x: v3 uses macOS FSEvents (a single stream, ~0
+      // FDs per file). v4 dropped FSEvents and watches each file via kqueue (one
+      // FD per file), which exhausts the process FD table on large projects and
+      // breaks spawning child processes (e.g. PDF export's hidden render window
+      // crashed with "Failed to initialize sandbox" on a 20k-file folder).
+      disableGlobbing: true, // Treat the path literally (matches v4); avoids glob chars in project paths
       awaitWriteFinish: false, // Not needed for directory operations
       depth, // Optional cap for performance
       followSymlinks: false // Security: don't follow symlinks

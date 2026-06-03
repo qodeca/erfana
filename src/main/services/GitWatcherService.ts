@@ -284,6 +284,7 @@ export class GitWatcherService implements IGitWatcherService {
       persistent: true,
       ignoreInitial: true,
       usePolling: false,
+      disableGlobbing: true, // chokidar v3: treat paths literally (matches v4); avoids glob chars in repo paths
       awaitWriteFinish: false,
       followSymlinks: false,
       // Watch directories recursively for refs/heads/
