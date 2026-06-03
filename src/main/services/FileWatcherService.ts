@@ -104,6 +104,7 @@ export class FileWatcherService {
         pollInterval: 100
       },
       usePolling: false, // Use native fs events (faster)
+      disableGlobbing: true, // chokidar v3: treat path literally (matches v4); avoids glob chars in file paths
       interval: 100,
       binaryInterval: 300
     })
