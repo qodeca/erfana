@@ -9,24 +9,31 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { TerminalToolbar } from './TerminalToolbar'
 import { TEST_IDS } from '../../../../constants/testids'
 
-// Mock ScreenSelectDialog
+// Mock the Dialog barrel - both ScreenSelectDialog and WindowPickerDialog are no-ops here
 vi.mock('../../../Dialog', () => ({
-  ScreenSelectDialog: vi.fn(() => null)
+  ScreenSelectDialog: vi.fn(() => null),
+  WindowPickerDialog: vi.fn(() => null)
 }))
 
 describe('TerminalToolbar', () => {
   const defaultProps = {
     isTerminalReady: true,
-    isMacOS: false,
+    isScreenshotSupported: false,
+    hasNativeWindowPicker: false,
     capturingMode: null,
     scrollLocked: false,
     displays: [],
+    windowSources: [],
     showScreenSelectDialog: false,
+    showWindowPickerDialog: false,
+    isLoadingWindowSources: false,
     onCaptureScreen: vi.fn(),
     onCaptureWindow: vi.fn(),
     onCaptureArea: vi.fn(),
     onDisplaySelect: vi.fn(),
     onDisplaySelectCancel: vi.fn(),
+    onWindowSelect: vi.fn(),
+    onWindowPickerCancel: vi.fn(),
     onScrollToBottom: vi.fn(),
     onToggleScrollLock: vi.fn(),
     onRestart: vi.fn()
@@ -58,16 +65,16 @@ describe('TerminalToolbar', () => {
     expect(screen.getByTestId(TEST_IDS.TERMINAL_BTN_LOCK)).toBeInTheDocument()
   })
 
-  it('hides screenshot buttons on non-macOS', () => {
-    render(<TerminalToolbar {...defaultProps} isMacOS={false} />)
+  it('hides screenshot buttons on unsupported platforms', () => {
+    render(<TerminalToolbar {...defaultProps} isScreenshotSupported={false} />)
 
     expect(screen.queryByTestId(TEST_IDS.TERMINAL_BTN_CAPTURE_SCREEN)).not.toBeInTheDocument()
     expect(screen.queryByTestId(TEST_IDS.TERMINAL_BTN_CAPTURE_WINDOW)).not.toBeInTheDocument()
     expect(screen.queryByTestId(TEST_IDS.TERMINAL_BTN_CAPTURE_AREA)).not.toBeInTheDocument()
   })
 
-  it('shows screenshot buttons on macOS', () => {
-    render(<TerminalToolbar {...defaultProps} isMacOS={true} />)
+  it('shows screenshot buttons on supported platforms', () => {
+    render(<TerminalToolbar {...defaultProps} isScreenshotSupported={true} />)
 
     expect(screen.getByTestId(TEST_IDS.TERMINAL_BTN_CAPTURE_SCREEN)).toBeInTheDocument()
     expect(screen.getByTestId(TEST_IDS.TERMINAL_BTN_CAPTURE_WINDOW)).toBeInTheDocument()
@@ -107,7 +114,9 @@ describe('TerminalToolbar', () => {
   })
 
   it('disables screenshot buttons during capture', () => {
-    render(<TerminalToolbar {...defaultProps} isMacOS={true} capturingMode="screen" />)
+    render(
+      <TerminalToolbar {...defaultProps} isScreenshotSupported={true} capturingMode="screen" />
+    )
 
     expect(screen.getByTestId(TEST_IDS.TERMINAL_BTN_CAPTURE_SCREEN)).toBeDisabled()
     expect(screen.getByTestId(TEST_IDS.TERMINAL_BTN_CAPTURE_WINDOW)).toBeDisabled()
@@ -115,14 +124,16 @@ describe('TerminalToolbar', () => {
   })
 
   it('shows loading state on capturing button', () => {
-    render(<TerminalToolbar {...defaultProps} isMacOS={true} capturingMode="window" />)
+    render(
+      <TerminalToolbar {...defaultProps} isScreenshotSupported={true} capturingMode="window" />
+    )
 
     const windowButton = screen.getByTestId(TEST_IDS.TERMINAL_BTN_CAPTURE_WINDOW)
     expect(windowButton).toHaveClass('icon-btn--loading')
   })
 
   it('calls onCaptureScreen when screen button clicked', () => {
-    render(<TerminalToolbar {...defaultProps} isMacOS={true} />)
+    render(<TerminalToolbar {...defaultProps} isScreenshotSupported={true} />)
 
     fireEvent.click(screen.getByTestId(TEST_IDS.TERMINAL_BTN_CAPTURE_SCREEN))
 
@@ -130,7 +141,7 @@ describe('TerminalToolbar', () => {
   })
 
   it('calls onCaptureWindow when window button clicked', () => {
-    render(<TerminalToolbar {...defaultProps} isMacOS={true} />)
+    render(<TerminalToolbar {...defaultProps} isScreenshotSupported={true} />)
 
     fireEvent.click(screen.getByTestId(TEST_IDS.TERMINAL_BTN_CAPTURE_WINDOW))
 
@@ -138,7 +149,7 @@ describe('TerminalToolbar', () => {
   })
 
   it('calls onCaptureArea when area button clicked', () => {
-    render(<TerminalToolbar {...defaultProps} isMacOS={true} />)
+    render(<TerminalToolbar {...defaultProps} isScreenshotSupported={true} />)
 
     fireEvent.click(screen.getByTestId(TEST_IDS.TERMINAL_BTN_CAPTURE_AREA))
 

@@ -75,7 +75,7 @@ sequenceDiagram
   GH->>CI: trigger release.yml
   CI->>GH: gh release create --draft
   par matrix
-    CI->>GH: build_mac uploads .dmg/.zip (notarized + stapled)
+    CI->>GH: build_mac uploads .dmg (arm64 only, notarized + stapled)
     CI->>GH: build_win uploads .exe (Authenticode signed)
   end
   CI->>GH: finalize signs SHA256SUMS with minisign

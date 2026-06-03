@@ -380,11 +380,13 @@ The Phase 2 plan (#161 step 4) called for "IPC serialization verification" of `A
 ### Triage cadence
 
 Re-read this document at the start of:
-- Phase 4 implementation (D1 + D2 + D3 trigger — note D1 amended 2026-04-21 so it does NOT trigger for Phase 4's whisper flow)
-- Phase 5 implementation (D6 trigger)
-- Phase 6 implementation (D4 + D5 + D7 trigger; see [`deferred-work-phase4.md`](deferred-work-phase4.md) for D11 + D12)
-- Pre-0.9.4 PR merge (D12 promotion-criteria check — see [`deferred-work-phase4.md`](deferred-work-phase4.md))
+- Phase 5 implementation (D6 trigger — `DependencyDetector` cache TTL)
+- Phase 6 implementation (D4 + D5 + D7 trigger; see [`deferred-work-phase4.md`](deferred-work-phase4.md) for D11)
 - Any change to a file referenced above (re-evaluate the deferral)
+
+Historical triage points (no longer applicable):
+- ~~Phase 4 implementation (D1 + D2 + D3 trigger)~~ — Phase 4 shipped in v0.9.4 without triggering D1/D2/D3 (D1 amended 2026-04-21, see entry; D2/D3 re-evaluate when a probe-style caller surfaces).
+- ~~Pre-0.9.4 PR merge (D12 promotion-criteria check)~~ — D12 was resolved 2026-04-23 (`fb3365e`); see [`deferred-work-phase4.md`](deferred-work-phase4.md).
 
 ### How to retire an item
 

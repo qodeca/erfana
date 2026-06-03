@@ -51,20 +51,23 @@ export function registerTerminalHandlers() {
 
   /**
    * Create a new terminal instance
-   * Passes webContentsId to TerminalService for cleanup on window close (issue #59)
+   * Passes webContentsId to TerminalService for cleanup on window close (issue #59).
+   *
+   * The response carries `shellKind` so the renderer can quote pasted paths
+   * correctly without a follow-up IPC round-trip (#164 round-2 F#1).
    */
   ipcMain.handle('terminal:create', async (event, config?: TerminalCreateConfig) => {
     logger.info('🚀 Creating terminal', config)
 
     try {
       const webContentsId = event.sender.id
-      const terminalId = await terminalService.createTerminal(config, webContentsId)
+      const result = await terminalService.createTerminal(config, webContentsId)
 
-      if (!terminalId) {
+      if (!result) {
         return { success: false, error: 'Failed to create terminal' }
       }
 
-      return { success: true, terminalId }
+      return { success: true, terminalId: result.terminalId, shellKind: result.shellKind }
     } catch (error) {
       logger.error('❌ Failed to create terminal', error instanceof Error ? error : undefined)
       const message = error instanceof Error ? error.message : String(error)
@@ -139,6 +142,10 @@ export function registerTerminalHandlers() {
       return { success: false, error: message }
     }
   })
+
+  // Note: `terminal:getShellKind` was removed in #164 round-2 (F#1). The kind
+  // now ships with the `terminal:create` response so a screenshot capture or
+  // drag-drop paste doesn't need a follow-up IPC round-trip.
 
   // Forward TerminalService events to renderer (with tracking for cleanup - issue #59)
   const dataListener = ({ terminalId, data }: { terminalId: string; data: string }): void => {

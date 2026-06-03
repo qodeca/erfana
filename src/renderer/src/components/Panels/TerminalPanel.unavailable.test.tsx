@@ -45,13 +45,15 @@ describe('TerminalPanel unavailable flow', () => {
     ;(window as any).api = {
       terminal: {
         isAvailable: vi.fn().mockResolvedValue({ success: true, available: false }),
-        create: vi.fn(),
+        create: vi.fn().mockResolvedValue({ success: true, terminalId: 'term-1', shellKind: 'posix' }),
         write: vi.fn(),
         resize: vi.fn(),
         kill: vi.fn(),
         onData: vi.fn().mockReturnValue(() => {}),
         onExit: vi.fn().mockReturnValue(() => {}),
         onError: vi.fn().mockReturnValue(() => {})
+        // #164 round-2 F#1: `terminal:getShellKind` was deleted; `shellKind`
+        // now travels with the `terminal:create` response above.
       },
       file: {
         onProjectChanged: vi.fn().mockReturnValue(() => {}),
@@ -64,7 +66,13 @@ describe('TerminalPanel unavailable flow', () => {
       },
       screenshot: {
         getDisplays: vi.fn().mockResolvedValue({ displays: [] }),
-        capture: vi.fn().mockResolvedValue({ success: true, filePath: '/tmp/screenshot.png' })
+        enumerateWindows: vi.fn().mockResolvedValue({ sources: [], truncated: false, availability: 'native-picker' }),
+        capture: vi.fn().mockResolvedValue({ success: true, filePath: '/tmp/screenshot.png' }),
+        getCapabilities: vi.fn().mockResolvedValue({
+          supported: true,
+          hasNativeWindowPicker: true,
+          areaCaptureMode: 'native'
+        })
       }
     }
     mockWriteText.mockReset().mockResolvedValue(true)

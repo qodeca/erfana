@@ -156,27 +156,34 @@ Cleanup stale locks from dead processes or timed-out network locks.
 
 **File:** `src/main/services/ScreenshotService.ts`
 
-macOS screenshot capture using native `screencapture` command.
+Thin dispatcher over an `IScreenshotCapturer` strategy: `MacScreenshotCapturer` on `darwin` (native `/usr/sbin/screencapture`), `DesktopCapturerScreenshotCapturer` on every other platform (Electron's `desktopCapturer.getSources()` + `nativeImage` + an in-app `ScreenshotOverlayWindow` for area mode). Strategy is picked once in the constructor.
 
-### Key Features
-- Three capture modes: screen, window, area
-- Multi-monitor support with monitor selection dialog
-- Captures saved to OS temp directory as PNG
-- 30-second timeout for interactive selections
+### Key features
+- Three capture modes — screen, window, area — across macOS + Windows (#164)
+- Multi-monitor support via `screen.getAllDisplays()` and `display_id` matching
+- Captures saved to OS temp directory as PNG (`erfana-screenshot-{timestamp}.png`)
+- Native screencapture: 30 s timeout; cross-platform overlay: 60 s timeout
+- Window picker dialog (`WindowPickerDialog`) on Windows; native picker on macOS
 
-### Public Methods
+### Public methods
 
-#### `captureScreen(options?: { monitorIndex?: number }): Promise<ScreenshotResult>`
-Capture entire screen (primary or specified monitor).
+#### `getDisplays(): DisplayInfo[]`
+Synchronous list of displays for the multi-monitor picker. Same shape on both backends.
 
-#### `captureWindow(): Promise<ScreenshotResult>`
-Open macOS window picker for user selection.
+#### `enumerateWindows(): Promise<WindowSource[]>`
+List capturable windows for the in-app picker. Returns an empty list on macOS (uses the OS-native picker instead).
 
-#### `captureArea(): Promise<ScreenshotResult>`
-Open crosshair tool for area selection.
+#### `capture(mode: ScreenshotMode, displayId?: number, windowId?: string): Promise<ScreenshotCaptureResponse>`
+Dispatches to `captureScreen` / `captureWindow` / `captureArea` on the selected capturer.
 
-#### `getMonitors(): Promise<MonitorInfo[]>`
-Get list of available monitors for multi-monitor selection.
+### Capturer modules
+
+- `src/main/services/screenshot/types.ts` — `IScreenshotCapturer` interface
+- `src/main/services/screenshot/MacScreenshotCapturer.ts`
+- `src/main/services/screenshot/DesktopCapturerScreenshotCapturer.ts`
+- `src/main/services/screenshot/ScreenshotOverlayWindow.ts` — area-select BrowserWindow lifecycle
+- `src/main/services/screenshot/sharedHelpers.ts` — temp-file generation, file-exists, display resolution
+- `src/renderer/src/components/Screenshot/ScreenshotOverlay.tsx` — the overlay's drag-to-select renderer (mounted via hash route in `src/renderer/src/main.tsx`)
 
 ---
 

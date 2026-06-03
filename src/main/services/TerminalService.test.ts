@@ -66,6 +66,20 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
 // Bootstrap Pattern Tests
 // =============================================================================
 
+/**
+ * #164 round-2 F#1: `createTerminal` now returns `{ terminalId, shellKind }`
+ * instead of a bare string id. Most tests below treat the historical `tid`
+ * variable as the terminal id, so this helper unwraps to preserve them
+ * unchanged. Tests that care about `shellKind` call `createTerminal` directly.
+ */
+async function createId(
+  service: { createTerminal: (...args: never[]) => Promise<{ terminalId: string; shellKind: string } | null> },
+  ...args: unknown[]
+): Promise<string | null> {
+  const result = await (service.createTerminal as (...a: unknown[]) => Promise<{ terminalId: string; shellKind: string } | null>)(...args)
+  return result?.terminalId ?? null
+}
+
 ;(isRendererEnv ? describe.skip : describe)('TerminalService - Bootstrap Pattern', () => {
   beforeEach(() => {
     spawnedPTYs.length = 0
@@ -82,7 +96,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       })
 
       const { terminalService } = await import('./TerminalService')
-      const tid = await terminalService.createTerminal({ cwd: '/tmp/project' })
+      const tid = await createId(terminalService,{ cwd: '/tmp/project' })
 
       expect(tid).toBeTruthy()
       expect(spawnedPTYs).toHaveLength(1)
@@ -110,7 +124,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       })
 
       const { terminalService } = await import('./TerminalService')
-      await terminalService.createTerminal({ cwd: '/tmp/project with spaces' })
+      await createId(terminalService,{ cwd: '/tmp/project with spaces' })
 
       const { args } = spawnedPTYs[0]
       const scriptIdx = args.indexOf('-c')
@@ -127,7 +141,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
 
       const { terminalService } = await import('./TerminalService')
       const shell = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
-      await terminalService.createTerminal({ shell, cwd: 'C:\\Projects\\test' })
+      await createId(terminalService,{ shell, cwd: 'C:\\Projects\\test' })
 
       const { args } = spawnedPTYs[0]
       expect(args).toContain('-NoProfile')
@@ -154,7 +168,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       const { terminalService } = await import('./TerminalService')
       const shell = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
       // Path with literal $ (would expand under "...") and a single quote
-      await terminalService.createTerminal({
+      await createId(terminalService,{
         shell,
         cwd: "C:\\Users\\me\\Dev\\$weird's-name"
       })
@@ -174,7 +188,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
 
       const { terminalService } = await import('./TerminalService')
       const shell = 'C:\\Windows\\System32\\cmd.exe'
-      const tid = await terminalService.createTerminal({ shell, cwd: 'C:\\Projects\\test' })
+      const tid = await createId(terminalService,{ shell, cwd: 'C:\\Projects\\test' })
 
       expect(tid).toBeTruthy()
       expect(spawnedPTYs).toHaveLength(1)
@@ -206,7 +220,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       terminalService.on('clearTerminal', clearSpy)
 
       const shell = 'C:\\Windows\\System32\\cmd.exe'
-      const tid = await terminalService.createTerminal({ shell, cwd: 'C:\\Projects\\test' })
+      const tid = await createId(terminalService,{ shell, cwd: 'C:\\Projects\\test' })
 
       const { pty, args } = spawnedPTYs[0]
       const marker = args[2].match(/__ERFANA_PWD_MARKER_\d+__/)![0]
@@ -237,7 +251,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       const clearSpy = vi.fn()
       terminalService.on('clearTerminal', clearSpy)
 
-      const tid = await terminalService.createTerminal({ cwd: '/tmp/project' })
+      const tid = await createId(terminalService,{ cwd: '/tmp/project' })
       expect(tid).toBeTruthy()
 
       const { pty } = spawnedPTYs[0]
@@ -272,7 +286,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       const clearSpy = vi.fn()
       terminalService.on('clearTerminal', clearSpy)
 
-      const tid = await terminalService.createTerminal({ cwd: '/home/user' })
+      const tid = await createId(terminalService,{ cwd: '/home/user' })
       const { pty } = spawnedPTYs[0]
 
       // Extract marker
@@ -293,7 +307,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       })
 
       const { terminalService } = await import('./TerminalService')
-      const tid = await terminalService.createTerminal({ cwd: '/tmp' })
+      const tid = await createId(terminalService,{ cwd: '/tmp' })
       const { pty } = spawnedPTYs[0]
 
       // Extract marker and emit it
@@ -323,7 +337,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       })
 
       const { terminalService } = await import('./TerminalService')
-      const tid = await terminalService.createTerminal({ cwd: '/tmp' })
+      const tid = await createId(terminalService,{ cwd: '/tmp' })
       const { pty } = spawnedPTYs[0]
 
       // Extract marker and emit it
@@ -364,7 +378,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       })
 
       const { terminalService } = await import('./TerminalService')
-      await terminalService.createTerminal({ cwd: '/tmp' })
+      await createId(terminalService,{ cwd: '/tmp' })
       const { pty } = spawnedPTYs[0]
 
       const dataSpy = vi.fn()
@@ -384,7 +398,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       })
 
       const { terminalService } = await import('./TerminalService')
-      await terminalService.createTerminal({ cwd: '/tmp' })
+      await createId(terminalService,{ cwd: '/tmp' })
       const { pty } = spawnedPTYs[0]
 
       // Extract marker and emit it (sets hasReceivedMarker=true, isClearing=true)
@@ -409,7 +423,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       })
 
       const { terminalService } = await import('./TerminalService')
-      await terminalService.createTerminal({ cwd: '/tmp' })
+      await createId(terminalService,{ cwd: '/tmp' })
       const { pty } = spawnedPTYs[0]
 
       // Extract marker and emit it (sets isClearing=true)
@@ -433,7 +447,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       })
 
       const { terminalService } = await import('./TerminalService')
-      const tid = await terminalService.createTerminal({ cwd: '/tmp' })
+      const tid = await createId(terminalService,{ cwd: '/tmp' })
       const { pty } = spawnedPTYs[0]
 
       // Extract marker and emit it
@@ -479,7 +493,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       }
 
       const { terminalService } = await import('./TerminalService')
-      await terminalService.createTerminal({ cwd: '/tmp' })
+      await createId(terminalService,{ cwd: '/tmp' })
 
       const { opts } = spawnedPTYs[0]
       const env = opts.env
@@ -515,7 +529,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       }
 
       const { terminalService } = await import('./TerminalService')
-      await terminalService.createTerminal({ cwd: '/tmp' })
+      await createId(terminalService,{ cwd: '/tmp' })
 
       const { opts } = spawnedPTYs[0]
       const env = opts.env
@@ -538,7 +552,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       })
 
       const { terminalService } = await import('./TerminalService')
-      await terminalService.createTerminal({ cwd: '/tmp' })
+      await createId(terminalService,{ cwd: '/tmp' })
 
       const { opts } = spawnedPTYs[0]
       const env = opts.env
@@ -562,7 +576,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       })
 
       const { terminalService } = await import('./TerminalService')
-      const tid = await terminalService.createTerminal({ cwd: '/tmp' })
+      const tid = await createId(terminalService,{ cwd: '/tmp' })
 
       const { pty } = spawnedPTYs[0]
       const writeSpy = vi.spyOn(pty, 'write')
@@ -579,7 +593,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       })
 
       const { terminalService } = await import('./TerminalService')
-      const tid = await terminalService.createTerminal({ cwd: '/tmp', cols: 80, rows: 24 })
+      const tid = await createId(terminalService,{ cwd: '/tmp', cols: 80, rows: 24 })
 
       const { pty } = spawnedPTYs[0]
       const resizeSpy = vi.spyOn(pty, 'resize')
@@ -595,7 +609,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       })
 
       const { terminalService } = await import('./TerminalService')
-      const tid = await terminalService.createTerminal({ cwd: '/tmp' })
+      const tid = await createId(terminalService,{ cwd: '/tmp' })
 
       const { pty } = spawnedPTYs[0]
       const killSpy = vi.spyOn(pty, 'kill')
@@ -616,7 +630,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       const exitSpy = vi.fn()
       terminalService.on('exit', exitSpy)
 
-      const tid = await terminalService.createTerminal({ cwd: '/tmp' })
+      const tid = await createId(terminalService,{ cwd: '/tmp' })
       const { pty } = spawnedPTYs[0]
 
       // Simulate PTY exit
@@ -641,9 +655,9 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       const { terminalService } = await import('./TerminalService')
 
       // Create terminals with different webContentsIds
-      const tid1 = await terminalService.createTerminal({ cwd: '/tmp' }, 1)
-      const tid2 = await terminalService.createTerminal({ cwd: '/tmp' }, 2)
-      const tid3 = await terminalService.createTerminal({ cwd: '/tmp' }, 1)
+      const tid1 = await createId(terminalService,{ cwd: '/tmp' }, 1)
+      const tid2 = await createId(terminalService,{ cwd: '/tmp' }, 2)
+      const tid3 = await createId(terminalService,{ cwd: '/tmp' }, 1)
 
       expect(tid1).toBeTruthy()
       expect(tid2).toBeTruthy()
@@ -667,8 +681,8 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       const { terminalService } = await import('./TerminalService')
 
       // Create terminals with webContentsId 1 and 2
-      const tid1 = await terminalService.createTerminal({ cwd: '/tmp' }, 1)
-      const tid2 = await terminalService.createTerminal({ cwd: '/tmp' }, 2)
+      const tid1 = await createId(terminalService,{ cwd: '/tmp' }, 1)
+      const tid2 = await createId(terminalService,{ cwd: '/tmp' }, 2)
 
       // Cleanup webContentsId 999 (doesn't exist)
       terminalService.cleanupForWebContentsId(999)
@@ -686,7 +700,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
 
       const { terminalService } = await import('./TerminalService')
 
-      const tid = await terminalService.createTerminal({ cwd: '/tmp' }, 1)
+      const tid = await createId(terminalService,{ cwd: '/tmp' }, 1)
       expect(tid).toBeTruthy()
 
       // First cleanup
@@ -705,7 +719,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
 
       const { terminalService } = await import('./TerminalService')
 
-      const tid = await terminalService.createTerminal({ cwd: '/tmp' }, 1)
+      const tid = await createId(terminalService,{ cwd: '/tmp' }, 1)
       expect(tid).toBeTruthy()
 
       // Simulate natural exit before cleanup runs
@@ -727,7 +741,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
 
       const { terminalService } = await import('./TerminalService')
 
-      const tid = await terminalService.createTerminal({ cwd: '/tmp' })
+      const tid = await createId(terminalService,{ cwd: '/tmp' })
       const { pty } = spawnedPTYs[0]
 
       // Extract marker and emit it (triggers fallback timeout)
@@ -759,7 +773,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       const { terminalService } = await import('./TerminalService')
 
       // Create terminal without webContentsId (default -1)
-      const tid = await terminalService.createTerminal({ cwd: '/tmp' })
+      const tid = await createId(terminalService,{ cwd: '/tmp' })
       expect(tid).toBeTruthy()
 
       // Cleanup arbitrary webContentsId
@@ -780,7 +794,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
 
       const { terminalService } = await import('./TerminalService')
 
-      const tid = await terminalService.createTerminal({ cwd: '/tmp' }, 1)
+      const tid = await createId(terminalService,{ cwd: '/tmp' }, 1)
       const { pty } = spawnedPTYs[0]
 
       // Extract marker and emit it (triggers fallback timeout)
@@ -815,9 +829,9 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       mockLogger.info.mockClear()
 
       // Create multiple terminals with same webContentsId
-      await terminalService.createTerminal({ cwd: '/tmp' }, 5)
-      await terminalService.createTerminal({ cwd: '/tmp' }, 5)
-      await terminalService.createTerminal({ cwd: '/tmp' }, 5)
+      await createId(terminalService,{ cwd: '/tmp' }, 5)
+      await createId(terminalService,{ cwd: '/tmp' }, 5)
+      await createId(terminalService,{ cwd: '/tmp' }, 5)
 
       // Cleanup webContentsId 5
       terminalService.cleanupForWebContentsId(5)
@@ -968,7 +982,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
       terminalService.on('clearTerminal', clearSpy)
 
       const shell = 'C:\\Windows\\System32\\cmd.exe'
-      const tid = await terminalService.createTerminal({ shell, cwd: 'C:\\Projects\\test' })
+      const tid = await createId(terminalService,{ shell, cwd: 'C:\\Projects\\test' })
       expect(tid).toBeTruthy()
 
       const { pty, args } = spawnedPTYs[0]
@@ -1274,7 +1288,7 @@ const isRendererEnv = typeof (globalThis as any).window !== 'undefined'
         return { ...actual, platform: () => 'win32' }
       })
       const { terminalService } = await import('./TerminalService')
-      const tid = await terminalService.createTerminal({ shell, cwd: 'C:\\Projects\\test' })
+      const tid = await createId(terminalService,{ shell, cwd: 'C:\\Projects\\test' })
       expect(tid).toBeTruthy()
       return spawnedPTYs[0].args
     }

@@ -177,41 +177,48 @@ Drag files or folders from project tree or Finder to insert shell-escaped paths 
 **Related issues**:
 - #85 - Terminal drag-drop file path insertion
 
-### Screenshot Capture (v0.6.5, macOS only)
+### Screenshot Capture (v0.6.5 macOS, cross-platform via #164)
 
-Capture screenshots directly from terminal toolbar with file paths automatically pasted to terminal.
+Capture screenshots directly from the terminal toolbar with file paths automatically pasted into the terminal. macOS uses the native `/usr/sbin/screencapture` binary; Windows (and Linux as a fallback) use Electron's `desktopCapturer` API + an in-app area-select overlay window.
 
-**Toolbar Buttons** (macOS only, hidden on other platforms):
-- **Capture Screen** (Camera icon): Captures primary display immediately
-- **Capture Window** (AppWindow icon): Opens macOS window picker
-- **Capture Area** (BoxSelect icon): Opens crosshair area selection tool
+**Toolbar Buttons** (visible on macOS + Windows; hidden on Linux):
+- **Capture Screen** (Camera icon): captures the chosen display immediately (or shows a picker when there is more than one display)
+- **Capture Window** (AppWindow icon): macOS opens the native OS picker; Windows opens an in-app thumbnail-grid `WindowPickerDialog`
+- **Capture Area** (BoxSelect icon): macOS opens the OS crosshair; Windows opens a transparent always-on-top `ScreenshotOverlayWindow` for drag-to-select
 
 **Behavior**:
 - Screenshots saved to OS temp directory as PNG (`erfana-screenshot-{timestamp}.png`)
-- File path automatically pasted to active terminal in double quotes
+- File path automatically pasted to the active terminal with shell-safe escaping
 - Success/error toasts provide user feedback
-- 30-second timeout for interactive selections (window picker, area selection)
-- Loading spinner displays during capture operations
+- 30 s timeout for the macOS native selection, 60 s for the cross-platform overlay (`SCREENSHOT.OVERLAY_TIMEOUT_MS`)
+- Loading spinner during capture; window picker shows a "Looking for capturable windows…" state while sources resolve
 
-**Use Cases**:
-- Quick attachment of screenshots in chat/command workflows
-- Visual documentation of terminal output
-- Bug reporting with visual context
-
-**Architecture**:
-- `ScreenshotService.ts`: Main process service using macOS `screencapture` command
-- `screenshot-handlers.ts`: IPC handlers for renderer communication
-- `screenshot-schema.ts`: Zod schemas for IPC types
-- Platform detection via `utils.getPlatform()` in preload
+**Architecture (strategy pattern, #164)**:
+- `IScreenshotCapturer` interface in `src/main/services/screenshot/types.ts`
+- `MacScreenshotCapturer` wraps the existing `screencapture` flow
+- `DesktopCapturerScreenshotCapturer` uses `desktopCapturer.getSources()` + `nativeImage.toPNG()` for full-resolution captures, and `nativeImage.crop()` for area mode
+- `ScreenshotOverlayWindow.selectArea()` spawns the area-select `BrowserWindow` on the primary display, awaits the renderer's `screenshot:areaSelected` / `screenshot:areaCancelled` IPC, then destroys the window. A module-level `isActive` guard prevents concurrent overlays. Sender frame validated against `overlay.webContents` to reject cross-window messages.
+- `ScreenshotService` is a thin dispatcher selecting the capturer in its constructor based on `process.platform`
+- Renderer state lives in `useScreenshotCapture` (was macOS-only; the boolean flag was renamed `isMacOS` → `isScreenshotSupported` to reflect the cross-platform reality)
+- The overlay re-uses the main renderer bundle via a hash route (`#overlay/screenshot?displayId=…`); `main.tsx` mounts `ScreenshotOverlay` instead of `App` when the hash is present
 
 **Files**:
-- `src/main/services/ScreenshotService.ts`
-- `src/main/ipc/screenshot-handlers.ts`
-- `src/shared/ipc/screenshot-schema.ts`
-- `src/renderer/src/components/Panels/TerminalPanel.tsx` (UI buttons)
+- `src/main/services/ScreenshotService.ts` (dispatcher)
+- `src/main/services/screenshot/MacScreenshotCapturer.ts`
+- `src/main/services/screenshot/DesktopCapturerScreenshotCapturer.ts`
+- `src/main/services/screenshot/ScreenshotOverlayWindow.ts`
+- `src/main/services/screenshot/sharedHelpers.ts`
+- `src/main/services/screenshot/types.ts`
+- `src/main/ipc/screenshot-handlers.ts` (now also `screenshot:enumerateWindows`)
+- `src/shared/ipc/screenshot-schema.ts` (adds `WindowSource`, `AreaSelection`, `windowId`)
+- `src/renderer/src/components/Screenshot/ScreenshotOverlay.tsx` + `.css`
+- `src/renderer/src/components/Dialog/WindowPickerDialog.tsx` + `.css`
+- `src/renderer/src/components/Panels/TerminalPanel.tsx` (renamed gate, removed duplicated effect)
+- `src/renderer/src/main.tsx` (hash-routed overlay mount)
 
 **Related issues**:
-- #86 - Screenshot capture buttons for terminal panel
+- #86 - original macOS screenshot capture
+- #164 - Windows Phase 3 screenshot parity
 
 ### Camera Photo Capture (v0.7.0)
 

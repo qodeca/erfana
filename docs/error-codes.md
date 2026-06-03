@@ -58,15 +58,18 @@ Grouped by pipeline stage. See `docs/api-services-features.md` §LiteParseConver
 
 ---
 
-## Screenshot & camera (9 codes)
+## Screenshot & camera (12 codes)
 
 | Code | User copy | Notes |
 |------|-----------|-------|
-| `SCREENSHOT_PERMISSION_DENIED` | "Screen recording permission required..." | macOS only; Phase 3 extends to Windows |
-| `SCREENSHOT_TIMEOUT` | "Screenshot capture timed out" | 30s timeout on area/window selection |
+| `SCREENSHOT_PERMISSION_DENIED` | "Screen recording permission required..." | macOS only (Windows desktopCapturer needs no extra grant) |
+| `SCREENSHOT_TIMEOUT` | "Screenshot capture timed out" | 30s for macOS screencapture; 60s for the cross-platform overlay |
 | `SCREENSHOT_CANCELLED` | "Screenshot capture was cancelled" | User ESC during selection |
 | `SCREENSHOT_FAILED` | "Failed to capture screenshot" | Generic fallback |
-| `SCREENSHOT_NOT_SUPPORTED` | "Screenshot capture is only available on macOS" | Will be retired with Phase 3 |
+| `SCREENSHOT_NOT_SUPPORTED` | "Screenshot capture is not supported on this platform" | Linux (no capturer wired) |
+| `SCREENSHOT_OVERLAY_FAILED` | "Could not open the screenshot selection overlay" | Windows-only; overlay BrowserWindow load failed (#164) |
+| `SCREENSHOT_WINDOW_NOT_FOUND` | "The selected window is no longer available" | desktopCapturer source vanished between picker and capture (#164) |
+| `SCREENSHOT_DISPLAY_NOT_FOUND` | "The selected display is no longer available" | display unplugged mid-capture (#164) |
 | `CAMERA_PERMISSION_DENIED` | "Camera permission required..." | cross-platform |
 | `CAMERA_NOT_FOUND` | "No camera found..." | No device enumerated |
 | `CAMERA_DISCONNECTED` | "Camera was disconnected during capture" | Mid-capture failure |

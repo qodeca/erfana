@@ -105,6 +105,9 @@ export enum ErrorCode {
   SCREENSHOT_CANCELLED = 'SCREENSHOT_CANCELLED',
   SCREENSHOT_FAILED = 'SCREENSHOT_FAILED',
   SCREENSHOT_NOT_SUPPORTED = 'SCREENSHOT_NOT_SUPPORTED',
+  SCREENSHOT_OVERLAY_FAILED = 'SCREENSHOT_OVERLAY_FAILED',
+  SCREENSHOT_WINDOW_NOT_FOUND = 'SCREENSHOT_WINDOW_NOT_FOUND',
+  SCREENSHOT_DISPLAY_NOT_FOUND = 'SCREENSHOT_DISPLAY_NOT_FOUND',
 
   // Camera capture errors (Spec #014)
   CAMERA_PERMISSION_DENIED = 'CAMERA_PERMISSION_DENIED',
@@ -317,7 +320,10 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.SCREENSHOT_TIMEOUT]: 'Screenshot capture timed out',
   [ErrorCode.SCREENSHOT_CANCELLED]: 'Screenshot capture was cancelled',
   [ErrorCode.SCREENSHOT_FAILED]: 'Failed to capture screenshot',
-  [ErrorCode.SCREENSHOT_NOT_SUPPORTED]: 'Screenshot capture is only available on macOS',
+  [ErrorCode.SCREENSHOT_NOT_SUPPORTED]: 'Screenshot capture is not supported on this platform',
+  [ErrorCode.SCREENSHOT_OVERLAY_FAILED]: 'Could not open the screenshot selection overlay',
+  [ErrorCode.SCREENSHOT_WINDOW_NOT_FOUND]: 'The selected window is no longer available',
+  [ErrorCode.SCREENSHOT_DISPLAY_NOT_FOUND]: 'The selected display is no longer available',
 
   // Camera capture errors (Spec #014)
   [ErrorCode.CAMERA_PERMISSION_DENIED]: 'Camera permission required. Grant access in System Settings > Privacy & Security.',

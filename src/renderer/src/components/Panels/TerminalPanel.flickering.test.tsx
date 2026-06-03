@@ -99,7 +99,8 @@ describe('TerminalPanel flickering prevention', () => {
         isAvailable: vi.fn().mockResolvedValue({ success: true, available: true }),
         create: vi.fn().mockResolvedValue({
           success: true,
-          terminalId: 'test-terminal-1'
+          terminalId: 'test-terminal-1',
+          shellKind: 'posix'
         }),
         write: vi.fn(),
         resize: vi.fn(),
@@ -112,6 +113,8 @@ describe('TerminalPanel flickering prevention', () => {
           return vi.fn() // unsubscribe
         }),
         markClearComplete: vi.fn()
+        // #164 round-2 F#1: `terminal:getShellKind` deleted; shellKind
+        // travels with the `terminal:create` response.
       },
       file: {
         getProjectPath: vi.fn().mockResolvedValue('/test/project'),
@@ -123,7 +126,13 @@ describe('TerminalPanel flickering prevention', () => {
       },
       screenshot: {
         getDisplays: vi.fn().mockResolvedValue({ displays: [] }),
-        capture: vi.fn().mockResolvedValue({ success: true, filePath: '/tmp/screenshot.png' })
+        enumerateWindows: vi.fn().mockResolvedValue({ sources: [], truncated: false, availability: 'native-picker' }),
+        capture: vi.fn().mockResolvedValue({ success: true, filePath: '/tmp/screenshot.png' }),
+        getCapabilities: vi.fn().mockResolvedValue({
+          supported: true,
+          hasNativeWindowPicker: true,
+          areaCaptureMode: 'native'
+        })
       }
     }
   })

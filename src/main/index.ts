@@ -104,6 +104,18 @@ function createWindow(): BrowserWindow {
     return { action: 'deny' }
   })
 
+  // Lock the main renderer to its initial URL. Any navigation attempt
+  // (planted href, deep-link, the area-select hash route, etc.) is denied
+  // so the main editor cannot be coerced into mounting the area-select
+  // overlay UI (#164 lens-review F[7]).
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const currentUrl = mainWindow.webContents.getURL()
+    if (url !== currentUrl) {
+      logger.warn('Blocked main-window will-navigate', { from: currentUrl, to: url })
+      event.preventDefault()
+    }
+  })
+
   // Cleanup services when webContents is destroyed (window close or dev refresh - issue #59)
   // This prevents stale watchers and terminal processes from accumulating
   // CRITICAL: Must also clear project state so new window can re-open the same project

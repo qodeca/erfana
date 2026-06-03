@@ -1,8 +1,8 @@
 /**
  * Tests for useScreenshotCapture Hook
  *
- * Tests platform detection, display enumeration, screenshot capture
- * with various outcomes, and error handling.
+ * Covers platform detection, display + window enumeration, screenshot
+ * capture across outcomes, and error handling.
  *
  * @module TerminalPanel/hooks/useScreenshotCapture.test
  */
@@ -47,8 +47,10 @@ import {
 // =============================================================================
 
 const mockGetDisplays = vi.fn()
+const mockEnumerateWindows = vi.fn()
 const mockCapture = vi.fn()
 const mockGetPlatform = vi.fn()
+const mockGetCapabilities = vi.fn()
 const mockTerminalWrite = vi.fn()
 
 Object.defineProperty(global.window, 'api', {
@@ -57,7 +59,9 @@ Object.defineProperty(global.window, 'api', {
   value: {
     screenshot: {
       getDisplays: mockGetDisplays,
-      capture: mockCapture
+      enumerateWindows: mockEnumerateWindows,
+      capture: mockCapture,
+      getCapabilities: mockGetCapabilities
     },
     terminal: {
       write: mockTerminalWrite
@@ -79,9 +83,16 @@ const mockDisplay = {
   bounds: { x: 0, y: 0, width: 1920, height: 1080 }
 }
 
-function createRefs(terminalId: string | null = 'term-1') {
+const mockWindowSource = {
+  id: 'window:42:0',
+  name: 'Visual Studio Code',
+  thumbnailDataUrl: 'data:image/png;base64,AAA='
+}
+
+function createRefs(terminalId: string | null = 'term-1', shellKind: 'posix' | 'cmd' | 'powershell' | null = 'posix') {
   return {
     terminalIdRef: { current: terminalId },
+    shellKindRef: { current: shellKind },
     xtermRef: { current: { focus: vi.fn() } as unknown as React.RefObject<import('@xterm/xterm').Terminal | null>['current'] }
   }
 }
@@ -92,11 +103,21 @@ function createRefs(terminalId: string | null = 'term-1') {
 
 describe('useScreenshotCapture', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    // #164 round-2 F#21: resetAllMocks (not clearAllMocks) so
+    // `mockResolvedValueOnce` queues don't leak into the next case.
+    vi.resetAllMocks()
     mockGetPlatform.mockReturnValue('darwin')
     mockGetDisplays.mockResolvedValue({ displays: [mockDisplay] })
+    mockEnumerateWindows.mockResolvedValue({ sources: [mockWindowSource] })
     mockCapture.mockResolvedValue({ success: true, filePath: '/tmp/screenshot.png' })
     mockTerminalWrite.mockResolvedValue(undefined)
+    // Default: macOS-style capabilities (supported, native picker). Tests
+    // that exercise Windows / unsupported flows override per-test.
+    mockGetCapabilities.mockResolvedValue({
+      supported: true,
+      hasNativeWindowPicker: true,
+      areaCaptureMode: 'native'
+    })
   })
 
   it('is a function', () => {
@@ -104,31 +125,56 @@ describe('useScreenshotCapture', () => {
   })
 
   describe('platform detection', () => {
-    it('sets isMacOS true on darwin', async () => {
-      mockGetPlatform.mockReturnValue('darwin')
+    it('reflects darwin capabilities (supported, native window picker)', async () => {
+      mockGetCapabilities.mockResolvedValueOnce({
+        supported: true,
+        hasNativeWindowPicker: true,
+        areaCaptureMode: 'native'
+      })
       const refs = createRefs()
 
       const { result } = renderHook(() => useScreenshotCapture(refs))
 
       await waitFor(() => {
-        expect(result.current.isMacOS).toBe(true)
+        expect(result.current.isScreenshotSupported).toBe(true)
+        expect(result.current.hasNativeWindowPicker).toBe(true)
       })
     })
 
-    it('sets isMacOS false on linux', async () => {
-      mockGetPlatform.mockReturnValue('linux')
+    it('reflects win32 capabilities (supported, in-app picker)', async () => {
+      mockGetCapabilities.mockResolvedValueOnce({
+        supported: true,
+        hasNativeWindowPicker: false,
+        areaCaptureMode: 'overlay'
+      })
       const refs = createRefs()
 
       const { result } = renderHook(() => useScreenshotCapture(refs))
 
       await waitFor(() => {
-        expect(result.current.isMacOS).toBe(false)
+        expect(result.current.isScreenshotSupported).toBe(true)
+        expect(result.current.hasNativeWindowPicker).toBe(false)
+      })
+    })
+
+    it('reports unsupported when main returns supported: false', async () => {
+      mockGetCapabilities.mockResolvedValueOnce({
+        supported: false,
+        hasNativeWindowPicker: false,
+        areaCaptureMode: 'unsupported'
+      })
+      const refs = createRefs()
+
+      const { result } = renderHook(() => useScreenshotCapture(refs))
+
+      await waitFor(() => {
+        expect(result.current.isScreenshotSupported).toBe(false)
       })
     })
   })
 
   describe('initial displays', () => {
-    it('fetches displays on mount when macOS', async () => {
+    it('fetches displays on mount when supported (darwin)', async () => {
       const refs = createRefs()
 
       const { result } = renderHook(() => useScreenshotCapture(refs))
@@ -139,13 +185,32 @@ describe('useScreenshotCapture', () => {
       })
     })
 
-    it('does not fetch displays on non-macOS', async () => {
-      mockGetPlatform.mockReturnValue('win32')
+    it('fetches displays on mount when supported (win32)', async () => {
+      mockGetCapabilities.mockResolvedValueOnce({
+        supported: true,
+        hasNativeWindowPicker: false,
+        areaCaptureMode: 'overlay'
+      })
+      const refs = createRefs()
+
+      const { result } = renderHook(() => useScreenshotCapture(refs))
+
+      await waitFor(() => {
+        expect(mockGetDisplays).toHaveBeenCalledOnce()
+        expect(result.current.displays).toEqual([mockDisplay])
+      })
+    })
+
+    it('does not fetch displays on unsupported platforms', async () => {
+      mockGetCapabilities.mockResolvedValueOnce({
+        supported: false,
+        hasNativeWindowPicker: false,
+        areaCaptureMode: 'unsupported'
+      })
       const refs = createRefs()
 
       renderHook(() => useScreenshotCapture(refs))
 
-      // Give the useEffect time to run
       await waitFor(() => {
         expect(mockGetDisplays).not.toHaveBeenCalled()
       })
@@ -160,12 +225,17 @@ describe('useScreenshotCapture', () => {
       await waitFor(() => {
         expect(result.current).toEqual(
           expect.objectContaining({
-            isMacOS: expect.any(Boolean),
+            isScreenshotSupported: expect.any(Boolean),
+            hasNativeWindowPicker: expect.any(Boolean),
             capturingMode: null,
             displays: expect.any(Array),
+            windowSources: expect.any(Array),
             showScreenSelectDialog: false,
             setShowScreenSelectDialog: expect.any(Function),
+            showWindowPickerDialog: false,
+            setShowWindowPickerDialog: expect.any(Function),
             refreshDisplays: expect.any(Function),
+            refreshWindowSources: expect.any(Function),
             handleScreenshot: expect.any(Function)
           })
         )
@@ -178,7 +248,7 @@ describe('useScreenshotCapture', () => {
       const refs = createRefs()
       const { result } = renderHook(() => useScreenshotCapture(refs))
 
-      await waitFor(() => expect(result.current.isMacOS).toBe(true))
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
 
       const newDisplay = { ...mockDisplay, id: 2, label: 'External' }
       mockGetDisplays.mockResolvedValue({ displays: [mockDisplay, newDisplay] })
@@ -193,18 +263,36 @@ describe('useScreenshotCapture', () => {
     })
   })
 
+  describe('refreshWindowSources', () => {
+    it('updates windowSources state', async () => {
+      mockGetPlatform.mockReturnValue('win32')
+      const refs = createRefs()
+      const { result } = renderHook(() => useScreenshotCapture(refs))
+
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
+
+      let returned: unknown[]
+      await act(async () => {
+        returned = await result.current.refreshWindowSources()
+      })
+
+      expect(result.current.windowSources).toEqual([mockWindowSource])
+      expect(returned!).toEqual([mockWindowSource])
+    })
+  })
+
   describe('handleScreenshot', () => {
     it('captures and writes path to terminal on success', async () => {
       const refs = createRefs()
       const { result } = renderHook(() => useScreenshotCapture(refs))
 
-      await waitFor(() => expect(result.current.isMacOS).toBe(true))
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
 
       await act(async () => {
         await result.current.handleScreenshot('area')
       })
 
-      expect(mockCapture).toHaveBeenCalledWith({ mode: 'area', displayId: undefined })
+      expect(mockCapture).toHaveBeenCalledWith({ mode: 'area' })
       expect(mockTerminalWrite).toHaveBeenCalledWith('term-1', "'/tmp/screenshot.png'")
       expect(showSuccessToast).toHaveBeenCalledWith('Screenshot captured', 'screenshot.png')
     })
@@ -213,20 +301,54 @@ describe('useScreenshotCapture', () => {
       const refs = createRefs()
       const { result } = renderHook(() => useScreenshotCapture(refs))
 
-      await waitFor(() => expect(result.current.isMacOS).toBe(true))
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
 
       await act(async () => {
-        await result.current.handleScreenshot('screen', 2)
+        await result.current.handleScreenshot('screen', { displayId: 2 })
       })
 
       expect(mockCapture).toHaveBeenCalledWith({ mode: 'screen', displayId: 2 })
+    })
+
+    it('sends window-native on darwin (macOS native picker, no windowId)', async () => {
+      // Default darwin capabilities — hasNativeWindowPicker: true.
+      const refs = createRefs()
+      const { result } = renderHook(() => useScreenshotCapture(refs))
+
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
+
+      await act(async () => {
+        await result.current.handleScreenshot('window')
+      })
+
+      // #164 round-2 D4: macOS uses the dedicated `window-native` variant
+      // because the OS picker resolves the target window itself.
+      expect(mockCapture).toHaveBeenCalledWith({ mode: 'window-native' })
+    })
+
+    it('sends window with windowId on Windows (in-app picker)', async () => {
+      mockGetCapabilities.mockResolvedValueOnce({
+        supported: true,
+        hasNativeWindowPicker: false,
+        areaCaptureMode: 'overlay'
+      })
+      const refs = createRefs()
+      const { result } = renderHook(() => useScreenshotCapture(refs))
+
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
+
+      await act(async () => {
+        await result.current.handleScreenshot('window', { windowId: 'window:42:0' })
+      })
+
+      expect(mockCapture).toHaveBeenCalledWith({ mode: 'window', windowId: 'window:42:0' })
     })
 
     it('shows warning when no terminal is open', async () => {
       const refs = createRefs(null)
       const { result } = renderHook(() => useScreenshotCapture(refs))
 
-      await waitFor(() => expect(result.current.isMacOS).toBe(true))
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
 
       await act(async () => {
         await result.current.handleScreenshot('window')
@@ -244,7 +366,7 @@ describe('useScreenshotCapture', () => {
       const refs = createRefs()
       const { result } = renderHook(() => useScreenshotCapture(refs))
 
-      await waitFor(() => expect(result.current.isMacOS).toBe(true))
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
 
       await act(async () => {
         await result.current.handleScreenshot('area')
@@ -262,7 +384,7 @@ describe('useScreenshotCapture', () => {
       const refs = createRefs()
       const { result } = renderHook(() => useScreenshotCapture(refs))
 
-      await waitFor(() => expect(result.current.isMacOS).toBe(true))
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
 
       await act(async () => {
         await result.current.handleScreenshot('screen')
@@ -282,7 +404,7 @@ describe('useScreenshotCapture', () => {
       const refs = createRefs()
       const { result } = renderHook(() => useScreenshotCapture(refs))
 
-      await waitFor(() => expect(result.current.isMacOS).toBe(true))
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
 
       await act(async () => {
         await result.current.handleScreenshot('window')
@@ -294,6 +416,66 @@ describe('useScreenshotCapture', () => {
       )
     })
 
+    it('shows error toast on SCREENSHOT_WINDOW_NOT_FOUND', async () => {
+      mockCapture.mockResolvedValue({
+        success: false,
+        errorCode: 'SCREENSHOT_WINDOW_NOT_FOUND'
+      })
+      const refs = createRefs()
+      const { result } = renderHook(() => useScreenshotCapture(refs))
+
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
+
+      await act(async () => {
+        await result.current.handleScreenshot('window')
+      })
+
+      expect(showErrorToast).toHaveBeenCalledWith(
+        'Window unavailable',
+        'The selected window is no longer available'
+      )
+    })
+
+    it('shows error toast on SCREENSHOT_DISPLAY_NOT_FOUND', async () => {
+      mockCapture.mockResolvedValue({
+        success: false,
+        errorCode: 'SCREENSHOT_DISPLAY_NOT_FOUND'
+      })
+      const refs = createRefs()
+      const { result } = renderHook(() => useScreenshotCapture(refs))
+
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
+
+      await act(async () => {
+        await result.current.handleScreenshot('screen')
+      })
+
+      expect(showErrorToast).toHaveBeenCalledWith(
+        'Display unavailable',
+        'The selected display is no longer available'
+      )
+    })
+
+    it('shows error toast on SCREENSHOT_OVERLAY_FAILED', async () => {
+      mockCapture.mockResolvedValue({
+        success: false,
+        errorCode: 'SCREENSHOT_OVERLAY_FAILED'
+      })
+      const refs = createRefs()
+      const { result } = renderHook(() => useScreenshotCapture(refs))
+
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
+
+      await act(async () => {
+        await result.current.handleScreenshot('area')
+      })
+
+      expect(showErrorToast).toHaveBeenCalledWith(
+        'Overlay failed',
+        'Could not open the area-selection overlay'
+      )
+    })
+
     it('shows generic error toast on unknown failure', async () => {
       mockCapture.mockResolvedValue({
         success: false,
@@ -302,7 +484,7 @@ describe('useScreenshotCapture', () => {
       const refs = createRefs()
       const { result } = renderHook(() => useScreenshotCapture(refs))
 
-      await waitFor(() => expect(result.current.isMacOS).toBe(true))
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
 
       await act(async () => {
         await result.current.handleScreenshot('area')
@@ -314,14 +496,13 @@ describe('useScreenshotCapture', () => {
     it('shows info toast when terminal closes during capture', async () => {
       const refs = createRefs('term-1')
       mockCapture.mockImplementation(async () => {
-        // Simulate terminal closing during capture
         refs.terminalIdRef.current = null
         return { success: true, filePath: '/tmp/shot.png' }
       })
 
       const { result } = renderHook(() => useScreenshotCapture(refs))
 
-      await waitFor(() => expect(result.current.isMacOS).toBe(true))
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
 
       await act(async () => {
         await result.current.handleScreenshot('area')
@@ -334,11 +515,31 @@ describe('useScreenshotCapture', () => {
       )
     })
 
+    it('handles Windows backslash-separated filename correctly', async () => {
+      mockCapture.mockResolvedValue({
+        success: true,
+        filePath: 'C:\\Users\\me\\AppData\\Local\\Temp\\erfana-screenshot-1.png'
+      })
+      const refs = createRefs()
+      const { result } = renderHook(() => useScreenshotCapture(refs))
+
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
+
+      await act(async () => {
+        await result.current.handleScreenshot('screen')
+      })
+
+      expect(showSuccessToast).toHaveBeenCalledWith(
+        'Screenshot captured',
+        'erfana-screenshot-1.png'
+      )
+    })
+
     it('resets capturingMode after completion', async () => {
       const refs = createRefs()
       const { result } = renderHook(() => useScreenshotCapture(refs))
 
-      await waitFor(() => expect(result.current.isMacOS).toBe(true))
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
 
       await act(async () => {
         await result.current.handleScreenshot('window')
@@ -352,7 +553,7 @@ describe('useScreenshotCapture', () => {
       const refs = createRefs()
       const { result } = renderHook(() => useScreenshotCapture(refs))
 
-      await waitFor(() => expect(result.current.isMacOS).toBe(true))
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
 
       await act(async () => {
         await result.current.handleScreenshot('area')

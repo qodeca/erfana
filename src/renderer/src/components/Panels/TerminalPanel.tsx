@@ -11,14 +11,13 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import { ISplitviewPanelProps } from 'dockview'
 import { Terminal as TerminalIcon, RotateCw, ArrowDownToLine, LockKeyhole, LockKeyholeOpen, Camera, AppWindow, BoxSelect, Webcam, Maximize2, Minimize2 } from 'lucide-react'
-import type { DisplayInfo } from '../../../../shared/ipc/screenshot-schema'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { useTerminalStore } from '../../stores/useTerminalStore'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { useActivityBarStore } from '../../stores/useActivityBarStore'
-import { showWarningToast, showErrorToast, showSuccessToast, showInfoToast } from '../../utils/toastHelpers'
+import { showWarningToast, showSuccessToast, showInfoToast } from '../../utils/toastHelpers'
 import { useScrollAnomalyRecovery } from '../../hooks/useScrollAnomalyRecovery'
 import { useTerminalParserHooks } from '../../hooks/useTerminalParserHooks'
 import { useTerminalClipboard } from '../../hooks/useTerminalClipboard'
@@ -30,9 +29,10 @@ import { useProjectManagementContextSafe } from '../../context/ProjectManagement
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { TerminalContextMenu } from '../ContextMenu/TerminalContextMenu'
 import { FilePickerDialog } from '../Dialog/FilePickerDialog'
-import { ScreenSelectDialog, CameraDialog } from '../Dialog'
+import { ScreenSelectDialog, WindowPickerDialog, CameraDialog } from '../Dialog'
+import { useScreenshotCapture } from './TerminalPanel/hooks/useScreenshotCapture'
 import { sanitizeFilePath } from '../../utils/fileUtils'
-import { formatPathsForTerminal, escapePathForShell } from '../../utils/shellPathEscape'
+import { formatPathsForTerminal, escapePathForShell, type ShellKind } from '../../utils/shellPathEscape'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
 import '@xterm/xterm/css/xterm.css'
@@ -52,6 +52,10 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const xtermRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const terminalIdRef = useRef<string | null>(null)
+  // Quoting flavour for the active terminal. Populated from the
+  // `terminal:create` response (#164 round-2 F#1). The screenshot hook reads
+  // this directly so a path-paste never needs an extra IPC round-trip.
+  const shellKindRef = useRef<ShellKind | null>(null)
   const pendingInitRef = useRef<boolean>(false)
   const visibilityObserverRef = useRef<ResizeObserver | null>(null)
   const warmupUntilRef = useRef<number>(0)
@@ -66,14 +70,25 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   } | null>(null)
   const [projectPath, setProjectPath] = useState<string | null>(null)
   const [isDropTarget, setIsDropTarget] = useState(false)
-  // Screenshot capture state (issue #86)
-  const [capturingMode, setCapturingMode] = useState<'screen' | 'window' | 'area' | null>(null)
-  const [isMacOS, setIsMacOS] = useState(false)
-  // Multi-monitor display selection state (issue #86 enhancement)
-  const [displays, setDisplays] = useState<DisplayInfo[]>([])
-  const [showScreenSelectDialog, setShowScreenSelectDialog] = useState(false)
   // Camera capture state (Spec #014)
   const [isCameraDialogOpen, setIsCameraDialogOpen] = useState(false)
+
+  // Screenshot capture state (issue #86 → cross-platform in #164)
+  const {
+    isScreenshotSupported,
+    hasNativeWindowPicker,
+    capturingMode,
+    displays,
+    windowSources,
+    showScreenSelectDialog,
+    setShowScreenSelectDialog,
+    showWindowPickerDialog,
+    setShowWindowPickerDialog,
+    refreshDisplays,
+    refreshWindowSources,
+    handleScreenshot
+  } = useScreenshotCapture({ terminalIdRef, shellKindRef, xtermRef })
+  const [isLoadingWindowSources, setIsLoadingWindowSources] = useState(false)
 
   // Cleanup helper for drag handlers (issue #85 - DRY principle)
   // Centralized cleanup to avoid duplication across unmount, project change, and restart
@@ -275,21 +290,6 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     })
 
     return unsubscribe
-  }, [])
-
-  // Check platform on mount for macOS-only features (issue #86)
-  // Also fetch available displays for multi-monitor support
-  useEffect(() => {
-    const platform = window.api.utils.getPlatform()
-    const isMac = platform === 'darwin'
-    setIsMacOS(isMac)
-
-    // Initial fetch of displays (macOS only)
-    if (isMac) {
-      window.api.screenshot.getDisplays().then((result) => {
-        setDisplays(result.displays)
-      })
-    }
   }, [])
 
   async function checkAvailability() {
@@ -617,6 +617,10 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       }
 
       setTerminalId(result.terminalId)
+      // Record the resolved shellKind so the screenshot path-paste quotes
+      // correctly without an extra IPC (#164 round-2 F#1). Main always
+      // returns a value when terminalId is present, but guard defensively.
+      shellKindRef.current = result.shellKind ?? null
       setActiveTerminalId(result.terminalId) // Register in store
       warmupUntilRef.current = Date.now() + 500
 
@@ -660,6 +664,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // Use centralized cleanup (Phase 1.1 bug fix - race condition)
       // Fire-and-forget in cleanup, but properly awaited internally
       void cleanupTerminalInstance(terminalIdRef.current)
+      shellKindRef.current = null
       setActiveTerminalId(null)
       // Cleanup parser hooks before disposing xterm
       parserDisposablesRef.current.forEach((d) => d.dispose())
@@ -688,6 +693,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     const unsubscribe = window.api.file.onProjectChanged(async (data) => {
       // Kill current terminal session (Phase 1.1 bug fix - use centralized cleanup)
       await cleanupTerminalInstance(terminalIdRef.current)
+      shellKindRef.current = null
       setActiveTerminalId(null)
       // Cleanup parser hooks before disposing xterm
       parserDisposablesRef.current.forEach((d) => d.dispose())
@@ -909,70 +915,41 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
 
 
   /**
-   * Handle screenshot capture (issue #86)
+   * Click handler for the screen-capture button.
    *
-   * Captures the terminal ID at click time, invokes the screenshot service,
-   * and pastes the resulting path to the terminal. Handles various error
-   * conditions including permission denial, timeout, and terminal closure.
-   *
-   * @param mode - Screenshot capture mode: 'screen', 'window', or 'area'
-   * @param displayId - Optional display ID for 'screen' mode (multi-monitor support)
+   * Refreshes displays at click time so plugged-in / unplugged monitors are
+   * reflected immediately; with multi-monitor we open the picker, otherwise
+   * we capture the primary display directly.
    */
-  const handleScreenshot = useCallback(async (mode: 'screen' | 'window' | 'area', displayId?: number) => {
-    // Capture terminal ID at click time to ensure we paste to the correct terminal
-    // even if user switches terminals during interactive window/area selection
-    const capturedTerminalId = terminalIdRef.current
+  const onCaptureScreenClick = useCallback(async () => {
+    const fresh = await refreshDisplays()
+    if (fresh.length > 1) {
+      setShowScreenSelectDialog(true)
+    } else {
+      handleScreenshot('screen')
+    }
+  }, [refreshDisplays, setShowScreenSelectDialog, handleScreenshot])
 
-    if (!capturedTerminalId) {
-      showWarningToast('No terminal', 'Open a terminal first')
+  /**
+   * Click handler for the window-capture button.
+   *
+   * On macOS the system-native screencapture picker is used, so we just
+   * trigger capture directly. On Windows / Linux we first enumerate windows
+   * and open the in-app thumbnail picker (#164).
+   */
+  const onCaptureWindowClick = useCallback(async () => {
+    if (hasNativeWindowPicker) {
+      handleScreenshot('window')
       return
     }
-
-    setCapturingMode(mode)
-
+    setIsLoadingWindowSources(true)
+    setShowWindowPickerDialog(true)
     try {
-      const result = await window.api.screenshot.capture({ mode, displayId })
-
-      if (!result.success) {
-        if (result.errorCode === 'SCREENSHOT_CANCELLED') {
-          // Silent - user cancelled intentionally (pressed Escape)
-          return
-        } else if (result.errorCode === 'SCREENSHOT_TIMEOUT') {
-          showErrorToast('Timeout', 'Screenshot capture timed out after 30 seconds')
-        } else if (result.errorCode === 'SCREENSHOT_PERMISSION_DENIED') {
-          showErrorToast('Permission required', 'Grant screen recording permission in System Settings > Privacy & Security')
-        } else {
-          showErrorToast('Capture failed', result.error || 'Unknown error')
-        }
-        return
-      }
-
-      // Verify terminal still exists after capture completes
-      const currentTerminalId = terminalIdRef.current
-      if (!currentTerminalId) {
-        // Terminal closed during capture - show full path in toast for manual copy
-        showInfoToast('Terminal closed', `Screenshot saved to: ${result.filePath}`)
-        return
-      }
-
-      // Paste path to terminal with shell-safe escaping (single quotes)
-      // Uses same escaping as drag-drop for consistency
-      const quotedPath = escapePathForShell(result.filePath!)
-      await window.api.terminal.write(currentTerminalId, quotedPath)
-
-      // Show success toast with filename only (not full path)
-      const filename = result.filePath?.split('/').pop() || 'screenshot.png'
-      showSuccessToast('Screenshot captured', filename)
-
-      // Return focus to terminal after capture
-      xtermRef.current?.focus()
-    } catch (error) {
-      showErrorToast('Error', 'Screenshot capture failed unexpectedly')
-      logger.error('Screenshot capture error', error instanceof Error ? error : undefined)
+      await refreshWindowSources()
     } finally {
-      setCapturingMode(null)
+      setIsLoadingWindowSources(false)
     }
-  }, [])
+  }, [hasNativeWindowPicker, handleScreenshot, refreshWindowSources, setShowWindowPickerDialog])
 
   /**
    * Handle camera photo capture result (Spec #014)
@@ -1014,6 +991,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const handleRestartTerminal = useCallback(async () => {
     // Kill current terminal session (Phase 1.1 bug fix - use centralized cleanup)
     await cleanupTerminalInstance(terminalIdRef.current)
+    shellKindRef.current = null
     setActiveTerminalId(null)
 
     // Cleanup parser hooks before disposing xterm
@@ -1142,28 +1120,22 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
             <span className="sidebar-panel-title">Terminal</span>
             {terminalId && (
               <>
-                {/* Screenshot capture buttons - macOS only (issue #86) */}
-                {isMacOS && (
+                {/* Screenshot capture buttons (#86 macOS → #164 cross-platform).
+                  * Loading state via `icon-btn--loading` is announced to SRs via
+                  * dynamic `aria-label` + `aria-busy` (#164 F[39]) plus a shared
+                  * live region below. */}
+                {isScreenshotSupported && (
                   <>
-                    {/* Screen capture: checks for multi-monitor at click time */}
                     <button
                       className={`icon-btn${capturingMode === 'screen' ? ' icon-btn--loading' : ''}`}
-                      onClick={async () => {
-                        // Refresh displays and check count at click time
-                        const result = await window.api.screenshot.getDisplays()
-                        const freshDisplays = result.displays
-                        setDisplays(freshDisplays)
-
-                        if (freshDisplays.length > 1) {
-                          // Multiple monitors - show selection dialog
-                          setShowScreenSelectDialog(true)
-                        } else {
-                          // Single monitor - capture directly
-                          handleScreenshot('screen')
-                        }
-                      }}
+                      onClick={onCaptureScreenClick}
                       title="Capture screen"
-                      aria-label="Capture full screen screenshot"
+                      aria-label={
+                        capturingMode === 'screen'
+                          ? 'Capturing screen, please wait'
+                          : 'Capture full screen screenshot'
+                      }
+                      aria-busy={capturingMode === 'screen'}
                       disabled={!terminalId || capturingMode !== null}
                       data-testid={TEST_IDS.TERMINAL_BTN_CAPTURE_SCREEN}
                     >
@@ -1175,30 +1147,66 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                       zIndex={10000}
                       onSelect={(displayId) => {
                         setShowScreenSelectDialog(false)
-                        handleScreenshot('screen', displayId)
+                        handleScreenshot('screen', { displayId })
                       }}
                       onCancel={() => setShowScreenSelectDialog(false)}
                     />
                     <button
                       className={`icon-btn${capturingMode === 'window' ? ' icon-btn--loading' : ''}`}
-                      onClick={() => handleScreenshot('window')}
+                      onClick={onCaptureWindowClick}
                       title="Capture window"
-                      aria-label="Capture window screenshot"
+                      aria-label={
+                        capturingMode === 'window'
+                          ? 'Capturing window, please wait'
+                          : 'Capture window screenshot'
+                      }
+                      aria-busy={capturingMode === 'window'}
                       disabled={!terminalId || capturingMode !== null}
                       data-testid={TEST_IDS.TERMINAL_BTN_CAPTURE_WINDOW}
                     >
                       <AppWindow size={14} />
                     </button>
+                    {!hasNativeWindowPicker && (
+                      <WindowPickerDialog
+                        isOpen={showWindowPickerDialog}
+                        sources={windowSources}
+                        isLoading={isLoadingWindowSources}
+                        zIndex={10000}
+                        onSelect={(windowId) => {
+                          setShowWindowPickerDialog(false)
+                          handleScreenshot('window', { windowId })
+                        }}
+                        onCancel={() => setShowWindowPickerDialog(false)}
+                      />
+                    )}
                     <button
                       className={`icon-btn${capturingMode === 'area' ? ' icon-btn--loading' : ''}`}
                       onClick={() => handleScreenshot('area')}
                       title="Capture area"
-                      aria-label="Capture area screenshot"
+                      aria-label={
+                        capturingMode === 'area'
+                          ? 'Capturing area, please wait'
+                          : 'Capture area screenshot'
+                      }
+                      aria-busy={capturingMode === 'area'}
                       disabled={!terminalId || capturingMode !== null}
                       data-testid={TEST_IDS.TERMINAL_BTN_CAPTURE_AREA}
                     >
                       <BoxSelect size={14} />
                     </button>
+                    {/* Shared SR status for the in-progress capture.
+                      *
+                      * (#164 round-2 F#4): the live region MUST be present
+                      * before the value changes, otherwise NVDA / JAWS see a
+                      * region added and removed and never announce its
+                      * contents. Always render the span; the text content
+                      * (empty when idle) is what changes, which is what AT
+                      * listens for. */}
+                    <span role="status" aria-live="polite" className="sr-only">
+                      {capturingMode === 'screen' && 'Capturing screen…'}
+                      {capturingMode === 'window' && 'Capturing window…'}
+                      {capturingMode === 'area' && 'Capturing area…'}
+                    </span>
                   </>
                 )}
                 {/* Camera photo capture button (Spec #014) - cross-platform */}

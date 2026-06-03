@@ -10,7 +10,10 @@ import type { LockResult, LockStatus } from '../shared/ipc/project-lock-schema'
 import type {
   ScreenshotCaptureRequest,
   ScreenshotCaptureResponse,
-  GetDisplaysResponse
+  GetDisplaysResponse,
+  EnumerateWindowsRequest,
+  EnumerateWindowsResponse,
+  ScreenshotCapabilities
 } from '../shared/ipc/screenshot-schema'
 import type {
   CameraSaveRequest,
@@ -183,13 +186,23 @@ declare global {
       }
       terminal: {
         isAvailable: (terminalId?: string) => Promise<{ success: boolean; available: boolean; initialized?: boolean }>
+        /**
+         * Create a terminal. Response includes `shellKind` so renderer
+         * path-quoting works without a follow-up IPC round-trip
+         * (#164 round-2 F#1).
+         */
         create: (config?: {
           shell?: string
           cwd?: string
           env?: Record<string, string>
           cols?: number
           rows?: number
-        }) => Promise<{ success: boolean; terminalId?: string; error?: string }>
+        }) => Promise<{
+          success: boolean
+          terminalId?: string
+          shellKind?: 'posix' | 'cmd' | 'powershell'
+          error?: string
+        }>
         write: (terminalId: string, data: string) => Promise<{ success: boolean; error?: string }>
         resize: (terminalId: string, cols: number, rows: number) => void
         kill: (terminalId: string) => Promise<{ success: boolean; error?: string }>
@@ -254,14 +267,23 @@ declare global {
         exportToDocx: (request: DocxExportRequest) => Promise<DocxExportResponse>
       }
       /**
-       * Screenshot capture operations (macOS only)
-       * @see Issue #86 - Screenshot capture buttons for terminal panel
+       * Screenshot capture operations (cross-platform: macOS native +
+       * Windows / Linux desktopCapturer).
+       * @see Issue #86 - original macOS screenshot capture
+       * @see Issue #164 - Windows Phase 3 parity
        */
       screenshot: {
         /** Get available displays for multi-monitor support */
         getDisplays: () => Promise<GetDisplaysResponse>
+        /** Enumerate capturable windows (empty array on macOS — uses native picker) */
+        enumerateWindows: (request?: EnumerateWindowsRequest) => Promise<EnumerateWindowsResponse>
         /** Capture a screenshot */
         capture: (request: ScreenshotCaptureRequest) => Promise<ScreenshotCaptureResponse>
+        /** Platform capability matrix (#164 F[31]) */
+        getCapabilities: () => Promise<ScreenshotCapabilities>
+        // Overlay-only verbs are NOT exposed here (#164 F[6]). The overlay
+        // window's preload (`src/preload/screenshotOverlay.ts`) exposes them
+        // as `window.overlayApi.areaSelected` / `areaCancelled`.
       }
       /**
        * Camera photo capture operations
@@ -376,6 +398,19 @@ declare global {
          */
         getArch: () => NodeJS.Architecture
       }
+    }
+    /**
+     * Area-select overlay API exposed only by the per-display overlay
+     * BrowserWindows via `src/preload/screenshotOverlay.ts`. `undefined`
+     * in every other renderer — declared optional so callers must guard.
+     *
+     * @see Issue #164 (lens-review F[6]) - split preload bundle.
+     */
+    overlayApi?: {
+      areaSelected: (
+        selection: import('../shared/ipc/screenshot-schema').AreaSelection
+      ) => void
+      areaCancelled: () => void
     }
   }
 }

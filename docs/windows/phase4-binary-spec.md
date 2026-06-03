@@ -149,6 +149,12 @@ git diff --stat <old-SHA>..<new-SHA>
 
 Review checklist: see [`docs/build/whisper-binaries.md#diff-review-checklist-every-upstream-bump`](../build/whisper-binaries.md#diff-review-checklist-every-upstream-bump).
 
+## CPU-unsupported exit-code contract (POSIX vs Win32)
+
+`src/main/services/LocalWhisperService.ts:831-843` branches the CPU-unsupported detection on `process.platform === 'win32'` and reads from `WIN32_CPU_UNSUPPORTED_EXIT_CODES` or `POSIX_CPU_UNSUPPORTED_EXIT_CODES` accordingly. The `POSIX_*` set is currently **macOS-only by accident-of-support**: `classifyPlatform()` in `whisper-assets.ts:171-201` rejects Linux outright with a `WHISPER_UNSUPPORTED_PLATFORM` reason, so the POSIX path never actually executes against a Linux SIGILL today.
+
+Any future Linux enablement must validate the `POSIX_CPU_UNSUPPORTED_EXIT_CODES` set against Linux SIGILL exit codes before unlocking the platform; the macOS values are not guaranteed to match. The branch is correct today; the contract is just implicit.
+
 ## History
 
 | Erfana app versions | Pinned whisper build | Date pinned | Notes |

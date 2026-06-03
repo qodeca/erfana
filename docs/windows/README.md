@@ -14,7 +14,7 @@ This folder tracks the work to bring Erfana to full Windows parity with macOS.
 ```bash
 # Windows 11 host (PowerShell or Git Bash)
 npm install
-npm run test:main        # 243 files / ~7887 tests baseline (Phase-2 UAT added 60 bootstrap tests)
+npm run test:main        # baseline drifts per release — see docs/ci.md for current count
 npm run dev              # smoke-test Electron + terminal
 
 # macOS host (regression check for cross-platform changes)
@@ -27,7 +27,7 @@ See [`contributing.md`](contributing.md) for the full pre-PR test matrix.
 
 ## Context
 
-Erfana (v0.9.4, Electron 39) now ships with first-class Windows support for Phases 0–2 + 4: the dev loop, terminal parity, file-ops safety (reserved-filename guard), git-status discovery, LibreOffice-backed DOCX import, and local whisper.cpp transcription (Windows x64) all work on Windows 11 Pro. The codebase started with partial Windows awareness — `CmdOrCtrl` accelerators, case-insensitive path folding in `ProjectService.ts`, `where`/`which` switching in the git worker, PowerShell shell selection in `TerminalService`, NSIS target in `electron-builder.yml`, `ffmpeg-static` (Windows binary), cross-platform chokidar config in `PlatformConfig.ts` — but several gaps were **hard blockers**, and a handful of "looks handled" areas were silently broken or dead code. Those blockers were resolved in v0.9.3.
+Erfana (v0.11.2, Electron 39) ships with first-class Windows support for Phases 0–2 + 4: the dev loop, terminal parity, file-ops safety (reserved-filename guard), git-status discovery, LibreOffice-backed DOCX import, and local whisper.cpp transcription (Windows x64) all work on Windows 11 Pro. The codebase started with partial Windows awareness — `CmdOrCtrl` accelerators, case-insensitive path folding in `ProjectService.ts`, `where`/`which` switching in the git worker, PowerShell shell selection in `TerminalService`, NSIS target in `electron-builder.yml`, `ffmpeg-static` (Windows binary), cross-platform chokidar config in `PlatformConfig.ts` — but several gaps were **hard blockers**, and a handful of "looks handled" areas were silently broken or dead code. Those blockers were resolved in v0.9.3.
 
 The goal is **full Windows parity** — every feature that works on macOS must work on Windows, including local Whisper transcription and screen capture. **Phase 4 closed the local-Whisper gap for both macOS and Windows x64** (the pre-Phase-4 macOS path was also broken — ggml-org never published a macOS CLI binary; Phase 4 self-hosts both). Phase 3 (screenshots) and Phases 5–6 (distribution/signing/auto-update/polish) close the remaining gaps.
 
@@ -50,7 +50,7 @@ The goal is **full Windows parity** — every feature that works on macOS must w
 
 **Canonical status snapshot:** [`implementation-plan.md` § Status snapshot](implementation-plan.md#status-snapshot) — per-phase verification, shipped features, and remaining work all live there. This file covers the document map + onboarding only.
 
-**One-line current state (2026-04-23):** Phases 0, 1, 2 shipped in **v0.9.3** (merged from `windows` → `develop` on 2026-04-22). **Phase 4 (local Whisper, [#165](https://github.com/qodeca/erfana/issues/165)) shipped in [v0.9.4](https://github.com/qodeca/erfana/releases/tag/v0.9.4)** (merge `110f1b9`, tag cut 2026-04-23) — B1+B2+B2c trust chain, B3 UI gate, B4 docs, B5a-f audit-gap closure, D12 test rewrite, plus post-merge `faaee61` CI stability fix. Windows NSIS installer cut 2026-04-23; macOS + Linux follow on native hosts. Windows-host test-flake remediation pool ([#172](https://github.com/qodeca/erfana/issues/172)) + ThrottledWorker offset-deque refactor ([#173](https://github.com/qodeca/erfana/issues/173)) also merged 2026-04-23 (`c3cc005`). Phase 3 (screenshots, [#164](https://github.com/qodeca/erfana/issues/164)) + Phases 5–6 ([#166](https://github.com/qodeca/erfana/issues/166) / [#167](https://github.com/qodeca/erfana/issues/167)) unstarted. Deferred items D1–D12 → [#168](https://github.com/qodeca/erfana/issues/168) (D12 resolved 2026-04-23). Dependabot triage → [#169](https://github.com/qodeca/erfana/issues/169).
+**One-line current state (2026-06-03, v0.11.2):** Phases 0–2 shipped in **v0.9.3** (2026-04-22). **Phase 4** (local Whisper, [#165](https://github.com/qodeca/erfana/issues/165)) shipped in **v0.9.4** (merge `110f1b9`, 2026-04-23). The multi-platform signed release pipeline ([#174](https://github.com/qodeca/erfana/issues/174)) shipped in v0.9.5 — this delivered the Phase 5 auto-updater + Windows signing scope ahead of the formal phase, so #166 is now narrowed to NSIS UX only. Linux distribution was discontinued in v0.11.2 ([#206](https://github.com/qodeca/erfana/pull/206)); macOS now ships only the arm64 DMG. **Phase 3 (screenshots, [#164](https://github.com/qodeca/erfana/issues/164)) remains unstarted; Phase 5 (#166 — NSIS UX) and Phase 6 (#167) are the open phases.** Deferred items D1–D8 → [#168](https://github.com/qodeca/erfana/issues/168) (D1 amended out 2026-04-21; D9–D12 in [`deferred-work-phase4.md`](deferred-work-phase4.md), D12 resolved 2026-04-23). SmartScreen reputation ramp → [#177](https://github.com/qodeca/erfana/issues/177).
 
 ## How the analysis was produced
 

@@ -43,9 +43,35 @@
   background-color: var(--color-bg-active);
 }
 
-.screen-select-item:focus {
+/* `:focus-visible` instead of `:focus` so mouse-clicks don't flash the
+ * indicator; #164 F[35], round-2 F#35. Box-shadow surfaces the focus state
+ * even when the option is also selected (same border color). The hex
+ * fallback was dropped in round-2 — token-only values keep theming
+ * consistent across light/dark/HCM. */
+.screen-select-item:focus-visible {
   outline: none;
   border-color: var(--color-accent-primary);
+  box-shadow: 0 0 0 3px var(--color-accent-primary);
+}
+
+/* Forced-colors / Windows High Contrast (#164 F[17], round-2 F#19).
+ * Pair `Highlight` background with `HighlightText` foreground so the label
+ * survives the system palette. */
+@media (forced-colors: active) {
+  .screen-select-item {
+    border: 1px solid CanvasText;
+    forced-color-adjust: none;
+  }
+  .screen-select-item.selected,
+  .screen-select-item:focus-visible {
+    border: 2px solid Highlight;
+    background-color: Highlight;
+    color: HighlightText;
+  }
+  .screen-select-item-label,
+  .screen-select-item-resolution {
+    color: inherit;
+  }
 }
 
 /* Display name and resolution container */

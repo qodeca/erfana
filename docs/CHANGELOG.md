@@ -93,6 +93,8 @@ Three operational/metadata shifts on 2026-04-25 with no runtime impact:
 
 *Released 2026-04-25. Tag [`v0.9.5`](https://github.com/qodeca/erfana/releases/tag/v0.9.5).*
 
+> *Note added 2026-06-03: Linux distribution references in this entry are historical. The Linux build target was dropped in v0.11.2 ([#206](https://github.com/qodeca/erfana/pull/206)). The signed pipeline + signing infrastructure described below remain accurate for macOS + Windows.*
+
 ### Multi-platform signed release pipeline ([#174](https://github.com/qodeca/erfana/issues/174))
 
 Single GitHub Actions workflow (`.github/workflows/release.yml`) now produces signed, notarized artifacts for macOS, Windows, and Linux on a single tag push. Replaces the prior tag-only flow used through v0.9.4.
@@ -135,6 +137,8 @@ Supersedes the tag-only release flow used through v0.9.4. v0.9.5 is the first re
 ## 0.9.4
 
 *Released 2026-04-23 (Windows installer; macOS + Linux builds follow on native build hosts). Tag [`v0.9.4`](https://github.com/qodeca/erfana/releases/tag/v0.9.4).*
+
+> *Note added 2026-06-03: Linux references in this entry are historical. The Linux distribution target was dropped in v0.11.2 ([#206](https://github.com/qodeca/erfana/pull/206)).*
 
 ### Windows-host test-flake remediation ([#172](https://github.com/qodeca/erfana/issues/172), [#173](https://github.com/qodeca/erfana/issues/173))
 
