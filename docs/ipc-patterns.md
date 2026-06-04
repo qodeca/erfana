@@ -138,10 +138,12 @@ if (!writeResult.success) {
 | `project-lock:check` | project-lock-handlers | Check lock status for project path |
 | `project-lock:requestFocus` | project-lock-handlers | Request focus from lock holder |
 | `project-lock:cleanup` | project-lock-handlers | Cleanup stale locks |
-| `screenshot:captureScreen` | screenshot-handlers | Capture full screen (macOS) |
-| `screenshot:captureWindow` | screenshot-handlers | Window picker capture (macOS) |
-| `screenshot:captureArea` | screenshot-handlers | Area selection capture (macOS) |
+| `screenshot:capture` | screenshot-handlers | Cross-platform capture, mode-discriminated request (`screen` / `window` (Windows) / `window-native` (macOS) / `area`); Zod-validated, `.strict()` (#164) |
 | `screenshot:getDisplays` | screenshot-handlers | Get available displays for multi-monitor |
+| `screenshot:getCapabilities` | screenshot-handlers | Per-capturer capability matrix (`supported`, `hasNativeWindowPicker`, `areaCaptureMode`) — renderer hook calls once on mount instead of branching on `process.platform` (#164) |
+| `screenshot:enumerateWindows` | screenshot-handlers | List capturable windows for the in-app picker on Windows; returns `availability`-discriminated union (`'enumerable'` / `'native-picker'` (macOS) / `'unsupported'`) with bounded `thumbnailDataUrl` (#164) |
+| `screenshot:areaSelected` | overlay-scoped (frame-IPC) | Overlay-only: renderer posts the chosen rectangle. Listener attached per-call by `AreaSelectOverlay.selectArea()` via `overlay.webContents.mainFrame.ipc.on`; rejected on token / `senderFrame.url` mismatch. Not registered in the global handler (#164) |
+| `screenshot:areaCancelled` | overlay-scoped (frame-IPC) | Overlay-only: renderer signals user cancel (Escape / blur / close). Same per-call frame-scoped attachment as `screenshot:areaSelected`; not registered globally (#164) |
 | `external-file:validate` | external-file-handlers | Validate external file before copy/move |
 | `external-file:copy` | external-file-handlers | Copy external file into project |
 | `external-file:move` | external-file-handlers | Move external file into project |

@@ -8,17 +8,17 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 ## Status snapshot
 
-*Last updated 2026-06-03, anchored on v0.11.2 (Windows NSIS installer + macOS arm64 DMG). Phase 3 implementation now in flight on `feature/windows-phase-3-screenshots`.*
+*Last updated 2026-06-04, anchored on v0.11.2 (Windows NSIS installer + macOS arm64 DMG). Phase 3 (screenshots) merged to `develop` on 2026-06-03 via [PR #208](https://github.com/qodeca/erfana/pull/208) (merge `9b2f91a`); pending first tagged release.*
 
 **Current state:** Phases 0, 1, 2 shipped to `develop` in **v0.9.3** (merge `c1e085d`, release `0b593a1`, tag `v0.9.3` on 2026-04-22). **Phase 4 (local Whisper parity, [#165](https://github.com/qodeca/erfana/issues/165)) shipped in [v0.9.4](https://github.com/qodeca/erfana/releases/tag/v0.9.4)** (merge `110f1b9`, tag 2026-04-23) — see the Phase 4 section below and [`docs/build/whisper-binaries.md`](../build/whisper-binaries.md). In parallel, the Windows-host test-flake remediation pool ([#172](https://github.com/qodeca/erfana/issues/172)) + ThrottledWorker offset-deque refactor ([#173](https://github.com/qodeca/erfana/issues/173)) shipped the same day (`c3cc005`).
 
-Since v0.9.4 the project has shipped five non-Windows-phase releases without advancing the Windows roadmap: **v0.9.5** (multi-platform signed release pipeline via [#174](https://github.com/qodeca/erfana/issues/174) — Azure Artifact Signing for Windows, macOS notarization; SmartScreen reputation tracked in [#177](https://github.com/qodeca/erfana/issues/177)), **v0.9.6** (`spawn-helper` `chmod 0755` fix in `afterPack`), **v0.10.0–v0.10.1** (apply-to-document footer for mutation prompts, 22-diagram Visualize, terminal expand), and **v0.11.0–v0.11.2** (Linux distribution discontinued via [#206](https://github.com/qodeca/erfana/pull/206); macOS now arm64-only; clipboard service via [#203](https://github.com/qodeca/erfana/issues/203); chokidar v3 pin against FD exhaustion in `1139bf2`). **Phase 3 (screenshot parity, [#164](https://github.com/qodeca/erfana/issues/164))** is now implemented on `feature/windows-phase-3-screenshots`: `ScreenshotService` became a thin dispatcher selecting `MacScreenshotCapturer` (existing `screencapture` flow) or `DesktopCapturerScreenshotCapturer` (new — Electron `desktopCapturer` + `nativeImage` + an in-app `ScreenshotOverlayWindow` for area selection), and the renderer hook + UI gate were renamed from `isMacOS` → `isScreenshotSupported`. Branch pending merge + UAT verification on Windows. Phase 5 (#166) remains narrowed to NSIS UX only — auto-updater and Windows signing both shipped via #174 in v0.9.5. Phase 6 (#167) work continues on `feature/windows-phase-6-*` branches off `develop`.
+Since v0.9.4 the project has shipped five non-Windows-phase releases without advancing the Windows roadmap: **v0.9.5** (multi-platform signed release pipeline via [#174](https://github.com/qodeca/erfana/issues/174) — Azure Artifact Signing for Windows, macOS notarization; SmartScreen reputation tracked in [#177](https://github.com/qodeca/erfana/issues/177)), **v0.9.6** (`spawn-helper` `chmod 0755` fix in `afterPack`), **v0.10.0–v0.10.1** (apply-to-document footer for mutation prompts, 22-diagram Visualize, terminal expand), and **v0.11.0–v0.11.2** (Linux distribution discontinued via [#206](https://github.com/qodeca/erfana/pull/206); macOS now arm64-only; clipboard service via [#203](https://github.com/qodeca/erfana/issues/203); chokidar v3 pin against FD exhaustion in `1139bf2`). **Phase 3 (screenshot parity, [#164](https://github.com/qodeca/erfana/issues/164))** shipped on `develop` 2026-06-03 via [PR #208](https://github.com/qodeca/erfana/pull/208) (merge `9b2f91a`): `ScreenshotService` is a thin dispatcher selecting `MacScreenshotCapturer` (existing `screencapture` flow) or `DesktopCapturerScreenshotCapturer` (Electron `desktopCapturer` + `nativeImage` + a per-display transparent `AreaSelectOverlay` BrowserWindow); the renderer ships `WindowPickerDialog` for in-app window selection (thumbnail grid with roving tabindex) and a Tab-keyboard mode in `ScreenshotOverlay`; security boundary uses a dedicated `screenshotOverlay.ts` preload + per-capture UUID nonce + frame-scoped IPC + sender-frame URL validation on the four public `screenshot:*` handlers; the renderer hook + UI gate are `isScreenshotSupported` (was `isMacOS` pre-PR). UAT verified on Windows host 2026-06-04 (screen / window / area / camera all captured). Phase 5 (#166) remains narrowed to NSIS UX only — auto-updater and Windows signing both shipped via #174 in v0.9.5. Phase 6 (#167) work continues on `feature/windows-phase-6-*` branches off `develop`.
 
 **Phase issue state (canonical, refreshed 2026-06-03):**
 
 | Phase | Issue | State | Notes |
 |---|---|---|---|
-| 3 | [#164](https://github.com/qodeca/erfana/issues/164) | OPEN, branch in flight | strategy pattern landed on `feature/windows-phase-3-screenshots`; UAT + merge pending |
+| 3 | [#164](https://github.com/qodeca/erfana/issues/164) | ✅ MERGED to `develop` ([PR #208](https://github.com/qodeca/erfana/pull/208), `9b2f91a`, 2026-06-03) | strategy + dispatcher, dedicated overlay preload + per-capture nonce, in-app `WindowPickerDialog`, keyboard area-select; UAT passed on Windows 2026-06-04; pending first tagged release |
 | 4 | [#165](https://github.com/qodeca/erfana/issues/165) | Shipped v0.9.4 (`110f1b9`) | Issue closure pending in alignment pass |
 | 5 | [#166](https://github.com/qodeca/erfana/issues/166) | OPEN, narrowed to NSIS UX only | Auto-updater + signing landed via #174 in v0.9.5 |
 | 6 | [#167](https://github.com/qodeca/erfana/issues/167) | OPEN | `#158` reference dropped (#158 closed 2026-04-22); D6 owned by Phase 5 not Phase 6 |
@@ -65,14 +65,14 @@ macOS host (Phase 0 AC #4, 2026-04-20):
 - `npm run test:cov` → 7532/7532 tests pass, 0 failures across main / preload / renderer
 - `npm run build:mac` → x64 + arm64 DMGs at v0.9.2 baseline. As of v0.11.2 macOS ships only the arm64 DMG.
 
-## Next session — start Phase 3
+## Next session — start Phase 5 (NSIS UX)
 
-**Phase 2 closure is complete** (all seven streams A–G executed; see [`phase2-closure.md`](phase2-closure.md) for the historical breakdown). **Phase 4 (local Whisper) subsequently merged to `develop` on 2026-04-23 ahead of Phase 3** — the order was driven by [#165](https://github.com/qodeca/erfana/issues/165) scope becoming urgent once step-zero verification surfaced the ggml-org macOS gap. Windows work now resumes on Phase 3 (screenshot parity, [#164](https://github.com/qodeca/erfana/issues/164)), still the next unstarted phase.
+**Phase 3 (screenshot parity) merged to `develop` on 2026-06-03 via [PR #208](https://github.com/qodeca/erfana/pull/208) (merge `9b2f91a`)** — UAT verified on Windows host 2026-06-04. **Phase 4 (local Whisper) merged to `develop` on 2026-04-23 ahead of Phase 3** — the order was driven by [#165](https://github.com/qodeca/erfana/issues/165) scope becoming urgent once step-zero verification surfaced the ggml-org macOS gap. Windows work now resumes on **Phase 5 (NSIS UX, [#166](https://github.com/qodeca/erfana/issues/166))** — the next unstarted phase since auto-updater + Windows signing already shipped via #174 in v0.9.5.
 
-### Open Windows-tagged issues (refreshed 2026-06-03)
+### Open Windows-tagged issues (refreshed 2026-06-04)
 
-- [#164](https://github.com/qodeca/erfana/issues/164) — Phase 3: screenshot parity (next up; unstarted)
-- [#166](https://github.com/qodeca/erfana/issues/166) — Phase 5: NSIS UX only (auto-updater + Windows signing shipped via #174 in v0.9.5)
+- [#164](https://github.com/qodeca/erfana/issues/164) — Phase 3: screenshot parity (✅ merged via [PR #208](https://github.com/qodeca/erfana/pull/208), closure queued for the next release tag)
+- [#166](https://github.com/qodeca/erfana/issues/166) — Phase 5: NSIS UX only (next up; auto-updater + Windows signing shipped via #174 in v0.9.5)
 - [#167](https://github.com/qodeca/erfana/issues/167) — Phase 6: polish, Windows CI guard, visual baselines (#158 reference dropped; D6 owned by Phase 5)
 - [#168](https://github.com/qodeca/erfana/issues/168) — D1–D8 deferred items meta (D1 amended out; D2/D3 re-evaluate after Phase 4 closed without trigger)
 - [#177](https://github.com/qodeca/erfana/issues/177) — SmartScreen reputation tracking (closes at v0.9.9 or "clean" status)
@@ -243,31 +243,27 @@ Four parallel reviewers (architecture, solution, code, security) audited #160-#1
 
 ### Status
 
-All four sub-issues + umbrella closed 2026-04-21. Phase 2 **shipped in v0.9.3** on 2026-04-22 (merge `c1e085d`, release `0b593a1`). Next up: Phase 3 (screenshots, [#164](https://github.com/qodeca/erfana/issues/164)).
+All four sub-issues + umbrella closed 2026-04-21. Phase 2 **shipped in v0.9.3** on 2026-04-22 (merge `c1e085d`, release `0b593a1`). Phase 3 (screenshots, [#164](https://github.com/qodeca/erfana/issues/164)) **merged to `develop` on 2026-06-03 via [PR #208](https://github.com/qodeca/erfana/pull/208) (`9b2f91a`)** — pending first tagged release. Next phase up: Phase 5 (NSIS UX, [#166](https://github.com/qodeca/erfana/issues/166)).
 
 ---
 
-## Phase 3 — Screenshot parity
+## Phase 3 — Screenshot parity — ✅ MERGED to `develop` on 2026-06-03 (`9b2f91a`) via [PR #208](https://github.com/qodeca/erfana/pull/208)
 
-**Why:** Large chunk of work. Target feature parity with the macOS modes (full screen, window, area).
+**Why:** Feature parity with the macOS modes (full screen, window, area) on Windows.
 
-Changes:
+**What shipped (merged to `develop` 2026-06-03, `9b2f91a`):**
 
-1. **Main-process capture strategy** (fixes B1) — `ScreenshotService.ts`
-   - Drop the `process.platform !== 'darwin'` guard; replace with a dispatcher on `process.platform`.
-   - On Windows, use **Electron's `desktopCapturer.getSources()`** to list screens and windows, then `nativeImage` to grab the image. Pure Electron API, zero extra native deps, works cross-platform. Tradeoff: "area selection" needs an in-app selector overlay rather than OS-level.
-   - Alternative (rejected as fragile): shell out to PowerShell `Add-Type -AssemblyName System.Windows.Forms` + `Graphics.CopyFromScreen`.
-2. **Renderer "area selection" overlay** (since Windows has no `screencapture -i` equivalent)
-   - Create a `ScreenshotOverlayWindow` — frameless, transparent, fullscreen, always-on-top.
-   - User drags a selection rectangle; overlay returns `{x, y, w, h}` to main; main runs `desktopCapturer` on the chosen display and crops via `nativeImage.crop()`.
-   - Optional future consolidation: use the same overlay on macOS too (not required — `screencapture -i` still works).
-3. **Window selection mode**
-   - `desktopCapturer.getSources({ types: ['window'] })` returns a thumbnail + ID per window; main shows a picker modal (reuse existing dialog components) → user picks → capture.
-4. **Multi-monitor**
-   - `getDisplays()` already exists and is cross-platform (`screen.getAllDisplays()`). Wire `displayId` → `desktopCapturer` source via the display's `display_id` property.
-5. **Refactor**: extract `MacScreenshotCapturer` (current code) and `DesktopCapturerScreenshotCapturer` (new) behind an interface; pick strategy in the constructor.
+1. **Strategy + dispatcher** — `ScreenshotService` is a thin factory + dispatcher that picks `MacScreenshotCapturer` (existing `/usr/sbin/screencapture` flow) on darwin or `DesktopCapturerScreenshotCapturer` (Electron `desktopCapturer.getSources` + `nativeImage`) on win32; everything else returns `SCREENSHOT_NOT_SUPPORTED`. Capabilities live on each capturer (`getCapabilities()`); the service owns truncation + the `availability` discriminator. `createScreenshotService(capturer?)` factory enables test injection without `process.platform` shims.
+2. **Per-display area-select overlay** (`src/main/services/screenshot/ScreenshotOverlayWindow.ts`) — frameless transparent always-on-top BrowserWindow per display, owned via constructor injection. `Promise.allSettled` + per-overlay 5 s `did-finish-load` watchdog so a slow display does not block the round. `setFullScreen` is intentionally not called on Windows (kept transparent via `screen-saver` always-on-top level).
+3. **In-app window picker** (`src/renderer/src/components/Dialog/WindowPickerDialog.tsx`) — thumbnail grid with roving tabindex, `useId()` titles, real width/height from `source.thumbnail.getSize()`, forced-colors `Highlight` + `HighlightText` pairing. Used on Windows; macOS keeps the native `screencapture -iw` picker (no in-app dialog).
+4. **Keyboard area selection** (`src/renderer/src/components/Screenshot/ScreenshotOverlay.tsx`) — Tab from idle initialises a 240×160 rectangle centred in the viewport; arrows translate by 10 px, Shift+arrows resize, Alt+arrows step by 50 px, Space/Enter capture, Esc cancel. `role="group"` + `aria-describedby` shortcut help discoverable before Tab. WCAG 2.2 SC 2.1.1 / 2.5.7.
+5. **Security boundary** — dedicated `src/preload/screenshotOverlay.ts` exposes the overlay-only `areaSelected` / `areaCancelled` verbs; the main editor renderer never receives them. Per-capture UUID nonce delivered via `webPreferences.additionalArguments`; frame-scoped IPC listeners reject token mismatches and `senderFrame.url` mismatches. The four public `screenshot:*` handlers (`getDisplays`, `getCapabilities`, `enumerateWindows`, `capture`) validate `event.senderFrame.url` against the main renderer's loaded URL (mirrors `clipboard-handlers`). Mount discriminator in `main.tsx` is `window.overlayApi !== undefined` (the dedicated preload's mere presence) — `will-navigate` does not fire on hash changes, so the hash is content only.
+6. **Schema split + tightening** — `ScreenshotCaptureRequestSchema` is a `.strict()` discriminated union on four modes: `'screen'`, `'window'` (Windows; `windowId: string` required), `'window-native'` (macOS native picker), `'area'`. `EnumerateWindowsResponseSchema` is a discriminated union on `availability` (`sources: z.tuple([])` for non-enumerable variants); `thumbnailDataUrl` is bounded to 600 KB and refined to `data:image/`.
+7. **shellKind plumbing** — `terminal:create` returns `{ terminalId, shellKind }`; the screenshot path-paste reads it from a `shellKindRef` and routes through `escapePathForShell(path, shellKind)` so PowerShell paths quote with `'...''` (doubled single quotes), cmd uses `"..."`, Git Bash / POSIX uses `'...'` with `'\''` escape.
 
-**Manual validation:** all three modes (screen / window / area) on Windows with single and dual monitors. Screenshot path pastes into terminal as before.
+**Verification (2026-06-04):** all three modes (screen / window / area) captured successfully on a Windows host; camera capture also exercised; clean app quit. Path quoting verified in cmd. macOS regression check pending on a darwin host (see PR description test plan).
+
+**Out-of-scope follow-ups (FT-1..FT-7):** broader `webPreferences` hardening on the main window; cross-package `ErrorCode` / Zod enum sync pattern; E2E screenshot coverage once `e2e.yml` is re-enabled; overlay-only design-token entry; `validateTerminalOwner` audit across all terminal IPC handlers; configurable `WINDOW_PICKER.MAX_SOURCES`. None are blocking; tracked in the PR thread for the follow-up backlog.
 
 ---
 
