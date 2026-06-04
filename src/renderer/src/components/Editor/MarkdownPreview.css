@@ -39,6 +39,16 @@
   font-size: 15px;
   line-height: var(--leading-normal);
   letter-spacing: -0.003em;
+  /* Re-enable text selection inside the preview. The renderer inherits
+   * `user-select: none` from <html> (set by a global library rule), which
+   * silently breaks the "select text → right-click → Explain/Modify/Ask"
+   * prompt flow: window.getSelection().toString() returns '' even after
+   * the user drags across text, so MarkdownPreview's handleContextMenu
+   * sees an empty selection and the preview context menu never renders.
+   * Setting `user-select: text` here restores the gesture for end users
+   * AND makes the e2e test's programmatic Range selection carry text. */
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* Headings - compact spacing with reduced top margins */
