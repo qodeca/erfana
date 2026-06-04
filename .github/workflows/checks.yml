@@ -64,8 +64,51 @@ jobs:
           # postinstall download. Rebuild the allowlisted natives so the
           # binary + node-pty are present for vitest.
           run-postinstall: "true"
+
+      # Guard: chokidar pinned to exact 3.6.0.
+      # v4 removed disableGlobbing — DirectoryWatcherService /
+      # FileWatcherService / GitWatcherService all rely on it (FD-exhaustion
+      # fix shipped in merge 1139bf2). A regenerated lockfile, an
+      # `npm install chokidar` bump, or a transitive declaring ^4 would all
+      # have failed today's clean-checkout typecheck silently in the past;
+      # this guard makes it loud. Runs before tests so we know what's being
+      # tested.
+      - name: Guard - chokidar v3 pinned
+        run: |
+          set -euo pipefail
+          ACTUAL=$(node -p "require('chokidar/package.json').version")
+          if [ "$ACTUAL" != "3.6.0" ]; then
+            echo "::error::chokidar version drift: expected 3.6.0, got $ACTUAL — see package.json overrides and #1416"
+            exit 1
+          fi
+          echo "chokidar pinned at $ACTUAL"
+
       - name: Unit tests
-        run: npm run test:ci
+        # Deprecation tripwire: captures vitest output and fails if any
+        # deprecation warning that ISN'T already on the known-and-tracked
+        # whitelist appears. The known `workspace` / `defineWorkspace`
+        # deprecation is on the whitelist because Phase H of the test-
+        # infrastructure plan migrates it (root vitest.config.ts with
+        # `projects: [...]`). Any other deprecation (e.g. a new vitest 3.x
+        # warning, a Node.js DEPnnn) fires this step.
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/vitest.log"
+          set +e
+          npm run test:ci 2>&1 | tee "$OUT"
+          TEST_EXIT=${PIPESTATUS[0]}
+          set -e
+          # Match deprecation/DEP-warning lines NOT covered by the whitelist.
+          # Whitelist (known, tracked):
+          #   - `workspace` / `defineWorkspace` — vitest 3.2 → 4 migration (Phase H)
+          UNTRACKED=$(grep -iE 'deprecated|DEP[0-9]+' "$OUT" | \
+            grep -viE 'workspace|defineWorkspace' || true)
+          if [ -n "$UNTRACKED" ]; then
+            echo "::error::Untracked deprecation warning(s) detected:"
+            echo "$UNTRACKED"
+            exit 1
+          fi
+          exit "$TEST_EXIT"
 
   build:
     name: Build
