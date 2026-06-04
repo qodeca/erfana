@@ -68,9 +68,9 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      # actions/checkout v4.2.2
+      # actions/checkout v6.0.3
       - name: Checkout tag
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Assert release notes file exists
         # Skipped in dry-run (workflow_dispatch from a branch — GITHUB_REF_NAME
@@ -218,9 +218,9 @@ jobs:
     outputs:
       sha256sums: ${{ steps.sign.outputs.sha256sums }}
     steps:
-      # actions/checkout v4.2.2
+      # actions/checkout v6.0.3
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Install minisign
         run: |
@@ -318,14 +318,14 @@ jobs:
 
       - name: Publish SHA256SUMS as workflow artifact (tamper-check for skill Phase 4)
         if: needs.prepare.outputs.is_dry_run != 'true'
-        # actions/upload-artifact v4.4.3
+        # actions/upload-artifact v7.0.1
         # The skill downloads this artifact via `gh run download` and byte-compares
         # against the SHA256SUMS on the draft release. Any delta between this
         # artifact and the release asset indicates tampering after finalize.
         # Note: job-level `outputs` are not retrievable via the REST API after
         # a workflow run completes; an artifact gives us a durable, API-reachable
         # handle that the skill can diff against.
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: sha256sums-digest
           path: dl/SHA256SUMS

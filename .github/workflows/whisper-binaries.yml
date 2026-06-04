@@ -114,8 +114,8 @@ jobs:
     environment: production-signing
     steps:
       - name: Checkout whisper.cpp
-        # actions/checkout v4.2.2 — keep aligned with release.yml + checks.yml
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        # actions/checkout v6.0.3 — keep aligned with release.yml + checks.yml
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           repository: ${{ env.UPSTREAM_REPO }}
           ref: ${{ inputs.upstream_sha }}
@@ -264,8 +264,8 @@ jobs:
           shasum -a 256 "$PKG" | tee "$PKG.sha256"
 
       - name: Upload artifact
-        # actions/upload-artifact v4.4.3 — keep aligned with build_*.yml + checks.yml
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+        # actions/upload-artifact v7.0.1 — keep aligned with build_*.yml + checks.yml
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: whisper-macos-universal
           path: |
@@ -288,8 +288,8 @@ jobs:
     environment: production-signing
     steps:
       - name: Checkout whisper.cpp
-        # actions/checkout v4.2.2 — keep aligned with release.yml + checks.yml
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        # actions/checkout v6.0.3 — keep aligned with release.yml + checks.yml
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           repository: ${{ env.UPSTREAM_REPO }}
           ref: ${{ inputs.upstream_sha }}
@@ -387,8 +387,8 @@ jobs:
           ls roundtrip/*.dll | grep -E "(whisper|ggml)" >/dev/null
 
       - name: Upload artifact
-        # actions/upload-artifact v4.4.3 — keep aligned with build_*.yml + checks.yml
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+        # actions/upload-artifact v7.0.1 — keep aligned with build_*.yml + checks.yml
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: whisper-win-x64
           path: |
@@ -417,10 +417,10 @@ jobs:
           exit 1
 
       - name: Download artifacts
-        # actions/download-artifact v4 (resolved 2026-04-25 to commit
-        # d3f86a106a0bac45b974a628896c90dbdf5c8093). Dependabot github-actions
+        # actions/download-artifact v8.0.1 (resolved 2026-06-04 to commit
+        # 3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c). Dependabot github-actions
         # ecosystem (.github/dependabot.yml) keeps this fresh.
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           path: artifacts
 

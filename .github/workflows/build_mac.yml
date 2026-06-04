@@ -54,8 +54,8 @@ jobs:
       APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
-      # actions/checkout v4.2.2 — MUST run before the local composite action.
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # actions/checkout v6.0.3 — MUST run before the local composite action.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
       - name: Setup Node + install
         uses: ./.github/actions/setup-node-with-retry
         with:
@@ -288,8 +288,8 @@ jobs:
 
       - name: Upload workflow-run artifacts (dry-run)
         if: ${{ inputs.is-dry-run }}
-        # actions/upload-artifact v4.4.3
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
+        # actions/upload-artifact v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: mac-dry-run
           path: ${{ steps.art.outputs.dir }}
