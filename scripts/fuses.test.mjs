@@ -41,7 +41,11 @@ function modeOf(p) {
   return fs.lstatSync(p).mode & 0o777;
 }
 
-describe('chmodNodePtySpawnHelper', () => {
+// Pure POSIX-mode contract tests: Windows `fs.chmodSync` is effectively a no-op
+// for POSIX permission bits, so these assert 0o644/0o755 transitions that only
+// hold on macOS/Linux. Skipped on Windows (ubuntu CI still covers them).
+// See docs/windows/known-flakes.md row "scripts/fuses.test.mjs".
+describe.skipIf(process.platform === 'win32')('chmodNodePtySpawnHelper', () => {
   let tmpRoot;
 
   beforeEach(() => {
@@ -165,7 +169,9 @@ describe('chmodNodePtySpawnHelper', () => {
   });
 });
 
-describe('ensurePackedMediaBinaries', () => {
+// POSIX-mode contract (chmod 0755 on copied media binaries) — same Windows
+// no-op caveat as chmodNodePtySpawnHelper above. See docs/windows/known-flakes.md.
+describe.skipIf(process.platform === 'win32')('ensurePackedMediaBinaries', () => {
   // Use an unpinned key (linux-x64) so verifyBinary does size-only (no SHA pin).
   const PLATFORM = 'linux';
   const ARCH_ENUM = Arch.x64;
