@@ -16,7 +16,7 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
-import { visualTest, expect } from './fixtures'
+import { visualTest, expect } from './fixtures/index'
 import {
   TEST_IDS,
   byTestId,
@@ -26,16 +26,27 @@ import {
 } from './utils/helpers'
 
 /**
- * Check if a baseline exists for this platform.
- * Returns true if baseline exists or if we're in update mode.
+ * Assert that a baseline exists for this platform. Throws to fail the test
+ * loudly when the baseline is missing — previously this skipped silently,
+ * which meant the first run on a new platform auto-wrote whatever the app
+ * rendered as canonical (the autobaseline trap). Generate new baselines
+ * via `npm run test:e2e:update-screenshots` and commit them in a PR.
+ *
+ * No-ops when running under `--update-snapshots` (the update script sets
+ * `updateSnapshots !== 'none'`, signalling the operator intends to write).
  */
-function hasBaseline(screenshotName: string, testInfo: import('@playwright/test').TestInfo): boolean {
-  if (testInfo.config.updateSnapshots !== 'none') return true
+function assertBaselineExists(screenshotName: string, testInfo: import('@playwright/test').TestInfo): void {
+  if (testInfo.config.updateSnapshots !== 'none') return
   // Path mirrors snapshotPathTemplate: {snapshotDir}/{arg}-{platform}{ext}
   // where {arg} = screenshotName (without .png), {platform} = process.platform
   const nameWithoutExt = screenshotName.replace(/\.png$/, '')
   const baselinePath = path.join(__dirname, 'screenshots', `${nameWithoutExt}-${process.platform}.png`)
-  return fs.existsSync(baselinePath)
+  if (fs.existsSync(baselinePath)) return
+  throw new Error(
+    `Missing visual baseline: ${nameWithoutExt}-${process.platform}.png. ` +
+    `Generate via 'npm run test:e2e:update-screenshots' and commit the new baseline in a PR. ` +
+    `The auto-write-on-first-run path is intentionally closed (config: updateSnapshots: 'none').`
+  )
 }
 
 /**
@@ -98,10 +109,7 @@ visualTest.describe('Visual regression – no project', () => {
   visualTest.slow()
 
   visualTest('(a) welcome panel', async ({ visualWindow }, testInfo) => {
-    if (!hasBaseline('welcome-empty', testInfo)) {
-      visualTest.skip(true, `No baseline for ${process.platform}: welcome-empty`)
-    }
-
+    assertBaselineExists('welcome-empty', testInfo)
     await expect(visualWindow).toHaveScreenshot({ name: 'welcome-empty.png' })
   })
 })
@@ -114,9 +122,7 @@ visualTest.describe('Visual regression – with project', () => {
   visualTest.slow()
 
   visualTest('(b) editor loaded', async ({ visualWindowWithProject }, testInfo) => {
-    if (!hasBaseline('editor-loaded', testInfo)) {
-      visualTest.skip(true, `No baseline for ${process.platform}: editor-loaded`)
-    }
+    assertBaselineExists('editor-loaded', testInfo)
 
     const page = visualWindowWithProject
 
@@ -141,9 +147,7 @@ visualTest.describe('Visual regression – with project', () => {
   })
 
   visualTest('(c) terminal open', async ({ visualWindowWithProject }, testInfo) => {
-    if (!hasBaseline('terminal-open', testInfo)) {
-      visualTest.skip(true, `No baseline for ${process.platform}: terminal-open`)
-    }
+    assertBaselineExists('terminal-open', testInfo)
 
     const page = visualWindowWithProject
 
@@ -166,9 +170,7 @@ visualTest.describe('Visual regression – with project', () => {
   })
 
   visualTest('(d) settings overlay', async ({ visualWindowWithProject }, testInfo) => {
-    if (!hasBaseline('settings-overlay', testInfo)) {
-      visualTest.skip(true, `No baseline for ${process.platform}: settings-overlay`)
-    }
+    assertBaselineExists('settings-overlay', testInfo)
 
     const page = visualWindowWithProject
 
@@ -181,9 +183,7 @@ visualTest.describe('Visual regression – with project', () => {
   })
 
   visualTest('(e) confirm dialog', async ({ visualAppWithProject, visualWindowWithProject }, testInfo) => {
-    if (!hasBaseline('confirm-dialog', testInfo)) {
-      visualTest.skip(true, `No baseline for ${process.platform}: confirm-dialog`)
-    }
+    assertBaselineExists('confirm-dialog', testInfo)
 
     const page = visualWindowWithProject
 

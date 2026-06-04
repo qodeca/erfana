@@ -33,23 +33,51 @@ const testSeed = {
 }
 
 /**
- * Programmatically select the first paragraph inside a preview pane.
- * Uses the Range API because MarkdownPreview reads window.getSelection()
- * directly in handleContextMenu.
+ * Atomically select the first paragraph inside a preview pane AND fire the
+ * contextmenu event on it, in a single page.evaluate. This is the actual
+ * user gesture being modeled: drag across text, then right-click on the
+ * selection — the selection survives the right-mousedown.
+ *
+ * Why one atomic step. Doing select-then-dispatch as two separate Playwright
+ * calls leaves an async gap during which React re-renders / focus changes
+ * can clear `window.getSelection()`. MarkdownPreview's handler at
+ * handleContextMenu reads `window.getSelection()` directly and returns
+ * early when the selection is empty, so any gap that loses the selection
+ * silently kills the menu render and the test times out waiting for it.
+ *
+ * Why dispatchEvent and not click({button:'right'}). Playwright's synthetic
+ * right-click emits a mousedown that clears the selection BEFORE the
+ * contextmenu event fires. dispatchEvent('contextmenu') bypasses the
+ * mousedown step entirely; React's synthetic-event system at the root
+ * still catches the bubbled native event and runs onContextMenu.
+ *
+ * For the "no-selection right-click does NOT open the menu" path, keep a
+ * real `paragraph.click({button:'right'})` — that exercises the actual
+ * user gesture where there is nothing selected.
  */
-async function selectPreviewParagraph(
+async function selectAndOpenPreviewContextMenu(
   page: Awaited<ReturnType<typeof electron.firstWindow>>,
-  testId: string
+  previewTestId: string
 ): Promise<void> {
   await page.evaluate((tid) => {
     const p = document.querySelector(`[data-testid="${tid}"] .markdown-preview-content p`)
     if (!p) throw new Error('Paragraph not found in preview')
+    // Establish selection.
     const range = document.createRange()
     range.selectNodeContents(p)
     const sel = window.getSelection()!
     sel.removeAllRanges()
     sel.addRange(range)
-  }, testId)
+    // Fire contextmenu atomically (no async gap that could clear selection).
+    const rect = p.getBoundingClientRect()
+    p.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      button: 2,
+      clientX: rect.left + 50,
+      clientY: rect.top + 10
+    }))
+  }, previewTestId)
 }
 
 test.describe('Context Menu – Explain prompt', () => {
@@ -94,11 +122,8 @@ test.describe('Context Menu – Explain prompt', () => {
       const previewMenu = byTestId(window, TEST_IDS.CONTEXT_MENU_PREVIEW)
       await expect(previewMenu).not.toBeVisible({ timeout: 1000 })
 
-      // ── Step 2: Select text programmatically ──
-      await selectPreviewParagraph(window, TEST_IDS.EDITOR_PREVIEW)
-
-      // ── Step 3: Right-click shows context menu ──
-      await paragraph.click({ button: 'right' })
+      // ── Step 2+3: Select text and open context menu (atomic) ──
+      await selectAndOpenPreviewContextMenu(window, TEST_IDS.EDITOR_PREVIEW)
       await expect(previewMenu).toBeVisible({ timeout: 3000 })
 
       // ── Step 4: Verify prompt items are present ──
@@ -116,15 +141,13 @@ test.describe('Context Menu – Explain prompt', () => {
       await expect(previewMenu).not.toBeVisible({ timeout: 1000 })
 
       // ── Step 6: Click-outside dismissal (separate code path from Escape) ──
-      await selectPreviewParagraph(window, TEST_IDS.EDITOR_PREVIEW)
-      await paragraph.click({ button: 'right' })
+      await selectAndOpenPreviewContextMenu(window, TEST_IDS.EDITOR_PREVIEW)
       await expect(previewMenu).toBeVisible({ timeout: 3000 })
       await previewPane.click({ position: { x: 5, y: 5 } })
       await expect(previewMenu).not.toBeVisible({ timeout: 1000 })
 
       // ── Step 7: Re-select, right-click, click Explain ──
-      await selectPreviewParagraph(window, TEST_IDS.EDITOR_PREVIEW)
-      await paragraph.click({ button: 'right' })
+      await selectAndOpenPreviewContextMenu(window, TEST_IDS.EDITOR_PREVIEW)
       await expect(previewMenu).toBeVisible({ timeout: 3000 })
 
       // Click "Explain"

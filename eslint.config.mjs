@@ -56,6 +56,29 @@ export default [
       '@typescript-eslint/ban-ts-comment': 'off'
     }
   },
+  // E2E suite: forbid the bare `./fixtures` import path. The legacy
+  // `e2e/fixtures.ts` file was deleted in Phase E.4 of the test-infra
+  // plan, but the bare specifier remains an unhealthy pattern — it
+  // re-acquires the resolution ambiguity the moment anyone adds a new
+  // `fixtures.ts` file to e2e/. Require the explicit `./fixtures/index`
+  // form so the import line states exactly which entry point is meant.
+  {
+    files: ['e2e/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: './fixtures',
+              message:
+                'Use `./fixtures/index` explicitly — the bare `./fixtures` path is ambiguous (file before directory in Node/TS resolution).'
+            }
+          ]
+        }
+      ]
+    }
+  },
   // Build scripts: CommonJS Node.js environment
   {
     files: ['scripts/**/*.js', 'scripts/**/*.cjs', 'scripts/**/*.mjs'],

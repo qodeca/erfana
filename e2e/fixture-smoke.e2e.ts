@@ -91,10 +91,7 @@ test.describe('fixture smoke: withSettings', () => {
 })
 
 test.describe('fixture smoke: appWithTestProject + windowWithTestProject', () => {
-  // TODO(spec-018): App does not auto-open project from CLI args yet.
-  // appWithTestProject passes the path as a CLI arg, but the app only opens
-  // projects via IPC (file:openProjectByPath). Needs main process CLI parsing.
-  test.fixme('project tree shows seed file', async ({ windowWithTestProject }) => {
+  test('project tree shows seed file', async ({ windowWithTestProject }) => {
     const fileNode = windowWithTestProject
       .locator(`[data-testid^="${TEST_IDS.PROJECT_TREE_NODE_FILE}-"]`)
       .filter({ hasText: 'test.md' })
@@ -104,11 +101,17 @@ test.describe('fixture smoke: appWithTestProject + windowWithTestProject', () =>
 
 test.describe('fixture smoke: withOpenFile', () => {
   test.describe('opens specified file', () => {
-    test.use({ openFilePath: 'test.md' })
+    // `.txt` seed instead of `.md` because markdown files default to
+    // preview-only mode in this app — Monaco isn't visible until edit
+    // mode toggles on. The `withOpenFile` fixture's contract is
+    // explicitly "returns a ready MonacoPage", so the test must seed
+    // a file type that opens Monaco directly.
+    test.use({
+      openFilePath: 'test.txt',
+      testProjectFiles: { 'test.txt': 'Test Document\nMonaco-rendered text\n' }
+    })
 
-    // TODO(spec-018): Depends on appWithTestProject which doesn't load the project yet.
-    // See "project tree shows seed file" test.fixme above.
-    test.fixme('returns ready MonacoPage', async ({ withOpenFile }) => {
+    test('returns ready MonacoPage', async ({ withOpenFile }) => {
       expect(withOpenFile).not.toBeUndefined()
       const content = await withOpenFile!.getContent()
       expect(content).toContain('Test Document')

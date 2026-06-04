@@ -58,11 +58,23 @@ const OUTPUT_FILENAME = 'speech-harvard-female.md'
 // ---------------------------------------------------------------------------
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
+const TRANSCRIPTION_ENABLED = process.env.ERFANA_E2E_TRANSCRIPTION === '1'
+
+// Project-level gating handles "should this suite run at all" via
+// ERFANA_E2E_TRANSCRIPTION=1 in playwright.config.ts (transcription
+// project's grepInvert). When the operator HAS opted in but forgot to
+// provide a key, fail loudly at load time — the previous `test.skip`
+// pattern silently green-ticked the run, masking regressions in the
+// keyed code path (see capability-summary reporter for the audit line).
+if (TRANSCRIPTION_ENABLED && !OPENAI_API_KEY) {
+  throw new Error(
+    'OPENAI_API_KEY is required when ERFANA_E2E_TRANSCRIPTION=1. ' +
+      'Either unset ERFANA_E2E_TRANSCRIPTION to skip the transcription project ' +
+      'or provide an OPENAI_API_KEY.'
+  )
+}
 
 test.describe('Audio transcription', () => {
-  // Skip the entire suite if no API key is available
-  test.skip(!OPENAI_API_KEY, 'OPENAI_API_KEY environment variable is required')
-
   // Disable retries – each run makes a real (paid) OpenAI API call.
   // A late assertion failure should not trigger a second transcription.
   test.describe.configure({ retries: 0 })
