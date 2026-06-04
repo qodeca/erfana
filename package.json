@@ -14,7 +14,7 @@
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "test": "vitest --run --workspace vitest.workspace.ts",
     "test:watch": "vitest --workspace vitest.workspace.ts --watch",
-    "test:ci": "vitest --run --workspace vitest.workspace.ts --reporter=basic",
+    "test:ci": "vitest --run --workspace vitest.workspace.ts --reporter=dot",
     "test:main": "vitest --run --config vitest.main.ts",
     "test:preload": "vitest --run --config vitest.preload.ts",
     "test:renderer": "vitest --run --config vitest.renderer.ts",
