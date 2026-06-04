@@ -4,6 +4,24 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## 0.12.0
+
+*Released 2026-06-04. Tag [`v0.12.0`](https://github.com/qodeca/erfana/releases/tag/v0.12.0).*
+
+### Windows screenshot capture
+
+- **Terminal screenshot capture now works on Windows and Linux** ([#164](https://github.com/qodeca/erfana/issues/164), [PR #208](https://github.com/qodeca/erfana/pull/208)) — the terminal screenshot button previously worked only on macOS (native `screencapture`). Windows and Linux now capture through Electron's `desktopCapturer`: full-screen and per-window capture use an in-app window picker with live thumbnails, and area capture uses a frameless transparent overlay you drag to select a region (with a keyboard-driven selection mode for accessibility). The captured image path is pasted into the terminal exactly as on macOS, and macOS behaviour is unchanged. This completes Windows enablement Phase 3.
+
+### Fixes
+
+- **Text selection restored in the markdown preview** — selecting text in the rendered preview pane had stopped inheriting the editor's selection styling; normal click-drag text selection works again in the preview.
+- **Large projects no longer risk file-descriptor exhaustion** — pinned the file watcher's `chokidar` dependency to exact v3 (3.6.0). chokidar v4 opens one file descriptor per watched file, which could exhaust the OS limit on large folders (>~10k files) and crash PDF/DOCX export at sandbox init. v3 uses FSEvents (near-zero descriptors per file). Added CI guards to prevent an accidental v4 bump.
+
+### Internal
+
+- **CI on Node 24** — GitHub Actions runners and the project toolchain moved to Node 24.
+- **Test-infrastructure hardening** — Playwright, vitest, and ESLint configuration tightened; Windows visual-regression baselines added for the five core UI scenes; POSIX-only fuse-contract tests skip on Windows hosts; the deprecated vitest `basic` reporter replaced with `dot` in `test:ci`; the e2e re-enable strategy documented in the workflow header.
+
 ## 0.11.2
 
 *Released 2026-06-01. Tag [`v0.11.2`](https://github.com/qodeca/erfana/releases/tag/v0.11.2).*
