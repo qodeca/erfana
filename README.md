@@ -2,7 +2,9 @@
 
 An Electron-based project workspace focused on markdown editing, a project tree, and an integrated terminal.
 
-> **Version:** 0.11.2 ([changelog](docs/CHANGELOG.md) · [release notes](docs/release-notes/v0.11.2.md)) · **Documentation:** [docs/](docs/README.md) · **Architecture:** [docs/architecture.md](docs/architecture.md)
+> **Version:** 0.12.0 ([changelog](docs/CHANGELOG.md) · [release notes](docs/release-notes/v0.12.0.md)) · **Documentation:** [docs/](docs/README.md) · **Architecture:** [docs/architecture.md](docs/architecture.md)
+>
+> **v0.12.0 highlights:** Terminal screenshot capture now works on Windows and Linux (previously macOS-only) — grab a full screen, pick a window from a thumbnail picker, or drag to select a region, with the image path dropped into the terminal. Text selection works again in the markdown preview. A file-watcher resource leak that could crash PDF/DOCX export on very large projects (>~10k files) was fixed by pinning chokidar to v3.
 >
 > **v0.11.2 highlights:** Copy, cut and paste work reliably again across the editor, terminal, dialogs and preview (fixed a sandbox clipboard bug); the macOS app is roughly 40% smaller to download; macOS now ships a single Apple Silicon build and Windows a single installer (Intel Macs and Linux no longer have downloads); and high-severity advisories in axios and fast-uri were patched.
 >
@@ -10,7 +12,7 @@ An Electron-based project workspace focused on markdown editing, a project tree,
 >
 > **macOS patch — upgrade required from v0.9.5:** v0.9.6 restored the integrated terminal on macOS (carried forward in v0.10.0). The v0.9.5 signed DMG shipped node-pty's `spawn-helper` at mode `0644`, causing every terminal-spawn to fail with `posix_spawnp: EACCES`. The `scripts/fuses.js` `afterPack` hook now `chmod 0755`'s the helper before code-signing. See [CHANGELOG § 0.9.6](docs/CHANGELOG.md#096), [build/fuses.md § afterPack also chmods node-pty spawn-helper](docs/build/fuses.md#afterpack-also-chmods-node-pty-spawn-helper).
 >
-> **Windows enablement:** Phases 0–2 shipped in **v0.9.3** (merged from the `windows` branch on 2026-04-22); Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in [**v0.9.4**](https://github.com/qodeca/erfana/releases/tag/v0.9.4) on 2026-04-23. Erfana now installs, runs, builds, and passes the full test matrix on Windows 11 Pro, with offline transcription supported on Windows x64. See [`docs/windows/README.md`](docs/windows/README.md) for roadmap status, and [Windows known issues](docs/known-issues.md#windows-specific-issues) for remaining gaps — screenshots ([#164](https://github.com/qodeca/erfana/issues/164)), code-signing ([#166](https://github.com/qodeca/erfana/issues/166)), polish ([#167](https://github.com/qodeca/erfana/issues/167)).
+> **Windows enablement:** Phases 0–2 shipped in **v0.9.3** (merged from the `windows` branch on 2026-04-22); Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in [**v0.9.4**](https://github.com/qodeca/erfana/releases/tag/v0.9.4) on 2026-04-23; Phase 3 (cross-platform screenshot capture, [#164](https://github.com/qodeca/erfana/issues/164)) shipped in [**v0.12.0**](https://github.com/qodeca/erfana/releases/tag/v0.12.0) on 2026-06-04. Erfana now installs, runs, builds, and passes the full test matrix on Windows 11 Pro, with offline transcription and screenshot capture supported. See [`docs/windows/README.md`](docs/windows/README.md) for roadmap status, and [Windows known issues](docs/known-issues.md#windows-specific-issues) for remaining gaps — code-signing UX ([#166](https://github.com/qodeca/erfana/issues/166)), polish ([#167](https://github.com/qodeca/erfana/issues/167)).
 
 ## Features
 

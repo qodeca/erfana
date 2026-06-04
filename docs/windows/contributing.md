@@ -65,7 +65,7 @@ On a Windows host:
 
 ```bash
 npm run typecheck
-npm run test:main        # baseline drifts per release — see docs/ci.md for current count (~8,087 / 259 files as of v0.11.2)
+npm run test:main        # baseline drifts per release — see docs/ci.md for current count (~8,135 / 262 files as of v0.12.0)
 npm run test:renderer
 npm run test:preload
 ```

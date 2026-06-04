@@ -22,7 +22,7 @@ Four jobs run in parallel:
 |-----|---------|------------------|
 | `lint` | `npm run lint` | 1–2 min |
 | `typecheck` | `npm run typecheck` (tsc node + web) | 1–2 min |
-| `test` | `npm run test:ci` (vitest workspace, ~8,129 tests across 262 files — v0.10.0 added `prompts/applyFooter.test.ts` + `prompts/mutation-templates.test.ts` for the deterministic-apply prompt feature and `components/DockLayout/terminalExpand.test.ts` for terminal maximize; #203 added the clipboard service test files `ipc/clipboard-handlers.test.ts`, `services/textClipboard.test.ts`, `utils/monacoClipboardCommands.test.ts`, `components/Editor/MonacoMarkdownEditor.clipboard.test.ts`; #164 added the screenshot suite `services/screenshot/MacScreenshotCapturer.test.ts`, `services/screenshot/DesktopCapturerScreenshotCapturer.test.ts`, `services/screenshot/ScreenshotOverlayWindow.test.ts`) | 2–3 min |
+| `test` | `npm run test:ci` (vitest workspace, ~8,135 tests across 262 files — v0.10.0 added `prompts/applyFooter.test.ts` + `prompts/mutation-templates.test.ts` for the deterministic-apply prompt feature and `components/DockLayout/terminalExpand.test.ts` for terminal maximize; #203 added the clipboard service test files `ipc/clipboard-handlers.test.ts`, `services/textClipboard.test.ts`, `utils/monacoClipboardCommands.test.ts`, `components/Editor/MonacoMarkdownEditor.clipboard.test.ts`; #164 added the screenshot suite `services/screenshot/MacScreenshotCapturer.test.ts`, `services/screenshot/DesktopCapturerScreenshotCapturer.test.ts`, `services/screenshot/ScreenshotOverlayWindow.test.ts`) | 2–3 min |
 | `build` | `npx electron-vite build` | 2–3 min |
 
 **Design notes**:
