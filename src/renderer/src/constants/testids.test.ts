@@ -88,6 +88,12 @@ describe('TEST_IDS', () => {
       expect(terminalIds).toHaveLength(14)
     })
 
+    it('should have 3 Claude Status Bar IDs', async () => {
+      const { TEST_IDS } = await getTestIds()
+      const claudeIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('CLAUDE_STATUS_'))
+      expect(claudeIds).toHaveLength(3)
+    })
+
     it('should have 8 Camera Dialog IDs', async () => {
       const { TEST_IDS } = await getTestIds()
       const cameraIds = Object.keys(TEST_IDS).filter((k) => k.startsWith('CAMERA_'))

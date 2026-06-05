@@ -40,6 +40,8 @@ import './TerminalPanel.css'
 import { isElementVisible } from '../../utils/domUtils'
 import { isPointInElement } from '../../utils/domGeometry'
 import { TerminalStatusContent } from './TerminalPanel/components/TerminalStatusContent'
+import { ClaudeStatusBar } from './TerminalPanel/components/ClaudeStatusBar'
+import { useClaudeStatusStore } from '../../stores/useClaudeStatusStore'
 import type { TerminalState } from './TerminalPanel/types'
 
 export function TerminalPanel(_props: ISplitviewPanelProps) {
@@ -52,6 +54,10 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
   const xtermRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const terminalIdRef = useRef<string | null>(null)
+  // Trailing-debounce timer for the Claude-status activity nudge (#216).
+  // Main also gates re-checks, so a light ~1s renderer debounce is enough to
+  // avoid a nudge per PTY chunk / keystroke.
+  const claudeNudgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Quoting flavour for the active terminal. Populated from the
   // `terminal:create` response (#164 round-2 F#1). The screenshot hook reads
   // this directly so a path-paste never needs an extra IPC round-trip.
@@ -103,10 +109,35 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
   }, [])
 
+  // Debounced Claude-status nudge (#216). Funnels every activity signal
+  // (PTY output + user input) into a trailing ~1s nudge so claude start/stop
+  // is detected without a nudge-per-chunk. Guarded so test/non-Electron
+  // environments without the bridge do not crash.
+  const nudgeClaudeStatus = useCallback((id: string) => {
+    if (claudeNudgeTimerRef.current) {
+      clearTimeout(claudeNudgeTimerRef.current)
+    }
+    claudeNudgeTimerRef.current = setTimeout(() => {
+      claudeNudgeTimerRef.current = null
+      void window.api?.claudeStatus?.nudge(id)
+    }, 1000)
+  }, [])
+
   // Centralized terminal cleanup function (Phase 1.1 bug fix - race condition)
   // Awaits terminal kill to prevent orphaned PTY processes
   const cleanupTerminalInstance = useCallback(async (id: string | null) => {
     if (!id) return
+    // Stop tracking Claude status for this panel and cancel any pending nudge
+    // (#216). Every teardown path (unmount, project change, restart) funnels
+    // through here, so this is the single unregister chokepoint.
+    if (claudeNudgeTimerRef.current) {
+      clearTimeout(claudeNudgeTimerRef.current)
+      claudeNudgeTimerRef.current = null
+    }
+    void window.api?.claudeStatus?.unregister(id)
+    // Prune this terminal's slice so the store map does not grow a stale `null`
+    // entry per closed terminal forever (#216).
+    useClaudeStatusStore.getState().clearTerminal(id)
     try {
       await window.api.terminal.kill(id)
     } catch (err) {
@@ -622,6 +653,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       // returns a value when terminalId is present, but guard defensively.
       shellKindRef.current = result.shellKind ?? null
       setActiveTerminalId(result.terminalId) // Register in store
+      // Begin tracking Claude Code context status for this panel (#216).
+      // Guarded so environments without the bridge (tests) do not crash.
+      void window.api?.claudeStatus?.register(result.terminalId)
       warmupUntilRef.current = Date.now() + 500
 
       // Don't manually clear - let the bypass channel clear handle it
@@ -633,6 +667,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           const store = useTerminalStore.getState()
           store.markActivity(result.terminalId)
           store.markUserInput(result.terminalId)
+          // Light Claude-status re-check on input (#216, debounced).
+          nudgeClaudeStatus(result.terminalId)
           window.api.terminal.write(result.terminalId, data)
         }
       })
@@ -738,6 +774,8 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
         // Record recent activity (ignore warmup period noise)
         if (Date.now() >= warmupUntilRef.current) {
           useTerminalStore.getState().markActivity(terminalId)
+          // Light Claude-status re-check on output (#216, debounced).
+          nudgeClaudeStatus(terminalId)
         }
       }
     })
@@ -767,7 +805,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       unsubscribeExit()
       unsubscribeError()
     }
-  }, [terminalId, wrapOnDataHandler])
+  }, [terminalId, wrapOnDataHandler, nudgeClaudeStatus])
 
   // Handle resize (panel drag, window resize, show/hide)
   useEffect(() => {
@@ -1270,6 +1308,9 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
           onRecheck={handleRecheck}
           onCopyFix={handleCopyFix}
         />
+        {/* Per-terminal Claude Code context status bar (#216). Sibling AFTER
+          * the status content; self-hides (returns null) when no snapshot. */}
+        {terminalId && <ClaudeStatusBar terminalId={terminalId} />}
         {portalContext?.terminalContextMenuPosition && (
           <TerminalContextMenu
             x={portalContext.terminalContextMenuPosition.x}

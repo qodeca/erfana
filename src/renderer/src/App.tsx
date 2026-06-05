@@ -14,6 +14,7 @@ import { TerminalPortalProvider } from './context/TerminalPortalContext'
 import { useGlobalSettingsInit } from './hooks/useGlobalSettingsInit'
 import { useQuitHandler } from './hooks/useQuitHandler'
 import { useGlobalSettingsStore } from './stores/useGlobalSettingsStore'
+import { useClaudeStatusStore } from './stores/useClaudeStatusStore'
 import { initializeLogger, logger } from './utils/logger'
 
 /**
@@ -43,6 +44,18 @@ function AppContent() {
       logger.setLevel(loggingLevel)
     }
   }, [loggingLevel])
+
+  // Single global subscription for per-terminal Claude Code status (issue #216).
+  // AppContent is always mounted, so this owns the one onChanged listener and
+  // routes every payload into the store; individual ClaudeStatusBar instances
+  // read only their own slice. Guarded so environments without the bridge
+  // (e.g. tests) do not crash.
+  useEffect(() => {
+    const unsubscribe = window.api?.claudeStatus?.onChanged((payload) => {
+      useClaudeStatusStore.getState().setSnapshot(payload)
+    })
+    return unsubscribe
+  }, [])
 
   return (
     <ProjectManagementProvider>

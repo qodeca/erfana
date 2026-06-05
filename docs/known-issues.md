@@ -116,6 +116,28 @@ Pipeline contributors on Windows:
 
 ---
 
+### Claude Code status bar: macOS only in v1
+
+**Issue**: The per-terminal Claude Code context status bar ([#216](https://github.com/qodeca/erfana/issues/216)) ships macOS-only in its first version. On Windows (and Linux) the per-panel process detector is a no-op, so the bar never appears.
+
+**Workaround**: None — the feature is simply unavailable off macOS. Use Claude Code's own statusLine if you need context usage on Windows.
+
+**Tracking**: A Windows follow-up issue (to be filed). The cwd→transcript-directory encoding and the ConPTY process-chain walk both need verification against a live Windows host before the Windows detector can be implemented.
+
+---
+
+### Claude Code status bar: 1M-window detection caveats and token-count access
+
+**Issue**: Two documented limitations of the status bar:
+- **Rare-enterprise over-statement (inverse of the old bug).** Window detection now uses a model-capability registry: Claude Code auto-upgrades **Opus 4.6+** to the 1M window with no on-disk marker, so the bar correctly badges **1M** for an auto-upgraded Opus session under 200k usage (this fixes the prior bug where such a session briefly badged 200k). The remaining edge case is the *inverse*: a 200k-capped Opus deployment — e.g. **Microsoft Foundry Opus 4.8** — is actually 200k, but the registry over-states it as **1M** and so under-warns (it can never cross 200k to self-correct). Sonnet/Haiku/older models, and any unrecognized id, still default to 200k unless an explicit `settings.json` `[1m]` or observed usage > 200k forces 1M.
+- Exact token counts (e.g. "84k / 200k") are available via the native-title hover tooltip / `aria-valuetext` only. The bar is non-focusable in v1, so the exact figures are not reachable by keyboard alone.
+
+**Workaround**: The percentage and color band remain accurate against the *displayed* window throughout; hover with the mouse (or read `aria-valuetext` via a screen reader) for exact tokens. There is no workaround for the Foundry-Opus over-statement — it is an accepted rare-enterprise trade-off (better to over-state for the rare 200k-capped deployment than under-warn the common auto-upgraded 1M case).
+
+**Tracking**: Accepted residual limitations, consistent with the issue's degrade-gracefully philosophy. See [`docs/designs/216-claude-status-bar.md`](./designs/216-claude-status-bar.md).
+
+---
+
 ### Screenshot capture on Windows
 
 **Status**: ✅ Resolved by [#164](https://github.com/qodeca/erfana/issues/164) (Phase 3) — `ScreenshotService` now picks `MacScreenshotCapturer` on `darwin` and `DesktopCapturerScreenshotCapturer` on Windows + Linux. All three modes (screen / window / area) work cross-platform via Electron's `desktopCapturer` and an in-app overlay window. Area selection currently spawns the overlay on the **primary display only**; multi-display area-select is a deferred polish item.

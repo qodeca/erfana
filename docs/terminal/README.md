@@ -44,6 +44,20 @@ A toggle maximizes the terminal to cover the editor/tabs area, leaving only the 
 - `src/renderer/src/components/DockLayout/terminalExpand.ts`
 - `src/renderer/src/stores/useActivityBarStore.ts`
 
+### Claude Code context status bar (macOS v1)
+
+A thin status bar pinned to the bottom of a terminal panel — its height matches the Project sidebar footer (`var(--header-height)`) — visible **only** while Claude Code (`claude` CLI) is actively running in that panel; hidden otherwise. It shows the friendly model name (e.g. "Opus 4.8"), a 200k-vs-1M context-window badge, the context-used percentage (pinned to the right edge), and a green/orange/red `role="meter"` progress bar that fills the available width between the badge and the percentage; a native-title hover tooltip reveals exact token counts (e.g. "84k / 200k"). Display-only, always on.
+
+**Behavior**:
+- Data is read **non-invasively** (read-only) from Claude Code's own transcript JSONL under `~/.claude/projects/<encoded-cwd>/*.jsonl` — Erfana never writes the user's Claude Code config
+- Per-panel detection inspects the panel's own PTY child-process tree for a `claude` process (macOS `ps`/`lsof`) and uses that process's live cwd to locate the transcript
+- Window size uses a model-capability registry: Claude Code auto-upgrades **Opus 4.6+** to the 1M window with no on-disk marker (Opus 4.5/older, all Sonnet incl. sonnet-4-6, and all Haiku stay 200k), while observed usage > 200k or a `settings.json` `[1m]` model still force 1M
+- Colour bands track usage against the active window: a true green safe band (`--color-context-safe` #3fb950, distinct from the Qodeca-lime brand colour) below 30%, orange at 30–60%, red at ≥60% (on a 1M window that's 300k / 600k tokens; on 200k it's 60k / 120k)
+- On any detection/parse failure the bar hides gracefully — no error, no stale data
+- macOS only in v1; on other platforms the process detector is a no-op so the bar never appears. Windows is deferred to a follow-up issue
+
+See the full design in [`docs/designs/216-claude-status-bar.md`](../designs/216-claude-status-bar.md). IPC: `claude-status:register` / `:unregister` / `:nudge` (invoke) and `claude-status:changed` (main → renderer push).
+
 ### Auto-Open on Project Load (v0.6.3)
 
 Terminal panel automatically opens when a project loads, providing immediate shell access.

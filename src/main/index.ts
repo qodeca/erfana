@@ -22,6 +22,7 @@ import { registerProjectLockHandlers } from './ipc/project-lock-handlers'
 import { registerExternalFileHandlers } from './ipc/external-file-handlers'
 import { registerTranscriptionHandlers } from './ipc/transcription-handlers'
 import { registerClipboardHandlers } from './ipc/clipboard-handlers'
+import { registerClaudeStatusHandlers } from './ipc/claude-status-handlers'
 import { DependencyDetector, converterRegistry, getExtensionsForDependencies } from './services/import'
 import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
 import type { DependencyReadyEvent } from '../shared/ipc/import-schema'
@@ -53,6 +54,8 @@ if (newWindowArgIndex !== -1) {
 // Quit confirmation state
 let isQuitting = false
 let mainWindowRef: BrowserWindow | null = null
+/** Claude status handler bundle (#216); disposed on app shutdown. */
+let claudeStatusHandlers: { dispose: () => Promise<void> } | null = null
 
 // WebGL Command Line Switches (originally added for Electron 33+)
 // Fixes WebGL context creation issues and terminal flickering in production builds
@@ -231,6 +234,9 @@ app.whenReady().then(async () => {
   registerExternalFileHandlers()
   registerTranscriptionHandlers()
   registerClipboardHandlers()
+  // Per-terminal Claude Code context status bar (#216). Uses the same
+  // terminalService singleton so it can look up the main-owned PTY pid + cwd.
+  claudeStatusHandlers = registerClaudeStatusHandlers(terminalService)
 
   // RELIABILITY FIX (todo012): Clean up stale projects on startup
   // This runs asynchronously but doesn't block window creation
@@ -342,6 +348,7 @@ app.on('before-quit', async () => {
   await fileWatcherService.dispose()
   await directoryWatcherService.dispose()
   await terminalService.dispose()
+  if (claudeStatusHandlers) await claudeStatusHandlers.dispose()
   await gitWatcherService.dispose()
   gitPollingService.dispose()
   await gitStatusService.dispose()
