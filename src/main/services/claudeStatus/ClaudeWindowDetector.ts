@@ -1,6 +1,6 @@
 /**
  * Detect the Claude Code context-window size (200k vs 1M) for the active
- * session, hybrid and read-only.
+ * session via a model-capability registry plus read-only signals.
  *
  * The transcript does NOT record the window size (§2). The only authoritative
  * signal (`context_window_size`) lives in Claude Code's statusLine stdin payload,
