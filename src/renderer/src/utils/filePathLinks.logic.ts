@@ -201,15 +201,6 @@ export function stripAnsi(text: string): string {
 }
 
 /**
- * Detects if the current platform is Windows.
- *
- * @returns True if running on Windows, false otherwise
- */
-export function isWindows(): boolean {
-  return process.platform === 'win32';
-}
-
-/**
  * Normalizes a file path to use forward slashes.
  * Handles Windows paths (C:\path or C:/path) and POSIX paths.
  *

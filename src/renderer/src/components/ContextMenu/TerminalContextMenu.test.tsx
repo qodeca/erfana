@@ -12,6 +12,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { TerminalContextMenu } from './TerminalContextMenu'
+import { isMacOS } from '../../utils/platform'
+
+// Platform detection is resolved via the preload bridge (utils/platform).
+// Mock it so tests drive the macOS-vs-Windows shortcut rendering directly.
+vi.mock('../../utils/platform', () => ({
+  isMacOS: vi.fn()
+}))
+
+const mockIsMacOS = vi.mocked(isMacOS)
 
 describe('TerminalContextMenu', () => {
   const defaultProps = {
@@ -23,11 +32,10 @@ describe('TerminalContextMenu', () => {
     onClose: vi.fn()
   }
 
-  let originalPlatform: string
-
   beforeEach(() => {
     vi.clearAllMocks()
-    originalPlatform = navigator.platform
+    // Default to non-macOS (Windows/Linux shortcuts) unless a test overrides.
+    mockIsMacOS.mockReturnValue(false)
 
     // Create portal-root div for ContextMenu (uses createPortal)
     const portalRoot = document.createElement('div')
@@ -36,12 +44,6 @@ describe('TerminalContextMenu', () => {
   })
 
   afterEach(() => {
-    Object.defineProperty(navigator, 'platform', {
-      value: originalPlatform,
-      writable: true,
-      configurable: true
-    })
-
     // Clean up portal-root
     const portalRoot = document.getElementById('portal-root')
     if (portalRoot) {
@@ -58,11 +60,7 @@ describe('TerminalContextMenu', () => {
     })
 
     it('shows macOS shortcuts (⌘C/⌘V) on macOS', () => {
-      Object.defineProperty(navigator, 'platform', {
-        value: 'MacIntel',
-        writable: true,
-        configurable: true
-      })
+      mockIsMacOS.mockReturnValue(true)
 
       render(<TerminalContextMenu {...defaultProps} />)
 
@@ -71,11 +69,7 @@ describe('TerminalContextMenu', () => {
     })
 
     it('shows Windows shortcuts (Ctrl+C/Ctrl+V) on Windows', () => {
-      Object.defineProperty(navigator, 'platform', {
-        value: 'Win32',
-        writable: true,
-        configurable: true
-      })
+      mockIsMacOS.mockReturnValue(false)
 
       render(<TerminalContextMenu {...defaultProps} />)
 
@@ -84,11 +78,7 @@ describe('TerminalContextMenu', () => {
     })
 
     it('shows Windows shortcuts on Linux', () => {
-      Object.defineProperty(navigator, 'platform', {
-        value: 'Linux x86_64',
-        writable: true,
-        configurable: true
-      })
+      mockIsMacOS.mockReturnValue(false)
 
       render(<TerminalContextMenu {...defaultProps} />)
 
@@ -269,30 +259,12 @@ describe('TerminalContextMenu', () => {
   })
 
   describe('Platform detection edge cases', () => {
-    it('handles empty platform string', () => {
-      Object.defineProperty(navigator, 'platform', {
-        value: '',
-        writable: true,
-        configurable: true
-      })
+    it('defaults to Windows shortcuts when not macOS', () => {
+      // isMacOS resolves false for empty/unknown platforms (see utils/platform).
+      mockIsMacOS.mockReturnValue(false)
 
       render(<TerminalContextMenu {...defaultProps} />)
 
-      // Should default to Windows shortcuts
-      expect(screen.getByText('Ctrl+C')).toBeInTheDocument()
-      expect(screen.getByText('Ctrl+V')).toBeInTheDocument()
-    })
-
-    it('handles unknown platform', () => {
-      Object.defineProperty(navigator, 'platform', {
-        value: 'FreeBSD',
-        writable: true,
-        configurable: true
-      })
-
-      render(<TerminalContextMenu {...defaultProps} />)
-
-      // Should default to Windows shortcuts
       expect(screen.getByText('Ctrl+C')).toBeInTheDocument()
       expect(screen.getByText('Ctrl+V')).toBeInTheDocument()
     })

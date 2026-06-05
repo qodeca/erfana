@@ -26,6 +26,7 @@ import { getPanelById } from '../ActivityBar/activityBarConfig'
 import { useProjectManagementContext } from '../../context/ProjectManagementContext'
 import { useAutoOpenTerminal } from '../../hooks/useAutoOpenTerminal'
 import { logger } from '../../utils/logger'
+import { isMacOS } from '../../utils/platform'
 import { TEST_IDS } from '../../constants/testids'
 import {
   shouldExpandTerminal,
@@ -416,7 +417,7 @@ export function AppDockLayout() {
   // Keyboard shortcuts (matching VS Code)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
+      const isMac = isMacOS()
       const modKey = isMac ? e.metaKey : e.ctrlKey
 
       // Cmd/Ctrl + B - Toggle Project

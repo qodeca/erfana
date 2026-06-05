@@ -3,14 +3,7 @@
  * Extracted for testability without React/xterm dependencies.
  */
 
-/**
- * Detects if running on macOS.
- * Uses codebase pattern from MarkdownEditorPanel.tsx
- */
-export function isMacOS(): boolean {
-  return typeof navigator !== 'undefined' &&
-    navigator.platform.toUpperCase().indexOf('MAC') >= 0
-}
+import { isMacOS } from './platform'
 
 export interface KeyEventInfo {
   key: string
@@ -34,13 +27,19 @@ export type ClipboardAction = 'copy' | 'paste' | 'none'
  *
  * @param event Key event information
  * @param hasSelection Whether terminal has text selected
+ * @param platform Optional platform override; defaults to the renderer platform
+ *   resolved via the preload bridge. Passing it explicitly keeps this function
+ *   pure (no `window.api`/`navigator` access) for unit tests.
  * @returns 'copy', 'paste', or 'none'
  */
 export function getClipboardAction(
   event: KeyEventInfo,
-  hasSelection: boolean
+  hasSelection: boolean,
+  platform?: NodeJS.Platform
 ): ClipboardAction {
-  const isMac = isMacOS()
+  // Resolve the macOS-ness once so the decision table below stays
+  // behaviorally identical regardless of how platform was supplied.
+  const isMac = isMacOS(platform)
   const { key, ctrlKey, metaKey, shiftKey } = event
   const keyLower = key.toLowerCase()
 
@@ -72,11 +71,13 @@ export function getClipboardAction(
  *
  * @param event Key event information
  * @param hasSelection Whether terminal has text selected
+ * @param platform Optional platform override; threaded to {@link getClipboardAction}
  * @returns true to pass through to terminal, false to intercept
  */
 export function shouldPassThrough(
   event: KeyEventInfo,
-  hasSelection: boolean
+  hasSelection: boolean,
+  platform?: NodeJS.Platform
 ): boolean {
-  return getClipboardAction(event, hasSelection) === 'none'
+  return getClipboardAction(event, hasSelection, platform) === 'none'
 }

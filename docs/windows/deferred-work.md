@@ -22,7 +22,7 @@ This ledger covers **D1-D8** (Phase 2 review aftermath). **D9-D12** (Phase 4 aud
 |---|---|
 | **Phase 4** (whisper, OCP cleanup window) | ~~D1 `resolvePlatformBinary` extraction~~ (amended 2026-04-21 — whisper is not a probe-style caller; see D1 for revised promotion rule), D2 `MAX_FILENAME_LENGTH` consolidation, D3 `ExportLock` deduplication |
 | **Phase 5** (distribution + signing) | D6 `DependencyDetector` cache TTL |
-| **Phase 6** (polish + CI guard) | D4 Structured-error IPC serialization, D5 Log-redaction pass for filename PII, D7 Filename PII 40-char truncation review (bundled with D5). **Phase 4 items**: see [`deferred-work-phase4.md`](deferred-work-phase4.md) for D11 (ISP split of `IWhisperModelManager`) and D12 (rewrite the 5 skipped `WhisperModelManager.test.ts` cases). |
+| **Phase 6** (polish + CI guard) | ~~D5 Log-redaction pass for filename PII~~ (✅ RESOLVED 2026-06-05, `feature/windows-phase-6-polish`), ~~D7 Filename PII 40-char truncation review~~ (✅ RESOLVED 2026-06-05, bundled with D5). D4 Structured-error IPC serialization — **promoted to its own ticket** (design review found it larger/riskier than the umbrella implied; still deferred, now the active D-item). **Phase 4 items**: see [`deferred-work-phase4.md`](deferred-work-phase4.md) for D11 (ISP split of `IWhisperModelManager`) and D12 (rewrite the 5 skipped `WhisperModelManager.test.ts` cases). |
 | **Tracked-only** (no scheduled phase) | D8 IPC serialization ADR. **Phase 4 items**: see [`deferred-work-phase4.md`](deferred-work-phase4.md) for D9 (forensic-logging correlation ID) and D10 (`WhisperPlatform` tagged-union refactor, triggers when a 3rd platform lands). |
 
 ---
@@ -173,6 +173,12 @@ LOW — duplication is stable; both copies have stayed in sync.
 
 **Severity:** HIGH (solution-reviewer SR-001 / SR-002, architecture-reviewer M2)
 **Source:** Solution + architecture — "Renderer depends on main-process error message shape"
+**Status:** ACTIVE deferred item (the now-promoted Phase 6 D-item). A 2026-06-05 design review (during `feature/windows-phase-6-polish`) found this larger and riskier than the umbrella implied and **moved it to its own ticket** rather than bundling it with the D5/D7 polish.
+
+### 2026-06-05 design-review findings
+
+- **Recommended transport is Option B (return-object), not a message-string prefix.** The 3 filename handlers (`createFile` / `createFolder` / `rename`) should **return** a structured `{ ok, data, error: { code } }` object instead of throwing — `invoke` resolves objects with their props intact, and the renderer reads `result.error.code`. A message-string prefix would just re-introduce a string sentinel (the very thing this item exists to retire). This narrows Option B's original "~50 handlers, breaking change" framing to the 3 filename handlers as the first slice.
+- **`INVALID_FILENAME_MARKER` has a wider consumer list than the H3 fix suggested.** The marker is also used to *build the thrown message* in `validateFilename.ts:54,217` and is asserted by tests in `validateFilename.test.ts`. Full consumer list spans **~8 code files plus docs** (`docs/glossary.md`, `docs/error-codes.md`, `docs/windows/implementation-plan.md`, `phase2-closure.md`). Any retirement must update all of these in lockstep.
 
 ### What
 
@@ -238,7 +244,9 @@ Renderer always destructures `{ ok, data, error }`. **Breaking change** for ~50 
 
 ---
 
-## D5 — Log-redaction pass for filename PII
+## D5 — Log-redaction pass for filename PII — ✅ RESOLVED 2026-06-05 (`feature/windows-phase-6-polish`)
+
+**Resolution:** New `src/main/utils/redactUserInput.ts` strips filename PII from **log** messages for `ErrorCode.INVALID_FILENAME` at the `createFile` / `createFolder` / `rename` handlers; the user-facing toast keeps the full filename. Applied **at the call-site as an interim measure** (with a test guard), not yet centralized in `LoggingService`. **Follow-up trigger:** centralize in `LoggingService` before any telemetry / crash-reporting feature ships (logs leaving the device is the original promotion criterion). D7 is covered by this same redaction (see below).
 
 **Severity:** LOW (security-auditor)
 **Source:** Security — "Error-message input echo"
@@ -312,7 +320,9 @@ Today, `cachedResult` lives forever once set. If LibreOffice is uninstalled mid-
 
 ---
 
-## D7 — Filename PII 40-char truncation review
+## D7 — Filename PII 40-char truncation review — ✅ RESOLVED 2026-06-05 (`feature/windows-phase-6-polish`, bundled with D5)
+
+**Resolution:** Reviewed — the 40-char toast truncation in `validateFilename.ts` is **intentional UX and stays**. The LOG-side PII concern that motivated this item is now covered by the D5 redaction (`redactUserInput.ts`), so D7 is considered resolved as part of D5.
 
 **Severity:** LOW (security-auditor)
 **Source:** Security

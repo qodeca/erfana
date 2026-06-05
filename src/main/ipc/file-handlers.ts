@@ -11,6 +11,7 @@ import { projectLockService } from '../services/ProjectLockService'
 import type { ProjectChanged } from '../../shared/ipc/schema'
 import { logger } from '../services/LoggingService'
 import { fileExists } from '../utils/fileUtils'
+import { redactedLogError } from '../utils/redactUserInput'
 
 /**
  * Broadcast project change to all renderer processes
@@ -253,7 +254,9 @@ export function registerFileHandlers(): void {
       const createdFilePath = await fileService.createFile(dirPath, sanitizedFileName)
       return createdFilePath
     } catch (error) {
-      logger.error('Error creating file', error instanceof Error ? error : undefined)
+      // Redact user-typed filename before logging (INVALID_FILENAME embeds it);
+      // re-throw the ORIGINAL error so the renderer toast keeps the full name.
+      logger.error('Error creating file', redactedLogError(error))
       throw error
     }
   })
@@ -278,7 +281,9 @@ export function registerFileHandlers(): void {
       const createdFolderPath = await fileService.createFolder(dirPath, sanitizedFolderName)
       return createdFolderPath
     } catch (error) {
-      logger.error('Error creating folder', error instanceof Error ? error : undefined)
+      // Redact user-typed name before logging (INVALID_FILENAME embeds it);
+      // re-throw the ORIGINAL error so the renderer toast keeps the full name.
+      logger.error('Error creating folder', redactedLogError(error))
       throw error
     }
   })
@@ -335,7 +340,9 @@ export function registerFileHandlers(): void {
       const newPath = await fileService.rename(oldPath, sanitizedName)
       return newPath
     } catch (error) {
-      logger.error('Error renaming', error instanceof Error ? error : undefined)
+      // Redact user-typed name before logging (INVALID_FILENAME embeds it);
+      // re-throw the ORIGINAL error so the renderer toast keeps the full name.
+      logger.error('Error renaming', redactedLogError(error))
       throw error
     }
   })

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useSearchStore } from '../stores/useSearchStore'
 import type { MonacoEditorHandle } from '../components/Editor/MonacoMarkdownEditor'
 import { getSelectedText } from '../utils/selectionHelpers'
+import { isMacOS } from '../utils/platform'
 
 /**
  * Options for the useSearchKeyboard hook.
@@ -50,7 +51,7 @@ export function useSearchKeyboard(options?: UseSearchKeyboardOptions): void {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       // Detect platform
-      const isMac = navigator.platform.toUpperCase().includes('MAC')
+      const isMac = isMacOS()
       const modifierKey = isMac ? e.metaKey : e.ctrlKey
 
       // Check for Cmd/Ctrl+F

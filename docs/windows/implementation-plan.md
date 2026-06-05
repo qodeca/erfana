@@ -8,7 +8,7 @@ See [`gap-analysis.md`](gap-analysis.md) for the full finding-by-finding invento
 
 ## Status snapshot
 
-*Last updated 2026-06-04, anchored on v0.12.0 (Windows NSIS installer + macOS arm64 DMG). Phase 3 (screenshots) shipped in [v0.12.0](https://github.com/qodeca/erfana/releases/tag/v0.12.0) (tag 2026-06-04) via [PR #208](https://github.com/qodeca/erfana/pull/208) (merge `9b2f91a`).*
+*Last updated 2026-06-05, anchored on v0.12.0 (Windows NSIS installer + macOS arm64 DMG). Phase 3 (screenshots) shipped in [v0.12.0](https://github.com/qodeca/erfana/releases/tag/v0.12.0) (tag 2026-06-04) via [PR #208](https://github.com/qodeca/erfana/pull/208) (merge `9b2f91a`). **Phase 6 (polish, [#167](https://github.com/qodeca/erfana/issues/167)) in progress on `feature/windows-phase-6-polish`** — items 1, 4, 7 (advisory CI), and D5/D7 done; items 2 (CameraService) and 3 (ProjectLockService) verified working with no code change; D4 promoted to its own ticket; items 5/6 + the forward-looking parity items remain. Unreleased — not yet tagged.*
 
 **Current state:** Phases 0, 1, 2 shipped to `develop` in **v0.9.3** (merge `c1e085d`, release `0b593a1`, tag `v0.9.3` on 2026-04-22). **Phase 4 (local Whisper parity, [#165](https://github.com/qodeca/erfana/issues/165)) shipped in [v0.9.4](https://github.com/qodeca/erfana/releases/tag/v0.9.4)** (merge `110f1b9`, tag 2026-04-23) — see the Phase 4 section below and [`docs/build/whisper-binaries.md`](../build/whisper-binaries.md). In parallel, the Windows-host test-flake remediation pool ([#172](https://github.com/qodeca/erfana/issues/172)) + ThrottledWorker offset-deque refactor ([#173](https://github.com/qodeca/erfana/issues/173)) shipped the same day (`c3cc005`).
 
@@ -21,7 +21,7 @@ Since v0.9.4 the project shipped five non-Windows-phase releases before Phase 3 
 | 3 | [#164](https://github.com/qodeca/erfana/issues/164) | ✅ MERGED to `develop` ([PR #208](https://github.com/qodeca/erfana/pull/208), `9b2f91a`, 2026-06-03) | strategy + dispatcher, dedicated overlay preload + per-capture nonce, in-app `WindowPickerDialog`, keyboard area-select; UAT passed on Windows 2026-06-04; pending first tagged release |
 | 4 | [#165](https://github.com/qodeca/erfana/issues/165) | Shipped v0.9.4 (`110f1b9`) | Issue closure pending in alignment pass |
 | 5 | [#166](https://github.com/qodeca/erfana/issues/166) | OPEN, narrowed to NSIS UX only | Auto-updater + signing landed via #174 in v0.9.5 |
-| 6 | [#167](https://github.com/qodeca/erfana/issues/167) | OPEN | `#158` reference dropped (#158 closed 2026-04-22); D6 owned by Phase 5 not Phase 6 |
+| 6 | [#167](https://github.com/qodeca/erfana/issues/167) | OPEN, in progress on `feature/windows-phase-6-polish` | Items 1/4/7 + D5/D7 done 2026-06-05; items 2/3 verified (no code change); D4 promoted to own ticket; items 5/6 + parity items remain. `#158` reference dropped (#158 closed 2026-04-22); D6 owned by Phase 5 not Phase 6 |
 | meta | [#168](https://github.com/qodeca/erfana/issues/168) | OPEN | D1 amended out 2026-04-21 (whisper not probe-style); D2/D3 re-evaluate after Phase 4 closed without trigger |
 | post | [#177](https://github.com/qodeca/erfana/issues/177) | OPEN | SmartScreen reputation tracking; closes at v0.9.9 or "clean" status |
 
@@ -354,17 +354,23 @@ Phase 4's ~55 new tests span 8 files. Table below is the authoritative coverage 
 
 ## Phase 6 — Polish & DX
 
+**Tracking:** [#167](https://github.com/qodeca/erfana/issues/167) — in progress on `feature/windows-phase-6-polish` (status as of 2026-06-05 below). Unreleased.
+
 Changes:
 
-1. **Migrate renderer platform detection** (fixes m1) to `window.api.getPlatform()` — 6 call sites, mechanical, tests already cover both platforms.
-2. **Verify `CameraService`** (fixes M9) — read the file, confirm pure WebRTC, add a `win32` manual test.
-3. **Verify `ProjectLockService`** (fixes M10) — force-kill an Erfana process mid-edit on Windows, reopen, confirm stale lock recovers. If broken, add PID-liveness check.
-4. **Write Windows section in `docs/known-issues.md`** (fixes m3) — SmartScreen on unsigned builds, long paths requiring opt-in, OneDrive / AV EPERM storms.
+1. ✅ **Migrate renderer platform detection** (fixes m1) — **done 2026-06-05.** All 6 sites (5 `navigator.platform` + `filePathLinks.logic.ts` `process.platform`) migrated to `window.api.utils.getPlatform()` via a new `src/renderer/src/utils/platform.ts` (`isMacOS` / `isWindows`). `filePathLinks.logic.ts` `isWindows()` was reading `process.platform` in the sandboxed renderer where it is `undefined` (dead / always-false) — now fixed via the bridge.
+2. ✅ **Verify `CameraService`** (fixes M9) — **verified working on Windows as-is 2026-06-05**, no code change: pure WebRTC + `os.tmpdir()` + `path.join`.
+3. ✅ **Verify `ProjectLockService`** (fixes M10) — **verified working on Windows as-is 2026-06-05**, no code change. Empirical test on Win11 / Node 24 confirmed `process.kill(pid, 0)` throws `ESRCH` for dead PIDs (disproving a prior no-op claim), so `isProcessAlive()` / stale-lock recovery work correctly. No PID-liveness fallback needed.
+4. ✅ **Write Windows section in `docs/known-issues.md`** (fixes m3) — **done 2026-06-05** (OneDrive / AV EPERM-storm subsection added; SmartScreen + long-path opt-in already present).
    - ✅ 2026-04-23: Windows test-flake remediation pool landed (#172). Fixes ThrottledWorker O(n²) eviction, FileService.copyItem 1000-conflict, directory-watcher e2e budget, SettingsOverlay focus race. See [`known-flakes.md`](known-flakes.md) for the register + follow-up audit candidates.
-5. **Verify Tesseract `tessdata` path** on packaged Windows build (fixes m4).
-6. **Generate `-win32.png` visual baselines** (fixes m6) — run `npm run test:e2e:update-screenshots` on Windows, commit. Enables local visual regression runs; not blocking since CI is deferred.
-7. **Windows CI guard** (deferred from Phase 0) — minimal `windows-latest` workflow running `typecheck + test:main`. Also wire visual regression once `-win32.png` baselines exist. File as part of Phase 6.
+5. ⏳ **Verify Tesseract `tessdata` path** on packaged Windows build (fixes m4) — **not done** (requires a packaged NSIS build to verify).
+6. ⏳ **Generate `-win32.png` visual baselines** (fixes m6) — **not done** (requires a full Windows e2e run). Run `npm run test:e2e:update-screenshots` on Windows, commit. Enables local visual regression runs; not blocking since CI is deferred.
+7. ✅ **Windows CI guard** (deferred from Phase 0) — **done 2026-06-05 as an advisory (non-required) check.** Added a `windows-checks` job to `.github/workflows/checks.yml` running `typecheck + test:main` on `windows-latest`. **NOT a required status check yet** — promote to required once it proves stable. Wiring visual regression here remains pending until item 6 lands `-win32.png` baselines.
 8. ~~Resolve #158 (v8 coverage race)~~ — **#158 closed 2026-04-22** without code change; verify the wrapper exit-1 no longer reproduces on Windows before considering this row truly done.
+
+**Item 8 / deferred items (D-series):** D5 (log-redaction for filename PII) and D7 (40-char truncation review) **resolved 2026-06-05** — see [`deferred-work.md`](deferred-work.md). New `src/main/utils/redactUserInput.ts` strips filename PII from log messages for `ErrorCode.INVALID_FILENAME` at the create/rename handlers (applied at call-site as an interim; centralize-in-`LoggingService` is the documented follow-up trigger before any telemetry ships). The 40-char toast truncation is intentional UX and stays. **D4 (structured-error IPC serialization to retire `INVALID_FILENAME_MARKER`) is deferred to its own ticket** — a design review found it larger / riskier than the umbrella implied; recommended transport is the documented Option B (the 3 filename handlers return a `{ ok, data, error: { code } }` object instead of throwing, renderer reads `result.error.code` — not a message-string prefix), and the marker's consumer list spans ~8 code files plus docs.
+
+**Forward-looking parity items deferred to their own follow-up tickets:** `flashFrame` focus (Windows), `addRecentDocument` jumplist wiring, Windows About / Help menu entry, `shell.trashItem` for file deletion (see §"Degraded" for file:line references).
 
 ---
 

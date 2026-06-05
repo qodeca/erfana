@@ -17,13 +17,14 @@
  * @see Spec #001 - Unified search feature
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import type { MonacoEditorHandle } from '../components/Editor/MonacoMarkdownEditor'
 
-const { mockOpenSearch, mockGetSelectedText } = vi.hoisted(() => ({
+const { mockOpenSearch, mockGetSelectedText, mockIsMacOS } = vi.hoisted(() => ({
   mockOpenSearch: vi.fn(),
-  mockGetSelectedText: vi.fn()
+  mockGetSelectedText: vi.fn(),
+  mockIsMacOS: vi.fn()
 }))
 
 // Mock useSearchStore
@@ -40,11 +41,16 @@ vi.mock('../utils/selectionHelpers', () => ({
   getSelectedText: mockGetSelectedText
 }))
 
+// Platform detection is resolved via the preload bridge (utils/platform).
+// Mock it so tests drive the metaKey-vs-ctrlKey modifier directly.
+vi.mock('../utils/platform', () => ({
+  isMacOS: mockIsMacOS
+}))
+
 // Import after mocks
 import { useSearchKeyboard } from './useSearchKeyboard'
 
 describe('useSearchKeyboard', () => {
-  let originalPlatform: PropertyDescriptor | undefined
   let addEventListenerSpy: ReturnType<typeof vi.spyOn>
   let removeEventListenerSpy: ReturnType<typeof vi.spyOn>
 
@@ -52,28 +58,14 @@ describe('useSearchKeyboard', () => {
     vi.clearAllMocks()
     addEventListenerSpy = vi.spyOn(window, 'addEventListener')
     removeEventListenerSpy = vi.spyOn(window, 'removeEventListener')
-    originalPlatform = Object.getOwnPropertyDescriptor(navigator, 'platform')
+    // Default to non-macOS unless a test overrides via setPlatform().
+    mockIsMacOS.mockReturnValue(false)
   })
 
-  afterEach(() => {
-    if (originalPlatform) {
-      Object.defineProperty(navigator, 'platform', originalPlatform)
-    } else {
-      // Reset to default if it wasn't originally defined
-      Object.defineProperty(navigator, 'platform', {
-        value: '',
-        writable: true,
-        configurable: true
-      })
-    }
-  })
-
+  // Map a legacy platform string onto the mocked isMacOS result, keeping the
+  // existing call sites (`setPlatform('MacIntel')`) unchanged.
   const setPlatform = (platform: string): void => {
-    Object.defineProperty(navigator, 'platform', {
-      value: platform,
-      writable: true,
-      configurable: true
-    })
+    mockIsMacOS.mockReturnValue(platform.toUpperCase().includes('MAC'))
   }
 
   const createKeyboardEvent = (
