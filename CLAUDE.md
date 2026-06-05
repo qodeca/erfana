@@ -134,6 +134,8 @@ Feature specifications live in `specs/`. Check registry before implementing new 
 - IPC pattern: main/services → ipc/handlers → preload → renderer
 - CSS modules for component styling
 - Lucide React for icons
+- Renderer platform detection: use `isMacOS()` / `isWindows()` from `src/renderer/src/utils/platform.ts` (backed by the sync `window.api.utils.getPlatform()` bridge). Never read `navigator.platform` or `process.platform` in the renderer — `process.platform` is `undefined` under the sandbox
+- User-input PII in logs: redact user-supplied values (e.g. filenames) before `logger.error` via `redactUserInput(message, code)` (`src/main/utils/redactUserInput.ts`); the user-facing toast keeps the full value, log files get `[redacted-filename]`
 
 ## UI Style Guide (MANDATORY)
 
@@ -172,7 +174,7 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ## Continuous Integration
 See [docs/ci.md](docs/ci.md) for the full pipeline map. Summary:
-- **`checks.yml`** (`.github/workflows/checks.yml`) — runs on **every push to any branch**. 4 parallel jobs on `ubuntu-latest`: `lint`, `typecheck`, `test` (the full vitest workspace — main/renderer/preload), `build` (`electron-vite build`). ~3 min wall-clock.
+- **`checks.yml`** (`.github/workflows/checks.yml`) — runs on **every push to any branch**. 4 parallel jobs on `ubuntu-latest`: `lint`, `typecheck`, `test` (the full vitest workspace — main/renderer/preload), `build` (`electron-vite build`). ~3 min wall-clock. Plus an advisory `windows-checks` job on `windows-latest` (typecheck + `test:main` only; `shell: bash`; not a branch-protection required check until proven stable).
 - **`e2e.yml`** (`.github/workflows/e2e.yml`) — **disabled**: both functional `electron` and `visual` suites run locally only until macos-latest instability is root-caused. Re-enable with `gh workflow enable "E2E Tests"`. E2E is excluded from branch-protection required checks, so disabling blocks no merges.
 - **`release.yml`** — fires on `v*.*.*` tag push, calls `build_mac.yml` / `build_win.yml` reusables (multi-platform build — macOS + Windows; Linux distribution target dropped). See [docs/build/release.md](docs/build/release.md).
 - **`whisper-binaries.yml` + `whisper-binaries-canary.yml`** — `workflow_dispatch` only and monthly schedule respectively. See [docs/build/whisper-binaries.md](docs/build/whisper-binaries.md).

@@ -14,6 +14,11 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 - **Reliable native build on hardened Windows 11** — a fresh `npm ci` now rebuilds the `node-pty` terminal backend successfully on Windows 11 machines with the hardened `NoDefaultCurrentDirectoryInExePath` setting, fixing an install failure that blocked building Erfana from a clean checkout on those systems. See [docs/build/windows.md](./build/windows.md#node-pty-build-failures-on-windows-11).
 
+### Windows enablement (Phase 6)
+
+- **Filenames are no longer written to log files** ([#167](https://github.com/qodeca/erfana/issues/167)) — when a file or folder name is rejected as invalid, the on-screen message still shows the name you typed, but Erfana's local log files now record `[redacted-filename]` instead, keeping anything sensitive you might paste into a filename field out of the logs.
+- **Internal** — renderer platform detection now routes through a single `window.api.utils.getPlatform()` bridge (retiring scattered `navigator.platform` / `process.platform` checks), the OneDrive and antivirus file-watching contention case is documented in [known issues](./known-issues.md#windows-specific-issues), and an advisory `windows-latest` CI job (typecheck + main-process tests) was added. The camera and project-lock services were verified working on Windows with no code change. See [docs/windows/implementation-plan.md](./windows/implementation-plan.md).
+
 ## 0.12.0
 
 *Released 2026-06-04. Tag [`v0.12.0`](https://github.com/qodeca/erfana/releases/tag/v0.12.0).*
