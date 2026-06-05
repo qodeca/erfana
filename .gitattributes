@@ -11,6 +11,11 @@ src/main/utils/__fixtures__/manifest.fixture.json.minisig text eol=lf
 # Shell scripts must stay LF on every host (Windows-checkout safety)
 *.sh text eol=lf
 
+# patch-package patches must stay LF — autocrlf converting them to CRLF on
+# Windows checkout breaks patch application (patches/node-pty+1.1.0.patch
+# is applied at install time by the postinstall hook).
+patches/*.patch text eol=lf
+
 # Binary assets — never normalize
 *.png binary
 *.jpg binary

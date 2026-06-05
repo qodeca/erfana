@@ -54,6 +54,16 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
+        # Apply committed patches before rebuilding. `npm ci --ignore-scripts`
+        # skips the postinstall hook that normally runs patch-package, so we
+        # invoke it explicitly here. This MUST run before `npm rebuild
+        # node-pty` so the patched gyp files (Windows msvs-only fields) are in
+        # place at compile time. On Linux/macOS the msvs-only fields are inert,
+        # so applying the patch is harmless. `--no-install` keeps it pinned to
+        # the local devDep (no registry fallback); `--error-on-fail` makes a
+        # stale/orphaned patch (e.g. after a node-pty bump) fail the step loudly
+        # instead of relying on CI auto-detection.
+        npx --no-install patch-package --error-on-fail
         # Only rebuild native modules we explicitly trust. Any other package
         # with a postinstall script was blocked by --ignore-scripts above and
         # stays blocked.

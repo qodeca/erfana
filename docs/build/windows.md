@@ -101,7 +101,9 @@ cd erfana
 npm install
 ```
 
-`npm install` will run `electron-builder install-app-deps` (via the `postinstall` hook), which rebuilds `node-pty` against Electron's bundled Node.js. If this step fails, you almost always have the wrong Python or are missing the C++ workload — re-check steps 2 and 3.
+`npm install` runs the `postinstall` hook, which is `patch-package && electron-builder install-app-deps`. `patch-package` first applies the committed `patches/node-pty+1.1.0.patch`, then `electron-builder install-app-deps` rebuilds `node-pty` against Electron's bundled Node.js. If the rebuild step fails, you almost always have the wrong Python or are missing the C++ workload — re-check steps 2 and 3.
+
+> **Why the patch?** A fresh `npm ci` on a default-hardened Windows 11 box used to fail in two ways during the `node-pty` build; `patch-package` now fixes both automatically. See the [node-pty build failures on Windows 11](#node-pty-build-failures-on-windows-11) note below.
 
 ### 7. Verify the dev loop
 
@@ -125,12 +127,25 @@ This produces an NSIS installer in `release/{version}/`. The build runs `prebuil
 
 ---
 
+## node-pty build failures on Windows 11
+
+A fresh `git clone && npm ci` on a default-hardened Windows 11 box previously failed in two ways while compiling `node-pty`. Both are now fixed automatically by the committed `patches/node-pty+1.1.0.patch`, applied via `patch-package` in the `postinstall` hook — no manual intervention required.
+
+- **`'GetCommitHash.bat' is not recognized`** – node-pty's `deps/winpty/src/winpty.gyp` invokes `cmd /c "cd shared && GetCommitHash.bat"` / `UpdateGenVersion.bat`. When Windows sets `NoDefaultCurrentDirectoryInExePath=1` (a security-hardening flag, often applied via enterprise / Group Policy baselines), `cmd.exe` no longer searches the current directory, so the `.bat` is "not recognized" and the build aborts. The patch prefixes the calls with `.\` to force current-directory resolution (per Microsoft's `NeedCurrentDirectoryForExePath` contract).
+- **`MSB8040: Spectre-mitigated libraries are required for this project`** – node-pty's gyp requests `SpectreMitigation: 'Spectre'`, which fails on a default MSVC install that lacks the Spectre-mitigated libs. The patch sets `SpectreMitigation: 'false'` for node-pty's builds. This is an accepted residual risk: node-pty wraps an operator-driven PTY rather than adversarial cross-boundary input, and the flag is kept off everywhere (local / CI / release) for consistency.
+
+> **Future direction**: node-pty `1.2.0-beta.7+` removes the winpty build step entirely, which would eliminate the first failure at the root. Adopting it is tracked as a follow-up; until then the patch is the supported fix.
+
+---
+
 ## Troubleshooting
 
 **`node-pty` fails to compile during `npm install`**
+- First confirm the patch is present and applied: `patches/node-pty+1.1.0.patch` should exist, and `npm install` output should show `patch-package` applying it (`node-pty@1.1.0 ✔`). If the patch failed to apply, re-run `npx patch-package` and read the error.
 - Check `python --version` is 3.12.x, not 3.13.x.
 - Confirm Visual Studio Build Tools 2022 is installed with the "Desktop development with C++" workload.
 - Run `npm config get msvs_version` — should return `2022`.
+- For `'GetCommitHash.bat' is not recognized` or `MSB8040` (Spectre libs), see [node-pty build failures on Windows 11](#node-pty-build-failures-on-windows-11) above — these are handled by the committed patch.
 
 **`ENAMETOOLONG` or `MAX_PATH` errors**
 - Verify long paths are enabled in both Git and Windows (step 5).

@@ -59,7 +59,13 @@ npm install
 # - Rebuild native modules (node-pty) for current platform
 ```
 
-**Important**: The `postinstall` script automatically runs `electron-builder install-app-deps` to rebuild native modules for Electron's Node.js version.
+**Important**: The `postinstall` script is `patch-package && electron-builder install-app-deps`. `patch-package` first applies the committed `patches/node-pty+1.1.0.patch` (which fixes two `node-pty` build failures on default-hardened Windows 11 — a `cmd.exe` current-directory resolution failure under `NoDefaultCurrentDirectoryInExePath=1` and an MSVC Spectre-libs requirement; see [windows.md](./windows.md#node-pty-build-failures-on-windows-11)), then `electron-builder install-app-deps` rebuilds native modules for Electron's Node.js version.
+
+> **Maintenance note**: the patch is keyed to the exact resolved version (`node-pty+1.1.0.patch`). When `node-pty` is bumped, regenerate the patch and re-commit it:
+> ```bash
+> npx patch-package node-pty --include '\.gyp$'
+> ```
+> CI installs with `npm ci --ignore-scripts`, so the `setup-node-with-retry` composite action runs `npx --no-install patch-package --error-on-fail` explicitly before its `npm rebuild` loop — `--error-on-fail` makes a stale patch (e.g. after an un-regenerated bump) fail the build loudly rather than silently skip.
 
 ### Clean State (Recommended)
 

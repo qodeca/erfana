@@ -201,23 +201,28 @@ Re-enable with `gh workflow enable "E2E Tests"` once the root cause is isolated.
 
 ### node-pty Build Failure
 
-**Issue**: Fails to build on Python 3.13 (missing `distutils`)
+`node-pty` (which powers the terminal) compiles native bindings at install time and has three known failure modes. Two are Windows 11-specific and are now fixed automatically.
 
-**Error**:
+**1. Python 3.13 (`distutils` removed)**
+
+Error:
 ```
 ModuleNotFoundError: No module named 'distutils'
 ```
 
-**Workaround**:
-- Terminal functionality may be limited
-- Use external terminal if needed
- 
+Solution: downgrade to Python 3.12 (the `node-gyp` shipped with Node 24 doesn't yet handle Python 3.13's removed `distutils`). Not auto-fixable — see [`docs/build/windows.md`](./build/windows.md) step 2.
 
-**Solution**:
-- Downgrade to Python 3.12, OR
-- Wait for node-pty update
+**2. Windows 11 — `cmd.exe` current-directory hardening (resolved by [#213](https://github.com/qodeca/erfana/issues/213))**
 
-**Tracking**: https://github.com/microsoft/node-pty/issues
+Symptom: `'GetCommitHash.bat' is not recognized` during the winpty build. When Windows sets `NoDefaultCurrentDirectoryInExePath=1` (a security-hardening flag, often via enterprise / Group Policy baselines), `cmd.exe` stops searching the current directory, so node-pty's `winpty.gyp` `.bat` invocations fail.
+
+**3. Windows 11 — Spectre-mitigated libraries (resolved by [#213](https://github.com/qodeca/erfana/issues/213))**
+
+Symptom: `MSB8040: Spectre-mitigated libraries are required for this project`. node-pty's gyp requests `SpectreMitigation: 'Spectre'`, which fails on a default MSVC install that lacks those libs.
+
+**Status of (2) and (3)**: both are now handled automatically by the committed `patches/node-pty+1.1.0.patch`, applied via `patch-package` in the `postinstall` hook, so a fresh `npm ci` on a default-hardened Windows 11 box succeeds. The patch is keyed to the resolved version — when `node-pty` is bumped it must be regenerated (see [`docs/build/README.md`](./build/README.md#install-dependencies) and [`docs/build/windows.md` § node-pty build failures on Windows 11](./build/windows.md#node-pty-build-failures-on-windows-11)). A follow-up will evaluate node-pty `1.2.0-beta.7+`, which removes the winpty build step and eliminates failure (2) at the root.
+
+**Tracking**: [#213](https://github.com/qodeca/erfana/issues/213) (Windows 11 build fix, resolved); https://github.com/microsoft/node-pty/issues (upstream).
 
 ---
 

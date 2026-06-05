@@ -2,6 +2,8 @@
 
 Workflow for contributors working on Windows parity (Phases 0–6). Environment setup lives in [`../build/windows.md`](../build/windows.md); this file is workflow only.
 
+> **Fresh setup just works.** As of [#213](https://github.com/qodeca/erfana/issues/213), `git clone && npm ci` completes on a default-hardened Windows 11 box with no manual `node_modules` recovery. The committed `patches/node-pty+1.1.0.patch` (applied via `patch-package` in `postinstall`) fixes the two `node-pty` build failures that previously broke a clean install — see [`../build/windows.md` § node-pty build failures on Windows 11](../build/windows.md#node-pty-build-failures-on-windows-11). Do not hand-edit anything under `node_modules`; if you bump `node-pty`, regenerate the patch instead (procedure in [`../build/README.md`](../build/README.md#install-dependencies)).
+
 ---
 
 ## Which branch?
