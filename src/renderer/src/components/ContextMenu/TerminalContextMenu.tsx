@@ -1,6 +1,6 @@
 import { Copy, ClipboardPaste } from 'lucide-react'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
-import { isMacOS } from '../../utils/terminalClipboard.logic'
+import { isMacOS } from '../../utils/platform'
 import { TEST_IDS } from '../../constants/testids'
 
 interface TerminalContextMenuProps {

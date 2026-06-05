@@ -14,12 +14,20 @@
  * Total: 22 tests
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useKeyboardShortcuts } from './useKeyboardShortcuts'
+import { isMacOS } from '../utils/platform'
+
+// Platform detection is resolved via the preload bridge (utils/platform).
+// Mock it so tests drive the metaKey-vs-ctrlKey modifier directly.
+vi.mock('../utils/platform', () => ({
+  isMacOS: vi.fn()
+}))
+
+const mockIsMacOS = vi.mocked(isMacOS)
 
 describe('useKeyboardShortcuts', () => {
-  let originalPlatform: PropertyDescriptor | undefined
   let addEventListenerSpy: ReturnType<typeof vi.spyOn>
   let removeEventListenerSpy: ReturnType<typeof vi.spyOn>
   let mockOnSave: ReturnType<typeof vi.fn>
@@ -30,31 +38,18 @@ describe('useKeyboardShortcuts', () => {
     vi.clearAllMocks()
     addEventListenerSpy = vi.spyOn(window, 'addEventListener')
     removeEventListenerSpy = vi.spyOn(window, 'removeEventListener')
-    originalPlatform = Object.getOwnPropertyDescriptor(navigator, 'platform')
+    // Default to non-macOS unless a test overrides via setPlatform().
+    mockIsMacOS.mockReturnValue(false)
 
     mockOnSave = vi.fn()
     mockOnClose = vi.fn()
     mockShowConfirm = vi.fn().mockResolvedValue(false)
   })
 
-  afterEach(() => {
-    if (originalPlatform) {
-      Object.defineProperty(navigator, 'platform', originalPlatform)
-    } else {
-      Object.defineProperty(navigator, 'platform', {
-        value: '',
-        writable: true,
-        configurable: true
-      })
-    }
-  })
-
+  // Map a legacy platform string onto the mocked isMacOS result, keeping the
+  // existing call sites (`setPlatform('MacIntel')`) unchanged.
   const setPlatform = (platform: string): void => {
-    Object.defineProperty(navigator, 'platform', {
-      value: platform,
-      writable: true,
-      configurable: true
-    })
+    mockIsMacOS.mockReturnValue(platform.toUpperCase().includes('MAC'))
   }
 
   const createKeyboardEvent = (

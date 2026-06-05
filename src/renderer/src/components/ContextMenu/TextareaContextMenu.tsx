@@ -1,5 +1,6 @@
 import { Scissors, Copy, ClipboardPaste } from 'lucide-react'
 import { ContextMenu, type ContextMenuItem } from './ContextMenu'
+import { isMacOS } from '../../utils/platform'
 
 interface TextareaContextMenuProps {
   x: number
@@ -24,7 +25,7 @@ export function TextareaContextMenu({
   onPaste,
   onClose
 }: TextareaContextMenuProps): JSX.Element {
-  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
+  const isMac = isMacOS()
   const cutShortcut = isMac ? '⌘X' : 'Ctrl+X'
   const copyShortcut = isMac ? '⌘C' : 'Ctrl+C'
   const pasteShortcut = isMac ? '⌘V' : 'Ctrl+V'

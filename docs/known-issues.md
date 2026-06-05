@@ -106,6 +106,16 @@ Pipeline contributors on Windows:
 
 ---
 
+### OneDrive / antivirus EPERM storms during file watching
+
+**Issue**: A project inside a OneDrive / Dropbox / Google-Drive-synced folder, or one subject to on-access antivirus scanning, causes the directory watcher to hit bursts of `EPERM` / `EBUSY` because the sync client or AV briefly holds exclusive handles on files as they change. Symptoms: transient permission-denied toasts on save, Project Tree flicker / lag, and `EPERM` lines in `~/.erfana/logs/`. OneDrive Files On-Demand (dehydrated placeholders) makes it worse — opening a placeholder triggers a synchronous download that can stall a watcher callback.
+
+**Workaround**: Prefer a project location outside the cloud-sync root (e.g. `C:\dev\<project>`). If it must stay in OneDrive, mark the folder "Always keep on this device" so its files are not dehydrated placeholders. Add the project folder and `~/.erfana` to your antivirus exclusions. Transient `EPERM` / `EBUSY` are recoverable — Erfana retries and the tree self-heals on the next stable event, and Cmd/Ctrl+Alt+R forces a manual refresh.
+
+**Tracking**: Platform-inherent contention (cloud-sync / AV handle locks versus the watcher), not an Erfana bug. See [`docs/file-watching/README.md`](./file-watching/README.md) for the recoverable-ENOENT / EPERM handling.
+
+---
+
 ### cmd.exe terminals can leak pre-bootstrap text into scrollback after aggressive resizing
 
 **Issue**: On Windows, ConPTY keeps its own screen buffer and re-emits the buffer contents back through the PTY stream on every terminal resize. The Git Bash and PowerShell bootstraps emit a full CSI 2J / CSI 3J / CSI H sequence after the startup marker so ConPTY's buffer is wiped before the interactive shell takes over, leaving nothing for a later reflow to replay. cmd.exe can only clear the visible viewport (`cls` → CSI 2J + CSI H); `CSI 3J` (scrollback clear) isn't available from cmd without spawning a child process. In rare cases, a user who opens a fresh cmd.exe terminal and immediately drags the panel splitter may see faint reflowed pwd / marker text appear in scrollback history (not the visible viewport).

@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useRef } from 'react'
+import { isMacOS } from '../utils/platform'
 
 /**
  * Configuration for confirmation dialog.
@@ -94,7 +95,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions): void
   useEffect(() => {
     const handleKeyDown = async (e: KeyboardEvent): Promise<void> => {
       // Detect platform for correct modifier key
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
+      const isMac = isMacOS()
       const modKey = isMac ? e.metaKey : e.ctrlKey
 
       // Cmd/Ctrl+S - Save

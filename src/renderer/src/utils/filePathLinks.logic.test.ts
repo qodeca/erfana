@@ -8,7 +8,8 @@
  * - createPathCache(): LRU cache with TTL for path validation
  * - normalizePath(): Path normalization (backslash to forward slash)
  * - stripAnsi(): Removing ANSI escape sequences
- * - isWindows(): Platform detection
+ *
+ * Platform detection (isWindows) moved to utils/platform.ts and is tested there.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
@@ -19,7 +20,6 @@ import {
   createPathCache,
   normalizePath,
   stripAnsi,
-  isWindows,
   type PathCache,
   type PathCacheEntry
 } from './filePathLinks.logic'
@@ -58,50 +58,6 @@ describe('filePathLinks.logic', () => {
     it('removes ANSI codes from file path output', () => {
       const text = '\x1b[31merror\x1b[0m in \x1b[36m/path/to/file.ts\x1b[0m:42'
       expect(stripAnsi(text)).toBe('error in /path/to/file.ts:42')
-    })
-  })
-
-  describe('isWindows()', () => {
-    let originalPlatform: string
-
-    beforeEach(() => {
-      originalPlatform = process.platform
-    })
-
-    afterEach(() => {
-      // Restore original platform
-      Object.defineProperty(process, 'platform', {
-        value: originalPlatform,
-        writable: true,
-        configurable: true
-      })
-    })
-
-    it('returns true for win32', () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'win32',
-        writable: true,
-        configurable: true
-      })
-      expect(isWindows()).toBe(true)
-    })
-
-    it('returns false for darwin', () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'darwin',
-        writable: true,
-        configurable: true
-      })
-      expect(isWindows()).toBe(false)
-    })
-
-    it('returns false for linux', () => {
-      Object.defineProperty(process, 'platform', {
-        value: 'linux',
-        writable: true,
-        configurable: true
-      })
-      expect(isWindows()).toBe(false)
     })
   })
 

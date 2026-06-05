@@ -11,7 +11,7 @@
  * service (issue #203); the hook surfaces no failure callback of its own.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { useTerminalClipboard } from './useTerminalClipboard'
 import type { Terminal } from '@xterm/xterm'
@@ -27,6 +27,14 @@ vi.mock('../services/textClipboard', () => ({
   }
 }))
 
+// Platform detection is resolved via the preload bridge (utils/platform);
+// getClipboardAction reads it internally. Mock it so tests drive the
+// macOS-vs-Windows clipboard behavior directly.
+const { mockIsMacOS } = vi.hoisted(() => ({ mockIsMacOS: vi.fn() }))
+vi.mock('../utils/platform', () => ({
+  isMacOS: mockIsMacOS
+}))
+
 describe('useTerminalClipboard', () => {
   // Mock xterm Terminal
   const createMockXterm = (hasSelection = false, selection = ''): Terminal => {
@@ -40,29 +48,13 @@ describe('useTerminalClipboard', () => {
     } as unknown as Terminal
   }
 
-  let originalPlatform: string
-
   beforeEach(() => {
-    originalPlatform = navigator.platform
-
     // Reset service mocks: success-by-default
     mockWriteText.mockReset().mockResolvedValue(true)
     mockReadText.mockReset().mockResolvedValue('clipboard text')
 
     // Default to macOS
-    Object.defineProperty(navigator, 'platform', {
-      value: 'MacIntel',
-      writable: true,
-      configurable: true
-    })
-  })
-
-  afterEach(() => {
-    Object.defineProperty(navigator, 'platform', {
-      value: originalPlatform,
-      writable: true,
-      configurable: true
-    })
+    mockIsMacOS.mockReset().mockReturnValue(true)
   })
 
   describe('Initial state', () => {
@@ -326,11 +318,7 @@ describe('useTerminalClipboard', () => {
 
     describe('Copy action (macOS)', () => {
       beforeEach(() => {
-        Object.defineProperty(navigator, 'platform', {
-          value: 'MacIntel',
-          writable: true,
-          configurable: true
-        })
+        mockIsMacOS.mockReturnValue(true)
       })
 
       it('returns false and calls copy for Cmd+C with selection', async () => {
@@ -383,11 +371,7 @@ describe('useTerminalClipboard', () => {
 
     describe('Copy action (Windows)', () => {
       beforeEach(() => {
-        Object.defineProperty(navigator, 'platform', {
-          value: 'Win32',
-          writable: true,
-          configurable: true
-        })
+        mockIsMacOS.mockReturnValue(false)
       })
 
       it('returns false and calls copy for Ctrl+C with selection', async () => {
@@ -422,11 +406,7 @@ describe('useTerminalClipboard', () => {
 
     describe('Paste action (macOS)', () => {
       beforeEach(() => {
-        Object.defineProperty(navigator, 'platform', {
-          value: 'MacIntel',
-          writable: true,
-          configurable: true
-        })
+        mockIsMacOS.mockReturnValue(true)
       })
 
       it('returns true for Cmd+V (lets xterm handle native paste)', () => {
@@ -461,11 +441,7 @@ describe('useTerminalClipboard', () => {
 
     describe('Paste action (Windows)', () => {
       beforeEach(() => {
-        Object.defineProperty(navigator, 'platform', {
-          value: 'Win32',
-          writable: true,
-          configurable: true
-        })
+        mockIsMacOS.mockReturnValue(false)
       })
 
       it('returns true for Ctrl+V (lets xterm handle native paste)', () => {
@@ -520,11 +496,7 @@ describe('useTerminalClipboard', () => {
 
     describe('Non-clipboard keys', () => {
       beforeEach(() => {
-        Object.defineProperty(navigator, 'platform', {
-          value: 'MacIntel',
-          writable: true,
-          configurable: true
-        })
+        mockIsMacOS.mockReturnValue(true)
       })
 
       it('returns true for regular key presses', () => {

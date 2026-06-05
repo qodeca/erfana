@@ -103,6 +103,73 @@ describe('file:getStats logging', () => {
   })
 })
 
+describe('file:createFile / createFolder / rename log redaction', () => {
+  beforeEach(() => {
+    for (const k of Object.keys(handlers)) delete handlers[k]
+    vi.resetModules()
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  // Test guard (#167 D5): prevents a future call site from silently logging the
+  // raw user-typed filename. Each handler must (a) log a redacted copy and
+  // (b) re-throw the ORIGINAL error so the renderer toast keeps the full name.
+  const cases = [
+    {
+      title: 'file:createFile',
+      channel: 'file:createFile',
+      method: 'createFile' as const,
+      invoke: (h: (...args: any[]) => any) => h({}, '/proj', 'secret-budget-q4.md'),
+    },
+    {
+      title: 'file:createFolder',
+      channel: 'file:createFolder',
+      method: 'createFolder' as const,
+      invoke: (h: (...args: any[]) => any) => h({}, '/proj', 'secret-budget-q4'),
+    },
+    {
+      title: 'file:rename',
+      channel: 'file:rename',
+      method: 'rename' as const,
+      invoke: (h: (...args: any[]) => any) => h({}, '/proj/old.md', 'secret-budget-q4.md'),
+    },
+  ]
+
+  for (const { title, channel, method, invoke } of cases) {
+    it(`${title} redacts the filename in logs but re-throws the original error`, async () => {
+      const { registerFileHandlers } = await import('./file-handlers')
+      const { fileService } = await import('../services/FileService')
+      const { logger } = await import('../services/LoggingService')
+      const { AppError, ErrorCode, INVALID_FILENAME_MARKER } = await import('../../shared/errors')
+
+      const rawFilename = 'secret-budget-q4.md'
+      const original = new AppError(
+        `"${rawFilename}" ${INVALID_FILENAME_MARKER} — remove trailing dot(s)`,
+        ErrorCode.INVALID_FILENAME,
+      )
+
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {})
+      vi.spyOn(fileService, method).mockRejectedValue(original)
+
+      registerFileHandlers()
+
+      // (b) Handler re-throws the ORIGINAL unredacted error (full filename intact).
+      await expect(invoke(handlers[channel])).rejects.toBe(original)
+      expect(original.message).toContain(rawFilename)
+
+      // (a) logger.error received a redacted message, not the raw filename.
+      expect(errorSpy).toHaveBeenCalledTimes(1)
+      const loggedError = errorSpy.mock.calls[0][1] as Error | undefined
+      expect(loggedError).toBeInstanceOf(Error)
+      expect(loggedError?.message).toContain('[redacted-filename]')
+      expect(loggedError?.message).not.toContain(rawFilename)
+      // Stack must not re-leak the filename either.
+      expect(loggedError?.stack ?? '').not.toContain(rawFilename)
+    })
+  }
+})
+
 describe('file:exists', () => {
   beforeEach(() => {
     for (const k of Object.keys(handlers)) delete handlers[k]
