@@ -22,7 +22,7 @@ This ledger covers **D1-D8** (Phase 2 review aftermath). **D9-D12** (Phase 4 aud
 |---|---|
 | **Phase 4** (whisper, OCP cleanup window) | ~~D1 `resolvePlatformBinary` extraction~~ (amended 2026-04-21 — whisper is not a probe-style caller; see D1 for revised promotion rule), D2 `MAX_FILENAME_LENGTH` consolidation, D3 `ExportLock` deduplication |
 | **Phase 5** (distribution + signing) | D6 `DependencyDetector` cache TTL |
-| **Phase 6** (polish + CI guard) | ~~D5 Log-redaction pass for filename PII~~ (✅ RESOLVED 2026-06-05, `feature/windows-phase-6-polish`), ~~D7 Filename PII 40-char truncation review~~ (✅ RESOLVED 2026-06-05, bundled with D5). D4 Structured-error IPC serialization — **promoted to its own ticket** (design review found it larger/riskier than the umbrella implied; still deferred, now the active D-item). **Phase 4 items**: see [`deferred-work-phase4.md`](deferred-work-phase4.md) for D11 (ISP split of `IWhisperModelManager`) and D12 (rewrite the 5 skipped `WhisperModelManager.test.ts` cases). |
+| **Phase 6** (polish + CI guard) | ~~D5 Log-redaction pass for filename PII~~ (✅ RESOLVED 2026-06-05, `feature/windows-phase-6-polish`), ~~D7 Filename PII 40-char truncation review~~ (✅ RESOLVED 2026-06-05, bundled with D5). D4 Structured-error IPC serialization — **promoted to its own ticket** ([#220](https://github.com/qodeca/erfana/issues/220)) (design review found it larger/riskier than the umbrella implied; still deferred, now the active D-item). **Phase 4 items**: see [`deferred-work-phase4.md`](deferred-work-phase4.md) for D11 (ISP split of `IWhisperModelManager`) and D12 (rewrite the 5 skipped `WhisperModelManager.test.ts` cases). |
 | **Tracked-only** (no scheduled phase) | D8 IPC serialization ADR. **Phase 4 items**: see [`deferred-work-phase4.md`](deferred-work-phase4.md) for D9 (forensic-logging correlation ID) and D10 (`WhisperPlatform` tagged-union refactor, triggers when a 3rd platform lands). |
 
 ---
@@ -173,7 +173,7 @@ LOW — duplication is stable; both copies have stayed in sync.
 
 **Severity:** HIGH (solution-reviewer SR-001 / SR-002, architecture-reviewer M2)
 **Source:** Solution + architecture — "Renderer depends on main-process error message shape"
-**Status:** ACTIVE deferred item (the now-promoted Phase 6 D-item). A 2026-06-05 design review (during `feature/windows-phase-6-polish`) found this larger and riskier than the umbrella implied and **moved it to its own ticket** rather than bundling it with the D5/D7 polish.
+**Status:** ACTIVE deferred item (the now-promoted Phase 6 D-item). A 2026-06-05 design review (during `feature/windows-phase-6-polish`) found this larger and riskier than the umbrella implied and **moved it to its own ticket** ([#220](https://github.com/qodeca/erfana/issues/220)) rather than bundling it with the D5/D7 polish.
 
 ### 2026-06-05 design-review findings
 
