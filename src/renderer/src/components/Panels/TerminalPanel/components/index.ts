@@ -11,3 +11,6 @@ export type { TerminalToolbarProps } from './TerminalToolbar'
 
 export { TerminalStatusContent } from './TerminalStatusContent'
 export type { TerminalStatusContentProps } from './TerminalStatusContent'
+
+export { ClaudeStatusBar } from './ClaudeStatusBar'
+export type { ClaudeStatusBarProps } from './ClaudeStatusBar'

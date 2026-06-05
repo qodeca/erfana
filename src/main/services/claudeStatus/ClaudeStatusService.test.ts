@@ -1,0 +1,384 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+vi.mock('../LoggingService', () => ({
+  logger: {
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn()
+  }
+}))
+
+import { ClaudeStatusService, type ClaudeStatusDeps } from './ClaudeStatusService'
+import type { IClaudeProcessDetector } from './process/types'
+import type { ClaudeStatusChangePayload } from '../../../shared/ipc/claude-status-schema'
+import { modelNativelySupportsExtended } from './ClaudeWindowDetector'
+
+/** Minimal fake watcher implementing the surface ClaudeStatusService uses. */
+function makeFakeWatcher() {
+  const watchDir = vi.fn()
+  const unwatchDir = vi.fn()
+  const closeAll = vi.fn().mockResolvedValue(undefined)
+  let onChangeCb: ((dir: string) => void) | null = null
+  const onChange = vi.fn((cb: (dir: string) => void) => {
+    onChangeCb = cb
+  })
+  return {
+    watchDir,
+    unwatchDir,
+    closeAll,
+    onChange,
+    /** Drive a transcript-dir change as the real watcher would. */
+    fire: (dir: string) => onChangeCb?.(dir)
+  }
+}
+
+type FakeWatcher = ReturnType<typeof makeFakeWatcher>
+
+interface Harness {
+  service: ClaudeStatusService
+  detector: { isClaudeRunning: ReturnType<typeof vi.fn> }
+  locateTranscript: ReturnType<typeof vi.fn>
+  parseTranscript: ReturnType<typeof vi.fn>
+  detectWindowSize: ReturnType<typeof vi.fn>
+  watcher: FakeWatcher
+  emit: ReturnType<typeof vi.fn>
+  emitted: Array<{ wc: number; payload: ClaudeStatusChangePayload }>
+}
+
+function makeHarness(overrides?: Partial<ClaudeStatusDeps>): Harness {
+  const emitted: Array<{ wc: number; payload: ClaudeStatusChangePayload }> = []
+  const detector = { isClaudeRunning: vi.fn() }
+  const locateTranscript = vi.fn().mockResolvedValue('/root/ENC/session.jsonl')
+  const parseTranscript = vi.fn().mockResolvedValue({ modelId: 'claude-opus-4-8', usedTokens: 95329 })
+  // Default mirrors the real registry: Opus 4.6+ (incl. claude-opus-4-8) is
+  // auto-1M even under 200k usage; everything else with low usage is 200k.
+  const detectWindowSize = vi
+    .fn()
+    .mockImplementation(async (modelId: string, used: number) =>
+      modelNativelySupportsExtended(modelId) || used > 200000 ? 1000000 : 200000
+    )
+  const watcher = makeFakeWatcher()
+  const emit = vi.fn((wc: number, payload: ClaudeStatusChangePayload) => {
+    emitted.push({ wc, payload })
+  })
+
+  detector.isClaudeRunning.mockResolvedValue({ running: true })
+
+  const service = new ClaudeStatusService({
+    detector: detector as unknown as IClaudeProcessDetector,
+    locateTranscript,
+    parseTranscript,
+    detectWindowSize,
+    watcher: watcher as never,
+    emit,
+    ...overrides
+  })
+
+  return { service, detector, locateTranscript, parseTranscript, detectWindowSize, watcher, emit, emitted }
+}
+
+/** Flush all pending microtasks (lets serialized refresh chains settle). */
+async function flush(): Promise<void> {
+  for (let i = 0; i < 20; i++) await Promise.resolve()
+}
+
+describe('ClaudeStatusService', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('emits a correct snapshot for a running session with a valid transcript', async () => {
+    const h = makeHarness()
+    h.service.registerPanel('t1', 4242, '/Users/x/proj', 7)
+    await flush()
+
+    expect(h.emitted).toHaveLength(1)
+    const { wc, payload } = h.emitted[0]
+    expect(wc).toBe(7)
+    expect(payload.terminalId).toBe('t1')
+    expect(payload.snapshot).not.toBeNull()
+    expect(payload.snapshot).toMatchObject({
+      terminalId: 't1',
+      modelId: 'claude-opus-4-8',
+      friendlyName: 'Opus 4.8',
+      // claude-opus-4-8 is auto-upgraded to 1M (registry), so an under-200k turn
+      // now correctly reports the 1M window — the #216 UAT fix.
+      windowSize: 1000000,
+      usedTokens: 95329,
+      // 95329 / 1000000 = 9.53 → floored to 9 (clampPercent uses Math.floor so
+      // the display never enters a band before the colour does — CORRECTNESS-1).
+      percent: 9,
+      level: 'green',
+      tooltip: '95k / 1M'
+    })
+  })
+
+  it('formats the 1M tooltip and badge for an extended window', async () => {
+    const h = makeHarness()
+    h.parseTranscript.mockResolvedValue({ modelId: 'claude-opus-4-8', usedTokens: 250000 })
+    h.detectWindowSize.mockResolvedValue(1000000)
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+
+    expect(h.emitted[0].payload.snapshot?.tooltip).toBe('250k / 1M')
+    expect(h.emitted[0].payload.snapshot?.windowSize).toBe(1000000)
+  })
+
+  it('snapshot percent (floored) and level (raw) agree at a band boundary', async () => {
+    // 119200 / 200000 = 59.6 → display floors to 59; the colour reads the raw
+    // 59.6 and stays amber. Floored display must not read "60" (red). Uses a
+    // 200k model (Sonnet 4.5) so the window is genuinely 200k.
+    const h = makeHarness()
+    h.parseTranscript.mockResolvedValue({ modelId: 'claude-sonnet-4-5', usedTokens: 119200 })
+    h.detectWindowSize.mockResolvedValue(200000)
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+
+    expect(h.emitted[0].payload.snapshot?.percent).toBe(59)
+    expect(h.emitted[0].payload.snapshot?.level).toBe('amber')
+  })
+
+  it('emits {snapshot:null} when claude is not running', async () => {
+    const h = makeHarness()
+    h.detector.isClaudeRunning.mockResolvedValue({ running: false })
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+
+    expect(h.emitted).toHaveLength(1)
+    expect(h.emitted[0].payload.snapshot).toBeNull()
+  })
+
+  it('emits null when pid is undefined (fail-closed)', async () => {
+    const h = makeHarness()
+    h.service.registerPanel('t1', undefined, '/p', 7)
+    await flush()
+
+    expect(h.detector.isClaudeRunning).not.toHaveBeenCalled()
+    expect(h.emitted[0].payload.snapshot).toBeNull()
+  })
+
+  it('emits null when the transcript cannot be located', async () => {
+    const h = makeHarness()
+    h.locateTranscript.mockResolvedValue(null)
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+
+    expect(h.emitted[0].payload.snapshot).toBeNull()
+  })
+
+  it('emits null when the transcript cannot be parsed', async () => {
+    const h = makeHarness()
+    h.parseTranscript.mockResolvedValue(null)
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+
+    expect(h.emitted[0].payload.snapshot).toBeNull()
+  })
+
+  it('uses the live process cwd (not spawn cwd) to locate the transcript', async () => {
+    const h = makeHarness()
+    h.detector.isClaudeRunning.mockResolvedValue({ running: true, cwd: '/live/cwd' })
+    h.service.registerPanel('t1', 4242, '/spawn/cwd', 7)
+    await flush()
+
+    expect(h.locateTranscript).toHaveBeenCalledWith('/live/cwd')
+  })
+
+  it('falls back to spawn cwd when the process has no live cwd', async () => {
+    const h = makeHarness()
+    h.detector.isClaudeRunning.mockResolvedValue({ running: true })
+    h.service.registerPanel('t1', 4242, '/spawn/cwd', 7)
+    await flush()
+
+    expect(h.locateTranscript).toHaveBeenCalledWith('/spawn/cwd')
+  })
+
+  it('generation guard: a slow refresh resolving after a re-register does not emit its own (stale) result', async () => {
+    const h = makeHarness()
+
+    // First detection resolves LATE and reports a STALE model so we could tell
+    // its emit apart; it must be dropped by the generation guard.
+    let resolveFirst!: (v: { running: boolean }) => void
+    const firstDetect = new Promise<{ running: boolean }>((r) => {
+      resolveFirst = r
+    })
+    h.detector.isClaudeRunning.mockReturnValueOnce(firstDetect)
+
+    h.service.registerPanel('t1', 4242, '/p', 7) // run A — parked on firstDetect
+    await flush()
+    expect(h.emitted).toHaveLength(0)
+
+    // Re-register bumps generation while A is parked. Its refresh is queued behind
+    // the in-flight A (serialized), and the default detector/parser apply to it.
+    h.detector.isClaudeRunning.mockResolvedValue({ running: true })
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+
+    // Now release A. Its captured generation is stale → A aborts WITHOUT emitting
+    // (right after its detector resolves); the queued run B then runs exactly once
+    // and emits the single current snapshot. No duplicate/stale emit from A.
+    resolveFirst({ running: true })
+    await flush()
+
+    expect(h.emitted).toHaveLength(1)
+    expect(h.emitted[0].payload.snapshot?.modelId).toBe('claude-opus-4-8')
+  })
+
+  it('emits null and never locates a transcript for a cwd with a control char', async () => {
+    const h = makeHarness()
+    // Live cwd carrying a newline (control char) — must be rejected fail-closed
+    // BEFORE transcript location (§10 cwd sanitization).
+    h.detector.isClaudeRunning.mockResolvedValue({ running: true, cwd: '/evil\ncwd' })
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+
+    expect(h.locateTranscript).not.toHaveBeenCalled()
+    expect(h.emitted).toHaveLength(1)
+    expect(h.emitted[0].payload.snapshot).toBeNull()
+  })
+
+  it('serializes overlapping refreshes and runs queue-latest once more', async () => {
+    const h = makeHarness()
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+    const baseline = h.detector.isClaudeRunning.mock.calls.length
+
+    // Make the detector slow so the first refresh stays in-flight.
+    let resolveGate!: () => void
+    const gate = new Promise<void>((r) => {
+      resolveGate = r
+    })
+    h.detector.isClaudeRunning.mockImplementation(async () => {
+      await gate
+      return { running: true }
+    })
+
+    const r1 = h.service.refresh('t1') // starts, parks on gate
+    const r2 = h.service.refresh('t1') // in-flight → queued
+    const r3 = h.service.refresh('t1') // in-flight → queued (latest)
+
+    resolveGate()
+    await Promise.all([r1, r2, r3])
+    await flush()
+
+    // One run for r1, then exactly one more for the queued-latest = 2 extra calls.
+    const extra = h.detector.isClaudeRunning.mock.calls.length - baseline
+    expect(extra).toBe(2)
+  })
+
+  it('unregisterPanel is idempotent and unwatches the dir', async () => {
+    const h = makeHarness()
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+    expect(h.watcher.watchDir).toHaveBeenCalled()
+
+    h.service.unregisterPanel('t1')
+    expect(h.watcher.unwatchDir).toHaveBeenCalledWith(expect.any(String), 't1')
+
+    // Second call + unknown id are safe.
+    expect(() => h.service.unregisterPanel('t1')).not.toThrow()
+    expect(() => h.service.unregisterPanel('unknown')).not.toThrow()
+  })
+
+  it('cleanupForWebContentsId removes all terminals for that webContents', async () => {
+    const h = makeHarness()
+    h.service.registerPanel('t1', 1, '/p', 7)
+    h.service.registerPanel('t2', 2, '/p', 7)
+    h.service.registerPanel('t3', 3, '/p', 99)
+    await flush()
+
+    h.service.cleanupForWebContentsId(7)
+
+    // t1 + t2 removed → re-refresh is a no-op (emits nothing new).
+    const before = h.emitted.length
+    void h.service.refresh('t1')
+    void h.service.refresh('t2')
+    await flush()
+    expect(h.emitted.length).toBe(before)
+
+    // t3 still tracked.
+    const beforeT3 = h.emitted.length
+    void h.service.refresh('t3')
+    await flush()
+    expect(h.emitted.length).toBeGreaterThan(beforeT3)
+  })
+
+  it('nudge is gated to one refresh per second', async () => {
+    vi.useFakeTimers()
+    const h = makeHarness()
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await vi.advanceTimersByTimeAsync(0)
+    const baseline = h.detector.isClaudeRunning.mock.calls.length
+
+    h.service.nudge('t1')
+    h.service.nudge('t1') // within 1s → ignored
+    await vi.advanceTimersByTimeAsync(250)
+    await vi.advanceTimersByTimeAsync(0)
+
+    const extra = h.detector.isClaudeRunning.mock.calls.length - baseline
+    expect(extra).toBe(1)
+  })
+
+  it('dispose closes the watcher and clears pending timers', async () => {
+    vi.useFakeTimers()
+    const h = makeHarness()
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await vi.advanceTimersByTimeAsync(0)
+
+    await h.service.dispose()
+    expect(h.watcher.closeAll).toHaveBeenCalledTimes(1)
+
+    // After dispose, a refresh on the cleared entry is a no-op.
+    const before = h.emitted.length
+    void h.service.refresh('t1')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(h.emitted.length).toBe(before)
+  })
+
+  it('two terminals in the same folder each watch the dir and emit to their own webContents', async () => {
+    const h = makeHarness()
+    h.detector.isClaudeRunning.mockResolvedValue({ running: true, cwd: '/shared/folder' })
+    h.service.registerPanel('t1', 11, '/shared/folder', 7)
+    h.service.registerPanel('t2', 22, '/shared/folder', 9)
+    await flush()
+
+    // Same dir watched once per terminal (refcount lives in the watcher).
+    const watchedDirs = h.watcher.watchDir.mock.calls.map((c) => c[1])
+    expect(watchedDirs).toContain('t1')
+    expect(watchedDirs).toContain('t2')
+    const dirA = h.watcher.watchDir.mock.calls.find((c) => c[1] === 't1')?.[0]
+    const dirB = h.watcher.watchDir.mock.calls.find((c) => c[1] === 't2')?.[0]
+    expect(dirA).toBe(dirB)
+
+    // Each terminal emitted to its own webContents.
+    const wcsByTerminal = new Map<string, number>()
+    for (const { payload, wc } of h.emitted) wcsByTerminal.set(payload.terminalId, wc)
+    expect(wcsByTerminal.get('t1')).toBe(7)
+    expect(wcsByTerminal.get('t2')).toBe(9)
+  })
+
+  it('a watcher onChange for a dir refreshes only terminals watching that dir', async () => {
+    const h = makeHarness()
+    h.detector.isClaudeRunning.mockResolvedValue({ running: true, cwd: '/folder/a' })
+    h.service.registerPanel('t1', 11, '/folder/a', 7)
+    await flush()
+    const watchedDir = h.watcher.watchDir.mock.calls[0][0]
+
+    const before = h.emitted.length
+    h.watcher.fire(watchedDir)
+    await flush()
+    expect(h.emitted.length).toBeGreaterThan(before)
+
+    // An unrelated dir change triggers nothing.
+    const before2 = h.emitted.length
+    h.watcher.fire('/some/other/dir')
+    await flush()
+    expect(h.emitted.length).toBe(before2)
+  })
+})

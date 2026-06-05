@@ -135,6 +135,17 @@ export const TEST_IDS = {
   TERMINAL_BTN_EXPAND: 'terminal-btn-expand',
 
   // =========================================================================
+  // Claude Status Bar (3)
+  // =========================================================================
+
+  /** Per-terminal Claude Code context status bar root (issue #216) */
+  CLAUDE_STATUS_BAR: 'claude-status-bar',
+  /** Context-window size badge chip ("200k" / "1M") */
+  CLAUDE_STATUS_BADGE: 'claude-status-badge',
+  /** Progress meter fill element (width = percent) */
+  CLAUDE_STATUS_FILL: 'claude-status-fill',
+
+  // =========================================================================
   // UI Blocker (1)
   // =========================================================================
 

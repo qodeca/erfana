@@ -2,7 +2,6 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
 import App from './App'
-import { ScreenshotOverlay } from './components/Screenshot/ScreenshotOverlay'
 
 /**
  * Mount the area-select overlay instead of the main app when this renderer
@@ -33,11 +32,19 @@ function isOverlayRoute(): boolean {
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement)
 
 if (isOverlayRoute()) {
-  root.render(
-    <React.StrictMode>
-      <ScreenshotOverlay />
-    </React.StrictMode>
-  )
+  // Load the overlay (and its `ScreenshotOverlay.css`) via a dynamic import so the
+  // bundler emits it as a separate chunk. A static top-level import would fold the
+  // overlay's global `html, body, #root { cursor: crosshair; … }` rule into the MAIN
+  // window's single-entry CSS bundle, leaking a crosshair cursor across the whole app.
+  // The overlay window is transparent until a selection starts, so the extra microtask
+  // before first paint is immaterial.
+  void import('./components/Screenshot/ScreenshotOverlay').then(({ ScreenshotOverlay }) => {
+    root.render(
+      <React.StrictMode>
+        <ScreenshotOverlay />
+      </React.StrictMode>
+    )
+  })
 } else {
   root.render(
     <React.StrictMode>

@@ -6,12 +6,16 @@ import { EventEmitter } from 'events'
 // =============================================================================
 
 interface MockPTY extends EventEmitter {
+  pid: number
   write: (d: string, callback?: () => void) => void
   resize: (cols: number, rows: number) => void
   kill: () => void
   onData: (cb: (d: string) => void) => void
   onExit: (cb: (event: { exitCode: number; signal?: number }) => void) => void
 }
+
+/** Monotonic fake pid generator so each spawned mock PTY has a distinct pid. */
+let nextMockPid = 4000
 
 // Track all spawned PTYs and their configurations
 const spawnedPTYs: Array<{
@@ -23,7 +27,8 @@ const spawnedPTYs: Array<{
 
 function createMockPTY(): MockPTY {
   const emitter = new EventEmitter() as MockPTY
-  emitter.write = vi.fn((data: string, callback?: () => void) => {
+  emitter.pid = ++nextMockPid
+  emitter.write = vi.fn((_data: string, callback?: () => void) => {
     // Call callback immediately to simulate successful write
     if (callback) callback()
   })
@@ -1320,6 +1325,38 @@ async function createId(
       expect(args[0]).toBe('/D')
       expect(args[1]).toBe('/K')
       expect(args[2]).toMatch(/^@echo off &&/)
+    })
+  })
+
+  describe('Issue #216 - getPid', () => {
+    beforeEach(() => {
+      spawnedPTYs.length = 0
+      vi.clearAllMocks()
+      vi.resetModules()
+    })
+
+    it('returns the spawned PTY pid for a known terminal', async () => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+
+      const { terminalService } = await import('./TerminalService')
+      const tid = await createId(terminalService, { cwd: '/tmp' })
+
+      const { pty } = spawnedPTYs[0]
+      expect(tid).toBeTruthy()
+      expect(terminalService.getPid(tid!)).toBe(pty.pid)
+    })
+
+    it('returns undefined for an unknown terminal id', async () => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+
+      const { terminalService } = await import('./TerminalService')
+      expect(terminalService.getPid('terminal-does-not-exist')).toBeUndefined()
     })
   })
 

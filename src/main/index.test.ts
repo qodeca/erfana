@@ -31,6 +31,11 @@ describe('Main Process - Window Creation', () => {
     }
 
     mockBrowserWindow = vi.fn(() => createdWindow)
+    // #216: registerClaudeStatusHandlers wires window-destroy cleanup over the
+    // currently-open windows, so the BrowserWindow factory needs getAllWindows.
+    ;(mockBrowserWindow as unknown as { getAllWindows: () => unknown[] }).getAllWindows = vi.fn(
+      () => []
+    )
 
     // Mock app
     mockApp = {
@@ -39,6 +44,9 @@ describe('Main Process - Window Creation', () => {
       setName: vi.fn(),
       whenReady: vi.fn(() => Promise.resolve()),
       on: vi.fn(),
+      // #216: claude-status handler attaches/detaches a browser-window-created
+      // listener for future-window cleanup.
+      removeListener: vi.fn(),
       commandLine: {
         appendSwitch: vi.fn()
       },
@@ -69,7 +77,12 @@ describe('Main Process - Window Creation', () => {
       },
       ipcMain: {
         on: vi.fn(),
-        handle: vi.fn()
+        handle: vi.fn(),
+        removeHandler: vi.fn()
+      },
+      // #216: claude-status handler imports `webContents` for the targeted send.
+      webContents: {
+        fromId: vi.fn(() => null)
       }
     }))
 
@@ -371,7 +384,11 @@ describe('Main Process - Window Creation', () => {
           },
           ipcMain: {
             on: vi.fn(),
-            handle: vi.fn()
+            handle: vi.fn(),
+            removeHandler: vi.fn()
+          },
+          webContents: {
+            fromId: vi.fn(() => null)
           }
         }))
 

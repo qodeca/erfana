@@ -44,6 +44,8 @@ void import('node-pty')
 interface TerminalInstance {
   id: string
   ptyProcess: IPty
+  /** OS pid of the spawned PTY process; main-only, never sent over IPC (#216 §10). */
+  pid?: number
   cwd: string
   title: string
   initializationComplete: boolean // Track whether terminal has finished init
@@ -242,6 +244,9 @@ export class TerminalService extends EventEmitter {
       const terminal: TerminalInstance = {
         id: terminalId,
         ptyProcess,
+        // Record the PTY pid for the Claude status detector (#216). Looked up
+        // main-side via getPid(); never returned to or supplied by the renderer.
+        pid: ptyProcess.pid,
         cwd,
         title: `Terminal ${this.terminalCounter}`,
         initializationComplete: false, // Will be set to true after cwd verification
@@ -494,6 +499,19 @@ export class TerminalService extends EventEmitter {
       cwd: terminal.cwd,
       title: terminal.title
     }
+  }
+
+  /**
+   * Get the OS pid of a terminal's PTY process.
+   *
+   * Main-only accessor for the Claude Code status detector (#216): the pid keys
+   * the per-OS process-tree walk and is NEVER sent to or supplied by the
+   * renderer (security remediation §10).
+   *
+   * @returns the pid, or `undefined` for an unknown terminal id.
+   */
+  getPid(terminalId: string): number | undefined {
+    return this.terminals.get(terminalId)?.pid
   }
 
   /**

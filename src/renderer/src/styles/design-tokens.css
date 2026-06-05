@@ -129,6 +129,7 @@
    * Use these for status indicators
    * ============================================ */
   --color-success: var(--color-brand-lime);  /* Qodeca Lime - vibrant success */
+  --color-context-safe: #3fb950;             /* True green - context-usage safe band (#216); distinct from lime/amber */
   --color-warning: #cca700;                  /* Amber - unchanged */
   --color-warning-bright: #f59e0b;           /* Amber bright - unchanged */
   --color-warning-icon: #dcdcaa;             /* Warning icon color */

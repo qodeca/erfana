@@ -4,6 +4,16 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## Unreleased
+
+### Terminal Claude Code context status bar (macOS)
+
+- **See your Claude Code context usage right in the terminal** ([#216](https://github.com/qodeca/erfana/issues/216)) — when you run Claude Code (`claude`) in a terminal panel, a thin status bar appears at the bottom of that panel showing the model (e.g. "Opus 4.8"), a badge for the context-window size (200k or 1M), and how much of the window you've used as a percentage. A progress bar shifts from green to orange to red as you fill the window, so you can see at a glance how much room is left. Hover the bar to see exact token counts (e.g. "84k / 200k"). The bar is display-only and shows only while Claude Code is actively running in that panel; it disappears when Claude exits. Erfana reads this purely from Claude Code's own session files and **never changes your Claude Code configuration**. If anything can't be read, the bar quietly hides rather than showing stale or wrong numbers. **macOS only in this version** — Windows support is planned as a follow-up.
+
+### Fixed
+
+- **Reliable native build on hardened Windows 11** — a fresh `npm ci` now rebuilds the `node-pty` terminal backend successfully on Windows 11 machines with the hardened `NoDefaultCurrentDirectoryInExePath` setting, fixing an install failure that blocked building Erfana from a clean checkout on those systems. See [docs/build/windows.md](./build/windows.md#node-pty-build-failures-on-windows-11).
+
 ## 0.12.0
 
 *Released 2026-06-04. Tag [`v0.12.0`](https://github.com/qodeca/erfana/releases/tag/v0.12.0).*

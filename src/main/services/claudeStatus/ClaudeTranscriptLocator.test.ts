@@ -1,0 +1,143 @@
+/**
+ * ClaudeTranscriptLocator tests.
+ *
+ * Uses an injected `root` (preferred over an env override for testability) so a
+ * temp projects root can be passed directly. Covers newest-mtime selection,
+ * `subagents/` exclusion, non-`.jsonl` filtering, symlink skipping, realpath
+ * escape rejection, and the missing/empty-dir null paths.
+ *
+ * @see Issue #216 - Per-terminal Claude Code context status bar
+ * @see docs/designs/216-claude-status-bar.md §2, §8, §10
+ */
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { promises as fs } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { encodeProjectDir } from './encodeCwd'
+import { locateLatestTranscript, __resetRootCacheForTests } from './ClaudeTranscriptLocator'
+
+let rootDir: string
+/** A cwd whose encoded dir lives under rootDir. */
+const CWD = '/Users/test/Projects/demo'
+let encDir: string
+
+beforeEach(async () => {
+  __resetRootCacheForTests()
+  // realpath the temp base so the injected root matches what the locator
+  // computes via fs.realpath on the chosen file (macOS /var → /private/var).
+  const base = await fs.mkdtemp(path.join(os.tmpdir(), 'erfana-locator-'))
+  rootDir = await fs.realpath(base)
+  encDir = path.join(rootDir, encodeProjectDir(CWD))
+  await fs.mkdir(encDir, { recursive: true })
+})
+
+afterEach(async () => {
+  __resetRootCacheForTests()
+  await fs.rm(rootDir, { recursive: true, force: true })
+})
+
+/** Write a `.jsonl` file with an explicit mtime (ms since epoch). */
+async function writeJsonl(name: string, mtimeMs: number): Promise<string> {
+  const file = path.join(encDir, name)
+  await fs.writeFile(file, '{}\n', 'utf8')
+  const when = new Date(mtimeMs)
+  await fs.utimes(file, when, when)
+  return file
+}
+
+describe('locateLatestTranscript', () => {
+  it('returns the newest-mtime .jsonl among several', async () => {
+    await writeJsonl('old.jsonl', 1_000_000)
+    const newest = await writeJsonl('new.jsonl', 9_000_000)
+    await writeJsonl('mid.jsonl', 5_000_000)
+
+    const result = await locateLatestTranscript(CWD, { root: rootDir })
+    expect(result).toBe(newest)
+  })
+
+  it('breaks an mtime tie deterministically (lexicographically greater name wins)', async () => {
+    // Two files share an identical mtime; selection must not depend on readdir
+    // order. The lexicographically greater name ("b" > "a") is the stable winner.
+    const tie = 5_000_000
+    await writeJsonl('a-session.jsonl', tie)
+    const expected = await writeJsonl('b-session.jsonl', tie)
+
+    // Run twice to confirm stability (no dependence on enumeration order).
+    expect(await locateLatestTranscript(CWD, { root: rootDir })).toBe(expected)
+    expect(await locateLatestTranscript(CWD, { root: rootDir })).toBe(expected)
+  })
+
+  it('excludes the subagents/ subdir', async () => {
+    const subagents = path.join(encDir, 'subagents')
+    await fs.mkdir(subagents, { recursive: true })
+    const sideFile = path.join(subagents, 'side.jsonl')
+    await fs.writeFile(sideFile, '{}\n', 'utf8')
+    await fs.utimes(sideFile, new Date(9_999_999), new Date(9_999_999))
+
+    const main = await writeJsonl('main.jsonl', 1_000_000)
+
+    const result = await locateLatestTranscript(CWD, { root: rootDir })
+    expect(result).toBe(main)
+  })
+
+  it('ignores non-.jsonl files even if newer', async () => {
+    await fs.writeFile(path.join(encDir, 'notes.txt'), 'x', 'utf8')
+    await fs.utimes(path.join(encDir, 'notes.txt'), new Date(9_999_999), new Date(9_999_999))
+    const jsonl = await writeJsonl('session.jsonl', 1_000_000)
+
+    const result = await locateLatestTranscript(CWD, { root: rootDir })
+    expect(result).toBe(jsonl)
+  })
+
+  it('skips a symlink entry even if it is the newest', async () => {
+    const realTarget = path.join(rootDir, 'outside-target.jsonl')
+    await fs.writeFile(realTarget, '{}\n', 'utf8')
+
+    const link = path.join(encDir, 'link.jsonl')
+    await fs.symlink(realTarget, link)
+    // Make the symlink the newest by lstat mtime.
+    await fs.lutimes(link, new Date(9_999_999), new Date(9_999_999))
+
+    const real = await writeJsonl('real.jsonl', 1_000_000)
+
+    const result = await locateLatestTranscript(CWD, { root: rootDir })
+    expect(result).toBe(real)
+  })
+
+  it('returns null when the only entry is a symlink (no regular jsonl)', async () => {
+    const target = path.join(os.tmpdir(), 'erfana-locator-external.jsonl')
+    await fs.writeFile(target, '{}\n', 'utf8')
+    await fs.symlink(target, path.join(encDir, 'only-link.jsonl'))
+
+    const result = await locateLatestTranscript(CWD, { root: rootDir })
+    expect(result).toBeNull()
+    await fs.rm(target, { force: true })
+  })
+
+  it('rejects a file whose realpath escapes the root (symlinked ENC dir)', async () => {
+    // Build an outside dir containing a regular jsonl, then make the ENC dir a
+    // symlink to it. The regular file passes isFile(), but its realpath lands
+    // outside the root and must be rejected.
+    const outsideBase = await fs.mkdtemp(path.join(os.tmpdir(), 'erfana-escape-'))
+    const outside = await fs.realpath(outsideBase)
+    await fs.writeFile(path.join(outside, 'escaped.jsonl'), '{}\n', 'utf8')
+
+    await fs.rm(encDir, { recursive: true, force: true })
+    await fs.symlink(outside, encDir)
+
+    const result = await locateLatestTranscript(CWD, { root: rootDir })
+    expect(result).toBeNull()
+
+    await fs.rm(outside, { recursive: true, force: true })
+  })
+
+  it('returns null when the ENC dir is missing', async () => {
+    const result = await locateLatestTranscript('/Users/test/no/such/dir', { root: rootDir })
+    expect(result).toBeNull()
+  })
+
+  it('returns null for an empty ENC dir', async () => {
+    const result = await locateLatestTranscript(CWD, { root: rootDir })
+    expect(result).toBeNull()
+  })
+})

@@ -38,6 +38,7 @@ import type {
   DependencyReadyEvent
 } from '../shared/ipc/import-schema'
 import type { ClipboardBridge } from '../shared/ipc/clipboard-schema'
+import type { ClaudeStatusBridge } from '../shared/ipc/claude-status-schema'
 
 declare global {
   interface Window {
@@ -351,6 +352,11 @@ declare global {
        * @see Issue #203 - Central text-clipboard service
        */
       clipboard: ClipboardBridge
+      /**
+       * Per-terminal Claude Code context status bridge
+       * @see Issue #216 - Per-terminal Claude Code context status bar
+       */
+      claudeStatus: ClaudeStatusBridge
       quit: {
         onQuitRequested: (callback: (data: { reason?: string }) => void) => () => void
         sendQuitResponse: (proceed: boolean) => void

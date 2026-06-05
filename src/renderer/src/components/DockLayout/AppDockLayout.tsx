@@ -103,6 +103,12 @@ const EditorAreaSplitPanel = (props: ISplitviewPanelProps) => {
         tabComponents={{ welcomeTab: WelcomeTab, editorTab: EditorTab, imageTab: ImageTab }}
         onReady={onEditorReady}
         className="dockview-theme-dark"
+        // Dockview is used for editor tabs only — never docking/splitting (see
+        // docs/architecture.md). Disabling DnD drops the `dv-draggable` class from the
+        // tab-header void area, removing the misleading open-hand "grab" cursor at its
+        // source and preventing accidental group splits/tear-outs. Tabs still switch and
+        // close normally.
+        disableDnd
       />
     </div>
   )

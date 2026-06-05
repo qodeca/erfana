@@ -28,6 +28,11 @@ import type {
 import { TRANSCRIPTION_CHANNELS } from '../shared/ipc/transcription-channels'
 import { IMPORT_CHANNELS } from '../shared/ipc/import-channels'
 import { CLIPBOARD_CHANNELS } from '../shared/ipc/clipboard-channels'
+import {
+  ClaudeStatusChannels,
+  ClaudeStatusEvents
+} from '../shared/ipc/claude-status-channels'
+import type { ClaudeStatusChangePayload } from '../shared/ipc/claude-status-schema'
 import type {
   DocumentImportRequest,
   DocumentImportResult,
@@ -881,6 +886,33 @@ const api = {
     /** Write plain text to the OS clipboard (false on failure/reject) */
     writeText: (text: string): Promise<boolean> =>
       ipcRenderer.invoke(CLIPBOARD_CHANNELS.writeText, text)
+  },
+
+  /**
+   * Per-terminal Claude Code context status bridge (#216).
+   *
+   * `register`/`unregister`/`nudge` carry a `terminalId` only — the PTY pid is
+   * resolved main-side and never sent (security §10). `onChanged` mirrors
+   * `terminal.onData`: the returned unsubscribe removes the SAME wrapper
+   * listener reference so its identity never drifts.
+   */
+  claudeStatus: {
+    /** Begin tracking Claude status for a terminal panel. */
+    register: (terminalId: string): Promise<void> =>
+      ipcRenderer.invoke(ClaudeStatusChannels.REGISTER, { terminalId }),
+    /** Stop tracking a terminal panel (idempotent). */
+    unregister: (terminalId: string): Promise<void> =>
+      ipcRenderer.invoke(ClaudeStatusChannels.UNREGISTER, { terminalId }),
+    /** Activity-triggered light re-check for a terminal panel. */
+    nudge: (terminalId: string): Promise<void> =>
+      ipcRenderer.invoke(ClaudeStatusChannels.NUDGE, { terminalId }),
+    /** Subscribe to per-terminal snapshot changes; returns an unsubscribe. */
+    onChanged: (callback: (payload: ClaudeStatusChangePayload) => void): (() => void) => {
+      const listener = (_event: unknown, payload: ClaudeStatusChangePayload): void =>
+        callback(payload)
+      ipcRenderer.on(ClaudeStatusEvents.CHANGED, listener)
+      return () => ipcRenderer.removeListener(ClaudeStatusEvents.CHANGED, listener)
+    }
   },
 
   // Quit confirmation operations

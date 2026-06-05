@@ -161,6 +161,10 @@ if (!writeResult.success) {
 | `import:dependenciesReady` | import-handlers | Event: Dependency detection complete (main → renderer) |
 | `clipboard:readText` | clipboard-handlers | Read plain text from OS clipboard → `Promise<string>` |
 | `clipboard:writeText` | clipboard-handlers | Write plain text to OS clipboard (Zod-validated, 5 MB cap) → `Promise<boolean>` |
+| `claude-status:register` | claude-status-handlers | Register a terminal panel for Claude Code status tracking; carries `terminalId` only, pid resolved main-side (#216) |
+| `claude-status:unregister` | claude-status-handlers | Stop tracking a panel (PTY exit / panel unmount) (#216) |
+| `claude-status:nudge` | claude-status-handlers | Request an immediate status refresh for a panel (#216) |
+| `claude-status:changed` | claude-status-handlers | Event: per-`terminalId` status snapshot update (main → renderer) (#216) |
 
 ## Clipboard Channels – async invoke + sender validation (#203)
 
@@ -185,6 +189,7 @@ To keep IPC payloads consistent across processes, shared zod schemas live at `sr
 - Transcription schemas — `TranscriptionImportRequestSchema`, `TranscriptionProgress`, `TranscriptionImportResult`, `TranscriptionSettingsSchema` (see `src/shared/ipc/transcription-schema.ts`)
 - Document import schemas — `DocumentImportRequestSchema`, `DocumentImportOptionsSchema`, `DocumentImportProgress`, `DocumentImportResult`, `DependencyReadyEvent` (see `src/shared/ipc/import-schema.ts`); channel constants in `src/shared/ipc/import-channels.ts`
 - Clipboard schemas — `ClipboardWriteTextSchema`, `CLIPBOARD_MAX_TEXT_LENGTH`, and the `ClipboardBridge` contract shared by the preload bridge and renderer service (see `src/shared/ipc/clipboard-schema.ts`); channel constants in `src/shared/ipc/clipboard-channels.ts`
+- Claude Code status schemas — the per-`terminalId` `ClaudeStatusSnapshot` contract consumed by `useClaudeStatusStore` and the register/nudge payloads (see `src/shared/ipc/claude-status-schema.ts`); channel constants in `src/shared/ipc/claude-status-channels.ts` (#216)
 
 Recommended:
 - Validate payloads in tests using these schemas (see contract tests under `src/preload/__tests__/`)
