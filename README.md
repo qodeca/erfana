@@ -2,7 +2,9 @@
 
 An Electron-based project workspace focused on markdown editing, a project tree, and an integrated terminal.
 
-> **Version:** 0.12.0 ([changelog](docs/CHANGELOG.md) · [release notes](docs/release-notes/v0.12.0.md)) · **Documentation:** [docs/](docs/README.md) · **Architecture:** [docs/architecture.md](docs/architecture.md)
+> **Version:** 0.13.0 ([changelog](docs/CHANGELOG.md) · [release notes](docs/release-notes/v0.13.0.md)) · **Documentation:** [docs/](docs/README.md) · **Architecture:** [docs/architecture.md](docs/architecture.md)
+>
+> **v0.13.0 highlights:** When you run Claude Code (`claude`) in a terminal panel, a new status bar (macOS) shows the model (for example "Opus 4.8"), the context-window size, and how much of the window you have used, with a progress bar that shifts green – orange – red as it fills. A fresh install now rebuilds the terminal backend reliably on hardened Windows 11. Filenames you type are no longer written to local log files (recorded as `[redacted-filename]`), while the on-screen message still shows the full name.
 >
 > **v0.12.0 highlights:** Terminal screenshot capture now works on Windows and Linux (previously macOS-only) — grab a full screen, pick a window from a thumbnail picker, or drag to select a region, with the image path dropped into the terminal. Text selection works again in the markdown preview. A file-watcher resource leak that could crash PDF/DOCX export on very large projects (>~10k files) was fixed by pinning chokidar to v3.
 >
