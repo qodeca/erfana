@@ -127,7 +127,7 @@ jobs:
         # maxim-lobanov/setup-xcode v1 (resolved 2026-04-25 to commit
         # 1242409711ff5721add51979e9e11e23ebb7e5a4). Third-party action;
         # SHA-pin is a hard requirement for any step in the signing path.
-        uses: maxim-lobanov/setup-xcode@1242409711ff5721add51979e9e11e23ebb7e5a4
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90
         with:
           xcode-version: "16.2"
 
