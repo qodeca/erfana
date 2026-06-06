@@ -93,7 +93,7 @@
     "jsdom": "^25.0.1",
     "lucide-react": "^0.545.0",
     "mermaid": "^11.12.0",
-    "monaco-editor": "^0.54.0",
+    "monaco-editor": "^0.55.1",
     "patch-package": "^8.0.1",
     "path-browserify": "^1.0.1",
     "prettier": "^3.4.2",
