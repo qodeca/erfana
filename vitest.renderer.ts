@@ -4,6 +4,11 @@ import path from 'node:path'
 
 export default defineConfig({
   plugins: [react()],
+  // Mirror the renderer build's `define` (electron.vite.config.ts) so components
+  // that read the inlined app version resolve to a stable value under test.
+  define: {
+    __APP_VERSION__: JSON.stringify('0.0.0-test')
+  },
   test: {
     name: 'renderer',
     environment: 'jsdom',

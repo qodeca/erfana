@@ -74,6 +74,30 @@ describe('ProjectManagementContext', () => {
     capturedOnProjectChanged = null
   })
 
+  describe('window title', () => {
+    it('sets "{name} | ERFANA v{version}" when a project is open', () => {
+      mockProjectManagement.projectPath = 'C:\\Users\\marcin\\Projects\\erfana'
+      render(
+        <ProjectManagementProvider>
+          <div>child</div>
+        </ProjectManagementProvider>
+      )
+      expect(document.title).toBe('erfana | ERFANA v0.0.0-test')
+      mockProjectManagement.projectPath = '/test/project'
+    })
+
+    it('sets just "ERFANA v{version}" when no project is open', () => {
+      mockProjectManagement.projectPath = null as unknown as string
+      render(
+        <ProjectManagementProvider>
+          <div>child</div>
+        </ProjectManagementProvider>
+      )
+      expect(document.title).toBe('ERFANA v0.0.0-test')
+      mockProjectManagement.projectPath = '/test/project'
+    })
+  })
+
   describe('ProjectManagementProvider', () => {
     it('should provide context values to children', () => {
       function TestComponent() {

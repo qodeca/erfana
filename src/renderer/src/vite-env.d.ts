@@ -6,3 +6,6 @@ declare module '*.md?raw' {
   const content: string
   export default content
 }
+
+// App version inlined at build time via electron.vite.config.ts `define`.
+declare const __APP_VERSION__: string
