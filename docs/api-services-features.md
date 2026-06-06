@@ -70,23 +70,6 @@ Per-project circuit breaker preventing cascading failures when the git status wo
 
 ---
 
-## GitStatusStrategySelector
-
-**File:** `src/main/services/GitStatusStrategySelector.ts`
-
-Selects the optimal git status strategy (isomorphic-git vs native git) based on repository size.
-
-### Key features
-- Checks `.git/index` file size to determine repo scale
-- Selects `isomorphic-git` for repos with index < 5 MB (default)
-- Selects native `git status --porcelain` for large repos (index >= 5 MB)
-- Stateless – re-evaluates on every call (no caching)
-
-### Public methods
-- `select(projectPath)` – Returns `'isomorphic-git'` or `'native-git'`
-
----
-
 ## GitWatcherService
 
 **File:** `src/main/services/GitWatcherService.ts`

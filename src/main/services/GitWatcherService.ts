@@ -25,8 +25,9 @@
 
 import chokidar, { FSWatcher } from 'chokidar'
 import { access, stat } from 'fs/promises'
-import { basename, join } from 'path'
+import { join } from 'path'
 import { GitEventCoalescer, classifyGitPath, type GitEventType } from './watcher/GitEventCoalescer'
+import { RepoPresenceWatcher } from './watcher/RepoPresenceWatcher'
 import { logger } from './LoggingService'
 import { broadcastToAllWindows } from '../utils/ipcBroadcast'
 import { watcherMetrics } from './watcher/WatcherMetrics'
@@ -60,14 +61,6 @@ const HEALTH_LOG_INTERVAL_MS = 5 * 60 * 1000
 
 /** Polling efficiency threshold for degraded state warning (%) - ADR-Spec003-002 */
 const HIGH_POLLING_DEPENDENCY_THRESHOLD = 80
-
-/**
- * Debounce for `.git` presence transitions (ms).
- *
- * `git init` creates the `.git` directory and then writes HEAD/config/refs into
- * it in rapid succession; debouncing lets the directory settle before we react.
- */
-const REPO_PRESENCE_DEBOUNCE_MS = 400
 
 /** Git paths to watch (relative to project root) */
 const GIT_WATCH_PATHS = [
@@ -121,17 +114,30 @@ export class GitWatcherService implements IGitWatcherService {
   private healthLogInterval: NodeJS.Timeout | null = null
 
   /**
-   * Watcher for the `.git` path itself – detects a repo appearing (`git init` /
-   * clone into an open folder) or disappearing (`rm .git`). Lives for the whole
-   * time a project is open, independent of the inner git-state watcher.
+   * Collaborator that watches the project's `.git` path itself and emits
+   * `'added'`/`'removed'` when the folder becomes (`git init` / clone) or
+   * stops being (`rm .git`) a repository while it stays open. Lives for the
+   * whole time a project is open, independent of the inner git-state watcher.
+   *
+   * Extracted out of this class in the lens-review follow-up (#10/A4) so the
+   * service keeps a single responsibility – watch git state files – and uses
+   * the collaborator's own debounce instead of running a parallel one here.
    */
-  private presenceWatcher: FSWatcher | null = null
+  private presenceWatcher: RepoPresenceWatcher | null = null
 
-  /** Project root the presence watcher is bound to (identity guard for debounced callbacks) */
-  private presenceWatcherPath: string | null = null
+  /**
+   * Project root the presence collaborator is bound to. Acts as the identity
+   * guard for debounced `onTransition` callbacks: if a transition fires after
+   * a project switch (`stop()` clears this), we drop it before touching state.
+   */
+  private presenceProjectPath: string | null = null
 
-  /** Debounce timer for `.git` presence transitions */
-  private presenceDebounce: NodeJS.Timeout | null = null
+  /**
+   * Set while a presence-`'removed'` transition tears the inner watcher down.
+   * `handleWatcherError` checks this to avoid scheduling a recovery restart
+   * during a deliberate teardown (lens review #11).
+   */
+  private repoTeardownInProgress = false
 
   /**
    * Start watching git state for a project
@@ -161,7 +167,9 @@ export class GitWatcherService implements IGitWatcherService {
 
     // Always watch the `.git` path itself so we react when this folder becomes
     // (git init / clone) or stops being (rm .git) a repo while it stays open.
-    this.createPresenceWatcher(projectPath)
+    this.presenceProjectPath = projectPath
+    this.presenceWatcher = new RepoPresenceWatcher(projectPath, (kind) => this.onRepoTransition(projectPath, kind))
+    this.presenceWatcher.start()
 
     // Check if .git directory exists right now
     const gitDir = join(projectPath, '.git')
@@ -200,22 +208,17 @@ export class GitWatcherService implements IGitWatcherService {
       this.pendingRestart = null
     }
 
-    // Tear down the presence watcher (it can exist even when there is no inner
-    // watcher – e.g. a non-repo folder waiting for `git init`).
-    if (this.presenceDebounce) {
-      clearTimeout(this.presenceDebounce)
-      this.presenceDebounce = null
-    }
-    this.presenceWatcherPath = null
+    // Tear down the presence collaborator (it can exist even when there is no
+    // inner watcher – e.g. a non-repo folder waiting for `git init`).
+    this.presenceProjectPath = null
     if (this.presenceWatcher) {
-      try {
-        await this.presenceWatcher.close()
-      } catch (error) {
-        logger.warn('GitWatcherService: Error closing presence watcher', {
+      const presence = this.presenceWatcher
+      this.presenceWatcher = null
+      try { await presence.dispose() } catch (error) {
+        logger.warn('GitWatcherService: Error disposing presence watcher', {
           error: error instanceof Error ? error.message : String(error)
         })
       }
-      this.presenceWatcher = null
     }
 
     if (!this.activeWatcher) {
@@ -223,23 +226,40 @@ export class GitWatcherService implements IGitWatcherService {
     }
 
     try {
-      // Dispose coalescer first
-      this.activeWatcher.coalescer.dispose()
-
-      // Close watcher
-      await this.activeWatcher.watcher.close()
-
-      logger.info('GitWatcherService: Stopped watching', {
-        projectPath: this.activeWatcher.projectPath
-      })
-
-      this.activeWatcher = null
+      await this.teardownInnerWatcher()
       return { success: true }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       logger.error('GitWatcherService: Error stopping watcher', error instanceof Error ? error : undefined)
       this.activeWatcher = null
       return { success: false, error: errorMessage }
+    }
+  }
+
+  /**
+   * Dispose the inner git-state watcher + coalescer.
+   *
+   * Synchronously nulls `activeWatcher` *before* awaiting `close()`. Without
+   * this, two teardown paths (e.g. presence-`'removed'` racing
+   * `scheduleRestart`'s timer) could both capture the same `activeWatcher`
+   * reference and `close()` the same chokidar instance twice (lens review
+   * #9 + #11/C2). Logged with the project path it was bound to so the trace
+   * doesn't go silent.
+   */
+  private async teardownInnerWatcher(): Promise<void> {
+    const inner = this.activeWatcher
+    if (!inner) return
+    this.activeWatcher = null
+    inner.coalescer.dispose()
+    try {
+      await inner.watcher.close()
+      logger.info('GitWatcherService: Stopped watching', { projectPath: inner.projectPath })
+    } catch (error) {
+      logger.warn('GitWatcherService: Error closing inner watcher', {
+        projectPath: inner.projectPath,
+        error: error instanceof Error ? error.message : String(error)
+      })
+      throw error
     }
   }
 
@@ -318,6 +338,17 @@ export class GitWatcherService implements IGitWatcherService {
       return { success: true } // Not an error
     }
 
+    // Identity re-check before any side-effects (lens review #4).
+    //
+    // The `stat` loop above is asynchronous; a project switch or restart can
+    // intervene and bump `sessionVersion`. If we're stale, bail without
+    // touching `activeWatcher` – otherwise a presence-`'added'` racing a
+    // project-switch `start()` would overwrite the new project's watcher with
+    // ours and leak its chokidar instance + coalescer.
+    if (this.isDisposing || currentVersion !== this.sessionVersion) {
+      return { success: true }
+    }
+
     // Create coalescer
     const coalescer = new GitEventCoalescer((eventTypes) => {
       this.handleCoalescedEvent(projectPath, currentVersion, eventTypes)
@@ -335,6 +366,13 @@ export class GitWatcherService implements IGitWatcherService {
       // Watch directories recursively for refs/heads/
       depth: 3
     })
+
+    // If somehow `activeWatcher` is already populated (a concurrent path beat
+    // us to assignment), tear it down before overwriting. Belt-and-braces with
+    // the identity check above.
+    if (this.activeWatcher) {
+      await this.teardownInnerWatcher()
+    }
 
     // Store active watcher state
     this.activeWatcher = {
@@ -498,133 +536,95 @@ export class GitWatcherService implements IGitWatcherService {
   }
 
   /**
-   * Watch the project's `.git` path itself to detect a repository appearing
-   * (`git init` / clone into an already-open folder) or disappearing (`rm .git`).
+   * Handle a `.git` presence transition reported by `RepoPresenceWatcher`.
    *
-   * Watching the exact `.git` path with `depth: 0` reliably fires
-   * `addDir`/`unlinkDir` for the directory (verified empirically on chokidar
-   * 3.6.0 incl. Windows) and does NOT recurse into `.git/objects`. Watching the
-   * project root with an `ignored` predicate does NOT detect the child `.git`
-   * being created/removed, so the direct-path watch is required.
+   * The collaborator has already re-derived the kind from disk and debounced
+   * rapid events into one notification, so we just need to:
+   *  - drop the call if the project was switched while the transition was in
+   *    flight (`presenceProjectPath` identity guard);
+   *  - on `'added'`, (re)start the inner git-state watcher;
+   *  - on `'removed'`, tear it down while suppressing the inner watcher's
+   *    own error-recovery (lens review #11 – otherwise the inner watcher's
+   *    ENOENT error and our deliberate teardown race each other);
+   *  - broadcast a `git:state-changed` with `eventTypes:['repo']`. The
+   *    renderer's `onStateChanged → debouncedRefresh → getStatus` re-checks
+   *    `.git` presence per call, so `isGitRepo` flips both directions without
+   *    a dedicated IPC.
+   *
+   * The whole body is wrapped in try/catch so a thrown error in the inner
+   * teardown or broadcast cannot escape as an unhandled rejection (lens
+   * review #12).
    */
-  private createPresenceWatcher(projectPath: string): void {
-    const gitDir = join(projectPath, '.git')
-    this.presenceWatcherPath = projectPath
-
-    // A presence-watcher failure must never break start() (which calls this
-    // before the inner watcher) – the inner watcher and polling remain the
-    // primary status path, so degrade silently if chokidar throws here.
-    try {
-      const watcher = chokidar.watch(gitDir, {
-        persistent: true,
-        ignoreInitial: true,
-        usePolling: false,
-        disableGlobbing: true,
-        followSymlinks: false,
-        depth: 0
-      })
-
-      // basename guard: ignore any direct children of .git the watcher may
-      // surface; only the `.git` entry itself signals a repo transition.
-      // `add`/`unlink` cover a `.git` *file* (worktree/submodule gitdir pointer).
-      const onAppear = (p: string): void => {
-        if (basename(p) === '.git') this.scheduleRepoTransition(projectPath, 'added')
-      }
-      const onDisappear = (p: string): void => {
-        if (basename(p) === '.git') this.scheduleRepoTransition(projectPath, 'removed')
-      }
-
-      watcher.on('addDir', onAppear)
-      watcher.on('add', onAppear)
-      watcher.on('unlinkDir', onDisappear)
-      watcher.on('unlink', onDisappear)
-      watcher.on('error', (error: unknown) => {
-        logger.warn('GitWatcherService: Presence watcher error', {
-          error: error instanceof Error ? error.message : String(error)
-        })
-      })
-
-      this.presenceWatcher = watcher
-    } catch (error) {
-      logger.warn('GitWatcherService: Failed to create presence watcher', {
-        projectPath,
-        error: error instanceof Error ? error.message : String(error)
-      })
-      this.presenceWatcher = null
-    }
-  }
-
-  /**
-   * Debounce a `.git` presence transition. `git init` writes many files into
-   * `.git` right after creating it, so coalesce rapid events into one.
-   */
-  private scheduleRepoTransition(projectPath: string, kind: 'added' | 'removed'): void {
-    if (this.isDisposing || this.presenceWatcherPath !== projectPath) return
-
-    if (this.presenceDebounce) clearTimeout(this.presenceDebounce)
-    this.presenceDebounce = setTimeout(() => {
-      this.presenceDebounce = null
-      void this.applyRepoTransition(projectPath, kind)
-    }, REPO_PRESENCE_DEBOUNCE_MS)
-  }
-
-  /**
-   * Apply a debounced `.git` presence transition: (re)start or tear down the
-   * inner git-state watcher, then tell the renderer to re-fetch status.
-   */
-  private async applyRepoTransition(projectPath: string, kind: 'added' | 'removed'): Promise<void> {
-    // Identity guard: drop if the project was switched/closed while debouncing.
-    if (this.isDisposing || this.presenceWatcherPath !== projectPath) return
+  private async onRepoTransition(projectPath: string, kind: 'added' | 'removed'): Promise<void> {
+    if (this.isDisposing || this.presenceProjectPath !== projectPath) return
 
     logger.info('GitWatcherService: Repo presence transition', { projectPath, kind })
 
-    if (kind === 'added') {
-      // Start real-time inner watching if not already active. createWatcher
-      // self-guards on `.git/index`; if git has not written it yet (init writes
-      // it on first add/commit), polling drives the refresh and the next index
-      // write engages the watcher.
-      if (!this.activeWatcher) {
-        try {
-          await this.createWatcher(projectPath)
-        } catch (error) {
-          logger.warn('GitWatcherService: Failed to start inner watcher after repo appeared', {
-            error: error instanceof Error ? error.message : String(error)
-          })
+    try {
+      if (kind === 'added') {
+        // Start real-time inner watching if not already active. `createWatcher`
+        // self-guards on `.git/index`; if git has not written it yet (init
+        // writes it on first add/commit), polling drives the refresh and the
+        // next index write engages the watcher.
+        if (!this.activeWatcher) {
+          try {
+            await this.createWatcher(projectPath)
+          } catch (error) {
+            logger.warn('GitWatcherService: Failed to start inner watcher after repo appeared', {
+              error: error instanceof Error ? error.message : String(error)
+            })
+          }
         }
-      }
-    } else {
-      // `.git` removed: tear down the inner watcher but KEEP the presence watcher
-      // alive so a later `git init` in the same folder is detected again.
-      if (this.activeWatcher) {
+      } else {
+        // `.git` removed: tear down the inner watcher but KEEP the presence
+        // watcher alive so a later `git init` in the same folder is detected
+        // again. While the teardown is in flight, suppress the inner
+        // watcher's own restart-on-error so we don't recreate a watcher for
+        // a now-gone repo.
+        if (this.pendingRestart) {
+          clearTimeout(this.pendingRestart)
+          this.pendingRestart = null
+        }
+        this.repoTeardownInProgress = true
         try {
-          this.activeWatcher.coalescer.dispose()
-          await this.activeWatcher.watcher.close()
+          await this.teardownInnerWatcher()
         } catch (error) {
           logger.warn('GitWatcherService: Error tearing down inner watcher after .git removal', {
             error: error instanceof Error ? error.message : String(error)
           })
+        } finally {
+          this.repoTeardownInProgress = false
         }
-        this.activeWatcher = null
       }
-    }
 
-    // Re-check the identity guard: createWatcher above is async and a project
-    // switch may have intervened.
-    if (this.isDisposing || this.presenceWatcherPath !== projectPath) return
+      // Re-check identity after the awaited createWatcher/teardown – a project
+      // switch in flight invalidates this broadcast.
+      if (this.isDisposing || this.presenceProjectPath !== projectPath) return
 
-    // Re-fetch on the renderer: getStatus() re-checks `.git` presence and returns
-    // isGitRepo true/false, so the store flips decorations on (added) or off
-    // (removed) without any dedicated IPC.
-    const timestamp = Date.now()
-    this.lastEventTimestamp = timestamp
-    const payload: GitStateChangeEvent = {
-      projectPath,
-      eventTypes: ['repo'],
-      timestamp,
-      correlationId: this.generateCorrelationId()
+      // Re-fetch on the renderer: getStatus() re-checks `.git` presence and
+      // returns isGitRepo true/false, so the store flips decorations on
+      // (added) or off (removed) without any dedicated IPC.
+      const timestamp = Date.now()
+      this.lastEventTimestamp = timestamp
+      const payload: GitStateChangeEvent = {
+        projectPath,
+        eventTypes: ['repo'],
+        timestamp,
+        correlationId: this.generateCorrelationId()
+      }
+      watcherMetrics.recordGitWatcherEvent()
+      broadcastToAllWindows('git:state-changed', payload)
+    } catch (error) {
+      // The unguarded tail of the old applyRepoTransition could throw
+      // (broadcast/metrics/correlation-id) and reject through a `void`-called
+      // promise, escalating to an unhandled rejection (lens review #12). This
+      // catch ensures the handler can't crash the main process.
+      logger.warn('GitWatcherService: onRepoTransition handler failed', {
+        projectPath,
+        kind,
+        error: error instanceof Error ? error.message : String(error)
+      })
     }
-    watcherMetrics.recordGitWatcherEvent()
-    broadcastToAllWindows('git:state-changed', payload)
   }
 
   /**
@@ -639,6 +639,12 @@ export class GitWatcherService implements IGitWatcherService {
     logger.error('GitWatcherService: Watcher error', error instanceof Error ? error : undefined, {
       errorType
     })
+
+    // While a presence-`'removed'` teardown is in flight the inner watcher
+    // will naturally see ENOENT events from its watched files vanishing –
+    // scheduling a restart on those would race the teardown and recreate a
+    // watcher for a now-gone repo (lens review #11).
+    if (this.repoTeardownInProgress) return
 
     // Check if transient error that can be recovered
     if (this.isTransientError(errorType) && this.restartAttempts < MAX_RESTART_ATTEMPTS) {
@@ -701,12 +707,10 @@ export class GitWatcherService implements IGitWatcherService {
       this.sessionVersion++ // Invalidate old watcher's timeout handles
 
       try {
-        // Stop current watcher
-        if (this.activeWatcher) {
-          this.activeWatcher.coalescer.dispose()
-          await this.activeWatcher.watcher.close()
-          this.activeWatcher = null
-        }
+        // Stop current watcher via the shared helper – synchronously nulls
+        // `activeWatcher` so a racing teardown can't double-close (lens
+        // review #9 / #11/C2).
+        await this.teardownInnerWatcher()
 
         // Try to recreate
         const result = await this.createWatcher(projectPath)

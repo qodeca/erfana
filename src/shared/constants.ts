@@ -369,7 +369,7 @@ export const DOCUMENT_IMPORT = {
  * Git status worker thread constants
  * Used by git status offloading for strategy selection and circuit breaker
  *
- * @see GitStatusWorkerAdapter, GitStatusCircuitBreaker, GitStatusStrategySelector
+ * @see GitStatusWorkerAdapter, GitStatusCircuitBreaker
  * @see Spec #022 - Git status thread offloading
  */
 export const GIT_STATUS = {

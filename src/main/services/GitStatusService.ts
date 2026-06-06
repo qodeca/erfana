@@ -1,10 +1,9 @@
 import { join } from 'path'
-import { stat } from 'fs/promises'
+import { access } from 'fs/promises'
 import { createEmptyGitStatusResponse } from '../../shared/ipc/git-schema'
 import type { GitStatusResponse } from '../../shared/ipc/git-schema'
 import type { IGitStatusWorker } from '../interfaces/IGitStatusWorker'
 import { GitStatusCircuitBreaker } from './GitStatusCircuitBreaker'
-import { GitStatusStrategySelector } from './GitStatusStrategySelector'
 import { GitStatusWorkerAdapter } from './GitStatusWorkerAdapter'
 import { logger } from './LoggingService'
 
@@ -15,8 +14,13 @@ import { logger } from './LoggingService'
  * keeping the main Electron thread responsive. The service handles:
  * - Per-project operation queuing (prevents concurrent worker calls per project)
  * - Circuit breaker (disables worker after repeated crashes)
- * - Strategy selection (isomorphic-git vs native git based on repo size)
  * - Timing and structured logging
+ *
+ * Native git is the preferred strategy (it honours core.autocrlf /
+ * .gitattributes, matching the user's own git). The worker falls back to
+ * isomorphic-git only when no git binary is available; the native-vs-iso
+ * decision is therefore made *inside* the worker (see
+ * `git-status.worker.ts:resolveGitPath`), not here.
  *
  * Concurrency control:
  * Uses per-project operation queues to serialize requests. Different projects
@@ -29,7 +33,6 @@ import { logger } from './LoggingService'
 export class GitStatusService {
   private readonly worker: IGitStatusWorker
   private readonly circuitBreaker = new GitStatusCircuitBreaker()
-  private readonly strategySelector = new GitStatusStrategySelector()
 
   /**
    * Per-project operation queues - prevents concurrent git operations on same project.
@@ -90,13 +93,16 @@ export class GitStatusService {
    * @returns Git status response with branch, files, and counts
    */
   private async executeGetStatus(projectPath: string): Promise<GitStatusResponse> {
-    // Quick bail-out: check if .git directory exists
+    // Quick bail-out: only when `.git` is truly absent (ENOENT).
+    //
+    // We intentionally do NOT require `.git` to be a directory: linked git
+    // worktrees and submodules use a `.git` *file* containing a `gitdir:`
+    // pointer, and native git resolves it fine. Short-circuiting on
+    // !isDirectory() previously hid status for every worktree. The worker's
+    // executeIsomorphicGit and executeNativeGit handle both shapes.
     const gitDir = join(projectPath, '.git')
     try {
-      const stats = await stat(gitDir)
-      if (!stats.isDirectory()) {
-        return createEmptyGitStatusResponse()
-      }
+      await access(gitDir)
     } catch {
       logger.trace('GitStatus: not a git repo', { projectPath })
       return createEmptyGitStatusResponse()
@@ -107,8 +113,10 @@ export class GitStatusService {
       return { ...createEmptyGitStatusResponse(), error: 'Git status disabled: worker crashed repeatedly' }
     }
 
-    // Select strategy based on repository size
-    const strategy = await this.strategySelector.select(projectPath)
+    // Native is the *preferred* strategy. The native-vs-iso decision lives in
+    // the worker, keyed on whether `resolveGitPath()` succeeds. Tests can pass
+    // `'isomorphic-git'` to force the portable path.
+    const strategy = 'native-git' as const
 
     // Delegate to worker with timing
     const startTime = performance.now()
@@ -116,14 +124,21 @@ export class GitStatusService {
       const response = await this.worker.execute({ projectPath, strategy })
       const duration = Math.round(performance.now() - startTime)
 
-      // Record success for circuit breaker half-open recovery
-      this.circuitBreaker.recordSuccess(projectPath)
+      // Record breaker success only when the worker returned a clean response.
+      // A response with `error` set is the worker's "transient / durable
+      // failure" signal; counting it as success here would reset interleaved
+      // real-crash history and let a permanently failing worker mask the
+      // breaker. Crashes (thrown by execute()) are handled in the catch below.
+      if (!response.error) {
+        this.circuitBreaker.recordSuccess(projectPath)
+      }
 
       logger.info('GitStatus: completed', {
         strategy,
         durationMs: duration,
         fileCount: response.files.length,
-        truncated: response.truncated
+        truncated: response.truncated,
+        hasError: Boolean(response.error)
       })
 
       return response

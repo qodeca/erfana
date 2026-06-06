@@ -8,15 +8,30 @@
 import { z } from 'zod'
 
 /**
- * Git event types that trigger status updates
+ * Git event types that trigger status updates.
+ *
+ * Single source of truth for both producer (main / GitWatcherService) and
+ * consumer (renderer Zod parsing): the type is `z.infer`-derived so it cannot
+ * drift from the wire schema. The legacy hand-written union in
+ * `GitEventCoalescer.ts` was removed (lens review #8).
  *
  * - 'index': Changes to .git/index (staging area modifications)
  * - 'head': Changes to .git/HEAD (branch switches, commits)
  * - 'refs': Changes to .git/refs/ (new branches, tags, remote updates)
  * - 'fetch': Changes from git fetch operations
  * - 'stash': Changes to .git/refs/stash (stash push/pop)
- * - 'repo': The .git directory itself appeared or disappeared
- *           (git init / clone into an open folder, or .git removal)
+ * - 'repo': The .git path itself appeared or disappeared (git init / clone
+ *           into an open folder, or .git removal). Broadcast-only – never
+ *           queued through GitEventCoalescer, only emitted from
+ *           RepoPresenceWatcher's debounced transition handler.
+ *
+ * Note on channel reuse: `git:state-changed` carries both file-content events
+ * (the first five types) and presence events ('repo'). The sole renderer
+ * consumer treats them identically (it calls a debounced refresh and lets
+ * `getStatus` re-derive `isGitRepo`), so a dedicated channel would be
+ * over-engineering. If a future consumer must distinguish presence from
+ * content, prefer a typed `presence?: 'added' | 'removed'` field on the
+ * payload over enriching this enum further.
  */
 export const GitEventTypeSchema = z.enum(['index', 'head', 'refs', 'fetch', 'stash', 'repo'])
 export type GitEventType = z.infer<typeof GitEventTypeSchema>

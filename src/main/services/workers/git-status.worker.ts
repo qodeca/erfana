@@ -57,11 +57,29 @@ const BRANCH_DETECT_TIMEOUT = 5_000
 
 interface WorkerMessage { type: 'execute'; id: number; projectPath: string; strategy: GitStatusStrategy }
 
+// Consecutive native-git failures that count as transient before we give up
+// and fall back to isomorphic-git. Without this, a *permanently* failing native
+// path (corrupt repo, maxBuffer overflow on a huge tree, `safe.directory`
+// rejection) would loop forever returning "temporarily unavailable" and the
+// circuit breaker would never trip (the worker returns a successful result).
+const TRANSIENT_STRIKE_LIMIT = 3
+
 // -- Module state ------------------------------------------------------------
 
 let nativeGitPath: string | null = null
 let gitPathResolved = false
 let gitPathResolvedAt = 0
+
+// Counts consecutive *transient* native failures across calls. Reset on any
+// successful native call. Module-scoped (one worker thread serves all projects)
+// is deliberately coarse: an N-strike fallback to iso is a global safety valve,
+// not per-project routing.
+let consecutiveTransientFailures = 0
+
+/** Exported for tests – reset the transient-failure counter. */
+export function resetTransientFailureCount(): void {
+  consecutiveTransientFailures = 0
+}
 
 // -- Message listener --------------------------------------------------------
 
@@ -97,26 +115,9 @@ async function handleExecute(id: number, projectPath: string, strategy: GitStatu
       } else {
         try {
           data = await executeNativeGit(projectPath, gitPath)
+          consecutiveTransientFailures = 0
         } catch (nativeError) {
-          const code = (nativeError as NodeJS.ErrnoException).code
-          const msg = nativeError instanceof Error ? nativeError.message : String(nativeError)
-          if (code === 'ENOENT') {
-            // The resolved binary vanished between resolve and spawn. Re-probe on
-            // the next call and fall back to isomorphic-git just this once.
-            console.warn('git-status.worker: resolved git binary missing at spawn, re-probing + falling back:', msg)
-            resetGitPathCache()
-            data = await executeIsomorphicGit(projectPath)
-          } else {
-            // Present-binary failure: FD exhaustion (EMFILE/EBADF/ENFILE),
-            // timeout/kill, maxBuffer overflow, or non-zero git exit. All
-            // transient. Do NOT fall back to isomorphic-git – that would
-            // reintroduce line-ending false-positives on Windows. Return a
-            // transient error result; the next poll/debounce cycle retries
-            // native. Because this is a result (not a thrown worker error), the
-            // circuit breaker records a success and the worker is not penalised.
-            console.warn('git-status.worker: native git failed transiently, returning transient error:', msg)
-            data = { ...createEmptyGitStatusResponse(), isGitRepo: true, error: `Git status temporarily unavailable (${msg})` }
-          }
+          data = await handleNativeFailure(nativeError, projectPath)
         }
       }
     } else {
@@ -128,14 +129,126 @@ async function handleExecute(id: number, projectPath: string, strategy: GitStatu
   }
 }
 
+/**
+ * Classify a native-git failure and return the appropriate GitStatusResponse.
+ *
+ * Three buckets:
+ *  - ENOENT: distinguish a vanished project folder (return empty, leave the
+ *    git-path cache alone) from a missing binary (reset cache, fall back to
+ *    isomorphic-git for this one call). EACCES is treated the same as
+ *    binary-ENOENT – re-probe + fall back.
+ *  - Durable: maxBuffer overflow, dubious-ownership / safe.directory,
+ *    not-a-repo, corrupt – conditions that will not self-heal. Return a result
+ *    with `isGitRepo:false` and a generic actionable message so the renderer
+ *    surfaces a stable error rather than a flickering "temporarily unavailable".
+ *  - Transient: everything else (timeouts, FD exhaustion, transient exit).
+ *    Return a "temporarily unavailable" result and count toward the N-strike
+ *    fallback to isomorphic-git, so a *persistent* failure cannot loop forever
+ *    while masquerading as success at the circuit breaker.
+ *
+ * Error strings are kept generic: the underlying `nativeError.message` from
+ * execFile typically embeds the absolute git binary path and the project path,
+ * which would leak into the renderer UI and bypass the LoggingService
+ * redaction policy (see CLAUDE.md). The error CODE is logged here for
+ * diagnostics; the path-bearing message is not interpolated into the response.
+ */
+async function handleNativeFailure(nativeError: unknown, projectPath: string): Promise<GitStatusResponse> {
+  const errObj = nativeError as NodeJS.ErrnoException & { stderr?: string | Buffer; killed?: boolean }
+  const code = errObj.code
+  const stderr = typeof errObj.stderr === 'string' ? errObj.stderr : errObj.stderr?.toString() ?? ''
+
+  if (code === 'ENOENT') {
+    // ENOENT can mean either the binary is missing *or* the spawn cwd does not
+    // exist. Disambiguate before invalidating the resolver cache.
+    let cwdGone = false
+    try { await access(projectPath) } catch { cwdGone = true }
+    if (cwdGone) {
+      // Project folder was deleted between the service's `.git` check and our
+      // spawn – return empty, leave the resolver cache untouched.
+      return createEmptyGitStatusResponse()
+    }
+    console.warn('git-status.worker: resolved git binary missing at spawn (code ENOENT), re-probing + falling back')
+    resetGitPathCache()
+    consecutiveTransientFailures = 0
+    return executeIsomorphicGit(projectPath)
+  }
+
+  if (code === 'EACCES') {
+    // Binary is not executable (permissions changed, AV quarantine swap, …).
+    // Treat like binary-ENOENT: re-probe + fall back this one call.
+    console.warn('git-status.worker: git binary not executable (code EACCES), re-probing + falling back')
+    resetGitPathCache()
+    consecutiveTransientFailures = 0
+    return executeIsomorphicGit(projectPath)
+  }
+
+  if (isDurableNativeError(code, stderr)) {
+    console.warn('git-status.worker: native git reported a durable error', { code, signature: durableSignature(stderr) })
+    consecutiveTransientFailures = 0
+    return { ...createEmptyGitStatusResponse(), error: durableMessage(stderr) }
+  }
+
+  // Transient: FD exhaustion, timeout/kill, transient non-zero exit, etc.
+  consecutiveTransientFailures++
+  if (consecutiveTransientFailures >= TRANSIENT_STRIKE_LIMIT) {
+    // The native path has been failing for several consecutive calls. Better to
+    // serve a *possibly* stale (CRLF-false-positive on Windows) iso result than
+    // to keep returning "temporarily unavailable" indefinitely.
+    console.warn('git-status.worker: native git transient threshold reached, falling back to isomorphic-git', { strikes: consecutiveTransientFailures })
+    consecutiveTransientFailures = 0
+    return executeIsomorphicGit(projectPath)
+  }
+  console.warn('git-status.worker: native git failed transiently', { code: code ?? 'unknown', killed: errObj.killed === true, strikes: consecutiveTransientFailures })
+  return { ...createEmptyGitStatusResponse(), isGitRepo: true, error: 'Git status temporarily unavailable. Retrying…' }
+}
+
+/**
+ * Is this error a *durable* condition (won't self-heal across retries)?
+ *
+ * Distinct from "transient" so we can surface a stable, actionable message
+ * instead of looping on "temporarily unavailable" forever.
+ */
+function isDurableNativeError(code: unknown, stderr: string): boolean {
+  // maxBuffer overflow on the status output: on a repo big enough to exceed the
+  // 5 MB cap, every refresh will overflow until the cap is raised. Not transient.
+  if (code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') return true
+  const s = stderr.toLowerCase()
+  if (s.includes('dubious ownership')) return true               // safe.directory rejection
+  if (s.includes('not a git repository')) return true            // .git unreadable / corrupt
+  if (s.includes('unable to read tree')) return true             // corrupt object DB
+  if (s.includes('bad object')) return true                      // corrupt ref / object
+  return false
+}
+
+function durableSignature(stderr: string): string {
+  const s = stderr.toLowerCase()
+  if (s.includes('dubious ownership')) return 'safe.directory'
+  if (s.includes('not a git repository')) return 'not-a-repo'
+  if (s.includes('unable to read tree') || s.includes('bad object')) return 'corrupt'
+  return 'durable'
+}
+
+function durableMessage(stderr: string): string {
+  const sig = durableSignature(stderr)
+  switch (sig) {
+    case 'safe.directory': return 'Git refused this folder (dubious ownership). Add it to safe.directory in your git config.'
+    case 'not-a-repo': return 'This folder is no longer a usable git repository.'
+    case 'corrupt': return 'The git repository data appears corrupted. Run `git fsck`.'
+    default: return 'Git status is unavailable for this repository.'
+  }
+}
+
 // -- isomorphic-git strategy -------------------------------------------------
 
 async function executeIsomorphicGit(projectPath: string): Promise<GitStatusResponse> {
   try {
     const gitDir = join(projectPath, '.git')
     try {
-      const stats = await stat(gitDir)
-      if (!stats.isDirectory()) return createEmptyGitStatusResponse()
+      await stat(gitDir)
+      // NOTE: do NOT short-circuit when `.git` is a file – worktrees and
+      // submodules use a gitdir-pointer file. Let isomorphic-git try; if it
+      // cannot resolve the pointer it will throw and we'll surface an error
+      // response from the outer catch rather than silently report no-repo.
     } catch {
       return createEmptyGitStatusResponse()
     }
@@ -166,22 +279,40 @@ async function executeIsomorphicGit(projectPath: string): Promise<GitStatusRespo
 
 // -- Native git strategy -----------------------------------------------------
 
+/**
+ * Run `git status --porcelain=v1 --branch -z --no-renames -uall` ONCE and read
+ * both the branch state (via the leading `## …` header) and the per-file
+ * entries from a single spawn.
+ *
+ * Why one command:
+ *  - Halves process-creation cost per refresh (no separate `rev-parse --abbrev-ref`).
+ *  - `--branch` reports the *unborn* state (`## No commits yet on <name>`),
+ *    so a freshly-`git init`ed repo with no commits still gets correct status
+ *    + untracked listings instead of failing in `rev-parse HEAD`.
+ *  - `-uall` lists individual untracked *files*, not just the parent directory,
+ *    so new files inside a brand-new folder each get their own decoration.
+ *
+ * A conditional second spawn (`rev-parse HEAD`) runs only when the header
+ * indicates detached HEAD, to resolve a 7-char SHA for parity with the
+ * isomorphic-git path.
+ */
 async function executeNativeGit(projectPath: string, gitPath: string): Promise<GitStatusResponse> {
   // Serialize execFile calls (not Promise.all) to reduce peak FD usage from 6 to 3.
   // On large repos the directory watcher already consumes most available FDs;
   // parallel child process spawns can tip the system into EMFILE.
-  const statusResult = await execFileAsync(gitPath, ['status', '--porcelain', '-z', '--no-renames', '-unormal'], {
-    cwd: projectPath, maxBuffer: GIT_STATUS.NATIVE_GIT_MAX_BUFFER, timeout: GIT_STATUS.NATIVE_GIT_TIMEOUT
-  })
-  const branchResult = await execFileAsync(gitPath, ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: projectPath, timeout: BRANCH_DETECT_TIMEOUT })
+  const statusResult = await execFileAsync(
+    gitPath,
+    ['status', '--porcelain=v1', '--branch', '-z', '--no-renames', '-uall'],
+    { cwd: projectPath, maxBuffer: GIT_STATUS.NATIVE_GIT_MAX_BUFFER, timeout: GIT_STATUS.NATIVE_GIT_TIMEOUT }
+  )
 
-  const rawBranch = branchResult.stdout.trim()
-  const isDetached = rawBranch === 'HEAD'
+  const header = parseBranchHeader(statusResult.stdout)
   const files = parsePorcelainOutput(statusResult.stdout, projectPath)
 
-  // For detached HEAD, resolve the actual commit SHA (parity with isomorphic-git path)
-  let branch: string | null = rawBranch
-  if (isDetached) {
+  let branch: string | null = header.branch
+  // For detached HEAD, resolve the actual commit SHA (parity with isomorphic-git path).
+  // An unborn branch (just-init repo) is NOT detached – we keep the branch name.
+  if (header.isDetached) {
     try {
       const { stdout } = await execFileAsync(gitPath, ['rev-parse', 'HEAD'], { cwd: projectPath, timeout: BRANCH_DETECT_TIMEOUT })
       branch = stdout.trim().substring(0, 7)
@@ -197,7 +328,38 @@ async function executeNativeGit(projectPath: string, gitPath: string): Promise<G
     }
   }
 
-  return { isGitRepo: true, branch, isDetached, files, counts, truncated: false }
+  return { isGitRepo: true, branch, isDetached: header.isDetached, files, counts, truncated: false }
+}
+
+/**
+ * Parse the leading `## <something>\0` branch header from `git status
+ * --porcelain=v1 --branch -z` output. Three shapes git emits:
+ *
+ *   `## main` / `## main...origin/main [ahead 1, behind 2]` → normal branch.
+ *   `## HEAD (no branch)`                                    → detached HEAD.
+ *   `## No commits yet on main`                              → unborn branch (just `git init`).
+ *
+ * Exported for tests.
+ */
+export function parseBranchHeader(output: string): { branch: string | null; isDetached: boolean; isUnborn: boolean } {
+  if (!output) return { branch: null, isDetached: false, isUnborn: false }
+  // The branch header is the first NUL-delimited part; defensively scan in case
+  // git ever emits stray output before it.
+  for (const part of output.split('\0')) {
+    if (!part.startsWith('## ')) {
+      // No branch header at all – return safe defaults.
+      if (part.length >= 4) return { branch: null, isDetached: false, isUnborn: false }
+      continue
+    }
+    const rest = part.slice(3)
+    if (rest === 'HEAD (no branch)') return { branch: 'HEAD', isDetached: true, isUnborn: false }
+    const unborn = rest.match(/^No commits yet on (.+)$/)
+    if (unborn) return { branch: unborn[1], isDetached: false, isUnborn: true }
+    // Normal: strip everything after `...` (upstream tracking) and after a space (ahead/behind).
+    const name = rest.split('...')[0].split(' ')[0]
+    return { branch: name || null, isDetached: false, isUnborn: false }
+  }
+  return { branch: null, isDetached: false, isUnborn: false }
 }
 
 // -- Git path resolution -----------------------------------------------------
@@ -274,6 +436,9 @@ export function parsePorcelainOutput(output: string, projectPath: string): GitFi
   const entries: GitFileEntry[] = []
   for (const part of output.split('\0')) {
     if (part.length < 4) continue
+    // `--branch` emits a leading `## <branch-info>` part that is not a file
+    // entry – skip it so the entry loop is unaffected by the new flag.
+    if (part.startsWith('## ')) continue
     const xy = part.substring(0, 2)
     const filepath = part.substring(3)
     if (!filepath) continue
@@ -295,10 +460,16 @@ function mapXYToStatus(xy: string): { status: GitDisplayStatus; staged: boolean 
     case ' D': return { status: 'deleted', staged: false }
     case '??': return { status: 'untracked', staged: false }
     case '!!': return null
-    default:
-      console.warn(`git-status.worker: unknown porcelain XY code "${xy}"`)
-      return null
   }
+  // Typechange (`T` in X or Y) – symlink↔file, exec-bit flip. Surface as
+  // modified so the file gets decorated; treat the worktree side as dominant
+  // (parity with the ` M`/`M ` convention: staged iff the worktree column is blank).
+  if (xy[0] === 'T' || xy[1] === 'T') {
+    return { status: 'modified', staged: xy[1] === ' ' }
+  }
+  // Unknown but present codes – default to modified rather than dropping the
+  // file with a warn-spam log. Better to over-decorate than to miss a change.
+  return { status: 'modified', staged: xy[1] === ' ' }
 }
 
 // -- statusMatrix mapper (ports logic from GitStatusService) -----------------
@@ -322,18 +493,17 @@ function mapStatusMatrix(matrix: StatusMatrixRow[], projectPath: string): Mapped
     } else if (HEAD === 1 && workdir === 2 && stage === 1) {
       status = 'modified'; counts.modified++
     } else if (HEAD === 0 && workdir === 2 && (stage === 2 || stage === 3)) {
+      // New file, added to the index – matches native `A ` → status:'staged'.
       status = 'staged'; isStaged = true; counts.staged++
     } else if (HEAD === 1 && workdir === 2 && (stage === 2 || stage === 3)) {
-      status = 'staged'; isStaged = true; counts.staged++
+      // Tracked file modified in worktree AND staged differently. Native git
+      // reports this as `M ` (modified, staged). Aligning the iso fallback so
+      // the badge and counters agree across strategies (lens review #17).
+      status = 'modified'; isStaged = true; counts.modified++
     } else if (HEAD === 1 && workdir === 0 && stage === 1) {
       status = 'deleted'; counts.deleted++
     } else if (HEAD === 1 && workdir === 0 && stage === 0) {
       status = 'deleted'; isStaged = true; counts.deleted++
-    } else if (HEAD === 1 && workdir === 2 && stage === 3) {
-      // Note: this branch is unreachable – [1,2,3] is caught by the staged condition
-      // above (stage === 2 || stage === 3). Kept for documentation and parity with
-      // the original GitStatusService implementation.
-      status = 'conflicted'; counts.conflicted++
     } else if (HEAD === 1 && workdir === 1 && stage === 1) {
       continue // unmodified
     } else {

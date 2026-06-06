@@ -78,7 +78,6 @@ src/
 │   │   ├── GitStatusService.ts  # Git status orchestrator (delegates to worker)
 │   │   ├── GitStatusWorkerAdapter.ts  # worker_threads adapter (IGitStatusWorker)
 │   │   ├── GitStatusCircuitBreaker.ts # Per-project + global crash tracking
-│   │   ├── GitStatusStrategySelector.ts # Repo size → strategy selection
 │   │   ├── GitWatcherService.ts # Git state file watching (v0.6.3)
 │   │   ├── GitPollingService.ts # Hybrid polling fallback (v0.6.3)
 │   │   ├── ProjectLockService.ts # Multi-instance project locking (v0.6.5)

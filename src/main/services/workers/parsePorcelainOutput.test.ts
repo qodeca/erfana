@@ -177,30 +177,75 @@ describe('parsePorcelainOutput', () => {
   // ---------------------------------------------------------------------------
 
   describe('unknown XY codes', () => {
-    it('skips entry with unknown code', () => {
+    // Lens review #18: unknown-but-present codes now default to `modified`
+    // (over-decoration is safer than missing a change) and do NOT emit
+    // console.warn – that was a noisy log on every typechange code. The old
+    // behavior was to drop the entry and warn.
+    it('defaults unknown code to modified (no warn)', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
       const result = parsePorcelainOutput('ZZ src/file.ts\0', PROJECT)
-      expect(result).toEqual([])
+      expect(result).toEqual([{ path: p('src/file.ts'), status: 'modified', staged: false }])
+      expect(warnSpy).not.toHaveBeenCalled()
       warnSpy.mockRestore()
     })
 
-    it('emits console.warn for unknown XY code', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-      parsePorcelainOutput('ZZ src/file.ts\0', PROJECT)
-      // The worker emits a single-argument warn message containing both the label and the code
-      expect(warnSpy).toHaveBeenCalledOnce()
-      expect(warnSpy.mock.calls[0][0]).toContain('unknown porcelain XY code')
-      expect(warnSpy.mock.calls[0][0]).toContain('ZZ')
-      warnSpy.mockRestore()
-    })
-
-    it('continues parsing remaining entries after unknown code', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    it('continues parsing remaining entries after an unknown code', () => {
       const output = 'ZZ src/unknown.ts\0?? src/new.ts\0'
+      const result = parsePorcelainOutput(output, PROJECT)
+      expect(result).toHaveLength(2)
+      expect(result[0]).toEqual({ path: p('src/unknown.ts'), status: 'modified', staged: false })
+      expect(result[1].status).toBe('untracked')
+    })
+  })
+
+  describe('typechange codes (lens review #18)', () => {
+    // Symlink↔file, exec-bit flips. Both worktree-only (`. T`/` T`) and
+    // index-side (`T `) surface as `modified`; staged tracks the worktree
+    // column being blank, parity with the ` M`/`M ` convention.
+    it('worktree typechange ` T` → modified, staged:false', () => {
+      const result = parsePorcelainOutput(' T src/symlink\0', PROJECT)
+      expect(result).toEqual([{ path: p('src/symlink'), status: 'modified', staged: false }])
+    })
+
+    it('index typechange `T ` → modified, staged:true', () => {
+      const result = parsePorcelainOutput('T  src/symlink\0', PROJECT)
+      expect(result).toEqual([{ path: p('src/symlink'), status: 'modified', staged: true }])
+    })
+
+    it('both-side typechange `TT` → modified, staged:false', () => {
+      const result = parsePorcelainOutput('TT src/symlink\0', PROJECT)
+      expect(result).toEqual([{ path: p('src/symlink'), status: 'modified', staged: false }])
+    })
+
+    it('worktree-typechange after staged-modify `MT` → modified', () => {
+      const result = parsePorcelainOutput('MT src/file.ts\0', PROJECT)
+      expect(result[0].status).toBe('modified')
+    })
+  })
+
+  describe('branch header skipping (lens review #1)', () => {
+    // `--branch` emits a leading `## <branch-info>` part that must NOT be
+    // treated as a file entry. Otherwise the parser would try to map `##`
+    // as an XY code and pollute the file list.
+    it('skips `## main` header but parses following entries', () => {
+      const output = '## main\0?? src/new.ts\0'
+      const result = parsePorcelainOutput(output, PROJECT)
+      expect(result).toHaveLength(1)
+      expect(result[0]).toEqual({ path: p('src/new.ts'), status: 'untracked', staged: false })
+    })
+
+    it('skips the unborn-branch header `## No commits yet on main`', () => {
+      const output = '## No commits yet on main\0?? src/new.ts\0'
       const result = parsePorcelainOutput(output, PROJECT)
       expect(result).toHaveLength(1)
       expect(result[0].status).toBe('untracked')
-      warnSpy.mockRestore()
+    })
+
+    it('skips the detached-HEAD header `## HEAD (no branch)`', () => {
+      const output = '## HEAD (no branch)\0 M src/file.ts\0'
+      const result = parsePorcelainOutput(output, PROJECT)
+      expect(result).toHaveLength(1)
+      expect(result[0].status).toBe('modified')
     })
   })
 

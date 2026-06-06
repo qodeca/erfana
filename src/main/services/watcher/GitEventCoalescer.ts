@@ -26,6 +26,7 @@
  */
 
 import { logger } from '../LoggingService'
+import type { GitEventType } from '../../../shared/ipc/git-watcher-schema'
 
 /** Default event coalescing window in milliseconds */
 const DEFAULT_COALESCE_WINDOW_MS = 150
@@ -33,8 +34,12 @@ const DEFAULT_COALESCE_WINDOW_MS = 150
 /** Max consecutive callback errors before circuit breaker trips (Issue #74 review fix) */
 const MAX_CALLBACK_ERRORS = 5
 
-/** Git event types that can trigger state changes */
-export type GitEventType = 'index' | 'head' | 'refs' | 'fetch' | 'stash' | 'repo'
+/**
+ * Re-export so existing consumers (`GitWatcherService`, tests) keep working
+ * after the lens-review #8 single-sourcing. The union is the same wire enum
+ * the renderer parses – no hand-written duplicate to drift.
+ */
+export type { GitEventType }
 
 /** Callback signature for coalesced git events */
 export type GitEventCallback = (eventTypes: GitEventType[]) => void

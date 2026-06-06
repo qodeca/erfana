@@ -12,8 +12,11 @@ import type { IGitStatusWorker } from '../interfaces/IGitStatusWorker'
 import type { GitStatusResponse } from '../../shared/ipc/git-schema'
 import { GIT_STATUS } from '../../shared/constants'
 
-// Mock fs/promises – used by both service (.git dir check) and strategy selector (.git/index size)
+// Mock fs/promises – used by the service's `.git` presence check (now via
+// `access`, not `stat`: a `.git` *file* gitdir pointer is also valid for git
+// worktrees and submodules).
 vi.mock('fs/promises', () => ({
+  access: vi.fn(),
   stat: vi.fn(),
 }))
 
@@ -29,12 +32,13 @@ vi.mock('./LoggingService', () => ({
   },
 }))
 
-import { stat } from 'fs/promises'
+import { access, stat } from 'fs/promises'
 import { logger } from './LoggingService'
 import { GitStatusService } from './GitStatusService'
 
 const mockLogger = vi.mocked(logger)
 
+const mockedAccess = vi.mocked(access)
 const mockedStat = vi.mocked(stat)
 
 // ---------------------------------------------------------------------------
@@ -62,8 +66,9 @@ function createMockWorker(overrides?: Partial<IGitStatusWorker>): IGitStatusWork
   }
 }
 
-/** Make stat resolve as a valid .git directory for the given path prefix */
+/** Make access() succeed for the .git presence check */
 function mockGitDirExists(): void {
+  mockedAccess.mockResolvedValue(undefined)
   mockedStat.mockResolvedValue({
     isDirectory: () => true,
     isFile: () => false,
@@ -71,9 +76,9 @@ function mockGitDirExists(): void {
   } as any)
 }
 
-/** Make stat reject for the .git directory check but succeed for index size */
+/** Make access() reject for the .git presence check */
 function mockGitDirMissing(): void {
-  mockedStat.mockRejectedValue(new Error('ENOENT: no such file or directory'))
+  mockedAccess.mockRejectedValue(new Error('ENOENT: no such file or directory'))
 }
 
 // ---------------------------------------------------------------------------
@@ -106,16 +111,17 @@ describe('GitStatusService', () => {
       expect(result.files).toEqual([])
     })
 
-    it('should return isGitRepo: false when .git is not a directory', async () => {
-      mockedStat.mockResolvedValue({
-        isDirectory: () => false,
-        isFile: () => true,
-        size: 0,
-      } as any)
+    it('should NOT short-circuit when .git is a file (worktree/submodule gitdir pointer)', async () => {
+      // Lens review #20: a `.git` *file* containing `gitdir: <path>` is a
+      // valid git worktree / submodule layout. Previously the service
+      // short-circuited on !isDirectory and silently reported no-repo for
+      // every worktree. The service now uses `access()` and lets the worker
+      // resolve the pointer.
+      mockedAccess.mockResolvedValue(undefined)
 
-      const result = await service.getStatus('/path/to/project')
+      await service.getStatus('/path/to/worktree-project')
 
-      expect(result.isGitRepo).toBe(false)
+      expect(mockWorker.execute).toHaveBeenCalledOnce()
     })
 
     it('should not call worker.execute when not a git repo', async () => {
@@ -195,12 +201,8 @@ describe('GitStatusService', () => {
     })
 
     it('should pass strategy "native-git" even for a tiny repo', async () => {
-      // .git dir check succeeds; selector no longer stats .git/index at all
-      mockedStat.mockResolvedValueOnce({
-        isDirectory: () => true,
-        isFile: () => false,
-        size: 0,
-      } as any)
+      // .git presence check succeeds via access(); no .git/index stat happens.
+      mockedAccess.mockResolvedValueOnce(undefined)
 
       await service.getStatus('/project')
 

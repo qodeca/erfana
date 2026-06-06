@@ -88,11 +88,13 @@ describe('git-status.worker – CRLF clean-repo regression', () => {
     resetGitPathCache()
     // Every allowlist candidate "exists" so the binary resolves on any host...
     mockAccess.mockResolvedValue(undefined)
-    // ...and native git reports a CLEAN tree on branch `main`.
+    // ...and native git reports a CLEAN tree on branch `main`. With the
+    // combined `--porcelain=v1 --branch -z` command the only thing emitted
+    // for a clean working tree is the leading branch header.
     mockRun.mockImplementation(async (_cmd: string, args: string[]) => {
       if (args[0] === '--version') return 'git version 2.43.0\n' // resolver liveness probe (win32)
-      if (args[0] === 'status') return '' // porcelain: clean working tree
-      if (args[0] === 'rev-parse') return 'main\n' // current branch
+      if (args[0] === 'status') return '## main\0' // branch header only – clean tree
+      if (args[0] === 'rev-parse') return 'main\n' // only used on detached HEAD
       return '/usr/bin/git\n' // where/which fallback (unused on happy path)
     })
   })
