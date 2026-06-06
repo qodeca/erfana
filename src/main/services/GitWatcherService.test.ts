@@ -123,6 +123,17 @@ describe('GitWatcherService', () => {
     return startPromise
   }
 
+  // The inner git-state watcher is invoked with an ARRAY of paths; the
+  // presence watcher (always created, even for non-repos) is invoked with a
+  // single `.git` path STRING. These helpers disambiguate the two chokidar
+  // calls so tests target the inner watcher specifically.
+  function innerWatchCall(): any[] | undefined {
+    return mockChokidar.watch.mock.calls.find((c: any[]) => Array.isArray(c[0]))
+  }
+  function presenceWatchCall(): any[] | undefined {
+    return mockChokidar.watch.mock.calls.find((c: any[]) => typeof c[0] === 'string')
+  }
+
   describe('start', () => {
     it('should start watching git paths when .git directory exists', async () => {
       const result = await startServiceAndEmitReady('/project')
@@ -130,19 +141,23 @@ describe('GitWatcherService', () => {
       expect(result.success).toBe(true)
       expect(mockChokidar.watch).toHaveBeenCalled()
 
-      const watchedPaths = mockChokidar.watch.mock.calls[0][0]
+      const watchedPaths = innerWatchCall()![0]
       expect(watchedPaths).toContain(path.join('/project', '.git', 'index'))
       expect(watchedPaths).toContain(path.join('/project', '.git', 'HEAD'))
       expect(watchedPaths).toContain(path.join('/project', '.git', 'refs', 'heads'))
     })
 
-    it('should return success without starting if no .git directory', async () => {
+    it('should not start the inner watcher if no .git directory (but presence watcher runs)', async () => {
       vi.mocked(fsPromises.access).mockRejectedValue(new Error('ENOENT'))
 
       const result = await service.start('/project')
 
       expect(result.success).toBe(true)
-      expect(mockChokidar.watch).not.toHaveBeenCalled()
+      // Inner git-state watcher must NOT be created for a non-repo folder...
+      expect(innerWatchCall()).toBeUndefined()
+      // ...but the presence watcher IS created so a later `git init` is caught.
+      expect(presenceWatchCall()).toBeDefined()
+      expect(presenceWatchCall()![0]).toBe(path.join('/project', '.git'))
       expect(mockLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining('No .git directory'),
         expect.any(Object)
@@ -209,19 +224,21 @@ describe('GitWatcherService', () => {
 
       await startServiceAndEmitReady('/project')
 
-      const watchedPaths = mockChokidar.watch.mock.calls[0][0]
+      const watchedPaths = innerWatchCall()![0]
       expect(watchedPaths).toHaveLength(2)
       expect(watchedPaths).toContain(path.join('/project', '.git', 'index'))
       expect(watchedPaths).toContain(path.join('/project', '.git', 'HEAD'))
     })
 
-    it('should return success if .git/index not found (bare repo)', async () => {
+    it('should not start the inner watcher if .git/index not found (bare repo)', async () => {
       vi.mocked(fsPromises.stat).mockRejectedValue(new Error('ENOENT'))
 
       const result = await service.start('/project')
 
       expect(result.success).toBe(true)
-      expect(mockChokidar.watch).not.toHaveBeenCalled()
+      // No inner watcher for a bare/index-less repo, but presence watcher runs.
+      expect(innerWatchCall()).toBeUndefined()
+      expect(presenceWatchCall()).toBeDefined()
       expect(mockLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining('.git/index not found'),
         expect.any(Object)
@@ -231,7 +248,7 @@ describe('GitWatcherService', () => {
     it('should configure chokidar with correct options', async () => {
       await startServiceAndEmitReady('/project')
 
-      const options = mockChokidar.watch.mock.calls[0][1]
+      const options = innerWatchCall()![1]
       expect(options).toMatchObject({
         persistent: true,
         ignoreInitial: true,

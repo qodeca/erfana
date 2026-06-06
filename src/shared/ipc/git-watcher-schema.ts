@@ -15,8 +15,10 @@ import { z } from 'zod'
  * - 'refs': Changes to .git/refs/ (new branches, tags, remote updates)
  * - 'fetch': Changes from git fetch operations
  * - 'stash': Changes to .git/refs/stash (stash push/pop)
+ * - 'repo': The .git directory itself appeared or disappeared
+ *           (git init / clone into an open folder, or .git removal)
  */
-export const GitEventTypeSchema = z.enum(['index', 'head', 'refs', 'fetch', 'stash'])
+export const GitEventTypeSchema = z.enum(['index', 'head', 'refs', 'fetch', 'stash', 'repo'])
 export type GitEventType = z.infer<typeof GitEventTypeSchema>
 
 /**

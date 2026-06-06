@@ -1,33 +1,32 @@
-import { stat } from 'fs/promises'
-import { join } from 'path'
-import { GIT_STATUS } from '../../shared/constants'
 import type { GitStatusStrategy } from '../interfaces/IGitStatusWorker'
 
 /**
- * Selects the git status computation strategy based on repository size.
+ * Selects the *preferred* git status computation strategy.
  *
- * Checks the .git/index file size to determine whether the repo is large
- * enough to benefit from native git over isomorphic-git.
+ * Native `git status --porcelain` is always preferred because it honours the
+ * user's git configuration – `core.autocrlf`, `.gitattributes` text/eol rules,
+ * filemode – so Erfana's status matches what the user's own git reports.
+ * isomorphic-git's `statusMatrix()` does NOT implement that normalization and
+ * would falsely report line-ending-only differences as "modified" (notably on
+ * Windows with `autocrlf=true`).
+ *
+ * The actual native-vs-isomorphic decision is made in the worker
+ * (`git-status.worker.ts`), keyed on whether a git binary is available
+ * (`resolveGitPath()`); isomorphic-git is used only as a no-binary fallback.
+ * This selector therefore returns the preferred strategy unconditionally; the
+ * `strategy` field remains a test/override seam (passing `'isomorphic-git'`
+ * forces the portable path).
  *
  * @see Spec #022 - Git status thread offloading
  */
 export class GitStatusStrategySelector {
   /**
-   * Select the git status strategy based on .git/index file size.
+   * Select the preferred git status strategy.
    *
-   * @param projectPath - Absolute path to project root
-   * @returns The recommended strategy for this repository
+   * @param _projectPath - Absolute path to project root (unused; retained for API stability)
+   * @returns Always `'native-git'` (the preferred strategy)
    */
-  async select(projectPath: string): Promise<GitStatusStrategy> {
-    try {
-      const indexPath = join(projectPath, '.git', 'index')
-      const indexStat = await stat(indexPath)
-      return indexStat.size > GIT_STATUS.INDEX_SIZE_THRESHOLD
-        ? 'native-git'
-        : 'isomorphic-git'
-    } catch {
-      // If .git/index doesn't exist or can't be read, use isomorphic-git
-      return 'isomorphic-git'
-    }
+  async select(_projectPath: string): Promise<GitStatusStrategy> {
+    return 'native-git'
   }
 }

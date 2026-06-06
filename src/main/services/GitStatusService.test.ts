@@ -179,29 +179,13 @@ describe('GitStatusService', () => {
 
   // -------------------------------------------------------------------------
   describe('strategy selection', () => {
-    it('should pass strategy "isomorphic-git" when .git/index size is below threshold', async () => {
-      // First stat call = .git dir check (resolves as directory)
-      // Second stat call = .git/index size check (small)
-      mockedStat
-        .mockResolvedValueOnce({ isDirectory: () => true, isFile: () => false, size: 0 } as any)
-        .mockResolvedValueOnce({ isDirectory: () => false, isFile: () => true, size: 100 } as any)
-
-      await service.getStatus('/project')
-
-      expect(mockWorker.execute).toHaveBeenCalledWith(
-        expect.objectContaining({ strategy: 'isomorphic-git' })
-      )
-    })
-
-    it('should pass strategy "native-git" when .git/index size exceeds threshold', async () => {
-      const largeSize = GIT_STATUS.INDEX_SIZE_THRESHOLD + 1
-      mockedStat
-        .mockResolvedValueOnce({ isDirectory: () => true, isFile: () => false, size: 0 } as any)
-        .mockResolvedValueOnce({
-          isDirectory: () => false,
-          isFile: () => true,
-          size: largeSize,
-        } as any)
+    // Native git is now always the PREFERRED strategy (it honours the user's
+    // core.autocrlf / .gitattributes normalization, so status matches the
+    // user's own git). The native-vs-isomorphic decision is made in the worker
+    // based on git-binary availability, not on repo size. The 5 MB index-size
+    // threshold was removed.
+    it('should always pass strategy "native-git" regardless of repo size', async () => {
+      mockGitDirExists()
 
       await service.getStatus('/project')
 
@@ -210,16 +194,18 @@ describe('GitStatusService', () => {
       )
     })
 
-    it('should fall back to "isomorphic-git" when .git/index cannot be read', async () => {
-      // .git dir check succeeds, .git/index stat fails
-      mockedStat
-        .mockResolvedValueOnce({ isDirectory: () => true, isFile: () => false, size: 0 } as any)
-        .mockRejectedValueOnce(new Error('ENOENT'))
+    it('should pass strategy "native-git" even for a tiny repo', async () => {
+      // .git dir check succeeds; selector no longer stats .git/index at all
+      mockedStat.mockResolvedValueOnce({
+        isDirectory: () => true,
+        isFile: () => false,
+        size: 0,
+      } as any)
 
       await service.getStatus('/project')
 
       expect(mockWorker.execute).toHaveBeenCalledWith(
-        expect.objectContaining({ strategy: 'isomorphic-git' })
+        expect.objectContaining({ strategy: 'native-git' })
       )
     })
   })

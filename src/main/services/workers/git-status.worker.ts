@@ -87,28 +87,37 @@ async function handleExecute(id: number, projectPath: string, strategy: GitStatu
     let data: GitStatusResponse
     if (strategy === 'native-git') {
       const gitPath = await resolveGitPath()
-      if (gitPath) {
+      if (!gitPath) {
+        // No git binary on this machine: isomorphic-git is the only option.
+        // This is the ONE case where line-ending false-positives are possible –
+        // statusMatrix() cannot replicate git's autocrlf/.gitattributes
+        // normalization – and it is the accepted trade-off for a git-less host.
+        console.warn('git-status.worker: native git not available, falling back to isomorphic-git')
+        data = await executeIsomorphicGit(projectPath)
+      } else {
         try {
           data = await executeNativeGit(projectPath, gitPath)
         } catch (nativeError) {
+          const code = (nativeError as NodeJS.ErrnoException).code
           const msg = nativeError instanceof Error ? nativeError.message : String(nativeError)
-          const isFdError = msg.includes('EBADF') || msg.includes('EMFILE') || msg.includes('ENFILE')
-          if (isFdError) {
-            // FD exhaustion: do NOT fall back to isomorphic-git – statusMatrix() on a large
-            // repo opens thousands of FDs via fs.stat(), which would make the pressure worse.
-            // Return a transient error; the next poll cycle will retry when FDs are freed.
-            console.warn('git-status.worker: native git hit FD limit, returning transient error:', msg)
-            data = { ...createEmptyGitStatusResponse(), isGitRepo: true, error: `Git status temporarily unavailable (${msg})` }
-          } else {
-            // Non-FD errors (e.g., git binary crashed): fall back to isomorphic-git
-            console.warn('git-status.worker: native git failed, falling back to isomorphic-git:', msg)
+          if (code === 'ENOENT') {
+            // The resolved binary vanished between resolve and spawn. Re-probe on
+            // the next call and fall back to isomorphic-git just this once.
+            console.warn('git-status.worker: resolved git binary missing at spawn, re-probing + falling back:', msg)
+            resetGitPathCache()
             data = await executeIsomorphicGit(projectPath)
+          } else {
+            // Present-binary failure: FD exhaustion (EMFILE/EBADF/ENFILE),
+            // timeout/kill, maxBuffer overflow, or non-zero git exit. All
+            // transient. Do NOT fall back to isomorphic-git – that would
+            // reintroduce line-ending false-positives on Windows. Return a
+            // transient error result; the next poll/debounce cycle retries
+            // native. Because this is a result (not a thrown worker error), the
+            // circuit breaker records a success and the worker is not penalised.
+            console.warn('git-status.worker: native git failed transiently, returning transient error:', msg)
+            data = { ...createEmptyGitStatusResponse(), isGitRepo: true, error: `Git status temporarily unavailable (${msg})` }
           }
         }
-      } else {
-        // FR-004 / AC-006: fall back to isomorphic-git when native git is unavailable
-        console.warn('git-status.worker: native git not available, falling back to isomorphic-git')
-        data = await executeIsomorphicGit(projectPath)
       }
     } else {
       data = await executeIsomorphicGit(projectPath)

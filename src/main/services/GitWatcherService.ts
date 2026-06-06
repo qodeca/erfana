@@ -25,7 +25,7 @@
 
 import chokidar, { FSWatcher } from 'chokidar'
 import { access, stat } from 'fs/promises'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { GitEventCoalescer, classifyGitPath, type GitEventType } from './watcher/GitEventCoalescer'
 import { logger } from './LoggingService'
 import { broadcastToAllWindows } from '../utils/ipcBroadcast'
@@ -60,6 +60,14 @@ const HEALTH_LOG_INTERVAL_MS = 5 * 60 * 1000
 
 /** Polling efficiency threshold for degraded state warning (%) - ADR-Spec003-002 */
 const HIGH_POLLING_DEPENDENCY_THRESHOLD = 80
+
+/**
+ * Debounce for `.git` presence transitions (ms).
+ *
+ * `git init` creates the `.git` directory and then writes HEAD/config/refs into
+ * it in rapid succession; debouncing lets the directory settle before we react.
+ */
+const REPO_PRESENCE_DEBOUNCE_MS = 400
 
 /** Git paths to watch (relative to project root) */
 const GIT_WATCH_PATHS = [
@@ -113,10 +121,25 @@ export class GitWatcherService implements IGitWatcherService {
   private healthLogInterval: NodeJS.Timeout | null = null
 
   /**
+   * Watcher for the `.git` path itself – detects a repo appearing (`git init` /
+   * clone into an open folder) or disappearing (`rm .git`). Lives for the whole
+   * time a project is open, independent of the inner git-state watcher.
+   */
+  private presenceWatcher: FSWatcher | null = null
+
+  /** Project root the presence watcher is bound to (identity guard for debounced callbacks) */
+  private presenceWatcherPath: string | null = null
+
+  /** Debounce timer for `.git` presence transitions */
+  private presenceDebounce: NodeJS.Timeout | null = null
+
+  /**
    * Start watching git state for a project
    *
-   * Automatically stops any existing watcher before starting.
-   * Does nothing if the project has no .git directory.
+   * Automatically stops any existing watcher before starting. Always starts a
+   * presence watcher on the project's `.git` path (even for a non-repo folder,
+   * to catch a later `git init`); the inner git-state watcher starts only if
+   * `.git` already exists.
    *
    * @param projectPath - Absolute path to project root
    * @returns Promise resolving when watcher is ready
@@ -136,13 +159,17 @@ export class GitWatcherService implements IGitWatcherService {
     // Increment session to invalidate any stale events
     this.sessionVersion++
 
-    // Check if .git directory exists
+    // Always watch the `.git` path itself so we react when this folder becomes
+    // (git init / clone) or stops being (rm .git) a repo while it stays open.
+    this.createPresenceWatcher(projectPath)
+
+    // Check if .git directory exists right now
     const gitDir = join(projectPath, '.git')
     try {
       await access(gitDir)
     } catch {
-      logger.debug('GitWatcherService: No .git directory found', { projectPath })
-      return { success: true } // Not an error, just not a git repo
+      logger.debug('GitWatcherService: No .git directory yet (presence watcher active)', { projectPath })
+      return { success: true } // Not a repo yet; presence watcher will catch `git init`
     }
 
     try {
@@ -171,6 +198,24 @@ export class GitWatcherService implements IGitWatcherService {
     if (this.pendingRestart) {
       clearTimeout(this.pendingRestart)
       this.pendingRestart = null
+    }
+
+    // Tear down the presence watcher (it can exist even when there is no inner
+    // watcher – e.g. a non-repo folder waiting for `git init`).
+    if (this.presenceDebounce) {
+      clearTimeout(this.presenceDebounce)
+      this.presenceDebounce = null
+    }
+    this.presenceWatcherPath = null
+    if (this.presenceWatcher) {
+      try {
+        await this.presenceWatcher.close()
+      } catch (error) {
+        logger.warn('GitWatcherService: Error closing presence watcher', {
+          error: error instanceof Error ? error.message : String(error)
+        })
+      }
+      this.presenceWatcher = null
     }
 
     if (!this.activeWatcher) {
@@ -449,6 +494,136 @@ export class GitWatcherService implements IGitWatcherService {
       correlationId
     }
 
+    broadcastToAllWindows('git:state-changed', payload)
+  }
+
+  /**
+   * Watch the project's `.git` path itself to detect a repository appearing
+   * (`git init` / clone into an already-open folder) or disappearing (`rm .git`).
+   *
+   * Watching the exact `.git` path with `depth: 0` reliably fires
+   * `addDir`/`unlinkDir` for the directory (verified empirically on chokidar
+   * 3.6.0 incl. Windows) and does NOT recurse into `.git/objects`. Watching the
+   * project root with an `ignored` predicate does NOT detect the child `.git`
+   * being created/removed, so the direct-path watch is required.
+   */
+  private createPresenceWatcher(projectPath: string): void {
+    const gitDir = join(projectPath, '.git')
+    this.presenceWatcherPath = projectPath
+
+    // A presence-watcher failure must never break start() (which calls this
+    // before the inner watcher) – the inner watcher and polling remain the
+    // primary status path, so degrade silently if chokidar throws here.
+    try {
+      const watcher = chokidar.watch(gitDir, {
+        persistent: true,
+        ignoreInitial: true,
+        usePolling: false,
+        disableGlobbing: true,
+        followSymlinks: false,
+        depth: 0
+      })
+
+      // basename guard: ignore any direct children of .git the watcher may
+      // surface; only the `.git` entry itself signals a repo transition.
+      // `add`/`unlink` cover a `.git` *file* (worktree/submodule gitdir pointer).
+      const onAppear = (p: string): void => {
+        if (basename(p) === '.git') this.scheduleRepoTransition(projectPath, 'added')
+      }
+      const onDisappear = (p: string): void => {
+        if (basename(p) === '.git') this.scheduleRepoTransition(projectPath, 'removed')
+      }
+
+      watcher.on('addDir', onAppear)
+      watcher.on('add', onAppear)
+      watcher.on('unlinkDir', onDisappear)
+      watcher.on('unlink', onDisappear)
+      watcher.on('error', (error: unknown) => {
+        logger.warn('GitWatcherService: Presence watcher error', {
+          error: error instanceof Error ? error.message : String(error)
+        })
+      })
+
+      this.presenceWatcher = watcher
+    } catch (error) {
+      logger.warn('GitWatcherService: Failed to create presence watcher', {
+        projectPath,
+        error: error instanceof Error ? error.message : String(error)
+      })
+      this.presenceWatcher = null
+    }
+  }
+
+  /**
+   * Debounce a `.git` presence transition. `git init` writes many files into
+   * `.git` right after creating it, so coalesce rapid events into one.
+   */
+  private scheduleRepoTransition(projectPath: string, kind: 'added' | 'removed'): void {
+    if (this.isDisposing || this.presenceWatcherPath !== projectPath) return
+
+    if (this.presenceDebounce) clearTimeout(this.presenceDebounce)
+    this.presenceDebounce = setTimeout(() => {
+      this.presenceDebounce = null
+      void this.applyRepoTransition(projectPath, kind)
+    }, REPO_PRESENCE_DEBOUNCE_MS)
+  }
+
+  /**
+   * Apply a debounced `.git` presence transition: (re)start or tear down the
+   * inner git-state watcher, then tell the renderer to re-fetch status.
+   */
+  private async applyRepoTransition(projectPath: string, kind: 'added' | 'removed'): Promise<void> {
+    // Identity guard: drop if the project was switched/closed while debouncing.
+    if (this.isDisposing || this.presenceWatcherPath !== projectPath) return
+
+    logger.info('GitWatcherService: Repo presence transition', { projectPath, kind })
+
+    if (kind === 'added') {
+      // Start real-time inner watching if not already active. createWatcher
+      // self-guards on `.git/index`; if git has not written it yet (init writes
+      // it on first add/commit), polling drives the refresh and the next index
+      // write engages the watcher.
+      if (!this.activeWatcher) {
+        try {
+          await this.createWatcher(projectPath)
+        } catch (error) {
+          logger.warn('GitWatcherService: Failed to start inner watcher after repo appeared', {
+            error: error instanceof Error ? error.message : String(error)
+          })
+        }
+      }
+    } else {
+      // `.git` removed: tear down the inner watcher but KEEP the presence watcher
+      // alive so a later `git init` in the same folder is detected again.
+      if (this.activeWatcher) {
+        try {
+          this.activeWatcher.coalescer.dispose()
+          await this.activeWatcher.watcher.close()
+        } catch (error) {
+          logger.warn('GitWatcherService: Error tearing down inner watcher after .git removal', {
+            error: error instanceof Error ? error.message : String(error)
+          })
+        }
+        this.activeWatcher = null
+      }
+    }
+
+    // Re-check the identity guard: createWatcher above is async and a project
+    // switch may have intervened.
+    if (this.isDisposing || this.presenceWatcherPath !== projectPath) return
+
+    // Re-fetch on the renderer: getStatus() re-checks `.git` presence and returns
+    // isGitRepo true/false, so the store flips decorations on (added) or off
+    // (removed) without any dedicated IPC.
+    const timestamp = Date.now()
+    this.lastEventTimestamp = timestamp
+    const payload: GitStateChangeEvent = {
+      projectPath,
+      eventTypes: ['repo'],
+      timestamp,
+      correlationId: this.generateCorrelationId()
+    }
+    watcherMetrics.recordGitWatcherEvent()
     broadcastToAllWindows('git:state-changed', payload)
   }
 

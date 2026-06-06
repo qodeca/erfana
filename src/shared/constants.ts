@@ -373,8 +373,6 @@ export const DOCUMENT_IMPORT = {
  * @see Spec #022 - Git status thread offloading
  */
 export const GIT_STATUS = {
-  /** .git/index file size threshold for switching to native git (5 MB ~ 50K files) */
-  INDEX_SIZE_THRESHOLD: 5 * 1024 * 1024,
   /** Timeout for native git execFile calls (ms) */
   NATIVE_GIT_TIMEOUT: 10_000,
   /** Maximum buffer size for native git output (5 MB) */

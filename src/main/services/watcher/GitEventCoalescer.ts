@@ -34,7 +34,7 @@ const DEFAULT_COALESCE_WINDOW_MS = 150
 const MAX_CALLBACK_ERRORS = 5
 
 /** Git event types that can trigger state changes */
-export type GitEventType = 'index' | 'head' | 'refs' | 'fetch' | 'stash'
+export type GitEventType = 'index' | 'head' | 'refs' | 'fetch' | 'stash' | 'repo'
 
 /** Callback signature for coalesced git events */
 export type GitEventCallback = (eventTypes: GitEventType[]) => void
