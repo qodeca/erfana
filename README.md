@@ -2,7 +2,9 @@
 
 An Electron-based project workspace focused on markdown editing, a project tree, and an integrated terminal.
 
-> **Version:** 0.13.0 ([changelog](docs/CHANGELOG.md) · [release notes](docs/release-notes/v0.13.0.md)) · **Documentation:** [docs/](docs/README.md) · **Architecture:** [docs/architecture.md](docs/architecture.md)
+> **Version:** 0.14.0 ([changelog](docs/CHANGELOG.md) · [release notes](docs/release-notes/v0.14.0.md)) · **Documentation:** [docs/](docs/README.md) · **Architecture:** [docs/architecture.md](docs/architecture.md)
+>
+> **v0.14.0 highlights:** The terminal now looks identical on Windows and macOS — Erfana bundles the Cascadia Mono font so the Windows terminal matches the polished Mac look (previously Windows fell back to the dated Courier New). The OS window title now shows the open project and app version, for example `My Project | ERFANA v0.14.0`. The project sidebar header on Windows shows the folder name instead of the full `C:\…` path, and `git status` no longer reports phantom "modified" files caused by line-ending (CRLF) handling.
 >
 > **v0.13.0 highlights:** When you run Claude Code (`claude`) in a terminal panel, a new status bar (macOS) shows the model (for example "Opus 4.8"), the context-window size, and how much of the window you have used, with a progress bar that shifts green – orange – red as it fills. A fresh install now rebuilds the terminal backend reliably on hardened Windows 11. Filenames you type are no longer written to local log files (recorded as `[redacted-filename]`), while the on-screen message still shows the full name.
 >

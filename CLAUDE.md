@@ -3,9 +3,9 @@
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
 - **Repository**: `qodeca/erfana` (GitHub, private)
-- **Version**: 0.13.0
+- **Version**: 0.14.0
 - **License**: Proprietary — `UNLICENSED` in package.json, `private: true`. Copyright (c) 2025-2026 **Qodeca sp. z o.o.** All rights reserved. See [LICENSE](LICENSE). Erfana is a closed-source freemium product; never frame it as open source or suggest OSS-style licensing.
-- **Tech Stack**: Electron 39, React 18, TypeScript 5.7, Monaco Editor, xterm.js
+- **Tech Stack**: Electron 39, React 18, TypeScript 6.0, Monaco Editor, xterm.js
 - **Build Toolchain**: electron-vite 5, Vite 6, vitest 3
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 24+ (development), Electron 39 bundles Node.js 22.20.0
@@ -39,7 +39,7 @@ resources/
 └── tessdata/       # Pre-bundled Tesseract OCR language data (eng.traineddata)
 src/
 ├── main/           # Electron main process
-│   ├── services/   # Core: FileService, TerminalService, ProjectService, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService, GitStatusWorkerAdapter, GitStatusCircuitBreaker, GitStatusStrategySelector; Watchers: DirectoryWatcherService, FileWatcherService; Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media: ScreenshotService (dispatcher → screenshot/ subdir with MacScreenshotCapturer + DesktopCapturerScreenshotCapturer + ScreenshotOverlayWindow [#164]), CameraService, DocxService, TranscriptionService, LocalWhisperService, WhisperModelManager, whisper-assets (pinned release + classifyPlatform), whisper-pubkeys (dual minisign keys), AudioMetadataService, AudioExtractionService, ApiKeyService; Import: LiteParseConverter, DependencyDetector; Claude status: claudeStatus/ (ClaudeStatusService orchestrator, ClaudeTranscriptWatcher [refcounted chokidar on ~/.claude/projects], ClaudeTranscriptParser, ClaudeTranscriptLocator, ClaudeWindowDetector [model-capability registry 200k/1M], friendlyModelName, encodeCwd, process/{MacClaudeProcessDetector, createProcessDetector}); Multi-instance: ProjectLockService, ExternalFileService; Subdirs: import/, watcher/, workers/, screenshot/, claudeStatus/
+│   ├── services/   # Core: FileService, TerminalService, ProjectService, LoggingService; Git: GitStatusService, GitWatcherService, GitPollingService, GitStatusWorkerAdapter, GitStatusCircuitBreaker; Watchers: DirectoryWatcherService, FileWatcherService; Settings: SettingsService, ProjectSettingsService, GlobalSettingsService; Media: ScreenshotService (dispatcher → screenshot/ subdir with MacScreenshotCapturer + DesktopCapturerScreenshotCapturer + ScreenshotOverlayWindow [#164]), CameraService, DocxService, TranscriptionService, LocalWhisperService, WhisperModelManager, whisper-assets (pinned release + classifyPlatform), whisper-pubkeys (dual minisign keys), AudioMetadataService, AudioExtractionService, ApiKeyService; Import: LiteParseConverter, DependencyDetector; Claude status: claudeStatus/ (ClaudeStatusService orchestrator, ClaudeTranscriptWatcher [refcounted chokidar on ~/.claude/projects], ClaudeTranscriptParser, ClaudeTranscriptLocator, ClaudeWindowDetector [model-capability registry 200k/1M], friendlyModelName, encodeCwd, process/{MacClaudeProcessDetector, createProcessDetector}); Multi-instance: ProjectLockService, ExternalFileService; Subdirs: import/, watcher/, workers/, screenshot/, claudeStatus/
 │   ├── ipc/        # IPC handlers
 │   └── utils/      # PauseController (pause/resume with safety timeout), RateLimitedLogger; Phase 4 trust-chain: zipArchive (yauzl + assertSafeEntry), tarArchive (tar@7.5.16 filter), secureDownloader (hostname allowlist + streaming SHA-256), verifyManifest (minisign Ed25519 dual-key)
 ├── preload/        # Context bridge API

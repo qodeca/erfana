@@ -6,6 +6,8 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 ## 0.14.0
 
+*Released 2026-06-06. Tag [`v0.14.0`](https://github.com/qodeca/erfana/releases/tag/v0.14.0).*
+
 ### Terminal font
 
 - **The terminal now looks the same on every platform** — Erfana bundles the Cascadia Mono font and uses it in the terminal. Previously the terminal asked for Apple's SF Mono, which only exists on macOS; on Windows it fell back to the dated Courier New. Cascadia Mono (a clean, SF Mono–like programming font) now ships inside the app, so the Windows terminal matches the polished Mac look and renders identically across machines. The font is loaded before the terminal opens so text stays crisply aligned from the first frame.
@@ -17,6 +19,8 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 ### Fixed
 
 - **Project panel header shows the folder name on Windows** — the sidebar header showed the full path (e.g. `C:\Users\…\erfana`) on Windows because the name was derived with a POSIX-only path split. It now shows just the folder name (e.g. `erfana`), matching macOS.
+- **More reliable `git status` on Windows** — the project tree no longer reports phantom "modified" files caused by CRLF line-ending handling differences between `isomorphic-git` and the user's `git config core.autocrlf` setting. The git-status worker now prefers the native `git` binary on Windows (and falls back to `isomorphic-git` only when `git` is not on PATH) and detects when a folder becomes or stops being a git repository.
+- **Accurate Claude Code context bar on launch** ([#225](https://github.com/qodeca/erfana/issues/225)) — a freshly launched `claude` session could briefly display the context percentage of a *previous* session that ran in the same terminal directory. Transcript selection is now floored by the running `claude` process's start time, so a fresh session hides the bar until it writes its own first turn instead of mis-reporting the prior session; `claude --continue` still resolves correctly because resume bumps the reused transcript's mtime above the floor.
 
 ## 0.13.0
 
