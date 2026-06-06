@@ -246,8 +246,10 @@
                'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
                'Helvetica Neue', sans-serif;
   --font-system: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono',
-               Consolas, 'Courier New', monospace;
+  /* 'Cascadia Mono' is bundled with the app (see styles/fonts.css) so it renders
+     identically on every platform; SF Mono/Monaco/Consolas remain as fallbacks. */
+  --font-mono: 'Cascadia Mono', 'SF Mono', Monaco, 'Cascadia Code',
+               'Roboto Mono', Consolas, 'Courier New', monospace;
   --font-serif: Charter, Georgia, Cambria, 'Times New Roman', serif;
 
   /* ============================================

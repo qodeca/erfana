@@ -42,6 +42,7 @@ import { isPointInElement } from '../../utils/domGeometry'
 import { TerminalStatusContent } from './TerminalPanel/components/TerminalStatusContent'
 import { ClaudeStatusBar } from './TerminalPanel/components/ClaudeStatusBar'
 import { useClaudeStatusStore } from '../../stores/useClaudeStatusStore'
+import { ensureTerminalFontLoaded } from './TerminalPanel/terminalPanel.logic'
 import type { TerminalState } from './TerminalPanel/types'
 
 export function TerminalPanel(_props: ISplitviewPanelProps) {
@@ -389,7 +390,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       const xterm = new Terminal({
         cursorBlink: true,
         fontSize: 12,
-        fontFamily: "'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace",
+        fontFamily: "'Cascadia Mono', 'SF Mono', 'Monaco', Consolas, 'Courier New', monospace",
         fontWeight: 'normal',
         fontWeightBold: 'bold',
         allowTransparency: false,
@@ -430,8 +431,19 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       xterm.loadAddon(fitAddon)
       xterm.loadAddon(webLinksAddon)
 
+      // Ensure the bundled font is loaded before open(): xterm measures glyph
+      // metrics on a canvas at open() time, so a not-yet-loaded web font would
+      // be cached as fallback metrics and misalign the grid after it swaps in.
+      await ensureTerminalFontLoaded()
+
+      // The await above is an async gap: bail if the panel unmounted meanwhile.
+      if (!terminalRef.current) {
+        xterm.dispose()
+        return
+      }
+
       // Open terminal in DOM
-      xterm.open(terminalRef.current!)
+      xterm.open(terminalRef.current)
 
       // Register parser hooks for same-frame scroll preservation
       // Must be after open() when parser API is available

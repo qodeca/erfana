@@ -87,7 +87,9 @@ export const TERMINAL_THEME: ITheme = {
 export const TERMINAL_OPTIONS = {
   cursorBlink: true,
   fontSize: 12,
-  fontFamily: "'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace",
+  // 'Cascadia Mono' is bundled (styles/fonts.css) and loaded before the terminal
+  // opens (see TerminalPanel.initializeTerminal). Mirrors the --font-mono token.
+  fontFamily: "'Cascadia Mono', 'SF Mono', 'Monaco', Consolas, 'Courier New', monospace",
   fontWeight: 'normal' as const,
   fontWeightBold: 'bold' as const,
   allowTransparency: false,
@@ -97,6 +99,44 @@ export const TERMINAL_OPTIONS = {
   scrollOnUserInput: false, // Don't auto-scroll when user types (preserve manual scroll position)
   smoothScrollDuration: 0, // Disable smooth scroll for instant response (no animation lag)
   allowProposedApi: true
+}
+
+/**
+ * Bundled monospace family (see styles/fonts.css). Listed first in TERMINAL_OPTIONS
+ * so the terminal renders identically across platforms.
+ */
+export const TERMINAL_FONT_FAMILY = 'Cascadia Mono'
+
+let terminalFontLoadPromise: Promise<void> | null = null
+
+/**
+ * Idempotently load the bundled terminal font (regular + bold) before the
+ * terminal opens.
+ *
+ * xterm.js measures glyph dimensions on a `<canvas>` at `open()` time and caches
+ * them. If the bundled web font hasn't loaded yet, it caches fallback metrics
+ * and the later font swap misaligns the character grid. Awaiting the CSS Font
+ * Loading API first guarantees Cascadia Mono is measured.
+ *
+ * The promise resolves even on failure (or in non-DOM test envs) so terminal
+ * initialization never blocks — xterm degrades through the font stack.
+ */
+export function ensureTerminalFontLoaded(): Promise<void> {
+  if (terminalFontLoadPromise) return terminalFontLoadPromise
+
+  if (typeof document === 'undefined' || !document.fonts) {
+    terminalFontLoadPromise = Promise.resolve()
+    return terminalFontLoadPromise
+  }
+
+  terminalFontLoadPromise = Promise.all([
+    document.fonts.load(`12px "${TERMINAL_FONT_FAMILY}"`),
+    document.fonts.load(`bold 12px "${TERMINAL_FONT_FAMILY}"`)
+  ])
+    .then(() => undefined)
+    .catch(() => undefined)
+
+  return terminalFontLoadPromise
 }
 
 /**

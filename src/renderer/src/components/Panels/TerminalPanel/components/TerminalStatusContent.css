@@ -22,6 +22,6 @@
 .terminal-status-hint code {
   background: var(--color-bg-tertiary, #1e1e1e);
   padding: 2px 6px;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Courier New', monospace;
+  font-family: 'Cascadia Mono', 'SF Mono', 'Monaco', Consolas, 'Courier New', monospace;
   font-size: var(--text-xs, 0.75rem);
 }

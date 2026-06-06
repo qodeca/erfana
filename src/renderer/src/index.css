@@ -1,3 +1,6 @@
+/* Bundled @font-face declarations - must load before anything references the fonts */
+@import './styles/fonts.css';
+
 /* Import design tokens - must be first */
 @import './styles/design-tokens.css';
 
