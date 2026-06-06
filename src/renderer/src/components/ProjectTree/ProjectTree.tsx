@@ -9,6 +9,7 @@ import type { DropModeDialogResult, ConflictDialogResult } from '../Dialog/types
 import './ProjectTree.css'
 import { showGlobalToast } from '../Toast/toastService'
 import { isPointInElement } from '../../utils/domGeometry'
+import { getBasename } from '../../utils/fileUtils'
 import type { MenuContext } from './context-menu/types'
 import { ContextMenuFactory } from './context-menu/factory'
 import {
@@ -302,7 +303,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       return null
     }
 
-    const projectName = projectPath.split('/').pop() || 'Project'
+    const projectName = getBasename(projectPath) || 'Project'
     return {
       name: projectName,
       path: projectPath,
@@ -1231,7 +1232,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       )}
 
       <div className="project-tree-path">
-        <span className="project-name">{projectPath ? projectPath.split('/').pop() : 'No project open'}</span>
+        <span className="project-name">{projectPath ? getBasename(projectPath) : 'No project open'}</span>
         <div className="project-tree-actions">
           <button
             className="icon-btn"

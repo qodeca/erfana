@@ -1,6 +1,13 @@
+import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
+
+// App version is read from package.json at build time and inlined into the
+// renderer as `__APP_VERSION__` (no runtime IPC). Used by the window title.
+const appVersion: string = JSON.parse(
+  readFileSync(resolve('package.json'), 'utf-8')
+).version
 
 export default defineConfig({
   main: {
@@ -40,6 +47,9 @@ export default defineConfig({
       alias: {
         '@renderer': resolve('src/renderer/src')
       }
+    },
+    define: {
+      __APP_VERSION__: JSON.stringify(appVersion)
     },
     plugins: [react()]
   }

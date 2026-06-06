@@ -21,6 +21,7 @@ import { createContext, useContext, useEffect, useRef, type ReactNode } from 're
 import { useProjectManagement } from '../hooks/useProjectManagement'
 import type { IUseProjectManagementReturn } from '../interfaces/IProjectManagement'
 import { logger } from '../utils/logger'
+import { getBasename } from '../utils/fileUtils'
 
 const ProjectManagementContext = createContext<IUseProjectManagementReturn | null>(null)
 
@@ -60,6 +61,17 @@ export function ProjectManagementProvider({ children }: ProjectManagementProvide
       })
     }
   })
+
+  // Drive the OS window title from project state (single per-window owner of
+  // projectPath). document.title flows to the native title bar on both
+  // platforms — "ERFANA v{version}" with no project, "{name} | ERFANA v{version}"
+  // when one is open.
+  const { projectPath } = projectManagement
+  useEffect(() => {
+    const base = `ERFANA v${__APP_VERSION__}`
+    const name = projectPath ? getBasename(projectPath) : ''
+    document.title = name ? `${name} | ${base}` : base
+  }, [projectPath])
 
   return (
     <ProjectManagementContext.Provider value={projectManagement}>

@@ -360,7 +360,7 @@ See [Scroll Fixes](./scroll-fixes.md) for related scroll preservation features.
 
 ### Terminal Configuration
 
-- **Font**: SF Mono / Monaco / Inconsolata, 12px, bold support
+- **Font**: **Cascadia Mono**, 12px, bold support — bundled with the app (`src/renderer/src/assets/fonts/`, declared in `src/renderer/src/styles/fonts.css`, SIL OFL 1.1) so the terminal renders identically on every platform. SF Mono / Monaco / Consolas remain as fallbacks. Apple's SF Mono cannot be redistributed, so Cascadia Mono is the closest freely-licensable match. The font is awaited via the CSS Font Loading API (`ensureTerminalFontLoaded`) **before** `xterm.open()` — xterm measures glyph metrics on a canvas at open time, so a not-yet-loaded web font would cache fallback metrics and misalign the grid.
 - **Theme**: High contrast – black background (`#000000`), white foreground (`#ffffff`), cyan cursor (`#4fc1ff`)
 - **Scrollbar**: 16px wide, dark gray thumb (`#555555`) on `#1e1e1e` track, custom WebKit styling
 - **Container**: `padding: 0` on container, `padding: 8px` on `.xterm`

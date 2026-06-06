@@ -322,7 +322,7 @@ describe('Main Process - Window Creation', () => {
       expect(windowConfig.title).toBe('ERFANA v0.3.7')
     })
 
-    it('should set title to "ERFANA" (without version) in development mode', async () => {
+    it('should include the version in development mode too', async () => {
       // Set development mode
       mockIs.dev = true
       mockIs.prod = false
@@ -336,8 +336,9 @@ describe('Main Process - Window Creation', () => {
       // Get the config passed to BrowserWindow
       const windowConfig = mockBrowserWindow.mock.calls[0][0]
 
-      // Verify title is just "ERFANA" in dev mode (no version)
-      expect(windowConfig.title).toBe('ERFANA')
+      // Pre-load title is "ERFANA v{version}" in all modes; the renderer takes
+      // over with the project-aware title once the page loads.
+      expect(windowConfig.title).toBe('ERFANA v0.3.7')
     })
 
     it('should read version from app.getVersion()', async () => {

@@ -12,6 +12,10 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 - **See your Claude Code context usage right in the terminal** ([#216](https://github.com/qodeca/erfana/issues/216)) — when you run Claude Code (`claude`) in a terminal panel, a thin status bar appears at the bottom of that panel showing the model (e.g. "Opus 4.8"), a badge for the context-window size (200k or 1M), and how much of the window you've used as a percentage. A progress bar shifts from green to orange to red as you fill the window, so you can see at a glance how much room is left. Hover the bar to see exact token counts (e.g. "84k / 200k"). The bar is display-only and shows only while Claude Code is actively running in that panel; it disappears when Claude exits. Erfana reads this purely from Claude Code's own session files and **never changes your Claude Code configuration**. If anything can't be read, the bar quietly hides rather than showing stale or wrong numbers. **macOS only in this version** — Windows support is planned as a follow-up.
 
+### Terminal font
+
+- **The terminal now looks the same on every platform** — Erfana bundles the Cascadia Mono font and uses it in the terminal. Previously the terminal asked for Apple's SF Mono, which only exists on macOS; on Windows it fell back to the dated Courier New. Cascadia Mono (a clean, SF Mono–like programming font) now ships inside the app, so the Windows terminal matches the polished Mac look and renders identically across machines. The font is loaded before the terminal opens so text stays crisply aligned from the first frame.
+
 ### Fixed
 
 - **Reliable native build on hardened Windows 11** — a fresh `npm ci` now rebuilds the `node-pty` terminal backend successfully on Windows 11 machines with the hardened `NoDefaultCurrentDirectoryInExePath` setting, fixing an install failure that blocked building Erfana from a clean checkout on those systems. See [docs/build/windows.md](./build/windows.md#node-pty-build-failures-on-windows-11).

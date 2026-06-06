@@ -12,7 +12,9 @@ import {
   RESIZE_ROW_THRESHOLD,
   NODE_PTY_FIX_COMMAND,
   TERMINAL_THEME,
-  TERMINAL_OPTIONS
+  TERMINAL_OPTIONS,
+  TERMINAL_FONT_FAMILY,
+  ensureTerminalFontLoaded
 } from './terminalPanel.logic'
 
 describe('computeTerminalState', () => {
@@ -84,5 +86,23 @@ describe('constants', () => {
     expect(TERMINAL_OPTIONS.fontSize).toBeGreaterThan(0)
     expect(TERMINAL_OPTIONS.scrollback).toBeGreaterThan(0)
     expect(TERMINAL_OPTIONS.cursorBlink).toBe(true)
+  })
+
+  it('lists the bundled Cascadia Mono first in the font stack', () => {
+    // Cross-platform identical rendering depends on the bundled font winning.
+    expect(TERMINAL_OPTIONS.fontFamily.startsWith(`'${TERMINAL_FONT_FAMILY}'`)).toBe(true)
+    // Keeps a generic fallback so the terminal never renders an invalid family.
+    expect(TERMINAL_OPTIONS.fontFamily).toContain('monospace')
+  })
+})
+
+describe('ensureTerminalFontLoaded', () => {
+  it('resolves and is idempotent even without a Font Loading API', async () => {
+    // jsdom has no document.fonts; the helper must degrade gracefully so
+    // terminal init never blocks. Same promise instance on repeat calls.
+    const first = ensureTerminalFontLoaded()
+    const second = ensureTerminalFontLoaded()
+    expect(second).toBe(first)
+    await expect(first).resolves.toBeUndefined()
   })
 })

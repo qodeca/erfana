@@ -66,8 +66,10 @@ app.commandLine.appendSwitch('ignore-gpu-blocklist')
 
 function createWindow(): BrowserWindow {
   // Create the browser window.
-  // In production, show version in title bar for easy identification
-  const windowTitle = is.dev ? 'ERFANA' : `ERFANA v${app.getVersion()}`
+  // Pre-load title shown in the OS title bar / taskbar until the renderer takes
+  // over via document.title (see ProjectManagementContext). Version is always
+  // shown for easy build identification.
+  const windowTitle = `ERFANA v${app.getVersion()}`
 
   const mainWindow = new BrowserWindow({
     width: 1400,
