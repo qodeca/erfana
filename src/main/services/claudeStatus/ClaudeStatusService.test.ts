@@ -187,7 +187,8 @@ describe('ClaudeStatusService', () => {
     h.service.registerPanel('t1', 4242, '/spawn/cwd', 7)
     await flush()
 
-    expect(h.locateTranscript).toHaveBeenCalledWith('/live/cwd')
+    // No startedAtMs from the detector → no floor (undefined) is passed.
+    expect(h.locateTranscript).toHaveBeenCalledWith('/live/cwd', undefined)
   })
 
   it('falls back to spawn cwd when the process has no live cwd', async () => {
@@ -196,7 +197,40 @@ describe('ClaudeStatusService', () => {
     h.service.registerPanel('t1', 4242, '/spawn/cwd', 7)
     await flush()
 
-    expect(h.locateTranscript).toHaveBeenCalledWith('/spawn/cwd')
+    expect(h.locateTranscript).toHaveBeenCalledWith('/spawn/cwd', undefined)
+  })
+
+  it("forwards the running claude's start time as the transcript-selection floor (#216)", async () => {
+    const h = makeHarness()
+    h.detector.isClaudeRunning.mockResolvedValue({
+      running: true,
+      cwd: '/live/cwd',
+      startedAtMs: 1_700_000_000_000
+    })
+    h.service.registerPanel('t1', 4242, '/spawn/cwd', 7)
+    await flush()
+
+    expect(h.locateTranscript).toHaveBeenCalledWith('/live/cwd', 1_700_000_000_000)
+  })
+
+  it('hides the bar on a fresh launch when the floor excludes every prior transcript (#216)', async () => {
+    const h = makeHarness()
+    // Detector reports a running claude with a start time; the floored locator
+    // finds no transcript newer than the launch (the new session has no turn yet).
+    h.detector.isClaudeRunning.mockResolvedValue({
+      running: true,
+      cwd: '/live/cwd',
+      startedAtMs: 1_700_000_000_000
+    })
+    h.locateTranscript.mockResolvedValue(null)
+    h.service.registerPanel('t1', 4242, '/spawn/cwd', 7)
+    await flush()
+
+    // Self-sufficient: prove BOTH that the floor was forwarded AND that a null
+    // locate result hides the bar — not split across two separate tests.
+    expect(h.locateTranscript).toHaveBeenCalledWith('/live/cwd', 1_700_000_000_000)
+    expect(h.emitted).toHaveLength(1)
+    expect(h.emitted[0].payload.snapshot).toBeNull()
   })
 
   it('generation guard: a slow refresh resolving after a re-register does not emit its own (stale) result', async () => {

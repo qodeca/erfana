@@ -31,7 +31,7 @@ import type { ClaudeDetection, IClaudeProcessDetector } from './types'
 export type ExecLike = (
   file: string,
   args: string[],
-  opts: { timeout: number; maxBuffer: number }
+  opts: { timeout: number; maxBuffer: number; env?: NodeJS.ProcessEnv }
 ) => Promise<{ stdout: string }>
 
 const execFileAsync = promisify(execFile)
@@ -132,8 +132,43 @@ export class MacClaudeProcessDetector implements IClaudeProcessDetector {
     const matchPid = findClaudeDescendant(rows, rootPid)
     if (matchPid === undefined) return { running: false }
 
-    const cwd = await this.getProcessCwd(matchPid)
-    return cwd !== undefined ? { running: true, cwd } : { running: true }
+    // Resolve cwd and start time concurrently. Both are best-effort: a failure of
+    // either leaves its field omitted but never demotes `running` (#216).
+    const [cwd, startedAtMs] = await Promise.all([
+      this.getProcessCwd(matchPid),
+      this.getProcessStartTime(matchPid),
+    ])
+
+    const detection: ClaudeDetection = { running: true }
+    if (cwd !== undefined) detection.cwd = cwd
+    if (startedAtMs !== undefined) detection.startedAtMs = startedAtMs
+    return detection
+  }
+
+  /**
+   * Resolve the start time (epoch ms) of `pid` via `ps -p <pid> -o lstart=`.
+   * A scoped single-pid call keeps the main `ps -axo pid,ppid,command` parser
+   * untouched — BSD `lstart` is a space-bearing field that would break that
+   * row regex. Returns undefined on any error / unparseable output; the caller
+   * then applies no transcript floor (graceful degrade, #216).
+   */
+  private async getProcessStartTime(pid: number): Promise<number | undefined> {
+    if (!isValidPid(pid)) return undefined
+    let stdout: string
+    try {
+      const res = await this.exec(PS_BIN, ['-p', String(pid), '-o', 'lstart='], {
+        timeout: EXEC_TIMEOUT_MS,
+        maxBuffer: EXEC_MAX_BUFFER,
+        // Force the C locale so `lstart` is emitted in English ctime form. Under a
+        // non-English LC_TIME the month name is localized and Date.parse would
+        // return NaN → undefined → the floor would silently disable itself (#216).
+        env: { ...process.env, LC_ALL: 'C', LC_TIME: 'C' },
+      })
+      stdout = res.stdout
+    } catch {
+      return undefined
+    }
+    return parsePsLstart(stdout)
   }
 
   /**
@@ -230,6 +265,35 @@ function commandIsClaude(command: string): boolean {
     if (basename === 'claude') return true
   }
   return false
+}
+
+/**
+ * Parse BSD `ps -o lstart=` output into epoch ms. The field is ctime(3) format —
+ * `"Sat Jun  6 11:16:39 2026"` — emitted in English because the probe forces the
+ * C locale (see `getProcessStartTime`). It carries no timezone, so it is parsed
+ * in LOCAL time, the same clock that stamps filesystem mtimes (the floor compares
+ * the two). Note the local-time parse is approximate, not exact: during the
+ * once-a-year DST fall-back hour a wall-clock string is ambiguous and may resolve
+ * up to an hour off — acceptable because the floor only gates older transcripts
+ * and self-corrects on the next turn.
+ *
+ * Internal runs of whitespace (e.g. `"Jun  6"`) are collapsed before parsing so
+ * `Date.parse` tokenizes cleanly. The string must contain a 4-digit year and an
+ * `HH:MM:SS` group; this shape guard fails a non-ctime string closed to
+ * `undefined` rather than letting `Date.parse`'s leniency coerce it to a
+ * wrong-but-valid epoch. Returns undefined for empty / non-conforming / otherwise
+ * unparseable input (fail-soft → the caller applies no floor). Exported for unit
+ * testing.
+ */
+export function parsePsLstart(stdout: string): number | undefined {
+  const text = stdout.trim().replace(/\s+/g, ' ')
+  if (text === '') return undefined
+  // Shape guard: a real ctime string has a 4-digit year and a HH:MM:SS time.
+  if (!/\d{4}/.test(text) || !/\d{2}:\d{2}:\d{2}/.test(text)) return undefined
+  const ms = Date.parse(text)
+  // Date.parse yields a finite number or NaN (never ±Infinity), so NaN is the
+  // only failure to screen out.
+  return Number.isNaN(ms) ? undefined : ms
 }
 
 /**

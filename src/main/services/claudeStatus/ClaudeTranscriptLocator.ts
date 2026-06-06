@@ -24,6 +24,15 @@ import { encodeProjectDir } from './encodeCwd'
 const SUBAGENTS_DIR = 'subagents'
 
 /**
+ * Clock-skew tolerance (ms) applied below the `minMtimeMs` floor. `ps lstart` has
+ * one-second granularity while mtimes are sub-second, so a transcript written in
+ * the same wall-clock second as the process start can carry an mtime a few hundred
+ * ms under the floor; 2s absorbs that without re-admitting genuinely stale files
+ * (which predate the launch by minutes/hours). See #216 (fresh-launch fix).
+ */
+const MTIME_SKEW_MS = 2000
+
+/**
  * Cached realpath of `~/.claude/projects`. Resolved once (the homedir and the
  * realpath of the projects root do not change within a process lifetime) and
  * reused as the security prefix for every read.
@@ -72,16 +81,23 @@ function isInsideRoot(candidate: string, root: string): boolean {
  * @param opts.root Override the projects root (test injection). Defaults to the
  *   realpath of `~/.claude/projects`. Preferred over an env override for
  *   testability — a temp root is passed directly in tests.
- * @returns The validated absolute path of the newest regular `*.jsonl`, or
- *   `null` if the dir is missing / has no eligible file / the choice escapes the
- *   root. Never throws.
+ * @param opts.minMtimeMs Optional floor (epoch ms, typically the running
+ *   `claude` process's start time): entries last modified before
+ *   `minMtimeMs - MTIME_SKEW_MS` are skipped. This stops a freshly-launched
+ *   session — whose own transcript does not exist until its first turn — from
+ *   picking up a *prior* session's stale transcript (#216). Omit to disable the
+ *   floor (graceful degrade when the start time is unknown).
+ * @returns The validated absolute path of the newest eligible regular `*.jsonl`,
+ *   or `null` if the dir is missing / has no eligible file / the choice escapes
+ *   the root. Never throws.
  */
 export async function locateLatestTranscript(
   cwd: string,
-  opts?: { root?: string }
+  opts?: { root?: string; minMtimeMs?: number }
 ): Promise<string | null> {
   try {
     const root = opts?.root ?? (await resolveProjectsRoot())
+    const minMtimeMs = opts?.minMtimeMs
     const encDir = path.join(root, encodeProjectDir(cwd))
 
     let entries: string[]
@@ -111,6 +127,11 @@ export async function locateLatestTranscript(
       }
 
       if (!stat.isFile()) continue // skips symlinks, dirs, sockets, etc.
+
+      // Process-start-time floor (#216): a transcript modified before the running
+      // claude launched cannot belong to it, so exclude it. Skew-tolerant so a
+      // same-second first write is not lost to sub-second-vs-1s granularity.
+      if (minMtimeMs !== undefined && stat.mtimeMs < minMtimeMs - MTIME_SKEW_MS) continue
 
       // Strictly-newer wins; on an EXACT mtime tie, break deterministically by
       // preferring the lexicographically greater filename so the selection no

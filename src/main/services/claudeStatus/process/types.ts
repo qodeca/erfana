@@ -21,10 +21,16 @@
  * `cwd` — the *live* working directory of the matched process (absolute path),
  * omitted when it cannot be resolved (the caller then falls back to the panel's
  * recorded spawn cwd). `cwd` is meaningless when `running` is false.
+ * `startedAtMs` — epoch ms of the matched process's start time (from `ps
+ * lstart`), used as a transcript-selection floor so a freshly-launched session
+ * never picks up a *prior* session's transcript (#216). Omitted when it cannot
+ * be resolved (the caller then applies no floor — graceful degrade). Meaningless
+ * when `running` is false.
  */
 export interface ClaudeDetection {
   running: boolean
   cwd?: string
+  startedAtMs?: number
 }
 
 /**

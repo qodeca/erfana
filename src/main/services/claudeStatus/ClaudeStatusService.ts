@@ -57,8 +57,12 @@ interface ParsedTurn {
 export interface ClaudeStatusDeps {
   /** Per-OS process detector keyed by PTY pid. */
   detector: IClaudeProcessDetector
-  /** Resolve the newest transcript for a cwd, or null. */
-  locateTranscript: (cwd: string) => Promise<string | null>
+  /**
+   * Resolve the newest transcript for a cwd, or null. `minMtimeMs` (the running
+   * claude's start time, when known) floors selection so a fresh launch never
+   * resolves a prior session's transcript (#216).
+   */
+  locateTranscript: (cwd: string, minMtimeMs?: number) => Promise<string | null>
   /** Parse a transcript file into {modelId, usedTokens}, or null. */
   parseTranscript: (file: string) => Promise<ParsedTurn | null>
   /** Detect the 200k/1M window for a model id + used-token count. */
@@ -120,7 +124,8 @@ export class ClaudeStatusService {
     const watcher = deps?.watcher ?? new ClaudeTranscriptWatcher()
     this.deps = {
       detector: deps?.detector ?? createProcessDetector(),
-      locateTranscript: deps?.locateTranscript ?? ((cwd) => locateLatestTranscript(cwd)),
+      locateTranscript:
+        deps?.locateTranscript ?? ((cwd, minMtimeMs) => locateLatestTranscript(cwd, { minMtimeMs })),
       parseTranscript: deps?.parseTranscript ?? ((file) => parseTranscript(file)),
       detectWindowSize:
         deps?.detectWindowSize ?? ((modelId, used) => detectWindowSize(modelId, used)),
@@ -269,8 +274,10 @@ export class ClaudeStatusService {
 
       this.ensureWatching(terminalId, cwd)
 
-      // 3. Locate + parse transcript.
-      const file = await this.deps.locateTranscript(cwd)
+      // 3. Locate + parse transcript. Floor selection by the running claude's
+      // start time so a fresh launch hides until its own session writes a turn,
+      // instead of showing a prior session's context (#216).
+      const file = await this.deps.locateTranscript(cwd, detection.startedAtMs)
       if (isStale()) return
       if (file === null) {
         this.emitNull(terminalId)

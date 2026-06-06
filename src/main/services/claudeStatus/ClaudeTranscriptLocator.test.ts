@@ -140,4 +140,59 @@ describe('locateLatestTranscript', () => {
     const result = await locateLatestTranscript(CWD, { root: rootDir })
     expect(result).toBeNull()
   })
+
+  describe('minMtimeMs floor (#216 fresh-launch fix)', () => {
+    it('excludes files modified before the floor, selecting the newest eligible one', async () => {
+      await writeJsonl('prior.jsonl', 1_000_000) // a stale prior session
+      const fresh = await writeJsonl('fresh.jsonl', 9_000_000)
+
+      const result = await locateLatestTranscript(CWD, { root: rootDir, minMtimeMs: 5_000_000 })
+      expect(result).toBe(fresh)
+    })
+
+    it('returns null when every transcript predates the floor (fresh launch, no own turn yet)', async () => {
+      // Only prior-session files exist; the new session has not written a turn,
+      // so nothing qualifies and the bar must hide.
+      await writeJsonl('a.jsonl', 1_000_000)
+      await writeJsonl('b.jsonl', 2_000_000)
+
+      const result = await locateLatestTranscript(CWD, { root: rootDir, minMtimeMs: 9_000_000 })
+      expect(result).toBeNull()
+    })
+
+    it('readmits a file within the 2s clock-skew tolerance just below the floor', async () => {
+      // MTIME_SKEW_MS = 2000 → floor 5_000_000 admits mtimes >= 4_998_000.
+      await writeJsonl('too-old.jsonl', 4_997_000) // below the skew window → excluded
+      const within = await writeJsonl('within-skew.jsonl', 4_999_000) // within skew → admitted
+
+      const result = await locateLatestTranscript(CWD, { root: rootDir, minMtimeMs: 5_000_000 })
+      expect(result).toBe(within)
+    })
+
+    it('admits a file at exactly the skew boundary (floor − MTIME_SKEW_MS), excluding one below', async () => {
+      // The predicate is strict `<`, so mtime === floor − 2000 is admitted. This
+      // pins the boundary against a `<` → `<=` regression that would flip it.
+      await writeJsonl('below-boundary.jsonl', 4_997_000) // < 4_998_000 → excluded
+      const boundary = await writeJsonl('at-boundary.jsonl', 4_998_000) // == floor − 2000 → admitted
+
+      const result = await locateLatestTranscript(CWD, { root: rootDir, minMtimeMs: 5_000_000 })
+      expect(result).toBe(boundary)
+    })
+
+    it('admits all files when the floor is 0 (no real lower bound)', async () => {
+      await writeJsonl('old.jsonl', 1_000_000)
+      const newest = await writeJsonl('new.jsonl', 9_000_000)
+
+      // mtimeMs < 0 − 2000 is never true for real (non-negative) mtimes.
+      const result = await locateLatestTranscript(CWD, { root: rootDir, minMtimeMs: 0 })
+      expect(result).toBe(newest)
+    })
+
+    it('applies no floor when minMtimeMs is omitted (back-compat)', async () => {
+      const prior = await writeJsonl('prior.jsonl', 1_000_000)
+
+      const result = await locateLatestTranscript(CWD, { root: rootDir })
+      expect(result).toBe(prior)
+    })
+  })
 })
