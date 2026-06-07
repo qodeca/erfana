@@ -509,9 +509,11 @@ export class ProjectLockService implements IProjectLockService {
       throw err
     })
     if (dirStat?.isSymbolicLink()) {
-      logger.error('ProjectLockService: Locks directory is a symlink; refusing to operate', {
-        locksDir: redactPath(this.locksDir)
-      })
+      logger.error(
+        'ProjectLockService: Locks directory is a symlink; refusing to operate',
+        new Error('locks directory is a symlink'),
+        { locksDir: redactPath(this.locksDir) }
+      )
       return 0
     }
 
