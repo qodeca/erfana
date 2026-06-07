@@ -978,6 +978,7 @@ export class ProjectLockService implements IProjectLockService {
         }
 
         if (lockInfo.focus_request) {
+          if (this.isDisposing) return
           const ok = await this.handleFocusRequest(lockInfo, lockPath, projectPath)
           if (ok) {
             const active = this.activeLocks.get(projectPath)
@@ -988,6 +989,7 @@ export class ProjectLockService implements IProjectLockService {
 
         const active = this.activeLocks.get(projectPath)
         if (active && Date.now() - active.lastHeartbeatAt >= HEARTBEAT_INTERVAL_MS) {
+          if (this.isDisposing) return
           const ok = await this.writeHeartbeat(lockInfo, lockPath, projectPath)
           if (ok) active.lastHeartbeatAt = Date.now()
         }

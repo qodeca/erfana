@@ -1775,6 +1775,68 @@ describe('ProjectLockService', () => {
     })
   })
 
+  describe('Dispose race – isDisposing re-check before writes', () => {
+    it('skips the polling-tick write when isDisposing flips mid-flight', async () => {
+      const projectPath = '/test/dispose-race'
+      await service.acquireLock(projectPath)
+
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = join(service.getLocksDirectory(), hash + '.lock')
+      const initialHeartbeat = JSON.parse(mockFileSystem.get(lockPath)!).lastHeartbeat
+
+      // Deferred promise that we resolve after flipping isDisposing,
+      // so the readLockFile spy pauses the tick mid-await.
+      let resolveRead: () => void = () => {}
+      const blockedRead = new Promise<void>((resolve) => {
+        resolveRead = resolve
+      })
+
+      // Wrap atomicWriteJSON to count writes that happen after isDisposing is set.
+      const originalImpl = mockedAtomicWriteJSON.getMockImplementation()
+      let heartbeatWritesAfterDispose = 0
+      mockedAtomicWriteJSON.mockImplementation(async (...args) => {
+        if ((service as any).isDisposing) {
+          heartbeatWritesAfterDispose++
+        }
+        if (originalImpl) await originalImpl(...args)
+      })
+
+      // Spy on readLockFile to pause execution so dispose() can flip isDisposing
+      // in the window between readLockFile completing and the write calls.
+      const originalReadLockFile = (service as any).readLockFile.bind(service)
+      vi.spyOn(service as any, 'readLockFile').mockImplementation(async (path: string) => {
+        const result = await originalReadLockFile(path)
+        await blockedRead // pause here — dispose will flip isDisposing while we wait
+        return result
+      })
+
+      // Advance past HEARTBEAT_INTERVAL_MS (5000ms) so the next tick will want to write
+      await vi.advanceTimersByTimeAsync(5000)
+
+      // Trigger one more tick — readLockFile spy pauses it mid-flight
+      await vi.advanceTimersByTimeAsync(500)
+
+      // While the tick is paused mid-read, simulate dispose() flipping the flag
+      ;(service as any).isDisposing = true
+
+      // Unblock the paused readLockFile
+      resolveRead()
+
+      // Drain all pending microtasks / promises
+      await vi.runOnlyPendingTimersAsync()
+      await Promise.resolve()
+      await Promise.resolve()
+      await Promise.resolve()
+
+      // No heartbeat write should have occurred after isDisposing was set
+      expect(heartbeatWritesAfterDispose).toBe(0)
+
+      // The lock file's heartbeat on disk should be unchanged (initial write only)
+      const onDisk = JSON.parse(mockFileSystem.get(lockPath)!).lastHeartbeat
+      expect(onDisk).toBe(initialHeartbeat)
+    })
+  })
+
   describe('Symlink TOCTOU defense in acquireLockRetry', () => {
     it('refuses to recreate lock at a symlink path (CVE-2025-68146 class)', async () => {
       const projectPath = '/test/symlink-attack'
