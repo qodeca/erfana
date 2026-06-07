@@ -343,10 +343,13 @@ app.on('window-all-closed', () => {
 })
 
 // Cleanup file watchers, directory watchers, terminals, git watchers, and project locks before app quits
-// NOTE: Electron's before-quit doesn't await async handlers, so cleanup is best-effort.
-// Lock files may remain stale on forced quit - they will be cleaned up on next startup.
+// NOTE: Electron's before-quit doesn't reliably await async handlers — process exit can race ahead.
+// projectLockService.dispose() runs FIRST so the lock file release is the change most likely to land
+// before the OS kills us; the heartbeat-based staleness check (HEARTBEAT_STALE_MS) covers cases where
+// this still doesn't complete (e.g., Task Manager force-kill, BSOD).
 app.on('before-quit', async () => {
   logger.info('App quitting, cleaning up services')
+  await projectLockService.dispose()
   await fileWatcherService.dispose()
   await directoryWatcherService.dispose()
   await terminalService.dispose()
@@ -354,7 +357,6 @@ app.on('before-quit', async () => {
   await gitWatcherService.dispose()
   gitPollingService.dispose()
   await gitStatusService.dispose()
-  await projectLockService.dispose()
 })
 
 // In this file you can include the rest of your app's specific main process
