@@ -26,7 +26,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { readFile, readdir, mkdir, lstat, open } from 'node:fs/promises'
 import { join, normalize, sep, isAbsolute } from 'node:path'
 import { realpath } from 'node:fs/promises'
-import { app } from 'electron'
+import { app, powerMonitor } from 'electron'
 import { hostname } from 'node:os'
 
 import { AppError, ErrorCode } from '../../shared/errors'
@@ -104,6 +104,12 @@ export class ProjectLockService implements IProjectLockService {
   /** Flag to prevent operations during disposal */
   private isDisposing = false
 
+  /** True while the system is suspended (lid closed, sleep, etc.) */
+  private isSuspended = false
+
+  /** Guard so powerMonitor listeners are registered exactly once */
+  private powerMonitorInitialized = false
+
   /** Current hostname (cached for performance) */
   private readonly currentHostname: string
 
@@ -126,6 +132,7 @@ export class ProjectLockService implements IProjectLockService {
    * @returns LockResult indicating success, already locked, or error
    */
   async acquireLock(projectPath: string): Promise<LockResult> {
+    this.initPowerMonitor()
     const startTime = Date.now()
 
     if (this.isDisposing) {
@@ -671,6 +678,47 @@ export class ProjectLockService implements IProjectLockService {
   // ───────────────────────────────────────────────────────────────────────────
 
   /**
+   * Registers powerMonitor listeners exactly once (idempotent).
+   * Called from acquireLock rather than the constructor so that the
+   * Electron mock is fully initialized before subscription.
+   */
+  private initPowerMonitor(): void {
+    if (this.powerMonitorInitialized) return
+    this.powerMonitorInitialized = true
+
+    powerMonitor.on('suspend', () => {
+      this.isSuspended = true
+    })
+    powerMonitor.on('lock-screen', () => {
+      this.isSuspended = true
+    })
+    powerMonitor.on('resume', () => {
+      void this.handleResume()
+    })
+    powerMonitor.on('unlock-screen', () => {
+      void this.handleResume()
+    })
+  }
+
+  /**
+   * Called when the system wakes from suspend or unlocks the screen.
+   * Immediately refreshes every active lock heartbeat so a sibling
+   * Erfana instance cannot observe staleness and steal the lock.
+   */
+  private async handleResume(): Promise<void> {
+    this.isSuspended = false
+    if (this.isDisposing) return
+
+    for (const [projectPath, active] of this.activeLocks.entries()) {
+      const lockPath = this.getLockPath(active.hash)
+      const lockInfo = await this.readLockFile(lockPath)
+      if (!lockInfo || lockInfo.instanceId !== this.instanceId) continue
+      const ok = await this.writeHeartbeat(lockInfo, lockPath, projectPath)
+      if (ok) active.lastHeartbeatAt = Date.now()
+    }
+  }
+
+  /**
    * Gets the full path to a lock file by hash.
    *
    * @param hash - Truncated SHA-256 hash
@@ -815,6 +863,10 @@ export class ProjectLockService implements IProjectLockService {
 
     const timer = setInterval(async () => {
       if (this.isDisposing) {
+        return
+      }
+
+      if (this.isSuspended) {
         return
       }
 

@@ -21,6 +21,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { LockInfo } from '../../shared/ipc/project-lock-schema'
 
+// Fake powerMonitor — hoisted so it is available inside the vi.mock factory.
+// setMaxListeners(0) suppresses the "memory leak" warning that fires in tests
+// where many service instances each register their own listeners on this shared emitter.
+const { mockedPowerMonitor } = vi.hoisted(() => {
+  const { EventEmitter } = require('node:events') as typeof import('node:events')
+  const emitter = new EventEmitter()
+  emitter.setMaxListeners(0)
+  return { mockedPowerMonitor: emitter }
+})
+
 // Mock dependencies
 vi.mock('node:fs/promises', () => ({
   readFile: vi.fn(),
@@ -52,7 +62,8 @@ vi.mock('electron', () => ({
   },
   BrowserWindow: {
     getAllWindows: vi.fn(() => [])
-  }
+  },
+  powerMonitor: mockedPowerMonitor
 }))
 
 vi.mock('../utils/atomicWrite', () => ({
@@ -1602,6 +1613,39 @@ describe('ProjectLockService', () => {
 
       const finalHeartbeat = JSON.parse(mockFileSystem.get(lockPath)!).lastHeartbeat
       expect(new Date(finalHeartbeat).getTime()).toBeGreaterThan(new Date(initial).getTime())
+    })
+  })
+
+  describe('powerMonitor integration', () => {
+    it('writes an immediate heartbeat to every active lock on powerMonitor resume', async () => {
+      const projectPath = '/test/sleepy'
+      await service.acquireLock(projectPath)
+
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = join(service.getLocksDirectory(), hash + '.lock')
+      const initialHeartbeat = JSON.parse(mockFileSystem.get(lockPath)!).lastHeartbeat
+
+      // Simulate suspend — isSuspended flag is set synchronously
+      mockedPowerMonitor.emit('suspend')
+
+      // Advance past HEARTBEAT_INTERVAL_MS (5000ms) + several poll ticks.
+      // The isSuspended guard short-circuits each tick, so the heartbeat must not advance.
+      await vi.advanceTimersByTimeAsync(5500)
+
+      // On-disk heartbeat unchanged during suspend (poll callback no-ops)
+      const duringSuspend = JSON.parse(mockFileSystem.get(lockPath)!).lastHeartbeat
+      expect(duringSuspend).toBe(initialHeartbeat)
+
+      // Resume must trigger an immediate write for every active lock.
+      // handleResume is synchronously triggered by the EventEmitter but is async internally —
+      // use Promise.resolve() chains to drain the microtask queue without fake-timer interaction.
+      mockedPowerMonitor.emit('resume')
+      await Promise.resolve()
+      await Promise.resolve()
+      await Promise.resolve()
+
+      const afterResume = JSON.parse(mockFileSystem.get(lockPath)!).lastHeartbeat
+      expect(new Date(afterResume).getTime()).toBeGreaterThan(new Date(initialHeartbeat).getTime())
     })
   })
 
