@@ -1837,6 +1837,44 @@ describe('ProjectLockService', () => {
     })
   })
 
+  describe('Symlink junction-redirect defense in cleanupStaleLocks', () => {
+    it('refuses to operate when the locks directory is a symlink (junction-redirect defense)', async () => {
+      const locksDir = service.getLocksDirectory()
+
+      // Populate the mock filesystem with a stale lock that *would* be removed if
+      // the guard were absent, so a return of 0 proves the guard fired (not an empty dir).
+      const staleLock: LockInfo = {
+        instanceId: '550e8400-e29b-41d4-a716-446655440099',
+        pid: 99999,
+        timestamp: new Date().toISOString(),
+        hostname: 'test-machine.local',
+        path: '/test/junction-attack',
+        focus_request: false
+      }
+      const join_ = (await import('node:path')).join
+      mockFileSystem.set(join_(locksDir, 'abc999.lock'), JSON.stringify(staleLock))
+      mockedReaddir.mockResolvedValue(['abc999.lock'] as any)
+      process.kill = vi.fn(() => {
+        const e: NodeJS.ErrnoException = new Error('ESRCH')
+        e.code = 'ESRCH'
+        throw e
+      }) as any
+
+      // Mock lstat for the locks directory to report a symlink
+      mockedLstat.mockImplementation(async (path: any) => {
+        if (path === locksDir) {
+          return { isSymbolicLink: () => true } as any
+        }
+        return { isSymbolicLink: () => false } as any
+      })
+
+      const cleaned = await service.cleanupStaleLocks()
+      // Guard must abort before processing any lock files; no removal should occur.
+      expect(cleaned).toBe(0)
+      expect(mockedRemoveIfExists).not.toHaveBeenCalled()
+    })
+  })
+
   describe('Symlink TOCTOU defense in acquireLockRetry', () => {
     it('refuses to recreate lock at a symlink path (CVE-2025-68146 class)', async () => {
       const projectPath = '/test/symlink-attack'

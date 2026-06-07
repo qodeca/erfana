@@ -499,6 +499,22 @@ export class ProjectLockService implements IProjectLockService {
       return 0
     }
 
+    // Security: refuse to operate if the locks directory is a symlink/junction.
+    // On Windows, mode: 0o700 is a no-op; a peer process could pre-create the
+    // locks directory as a junction redirecting all writes elsewhere. We detect
+    // this at startup so we never write into a redirected location.
+    const dirStat = await lstat(this.locksDir).catch((err) => {
+      // ENOENT is fine — mkdir will create it below. Other errors propagate.
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+      throw err
+    })
+    if (dirStat?.isSymbolicLink()) {
+      logger.error('ProjectLockService: Locks directory is a symlink; refusing to operate', {
+        locksDir: redactPath(this.locksDir)
+      })
+      return 0
+    }
+
     let cleanedCount = 0
 
     try {
