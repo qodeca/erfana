@@ -429,7 +429,7 @@ describe('ProjectLockService', () => {
       expect(result.status).toBe('acquired')
 
       const hash = await service.computeLockHash(projectPath)
-      const lockPath = service.getLocksDirectory() + '\\' + hash + '.lock'
+      const lockPath = join(service.getLocksDirectory(), hash + '.lock')
       const written = JSON.parse(mockFileSystem.get(lockPath)!)
       expect(written.lastHeartbeat).toBeDefined()
       expect(written.lastHeartbeat).toBe(written.timestamp)
@@ -1388,7 +1388,7 @@ describe('ProjectLockService', () => {
       await service.acquireLock(projectPath)
 
       const hash = await service.computeLockHash(projectPath)
-      const lockPath = service.getLocksDirectory() + '\\' + hash + '.lock'
+      const lockPath = join(service.getLocksDirectory(), hash + '.lock')
       const initial = JSON.parse(mockFileSystem.get(lockPath)!)
       const initialHeartbeat = initial.lastHeartbeat
 
