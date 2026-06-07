@@ -54,7 +54,6 @@ const RENAME_RETRYABLE = new Set(['EPERM', 'EBUSY', 'EACCES'])
 const RENAME_BACKOFFS_MS = [10, 30, 100]
 
 async function renameWithRetry(from: string, to: string): Promise<void> {
-  let lastError: unknown
   for (let attempt = 0; attempt <= RENAME_BACKOFFS_MS.length; attempt++) {
     try {
       await rename(from, to)
@@ -65,10 +64,9 @@ async function renameWithRetry(from: string, to: string): Promise<void> {
         throw error
       }
       await new Promise((resolve) => setTimeout(resolve, RENAME_BACKOFFS_MS[attempt]))
-      lastError = error
     }
   }
-  throw lastError
+  throw new Error('renameWithRetry: unreachable')
 }
 
 /**
