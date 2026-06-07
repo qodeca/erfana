@@ -1480,6 +1480,64 @@ describe('ProjectLockService', () => {
       const result = await service.checkLock(projectPath)
       expect(result.status).toBe('unlocked') // stale via timestamp fallback
     })
+
+    it('treats a lock with an unparseable timestamp as stale (NaN guard) – same host', async () => {
+      const projectPath = '/Users/test/projects/corrupt-time-same-host'
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = join(service.getLocksDirectory(), `${hash}.lock`)
+
+      // Construct a lock whose heartbeat/timestamp produces NaN from new Date().getTime().
+      // We bypass Zod (which rejects non-ISO strings) by spying on LockInfoSchema.parse.
+      const malformedLock = {
+        instanceId: '550e8400-e29b-41d4-a716-446655440099',
+        pid: 99999,
+        timestamp: 'not-a-real-iso-date',
+        lastHeartbeat: 'not-a-real-iso-date',
+        hostname: osHostname(), // same host → takes the same-host branch
+        path: projectPath,
+        focus_request: false
+      }
+      mockFileSystem.set(lockPath, JSON.stringify(malformedLock))
+
+      const schemaModule = await import('../../shared/ipc/project-lock-schema')
+      const parseSpy = vi
+        .spyOn(schemaModule.LockInfoSchema, 'parse')
+        .mockReturnValue(malformedLock as any)
+
+      // PID is "alive" so we isolate the NaN-from-datetime code path
+      process.kill = vi.fn(() => true)
+
+      const result = await service.checkLock(projectPath)
+      expect(result.status).toBe('unlocked')
+
+      parseSpy.mockRestore()
+    })
+
+    it('treats a lock with an unparseable timestamp as stale (NaN guard) – cross host', async () => {
+      const projectPath = '/Users/test/projects/corrupt-time-cross-host'
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = join(service.getLocksDirectory(), `${hash}.lock`)
+
+      const malformedLock = {
+        instanceId: '550e8400-e29b-41d4-a716-446655440098',
+        pid: 99999,
+        timestamp: 'not-a-real-iso-date',
+        hostname: 'other-machine.local', // different host → cross-host branch
+        path: projectPath,
+        focus_request: false
+      }
+      mockFileSystem.set(lockPath, JSON.stringify(malformedLock))
+
+      const schemaModule = await import('../../shared/ipc/project-lock-schema')
+      const parseSpy = vi
+        .spyOn(schemaModule.LockInfoSchema, 'parse')
+        .mockReturnValue(malformedLock as any)
+
+      const result = await service.checkLock(projectPath)
+      expect(result.status).toBe('unlocked')
+
+      parseSpy.mockRestore()
+    })
   })
 
   describe('Focus polling edge cases', () => {

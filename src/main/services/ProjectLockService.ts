@@ -783,6 +783,17 @@ export class ProjectLockService implements IProjectLockService {
       // PID alive → also require fresh heartbeat. Fall back to `timestamp` for legacy locks.
       const heartbeatStr = lockInfo.lastHeartbeat ?? lockInfo.timestamp
       const heartbeatAge = Date.now() - new Date(heartbeatStr).getTime()
+      if (Number.isNaN(heartbeatAge)) {
+        logger.warn(
+          'ProjectLockService: Lock has unparseable heartbeat/timestamp – treating as stale',
+          {
+            projectPath: lockInfo.path,
+            holderPid: lockInfo.pid,
+            heartbeatStr
+          }
+        )
+        return true
+      }
       if (heartbeatAge > HEARTBEAT_STALE_MS) {
         logger.warn('ProjectLockService: Same-host lock heartbeat expired (zombie holder)', {
           projectPath: lockInfo.path,
@@ -801,6 +812,16 @@ export class ProjectLockService implements IProjectLockService {
     const lockTime = new Date(lockInfo.timestamp).getTime()
     const now = Date.now()
     const age = now - lockTime
+    if (Number.isNaN(age)) {
+      logger.warn(
+        'ProjectLockService: Cross-host lock has unparseable timestamp – treating as stale',
+        {
+          holderHostname: lockInfo.hostname,
+          timestamp: lockInfo.timestamp
+        }
+      )
+      return true
+    }
     const effectiveTimeout = STALE_TIMEOUT_MS + CLOCK_SKEW_BUFFER_MS
 
     if (age > effectiveTimeout) {
