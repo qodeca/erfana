@@ -36,7 +36,9 @@ export async function atomicWriteJSON<T>(filePath: string, content: T): Promise<
     })
 
     // Atomic rename (POSIX guarantees atomicity for rename within same filesystem)
-    await rename(tempPath, filePath)
+    // On Windows, MoveFileEx(MOVEFILE_REPLACE_EXISTING) can fail with EPERM/EBUSY when
+    // antivirus or Windows Search transiently locks the target (Node issue #29481).
+    await renameWithRetry(tempPath, filePath)
   } catch (error) {
     // Clean up temp file if rename failed
     try {
@@ -46,6 +48,27 @@ export async function atomicWriteJSON<T>(filePath: string, content: T): Promise<
     }
     throw error
   }
+}
+
+const RENAME_RETRYABLE = new Set(['EPERM', 'EBUSY', 'EACCES'])
+const RENAME_BACKOFFS_MS = [10, 30, 100]
+
+async function renameWithRetry(from: string, to: string): Promise<void> {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= RENAME_BACKOFFS_MS.length; attempt++) {
+    try {
+      await rename(from, to)
+      return
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if (!code || !RENAME_RETRYABLE.has(code) || attempt === RENAME_BACKOFFS_MS.length) {
+        throw error
+      }
+      await new Promise((resolve) => setTimeout(resolve, RENAME_BACKOFFS_MS[attempt]))
+      lastError = error
+    }
+  }
+  throw lastError
 }
 
 /**

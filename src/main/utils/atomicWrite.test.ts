@@ -271,3 +271,79 @@ describe('removeIfExists', () => {
     expect(result2).toBe(false)
   })
 })
+
+describe('atomicWriteJSON rename retry', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // Use fake timers to make backoff delays instant
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('retries rename up to 3 times when Windows reports EPERM (AV/indexer race)', async () => {
+    mockedMkdir.mockResolvedValue(undefined)
+    mockedWriteFile.mockResolvedValue(undefined)
+    mockedUnlink.mockResolvedValue(undefined)
+
+    let attempts = 0
+    mockedRename.mockImplementation(async () => {
+      attempts++
+      if (attempts < 3) {
+        const err: NodeJS.ErrnoException = new Error('EPERM: simulated')
+        err.code = 'EPERM'
+        throw err
+      }
+      // third attempt succeeds
+    })
+
+    const writePromise = atomicWriteJSON('/test/file.json', { ok: true })
+    await vi.runAllTimersAsync()
+    await writePromise
+
+    expect(attempts).toBe(3)
+  })
+
+  it('does not retry on non-retryable errno (ENOSPC)', async () => {
+    mockedMkdir.mockResolvedValue(undefined)
+    mockedWriteFile.mockResolvedValue(undefined)
+    mockedUnlink.mockResolvedValue(undefined)
+
+    let attempts = 0
+    mockedRename.mockImplementation(async () => {
+      attempts++
+      const err: NodeJS.ErrnoException = new Error('ENOSPC: disk full')
+      err.code = 'ENOSPC'
+      throw err
+    })
+
+    const writePromise = atomicWriteJSON('/test/file.json', { ok: true })
+    await vi.runAllTimersAsync()
+
+    await expect(writePromise).rejects.toThrow('ENOSPC')
+    expect(attempts).toBe(1)
+  })
+
+  it('throws the last error after exhausting all retries', async () => {
+    mockedMkdir.mockResolvedValue(undefined)
+    mockedWriteFile.mockResolvedValue(undefined)
+    mockedUnlink.mockResolvedValue(undefined)
+
+    let attempts = 0
+    mockedRename.mockImplementation(async () => {
+      attempts++
+      const err: NodeJS.ErrnoException = new Error('EPERM: persistent')
+      err.code = 'EPERM'
+      throw err
+    })
+
+    const writePromise = atomicWriteJSON('/test/file.json', { ok: true })
+    await vi.runAllTimersAsync()
+
+    await expect(writePromise).rejects.toThrow('EPERM')
+    expect(attempts).toBe(4) // initial attempt + 3 retries = 4 total
+  })
+})
