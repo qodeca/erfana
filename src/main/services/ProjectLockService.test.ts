@@ -25,6 +25,10 @@ import type { LockInfo } from '../../shared/ipc/project-lock-schema'
 // setMaxListeners(0) suppresses the "memory leak" warning that fires in tests
 // where many service instances each register their own listeners on this shared emitter.
 const { mockedPowerMonitor } = vi.hoisted(() => {
+  // vi.hoisted's factory runs synchronously before any ESM imports are bound, so
+  // a top-level `import { EventEmitter }` would not be resolvable here. require()
+  // is the documented Vitest workaround for this exact case.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { EventEmitter } = require('node:events') as typeof import('node:events')
   const emitter = new EventEmitter()
   emitter.setMaxListeners(0)
