@@ -860,6 +860,7 @@ export class ProjectLockService implements IProjectLockService {
    */
   private startFocusPolling(projectPath: string, hash: string): NodeJS.Timeout {
     const lockPath = this.getLockPath(hash)
+    let ticking = false
 
     const timer = setInterval(async () => {
       if (this.isDisposing) {
@@ -869,6 +870,11 @@ export class ProjectLockService implements IProjectLockService {
       if (this.isSuspended) {
         return
       }
+
+      if (ticking) {
+        return
+      }
+      ticking = true
 
       try {
         const lockInfo = await this.readLockFile(lockPath)
@@ -909,6 +915,8 @@ export class ProjectLockService implements IProjectLockService {
         }
       } catch {
         // Ignore polling errors - lock file may be temporarily unavailable
+      } finally {
+        ticking = false
       }
     }, POLL_INTERVAL_MS)
 

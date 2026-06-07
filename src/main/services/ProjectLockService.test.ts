@@ -1616,6 +1616,33 @@ describe('ProjectLockService', () => {
     })
   })
 
+  describe('Re-entrance guard', () => {
+    it('skips a polling tick if the previous tick has not finished', async () => {
+      const projectPath = '/test/slow-disk'
+      await service.acquireLock(projectPath)
+
+      let concurrentInvocations = 0
+      let maxConcurrent = 0
+      const originalImpl = mockedAtomicWriteJSON.getMockImplementation()
+      mockedAtomicWriteJSON.mockImplementation(async (...args) => {
+        concurrentInvocations++
+        maxConcurrent = Math.max(maxConcurrent, concurrentInvocations)
+        // Simulate slow disk: 1500ms write
+        await new Promise<void>((resolve) => setTimeout(resolve, 1500))
+        try {
+          if (originalImpl) await originalImpl(...args)
+        } finally {
+          concurrentInvocations--
+        }
+      })
+
+      // Advance 10 seconds — under the bug, multiple writes overlap; with the guard, max stays at 1
+      await vi.advanceTimersByTimeAsync(10_000)
+
+      expect(maxConcurrent).toBeLessThanOrEqual(1)
+    })
+  })
+
   describe('powerMonitor integration', () => {
     it('writes an immediate heartbeat to every active lock on powerMonitor resume', async () => {
       const projectPath = '/test/sleepy'
