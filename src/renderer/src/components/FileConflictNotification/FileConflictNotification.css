@@ -41,6 +41,8 @@
   flex-direction: column;
   gap: var(--space-1);
   min-width: 0;
+  /* Override dockview's inherited user-select: none (issue #211). */
+  user-select: text;
 }
 
 .file-conflict-title {

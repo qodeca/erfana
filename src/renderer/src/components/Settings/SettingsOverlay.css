@@ -87,6 +87,8 @@
   flex: 1;
   padding: var(--space-12);
   overflow-y: auto;
+  /* Override dockview's inherited user-select: none (issue #211). */
+  user-select: text;
 }
 
 /* Settings Body - Max-width container */

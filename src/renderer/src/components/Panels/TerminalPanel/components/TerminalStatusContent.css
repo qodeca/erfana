@@ -17,6 +17,8 @@
   margin-top: var(--space-3, 12px);
   font-size: var(--text-sm, 0.875rem);
   color: var(--color-text-secondary, #888);
+  /* Override dockview's inherited user-select: none (issue #211). */
+  user-select: text;
 }
 
 .terminal-status-hint code {

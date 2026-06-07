@@ -92,6 +92,8 @@ For editor tabs that should appear in the center area:
    }
    ```
 
+   > Note: panel content is non-selectable by default – dockview applies `user-select: none` to panel chrome and the rule cascades into your component. See [Text selection policy](./ui-style-guide.md#text-selection-policy) before deciding which text inside your panel should be selectable.
+
 2. Register in `editorComponents` inside `EditorAreaSplitPanel`:
    ```typescript
    const editorComponents = {

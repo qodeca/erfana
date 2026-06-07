@@ -195,6 +195,16 @@
   font-size: var(--text-md);
 }
 
+/* Override dockview's inherited user-select: none on welcome content
+   only — chrome children stay unselectable (issue #211). */
+.welcome-content h2,
+.welcome-content p,
+.recent-project-name,
+.recent-project-path,
+.recent-project-time {
+  user-select: text;
+}
+
 /* Recent Projects Section */
 .recent-projects-section {
   margin-top: var(--space-20);

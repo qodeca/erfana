@@ -55,6 +55,8 @@
   box-shadow: var(--shadow-lg);
   animation: chatPanelSlideUp var(--transition-slow);
   overflow: hidden;
+  /* Override dockview's inherited user-select: none (issue #211). */
+  user-select: text;
 }
 
 @keyframes chatPanelSlideUp {

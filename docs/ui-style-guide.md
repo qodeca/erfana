@@ -1,5 +1,9 @@
 # Erfana UI Style Guide
 
+<!-- Convention: new section headings use sentence case (project rule).
+     Existing Title-Case headings are grandfathered to preserve anchor URLs
+     referenced elsewhere; do not bulk-rename without coordinating links. -->
+
 > **Version**: 2.0
 > **Last Updated**: November 2025
 > **Design System**: Qodeca brand with dark theme
@@ -16,10 +20,11 @@ This style guide documents all design decisions for the Erfana application. All 
 4. [Spacing System](#spacing-system)
 5. [Borders & Shadows](#borders--shadows)
 6. [Interactive States](#interactive-states)
-7. [Do's and Don'ts](#dos-and-donts)
-8. [Checklist for UI Changes](#checklist-for-ui-changes)
-9. [Quick Reference](#quick-reference)
-10. [Additional Resources](#additional-resources)
+7. [Text selection policy](#text-selection-policy)
+8. [Do's and Don'ts](#dos-and-donts)
+9. [Checklist for UI Changes](#checklist-for-ui-changes)
+10. [Quick Reference](#quick-reference)
+11. [Additional Resources](#additional-resources)
 
 ---
 
@@ -374,6 +379,36 @@ opacity: var(--opacity-disabled);  /* 0.4 */
 cursor: not-allowed;
 pointer-events: none;  /* optional - prevents interaction */
 ```
+
+---
+
+## Text selection policy
+
+`dockview-core` sets `user-select: none` on panel chrome, and that rule inherits into nested content – so without an explicit override, text inside panel content surfaces is silently non-selectable. This previously broke the markdown-preview prompt-template context menu (Explain / Modify / Ask / Visualize), which reads `window.getSelection().toString()` and silently does nothing when the result is empty. Treat selectability as a deliberate per-surface decision.
+
+| Policy | When to use | Example surfaces | CSS |
+|---|---|---|---|
+| Selectable | Data-bearing text users would want to copy – markdown body, dialog messages, toasts, settings descriptions, paths, filenames, status data, log lines | MarkdownPreview, Dialog body + title, Toast, Settings descriptions, FilePicker filename + path, status bar token counts, chat bubbles | `user-select: text;` |
+| Not selectable | Chrome where selection would interfere with click/drag affordances – tabs, tree nodes, toolbars, context menus, activity bar, drag handles, image-pan layers | EditorTab, ProjectTree node, Toolbar, ContextMenu, ActivityBar | `user-select: none;` (or rely on dockview's inherited `none`) |
+| Self-managed | Components that own their selection model via canvas or library internals | Monaco editor, xterm terminal canvas | Do not override; the component owns it |
+
+**Decision rule.** Would a user reasonably want to copy this text? If yes – add explicit selectable CSS. If it is a clickable or draggable label acting as chrome – leave `none`. If the component owns its own selection – do not interfere.
+
+**Scope rule.** Opt in at the data-text element, not at a click-target or drag-target ancestor. A row container with both `cursor: pointer` and `user-select: text` creates a gesture conflict (drag-to-select competes with click-to-pick). FilePicker is the worked example – the override lives on `.file-picker-filename` and `.file-picker-path` (data), not on `.file-picker-item` (the clickable row). Use container scope (`.dialog-body`, `.markdown-preview-content`) only when no descendant is interactive. When a container has both selectable content and chrome children (welcome panel's recent-project rows mix data text with action buttons), enumerate the data selectors explicitly – do not blanket the container.
+
+**Canonical override** (drop straight into a component CSS, replace the selector):
+```css
+.markdown-preview-content {
+  /* Override dockview's inherited user-select: none (see ui-style-guide § Text selection policy). */
+  user-select: text;
+}
+```
+
+The `-webkit-user-select` prefix is not needed; Erfana ships on Chromium 130+ via Electron 39 and unprefixed `user-select` has been honored in Chromium since v54.
+
+**Cascade assumption.** These overrides rely on app stylesheets loading after `dockview-core/dist/styles/dockview.css` in the Vite bundle. Don't change CSS import order without re-running `src/renderer/src/styles/userSelect.audit.test.ts`, which asserts every audited selector still declares `user-select: text` in its source file.
+
+See [#211](https://github.com/qodeca/erfana/issues/211) for the original audit and per-component policy decisions.
 
 ---
 

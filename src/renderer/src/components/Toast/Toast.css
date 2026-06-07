@@ -90,6 +90,8 @@
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   line-height: 1.4;
+  /* Override dockview's inherited user-select: none (issue #211). */
+  user-select: text;
 }
 
 .toast-close {
