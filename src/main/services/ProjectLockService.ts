@@ -39,6 +39,7 @@ import { LockInfoSchema } from '../../shared/ipc/project-lock-schema'
 import { atomicWriteJSON, removeIfExists } from '../utils/atomicWrite'
 import { focusWindow, getMainWindow } from '../utils/focusWindow'
 import { logger } from './LoggingService'
+import { redactPath } from '../utils/redactUserInput'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -148,7 +149,9 @@ export class ProjectLockService implements IProjectLockService {
 
       // Check if we already hold this lock
       if (this.activeLocks.has(projectPath)) {
-        logger.debug('ProjectLockService: Lock already held by this instance', { projectPath })
+        logger.debug('ProjectLockService: Lock already held by this instance', {
+          projectPath: redactPath(projectPath)
+        })
         return { status: 'acquired', lockPath }
       }
 
@@ -181,10 +184,13 @@ export class ProjectLockService implements IProjectLockService {
         this.activeLocks.set(projectPath, { hash, pollTimer, lastHeartbeatAt: Date.now() })
 
         const result: LockResult = { status: 'acquired', lockPath }
-        logger.info('ProjectLockService: Lock acquired', { projectPath, lockPath })
+        logger.info('ProjectLockService: Lock acquired', {
+          projectPath: redactPath(projectPath),
+          lockHash: hash
+        })
         logger.debug('Lock operation completed', {
           operation: 'acquire',
-          projectPath,
+          projectPath: redactPath(projectPath),
           status: result.status,
           latencyMs: Date.now() - startTime
         })
@@ -196,7 +202,10 @@ export class ProjectLockService implements IProjectLockService {
 
           if (!existingLock) {
             // Lock file is corrupt/invalid or disappeared - remove and retry
-            logger.info('ProjectLockService: Removing corrupt/invalid lock file', { projectPath })
+            logger.info('ProjectLockService: Removing corrupt/invalid lock file', {
+              projectPath: redactPath(projectPath),
+              lockHash: hash
+            })
             await removeIfExists(lockPath)
             return this.acquireLockRetry(projectPath, lockInfo, hash, lockPath, startTime)
           }
@@ -206,8 +215,8 @@ export class ProjectLockService implements IProjectLockService {
 
           if (stale) {
             logger.info('ProjectLockService: Removing stale lock', {
-              projectPath,
-              lockPath,
+              projectPath: redactPath(projectPath),
+              lockHash: hash,
               holderPid: existingLock.pid,
               holderHostname: existingLock.hostname,
               holderInstanceId: existingLock.instanceId
@@ -220,7 +229,8 @@ export class ProjectLockService implements IProjectLockService {
 
           // Lock is held by another active instance
           logger.info('ProjectLockService: Project already locked', {
-            projectPath,
+            projectPath: redactPath(projectPath),
+            lockHash: hash,
             holderPid: existingLock.pid,
             holderHostname: existingLock.hostname
           })
@@ -231,7 +241,7 @@ export class ProjectLockService implements IProjectLockService {
           }
           logger.debug('Lock operation completed', {
             operation: 'acquire',
-            projectPath,
+            projectPath: redactPath(projectPath),
             status: result.status,
             latencyMs: Date.now() - startTime
           })
@@ -244,11 +254,11 @@ export class ProjectLockService implements IProjectLockService {
       logger.error(
         'ProjectLockService: Failed to acquire lock',
         error instanceof Error ? error : new Error(message),
-        { projectPath }
+        { projectPath: redactPath(projectPath) }
       )
       logger.debug('Lock operation completed', {
         operation: 'acquire',
-        projectPath,
+        projectPath: redactPath(projectPath),
         status: 'error',
         latencyMs: Date.now() - startTime
       })
@@ -283,7 +293,8 @@ export class ProjectLockService implements IProjectLockService {
       })
       if (preExisting && preExisting.isSymbolicLink()) {
         logger.warn('ProjectLockService: Refusing to write through a symlink at lock path', {
-          lockPath
+          lockPath: redactPath(lockPath),
+          lockHash: hash
         })
         return { status: 'error', message: 'lock path is a symlink' }
       }
@@ -301,10 +312,13 @@ export class ProjectLockService implements IProjectLockService {
       this.activeLocks.set(projectPath, { hash, pollTimer, lastHeartbeatAt: Date.now() })
 
       const result: LockResult = { status: 'acquired', lockPath }
-      logger.info('ProjectLockService: Lock acquired after retry', { projectPath, lockPath })
+      logger.info('ProjectLockService: Lock acquired after retry', {
+        projectPath: redactPath(projectPath),
+        lockHash: hash
+      })
       logger.debug('Lock operation completed', {
         operation: 'acquire',
-        projectPath,
+        projectPath: redactPath(projectPath),
         status: result.status,
         latencyMs: Date.now() - startTime
       })
@@ -321,7 +335,7 @@ export class ProjectLockService implements IProjectLockService {
           }
           logger.debug('Lock operation completed', {
             operation: 'acquire',
-            projectPath,
+            projectPath: redactPath(projectPath),
             status: result.status,
             latencyMs: Date.now() - startTime
           })
@@ -346,7 +360,9 @@ export class ProjectLockService implements IProjectLockService {
 
     if (!activeLock) {
       // Not tracking this lock - may be held by another instance
-      logger.debug('ProjectLockService: No active lock to release', { projectPath })
+      logger.debug('ProjectLockService: No active lock to release', {
+        projectPath: redactPath(projectPath)
+      })
       return
     }
 
@@ -360,13 +376,16 @@ export class ProjectLockService implements IProjectLockService {
     try {
       const removed = await removeIfExists(lockPath)
       if (removed) {
-        logger.info('ProjectLockService: Lock released', { projectPath, lockPath })
+        logger.info('ProjectLockService: Lock released', {
+          projectPath: redactPath(projectPath),
+          lockHash: activeLock.hash
+        })
       }
     } catch (error) {
       // Log but don't throw - release should be best-effort
       logger.warn('ProjectLockService: Error removing lock file', {
-        projectPath,
-        lockPath,
+        projectPath: redactPath(projectPath),
+        lockHash: activeLock.hash,
         error: error instanceof Error ? error.message : String(error)
       })
     }
@@ -376,7 +395,7 @@ export class ProjectLockService implements IProjectLockService {
 
     logger.debug('Lock operation completed', {
       operation: 'release',
-      projectPath,
+      projectPath: redactPath(projectPath),
       status: 'success',
       latencyMs: Date.now() - startTime
     })
@@ -405,7 +424,7 @@ export class ProjectLockService implements IProjectLockService {
         const result: LockStatus = { status: 'unlocked' }
         logger.debug('Lock operation completed', {
           operation: 'check',
-          projectPath,
+          projectPath: redactPath(projectPath),
           status: result.status,
           latencyMs: Date.now() - startTime
         })
@@ -417,7 +436,7 @@ export class ProjectLockService implements IProjectLockService {
         const result: LockStatus = { status: 'locked_by_self', lockPath }
         logger.debug('Lock operation completed', {
           operation: 'check',
-          projectPath,
+          projectPath: redactPath(projectPath),
           status: result.status,
           latencyMs: Date.now() - startTime
         })
@@ -431,7 +450,7 @@ export class ProjectLockService implements IProjectLockService {
         const result: LockStatus = { status: 'unlocked' }
         logger.debug('Lock operation completed', {
           operation: 'check',
-          projectPath,
+          projectPath: redactPath(projectPath),
           status: result.status,
           latencyMs: Date.now() - startTime
         })
@@ -445,7 +464,7 @@ export class ProjectLockService implements IProjectLockService {
       }
       logger.debug('Lock operation completed', {
         operation: 'check',
-        projectPath,
+        projectPath: redactPath(projectPath),
         status: result.status,
         latencyMs: Date.now() - startTime
       })
@@ -455,11 +474,11 @@ export class ProjectLockService implements IProjectLockService {
       logger.error(
         'ProjectLockService: Failed to check lock',
         error instanceof Error ? error : new Error(message),
-        { projectPath }
+        { projectPath: redactPath(projectPath) }
       )
       logger.debug('Lock operation completed', {
         operation: 'check',
-        projectPath,
+        projectPath: redactPath(projectPath),
         status: 'error',
         latencyMs: Date.now() - startTime
       })
@@ -498,8 +517,11 @@ export class ProjectLockService implements IProjectLockService {
         try {
           // Security: Skip symlinks to prevent file deletion outside locks directory
           const stats = await lstat(lockPath)
+          // Derive lockHash from filename stem (e.g. "abc123.lock" → "abc123")
+          const lockHash = entry.slice(0, -LOCK_EXTENSION.length)
+
           if (stats.isSymbolicLink()) {
-            logger.warn('ProjectLockService: Skipping symlink lock file', { lockPath })
+            logger.warn('ProjectLockService: Skipping symlink lock file', { lockHash })
             continue
           }
 
@@ -516,17 +538,19 @@ export class ProjectLockService implements IProjectLockService {
             if (removed) {
               cleanedCount++
               logger.info('ProjectLockService: Cleaned up stale lock', {
-                lockPath,
+                lockHash,
                 holderPid: lockInfo.pid,
                 holderHostname: lockInfo.hostname,
-                projectPath: lockInfo.path
+                projectPath: redactPath(lockInfo.path)
               })
             }
           }
         } catch (error) {
           // Log individual lock cleanup errors but continue with others
+          // Derive lockHash from filename stem for correlation (no lockHash in scope for error)
+          const lockHash = entry.slice(0, -LOCK_EXTENSION.length)
           logger.warn('ProjectLockService: Error checking lock file', {
-            lockPath,
+            lockHash,
             error: error instanceof Error ? error.message : String(error)
           })
         }
@@ -567,7 +591,10 @@ export class ProjectLockService implements IProjectLockService {
       const lockInfo = await this.readLockFile(lockPath)
 
       if (!lockInfo) {
-        logger.debug('ProjectLockService: No lock file to request focus', { projectPath })
+        logger.debug('ProjectLockService: No lock file to request focus', {
+          projectPath: redactPath(projectPath),
+          lockHash: hash
+        })
         return false
       }
 
@@ -586,7 +613,8 @@ export class ProjectLockService implements IProjectLockService {
       await atomicWriteJSON(lockPath, updatedLock)
 
       logger.info('ProjectLockService: Focus request sent', {
-        projectPath,
+        projectPath: redactPath(projectPath),
+        lockHash: hash,
         holderPid: lockInfo.pid,
         holderHostname: lockInfo.hostname
       })
@@ -594,7 +622,7 @@ export class ProjectLockService implements IProjectLockService {
       return true
     } catch (error) {
       logger.warn('ProjectLockService: Failed to request focus', {
-        projectPath,
+        projectPath: redactPath(projectPath),
         error: error instanceof Error ? error.message : String(error)
       })
       return false
@@ -684,7 +712,7 @@ export class ProjectLockService implements IProjectLockService {
     const releasePromises = Array.from(this.activeLocks.keys()).map((projectPath) =>
       this.releaseLock(projectPath).catch((e) => {
         logger.warn('Disposal release failed', {
-          projectPath,
+          projectPath: redactPath(projectPath),
           error: e instanceof Error ? e.message : String(e)
         })
       })
@@ -770,7 +798,7 @@ export class ProjectLockService implements IProjectLockService {
 
       // Log other errors (corrupt file, invalid schema, etc.)
       logger.debug('ProjectLockService: Error reading lock file', {
-        lockPath,
+        lockPath: redactPath(lockPath),
         error: error instanceof Error ? error.message : String(error)
       })
 
@@ -795,7 +823,8 @@ export class ProjectLockService implements IProjectLockService {
       if (!alive) {
         logger.debug('ProjectLockService: Lock holder process is dead', {
           pid: lockInfo.pid,
-          hostname: lockInfo.hostname
+          hostname: lockInfo.hostname,
+          projectPath: redactPath(lockInfo.path)
         })
         return true
       }
@@ -807,7 +836,7 @@ export class ProjectLockService implements IProjectLockService {
         logger.warn(
           'ProjectLockService: Lock has unparseable heartbeat/timestamp – treating as stale',
           {
-            projectPath: lockInfo.path,
+            projectPath: redactPath(lockInfo.path),
             holderPid: lockInfo.pid,
             heartbeatStr
           }
@@ -816,7 +845,7 @@ export class ProjectLockService implements IProjectLockService {
       }
       if (heartbeatAge > HEARTBEAT_STALE_MS) {
         logger.warn('ProjectLockService: Same-host lock heartbeat expired (zombie holder)', {
-          projectPath: lockInfo.path,
+          projectPath: redactPath(lockInfo.path),
           holderPid: lockInfo.pid,
           holderHostname: lockInfo.hostname,
           holderInstanceId: lockInfo.instanceId,
@@ -926,7 +955,10 @@ export class ProjectLockService implements IProjectLockService {
 
         if (!lockInfo) {
           // Lock was deleted - stop polling
-          logger.warn('Lock file deleted, stopping polling', { projectPath })
+          logger.warn('Lock file deleted, stopping polling', {
+            projectPath: redactPath(projectPath),
+            lockHash: hash
+          })
           clearInterval(timer)
           this.activeLocks.delete(projectPath)
           return
@@ -935,7 +967,8 @@ export class ProjectLockService implements IProjectLockService {
         if (lockInfo.instanceId !== this.instanceId) {
           // Lock stolen by another instance - stop polling
           logger.warn('Lock ownership lost', {
-            projectPath,
+            projectPath: redactPath(projectPath),
+            lockHash: hash,
             currentInstance: this.instanceId,
             lockInstance: lockInfo.instanceId
           })
@@ -960,7 +993,7 @@ export class ProjectLockService implements IProjectLockService {
         }
       } catch (err) {
         logger.debug('ProjectLockService: Polling tick error', {
-          projectPath,
+          projectPath: redactPath(projectPath),
           error: err instanceof Error ? err.message : String(err),
           errno: (err as NodeJS.ErrnoException).code
         })
@@ -994,8 +1027,7 @@ export class ProjectLockService implements IProjectLockService {
     } catch (error) {
       const age = Date.now() - new Date(lockInfo.lastHeartbeat ?? lockInfo.timestamp).getTime()
       logger.warn('ProjectLockService: Heartbeat write failed', {
-        projectPath,
-        lockPath,
+        projectPath: redactPath(projectPath),
         heartbeatAgeMs: Number.isNaN(age) ? null : age,
         error: error instanceof Error ? error.message : String(error)
       })
@@ -1016,7 +1048,7 @@ export class ProjectLockService implements IProjectLockService {
     projectPath: string
   ): Promise<boolean> {
     logger.info('ProjectLockService: Handling focus request', {
-      projectPath,
+      projectPath: redactPath(projectPath),
       requesterPid: lockInfo.requester_pid
     })
 

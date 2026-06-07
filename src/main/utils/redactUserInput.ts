@@ -89,3 +89,26 @@ export function redactedLogError(error: unknown): Error | undefined {
   const redacted = redactUserInput(error.message, code)
   return redacted === error.message ? error : new Error(redacted)
 }
+
+/**
+ * Redact a filesystem path for logging: keep only the basename (file/dir name),
+ * replace the rest with [redacted]. Empty/falsy values pass through unchanged.
+ *
+ * Example:
+ *   redactPath('C:\\Users\\alice\\Documents\\secret-project')
+ *     => '[redacted]/secret-project'
+ *   redactPath('/Users/alice/Documents/secret-project/sub/dir')
+ *     => '[redacted]/dir'
+ *   redactPath('')                 => ''
+ *   redactPath('single-segment')   => 'single-segment'  (no path separators present)
+ *
+ * Use at every logger.* site that would otherwise emit a full filesystem path.
+ */
+export function redactPath(p: string): string {
+  if (!p) return p
+  const segments = p.split(/[\\/]+/)
+  const tail = segments.pop() ?? ''
+  // If no separators were present, return the input unchanged (already non-revealing)
+  if (segments.length === 0 || segments.every((s) => s === '')) return tail
+  return `[redacted]/${tail}`
+}

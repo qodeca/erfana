@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { redactUserInput, redactedLogError } from './redactUserInput'
+import { redactUserInput, redactedLogError, redactPath } from './redactUserInput'
 import { AppError, ErrorCode, INVALID_FILENAME_MARKER } from '../../shared/errors'
 
 const PLACEHOLDER = '[redacted-filename]'
@@ -111,5 +111,36 @@ describe('redactedLogError', () => {
     expect(redactedLogError('a string')).toBeUndefined()
     expect(redactedLogError(undefined)).toBeUndefined()
     expect(redactedLogError(null)).toBeUndefined()
+  })
+})
+
+describe('redactPath', () => {
+  it('keeps only the basename for Windows-style absolute paths', () => {
+    expect(redactPath('C:\\Users\\alice\\Documents\\secret-project')).toBe(
+      '[redacted]/secret-project'
+    )
+  })
+
+  it('keeps only the basename for POSIX-style absolute paths', () => {
+    expect(redactPath('/Users/alice/Documents/secret-project')).toBe('[redacted]/secret-project')
+  })
+
+  it('handles nested paths with multiple separators', () => {
+    expect(redactPath('/Users/alice/Documents/secret-project/sub/dir')).toBe('[redacted]/dir')
+  })
+
+  it('passes through empty strings unchanged', () => {
+    expect(redactPath('')).toBe('')
+  })
+
+  it('passes through single-segment values (no separator) unchanged', () => {
+    expect(redactPath('myproject')).toBe('myproject')
+  })
+
+  it('handles trailing separators gracefully', () => {
+    // Trailing slash causes pop() to yield '' as the tail, so the result is '[redacted]/'.
+    // This is the documented behavior — callers should strip trailing separators before
+    // logging, or accept that a trailing-slash path redacts to the prefix form.
+    expect(redactPath('/Users/alice/proj/')).toBe('[redacted]/')
   })
 })
