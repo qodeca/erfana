@@ -107,6 +107,10 @@ await window.waitForTimeout(1000)  // PTY initialization
 await sendTerminalInput(window, 'echo test')
 ```
 
+The newer `terminal.open()` POM (`e2e/pages/terminal.page.ts`) wraps this with `PTY_INIT_DELAY_MS = 1500`. This is still a blind sleep, not a real readiness probe — on a dev machine with a heavy `.zshrc`, zsh's `source ~/.zshrc` can take longer than 1500 ms and the typed command sits in the kernel PTY buffer without ever being read by the shell. The kernel TTY line discipline echoes each character back to xterm (giving the impression that input is being processed), but no command executes and the shell prompt never appears.
+
+If a terminal-driven test fails consistently on your machine while passing on CI, time your shell init (e.g. `time zsh -i -c exit`) before suspecting a code regression. See [known issues § E2E terminal-driven tests sensitive to user's shell init speed](../known-issues.md#e2e-terminal-driven-tests-sensitive-to-users-shell-init-speed) for the full root-cause analysis and the two candidate fixes.
+
 ---
 
 ## Dynamic testids not matching

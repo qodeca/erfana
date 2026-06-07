@@ -202,6 +202,24 @@ Re-enable with `gh workflow enable "E2E Tests"` once the root cause is isolated.
 
 ---
 
+### E2E terminal-driven tests sensitive to user's shell init speed
+
+**Issue**: E2E tests that drive the terminal via `terminal.sendCommand` — notably `e2e/directory-watcher.e2e.ts` and the xterm command in `e2e/third-party-components.e2e.ts` — assume the PTY's interactive shell will be ready 1500 ms after the panel becomes visible. The 1500 ms is a blind sleep in `TerminalPage.waitForPrompt` (`e2e/pages/terminal.page.ts:29` `PTY_INIT_DELAY_MS`), not a real readiness probe.
+
+**Symptom**: `directory-watcher.e2e.ts` times out at its 2000 ms budget with the new file never appearing in the tree on macOS dev machines with a heavy `.zshrc`. Instrumented PTY tracing shows the keystrokes reach the kernel PTY buffer and the kernel TTY line discipline echoes each character back, but no shell prompt is rendered and no command executes. The shell's first real output (e.g. an `(eval):N: warning: 1 jobs SIGHUPed` line) only arrives 5–6 s later, after the test has given up and `closeApp` has torn the PTY down.
+
+**Root cause**: The POSIX terminal bootstrap pattern uses `exec -l "$SHELL" -i` (`src/main/services/TerminalService.ts:218`). On a developer machine with a heavy `.zshrc` (oh-my-zsh, slow plugins, async work), sourcing the file takes longer than 1500 ms; the test types `touch …` while zsh is still mid-init, and the buffered input is dropped when the PTY is closed. CI runners and clean dev machines have well under 500 ms zsh init and pass the test, hiding the dependency.
+
+**Workaround**: None for the test as written. `third-party-components.e2e.ts` is symptomatically silent on the same machines — it only asserts the terminal element is still visible, so it "passes" without verifying that `echo` actually ran.
+
+**Tracking**: Not yet filed as an issue. Two fix options under consideration:
+1. Force a clean shell for the E2E bootstrap (`zsh --no-rcs --no-globalrcs` or `ZDOTDIR` pointing at an empty dir) — eliminates the environment dependency.
+2. Replace the 1500 ms blind sleep in `waitForPrompt` with a real prompt-readiness probe (inject `precmd () { print -Pn "\e]133;A\a" }` and parse OSC 133 `;A` off the PTY data stream).
+
+See [E2E troubleshooting § Terminal commands not executing](./testing/e2e-troubleshooting.md#terminal-commands-not-executing).
+
+---
+
 ### Git Status: Global .gitignore not supported
 
 **Issue**: Files ignored via global gitignore (`~/.gitignore_global` or `~/.config/git/ignore`) may appear as "untracked" in the project tree git status indicators.
