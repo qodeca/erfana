@@ -1381,6 +1381,27 @@ describe('ProjectLockService', () => {
     })
   })
 
+  describe('Heartbeat refresh', () => {
+    it('refreshes lastHeartbeat every HEARTBEAT_INTERVAL_MS while holding the lock', async () => {
+      const projectPath = 'C:\\test\\project'
+      await service.acquireLock(projectPath)
+
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = service.getLocksDirectory() + '\\' + hash + '.lock'
+      const initial = JSON.parse(mockFileSystem.get(lockPath)!)
+      const initialHeartbeat = initial.lastHeartbeat
+
+      // Advance fake clock past HEARTBEAT_INTERVAL_MS (5000) and run one poll tick (500ms)
+      await vi.advanceTimersByTimeAsync(5500)
+
+      const updated = JSON.parse(mockFileSystem.get(lockPath)!)
+      expect(updated.lastHeartbeat).toBeDefined()
+      expect(new Date(updated.lastHeartbeat).getTime()).toBeGreaterThan(
+        new Date(initialHeartbeat).getTime()
+      )
+    })
+  })
+
   describe('Focus polling edge cases', () => {
     const projectPath = '/Users/test/projects/focus-edge-test'
 

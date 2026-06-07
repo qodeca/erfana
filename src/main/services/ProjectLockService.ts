@@ -832,6 +832,15 @@ export class ProjectLockService implements IProjectLockService {
 
         if (lockInfo.focus_request) {
           await this.handleFocusRequest(lockInfo, lockPath, projectPath)
+          const active = this.activeLocks.get(projectPath)
+          if (active) active.lastHeartbeatAt = Date.now()
+          return
+        }
+
+        const active = this.activeLocks.get(projectPath)
+        if (active && Date.now() - active.lastHeartbeatAt >= HEARTBEAT_INTERVAL_MS) {
+          await this.writeHeartbeat(lockInfo, lockPath, projectPath)
+          active.lastHeartbeatAt = Date.now()
         }
       } catch {
         // Ignore polling errors - lock file may be temporarily unavailable
@@ -839,6 +848,32 @@ export class ProjectLockService implements IProjectLockService {
     }, POLL_INTERVAL_MS)
 
     return timer
+  }
+
+  /**
+   * Writes a fresh heartbeat timestamp to the lock file.
+   *
+   * Called from the focus-polling timer when HEARTBEAT_INTERVAL_MS has elapsed
+   * since the last heartbeat write. On failure, warns and lets the next tick retry.
+   *
+   * @param lockInfo - Current lock information (read this tick)
+   * @param lockPath - Path to the lock file
+   * @param projectPath - The project path (for logging)
+   */
+  private async writeHeartbeat(
+    lockInfo: LockInfo,
+    lockPath: string,
+    projectPath: string
+  ): Promise<void> {
+    const updated: LockInfo = { ...lockInfo, lastHeartbeat: new Date().toISOString() }
+    try {
+      await atomicWriteJSON(lockPath, updated)
+    } catch (error) {
+      logger.warn('ProjectLockService: Heartbeat write failed', {
+        projectPath,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
   }
 
   /**
@@ -871,11 +906,12 @@ export class ProjectLockService implements IProjectLockService {
       })
     }
 
-    // Clear the focus request
+    // Clear the focus request and refresh the heartbeat in the same atomic write
     const updatedLock: LockInfo = {
       ...lockInfo,
       focus_request: false,
-      requester_pid: undefined
+      requester_pid: undefined,
+      lastHeartbeat: new Date().toISOString()
     }
 
     try {
