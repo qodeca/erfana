@@ -43,6 +43,10 @@ The trailing screen-clear step (`printf`, `[Console]::Write`, or `cls`) is Windo
 - `-c`: Execute command string (non-interactive, suppresses TTY echo)
 - `exec -l "$SHELL" -i`: Replaces the bootstrap process with a login-mode (`-l`) interactive (`-i`) shell. User sees no process-tree artifact.
 
+#### Fast-shell mode (E2E tests only)
+
+When the main process sees `process.env.ERFANA_E2E_FAST_SHELL === '1'`, the POSIX bootstrap's final step changes from `exec -l "$SHELL" -i` to `exec /bin/sh -i`. `/bin/sh` reads no user rc files (no `.zshenv` / `.zshrc` / `.bash_profile` / `.bashrc`) and starts in well under 50 ms, eliminating any dependency on individual contributors' shell-init speed for terminal-driven E2E assertions. The env var is opt-in per E2E test via `electron.launch({ env: { ..., ERFANA_E2E_FAST_SHELL: '1' } })`; production startup and any run without the env var keeps the login-interactive `$SHELL` behaviour unchanged. See [docs/known-issues.md § E2E terminal-driven tests sensitive to user's shell init speed](../known-issues.md#e2e-terminal-driven-tests-sensitive-to-users-shell-init-speed).
+
 ### PowerShell
 
 - `-NoProfile`: Skip profile loading (faster bootstrap; isolates from user RC)

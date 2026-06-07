@@ -10,6 +10,10 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 - **Text is selectable again across the app** ([#211](https://github.com/qodeca/erfana/issues/211)) – you can now copy error messages, file paths, status data, dialog text, toast messages, settings descriptions, and chat content, and the markdown-preview prompt-template context menu (Explain / Modify / Ask / Visualize) works again. A dockview panel-chrome style had been disabling selection on nested content; the per-surface rule is now captured in the [Text selection policy](./ui-style-guide.md#text-selection-policy) so future components stay selectable by default where it matters.
 
+### Internal
+
+- **E2E terminal-driven tests no longer race the user's `.zshrc`** — `TerminalService`'s POSIX bootstrap pattern now honors `ERFANA_E2E_FAST_SHELL=1` and execs into `/bin/sh -i` instead of `exec -l "$SHELL" -i` when set. Removes the dependency on individual contributors' shell-init speed (a heavy `.zshrc` sourcing >1500 ms used to leave `e2e/directory-watcher.e2e.ts` consistently timing out on some dev machines while passing on CI). `e2e/directory-watcher.e2e.ts` opts in; production behaviour and other tests are unchanged. See [docs/known-issues.md § E2E terminal-driven tests sensitive to user's shell init speed](./known-issues.md#e2e-terminal-driven-tests-sensitive-to-users-shell-init-speed).
+
 ## 0.14.0
 
 *Released 2026-06-06. Tag [`v0.14.0`](https://github.com/qodeca/erfana/releases/tag/v0.14.0).*
