@@ -842,16 +842,18 @@ export class ProjectLockService implements IProjectLockService {
         }
 
         if (lockInfo.focus_request) {
-          await this.handleFocusRequest(lockInfo, lockPath, projectPath)
-          const active = this.activeLocks.get(projectPath)
-          if (active) active.lastHeartbeatAt = Date.now()
+          const ok = await this.handleFocusRequest(lockInfo, lockPath, projectPath)
+          if (ok) {
+            const active = this.activeLocks.get(projectPath)
+            if (active) active.lastHeartbeatAt = Date.now()
+          }
           return
         }
 
         const active = this.activeLocks.get(projectPath)
         if (active && Date.now() - active.lastHeartbeatAt >= HEARTBEAT_INTERVAL_MS) {
-          await this.writeHeartbeat(lockInfo, lockPath, projectPath)
-          active.lastHeartbeatAt = Date.now()
+          const ok = await this.writeHeartbeat(lockInfo, lockPath, projectPath)
+          if (ok) active.lastHeartbeatAt = Date.now()
         }
       } catch {
         // Ignore polling errors - lock file may be temporarily unavailable
@@ -875,15 +877,20 @@ export class ProjectLockService implements IProjectLockService {
     lockInfo: LockInfo,
     lockPath: string,
     projectPath: string
-  ): Promise<void> {
+  ): Promise<boolean> {
     const updated: LockInfo = { ...lockInfo, lastHeartbeat: new Date().toISOString() }
     try {
       await atomicWriteJSON(lockPath, updated)
+      return true
     } catch (error) {
       logger.warn('ProjectLockService: Heartbeat write failed', {
         projectPath,
+        lockPath,
+        heartbeatAgeMs:
+          Date.now() - new Date(lockInfo.lastHeartbeat ?? lockInfo.timestamp).getTime(),
         error: error instanceof Error ? error.message : String(error)
       })
+      return false
     }
   }
 
@@ -898,7 +905,7 @@ export class ProjectLockService implements IProjectLockService {
     lockInfo: LockInfo,
     lockPath: string,
     projectPath: string
-  ): Promise<void> {
+  ): Promise<boolean> {
     logger.info('ProjectLockService: Handling focus request', {
       projectPath,
       requesterPid: lockInfo.requester_pid
@@ -927,10 +934,12 @@ export class ProjectLockService implements IProjectLockService {
 
     try {
       await atomicWriteJSON(lockPath, updatedLock)
+      return true
     } catch (error) {
       logger.warn('ProjectLockService: Failed to clear focus request', {
         error: error instanceof Error ? error.message : String(error)
       })
+      return false
     }
   }
 }

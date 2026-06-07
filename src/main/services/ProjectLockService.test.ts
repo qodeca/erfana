@@ -1575,6 +1575,34 @@ describe('ProjectLockService', () => {
       // Verify focus was still attempted despite write failure
       expect(mockedFocusWindow).toHaveBeenCalled()
     })
+
+    it('does not advance lastHeartbeatAt when the heartbeat write fails', async () => {
+      const projectPath = '/test/write-fails'
+      await service.acquireLock(projectPath)
+
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = join(service.getLocksDirectory(), hash + '.lock')
+      const initial = JSON.parse(mockFileSystem.get(lockPath)!).lastHeartbeat
+
+      // Force every atomicWriteJSON call to reject for the next ~10 seconds
+      mockedAtomicWriteJSON.mockRejectedValue(new Error('EPERM: simulated'))
+
+      await vi.advanceTimersByTimeAsync(11_000) // two heartbeat opportunities
+
+      // On-disk heartbeat should remain unchanged (writes all failed)
+      const stillOnDisk = JSON.parse(mockFileSystem.get(lockPath)!).lastHeartbeat
+      expect(stillOnDisk).toBe(initial)
+
+      // Allow writes again; restore the stateful implementation so writes land in mockFileSystem
+      mockedAtomicWriteJSON.mockImplementation((path, data) => {
+        mockFileSystem.set(path, JSON.stringify(data))
+        return Promise.resolve(undefined)
+      })
+      await vi.advanceTimersByTimeAsync(600) // one more poll tick (500 ms)
+
+      const finalHeartbeat = JSON.parse(mockFileSystem.get(lockPath)!).lastHeartbeat
+      expect(new Date(finalHeartbeat).getTime()).toBeGreaterThan(new Date(initial).getTime())
+    })
   })
 
   describe('Dispose edge cases', () => {
