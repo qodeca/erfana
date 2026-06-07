@@ -929,8 +929,14 @@ export class ProjectLockService implements IProjectLockService {
         return false
       }
 
-      // Other errors: assume process is gone
-      return false
+      // Unknown errno (Windows can surface ENOMEM, EACCES under load, etc.).
+      // Fail-closed: assume alive. The heartbeat-stale path still cleans up
+      // genuinely dead holders within HEARTBEAT_STALE_MS.
+      logger.debug('ProjectLockService: isProcessAlive unknown errno; assuming alive', {
+        pid,
+        errno
+      })
+      return true
     }
   }
 

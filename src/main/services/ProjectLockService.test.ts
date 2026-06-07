@@ -589,6 +589,36 @@ describe('ProjectLockService', () => {
       // Actually, let's just skip this test since the error path is hard to hit with mocks
       expect(result.status).toBe('unlocked') // Error in readLockFile returns null -> unlocked
     })
+
+    it('treats unknown errno from process.kill as "alive" (fail-closed)', async () => {
+      const projectPath = '/test/unknown-errno'
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = join(service.getLocksDirectory(), hash + '.lock')
+
+      const recentDate = new Date(Date.now() - 1000).toISOString()
+      const lockWithMysteryPid: LockInfo = {
+        instanceId: '550e8400-e29b-41d4-a716-446655440042',
+        pid: 99999,
+        timestamp: recentDate,
+        hostname: osHostname(),
+        path: projectPath,
+        focus_request: false,
+        lastHeartbeat: recentDate
+      }
+      mockFileSystem.set(lockPath, JSON.stringify(lockWithMysteryPid))
+
+      // Mock process.kill to throw an unknown errno
+      process.kill = vi.fn(() => {
+        const err: NodeJS.ErrnoException = new Error('ENOMEM: transient memory pressure')
+        err.code = 'ENOMEM'
+        throw err
+      }) as any
+
+      const result = await service.checkLock(projectPath)
+      // With B5's fix: ENOMEM → assume alive → lock not stale → locked_by_other
+      // Without the fix: ENOMEM → assume dead → lock stale → unlocked
+      expect(result.status).toBe('locked_by_other')
+    })
   })
 
   describe('isProcessAlive', () => {
@@ -625,14 +655,18 @@ describe('ProjectLockService', () => {
       expect(result).toBe(true)
     })
 
-    it('returns false on other errors', () => {
+    it('returns true on unknown errno (fail-closed)', () => {
       process.kill = vi.fn(() => {
-        throw new Error('Unknown error')
+        const err: NodeJS.ErrnoException = new Error('ENOMEM: transient memory pressure')
+        err.code = 'ENOMEM'
+        throw err
       })
 
       const result = (service as any).isProcessAlive(99999)
 
-      expect(result).toBe(false)
+      // Unknown errnos (Windows OpenProcess failures, etc.) are treated as alive
+      // so the heartbeat-stale path handles cleanup rather than a false steal
+      expect(result).toBe(true)
     })
   })
 
