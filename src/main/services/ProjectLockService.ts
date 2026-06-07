@@ -207,8 +207,10 @@ export class ProjectLockService implements IProjectLockService {
           if (stale) {
             logger.info('ProjectLockService: Removing stale lock', {
               projectPath,
+              lockPath,
               holderPid: existingLock.pid,
-              holderHostname: existingLock.hostname
+              holderHostname: existingLock.hostname,
+              holderInstanceId: existingLock.instanceId
             })
             await removeIfExists(lockPath)
 
@@ -782,9 +784,11 @@ export class ProjectLockService implements IProjectLockService {
       const heartbeatStr = lockInfo.lastHeartbeat ?? lockInfo.timestamp
       const heartbeatAge = Date.now() - new Date(heartbeatStr).getTime()
       if (heartbeatAge > HEARTBEAT_STALE_MS) {
-        logger.info('ProjectLockService: Same-host lock heartbeat expired (zombie holder)', {
-          pid: lockInfo.pid,
-          hostname: lockInfo.hostname,
+        logger.warn('ProjectLockService: Same-host lock heartbeat expired (zombie holder)', {
+          projectPath: lockInfo.path,
+          holderPid: lockInfo.pid,
+          holderHostname: lockInfo.hostname,
+          holderInstanceId: lockInfo.instanceId,
           heartbeatAgeMs: heartbeatAge,
           thresholdMs: HEARTBEAT_STALE_MS
         })
@@ -913,8 +917,12 @@ export class ProjectLockService implements IProjectLockService {
           const ok = await this.writeHeartbeat(lockInfo, lockPath, projectPath)
           if (ok) active.lastHeartbeatAt = Date.now()
         }
-      } catch {
-        // Ignore polling errors - lock file may be temporarily unavailable
+      } catch (err) {
+        logger.debug('ProjectLockService: Polling tick error', {
+          projectPath,
+          error: err instanceof Error ? err.message : String(err),
+          errno: (err as NodeJS.ErrnoException).code
+        })
       } finally {
         ticking = false
       }
