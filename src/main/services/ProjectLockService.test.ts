@@ -78,6 +78,7 @@ vi.mock('./LoggingService', () => ({
 import { readFile, readdir, mkdir, realpath, lstat, open } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
+import { hostname as osHostname } from 'node:os'
 import { atomicWriteJSON, removeIfExists } from '../utils/atomicWrite'
 import { focusWindow, getMainWindow } from '../utils/focusWindow'
 import { ProjectLockService } from './ProjectLockService'
@@ -1399,6 +1400,74 @@ describe('ProjectLockService', () => {
       expect(new Date(updated.lastHeartbeat).getTime()).toBeGreaterThan(
         new Date(initialHeartbeat).getTime()
       )
+    })
+  })
+
+  describe('Heartbeat staleness detection', () => {
+    it('treats same-host lock as stale when heartbeat is older than HEARTBEAT_STALE_MS', async () => {
+      // Holder PID is alive (mock process.kill to succeed) but heartbeat is stale
+      const projectPath = '/Users/test/projects/zombie'
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = join(service.getLocksDirectory(), `${hash}.lock`)
+      const oldDate = new Date(Date.now() - 60_000).toISOString() // 60s ago
+      const staleLock: LockInfo = {
+        instanceId: '550e8400-e29b-41d4-a716-446655440001',
+        pid: 99999,
+        timestamp: oldDate,
+        hostname: osHostname(),
+        path: projectPath,
+        focus_request: false,
+        lastHeartbeat: oldDate
+      }
+      mockFileSystem.set(lockPath, JSON.stringify(staleLock))
+      // mock process.kill to NOT throw → PID "alive"
+      process.kill = vi.fn(() => true)
+
+      const result = await service.checkLock(projectPath)
+      expect(result.status).toBe('unlocked')
+    })
+
+    it('treats same-host lock as fresh when heartbeat is recent (pid alive)', async () => {
+      const projectPath = '/Users/test/projects/healthy'
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = join(service.getLocksDirectory(), `${hash}.lock`)
+      const recentDate = new Date(Date.now() - 1000).toISOString() // 1s ago
+      const freshLock: LockInfo = {
+        instanceId: '550e8400-e29b-41d4-a716-446655440002',
+        pid: 99999,
+        timestamp: recentDate,
+        hostname: osHostname(),
+        path: projectPath,
+        focus_request: false,
+        lastHeartbeat: recentDate
+      }
+      mockFileSystem.set(lockPath, JSON.stringify(freshLock))
+      process.kill = vi.fn(() => true)
+
+      const result = await service.checkLock(projectPath)
+      expect(result.status).toBe('locked_by_other')
+    })
+
+    it('falls back to timestamp when lastHeartbeat is missing (legacy lock format)', async () => {
+      // Old lock written before the heartbeat field existed
+      const projectPath = '/Users/test/projects/legacy'
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = join(service.getLocksDirectory(), `${hash}.lock`)
+      const oldDate = new Date(Date.now() - 60_000).toISOString()
+      const legacyLock = {
+        instanceId: '550e8400-e29b-41d4-a716-446655440003',
+        pid: 99999,
+        timestamp: oldDate,
+        hostname: osHostname(),
+        path: projectPath,
+        focus_request: false
+        // no lastHeartbeat
+      }
+      mockFileSystem.set(lockPath, JSON.stringify(legacyLock))
+      process.kill = vi.fn(() => true)
+
+      const result = await service.checkLock(projectPath)
+      expect(result.status).toBe('unlocked') // stale via timestamp fallback
     })
   })
 

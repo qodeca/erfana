@@ -719,7 +719,7 @@ export class ProjectLockService implements IProjectLockService {
    * @returns true if lock is stale and can be removed
    */
   private async isLockStale(lockInfo: LockInfo): Promise<boolean> {
-    // Same hostname: check if process is alive
+    // Same hostname: PID liveness + heartbeat freshness
     if (lockInfo.hostname === this.currentHostname) {
       const alive = this.isProcessAlive(lockInfo.pid)
       if (!alive) {
@@ -729,15 +729,26 @@ export class ProjectLockService implements IProjectLockService {
         })
         return true
       }
+
+      // PID alive → also require fresh heartbeat. Fall back to `timestamp` for legacy locks.
+      const heartbeatStr = lockInfo.lastHeartbeat ?? lockInfo.timestamp
+      const heartbeatAge = Date.now() - new Date(heartbeatStr).getTime()
+      if (heartbeatAge > HEARTBEAT_STALE_MS) {
+        logger.info('ProjectLockService: Same-host lock heartbeat expired (zombie holder)', {
+          pid: lockInfo.pid,
+          hostname: lockInfo.hostname,
+          heartbeatAgeMs: heartbeatAge,
+          thresholdMs: HEARTBEAT_STALE_MS
+        })
+        return true
+      }
       return false
     }
 
-    // Different hostname: check timestamp with clock skew buffer
+    // Different hostname: check timestamp with clock skew buffer (existing behavior)
     const lockTime = new Date(lockInfo.timestamp).getTime()
     const now = Date.now()
     const age = now - lockTime
-
-    // Account for potential clock skew
     const effectiveTimeout = STALE_TIMEOUT_MS + CLOCK_SKEW_BUFFER_MS
 
     if (age > effectiveTimeout) {
