@@ -268,6 +268,20 @@ export class ProjectLockService implements IProjectLockService {
     startTime: number
   ): Promise<LockResult> {
     try {
+      // Security: refuse to write through a symlink (CVE-2025-68146 class).
+      // Between removeIfExists and open('wx'), an attacker on the same user account
+      // could plant a symlink at lockPath pointing to an arbitrary file.  Node's
+      // O_EXCL on Windows resolves symlinks before the exclusivity check, so the
+      // target would be truncated and overwritten.  lstat (not stat) sees the link
+      // itself, so it detects the plant before we touch anything.
+      const preExisting = await lstat(lockPath).catch(() => null)
+      if (preExisting && preExisting.isSymbolicLink()) {
+        logger.warn('ProjectLockService: Refusing to write through a symlink at lock path', {
+          lockPath
+        })
+        return { status: 'error', message: 'lock path is a symlink' }
+      }
+
       const now = new Date().toISOString()
       const freshLockInfo: LockInfo = { ...lockInfo, timestamp: now, lastHeartbeat: now }
       const handle = await open(lockPath, 'wx', 0o600)

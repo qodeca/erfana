@@ -1774,4 +1774,44 @@ describe('ProjectLockService', () => {
       await disposePromise
     })
   })
+
+  describe('Symlink TOCTOU defense in acquireLockRetry', () => {
+    it('refuses to recreate lock at a symlink path (CVE-2025-68146 class)', async () => {
+      const projectPath = '/test/symlink-attack'
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = join(service.getLocksDirectory(), hash + '.lock')
+
+      // Pre-existing stale lock that triggers the remove+retry path
+      const staleLock: LockInfo = {
+        instanceId: '550e8400-e29b-41d4-a716-446655440011',
+        pid: 99999,
+        timestamp: new Date(Date.now() - 60_000).toISOString(),
+        hostname: osHostname(), // resolves to 'test-machine.local' via the mock
+        path: projectPath,
+        focus_request: false,
+        lastHeartbeat: new Date(Date.now() - 60_000).toISOString()
+      }
+      mockFileSystem.set(lockPath, JSON.stringify(staleLock))
+
+      // Mock process.kill so PID-alive returns false → lock is stale and will be removed
+      process.kill = vi.fn(() => {
+        const e: NodeJS.ErrnoException = new Error('ESRCH')
+        e.code = 'ESRCH'
+        throw e
+      }) as any
+
+      // After removeIfExists clears the file, lstat for the path now reports a symlink
+      // (simulating an attacker planting one in the TOCTOU window)
+      mockedLstat.mockImplementation(async (path: any) => {
+        if (path === lockPath) {
+          return { isSymbolicLink: () => true } as any
+        }
+        return { isSymbolicLink: () => false } as any
+      })
+
+      const result = await service.acquireLock(projectPath)
+      expect(result.status).toBe('error')
+      expect(result.message).toMatch(/symlink/i)
+    })
+  })
 })
