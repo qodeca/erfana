@@ -71,7 +71,12 @@ test.describe('Directory watcher pipeline', () => {
         args: [path.join(__dirname, '..'), `--user-data-dir=${userDataDir}`],
         env: {
           ...process.env,
-          NODE_ENV: 'development'
+          NODE_ENV: 'development',
+          // Force the PTY bootstrap to exec into /bin/sh -i instead of the
+          // user's login interactive $SHELL, so the test does not race a
+          // multi-second `source ~/.zshrc`. See docs/known-issues.md §
+          // "E2E terminal-driven tests sensitive to user's shell init speed".
+          ERFANA_E2E_FAST_SHELL: '1'
         }
       })
 

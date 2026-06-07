@@ -211,11 +211,24 @@ export class TerminalService extends EventEmitter {
           return null
         }
         const posixEscapedCwd = cwd.replace(/'/g, "'\\''")
+        // E2E fast-shell mode: exec into /bin/sh -i instead of the user's
+        // login interactive $SHELL. The user's $SHELL (e.g. zsh) sources
+        // .zshenv / .zprofile / .zshrc / .zlogin on a login interactive
+        // start, which can take seconds with a heavy framework (oh-my-zsh,
+        // async plugins). For deterministic E2E timing we use /bin/sh,
+        // which reads no user rc files and starts in well under 50 ms.
+        // Production (and any run without the env var) is unchanged.
+        // See docs/known-issues.md § "E2E terminal-driven tests sensitive
+        // to user's shell init speed".
+        const innerShellCmd =
+          process.env.ERFANA_E2E_FAST_SHELL === '1'
+            ? 'exec /bin/sh -i'
+            : `exec -l "$SHELL" -i`
         const bootstrapScript = [
           `cd '${posixEscapedCwd}'`,    // Change to target directory (literal)
           'pwd',                          // Print working directory (for verification)
           `echo ${marker}`,               // Print marker (triggers clear handshake)
-          `exec -l "$SHELL" -i`           // Exec into login interactive shell (replaces process)
+          innerShellCmd                   // Exec into interactive shell (replaces process)
         ].join('; ')
         shellArgs.push('-c', bootstrapScript)
       }
