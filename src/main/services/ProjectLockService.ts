@@ -56,6 +56,12 @@ const STALE_TIMEOUT_MS = 60 * 60 * 1000
 /** Clock skew buffer for cross-host timestamp comparison (15 minutes - robust for VMs and cloud) */
 const CLOCK_SKEW_BUFFER_MS = 15 * 60 * 1000
 
+/** Heartbeat write interval (ms) — holder rewrites lock with fresh heartbeat at this cadence */
+const HEARTBEAT_INTERVAL_MS = 5000
+
+/** Same-host stale threshold (ms) — if heartbeat is older than this, lock is considered zombie */
+const HEARTBEAT_STALE_MS = 30000
+
 /** Lock file extension */
 const LOCK_EXTENSION = '.lock'
 
@@ -71,6 +77,8 @@ interface ActiveLock {
   hash: string
   /** Focus polling timer (null if not polling) */
   pollTimer: NodeJS.Timeout | null
+  /** Epoch ms of the last successful heartbeat write (or lock creation) */
+  lastHeartbeatAt: number
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -141,13 +149,15 @@ export class ProjectLockService implements IProjectLockService {
       await mkdir(this.locksDir, { recursive: true, mode: 0o700 })
 
       // Create new lock info
+      const now = new Date().toISOString()
       const lockInfo: LockInfo = {
         instanceId: this.instanceId,
         pid: process.pid,
-        timestamp: new Date().toISOString(),
+        timestamp: now,
         hostname: this.currentHostname,
         path: projectPath,
-        focus_request: false
+        focus_request: false,
+        lastHeartbeat: now
       }
 
       try {
@@ -161,7 +171,7 @@ export class ProjectLockService implements IProjectLockService {
 
         // Success - we created the lock
         const pollTimer = this.startFocusPolling(projectPath, hash)
-        this.activeLocks.set(projectPath, { hash, pollTimer })
+        this.activeLocks.set(projectPath, { hash, pollTimer, lastHeartbeatAt: Date.now() })
 
         const result: LockResult = { status: 'acquired', lockPath }
         logger.info('ProjectLockService: Lock acquired', { projectPath, lockPath })
@@ -249,15 +259,17 @@ export class ProjectLockService implements IProjectLockService {
     startTime: number
   ): Promise<LockResult> {
     try {
+      const now = new Date().toISOString()
+      const freshLockInfo: LockInfo = { ...lockInfo, timestamp: now, lastHeartbeat: now }
       const handle = await open(lockPath, 'wx', 0o600)
       try {
-        await handle.writeFile(JSON.stringify(lockInfo, null, 2))
+        await handle.writeFile(JSON.stringify(freshLockInfo, null, 2))
       } finally {
         await handle.close()
       }
 
       const pollTimer = this.startFocusPolling(projectPath, hash)
-      this.activeLocks.set(projectPath, { hash, pollTimer })
+      this.activeLocks.set(projectPath, { hash, pollTimer, lastHeartbeatAt: Date.now() })
 
       const result: LockResult = { status: 'acquired', lockPath }
       logger.info('ProjectLockService: Lock acquired after retry', { projectPath, lockPath })

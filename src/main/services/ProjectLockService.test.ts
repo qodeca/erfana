@@ -421,6 +421,18 @@ describe('ProjectLockService', () => {
         expect(result.message).toContain('Permission denied')
       }
     })
+
+    it('initializes lastHeartbeat at lock creation', async () => {
+      const projectPath = 'C:\\test\\project'
+      const result = await service.acquireLock(projectPath)
+      expect(result.status).toBe('acquired')
+
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = service.getLocksDirectory() + '\\' + hash + '.lock'
+      const written = JSON.parse(mockFileSystem.get(lockPath)!)
+      expect(written.lastHeartbeat).toBeDefined()
+      expect(written.lastHeartbeat).toBe(written.timestamp)
+    })
   })
 
   describe('releaseLock', () => {
