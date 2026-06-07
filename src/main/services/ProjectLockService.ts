@@ -972,11 +972,11 @@ export class ProjectLockService implements IProjectLockService {
       await atomicWriteJSON(lockPath, updated)
       return true
     } catch (error) {
+      const age = Date.now() - new Date(lockInfo.lastHeartbeat ?? lockInfo.timestamp).getTime()
       logger.warn('ProjectLockService: Heartbeat write failed', {
         projectPath,
         lockPath,
-        heartbeatAgeMs:
-          Date.now() - new Date(lockInfo.lastHeartbeat ?? lockInfo.timestamp).getTime(),
+        heartbeatAgeMs: Number.isNaN(age) ? null : age,
         error: error instanceof Error ? error.message : String(error)
       })
       return false
