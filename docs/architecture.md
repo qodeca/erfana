@@ -118,6 +118,7 @@ src/
 │   └── index.d.ts            # TypeScript definitions
 └── renderer/
     └── src/
+        ├── assets/              # Vendored fonts (Cascadia Mono) and static assets
         ├── components/
         │   ├── DockLayout/      # Hybrid SplitviewReact + DockviewReact
         │   ├── ActivityBar/     # Vertical activity bars (left/right)
@@ -130,6 +131,10 @@ src/
         │   ├── Toast/           # Toast notification system
         │   ├── Settings/        # Settings overlay
         │   └── Transcription/   # TranscriptionDialog, LanguageSelect
+        ├── constants/           # Shared renderer constants
+        ├── context/             # React contexts (ProjectManagementContext, TerminalPortalContext)
+        ├── hooks/               # React hooks
+        ├── interfaces/          # Renderer-only TypeScript interfaces
         ├── prompts/             # Prompt template system
         │   ├── templates/       # Markdown templates with YAML frontmatter
         │   ├── parser.ts        # CSP-safe YAML parser
@@ -138,12 +143,20 @@ src/
         │   ├── registry.ts      # Dynamic template loading
         │   ├── helpers.ts       # Template helper functions
         │   └── types.ts         # TypeScript interfaces
+        ├── providers/           # React provider components
+        ├── services/            # Renderer-side services (textClipboard transport)
         ├── stores/              # Zustand stores (ActivityBar, Settings, GlobalSettings, Transcription)
-        ├── context/             # React contexts (ProjectManagementContext)
-        ├── hooks/               # React hooks
+        ├── styles/              # Global stylesheets
+        │   ├── fonts.css            # @font-face declarations (Cascadia Mono)
+        │   ├── design-tokens.css    # Design system tokens (colors, spacing, typography)
+        │   ├── utilities.css        # Cross-cutting CSS policies (text-selection, etc.)
+        │   └── userSelect.audit.test.ts  # Raw-CSS policy audit (#211/#228)
+        ├── test-utils/          # Vitest helpers for renderer-side tests
         ├── types/               # Shared TypeScript types (filters.ts)
-        ├── utils/               # Shared utilities (fileUtils.ts, panelUtils.ts)
+        ├── utils/               # Shared utilities (fileUtils.ts, panelUtils.ts, platform.ts)
+        ├── App.css              # Root layout styles
         ├── App.tsx              # Root component
+        ├── index.css            # Global stylesheet entry (imports fonts/tokens/utilities)
         └── main.tsx
 ```
 
