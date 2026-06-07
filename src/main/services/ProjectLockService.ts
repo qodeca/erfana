@@ -274,7 +274,13 @@ export class ProjectLockService implements IProjectLockService {
       // O_EXCL on Windows resolves symlinks before the exclusivity check, so the
       // target would be truncated and overwritten.  lstat (not stat) sees the link
       // itself, so it detects the plant before we touch anything.
-      const preExisting = await lstat(lockPath).catch(() => null)
+      // ENOENT is the expected case after removeIfExists cleared the slot. Any
+      // other lstat error (EACCES, EIO) is unexpected and surfaces to the outer
+      // catch so the user sees it instead of us silently proceeding to open().
+      const preExisting = await lstat(lockPath).catch((err) => {
+        if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+        throw err
+      })
       if (preExisting && preExisting.isSymbolicLink()) {
         logger.warn('ProjectLockService: Refusing to write through a symlink at lock path', {
           lockPath
