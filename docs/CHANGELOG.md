@@ -12,6 +12,7 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 ### Internal
 
+- **Text-selection policy lives in one file** ([#228](https://github.com/qodeca/erfana/issues/228)) – the `user-select: text` override previously repeated across 15 component CSS files (a follow-up to #211). It is now declared once in `src/renderer/src/styles/utilities.css` for 20 selectors, and the cross-cutting audit test (`src/renderer/src/styles/userSelect.audit.test.ts`) reads from the central file. Two CSS-module surfaces (`.metadataItem`, `.errorMessage` in `ImageViewerPanel.module.css`) keep their declarations in-place because build-time class-name hashing prevents the central selector from matching them at runtime; this is documented in [Text selection policy](./ui-style-guide.md#text-selection-policy).
 - **E2E terminal-driven tests no longer race the user's `.zshrc`** — `TerminalService`'s POSIX bootstrap pattern now honors `ERFANA_E2E_FAST_SHELL=1` and execs into `/bin/sh -i` instead of `exec -l "$SHELL" -i` when set. Removes the dependency on individual contributors' shell-init speed (a heavy `.zshrc` sourcing >1500 ms used to leave `e2e/directory-watcher.e2e.ts` consistently timing out on some dev machines while passing on CI). `e2e/directory-watcher.e2e.ts` opts in; production behaviour and other tests are unchanged. See [docs/known-issues.md § E2E terminal-driven tests sensitive to user's shell init speed](./known-issues.md#e2e-terminal-driven-tests-sensitive-to-users-shell-init-speed).
 
 ## 0.14.0

@@ -8,8 +8,6 @@
   font-variant-numeric: tabular-nums;
   display: flex;
   align-items: center;
-  /* Override dockview's inherited user-select: none (issue #211). */
-  user-select: text;
 }
 
 /* Validation state colors */

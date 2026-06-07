@@ -4,6 +4,9 @@
 /* Import design tokens - must be first */
 @import './styles/design-tokens.css';
 
+/* Project-level utility classes (text selection policy, etc.) - load after tokens, before components */
+@import './styles/utilities.css';
+
 html, body, #root {
   width: 100%;
   height: 100%;

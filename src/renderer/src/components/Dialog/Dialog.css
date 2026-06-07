@@ -86,13 +86,6 @@
   letter-spacing: -0.2px;
 }
 
-/* Dialog body + title — both opt in to selectable text */
-.dialog-body,
-.dialog-title {
-  /* Override dockview's inherited user-select: none (issue #211). */
-  user-select: text;
-}
-
 .dialog-body {
   margin: 0 0 var(--space-12) 0;
 }

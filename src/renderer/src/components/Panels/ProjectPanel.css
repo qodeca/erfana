@@ -35,8 +35,6 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  /* Override dockview's inherited user-select: none (issue #211). */
-  user-select: text;
 }
 
 /* Control Panel Chevron in Header */

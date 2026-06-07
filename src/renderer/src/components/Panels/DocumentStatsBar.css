@@ -16,8 +16,6 @@
   color: var(--color-text-secondary);
   flex-shrink: 0;
   height: 26px;
-  /* Override dockview's inherited user-select: none (issue #211). */
-  user-select: text;
 }
 
 .document-stats-bar .stats-group {

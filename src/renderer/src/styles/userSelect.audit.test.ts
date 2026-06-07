@@ -3,8 +3,9 @@
  *
  * The audit added `user-select: text` to data-bearing text surfaces that
  * dockview-core's panel chrome would otherwise inherit as `none`. This test
- * reads each component CSS file as raw text (Vite `?raw` import) and asserts
- * the policy rule is still declared for the named selector.
+ * reads the central utilities.css plus the surviving module-scoped CSS files as
+ * raw text (Vite `?raw` import) and asserts the policy rule is still declared
+ * for the named selector.
  *
  * Why raw CSS instead of computed-style assertions: `getComputedStyle` for
  * non-standard properties like `user-select` is unreliable in jsdom (vitest
@@ -12,46 +13,17 @@
  * raw-CSS approach is deterministic, covers every audited surface, and has no
  * runtime dependency.
  *
- * Adding a new selectable surface: declare `user-select: text` on the
- * component CSS, add a new row to AUDIT_211_SURFACES, and (if it's a new
- * file) add the `?raw` import below.
+ * Adding a new selectable surface: add the selector to
+ * `src/renderer/src/styles/utilities.css` and add a new row to
+ * AUDIT_211_SURFACES.
  *
  * See: docs/ui-style-guide.md § Text selection policy
  */
 
 import { describe, it, expect } from 'vitest'
 
- 
-// @ts-expect-error Vite ?raw query — typed via vite/client
-import dialogCss from '../components/Dialog/Dialog.css?raw'
-// @ts-expect-error Vite ?raw query
-import filePickerCss from '../components/Dialog/FilePickerDialog.css?raw'
-// @ts-expect-error Vite ?raw query
-import appDockLayoutCss from '../components/DockLayout/AppDockLayout.css?raw'
-// @ts-expect-error Vite ?raw query
-import chatBubbleCss from '../components/Editor/DiagramViewer/ChatBubble.css?raw'
-// @ts-expect-error Vite ?raw query
-import markdownPreviewCss from '../components/Editor/MarkdownPreview.css?raw'
-// @ts-expect-error Vite ?raw query
-import fileConflictCss from '../components/FileConflictNotification/FileConflictNotification.css?raw'
-// @ts-expect-error Vite ?raw query
-import documentStatsBarCss from '../components/Panels/DocumentStatsBar.css?raw'
-// @ts-expect-error Vite ?raw query
+import utilitiesCss from './utilities.css?raw'
 import imageViewerCss from '../components/Panels/ImageViewerPanel.module.css?raw'
-// @ts-expect-error Vite ?raw query
-import projectPanelCss from '../components/Panels/ProjectPanel.css?raw'
-// @ts-expect-error Vite ?raw query
-import claudeStatusBarCss from '../components/Panels/TerminalPanel/components/ClaudeStatusBar.css?raw'
-// @ts-expect-error Vite ?raw query
-import terminalStatusContentCss from '../components/Panels/TerminalPanel/components/TerminalStatusContent.css?raw'
-// @ts-expect-error Vite ?raw query
-import searchBarCss from '../components/Search/SearchBar.css?raw'
-// @ts-expect-error Vite ?raw query
-import settingsOverlayCss from '../components/Settings/SettingsOverlay.css?raw'
-// @ts-expect-error Vite ?raw query
-import toastCss from '../components/Toast/Toast.css?raw'
-// @ts-expect-error Vite ?raw query
-import characterCountCss from '../components/shared/CharacterCount.css?raw'
 
 interface AuditSurface {
   /** Plain label used in test names and assertion messages */
@@ -70,28 +42,28 @@ interface AuditSurface {
  * the declaration fails this test loudly with the surface name.
  */
 export const AUDIT_211_SURFACES: readonly AuditSurface[] = [
-  { surface: 'MarkdownPreview content', file: 'src/renderer/src/components/Editor/MarkdownPreview.css', selector: '.markdown-preview-content', css: markdownPreviewCss },
-  { surface: 'Dialog body', file: 'src/renderer/src/components/Dialog/Dialog.css', selector: '.dialog-body', css: dialogCss },
-  { surface: 'Dialog title', file: 'src/renderer/src/components/Dialog/Dialog.css', selector: '.dialog-title', css: dialogCss },
-  { surface: 'FilePicker filename', file: 'src/renderer/src/components/Dialog/FilePickerDialog.css', selector: '.file-picker-filename', css: filePickerCss },
-  { surface: 'FilePicker path', file: 'src/renderer/src/components/Dialog/FilePickerDialog.css', selector: '.file-picker-path', css: filePickerCss },
-  { surface: 'Welcome heading', file: 'src/renderer/src/components/DockLayout/AppDockLayout.css', selector: '.welcome-content h2', css: appDockLayoutCss },
-  { surface: 'Welcome paragraph', file: 'src/renderer/src/components/DockLayout/AppDockLayout.css', selector: '.welcome-content p', css: appDockLayoutCss },
-  { surface: 'Recent project name', file: 'src/renderer/src/components/DockLayout/AppDockLayout.css', selector: '.recent-project-name', css: appDockLayoutCss },
-  { surface: 'Recent project path', file: 'src/renderer/src/components/DockLayout/AppDockLayout.css', selector: '.recent-project-path', css: appDockLayoutCss },
-  { surface: 'Recent project time', file: 'src/renderer/src/components/DockLayout/AppDockLayout.css', selector: '.recent-project-time', css: appDockLayoutCss },
-  { surface: 'Chat panel', file: 'src/renderer/src/components/Editor/DiagramViewer/ChatBubble.css', selector: '.chat-panel', css: chatBubbleCss },
-  { surface: 'File conflict message', file: 'src/renderer/src/components/FileConflictNotification/FileConflictNotification.css', selector: '.file-conflict-message', css: fileConflictCss },
-  { surface: 'Document stats bar', file: 'src/renderer/src/components/Panels/DocumentStatsBar.css', selector: '.document-stats-bar', css: documentStatsBarCss },
+  { surface: 'MarkdownPreview content', file: 'src/renderer/src/styles/utilities.css', selector: '.markdown-preview-content', css: utilitiesCss },
+  { surface: 'Dialog body', file: 'src/renderer/src/styles/utilities.css', selector: '.dialog-body', css: utilitiesCss },
+  { surface: 'Dialog title', file: 'src/renderer/src/styles/utilities.css', selector: '.dialog-title', css: utilitiesCss },
+  { surface: 'FilePicker filename', file: 'src/renderer/src/styles/utilities.css', selector: '.file-picker-filename', css: utilitiesCss },
+  { surface: 'FilePicker path', file: 'src/renderer/src/styles/utilities.css', selector: '.file-picker-path', css: utilitiesCss },
+  { surface: 'Welcome heading', file: 'src/renderer/src/styles/utilities.css', selector: '.welcome-content h2', css: utilitiesCss },
+  { surface: 'Welcome paragraph', file: 'src/renderer/src/styles/utilities.css', selector: '.welcome-content p', css: utilitiesCss },
+  { surface: 'Recent project name', file: 'src/renderer/src/styles/utilities.css', selector: '.recent-project-name', css: utilitiesCss },
+  { surface: 'Recent project path', file: 'src/renderer/src/styles/utilities.css', selector: '.recent-project-path', css: utilitiesCss },
+  { surface: 'Recent project time', file: 'src/renderer/src/styles/utilities.css', selector: '.recent-project-time', css: utilitiesCss },
+  { surface: 'Chat panel', file: 'src/renderer/src/styles/utilities.css', selector: '.chat-panel', css: utilitiesCss },
+  { surface: 'File conflict message', file: 'src/renderer/src/styles/utilities.css', selector: '.file-conflict-message', css: utilitiesCss },
+  { surface: 'Document stats bar', file: 'src/renderer/src/styles/utilities.css', selector: '.document-stats-bar', css: utilitiesCss },
   { surface: 'Image viewer metadata', file: 'src/renderer/src/components/Panels/ImageViewerPanel.module.css', selector: '.metadataItem', css: imageViewerCss },
   { surface: 'Image viewer error', file: 'src/renderer/src/components/Panels/ImageViewerPanel.module.css', selector: '.errorMessage', css: imageViewerCss },
-  { surface: 'Project panel content', file: 'src/renderer/src/components/Panels/ProjectPanel.css', selector: '.project-panel .sidebar-panel-content', css: projectPanelCss },
-  { surface: 'Claude status bar', file: 'src/renderer/src/components/Panels/TerminalPanel/components/ClaudeStatusBar.css', selector: '.terminal-claude-statusbar', css: claudeStatusBarCss },
-  { surface: 'Terminal status hint', file: 'src/renderer/src/components/Panels/TerminalPanel/components/TerminalStatusContent.css', selector: '.terminal-status-hint', css: terminalStatusContentCss },
-  { surface: 'Search match count', file: 'src/renderer/src/components/Search/SearchBar.css', selector: '.search-match-count', css: searchBarCss },
-  { surface: 'Settings content', file: 'src/renderer/src/components/Settings/SettingsOverlay.css', selector: '.settings-content', css: settingsOverlayCss },
-  { surface: 'Toast message', file: 'src/renderer/src/components/Toast/Toast.css', selector: '.toast-message', css: toastCss },
-  { surface: 'Character count', file: 'src/renderer/src/components/shared/CharacterCount.css', selector: '.char-count', css: characterCountCss }
+  { surface: 'Project panel content', file: 'src/renderer/src/styles/utilities.css', selector: '.project-panel .sidebar-panel-content', css: utilitiesCss },
+  { surface: 'Claude status bar', file: 'src/renderer/src/styles/utilities.css', selector: '.terminal-claude-statusbar', css: utilitiesCss },
+  { surface: 'Terminal status hint', file: 'src/renderer/src/styles/utilities.css', selector: '.terminal-status-hint', css: utilitiesCss },
+  { surface: 'Search match count', file: 'src/renderer/src/styles/utilities.css', selector: '.search-match-count', css: utilitiesCss },
+  { surface: 'Settings content', file: 'src/renderer/src/styles/utilities.css', selector: '.settings-content', css: utilitiesCss },
+  { surface: 'Toast message', file: 'src/renderer/src/styles/utilities.css', selector: '.toast-message', css: utilitiesCss },
+  { surface: 'Character count', file: 'src/renderer/src/styles/utilities.css', selector: '.char-count', css: utilitiesCss }
 ]
 
 /**

@@ -21,9 +21,6 @@
   border-top: 1px solid var(--color-border-subtle);
   border-radius: 0;
   font-family: var(--font-sans);
-  /* Model name + token counts are data-bearing; opt back into selectable
-     text over dockview's inherited none (issue #211). */
-  user-select: text;
   flex-shrink: 0;
 }
 

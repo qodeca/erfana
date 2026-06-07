@@ -39,8 +39,6 @@
   font-size: 15px;
   line-height: var(--leading-normal);
   letter-spacing: -0.003em;
-  /* Override dockview's inherited user-select: none (issue #211). */
-  user-select: text;
 }
 
 /* Headings - compact spacing with reduced top margins */

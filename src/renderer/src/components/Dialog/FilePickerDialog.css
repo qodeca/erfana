@@ -64,16 +64,12 @@
   font-weight: var(--font-medium);
   color: var(--color-text-primary);
   margin-bottom: var(--space-1);
-  /* Override dockview's inherited user-select: none (issue #211). */
-  user-select: text;
 }
 
 .file-picker-path {
   font-size: var(--text-sm);
   color: var(--color-text-secondary);
   word-break: break-all;
-  /* Override dockview's inherited user-select: none (issue #211). */
-  user-select: text;
 }
 
 .file-picker-dialog .dialog-actions {

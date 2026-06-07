@@ -396,10 +396,13 @@ pointer-events: none;  /* optional - prevents interaction */
 
 **Scope rule.** Opt in at the data-text element, not at a click-target or drag-target ancestor. A row container with both `cursor: pointer` and `user-select: text` creates a gesture conflict (drag-to-select competes with click-to-pick). FilePicker is the worked example – the override lives on `.file-picker-filename` and `.file-picker-path` (data), not on `.file-picker-item` (the clickable row). Use container scope (`.dialog-body`, `.markdown-preview-content`) only when no descendant is interactive. When a container has both selectable content and chrome children (welcome panel's recent-project rows mix data text with action buttons), enumerate the data selectors explicitly – do not blanket the container.
 
-**Canonical override** (drop straight into a component CSS, replace the selector):
+**Canonical override** lives in `src/renderer/src/styles/utilities.css`. To make a new surface selectable, add its selector to the grouped rule there (and add a row to `src/renderer/src/styles/userSelect.audit.test.ts`). Two CSS-module surfaces (`.metadataItem`, `.errorMessage` in `ImageViewerPanel.module.css`) declare the rule in-place because the build-time class-name hashing prevents the central selector from matching them at runtime — for any other new surface, add it to `utilities.css`, not to the component file.
+
 ```css
-.markdown-preview-content {
-  /* Override dockview's inherited user-select: none (see ui-style-guide § Text selection policy). */
+/* src/renderer/src/styles/utilities.css */
+.markdown-preview-content,
+.dialog-body,
+/* ... */ {
   user-select: text;
 }
 ```

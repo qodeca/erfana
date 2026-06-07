@@ -87,8 +87,6 @@
   min-width: 80px;
   text-align: center;
   font-family: var(--font-sans);
-  /* Override dockview's inherited user-select: none (issue #211). */
-  user-select: text;
 }
 
 /* Navigation buttons container */
