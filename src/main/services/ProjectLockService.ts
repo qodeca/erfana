@@ -554,11 +554,33 @@ export class ProjectLockService implements IProjectLockService {
       const entries = await readdir(this.locksDir)
 
       for (const entry of entries) {
-        if (!entry.endsWith(LOCK_EXTENSION)) {
+        // Detect orphaned .tmp files left by atomicWriteJSON (written as .{uuid}.tmp then
+        // renamed to the target; a kill between those two steps leaves the .tmp behind).
+        const isOrphanTmp = entry.startsWith('.') && entry.endsWith('.tmp')
+
+        if (!entry.endsWith(LOCK_EXTENSION) && !isOrphanTmp) {
           continue
         }
 
-        const lockPath = join(this.locksDir, entry)
+        const fullPath = join(this.locksDir, entry)
+
+        if (isOrphanTmp) {
+          try {
+            const removed = await removeIfExists(fullPath)
+            if (removed) {
+              logger.debug('ProjectLockService: Cleaned up orphan atomic-write tmp file', {
+                lockHash: entry
+              })
+            }
+          } catch (error) {
+            logger.warn('ProjectLockService: Error removing orphan tmp file', {
+              error: error instanceof Error ? error.message : String(error)
+            })
+          }
+          continue
+        }
+
+        const lockPath = fullPath
 
         try {
           // Security: Skip symlinks to prevent file deletion outside locks directory

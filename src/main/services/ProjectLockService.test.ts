@@ -2061,6 +2061,67 @@ describe('ProjectLockService', () => {
     })
   })
 
+  describe('Orphaned .tmp file cleanup (F28)', () => {
+    it('cleans up orphaned .tmp files from interrupted atomic writes', async () => {
+      const locksDir = service.getLocksDirectory()
+      const orphanTmpName = '.abc123-def456.tmp'
+      const orphanTmpPath = join(locksDir, orphanTmpName)
+
+      // Pre-populate the mock filesystem with the orphan tmp
+      mockFileSystem.set(orphanTmpPath, 'partial write content')
+
+      // readdir returns only the orphan tmp (no .lock files in this test)
+      mockedReaddir.mockResolvedValue([orphanTmpName] as any)
+
+      // lstat: the locksDir itself is not a symlink; the tmp file is not a symlink either
+      mockedLstat.mockImplementation(async (path: any) => {
+        return { isSymbolicLink: () => false } as any
+      })
+
+      // Track what removeIfExists is called with
+      const removedPaths: string[] = []
+      mockedRemoveIfExists.mockImplementation(async (path: string) => {
+        removedPaths.push(path)
+        mockFileSystem.delete(path)
+        return true
+      })
+
+      await service.cleanupStaleLocks()
+
+      expect(removedPaths.some((p) => p.endsWith('.abc123-def456.tmp'))).toBe(true)
+    })
+
+    it('does not count orphaned .tmp removals toward the stale-lock count', async () => {
+      const locksDir = service.getLocksDirectory()
+      const orphanTmpName = '.abc123-def456.tmp'
+      const orphanTmpPath = join(locksDir, orphanTmpName)
+
+      mockFileSystem.set(orphanTmpPath, 'partial write content')
+      mockedReaddir.mockResolvedValue([orphanTmpName] as any)
+      mockedLstat.mockResolvedValue({ isSymbolicLink: () => false } as any)
+      mockedRemoveIfExists.mockImplementation(async (path: string) => {
+        mockFileSystem.delete(path)
+        return true
+      })
+
+      const count = await service.cleanupStaleLocks()
+
+      // Orphan tmps are removed but not counted as stale locks
+      expect(count).toBe(0)
+    })
+
+    it('still skips files that are neither .lock nor orphan .tmp', async () => {
+      mockedReaddir.mockResolvedValue(['README.md', '.DS_Store', 'abc123.tmp'] as any)
+
+      await service.cleanupStaleLocks()
+
+      // None of these match the orphan-tmp pattern (abc123.tmp doesn't start with '.')
+      // and none end in .lock, so nothing should be removed or read
+      expect(mockedRemoveIfExists).not.toHaveBeenCalled()
+      expect(mockedReadFile).not.toHaveBeenCalled()
+    })
+  })
+
   describe('Symlink TOCTOU defense in acquireLockRetry', () => {
     it('refuses to recreate lock at a symlink path (CVE-2025-68146 class)', async () => {
       const projectPath = '/test/symlink-attack'
