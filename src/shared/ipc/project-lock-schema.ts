@@ -32,7 +32,8 @@ export const LockInfoSchema = z.object({
   path: z.string(),
   focus_request: z.boolean().optional().default(false),
   requester_pid: z.number().int().positive().optional(),
-  lastHeartbeat: z.string().datetime().optional()
+  lastHeartbeat: z.string().datetime().optional(),
+  hmac: z.string().optional()
 })
 export type LockInfo = z.infer<typeof LockInfoSchema>
 
