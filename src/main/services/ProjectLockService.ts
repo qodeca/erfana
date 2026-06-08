@@ -1,21 +1,21 @@
 /**
- * ProjectLockService - File-based project locking for multi-instance support
+ * ProjectLockService - Thin composer for file-based project locking
  *
  * Prevents duplicate project opens across Erfana instances using file locks.
  * Lock files are stored in ~/.erfana/locks/{sha256-hash}.lock
  *
- * Features:
- * - Hybrid stale detection: PID check (same host) + 60-min timeout (cross-host)
- * - 500ms focus polling for inter-instance focus requests
- * - Atomic writes for crash safety
- * - Platform-adaptive window focusing
- * - Session-based lock tracking with cleanup on dispose
+ * Composition:
+ * - LockStalenessPolicy — hybrid stale detection (PID check same-host, 60-min timeout cross-host)
+ * - LockHeartbeatService — polling timer, heartbeat writes, powerMonitor integration, focus handling
  *
- * Design:
- * - Singleton pattern for centralized state
- * - Implements IProjectLockService interface
- * - Uses atomicWriteJSON for crash-safe writes
- * - Uses focusWindow for platform-adaptive focusing
+ * Owns:
+ * - acquireLock / releaseLock / checkLock — lock lifecycle
+ * - requestFocus — writes focus_request to the lock file
+ * - cleanupStaleLocks — startup recovery (removes stale / orphan-tmp files)
+ * - dispose — stops all timers then releases all active locks
+ *
+ * Constructor-injected: Clock, ProcessLiveness, hostname, locksDir, powerMonitor (testability).
+ * Singleton instance exported at the bottom.
  *
  * @see IProjectLockService for interface definition
  * @see Spec #010 - Multi-instance support specification
@@ -250,7 +250,7 @@ export class ProjectLockService implements IProjectLockService {
           }
 
           // Check if the lock is stale
-          const stale = this.isLockStale(existingLock)
+          const stale = this.stalenessPolicy.isStale(existingLock)
 
           if (stale) {
             logger.info('ProjectLockService: Removing stale lock', {
@@ -511,7 +511,7 @@ export class ProjectLockService implements IProjectLockService {
       }
 
       // Check if lock is stale
-      const stale = this.isLockStale(lockInfo)
+      const stale = this.stalenessPolicy.isStale(lockInfo)
 
       if (stale) {
         const result: LockStatus = { status: 'unlocked' }
@@ -638,7 +638,7 @@ export class ProjectLockService implements IProjectLockService {
             continue
           }
 
-          const stale = this.isLockStale(lockInfo)
+          const stale = this.stalenessPolicy.isStale(lockInfo)
 
           if (stale) {
             const removed = await removeIfExists(lockPath)
@@ -876,18 +876,6 @@ export class ProjectLockService implements IProjectLockService {
 
       return null
     }
-  }
-
-  /**
-   * Checks if a lock is stale (holder process is dead or timed out).
-   *
-   * Delegates to LockStalenessPolicy.
-   *
-   * @param lockInfo - Lock information to check
-   * @returns true if lock is stale and can be removed
-   */
-  private isLockStale(lockInfo: LockInfo): boolean {
-    return this.stalenessPolicy.isStale(lockInfo)
   }
 
 }
