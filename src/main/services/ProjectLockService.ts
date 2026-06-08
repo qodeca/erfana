@@ -102,6 +102,9 @@ export class ProjectLockService implements IProjectLockService {
   /** Map of project paths to active lock state */
   private readonly activeLocks = new Map<string, ActiveLock>()
 
+  /** Cache the most recent raw content + parsed lock per lockPath, to skip re-parsing on unchanged ticks */
+  private readonly lockReadCache = new Map<string, { raw: string; parsed: LockInfo }>()
+
   /** Flag to prevent operations during disposal */
   private isDisposing = false
 
@@ -389,6 +392,9 @@ export class ProjectLockService implements IProjectLockService {
         error: error instanceof Error ? error.message : String(error)
       })
     }
+
+    // Invalidate cache for this lock path
+    this.lockReadCache.delete(lockPath)
 
     // Remove from tracking
     this.activeLocks.delete(projectPath)
@@ -738,6 +744,8 @@ export class ProjectLockService implements IProjectLockService {
 
     await Promise.all(releasePromises)
 
+    this.lockReadCache.clear()
+
     logger.info('ProjectLockService: Disposed')
   }
 
@@ -805,12 +813,21 @@ export class ProjectLockService implements IProjectLockService {
   private async readLockFile(lockPath: string): Promise<LockInfo | null> {
     try {
       const content = await readFile(lockPath, 'utf8')
+
+      // Cache hit: same path, same raw bytes -> reuse parsed object
+      const cached = this.lockReadCache.get(lockPath)
+      if (cached && cached.raw === content) {
+        return cached.parsed
+      }
+
       const parsed = JSON.parse(content)
       const validated = LockInfoSchema.parse(parsed)
+      this.lockReadCache.set(lockPath, { raw: content, parsed: validated })
       return validated
     } catch (error) {
-      // ENOENT is expected if lock doesn't exist
+      // ENOENT is expected if lock doesn't exist — also drop cache
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        this.lockReadCache.delete(lockPath)
         return null
       }
 

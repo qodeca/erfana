@@ -1954,6 +1954,41 @@ describe('ProjectLockService', () => {
     })
   })
 
+  describe('readLockFile cache', () => {
+    it('reuses the cached LockInfo when the raw file content is unchanged', async () => {
+      const projectPath = '/test/cache-hit'
+      await service.acquireLock(projectPath)
+
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = join(service.getLocksDirectory(), hash + '.lock')
+
+      // Spy on Zod's parse to count invocations
+      const schemaModule = await import('../../shared/ipc/project-lock-schema')
+      const parseSpy = vi.spyOn(schemaModule.LockInfoSchema, 'parse')
+
+      // First read parses
+      await (service as any).readLockFile(lockPath)
+      const parseCallsAfterFirstRead = parseSpy.mock.calls.length
+
+      // Second read on byte-identical content should NOT re-parse
+      await (service as any).readLockFile(lockPath)
+      expect(parseSpy.mock.calls.length).toBe(parseCallsAfterFirstRead)
+
+      // Mutate the file to invalidate the cache
+      const updated = JSON.stringify({
+        ...JSON.parse(mockFileSystem.get(lockPath)!),
+        focus_request: true
+      })
+      mockFileSystem.set(lockPath, updated)
+
+      // Third read sees different bytes and parses again
+      await (service as any).readLockFile(lockPath)
+      expect(parseSpy.mock.calls.length).toBe(parseCallsAfterFirstRead + 1)
+
+      parseSpy.mockRestore()
+    })
+  })
+
   describe('Symlink TOCTOU defense in acquireLockRetry', () => {
     it('refuses to recreate lock at a symlink path (CVE-2025-68146 class)', async () => {
       const projectPath = '/test/symlink-attack'
