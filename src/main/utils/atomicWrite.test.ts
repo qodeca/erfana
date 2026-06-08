@@ -5,8 +5,7 @@
  *
  * Coverage:
  * - atomicWriteJSON creates file with correct content
- * - atomicWriteJSON creates directory if not exists
- * - atomicWriteJSON sets correct permissions (0o600 for files, 0o700 for dirs)
+ * - atomicWriteJSON sets correct permissions (0o600 for files)
  * - atomicWriteJSON handles write errors and cleans up temp files
  * - removeIfExists returns true when file exists
  * - removeIfExists returns false for ENOENT
@@ -19,9 +18,7 @@ import * as os from 'os'
 import { atomicWriteJSON, removeIfExists } from './atomicWrite'
 
 const TEST_BASE = path.join(os.tmpdir(), 'erfana-test', '.erfana', 'locks')
-const TEST_BASE_NEW = path.join(TEST_BASE, 'new')
 const LOCK_PATH = path.join(TEST_BASE, 'test.lock')
-const LOCK_PATH_NEW = path.join(TEST_BASE_NEW, 'test.lock')
 const TMP_PATH = path.join(TEST_BASE, '.test-uuid-1234.tmp')
 const NONEXISTENT_LOCK = path.join(TEST_BASE, 'nonexistent.lock')
 const LOCK_1 = path.join(TEST_BASE, 'test1.lock')
@@ -46,7 +43,6 @@ import { writeFile, rename, unlink, mkdir } from 'node:fs/promises'
 const mockedWriteFile = vi.mocked(writeFile)
 const mockedRename = vi.mocked(rename)
 const mockedUnlink = vi.mocked(unlink)
-const mockedMkdir = vi.mocked(mkdir)
 
 describe('atomicWriteJSON', () => {
   beforeEach(() => {
@@ -57,16 +53,15 @@ describe('atomicWriteJSON', () => {
     const content = { foo: 'bar', num: 42 }
     const filePath = LOCK_PATH
 
-    mockedMkdir.mockResolvedValue(undefined)
     mockedWriteFile.mockResolvedValue(undefined)
     mockedRename.mockResolvedValue(undefined)
 
     await atomicWriteJSON(filePath, content)
 
-    // Should write formatted JSON to temp file
+    // Should write compact JSON to temp file
     expect(mockedWriteFile).toHaveBeenCalledWith(
       TMP_PATH,
-      JSON.stringify(content, null, 2),
+      JSON.stringify(content),
       {
         encoding: 'utf8',
         mode: 0o600
@@ -80,27 +75,10 @@ describe('atomicWriteJSON', () => {
     )
   })
 
-  it('creates directory if not exists with correct permissions', async () => {
-    const content = { test: 'data' }
-    const filePath = LOCK_PATH_NEW
-
-    mockedMkdir.mockResolvedValue(undefined)
-    mockedWriteFile.mockResolvedValue(undefined)
-    mockedRename.mockResolvedValue(undefined)
-
-    await atomicWriteJSON(filePath, content)
-
-    expect(mockedMkdir).toHaveBeenCalledWith(TEST_BASE_NEW, {
-      recursive: true,
-      mode: 0o700
-    })
-  })
-
   it('sets owner-only permissions (0o600) for files', async () => {
     const content = { sensitive: 'data' }
     const filePath = LOCK_PATH
 
-    mockedMkdir.mockResolvedValue(undefined)
     mockedWriteFile.mockResolvedValue(undefined)
     mockedRename.mockResolvedValue(undefined)
 
@@ -120,7 +98,6 @@ describe('atomicWriteJSON', () => {
     const filePath = LOCK_PATH
     const writeError = new Error('Disk full')
 
-    mockedMkdir.mockResolvedValue(undefined)
     mockedWriteFile.mockRejectedValue(writeError)
     mockedUnlink.mockResolvedValue(undefined)
 
@@ -135,7 +112,6 @@ describe('atomicWriteJSON', () => {
     const filePath = LOCK_PATH
     const renameError = new Error('Permission denied')
 
-    mockedMkdir.mockResolvedValue(undefined)
     mockedWriteFile.mockResolvedValue(undefined)
     mockedRename.mockRejectedValue(renameError)
     mockedUnlink.mockResolvedValue(undefined)
@@ -152,7 +128,6 @@ describe('atomicWriteJSON', () => {
     const renameError = new Error('Permission denied')
     const unlinkError = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
 
-    mockedMkdir.mockResolvedValue(undefined)
     mockedWriteFile.mockResolvedValue(undefined)
     mockedRename.mockRejectedValue(renameError)
     mockedUnlink.mockRejectedValue(unlinkError)
@@ -171,7 +146,6 @@ describe('atomicWriteJSON', () => {
     }
     const filePath = LOCK_PATH
 
-    mockedMkdir.mockResolvedValue(undefined)
     mockedWriteFile.mockResolvedValue(undefined)
     mockedRename.mockResolvedValue(undefined)
 
@@ -179,7 +153,7 @@ describe('atomicWriteJSON', () => {
 
     expect(mockedWriteFile).toHaveBeenCalledWith(
       expect.any(String),
-      JSON.stringify(content, null, 2),
+      JSON.stringify(content),
       expect.any(Object)
     )
   })
@@ -188,7 +162,6 @@ describe('atomicWriteJSON', () => {
     const content = { test: 'data' }
     const filePath = LOCK_PATH
 
-    mockedMkdir.mockResolvedValue(undefined)
     mockedWriteFile.mockResolvedValue(undefined)
     mockedRename.mockResolvedValue(undefined)
 
@@ -285,7 +258,6 @@ describe('atomicWriteJSON rename retry', () => {
   })
 
   it('retries rename up to 3 times when Windows reports EPERM (AV/indexer race)', async () => {
-    mockedMkdir.mockResolvedValue(undefined)
     mockedWriteFile.mockResolvedValue(undefined)
     mockedUnlink.mockResolvedValue(undefined)
 
@@ -308,7 +280,6 @@ describe('atomicWriteJSON rename retry', () => {
   })
 
   it('does not retry on non-retryable errno (ENOSPC)', async () => {
-    mockedMkdir.mockResolvedValue(undefined)
     mockedWriteFile.mockResolvedValue(undefined)
     mockedUnlink.mockResolvedValue(undefined)
 
@@ -328,7 +299,6 @@ describe('atomicWriteJSON rename retry', () => {
   })
 
   it('throws the last error after exhausting all retries', async () => {
-    mockedMkdir.mockResolvedValue(undefined)
     mockedWriteFile.mockResolvedValue(undefined)
     mockedUnlink.mockResolvedValue(undefined)
 

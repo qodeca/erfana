@@ -7,7 +7,7 @@
  * @see ProjectLockService.ts - uses atomic writes for lock files
  * @see Spec #010 - Multi-instance support specification
  */
-import { writeFile, rename, unlink, mkdir } from 'node:fs/promises'
+import { writeFile, rename, unlink } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
@@ -15,7 +15,9 @@ import { randomUUID } from 'node:crypto'
  * Writes JSON content atomically using write-to-temp-then-rename pattern.
  * This ensures crash safety - file is either fully written or not at all.
  *
- * Security: Uses restrictive permissions (0o700 for dirs, 0o600 for files)
+ * Security: Uses restrictive permissions (0o600 for files).
+ * Callers are responsible for ensuring the target directory exists before
+ * calling this function (e.g. via `mkdir(dir, { recursive: true, mode: 0o700 })`).
  *
  * @param filePath - Absolute path to the target file
  * @param content - Content to serialize and write
@@ -25,12 +27,9 @@ export async function atomicWriteJSON<T>(filePath: string, content: T): Promise<
   const dir = dirname(filePath)
   const tempPath = join(dir, `.${randomUUID()}.tmp`)
 
-  // Ensure directory exists with restrictive permissions
-  await mkdir(dir, { recursive: true, mode: 0o700 })
-
   try {
     // Write to temp file with owner-only permissions
-    await writeFile(tempPath, JSON.stringify(content, null, 2), {
+    await writeFile(tempPath, JSON.stringify(content), {
       encoding: 'utf8',
       mode: 0o600 // Owner read/write only
     })
