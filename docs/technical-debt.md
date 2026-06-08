@@ -169,6 +169,18 @@ Moving the block would require synchronized edits to checks.yml + skill + README
 
 ---
 
+### 11. Project-lock honest-challenger stale-steal race (lens-review F3, 2026-06)
+
+**Severity**: Low
+**Origin**: Lens-review F3; project-lock heartbeat hardening Phase D
+
+After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 HMAC signing) the major lock-theft vectors are closed. The remaining surface: two healthy peer instances can still race between "this lock is heartbeat-stale" and "I just stole it" because file-locks alone have no OS-level handshake. Resolving requires either a named-pipe handshake or a lease-renewal protocol – out of scope for the enhancement branch. Note this is the *honest* (non-malicious) race; malicious forgery is now defeated by HMAC.
+
+**Estimated effort:** 1–2 days
+**Triggers reconsideration:** if telemetry shows double-open occurrences in the wild
+
+---
+
 ## Code Quality Improvements
 
 ### Documentation Token Efficiency

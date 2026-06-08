@@ -481,6 +481,44 @@ The `afterSign` hook is critical: without it, macOS Sequoia+ rejects `@rpath` li
 
 Git status runs in a `worker_threads` Worker – same process memory space, no new sandbox boundary. Security: `validateProjectPath()` in IPC handler before worker; worker also rejects non-absolute paths (defense-in-depth). Native git uses `execFile` with array args (no `shell: true`). Git binary resolved via hardcoded allowlist first.
 
+## Project-lock authenticity (HMAC-signed lock body)
+
+Lens-review F6 – addressed in commit `19d9827` (Phase D Task D3b).
+
+### Threat model
+
+A process running as the same user on the same machine can write a forged lock file (denying us the project, or planting a fake "stale" lock to trigger an incorrect steal). The lock file's `pid`, `lastHeartbeat`, and `hostname` were previously trust-on-first-read – any same-user process could fabricate them.
+
+### Mitigation
+
+Every lock body is HMAC-SHA-256 signed with a per-user key derived once from `safeStorage.encryptString('erfana-lock-hmac-v1')`. The key is cached in-process and never written to disk; another local user cannot reproduce the encryption without our process credentials.
+
+- **Write path (5 sites):** `acquireLock`, `acquireLockRetry`, `requestFocus`, `writeHeartbeat`, `handleFocusRequest`.
+- **Read path:** `readLockFile` verifies after Zod validation, BEFORE the parsed-lock cache populates. `'invalid'` → log warn + return null (lock is treated as if it didn't exist, so the next acquire proceeds normally).
+
+### Verification outcomes
+
+| Result    | Meaning                                        | Behavior                                                            |
+|-----------|------------------------------------------------|---------------------------------------------------------------------|
+| `valid`   | HMAC present and matches                        | Accept the lock as-is                                               |
+| `missing` | HMAC absent (legacy lock from older build)      | Accept for backward compat; lock gets re-signed on next write       |
+| `invalid` | HMAC present but doesn't match                  | **Treat as absent** – log warn at info level; next acquire proceeds |
+| `no-key`  | safeStorage unavailable on this OS              | Accept; log warn once per process; HMAC disabled in this session    |
+
+### Backward compat
+
+The `hmac` field is `z.string().optional()` on `LockInfoSchema`. Existing lock files written by pre-D3 builds parse cleanly with no `hmac` (verification returns `'missing'` → accepted). When the lock is next refreshed by a heartbeat tick, the new write attaches an HMAC.
+
+### What this does NOT defend against
+
+- An attacker with **read access to the running Erfana process memory** (debugger attached, malware injected into the process) can extract the cached key and forge locks.
+- A process running as a **different user** is already excluded by filesystem permissions on `%APPDATA%\Erfana\locks\` (the locks directory inherits user-private inheritance from `%APPDATA%`). The HMAC is defense-in-depth for the same-user attacker.
+- On **Linux without secret-service**, safeStorage uses a basic password fallback that may not be as strong as Keychain/DPAPI. Treat HMAC as best-effort on those installs.
+
+### Residual risk: honest-challenger stale-steal race
+
+After A4 (`powerMonitor` resume), B1 (symlink TOCTOU), and D3 (HMAC), the major attack vectors are closed. But two healthy peer instances can still race between "this lock is heartbeat-stale" and "I just stole it" without an OS-level handshake. Tracked in `docs/technical-debt.md` as the F3 residual.
+
 ## Local Whisper trust chain (Phase 4, v0.9.4)
 
 4-layer client-side trust model for the whisper.cpp subprocess (manifest Ed25519 sig + artifact SHA pin + per-spawn re-hash for TOCTOU + monotonic revision floor). Composition + attacker model: [`windows/whisper-trust-chain.md`](./windows/whisper-trust-chain.md). Decisions: [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)–[ADR 0004](./adrs/0004-per-spawn-toctou-rehash.md). Operator runbook: [`windows/whisper-support-runbook.md`](./windows/whisper-support-runbook.md).
