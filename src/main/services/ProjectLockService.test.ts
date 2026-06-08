@@ -2074,7 +2074,7 @@ describe('ProjectLockService', () => {
       mockedReaddir.mockResolvedValue([orphanTmpName] as any)
 
       // lstat: the locksDir itself is not a symlink; the tmp file is not a symlink either
-      mockedLstat.mockImplementation(async (path: any) => {
+      mockedLstat.mockImplementation(async () => {
         return { isSymbolicLink: () => false } as any
       })
 

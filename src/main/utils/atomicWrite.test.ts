@@ -38,7 +38,7 @@ vi.mock('node:crypto', () => ({
 }))
 
 // Import mocked modules
-import { writeFile, rename, unlink, mkdir } from 'node:fs/promises'
+import { writeFile, rename, unlink } from 'node:fs/promises'
 
 const mockedWriteFile = vi.mocked(writeFile)
 const mockedRename = vi.mocked(rename)
