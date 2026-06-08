@@ -345,6 +345,28 @@ export class ProjectLockService implements IProjectLockService {
           return result
         }
       }
+
+      // EPERM on retry typically means an orphan process still holds a file handle
+      // on the lock file (the original Windows bug scenario). Treat as "already locked"
+      // so the user sees the correct "project already open" UX rather than a fault dialog.
+      if ((retryError as NodeJS.ErrnoException).code === 'EPERM') {
+        const existingLock = await this.readLockFile(lockPath)
+        if (existingLock) {
+          const result: LockResult = {
+            status: 'already_locked',
+            holderPid: existingLock.pid,
+            holderHostname: existingLock.hostname
+          }
+          logger.info('ProjectLockService: EPERM on retry — treating as already_locked', {
+            projectPath: redactPath(projectPath),
+            lockHash: hash,
+            holderPid: existingLock.pid
+          })
+          return result
+        }
+        // Lock file unreadable: fall through to the existing throw
+      }
+
       throw retryError
     }
   }

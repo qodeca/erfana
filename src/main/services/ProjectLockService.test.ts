@@ -1989,6 +1989,78 @@ describe('ProjectLockService', () => {
     })
   })
 
+  describe('EPERM on retry treated as already_locked (F18)', () => {
+    it('returns already_locked when EPERM is thrown on retry (orphan handle scenario)', async () => {
+      const projectPath = '/test/eperm-retry'
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = join(service.getLocksDirectory(), hash + '.lock')
+
+      // Seed a stale lock that will trigger the remove+retry path
+      const recentDate = new Date(Date.now() - 60_000).toISOString()
+      const staleLock: LockInfo = {
+        instanceId: '550e8400-e29b-41d4-a716-446655440077',
+        pid: 99999,
+        timestamp: recentDate,
+        hostname: osHostname(),
+        path: projectPath,
+        focus_request: false,
+        lastHeartbeat: recentDate
+      }
+      mockFileSystem.set(lockPath, JSON.stringify(staleLock))
+
+      // Mock process.kill to return ESRCH → lock is stale → enters retry path
+      vi.spyOn(process, 'kill').mockImplementation(() => {
+        const e: NodeJS.ErrnoException = new Error('ESRCH')
+        e.code = 'ESRCH'
+        throw e
+      })
+
+      // Override open so the FIRST call (in acquireLock) behaves normally (EEXIST since file
+      // exists) and the SECOND call (in acquireLockRetry, after removeIfExists cleared the
+      // slot) throws EPERM — simulating an orphan process still holding the file handle.
+      let openCallCount = 0
+      mockedOpen.mockImplementation((path, flags) => {
+        const pathStr = path.toString()
+        if (flags === 'wx') {
+          openCallCount++
+          if (openCallCount === 1) {
+            // First call: file is in mockFileSystem → EEXIST (normal path)
+            if (mockFileSystem.has(pathStr)) {
+              return Promise.reject(
+                Object.assign(new Error('EEXIST'), { code: 'EEXIST' }) as NodeJS.ErrnoException
+              )
+            }
+          }
+          if (openCallCount === 2) {
+            // Second call (inside acquireLockRetry): orphan holds a handle → EPERM
+            // Restore the staleLock so readLockFile can resolve it after the EPERM
+            mockFileSystem.set(pathStr, JSON.stringify(staleLock))
+            return Promise.reject(
+              Object.assign(new Error('EPERM: simulated orphan handle'), {
+                code: 'EPERM'
+              }) as NodeJS.ErrnoException
+            )
+          }
+        }
+        // Fallback: mock handle that writes to mockFileSystem
+        const handle = {
+          writeFile: vi.fn((content: string) => {
+            mockFileSystem.set(pathStr, content)
+            return Promise.resolve()
+          }),
+          close: vi.fn().mockResolvedValue(undefined)
+        }
+        return Promise.resolve(handle)
+      })
+
+      const result = await service.acquireLock(projectPath)
+      expect(result.status).toBe('already_locked')
+      if (result.status === 'already_locked') {
+        expect(result.holderPid).toBe(99999)
+      }
+    })
+  })
+
   describe('Symlink TOCTOU defense in acquireLockRetry', () => {
     it('refuses to recreate lock at a symlink path (CVE-2025-68146 class)', async () => {
       const projectPath = '/test/symlink-attack'
