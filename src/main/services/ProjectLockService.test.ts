@@ -190,6 +190,7 @@ describe('ProjectLockService', () => {
 
   afterEach(async () => {
     vi.useRealTimers()
+    vi.restoreAllMocks()
     await service.dispose()
 
     // Restore original platform and process.kill
@@ -338,7 +339,7 @@ describe('ProjectLockService', () => {
       mockFileSystem.set(lockPath, JSON.stringify(existingLock))
 
       // Mock process.kill to simulate process is alive
-      process.kill = vi.fn(() => true)
+      vi.spyOn(process, 'kill').mockImplementation(() => true as never)
 
       const result = await service.acquireLock(projectPath)
 
@@ -367,7 +368,7 @@ describe('ProjectLockService', () => {
       mockFileSystem.set(lockPath, JSON.stringify(staleLock))
 
       // Mock process.kill to throw ESRCH (process not found)
-      process.kill = vi.fn(() => {
+      vi.spyOn(process, 'kill').mockImplementation(() => {
         const error: NodeJS.ErrnoException = new Error('ESRCH')
         error.code = 'ESRCH'
         throw error
@@ -542,7 +543,7 @@ describe('ProjectLockService', () => {
       mockFileSystem.set(lockPath, JSON.stringify(otherLock))
 
       // Mock process.kill to simulate process is alive
-      process.kill = vi.fn(() => true)
+      vi.spyOn(process, 'kill').mockImplementation(() => true as never)
 
       const result = await service.checkLock(projectPath)
 
@@ -566,7 +567,7 @@ describe('ProjectLockService', () => {
       mockedReadFile.mockResolvedValue(JSON.stringify(staleLock))
 
       // Mock process.kill to throw ESRCH (process not found)
-      process.kill = vi.fn(() => {
+      vi.spyOn(process, 'kill').mockImplementation(() => {
         const error: NodeJS.ErrnoException = new Error('ESRCH')
         error.code = 'ESRCH'
         throw error
@@ -608,11 +609,11 @@ describe('ProjectLockService', () => {
       mockFileSystem.set(lockPath, JSON.stringify(lockWithMysteryPid))
 
       // Mock process.kill to throw an unknown errno
-      process.kill = vi.fn(() => {
+      vi.spyOn(process, 'kill').mockImplementation(() => {
         const err: NodeJS.ErrnoException = new Error('ENOMEM: transient memory pressure')
         err.code = 'ENOMEM'
         throw err
-      }) as any
+      })
 
       const result = await service.checkLock(projectPath)
       // With B5's fix: ENOMEM → assume alive → lock not stale → locked_by_other
@@ -623,7 +624,7 @@ describe('ProjectLockService', () => {
 
   describe('isProcessAlive', () => {
     it('returns true when process exists', () => {
-      process.kill = vi.fn(() => true)
+      vi.spyOn(process, 'kill').mockImplementation(() => true as never)
 
       const result = (service as any).isProcessAlive(process.pid)
 
@@ -632,7 +633,7 @@ describe('ProjectLockService', () => {
     })
 
     it('returns false when process does not exist (ESRCH)', () => {
-      process.kill = vi.fn(() => {
+      vi.spyOn(process, 'kill').mockImplementation(() => {
         const error: NodeJS.ErrnoException = new Error('ESRCH')
         error.code = 'ESRCH'
         throw error
@@ -644,7 +645,7 @@ describe('ProjectLockService', () => {
     })
 
     it('returns true when process exists but no permission (EPERM)', () => {
-      process.kill = vi.fn(() => {
+      vi.spyOn(process, 'kill').mockImplementation(() => {
         const error: NodeJS.ErrnoException = new Error('EPERM')
         error.code = 'EPERM'
         throw error
@@ -656,7 +657,7 @@ describe('ProjectLockService', () => {
     })
 
     it('returns true on unknown errno (fail-closed)', () => {
-      process.kill = vi.fn(() => {
+      vi.spyOn(process, 'kill').mockImplementation(() => {
         const err: NodeJS.ErrnoException = new Error('ENOMEM: transient memory pressure')
         err.code = 'ENOMEM'
         throw err
@@ -691,7 +692,7 @@ describe('ProjectLockService', () => {
       mockedReaddir.mockResolvedValue(['abc123.lock', 'def456.lock'] as any)
 
       // Mock process.kill to throw ESRCH (process not found)
-      process.kill = vi.fn(() => {
+      vi.spyOn(process, 'kill').mockImplementation(() => {
         const error: NodeJS.ErrnoException = new Error('ESRCH')
         error.code = 'ESRCH'
         throw error
@@ -726,7 +727,7 @@ describe('ProjectLockService', () => {
       mockedReadFile.mockResolvedValue(JSON.stringify(activeLock))
 
       // Mock process.kill to succeed (process is alive)
-      process.kill = vi.fn(() => true)
+      vi.spyOn(process, 'kill').mockImplementation(() => true as never)
 
       const count = await service.cleanupStaleLocks()
 
@@ -753,7 +754,7 @@ describe('ProjectLockService', () => {
       // Override readdir to return the lock files
       mockedReaddir.mockResolvedValue(['corrupt.lock', 'valid.lock'] as any)
 
-      process.kill = vi.fn(() => {
+      vi.spyOn(process, 'kill').mockImplementation(() => {
         const error: NodeJS.ErrnoException = new Error('ESRCH')
         error.code = 'ESRCH'
         throw error
@@ -1023,7 +1024,7 @@ describe('ProjectLockService', () => {
       mockFileSystem.set(lockPath, JSON.stringify(futureLock))
 
       // Mock process.kill to simulate process is alive
-      process.kill = vi.fn(() => true)
+      vi.spyOn(process, 'kill').mockImplementation(() => true as never)
 
       const result = await service.acquireLock(projectPath)
 
@@ -1323,7 +1324,7 @@ describe('ProjectLockService', () => {
 
       mockedReaddir.mockResolvedValue(['invalid1.lock', 'invalid2.lock', 'valid.lock'] as any)
 
-      process.kill = vi.fn(() => {
+      vi.spyOn(process, 'kill').mockImplementation(() => {
         const error: NodeJS.ErrnoException = new Error('ESRCH')
         error.code = 'ESRCH'
         throw error
@@ -1362,7 +1363,7 @@ describe('ProjectLockService', () => {
         return Promise.resolve({ isSymbolicLink: () => false } as any)
       })
 
-      process.kill = vi.fn(() => {
+      vi.spyOn(process, 'kill').mockImplementation(() => {
         const error: NodeJS.ErrnoException = new Error('ESRCH')
         error.code = 'ESRCH'
         throw error
@@ -1417,7 +1418,7 @@ describe('ProjectLockService', () => {
         )
       })
 
-      process.kill = vi.fn(() => {
+      vi.spyOn(process, 'kill').mockImplementation(() => {
         const error: NodeJS.ErrnoException = new Error('ESRCH')
         error.code = 'ESRCH'
         throw error
@@ -1470,7 +1471,7 @@ describe('ProjectLockService', () => {
       }
       mockFileSystem.set(lockPath, JSON.stringify(staleLock))
       // mock process.kill to NOT throw → PID "alive"
-      process.kill = vi.fn(() => true)
+      vi.spyOn(process, 'kill').mockImplementation(() => true as never)
 
       const result = await service.checkLock(projectPath)
       expect(result.status).toBe('unlocked')
@@ -1491,7 +1492,7 @@ describe('ProjectLockService', () => {
         lastHeartbeat: recentDate
       }
       mockFileSystem.set(lockPath, JSON.stringify(freshLock))
-      process.kill = vi.fn(() => true)
+      vi.spyOn(process, 'kill').mockImplementation(() => true as never)
 
       const result = await service.checkLock(projectPath)
       expect(result.status).toBe('locked_by_other')
@@ -1513,7 +1514,7 @@ describe('ProjectLockService', () => {
         // no lastHeartbeat
       }
       mockFileSystem.set(lockPath, JSON.stringify(legacyLock))
-      process.kill = vi.fn(() => true)
+      vi.spyOn(process, 'kill').mockImplementation(() => true as never)
 
       const result = await service.checkLock(projectPath)
       expect(result.status).toBe('unlocked') // stale via timestamp fallback
@@ -1543,7 +1544,7 @@ describe('ProjectLockService', () => {
         .mockReturnValue(malformedLock as any)
 
       // PID is "alive" so we isolate the NaN-from-datetime code path
-      process.kill = vi.fn(() => true)
+      vi.spyOn(process, 'kill').mockImplementation(() => true as never)
 
       const result = await service.checkLock(projectPath)
       expect(result.status).toBe('unlocked')
@@ -1575,6 +1576,50 @@ describe('ProjectLockService', () => {
       expect(result.status).toBe('unlocked')
 
       parseSpy.mockRestore()
+    })
+
+    it('does NOT treat heartbeat as stale at exactly HEARTBEAT_STALE_MS boundary', async () => {
+      const projectPath = '/test/boundary'
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = join(service.getLocksDirectory(), hash + '.lock')
+
+      const exactlyAtThreshold = new Date(Date.now() - 30_000).toISOString()
+      const lock: LockInfo = {
+        instanceId: '550e8400-e29b-41d4-a716-446655440101',
+        pid: 99999,
+        timestamp: exactlyAtThreshold,
+        hostname: osHostname(),
+        path: projectPath,
+        focus_request: false,
+        lastHeartbeat: exactlyAtThreshold
+      }
+      mockFileSystem.set(lockPath, JSON.stringify(lock))
+      vi.spyOn(process, 'kill').mockImplementation(() => true as never)
+
+      const result = await service.checkLock(projectPath)
+      expect(result.status).toBe('locked_by_other') // > not >=, so exact threshold is fresh
+    })
+
+    it('treats heartbeat as stale at HEARTBEAT_STALE_MS + 1 ms past threshold', async () => {
+      const projectPath = '/test/one-ms-past'
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = join(service.getLocksDirectory(), hash + '.lock')
+
+      const justPastThreshold = new Date(Date.now() - 30_001).toISOString()
+      const lock: LockInfo = {
+        instanceId: '550e8400-e29b-41d4-a716-446655440102',
+        pid: 99999,
+        timestamp: justPastThreshold,
+        hostname: osHostname(),
+        path: projectPath,
+        focus_request: false,
+        lastHeartbeat: justPastThreshold
+      }
+      mockFileSystem.set(lockPath, JSON.stringify(lock))
+      vi.spyOn(process, 'kill').mockImplementation(() => true as never)
+
+      const result = await service.checkLock(projectPath)
+      expect(result.status).toBe('unlocked')
     })
   })
 
@@ -1888,11 +1933,11 @@ describe('ProjectLockService', () => {
       const join_ = (await import('node:path')).join
       mockFileSystem.set(join_(locksDir, 'abc999.lock'), JSON.stringify(staleLock))
       mockedReaddir.mockResolvedValue(['abc999.lock'] as any)
-      process.kill = vi.fn(() => {
+      vi.spyOn(process, 'kill').mockImplementation(() => {
         const e: NodeJS.ErrnoException = new Error('ESRCH')
         e.code = 'ESRCH'
         throw e
-      }) as any
+      })
 
       // Mock lstat for the locks directory to report a symlink
       mockedLstat.mockImplementation(async (path: any) => {
@@ -1928,11 +1973,11 @@ describe('ProjectLockService', () => {
       mockFileSystem.set(lockPath, JSON.stringify(staleLock))
 
       // Mock process.kill so PID-alive returns false → lock is stale and will be removed
-      process.kill = vi.fn(() => {
+      vi.spyOn(process, 'kill').mockImplementation(() => {
         const e: NodeJS.ErrnoException = new Error('ESRCH')
         e.code = 'ESRCH'
         throw e
-      }) as any
+      })
 
       // After removeIfExists clears the file, lstat for the path now reports a symlink
       // (simulating an attacker planting one in the TOCTOU window)
