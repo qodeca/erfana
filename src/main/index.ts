@@ -342,21 +342,49 @@ app.on('window-all-closed', () => {
   app.quit()
 })
 
-// Cleanup file watchers, directory watchers, terminals, git watchers, and project locks before app quits
-// NOTE: Electron's before-quit doesn't reliably await async handlers — process exit can race ahead.
-// projectLockService.dispose() runs FIRST so the lock file release is the change most likely to land
-// before the OS kills us; the heartbeat-based staleness check (HEARTBEAT_STALE_MS) covers cases where
-// this still doesn't complete (e.g., Task Manager force-kill, BSOD).
-app.on('before-quit', async () => {
+// Cleanup file watchers, directory watchers, terminals, git watchers, and project locks before app quits.
+// Pattern B (F11): preventDefault + sequenced shutdown guarantees lock release before exit.
+// isShuttingDown guards against the second before-quit Electron emits after preventDefault.
+const SHUTDOWN_TIMEOUT_MS = 2_000
+let isShuttingDown = false
+
+app.on('before-quit', async (event) => {
+  if (isShuttingDown) return
+  isShuttingDown = true
+  event.preventDefault()
+
   logger.info('App quitting, cleaning up services')
-  await projectLockService.dispose()
-  await fileWatcherService.dispose()
-  await directoryWatcherService.dispose()
-  await terminalService.dispose()
-  if (claudeStatusHandlers) await claudeStatusHandlers.dispose()
-  await gitWatcherService.dispose()
+
+  // Critical: lock release must complete before exit so the next launch
+  // can open the project without waiting for heartbeat staleness.
+  try {
+    await projectLockService.dispose()
+  } catch (err) {
+    logger.warn('App quit: projectLockService.dispose() threw', {
+      error: err instanceof Error ? err.message : String(err)
+    })
+  }
+
+  // Best-effort: race remaining disposers against a hard timeout.
+  // Promise.allSettled swallows individual failures so one bad disposer
+  // can't cancel the others.
+  const bestEffort = Promise.allSettled([
+    fileWatcherService.dispose(),
+    directoryWatcherService.dispose(),
+    terminalService.dispose(),
+    claudeStatusHandlers ? claudeStatusHandlers.dispose() : Promise.resolve(),
+    gitWatcherService.dispose(),
+    gitStatusService.dispose()
+  ])
+  await Promise.race([
+    bestEffort,
+    new Promise((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS))
+  ])
+
+  // Sync disposer — always runs after the race
   gitPollingService.dispose()
-  await gitStatusService.dispose()
+
+  app.exit(0)
 })
 
 // In this file you can include the rest of your app's specific main process
