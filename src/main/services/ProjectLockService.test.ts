@@ -1388,26 +1388,7 @@ describe('ProjectLockService', () => {
     })
   })
 
-  describe('Heartbeat refresh', () => {
-    it('refreshes lastHeartbeat every HEARTBEAT_INTERVAL_MS while holding the lock', async () => {
-      const projectPath = 'C:\\test\\project'
-      await service.acquireLock(projectPath)
-
-      const hash = await service.computeLockHash(projectPath)
-      const lockPath = join(service.getLocksDirectory(), hash + '.lock')
-      const initial = JSON.parse(mockFileSystem.get(lockPath)!)
-      const initialHeartbeat = initial.lastHeartbeat
-
-      // Advance fake clock past HEARTBEAT_INTERVAL_MS (5000) and run one poll tick (500ms)
-      await vi.advanceTimersByTimeAsync(5500)
-
-      const updated = JSON.parse(mockFileSystem.get(lockPath)!)
-      expect(updated.lastHeartbeat).toBeDefined()
-      expect(new Date(updated.lastHeartbeat).getTime()).toBeGreaterThan(
-        new Date(initialHeartbeat).getTime()
-      )
-    })
-  })
+  // Heartbeat refresh tests moved to LockHeartbeat.test.ts (D2b)
 
   describe('Focus polling edge cases', () => {
     const projectPath = '/Users/test/projects/focus-edge-test'
@@ -1543,65 +1524,7 @@ describe('ProjectLockService', () => {
     })
   })
 
-  describe('Re-entrance guard', () => {
-    it('skips a polling tick if the previous tick has not finished', async () => {
-      const projectPath = '/test/slow-disk'
-      await service.acquireLock(projectPath)
-
-      let concurrentInvocations = 0
-      let maxConcurrent = 0
-      const originalImpl = mockedAtomicWriteJSON.getMockImplementation()
-      mockedAtomicWriteJSON.mockImplementation(async (...args) => {
-        concurrentInvocations++
-        maxConcurrent = Math.max(maxConcurrent, concurrentInvocations)
-        // Simulate slow disk: 1500ms write
-        await new Promise<void>((resolve) => setTimeout(resolve, 1500))
-        try {
-          if (originalImpl) await originalImpl(...args)
-        } finally {
-          concurrentInvocations--
-        }
-      })
-
-      // Advance 10 seconds — under the bug, multiple writes overlap; with the guard, max stays at 1
-      await vi.advanceTimersByTimeAsync(10_000)
-
-      expect(maxConcurrent).toBeLessThanOrEqual(1)
-    })
-  })
-
-  describe('powerMonitor integration', () => {
-    it('writes an immediate heartbeat to every active lock on powerMonitor resume', async () => {
-      const projectPath = '/test/sleepy'
-      await service.acquireLock(projectPath)
-
-      const hash = await service.computeLockHash(projectPath)
-      const lockPath = join(service.getLocksDirectory(), hash + '.lock')
-      const initialHeartbeat = JSON.parse(mockFileSystem.get(lockPath)!).lastHeartbeat
-
-      // Simulate suspend — isSuspended flag is set synchronously
-      mockedPowerMonitor.emit('suspend')
-
-      // Advance past HEARTBEAT_INTERVAL_MS (5000ms) + several poll ticks.
-      // The isSuspended guard short-circuits each tick, so the heartbeat must not advance.
-      await vi.advanceTimersByTimeAsync(5500)
-
-      // On-disk heartbeat unchanged during suspend (poll callback no-ops)
-      const duringSuspend = JSON.parse(mockFileSystem.get(lockPath)!).lastHeartbeat
-      expect(duringSuspend).toBe(initialHeartbeat)
-
-      // Resume must trigger an immediate write for every active lock.
-      // handleResume is synchronously triggered by the EventEmitter but is async internally —
-      // use Promise.resolve() chains to drain the microtask queue without fake-timer interaction.
-      mockedPowerMonitor.emit('resume')
-      await Promise.resolve()
-      await Promise.resolve()
-      await Promise.resolve()
-
-      const afterResume = JSON.parse(mockFileSystem.get(lockPath)!).lastHeartbeat
-      expect(new Date(afterResume).getTime()).toBeGreaterThan(new Date(initialHeartbeat).getTime())
-    })
-  })
+  // Re-entrance guard, powerMonitor integration tests moved to LockHeartbeat.test.ts (D2b)
 
   describe('Dispose edge cases', () => {
     it('should handle errors when releasing locks during dispose', async () => {
@@ -1640,67 +1563,7 @@ describe('ProjectLockService', () => {
     })
   })
 
-  describe('Dispose race – isDisposing re-check before writes', () => {
-    it('skips the polling-tick write when isDisposing flips mid-flight', async () => {
-      const projectPath = '/test/dispose-race'
-      await service.acquireLock(projectPath)
-
-      const hash = await service.computeLockHash(projectPath)
-      const lockPath = join(service.getLocksDirectory(), hash + '.lock')
-      const initialHeartbeat = JSON.parse(mockFileSystem.get(lockPath)!).lastHeartbeat
-
-      // Deferred promise that we resolve after flipping isDisposing,
-      // so the readLockFile spy pauses the tick mid-await.
-      let resolveRead: () => void = () => {}
-      const blockedRead = new Promise<void>((resolve) => {
-        resolveRead = resolve
-      })
-
-      // Wrap atomicWriteJSON to count writes that happen after isDisposing is set.
-      const originalImpl = mockedAtomicWriteJSON.getMockImplementation()
-      let heartbeatWritesAfterDispose = 0
-      mockedAtomicWriteJSON.mockImplementation(async (...args) => {
-        if ((service as any).isDisposing) {
-          heartbeatWritesAfterDispose++
-        }
-        if (originalImpl) await originalImpl(...args)
-      })
-
-      // Spy on readLockFile to pause execution so dispose() can flip isDisposing
-      // in the window between readLockFile completing and the write calls.
-      const originalReadLockFile = (service as any).readLockFile.bind(service)
-      vi.spyOn(service as any, 'readLockFile').mockImplementation(async (path: string) => {
-        const result = await originalReadLockFile(path)
-        await blockedRead // pause here — dispose will flip isDisposing while we wait
-        return result
-      })
-
-      // Advance past HEARTBEAT_INTERVAL_MS (5000ms) so the next tick will want to write
-      await vi.advanceTimersByTimeAsync(5000)
-
-      // Trigger one more tick — readLockFile spy pauses it mid-flight
-      await vi.advanceTimersByTimeAsync(500)
-
-      // While the tick is paused mid-read, simulate dispose() flipping the flag
-      ;(service as any).isDisposing = true
-
-      // Unblock the paused readLockFile
-      resolveRead()
-
-      // Drain all pending microtasks / promises
-      await vi.runOnlyPendingTimersAsync()
-      await Promise.resolve()
-      await Promise.resolve()
-      await Promise.resolve()
-
-      // No heartbeat write should have occurred after isDisposing was set
-      expect(heartbeatWritesAfterDispose).toBe(0)
-
-      // The lock file's heartbeat on disk should be unchanged (initial write only)
-      const onDisk = JSON.parse(mockFileSystem.get(lockPath)!).lastHeartbeat
-      expect(onDisk).toBe(initialHeartbeat)
-    })
-  })
+  // Dispose-race guard tests moved to LockHeartbeat.test.ts (D2b)
 
   describe('Symlink junction-redirect defense in cleanupStaleLocks', () => {
     it('refuses to operate when the locks directory is a symlink (junction-redirect defense)', async () => {

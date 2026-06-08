@@ -35,6 +35,8 @@ import { broadcastToAllWindows } from '../utils/ipcBroadcast'
 import { systemClock, type Clock } from '../utils/Clock'
 import { systemProcessLiveness, type ProcessLiveness } from '../utils/ProcessLiveness'
 import { createLockStalenessPolicy, type LockStalenessPolicy } from './LockStalenessPolicy'
+import { createLockHeartbeat, type LockHeartbeatService, type LockHeartbeatHandle } from './LockHeartbeat'
+import type { PowerMonitorLike } from '../utils/PowerMonitorLike'
 
 import type { IProjectLockService } from '../interfaces/IProjectLockService'
 import type { LockInfo, LockResult, LockStatus } from '../../shared/ipc/project-lock-schema'
@@ -51,12 +53,6 @@ import { redactPath } from '../utils/redactUserInput'
 /** Length of truncated SHA-256 hash (128 bits = 32 hex chars) */
 const LOCK_HASH_LENGTH = 32
 
-/** Focus request polling interval (ms) */
-const POLL_INTERVAL_MS = 500
-
-/** Heartbeat write interval (ms) — holder rewrites lock with fresh heartbeat at this cadence */
-const HEARTBEAT_INTERVAL_MS = 5000
-
 /** Lock file extension */
 const LOCK_EXTENSION = '.lock'
 
@@ -70,10 +66,8 @@ const LOCK_EXTENSION = '.lock'
 interface ActiveLock {
   /** Truncated hash of the project path */
   hash: string
-  /** Focus polling timer (null if not polling) */
-  pollTimer: NodeJS.Timeout | null
-  /** Epoch ms of the last successful heartbeat write (or lock creation) */
-  lastHeartbeatAt: number
+  /** Handle returned by LockHeartbeat.start() — used to stop polling on release */
+  heartbeatHandle: LockHeartbeatHandle
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -85,6 +79,7 @@ export interface ProjectLockServiceDeps {
   liveness?: ProcessLiveness
   hostname?: string
   locksDir?: string
+  powerMonitor?: PowerMonitorLike
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -113,12 +108,6 @@ export class ProjectLockService implements IProjectLockService {
   /** Flag to prevent operations during disposal */
   private isDisposing = false
 
-  /** True while the system is suspended (lid closed, sleep, etc.) */
-  private isSuspended = false
-
-  /** Guard so powerMonitor listeners are registered exactly once */
-  private powerMonitorInitialized = false
-
   /** Current hostname (cached for performance) */
   private readonly currentHostname: string
 
@@ -131,6 +120,9 @@ export class ProjectLockService implements IProjectLockService {
   /** Staleness policy (same-host PID+heartbeat, cross-host timestamp) */
   private readonly stalenessPolicy: LockStalenessPolicy
 
+  /** Heartbeat service — owns polling timer, heartbeat writes, and powerMonitor integration */
+  private readonly lockHeartbeat: LockHeartbeatService
+
   constructor(deps: ProjectLockServiceDeps = {}) {
     this.clock = deps.clock ?? systemClock
     this.liveness = deps.liveness ?? systemProcessLiveness
@@ -140,6 +132,25 @@ export class ProjectLockService implements IProjectLockService {
       clock: this.clock,
       liveness: this.liveness,
       currentHostname: this.currentHostname
+    })
+    this.lockHeartbeat = createLockHeartbeat({
+      clock: this.clock,
+      powerMonitor: deps.powerMonitor ?? powerMonitor,
+      readLockFile: (lockPath) => this.readLockFile(lockPath),
+      onOwnershipLost: (projectPath) => {
+        this.activeLocks.delete(projectPath)
+      },
+      onFocusRequest: async (lockInfo, projectPath) => {
+        const mainWindow = getMainWindow()
+        if (mainWindow) {
+          const focused = await focusWindow(mainWindow)
+          logger.debug('ProjectLockService: Window focus result', { focused })
+          broadcastToAllWindows('project-lock:focused', {
+            projectPath,
+            requesterPid: lockInfo.requester_pid ?? 0
+          })
+        }
+      }
     })
   }
 
@@ -157,7 +168,6 @@ export class ProjectLockService implements IProjectLockService {
    * @returns LockResult indicating success, already locked, or error
    */
   async acquireLock(projectPath: string): Promise<LockResult> {
-    this.initPowerMonitor()
     const startTime = this.clock.now()
 
     if (this.isDisposing) {
@@ -196,16 +206,21 @@ export class ProjectLockService implements IProjectLockService {
 
       try {
         // Attempt exclusive create (atomic, fails if exists)
-        const handle = await open(lockPath, 'wx', 0o600)
+        const fileHandle = await open(lockPath, 'wx', 0o600)
         try {
-          await handle.writeFile(JSON.stringify(lockInfo, null, 2))
+          await fileHandle.writeFile(JSON.stringify(lockInfo, null, 2))
         } finally {
-          await handle.close()
+          await fileHandle.close()
         }
 
         // Success - we created the lock
-        const pollTimer = this.startFocusPolling(projectPath, hash)
-        this.activeLocks.set(projectPath, { hash, pollTimer, lastHeartbeatAt: this.clock.now() })
+        const heartbeatHandle = this.lockHeartbeat.start({
+          projectPath,
+          lockPath,
+          lockHash: hash,
+          instanceId: this.instanceId
+        })
+        this.activeLocks.set(projectPath, { hash, heartbeatHandle })
 
         const result: LockResult = { status: 'acquired', lockPath }
         logger.info('ProjectLockService: Lock acquired', {
@@ -325,15 +340,20 @@ export class ProjectLockService implements IProjectLockService {
 
       const now = this.clock.nowIso()
       const freshLockInfo: LockInfo = { ...lockInfo, timestamp: now, lastHeartbeat: now }
-      const handle = await open(lockPath, 'wx', 0o600)
+      const fileHandle = await open(lockPath, 'wx', 0o600)
       try {
-        await handle.writeFile(JSON.stringify(freshLockInfo, null, 2))
+        await fileHandle.writeFile(JSON.stringify(freshLockInfo, null, 2))
       } finally {
-        await handle.close()
+        await fileHandle.close()
       }
 
-      const pollTimer = this.startFocusPolling(projectPath, hash)
-      this.activeLocks.set(projectPath, { hash, pollTimer, lastHeartbeatAt: this.clock.now() })
+      const heartbeatHandle = this.lockHeartbeat.start({
+        projectPath,
+        lockPath,
+        lockHash: hash,
+        instanceId: this.instanceId
+      })
+      this.activeLocks.set(projectPath, { hash, heartbeatHandle })
 
       const result: LockResult = { status: 'acquired', lockPath }
       logger.info('ProjectLockService: Lock acquired after retry', {
@@ -413,9 +433,7 @@ export class ProjectLockService implements IProjectLockService {
     }
 
     // Stop focus polling
-    if (activeLock.pollTimer) {
-      clearInterval(activeLock.pollTimer)
-    }
+    activeLock.heartbeatHandle.stop()
 
     // Remove lock file
     const lockPath = this.getLockPath(activeLock.hash)
@@ -790,12 +808,7 @@ export class ProjectLockService implements IProjectLockService {
     logger.info('ProjectLockService: Disposing', { activeLocksCount: this.activeLocks.size })
 
     // Stop all timers first (guaranteed cleanup)
-    for (const lock of this.activeLocks.values()) {
-      if (lock.pollTimer) {
-        clearInterval(lock.pollTimer)
-        lock.pollTimer = null
-      }
-    }
+    await this.lockHeartbeat.disposeAll()
 
     // Then attempt lock releases (best-effort)
     const releasePromises = Array.from(this.activeLocks.keys()).map((projectPath) =>
@@ -817,47 +830,6 @@ export class ProjectLockService implements IProjectLockService {
   // ───────────────────────────────────────────────────────────────────────────
   // Private methods
   // ───────────────────────────────────────────────────────────────────────────
-
-  /**
-   * Registers powerMonitor listeners exactly once (idempotent).
-   * Called from acquireLock rather than the constructor so that the
-   * Electron mock is fully initialized before subscription.
-   */
-  private initPowerMonitor(): void {
-    if (this.powerMonitorInitialized) return
-    this.powerMonitorInitialized = true
-
-    powerMonitor.on('suspend', () => {
-      this.isSuspended = true
-    })
-    powerMonitor.on('lock-screen', () => {
-      this.isSuspended = true
-    })
-    powerMonitor.on('resume', () => {
-      void this.handleResume()
-    })
-    powerMonitor.on('unlock-screen', () => {
-      void this.handleResume()
-    })
-  }
-
-  /**
-   * Called when the system wakes from suspend or unlocks the screen.
-   * Immediately refreshes every active lock heartbeat so a sibling
-   * Erfana instance cannot observe staleness and steal the lock.
-   */
-  private async handleResume(): Promise<void> {
-    this.isSuspended = false
-    if (this.isDisposing) return
-
-    for (const [projectPath, active] of this.activeLocks.entries()) {
-      const lockPath = this.getLockPath(active.hash)
-      const lockInfo = await this.readLockFile(lockPath)
-      if (!lockInfo || lockInfo.instanceId !== this.instanceId) continue
-      const ok = await this.writeHeartbeat(lockInfo, lockPath, projectPath)
-      if (ok) active.lastHeartbeatAt = this.clock.now()
-    }
-  }
 
   /**
    * Gets the full path to a lock file by hash.
@@ -918,173 +890,6 @@ export class ProjectLockService implements IProjectLockService {
     return this.stalenessPolicy.isStale(lockInfo)
   }
 
-  /**
-   * Starts focus request polling for a locked project.
-   *
-   * Polls the lock file every POLL_INTERVAL_MS to check for focus_request.
-   * When a focus request is detected, focuses the main window and clears
-   * the request.
-   *
-   * Also validates lock ownership on each poll - stops polling if lock was
-   * deleted or stolen by another instance.
-   *
-   * @param projectPath - The project path being locked
-   * @param hash - The lock hash
-   * @returns The interval timer (for cleanup)
-   */
-  private startFocusPolling(projectPath: string, hash: string): NodeJS.Timeout {
-    const lockPath = this.getLockPath(hash)
-    let ticking = false
-
-    const timer = setInterval(async () => {
-      if (this.isDisposing) {
-        return
-      }
-
-      if (this.isSuspended) {
-        return
-      }
-
-      if (ticking) {
-        return
-      }
-      ticking = true
-
-      try {
-        const lockInfo = await this.readLockFile(lockPath)
-
-        if (!lockInfo) {
-          // Lock was deleted - stop polling
-          logger.warn('Lock file deleted, stopping polling', {
-            projectPath: redactPath(projectPath),
-            lockHash: hash
-          })
-          clearInterval(timer)
-          this.activeLocks.delete(projectPath)
-          return
-        }
-
-        if (lockInfo.instanceId !== this.instanceId) {
-          // Lock stolen by another instance - stop polling
-          logger.warn('Lock ownership lost', {
-            projectPath: redactPath(projectPath),
-            lockHash: hash,
-            currentInstance: this.instanceId,
-            lockInstance: lockInfo.instanceId
-          })
-          clearInterval(timer)
-          this.activeLocks.delete(projectPath)
-          return
-        }
-
-        if (lockInfo.focus_request) {
-          if (this.isDisposing) return
-          const ok = await this.handleFocusRequest(lockInfo, lockPath, projectPath)
-          if (ok) {
-            const active = this.activeLocks.get(projectPath)
-            if (active) active.lastHeartbeatAt = this.clock.now()
-          }
-          return
-        }
-
-        const active = this.activeLocks.get(projectPath)
-        if (active && this.clock.now() - active.lastHeartbeatAt >= HEARTBEAT_INTERVAL_MS) {
-          if (this.isDisposing) return
-          const ok = await this.writeHeartbeat(lockInfo, lockPath, projectPath)
-          if (ok) active.lastHeartbeatAt = this.clock.now()
-        }
-      } catch (err) {
-        logger.debug('ProjectLockService: Polling tick error', {
-          projectPath: redactPath(projectPath),
-          error: err instanceof Error ? err.message : String(err),
-          errno: (err as NodeJS.ErrnoException).code
-        })
-      } finally {
-        ticking = false
-      }
-    }, POLL_INTERVAL_MS)
-
-    return timer
-  }
-
-  /**
-   * Writes a fresh heartbeat timestamp to the lock file.
-   *
-   * Called from the focus-polling timer when HEARTBEAT_INTERVAL_MS has elapsed
-   * since the last heartbeat write. On failure, warns and lets the next tick retry.
-   *
-   * @param lockInfo - Current lock information (read this tick)
-   * @param lockPath - Path to the lock file
-   * @param projectPath - The project path (for logging)
-   */
-  private async writeHeartbeat(
-    lockInfo: LockInfo,
-    lockPath: string,
-    projectPath: string
-  ): Promise<boolean> {
-    const updated: LockInfo = { ...lockInfo, lastHeartbeat: this.clock.nowIso() }
-    try {
-      await atomicWriteJSON(lockPath, updated)
-      return true
-    } catch (error) {
-      const age = this.clock.now() - new Date(lockInfo.lastHeartbeat ?? lockInfo.timestamp).getTime()
-      logger.warn('ProjectLockService: Heartbeat write failed', {
-        projectPath: redactPath(projectPath),
-        heartbeatAgeMs: Number.isNaN(age) ? null : age,
-        error: error instanceof Error ? error.message : String(error)
-      })
-      return false
-    }
-  }
-
-  /**
-   * Handles a focus request by focusing the main window and clearing the request.
-   *
-   * @param lockInfo - Current lock information
-   * @param lockPath - Path to the lock file
-   * @param projectPath - The project path
-   */
-  private async handleFocusRequest(
-    lockInfo: LockInfo,
-    lockPath: string,
-    projectPath: string
-  ): Promise<boolean> {
-    logger.info('ProjectLockService: Handling focus request', {
-      projectPath: redactPath(projectPath),
-      requesterPid: lockInfo.requester_pid
-    })
-
-    // Focus the main window
-    const mainWindow = getMainWindow()
-    if (mainWindow) {
-      const focused = await focusWindow(mainWindow)
-      logger.debug('ProjectLockService: Window focus result', { focused })
-
-      // Notify renderer that window was focused by another instance
-      broadcastToAllWindows('project-lock:focused', {
-        projectPath,
-        requesterPid: lockInfo.requester_pid ?? 0
-      })
-    }
-
-    // Clear the focus request and refresh the heartbeat in the same atomic write
-    const updatedLock: LockInfo = {
-      ...lockInfo,
-      focus_request: false,
-      requester_pid: undefined,
-      lastHeartbeat: this.clock.nowIso()
-    }
-
-    try {
-      await atomicWriteJSON(lockPath, updatedLock)
-      return true
-    } catch (error) {
-      logger.warn('ProjectLockService: Failed to clear focus request', {
-        error: error instanceof Error ? error.message : String(error)
-      })
-      return false
-    }
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
