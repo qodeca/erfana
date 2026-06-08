@@ -80,6 +80,16 @@ vi.mock('../utils/focusWindow', () => ({
   getMainWindow: vi.fn()
 }))
 
+// Lock HMAC mock — keeps tests isolated from safeStorage / Electron keychain.
+// signLock returns a stable digest; verifyLock returns 'valid' by default so
+// all existing tests continue to pass.  Individual tests override verifyLock
+// to return 'invalid' when testing the forged-lock scenario.
+vi.mock('../utils/lockHmac', () => ({
+  signLock: vi.fn(() => 'a'.repeat(64)),
+  verifyLock: vi.fn(() => 'valid'),
+  _resetForTesting: vi.fn()
+}))
+
 vi.mock('./LoggingService', () => ({
   logger: {
     debug: vi.fn(),
@@ -96,6 +106,7 @@ import { join } from 'node:path'
 import { hostname as osHostname } from 'node:os'
 import { atomicWriteJSON, removeIfExists } from '../utils/atomicWrite'
 import { focusWindow, getMainWindow } from '../utils/focusWindow'
+import { verifyLock } from '../utils/lockHmac'
 import { ProjectLockService } from './ProjectLockService'
 
 const mockedReadFile = vi.mocked(readFile)
@@ -108,6 +119,7 @@ const mockedAtomicWriteJSON = vi.mocked(atomicWriteJSON)
 const mockedRemoveIfExists = vi.mocked(removeIfExists)
 const mockedFocusWindow = vi.mocked(focusWindow)
 const mockedGetMainWindow = vi.mocked(getMainWindow)
+const mockedVerifyLock = vi.mocked(verifyLock)
 
 describe('ProjectLockService', () => {
   let service: ProjectLockService
@@ -1768,6 +1780,83 @@ describe('ProjectLockService', () => {
       // and none end in .lock, so nothing should be removed or read
       expect(mockedRemoveIfExists).not.toHaveBeenCalled()
       expect(mockedReadFile).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('HMAC verification (F6)', () => {
+    it('rejects a lock whose HMAC does not match (forged-by-peer scenario)', async () => {
+      const projectPath = '/test/forged'
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = join(service.getLocksDirectory(), hash + '.lock')
+
+      // Plant a well-formed lock with a wrong hmac
+      const forged: LockInfo = {
+        instanceId: '550e8400-e29b-41d4-a716-446655440042',
+        pid: 99999,
+        timestamp: new Date().toISOString(),
+        hostname: 'test-machine.local',
+        path: projectPath,
+        focus_request: false,
+        lastHeartbeat: new Date().toISOString(),
+        hmac: 'b'.repeat(64) // wrong digest
+      }
+      mockFileSystem.set(lockPath, JSON.stringify(forged))
+
+      // Override verifyLock to return 'invalid' for this test
+      mockedVerifyLock.mockReturnValueOnce('invalid')
+
+      const result = await service.checkLock(projectPath)
+      expect(result.status).toBe('unlocked')
+    })
+
+    it('accepts a legacy lock without an HMAC (missing → backward compat)', async () => {
+      const projectPath = '/test/legacy'
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = join(service.getLocksDirectory(), hash + '.lock')
+
+      const legacyLock: LockInfo = {
+        instanceId: '550e8400-e29b-41d4-a716-446655440043',
+        pid: 99999,
+        timestamp: new Date().toISOString(),
+        hostname: 'test-machine.local',
+        path: projectPath,
+        focus_request: false
+        // no hmac field
+      }
+      mockFileSystem.set(lockPath, JSON.stringify(legacyLock))
+
+      // verifyLock returns 'missing' for a lock with no hmac
+      mockedVerifyLock.mockReturnValueOnce('missing')
+
+      vi.spyOn(process, 'kill').mockImplementation(() => true as never)
+
+      const result = await service.checkLock(projectPath)
+      expect(result.status).toBe('locked_by_other')
+    })
+
+    it('accepts when safeStorage is unavailable (no-key → degraded mode)', async () => {
+      const projectPath = '/test/nokey'
+      const hash = await service.computeLockHash(projectPath)
+      const lockPath = join(service.getLocksDirectory(), hash + '.lock')
+
+      const lock: LockInfo = {
+        instanceId: '550e8400-e29b-41d4-a716-446655440044',
+        pid: 99999,
+        timestamp: new Date().toISOString(),
+        hostname: 'test-machine.local',
+        path: projectPath,
+        focus_request: false,
+        hmac: 'a'.repeat(64)
+      }
+      mockFileSystem.set(lockPath, JSON.stringify(lock))
+
+      // verifyLock returns 'no-key' when safeStorage is unavailable
+      mockedVerifyLock.mockReturnValueOnce('no-key')
+
+      vi.spyOn(process, 'kill').mockImplementation(() => true as never)
+
+      const result = await service.checkLock(projectPath)
+      expect(result.status).toBe('locked_by_other')
     })
   })
 

@@ -12,6 +12,7 @@ import type { LockInfo } from '../../shared/ipc/project-lock-schema'
 import { atomicWriteJSON } from '../utils/atomicWrite'
 import { logger } from './LoggingService'
 import { redactPath } from '../utils/redactUserInput'
+import { signLock } from '../utils/lockHmac'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -103,8 +104,9 @@ export function createLockHeartbeat(deps: LockHeartbeatDeps): LockHeartbeatServi
     projectPath: string
   ): Promise<boolean> {
     const updated: LockInfo = { ...lockInfo, lastHeartbeat: deps.clock.nowIso() }
+    const signed: LockInfo = { ...updated, hmac: signLock(updated) }
     try {
-      await atomicWriteJSON(lockPath, updated)
+      await atomicWriteJSON(lockPath, signed)
       return true
     } catch (error) {
       const age =
@@ -142,8 +144,9 @@ export function createLockHeartbeat(deps: LockHeartbeatDeps): LockHeartbeatServi
       requester_pid: undefined,
       lastHeartbeat: deps.clock.nowIso()
     }
+    const signedCleared: LockInfo = { ...cleared, hmac: signLock(cleared) }
     try {
-      await atomicWriteJSON(lockPath, cleared)
+      await atomicWriteJSON(lockPath, signedCleared)
       return true
     } catch (error) {
       logger.warn('LockHeartbeat: Failed to clear focus request', {

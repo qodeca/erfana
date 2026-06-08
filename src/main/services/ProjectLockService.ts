@@ -45,6 +45,7 @@ import { atomicWriteJSON, removeIfExists } from '../utils/atomicWrite'
 import { focusWindow, getMainWindow } from '../utils/focusWindow'
 import { logger } from './LoggingService'
 import { redactPath } from '../utils/redactUserInput'
+import { signLock, verifyLock } from '../utils/lockHmac'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -206,9 +207,10 @@ export class ProjectLockService implements IProjectLockService {
 
       try {
         // Attempt exclusive create (atomic, fails if exists)
+        const signedLock: LockInfo = { ...lockInfo, hmac: signLock(lockInfo) }
         const fileHandle = await open(lockPath, 'wx', 0o600)
         try {
-          await fileHandle.writeFile(JSON.stringify(lockInfo, null, 2))
+          await fileHandle.writeFile(JSON.stringify(signedLock, null, 2))
         } finally {
           await fileHandle.close()
         }
@@ -340,9 +342,10 @@ export class ProjectLockService implements IProjectLockService {
 
       const now = this.clock.nowIso()
       const freshLockInfo: LockInfo = { ...lockInfo, timestamp: now, lastHeartbeat: now }
+      const signedFreshLock: LockInfo = { ...freshLockInfo, hmac: signLock(freshLockInfo) }
       const fileHandle = await open(lockPath, 'wx', 0o600)
       try {
-        await fileHandle.writeFile(JSON.stringify(freshLockInfo, null, 2))
+        await fileHandle.writeFile(JSON.stringify(signedFreshLock, null, 2))
       } finally {
         await fileHandle.close()
       }
@@ -716,8 +719,9 @@ export class ProjectLockService implements IProjectLockService {
         focus_request: true,
         requester_pid: process.pid
       }
+      const signedUpdatedLock: LockInfo = { ...updatedLock, hmac: signLock(updatedLock) }
 
-      await atomicWriteJSON(lockPath, updatedLock)
+      await atomicWriteJSON(lockPath, signedUpdatedLock)
 
       logger.info('ProjectLockService: Focus request sent', {
         projectPath: redactPath(projectPath),
@@ -859,6 +863,18 @@ export class ProjectLockService implements IProjectLockService {
 
       const parsed = JSON.parse(content)
       const validated = LockInfoSchema.parse(parsed)
+
+      const verifyResult = verifyLock(validated)
+      if (verifyResult === 'invalid') {
+        logger.warn('ProjectLockService: Lock failed HMAC verification — treating as absent', {
+          lockPath: redactPath(lockPath),
+          holderPid: validated.pid,
+          holderHostname: validated.hostname,
+          holderInstanceId: validated.instanceId
+        })
+        return null
+      }
+      // 'valid', 'missing' (legacy lock), or 'no-key' (safeStorage unavailable) — accept all
       this.lockReadCache.set(lockPath, { raw: content, parsed: validated })
       return validated
     } catch (error) {
