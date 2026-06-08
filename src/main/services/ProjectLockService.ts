@@ -34,6 +34,7 @@ import { AppError, ErrorCode } from '../../shared/errors'
 import { broadcastToAllWindows } from '../utils/ipcBroadcast'
 import { systemClock, type Clock } from '../utils/Clock'
 import { systemProcessLiveness, type ProcessLiveness } from '../utils/ProcessLiveness'
+import { createLockStalenessPolicy, type LockStalenessPolicy } from './LockStalenessPolicy'
 
 import type { IProjectLockService } from '../interfaces/IProjectLockService'
 import type { LockInfo, LockResult, LockStatus } from '../../shared/ipc/project-lock-schema'
@@ -53,17 +54,8 @@ const LOCK_HASH_LENGTH = 32
 /** Focus request polling interval (ms) */
 const POLL_INTERVAL_MS = 500
 
-/** Stale lock timeout for cross-host detection (60 minutes) */
-const STALE_TIMEOUT_MS = 60 * 60 * 1000
-
-/** Clock skew buffer for cross-host timestamp comparison (15 minutes - robust for VMs and cloud) */
-const CLOCK_SKEW_BUFFER_MS = 15 * 60 * 1000
-
 /** Heartbeat write interval (ms) — holder rewrites lock with fresh heartbeat at this cadence */
 const HEARTBEAT_INTERVAL_MS = 5000
-
-/** Same-host stale threshold (ms) — if heartbeat is older than this, lock is considered zombie */
-const HEARTBEAT_STALE_MS = 30000
 
 /** Lock file extension */
 const LOCK_EXTENSION = '.lock'
@@ -136,11 +128,19 @@ export class ProjectLockService implements IProjectLockService {
   /** Process liveness abstraction for testability */
   private readonly liveness: ProcessLiveness
 
+  /** Staleness policy (same-host PID+heartbeat, cross-host timestamp) */
+  private readonly stalenessPolicy: LockStalenessPolicy
+
   constructor(deps: ProjectLockServiceDeps = {}) {
     this.clock = deps.clock ?? systemClock
     this.liveness = deps.liveness ?? systemProcessLiveness
     this.currentHostname = deps.hostname ?? hostname()
     this.locksDir = deps.locksDir ?? join(app.getPath('userData'), 'locks')
+    this.stalenessPolicy = createLockStalenessPolicy({
+      clock: this.clock,
+      liveness: this.liveness,
+      currentHostname: this.currentHostname
+    })
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -235,7 +235,7 @@ export class ProjectLockService implements IProjectLockService {
           }
 
           // Check if the lock is stale
-          const stale = await this.isLockStale(existingLock)
+          const stale = this.isLockStale(existingLock)
 
           if (stale) {
             logger.info('ProjectLockService: Removing stale lock', {
@@ -493,7 +493,7 @@ export class ProjectLockService implements IProjectLockService {
       }
 
       // Check if lock is stale
-      const stale = await this.isLockStale(lockInfo)
+      const stale = this.isLockStale(lockInfo)
 
       if (stale) {
         const result: LockStatus = { status: 'unlocked' }
@@ -620,7 +620,7 @@ export class ProjectLockService implements IProjectLockService {
             continue
           }
 
-          const stale = await this.isLockStale(lockInfo)
+          const stale = this.isLockStale(lockInfo)
 
           if (stale) {
             const removed = await removeIfExists(lockPath)
@@ -909,80 +909,13 @@ export class ProjectLockService implements IProjectLockService {
   /**
    * Checks if a lock is stale (holder process is dead or timed out).
    *
-   * Hybrid approach:
-   * - Same hostname: Check if PID is alive
-   * - Different hostname: Check if lock is older than STALE_TIMEOUT_MS
+   * Delegates to LockStalenessPolicy.
    *
    * @param lockInfo - Lock information to check
    * @returns true if lock is stale and can be removed
    */
-  private async isLockStale(lockInfo: LockInfo): Promise<boolean> {
-    // Same hostname: PID liveness + heartbeat freshness
-    if (lockInfo.hostname === this.currentHostname) {
-      const alive = this.liveness.isAlive(lockInfo.pid)
-      if (!alive) {
-        logger.debug('ProjectLockService: Lock holder process is dead', {
-          pid: lockInfo.pid,
-          hostname: lockInfo.hostname,
-          projectPath: redactPath(lockInfo.path)
-        })
-        return true
-      }
-
-      // PID alive → also require fresh heartbeat. Fall back to `timestamp` for legacy locks.
-      const heartbeatStr = lockInfo.lastHeartbeat ?? lockInfo.timestamp
-      const heartbeatAge = this.clock.now() - new Date(heartbeatStr).getTime()
-      if (Number.isNaN(heartbeatAge)) {
-        logger.warn(
-          'ProjectLockService: Lock has unparseable heartbeat/timestamp – treating as stale',
-          {
-            projectPath: redactPath(lockInfo.path),
-            holderPid: lockInfo.pid,
-            heartbeatStr
-          }
-        )
-        return true
-      }
-      if (heartbeatAge > HEARTBEAT_STALE_MS) {
-        logger.warn('ProjectLockService: Same-host lock heartbeat expired (zombie holder)', {
-          projectPath: redactPath(lockInfo.path),
-          holderPid: lockInfo.pid,
-          holderHostname: lockInfo.hostname,
-          holderInstanceId: lockInfo.instanceId,
-          heartbeatAgeMs: heartbeatAge,
-          thresholdMs: HEARTBEAT_STALE_MS
-        })
-        return true
-      }
-      return false
-    }
-
-    // Different hostname: check timestamp with clock skew buffer (existing behavior)
-    const lockTime = new Date(lockInfo.timestamp).getTime()
-    const now = this.clock.now()
-    const age = now - lockTime
-    if (Number.isNaN(age)) {
-      logger.warn(
-        'ProjectLockService: Cross-host lock has unparseable timestamp – treating as stale',
-        {
-          holderHostname: lockInfo.hostname,
-          timestamp: lockInfo.timestamp
-        }
-      )
-      return true
-    }
-    const effectiveTimeout = STALE_TIMEOUT_MS + CLOCK_SKEW_BUFFER_MS
-
-    if (age > effectiveTimeout) {
-      logger.debug('ProjectLockService: Cross-host lock timed out', {
-        pid: lockInfo.pid,
-        hostname: lockInfo.hostname,
-        ageMinutes: Math.round(age / 60000)
-      })
-      return true
-    }
-
-    return false
+  private isLockStale(lockInfo: LockInfo): boolean {
+    return this.stalenessPolicy.isStale(lockInfo)
   }
 
   /**
