@@ -55,10 +55,7 @@ renderer                          main
 
 ## Known tech debt
 
-- `htmlFor="transcription-lang"` references non-existent `id` on `<select>` – add `id="transcription-lang"` to LanguageSelect
-- `zIndex={10000}` hardcoded – should use dialog stack manager or `var(--z-dialog)` token
-- Focus trap logic should move to BaseDialog (benefits all dialogs)
-- `background-size: 12px` hardcoded in language select dropdown arrow (same pattern exists in Dialog.css)
+Tracked in [`docs/technical-debt.md`](../../../../../docs/technical-debt.md): item #3 (BaseDialog Tab-cycling focus trap), #4 (LanguageSelect missing `id`), #9 (TranscriptionDialog hardcoded `zIndex`), #10 (language-select dropdown arrow hardcoded `background-size`).
 
 ## Related files
 

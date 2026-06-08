@@ -147,6 +147,28 @@ Moving the block would require synchronized edits to checks.yml + skill + README
 
 ---
 
+### 9. TranscriptionDialog hardcodes `zIndex`
+
+**Severity**: Low
+**Impact**: `zIndex={10000}` is hardcoded on the TranscriptionDialog instance instead of going through the dialog-stack manager or the `var(--z-dialog)` design token. Diverges from the project's tokens-only rule for spacing/colors/typography and from the dialog stack's contract.
+
+**Fix**: Replace the literal with the dialog-stack manager value, or with `var(--z-dialog)` if the dialog is not stack-managed.
+
+**Files**: `src/renderer/src/components/Transcription/TranscriptionDialog.tsx`.
+
+---
+
+### 10. Language-select dropdown arrow hardcodes `background-size`
+
+**Severity**: Low
+**Impact**: `background-size: 12px` is hardcoded for the dropdown-arrow background image in `LanguageSelect`. The same literal exists in `Dialog.css`. Two places to keep in sync; no token covers it.
+
+**Fix**: Extract the arrow background (image + size) to a shared utility class or design token so the size lives in one place.
+
+**Files**: `src/renderer/src/components/Transcription/LanguageSelect.tsx`, `src/renderer/src/components/Dialog/Dialog.css`.
+
+---
+
 ## Code Quality Improvements
 
 ### Documentation Token Efficiency
@@ -222,4 +244,4 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 
 ---
 
-**Last Updated**: v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
+**Last Updated**: v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
