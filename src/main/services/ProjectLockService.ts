@@ -32,6 +32,8 @@ import { hostname } from 'node:os'
 import { AppError, ErrorCode } from '../../shared/errors'
 
 import { broadcastToAllWindows } from '../utils/ipcBroadcast'
+import { systemClock, type Clock } from '../utils/Clock'
+import { systemProcessLiveness, type ProcessLiveness } from '../utils/ProcessLiveness'
 
 import type { IProjectLockService } from '../interfaces/IProjectLockService'
 import type { LockInfo, LockResult, LockStatus } from '../../shared/ipc/project-lock-schema'
@@ -83,6 +85,17 @@ interface ActiveLock {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Dependency injection
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ProjectLockServiceDeps {
+  clock?: Clock
+  liveness?: ProcessLiveness
+  hostname?: string
+  locksDir?: string
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Service implementation
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -117,9 +130,17 @@ export class ProjectLockService implements IProjectLockService {
   /** Current hostname (cached for performance) */
   private readonly currentHostname: string
 
-  constructor() {
-    this.locksDir = join(app.getPath('userData'), 'locks')
-    this.currentHostname = hostname()
+  /** Clock abstraction for testability */
+  private readonly clock: Clock
+
+  /** Process liveness abstraction for testability */
+  private readonly liveness: ProcessLiveness
+
+  constructor(deps: ProjectLockServiceDeps = {}) {
+    this.clock = deps.clock ?? systemClock
+    this.liveness = deps.liveness ?? systemProcessLiveness
+    this.currentHostname = deps.hostname ?? hostname()
+    this.locksDir = deps.locksDir ?? join(app.getPath('userData'), 'locks')
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -137,7 +158,7 @@ export class ProjectLockService implements IProjectLockService {
    */
   async acquireLock(projectPath: string): Promise<LockResult> {
     this.initPowerMonitor()
-    const startTime = Date.now()
+    const startTime = this.clock.now()
 
     if (this.isDisposing) {
       return { status: 'error', message: 'Service is disposing' }
@@ -162,7 +183,7 @@ export class ProjectLockService implements IProjectLockService {
       await mkdir(this.locksDir, { recursive: true, mode: 0o700 })
 
       // Create new lock info
-      const now = new Date().toISOString()
+      const now = this.clock.nowIso()
       const lockInfo: LockInfo = {
         instanceId: this.instanceId,
         pid: process.pid,
@@ -184,7 +205,7 @@ export class ProjectLockService implements IProjectLockService {
 
         // Success - we created the lock
         const pollTimer = this.startFocusPolling(projectPath, hash)
-        this.activeLocks.set(projectPath, { hash, pollTimer, lastHeartbeatAt: Date.now() })
+        this.activeLocks.set(projectPath, { hash, pollTimer, lastHeartbeatAt: this.clock.now() })
 
         const result: LockResult = { status: 'acquired', lockPath }
         logger.info('ProjectLockService: Lock acquired', {
@@ -195,7 +216,7 @@ export class ProjectLockService implements IProjectLockService {
           operation: 'acquire',
           projectPath: redactPath(projectPath),
           status: result.status,
-          latencyMs: Date.now() - startTime
+          latencyMs: this.clock.now() - startTime
         })
         return result
       } catch (error) {
@@ -246,7 +267,7 @@ export class ProjectLockService implements IProjectLockService {
             operation: 'acquire',
             projectPath: redactPath(projectPath),
             status: result.status,
-            latencyMs: Date.now() - startTime
+            latencyMs: this.clock.now() - startTime
           })
           return result
         }
@@ -263,7 +284,7 @@ export class ProjectLockService implements IProjectLockService {
         operation: 'acquire',
         projectPath: redactPath(projectPath),
         status: 'error',
-        latencyMs: Date.now() - startTime
+        latencyMs: this.clock.now() - startTime
       })
       return { status: 'error', message }
     }
@@ -302,7 +323,7 @@ export class ProjectLockService implements IProjectLockService {
         return { status: 'error', message: 'lock path is a symlink' }
       }
 
-      const now = new Date().toISOString()
+      const now = this.clock.nowIso()
       const freshLockInfo: LockInfo = { ...lockInfo, timestamp: now, lastHeartbeat: now }
       const handle = await open(lockPath, 'wx', 0o600)
       try {
@@ -312,7 +333,7 @@ export class ProjectLockService implements IProjectLockService {
       }
 
       const pollTimer = this.startFocusPolling(projectPath, hash)
-      this.activeLocks.set(projectPath, { hash, pollTimer, lastHeartbeatAt: Date.now() })
+      this.activeLocks.set(projectPath, { hash, pollTimer, lastHeartbeatAt: this.clock.now() })
 
       const result: LockResult = { status: 'acquired', lockPath }
       logger.info('ProjectLockService: Lock acquired after retry', {
@@ -323,7 +344,7 @@ export class ProjectLockService implements IProjectLockService {
         operation: 'acquire',
         projectPath: redactPath(projectPath),
         status: result.status,
-        latencyMs: Date.now() - startTime
+        latencyMs: this.clock.now() - startTime
       })
       return result
     } catch (retryError) {
@@ -340,7 +361,7 @@ export class ProjectLockService implements IProjectLockService {
             operation: 'acquire',
             projectPath: redactPath(projectPath),
             status: result.status,
-            latencyMs: Date.now() - startTime
+            latencyMs: this.clock.now() - startTime
           })
           return result
         }
@@ -380,7 +401,7 @@ export class ProjectLockService implements IProjectLockService {
    * @param projectPath - Absolute path to the project directory
    */
   async releaseLock(projectPath: string): Promise<void> {
-    const startTime = Date.now()
+    const startTime = this.clock.now()
     const activeLock = this.activeLocks.get(projectPath)
 
     if (!activeLock) {
@@ -425,7 +446,7 @@ export class ProjectLockService implements IProjectLockService {
       operation: 'release',
       projectPath: redactPath(projectPath),
       status: 'success',
-      latencyMs: Date.now() - startTime
+      latencyMs: this.clock.now() - startTime
     })
   }
 
@@ -436,7 +457,7 @@ export class ProjectLockService implements IProjectLockService {
    * @returns LockStatus indicating unlocked, locked_by_self, locked_by_other, or error
    */
   async checkLock(projectPath: string): Promise<LockStatus> {
-    const startTime = Date.now()
+    const startTime = this.clock.now()
 
     if (this.isDisposing) {
       return { status: 'error', message: 'Service is disposing' }
@@ -454,7 +475,7 @@ export class ProjectLockService implements IProjectLockService {
           operation: 'check',
           projectPath: redactPath(projectPath),
           status: result.status,
-          latencyMs: Date.now() - startTime
+          latencyMs: this.clock.now() - startTime
         })
         return result
       }
@@ -466,7 +487,7 @@ export class ProjectLockService implements IProjectLockService {
           operation: 'check',
           projectPath: redactPath(projectPath),
           status: result.status,
-          latencyMs: Date.now() - startTime
+          latencyMs: this.clock.now() - startTime
         })
         return result
       }
@@ -480,7 +501,7 @@ export class ProjectLockService implements IProjectLockService {
           operation: 'check',
           projectPath: redactPath(projectPath),
           status: result.status,
-          latencyMs: Date.now() - startTime
+          latencyMs: this.clock.now() - startTime
         })
         return result
       }
@@ -494,7 +515,7 @@ export class ProjectLockService implements IProjectLockService {
         operation: 'check',
         projectPath: redactPath(projectPath),
         status: result.status,
-        latencyMs: Date.now() - startTime
+        latencyMs: this.clock.now() - startTime
       })
       return result
     } catch (error) {
@@ -508,7 +529,7 @@ export class ProjectLockService implements IProjectLockService {
         operation: 'check',
         projectPath: redactPath(projectPath),
         status: 'error',
-        latencyMs: Date.now() - startTime
+        latencyMs: this.clock.now() - startTime
       })
       return { status: 'error', message }
     }
@@ -834,7 +855,7 @@ export class ProjectLockService implements IProjectLockService {
       const lockInfo = await this.readLockFile(lockPath)
       if (!lockInfo || lockInfo.instanceId !== this.instanceId) continue
       const ok = await this.writeHeartbeat(lockInfo, lockPath, projectPath)
-      if (ok) active.lastHeartbeatAt = Date.now()
+      if (ok) active.lastHeartbeatAt = this.clock.now()
     }
   }
 
@@ -898,7 +919,7 @@ export class ProjectLockService implements IProjectLockService {
   private async isLockStale(lockInfo: LockInfo): Promise<boolean> {
     // Same hostname: PID liveness + heartbeat freshness
     if (lockInfo.hostname === this.currentHostname) {
-      const alive = this.isProcessAlive(lockInfo.pid)
+      const alive = this.liveness.isAlive(lockInfo.pid)
       if (!alive) {
         logger.debug('ProjectLockService: Lock holder process is dead', {
           pid: lockInfo.pid,
@@ -910,7 +931,7 @@ export class ProjectLockService implements IProjectLockService {
 
       // PID alive → also require fresh heartbeat. Fall back to `timestamp` for legacy locks.
       const heartbeatStr = lockInfo.lastHeartbeat ?? lockInfo.timestamp
-      const heartbeatAge = Date.now() - new Date(heartbeatStr).getTime()
+      const heartbeatAge = this.clock.now() - new Date(heartbeatStr).getTime()
       if (Number.isNaN(heartbeatAge)) {
         logger.warn(
           'ProjectLockService: Lock has unparseable heartbeat/timestamp – treating as stale',
@@ -938,7 +959,7 @@ export class ProjectLockService implements IProjectLockService {
 
     // Different hostname: check timestamp with clock skew buffer (existing behavior)
     const lockTime = new Date(lockInfo.timestamp).getTime()
-    const now = Date.now()
+    const now = this.clock.now()
     const age = now - lockTime
     if (Number.isNaN(age)) {
       logger.warn(
@@ -962,45 +983,6 @@ export class ProjectLockService implements IProjectLockService {
     }
 
     return false
-  }
-
-  /**
-   * Checks if a process is alive using kill signal 0.
-   *
-   * process.kill(pid, 0) doesn't actually send a signal - it just
-   * checks if the process exists and we have permission to signal it.
-   *
-   * @param pid - Process ID to check
-   * @returns true if process exists, false otherwise
-   */
-  private isProcessAlive(pid: number): boolean {
-    try {
-      // Signal 0 doesn't actually kill - just checks if process exists
-      process.kill(pid, 0)
-      return true
-    } catch (error) {
-      const errno = (error as NodeJS.ErrnoException).code
-
-      // EPERM means process exists but we don't have permission to signal it
-      // This shouldn't happen for our own locks, but handle it gracefully
-      if (errno === 'EPERM') {
-        return true
-      }
-
-      // ESRCH means process doesn't exist
-      if (errno === 'ESRCH') {
-        return false
-      }
-
-      // Unknown errno (Windows can surface ENOMEM, EACCES under load, etc.).
-      // Fail-closed: assume alive. The heartbeat-stale path still cleans up
-      // genuinely dead holders within HEARTBEAT_STALE_MS.
-      logger.debug('ProjectLockService: isProcessAlive unknown errno; assuming alive', {
-        pid,
-        errno
-      })
-      return true
-    }
   }
 
   /**
@@ -1067,16 +1049,16 @@ export class ProjectLockService implements IProjectLockService {
           const ok = await this.handleFocusRequest(lockInfo, lockPath, projectPath)
           if (ok) {
             const active = this.activeLocks.get(projectPath)
-            if (active) active.lastHeartbeatAt = Date.now()
+            if (active) active.lastHeartbeatAt = this.clock.now()
           }
           return
         }
 
         const active = this.activeLocks.get(projectPath)
-        if (active && Date.now() - active.lastHeartbeatAt >= HEARTBEAT_INTERVAL_MS) {
+        if (active && this.clock.now() - active.lastHeartbeatAt >= HEARTBEAT_INTERVAL_MS) {
           if (this.isDisposing) return
           const ok = await this.writeHeartbeat(lockInfo, lockPath, projectPath)
-          if (ok) active.lastHeartbeatAt = Date.now()
+          if (ok) active.lastHeartbeatAt = this.clock.now()
         }
       } catch (err) {
         logger.debug('ProjectLockService: Polling tick error', {
@@ -1107,12 +1089,12 @@ export class ProjectLockService implements IProjectLockService {
     lockPath: string,
     projectPath: string
   ): Promise<boolean> {
-    const updated: LockInfo = { ...lockInfo, lastHeartbeat: new Date().toISOString() }
+    const updated: LockInfo = { ...lockInfo, lastHeartbeat: this.clock.nowIso() }
     try {
       await atomicWriteJSON(lockPath, updated)
       return true
     } catch (error) {
-      const age = Date.now() - new Date(lockInfo.lastHeartbeat ?? lockInfo.timestamp).getTime()
+      const age = this.clock.now() - new Date(lockInfo.lastHeartbeat ?? lockInfo.timestamp).getTime()
       logger.warn('ProjectLockService: Heartbeat write failed', {
         projectPath: redactPath(projectPath),
         heartbeatAgeMs: Number.isNaN(age) ? null : age,
@@ -1157,7 +1139,7 @@ export class ProjectLockService implements IProjectLockService {
       ...lockInfo,
       focus_request: false,
       requester_pid: undefined,
-      lastHeartbeat: new Date().toISOString()
+      lastHeartbeat: this.clock.nowIso()
     }
 
     try {

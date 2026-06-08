@@ -622,54 +622,10 @@ describe('ProjectLockService', () => {
     })
   })
 
-  describe('isProcessAlive', () => {
-    it('returns true when process exists', () => {
-      vi.spyOn(process, 'kill').mockImplementation(() => true as never)
-
-      const result = (service as any).isProcessAlive(process.pid)
-
-      expect(result).toBe(true)
-      expect(process.kill).toHaveBeenCalledWith(process.pid, 0)
-    })
-
-    it('returns false when process does not exist (ESRCH)', () => {
-      vi.spyOn(process, 'kill').mockImplementation(() => {
-        const error: NodeJS.ErrnoException = new Error('ESRCH')
-        error.code = 'ESRCH'
-        throw error
-      })
-
-      const result = (service as any).isProcessAlive(99999)
-
-      expect(result).toBe(false)
-    })
-
-    it('returns true when process exists but no permission (EPERM)', () => {
-      vi.spyOn(process, 'kill').mockImplementation(() => {
-        const error: NodeJS.ErrnoException = new Error('EPERM')
-        error.code = 'EPERM'
-        throw error
-      })
-
-      const result = (service as any).isProcessAlive(1)
-
-      expect(result).toBe(true)
-    })
-
-    it('returns true on unknown errno (fail-closed)', () => {
-      vi.spyOn(process, 'kill').mockImplementation(() => {
-        const err: NodeJS.ErrnoException = new Error('ENOMEM: transient memory pressure')
-        err.code = 'ENOMEM'
-        throw err
-      })
-
-      const result = (service as any).isProcessAlive(99999)
-
-      // Unknown errnos (Windows OpenProcess failures, etc.) are treated as alive
-      // so the heartbeat-stale path handles cleanup rather than a false steal
-      expect(result).toBe(true)
-    })
-  })
+  // isProcessAlive private method removed in D1 refactor – behavior moved to
+  // systemProcessLiveness in src/main/utils/ProcessLiveness.ts.
+  // The integration-level coverage (ESRCH → stale, EPERM/ENOMEM → alive) is
+  // retained via the public API tests in 'checkLock' and 'cleanupStaleLocks'.
 
   describe('cleanupStaleLocks', () => {
     it('removes stale locks from dead processes', async () => {
