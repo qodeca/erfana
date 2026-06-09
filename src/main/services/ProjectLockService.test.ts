@@ -452,7 +452,6 @@ describe('ProjectLockService', () => {
     })
 
     it('initializes lastHeartbeat at lock creation', async () => {
-      const projectPath = 'C:\\test\\project'
       const result = await service.acquireLock(projectPath)
       expect(result.status).toBe('acquired')
 
