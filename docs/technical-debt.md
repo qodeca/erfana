@@ -181,6 +181,21 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 ---
 
+### 12. Claude status bar — Windows v1 limitations ([#217](https://github.com/qodeca/erfana/issues/217), 2026-06)
+
+**Severity**: Low
+**Impact**: The Windows Claude Code context status bar works but carries three known v1 gaps (parity-limited vs the macOS detector).
+
+- **Live cwd not resolved** — Windows v1 has no `lsof` analog wired, so the transcript dir is keyed off the panel's **spawn cwd**, not Claude's live cwd. If the user `cd`s to a different folder before launching `claude`, the bar hides.
+- **Same-folder shared transcript** — two `claude` sessions in the same folder share the transcript dir (newest-wins selection); per-panel liveness stays independent.
+- **Live-host verification pending** — the ConPTY parent-chain and two-panel behavior on a real Windows host (issue AC-2 / AC-4) still need manual verification; not yet done.
+
+**Files**: `src/main/services/claudeStatus/process/WinClaudeProcessDetector.ts`, `src/main/services/claudeStatus/encodeCwd.ts`.
+
+**Recommended next step**: wire a Windows live-cwd probe (e.g. `Get-Process | Select Path` or a handle/NtQueryInformationProcess approach) to close the spawn-cwd fallback gap; run the live-host two-panel UAT on a Windows 11 host.
+
+---
+
 ## Code Quality Improvements
 
 ### Documentation Token Efficiency
@@ -256,4 +271,4 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 
 ---
 
-**Last Updated**: v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
+**Last Updated**: #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)

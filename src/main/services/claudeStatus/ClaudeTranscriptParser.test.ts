@@ -54,6 +54,16 @@ function assistantLine(opts: {
   })
 }
 
+/** Build a JSONL line for a Claude Code compaction-summary boundary marker. */
+function compactionLine(): string {
+  return JSON.stringify({
+    type: 'user',
+    isCompactSummary: true,
+    isVisibleInTranscriptOnly: true,
+    message: { role: 'user', content: 'summary' }
+  })
+}
+
 describe('parseTranscript', () => {
   it('parses a single valid main turn', async () => {
     const file = await writeTranscript(
@@ -217,5 +227,98 @@ describe('parseTranscript', () => {
     // is wholly within the window.
     const result = await parseTranscript(file, { maxBytes: latest.length + 5 })
     expect(result).toEqual({ modelId: 'claude-opus-4-8', usedTokens: 9 })
+  })
+})
+
+describe('compaction awareness', () => {
+  it('flags justCompacted when a compaction is newer than the last assistant turn', async () => {
+    const file = await writeTranscript(
+      [assistantLine({ model: 'claude-opus-4-8', input: 95329 }), compactionLine()].join('\n')
+    )
+    const result = await parseTranscript(file)
+    expect(result).toEqual({ modelId: 'claude-opus-4-8', usedTokens: 95329, justCompacted: true })
+  })
+
+  it('does NOT flag when a post-compaction assistant turn exists', async () => {
+    const file = await writeTranscript(
+      [
+        assistantLine({ model: 'claude-opus-4-7', input: 95329 }),
+        compactionLine(),
+        assistantLine({ model: 'claude-opus-4-8', input: 1200 })
+      ].join('\n')
+    )
+    const result = await parseTranscript(file)
+    expect(result).toEqual({ modelId: 'claude-opus-4-8', usedTokens: 1200 })
+    expect(result?.justCompacted).toBeUndefined()
+  })
+
+  it('returns the second assistant turn flagged for assistant/compaction/assistant/compaction', async () => {
+    const file = await writeTranscript(
+      [
+        assistantLine({ model: 'claude-opus-4-7', input: 10 }),
+        compactionLine(),
+        assistantLine({ model: 'claude-opus-4-8', input: 7777 }),
+        compactionLine()
+      ].join('\n')
+    )
+    const result = await parseTranscript(file)
+    expect(result).toEqual({ modelId: 'claude-opus-4-8', usedTokens: 7777, justCompacted: true })
+  })
+
+  it('does NOT flag when the latest turn follows back-to-back compactions', async () => {
+    const file = await writeTranscript(
+      [
+        assistantLine({ model: 'claude-opus-4-7', input: 10 }),
+        compactionLine(),
+        compactionLine(),
+        assistantLine({ model: 'claude-opus-4-8', input: 333 })
+      ].join('\n')
+    )
+    const result = await parseTranscript(file)
+    expect(result).toEqual({ modelId: 'claude-opus-4-8', usedTokens: 333 })
+    expect(result?.justCompacted).toBeUndefined()
+  })
+
+  it('returns null for a compaction with no prior assistant turn', async () => {
+    const aloneFile = await writeTranscript(compactionLine())
+    expect(await parseTranscript(aloneFile)).toBeNull()
+
+    const withUserFile = await writeTranscript(
+      [JSON.stringify({ type: 'user' }), compactionLine()].join('\n'),
+      'with-user.jsonl'
+    )
+    expect(await parseTranscript(withUserFile)).toBeNull()
+  })
+
+  it('keeps the flag past intervening non-assistant lines after the compaction', async () => {
+    const file = await writeTranscript(
+      [
+        assistantLine({ model: 'claude-opus-4-8', input: 5000 }),
+        compactionLine(),
+        JSON.stringify({ type: 'user' }),
+        JSON.stringify({ type: 'system' })
+      ].join('\n')
+    )
+    const result = await parseTranscript(file)
+    expect(result).toEqual({ modelId: 'claude-opus-4-8', usedTokens: 5000, justCompacted: true })
+  })
+
+  it('does NOT treat a string/number isCompactSummary as a compaction marker', async () => {
+    const stringMarker = JSON.stringify({ type: 'user', isCompactSummary: 'true' })
+    const stringFile = await writeTranscript(
+      [assistantLine({ model: 'claude-opus-4-8', input: 9 }), stringMarker].join('\n')
+    )
+    const stringResult = await parseTranscript(stringFile)
+    expect(stringResult).toEqual({ modelId: 'claude-opus-4-8', usedTokens: 9 })
+    expect(stringResult?.justCompacted).toBeUndefined()
+
+    const numberMarker = JSON.stringify({ type: 'user', isCompactSummary: 1 })
+    const numberFile = await writeTranscript(
+      [assistantLine({ model: 'claude-opus-4-8', input: 9 }), numberMarker].join('\n'),
+      'number-marker.jsonl'
+    )
+    const numberResult = await parseTranscript(numberFile)
+    expect(numberResult).toEqual({ modelId: 'claude-opus-4-8', usedTokens: 9 })
+    expect(numberResult?.justCompacted).toBeUndefined()
   })
 })

@@ -23,16 +23,12 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { isAbsolute } from 'node:path'
 import type { ClaudeDetection, IClaudeProcessDetector } from './types'
+import type { ExecLike } from './exec'
 
-/**
- * Minimal shape of the exec dependency, injectable for testing. Mirrors the
- * relevant slice of `promisify(execFile)`'s signature.
- */
-export type ExecLike = (
-  file: string,
-  args: string[],
-  opts: { timeout: number; maxBuffer: number; env?: NodeJS.ProcessEnv }
-) => Promise<{ stdout: string }>
+// Re-export so existing importers (e.g. MacClaudeProcessDetector.test.ts) that
+// pull `ExecLike` from this module keep compiling after the type moved to
+// `./exec`.
+export type { ExecLike } from './exec'
 
 const execFileAsync = promisify(execFile)
 

@@ -51,6 +51,11 @@ const REFRESH_DEBOUNCE_MS = 250
 interface ParsedTurn {
   modelId: string
   usedTokens: number
+  /**
+   * True iff a compaction is newer than the carried turn; the caller treats
+   * `usedTokens` as reset (~0). See ClaudeTranscriptParser.ParsedTurn.
+   */
+  justCompacted?: boolean
 }
 
 /** Injectable collaborators; defaults wire the real implementations. */
@@ -295,7 +300,7 @@ export class ClaudeStatusService {
       const windowSize = await this.deps.detectWindowSize(parsed.modelId, parsed.usedTokens)
       if (isStale()) return
 
-      const used = parsed.usedTokens
+      const used = parsed.justCompacted ? 0 : parsed.usedTokens
       const rawPercentage = windowSize > 0 ? (used / windowSize) * 100 : 0
       const payload: ClaudeStatusChangePayload = {
         terminalId,

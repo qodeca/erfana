@@ -35,6 +35,14 @@ export interface ParsedTurn {
   modelId: string
   /** Context tokens used = input + cache_creation + cache_read (output excluded). */
   usedTokens: number
+  /**
+   * True iff a compaction summary is NEWER than this assistant turn — i.e. the
+   * session just compacted and no post-compaction assistant turn has been written
+   * yet. `usedTokens` is then the PRE-compaction value and the caller MUST treat
+   * it as reset (~0); `modelId` is carried from that turn so the bar still shows
+   * the model + window.
+   */
+  justCompacted?: boolean
 }
 
 /** Sentinel model value Claude writes for synthetic/system turns — never a real model. */
@@ -111,6 +119,12 @@ function turnFromRecord(record: unknown): ParsedTurn | null {
   return { modelId: model, usedTokens }
 }
 
+/** True when a record is a Claude Code compaction-summary boundary marker. */
+function isCompactionMarker(record: unknown): boolean {
+  if (typeof record !== 'object' || record === null) return false
+  return (record as Record<string, unknown>).isCompactSummary === true
+}
+
 /**
  * Read the relevant portion of the transcript as text, or `null` if unreadable.
  *
@@ -176,6 +190,7 @@ export async function parseTranscript(
   // Scan BACKWARD for the most recent usable main assistant turn. A truncated
   // trailing line simply fails JSON.parse and is skipped, so the prior valid
   // turn still wins.
+  let sawCompactionAfterLastTurn = false
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i].trim()
     if (line.length === 0) continue
@@ -187,8 +202,18 @@ export async function parseTranscript(
       continue
     }
 
+    if (isCompactionMarker(record)) {
+      sawCompactionAfterLastTurn = true
+      continue
+    }
+
     const turn = turnFromRecord(record)
-    if (turn) return turn
+    if (turn) {
+      if (sawCompactionAfterLastTurn) {
+        return { modelId: turn.modelId, usedTokens: turn.usedTokens, justCompacted: true }
+      }
+      return turn
+    }
   }
 
   return null

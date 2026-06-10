@@ -1,6 +1,6 @@
 # Design — Issue #216: Per-terminal Claude Code context status bar
 
-> Status: APPROVED — implemented (macOS v1). Architecture design for the managing-issues implement workflow.
+> Status: APPROVED — implemented (macOS v1; **Windows added via [#217](https://github.com/qodeca/erfana/issues/217)** — see §10 "Follow-up issue — Windows support"). Architecture design for the managing-issues implement workflow.
 > Issue: https://github.com/qodeca/erfana/issues/216 · Branch: `feat/216-terminal-claude-status-bar`
 
 ## 1. Summary
@@ -196,5 +196,17 @@ All adopted from the 5-lens review. Items conflicting with §2–§9 are superse
 - **aria-live hysteresis.** Announce only on band transitions, require ~N ms in the new band before announcing (debounce 69↔70 oscillation), and announce a concise delta ("context now 90% — red") rather than re-emitting the full label. Mount the live region empty and populate after a tick to avoid an unsolicited on-launch announcement.
 - **Badge contrast:** badge text uses `--color-text-primary` on `--color-bg-tertiary` (9.54:1); component test asserts contrast against the **chip** surface, not the rail.
 
-### Follow-up issue to open (with approval at finalization)
-- **Windows support for the Claude status bar:** verify the Windows cwd→ENC encoding (drive letter / backslash) and the ConPTY parent-process chain against a live Windows host; implement `WinClaudeProcessDetector` (`Get-CimInstance Win32_Process` via `powershell.exe -NoProfile -NonInteractive`, pid as a parameter not interpolated, higher cache TTL for PowerShell cold-start) and platform-branched `encodeCwd` + Windows process-cwd best-effort. Re-instate the Windows acceptance criterion there.
+### Follow-up issue — Windows support ([#217](https://github.com/qodeca/erfana/issues/217)) — ✅ IMPLEMENTED
+- **Original ask:** verify the Windows cwd→ENC encoding (drive letter / backslash) and the ConPTY parent-process chain against a live Windows host; implement `WinClaudeProcessDetector` (`Get-CimInstance Win32_Process` via `powershell.exe -NoProfile -NonInteractive`, pid as a parameter not interpolated, higher cache TTL for PowerShell cold-start) and platform-branched `encodeCwd` + Windows process-cwd best-effort.
+- **Final approach as shipped:**
+  - `process/WinClaudeProcessDetector.ts` — a **single static** `powershell.exe -NoProfile -NonInteractive` `Get-CimInstance Win32_Process` query returning a JSON snapshot; BFS over the process tree from the panel's PTY pid to find a `claude` descendant; **fail-closed**. **No pid interpolation** — `powershell.exe` is resolved by absolute path off `%SystemRoot%` and spawned with cwd pinned to `System32` (DLL-plant defense). **8s liveness-cache TTL** (vs the macOS detector's per-detect call) absorbs PowerShell cold-start cost.
+  - **Start-time floor:** the same snapshot's `CreationDate` is projected to epoch ms (`StartMs`) and used as the transcript `minMtimeMs` floor — same anti-"% already filled on launch" guarantee as macOS, without a second probe.
+  - **node-launched `claude` (`node …/cli.js`):** matched via a whole-command-line anchored-suffix fallback (parity with the macOS argv match), so node-hosted launches are detected.
+  - `exec.ts` — shared `ExecLike` type extracted from the macOS detector for test injection.
+  - `encodeCwd.ts` — platform-branched: Windows replaces `/`, `\`, `:`, `.` with `-` (verified against live `~/.claude/projects`: `C:\Users\x\Projects\erfana` → `C--Users-x-Projects-erfana`).
+  - `createProcessDetector.ts` — `win32` → `WinClaudeProcessDetector`; Linux remains a no-op.
+- **Known v1 Windows limitations (recorded honestly):**
+  - **Live cwd not resolved.** Windows v1 does not read Claude's *live* working directory (no `lsof` analog wired), so it falls back to the panel's **spawn cwd** — the bar hides if the user `cd`s to a different folder before launching `claude`.
+  - **Same-folder shared transcript.** Two `claude` sessions in the same folder share the transcript dir (newest-wins selection); per-panel liveness is still independent.
+  - **Unusual quoting edge case.** A `node`-launched `cli.js` path with spaces is handled by the anchored-suffix fallback, but an edge case with unusual quoting may still miss (parity with the macOS whitespace-split limitation).
+  - **Live-host verification still pending.** The ConPTY parent-chain and two-panel behavior on a real Windows host (the issue's AC-2 / AC-4 "verify on a live host" items) still warrant manual verification; not yet done.

@@ -119,6 +119,62 @@ describe('ClaudeStatusService', () => {
     })
   })
 
+  it('resets to ~0% after a compaction while keeping model + window', async () => {
+    const h = makeHarness()
+    h.parseTranscript.mockResolvedValue({
+      modelId: 'claude-opus-4-8',
+      usedTokens: 95329,
+      justCompacted: true
+    })
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+
+    expect(h.emitted).toHaveLength(1)
+    expect(h.emitted[0].payload.snapshot).not.toBeNull()
+    expect(h.emitted[0].payload.snapshot).toMatchObject({
+      modelId: 'claude-opus-4-8',
+      friendlyName: 'Opus 4.8',
+      windowSize: 1000000,
+      usedTokens: 0,
+      percent: 0,
+      level: 'green',
+      tooltip: '0k / 1M'
+    })
+  })
+
+  it('detects the window on the REAL pre-compaction tokens so the badge stays stable', async () => {
+    const h = makeHarness()
+    // A 200k-family model (Sonnet 4.5) whose pre-compaction usage exceeded 200k,
+    // which is the only signal keeping it at the 1M window. detectWindowSize MUST
+    // see 250000 (not the reset 0) or the badge would flicker back to 200k.
+    h.parseTranscript.mockResolvedValue({
+      modelId: 'claude-sonnet-4-5',
+      usedTokens: 250000,
+      justCompacted: true
+    })
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+
+    expect(h.detectWindowSize).toHaveBeenCalledWith('claude-sonnet-4-5', 250000)
+    expect(h.emitted[0].payload.snapshot?.windowSize).toBe(1000000)
+    expect(h.emitted[0].payload.snapshot?.usedTokens).toBe(0)
+    expect(h.emitted[0].payload.snapshot?.percent).toBe(0)
+  })
+
+  it('passes usedTokens through unchanged when not compacted', async () => {
+    const h = makeHarness()
+    h.parseTranscript.mockResolvedValue({
+      modelId: 'claude-opus-4-8',
+      usedTokens: 95329,
+      justCompacted: false
+    })
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+
+    expect(h.emitted[0].payload.snapshot?.usedTokens).toBe(95329)
+    expect(h.emitted[0].payload.snapshot?.tooltip).toBe('95k / 1M')
+  })
+
   it('formats the 1M tooltip and badge for an extended window', async () => {
     const h = makeHarness()
     h.parseTranscript.mockResolvedValue({ modelId: 'claude-opus-4-8', usedTokens: 250000 })
