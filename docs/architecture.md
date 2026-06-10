@@ -166,7 +166,7 @@ src/
 - **OOP Services**: Business logic in service classes
   - FileService: File operations (read, write, create, rename, delete)
   - FileWatcherService: Auto-reload files on external changes (300ms debounce)
-  - DirectoryWatcherService: Auto-refresh file tree (1000ms debounce, ignored patterns)
+  - DirectoryWatcherService: Auto-refresh file tree on create/delete/rename and in-place edits (75 ms collect + 200 ms throttle main side, 250 ms renderer debounce; ignored patterns; `.git/` content events suppressed in favor of `GitWatcherService`)
   - SettingsService: Persistent storage with electron-store (dynamic ES Module import)
   - TerminalService: Terminal emulator with xterm.js + node-pty (PTY lifecycle, auto-resize)
 - **Auto-Refresh**: Chokidar-based watching with pause/resume race prevention

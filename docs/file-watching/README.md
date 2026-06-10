@@ -78,7 +78,7 @@ When a file has both external changes and unsaved local changes, an orange confl
 
 ## DirectoryWatcherService (Directory Watching)
 
-Monitors entire project folder for structural changes (files/folders created, deleted, moved).
+Monitors entire project folder for structural changes (files/folders created, deleted, moved) **and** in-place content modifications (chokidar `change` events from `fs.writeFile` truncate-in-place, added in #241).
 
 ### Architecture
 
