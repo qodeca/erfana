@@ -4,8 +4,8 @@ Erfana automatically detects and responds to external file system changes using 
 
 ## Overview
 
-**FileWatcherService**: Watches individual open files for content changes
-**DirectoryWatcherService**: Watches entire project directory for structural changes
+**FileWatcherService**: Watches individual open files for content changes, surfaces editor reload/conflict UI
+**DirectoryWatcherService**: Watches entire project directory for both structural changes (create/delete/rename) **and** in-place content changes (`fs.writeFile` in place), broadcasts `directory-watch:changed` for both
 
 Both use [Chokidar](https://github.com/paulmillr/chokidar) for cross-platform file system monitoring with intelligent debouncing and race condition prevention.
 
@@ -87,9 +87,11 @@ Monitors entire project folder for structural changes (files/folders created, de
   - 75ms collection window for batching events
   - 200ms throttle between processing rounds
   - AtomicSaveDetector (100ms) for unlink events
-- **Events**: `add`, `addDir`, `unlink`, `unlinkDir`
+- **Events**: `add`, `addDir`, `unlink`, `unlinkDir`, `change`
 - **Scope**: Entire project directory (recursive)
 - **Cleanup**: Automatic on window close and app quit
+
+> The `change` event covers in-place file content modifications from any source – Monaco autosave, terminal commands (`sed`, `echo >>`), external editors, format-on-save scripts. It is what wakes `useGitStatus.debouncedRefresh()` so the Project Tree's git badges update after an edit without a manual refresh. Prior to this, only structural changes broadcast on this channel, so badges only updated after create/delete/rename – not after editing an existing file.
 
 ### Watched Files
 
@@ -133,6 +135,7 @@ Recommended:
 |----------|----------|
 | Create file externally | Tree updates automatically within 500ms |
 | Delete folder externally | Tree updates, expanded folder state preserved |
+| Edit file content (Monaco autosave or external edit) | Git status badge refreshes after autosave settles (~2.5–3 s total) |
 | Git checkout (bulk changes) | Debounced to single refresh after changes settle |
 | Internal CRUD (create/delete/rename) | Watcher paused, no double refresh |
 | Expand folders, make external changes | Folders remain expanded after refresh |

@@ -30,6 +30,7 @@ import {
   createWatcherErrorMessage,
   createDirectoryErrorMessage
 } from './useDirectoryWatcher.logic'
+import { DIRECTORY_WATCHER } from '../components/ProjectTree/constants'
 import { logger } from '../utils/logger'
 
 interface UseDirectoryWatcherOptions {
@@ -60,6 +61,11 @@ export function useDirectoryWatcher({
   onProjectDeletedRef.current = onProjectDeleted
   onErrorRef.current = onError
 
+  // Debounce timer for refresh callbacks – consumer-side throttle for
+  // bursts of 'directory-watch:changed' broadcasts (multi-file edits, save
+  // storms, formatters). Mirrors the useGitStatus.debouncedRefresh pattern.
+  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
+
   useEffect(() => {
     // Guard: Should we start the watcher?
     if (!shouldStartWatcher(projectPath, initialLoadComplete)) {
@@ -71,15 +77,25 @@ export function useDirectoryWatcher({
       logger.error(createWatcherErrorMessage(), err instanceof Error ? err : undefined)
     })
 
-    // Listen for directory changes
+    // Listen for directory changes – debounce the refresh so a burst of
+    // broadcasts (one editor save + one external tool write + one git op,
+    // or N files rewritten by a formatter) collapses to a single tree
+    // re-list. Without this, every broadcast triggered a recursive IPC
+    // walk of the project directory.
     const unsubscribeChanged = window.api.directoryWatch.onDirectoryChanged((data) => {
       // Only refresh if not during our own internal operations
-      if (shouldHandleDirectoryChange(isInternalOperationRef.current)) {
-        logger.info(createDirectoryChangeMessage(data.eventCount))
-        onRefreshRef.current()
-      } else {
+      if (!shouldHandleDirectoryChange(isInternalOperationRef.current)) {
         logger.debug('[RENDERER] Directory change skipped (internal operation)')
+        return
       }
+      logger.info(createDirectoryChangeMessage(data.eventCount))
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current)
+      }
+      refreshTimerRef.current = setTimeout(() => {
+        refreshTimerRef.current = null
+        onRefreshRef.current()
+      }, DIRECTORY_WATCHER.DEBOUNCE_DELAY)
     })
 
     // Listen for project deletion
@@ -99,6 +115,10 @@ export function useDirectoryWatcher({
       unsubscribeChanged()
       unsubscribeDeleted()
       unsubscribeError()
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current)
+        refreshTimerRef.current = null
+      }
     }
   }, [projectPath, initialLoadComplete, isInternalOperationRef])
 }

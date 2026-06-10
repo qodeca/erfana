@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 import { renderHook, act, cleanup } from '@testing-library/react'
 import { useDirectoryWatcher } from './useDirectoryWatcher'
+import { DIRECTORY_WATCHER } from '../components/ProjectTree/constants'
 
 // Hoist logger mock so vi.mock can reference it
 const { mockLogger } = vi.hoisted(() => ({
@@ -67,6 +68,18 @@ describe('useDirectoryWatcher hook', () => {
   })
 
   describe('event handling', () => {
+    // The hook debounces refresh by DIRECTORY_WATCHER.DEBOUNCE_DELAY (250 ms)
+    // per lens-review Finding 2 on PR #241 – consumer-side throttle so multi-
+    // file write storms collapse into a single tree re-list. Tests advance
+    // fake timers to validate the debounced behavior.
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
     it('calls onRefresh when directory change event received (AC-001 renderer side)', () => {
       const onRefresh = vi.fn()
       const isInternalOperationRef = { current: false }
@@ -87,6 +100,13 @@ describe('useDirectoryWatcher hook', () => {
 
       act(() => {
         callback({ eventCount: 1, summary: { add: 1 } })
+      })
+
+      // Refresh is debounced – not yet called
+      expect(onRefresh).not.toHaveBeenCalled()
+
+      act(() => {
+        vi.advanceTimersByTime(DIRECTORY_WATCHER.DEBOUNCE_DELAY + 1)
       })
 
       expect(onRefresh).toHaveBeenCalledTimes(1)
@@ -111,6 +131,7 @@ describe('useDirectoryWatcher hook', () => {
 
       act(() => {
         callback({ eventCount: 1, summary: { add: 1 } })
+        vi.advanceTimersByTime(DIRECTORY_WATCHER.DEBOUNCE_DELAY + 1)
       })
 
       expect(onRefresh).not.toHaveBeenCalled()
@@ -136,6 +157,7 @@ describe('useDirectoryWatcher hook', () => {
       // While internal operation is active, onRefresh should not be called
       act(() => {
         callback({ eventCount: 1, summary: { add: 1 } })
+        vi.advanceTimersByTime(DIRECTORY_WATCHER.DEBOUNCE_DELAY + 1)
       })
 
       expect(onRefresh).not.toHaveBeenCalled()
@@ -143,9 +165,82 @@ describe('useDirectoryWatcher hook', () => {
       // Reset internal operation flag
       isInternalOperationRef.current = false
 
-      // Now onRefresh should be called
+      // Now onRefresh should be called after debounce expires.
+      // Uses the real 'change' event key DirectoryWatcherService emits.
       act(() => {
-        callback({ eventCount: 2, summary: { modify: 1 } })
+        callback({ eventCount: 2, summary: { change: 1 } })
+        vi.advanceTimersByTime(DIRECTORY_WATCHER.DEBOUNCE_DELAY + 1)
+      })
+
+      expect(onRefresh).toHaveBeenCalledTimes(1)
+    })
+
+    it('debounces rapid directory change events into a single refresh (lens-review Finding 2)', () => {
+      // Validates that consumer-side throttling collapses a multi-file write
+      // storm (e.g., prettier --write src/, snapshot updates) into one
+      // recursive readDirectory IPC walk rather than N. Each broadcast that
+      // arrives within DEBOUNCE_DELAY restarts the timer; refresh fires once
+      // the storm settles.
+      const onRefresh = vi.fn()
+
+      renderHook(() =>
+        useDirectoryWatcher({
+          projectPath: '/proj',
+          initialLoadComplete: true,
+          isInternalOperationRef: { current: false },
+          onRefresh,
+          onProjectDeleted: vi.fn(),
+          onError: vi.fn()
+        })
+      )
+
+      const callback = mockOnDirectoryChanged.mock.calls[0][0]
+
+      // Three rapid events within the debounce window
+      act(() => {
+        callback({ eventCount: 1, summary: { change: 1 } })
+        vi.advanceTimersByTime(50)
+        callback({ eventCount: 1, summary: { change: 1 } })
+        vi.advanceTimersByTime(50)
+        callback({ eventCount: 1, summary: { change: 1 } })
+      })
+
+      // Not yet — last event reset the timer
+      act(() => {
+        vi.advanceTimersByTime(DIRECTORY_WATCHER.DEBOUNCE_DELAY - 1)
+      })
+      expect(onRefresh).not.toHaveBeenCalled()
+
+      // Cross the boundary
+      act(() => {
+        vi.advanceTimersByTime(2)
+      })
+      expect(onRefresh).toHaveBeenCalledTimes(1)
+    })
+
+    it('refreshes on an event with empty summary (hook is summary-shape-agnostic, lens-review Finding 10)', () => {
+      // The hook does not inspect the summary contents – isInternalOperationRef
+      // and presence of the broadcast are what gate refresh. This pins the
+      // contract so a future change that starts depending on summary shape
+      // surfaces a test failure rather than silent drift.
+      const onRefresh = vi.fn()
+
+      renderHook(() =>
+        useDirectoryWatcher({
+          projectPath: '/proj',
+          initialLoadComplete: true,
+          isInternalOperationRef: { current: false },
+          onRefresh,
+          onProjectDeleted: vi.fn(),
+          onError: vi.fn()
+        })
+      )
+
+      const callback = mockOnDirectoryChanged.mock.calls[0][0]
+
+      act(() => {
+        callback({ eventCount: 0, summary: {} })
+        vi.advanceTimersByTime(DIRECTORY_WATCHER.DEBOUNCE_DELAY + 1)
       })
 
       expect(onRefresh).toHaveBeenCalledTimes(1)

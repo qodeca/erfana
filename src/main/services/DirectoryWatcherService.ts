@@ -31,7 +31,7 @@ interface WatchedDirectory {
 // Git index watching migrated to GitWatcherService (Issue #74)
 
 interface DirectoryChangeEvent {
-  type: 'add' | 'addDir' | 'unlink' | 'unlinkDir'
+  type: 'add' | 'addDir' | 'unlink' | 'unlinkDir' | 'change'
   path: string
 }
 export class DirectoryWatcherService {
@@ -205,7 +205,8 @@ export class DirectoryWatcherService {
       // breaks spawning child processes (e.g. PDF export's hidden render window
       // crashed with "Failed to initialize sandbox" on a 20k-file folder).
       disableGlobbing: true, // Treat the path literally (matches v4); avoids glob chars in project paths
-      awaitWriteFinish: false, // Not needed for directory operations
+      awaitWriteFinish: false, // Lower latency for editor saves; downstream
+                               // consumers tolerate one pre-flush `change` per write.
       depth, // Optional cap for performance
       followSymlinks: false // Security: don't follow symlinks
     })
@@ -256,6 +257,29 @@ export class DirectoryWatcherService {
 
     watcher.on('unlinkDir', (path: string) => {
       this.queueEvent(dirPath, { type: 'unlinkDir', path })
+    })
+
+    // Handle in-place file content modifications (editor autosave via
+    // fs.writeFile, terminal commands, external editors). Routes through the
+    // same throttle/coalesce/broadcast pipeline as structural events so the
+    // renderer's git-status refresh (useGitStatus) wakes on edits, not just
+    // on create/delete/rename.
+    //
+    // Pre-flush note (lens-review Finding 6): with `awaitWriteFinish: false`
+    // chokidar may surface a `change` event before the write has fully
+    // flushed — chokidar emits a final `change` after flush so state
+    // converges, but the first `git status` cycle may see partial content.
+    // The 250 ms renderer debounce + git's own stat re-read absorb this;
+    // documented chokidar behavior on Windows NTFS in particular.
+    //
+    // Filter `.git/` paths (lens-review Finding 7): GitWatcherService is the
+    // canonical publisher for `.git/HEAD`, `.git/index`, `.git/refs/*` state
+    // changes (and reaches the same `useGitStatus.debouncedRefresh`).
+    // Suppressing here avoids duplicate refresh requests during
+    // `git checkout` / `git commit` and similar internal git operations.
+    watcher.on('change', (path: string) => {
+      if (path.includes('/.git/') || path.includes('\\.git\\')) return
+      this.queueEvent(dirPath, { type: 'change', path })
     })
 
     // Handle errors

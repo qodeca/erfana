@@ -182,6 +182,94 @@ describe('DirectoryWatcherService pipeline integration', () => {
   })
 
   // -------------------------------------------------------------------------
+  // In-place content modifications broadcast through directory-watch:changed
+  //
+  // Closes the gap where chokidar 'change' events (from fs.writeFile + similar
+  // in-place writes by Monaco autosave, terminal commands, external editors)
+  // were silently dropped because watcher.on('change', ...) was never wired.
+  // useGitStatus.debouncedRefresh relies on directory-watch:changed to wake on
+  // edits — without these events the Project Tree git badge never updated
+  // until the user clicked manual refresh.
+  // -------------------------------------------------------------------------
+  describe('In-place content change events broadcast through directory-watch:changed', () => {
+    it('routes a single change event through the pipeline and surfaces summary.change=1', () => {
+      seedWatchedDirectory(svc, '/proj')
+
+      svc.queueEvent('/proj', { type: 'change', path: '/proj/notes.md' })
+
+      // Cross the ThrottledWorker collection window (75ms)
+      vi.advanceTimersByTime(76)
+
+      expect(sends.length).toBe(1)
+      const payload = firstPayload() as any
+      expect(sends[0].channel).toBe('directory-watch:changed')
+      expect(payload.summary.change).toBe(1)
+      // Structural keys must be absent — this was a pure content edit
+      expect(payload.summary.add).toBeUndefined()
+      expect(payload.summary.unlink).toBeUndefined()
+    })
+
+    it('coalesces back-to-back change events on the same path into a single broadcast', () => {
+      seedWatchedDirectory(svc, '/proj')
+
+      // Simulate three rapid autosaves on the same file inside one collection window
+      svc.queueEvent('/proj', { type: 'change', path: '/proj/notes.md' })
+      svc.queueEvent('/proj', { type: 'change', path: '/proj/notes.md' })
+      svc.queueEvent('/proj', { type: 'change', path: '/proj/notes.md' })
+
+      vi.advanceTimersByTime(76)
+
+      // EventCoalescer Rule 4: change+change → single change
+      expect(sends.length).toBe(1)
+      const payload = firstPayload() as any
+      expect(payload.summary.change).toBe(1)
+      expect(payload.eventCount).toBe(1)
+      // Confirms coalescedCount captures the two suppressed events
+      expect(payload.originalEventCount).toBe(3)
+      expect(payload.coalescedCount).toBe(2)
+    })
+
+    it('preserves cross-path events: add A + change B coalesce into one broadcast with both summary keys (lens-review Finding 9)', () => {
+      // Realistic save burst: one file edited while another is created
+      // (e.g., editor saves notes.md while a side terminal creates new.md).
+      // EventCoalescer's per-path stack means both events survive into a
+      // single broadcast — neither is suppressed by the other.
+      seedWatchedDirectory(svc, '/proj')
+
+      svc.queueEvent('/proj', { type: 'add', path: '/proj/new.md' })
+      svc.queueEvent('/proj', { type: 'change', path: '/proj/notes.md' })
+
+      vi.advanceTimersByTime(76)
+
+      expect(sends.length).toBe(1)
+      const payload = firstPayload() as any
+      expect(payload.summary.add).toBe(1)
+      expect(payload.summary.change).toBe(1)
+      expect(payload.eventCount).toBe(2)
+    })
+
+    it('applies EventCoalescer Rule 3: add + change on the same path → add only (lens-review Finding 9)', () => {
+      // When a file is created then immediately written in the same window,
+      // the change event collapses into the create — the renderer needs a
+      // single "file appeared" signal, not "appeared then modified".
+      seedWatchedDirectory(svc, '/proj')
+
+      svc.queueEvent('/proj', { type: 'add', path: '/proj/x.md' })
+      svc.queueEvent('/proj', { type: 'change', path: '/proj/x.md' })
+
+      vi.advanceTimersByTime(76)
+
+      expect(sends.length).toBe(1)
+      const payload = firstPayload() as any
+      expect(payload.summary.add).toBe(1)
+      expect(payload.summary.change).toBeUndefined()
+      expect(payload.eventCount).toBe(1)
+      // The change was coalesced away by Rule 3
+      expect(payload.coalescedCount).toBe(1)
+    })
+  })
+
+  // -------------------------------------------------------------------------
   // AC-008: Rapid event coalescing (50 files)
   // -------------------------------------------------------------------------
   describe('AC-008: Rapid event coalescing (50 files)', () => {

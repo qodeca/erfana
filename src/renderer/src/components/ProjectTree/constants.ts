@@ -56,6 +56,22 @@ export const AUTO_EXPAND = {
 } as const
 
 /**
+ * Directory Watcher Configuration
+ *
+ * Added per lens-review on PR #241: now that DirectoryWatcherService also
+ * broadcasts on file content edits (chokidar `change` events), the
+ * consumer of `'directory-watch:changed'` must debounce to avoid
+ * thrashing the recursive project-tree re-list on multi-file write
+ * storms (e.g., `prettier --write .`, snapshot updates, AI multi-file
+ * edits). Symmetric with GIT_STATUS.DEBOUNCE_DELAY below so the two
+ * consumers of the broadcast behave consistently.
+ */
+export const DIRECTORY_WATCHER = {
+  /** Debounce delay in ms for project tree refresh on directory changes. */
+  DEBOUNCE_DELAY: 250
+} as const
+
+/**
  * Git Status Configuration
  *
  * Issue #74: Reduced timing constants for faster git status latency.
