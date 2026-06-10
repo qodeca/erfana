@@ -4,7 +4,13 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
-## Unreleased
+## 0.15.0
+
+*Released 2026-06-09. Tag [`v0.15.0`](https://github.com/qodeca/erfana/releases/tag/v0.15.0).*
+
+### Multi-instance reliability
+
+- **Project locks are now tamper-resistant and self-healing** – when the same project is open in more than one Erfana window, the lock file that coordinates them is signed (HMAC) so a stale or forged lock from another process on the same machine can no longer hijack a project. Each live instance now refreshes a heartbeat, so a crashed or force-quit window's lock is reclaimed automatically once it goes quiet (after 30s) instead of leaving the project blocked. Locks also survive sleep/wake correctly – every held lock is refreshed when the machine resumes, preventing another instance from stealing it after a long sleep. Several edge cases were hardened along the way: symlinked lock directories and lock paths are refused (junction-redirect / CVE-2025-68146 class), interrupted lock writes leave no orphaned temp files behind, and the Windows process-liveness check now fails closed on unknown errors rather than assuming a process is dead.
 
 ### Fixed
 
