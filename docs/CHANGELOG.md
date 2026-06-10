@@ -8,6 +8,7 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 ### Fixed
 
+- **Parent-folder git-status dot now shows on Windows** ([#237](https://github.com/qodeca/erfana/issues/237)) – a folder's colored git-status indicator in the project tree was missing on Windows because the parent-path lookup only recognised the POSIX `/` separator; it now also recognises the Windows `\` separator, with no change to macOS/Linux behaviour.
 - **Text is selectable again across the app** ([#211](https://github.com/qodeca/erfana/issues/211)) – you can now copy error messages, file paths, status data, dialog text, toast messages, settings descriptions, and chat content, and the markdown-preview prompt-template context menu (Explain / Modify / Ask / Visualize) works again. A dockview panel-chrome style had been disabling selection on nested content; the per-surface rule is now captured in the [Text selection policy](./ui-style-guide.md#text-selection-policy) so future components stay selectable by default where it matters.
 
 ### Internal

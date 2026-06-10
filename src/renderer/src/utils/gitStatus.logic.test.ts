@@ -311,6 +311,98 @@ describe('gitStatus.logic', () => {
         expect(result.get('src')).toBe('modified')
       })
     })
+
+    describe('Windows-style paths (backslash separator)', () => {
+      it('should propagate single file status to parent folder', () => {
+        const files: GitFileEntry[] = [
+          { path: 'src\\index.ts', status: 'modified', staged: false },
+        ]
+        const result = calculateFolderStatuses(files)
+        expect(result.get('src')).toBe('modified')
+      })
+
+      it('should propagate to multiple parent levels', () => {
+        const files: GitFileEntry[] = [
+          { path: 'src\\components\\Button\\Button.tsx', status: 'modified', staged: false },
+        ]
+        const result = calculateFolderStatuses(files)
+        expect(result.get('src\\components\\Button')).toBe('modified')
+        expect(result.get('src\\components')).toBe('modified')
+        expect(result.get('src')).toBe('modified')
+      })
+
+      it('should propagate deeply nested file with absolute Windows path', () => {
+        const files: GitFileEntry[] = [
+          { path: 'C:\\Users\\dev\\project\\src\\index.ts', status: 'untracked', staged: false },
+        ]
+        const result = calculateFolderStatuses(files)
+        expect(result.get('C:\\Users\\dev\\project\\src')).toBe('untracked')
+        expect(result.get('C:\\Users\\dev\\project')).toBe('untracked')
+        expect(result.get('C:\\Users\\dev')).toBe('untracked')
+        expect(result.get('C:\\Users')).toBe('untracked')
+        expect(result.get('C:')).toBe('untracked')
+      })
+
+      it('should prioritize deleted over modified at the folder', () => {
+        const files: GitFileEntry[] = [
+          { path: 'src\\file1.ts', status: 'modified', staged: false },
+          { path: 'src\\file2.ts', status: 'deleted', staged: false },
+        ]
+        const result = calculateFolderStatuses(files)
+        // deleted (4) > modified (3)
+        expect(result.get('src')).toBe('deleted')
+      })
+
+      it('should prioritize conflicted over all others at the folder', () => {
+        const files: GitFileEntry[] = [
+          { path: 'src\\file1.ts', status: 'deleted', staged: false },
+          { path: 'src\\file2.ts', status: 'modified', staged: false },
+          { path: 'src\\file3.ts', status: 'conflicted', staged: false },
+          { path: 'src\\file4.ts', status: 'untracked', staged: false },
+        ]
+        const result = calculateFolderStatuses(files)
+        // conflicted (5) > all others
+        expect(result.get('src')).toBe('conflicted')
+      })
+
+      it('should track statuses independently per sibling folder', () => {
+        const files: GitFileEntry[] = [
+          { path: 'src\\file1.ts', status: 'modified', staged: false },
+          { path: 'docs\\file2.md', status: 'deleted', staged: false },
+          { path: 'tests\\file3.ts', status: 'untracked', staged: false },
+        ]
+        const result = calculateFolderStatuses(files)
+        expect(result.get('src')).toBe('modified')
+        expect(result.get('docs')).toBe('deleted')
+        expect(result.get('tests')).toBe('untracked')
+      })
+
+      it('should propagate different statuses up the tree correctly', () => {
+        const files: GitFileEntry[] = [
+          { path: 'src\\components\\Button.tsx', status: 'modified', staged: false },
+          { path: 'src\\utils\\helpers.ts', status: 'deleted', staged: false },
+        ]
+        const result = calculateFolderStatuses(files)
+        expect(result.get('src\\components')).toBe('modified')
+        expect(result.get('src\\utils')).toBe('deleted')
+        // src should have highest priority from children: deleted (4) > modified (3)
+        expect(result.get('src')).toBe('deleted')
+      })
+
+      it('rightmost separator wins for defensive mixed-separator input (not producer-emitted)', () => {
+        // Defensive property test of the Math.max rightmost-separator behavior.
+        // The mixed-separator fixture below is NOT a path the real producer can emit:
+        // the git worker's path.join normalizes to uniform backslashes on Windows.
+        // It exercises "whichever separator appears last wins" in isolation.
+        const files: GitFileEntry[] = [
+          { path: 'C:\\Users\\dev\\project/src/index.ts', status: 'modified', staged: false },
+        ]
+        const result = calculateFolderStatuses(files)
+        expect(result.get('C:\\Users\\dev\\project/src')).toBe('modified')
+        expect(result.get('C:\\Users\\dev\\project')).toBe('modified')
+        expect(result.get('C:\\Users\\dev')).toBe('modified')
+      })
+    })
   })
 
   describe('getStatusBadge', () => {
