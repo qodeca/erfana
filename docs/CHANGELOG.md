@@ -4,6 +4,15 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## 0.15.1
+
+*Released 2026-06-10. Tag [`v0.15.1`](https://github.com/qodeca/erfana/releases/tag/v0.15.1).*
+
+### Fixed
+
+- **Project Tree git-status badges update automatically after editing a file** ([#241](https://github.com/qodeca/erfana/issues/241)) – previously the `M` indicator only appeared after pressing `Cmd/Ctrl+Alt+R` because `DirectoryWatcherService` listened only to create / delete / rename events, never to chokidar `change`. Monaco autosaves (in-place `fs.writeFile`, same inode) emit `change`, which was silently dropped. The watcher now broadcasts `change` events through the existing throttle / coalesce / IPC pipeline; `.git/` internals are filtered so `GitWatcherService` stays the sole publisher for git-state changes. End-to-end latency is roughly 2.5–3 s on macOS (2 s autosave debounce + ~750 ms pipeline). A 250 ms debounce added to `useDirectoryWatcher` absorbs multi-file write storms (`prettier --write`, snapshot updates, AI multi-file edits) into one tree re-list.
+- **Parent-folder git-status dot now shows on Windows** ([#237](https://github.com/qodeca/erfana/issues/237)) – a folder's colored git-status indicator in the project tree was missing on Windows because the parent-path lookup only recognised the POSIX `/` separator; it now also recognises the Windows `\` separator, with no change to macOS/Linux behaviour.
+
 ## 0.15.0
 
 *Released 2026-06-09. Tag [`v0.15.0`](https://github.com/qodeca/erfana/releases/tag/v0.15.0).*
@@ -14,8 +23,6 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 ### Fixed
 
-- **Parent-folder git-status dot now shows on Windows** ([#237](https://github.com/qodeca/erfana/issues/237)) – a folder's colored git-status indicator in the project tree was missing on Windows because the parent-path lookup only recognised the POSIX `/` separator; it now also recognises the Windows `\` separator, with no change to macOS/Linux behaviour.
-- **Project Tree git-status badges update automatically after editing a file** ([#241](https://github.com/qodeca/erfana/issues/241)) – previously the `M` indicator only appeared after pressing `Cmd/Ctrl+Alt+R` because `DirectoryWatcherService` listened only to create / delete / rename events, never to chokidar `change`. Monaco autosaves (in-place `fs.writeFile`, same inode) emit `change`, which was silently dropped. The watcher now broadcasts `change` events through the existing throttle / coalesce / IPC pipeline; `.git/` internals are filtered so `GitWatcherService` stays the sole publisher for git-state changes. End-to-end latency is roughly 2.5–3 s on macOS (2 s autosave debounce + ~750 ms pipeline). A 250 ms debounce added to `useDirectoryWatcher` absorbs multi-file write storms (`prettier --write`, snapshot updates, AI multi-file edits) into one tree re-list.
 - **Text is selectable again across the app** ([#211](https://github.com/qodeca/erfana/issues/211)) – you can now copy error messages, file paths, status data, dialog text, toast messages, settings descriptions, and chat content, and the markdown-preview prompt-template context menu (Explain / Modify / Ask / Visualize) works again. A dockview panel-chrome style had been disabling selection on nested content; the per-surface rule is now captured in the [Text selection policy](./ui-style-guide.md#text-selection-policy) so future components stay selectable by default where it matters.
 
 ### Internal
