@@ -42,7 +42,10 @@ export function calculateFolderStatuses(files: GitFileEntry[]): Map<string, GitD
     // Propagate status to all parent folders
     let currentPath = file.path
     while (true) {
-      const lastSlash = currentPath.lastIndexOf('/')
+      const lastSlash = Math.max(
+        currentPath.lastIndexOf('/'),
+        currentPath.lastIndexOf('\\'),
+      )
       if (lastSlash === -1) break // Reached root
 
       const folderPath = currentPath.substring(0, lastSlash)
