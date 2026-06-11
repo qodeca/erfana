@@ -18,7 +18,7 @@
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { encodeProjectDir } from './encodeCwd'
+import { candidateProjectDirs } from './encodeCwd'
 
 /** Subdirectory holding sidechain/subagent transcripts — excluded from selection. */
 const SUBAGENTS_DIR = 'subagents'
@@ -98,14 +98,25 @@ export async function locateLatestTranscript(
   try {
     const root = opts?.root ?? (await resolveProjectsRoot())
     const minMtimeMs = opts?.minMtimeMs
-    const encDir = path.join(root, encodeProjectDir(cwd))
 
-    let entries: string[]
-    try {
-      entries = await fs.readdir(encDir)
-    } catch {
-      return null
+    // Try the primary encoding first, then a normalized alternate (e.g. a
+    // trailing-separator-stripped form) — the inferred Windows encoding is lossy,
+    // so a single attempt can silently miss (finding #3). The first candidate dir
+    // that exists wins; all candidates derive from this cwd, so a fallback can
+    // never resolve a different project's transcript.
+    let encDir: string | null = null
+    let entries: string[] | null = null
+    for (const candidate of candidateProjectDirs(cwd)) {
+      const dir = path.join(root, candidate)
+      try {
+        entries = await fs.readdir(dir)
+        encDir = dir
+        break
+      } catch {
+        // This candidate dir is absent — try the next.
+      }
     }
+    if (encDir === null || entries === null) return null
 
     let newestPath: string | null = null
     let newestName: string | null = null

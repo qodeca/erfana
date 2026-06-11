@@ -18,6 +18,8 @@ import { WinClaudeProcessDetector } from './WinClaudeProcessDetector'
  * callers degrade gracefully without platform branches of their own.
  */
 export class NoopClaudeProcessDetector implements IClaudeProcessDetector {
+  readonly resolvesLiveCwd = false
+
   async isClaudeRunning(): Promise<ClaudeDetection> {
     return { running: false }
   }

@@ -56,8 +56,8 @@ function makeHarness(overrides?: Partial<ClaudeStatusDeps>): Harness {
   // auto-1M even under 200k usage; everything else with low usage is 200k.
   const detectWindowSize = vi
     .fn()
-    .mockImplementation(async (modelId: string, used: number) =>
-      modelNativelySupportsExtended(modelId) || used > 200000 ? 1000000 : 200000
+    .mockImplementation(async (modelId: string, used: number, forceExtended?: boolean) =>
+      forceExtended || modelNativelySupportsExtended(modelId) || used > 200000 ? 1000000 : 200000
     )
   const watcher = makeFakeWatcher()
   const emit = vi.fn((wc: number, payload: ClaudeStatusChangePayload) => {
@@ -155,7 +155,7 @@ describe('ClaudeStatusService', () => {
     h.service.registerPanel('t1', 4242, '/p', 7)
     await flush()
 
-    expect(h.detectWindowSize).toHaveBeenCalledWith('claude-sonnet-4-5', 250000)
+    expect(h.detectWindowSize).toHaveBeenCalledWith('claude-sonnet-4-5', 250000, undefined)
     expect(h.emitted[0].payload.snapshot?.windowSize).toBe(1000000)
     expect(h.emitted[0].payload.snapshot?.usedTokens).toBe(0)
     expect(h.emitted[0].payload.snapshot?.percent).toBe(0)
@@ -198,6 +198,43 @@ describe('ClaudeStatusService', () => {
 
     expect(h.emitted[0].payload.snapshot?.percent).toBe(59)
     expect(h.emitted[0].payload.snapshot?.level).toBe('amber')
+  })
+
+  it('forces the 1M window from a /model …[1m] override (modelForcedExtended)', async () => {
+    const h = makeHarness()
+    h.parseTranscript.mockResolvedValue({
+      modelId: 'claude-sonnet-4-6',
+      usedTokens: 50000,
+      modelForcedExtended: true
+    })
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+
+    // The forceExtended hint is forwarded as the third arg and forces 1M even for
+    // a 200k-family model (Sonnet 4.6) under 200k usage.
+    expect(h.detectWindowSize).toHaveBeenCalledWith('claude-sonnet-4-6', 50000, true)
+    expect(h.emitted).toHaveLength(1)
+    expect(h.emitted[0].payload.snapshot).toMatchObject({
+      modelId: 'claude-sonnet-4-6',
+      friendlyName: 'Sonnet 4.6',
+      windowSize: 1000000,
+      usedTokens: 50000,
+      // 50000 / 1000000 = 5 → 5%.
+      percent: 5
+    })
+  })
+
+  it('passes a falsy forceExtended for a normal turn (no override) and behaves as before', async () => {
+    const h = makeHarness()
+    h.parseTranscript.mockResolvedValue({ modelId: 'claude-sonnet-4-5', usedTokens: 50000 })
+    h.detectWindowSize.mockResolvedValue(200000)
+    h.service.registerPanel('t1', 4242, '/p', 7)
+    await flush()
+
+    const thirdArg = h.detectWindowSize.mock.calls[0][2]
+    expect(thirdArg).toBeFalsy()
+    expect(h.emitted[0].payload.snapshot?.windowSize).toBe(200000)
+    expect(h.emitted[0].payload.snapshot?.usedTokens).toBe(50000)
   })
 
   it('emits {snapshot:null} when claude is not running', async () => {
@@ -470,5 +507,61 @@ describe('ClaudeStatusService', () => {
     h.watcher.fire('/some/other/dir')
     await flush()
     expect(h.emitted.length).toBe(before2)
+  })
+
+  describe('sticky 1M window + cache eviction (hardening)', () => {
+    it('keeps the 1M window after a post-compaction reset shrinks the detected window (finding #5)', async () => {
+      const h = makeHarness()
+      // Pass 1: a 200k-family model (Sonnet 4.5) whose >200k usage is the ONLY 1M
+      // signal → detected window is 1M, so the sticky bit is set.
+      h.parseTranscript.mockResolvedValueOnce({ modelId: 'claude-sonnet-4-5', usedTokens: 250000 })
+      h.service.registerPanel('t1', 4242, '/p', 7)
+      await flush()
+      expect(h.emitted.at(-1)?.payload.snapshot?.windowSize).toBe(1000000)
+
+      // Pass 2: post-compaction reset to a small count. detectWindowSize would now
+      // return 200k, but the sticky bit must keep the badge at 1M (no visible snap-back).
+      h.parseTranscript.mockResolvedValue({
+        modelId: 'claude-sonnet-4-5',
+        usedTokens: 30000,
+        justCompacted: true
+      })
+      await h.service.refresh('t1')
+      await flush()
+
+      expect(h.detectWindowSize).toHaveBeenLastCalledWith('claude-sonnet-4-5', 30000, undefined)
+      const last = h.emitted.at(-1)?.payload.snapshot
+      expect(last?.windowSize).toBe(1000000) // stayed 1M despite detection → 200k
+      expect(last?.usedTokens).toBe(0)
+    })
+
+    it('drops the sticky 1M window when the pid changes (new session) (finding #5)', async () => {
+      const h = makeHarness()
+      h.parseTranscript.mockResolvedValue({ modelId: 'claude-sonnet-4-5', usedTokens: 250000 })
+      h.service.registerPanel('t1', 100, '/p', 7)
+      await flush()
+      expect(h.emitted.at(-1)?.payload.snapshot?.windowSize).toBe(1000000)
+
+      // New session under the same terminalId but a different pid → sticky resets,
+      // so a low-usage Sonnet turn must re-resolve to the 200k window.
+      h.parseTranscript.mockResolvedValue({ modelId: 'claude-sonnet-4-5', usedTokens: 30000 })
+      h.service.registerPanel('t1', 200, '/p', 7)
+      await flush()
+      expect(h.emitted.at(-1)?.payload.snapshot?.windowSize).toBe(200000)
+    })
+
+    it('forgets the detector cache entry for the pid on unregister (finding #2)', async () => {
+      const forget = vi.fn()
+      const detector = {
+        isClaudeRunning: vi.fn().mockResolvedValue({ running: true }),
+        forget
+      }
+      const h = makeHarness({ detector: detector as unknown as IClaudeProcessDetector })
+      h.service.registerPanel('t1', 4242, '/p', 7)
+      await flush()
+
+      h.service.unregisterPanel('t1')
+      expect(forget).toHaveBeenCalledWith(4242)
+    })
   })
 })

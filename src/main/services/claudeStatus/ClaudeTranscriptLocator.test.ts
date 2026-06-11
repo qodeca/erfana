@@ -195,4 +195,23 @@ describe('locateLatestTranscript', () => {
       expect(result).toBe(prior)
     })
   })
+
+  describe('encoding fallback (finding #3)', () => {
+    it('resolves a trailing-separator cwd via the stripped-form alternate dir', async () => {
+      // The primary encoding of a trailing-slash cwd (`…demo/` → `-…-demo-`) does
+      // not exist; the locator must fall back to the stripped form (`-…-demo`),
+      // which is the real dir created in beforeEach.
+      const file = await writeJsonl('session.jsonl', 5_000_000)
+
+      const result = await locateLatestTranscript(`${CWD}/`, { root: rootDir })
+      expect(result).toBe(file)
+    })
+
+    it('returns null when no candidate dir exists', async () => {
+      const result = await locateLatestTranscript('/Users/test/Projects/nonexistent', {
+        root: rootDir
+      })
+      expect(result).toBeNull()
+    })
+  })
 })

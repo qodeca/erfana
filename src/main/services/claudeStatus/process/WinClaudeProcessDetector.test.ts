@@ -309,6 +309,87 @@ describe('WinClaudeProcessDetector', () => {
       expect(calls).toHaveLength(2)
     })
   })
+
+  describe('hardening (#217 review)', () => {
+    const single = JSON.stringify({
+      ProcessId: 4321,
+      ParentProcessId: 2000,
+      Name: 'claude.exe',
+      CommandLine: 'C:\\tools\\claude.exe',
+      StartMs: 100
+    })
+
+    it('detects a lone claude descendant when PowerShell returns a single bare object (5.1 unroll) (#12)', async () => {
+      const { exec } = makeExec({ stdout: single })
+      const detector = new WinClaudeProcessDetector(exec)
+      expect(await detector.isClaudeRunning(2000)).toEqual({ running: true, startedAtMs: 100 })
+    })
+
+    it('projects StartMs defensively (try/catch + UTC) so one bad date cannot blank the snapshot (#13)', async () => {
+      const { exec, calls } = makeExec({ stdout: single })
+      const detector = new WinClaudeProcessDetector(exec)
+      await detector.isClaudeRunning(2000)
+      const query = calls[0].args[calls[0].args.indexOf('-Command') + 1]
+      expect(query).toContain('ToUniversalTime')
+      expect(query).toContain('try{')
+      expect(query).toContain('catch{$null}')
+    })
+
+    it('does NOT cache a transient error — the next call retries (#8)', async () => {
+      let fail = true
+      const calls: Array<{ file: string }> = []
+      const exec: ExecLike = async (file) => {
+        calls.push({ file })
+        if (fail) throw new Error('powershell timeout')
+        return { stdout: single }
+      }
+      // Clock is fixed at 1000: a CACHED negative would skip the second exec, so a
+      // re-exec here proves the transient error was NOT cached.
+      const detector = new WinClaudeProcessDetector(exec, () => 1000)
+
+      expect(await detector.isClaudeRunning(2000)).toEqual({ running: false })
+      expect(calls).toHaveLength(1)
+
+      fail = false
+      expect(await detector.isClaudeRunning(2000)).toEqual({ running: true, startedAtMs: 100 })
+      expect(calls).toHaveLength(2)
+    })
+
+    it('DOES cache a definite negative for the TTL (a completed snapshot with no claude)', async () => {
+      const stdout = json([row(2000, 1, 'powershell.exe', 'powershell.exe', 100)])
+      const { exec, calls } = makeExec({ stdout })
+      const detector = new WinClaudeProcessDetector(exec, () => 1000)
+
+      expect(await detector.isClaudeRunning(2000)).toEqual({ running: false })
+      expect(await detector.isClaudeRunning(2000)).toEqual({ running: false })
+      expect(calls).toHaveLength(1) // second call served from cache
+    })
+
+    it('re-execs at exactly now === expiresAt (strict-< boundary)', async () => {
+      let nowMs = 1000
+      const { exec, calls } = makeExec({ stdout: single })
+      const detector = new WinClaudeProcessDetector(exec, () => nowMs)
+
+      await detector.isClaudeRunning(2000)
+      expect(calls).toHaveLength(1)
+
+      nowMs = 1000 + 8000 // exactly at expiry; now() < expiresAt is false → expired
+      await detector.isClaudeRunning(2000)
+      expect(calls).toHaveLength(2)
+    })
+
+    it('forget(pid) drops the cached entry so the next call recomputes (#2)', async () => {
+      const { exec, calls } = makeExec({ stdout: single })
+      const detector = new WinClaudeProcessDetector(exec, () => 1000)
+
+      await detector.isClaudeRunning(2000)
+      expect(calls).toHaveLength(1)
+
+      detector.forget(2000)
+      await detector.isClaudeRunning(2000)
+      expect(calls).toHaveLength(2)
+    })
+  })
 })
 
 describe('parseWin32Processes (unit)', () => {
@@ -360,5 +441,18 @@ describe('parseWin32Processes (unit)', () => {
     ])
     const rows = parseWin32Processes(stdout)
     expect(rows).toEqual([{ pid: 5, ppid: 1, name: '', commandLine: '', startMs: 1 }])
+  })
+
+  it.each([
+    ['legacy /Date(ms)/ form', '/Date(1717668000000)/'],
+    ['ISO-8601 string', '2026-06-06T11:16:39.000Z'],
+    ['negative epoch', -5],
+  ])('omits startMs for a non-numeric/implausible StartMs: %s (findings #6/#13)', (_label, startMs) => {
+    const stdout = JSON.stringify([
+      { ProcessId: 1, ParentProcessId: 0, Name: 'a.exe', CommandLine: 'a', StartMs: startMs },
+    ])
+    const rows = parseWin32Processes(stdout)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].startMs).toBeUndefined()
   })
 })

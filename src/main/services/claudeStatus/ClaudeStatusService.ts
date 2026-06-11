@@ -32,7 +32,7 @@ import path from 'node:path'
 import { logger } from '../LoggingService'
 import { encodeProjectDir } from './encodeCwd'
 import { locateLatestTranscript } from './ClaudeTranscriptLocator'
-import { parseTranscript } from './ClaudeTranscriptParser'
+import { parseTranscript, type ParsedTurn } from './ClaudeTranscriptParser'
 import { detectWindowSize } from './ClaudeWindowDetector'
 import { friendlyModelName } from './friendlyModelName'
 import { clampPercent, levelFor } from './thresholds'
@@ -47,17 +47,6 @@ const NUDGE_MIN_INTERVAL_MS = 1000
 /** Debounce window applied to nudge-triggered refreshes (ms). */
 const REFRESH_DEBOUNCE_MS = 250
 
-/** Parsed token usage from a transcript (subset re-declared to decouple deps). */
-interface ParsedTurn {
-  modelId: string
-  usedTokens: number
-  /**
-   * True iff a compaction is newer than the carried turn; the caller treats
-   * `usedTokens` as reset (~0). See ClaudeTranscriptParser.ParsedTurn.
-   */
-  justCompacted?: boolean
-}
-
 /** Injectable collaborators; defaults wire the real implementations. */
 export interface ClaudeStatusDeps {
   /** Per-OS process detector keyed by PTY pid. */
@@ -70,8 +59,18 @@ export interface ClaudeStatusDeps {
   locateTranscript: (cwd: string, minMtimeMs?: number) => Promise<string | null>
   /** Parse a transcript file into {modelId, usedTokens}, or null. */
   parseTranscript: (file: string) => Promise<ParsedTurn | null>
-  /** Detect the 200k/1M window for a model id + used-token count. */
-  detectWindowSize: (modelId: string, used: number) => Promise<200000 | 1000000>
+  /**
+   * Detect the 200k/1M window for a model id + used-token count. `forceExtended`
+   * (a fresh `/model …[1m]` override) forces the 1M window instantly. `opts`
+   * threads the settings-cache seam (`settingsPath`/`now`) so the path is
+   * injectable end-to-end from service tests with a controlled clock.
+   */
+  detectWindowSize: (
+    modelId: string,
+    used: number,
+    forceExtended?: boolean,
+    opts?: { settingsPath?: string; now?: () => number }
+  ) => Promise<200000 | 1000000>
   /** External chokidar watcher owning the watched-dir set. */
   watcher: ClaudeTranscriptWatcher
   /** Push a change payload to a webContents (wired to electron send later). */
@@ -91,6 +90,14 @@ interface PanelEntry {
   queued?: boolean
   /** Dir currently watched for this terminal (so cwd changes can re-target). */
   watchedDir?: string
+  /**
+   * Sticky 1M-window bit (finding #5): set once this session's window is detected
+   * as 1M, so a post-compaction token reset (which would otherwise re-resolve to
+   * 200k on a threshold-only session) cannot visibly shrink the badge. Reset when
+   * the pid changes (a new session). Window DETECTION still runs on the real
+   * token count; this only prevents a downward flicker of the displayed window.
+   */
+  observedExtended?: boolean
 }
 
 /**
@@ -133,7 +140,9 @@ export class ClaudeStatusService {
         deps?.locateTranscript ?? ((cwd, minMtimeMs) => locateLatestTranscript(cwd, { minMtimeMs })),
       parseTranscript: deps?.parseTranscript ?? ((file) => parseTranscript(file)),
       detectWindowSize:
-        deps?.detectWindowSize ?? ((modelId, used) => detectWindowSize(modelId, used)),
+        deps?.detectWindowSize ??
+        ((modelId, used, forceExtended, opts) =>
+          detectWindowSize(modelId, used, forceExtended, opts)),
       watcher,
       emit: deps?.emit ?? (() => {})
     }
@@ -171,6 +180,15 @@ export class ClaudeStatusService {
   ): void {
     const existing = this.entries.get(terminalId)
     if (existing) {
+      // A pid change means a new claude session — drop the sticky 1M bit so the
+      // window is re-detected from scratch for the new session (finding #5).
+      if (existing.pid !== pid) existing.observedExtended = undefined
+      // Clear any pending nudge debounce so its closure can't fire a refresh
+      // against the just-superseded generation (finding #14).
+      if (existing.debounceTimer) {
+        clearTimeout(existing.debounceTimer)
+        existing.debounceTimer = undefined
+      }
       existing.pid = pid
       existing.spawnCwd = spawnCwd
       existing.webContentsId = webContentsId
@@ -296,9 +314,20 @@ export class ClaudeStatusService {
         return
       }
 
-      // 4. Window detection + snapshot composition.
-      const windowSize = await this.deps.detectWindowSize(parsed.modelId, parsed.usedTokens)
+      // 4. Window detection + snapshot composition. Detection runs on the REAL
+      // (pre-compaction) token count so a >200k signal still upgrades to 1M.
+      const detectedWindow = await this.deps.detectWindowSize(
+        parsed.modelId,
+        parsed.usedTokens,
+        parsed.modelForcedExtended
+      )
       if (isStale()) return
+
+      // Sticky 1M (finding #5): once observed at 1M, keep it for the session so a
+      // post-compaction token reset cannot shrink the badge 1M→200k. `entry` is
+      // the live object here (isStale() above caught any re-registration).
+      if (detectedWindow === 1000000) entry.observedExtended = true
+      const windowSize: 200000 | 1000000 = entry.observedExtended ? 1000000 : detectedWindow
 
       const used = parsed.justCompacted ? 0 : parsed.usedTokens
       const rawPercentage = windowSize > 0 ? (used / windowSize) * 100 : 0
@@ -316,9 +345,13 @@ export class ClaudeStatusService {
         }
       }
 
-      // 5. Final generation re-check before the targeted send.
+      // 5. Final generation re-check, then re-fetch the live entry before the
+      // targeted send so the emit can never target a since-removed panel even if
+      // an await is later inserted before this point (finding #14).
       if (isStale()) return
-      this.emitTo(entry.webContentsId, payload)
+      const live = this.entries.get(terminalId)
+      if (!live) return
+      this.emitTo(live.webContentsId, payload)
     } catch (error) {
       // Fail-closed: any unexpected error hides the bar.
       logger.warn('ClaudeStatusService: refresh failed', {
@@ -346,6 +379,9 @@ export class ClaudeStatusService {
       this.deps.watcher.unwatchDir(entry.watchedDir, terminalId)
       entry.watchedDir = undefined
     }
+    // Drop the detector's cached liveness for this PTY so the cache doesn't grow
+    // unbounded as terminals open and close over a long session (finding #2).
+    if (entry.pid !== undefined) this.deps.detector.forget?.(entry.pid)
     this.entries.delete(terminalId)
   }
 

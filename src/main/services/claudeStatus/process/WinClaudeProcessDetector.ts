@@ -12,8 +12,10 @@
  * Projecting `StartMs` as epoch milliseconds inside the query avoids
  * Windows-PowerShell-5.1's `/Date(ms)/` JSON serialization plus DateTimeKind/
  * offset ambiguity, and collapses what would otherwise be a second per-pid probe
- * (removing its TOCTOU race) into one snapshot. `-InputObject @(...)` forces an
- * array even for a single row (5.1 has no `-AsArray`).
+ * (removing its TOCTOU race) into one snapshot. A single matching row would
+ * serialize as a bare object (5.1 unrolls a one-element array and lacks
+ * `-AsArray`); the array shape is GUARANTEED by `parseWin32Processes` normalizing
+ * a bare object to a one-element array, not by the `@(...)` wrapper alone.
  *
  * Matching rule (design §10 "Match on args, not comm"): a process counts as
  * Claude when its image name is a `claude` shim (`claude.exe`/`.cmd`/`.bat`)
@@ -34,7 +36,8 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { dirname, isAbsolute, join } from 'node:path'
 import type { ExecLike } from './exec'
-import type { ClaudeDetection, IClaudeProcessDetector } from './types'
+import type { ClaudeDetection } from './types'
+import { AbstractClaudeProcessDetector } from './AbstractClaudeProcessDetector'
 
 const execFileAsync = promisify(execFile)
 
@@ -69,15 +72,23 @@ const LIVENESS_TTL_MS = 8000
  * Static PowerShell query — NEVER interpolate any runtime value into this.
  *
  * `Win32_Process` is projected to `ProcessId,ParentProcessId,Name,CommandLine`
- * plus `StartMs`, a numeric epoch-ms computed from `CreationDate`. Computing
- * `StartMs` here (rather than serializing the raw date) sidesteps
- * Windows-PowerShell-5.1's `/Date(ms)/` JSON date form AND its DateTimeKind/
- * offset ambiguity, and folds the start-time read into the same snapshot as the
- * process table — no second per-pid probe, no TOCTOU race. `-InputObject @(...)`
- * forces array output even for a single matching row (5.1 lacks `-AsArray`).
+ * plus `StartMs`, a numeric epoch-ms computed from `CreationDate`. The per-row
+ * `StartMs` projection (finding #13):
+ *  - converts `CreationDate` to UTC first (`.ToUniversalTime()`) so the
+ *    `[datetimeoffset]` cast cannot pick up an ambiguous local offset;
+ *  - is wrapped in try/catch so ONE unparseable date yields a null `StartMs`
+ *    (tolerated downstream) instead of a terminating error that blanks the WHOLE
+ *    snapshot → empty stdout → fail-closed hide;
+ *  - sidesteps Windows-PowerShell-5.1's `/Date(ms)/` JSON date form by emitting a
+ *    plain number, and folds the start-time read into the same snapshot as the
+ *    process table — no second per-pid probe, no TOCTOU race.
+ *
+ * Array shape: the `@(...)` wrapper does not reliably force an array in 5.1 (a
+ * one-element result still unrolls to a bare object); `parseWin32Processes`
+ * normalizes that, so the array shape is guaranteed by the parser, not here.
  */
-const PS_QUERY =
-  "ConvertTo-Json -Compress -InputObject @(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine,@{N='StartMs';E={if($_.CreationDate){[long]([datetimeoffset]$_.CreationDate).ToUnixTimeMilliseconds()}else{$null}}})"
+export const PS_QUERY =
+  "ConvertTo-Json -Compress -InputObject @(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine,@{N='StartMs';E={try{if($_.CreationDate){[long]([datetimeoffset]$_.CreationDate.ToUniversalTime()).ToUnixTimeMilliseconds()}else{$null}}catch{$null}}})"
 
 /** Image names that denote the Claude CLI directly (lowercased basenames). */
 const CLAUDE_IMAGE_NAMES = new Set(['claude.exe', 'claude.cmd', 'claude.bat'])
@@ -103,12 +114,6 @@ interface WinProcRow {
   startMs?: number
 }
 
-/** A cached liveness result with its expiry deadline (ms, `now()` clock). */
-interface CacheEntry {
-  value: ClaudeDetection
-  expiresAt: number
-}
-
 /**
  * Resolve the absolute `powershell.exe` path off `%SystemRoot%` (or `%windir%`),
  * never via PATH and never `pwsh`. Fail-closed: returns undefined when the env
@@ -121,64 +126,50 @@ function resolvePowershell(): string | undefined {
   return isAbsolute(p) ? p : undefined
 }
 
-export class WinClaudeProcessDetector implements IClaudeProcessDetector {
-  /** Per-rootPid short-TTL liveness cache. Invalid pids are never cached. */
-  private readonly cache = new Map<number, CacheEntry>()
+export class WinClaudeProcessDetector extends AbstractClaudeProcessDetector {
+  protected readonly livenessTtlMs = LIVENESS_TTL_MS
+  /** Windows v1 never resolves the matched process's live cwd (design §10). */
+  readonly resolvesLiveCwd = false
 
   /**
    * @param exec Injected exec (real `execFile` by default; mocked in tests).
    * @param now Injected clock (defaults to `Date.now`) so tests control TTL
    *   expiry deterministically.
    */
-  constructor(
-    private exec: ExecLike = defaultExecFile,
-    private now: () => number = Date.now
-  ) {}
-
-  async isClaudeRunning(rootPid: number): Promise<ClaudeDetection> {
-    if (!isValidPid(rootPid)) return { running: false }
-
-    const cached = this.cache.get(rootPid)
-    if (cached !== undefined && this.now() < cached.expiresAt) {
-      return cached.value
-    }
-
-    const value = await this.computeLiveness(rootPid)
-    this.cache.set(rootPid, { value, expiresAt: this.now() + LIVENESS_TTL_MS })
-    return value
+  constructor(exec: ExecLike = defaultExecFile, now: () => number = Date.now) {
+    super(exec, now)
   }
 
-  /** Clear the liveness cache (test helper; entries also expire naturally). */
-  clearCache(): void {
-    this.cache.clear()
-  }
-
-  /** Compute liveness from a single PowerShell `Win32_Process` snapshot. */
-  private async computeLiveness(rootPid: number): Promise<ClaudeDetection> {
+  /**
+   * Compute liveness from a single PowerShell `Win32_Process` snapshot. Throws on
+   * a transient PowerShell failure (spawn error / timeout / ENOBUFS) so the base
+   * does not cache it; resolves a definite detection otherwise.
+   */
+  protected async computeDetection(rootPid: number): Promise<ClaudeDetection> {
     const powershell = resolvePowershell()
-    if (powershell === undefined) return { running: false } // fail-closed
+    // A missing %SystemRoot% is a stable (non-transient) condition; a definite
+    // fail-closed result is fine to cache for the short TTL.
+    if (powershell === undefined) return { running: false }
 
-    let rows: WinProcRow[]
-    try {
-      const { stdout } = await this.exec(
-        powershell,
-        ['-NoProfile', '-NonInteractive', '-Command', PS_QUERY],
-        {
-          timeout: EXEC_TIMEOUT_MS,
-          maxBuffer: EXEC_MAX_BUFFER,
-          // Pin cwd to powershell's own (trusted) System32 dir so a malicious DLL
-          // in the user's project folder cannot be side-loaded via the current
-          // directory during interpreter startup.
-          cwd: dirname(powershell),
-        }
-      )
-      rows = parseWin32Processes(stdout)
-    } catch {
-      // PowerShell error/timeout — fail closed.
-      return { running: false }
-    }
+    // A throw from the exec (spawn error / timeout / ENOBUFS) propagates to the
+    // base, which treats it as transient and does not cache the fail-closed value.
+    const { stdout } = await this.exec(
+      powershell,
+      ['-NoProfile', '-NonInteractive', '-Command', PS_QUERY],
+      {
+        timeout: EXEC_TIMEOUT_MS,
+        maxBuffer: EXEC_MAX_BUFFER,
+        // Pin cwd to powershell's own (trusted) System32 dir so a malicious DLL
+        // in the user's project folder cannot be side-loaded via the current
+        // directory during interpreter startup.
+        cwd: dirname(powershell),
+      }
+    )
+    const rows = parseWin32Processes(stdout)
 
-    const match = findClaudeDescendant(rows, rootPid)
+    const match = this.findClaudeDescendant(rows, rootPid, (r) =>
+      commandIsClaude(r.name, r.commandLine)
+    )
     if (match === undefined) return { running: false }
 
     const detection: ClaudeDetection = { running: true }
@@ -187,11 +178,6 @@ export class WinClaudeProcessDetector implements IClaudeProcessDetector {
     if (match.startMs !== undefined) detection.startedAtMs = match.startMs
     return detection
   }
-}
-
-/** Integer, strictly positive — guards the public arg. */
-function isValidPid(pid: number): boolean {
-  return Number.isInteger(pid) && pid > 0
 }
 
 /**
@@ -227,12 +213,15 @@ export function parseWin32Processes(stdout: string): WinProcRow[] {
 
     // The PS projection emits `StartMs` as a JSON number or null; null/undefined
     // must NOT coerce to 0 (Number(null) === 0), so guard before Number().
+    // A `/Date(ms)/` or ISO string (a non-numeric PS date serialization) coerces
+    // to NaN and is dropped; a negative epoch is implausible for a process start
+    // and is dropped too (→ no transcript floor, graceful degrade).
     const startMs =
       obj.StartMs === null || obj.StartMs === undefined
         ? undefined
         : (() => {
             const n = Number(obj.StartMs)
-            return Number.isFinite(n) ? n : undefined
+            return Number.isFinite(n) && n >= 0 ? n : undefined
           })()
 
     const row: WinProcRow = { pid, ppid, name, commandLine }
@@ -240,37 +229,6 @@ export function parseWin32Processes(stdout: string): WinProcRow[] {
     rows.push(row)
   }
   return rows
-}
-
-/**
- * BFS the descendants of `rootPid` and return the first row whose name/command
- * line denotes the Claude CLI, or undefined if none. Returning the ROW (not just
- * the pid) means `startMs` comes from the same snapshot. Short-circuits on the
- * first match.
- */
-function findClaudeDescendant(rows: WinProcRow[], rootPid: number): WinProcRow | undefined {
-  const childrenByPpid = new Map<number, WinProcRow[]>()
-  for (const row of rows) {
-    const siblings = childrenByPpid.get(row.ppid)
-    if (siblings) siblings.push(row)
-    else childrenByPpid.set(row.ppid, [row])
-  }
-
-  const queue: number[] = [rootPid]
-  const visited = new Set<number>([rootPid])
-  while (queue.length > 0) {
-    const ppid = queue.shift() as number
-    const children = childrenByPpid.get(ppid)
-    if (!children) continue
-    for (const child of children) {
-      if (commandIsClaude(child.name, child.commandLine)) return child
-      if (!visited.has(child.pid)) {
-        visited.add(child.pid)
-        queue.push(child.pid)
-      }
-    }
-  }
-  return undefined
 }
 
 /**

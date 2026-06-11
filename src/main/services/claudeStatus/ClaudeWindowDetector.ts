@@ -185,19 +185,23 @@ export function modelNativelySupportsExtended(modelId: string): boolean {
  * Detect the context-window size for the active session.
  *
  * Resolution order (cheap-first, see module doc):
+ *  0. `forceExtended` hint (a fresh `/model …[1m]` override) → 1M (in-memory,
+ *     no I/O). Highest priority so a `/model` switch reflects near-instantly.
  *  1. {@link modelNativelySupportsExtended}(modelId) → 1M (in-memory, no I/O).
  *  2. `usedTokens > EXTENDED_THRESHOLD` → 1M (in-memory, no I/O).
  *  3. settings.json `model` is a `[1m]` variant → 1M (file read).
  *  4. else → 200k.
  *
- * PERF (§10): steps 1–2 are pure in-memory predicates; when either holds we
+ * PERF (§10): steps 0–2 are pure in-memory predicates; when any holds we
  * return 1M WITHOUT reading settings.json. The file is read only when the model
- * is NOT a known-1M model AND usage ≤ 200k — preserving the PERF-2 goal of no
- * file read on the common path while still catching an explicit `sonnet[1m]` /
- * `opus-4-5[1m]`.
+ * is NOT a known-1M model AND usage ≤ 200k AND no force hint — preserving the
+ * PERF-2 goal of no file read on the common path while still catching an explicit
+ * `sonnet[1m]` / `opus-4-5[1m]`.
  *
  * @param modelId The transcript's model id (e.g. `claude-opus-4-8`).
  * @param usedTokens Context tokens used by the latest main turn.
+ * @param forceExtended Highest-priority in-memory hint that the 1M window is
+ *   active (a fresh `/model …[1m]` override); short-circuits to 1M with no I/O.
  * @param opts.settingsPath Override the settings.json path (test injection).
  *   Defaults to `~/.claude/settings.json`.
  * @param opts.now Injected clock (defaults to `Date.now`) controlling the
@@ -208,8 +212,13 @@ export function modelNativelySupportsExtended(modelId: string): boolean {
 export async function detectWindowSize(
   modelId: string,
   usedTokens: number,
+  forceExtended = false,
   opts?: { settingsPath?: string; now?: () => number }
 ): Promise<200000 | 1000000> {
+  // Highest-priority in-memory signal: a fresh `/model …[1m]` override forces the
+  // 1M window instantly, before any registry check or settings.json read.
+  if (forceExtended) return EXTENDED_WINDOW
+
   // Cheap in-memory predicates first: a natively-1M model or a token count above
   // the standard window can only be the 1M window — short-circuit WITHOUT
   // touching the filesystem (PERF-2 common path).

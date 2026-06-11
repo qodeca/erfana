@@ -7,7 +7,7 @@
  * @see docs/designs/216-claude-status-bar.md §2
  */
 import { describe, it, expect } from 'vitest'
-import { encodeProjectDir } from './encodeCwd'
+import { encodeProjectDir, candidateProjectDirs } from './encodeCwd'
 
 describe('encodeProjectDir', () => {
   it('encodes a normal project path', () => {
@@ -76,6 +76,46 @@ describe('encodeProjectDir', () => {
 
     it('preserves drive-letter case as-is', () => {
       expect(encodeProjectDir('D:\\work', 'win32')).toBe('D--work')
+    })
+
+    // The win32 rule is lossy/non-injective (finding #3); these pin the EXACT
+    // (documented) behavior for edge forms so a regression in the rule is caught.
+    it.each([
+      ['UNC path', '\\\\server\\share\\project', '--server-share-project'],
+      ['consecutive separators', 'C:\\a\\\\b', 'C--a--b'],
+      ['trailing separator', 'C:\\a\\', 'C--a-'],
+      ['forward-slash trailing', 'C:/a/', 'C--a-']
+    ])('encodes a %s', (_label, input, expected) => {
+      expect(encodeProjectDir(input, 'win32')).toBe(expected)
+    })
+  })
+
+  describe('candidateProjectDirs', () => {
+    it('yields a single candidate when the path has no trailing separator', () => {
+      expect(candidateProjectDirs('C:\\Users\\x\\proj', 'win32')).toEqual([
+        'C--Users-x-proj'
+      ])
+    })
+
+    it('adds a trailing-separator-stripped alternate (finding #3 fallback)', () => {
+      // Primary keeps the trailing dash; the alternate drops it so a cwd that
+      // carries a trailing `\` still resolves the real (un-trailing) dir.
+      expect(candidateProjectDirs('C:\\Users\\x\\proj\\', 'win32')).toEqual([
+        'C--Users-x-proj-',
+        'C--Users-x-proj'
+      ])
+    })
+
+    it('de-duplicates so a bare drive root yields one candidate', () => {
+      // `C:\` strips to `C:` → both encode to `C--`, so only one candidate remains.
+      expect(candidateProjectDirs('C:\\', 'win32')).toEqual(['C--'])
+    })
+
+    it('works on POSIX with a trailing slash', () => {
+      expect(candidateProjectDirs('/Users/x/proj/', 'darwin')).toEqual([
+        '-Users-x-proj-',
+        '-Users-x-proj'
+      ])
     })
   })
 })
