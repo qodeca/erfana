@@ -18,7 +18,16 @@
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { encodeProjectDir } from './encodeCwd'
+import { logger } from '../LoggingService'
+import { candidateProjectDirs } from './encodeCwd'
+
+/**
+ * Max candidate transcripts returned by {@link locateTranscriptCandidates}. The
+ * caller parses them newest-first until one yields a usable turn, so this only
+ * needs to be deep enough to skip a metadata-only sidecar (or two) and reach the
+ * real conversation file.
+ */
+export const MAX_CANDIDATES = 6
 
 /** Subdirectory holding sidechain/subagent transcripts — excluded from selection. */
 const SUBAGENTS_DIR = 'subagents'
@@ -75,42 +84,57 @@ function isInsideRoot(candidate: string, root: string): boolean {
 }
 
 /**
- * Locate the active transcript `.jsonl` for `cwd`, or `null`.
+ * Locate the eligible transcript `.jsonl` files for `cwd`, **newest-first**.
+ *
+ * The caller (ClaudeStatusService) parses these in order and uses the first that
+ * yields a usable assistant turn. Returning a ranked list rather than a single
+ * newest file is what lets the bar skip a metadata-only sidecar (`ai-title` /
+ * `last-prompt` / `mode`, no turns) that Claude Code writes alongside the real
+ * transcript and which otherwise wins "newest" and shadows it (the bug this fixes).
  *
  * @param cwd Absolute working directory whose `<ENC>` transcript dir to scan.
  * @param opts.root Override the projects root (test injection). Defaults to the
- *   realpath of `~/.claude/projects`. Preferred over an env override for
- *   testability — a temp root is passed directly in tests.
+ *   realpath of `~/.claude/projects`.
  * @param opts.minMtimeMs Optional floor (epoch ms, typically the running
  *   `claude` process's start time): entries last modified before
- *   `minMtimeMs - MTIME_SKEW_MS` are skipped. This stops a freshly-launched
- *   session — whose own transcript does not exist until its first turn — from
- *   picking up a *prior* session's stale transcript (#216). Omit to disable the
- *   floor (graceful degrade when the start time is unknown).
- * @returns The validated absolute path of the newest eligible regular `*.jsonl`,
- *   or `null` if the dir is missing / has no eligible file / the choice escapes
- *   the root. Never throws.
+ *   `minMtimeMs - MTIME_SKEW_MS` are skipped, so a freshly-launched session never
+ *   picks up a *prior* session's transcript (#216). Omit to disable the floor.
+ * @returns Up to {@link MAX_CANDIDATES} validated absolute paths, newest-first;
+ *   `[]` if the dir is missing / has no eligible file. Symlinks and root-escaping
+ *   entries are dropped. Never throws.
  */
-export async function locateLatestTranscript(
+export async function locateTranscriptCandidates(
   cwd: string,
   opts?: { root?: string; minMtimeMs?: number }
-): Promise<string | null> {
+): Promise<string[]> {
   try {
     const root = opts?.root ?? (await resolveProjectsRoot())
     const minMtimeMs = opts?.minMtimeMs
-    const encDir = path.join(root, encodeProjectDir(cwd))
 
-    let entries: string[]
-    try {
-      entries = await fs.readdir(encDir)
-    } catch {
-      return null
+    // Try the primary encoding first, then a normalized alternate (e.g. a
+    // trailing-separator-stripped form) — the inferred Windows encoding is lossy,
+    // so a single attempt can silently miss. The first candidate dir that exists
+    // wins; all candidates derive from this cwd, so a fallback can never resolve a
+    // different project's transcript.
+    let encDir: string | null = null
+    let entries: string[] | null = null
+    for (const candidate of candidateProjectDirs(cwd)) {
+      const dir = path.join(root, candidate)
+      try {
+        entries = await fs.readdir(dir)
+        encDir = dir
+        break
+      } catch {
+        // This candidate dir is absent — try the next.
+      }
+    }
+    if (encDir === null || entries === null) {
+      logger.debug('locateTranscript: no candidate project dir', { cwdBase: path.basename(cwd) })
+      return []
     }
 
-    let newestPath: string | null = null
-    let newestName: string | null = null
-    let newestMtimeMs = -Infinity
-
+    // Collect every eligible regular `.jsonl` (post-floor), with its mtime.
+    const eligible: Array<{ path: string; name: string; mtimeMs: number }> = []
     for (const name of entries) {
       if (name === SUBAGENTS_DIR) continue
       if (!name.endsWith('.jsonl')) continue
@@ -133,33 +157,54 @@ export async function locateLatestTranscript(
       // same-second first write is not lost to sub-second-vs-1s granularity.
       if (minMtimeMs !== undefined && stat.mtimeMs < minMtimeMs - MTIME_SKEW_MS) continue
 
-      // Strictly-newer wins; on an EXACT mtime tie, break deterministically by
-      // preferring the lexicographically greater filename so the selection no
-      // longer depends on readdir ordering (which is FS/platform dependent).
-      if (
-        stat.mtimeMs > newestMtimeMs ||
-        (stat.mtimeMs === newestMtimeMs && (newestName === null || name > newestName))
-      ) {
-        newestMtimeMs = stat.mtimeMs
-        newestName = name
-        newestPath = entryPath
+      eligible.push({ path: entryPath, name, mtimeMs: stat.mtimeMs })
+    }
+
+    if (eligible.length === 0) {
+      logger.debug('locateTranscript: no eligible .jsonl in dir', { dirBase: path.basename(encDir) })
+      return []
+    }
+
+    // Newest-first; on an EXACT mtime tie, break deterministically by preferring
+    // the lexicographically greater filename (selection no longer depends on
+    // readdir ordering, which is FS/platform dependent).
+    eligible.sort((a, b) => b.mtimeMs - a.mtimeMs || (a.name < b.name ? 1 : a.name > b.name ? -1 : 0))
+
+    // Realpath-validate each and keep those still inside the realpath'd root,
+    // capped to MAX_CANDIDATES. A root-escaping entry is dropped (and surfaced) —
+    // a security-boundary rejection, not a benign miss.
+    const out: string[] = []
+    for (const e of eligible) {
+      if (out.length >= MAX_CANDIDATES) break
+      let resolved: string
+      try {
+        resolved = await fs.realpath(e.path)
+      } catch {
+        continue
       }
+      if (!isInsideRoot(resolved, root)) {
+        logger.warn('locateTranscript: candidate escapes projects root (rejected)', {
+          nameBase: path.basename(e.name)
+        })
+        continue
+      }
+      out.push(resolved)
     }
-
-    if (newestPath === null) return null
-
-    // Realpath the winner and re-assert it stays within the realpath'd root.
-    let resolved: string
-    try {
-      resolved = await fs.realpath(newestPath)
-    } catch {
-      return null
-    }
-
-    if (!isInsideRoot(resolved, root)) return null
-
-    return resolved
+    return out
   } catch {
-    return null
+    return []
   }
+}
+
+/**
+ * Locate the single newest eligible transcript `.jsonl` for `cwd`, or `null`.
+ * Thin back-compat wrapper over {@link locateTranscriptCandidates} (returns the
+ * first candidate). Prefer the candidates form for turn-aware selection.
+ */
+export async function locateLatestTranscript(
+  cwd: string,
+  opts?: { root?: string; minMtimeMs?: number }
+): Promise<string | null> {
+  const candidates = await locateTranscriptCandidates(cwd, opts)
+  return candidates[0] ?? null
 }

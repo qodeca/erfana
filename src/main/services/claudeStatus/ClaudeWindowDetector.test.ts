@@ -56,53 +56,53 @@ describe('detectWindowSize', () => {
 
   it('returns 1M when settings model is "opus[1m]" even under 200k usage', async () => {
     const settingsPath = await writeSettings({ model: 'opus[1m]' })
-    expect(await detectWindowSize('claude-sonnet-4-5', 50_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-sonnet-4-5', 50_000, false, { settingsPath })).toBe(
       EXTENDED_WINDOW
     )
   })
 
   it('returns 1M when settings model is "claude-opus-4-5[1m]" (older Opus, 1m override)', async () => {
     const settingsPath = await writeSettings({ model: 'claude-opus-4-5[1m]' })
-    expect(await detectWindowSize('claude-opus-4-5', 0, { settingsPath })).toBe(EXTENDED_WINDOW)
+    expect(await detectWindowSize('claude-opus-4-5', 0, false, { settingsPath })).toBe(EXTENDED_WINDOW)
   })
 
   it('returns 200k for plain "opus" (older) model with low usage', async () => {
     const settingsPath = await writeSettings({ model: 'opus' })
-    expect(await detectWindowSize('claude-opus-4-5', 50_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-opus-4-5', 50_000, false, { settingsPath })).toBe(
       STANDARD_WINDOW
     )
   })
 
   it('returns 200k when no settings file and usage is low (older model)', async () => {
     const settingsPath = path.join(tmpDir, 'absent.json')
-    expect(await detectWindowSize('claude-sonnet-4-5', 50_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-sonnet-4-5', 50_000, false, { settingsPath })).toBe(
       STANDARD_WINDOW
     )
   })
 
   it('returns 1M when no settings file but usage exceeds 200k (threshold)', async () => {
     const settingsPath = path.join(tmpDir, 'absent.json')
-    expect(await detectWindowSize('claude-sonnet-4-5', 250_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-sonnet-4-5', 250_000, false, { settingsPath })).toBe(
       EXTENDED_WINDOW
     )
   })
 
   it('does NOT cross at exactly 200k (strictly greater-than)', async () => {
     const settingsPath = path.join(tmpDir, 'absent.json')
-    expect(await detectWindowSize('claude-sonnet-4-5', 200_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-sonnet-4-5', 200_000, false, { settingsPath })).toBe(
       STANDARD_WINDOW
     )
-    expect(await detectWindowSize('claude-sonnet-4-5', 200_001, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-sonnet-4-5', 200_001, false, { settingsPath })).toBe(
       EXTENDED_WINDOW
     )
   })
 
   it('falls through on malformed settings JSON (usage decides)', async () => {
     const settingsPath = await writeRawSettings('{ this is not json')
-    expect(await detectWindowSize('claude-sonnet-4-5', 50_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-sonnet-4-5', 50_000, false, { settingsPath })).toBe(
       STANDARD_WINDOW
     )
-    expect(await detectWindowSize('claude-sonnet-4-5', 300_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-sonnet-4-5', 300_000, false, { settingsPath })).toBe(
       EXTENDED_WINDOW
     )
   })
@@ -114,21 +114,53 @@ describe('detectWindowSize', () => {
     const settingsPath = await writeRawSettings(
       JSON.stringify({ model: 'opus[1m]', pad: padding })
     )
-    expect(await detectWindowSize('claude-sonnet-4-5', 50_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-sonnet-4-5', 50_000, false, { settingsPath })).toBe(
       STANDARD_WINDOW
     )
   })
 
   it('treats a non-string model as no signal', async () => {
     const settingsPath = await writeSettings({ model: 123 })
-    expect(await detectWindowSize('claude-sonnet-4-5', 50_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-sonnet-4-5', 50_000, false, { settingsPath })).toBe(
       STANDARD_WINDOW
     )
   })
 
   it('treats a missing model key as no signal', async () => {
     const settingsPath = await writeSettings({ theme: 'dark' })
-    expect(await detectWindowSize('claude-sonnet-4-5', 50_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-sonnet-4-5', 50_000, false, { settingsPath })).toBe(
+      STANDARD_WINDOW
+    )
+  })
+})
+
+describe('detectWindowSize forceExtended hint (fresh /model …[1m] override)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('returns 1M for a 200k-family model with forceExtended and never reads settings', async () => {
+    const settingsPath = await writeSettings({ model: 'opus' })
+    const readSpy = vi.spyOn(fs, 'readFile')
+
+    expect(await detectWindowSize('claude-sonnet-4-6', 1000, true, { settingsPath })).toBe(
+      EXTENDED_WINDOW
+    )
+
+    // Highest-priority in-memory signal short-circuits before any file read.
+    expect(readSpy.mock.calls.filter((c) => c[0] === settingsPath)).toHaveLength(0)
+  })
+
+  it('preserves existing behavior when forceExtended is false (200k-family, low usage)', async () => {
+    const settingsPath = path.join(tmpDir, 'absent.json')
+    expect(await detectWindowSize('claude-sonnet-4-6', 50_000, false, { settingsPath })).toBe(
+      STANDARD_WINDOW
+    )
+  })
+
+  it('preserves existing behavior when forceExtended is omitted (default false)', async () => {
+    const settingsPath = path.join(tmpDir, 'absent.json')
+    expect(await detectWindowSize('claude-sonnet-4-6', 50_000, false, { settingsPath })).toBe(
       STANDARD_WINDOW
     )
   })
@@ -141,7 +173,7 @@ describe('detectWindowSize model-capability registry (Opus 4.6+ auto-1M)', () =>
 
   it('UAT case: claude-opus-4-8 under 200k with NO settings file → 1M', async () => {
     const settingsPath = path.join(tmpDir, 'absent.json')
-    expect(await detectWindowSize('claude-opus-4-8', 95_329, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-opus-4-8', 95_329, false, { settingsPath })).toBe(
       EXTENDED_WINDOW
     )
   })
@@ -151,7 +183,7 @@ describe('detectWindowSize model-capability registry (Opus 4.6+ auto-1M)', () =>
     const settingsPath = await writeSettings({ model: 'opus' })
     const readSpy = vi.spyOn(fs, 'readFile')
 
-    expect(await detectWindowSize('claude-opus-4-8', 95_329, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-opus-4-8', 95_329, false, { settingsPath })).toBe(
       EXTENDED_WINDOW
     )
 
@@ -160,66 +192,66 @@ describe('detectWindowSize model-capability registry (Opus 4.6+ auto-1M)', () =>
 
   it('claude-opus-4-7 → 1M', async () => {
     const settingsPath = path.join(tmpDir, 'absent.json')
-    expect(await detectWindowSize('claude-opus-4-7', 0, { settingsPath })).toBe(EXTENDED_WINDOW)
+    expect(await detectWindowSize('claude-opus-4-7', 0, false, { settingsPath })).toBe(EXTENDED_WINDOW)
   })
 
   it('claude-opus-4-6 → 1M', async () => {
     const settingsPath = path.join(tmpDir, 'absent.json')
-    expect(await detectWindowSize('claude-opus-4-6', 0, { settingsPath })).toBe(EXTENDED_WINDOW)
+    expect(await detectWindowSize('claude-opus-4-6', 0, false, { settingsPath })).toBe(EXTENDED_WINDOW)
   })
 
   it('claude-opus-4-5 under 200k → 200k (not auto-upgraded)', async () => {
     const settingsPath = path.join(tmpDir, 'absent.json')
-    expect(await detectWindowSize('claude-opus-4-5', 50_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-opus-4-5', 50_000, false, { settingsPath })).toBe(
       STANDARD_WINDOW
     )
   })
 
   it('claude-opus-4-1 → 200k', async () => {
     const settingsPath = path.join(tmpDir, 'absent.json')
-    expect(await detectWindowSize('claude-opus-4-1', 50_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-opus-4-1', 50_000, false, { settingsPath })).toBe(
       STANDARD_WINDOW
     )
   })
 
   it('claude-sonnet-4-6 under 200k with no settings → 200k (1M-capable but not auto)', async () => {
     const settingsPath = path.join(tmpDir, 'absent.json')
-    expect(await detectWindowSize('claude-sonnet-4-6', 50_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-sonnet-4-6', 50_000, false, { settingsPath })).toBe(
       STANDARD_WINDOW
     )
   })
 
   it('claude-sonnet-4-6 with settings model "sonnet[1m]" → 1M (explicit override)', async () => {
     const settingsPath = await writeSettings({ model: 'sonnet[1m]' })
-    expect(await detectWindowSize('claude-sonnet-4-6', 50_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-sonnet-4-6', 50_000, false, { settingsPath })).toBe(
       EXTENDED_WINDOW
     )
   })
 
   it('claude-haiku-4-5-20251001 → 200k', async () => {
     const settingsPath = path.join(tmpDir, 'absent.json')
-    expect(await detectWindowSize('claude-haiku-4-5-20251001', 50_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-haiku-4-5-20251001', 50_000, false, { settingsPath })).toBe(
       STANDARD_WINDOW
     )
   })
 
   it('unknown/garbage modelId under 200k → 200k', async () => {
     const settingsPath = path.join(tmpDir, 'absent.json')
-    expect(await detectWindowSize('totally-bogus-id', 50_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('totally-bogus-id', 50_000, false, { settingsPath })).toBe(
       STANDARD_WINDOW
     )
   })
 
   it('unknown/garbage modelId over 200k → 1M (threshold override still works)', async () => {
     const settingsPath = path.join(tmpDir, 'absent.json')
-    expect(await detectWindowSize('totally-bogus-id', 250_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('totally-bogus-id', 250_000, false, { settingsPath })).toBe(
       EXTENDED_WINDOW
     )
   })
 
   it('claude-mythos-preview → 1M (allowlisted 1M-native)', async () => {
     const settingsPath = path.join(tmpDir, 'absent.json')
-    expect(await detectWindowSize('claude-mythos-preview', 0, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-mythos-preview', 0, false, { settingsPath })).toBe(
       EXTENDED_WINDOW
     )
   })
@@ -284,14 +316,14 @@ describe('detectWindowSize settings cache (short TTL)', () => {
     const readSpy = vi.spyOn(fs, 'readFile')
     let nowMs = 1000
 
-    const first = await detectWindowSize('claude-sonnet-4-5', 50_000, {
+    const first = await detectWindowSize('claude-sonnet-4-5', 50_000, false, {
       settingsPath,
       now: () => nowMs
     })
     const readsAfterFirst = readSpy.mock.calls.filter((c) => c[0] === settingsPath).length
 
     nowMs = 1000 + 4999 // still inside the 5000ms TTL
-    const second = await detectWindowSize('claude-sonnet-4-5', 50_000, {
+    const second = await detectWindowSize('claude-sonnet-4-5', 50_000, false, {
       settingsPath,
       now: () => nowMs
     })
@@ -306,11 +338,11 @@ describe('detectWindowSize settings cache (short TTL)', () => {
     const readSpy = vi.spyOn(fs, 'readFile')
     let nowMs = 1000
 
-    await detectWindowSize('claude-sonnet-4-5', 50_000, { settingsPath, now: () => nowMs })
+    await detectWindowSize('claude-sonnet-4-5', 50_000, false, { settingsPath, now: () => nowMs })
     const readsAfterFirst = readSpy.mock.calls.filter((c) => c[0] === settingsPath).length
 
     nowMs = 1000 + 5001 // just past the TTL
-    await detectWindowSize('claude-sonnet-4-5', 50_000, { settingsPath, now: () => nowMs })
+    await detectWindowSize('claude-sonnet-4-5', 50_000, false, { settingsPath, now: () => nowMs })
 
     expect(readSpy.mock.calls.filter((c) => c[0] === settingsPath).length).toBe(
       readsAfterFirst + 1
@@ -321,7 +353,7 @@ describe('detectWindowSize settings cache (short TTL)', () => {
     const settingsPath = await writeSettings({ model: 'opus' })
     const readSpy = vi.spyOn(fs, 'readFile')
 
-    expect(await detectWindowSize('claude-sonnet-4-5', 250_000, { settingsPath })).toBe(
+    expect(await detectWindowSize('claude-sonnet-4-5', 250_000, false, { settingsPath })).toBe(
       EXTENDED_WINDOW
     )
 
@@ -333,11 +365,11 @@ describe('detectWindowSize settings cache (short TTL)', () => {
     const readSpy = vi.spyOn(fs, 'readFile')
     const nowMs = 1000
 
-    await detectWindowSize('claude-sonnet-4-5', 50_000, { settingsPath, now: () => nowMs })
+    await detectWindowSize('claude-sonnet-4-5', 50_000, false, { settingsPath, now: () => nowMs })
     const readsAfterFirst = readSpy.mock.calls.filter((c) => c[0] === settingsPath).length
 
     __resetSettingsCacheForTests()
-    await detectWindowSize('claude-sonnet-4-5', 50_000, { settingsPath, now: () => nowMs })
+    await detectWindowSize('claude-sonnet-4-5', 50_000, false, { settingsPath, now: () => nowMs })
 
     expect(readSpy.mock.calls.filter((c) => c[0] === settingsPath).length).toBe(
       readsAfterFirst + 1

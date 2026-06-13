@@ -229,7 +229,11 @@ Auto-focus on tab change ensures active indicator shows immediately. Panels need
 
 **Location**: `WelcomePanel.tsx`, `WelcomeTab.tsx`
 
-Home icon tab (41px square, non-draggable) and centered welcome screen.
+Home-icon tab (41px square, non-draggable). The welcome screen is the central **home view** shown when no file is open:
+
+- **Background image** – `src/renderer/src/assets/home-background.jpg`, cover-scaled and anchored top-left. Painted via the `.home-bg` modifier on the welcome panel's `panel-content` root, **never** on the shared `.panel-content` class (that class also backs document/preview panels, so styling it would paint the image behind open documents).
+- **Controls** – heading (`Welcome to ERFANA v{__APP_VERSION__}`, no Home icon in the panel), Import button, and Recent Projects sit in a dimmed, blurred container pinned to the bottom-right corner; the Recent Projects label is left-aligned.
+- **Styles** – `AppDockLayout.css`: `.panel-content.home-bg`, `.welcome-panel`, `.welcome-content`.
 
 ## Development Patterns
 

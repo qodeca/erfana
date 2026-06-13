@@ -99,14 +99,17 @@ const sanitizationSchema = {
  * @param node - The AST node with position information
  * @returns Line range object or undefined
  */
-function extractLineRange(node?: unknown): { start: number; end: number } | undefined {
+function extractLineRange(node?: unknown, lineOffset = 0): { start: number; end: number } | undefined {
   const n = node as { position?: { start?: { line?: number }; end?: { line?: number } } }
   if (!n?.position?.start?.line) return undefined
 
   const startLine = n.position.start.line as number
   const endLine = (n.position.end?.line as number | undefined) ?? startLine
 
-  return { start: startLine, end: endLine }
+  // react-markdown positions are relative to the frontmatter-stripped body string.
+  // lineOffset (= frontmatterLineCount) shifts them back to real file lines so that
+  // selection -> source mapping and scroll sync line up with the original document.
+  return { start: startLine + lineOffset, end: endLine + lineOffset }
 }
 
 /**
@@ -115,10 +118,11 @@ function extractLineRange(node?: unknown): { start: number; end: number } | unde
  * Adds both data-line-start and data-line-end for multi-line elements
  */
 function withLineRange<T extends keyof JSX.IntrinsicElements>(
-  tag: T
+  tag: T,
+  lineOffset = 0
 ): React.ComponentType<{ node?: unknown } & Record<string, unknown>> {
   const Comp: React.FC<{ node?: unknown } & Record<string, unknown>> = ({ node, ...props }) => {
-    const range = extractLineRange(node)
+    const range = extractLineRange(node, lineOffset)
     const Component = tag as unknown as React.ElementType
     return (
       <Component
@@ -174,8 +178,20 @@ const rehypePlugins: PluggableList = [
 function createMarkdownComponents(
   filePath?: string,
   handleInternalLink?: (href: string) => Promise<void>,
-  resolvedLinks?: Map<string, ResolvedLink | null>
+  resolvedLinks?: Map<string, ResolvedLink | null>,
+  lineOffset = 0
 ): Components {
+  // Bind the frontmatter line offset once so every renderer (HOC-based and custom)
+  // emits real file line numbers. Using these instead of the bare module-level
+  // helpers guarantees no producer is missed.
+  function withRange<T extends keyof JSX.IntrinsicElements>(
+    tag: T
+  ): React.ComponentType<{ node?: unknown } & Record<string, unknown>> {
+    return withLineRange(tag, lineOffset)
+  }
+  const extractRange = (node?: unknown): { start: number; end: number } | undefined =>
+    extractLineRange(node, lineOffset)
+
   // Track used heading IDs to prevent duplicates
   // Map: base ID -> count (e.g., "example" -> 2 means next "example" becomes "example-3")
   const usedHeadingIds = new Map<string, number>()
@@ -212,11 +228,11 @@ function createMarkdownComponents(
 
   return {
   // Inject line range on all block elements for scroll synchronization
-  p: withLineRange('p'),
-  ul: withLineRange('ul'),
-  ol: withLineRange('ol'),
-  li: withLineRange('li'),
-  blockquote: withLineRange('blockquote'),
+  p: withRange('p'),
+  ul: withRange('ul'),
+  ol: withRange('ol'),
+  li: withRange('li'),
+  blockquote: withRange('blockquote'),
   // Custom code block styling with Mermaid diagram support
   code({
     node,
@@ -227,7 +243,7 @@ function createMarkdownComponents(
     const match = /language-(\w+)/.exec(className || '')
     // Detect inline vs block code: inline has no className and no newlines
     const isInline = !className && typeof children === 'string' && !children.includes('\n')
-    const range = extractLineRange(node)
+    const range = extractRange(node)
 
     // Check if this is a mermaid code block
     if (match && match[1] === 'mermaid') {
@@ -269,7 +285,7 @@ function createMarkdownComponents(
   },
   // Custom table styling with line range tracking
   table({ node, children }: { node?: unknown; children?: React.ReactNode }) {
-    const range = extractLineRange(node)
+    const range = extractRange(node)
     return (
       <div
         className="table-wrapper"
@@ -282,9 +298,9 @@ function createMarkdownComponents(
     )
   },
   // Add line range to table rows and cells for accurate selection mapping
-  tr: withLineRange('tr'),
-  th: withLineRange('th'),
-  td: withLineRange('td'),
+  tr: withRange('tr'),
+  th: withRange('th'),
+  td: withRange('td'),
   // Custom checkbox styling
   input({ type, checked, ...props }: { type?: string; checked?: boolean } & Record<string, unknown>) {
     if (type === 'checkbox') {
@@ -294,7 +310,7 @@ function createMarkdownComponents(
   },
   // Add IDs to headings for potential TOC and line range tracking for scroll sync
   h1({ node, children }: { node?: unknown; children?: React.ReactNode }) {
-    const range = extractLineRange(node)
+    const range = extractRange(node)
     const text = String(children)
     const id = generateUniqueHeadingId(text)
     return (
@@ -304,7 +320,7 @@ function createMarkdownComponents(
     )
   },
   h2({ node, children }: { node?: unknown; children?: React.ReactNode }) {
-    const range = extractLineRange(node)
+    const range = extractRange(node)
     const text = String(children)
     const id = generateUniqueHeadingId(text)
     return (
@@ -314,7 +330,7 @@ function createMarkdownComponents(
     )
   },
   h3({ node, children }: { node?: unknown; children?: React.ReactNode }) {
-    const range = extractLineRange(node)
+    const range = extractRange(node)
     const text = String(children)
     const id = generateUniqueHeadingId(text)
     return (
@@ -324,7 +340,7 @@ function createMarkdownComponents(
     )
   },
   h4({ node, children }: { node?: unknown; children?: React.ReactNode }) {
-    const range = extractLineRange(node)
+    const range = extractRange(node)
     const text = String(children)
     const id = generateUniqueHeadingId(text)
     return (
@@ -334,7 +350,7 @@ function createMarkdownComponents(
     )
   },
   h5({ node, children }: { node?: unknown; children?: React.ReactNode }) {
-    const range = extractLineRange(node)
+    const range = extractRange(node)
     const text = String(children)
     const id = generateUniqueHeadingId(text)
     return (
@@ -344,7 +360,7 @@ function createMarkdownComponents(
     )
   },
   h6({ node, children }: { node?: unknown; children?: React.ReactNode }) {
-    const range = extractLineRange(node)
+    const range = extractRange(node)
     const text = String(children)
     const id = generateUniqueHeadingId(text)
     return (
@@ -355,7 +371,7 @@ function createMarkdownComponents(
   },
   // Links - handle both external (browser) and internal (file navigation)
   a({ node, href, children, ...props }: { node?: unknown; href?: string; children?: React.ReactNode } & Record<string, unknown>) {
-    const range = extractLineRange(node)
+    const range = extractRange(node)
 
     // Security: Block dangerous protocols
     if (href && isDangerousProtocol(href)) {
@@ -456,7 +472,7 @@ function createMarkdownComponents(
   // Custom img component with explicit attribute handling
   // Ensures src, alt, title, width, height are preserved with line tracking
   img({ node, src, alt, title, width, height, ...props }: { node?: unknown; src?: string; alt?: string; title?: string; width?: number | string; height?: number | string } & Record<string, unknown>) {
-    const range = extractLineRange(node)
+    const range = extractRange(node)
     return (
       <img
         src={src}
@@ -472,7 +488,7 @@ function createMarkdownComponents(
     )
   },
   // Horizontal rule with line tracking
-  hr: withLineRange('hr'),
+  hr: withRange('hr'),
 
   // HTML Block Element Support with Line Tracking
   // These components ensure HTML elements parsed by rehypeRaw also get line tracking
@@ -482,19 +498,19 @@ function createMarkdownComponents(
    * Generic HTML container wrapper for block-level elements
    * Preserves line tracking and ensures proper semantic structure
    */
-  div: withLineRange('div'),
-  section: withLineRange('section'),
-  article: withLineRange('article'),
-  aside: withLineRange('aside'),
-  main: withLineRange('main'),
+  div: withRange('div'),
+  section: withRange('section'),
+  article: withRange('article'),
+  aside: withRange('aside'),
+  main: withRange('main'),
 
   /**
    * Collapsible disclosure elements (HTML5)
    * Allows users to hide/show content with native browser support
    * Edge case: details elements can contain block-level content
    */
-  details: withLineRange('details'),
-  summary: withLineRange('summary'),
+  details: withRange('details'),
+  summary: withRange('summary'),
 
   /**
    * Semantic text elements
@@ -502,16 +518,16 @@ function createMarkdownComponents(
    * time: dates and times
    * address: contact information
    */
-  mark: withLineRange('mark'),
-  time: withLineRange('time'),
-  address: withLineRange('address'),
+  mark: withRange('mark'),
+  time: withRange('time'),
+  address: withRange('address'),
 
   /**
    * Figure and caption for images with descriptions
    * Common in documentation and technical content
    */
-  figure: withLineRange('figure'),
-  figcaption: withLineRange('figcaption')
+  figure: withRange('figure'),
+  figcaption: withRange('figcaption')
   } as Components
 }
 
@@ -821,18 +837,20 @@ export const MarkdownPreview = forwardRef<MarkdownPreviewHandle, MarkdownPreview
       element: previewRef.current
     }))
 
-    // Memoize markdown components to prevent unnecessary re-renders
-    // Only recreate when filePath, handleInternalLink, or resolvedLinks changes
-    const markdownComponents = useMemo(
-      () => createMarkdownComponents(filePath, handleInternalLink, resolvedLinks),
-      [filePath, handleInternalLink, resolvedLinks]
-    )
-
     // Extract frontmatter from content (memoized)
-    // Separates YAML frontmatter from markdown body for separate rendering
+    // Separates YAML frontmatter from markdown body for separate rendering.
+    // Computed before markdownComponents so the body line offset is available.
     const { frontmatter, body, frontmatterLineCount, parseError, rawFrontmatter } = useMemo(
       () => extractFrontmatter(content),
       [content]
+    )
+
+    // Memoize markdown components to prevent unnecessary re-renders.
+    // frontmatterLineCount shifts body element line attributes back to real file
+    // lines (body is rendered frontmatter-stripped, so positions are body-relative).
+    const markdownComponents = useMemo(
+      () => createMarkdownComponents(filePath, handleInternalLink, resolvedLinks, frontmatterLineCount),
+      [filePath, handleInternalLink, resolvedLinks, frontmatterLineCount]
     )
 
     // Memoize ReactMarkdown rendering to prevent re-renders when selection state changes
