@@ -122,7 +122,9 @@ describe('WelcomePanel', () => {
       await waitFor(() => {
         expect(mockGetRecentProjects).toHaveBeenCalled()
       })
-      expect(screen.getByText('Welcome to ERFANA')).toBeInTheDocument()
+      // The heading renders "Welcome to ERFANA v{version}" (42fc072 added the
+      // version suffix), so match the stable prefix rather than the exact text.
+      expect(screen.getByText(/Welcome to ERFANA/)).toBeInTheDocument()
     })
 
     it('should show instructions', async () => {
