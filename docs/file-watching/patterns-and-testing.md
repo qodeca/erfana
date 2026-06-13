@@ -288,7 +288,7 @@ await window.api.directoryWatch.resume(<projectPath>)
 
 ### Expected Behaviors
 
-- Bulk changes (e.g., git checkout) aggregate to a single `directory-watch:changed` after ~1s idle.
+- Bulk changes aggregate at three layers: chokidar fires per-event → `EventCoalescer` deduplicates per path within the 75 ms collection window → `ThrottledWorker` waits 200 ms between broadcast rounds → the renderer's `useDirectoryWatcher` debounces by another 250 ms before re-listing the tree. Multi-file write storms (e.g., `prettier --write`, snapshot updates) therefore collapse to roughly one re-list per debounce-window. `git checkout` no longer reaches this channel for `.git/` internals — those flow exclusively through `GitWatcherService` with its own 150 ms coalescing window.
 - Deleting the project folder emits `directory-watch:project-deleted` and clears internal watchers.
 - After project switching, late events from previous sessions are dropped (guarded by session token).
 

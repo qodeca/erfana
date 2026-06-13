@@ -98,6 +98,7 @@ Pipeline contributors on Windows:
 - **chokidar `ReadDirectoryChangesW`** — 100–500 ms callback latency (vs. <5 ms for POSIX inotify).
 - **Windows Defender on-access scanning** — 200–800 ms scan of the new file before the FS notification fires. Enabled by default in Windows 11.
 - **ThrottledWorker collection delay** — 75 ms (VS Code value, deterministic).
+- **`useDirectoryWatcher` consumer debounce** — 250 ms (added in #241 to absorb multi-file write storms; same on macOS and Windows). Pushes the floor for cross-platform measurement above the 500 ms NFR-001 micro-target by design.
 - **IPC main → renderer + React reconcile** — ~50 ms.
 
 **Workaround**: None for end users — this is the Windows FS notification floor. Developers running the E2E suite on Windows see `e2e/directory-watcher.e2e.ts` use a platform-specific 6 s budget to accommodate this reality (macOS/Linux stays at 2 s). The 500 ms NFR-001 target is still asserted deterministically in the main-process integration test (`DirectoryWatcherService.pipeline.test.ts`, 016-NFR-001 describe block).

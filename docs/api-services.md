@@ -156,8 +156,9 @@ Start watching directory recursively.
 - `dirPath` - Absolute path to directory
 
 **Side Effects:**
-- Creates chokidar watcher (1000ms debounce)
-- Ignores: `node_modules`, `.git`, `.next`, `dist`, `build`, `.DS_Store`
+- Creates chokidar watcher feeding a 75 ms collection window + 200 ms throttle (VS Code pattern). The renderer's `useDirectoryWatcher` debounces its `onRefresh` callback by another 250 ms.
+- Ignores: `node_modules`, `.git/objects`, `.git/subtree-cache`, `.git/lfs`, `dist`, `build`, `out`, `.next`, `.vite`, `.cache`, `coverage`, `.venv`, `__pycache__`, etc. — see `DEFAULT_WATCHER_IGNORE_PATTERNS` in `src/shared/constants.ts` for the full list.
+- The `'change'` listener (added in #241) suppresses paths under `.git/` so `GitWatcherService` stays the sole publisher for git-state changes.
 
 ---
 
@@ -201,14 +202,23 @@ Resume watching after pause.
 
 ### Events
 
-#### `'directory-changed'`
-**Payload:** `{ dirPath: string; changeType: string; filePath?: string }`
+#### `'directory-watch:changed'`
+**Payload:**
+```ts
+{
+  dirPath: string
+  eventCount: number          // events surviving coalescing
+  originalEventCount: number  // raw events from chokidar
+  coalescedCount: number      // events removed by the coalescer
+  summary: Record<'add' | 'addDir' | 'unlink' | 'unlinkDir' | 'change', number>
+}
+```
 
-Emitted when directory changes (after 1000ms debounce).
+Emitted when files or folders change anywhere in the watched project tree. Main process throttles via a 75 ms collection window + 200 ms throttle (VS Code pattern); the renderer's `useDirectoryWatcher` adds a 250 ms consumer debounce so multi-file write storms collapse to a single tree re-list.
 
-**Change Types:** `'add'`, `'unlink'`, `'addDir'`, `'unlinkDir'`
+**Event types:** `'add'`, `'addDir'`, `'unlink'`, `'unlinkDir'`, `'change'`. The `'change'` listener was added in #241 — in-place editor saves (Monaco autosave, terminal commands, external editors) now also wake the renderer. `'change'` events whose path is inside `.git/` are suppressed at the source listener (`GitWatcherService` is the canonical publisher for git internals).
 
-**Note:** Not emitted during pause window.
+**Note:** Not emitted during pause window. The `'directory-watch:changed'` payload is also used by the PauseController auto-resume safety timeout (#103) to issue a compensating refresh after a stuck pause.
 
 ---
 
@@ -380,9 +390,10 @@ import { directoryWatcherService } from './services/DirectoryWatcherService'
 // Start watching
 directoryWatcherService.watchDirectory('/path/to/project')
 
-// Listen for changes
-directoryWatcherService.on('directory-changed', ({ dirPath, changeType, filePath }) => {
-  console.log(`${changeType}: ${filePath}`)
+// Listen for changes (renderer subscribes via preload bridge:
+//   window.api.directoryWatch.onDirectoryChanged((data) => …))
+directoryWatcherService.on('directory-watch:changed', ({ dirPath, eventCount, summary }) => {
+  console.log(`${eventCount} events: ${JSON.stringify(summary)}`)
   refreshProjectTree()
 })
 

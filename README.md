@@ -2,7 +2,11 @@
 
 An Electron-based project workspace focused on markdown editing, a project tree, and an integrated terminal.
 
-> **Version:** 0.14.0 ([changelog](docs/CHANGELOG.md) · [release notes](docs/release-notes/v0.14.0.md)) · **Documentation:** [docs/](docs/README.md) · **Architecture:** [docs/architecture.md](docs/architecture.md)
+> **Version:** 0.15.1 ([changelog](docs/CHANGELOG.md) · [release notes](docs/release-notes/v0.15.1.md)) · **Documentation:** [docs/](docs/README.md) · **Architecture:** [docs/architecture.md](docs/architecture.md)
+>
+> **v0.15.1 highlights:** Editing a file now updates its git-status badge in the Project Tree automatically — no manual refresh needed. On Windows, a folder's git-status colour dot now appears correctly.
+>
+> **v0.15.0 highlights:** Multi-instance project locks are now tamper-resistant and self-healing — the file that coordinates two open Erfana windows on the same project is signed (HMAC), each window refreshes a heartbeat so a crashed window's lock is reclaimed automatically after 30 s, and locks survive sleep/wake correctly. Several edge cases were hardened: symlinked lock paths are refused (junction-redirect class), interrupted writes leave no orphans, and the Windows process-liveness check fails closed on unknown errors. Text is selectable again across the app (#211).
 >
 > **v0.14.0 highlights:** The terminal now looks identical on Windows and macOS — Erfana bundles the Cascadia Mono font so the Windows terminal matches the polished Mac look (previously Windows fell back to the dated Courier New). The OS window title now shows the open project and app version, for example `My Project | ERFANA v0.14.0`. The project sidebar header on Windows shows the folder name instead of the full `C:\…` path, and `git status` no longer reports phantom "modified" files caused by line-ending (CRLF) handling.
 >

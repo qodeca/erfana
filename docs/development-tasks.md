@@ -424,7 +424,7 @@ File and directory watching with chokidar provides automatic refresh on external
 **Test Scenarios:**
 - File content reload (300ms debounce) - modify file externally, expect auto-reload
 - Conflict detection - unsaved changes + external modification shows conflict UI
-- Directory tree refresh (1000ms debounce) - external file/folder creation appears automatically
+- Directory tree refresh (75 ms collect + 200 ms throttle main side, 250 ms renderer debounce) - external file/folder create/delete/rename and in-place edits appear automatically; git badges update on edits via the chokidar `change` listener (#241)
 - Pause/resume pattern - internal CRUD operations don't trigger duplicate refreshes
 
 See: [File Watching](./file-watching/README.md) for detailed testing instructions
