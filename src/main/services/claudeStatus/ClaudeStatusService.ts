@@ -31,7 +31,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { logger } from '../LoggingService'
 import { encodeProjectDir } from './encodeCwd'
-import { locateTranscriptCandidates } from './ClaudeTranscriptLocator'
+import { locateTranscriptCandidates, MAX_CANDIDATES } from './ClaudeTranscriptLocator'
 import { parseTranscript, type ParsedTurn } from './ClaudeTranscriptParser'
 import { detectWindowSize } from './ClaudeWindowDetector'
 import { friendlyModelName } from './friendlyModelName'
@@ -51,9 +51,10 @@ const REFRESH_DEBOUNCE_MS = 250
  * Max transcript candidates to parse per refresh before giving up. The locator
  * returns them newest-first; parsing stops at the first usable turn, so this only
  * needs to be deep enough to skip a metadata-only sidecar (or two) and reach the
- * real conversation file.
+ * real conversation file. Bound to the locator's own cap so every candidate it
+ * returns is actually attempted (no silently-unreachable tail candidate).
  */
-const MAX_PARSE_ATTEMPTS = 5
+const MAX_PARSE_ATTEMPTS = MAX_CANDIDATES
 
 /**
  * Why a refresh produced no visible bar. Diagnostic only — never shown to the

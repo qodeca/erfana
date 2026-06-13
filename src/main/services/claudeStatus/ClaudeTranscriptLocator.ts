@@ -27,7 +27,7 @@ import { candidateProjectDirs } from './encodeCwd'
  * needs to be deep enough to skip a metadata-only sidecar (or two) and reach the
  * real conversation file.
  */
-const MAX_CANDIDATES = 6
+export const MAX_CANDIDATES = 6
 
 /** Subdirectory holding sidechain/subagent transcripts — excluded from selection. */
 const SUBAGENTS_DIR = 'subagents'

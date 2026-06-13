@@ -608,7 +608,7 @@ describe('ClaudeStatusService', () => {
       expect(h.emitted.at(-1)?.payload.snapshot).toBeNull()
     })
 
-    it('stops at MAX_PARSE_ATTEMPTS (5) and does not parse every candidate', async () => {
+    it('stops at MAX_PARSE_ATTEMPTS (6) and does not parse every candidate', async () => {
       const h = makeHarness()
       h.locateTranscripts.mockResolvedValue([
         'a.jsonl',
@@ -624,7 +624,7 @@ describe('ClaudeStatusService', () => {
       h.service.registerPanel('t1', 4242, '/p', 7)
       await flush()
 
-      expect(h.parseTranscript).toHaveBeenCalledTimes(5)
+      expect(h.parseTranscript).toHaveBeenCalledTimes(6)
       expect(h.emitted.at(-1)?.payload.snapshot).toBeNull()
     })
   })
