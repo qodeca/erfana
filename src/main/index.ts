@@ -39,6 +39,7 @@ import { gitPollingService } from './services/GitPollingService'
 import { projectLockService } from './services/ProjectLockService'
 import { gitStatusService } from './services/GitStatusService'
 import { installSafeConsole } from './utils/safeConsole'
+import { isBenignShutdownTimerError } from './utils/isBenignShutdownTimerError'
 
 // Install safe console logging to prevent EPIPE crashes
 // Must be called before any other code that uses console.log
@@ -348,10 +349,42 @@ app.on('window-all-closed', () => {
 const SHUTDOWN_TIMEOUT_MS = 2_000
 let isShuttingDown = false
 
+/**
+ * Shutdown-scoped uncaught-exception guard.
+ *
+ * During teardown a chokidar `awaitWriteFinish` throttle timer (FileWatcherService)
+ * can call `setTimeout` just as Node's timer subsystem is being dismantled, throwing
+ * a synchronous "reading 'expiry'" TypeError from `node:internal/timers`. We're
+ * already exiting, so it's benign – but as an uncaught exception it crashes the main
+ * process and leaves file handles locked (the e2e `EBUSY` teardown timeout on Windows).
+ *
+ * Registering ANY `uncaughtException` listener also suppresses Electron's native crash
+ * dialog (Electron only shows it when it is the sole listener), so this handler is
+ * installed only for the shutdown window – normal-operation crashes keep the dialog.
+ */
+function handleShutdownException(err: unknown): void {
+  const message = err instanceof Error ? err.message : String(err)
+  if (isBenignShutdownTimerError(err)) {
+    logger.warn('Suppressed benign timer race during shutdown (chokidar awaitWriteFinish throttle)', {
+      error: message
+    })
+    return
+  }
+  logger.error(
+    'Uncaught exception during shutdown',
+    err instanceof Error ? err : undefined,
+    { error: message }
+  )
+}
+
 app.on('before-quit', async (event) => {
   if (isShuttingDown) return
   isShuttingDown = true
   event.preventDefault()
+
+  // Install the guard synchronously, before the first await, so an already-queued
+  // chokidar read callback can't crash the process before the handler is registered.
+  process.on('uncaughtException', handleShutdownException)
 
   logger.info('App quitting, cleaning up services')
 
