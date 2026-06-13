@@ -119,13 +119,18 @@ interface PanelEntry {
   /** Last displayed outcome, so a state CHANGE logs once (no per-pass spam). */
   lastOutcome?: RefreshOutcome
   /**
-   * Sticky 1M-window bit (finding #5): set once this session's window is detected
-   * as 1M, so a post-compaction token reset (which would otherwise re-resolve to
-   * 200k on a threshold-only session) cannot visibly shrink the badge. Reset when
-   * the pid changes (a new session). Window DETECTION still runs on the real
-   * token count; this only prevents a downward flicker of the displayed window.
+   * Sticky 1M-window bit (finding #5): set once the CURRENT model is detected at
+   * 1M, so a post-compaction token reset (which would otherwise re-resolve to 200k
+   * on a threshold-only session) cannot visibly shrink the badge. Scoped to
+   * {@link windowModelId}: it is cleared the moment the model id changes or the
+   * user explicitly drops `[1m]`, so a mid-session model switch (e.g. Opus 1M →
+   * Sonnet 200k) downgrades immediately. Window DETECTION still runs every refresh
+   * on the real token count; this only smooths the post-compaction dip for an
+   * UNCHANGED model.
    */
   observedExtended?: boolean
+  /** Model id the {@link observedExtended} sticky bit currently applies to. */
+  windowModelId?: string
 }
 
 /**
@@ -209,9 +214,12 @@ export class ClaudeStatusService {
   ): void {
     const existing = this.entries.get(terminalId)
     if (existing) {
-      // A pid change means a new claude session — drop the sticky 1M bit so the
-      // window is re-detected from scratch for the new session (finding #5).
-      if (existing.pid !== pid) existing.observedExtended = undefined
+      // A pid change means a new claude session — drop the sticky 1M bit (and the
+      // model it applied to) so the window is re-detected from scratch (finding #5).
+      if (existing.pid !== pid) {
+        existing.observedExtended = undefined
+        existing.windowModelId = undefined
+      }
       // Clear any pending nudge debounce so its closure can't fire a refresh
       // against the just-superseded generation (finding #14).
       if (existing.debounceTimer) {
@@ -364,9 +372,20 @@ export class ClaudeStatusService {
       )
       if (isStale()) return
 
-      // Sticky 1M (finding #5): once observed at 1M, keep it for the session so a
-      // post-compaction token reset cannot shrink the badge 1M→200k. `entry` is
-      // the live object here (isStale() above caught any re-registration).
+      // Invalidate the sticky 1M bit on any genuine model/mode change so a
+      // mid-session switch (e.g. Opus 1M → Sonnet 200k) downgrades immediately:
+      //  - the model id changed (a switch re-evaluates from scratch), or
+      //  - the user explicitly selected standard mode (`/model …` without `[1m]`).
+      if (entry.windowModelId !== parsed.modelId) {
+        entry.observedExtended = false
+        entry.windowModelId = parsed.modelId
+      }
+      if (parsed.modelForcedStandard) entry.observedExtended = false
+
+      // Sticky 1M (finding #5), now scoped to the current model: once THIS model is
+      // observed at 1M, keep it so a post-compaction token reset cannot shrink the
+      // badge 1M→200k for the unchanged model. `entry` is the live object here
+      // (isStale() above caught any re-registration).
       if (detectedWindow === 1000000) entry.observedExtended = true
       const windowSize: 200000 | 1000000 = entry.observedExtended ? 1000000 : detectedWindow
 

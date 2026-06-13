@@ -363,7 +363,12 @@ describe('model-switch awareness', () => {
       ].join('\n')
     )
     const result = await parseTranscript(file)
-    expect(result).toEqual({ modelId: 'claude-sonnet-4-6', usedTokens: 42 })
+    // A non-[1m] override authoritatively selects standard mode for the new model.
+    expect(result).toEqual({
+      modelId: 'claude-sonnet-4-6',
+      usedTokens: 42,
+      modelForcedStandard: true
+    })
     expect(result?.modelForcedExtended).toBeUndefined()
   })
 
@@ -434,7 +439,11 @@ describe('model-switch awareness', () => {
       [assistantLine({ model: 'claude-opus-4-8', input: 42 }), arrayLine].join('\n')
     )
     const result = await parseTranscript(file)
-    expect(result).toEqual({ modelId: 'claude-sonnet-4-6', usedTokens: 42 })
+    expect(result).toEqual({
+      modelId: 'claude-sonnet-4-6',
+      usedTokens: 42,
+      modelForcedStandard: true
+    })
   })
 
   it('ignores a junk arg that is not a full model id', async () => {

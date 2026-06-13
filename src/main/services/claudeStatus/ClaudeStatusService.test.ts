@@ -628,4 +628,53 @@ describe('ClaudeStatusService', () => {
       expect(h.emitted.at(-1)?.payload.snapshot).toBeNull()
     })
   })
+
+  describe('context-window changes mid-session (per-model window)', () => {
+    it('downgrades 1M→200k when the model switches (Opus → Sonnet)', async () => {
+      const h = makeHarness()
+      h.parseTranscript.mockResolvedValueOnce({ modelId: 'claude-opus-4-8', usedTokens: 95329 })
+      h.service.registerPanel('t1', 4242, '/p', 7)
+      await flush()
+      expect(h.emitted.at(-1)?.payload.snapshot?.windowSize).toBe(1000000)
+
+      // Same session (pid), user switches to Sonnet with low usage.
+      h.parseTranscript.mockResolvedValue({ modelId: 'claude-sonnet-4-5', usedTokens: 30000 })
+      await h.service.refresh('t1')
+      await flush()
+      expect(h.emitted.at(-1)?.payload.snapshot?.windowSize).toBe(200000)
+      expect(h.emitted.at(-1)?.payload.snapshot?.modelId).toBe('claude-sonnet-4-5')
+    })
+
+    it('upgrades 200k→1M when the model switches (Sonnet → Opus)', async () => {
+      const h = makeHarness()
+      h.parseTranscript.mockResolvedValueOnce({ modelId: 'claude-sonnet-4-5', usedTokens: 30000 })
+      h.service.registerPanel('t1', 4242, '/p', 7)
+      await flush()
+      expect(h.emitted.at(-1)?.payload.snapshot?.windowSize).toBe(200000)
+
+      h.parseTranscript.mockResolvedValue({ modelId: 'claude-opus-4-8', usedTokens: 50000 })
+      await h.service.refresh('t1')
+      await flush()
+      expect(h.emitted.at(-1)?.payload.snapshot?.windowSize).toBe(1000000)
+    })
+
+    it('downgrades 1M→200k when [1m] is dropped on the SAME model (modelForcedStandard)', async () => {
+      const h = makeHarness()
+      // Sonnet observed at 1M (e.g. earlier usage > 200k).
+      h.parseTranscript.mockResolvedValueOnce({ modelId: 'claude-sonnet-4-5', usedTokens: 250000 })
+      h.service.registerPanel('t1', 4242, '/p', 7)
+      await flush()
+      expect(h.emitted.at(-1)?.payload.snapshot?.windowSize).toBe(1000000)
+
+      // Same model, low usage, explicit standard override → must drop the sticky.
+      h.parseTranscript.mockResolvedValue({
+        modelId: 'claude-sonnet-4-5',
+        usedTokens: 30000,
+        modelForcedStandard: true
+      })
+      await h.service.refresh('t1')
+      await flush()
+      expect(h.emitted.at(-1)?.payload.snapshot?.windowSize).toBe(200000)
+    })
+  })
 })

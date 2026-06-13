@@ -51,6 +51,13 @@ export interface ParsedTurn {
    * otherwise.
    */
   modelForcedExtended?: boolean
+  /**
+   * True iff an in-window `/model` override was applied WITHOUT the `[1m]` marker
+   * — i.e. the user explicitly selected standard (200k) mode for this model. Lets
+   * the caller drop any sticky 1M state authoritatively (vs. "no override seen",
+   * where neither flag is set). Mutually exclusive with {@link modelForcedExtended}.
+   */
+  modelForcedStandard?: boolean
 }
 
 /** Sentinel model value Claude writes for synthetic/system turns — never a real model. */
@@ -321,7 +328,11 @@ function scanForLatestTurn(text: string): ParsedTurn | null {
         : { modelId: turn.modelId, usedTokens: turn.usedTokens }
       if (modelOverride) {
         base.modelId = modelOverride.modelId
+        // An explicit `/model` override sets the mode authoritatively: `[1m]` →
+        // extended, otherwise standard. The caller uses these to update/clear any
+        // sticky window state on a mid-session model/mode switch.
         if (modelOverride.forceExtended) base.modelForcedExtended = true
+        else base.modelForcedStandard = true
       }
       return base
     }
