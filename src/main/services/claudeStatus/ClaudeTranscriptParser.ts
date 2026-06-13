@@ -28,6 +28,7 @@
  * @see docs/designs/216-claude-status-bar.md §2, §8, §10
  */
 import { promises as fs } from 'node:fs'
+import { logger } from '../LoggingService'
 
 /** Latest main-session assistant turn extracted from a transcript. */
 export interface ParsedTurn {
@@ -35,6 +36,28 @@ export interface ParsedTurn {
   modelId: string
   /** Context tokens used = input + cache_creation + cache_read (output excluded). */
   usedTokens: number
+  /**
+   * True iff a compaction summary is NEWER than this assistant turn — i.e. the
+   * session just compacted and no post-compaction assistant turn has been written
+   * yet. `usedTokens` is then the PRE-compaction value and the caller MUST treat
+   * it as reset (~0); `modelId` is carried from that turn so the bar still shows
+   * the model + window.
+   */
+  justCompacted?: boolean
+  /**
+   * True iff the displayed model came from a `/model …[1m]` override whose arg
+   * carried the 1M-context marker — a hint to force the 1M window instantly,
+   * before the next assistant turn or a settings.json read. Absent/false
+   * otherwise.
+   */
+  modelForcedExtended?: boolean
+  /**
+   * True iff an in-window `/model` override was applied WITHOUT the `[1m]` marker
+   * — i.e. the user explicitly selected standard (200k) mode for this model. Lets
+   * the caller drop any sticky 1M state authoritatively (vs. "no override seen",
+   * where neither flag is set). Mutually exclusive with {@link modelForcedExtended}.
+   */
+  modelForcedStandard?: boolean
 }
 
 /** Sentinel model value Claude writes for synthetic/system turns — never a real model. */
@@ -50,15 +73,22 @@ const SYNTHETIC_MODEL = '<synthetic>'
 const TAIL_THRESHOLD_BYTES = 256 * 1024
 
 /**
- * Coerce an untrusted usage field to a finite, non-negative integer count.
- * Missing/undefined is treated as 0. Returns `null` for any value that is not a
- * finite, non-negative number (so a malformed turn is rejected, not silently
- * miscounted).
+ * Largest plausible token count. Real context windows top out at 1M; a value far
+ * above that is malformed/adversarial and is rejected rather than displayed.
+ */
+const MAX_PLAUSIBLE_TOKENS = 100_000_000
+
+/**
+ * Coerce an untrusted usage field to a non-negative integer count within a sane
+ * ceiling. Missing/undefined is treated as 0. Returns `null` for anything that is
+ * not a non-negative integer ≤ {@link MAX_PLAUSIBLE_TOKENS} — floats, NaN/Infinity,
+ * negatives, and absurd magnitudes are rejected (finding #9) so a malformed turn
+ * is skipped, not silently miscounted.
  */
 function coerceCount(value: unknown): number | null {
   if (value === undefined || value === null) return 0
   const n = Number(value)
-  if (!Number.isFinite(n) || n < 0) return null
+  if (!Number.isInteger(n) || n < 0 || n > MAX_PLAUSIBLE_TOKENS) return null
   return n
 }
 
@@ -111,6 +141,58 @@ function turnFromRecord(record: unknown): ParsedTurn | null {
   return { modelId: model, usedTokens }
 }
 
+/** True when a record is a Claude Code compaction-summary boundary marker. */
+function isCompactionMarker(record: unknown): boolean {
+  if (typeof record !== 'object' || record === null) return false
+  return (record as Record<string, unknown>).isCompactSummary === true
+}
+
+/** Full `claude-<family>-<maj>-<min>[-<8-digit-date>]` id (rejects typed aliases). */
+const MODEL_OVERRIDE_ID_RE = /^claude-[a-z]+-\d+-\d+(-\d{8})?$/i
+
+/**
+ * If `record` is a `/model` slash-command entry, return the selected model id
+ * (and whether it carried the `[1m]` 1M-window marker), else undefined. Only a
+ * full `claude-<family>-<maj>-<min>[-<8-digit-date>]` id is accepted — a typed
+ * alias (`opus`, `default`, empty) returns undefined so the caller falls back to
+ * the assistant turn's model. Untrusted data: parsed defensively, never executed.
+ */
+function modelOverrideFromRecord(
+  record: unknown
+): { modelId: string; forceExtended: boolean } | undefined {
+  if (typeof record !== 'object' || record === null) return undefined
+  const rec = record as Record<string, unknown>
+  if (rec.type !== 'user') return undefined
+  const message = rec.message
+  if (typeof message !== 'object' || message === null) return undefined
+  const rawContent = (message as Record<string, unknown>).content
+  // content may be a string (slash-command case) or an array of text blocks.
+  let content = ''
+  if (typeof rawContent === 'string') content = rawContent
+  else if (Array.isArray(rawContent)) {
+    content = rawContent
+      .map((b) =>
+        b && typeof b === 'object' && typeof (b as Record<string, unknown>).text === 'string'
+          ? ((b as Record<string, unknown>).text as string)
+          : ''
+      )
+      .join(' ')
+  }
+  if (!content.includes('<command-name>/model</command-name>')) return undefined
+  const m = content.match(/<command-args>([\s\S]*?)<\/command-args>/)
+  if (!m) return undefined
+  let arg = m[1].trim()
+  if (arg === '') return undefined
+  let forceExtended = false
+  if (arg.toLowerCase().endsWith('[1m]')) {
+    forceExtended = true
+    arg = arg.slice(0, -4).trim()
+  }
+  // Accept only a full claude-* model id (reject aliases like `opus`, `default`).
+  if (!MODEL_OVERRIDE_ID_RE.test(arg)) return undefined
+  return { modelId: arg, forceExtended }
+}
+
 /**
  * Read the relevant portion of the transcript as text, or `null` if unreadable.
  *
@@ -119,7 +201,10 @@ function turnFromRecord(record: unknown): ParsedTurn | null {
  * and a partial leading line (everything before the first newline in the window)
  * is dropped so we only parse complete lines.
  */
-async function readRelevantText(filePath: string, maxBytes: number): Promise<string | null> {
+async function readRelevantText(
+  filePath: string,
+  maxBytes: number
+): Promise<{ text: string; truncated: boolean } | null> {
   let handle: fs.FileHandle | undefined
   try {
     handle = await fs.open(filePath, 'r')
@@ -127,11 +212,15 @@ async function readRelevantText(filePath: string, maxBytes: number): Promise<str
 
     if (size <= maxBytes) {
       const whole = await handle.readFile('utf8')
-      return whole
+      return { text: whole, truncated: false }
     }
 
     const start = size - maxBytes
-    const buffer = Buffer.allocUnsafe(maxBytes)
+    // Buffer.alloc (zero-filled) rather than allocUnsafe: a 256 KB allocation per
+    // refresh is not perf-sensitive given the caller's caches, and a zero-filled
+    // buffer removes any risk of exposing stale heap if a future edit reads past
+    // bytesRead.
+    const buffer = Buffer.alloc(maxBytes)
     const { bytesRead } = await handle.read(buffer, 0, maxBytes, start)
     const window = buffer.toString('utf8', 0, bytesRead)
 
@@ -139,7 +228,8 @@ async function readRelevantText(filePath: string, maxBytes: number): Promise<str
     // the middle of a line, so discard everything up to and including the first
     // newline. Whole-file reads (start === 0 branch above) never reach here.
     const firstNewline = window.indexOf('\n')
-    return firstNewline === -1 ? '' : window.slice(firstNewline + 1)
+    const text = firstNewline === -1 ? '' : window.slice(firstNewline + 1)
+    return { text, truncated: true }
   } catch {
     return null
   } finally {
@@ -168,14 +258,41 @@ export async function parseTranscript(
 ): Promise<ParsedTurn | null> {
   const maxBytes = opts?.maxBytes && opts.maxBytes > 0 ? opts.maxBytes : TAIL_THRESHOLD_BYTES
 
-  const text = await readRelevantText(filePath, maxBytes)
-  if (text === null) return null
+  const read = await readRelevantText(filePath, maxBytes)
+  if (read === null) return null
 
+  let turn = scanForLatestTurn(read.text)
+
+  // Compaction-summary / oversized-line resilience (findings #4/#10): a large
+  // compaction summary (the whole conversation condensed) or a single line bigger
+  // than the tail window can push the relevant assistant turn OUT of the window,
+  // so the tail scan finds nothing. When the read was truncated to a tail, retry
+  // ONCE over the whole file before giving up. This both recovers a turn that was
+  // merely evicted and keeps `justCompacted` honest — it now degrades only when
+  // even the full file genuinely has no post-compaction turn. Without this, an
+  // oversized tail silently hides the bar with no signal.
+  if (turn === null && read.truncated) {
+    logger.debug('ClaudeTranscriptParser: tail window yielded no turn; retrying full read', {
+      filePath
+    })
+    const full = await readRelevantText(filePath, Number.MAX_SAFE_INTEGER)
+    if (full !== null) turn = scanForLatestTurn(full.text)
+  }
+
+  return turn
+}
+
+/**
+ * Scan transcript text BACKWARD for the most recent usable main assistant turn,
+ * applying compaction-awareness and a pending `/model` override. Pure over the
+ * provided text; returns null if no usable turn is present. A truncated trailing
+ * line simply fails JSON.parse and is skipped, so the prior valid turn still wins.
+ */
+function scanForLatestTurn(text: string): ParsedTurn | null {
   const lines = text.split('\n')
 
-  // Scan BACKWARD for the most recent usable main assistant turn. A truncated
-  // trailing line simply fails JSON.parse and is skipped, so the prior valid
-  // turn still wins.
+  let sawCompactionAfterLastTurn = false
+  let modelOverride: { modelId: string; forceExtended: boolean } | undefined
   for (let i = lines.length - 1; i >= 0; i--) {
     const line = lines[i].trim()
     if (line.length === 0) continue
@@ -187,8 +304,38 @@ export async function parseTranscript(
       continue
     }
 
+    if (isCompactionMarker(record)) {
+      sawCompactionAfterLastTurn = true
+      continue
+    }
+
+    // Capture only an override NEWER than the latest assistant turn (encountered
+    // before that turn in this backward scan) — a genuinely *pending* model
+    // switch. An override older than the turn is superseded by the turn's own
+    // model and ignored (finding #11; the scan returns at the first turn).
+    if (modelOverride === undefined) {
+      const ov = modelOverrideFromRecord(record)
+      if (ov) {
+        modelOverride = ov
+        continue
+      }
+    }
+
     const turn = turnFromRecord(record)
-    if (turn) return turn
+    if (turn) {
+      const base: ParsedTurn = sawCompactionAfterLastTurn
+        ? { modelId: turn.modelId, usedTokens: turn.usedTokens, justCompacted: true }
+        : { modelId: turn.modelId, usedTokens: turn.usedTokens }
+      if (modelOverride) {
+        base.modelId = modelOverride.modelId
+        // An explicit `/model` override sets the mode authoritatively: `[1m]` →
+        // extended, otherwise standard. The caller uses these to update/clear any
+        // sticky window state on a mid-session model/mode switch.
+        if (modelOverride.forceExtended) base.modelForcedExtended = true
+        else base.modelForcedStandard = true
+      }
+      return base
+    }
   }
 
   return null

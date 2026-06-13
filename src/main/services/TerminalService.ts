@@ -117,7 +117,17 @@ export class TerminalService extends EventEmitter {
       /^INIT_CWD$/,
       /^VITE_/,
       /^FORCE_COLOR$/,
-      /^COLORTERM$/ // Will be set explicitly in spawn options
+      /^COLORTERM$/, // Will be set explicitly in spawn options
+      // Claude Code session markers. If Erfana itself was launched from inside a
+      // Claude Code session (e.g. `npm run dev` started by the agent), these are
+      // inherited; passing them into a spawned terminal makes a `claude` launched
+      // there believe it is a NESTED/child session, which (per Claude Code
+      // v2.1.170) silently suppresses transcript persistence — leaving the Claude
+      // status bar with no usage to read. Strip them so an in-terminal `claude`
+      // is always a clean top-level session. ANTHROPIC_* (e.g. API keys) are left
+      // intact intentionally.
+      /^CLAUDECODE$/,
+      /^CLAUDE_CODE_/
     ]
 
     for (const [key, value] of Object.entries(baseEnv)) {
