@@ -188,7 +188,7 @@ After the heartbeat hardening (Phase A4 resume-refresh, B1 symlink defense, D3 H
 
 - **Live cwd not resolved** — Windows v1 has no `lsof` analog wired, so the transcript dir is keyed off the panel's **spawn cwd**, not Claude's live cwd. If the user `cd`s to a different folder before launching `claude`, the bar hides.
 - **Same-folder shared transcript** — two `claude` sessions in the same folder share the transcript dir (newest-wins selection); per-panel liveness stays independent.
-- **Live-host verification pending** — the ConPTY parent-chain and two-panel behavior on a real Windows host (issue AC-2 / AC-4) still need manual verification; not yet done.
+- **Live-host verification partial** – single-panel detection on a real Windows host is verified (2026-06-13): the ConPTY parent-chain resolves, the bar shows, and the context-window badge tracks a mid-session `/model` switch (Opus 1M ↔ Sonnet 200k). The two-panel concurrent behavior (issue AC-4) still needs manual verification.
 
 **Files**: `src/main/services/claudeStatus/process/WinClaudeProcessDetector.ts`, `src/main/services/claudeStatus/encodeCwd.ts`.
 
@@ -271,4 +271,4 @@ Amendment discipline + promotion-rule conventions in [`windows/contributing.md`]
 
 ---
 
-**Last Updated**: #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
+**Last Updated**: PR #245 (2026-06-13 – entry #12 live-verification updated: single-panel detection + mid-session model-switch verified on a Windows host) + #217 Windows Claude status bar (2026-06-10 — entry #12 added: Windows v1 detector limitations) + v0.14.0 doc sweep (2026-06-08 — entries #9 + #10 added from `Transcription/CLAUDE.md` eviction) + v0.9.6 release (2026-05-22 — critical macOS terminal fix `ea3eaf1`) + v0.9.5 release (2026-04-25) + Phase I branch protection refinement (PR requirement removed same day) + entry #7 documenting `security.md` cap constraint (2026-04-25)
