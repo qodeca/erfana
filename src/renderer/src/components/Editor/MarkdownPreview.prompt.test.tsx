@@ -180,6 +180,92 @@ describe('MarkdownPreview Prompt Integration', () => {
     })
   })
 
+  // Regression guard for the frontmatter line-offset bug: body elements are rendered
+  // from the frontmatter-stripped string, so their react-markdown positions are
+  // body-relative. They must be shifted by frontmatterLineCount to become real file
+  // lines, otherwise context-menu Modify/Ask reads the wrong source lines (the bug)
+  // and scroll-sync drifts. See docs plan: preview-frontmatter-line-offset.
+  describe('Line Tracking Attributes – frontmatter offset', () => {
+    it('offsets body heading/paragraph line numbers by frontmatterLineCount', () => {
+      // Lines: 1 ---, 2 title, 3 author, 4 ---, 5 # Heading, 6 blank, 7 Paragraph
+      // frontmatterLineCount = 2 yaml + 2 delimiters = 4
+      const markdown = '---\ntitle: T\nauthor: Me\n---\n# Heading\n\nParagraph text'
+      const { container } = renderWithToast(<MarkdownPreview content={markdown} filePath="/test/file.md" />)
+
+      const h1 = container.querySelector('h1')
+      expect(h1?.getAttribute('data-line-start')).toBe('5')
+      expect(h1?.getAttribute('data-line-end')).toBe('5')
+      expect(h1?.getAttribute('data-line')).toBe('5')
+
+      const p = container.querySelector('p')
+      expect(p?.getAttribute('data-line-start')).toBe('7')
+    })
+
+    it('applies the offset to every producer path (heading, code block, link, table cell), not just <p>', () => {
+      // Asserts the offset reaches both the HOC-based and the direct-extractRange renderers.
+      const body =
+        '# Heading\n\n```js\nconst x = 1\n```\n\n[link](https://example.com)\n\n| A | B |\n|---|---|\n| 1 | 2 |'
+      const FRONT = '---\nk: v\n---\n' // frontmatterLineCount = 3
+
+      const plain = renderWithToast(<MarkdownPreview content={body} filePath="/f.md" />).container
+      const withFm = renderWithToast(<MarkdownPreview content={FRONT + body} filePath="/f.md" />).container
+
+      const startOf = (root: Element, sel: string) =>
+        Number(root.querySelector(sel)?.getAttribute('data-line-start'))
+
+      // Scope the table cell to the body table (.table-wrapper); the frontmatter
+      // table also renders <td>s but those intentionally carry no data-line-start.
+      for (const sel of ['h1', 'pre.code-block', 'a', '.table-wrapper td']) {
+        const before = startOf(plain, sel)
+        const after = startOf(withFm, sel)
+        expect(after).toBe(before + 3)
+      }
+    })
+
+    it('offsets both start and end for multi-line elements (code block spans real file lines)', () => {
+      // Lines: 1 ---, 2 k:v, 3 ---, 4 Lead, 5 blank, 6 ```js, 7 const x, 8 const y, 9 ```
+      const markdown = '---\nk: v\n---\nLead\n\n```js\nconst x = 1\nconst y = 2\n```'
+      const { container } = renderWithToast(<MarkdownPreview content={markdown} filePath="/test/file.md" />)
+
+      const code = container.querySelector('pre.code-block')
+      expect(code?.getAttribute('data-line-start')).toBe('6')
+      expect(code?.getAttribute('data-line-end')).toBe('9')
+    })
+
+    it('keeps the frontmatter table on real file lines so the two coordinate systems are contiguous', () => {
+      const markdown = '---\ntitle: T\nauthor: Me\n---\n# Heading'
+      const { container } = renderWithToast(<MarkdownPreview content={markdown} filePath="/test/file.md" />)
+
+      const wrapper = container.querySelector('.frontmatter-wrapper')
+      expect(wrapper?.getAttribute('data-line-start')).toBe('1')
+      expect(wrapper?.getAttribute('data-line-end')).toBe('4') // frontmatter occupies lines 1-4
+      // Body heading begins on the very next file line, 5 – no gap, no overlap.
+      expect(container.querySelector('h1')?.getAttribute('data-line-start')).toBe('5')
+    })
+
+    it('still offsets the body when the frontmatter YAML is invalid (FrontmatterCodeBlock path)', () => {
+      // `foo: [bar` is an unclosed flow sequence – parses with an error but the --- block matches.
+      const markdown = '---\nfoo: [bar\n---\n# Body'
+      const { container } = renderWithToast(<MarkdownPreview content={markdown} filePath="/test/file.md" />)
+
+      const errorWrapper = container.querySelector('.frontmatter-error-wrapper')
+      expect(errorWrapper).toBeTruthy()
+      expect(errorWrapper?.getAttribute('data-line-start')).toBe('1')
+      expect(errorWrapper?.getAttribute('data-line-end')).toBe('3')
+
+      // body is still stripped and offset by frontmatterLineCount (3)
+      expect(container.querySelector('h1')?.getAttribute('data-line-start')).toBe('4')
+    })
+
+    it('applies no offset when there is no frontmatter (offset 0, unchanged behavior)', () => {
+      const markdown = '# Heading\n\nParagraph'
+      const { container } = renderWithToast(<MarkdownPreview content={markdown} filePath="/test/file.md" />)
+
+      expect(container.querySelector('h1')?.getAttribute('data-line-start')).toBe('1')
+      expect(container.querySelector('p')?.getAttribute('data-line-start')).toBe('3')
+    })
+  })
+
   describe('Markdown Features', () => {
     it('should render GFM tables', () => {
       const markdown = '| A | B |\n|---|---|\n| 1 | 2 |'
