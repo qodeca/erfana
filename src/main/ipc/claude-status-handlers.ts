@@ -195,7 +195,9 @@ export function registerClaudeStatusHandlers(
         const { terminalId } = parsed.data
         const cwd = terminalService.getTerminalInfo(terminalId)?.cwd
         if (cwd === undefined) {
-          // Unknown terminal — nothing to track.
+          // Unknown terminal / cwd not yet set — nothing to track. Logged so a
+          // registration-timing race is visible rather than a silent no-op.
+          logger.debug('claude-status:register skipped — no cwd for terminal', { terminalId })
           return
         }
         const pid = terminalService.getPid(terminalId)

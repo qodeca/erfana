@@ -31,7 +31,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { logger } from '../LoggingService'
 import { encodeProjectDir } from './encodeCwd'
-import { locateLatestTranscript } from './ClaudeTranscriptLocator'
+import { locateTranscriptCandidates } from './ClaudeTranscriptLocator'
 import { parseTranscript, type ParsedTurn } from './ClaudeTranscriptParser'
 import { detectWindowSize } from './ClaudeWindowDetector'
 import { friendlyModelName } from './friendlyModelName'
@@ -47,16 +47,42 @@ const NUDGE_MIN_INTERVAL_MS = 1000
 /** Debounce window applied to nudge-triggered refreshes (ms). */
 const REFRESH_DEBOUNCE_MS = 250
 
+/**
+ * Max transcript candidates to parse per refresh before giving up. The locator
+ * returns them newest-first; parsing stops at the first usable turn, so this only
+ * needs to be deep enough to skip a metadata-only sidecar (or two) and reach the
+ * real conversation file.
+ */
+const MAX_PARSE_ATTEMPTS = 5
+
+/**
+ * Why a refresh produced no visible bar. Diagnostic only — never shown to the
+ * user; carried in logs so a hidden bar is no longer an indistinguishable silent
+ * null (six causes used to collapse into one).
+ */
+type HideReason =
+  | 'pid-unknown'
+  | 'not-running'
+  | 'cwd-rejected'
+  | 'no-transcript'
+  | 'no-usable-turn'
+  | 'exception'
+
+/** Displayed outcome of a refresh pass, for log-on-transition. */
+type RefreshOutcome = 'shown' | HideReason
+
 /** Injectable collaborators; defaults wire the real implementations. */
 export interface ClaudeStatusDeps {
   /** Per-OS process detector keyed by PTY pid. */
   detector: IClaudeProcessDetector
   /**
-   * Resolve the newest transcript for a cwd, or null. `minMtimeMs` (the running
-   * claude's start time, when known) floors selection so a fresh launch never
-   * resolves a prior session's transcript (#216).
+   * Resolve eligible transcripts for a cwd, **newest-first** (empty if none).
+   * `minMtimeMs` (the running claude's start time, when known) floors selection
+   * so a fresh launch never resolves a prior session's transcript (#216). The
+   * caller parses them in order and uses the first with a usable turn, so a
+   * metadata-only sidecar that wins "newest" no longer hides the bar.
    */
-  locateTranscript: (cwd: string, minMtimeMs?: number) => Promise<string | null>
+  locateTranscripts: (cwd: string, minMtimeMs?: number) => Promise<string[]>
   /** Parse a transcript file into {modelId, usedTokens}, or null. */
   parseTranscript: (file: string) => Promise<ParsedTurn | null>
   /**
@@ -90,6 +116,8 @@ interface PanelEntry {
   queued?: boolean
   /** Dir currently watched for this terminal (so cwd changes can re-target). */
   watchedDir?: string
+  /** Last displayed outcome, so a state CHANGE logs once (no per-pass spam). */
+  lastOutcome?: RefreshOutcome
   /**
    * Sticky 1M-window bit (finding #5): set once this session's window is detected
    * as 1M, so a post-compaction token reset (which would otherwise re-resolve to
@@ -136,8 +164,9 @@ export class ClaudeStatusService {
     const watcher = deps?.watcher ?? new ClaudeTranscriptWatcher()
     this.deps = {
       detector: deps?.detector ?? createProcessDetector(),
-      locateTranscript:
-        deps?.locateTranscript ?? ((cwd, minMtimeMs) => locateLatestTranscript(cwd, { minMtimeMs })),
+      locateTranscripts:
+        deps?.locateTranscripts ??
+        ((cwd, minMtimeMs) => locateTranscriptCandidates(cwd, { minMtimeMs })),
       parseTranscript: deps?.parseTranscript ?? ((file) => parseTranscript(file)),
       detectWindowSize:
         deps?.detectWindowSize ??
@@ -271,7 +300,7 @@ export class ClaudeStatusService {
       // 1. Liveness. pid undefined → not running.
       if (entry.pid === undefined) {
         this.ensureUnwatched(terminalId)
-        if (!isStale()) this.emitNull(terminalId)
+        if (!isStale()) this.emitNull(terminalId, 'pid-unknown')
         return
       }
 
@@ -279,7 +308,7 @@ export class ClaudeStatusService {
       if (isStale()) return
       if (!detection.running) {
         this.ensureUnwatched(terminalId)
-        this.emitNull(terminalId)
+        this.emitNull(terminalId, 'not-running')
         return
       }
 
@@ -291,26 +320,38 @@ export class ClaudeStatusService {
       // Fail-closed — hide the bar, never throw.
       if (hasControlChars(cwd)) {
         this.ensureUnwatched(terminalId)
-        this.emitNull(terminalId)
+        this.emitNull(terminalId, 'cwd-rejected')
         return
       }
 
       this.ensureWatching(terminalId, cwd)
 
-      // 3. Locate + parse transcript. Floor selection by the running claude's
-      // start time so a fresh launch hides until its own session writes a turn,
-      // instead of showing a prior session's context (#216).
-      const file = await this.deps.locateTranscript(cwd, detection.startedAtMs)
+      // 3. Locate candidates (newest-first) and parse them in order. Floor by the
+      // running claude's start time so a fresh launch hides until its own session
+      // writes a turn (#216). Selecting the first candidate that yields a usable
+      // turn — rather than the single newest file — skips a metadata-only sidecar
+      // (ai-title/last-prompt/mode) that wins "newest" but has no assistant turn.
+      const candidates = await this.deps.locateTranscripts(cwd, detection.startedAtMs)
       if (isStale()) return
-      if (file === null) {
-        this.emitNull(terminalId)
+      if (candidates.length === 0) {
+        this.emitNull(terminalId, 'no-transcript')
         return
       }
 
-      const parsed = await this.deps.parseTranscript(file)
-      if (isStale()) return
+      let parsed: ParsedTurn | null = null
+      let chosenFile: string | null = null
+      const attempts = Math.min(candidates.length, MAX_PARSE_ATTEMPTS)
+      for (let i = 0; i < attempts; i++) {
+        const candidate = await this.deps.parseTranscript(candidates[i])
+        if (isStale()) return
+        if (candidate !== null) {
+          parsed = candidate
+          chosenFile = candidates[i]
+          break
+        }
+      }
       if (parsed === null) {
-        this.emitNull(terminalId)
+        this.emitNull(terminalId, 'no-usable-turn')
         return
       }
 
@@ -351,6 +392,13 @@ export class ClaudeStatusService {
       if (isStale()) return
       const live = this.entries.get(terminalId)
       if (!live) return
+      this.recordOutcome(terminalId, 'shown', {
+        pid: entry.pid,
+        candidates: candidates.length,
+        chosenFile: chosenFile ? path.basename(chosenFile) : undefined,
+        windowSize,
+        used
+      })
       this.emitTo(live.webContentsId, payload)
     } catch (error) {
       // Fail-closed: any unexpected error hides the bar.
@@ -358,7 +406,7 @@ export class ClaudeStatusService {
         terminalId,
         error: error instanceof Error ? error.message : String(error)
       })
-      if (!isStale()) this.emitNull(terminalId)
+      if (!isStale()) this.emitNull(terminalId, 'exception')
     }
   }
 
@@ -432,11 +480,40 @@ export class ClaudeStatusService {
     entry.watchedDir = undefined
   }
 
-  /** Emit a null snapshot (hide the bar) to a terminal's owning webContents. */
-  private emitNull(terminalId: string): void {
+  /**
+   * Emit a null snapshot (hide the bar) to a terminal's owning webContents, with
+   * a diagnostic `reason` recorded so the hide is no longer an indistinguishable
+   * silent null.
+   */
+  private emitNull(terminalId: string, reason: HideReason): void {
+    this.recordOutcome(terminalId, reason)
     const entry = this.entries.get(terminalId)
     if (!entry) return
     this.emitTo(entry.webContentsId, { terminalId, snapshot: null })
+  }
+
+  /**
+   * Record the outcome of a refresh pass: one structured debug record per pass
+   * (the decision boundary), plus an info-level log ONLY when the displayed state
+   * changes (shown↔hidden-reason). The per-pass debug stays quiet at info, and
+   * the transition log gives a free audit trail of why each bar flipped without
+   * flooding the debounced refresh loop. Paths are logged as basenames only.
+   */
+  private recordOutcome(
+    terminalId: string,
+    outcome: RefreshOutcome,
+    meta?: Record<string, unknown>
+  ): void {
+    logger.debug('claudeStatus.refresh', { terminalId, outcome, ...meta })
+    const entry = this.entries.get(terminalId)
+    if (entry && entry.lastOutcome !== outcome) {
+      logger.info('claudeStatus.transition', {
+        terminalId,
+        from: entry.lastOutcome ?? 'init',
+        to: outcome
+      })
+      entry.lastOutcome = outcome
+    }
   }
 
   /** Guarded targeted send. */

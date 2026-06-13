@@ -92,6 +92,46 @@ async function createId(
     vi.resetModules()
   })
 
+  describe('Environment cleaning (Claude Code session markers)', () => {
+    it('strips CLAUDECODE / CLAUDE_CODE_* from the spawned terminal env but keeps other vars', async () => {
+      vi.doMock('os', async () => {
+        const actual = await vi.importActual<any>('os')
+        return { ...actual, platform: () => 'darwin' }
+      })
+
+      // Simulate Erfana having been launched from inside a Claude Code session.
+      process.env.CLAUDECODE = '1'
+      process.env.CLAUDE_CODE_CHILD_SESSION = 'abc'
+      process.env.CLAUDE_CODE_SESSION_ID = 'sid'
+      process.env.CLAUDE_CODE_ENTRYPOINT = 'cli'
+      process.env.ANTHROPIC_API_KEY = 'sk-test-keep'
+      process.env.ERFANA_KEEP_ME = 'yes'
+
+      try {
+        const { terminalService } = await import('./TerminalService')
+        await createId(terminalService, { cwd: '/tmp/project' })
+
+        const env = spawnedPTYs[0].opts.env as Record<string, string | undefined>
+        // Claude Code nested-session markers must be stripped so an in-terminal
+        // `claude` is a clean top-level session and persists its transcript.
+        expect(env.CLAUDECODE).toBeUndefined()
+        expect(env.CLAUDE_CODE_CHILD_SESSION).toBeUndefined()
+        expect(env.CLAUDE_CODE_SESSION_ID).toBeUndefined()
+        expect(env.CLAUDE_CODE_ENTRYPOINT).toBeUndefined()
+        // Non-marker vars (incl. ANTHROPIC_* API keys) pass through unchanged.
+        expect(env.ANTHROPIC_API_KEY).toBe('sk-test-keep')
+        expect(env.ERFANA_KEEP_ME).toBe('yes')
+      } finally {
+        delete process.env.CLAUDECODE
+        delete process.env.CLAUDE_CODE_CHILD_SESSION
+        delete process.env.CLAUDE_CODE_SESSION_ID
+        delete process.env.CLAUDE_CODE_ENTRYPOINT
+        delete process.env.ANTHROPIC_API_KEY
+        delete process.env.ERFANA_KEEP_ME
+      }
+    })
+  })
+
   describe('Bootstrap Script Generation', () => {
     it('POSIX: generates non-interactive bootstrap with exec', async () => {
       // Force POSIX platform

@@ -14,7 +14,11 @@ import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { encodeProjectDir } from './encodeCwd'
-import { locateLatestTranscript, __resetRootCacheForTests } from './ClaudeTranscriptLocator'
+import {
+  locateLatestTranscript,
+  locateTranscriptCandidates,
+  __resetRootCacheForTests
+} from './ClaudeTranscriptLocator'
 
 let rootDir: string
 /** A cwd whose encoded dir lives under rootDir. */
@@ -212,6 +216,49 @@ describe('locateLatestTranscript', () => {
         root: rootDir
       })
       expect(result).toBeNull()
+    })
+  })
+
+  describe('locateTranscriptCandidates (turn-aware selection support)', () => {
+    it('returns eligible files newest-first (so the caller can skip a sidecar)', async () => {
+      await writeJsonl('old.jsonl', 1_000_000)
+      await writeJsonl('new.jsonl', 9_000_000)
+      await writeJsonl('mid.jsonl', 5_000_000)
+
+      const result = await locateTranscriptCandidates(CWD, { root: rootDir })
+      expect(result.map((p) => path.basename(p))).toEqual(['new.jsonl', 'mid.jsonl', 'old.jsonl'])
+    })
+
+    it('applies the start-time floor to every candidate', async () => {
+      await writeJsonl('stale.jsonl', 1_000_000)
+      await writeJsonl('fresh.jsonl', 9_000_000)
+
+      const result = await locateTranscriptCandidates(CWD, {
+        root: rootDir,
+        minMtimeMs: 5_000_000
+      })
+      expect(result.map((p) => path.basename(p))).toEqual(['fresh.jsonl'])
+    })
+
+    it('breaks an mtime tie by lexicographically greater name (deterministic order)', async () => {
+      const tie = 5_000_000
+      await writeJsonl('a.jsonl', tie)
+      await writeJsonl('b.jsonl', tie)
+
+      const result = await locateTranscriptCandidates(CWD, { root: rootDir })
+      expect(result.map((p) => path.basename(p))).toEqual(['b.jsonl', 'a.jsonl'])
+    })
+
+    it('returns [] when the dir is missing or has no eligible file', async () => {
+      expect(
+        await locateTranscriptCandidates('/Users/test/Projects/none', { root: rootDir })
+      ).toEqual([])
+    })
+
+    it('locateLatestTranscript returns the first candidate (back-compat)', async () => {
+      await writeJsonl('a.jsonl', 1_000_000)
+      const newest = await writeJsonl('b.jsonl', 9_000_000)
+      expect(await locateLatestTranscript(CWD, { root: rootDir })).toBe(newest)
     })
   })
 })

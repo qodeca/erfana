@@ -39,7 +39,7 @@ type FakeWatcher = ReturnType<typeof makeFakeWatcher>
 interface Harness {
   service: ClaudeStatusService
   detector: { isClaudeRunning: ReturnType<typeof vi.fn> }
-  locateTranscript: ReturnType<typeof vi.fn>
+  locateTranscripts: ReturnType<typeof vi.fn>
   parseTranscript: ReturnType<typeof vi.fn>
   detectWindowSize: ReturnType<typeof vi.fn>
   watcher: FakeWatcher
@@ -50,7 +50,7 @@ interface Harness {
 function makeHarness(overrides?: Partial<ClaudeStatusDeps>): Harness {
   const emitted: Array<{ wc: number; payload: ClaudeStatusChangePayload }> = []
   const detector = { isClaudeRunning: vi.fn() }
-  const locateTranscript = vi.fn().mockResolvedValue('/root/ENC/session.jsonl')
+  const locateTranscripts = vi.fn().mockResolvedValue(['/root/ENC/session.jsonl'])
   const parseTranscript = vi.fn().mockResolvedValue({ modelId: 'claude-opus-4-8', usedTokens: 95329 })
   // Default mirrors the real registry: Opus 4.6+ (incl. claude-opus-4-8) is
   // auto-1M even under 200k usage; everything else with low usage is 200k.
@@ -68,7 +68,7 @@ function makeHarness(overrides?: Partial<ClaudeStatusDeps>): Harness {
 
   const service = new ClaudeStatusService({
     detector: detector as unknown as IClaudeProcessDetector,
-    locateTranscript,
+    locateTranscripts,
     parseTranscript,
     detectWindowSize,
     watcher: watcher as never,
@@ -76,7 +76,7 @@ function makeHarness(overrides?: Partial<ClaudeStatusDeps>): Harness {
     ...overrides
   })
 
-  return { service, detector, locateTranscript, parseTranscript, detectWindowSize, watcher, emit, emitted }
+  return { service, detector, locateTranscripts, parseTranscript, detectWindowSize, watcher, emit, emitted }
 }
 
 /** Flush all pending microtasks (lets serialized refresh chains settle). */
@@ -258,7 +258,7 @@ describe('ClaudeStatusService', () => {
 
   it('emits null when the transcript cannot be located', async () => {
     const h = makeHarness()
-    h.locateTranscript.mockResolvedValue(null)
+    h.locateTranscripts.mockResolvedValue([])
     h.service.registerPanel('t1', 4242, '/p', 7)
     await flush()
 
@@ -281,7 +281,7 @@ describe('ClaudeStatusService', () => {
     await flush()
 
     // No startedAtMs from the detector → no floor (undefined) is passed.
-    expect(h.locateTranscript).toHaveBeenCalledWith('/live/cwd', undefined)
+    expect(h.locateTranscripts).toHaveBeenCalledWith('/live/cwd', undefined)
   })
 
   it('falls back to spawn cwd when the process has no live cwd', async () => {
@@ -290,7 +290,7 @@ describe('ClaudeStatusService', () => {
     h.service.registerPanel('t1', 4242, '/spawn/cwd', 7)
     await flush()
 
-    expect(h.locateTranscript).toHaveBeenCalledWith('/spawn/cwd', undefined)
+    expect(h.locateTranscripts).toHaveBeenCalledWith('/spawn/cwd', undefined)
   })
 
   it("forwards the running claude's start time as the transcript-selection floor (#216)", async () => {
@@ -303,7 +303,7 @@ describe('ClaudeStatusService', () => {
     h.service.registerPanel('t1', 4242, '/spawn/cwd', 7)
     await flush()
 
-    expect(h.locateTranscript).toHaveBeenCalledWith('/live/cwd', 1_700_000_000_000)
+    expect(h.locateTranscripts).toHaveBeenCalledWith('/live/cwd', 1_700_000_000_000)
   })
 
   it('hides the bar on a fresh launch when the floor excludes every prior transcript (#216)', async () => {
@@ -315,13 +315,13 @@ describe('ClaudeStatusService', () => {
       cwd: '/live/cwd',
       startedAtMs: 1_700_000_000_000
     })
-    h.locateTranscript.mockResolvedValue(null)
+    h.locateTranscripts.mockResolvedValue([])
     h.service.registerPanel('t1', 4242, '/spawn/cwd', 7)
     await flush()
 
     // Self-sufficient: prove BOTH that the floor was forwarded AND that a null
     // locate result hides the bar — not split across two separate tests.
-    expect(h.locateTranscript).toHaveBeenCalledWith('/live/cwd', 1_700_000_000_000)
+    expect(h.locateTranscripts).toHaveBeenCalledWith('/live/cwd', 1_700_000_000_000)
     expect(h.emitted).toHaveLength(1)
     expect(h.emitted[0].payload.snapshot).toBeNull()
   })
@@ -365,7 +365,7 @@ describe('ClaudeStatusService', () => {
     h.service.registerPanel('t1', 4242, '/p', 7)
     await flush()
 
-    expect(h.locateTranscript).not.toHaveBeenCalled()
+    expect(h.locateTranscripts).not.toHaveBeenCalled()
     expect(h.emitted).toHaveLength(1)
     expect(h.emitted[0].payload.snapshot).toBeNull()
   })
@@ -562,6 +562,70 @@ describe('ClaudeStatusService', () => {
 
       h.service.unregisterPanel('t1')
       expect(forget).toHaveBeenCalledWith(4242)
+    })
+  })
+
+  describe('turn-aware transcript selection (bar-never-shows bug)', () => {
+    it('skips a metadata-only sidecar and uses the next candidate that parses', async () => {
+      const h = makeHarness()
+      // Newest candidate is a metadata sidecar (ai-title/last-prompt/mode → no
+      // usable turn → parse null); the second is the real conversation transcript.
+      h.locateTranscripts.mockResolvedValue(['/enc/sidecar.jsonl', '/enc/real.jsonl'])
+      h.parseTranscript
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ modelId: 'claude-opus-4-8', usedTokens: 95329 })
+
+      h.service.registerPanel('t1', 4242, '/p', 7)
+      await flush()
+
+      expect(h.parseTranscript).toHaveBeenNthCalledWith(1, '/enc/sidecar.jsonl')
+      expect(h.parseTranscript).toHaveBeenNthCalledWith(2, '/enc/real.jsonl')
+      const snap = h.emitted.at(-1)?.payload.snapshot
+      expect(snap).not.toBeNull()
+      expect(snap?.modelId).toBe('claude-opus-4-8')
+    })
+
+    it('hides the bar when every candidate parses to no usable turn', async () => {
+      const h = makeHarness()
+      h.locateTranscripts.mockResolvedValue(['/enc/a.jsonl', '/enc/b.jsonl'])
+      h.parseTranscript.mockResolvedValue(null)
+
+      h.service.registerPanel('t1', 4242, '/p', 7)
+      await flush()
+
+      expect(h.parseTranscript).toHaveBeenCalledTimes(2)
+      expect(h.emitted.at(-1)?.payload.snapshot).toBeNull()
+    })
+
+    it('hides the bar when there are no candidate transcripts', async () => {
+      const h = makeHarness()
+      h.locateTranscripts.mockResolvedValue([])
+
+      h.service.registerPanel('t1', 4242, '/p', 7)
+      await flush()
+
+      expect(h.parseTranscript).not.toHaveBeenCalled()
+      expect(h.emitted.at(-1)?.payload.snapshot).toBeNull()
+    })
+
+    it('stops at MAX_PARSE_ATTEMPTS (5) and does not parse every candidate', async () => {
+      const h = makeHarness()
+      h.locateTranscripts.mockResolvedValue([
+        'a.jsonl',
+        'b.jsonl',
+        'c.jsonl',
+        'd.jsonl',
+        'e.jsonl',
+        'f.jsonl',
+        'g.jsonl'
+      ])
+      h.parseTranscript.mockResolvedValue(null)
+
+      h.service.registerPanel('t1', 4242, '/p', 7)
+      await flush()
+
+      expect(h.parseTranscript).toHaveBeenCalledTimes(5)
+      expect(h.emitted.at(-1)?.payload.snapshot).toBeNull()
     })
   })
 })
