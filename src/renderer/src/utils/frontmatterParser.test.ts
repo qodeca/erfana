@@ -161,6 +161,24 @@ Content`
       expect(result.frontmatter).toBeNull()
       expect(result.body).toBe(content)
       expect(result.parseError).toBe(false)
+      // frontmatterLineCount stays 0, so the preview body line offset is 0 here (no off-by-one).
+      expect(result.frontmatterLineCount).toBe(0)
+    })
+
+    it('counts a blank-line-only frontmatter block as exactly the lines before the body', () => {
+      // This block DOES match (a blank line sits between the delimiters):
+      // 1 ---, 2 (blank), 3 ---, 4 Content  -> body starts at file line 4.
+      const content = `---
+
+---
+Content`
+
+      const result = extractFrontmatter(content)
+
+      expect(result.body).toBe('Content')
+      // The body offset relies on this equalling the number of lines preceding the body (3),
+      // so a body element at body-relative line 1 maps back to file line 4.
+      expect(result.frontmatterLineCount).toBe(3)
     })
 
     it('should handle invalid YAML and set parseError', () => {
