@@ -34,7 +34,11 @@
  */
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { dirname, isAbsolute, join } from 'node:path'
+// This detector builds Windows paths (powershell.exe under %SystemRoot%) and only
+// runs on Windows in production. Use the win32 path namespace explicitly so the
+// path logic is correct and unit-testable on any host (e.g. Linux CI), not just
+// when process.platform === 'win32'.
+import { win32 as winPath } from 'node:path'
 import type { ExecLike } from './exec'
 import type { ClaudeDetection } from './types'
 import { AbstractClaudeProcessDetector } from './AbstractClaudeProcessDetector'
@@ -122,8 +126,8 @@ interface WinProcRow {
 function resolvePowershell(): string | undefined {
   const root = process.env.SystemRoot ?? process.env.windir
   if (!root) return undefined // fail-closed: never guess a drive
-  const p = join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
-  return isAbsolute(p) ? p : undefined
+  const p = winPath.join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+  return winPath.isAbsolute(p) ? p : undefined
 }
 
 export class WinClaudeProcessDetector extends AbstractClaudeProcessDetector {
@@ -162,7 +166,7 @@ export class WinClaudeProcessDetector extends AbstractClaudeProcessDetector {
         // Pin cwd to powershell's own (trusted) System32 dir so a malicious DLL
         // in the user's project folder cannot be side-loaded via the current
         // directory during interpreter startup.
-        cwd: dirname(powershell),
+        cwd: winPath.dirname(powershell),
       }
     )
     const rows = parseWin32Processes(stdout)
