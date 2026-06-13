@@ -1,5 +1,5 @@
 import { IDockviewPanelProps } from 'dockview'
-import { Home, Folder, Clock, X, FileUp } from 'lucide-react'
+import { Folder, Clock, X, FileUp } from 'lucide-react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { useOpenProjectByPath, useProjectManagementContext } from '../../context/ProjectManagementContext'
@@ -159,11 +159,10 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
   const isLoading = loadingState.type === 'initial'
 
   return (
-    <div className="panel-content" tabIndex={0}>
+    <div className="panel-content home-bg" tabIndex={0}>
       <div className="welcome-panel">
         <div className="welcome-content">
-          <Home size={64} strokeWidth={1.5} className="welcome-icon" />
-          <h2>Welcome to ERFANA</h2>
+          <h2>Welcome to ERFANA v{__APP_VERSION__}</h2>
           <p>Open a folder from the Project panel to start editing</p>
 
           {projectPath && (

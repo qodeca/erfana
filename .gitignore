@@ -51,3 +51,6 @@ playwright-report/
 # Environment variables (API keys)
 .env
 .env.local
+
+# Superpowers visual brainstorm scratch
+.superpowers/
