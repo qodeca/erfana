@@ -3,7 +3,7 @@
 ## Project Overview
 Electron-based markdown IDE with integrated terminal and project management.
 - **Repository**: `qodeca/erfana` (GitHub, private)
-- **Version**: 0.15.1
+- **Version**: 0.16.0
 - **License**: Proprietary — `UNLICENSED` in package.json, `private: true`. Copyright (c) 2025-2026 **Qodeca sp. z o.o.** All rights reserved. See [LICENSE](LICENSE). Erfana is a closed-source freemium product; never frame it as open source or suggest OSS-style licensing.
 - **Tech Stack**: Electron 39, React 18, TypeScript 6.0, Monaco Editor, xterm.js
 - **Build Toolchain**: electron-vite 5, Vite 6, vitest 3

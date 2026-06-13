@@ -4,6 +4,25 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## 0.16.0
+
+*Released 2026-06-14. Tag [`v0.16.0`](https://github.com/qodeca/erfana/releases/tag/v0.16.0).*
+
+### Added
+
+- **Claude Code context status bar now works on Windows** ([#217](https://github.com/qodeca/erfana/issues/217)) – the per-terminal status bar (friendly model name, 200k/1M context-window badge, used-percentage meter) that shipped for macOS is now available on Windows. A native `WinClaudeProcessDetector` walks the PTY child-process tree, a shared `AbstractClaudeProcessDetector` base unifies the macOS and Windows detectors, and `encodeCwd` is platform-branched for Windows transcript paths. Context usage now also resets correctly after a `/compact` and tracks mid-session model switches.
+- **New home-view background** – the central welcome screen now shows a branded background image, with the controls (Import button, Recent Projects) grouped in a dimmed bottom-right panel and the live app version in the heading. The image is scoped to the welcome view only, never the shared panel background.
+
+### Fixed
+
+- **Preview "Modify"/"Ask" now act on the text you selected, not the frontmatter** – in a file with YAML frontmatter, selecting body text in Preview and choosing Modify or Ask previously sent the document's first frontmatter line instead of your selection. Body element line numbers were tracked relative to the frontmatter-stripped content while the source was read with full-file line numbers; they are now offset to real file lines. This also corrects a latent editor↔preview scroll-sync drift by the frontmatter height.
+- **Claude status bar cross-platform hardening** – the Windows detector uses the `win32` path namespace so its tests pass on Linux CI, and transcript parsing is bounded by a parse-attempt cap tied to the locator's candidate limit.
+- **No spurious error on quit** – a benign `chokidar` timer race during shutdown is now guarded instead of surfacing as an error.
+
+### Internal
+
+- Claude status-bar documentation synced with the merged [#217](https://github.com/qodeca/erfana/issues/217) work; the home-view background and `.home-bg` scoping rule are documented; the macOS welcome visual-regression baseline was regenerated for the new home view.
+
 ## 0.15.1
 
 *Released 2026-06-10. Tag [`v0.15.1`](https://github.com/qodeca/erfana/releases/tag/v0.15.1).*
