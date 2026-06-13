@@ -127,16 +127,6 @@ Pipeline contributors on Windows:
 
 ---
 
-### Claude Code status bar: macOS only in v1
-
-**Issue**: The per-terminal Claude Code context status bar ([#216](https://github.com/qodeca/erfana/issues/216)) ships macOS-only in its first version. On Windows (and Linux) the per-panel process detector is a no-op, so the bar never appears.
-
-**Workaround**: None — the feature is simply unavailable off macOS. Use Claude Code's own statusLine if you need context usage on Windows.
-
-**Tracking**: A Windows follow-up issue (to be filed). The cwd→transcript-directory encoding and the ConPTY process-chain walk both need verification against a live Windows host before the Windows detector can be implemented.
-
----
-
 ### Claude Code status bar: 1M-window detection caveats and token-count access
 
 **Issue**: Two documented limitations of the status bar:
