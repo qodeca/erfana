@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { FilePlus, FolderPlus, FolderOpen, Replace, FileText, Files, RotateCw, X as CloseIcon } from 'lucide-react'
+import { FilePlus, FolderPlus, FolderOpen, Replace, FileText, Files, FileUp, RotateCw, X as CloseIcon } from 'lucide-react'
 import type { FileNode } from '../../../../preload/index'
 import type { FilterMode } from '../../types/filters'
 import { ProjectTreeNode } from './ProjectTreeNode'
@@ -38,6 +38,7 @@ import { useDirectoryWatcher } from '../../hooks/useDirectoryWatcher'
 import { useProjectManagementContext, useProjectChangedEffect } from '../../context/ProjectManagementContext'
 import { useFileOperations } from '../../hooks/useFileOperations'
 import { useImport } from '../../hooks/useImport'
+import { runToolbarImport } from './toolbarImport.logic'
 import { useGitStatus } from '../../hooks/useGitStatus'
 import { GitStatusBar } from './GitStatusBar'
 import { GitErrorBoundary } from './GitErrorBoundary'
@@ -136,8 +137,8 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
   const { flattenedItems, isDescendant } = useDragDropTree(files, projectPath)
   const clipboard = useClipboardStore()
 
-  // Import hook (for context menu and external drop)
-  const { importFile, processFiles } = useImport()
+  // Import hook (for context menu, external drop, and toolbar button)
+  const { importFile, processFiles, isImporting } = useImport()
 
   // Manual refresh handler - refreshes both file tree and git status
   const handleRefresh = useCallback(async () => {
@@ -146,6 +147,13 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
       refreshGitStatus()
     ])
   }, [refreshFiles, refreshGitStatus])
+
+  // Toolbar import handler - opens the native picker via the shared import hook,
+  // then refreshes git status only on a successful import (parity with the
+  // context-menu ImportCommand). Contract lives in toolbarImport.logic.ts.
+  const handleToolbarImport = useCallback(() => {
+    return runToolbarImport(importFile, refreshGitStatus)
+  }, [importFile, refreshGitStatus])
 
   // Combined loading state for refresh operations
   const isAnyRefreshing = loading || isRefreshing
@@ -1283,6 +1291,20 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
                 data-testid={TEST_IDS.PROJECT_TREE_BTN_NEW_FOLDER}
               >
                 <FolderPlus size={14} strokeWidth={2} />
+              </button>
+              <button
+                className="icon-btn"
+                onClick={handleToolbarImport}
+                disabled={isImporting}
+                title={isImporting ? 'Importing file...' : 'Import a file'}
+                aria-label={isImporting ? 'Importing file...' : 'Import a file'}
+                data-testid={TEST_IDS.PROJECT_TREE_BTN_IMPORT}
+              >
+                {isImporting ? (
+                  <RotateCw size={14} strokeWidth={2} className="spin" />
+                ) : (
+                  <FileUp size={14} strokeWidth={2} />
+                )}
               </button>
               <button
                 className="icon-btn"

@@ -370,6 +370,14 @@
   cursor: not-allowed;
 }
 
+.welcome-action-button:focus-visible {
+  /* White (not the violet focus token) so the ring contrasts ≥3:1 against the
+     button's own violet fill; placed over the dark .welcome-content overlay via
+     the offset. WCAG 2.2 SC 1.4.11 / 2.4.13. */
+  outline: var(--border-width-thick) solid var(--color-white);
+  outline-offset: var(--border-width-thick);
+}
+
 /* Remove Dockview's default padding from welcome tab container */
 .dockview-theme-dark .dv-default-tab:has(.welcome-tab) {
   padding: 0 !important;

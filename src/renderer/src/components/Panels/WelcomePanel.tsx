@@ -1,5 +1,5 @@
 import { IDockviewPanelProps } from 'dockview'
-import { Folder, Clock, X, FileUp } from 'lucide-react'
+import { Folder, Clock, X, FileUp, FolderOpen, Replace } from 'lucide-react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { useOpenProjectByPath, useProjectManagementContext } from '../../context/ProjectManagementContext'
@@ -39,7 +39,7 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
   const [loadingState, setLoadingState] = useState<LoadingState>({ type: 'initial' })
   const isProjectChanging = useProjectStore((state) => state.isProjectChanging)
   const { handleOpenProjectByPath } = useOpenProjectByPath()
-  const { projectPath } = useProjectManagementContext()
+  const { projectPath, handleOpenProject, isSwitchingProject } = useProjectManagementContext()
   const { isImporting, importFile } = useImport()
 
   // todo019: Prevent state updates on unmounted components
@@ -163,22 +163,35 @@ export function WelcomePanel(_props: IDockviewPanelProps) {
       <div className="welcome-panel">
         <div className="welcome-content">
           <h2>Welcome to ERFANA v{__APP_VERSION__}</h2>
-          <p>Open a folder from the Project panel to start editing</p>
+          <p>Open a project folder to start editing</p>
 
-          {projectPath && (
-            <div className="welcome-actions">
+          <div className="welcome-actions">
+            {/* Open/Change project — mirrors the Project Tree toolbar button.
+                Visible text is the accessible name, so no aria-label is set (avoids
+                a WCAG 2.2 SC 2.5.3 "Label in Name" mismatch with the icon-only toolbar). */}
+            <button
+              className="welcome-action-button"
+              onClick={handleOpenProject}
+              disabled={isSwitchingProject}
+              data-testid={TEST_IDS.WELCOME_BTN_OPEN}
+            >
+              {projectPath ? <Replace size={16} /> : <FolderOpen size={16} />}
+              {projectPath ? 'Change project' : 'Open project'}
+            </button>
+
+            {projectPath && (
               <button
                 className="welcome-action-button"
                 onClick={importFile}
                 disabled={isImporting || isProjectChanging}
-                title={isImporting ? 'Importing file...' : 'Import a file (PDF, text, or other supported formats)'}
+                title={isImporting ? 'Importing file...' : 'Import a file'}
                 data-testid={TEST_IDS.WELCOME_BTN_IMPORT}
               >
                 <FileUp size={16} />
                 {isImporting ? 'Importing...' : 'Import...'}
               </button>
-            </div>
-          )}
+            )}
+          </div>
 
           {!isLoading && recentProjects.length > 0 && (
             <div className="recent-projects-section">

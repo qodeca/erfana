@@ -29,10 +29,15 @@ const mockProjects = [
 const mockGetRecentProjects = vi.fn()
 const mockRemoveRecentProject = vi.fn()
 const mockHandleOpenProjectByPath = vi.fn()
+const mockHandleOpenProject = vi.fn()
+const mockImportFile = vi.fn(() => Promise.resolve(null))
 const mockShowGlobalToast = vi.fn()
 
 // Use a getter pattern for dynamic mock value
 const mockState = { isProjectChanging: false }
+
+// Controllable context values for the Open/Change project button
+const mockContext = { projectPath: null as string | null, isSwitchingProject: false }
 
 // Mock useProjectStore
 vi.mock('../../stores/useProjectStore', () => ({
@@ -48,15 +53,17 @@ vi.mock('../../context/ProjectManagementContext', () => ({
     isSwitchingProject: false
   }),
   useProjectManagementContext: () => ({
-    projectPath: null
+    projectPath: mockContext.projectPath,
+    handleOpenProject: mockHandleOpenProject,
+    isSwitchingProject: mockContext.isSwitchingProject
   })
 }))
 
-// Mock useImport hook
+// Mock useImport hook (importFile is a referenceable spy so click wiring is assertable)
 vi.mock('../../hooks/useImport', () => ({
   useImport: () => ({
     isImporting: false,
-    importFile: vi.fn(() => Promise.resolve(null))
+    importFile: mockImportFile
   })
 }))
 
@@ -92,6 +99,8 @@ describe('WelcomePanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockState.isProjectChanging = false
+    mockContext.projectPath = null
+    mockContext.isSwitchingProject = false
     ;(window as unknown as { api: typeof mockApi }).api = mockApi
 
     // Default: successful load with projects
@@ -133,7 +142,7 @@ describe('WelcomePanel', () => {
       await waitFor(() => {
         expect(mockGetRecentProjects).toHaveBeenCalled()
       })
-      expect(screen.getByText('Open a folder from the Project panel to start editing')).toBeInTheDocument()
+      expect(screen.getByText('Open a project folder to start editing')).toBeInTheDocument()
     })
 
     it('should hide recent projects section during initial load', () => {
@@ -540,6 +549,64 @@ describe('WelcomePanel', () => {
           ).toBeInTheDocument()
         }
       })
+    })
+  })
+
+  describe('Open/Change project button', () => {
+    it('should render "Open project" and hide Import when no project is open', async () => {
+      mockContext.projectPath = null
+      render(<WelcomePanel {...mockDockviewProps} />)
+
+      const openBtn = screen.getByTestId(TEST_IDS.WELCOME_BTN_OPEN)
+      expect(openBtn).toHaveTextContent('Open project')
+      // Import button is gated behind an open project
+      expect(screen.queryByTestId(TEST_IDS.WELCOME_BTN_IMPORT)).not.toBeInTheDocument()
+    })
+
+    it('should render "Change project" and show Import when a project is open', async () => {
+      mockContext.projectPath = '/path/project-a'
+      render(<WelcomePanel {...mockDockviewProps} />)
+
+      expect(screen.getByTestId(TEST_IDS.WELCOME_BTN_OPEN)).toHaveTextContent('Change project')
+      expect(screen.getByTestId(TEST_IDS.WELCOME_BTN_IMPORT)).toBeInTheDocument()
+    })
+
+    it('should use the visible "Open project" text as the accessible name (no aria-label override)', async () => {
+      mockContext.projectPath = null
+      render(<WelcomePanel {...mockDockviewProps} />)
+
+      // Fails loudly if an aria-label is ever added that diverges from the visible text
+      expect(screen.getByTestId(TEST_IDS.WELCOME_BTN_OPEN)).toHaveAccessibleName('Open project')
+    })
+
+    it('should use the visible "Change project" text as the accessible name when a project is open', async () => {
+      mockContext.projectPath = '/path/project-a'
+      render(<WelcomePanel {...mockDockviewProps} />)
+
+      expect(screen.getByTestId(TEST_IDS.WELCOME_BTN_OPEN)).toHaveAccessibleName('Change project')
+    })
+
+    it('should disable the button while a project switch is in progress', async () => {
+      mockContext.isSwitchingProject = true
+      render(<WelcomePanel {...mockDockviewProps} />)
+
+      expect(screen.getByTestId(TEST_IDS.WELCOME_BTN_OPEN)).toBeDisabled()
+    })
+
+    it('should call handleOpenProject on click', async () => {
+      mockContext.projectPath = null
+      render(<WelcomePanel {...mockDockviewProps} />)
+
+      fireEvent.click(screen.getByTestId(TEST_IDS.WELCOME_BTN_OPEN))
+      expect(mockHandleOpenProject).toHaveBeenCalledTimes(1)
+    })
+
+    it('should call importFile when the Import button is clicked', async () => {
+      mockContext.projectPath = '/path/project-a'
+      render(<WelcomePanel {...mockDockviewProps} />)
+
+      fireEvent.click(screen.getByTestId(TEST_IDS.WELCOME_BTN_IMPORT))
+      expect(mockImportFile).toHaveBeenCalledTimes(1)
     })
   })
 

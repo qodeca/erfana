@@ -72,6 +72,14 @@
   animation: spin 0.9s linear infinite;
 }
 
+/* Honor reduced-motion preference: stop the continuous rotation for
+   motion-sensitive users (the icon stays static while still indicating busy). */
+@media (prefers-reduced-motion: reduce) {
+  .icon-btn .spin {
+    animation: none;
+  }
+}
+
 @keyframes spin {
   from {
     transform: rotate(0deg);
