@@ -503,14 +503,18 @@ export function registerFileHandlers(): void {
       }
 
       // Canonicalize (resolve symlinks) and re-check so an in-project symlink
-      // cannot escape the project. A missing path throws ENOENT here.
+      // cannot escape the project. A missing path throws ENOENT; other realpath
+      // errors (EACCES / ELOOP / ENOTDIR) get a distinct, accurate message.
       let realRoot: string
       let realResolved: string
       try {
         realRoot = await realpath(resolvedRoot)
         realResolved = await realpath(resolved)
-      } catch {
-        return 'Item no longer exists on disk'
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          return 'Item no longer exists on disk'
+        }
+        return 'Cannot reveal this item'
       }
       if (realResolved !== realRoot && !realResolved.startsWith(realRoot + path.sep)) {
         return 'Cannot reveal items outside the project'

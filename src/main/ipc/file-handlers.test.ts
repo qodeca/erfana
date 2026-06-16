@@ -10,7 +10,7 @@ const showItemInFolder = vi.fn()
 const isTrustedSenderMock = vi.fn(() => true)
 
 vi.mock('./senderValidation', () => ({
-  isTrustedSender: () => isTrustedSenderMock()
+  isTrustedSender: isTrustedSenderMock
 }))
 
 vi.mock('electron', () => {
@@ -303,6 +303,21 @@ describe('file:revealInFileManager', () => {
     expect(await reveal({}, missing)).toBe('Item no longer exists on disk')
     expect(showItemInFolder).not.toHaveBeenCalled()
   })
+
+  it.skipIf(process.platform === 'win32')(
+    'returns a distinct message for a non-ENOENT realpath error',
+    async () => {
+      const { writeFileSync } = await import('node:fs')
+      const { join } = await import('node:path')
+      // A regular file used as a path component → realpath throws ENOTDIR.
+      const file = join(tmp, 'note.md')
+      writeFileSync(file, '# hi')
+      const throughFile = join(file, 'child')
+
+      expect(await reveal({}, throughFile)).toBe('Cannot reveal this item')
+      expect(showItemInFolder).not.toHaveBeenCalled()
+    }
+  )
 
   it('returns an error for invalid input', async () => {
     expect(await reveal({}, '')).toBe('Invalid path')
