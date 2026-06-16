@@ -42,7 +42,7 @@
     "@turbodocx/html-to-docx": "^1.18.1",
     "async-mutex": "^0.5.0",
     "chokidar": "3.6.0",
-    "electron-log": "^5.4.3",
+    "electron-log": "^5.4.4",
     "electron-store": "^11.0.2",
     "extract-zip": "2.0.1",
     "ffmpeg-static": "^5.3.0",
