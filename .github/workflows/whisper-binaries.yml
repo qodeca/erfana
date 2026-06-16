@@ -198,7 +198,7 @@ jobs:
         # commit 63fff01cd422d4b7b855d40ca1e9d34d2de9427d). This action
         # consumes APPLE_CERT_P12 directly — SHA-pin is mandatory; a
         # tag-move would be a credential-handling supply-chain incident.
-        uses: apple-actions/import-codesign-certs@63fff01cd422d4b7b855d40ca1e9d34d2de9427d
+        uses: apple-actions/import-codesign-certs@5142e029c445c10ffc7149d172e540235a065466
         with:
           p12-file-base64: ${{ secrets.APPLE_CERT_P12 }}
           p12-password: ${{ secrets.APPLE_CERT_PASSWORD }}
