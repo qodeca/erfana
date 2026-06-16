@@ -23,10 +23,12 @@ import {
   DeleteDirectoryCommand,
   NewFileInDirectoryCommand,
   NewFolderInDirectoryCommand,
+  RevealInFileManagerCommand,
   separatorItem
 } from './commands'
 import { createMockMenuContext, createMockFileNode } from '../__test__/testUtils'
 import type { MenuContext, FileNodeDirectory, FileNodeFile } from './types'
+import type { Mock } from 'vitest'
 
 describe('Context Menu Commands', () => {
   let ctx: MenuContext
@@ -805,6 +807,37 @@ describe('Context Menu Commands', () => {
 
       expect(typeof item.execute).toBe('function')
       expect(() => item.execute()).not.toThrow()
+    })
+  })
+})
+
+describe('RevealInFileManagerCommand', () => {
+  let ctx: MenuContext
+
+  beforeEach(() => {
+    ctx = createMockMenuContext()
+  })
+
+  it('reveals the node path and shows no toast on success', async () => {
+    const node = createMockFileNode('test.md', 'file')
+    ;(ctx.api.revealInFileManager as Mock).mockResolvedValue('')
+
+    await new RevealInFileManagerCommand(ctx, node).execute()
+
+    expect(ctx.api.revealInFileManager).toHaveBeenCalledWith('/test/project/test.md')
+    expect(ctx.toast).not.toHaveBeenCalled()
+  })
+
+  it('shows an error toast when reveal fails', async () => {
+    const node = createMockFileNode('gone.md', 'file')
+    ;(ctx.api.revealInFileManager as Mock).mockResolvedValue('Item no longer exists on disk')
+
+    await new RevealInFileManagerCommand(ctx, node).execute()
+
+    expect(ctx.toast).toHaveBeenCalledWith({
+      type: 'error',
+      title: 'Reveal failed',
+      message: 'Item no longer exists on disk'
     })
   })
 })
