@@ -4,6 +4,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 const sends: Array<{ idx: number; channel: string; payload: unknown }> = []
 // Captures ipcMain.handle registrations so tests can invoke handlers directly
 const handlers: Record<string, (...args: any[]) => any> = {}
+// Captures shell.showItemInFolder calls for the reveal handler
+const showItemInFolder = vi.fn()
+// Toggleable sender-trust gate for the reveal handler
+const isTrustedSenderMock = vi.fn(() => true)
+
+vi.mock('./senderValidation', () => ({
+  isTrustedSender: () => isTrustedSenderMock()
+}))
 
 vi.mock('electron', () => {
   const mkWin = (idx: number, destroyed = false) => ({
@@ -26,6 +34,9 @@ vi.mock('electron', () => {
     dialog: {
       showOpenDialog: vi.fn(),
       showSaveDialog: vi.fn()
+    },
+    shell: {
+      showItemInFolder
     }
   }
 })
@@ -194,5 +205,83 @@ describe('file:exists', () => {
     await expect(handlers['file:exists']({}, join(dir, 'nope.md'))).resolves.toBe(false)
 
     rmSync(dir, { recursive: true, force: true })
+  })
+})
+
+describe('file:revealInFileManager', () => {
+  let tmp: string
+  let reveal: (...args: any[]) => any
+
+  beforeEach(async () => {
+    for (const k of Object.keys(handlers)) delete handlers[k]
+    showItemInFolder.mockClear()
+    isTrustedSenderMock.mockReturnValue(true)
+
+    const { mkdtempSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const { tmpdir } = await import('node:os')
+    tmp = mkdtempSync(join(tmpdir(), 'erfana-reveal-'))
+
+    const { fileService } = await import('../services/FileService')
+    vi.spyOn(fileService, 'getProjectPath').mockReturnValue(tmp)
+
+    const { registerFileHandlers } = await import('./file-handlers')
+    registerFileHandlers()
+    reveal = handlers['file:revealInFileManager']
+  })
+
+  afterEach(async () => {
+    const { rmSync } = await import('node:fs')
+    rmSync(tmp, { recursive: true, force: true })
+    vi.restoreAllMocks()
+    vi.resetModules()
+  })
+
+  it('reveals a file inside the project and returns empty string', async () => {
+    const { writeFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const file = join(tmp, 'note.md')
+    writeFileSync(file, '# hi')
+
+    expect(await reveal({}, file)).toBe('')
+    expect(showItemInFolder).toHaveBeenCalledWith(file)
+  })
+
+  it('reveals the project root directory itself', async () => {
+    expect(await reveal({}, tmp)).toBe('')
+    expect(showItemInFolder).toHaveBeenCalledWith(tmp)
+  })
+
+  it('rejects a path outside the project', async () => {
+    const { join } = await import('node:path')
+    const { tmpdir } = await import('node:os')
+    const outside = join(tmpdir(), 'definitely-outside-erfana-project')
+
+    expect(await reveal({}, outside)).toBe('Cannot reveal items outside the project')
+    expect(showItemInFolder).not.toHaveBeenCalled()
+  })
+
+  it('returns an error for a missing in-project path without calling shell', async () => {
+    const { join } = await import('node:path')
+    const missing = join(tmp, 'gone.md')
+
+    expect(await reveal({}, missing)).toBe('Item no longer exists on disk')
+    expect(showItemInFolder).not.toHaveBeenCalled()
+  })
+
+  it('returns an error for invalid input', async () => {
+    expect(await reveal({}, '')).toBe('Invalid path')
+    expect(showItemInFolder).not.toHaveBeenCalled()
+  })
+
+  it('no-ops for an untrusted sender', async () => {
+    const { writeFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    isTrustedSenderMock.mockReturnValue(false)
+    const file = join(tmp, 'note.md')
+    writeFileSync(file, '# hi')
+
+    expect(await reveal({}, file)).toBe('')
+    expect(showItemInFolder).not.toHaveBeenCalled()
   })
 })

@@ -1,4 +1,4 @@
-import { ipcMain, dialog, BrowserWindow } from 'electron'
+import { ipcMain, dialog, BrowserWindow, shell } from 'electron'
 import { stat } from 'fs/promises'
 import path from 'path'
 import { ProjectService } from '../services/ProjectService'
@@ -12,6 +12,7 @@ import type { ProjectChanged } from '../../shared/ipc/schema'
 import { logger } from '../services/LoggingService'
 import { fileExists } from '../utils/fileUtils'
 import { redactedLogError } from '../utils/redactUserInput'
+import { isTrustedSender } from './senderValidation'
 
 /**
  * Broadcast project change to all renderer processes
@@ -459,6 +460,44 @@ export function registerFileHandlers(): void {
       throw error
     }
   })
+
+  // Reveal a file or folder in the native OS file manager (Finder / Explorer).
+  // Returns '' on success, or a human-readable error string for the toast.
+  // Sender-validated and confined to the open project (the root itself is
+  // allowed so the project root node can be revealed).
+  ipcMain.handle(
+    'file:revealInFileManager',
+    async (event, filePath: string): Promise<string> => {
+      if (!isTrustedSender(event)) {
+        logger.warn('Rejected file:revealInFileManager from untrusted sender', {
+          url: event.senderFrame?.url
+        })
+        return ''
+      }
+
+      if (!filePath || typeof filePath !== 'string') {
+        return 'Invalid path'
+      }
+
+      const projectPath = fileService.getProjectPath()
+      if (!projectPath) {
+        return 'No project is open'
+      }
+
+      const resolved = path.resolve(filePath)
+      const resolvedRoot = path.resolve(projectPath)
+      if (resolved !== resolvedRoot && !resolved.startsWith(resolvedRoot + path.sep)) {
+        return 'Cannot reveal items outside the project'
+      }
+
+      if (!(await fileExists(resolved))) {
+        return 'Item no longer exists on disk'
+      }
+
+      shell.showItemInFolder(resolved)
+      return ''
+    }
+  )
 
   // Validate file path exists and return info
   // Note: projectRoot is optional to allow validation of absolute paths from terminal output.
