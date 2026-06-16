@@ -239,17 +239,19 @@ describe('file:revealInFileManager', () => {
 
   it('reveals a file inside the project and returns empty string', async () => {
     const { writeFileSync } = await import('node:fs')
+    const { realpath } = await import('node:fs/promises')
     const { join } = await import('node:path')
     const file = join(tmp, 'note.md')
     writeFileSync(file, '# hi')
 
     expect(await reveal({}, file)).toBe('')
-    expect(showItemInFolder).toHaveBeenCalledWith(file)
+    expect(showItemInFolder).toHaveBeenCalledWith(await realpath(file))
   })
 
   it('reveals the project root directory itself', async () => {
+    const { realpath } = await import('node:fs/promises')
     expect(await reveal({}, tmp)).toBe('')
-    expect(showItemInFolder).toHaveBeenCalledWith(tmp)
+    expect(showItemInFolder).toHaveBeenCalledWith(await realpath(tmp))
   })
 
   it('rejects a path outside the project', async () => {
@@ -258,6 +260,39 @@ describe('file:revealInFileManager', () => {
     const outside = join(tmpdir(), 'definitely-outside-erfana-project')
 
     expect(await reveal({}, outside)).toBe('Cannot reveal items outside the project')
+    expect(showItemInFolder).not.toHaveBeenCalled()
+  })
+
+  it('rejects a sibling whose name extends the project root (prefix boundary)', async () => {
+    // Shares the root string prefix but is not inside it; lexical guard must reject.
+    const sibling = tmp + '-evil'
+    expect(await reveal({}, sibling)).toBe('Cannot reveal items outside the project')
+    expect(showItemInFolder).not.toHaveBeenCalled()
+  })
+
+  it.skipIf(process.platform === 'win32')(
+    'rejects an in-project symlink that points outside the project',
+    async () => {
+      const { mkdtempSync, symlinkSync, rmSync } = await import('node:fs')
+      const { join } = await import('node:path')
+      const { tmpdir } = await import('node:os')
+      const outsideTarget = mkdtempSync(join(tmpdir(), 'erfana-outside-'))
+      const link = join(tmp, 'link')
+      symlinkSync(outsideTarget, link, 'dir')
+
+      expect(await reveal({}, link)).toBe('Cannot reveal items outside the project')
+      expect(showItemInFolder).not.toHaveBeenCalled()
+
+      rmSync(outsideTarget, { recursive: true, force: true })
+    }
+  )
+
+  it('returns an error when no project is open', async () => {
+    const { fileService } = await import('../services/FileService')
+    const { join } = await import('node:path')
+    vi.spyOn(fileService, 'getProjectPath').mockReturnValue(null)
+
+    expect(await reveal({}, join(tmp, 'note.md'))).toBe('No project is open')
     expect(showItemInFolder).not.toHaveBeenCalled()
   })
 
