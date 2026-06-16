@@ -29,6 +29,7 @@ export const createMockProjectTreeApi = (overrides?: Partial<IProjectTreeApi>): 
       moveItem: vi.fn().mockResolvedValue({ path: '/moved', isSymlink: false }),
       copyItem: vi.fn().mockResolvedValue({ path: '/copied', isSymlink: false }),
       checkConflict: vi.fn().mockResolvedValue(false),
+      revealInFileManager: vi.fn().mockResolvedValue(''),
       ...overrides?.file
     },
     directoryWatch: {
