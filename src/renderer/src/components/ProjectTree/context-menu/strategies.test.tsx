@@ -102,6 +102,18 @@ describe('Context Menu Strategies', () => {
         }
       })
     })
+
+    it('should end with a Reveal item below Delete', () => {
+      const node = createMockFileNode('folder', 'directory')
+
+      const items = strategy.build(node as FileNodeDirectory, ctx)
+      const visible = items.filter((item) => !item.separator)
+
+      expect(visible.at(-1)?.label).toMatch(/^Reveal in /)
+      expect(visible.findIndex((item) => /^Reveal in /.test(item.label))).toBeGreaterThan(
+        visible.findIndex((item) => item.label === 'Delete')
+      )
+    })
   })
 
   describe('FileContextMenuStrategy', () => {
@@ -169,6 +181,18 @@ describe('Context Menu Strategies', () => {
 
       expect(items.some((item) => item.label === 'Rename')).toBe(true)
       expect(items.some((item) => item.label === 'Delete')).toBe(true)
+    })
+
+    it('should end with a Reveal item below Delete', () => {
+      const node = createMockFileNode('test.md', 'file')
+
+      const items = strategy.build(node as FileNodeFile, ctx)
+      const visible = items.filter((item) => !item.separator)
+
+      expect(visible.at(-1)?.label).toMatch(/^Reveal in /)
+      expect(visible.findIndex((item) => /^Reveal in /.test(item.label))).toBeGreaterThan(
+        visible.findIndex((item) => item.label === 'Delete')
+      )
     })
   })
 })
