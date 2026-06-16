@@ -4,6 +4,12 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## Unreleased
+
+### Changed
+
+- **Erfana is now open source under `GPL-3.0-only`** *(2026-06-16)* – the project was relicensed from its prior proprietary ("All rights reserved") terms and published publicly at [github.com/qodeca/erfana](https://github.com/qodeca/erfana). The relicensing act of record is in [`COPYRIGHT`](../COPYRIGHT). Per-file licensing follows the [REUSE](https://reuse.software) specification (SPDX headers on every source file, `REUSE.toml`, `LICENSES/`); bundled third-party notices are in [`THIRD-PARTY-LICENSES.md`](../THIRD-PARTY-LICENSES.md). Added community-health files (`CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `CLA.md`, `TRADEMARKS.md`) and a secret-scan + license-compliance CI gate. The "Erfana"/"Qodeca" names and logos remain Qodeca trademarks — forks must rebrand. Contributions require the project CLA, which preserves Qodeca's dual-licensing option. `package.json` keeps `"private": true` as a desktop-app publish guard (not a license statement).
+
 ## 0.16.0
 
 *Released 2026-06-14. Tag [`v0.16.0`](https://github.com/qodeca/erfana/releases/tag/v0.16.0).*
