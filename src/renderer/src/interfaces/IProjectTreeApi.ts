@@ -56,6 +56,7 @@ export interface IProjectTreeApi {
       newName?: string
     ): Promise<{ path: string; isSymlink?: boolean }>
     checkConflict(targetPath: string, itemName: string): Promise<boolean>
+    revealInFileManager(filePath: string): Promise<string>
   }
 
   /**

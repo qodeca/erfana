@@ -63,6 +63,7 @@ declare global {
         deleteFile: (filePath: string) => Promise<boolean>
         deleteFolder: (folderPath: string) => Promise<boolean>
         rename: (oldPath: string, newName: string) => Promise<string>
+        revealInFileManager: (filePath: string) => Promise<string>
         moveItem: (sourcePath: string, targetParentPath: string, newName?: string) => Promise<{ path: string; isSymlink?: boolean }>
         copyItem: (sourcePath: string, targetParentPath: string, newName?: string) => Promise<{ path: string; isSymlink?: boolean }>
         checkConflict: (targetParentPath: string, itemName: string) => Promise<boolean>

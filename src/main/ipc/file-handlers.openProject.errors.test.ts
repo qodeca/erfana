@@ -21,6 +21,8 @@ const handlers: Record<string, (...args: any[]) => any> = {}
 // Capture broadcasts
 const sends: Array<{ ch: string; payload: any }> = []
 
+vi.mock('./senderValidation', () => ({ isTrustedSender: () => true }))
+
 vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn((ch: string, cb: any) => { handlers[ch] = cb })

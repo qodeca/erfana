@@ -23,6 +23,7 @@ import {
   NewFileInDirectoryCommand,
   NewFolderInDirectoryCommand,
   ImportCommand,
+  RevealInFileManagerCommand,
   separatorItem
 } from './commands'
 
@@ -66,6 +67,10 @@ export class DirectoryContextMenuStrategy implements IContextMenuStrategy {
     // Delete operation
     items.push(new DeleteDirectoryCommand(ctx, dirNode).toMenuItem())
 
+    // Reveal in OS file manager (last, below Delete)
+    items.push(separatorItem())
+    items.push(new RevealInFileManagerCommand(ctx, dirNode).toMenuItem())
+
     return items
   }
 }
@@ -96,6 +101,10 @@ export class FileContextMenuStrategy implements IContextMenuStrategy {
 
     // Delete operation
     items.push(new DeleteFileCommand(ctx, fileNode).toMenuItem())
+
+    // Reveal in OS file manager (last, below Delete)
+    items.push(separatorItem())
+    items.push(new RevealInFileManagerCommand(ctx, fileNode).toMenuItem())
 
     return items
   }

@@ -14,8 +14,9 @@
  * All commands are testable via dependency injection (MenuContext).
  */
 
-import { Copy, Scissors, Clipboard as ClipboardIcon, Edit, Trash, FilePlus, FolderPlus, FileUp } from 'lucide-react'
+import { Copy, Scissors, Clipboard as ClipboardIcon, Edit, Trash, FilePlus, FolderPlus, FileUp, FolderOpen } from 'lucide-react'
 import type { IMenuItem, MenuContext, FileNode, FileNodeDirectory, FileNodeFile } from './types'
+import { isMacOS, isWindows } from '../../../utils/platform'
 
 /**
  * Base class for all commands
@@ -400,6 +401,26 @@ export class ImportCommand extends CommandBase {
 export const ImportPdfCommand = ImportCommand
 
 /* ========== Utility ========== */
+
+/**
+ * Reveal a file or folder in the native OS file manager (Finder / Explorer).
+ * Works for both file and directory nodes (and the project root node).
+ */
+export class RevealInFileManagerCommand extends CommandBase {
+  label = isMacOS()
+    ? 'Reveal in Finder'
+    : isWindows()
+      ? 'Reveal in Explorer'
+      : 'Reveal in File Manager'
+  icon = <FolderOpen size={14} strokeWidth={2} />
+
+  async execute(): Promise<void> {
+    const error = await this.ctx.api.revealInFileManager(this.node.path)
+    if (error) {
+      this.ctx.toast({ type: 'error', title: 'Reveal failed', message: error })
+    }
+  }
+}
 
 /**
  * Creates a separator menu item

@@ -21,6 +21,8 @@ const { mockStat } = vi.hoisted(() => ({
 }))
 
 // Mock electron
+vi.mock('./senderValidation', () => ({ isTrustedSender: () => true }))
+
 vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => {

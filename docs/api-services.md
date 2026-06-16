@@ -281,6 +281,18 @@ Rename a file or folder. The second argument is a **basename**, not a full path 
 
 ---
 
+### IPC: `file:revealInFileManager`
+
+**Handler:** `src/main/ipc/file-handlers.ts` · **Preload:** `window.api.file.revealInFileManager(filePath)`
+
+Reveals a file or folder in the native OS file manager (Finder/Explorer) by calling Electron `shell.showItemInFolder`. Backs the Project Tree "Reveal in Finder/Explorer" context-menu command (file, folder, and project-root nodes).
+
+- **Arg:** absolute path (the right-clicked tree node's `path`).
+- **Returns `Promise<string>`:** `''` on success, otherwise a human-readable error message the renderer surfaces as an error toast (`'Item no longer exists on disk'`, `'Cannot reveal items outside the project'`, `'No project is open'`, `'Invalid path'`).
+- **Security:** validates the IPC sender via the shared `isTrustedSender` (`src/main/ipc/senderValidation.ts`, also used by the clipboard handlers) and confines the path to the open project root (the root itself is allowed so the project-root node can be revealed); an untrusted sender is a silent no-op returning `''`. The path is `fs.realpath`-canonicalized before the boundary check, so an in-project symlink cannot escape the project.
+
+---
+
 ## SettingsService
 
 **File:** `src/main/services/SettingsService.ts`

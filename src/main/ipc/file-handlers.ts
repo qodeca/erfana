@@ -1,5 +1,5 @@
-import { ipcMain, dialog, BrowserWindow } from 'electron'
-import { stat } from 'fs/promises'
+import { ipcMain, dialog, BrowserWindow, shell } from 'electron'
+import { stat, realpath } from 'fs/promises'
 import path from 'path'
 import { ProjectService } from '../services/ProjectService'
 import { fileService } from '../services/FileService'
@@ -12,6 +12,7 @@ import type { ProjectChanged } from '../../shared/ipc/schema'
 import { logger } from '../services/LoggingService'
 import { fileExists } from '../utils/fileUtils'
 import { redactedLogError } from '../utils/redactUserInput'
+import { isTrustedSender } from './senderValidation'
 
 /**
  * Broadcast project change to all renderer processes
@@ -459,6 +460,66 @@ export function registerFileHandlers(): void {
       throw error
     }
   })
+
+  // Reveal a file or folder in the native OS file manager (Finder / Explorer).
+  //
+  // Display-only and non-throwing by design: the outcome is surfaced as an
+  // advisory toast, so this returns '' on success or a human-readable error
+  // string — it does NOT throw like the mutating file:* handlers. An untrusted
+  // sender is a silent no-op returning '' (the safe outcome for a reveal).
+  // `shell.showItemInFolder` reveals the item in its containing folder, so a
+  // folder/root node is highlighted in its parent rather than opened.
+  //
+  // The path is confined to the open project: checked lexically first, then
+  // re-checked against fs.realpath-canonicalized paths so an in-project symlink
+  // cannot point the reveal at an out-of-project target. realpath also subsumes
+  // the existence check.
+  ipcMain.handle(
+    'file:revealInFileManager',
+    async (event, filePath: string): Promise<string> => {
+      if (!isTrustedSender(event)) {
+        logger.warn('Rejected file:revealInFileManager from untrusted sender', {
+          url: event.senderFrame?.url
+        })
+        return ''
+      }
+
+      if (!filePath || typeof filePath !== 'string') {
+        return 'Invalid path'
+      }
+
+      const projectPath = fileService.getProjectPath()
+      if (!projectPath) {
+        return 'No project is open'
+      }
+
+      // Fast lexical boundary check (no fs access; the root itself is allowed so
+      // the project-root node can be revealed). Rejects all clearly-outside
+      // paths uniformly, without disclosing whether they exist.
+      const resolved = path.resolve(filePath)
+      const resolvedRoot = path.resolve(projectPath)
+      if (resolved !== resolvedRoot && !resolved.startsWith(resolvedRoot + path.sep)) {
+        return 'Cannot reveal items outside the project'
+      }
+
+      // Canonicalize (resolve symlinks) and re-check so an in-project symlink
+      // cannot escape the project. A missing path throws ENOENT here.
+      let realRoot: string
+      let realResolved: string
+      try {
+        realRoot = await realpath(resolvedRoot)
+        realResolved = await realpath(resolved)
+      } catch {
+        return 'Item no longer exists on disk'
+      }
+      if (realResolved !== realRoot && !realResolved.startsWith(realRoot + path.sep)) {
+        return 'Cannot reveal items outside the project'
+      }
+
+      shell.showItemInFolder(realResolved)
+      return ''
+    }
+  )
 
   // Validate file path exists and return info
   // Note: projectRoot is optional to allow validation of absolute paths from terminal output.
