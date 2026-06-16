@@ -1,0 +1,122 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/*
+ * Visually-hidden live regions (standard clip-rect sr-only). They announce
+ * toast text to assistive tech without affecting layout or visuals.
+ */
+.toast-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.toast-container {
+  position: fixed;
+  bottom: var(--space-8);
+  left: var(--space-8);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-6);
+  min-width: 300px;
+  max-width: 400px;
+  padding: var(--space-6) var(--space-8);
+  background-color: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  pointer-events: auto;
+  animation: toast-slide-in var(--transition-slower);
+}
+
+@keyframes toast-slide-in {
+  from {
+    transform: translateX(-400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toast-success .toast-icon {
+  color: var(--color-success);
+}
+
+.toast-error .toast-icon {
+  color: var(--color-error);
+}
+
+.toast-warning .toast-icon {
+  color: var(--color-warning-icon);
+}
+
+.toast-info .toast-icon {
+  color: var(--color-info);
+}
+
+.toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-title {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.toast-message {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.toast-close {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-size-lg);
+  height: var(--icon-size-lg);
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--border-radius);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-slow);
+  pointer-events: auto;
+}
+
+.toast-close:hover {
+  background-color: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+
+.toast-close:focus {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}

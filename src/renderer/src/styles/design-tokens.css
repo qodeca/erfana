@@ -1,0 +1,379 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * ERFANA DESIGN TOKENS
+ * =====================
+ * VS Code-inspired dark theme design system
+ *
+ * IMPORTANT: Erfana is DARK MODE ONLY. Do not add light mode queries.
+ *
+ * This file is the single source of truth for all design values.
+ * Import this file in index.css and use these variables in all NEW CSS.
+ *
+ * See docs/ui-style-guide.md for comprehensive usage guidelines.
+ */
+
+:root {
+  /* ============================================
+   * COLORS: Qodeca Brand Palette
+   * Primary brand identity colors
+   * ============================================ */
+  --color-brand-lime: #E3E829;           /* Primary brand - high energy */
+  --color-brand-violet: #A0A8FF;         /* Secondary brand - soft, elegant */
+  --color-brand-black: #161312;          /* Brand black - warm undertone */
+  --color-brand-white: #F8FAF8;          /* Brand white - off-white */
+
+  /* Lime variants for states */
+  --color-brand-lime-hover: #d6d925;     /* Slightly darker for hover */
+  --color-brand-lime-active: #c9cc21;    /* Darker for pressed */
+  --color-brand-lime-muted: rgba(227, 232, 41, 0.3); /* For backgrounds */
+
+  /* Violet variants for states */
+  --color-brand-violet-hover: #8b94ff;   /* Slightly brighter for hover */
+  --color-brand-violet-active: #7680ff;  /* Brighter for pressed */
+  --color-brand-violet-muted: rgba(160, 168, 255, 0.2); /* For backgrounds */
+
+  /* ============================================
+   * COLORS: Secondary Accent Palette
+   * Extended brand colors for UI variety
+   * ============================================ */
+  --color-brand-amber: #FFA335;          /* Qodeca Amber - warm orange */
+  --color-brand-coral: #FF626A;          /* Qodeca Coral - soft red-pink */
+  --color-brand-magenta: #FF3381;        /* Qodeca Magenta - vivid pink */
+  --color-brand-indigo: #3F3FBA;         /* Qodeca Indigo - deep blue-violet */
+
+  /* ============================================
+   * COLORS: Neutral Scale
+   * Gray scale from white to black
+   * ============================================ */
+  --color-white: #ffffff;
+  --color-gray-100: #e8e8e8;
+  --color-gray-200: #d4d4d4;
+  --color-gray-300: #cccccc;
+  --color-gray-400: #b8b8b8;
+  --color-gray-500: #858585;
+  --color-gray-600: #6e6e6e;
+  --color-gray-700: #454545;
+  --color-gray-800: #3c3c3c;
+  --color-gray-900: #2d2d30;
+  --color-gray-950: #252526;
+  --color-gray-1000: var(--color-brand-black); /* Smoky Black - full brand adoption */
+  --color-black: #000000;
+
+  /* ============================================
+   * COLORS: Semantic Backgrounds
+   * Use these for component backgrounds
+   * ============================================ */
+  --color-bg-primary: var(--color-gray-1000);    /* Main app background */
+  --color-bg-secondary: var(--color-gray-900);   /* Panels, cards */
+  --color-bg-tertiary: var(--color-gray-950);    /* Sidebar, tree */
+  --color-bg-elevated: var(--color-gray-900);    /* Floating elements */
+  --color-bg-input: var(--color-gray-900);       /* Input fields */
+  --color-bg-hover: rgba(255, 255, 255, 0.05);   /* Hover state (overlay) */
+  --color-bg-hover-solid: #2a2d2e;               /* Hover state (solid, for menus) */
+  --color-bg-active: rgba(255, 255, 255, 0.1);   /* Active/pressed state */
+  --color-bg-selected: var(--color-brand-violet-muted); /* Selected items - brand violet */
+
+  /* ============================================
+   * COLORS: Semantic Text
+   * Use these for text content
+   * ============================================ */
+  --color-text-primary: var(--color-gray-300);   /* Main text */
+  --color-text-secondary: var(--color-gray-500); /* Muted text */
+  --color-text-muted: var(--color-gray-600);     /* Very muted text */
+  --color-text-emphasis: var(--color-white);     /* Headings, emphasis */
+  --color-text-disabled: var(--color-gray-600);  /* Disabled text */
+  --color-text-placeholder: var(--color-gray-600); /* Placeholder text */
+
+  /* ============================================
+   * COLORS: Semantic Borders
+   * Use these for borders and dividers
+   * ============================================ */
+  --color-border-default: var(--color-gray-800); /* Standard borders */
+  --color-border-subtle: var(--color-gray-700);  /* Subtle borders */
+  --color-border-focus: var(--color-brand-violet); /* Focus indicators - brand violet */
+
+  /* ============================================
+   * COLORS: Interactive / Accent
+   * Use these for interactive elements
+   * ============================================ */
+  --color-accent-primary: var(--color-brand-violet); /* Primary accent - Qodeca Violet */
+  --color-accent-secondary: var(--color-brand-lime); /* Secondary accent - Qodeca Lime */
+  --color-accent-tertiary: var(--color-brand-violet); /* Tertiary accent - Qodeca Violet */
+  --color-accent-drag: var(--color-brand-violet);    /* Drag-drop highlight - Qodeca Violet */
+  --color-accent-drag-bg: rgba(160, 168, 255, 0.2);  /* Drag-drop background */
+  --color-accent-drag-bg-subtle: rgba(160, 168, 255, 0.05); /* Drag-drop subtle background */
+  --color-accent-drag-border: rgba(160, 168, 255, 0.3);  /* Drag-drop border */
+
+  /* ============================================
+   * COLORS: Links
+   * Use these for anchor/link elements
+   * ============================================ */
+  --color-link: var(--color-brand-violet);       /* Default link color - Qodeca Violet */
+  --color-link-hover: var(--color-brand-violet-hover); /* Link hover state */
+  --color-link-visited: #9d7dd2;                 /* Visited link (purple) */
+
+  /* ============================================
+   * COLORS: Button Variants
+   * Specific colors for button states
+   * ============================================ */
+  --color-btn-primary-bg: var(--color-brand-violet);
+  --color-btn-primary-hover: var(--color-brand-violet-hover);
+  --color-btn-primary-active: var(--color-brand-violet-active);
+  --color-btn-secondary-bg: var(--color-gray-800);
+  --color-btn-secondary-hover: #505050;
+  --color-btn-danger-bg: #c72e0f;
+  --color-btn-danger-hover: #e03e18;
+  --color-bg-danger-hover: #5a1d1d;        /* Danger item hover background */
+
+  /* ============================================
+   * COLORS: Status / Feedback
+   * Use these for status indicators
+   * ============================================ */
+  --color-success: var(--color-brand-lime);  /* Qodeca Lime - vibrant success */
+  --color-context-safe: #3fb950;             /* True green - context-usage safe band (#216); distinct from lime/amber */
+  --color-warning: #cca700;                  /* Amber - unchanged */
+  --color-warning-bright: #f59e0b;           /* Amber bright - unchanged */
+  --color-warning-icon: #dcdcaa;             /* Warning icon color */
+  --color-error: #f48771;                    /* Coral - unchanged */
+  --color-error-bright: #ff6b6b;             /* Coral bright - unchanged */
+  --color-info: var(--color-brand-violet);   /* Qodeca Violet - info */
+
+  /* ============================================
+   * COLORS: Error State (Extended Palette)
+   * For error dialogs, Mermaid errors, etc.
+   * ============================================ */
+  --color-error-bg: #3c1f1f;              /* Error container background */
+  --color-error-bg-dark: #2a1414;         /* Error code block background */
+  --color-error-border: #5c2e2e;          /* Error container border */
+  --color-error-text-light: #ffcccb;      /* Light error text (code blocks) */
+  --color-error-text-hint: #d4a5a5;       /* Muted error hints */
+
+  /* ============================================
+   * COLORS: Success State
+   * For success dialogs, transcription complete, etc.
+   * ============================================ */
+  --color-success-bg: rgba(227, 232, 41, 0.1);  /* Success container background */
+  --color-success-border: rgba(227, 232, 41, 0.3); /* Success container border */
+
+  /* ============================================
+   * COLORS: Warning State
+   * For OCR warnings, import cautions, etc.
+   * ============================================ */
+  --color-warning-bg: rgba(204, 167, 0, 0.1);    /* Warning container background */
+  --color-warning-border: rgba(204, 167, 0, 0.3); /* Warning container border */
+
+  /* ============================================
+   * COLORS: Syntax Highlighting
+   * For code blocks and inline code
+   * ============================================ */
+  --color-syntax-string: #ce9178;         /* String literals, inline code */
+
+  /* ============================================
+   * COLORS: Terminal
+   * Terminal-specific colors
+   * ============================================ */
+  --color-cursor: #4fc1ff;                /* Terminal cursor color */
+
+  /* ============================================
+   * COLORS: Git Status (Brand Palette)
+   * Visual indicators using Qodeca brand colors
+   * ============================================ */
+  --color-git-modified: var(--color-brand-amber);    /* Amber - modified files (attention) */
+  --color-git-untracked: var(--color-brand-lime);    /* Lime - untracked/new files (positive) */
+  --color-git-deleted: var(--color-brand-coral);     /* Coral - deleted files (removed) */
+  --color-git-staged: var(--color-brand-violet);     /* Violet - staged/added files (ready) */
+  --color-git-renamed: var(--color-brand-indigo);    /* Indigo - renamed files (transformed) */
+  --color-git-conflicted: var(--color-brand-magenta); /* Magenta - conflicted files (urgent) */
+
+  /* ============================================
+   * COLORS: Git Status - Light Variants
+   * Lighter versions for better visibility on dark backgrounds
+   * Used for badges and file names (folders keep original)
+   * ============================================ */
+  --color-git-modified-light: #FFCC99;    /* Amber +45% lighter - soft peach */
+  --color-git-untracked-light: #F5F599;   /* Lime +50% lighter - pale yellow */
+  --color-git-deleted-light: #FFB3B8;     /* Coral +45% lighter - soft pink */
+  --color-git-staged-light: #D4D9FF;      /* Violet +40% lighter - pale lavender */
+  --color-git-renamed-light: #8F8FE5;     /* Indigo +100% lighter - much brighter purple */
+  --color-git-conflicted-light: #FF99BF;  /* Magenta +45% lighter - soft rose */
+
+  /* ============================================
+   * COLORS: Special Backgrounds
+   * Component-specific backgrounds
+   * ============================================ */
+  --color-bg-diagram: var(--color-brand-white); /* Mermaid SVG - Qodeca Powder White */
+  --color-bg-preview: #1a1a1c;                  /* Markdown preview - softer than primary */
+  --color-bg-warning: rgba(204, 167, 0, 0.12);  /* Warning notification background */
+  --color-bg-tertiary-translucent: rgba(45, 45, 48, 0.9); /* Semi-transparent tertiary bg */
+  --color-bg-primary-translucent: rgba(255, 255, 255, 0.95); /* Light mode translucent */
+  --color-overlay-dialog: rgba(0, 0, 0, 0.75);               /* Dialog backdrop overlay */
+
+  /* ============================================
+   * COLORS: Warning States (Extended Palette)
+   * For warning notifications, alerts, etc.
+   * ============================================ */
+  --color-border-warning: rgba(204, 167, 0, 0.3); /* Warning container border */
+  --color-text-tertiary: #b0b0b0;                 /* Tertiary text (lighter than secondary) */
+  --color-text-bright: #e0e0e0;                   /* Bright text for emphasis */
+
+  /* ============================================
+   * SPACING: 4px Base Grid
+   * All spacing should use these values
+   *
+   * NAMING: Token number = pixel value / 2
+   * Example: --space-4 = 8px (not 4px)
+   * This follows Tailwind-style scale naming.
+   * ============================================ */
+  --space-0: 0;
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 10px;
+  --space-6: 12px;
+  --space-7: 14px;
+  --space-8: 16px;
+  --space-10: 20px;
+  --space-12: 24px;
+  --space-14: 28px;
+  --space-16: 32px;
+  --space-20: 40px;
+  --space-24: 48px;
+
+  /* ============================================
+   * TYPOGRAPHY: Font Stacks
+   * ============================================ */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+               'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
+               'Helvetica Neue', sans-serif;
+  --font-system: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* 'Cascadia Mono' is bundled with the app (see styles/fonts.css) so it renders
+     identically on every platform; SF Mono/Monaco/Consolas remain as fallbacks. */
+  --font-mono: 'Cascadia Mono', 'SF Mono', Monaco, 'Cascadia Code',
+               'Roboto Mono', Consolas, 'Courier New', monospace;
+  --font-serif: Charter, Georgia, Cambria, 'Times New Roman', serif;
+
+  /* ============================================
+   * TYPOGRAPHY: Font Sizes
+   * ============================================ */
+  --text-xs: 10px;    /* Tiny labels */
+  --text-sm: 11px;    /* Small labels, hints */
+  --text-base: 13px;  /* Default body text */
+  --text-md: 14px;    /* Slightly larger body */
+  --text-lg: 16px;    /* Subheadings */
+  --text-xl: 18px;    /* Headings */
+  --text-2xl: 20px;   /* Large headings */
+
+  /* ============================================
+   * TYPOGRAPHY: Font Weights
+   * ============================================ */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* ============================================
+   * TYPOGRAPHY: Line Heights
+   * ============================================ */
+  --leading-none: 1;
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.6;
+
+  /* ============================================
+   * BORDERS
+   * ============================================ */
+  --border-radius: 0;           /* Flat design - no rounded corners */
+  --border-radius-circle: 50%;  /* Exception for circular elements */
+  --border-width: 1px;
+  --border-width-thick: 2px;
+
+  /* ============================================
+   * SHADOWS
+   * Depth scale from subtle to dramatic
+   * ============================================ */
+  --shadow-none: none;
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.8);
+  --shadow-focus: 0 0 0 3px rgba(160, 168, 255, 0.25); /* Qodeca Violet focus ring */
+  /* Dialog shadow with subtle edge highlight */
+  --shadow-dialog: 0 12px 48px rgba(0, 0, 0, 0.8),
+                   0 0 0 1px rgba(255, 255, 255, 0.05);
+
+  /* ============================================
+   * TRANSITIONS
+   * Standard animation timings
+   * ============================================ */
+  --transition-fast: 0.1s ease;
+  --transition-normal: 0.15s ease;
+  --transition-slow: 0.2s ease;
+  --transition-slower: 0.3s ease;
+
+  /* ============================================
+   * Z-INDEX SCALE
+   * Layer hierarchy for overlapping elements
+   * ============================================ */
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-fixed: 500;
+  --z-modal-backdrop: 900;
+  --z-modal: 1000;
+  --z-popover: 2000;
+  --z-tooltip: 3000;
+  --z-toast: 9000;
+  --z-blocker: 9999;
+  --z-dialog: 10000;
+  --z-context-menu: 100000;  /* Must appear above dialogs */
+
+  /* ============================================
+   * COMPONENT SIZES
+   * Standard dimensions for UI elements
+   * ============================================ */
+  --header-height: 41px;
+  --tab-height: 41px;
+  --sidebar-min-width: 200px;
+  --dialog-min-width: 500px;
+  --dialog-max-width: 800px;
+
+  /* Icon sizes */
+  --icon-size-xs: 12px;
+  --icon-size-sm: 16px;
+  --icon-size-md: 20px;
+  --icon-size-lg: 24px;
+  --icon-size-xl: 32px;
+
+  /* Button sizes */
+  --btn-height-sm: 24px;
+  --btn-height-md: 32px;
+  --btn-height-lg: 40px;
+
+  /* Input sizes */
+  --input-height-sm: 28px;
+  --input-height-md: 36px;
+  --input-height-lg: 44px;
+
+  /* ============================================
+   * INTERACTIVE STATES
+   * Opacity values for state overlays
+   * ============================================ */
+  --opacity-disabled: 0.4;
+  --opacity-hover-subtle: 0.05;
+  --opacity-hover-medium: 0.1;
+  --opacity-hover-strong: 0.15;
+  --opacity-active: 0.2;
+
+  /* ============================================
+   * SCROLLBAR
+   * Consistent scrollbar styling
+   * ============================================ */
+  --scrollbar-width: 10px;
+  --scrollbar-thumb: var(--color-gray-700);
+  --scrollbar-thumb-hover: #4e4e4e;
+  --scrollbar-track: var(--color-gray-1000);
+}

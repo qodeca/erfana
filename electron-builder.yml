@@ -1,0 +1,112 @@
+appId: com.erfana.app
+productName: Erfana
+beforePack: ./scripts/ensure-media-binaries.js
+afterPack: ./scripts/fuses.js
+afterSign: ./scripts/resign.js
+extraResources:
+  - from: resources/tessdata
+    to: tessdata
+    filter:
+      - '**/*'
+  - from: LICENSE
+    to: LICENSE
+  - from: THIRD-PARTY-LICENSES.md
+    to: THIRD-PARTY-LICENSES.md
+directories:
+  buildResources: resources
+  output: release/${version}
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!docs/**'
+  - '!release/**'
+  - '!coverage/**'
+  - '!tests/**'
+  - '!vitest.*.ts'
+  - '!tsconfig.test.json'
+  - '!*.md'
+  - '!node_modules/jsdom/**'
+  - '!node_modules/canvas/**'
+  - '!node_modules/@mapbox/node-pre-gyp/**'
+asar: false
+npmRebuild: false
+# Explicitly disable auto-updater metadata.
+# Using 'publish: null' (not 'provider: github') so electron-builder does NOT
+# emit latest.yml / latest-mac.yml / latest-linux.yml. The release workflow's
+# `finalize` job also deletes any such file that leaks into the draft.
+publish: null
+win:
+  executableName: Erfana
+  target:
+    - target: nsis
+  # signingHashAlgorithms + rfc3161TimeStampServer moved into signtoolOptions
+  # as a nested block in electron-builder 26 (flat fields were removed from
+  # the win schema). azureSignOptions stays at win level.
+  signtoolOptions:
+    signingHashAlgorithms:
+      - sha256
+    rfc3161TimeStampServer: http://timestamp.digicert.com
+  # Azure Artifact Signing (formerly Azure Trusted Signing). Values are
+  # overridden at CLI invocation via --config.win.azureSignOptions.*
+  # flags from build_win.yml.
+  #
+  # DO NOT put ${env.X} macros here — electron-builder's macro expander
+  # (util/macroExpander.ts) is only applied to pattern-based fields like
+  # artifactName; it is NOT applied to azureSignOptions. Literal
+  # `${env.AZURE_SIGNING_ENDPOINT}` reaches Invoke-TrustedSigning
+  # unchanged and SignTool's Azure.CodeSigning.Dlib throws
+  # System.UriFormatException when it tries to parse it as a URI.
+  #
+  # The placeholders below exist ONLY to satisfy the JSON-schema validator
+  # run by Packager.validateConfig() (app-builder-lib/src/packager.ts:398).
+  # Validation fires on every build — including linux/mac legs that never
+  # actually invoke signtool — so the four required fields must be
+  # present as string-typed values. CLI --config overrides replace them
+  # at bootstrap (before the actual signtool call), so the placeholders
+  # never reach the Azure signing backend.
+  azureSignOptions:
+    publisherName: placeholder-overridden-at-runtime
+    # IANA-reserved .invalid TLD (RFC 6761) — guaranteed not to resolve via DNS.
+    # If --config.win.azureSignOptions.endpoint=$AZURE_SIGNING_ENDPOINT injection
+    # silently fails for any reason, electron-builder will attempt outbound TLS
+    # to this host, which fails fast at DNS resolution rather than connecting
+    # to a third-party-registered placeholder.example domain.
+    endpoint: https://placeholder.invalid/
+    codeSigningAccountName: placeholder
+    certificateProfileName: placeholder
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+mac:
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.inherit.plist
+  extendInfo:
+    - NSCameraUsageDescription: Erfana uses the camera to capture photos you insert into notes.
+    - NSMicrophoneUsageDescription: Erfana uses the microphone for audio transcription you request.
+    - NSDocumentsFolderUsageDescription: Erfana reads and writes project files in folders you open.
+    - NSDownloadsFolderUsageDescription: Erfana writes exported files (PDF, DOCX) to folders you choose.
+  # Notarization is auto-invoked by electron-builder 26 when either:
+  #   (a) APPLE_API_KEY triad is set (.p8 ASC API key path), or
+  #   (b) APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID are set
+  #       (notarytool user-auth path — this project's choice).
+  # Either way it's notarytool (not altool), and the ticket is auto-stapled.
+  notarize: true
+  # Apple Silicon only — Erfana ships a single arm64 .dmg. The .zip target was
+  # dropped because auto-update is disabled (publish: null), so the Squirrel.Mac
+  # update feed that consumes the .zip does not exist.
+  target:
+    - target: dmg
+      arch:
+        - arm64
+dmg:
+  artifactName: ${name}-${version}-${arch}.${ext}
+# Linux distribution target removed — Erfana ships on macOS + Windows only.
+# Linux remains supported as a dev environment (npm run dev) and CI test runner.

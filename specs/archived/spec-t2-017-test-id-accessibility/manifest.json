@@ -1,0 +1,36 @@
+{
+  "id": 17,
+  "name": "Test ID coverage and accessibility selectors",
+  "slug": "test-id-accessibility",
+  "tier": "T2",
+  "status": "draft",
+  "scope": "improvement",
+  "description": "Expand data-testid coverage to UI elements currently missing identifiers (draggable elements, drop zones, transitional states) and add ARIA attributes to improve both accessibility and test selector reliability.",
+  "created": "2026-03-09T12:23:00.000Z",
+  "last_modified": "2026-03-09T13:47:00.000Z",
+  "requirement_sequences": {
+    "FR": 7,
+    "NFR": 4,
+    "AC": 8
+  },
+  "statistics": {
+    "total_requirements": 19,
+    "total_words": 1283
+  },
+  "change_history": [
+    {
+      "date": "2026-03-09T12:23:00.000Z",
+      "operation": "INIT",
+      "target": "manifest",
+      "description": "Initial creation – test ID coverage and accessibility selectors",
+      "by": "user"
+    },
+    {
+      "date": "2026-03-09T13:47:00.000Z",
+      "operation": "UPDATE",
+      "target": "spec",
+      "description": "Major rewrite based on 4-expert review: aligned with dnd-kit architecture (no separate drag handles), removed speculative FR-003 (overflow menus) and FR-005 (tooltips), added concrete component checklists, ARIA role mapping table, icon-button coverage test requirement, production build retention NFR, WAI-ARIA treeview and UIBlocker acceptance criteria",
+      "by": "user"
+    }
+  ]
+}

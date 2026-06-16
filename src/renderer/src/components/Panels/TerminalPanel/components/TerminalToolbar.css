@@ -1,0 +1,11 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * Terminal Toolbar Styles
+ *
+ * Styles for the terminal panel header toolbar.
+ * Inherits base styles from sidebar-panel-header.
+ */
+
+/* The toolbar inherits styles from .sidebar-panel-header in TerminalPanel.css */
+/* No additional styles needed - using existing icon-btn styles */

@@ -1,0 +1,223 @@
+{
+  "id": 21,
+  "name": "LiteParse document import",
+  "slug": "liteparse-document-import",
+  "tier": "T3",
+  "status": "draft",
+  "scope": "feature",
+  "description": "Replace PdfConverter with LiteParse for enhanced document import supporting PDF, Office, and image files with OCR, spatial text output, and optional page screenshots.",
+  "created": "2026-03-28T12:47:00.000Z",
+  "last_modified": "2026-03-28T22:30:00.000Z",
+  "components": [
+    "main-services",
+    "ipc",
+    "preload",
+    "renderer-components",
+    "renderer-stores",
+    "shared-types"
+  ],
+  "sections": [
+    { "id": "01", "file": "requirements/01-overview.md", "title": "Overview", "word_count": 704 },
+    { "id": "02", "file": "requirements/02-requirements.md", "title": "Requirements", "word_count": 1595 },
+    { "id": "03", "file": "requirements/03-acceptance.md", "title": "Acceptance", "word_count": 1311 }
+  ],
+  "requirement_sequences": {
+    "FR": 27,
+    "NFR": 10,
+    "AC": 36
+  },
+  "statistics": {
+    "total_sections": 3,
+    "total_requirements": 73,
+    "total_words": 3610
+  },
+  "requirements_index": {
+    "FR-001": { "section": "02-requirements", "status": "active" },
+    "FR-002": { "section": "02-requirements", "status": "active" },
+    "FR-003": { "section": "02-requirements", "status": "active" },
+    "FR-004": { "section": "02-requirements", "status": "active" },
+    "FR-005": { "section": "02-requirements", "status": "active" },
+    "FR-006": { "section": "02-requirements", "status": "active" },
+    "FR-007": { "section": "02-requirements", "status": "active" },
+    "FR-008": { "section": "02-requirements", "status": "active" },
+    "FR-009": { "section": "02-requirements", "status": "active" },
+    "FR-010": { "section": "02-requirements", "status": "active" },
+    "FR-011": { "section": "02-requirements", "status": "active" },
+    "FR-012": { "section": "02-requirements", "status": "active" },
+    "FR-013": { "section": "02-requirements", "status": "active" },
+    "FR-014": { "section": "02-requirements", "status": "active" },
+    "FR-015": { "section": "02-requirements", "status": "active" },
+    "FR-016": { "section": "02-requirements", "status": "active" },
+    "FR-017": { "section": "02-requirements", "status": "active" },
+    "FR-018": { "section": "02-requirements", "status": "active" },
+    "FR-019": { "section": "02-requirements", "status": "active" },
+    "FR-020": { "section": "02-requirements", "status": "active" },
+    "FR-021": { "section": "02-requirements", "status": "active" },
+    "FR-022": { "section": "02-requirements", "status": "active" },
+    "FR-023": { "section": "02-requirements", "status": "active" },
+    "FR-024": { "section": "02-requirements", "status": "active" },
+    "FR-025": { "section": "02-requirements", "status": "active" },
+    "FR-026": { "section": "02-requirements", "status": "active" },
+    "FR-027": { "section": "02-requirements", "status": "active" },
+    "NFR-001": { "section": "02-requirements", "status": "active" },
+    "NFR-002": { "section": "02-requirements", "status": "active" },
+    "NFR-003": { "section": "02-requirements", "status": "active" },
+    "NFR-004": { "section": "02-requirements", "status": "active" },
+    "NFR-005": { "section": "02-requirements", "status": "active" },
+    "NFR-006": { "section": "02-requirements", "status": "active" },
+    "NFR-007": { "section": "02-requirements", "status": "active" },
+    "NFR-008": { "section": "02-requirements", "status": "active" },
+    "NFR-009": { "section": "02-requirements", "status": "active" },
+    "NFR-010": { "section": "02-requirements", "status": "active" },
+    "AC-001": { "section": "03-acceptance", "status": "active" },
+    "AC-002": { "section": "03-acceptance", "status": "active" },
+    "AC-003": { "section": "03-acceptance", "status": "active" },
+    "AC-004": { "section": "03-acceptance", "status": "active" },
+    "AC-005": { "section": "03-acceptance", "status": "active" },
+    "AC-006": { "section": "03-acceptance", "status": "active" },
+    "AC-007": { "section": "03-acceptance", "status": "active" },
+    "AC-008": { "section": "03-acceptance", "status": "active" },
+    "AC-009": { "section": "03-acceptance", "status": "active" },
+    "AC-010": { "section": "03-acceptance", "status": "active" },
+    "AC-011": { "section": "03-acceptance", "status": "active" },
+    "AC-012": { "section": "03-acceptance", "status": "active" },
+    "AC-013": { "section": "03-acceptance", "status": "active" },
+    "AC-014": { "section": "03-acceptance", "status": "active" },
+    "AC-015": { "section": "03-acceptance", "status": "active" },
+    "AC-016": { "section": "03-acceptance", "status": "active" },
+    "AC-017": { "section": "03-acceptance", "status": "active" },
+    "AC-018": { "section": "03-acceptance", "status": "active" },
+    "AC-019": { "section": "03-acceptance", "status": "active" },
+    "AC-020": { "section": "03-acceptance", "status": "active" },
+    "AC-021": { "section": "03-acceptance", "status": "active" },
+    "AC-022": { "section": "03-acceptance", "status": "active" },
+    "AC-023": { "section": "03-acceptance", "status": "active" },
+    "AC-024": { "section": "03-acceptance", "status": "active" },
+    "AC-025": { "section": "03-acceptance", "status": "active" },
+    "AC-026": { "section": "03-acceptance", "status": "active" },
+    "AC-027": { "section": "03-acceptance", "status": "active" },
+    "AC-028": { "section": "03-acceptance", "status": "active" },
+    "AC-029": { "section": "03-acceptance", "status": "active" },
+    "AC-030": { "section": "03-acceptance", "status": "active" },
+    "AC-031": { "section": "03-acceptance", "status": "active" },
+    "AC-032": { "section": "03-acceptance", "status": "active" },
+    "AC-033": { "section": "03-acceptance", "status": "active" },
+    "AC-034": { "section": "03-acceptance", "status": "active" },
+    "AC-035": { "section": "03-acceptance", "status": "active" },
+    "AC-036": { "section": "03-acceptance", "status": "active" }
+  },
+  "cross_references": [],
+  "validation": {
+    "overall_score": null,
+    "passed": false,
+    "last_validated": null,
+    "threshold": 50
+  },
+  "change_history": [
+    {
+      "date": "2026-03-28T12:47:00.000Z",
+      "operation": "INIT",
+      "target": "manifest",
+      "description": "Spec created from validated design document with 3 sections",
+      "by": "user"
+    },
+    {
+      "date": "2026-03-28T12:17:56.000Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 2 issues: synced registry sections_count (0 -> 3) and requirements_count (0 -> 45)",
+      "by": "system",
+      "details": {
+        "word_count_updated": false,
+        "indexes_rebuilt": false,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": true
+      }
+    },
+    {
+      "date": "2026-03-28T13:45:00.000Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 8 issues: added FR-021/AC-019-022 to index, updated word counts (02-requirements 764->821, 03-acceptance 615->737), updated sequences (FR 20->21, AC 18->22), updated totals (requirements 45->50, words 1677->1856), synced registry",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": true,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": true
+      }
+    },
+    {
+      "date": "2026-03-28T16:30:00.000Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 15 issues after comprehensive review: added FR-022..027/NFR-008..010/AC-023..028 to index, updated word counts (01-overview 298->536, 02-requirements 821->1329, 03-acceptance 737->990), updated sequences (FR 21->27, NFR 7->10, AC 22->28), updated totals (requirements 50->65, words 1856->2855), synced registry",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": true,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": true
+      }
+    },
+    {
+      "date": "2026-03-28T18:00:00.000Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 6 issues: added AC-029/AC-030/AC-031 to index, updated word count (03-acceptance 990->1088), updated sequences (AC 28->31), updated totals (requirements 65->68, words 2855->2953), synced registry",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": true,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": true
+      }
+    },
+    {
+      "date": "2026-03-28T19:30:00.000Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 3 issues: updated word counts (01-overview 536->692, 02-requirements 1329->1344, 03-acceptance 1088->1084), updated total words (2953->3120)",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": false,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": true
+      }
+    },
+    {
+      "date": "2026-03-28T21:15:00.000Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 8 issues after round 2 review: added AC-032..036 to index, updated word counts (01-overview 692->704, 02-requirements 1344->1595, 03-acceptance 1084->1290), updated sequences (AC 31->36), updated totals (requirements 68->73, words 3120->3589), synced registry",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": true,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": true
+      }
+    },
+    {
+      "date": "2026-03-28T22:30:00.000Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 1 issue after validation fixes: updated word count (03-acceptance 1290->1311), updated total words (3589->3610)",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": false,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": false
+      }
+    }
+  ]
+}

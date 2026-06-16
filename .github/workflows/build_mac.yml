@@ -1,0 +1,307 @@
+name: Build macOS (Reusable)
+
+# Reusable workflow callable from release.yml. Signs with Developer ID
+# Application cert + notarizes via notarytool (user-auth mode: Apple ID +
+# app-specific password + Team ID). `production-signing` environment gate
+# lets repo admins require reviewer approval before credentials are touched.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag name (e.g. v0.9.5)
+        required: true
+        type: string
+      is-dry-run:
+        description: Skip gh release upload
+        required: false
+        type: boolean
+        default: false
+    # Explicit secrets declaration so the caller (release.yml) can pass an
+    # explicit per-secret allowlist instead of `secrets: inherit` — keeps
+    # the macOS leg blind to Azure / minisign credentials it never uses.
+    secrets:
+      APPLE_ID:
+        required: true
+      APPLE_APP_SPECIFIC_PASSWORD:
+        required: true
+      APPLE_TEAM_ID:
+        required: true
+      MAC_CERT_P12_BASE64:
+        required: true
+      MAC_CERT_PASSWORD:
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build macOS artifacts
+    runs-on: macos-latest
+    timeout-minutes: 60
+    if: github.repository == 'qodeca/erfana'
+    environment: production-signing
+    env:
+      EP_GH_IGNORE_TIME: "true"
+      # Notarization auth: Apple ID + app-specific password mode.
+      # electron-builder 26 auto-routes this through notarytool when
+      # APPLE_API_KEY* env vars are absent and APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD
+      # + APPLE_TEAM_ID are present. This is the supported user-auth path for
+      # notarytool — only the older deprecated Apple notarization CLI was
+      # the problem; notarytool itself accepts both auth modes.
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      # actions/checkout v6.0.3 — MUST run before the local composite action.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - name: Setup Node + install
+        uses: ./.github/actions/setup-node-with-retry
+        with:
+          run-postinstall: "true"
+
+      - name: Verify Rosetta 2 present (cross-arch native module rebuild)
+        # macos-latest is arm64 since late 2024. Cross-arch rebuild of
+        # native modules (node-pty etc.) during electron-builder --x64
+        # needs Rosetta 2. Runner images may skip it; install explicitly.
+        run: |
+          set -euo pipefail
+          if ! /usr/bin/pgrep -q oahd; then
+            echo "Installing Rosetta 2…"
+            sudo softwareupdate --install-rosetta --agree-to-license
+          else
+            echo "Rosetta 2 present."
+          fi
+
+      - name: Import Developer ID cert into ephemeral keychain
+        env:
+          MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+        run: |
+          set -eu
+          # Ephemeral random password; never re-used, discarded at cleanup.
+          KC_PW=$(openssl rand -base64 32)
+          # Mask it in logs BEFORE writing to $GITHUB_ENV so any accidental
+          # echo downstream gets scrubbed by the runner's log filter.
+          echo "::add-mask::$KC_PW"
+          echo "KC_PW=$KC_PW" >> "$GITHUB_ENV"
+          KC_FILE="${RUNNER_TEMP}/build.keychain-db"
+          echo "KC_FILE=$KC_FILE" >> "$GITHUB_ENV"
+          # Explicit keychain hint for electron-builder; future runner changes
+          # to the default keychain search order will not regress signing.
+          echo "CSC_KEYCHAIN=$KC_FILE" >> "$GITHUB_ENV"
+
+          security create-keychain -p "$KC_PW" "$KC_FILE"
+          security list-keychains -d user -s "$KC_FILE" login.keychain-db
+          security default-keychain -s "$KC_FILE"
+          security unlock-keychain -p "$KC_PW" "$KC_FILE"
+          security set-keychain-settings -lut 21600 "$KC_FILE"
+
+          CERT_PATH="${RUNNER_TEMP}/cert.p12"
+          umask 077
+          printf '%s' "$MAC_CERT_P12_BASE64" | base64 -d > "$CERT_PATH"
+          security import "$CERT_PATH" -k "$KC_FILE" -P "$MAC_CERT_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/productsign
+          rm -f "$CERT_PATH"
+
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KC_PW" "$KC_FILE"
+          # Visible check (no secret output): identity present?
+          security find-identity -v -p codesigning "$KC_FILE"
+
+      - name: Bundle sources (electron-vite)
+        # electron-builder packages prebuilt bundles from out/; it does NOT
+        # invoke electron-vite itself. Must run before electron-builder or
+        # packaging fails the sanity check for out/main/index.js.
+        run: npx electron-vite build
+
+      - name: Build + sign + notarize + staple (electron-builder)
+        # electron-builder 26 auto-invokes notarytool when either the
+        # APPLE_API_KEY triad or the APPLE_ID+APPLE_APP_SPECIFIC_PASSWORD+
+        # APPLE_TEAM_ID triad is set (this project uses the latter).
+        # Auto-staples on success. No custom notarize step needed.
+        run: |
+          set -euo pipefail
+          npx electron-builder --mac --arm64 --publish never
+
+      - name: Resolve artifact dir
+        id: art
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          DIR="release/${VERSION}"
+          [ -d "$DIR" ] || { echo "::error::Missing $DIR"; exit 1; }
+          # compgen -G has cleaner semantics than `ls` for existence testing.
+          if compgen -G "$DIR/latest*.yml" >/dev/null; then
+            echo "::error::Auto-updater file leaked into $DIR"
+            compgen -G "$DIR/latest*.yml" || true
+            exit 1
+          fi
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+          ls -la "$DIR"
+
+      - name: Notarize + staple DMGs
+        # electron-builder's `mac.notarize: true` notarizes the .app bundle
+        # inside each DMG but NOT the DMG container itself. spctl assesses
+        # the DMG as "no usable signature" until the DMG is separately
+        # submitted to notarytool and stapled.
+        #
+        # notarytool submit --wait ALWAYS exits 0 regardless of the
+        # submission outcome — Accepted, Invalid, or Rejected all come back
+        # as "successfully completed the wait". So we MUST parse the JSON
+        # output and check .status explicitly. On non-Accepted we fetch
+        # and print Apple's rejection log (the source of truth for why the
+        # notary service rejected) before failing the job.
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          DIR="${{ steps.art.outputs.dir }}"
+
+          submit_and_staple() {
+            local dmg="$1"
+            echo "Notarizing: $dmg"
+            local out
+            # Capture stdout only — Apple's xcrun notarytool occasionally
+            # prepends a deprecation warning to stderr (and very rarely to
+            # stdout). We isolate stderr so it doesn't corrupt JSON parse.
+            out=$(xcrun notarytool submit "$dmg" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --wait \
+              --output-format json 2>/dev/null)
+            echo "$out"
+
+            local id status parsed
+            # Robust JSON extraction: locate first '{' and last '}' in the
+            # raw output, parse the slice, print id + status. Handles
+            # arbitrary leading non-JSON warning lines AND nested braces
+            # inside the payload (the previous sed-range prefilter would
+            # have truncated on the first '^}' it saw). Single-line python
+            # so the YAML run-block indentation stays simple.
+            parsed=$(printf '%s' "$out" | python3 -c 'import json,sys; t=sys.stdin.read(); s=t.find("{"); e=t.rfind("}"); sys.exit("no JSON object") if s<0 or e<=s else None; o=json.loads(t[s:e+1]); print(o.get("id","")); print(o.get("status",""))' 2>/dev/null || echo "")
+            id=$(printf '%s\n' "$parsed" | sed -n '1p')
+            status=$(printf '%s\n' "$parsed" | sed -n '2p')
+            if [ -z "$id" ] || [ -z "$status" ]; then
+              echo "::error::Failed to parse notarytool JSON output. Raw:"
+              printf '%s\n' "$out"
+              return 1
+            fi
+
+            if [ "$status" != "Accepted" ]; then
+              echo "::error::Notarization returned status=$status (expected Accepted) for $dmg"
+              echo "Fetching Apple's rejection log for submission $id:"
+              xcrun notarytool log "$id" \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+                --team-id "$APPLE_TEAM_ID" \
+                || echo "(log fetch failed)"
+              return 1
+            fi
+
+            echo "Stapling: $dmg (retry for Apple ticket-DB indexing lag)"
+            # 12 × 30s = 6 min total. Apple's documented SLA is 2-5 min;
+            # 99th-percentile lag during peak load (WWDC week, major
+            # release windows) can reach 8-10 min. 6 min covers most
+            # peak scenarios; if a retry still fails after that, the
+            # operator can re-run the workflow without re-tagging since
+            # the notarized DMG is already on disk.
+            local attempt
+            for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+              if xcrun stapler staple "$dmg"; then
+                echo "Stapled on attempt $attempt"
+                return 0
+              fi
+              if [ "$attempt" -eq 12 ]; then
+                echo "::error::stapler staple failed after 12 attempts (6 min total wait)"
+                return 1
+              fi
+              echo "Stapler attempt $attempt failed — waiting 30s"
+              sleep 30
+            done
+          }
+
+          for DMG in "$DIR"/*.dmg; do
+            [ -e "$DMG" ] || continue
+            submit_and_staple "$DMG"
+          done
+
+      - name: Verify signatures (codesign / stapler / spctl)
+        run: |
+          set -euo pipefail
+          DIR="${{ steps.art.outputs.dir }}"
+          # Every Erfana.app under the artifact dir must codesign-verify.
+          while IFS= read -r -d '' APP; do
+            echo "codesign verifying: $APP"
+            codesign --verify --deep --strict --verbose=2 "$APP"
+          done < <(find "$DIR" -maxdepth 3 -name 'Erfana.app' -print0)
+
+          # DMGs only need their stapled notarization ticket verified.
+          # spctl is intentionally NOT run here for DMGs:
+          #
+          # Neither `-t install` (for .pkg) nor `-t open --context
+          # context:primary-signature` succeeds against an unsigned DMG
+          # container, and electron-builder does not codesign the DMG
+          # itself (only the .app bundles inside get Developer ID +
+          # hardenedRuntime + notarization). For CI verification,
+          # Apple's own DTS guidance in
+          # https://developer.apple.com/forums/thread/128683 is:
+          #   "spctl is a poor way to check for that. Use codesign with
+          #    --check-notarization."
+          # We already ran `codesign --verify --deep --strict` on every
+          # .app above and `xcrun stapler validate` below, which together
+          # cover the offline verification path Gatekeeper uses on first
+          # open. End-user Gatekeeper behaviour is verified out-of-band
+          # via manual DMG-download smoke tests documented in
+          # docs/build/release.md.
+          for DMG in "$DIR"/*.dmg; do
+            [ -e "$DMG" ] || continue
+            echo "stapler validating: $DMG"
+            xcrun stapler validate "$DMG"
+          done
+
+          # ZIPs are NOT stapler-validatable: the ZIP container has no
+          # extended-attribute storage, so `xcrun stapler validate <zip>`
+          # exits 66 ("incapable of working with ZIP archive files").
+          # The stapled ticket lives inside each archive's .app bundle
+          # (electron-builder notarizes + staples the .app BEFORE zipping
+          # it), and that same .app was already codesign-verified above
+          # from the unzipped mac/ and mac-arm64/ directories. End-users
+          # get the ticket preserved when they unzip, and Gatekeeper
+          # reads it from the .app bundle on first open.
+          echo "skipping stapler validate on ZIPs (not supported; ticket lives on the .app inside)"
+
+      - name: Upload to draft release
+        if: ${{ !inputs.is-dry-run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          ART_DIR: ${{ steps.art.outputs.dir }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" \
+            "$ART_DIR"/*.dmg \
+            --clobber
+
+      - name: Upload workflow-run artifacts (dry-run)
+        if: ${{ inputs.is-dry-run }}
+        # actions/upload-artifact v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mac-dry-run
+          path: ${{ steps.art.outputs.dir }}
+          retention-days: 7
+
+      - name: Tear down keychain
+        # Runs on success, failure, and cancellation so private key
+        # material never outlives the job.
+        if: always()
+        run: |
+          set +e
+          if [ -n "${KC_FILE:-}" ] && [ -e "$KC_FILE" ]; then
+            security delete-keychain "$KC_FILE" || true
+          fi
+          security list-keychains -d user -s login.keychain-db || true

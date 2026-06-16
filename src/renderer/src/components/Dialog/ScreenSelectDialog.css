@@ -1,0 +1,107 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * Screen select dialog styles (issue #86)
+ *
+ * Modal dialog for multi-monitor display selection.
+ * Uses shared dialog header/icon/actions patterns from Dialog.css.
+ */
+
+/* Dialog content - no extra padding/bg, container provides these */
+.screen-select-dialog {
+  min-width: 280px;
+}
+
+/* List of available displays */
+.screen-select-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+
+/* Individual display option button */
+.screen-select-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-4);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  background: none;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.screen-select-item:hover {
+  background-color: var(--color-bg-hover-solid);
+}
+
+.screen-select-item.selected {
+  border-color: var(--color-accent-primary);
+  background-color: var(--color-bg-active);
+}
+
+/* `:focus-visible` instead of `:focus` so mouse-clicks don't flash the
+ * indicator; #164 F[35], round-2 F#35. Box-shadow surfaces the focus state
+ * even when the option is also selected (same border color). The hex
+ * fallback was dropped in round-2 — token-only values keep theming
+ * consistent across light/dark/HCM. */
+.screen-select-item:focus-visible {
+  outline: none;
+  border-color: var(--color-accent-primary);
+  box-shadow: 0 0 0 3px var(--color-accent-primary);
+}
+
+/* Forced-colors / Windows High Contrast (#164 F[17], round-2 F#19).
+ * Pair `Highlight` background with `HighlightText` foreground so the label
+ * survives the system palette. */
+@media (forced-colors: active) {
+  .screen-select-item {
+    border: 1px solid CanvasText;
+    forced-color-adjust: none;
+  }
+  .screen-select-item.selected,
+  .screen-select-item:focus-visible {
+    border: 2px solid Highlight;
+    background-color: Highlight;
+    color: HighlightText;
+  }
+  .screen-select-item-label,
+  .screen-select-item-resolution {
+    color: inherit;
+  }
+}
+
+/* Display name and resolution container */
+.screen-select-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* Display label (name) */
+.screen-select-item-label {
+  font-size: var(--text-base);
+}
+
+/* Star indicator for primary display */
+.screen-select-primary {
+  color: var(--color-warning);
+  margin-right: var(--space-2);
+}
+
+/* Resolution text below display name */
+.screen-select-item-resolution {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Check icon for selected display */
+.screen-select-check {
+  color: var(--color-accent-primary);
+  flex-shrink: 0;
+}

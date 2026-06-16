@@ -1,0 +1,206 @@
+{
+  "spec_id": 22,
+  "slug": "git-status-offload",
+  "tier": "T3",
+  "version": "0.1.0",
+  "created": "2026-04-02T12:00:00.000Z",
+  "updated": "2026-04-03T12:00:00.000Z",
+  "application": {
+    "name": "Git status thread offloading",
+    "domain": null,
+    "tech_stack": ["worker_threads", "isomorphic-git", "electron-vite"]
+  },
+  "scope": {
+    "type": "module",
+    "name": "Git status thread offloading"
+  },
+  "sections": [
+    {
+      "id": "01",
+      "file": "requirements/01-overview.md",
+      "title": "Overview",
+      "word_count": 480
+    },
+    {
+      "id": "02",
+      "file": "requirements/02-requirements.md",
+      "title": "Requirements",
+      "word_count": 1147
+    },
+    {
+      "id": "03",
+      "file": "requirements/03-acceptance.md",
+      "title": "Acceptance",
+      "word_count": 676
+    }
+  ],
+  "requirements_index": {
+    "FR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "FR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "FR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "FR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "FR-005": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "NFR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "NFR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "NFR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "NFR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "NFR-005": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "NFR-006": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "NFR-007": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "AC-001": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "AC-002": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "AC-003": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "AC-004": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "AC-005": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "AC-006": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "AC-007": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "AC-008": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "AC-009": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "AC-010": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "AC-011": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "AC-012": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "AC-013": {
+      "section": "03-acceptance",
+      "status": "active"
+    }
+  },
+  "requirement_sequences": {
+    "FR": 5,
+    "NFR": 7,
+    "AC": 13
+  },
+  "cross_references": [
+    {"from": "FR-001", "to": ["AC-001", "AC-002", "AC-007", "AC-008", "AC-011"], "type": "traces"},
+    {"from": "FR-002", "to": ["AC-003", "AC-012"], "type": "traces"},
+    {"from": "FR-003", "to": ["AC-004"], "type": "traces"},
+    {"from": "FR-004", "to": ["AC-004", "AC-005", "AC-006"], "type": "traces"},
+    {"from": "FR-005", "to": ["AC-009"], "type": "traces"},
+    {"from": "NFR-001", "to": ["AC-001"], "type": "traces"},
+    {"from": "NFR-002", "to": ["AC-008", "AC-010"], "type": "traces"},
+    {"from": "NFR-003", "to": ["AC-002", "AC-011"], "type": "traces"},
+    {"from": "NFR-004", "to": ["AC-007", "AC-013"], "type": "traces"},
+    {"from": "NFR-005", "to": ["AC-010"], "type": "traces"},
+    {"from": "NFR-006", "to": ["AC-010"], "type": "traces"},
+    {"from": "NFR-007", "to": ["AC-005"], "type": "traces"}
+  ],
+  "statistics": {
+    "total_sections": 3,
+    "total_requirements": 25,
+    "total_words": 2303
+  },
+  "validation": {
+    "overall_score": 91.5,
+    "passed": true,
+    "last_validated": "2026-04-03T12:00:00.000Z",
+    "threshold": 50
+  },
+  "change_history": [
+    {
+      "date": "2026-04-03T00:00:00.000Z",
+      "operation": "INIT",
+      "target": "manifest",
+      "description": "Spec initialized as T3 with 3 sections",
+      "by": "system"
+    },
+    {
+      "date": "2026-04-03T07:35:56.041Z",
+      "operation": "RECONCILE",
+      "target": "registry",
+      "description": "Synced registry entry: sections_count 0->3, requirements_count 0->22",
+      "by": "system",
+      "details": {
+        "word_count_updated": false,
+        "indexes_rebuilt": false,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": true
+      }
+    },
+    {
+      "date": "2026-04-03T08:50:00.000Z",
+      "operation": "REVISION",
+      "target": "all-sections",
+      "description": "Comprehensive review revision: removed FR-005 (filepaths filter – infeasible), added porcelain mapping table to FR-004, added NFR-007 (security), added AC-011 (worker cleanup), added circuit breaker to NFR-004, fixed naming contract locations, clarified test setup in NFR-005",
+      "by": "review"
+    },
+    {
+      "date": "2026-04-03T12:00:00.000Z",
+      "operation": "VALIDATE",
+      "target": "all-sections",
+      "description": "Validation pass (91.5%): added AC-012 (cache lifecycle), AC-013 (circuit breaker), FR→AC cross-references, fixed subjective language in FR-002, added statusCache and GitStatusStrategy naming references, aligned created date, populated tech_stack and documents.issues",
+      "by": "system"
+    }
+  ]
+}

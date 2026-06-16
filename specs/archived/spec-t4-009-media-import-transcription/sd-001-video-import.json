@@ -1,0 +1,268 @@
+{
+  "implementation_plan": {
+    "overview": "Add video file import (MP4, MOV, AVI, MKV, WebM, FLV, WMV) by creating AudioExtractionService (wrapping fluent-ffmpeg with ffmpeg-static), VideoConverter (IConverter implementation mirroring AudioConverter), and extending the transcription pipeline with two-phase progress (extraction 0-20%, transcription 20-100%). Video files route through TranscriptionDialog for language selection, same as audio.",
+    "steps": [
+      {
+        "order": 1,
+        "description": "Install npm dependencies: fluent-ffmpeg, @types/fluent-ffmpeg, ffmpeg-static, ffprobe-static",
+        "files": ["package.json"],
+        "dependencies": [],
+        "rationale": "Bundled ffmpeg binaries avoid requiring system ffmpeg installation. fluent-ffmpeg provides stable Node.js API."
+      },
+      {
+        "order": 2,
+        "description": "Add VIDEO_IMPORT constants (SUPPORTED_EXTENSIONS, EXTRACTION_TIMEOUT_MS, TEMP_PREFIX, EXTRACTION_PROGRESS_WEIGHT) and VIDEO_* error codes (VIDEO_NO_AUDIO, VIDEO_EXTRACTION_FAILED, VIDEO_FFMPEG_MISSING) with user-friendly messages",
+        "files": [
+          "src/shared/constants.ts",
+          "src/shared/errors.ts"
+        ],
+        "dependencies": [1],
+        "rationale": "Centralized constants and error codes follow existing patterns (TRANSCRIPTION, SCREENSHOT blocks in constants.ts, ErrorCode enum in errors.ts)"
+      },
+      {
+        "order": 3,
+        "description": "Create AudioExtractionService with hasAudioStream(), extractAudio() (to temp WAV with progress/abort), getVideoMetadata() (resolution/codec), and isAvailable() static check. Include singleton export and factory function.",
+        "files": [
+          "src/main/services/AudioExtractionService.ts",
+          "src/main/services/AudioExtractionService.test.ts"
+        ],
+        "dependencies": [2],
+        "rationale": "Isolated service for ffmpeg operations, testable with mocked fluent-ffmpeg. Follows service pattern (singleton + factory) used by AudioMetadataService."
+      },
+      {
+        "order": 4,
+        "description": "Add VIDEO_EXTENSIONS constant and isVideoExtension() helper to extensions.ts",
+        "files": ["src/main/services/import/extensions.ts"],
+        "dependencies": [2],
+        "rationale": "Mirrors existing isTextExtension()/isCodeExtension() pattern for file type detection"
+      },
+      {
+        "order": 5,
+        "description": "Create VideoConverter implementing IConverter with category 'video', DI constructor accepting transcriptionService, audioMetadataService, audioExtractionService. validate() delegates to validateFileForImport(). convert() extracts audio, transcribes, formats markdown with video-specific frontmatter (type, resolution, codec).",
+        "files": [
+          "src/main/services/import/converters/VideoConverter.ts",
+          "src/main/services/import/converters/VideoConverter.test.ts"
+        ],
+        "dependencies": [3, 4],
+        "rationale": "Exact mirror of AudioConverter pattern with additional extraction step and video-specific frontmatter"
+      },
+      {
+        "order": 6,
+        "description": "Register VideoConverter in ConverterRegistry.registerBuiltInConverters() and export from import/index.ts",
+        "files": [
+          "src/main/services/import/ConverterRegistry.ts",
+          "src/main/services/import/index.ts"
+        ],
+        "dependencies": [5],
+        "rationale": "Makes video extensions available in registry for file dialog and import routing"
+      },
+      {
+        "order": 7,
+        "description": "Extend transcription-handlers.ts: detect video extensions in import handler, call hasAudioStream() (error if none), extractAudio() with progress mapped to 0-20%, transcribe extracted WAV with progress 20-100%, add video-specific frontmatter fields, clean up temp WAV in finally block. Extend validate handler for video files using ffprobe.",
+        "files": ["src/main/ipc/transcription-handlers.ts"],
+        "dependencies": [3, 6],
+        "rationale": "The interactive import path (with progress streaming) runs through transcription-handlers, not VideoConverter.convert(). Two-phase progress requires mapping extraction and transcription phases."
+      },
+      {
+        "order": 8,
+        "description": "Add 'Video Files' filter group in import-handlers.ts file dialog",
+        "files": ["src/main/ipc/import-handlers.ts"],
+        "dependencies": [6],
+        "rationale": "Separate filter group for video (like audio has its own group) for clear file dialog UX"
+      },
+      {
+        "order": 9,
+        "description": "Extend useImport.ts: add isVideoFile() function using VIDEO_IMPORT.SUPPORTED_EXTENSIONS, route video files to TranscriptionDialog in importFile(), filter video files from batch imports in processFiles(), update warning messages to include 'video'",
+        "files": ["src/renderer/src/hooks/useImport.ts"],
+        "dependencies": [2],
+        "rationale": "Video files need same interactive flow as audio -- language selection dialog, progress, etc."
+      },
+      {
+        "order": 10,
+        "description": "Update TranscriptionDialog: show 'Transcribe video' title and FileVideo icon when file has video extension. No structural changes needed -- progress phases come from backend.",
+        "files": ["src/renderer/src/components/Transcription/TranscriptionDialog.tsx"],
+        "dependencies": [2],
+        "rationale": "Visual distinction for video vs audio import. Minimal change since the dialog is already file-type agnostic."
+      }
+    ],
+    "patterns_to_follow": [
+      "IConverter strategy pattern (AudioConverter as template)",
+      "Service pattern with singleton + factory function (AudioMetadataService style)",
+      "DI via constructor with interface types (ITranscriptionServiceLike pattern)",
+      "Constants block in shared/constants.ts (TRANSCRIPTION, SCREENSHOT blocks)",
+      "ErrorCode enum entries with ERROR_MESSAGES mapping",
+      "Vitest with vi.mock() for dependency isolation",
+      "JSDoc comments on all public functions"
+    ],
+    "patterns_to_avoid": [
+      "System ffmpeg dependency (use ffmpeg-static)",
+      "Modifying TranscriptionService internals",
+      "Adding video-specific state to useTranscriptionStore (keep it file-type agnostic)",
+      "Hardcoded extension lists (use constants from shared/constants.ts)"
+    ]
+  },
+  "file_changes": [
+    {
+      "path": "package.json",
+      "action": "modify",
+      "description": "Add fluent-ffmpeg, @types/fluent-ffmpeg, ffmpeg-static, ffprobe-static dependencies"
+    },
+    {
+      "path": "src/shared/constants.ts",
+      "action": "modify",
+      "description": "Add VIDEO_IMPORT constants block"
+    },
+    {
+      "path": "src/shared/errors.ts",
+      "action": "modify",
+      "description": "Add VIDEO_NO_AUDIO, VIDEO_EXTRACTION_FAILED, VIDEO_FFMPEG_MISSING error codes and messages"
+    },
+    {
+      "path": "src/main/services/AudioExtractionService.ts",
+      "action": "create",
+      "description": "ffmpeg wrapper service for audio extraction, audio stream detection, and video metadata"
+    },
+    {
+      "path": "src/main/services/AudioExtractionService.test.ts",
+      "action": "create",
+      "description": "Unit tests for AudioExtractionService"
+    },
+    {
+      "path": "src/main/services/import/extensions.ts",
+      "action": "modify",
+      "description": "Add VIDEO_EXTENSIONS constant and isVideoExtension() helper"
+    },
+    {
+      "path": "src/main/services/import/converters/VideoConverter.ts",
+      "action": "create",
+      "description": "IConverter implementation for video files with audio extraction and transcription"
+    },
+    {
+      "path": "src/main/services/import/converters/VideoConverter.test.ts",
+      "action": "create",
+      "description": "Unit tests for VideoConverter"
+    },
+    {
+      "path": "src/main/services/import/ConverterRegistry.ts",
+      "action": "modify",
+      "description": "Import and register VideoConverter in registerBuiltInConverters()"
+    },
+    {
+      "path": "src/main/services/import/index.ts",
+      "action": "modify",
+      "description": "Export VideoConverter and createVideoConverter"
+    },
+    {
+      "path": "src/main/ipc/transcription-handlers.ts",
+      "action": "modify",
+      "description": "Add video detection, audio extraction with two-phase progress, video frontmatter, temp cleanup, video validation"
+    },
+    {
+      "path": "src/main/ipc/import-handlers.ts",
+      "action": "modify",
+      "description": "Add Video Files filter group to file dialog"
+    },
+    {
+      "path": "src/renderer/src/hooks/useImport.ts",
+      "action": "modify",
+      "description": "Add isVideoFile(), route video to TranscriptionDialog, filter from batch"
+    },
+    {
+      "path": "src/renderer/src/components/Transcription/TranscriptionDialog.tsx",
+      "action": "modify",
+      "description": "Show video-specific title and icon when importing video file"
+    }
+  ],
+  "test_strategy": {
+    "coverage_target": 80,
+    "test_types": ["unit", "integration"],
+    "test_files": [
+      "src/main/services/AudioExtractionService.test.ts",
+      "src/main/services/import/converters/VideoConverter.test.ts"
+    ],
+    "key_scenarios": [
+      "AudioExtractionService.hasAudioStream returns true for video with audio",
+      "AudioExtractionService.hasAudioStream returns false for video without audio",
+      "AudioExtractionService.extractAudio produces temp WAV and returns duration",
+      "AudioExtractionService.extractAudio handles abort signal",
+      "AudioExtractionService.extractAudio cleans up on failure",
+      "AudioExtractionService.getVideoMetadata returns resolution and codec",
+      "AudioExtractionService.getVideoMetadata returns null on probe failure",
+      "AudioExtractionService.isAvailable returns false when ffmpeg-static missing",
+      "VideoConverter has correct supportedExtensions, requiresConversion, category",
+      "VideoConverter.validate delegates to validateFileForImport",
+      "VideoConverter.convert success produces markdown with video frontmatter",
+      "VideoConverter.convert fails with clear error when no audio stream",
+      "VideoConverter.convert fails with clear error when extraction fails",
+      "VideoConverter.convert includes resolution and codec in frontmatter when available",
+      "VideoConverter.convert omits resolution/codec when metadata unavailable",
+      "isVideoFile correctly identifies video extensions",
+      "Video files route to TranscriptionDialog in useImport",
+      "Video files rejected from batch imports with warning",
+      "Two-phase progress maps extraction to 0-20% and transcription to 20-100%",
+      "Temp extracted WAV cleaned up after success",
+      "Temp extracted WAV cleaned up after failure"
+    ]
+  },
+  "risks": [
+    {
+      "risk": "ffmpeg-static binary significantly increases app bundle size (~70-100MB per platform)",
+      "likelihood": "high",
+      "impact": "medium",
+      "mitigation": "Measure bundle size impact before merging. Consider optional dependency or lazy download pattern if too large. Document size increase in PR."
+    },
+    {
+      "risk": "fluent-ffmpeg progress reporting inconsistency across video codecs",
+      "likelihood": "medium",
+      "impact": "low",
+      "mitigation": "Use timemark-based progress calculation as fallback when percent is unavailable. Progress is UX-only, not correctness-critical."
+    },
+    {
+      "risk": "Video files without audio streams cause confusing user experience",
+      "likelihood": "medium",
+      "impact": "low",
+      "mitigation": "Explicit hasAudioStream() check before extraction with clear error message: 'This video has no audio track to transcribe.'"
+    },
+    {
+      "risk": "Large video files (>1GB) cause long extraction times or temp disk space issues",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Extraction timeout (5 min), AbortSignal support, WAV output is mono 16kHz (smaller than source). Could add size warning for very large files."
+    },
+    {
+      "risk": "Electron ASAR packaging conflicts with ffmpeg-static binary paths",
+      "likelihood": "low",
+      "impact": "high",
+      "mitigation": "ffmpeg-static and ffprobe-static binaries must be excluded from ASAR. Check electron-builder config asarUnpack patterns."
+    }
+  ],
+  "estimates": {
+    "complexity": "medium",
+    "files_affected": 14,
+    "new_files": 4,
+    "test_files": 2
+  },
+  "verification_criteria": [
+    "VideoConverter registered and accessible via converterRegistry.getConverter('mp4')",
+    "Video extensions appear in file dialog filters",
+    "Video file selected via dialog opens TranscriptionDialog with video title",
+    "Video with audio: extraction produces temp WAV, transcription produces markdown with video frontmatter",
+    "Video without audio: clear error message before transcription attempt",
+    "Two-phase progress: 'Extracting audio...' (0-20%) then 'Transcribing...' (20-100%)",
+    "Temp WAV files cleaned up after success and failure",
+    "Video files rejected from batch drop with warning toast",
+    "All existing audio import tests still pass",
+    "npm run typecheck passes",
+    "npm run lint passes",
+    "npm run test passes with >80% coverage on new files"
+  ],
+  "design_persisted": {
+    "path": "specs/spec-t4-009-media-import-transcription/sd-001-video-import.md",
+    "sequence": 1
+  },
+  "register_with_spec": {
+    "spec_id": 9,
+    "doc_type": "design",
+    "doc_path": "specs/spec-t4-009-media-import-transcription/sd-001-video-import.md"
+  }
+}

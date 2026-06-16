@@ -1,0 +1,56 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+*.local.json
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Electron
+out
+release/
+
+# Temporary files
+temp/
+coverage/
+
+# Auto Claude data directory
+.auto-claude/
+.claude/scheduled_tasks.lock
+
+# Skill modification backups (ms-modifier)
+.claude/skills/*.backup.*
+.claude/skills/**/*.backup.*
+
+# TypeScript build info
+*.tsbuildinfo
+test-results/
+
+# E2E test temp projects
+.e2e-temp/
+playwright-report/
+
+# Environment variables (API keys)
+.env
+.env.local
+
+# Superpowers visual brainstorm scratch
+.superpowers/

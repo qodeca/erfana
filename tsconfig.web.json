@@ -1,0 +1,17 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.web.json",
+  "include": [
+    "src/renderer/**/*",
+    "src/preload/*.d.ts"
+  ],
+  "exclude": [
+    "src/renderer/src/**/*.test.*",
+    "src/renderer/src/**/__tests__/**"
+  ],
+  "compilerOptions": {
+    "composite": true,
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "types": ["electron-vite/node"]
+  }
+}

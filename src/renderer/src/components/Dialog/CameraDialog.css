@@ -1,0 +1,226 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * Camera dialog styles (Spec #014)
+ *
+ * Modal dialog for camera photo capture.
+ * Uses shared dialog header/icon/actions patterns from Dialog.css.
+ */
+
+/* Dialog content container */
+.camera-dialog {
+  width: 720px;
+  min-width: 720px;
+  max-width: 720px;
+}
+
+/* Device selector section */
+.camera-device-section {
+  margin-bottom: var(--space-8);
+}
+
+/* Device dropdown label */
+.camera-device-label {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--dialog-text-secondary);
+  margin-bottom: var(--space-4);
+}
+
+/* Device dropdown select */
+.camera-device-select {
+  width: 100%;
+  padding: var(--space-5) var(--space-6);
+  padding-right: var(--space-12);
+  background-color: var(--color-bg-input);
+  border: var(--border-width) solid var(--dialog-border);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-size: var(--text-md);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: all var(--transition-slow);
+
+  /* Remove default browser styling */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  /* Custom dropdown arrow using CSS */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23858585' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-6) center;
+  background-size: 12px;
+}
+
+.camera-device-select:hover {
+  border-color: var(--color-border-subtle);
+  background-color: var(--color-bg-tertiary);
+}
+
+.camera-device-select:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  background-color: var(--color-bg-tertiary);
+  box-shadow: var(--shadow-focus);
+}
+
+.camera-device-select option {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  padding: var(--space-4);
+}
+
+/* Video preview container - maintains 4:3 aspect ratio */
+.camera-preview-container {
+  position: relative;
+  width: 100%;
+  min-height: 480px;
+  background-color: var(--color-black);
+  overflow: hidden;
+  margin-bottom: var(--space-8);
+}
+
+/* Maintain aspect ratio using padding trick */
+.camera-preview-wrapper {
+  position: relative;
+  width: 100%;
+  padding-top: 75%; /* 4:3 aspect ratio (3/4 = 0.75) */
+}
+
+/* Video element fills the container */
+.camera-preview {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background-color: var(--color-black);
+}
+
+/* Mirror the preview horizontally for natural selfie-style view */
+.camera-preview--mirrored {
+  transform: scaleX(-1);
+}
+
+/* Loading state placeholder */
+.camera-preview-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+}
+
+/* Loading spinner animation */
+.camera-preview-loading svg {
+  animation: camera-spin 1s linear infinite;
+}
+
+@keyframes camera-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Shutter animation overlay */
+.camera-shutter {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--color-black);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 10;
+}
+
+/* Shutter flash animation */
+.camera-shutter--active {
+  animation: camera-shutter-flash 200ms ease-out forwards;
+}
+
+@keyframes camera-shutter-flash {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Error message area */
+.camera-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  background-color: var(--color-error-bg);
+  border: var(--border-width) solid var(--color-error-border);
+  border-radius: var(--border-radius);
+  margin-bottom: var(--space-8);
+}
+
+.camera-error-icon {
+  flex-shrink: 0;
+  color: var(--color-error);
+}
+
+.camera-error-message {
+  font-size: var(--text-base);
+  color: var(--color-error);
+  line-height: var(--leading-relaxed);
+}
+
+/* Empty state when no camera is available */
+.camera-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  padding: var(--space-16);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.camera-empty-state-icon {
+  color: var(--color-text-muted);
+}
+
+.camera-empty-state-text {
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+}
+
+/* Action buttons */
+.camera-actions {
+  display: flex;
+  gap: var(--space-6);
+  justify-content: flex-end;
+  align-items: center;
+  padding-top: var(--space-2);
+}
+
+/* Refresh button positioned on left */
+.camera-actions-left {
+  display: flex;
+  align-items: center;
+  margin-right: auto;
+}

@@ -1,0 +1,50 @@
+# git-cliff configuration for Erfana release notes.
+#
+# Used by the releasing-erfana skill (Phase 1) to extract a technical
+# section from Conventional Commits since the last tag. The operator
+# curates a user-facing summary and the skill concatenates both into
+# docs/release-notes/v{version}.md as a <details> two-tier document.
+#
+# See: docs/build/release.md § Release notes
+
+[changelog]
+header = ""
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+
+{% for commit in commits %}\
+- {{ commit.message | split(pat="\\n") | first | trim }}{% if commit.breaking %} **[BREAKING]**{% endif %}
+{% endfor %}
+
+{% endfor %}
+"""
+footer = ""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+require_conventional = false
+split_commits = false
+# Group ordering in rendered notes matches the declaration order below.
+# Keep the most user-relevant groups (Features, Bug fixes, Performance)
+# first so operators scanning the technical section can see changes that
+# commonly drive a release before scrolling past internal churn.
+commit_parsers = [
+  { message = "^feat",     group = "Features" },
+  { message = "^fix",      group = "Bug fixes" },
+  { message = "^perf",     group = "Performance" },
+  { message = "^refactor", group = "Refactoring" },
+  { message = "^docs",     group = "Documentation" },
+  { message = "^test",     group = "Tests" },
+  { message = "^ci",       group = "CI" },
+  { message = "^build",    group = "Build" },
+  { message = "^chore",    group = "Chores" },
+  { message = "^style",    skip = true },
+  { message = ".*",        skip = true },
+]
+protect_breaking_commits = true
+filter_commits = false
+tag_pattern = "v[0-9]+\\.[0-9]+\\.[0-9]+"
+sort_commits = "newest"

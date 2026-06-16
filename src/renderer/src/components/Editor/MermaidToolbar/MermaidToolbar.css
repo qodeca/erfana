@@ -1,0 +1,162 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/* MermaidToolbar - Unified toolbar for Mermaid diagrams */
+
+.mermaid-toolbar {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+  z-index: var(--z-dropdown);
+}
+
+/* Show toolbar on container hover */
+.mermaid-container:hover .mermaid-toolbar,
+.mermaid-toolbar:focus-within {
+  opacity: 1;
+}
+
+/* Always visible on touch devices */
+@media (pointer: coarse) {
+  .mermaid-toolbar {
+    opacity: 1;
+  }
+}
+
+/* Direction buttons group */
+.mermaid-toolbar-directions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--color-bg-tertiary-translucent);
+  border: var(--border-width) solid var(--color-gray-700);
+  border-radius: 0;
+}
+
+/* Individual direction button */
+.mermaid-direction-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 var(--space-3);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  font-family: var(--font-system);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.mermaid-direction-btn:hover:not(:disabled) {
+  background: var(--color-brand-lime);
+}
+
+.mermaid-direction-btn:active:not(:disabled) {
+  background: var(--color-brand-lime);
+}
+
+/* Active (current direction) state - both highlighted AND disabled */
+.mermaid-direction-btn--active {
+  background: var(--color-brand-violet-muted);
+  color: var(--color-brand-violet);
+}
+
+.mermaid-direction-btn--active:hover {
+  background: var(--color-brand-violet-muted);
+}
+
+/* Disabled state */
+.mermaid-direction-btn:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+/* Focus state for keyboard navigation */
+.mermaid-direction-btn:focus-visible {
+  outline: 1px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+/* Expand button */
+.mermaid-toolbar-expand-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 var(--space-3);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-family: var(--font-system);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.mermaid-toolbar-expand-btn:hover:not(:disabled) {
+  background: var(--color-brand-lime);
+}
+
+.mermaid-toolbar-expand-btn:active:not(:disabled) {
+  background: var(--color-brand-lime);
+}
+
+.mermaid-toolbar-expand-btn:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.mermaid-toolbar-expand-btn:focus-visible {
+  outline: 1px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+/* Light mode adjustments */
+@media (prefers-color-scheme: light) {
+  .mermaid-toolbar-directions {
+    background: var(--color-bg-primary-translucent);
+    border-color: var(--color-gray-400);
+  }
+
+  .mermaid-direction-btn {
+    color: var(--color-gray-800);
+  }
+
+  .mermaid-direction-btn:hover:not(:disabled) {
+    background: var(--color-brand-lime);
+  }
+
+  .mermaid-direction-btn:active:not(:disabled) {
+    background: var(--color-brand-lime);
+  }
+
+  .mermaid-direction-btn--active {
+    background: var(--color-brand-violet-muted);
+    color: var(--color-brand-violet);
+  }
+
+  .mermaid-toolbar-expand-btn {
+    background: transparent;
+    color: var(--color-gray-800);
+  }
+
+  .mermaid-toolbar-expand-btn:hover:not(:disabled) {
+    background: var(--color-brand-lime);
+  }
+
+  .mermaid-toolbar-expand-btn:active:not(:disabled) {
+    background: var(--color-brand-lime);
+  }
+}

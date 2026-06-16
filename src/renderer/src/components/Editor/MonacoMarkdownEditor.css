@@ -1,0 +1,48 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+.monaco-markdown-editor {
+  width: 100%;
+  height: 100%;
+  background-color: var(--color-bg-preview);
+}
+
+/* Override Monaco editor styles for better markdown experience */
+.monaco-markdown-editor .monaco-editor {
+  font-family: var(--font-mono);
+}
+
+.monaco-markdown-editor .monaco-editor .view-line {
+  line-height: 1.6;
+}
+
+/* Markdown-specific styling hints - neutral grays for readability */
+.monaco-markdown-editor .mtk1 {
+  /* Regular text */
+  color: var(--color-gray-200);
+}
+
+.monaco-markdown-editor .mtk4 {
+  /* Headings */
+  color: var(--color-gray-200);
+  font-weight: var(--font-semibold);
+}
+
+.monaco-markdown-editor .mtk8 {
+  /* Links */
+  color: var(--color-gray-300);
+}
+
+.monaco-markdown-editor .mtk12 {
+  /* Code */
+  color: var(--color-syntax-string);
+}
+
+/* Monaco search decoration classes */
+.search-match-decoration {
+  background-color: var(--color-brand-lime-muted);
+}
+
+.search-match-current-decoration {
+  background-color: var(--color-brand-lime);
+  color: var(--color-brand-black);
+}

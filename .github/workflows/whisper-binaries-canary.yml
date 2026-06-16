@@ -1,0 +1,112 @@
+# Whisper binaries credential-health canary
+#
+# Scheduled monthly check that the credentials used by the main
+# `whisper-binaries.yml` workflow are still valid — Apple notarization app-
+# specific passwords silently expire after ~6 months of inactivity; Windows
+# PFX certs have explicit expiry dates; minisign keys don't expire but can
+# rotate. Without this canary, we only discover credential failures when the
+# next genuine rebuild is attempted, often under pressure during an incident.
+#
+# B5c / audit finding I1 — plan §"Ops runbook" committed to a scheduled
+# canary in Phase 4 scope; previously only documented in
+# `docs/build/whisper-binaries.md` as Phase-5 scope.
+#
+# Runs on the 1st of every month at 09:00 UTC (matches typical cert rotation
+# cadence). Can also be triggered manually via `workflow_dispatch` for a dry
+# run. Fails fast if any credential is unusable; on failure posts an issue to
+# the repo so the incident is tracked.
+name: Whisper Binaries (Canary)
+
+on:
+  schedule:
+    - cron: '0 9 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read   # baseline
+  issues: write    # failure notification
+
+jobs:
+  macos-notarization-canary:
+    name: macOS notarization credentials
+    runs-on: macos-14
+    timeout-minutes: 10
+    environment: production-signing
+    steps:
+      - name: Probe notarytool history
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        # `notarytool history` lists recent notarization submissions; it
+        # authenticates with the same creds used by the main workflow's
+        # `notarytool submit`. Non-zero exit = creds no longer work.
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$APPLE_APP_PASSWORD"
+          xcrun notarytool history \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --output-format json >/tmp/notary-history.json
+          # Confirm the response is structured JSON, not a pass-through of a
+          # CLI error message.
+          jq -e 'has("history")' /tmp/notary-history.json >/dev/null
+          echo "notarytool history probe succeeded."
+
+  windows-signtool-canary:
+    name: Windows signtool (placeholder until Phase 5 cert lands)
+    runs-on: windows-latest
+    timeout-minutes: 5
+    environment: production-signing
+    steps:
+      - name: Check signtool is still resolvable on the runner image
+        shell: pwsh
+        # Phase 4 ships unsigned on Windows — when the cert lands in Phase 5
+        # this step grows into a real cert-chain probe. Today we just assert
+        # signtool itself resolves so the Phase-5 flip is drop-in.
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $signtool = Get-Command signtool.exe -ErrorAction SilentlyContinue
+          if ($null -eq $signtool) {
+            Write-Error "signtool.exe not found on PATH; Phase-5 cert-chain probe will need to locate it via the Windows SDK."
+            exit 1
+          }
+          Write-Host "signtool resolved at $($signtool.Source)"
+
+  notify-on-failure:
+    name: Post failure issue
+    needs: [macos-notarization-canary, windows-signtool-canary]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create / update tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          DATE=$(date -u +"%Y-%m-%d")
+          TITLE="[canary] whisper-binaries credential health failure ${DATE}"
+          BODY=$(cat <<EOF
+          The scheduled whisper-binaries credential canary failed on ${DATE}.
+
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          Likely causes:
+          - Apple app-specific password silently expired (~6-month inactivity timeout).
+          - Apple Developer ID cert expired or revoked.
+          - Windows signtool no longer on runner PATH (runner-image regression).
+
+          See \`docs/build/whisper-binaries.md\` §"Cert-revocation runbook" for recovery steps.
+          EOF
+          )
+          # Avoid stacking duplicate issues — append a comment if one already
+          # exists for today's date, else open a fresh one.
+          EXISTING=$(gh issue list --repo "${{ github.repository }}" --search "$TITLE in:title" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --repo "${{ github.repository }}" --body "$BODY"
+          else
+            gh issue create --repo "${{ github.repository }}" --title "$TITLE" --body "$BODY" --label canary
+          fi

@@ -1,0 +1,14 @@
+{
+  "watcher": {
+    "ignoreList": {
+      "mode": "extend",
+      "patterns": ["release"]
+    }
+  },
+  "tree": {
+    "hiddenPatterns": {
+      "mode": "extend",
+      "patterns": ["release"]
+    }
+  }
+}

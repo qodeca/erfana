@@ -1,0 +1,315 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * ImageViewerPanel Styles
+ *
+ * CSS Module for the ImageViewerPanel component.
+ * Uses design tokens for consistent theming.
+ * Matches MarkdownToolbar styling pattern.
+ *
+ * @see ImageViewerPanel.tsx for component implementation
+ * @see Spec #015 - Image preview viewer specification
+ */
+
+/* ============================================
+ * Container
+ * ============================================ */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--color-bg-primary);
+  overflow: hidden;
+}
+
+/* ============================================
+ * Toolbar (matches MarkdownToolbar style)
+ * ============================================ */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-6);
+  background-color: var(--color-bg-primary);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  flex-shrink: 0;
+}
+
+.toolbarSpacer {
+  flex: 1;
+  min-width: var(--space-6);
+}
+
+/* Separator between button groups */
+.toolbarSeparator {
+  width: var(--border-width);
+  height: var(--icon-size-lg);
+  background-color: var(--color-border-default);
+  margin: 0 var(--space-4);
+}
+
+/* ============================================
+ * Metadata Section
+ * ============================================ */
+
+.toolbarMetadata {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.metadataItem {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  /* Override dockview's inherited user-select: none (issue #211). */
+  user-select: text;
+}
+
+/* ============================================
+ * Control Buttons (matches MarkdownToolbar .toolbar-btn)
+ * ============================================ */
+
+.controlButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-height-md);
+  height: var(--input-height-sm);
+  padding: 0;
+  background-color: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.controlButton:hover:not(:disabled) {
+  background-color: var(--color-bg-hover-solid);
+  color: var(--color-white);
+}
+
+.controlButton:active:not(:disabled) {
+  background-color: var(--color-bg-selected);
+}
+
+.controlButton:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.controlButton:focus-visible {
+  outline: 1px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+/* ============================================
+ * Zoom Level Button
+ * ============================================ */
+
+.zoomLevel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* L1: min-width ensures consistent button size for zoom percentages (1% to 1000%) */
+  min-width: 50px;
+  height: var(--input-height-sm);
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.zoomLevel:hover {
+  background-color: var(--color-bg-hover-solid);
+  color: var(--color-white);
+}
+
+.zoomLevel:active {
+  background-color: var(--color-bg-selected);
+}
+
+.zoomLevel:focus-visible {
+  outline: 1px solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+/* ============================================
+ * Toolbar Controls Group
+ * ============================================ */
+
+.toolbarControls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.toolbarActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* ============================================
+ * Content Area (Image Display)
+ * ============================================ */
+
+.content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  background: var(--color-bg-primary);
+  cursor: grab;
+}
+
+.content:active {
+  cursor: grabbing;
+}
+
+/* ============================================
+ * Image Element
+ * ============================================ */
+
+.image {
+  max-width: none;
+  max-height: none;
+  transition: none; /* No transition for smooth drag */
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* ============================================
+ * Loading State
+ * ============================================ */
+
+.loadingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--space-6);
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  color: var(--color-accent-primary);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================
+ * Error State
+ * ============================================ */
+
+.errorState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--space-6);
+  color: var(--color-error);
+  font-size: var(--text-base);
+}
+
+.errorMessage {
+  /* L2: Use relative units for better scalability with user font preferences */
+  max-width: 25rem;
+  text-align: center;
+  word-wrap: break-word;
+  /* Override dockview's inherited user-select: none (issue #211). */
+  user-select: text;
+}
+
+/* ============================================
+ * Empty State
+ * ============================================ */
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--space-6);
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+}
+
+/* ============================================
+ * Full Screen Overlay
+ * ============================================ */
+
+.fullScreenOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-primary);
+  z-index: var(--z-modal);
+  animation: fadeIn var(--transition-normal);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Full screen content area */
+.fullScreenOverlay .content {
+  background: transparent;
+}
+
+/* Full screen toolbar */
+.fullScreenOverlay .toolbar {
+  background: var(--color-bg-tertiary-translucent);
+  border-bottom-color: var(--color-border-subtle);
+}
+
+/* ============================================
+ * Reduced Motion Support
+ * ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .controlButton,
+  .zoomLevel {
+    transition: none;
+  }
+
+  .spinner {
+    animation: none;
+  }
+
+  .fullScreenOverlay {
+    animation: none;
+  }
+}

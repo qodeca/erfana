@@ -1,0 +1,419 @@
+{
+  "spec_id": 9,
+  "slug": "media-import-transcription",
+  "tier": "T4",
+  "version": "1.0.0",
+  "status": "draft",
+  "created": "2025-12-22T18:27:45Z",
+  "updated": "2025-12-22T18:40:44Z",
+  "application": {
+    "name": "Media import with transcription",
+    "domain": "import",
+    "tech_stack": [
+      "ffmpeg-static",
+      "fluent-ffmpeg",
+      "openai",
+      "whisper.cpp"
+    ]
+  },
+  "scope": {
+    "type": "feature",
+    "name": "Media import with transcription"
+  },
+  "sections": [
+    {
+      "id": "01",
+      "file": "requirements/01-overview.md",
+      "title": "Overview",
+      "word_count": 380,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    },
+    {
+      "id": "02",
+      "file": "requirements/02-requirements.md",
+      "title": "Requirements",
+      "word_count": 910,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    },
+    {
+      "id": "03",
+      "file": "requirements/03-use-cases.md",
+      "title": "Use Cases",
+      "word_count": 1022,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    },
+    {
+      "id": "04",
+      "file": "requirements/04-acceptance.md",
+      "title": "Acceptance",
+      "word_count": 902,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    },
+    {
+      "id": "05",
+      "file": "requirements/05-notes.md",
+      "title": "Notes",
+      "word_count": 962,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    }
+  ],
+  "requirements_index": {
+    "009-FR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-005": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-006": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-007": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-008": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-009": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-010": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-011": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-012": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-013": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-014": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-015": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-016": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-017": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-018": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-019": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-020": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-021": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-022": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-023": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-024": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-025": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-026": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-027": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-028": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-FR-029": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-NFR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-NFR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-NFR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-NFR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-NFR-005": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-NFR-006": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-NFR-007": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-NFR-008": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-NFR-009": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "009-UC-001": {
+      "section": "03-use-cases",
+      "status": "active"
+    },
+    "009-UC-002": {
+      "section": "03-use-cases",
+      "status": "active"
+    },
+    "009-UC-003": {
+      "section": "03-use-cases",
+      "status": "active"
+    },
+    "009-UC-004": {
+      "section": "03-use-cases",
+      "status": "active"
+    },
+    "009-UC-005": {
+      "section": "03-use-cases",
+      "status": "active"
+    },
+    "009-AC-001": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-002": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-003": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-004": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-005": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-006": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-007": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-008": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-009": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-010": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-011": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-012": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-013": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-014": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-015": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-016": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-017": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-018": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-019": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-020": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-021": {
+      "section": "04-acceptance",
+      "status": "active"
+    },
+    "009-AC-022": {
+      "section": "04-acceptance",
+      "status": "active"
+    }
+  },
+  "requirement_sequences": {
+    "FR": 29,
+    "NFR": 9,
+    "UC": 5,
+    "AC": 22,
+    "TC": 0,
+    "ES": 0,
+    "BO": 0,
+    "SH": 0,
+    "CA": 0,
+    "AP": 0
+  },
+  "cross_references": [
+    {
+      "from": "Spec #009",
+      "to": "Spec #004",
+      "type": "future-integration",
+      "description": "Transcript indexing via graph engine foundation"
+    },
+    {
+      "from": "Spec #009",
+      "to": "Spec #005",
+      "type": "future-integration",
+      "description": "Semantic search of transcribed content via vector embeddings"
+    }
+  ],
+  "statistics": {
+    "total_sections": 5,
+    "total_requirements": 65,
+    "total_words": 4176,
+    "total_use_cases": 0,
+    "total_stakeholders": 0,
+    "deprecated_count": 0
+  },
+  "validation": {
+    "overall_score": null,
+    "passed": false,
+    "last_validated": null,
+    "threshold": 80
+  },
+  "change_history": [
+    {
+      "date": "2025-12-22T18:27:45Z",
+      "operation": "INIT",
+      "target": "manifest",
+      "description": "Spec initialized as T4 with 5 sections",
+      "by": "system"
+    },
+    {
+      "date": "2025-12-22T18:40:44Z",
+      "operation": "UPDATE",
+      "target": "multiple",
+      "description": "Applied 6 validation fixes: FR-017, NFR-001, NFR-003 clarity; UC-003 error message; AC-006 testability; cross-references added",
+      "by": "system"
+    },
+    {
+      "date": "2026-02-03T08:30:00+01:00",
+      "operation": "MIGRATE",
+      "target": "manifest",
+      "description": "Migrated from BRS to managing-specs naming convention",
+      "by": "system"
+    },
+    {
+      "date": "2026-03-08T22:50:00+01:00",
+      "operation": "ADD",
+      "target": "02-requirements, 04-acceptance",
+      "description": "Added post-import behavior requirements (FR-023 to FR-027) and acceptance criteria (AC-016 to AC-020): import folder creation, output filename convention, duplicate handling, organize prompt trigger, project tree refresh",
+      "by": "user"
+    },
+    {
+      "date": "2026-03-08T23:00:00+01:00",
+      "operation": "UPDATE",
+      "target": "multiple",
+      "description": "Architecture review fixes: added FR-028 (git status refresh), FR-029 (auto-open transcript), AC-021, AC-022; updated UC-001/UC-002 with post-import steps and traces; clarified FR-026 implementation guidance and FR-027 Chokidar mechanism; added design deviation notes (success feedback, project switch edge case); corrected file naming convention in notes",
+      "by": "user"
+    }
+  ],
+  "components": {
+    "requirements": true,
+    "architecture": false,
+    "solution": false,
+    "design": false,
+    "ux": false
+  },
+  "tags": [],
+  "related_specs": [],
+  "id_migrations": []
+}

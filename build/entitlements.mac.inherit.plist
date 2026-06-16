@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Inherited entitlements for ALL helper processes (Renderer / GPU /
+       Plugin). electron-builder's `mac.entitlementsInherit` is a single
+       plist applied uniformly to every helper bundle — there is no
+       built-in per-helper-type configuration as of electron-builder
+       26.8.1. The Renderer helper requires com.apple.security.cs.allow-jit
+       (V8 JIT) and com.apple.security.cs.allow-unsigned-executable-memory
+       to function; granting these to GPU / Plugin helpers is a known
+       upstream-imposed over-grant. Trigger to revisit: electron-builder
+       adds per-helper-type entitlement support (track via Dependabot once
+       github-actions ecosystem is enabled), or migrate to a customSign
+       callback that signs each helper bundle individually with a tighter
+       plist.
+
+       FORBIDDEN under all circumstances (CI guard at checks.yml:136-144
+       fails the build if either string appears here):
+         - com.apple.security.cs.disable-library-validation
+         - com.apple.security.cs.allow-dyld-environment-variables -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+</dict>
+</plist>

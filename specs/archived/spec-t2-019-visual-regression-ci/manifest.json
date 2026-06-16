@@ -1,0 +1,36 @@
+{
+  "id": 19,
+  "name": "Visual regression and CI resilience",
+  "slug": "visual-regression-ci",
+  "tier": "T2",
+  "status": "draft",
+  "scope": "improvement",
+  "description": "Configure Playwright visual regression testing with screenshot comparisons for key UI states, and improve CI resilience with video recording on failure, artifact management, and rendering tolerance for cross-platform consistency.",
+  "created": "2026-03-09T12:23:00.000Z",
+  "last_modified": "2026-03-09T14:33:00.000Z",
+  "requirement_sequences": {
+    "FR": 10,
+    "NFR": 3,
+    "AC": 5
+  },
+  "statistics": {
+    "total_requirements": 18,
+    "total_words": 1754
+  },
+  "change_history": [
+    {
+      "date": "2026-03-09T12:23:00.000Z",
+      "operation": "INIT",
+      "target": "manifest",
+      "description": "Initial creation – visual regression and CI resilience",
+      "by": "user"
+    },
+    {
+      "date": "2026-03-09T14:33:00.000Z",
+      "operation": "REVISION",
+      "target": "spec",
+      "description": "Address spec review findings – 21 items across CI workflow, snapshot config, video recording, masking, window sizing, dependency ordering",
+      "by": "claude"
+    }
+  ]
+}

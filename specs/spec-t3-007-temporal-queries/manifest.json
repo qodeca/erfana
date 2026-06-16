@@ -1,0 +1,344 @@
+{
+  "spec_id": 7,
+  "slug": "temporal-queries",
+  "tier": "T3",
+  "version": "0.1.1",
+  "status": "draft",
+  "created": "2025-12-22T17:10:00.000Z",
+  "updated": "2025-12-22T18:30:00.000Z",
+  "application": {
+    "name": "Temporal queries & timeline",
+    "domain": "knowledge-graph",
+    "tech_stack": [
+      "sqlite",
+      "typescript",
+      "react"
+    ]
+  },
+  "scope": {
+    "type": "feature",
+    "name": "Temporal queries & timeline"
+  },
+  "dependencies": [
+    "Spec #006"
+  ],
+  "sections": [
+    {
+      "id": "01",
+      "file": "requirements/01-overview.md",
+      "title": "Overview",
+      "word_count": 364,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    },
+    {
+      "id": "02",
+      "file": "requirements/02-requirements.md",
+      "title": "Requirements",
+      "word_count": 920,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    },
+    {
+      "id": "03",
+      "file": "requirements/03-acceptance.md",
+      "title": "Acceptance",
+      "word_count": 896,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    }
+  ],
+  "requirements_index": {
+    "007-FR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-005": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-006": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-007": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-008": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-009": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-010": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-011": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-012": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-013": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-014": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-015": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-016": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-017": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-018": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-019": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-020": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-021": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-022": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-023": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-024": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-NFR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-NFR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-NFR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-NFR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-AC-001": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-002": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-003": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-004": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-005": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-006": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-007": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-008": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-009": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-010": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-011": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-012": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-013": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-014": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-015": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-016": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-017": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-018": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-019": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-020": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-021": {
+      "section": "03-acceptance",
+      "status": "active"
+    }
+  },
+  "requirement_sequences": {
+    "FR": 24,
+    "NFR": 4,
+    "UC": 0,
+    "AC": 21,
+    "TC": 0,
+    "ES": 0,
+    "BO": 0,
+    "SH": 0,
+    "CA": 0,
+    "AP": 0
+  },
+  "cross_references": [],
+  "statistics": {
+    "total_sections": 3,
+    "total_requirements": 49,
+    "total_words": 2180,
+    "total_use_cases": 0,
+    "total_stakeholders": 0,
+    "deprecated_count": 0
+  },
+  "validation": {
+    "overall_score": null,
+    "passed": false,
+    "last_validated": null,
+    "threshold": 50
+  },
+  "change_history": [
+    {
+      "date": "2025-12-22T17:57:00.000Z",
+      "operation": "INIT",
+      "target": "manifest",
+      "description": "Spec initialized as T3 with 3 sections",
+      "by": "system"
+    },
+    {
+      "date": "2025-12-22T18:30:00.000Z",
+      "operation": "UPDATE",
+      "target": "02-requirements",
+      "description": "Applied validation fixes: standardized imperative language, abstracted implementation details from FR-001/FR-007/FR-008/FR-016, added export file naming to FR-021, added date picker option to FR-017, clarified NFR-002 retention policy",
+      "changes": {
+        "fields_updated": [
+          "FR-001",
+          "FR-003",
+          "FR-004",
+          "FR-005",
+          "FR-006",
+          "FR-007",
+          "FR-008",
+          "FR-009",
+          "FR-010",
+          "FR-011",
+          "FR-012",
+          "FR-013",
+          "FR-014",
+          "FR-015",
+          "FR-016",
+          "FR-017",
+          "FR-018",
+          "FR-019",
+          "FR-020",
+          "FR-021",
+          "FR-022",
+          "FR-023",
+          "FR-024",
+          "NFR-001",
+          "NFR-002",
+          "NFR-003",
+          "NFR-004"
+        ],
+        "type": "language_and_abstraction"
+      },
+      "by": "user"
+    },
+    {
+      "date": "2026-02-03T08:30:00+01:00",
+      "operation": "MIGRATE",
+      "target": "manifest",
+      "description": "Migrated from BRS to managing-specs naming convention",
+      "by": "system"
+    }
+  ],
+  "components": {
+    "requirements": true,
+    "architecture": false,
+    "solution": false,
+    "design": false,
+    "ux": false
+  },
+  "tags": [],
+  "related_specs": [],
+  "id_migrations": []
+}

@@ -1,0 +1,65 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+.project-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-bg-primary);
+}
+
+.project-panel .sidebar-panel-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-6);
+  height: var(--header-height);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  background: var(--color-bg-tertiary);
+  flex-shrink: 0;
+}
+
+.project-panel .sidebar-panel-title {
+  flex: 1;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-primary);
+}
+
+.project-panel .panel-header-icon {
+  opacity: 0.8;
+  color: var(--color-text-primary);
+}
+
+.project-panel .sidebar-panel-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Control Panel Chevron in Header */
+.control-panel-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 0;
+  color: var(--color-text-secondary);
+  transition: var(--transition-normal);
+}
+
+.control-panel-chevron:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}
+
+.control-panel-chevron:active {
+  background: var(--color-bg-active);
+}

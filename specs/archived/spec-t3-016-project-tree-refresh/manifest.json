@@ -1,0 +1,145 @@
+{
+  "spec_id": 16,
+  "slug": "project-tree-refresh",
+  "tier": "T3",
+  "version": "0.1.0",
+  "created": "2026-02-05T00:00:00Z",
+  "updated": "2026-02-05T14:52:30Z",
+  "application": {
+    "name": "Project Tree refresh specification",
+    "domain": null,
+    "tech_stack": []
+  },
+  "scope": {
+    "type": "feature",
+    "name": "Project Tree refresh specification"
+  },
+  "sections": [
+    {
+      "id": "01",
+      "file": "requirements/01-overview.md",
+      "title": "Overview",
+      "word_count": 1340
+    },
+    {
+      "id": "02",
+      "file": "requirements/02-requirements.md",
+      "title": "Requirements",
+      "word_count": 2191
+    },
+    {
+      "id": "03",
+      "file": "requirements/03-acceptance.md",
+      "title": "Acceptance",
+      "word_count": 1691
+    }
+  ],
+  "requirements_index": {
+    "016-FR-001": { "section": "02-requirements", "status": "active" },
+    "016-FR-002": { "section": "02-requirements", "status": "active" },
+    "016-FR-003": { "section": "02-requirements", "status": "active" },
+    "016-FR-004": { "section": "02-requirements", "status": "active" },
+    "016-FR-005": { "section": "02-requirements", "status": "active" },
+    "016-FR-006": { "section": "02-requirements", "status": "active" },
+    "016-FR-007": { "section": "02-requirements", "status": "active" },
+    "016-FR-008": { "section": "02-requirements", "status": "active" },
+    "016-FR-009": { "section": "02-requirements", "status": "active" },
+    "016-FR-010": { "section": "02-requirements", "status": "active" },
+    "016-FR-011": { "section": "02-requirements", "status": "active" },
+    "016-FR-012": { "section": "02-requirements", "status": "active" },
+    "016-FR-013": { "section": "02-requirements", "status": "active" },
+    "016-NFR-001": { "section": "02-requirements", "status": "active" },
+    "016-NFR-002": { "section": "02-requirements", "status": "active" },
+    "016-NFR-003": { "section": "02-requirements", "status": "active" },
+    "016-NFR-004": { "section": "02-requirements", "status": "active" },
+    "016-NFR-005": { "section": "02-requirements", "status": "active" },
+    "016-AC-001": { "section": "03-acceptance", "status": "active" },
+    "016-AC-002": { "section": "03-acceptance", "status": "active" },
+    "016-AC-003": { "section": "03-acceptance", "status": "active" },
+    "016-AC-004": { "section": "03-acceptance", "status": "active" },
+    "016-AC-005": { "section": "03-acceptance", "status": "active" },
+    "016-AC-006": { "section": "03-acceptance", "status": "active" },
+    "016-AC-007": { "section": "03-acceptance", "status": "active" },
+    "016-AC-008": { "section": "03-acceptance", "status": "active" },
+    "016-AC-009": { "section": "03-acceptance", "status": "active" },
+    "016-AC-010": { "section": "03-acceptance", "status": "active" },
+    "016-AC-011": { "section": "03-acceptance", "status": "active" },
+    "016-AC-012": { "section": "03-acceptance", "status": "active" },
+    "016-AC-013": { "section": "03-acceptance", "status": "active" },
+    "016-AC-014": { "section": "03-acceptance", "status": "active" },
+    "016-AC-015": { "section": "03-acceptance", "status": "active" },
+    "016-AC-016": { "section": "03-acceptance", "status": "active" },
+    "016-AC-017": { "section": "03-acceptance", "status": "active" },
+    "016-AC-018": { "section": "03-acceptance", "status": "active" },
+    "016-AC-019": { "section": "03-acceptance", "status": "active" },
+    "016-AC-020": { "section": "03-acceptance", "status": "active" }
+  },
+  "requirement_sequences": {
+    "FR": 13,
+    "NFR": 5,
+    "AC": 20
+  },
+  "cross_references": [],
+  "statistics": {
+    "total_sections": 3,
+    "total_requirements": 38,
+    "total_words": 5222
+  },
+  "validation": {
+    "overall_score": null,
+    "passed": false,
+    "last_validated": null,
+    "threshold": 50
+  },
+  "change_history": [
+    {
+      "date": "2026-02-05T00:00:00Z",
+      "operation": "INIT",
+      "target": "all",
+      "description": "Spec initialized as T3 with 3 sections -- Project Tree refresh behavior specification",
+      "by": "user"
+    },
+    {
+      "date": "2026-02-05T00:00:00Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 2 issues: registry sections_count (0 -> 3), registry requirements_count (0 -> 38)",
+      "by": "system",
+      "details": {
+        "word_count_updated": false,
+        "indexes_rebuilt": false,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": true
+      }
+    },
+    {
+      "date": "2026-02-05T11:38:10Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 3 word count issues after spec file edits",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": false,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": false
+      }
+    },
+    {
+      "date": "2026-02-05T14:52:30Z",
+      "operation": "RECONCILE",
+      "target": "manifest",
+      "description": "Auto-fixed 4 word count inconsistencies: 01-overview (1160 -> 1340), 02-requirements (1879 -> 2191), 03-acceptance (1563 -> 1691), total_words (4602 -> 5222)",
+      "by": "system",
+      "details": {
+        "word_count_updated": true,
+        "indexes_rebuilt": false,
+        "sections_synced": false,
+        "orphans_cleaned": 0,
+        "registry_synced": false
+      }
+    }
+  ]
+}

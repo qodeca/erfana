@@ -1,0 +1,136 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/* Activity Bar Container */
+.activity-bar {
+  width: 48px;
+  background: var(--color-gray-800);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.activity-bar-left {
+  border-right: var(--border-width) solid var(--color-bg-primary);
+}
+
+.activity-bar-right {
+  border-left: var(--border-width) solid var(--color-bg-primary);
+}
+
+/* Activity Bar Items Container */
+.activity-bar-items {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* Individual Activity Bar Item */
+.activity-bar-item {
+  width: 100%;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  color: var(--color-text-secondary);
+  transition: color var(--transition-fast);
+  outline: none;
+}
+
+.activity-bar-item:hover {
+  color: var(--color-white);
+}
+
+.activity-bar-item:focus-visible {
+  outline: 1px solid var(--color-border-focus);
+  outline-offset: -1px;
+}
+
+.activity-bar-item.active {
+  color: var(--color-white);
+}
+
+/* Active indicator (left bar on left side, right bar on right side) */
+.activity-bar-item-left.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-brand-lime);
+}
+
+.activity-bar-item-right.active::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-brand-lime);
+}
+
+/* Icon Container */
+.activity-bar-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Badge Styles */
+.activity-bar-badge {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  min-width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+  padding: 0 var(--space-2);
+  background: var(--color-brand-violet);
+  color: var(--color-white);
+  font-size: 9px;
+  font-weight: var(--font-semibold);
+  border-radius: var(--border-radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* Badge for left activity bar */
+.activity-bar-left .activity-bar-badge {
+  right: var(--space-3);
+}
+
+/* Badge for right activity bar */
+.activity-bar-right .activity-bar-badge {
+  left: var(--space-3);
+  right: auto;
+}
+
+/* Settings Button */
+.activity-bar-settings-btn {
+  width: 100%;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  transition: color var(--transition-fast);
+  outline: none;
+  margin-top: auto;
+}
+
+.activity-bar-settings-btn:hover {
+  color: var(--color-white);
+}
+
+.activity-bar-settings-btn:focus-visible {
+  outline: 1px solid var(--color-border-focus);
+  outline-offset: -1px;
+}

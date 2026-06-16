@@ -1,0 +1,656 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/* Unified Dialog Framework Styles */
+
+/* CSS Variables for theming - using design tokens */
+:root {
+  --dialog-overlay-bg: var(--color-overlay-dialog);
+  --dialog-bg: var(--color-bg-primary);
+  --dialog-border: var(--color-border-subtle);
+  --dialog-base-zindex: var(--z-dialog);
+  --dialog-text-primary: var(--color-text-emphasis);
+  --dialog-text-secondary: var(--color-gray-200);
+  --dialog-text-muted: var(--color-text-muted);
+  --dialog-btn-primary-bg: var(--color-btn-primary-bg);
+  --dialog-btn-primary-hover: var(--color-btn-primary-hover);
+  --dialog-btn-danger-bg: var(--color-btn-danger-bg);
+  --dialog-btn-danger-hover: var(--color-btn-danger-hover);
+  --dialog-btn-secondary-bg: var(--color-btn-secondary-bg);
+  --dialog-btn-secondary-hover: var(--color-btn-secondary-hover);
+  --dialog-spacing-large: var(--space-12);
+  --dialog-tooltip-min-width: 100px;
+  --dialog-icon-size: var(--icon-size-xl);
+  --dialog-icon-gap: var(--space-6);
+  --dialog-icon-radius: var(--border-radius);
+  --dialog-header-margin: var(--space-8);
+}
+
+/* Overlay - Full screen backdrop */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--dialog-overlay-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-10);
+  backdrop-filter: blur(4px);
+  animation: dialogFadeIn var(--transition-normal);
+}
+
+@keyframes dialogFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Dialog container */
+.dialog-container {
+  background-color: var(--dialog-bg);
+  border: var(--border-width) solid var(--dialog-border);
+  border-radius: var(--border-radius);
+  padding: var(--space-14);
+  min-width: var(--dialog-min-width);
+  max-width: var(--dialog-max-width);
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-dialog);
+  animation: dialogSlideUp var(--transition-slow);
+}
+
+@keyframes dialogSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Dialog header */
+.dialog-header {
+  margin: 0 0 var(--space-8) 0;
+}
+
+.dialog-title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  color: var(--dialog-text-primary);
+  letter-spacing: -0.2px;
+}
+
+.dialog-body {
+  margin: 0 0 var(--space-12) 0;
+}
+
+.dialog-message {
+  margin: 0;
+  color: var(--dialog-text-secondary);
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+}
+
+/* Dialog actions (buttons) */
+.dialog-actions {
+  display: flex;
+  gap: var(--space-6);
+  justify-content: flex-end;
+  align-items: center;
+  padding-top: var(--space-2);
+}
+
+/* Left side of actions row (info icon + char count) */
+.dialog-actions-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin-right: auto;
+}
+
+/* Button styles */
+.dialog-btn {
+  padding: var(--space-5) var(--space-12);
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  transition: all var(--transition-normal);
+  letter-spacing: 0.2px;
+}
+
+.dialog-btn:focus {
+  outline: 2px solid var(--dialog-btn-primary-bg);
+  outline-offset: var(--space-1);
+}
+
+/* Primary button (confirm, submit) */
+.dialog-btn-primary {
+  background-color: var(--dialog-btn-primary-bg);
+  color: var(--color-white);
+  box-shadow: var(--shadow-sm);
+}
+
+.dialog-btn-primary:hover:not(:disabled) {
+  background-color: var(--dialog-btn-primary-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.dialog-btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--shadow-xs);
+}
+
+/* Danger button (delete, destructive actions) */
+.dialog-btn-danger {
+  background-color: var(--dialog-btn-danger-bg);
+  color: var(--color-white);
+  box-shadow: var(--shadow-sm);
+}
+
+.dialog-btn-danger:hover:not(:disabled) {
+  background-color: var(--dialog-btn-danger-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.dialog-btn-danger:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--shadow-xs);
+}
+
+/* Secondary button (cancel) */
+.dialog-btn-secondary {
+  background-color: transparent;
+  color: var(--dialog-text-secondary);
+  border: var(--border-width) solid var(--dialog-border);
+}
+
+.dialog-btn-secondary:hover {
+  background-color: var(--dialog-btn-secondary-bg);
+  border-color: var(--color-gray-700);
+}
+
+/* Disabled state */
+.dialog-btn:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Input field (for PromptDialog) */
+.dialog-input {
+  width: 100%;
+  padding: var(--space-6);
+  background-color: var(--color-bg-input);
+  border: var(--border-width) solid var(--dialog-border);
+  border-radius: var(--border-radius);
+  color: var(--dialog-text-secondary);
+  font-size: var(--text-md);
+  font-family: var(--font-sans);
+  line-height: var(--leading-relaxed);
+  resize: vertical;
+  min-height: 120px;
+  transition: all var(--transition-slow);
+}
+
+.dialog-input:focus {
+  outline: none;
+  border-color: var(--dialog-btn-primary-bg);
+  background-color: var(--color-bg-tertiary);
+  box-shadow: var(--shadow-focus);
+}
+
+.dialog-input::placeholder {
+  color: var(--color-text-placeholder);
+  font-style: italic;
+}
+
+/* Input label */
+.dialog-input-label {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--dialog-text-secondary);
+  margin-bottom: var(--space-5);
+  letter-spacing: 0.1px;
+}
+
+/* Validation error message */
+.dialog-validation-error {
+  color: var(--color-error);
+  font-size: var(--text-base);
+  margin-top: var(--space-4);
+}
+
+/* Validation warning message (approaching limit) */
+.dialog-validation-warning {
+  color: var(--color-warning);
+  font-size: var(--text-base);
+  margin-top: var(--space-4);
+}
+
+/* Validation hint message (too short) */
+.dialog-validation-hint {
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+  margin-top: var(--space-4);
+}
+
+/* Keyboard hint text */
+.dialog-keyboard-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-6);
+  text-align: center;
+}
+
+.dialog-keyboard-hint kbd {
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-bg-primary);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  font-family: var(--font-mono);
+}
+
+/* Selected text preview section (for PromptDialog) */
+.dialog-selected-text {
+  background-color: var(--color-bg-secondary);
+  border-left: 3px solid var(--color-accent-secondary);
+  padding: var(--space-6) var(--space-8);
+  border-radius: var(--border-radius);
+  max-height: 200px;
+  overflow-y: scroll;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--dialog-spacing-large);
+}
+
+/* Custom scrollbar for selected text (Webkit browsers only) */
+/* Firefox will use default scrollbar styling */
+.dialog-selected-text::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+}
+
+.dialog-selected-text::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+.dialog-selected-text::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border: var(--border-width-thick) solid var(--color-bg-secondary);
+}
+
+.dialog-selected-text::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+.dialog-selected-text-label {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: var(--font-semibold);
+  flex-shrink: 0;
+}
+
+.dialog-selected-text-content {
+  font-size: var(--text-base);
+  color: var(--color-gray-300);
+  font-style: italic;
+  line-height: var(--leading-relaxed);
+  word-break: break-word;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  overflow-wrap: break-word;
+}
+
+/* Input section spacing (for PromptDialog) */
+.dialog-input-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* Info icon with tooltip (for PromptDialog) */
+.dialog-info-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.dialog-info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-secondary);
+  cursor: help;
+  transition: color var(--transition-slow);
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.dialog-info-icon:hover,
+.dialog-info-icon:focus {
+  color: var(--color-gray-200);
+  outline: none;
+}
+
+.dialog-info-icon:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: var(--space-1);
+}
+
+.dialog-tooltip {
+  position: absolute;
+  bottom: calc(100% + var(--space-4));
+  left: 0;
+  background-color: var(--color-bg-secondary);
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: 0;
+  padding: var(--space-4) var(--space-6);
+  min-width: var(--dialog-tooltip-min-width);
+  box-shadow: var(--shadow-md);
+  z-index: var(--z-tooltip);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity var(--transition-normal), transform var(--transition-normal);
+  white-space: nowrap;
+}
+
+.dialog-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.dialog-tooltip-content {
+  font-size: var(--text-sm);
+  color: var(--color-gray-200);
+  line-height: var(--leading-normal);
+}
+
+.dialog-tooltip-content kbd {
+  display: inline-block;
+  padding: var(--space-1) var(--space-3);
+  background-color: var(--color-bg-primary);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  color: var(--color-gray-200);
+  font-weight: var(--font-medium);
+}
+
+/* Scrollbar styling for dialog content */
+.dialog-container::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+}
+
+.dialog-container::-webkit-scrollbar-track {
+  background: var(--dialog-bg);
+}
+
+.dialog-container::-webkit-scrollbar-thumb {
+  background: var(--dialog-border);
+  border: var(--border-width-thick) solid var(--dialog-bg);
+}
+
+.dialog-container::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* Shared Dialog Header with Icon Styles */
+
+/* Base header style for all dialogs with icons */
+.dialog-header-with-icon {
+  display: flex;
+  align-items: center;
+  gap: var(--dialog-icon-gap);
+  margin-bottom: var(--dialog-header-margin);
+}
+
+/* Base icon container style for all dialogs */
+.dialog-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--dialog-icon-size);
+  height: var(--dialog-icon-size);
+  border-radius: var(--dialog-icon-radius);
+  background-color: var(--color-bg-hover);
+  color: var(--dialog-text-secondary);
+}
+
+.dialog-icon svg {
+  flex-shrink: 0;
+}
+
+/* Rename Dialog Specific Styles */
+
+/* Compact rename dialog */
+.dialog-rename .dialog-container {
+  min-width: 600px;
+  max-width: 700px;
+}
+
+/* Parent path context */
+.dialog-rename-context {
+  font-size: var(--text-base);
+  color: var(--dialog-text-muted);
+  margin-bottom: var(--space-10);
+  font-style: italic;
+}
+
+/* Input section */
+.dialog-rename-input-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Input field */
+.dialog-rename-input {
+  width: 100%;
+  padding: var(--space-5) var(--space-6);
+  background-color: var(--color-bg-input);
+  border: var(--border-width) solid var(--dialog-border);
+  border-radius: var(--border-radius);
+  color: var(--dialog-text-secondary);
+  font-size: var(--text-md);
+  font-family: var(--font-sans);
+  transition: all var(--transition-slow);
+}
+
+.dialog-rename-input:focus {
+  outline: none;
+  border-color: var(--dialog-btn-primary-bg);
+  background-color: var(--color-bg-tertiary);
+  box-shadow: var(--shadow-focus);
+}
+
+.dialog-rename-input.error {
+  color: var(--color-error);
+}
+
+/* Validation error */
+.dialog-rename-validation-error {
+  color: var(--color-error);
+  font-size: var(--text-sm);
+  margin-top: var(--space-2);
+}
+
+/* Prompt Dialog Specific Styles */
+
+/* Fixed width for PromptDialog to prevent width changes based on selected text */
+.dialog-container.dialog-prompt {
+  width: 600px;
+  min-width: 600px;
+  max-width: 600px;
+}
+
+/* Dropdown select for PromptDialog */
+.dialog-select {
+  width: 100%;
+  padding: var(--space-5) var(--space-6);
+  padding-right: var(--space-12); /* Extra space for custom arrow */
+  background-color: var(--color-bg-input);
+  border: var(--border-width) solid var(--dialog-border);
+  border-radius: 0; /* UI Style Guide: no rounded corners */
+  color: var(--color-text-primary);
+  font-size: var(--text-md);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: all var(--transition-slow);
+
+  /* Remove default browser styling */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  /* Custom dropdown arrow using CSS */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23858585' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-6) center;
+  background-size: 12px;
+}
+
+.dialog-select:hover {
+  border-color: var(--color-border-subtle);
+  background-color: var(--color-bg-tertiary);
+}
+
+.dialog-select:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  background-color: var(--color-bg-tertiary);
+  box-shadow: var(--shadow-focus);
+}
+
+/* Style dropdown options */
+.dialog-select option {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  padding: var(--space-4);
+}
+
+/* Dropdown section with label */
+.dialog-dropdown-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.dialog-dropdown-label {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--dialog-text-secondary);
+  letter-spacing: 0.1px;
+}
+
+/* ============================================================================
+   Drop Mode Dialog Styles
+   ============================================================================ */
+
+/* Container for mode selection buttons */
+.dialog-drop-mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-12);
+}
+
+/* Individual mode option button */
+.dialog-drop-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-8);
+  background-color: var(--color-bg-secondary);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition-normal);
+  position: relative;
+}
+
+.dialog-drop-mode-btn:hover {
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-border-default);
+}
+
+.dialog-drop-mode-btn:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+/* Icon positioning in mode button */
+.dialog-drop-mode-btn svg {
+  position: absolute;
+  top: var(--space-6);
+  right: var(--space-6);
+  color: var(--color-text-secondary);
+}
+
+/* Mode button label (Move, Copy, Import) */
+.dialog-drop-mode-btn-label {
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-emphasis);
+}
+
+/* Mode button description */
+.dialog-drop-mode-btn-description {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-normal);
+}
+
+/* ============================================================================
+   Conflict Dialog Styles
+   ============================================================================ */
+
+/* Warning icon variant */
+.dialog-icon-warning {
+  background-color: rgba(255, 135, 113, 0.15);
+  color: var(--color-error);
+}
+
+/* Filename highlight in message */
+.dialog-filename {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  color: var(--color-text-emphasis);
+  word-break: break-all;
+}
+
+/* Button with icon styling */
+.dialog-btn-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.dialog-btn-with-icon svg {
+  flex-shrink: 0;
+}

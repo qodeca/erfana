@@ -1,0 +1,681 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/* ProjectTree.css - File explorer sidebar component */
+
+.project-tree {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+}
+
+.project-tree-path {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  height: var(--header-height);
+  box-sizing: border-box;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+}
+
+.project-name {
+  flex: 1;
+}
+
+.project-tree-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  width: var(--icon-size-lg);
+  height: var(--icon-size-lg);
+  border-radius: var(--border-radius);
+  color: var(--color-text-secondary);
+  transition: all var(--transition-normal);
+}
+
+.icon-btn:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}
+
+.icon-btn:active:not(:disabled) {
+  background: var(--color-bg-hover-solid);
+}
+
+.icon-btn:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.icon-btn:focus-visible {
+  outline: var(--border-width) solid var(--color-border-focus);
+  outline-offset: 1px;
+}
+
+.icon-btn .spin {
+  animation: spin 0.9s linear infinite;
+}
+
+/* Honor reduced-motion preference: stop the continuous rotation for
+   motion-sensitive users (the icon stays static while still indicating busy). */
+@media (prefers-reduced-motion: reduce) {
+  .icon-btn .spin {
+    animation: none;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.project-tree-error {
+  padding: var(--space-4);
+  background-color: var(--color-error-bg);
+  color: var(--color-error);
+  font-size: var(--text-sm);
+  margin: var(--space-4);
+  border-radius: var(--border-radius);
+}
+
+.project-tree-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--space-5);
+}
+
+.project-tree-empty {
+  padding: var(--space-10);
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.project-tree-node {
+  user-select: none;
+}
+
+.project-tree-item {
+  display: flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-tree-item:hover {
+  background-color: var(--color-bg-hover-solid);
+}
+
+.project-tree-item.file {
+  cursor: pointer;
+}
+
+.project-tree-item.directory {
+  font-weight: var(--font-medium);
+}
+
+.project-tree-item.selected {
+  background-color: var(--color-bg-selected);
+  border-left: var(--border-width-thick) solid var(--color-brand-lime);
+}
+
+.file-icon {
+  margin-right: var(--space-3);
+  flex-shrink: 0;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-primary);
+}
+
+.file-icon svg {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+}
+
+/* Markdown file icon - brand violet */
+.file-icon.markdown {
+  color: var(--color-brand-violet);
+}
+
+.file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-text-emphasis);
+}
+
+.file-name.markdown {
+  color: var(--color-text-emphasis);
+  font-weight: var(--font-medium);
+}
+
+/* Sensitive files - amber color with warning */
+.file-name.sensitive {
+  color: var(--color-warning-bright);
+  font-weight: var(--font-medium);
+}
+
+.sensitive-icon {
+  color: var(--color-warning-bright);
+  margin-right: var(--space-2);
+  vertical-align: middle;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Hidden files - dimmed appearance */
+.file-name.hidden-file {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+/* Sensitive files take priority over hidden styling - security visibility is critical */
+.file-name.sensitive.hidden-file {
+  opacity: 1; /* Override hidden opacity to keep warning visible */
+}
+
+/* Hidden files hover - restore full opacity */
+.project-tree-item:hover .file-name.hidden-file {
+  opacity: 1;
+}
+
+.project-tree-children {
+  /* Children are indented via paddingLeft in ProjectTreeNode */
+}
+
+/* Scrollbar styling */
+.project-tree-content::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+}
+
+.project-tree-content::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+.project-tree-content::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--border-radius);
+}
+
+.project-tree-content::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* Project Control Panel */
+.project-control-panel {
+  background: var(--color-bg-tertiary);
+  border-bottom: var(--border-width) solid var(--color-bg-active);
+  font-family: var(--font-sans);
+}
+
+.control-panel-content {
+  padding: var(--space-8);
+  animation: slideDown var(--transition-slow);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.control-panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.control-panel-label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filter-options {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.filter-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  background: var(--color-bg-hover);
+  border: var(--border-width) solid var(--color-bg-active);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.filter-option:hover {
+  background: var(--color-bg-hover-solid);
+  border-color: var(--color-bg-active);
+}
+
+.filter-option.active {
+  background: var(--color-accent-drag-bg);
+  border-color: var(--color-accent-drag-border);
+  color: var(--color-accent-drag);
+}
+
+.filter-option.active:hover {
+  background: var(--color-brand-violet-muted);
+  border-color: var(--color-accent-drag);
+}
+
+/* ===================================================================
+   Drag and Drop Styles
+   =================================================================== */
+
+/* Dragging state - dim the original item */
+.project-tree-item[data-dragging="true"] {
+  opacity: var(--opacity-disabled);
+  cursor: grabbing !important;
+}
+
+/* Grab cursor on hover (drag handle) */
+.project-tree-item .file-icon {
+  cursor: grab;
+}
+
+.project-tree-item[data-dragging="true"] .file-icon {
+  cursor: grabbing;
+}
+
+/* VS Code-style folder highlighting during drag */
+/* Highlight the folder row when it's a drop target */
+.project-tree-item[data-drop-target="true"].directory {
+  background-color: var(--color-accent-drag-bg);
+  border-radius: var(--border-radius);
+  position: relative;
+}
+
+/* Folder highlighting during drag (auto-expand countdown) */
+.project-tree-node[data-drop-highlight="true"] > .project-tree-item.directory {
+  background-color: var(--color-accent-drag-bg);
+  border-radius: var(--border-radius);
+}
+
+/* Highlight the children area for expanded folders */
+.project-tree-node[data-drop-highlight="true"] > .project-tree-children {
+  position: relative;
+  background-color: var(--color-accent-drag-bg-subtle);
+  border-radius: var(--border-radius);
+}
+
+/* Visual left border using pseudo-element (no layout shift) */
+.project-tree-node[data-drop-highlight="true"] > .project-tree-children::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--border-width-thick);
+  background-color: var(--color-accent-drag-border);
+}
+
+/* Invalid drop target (e.g., trying to move folder into itself) */
+.project-tree-item[data-drop-invalid="true"] {
+  background-color: var(--color-error-bg);
+  border-radius: var(--border-radius);
+  cursor: not-allowed;
+}
+
+/* Cut operation - dim item until paste */
+.project-tree-item[data-clipboard-cut="true"] {
+  opacity: 0.6;
+  position: relative;
+}
+
+.project-tree-item[data-clipboard-cut="true"]::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--border-width);
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-text-secondary),
+    var(--color-text-secondary) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+/* Drag overlay (ghost element) */
+.drag-overlay {
+  background: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-accent-drag);
+  border-radius: var(--border-radius);
+  padding: var(--space-2) var(--space-4);
+  box-shadow: var(--shadow-md);
+  cursor: grabbing;
+  opacity: 0.95;
+  /* Allow elementFromPoint() to see through overlay to elements underneath (issue #85) */
+  pointer-events: none;
+}
+
+.drag-overlay .file-name {
+  color: var(--color-text-primary);
+  font-weight: var(--font-medium);
+}
+
+/* ARIA live region for drag announcements */
+.drag-announcements {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* ===================================================================
+   External File Drop Styles (Spec #012)
+   Visual feedback for drag-drop from external sources (Finder, etc.)
+   =================================================================== */
+
+/* External drag active indicator on the tree container */
+/* Provides subtle visual feedback that the tree is accepting drops */
+.project-tree[data-external-drag="true"] {
+  outline: var(--border-width) dashed var(--color-accent-drag-border);
+  outline-offset: -1px;
+}
+
+/* External drag active - highlight the content area */
+.project-tree[data-external-drag="true"] .project-tree-content {
+  background-color: var(--color-accent-drag-bg-subtle);
+}
+
+/* Valid drop target during external drag - folder being hovered */
+/* Reuses same visual language as internal drag-drop for consistency */
+.project-tree-item.directory[data-external-drop-target="true"] {
+  background-color: var(--color-accent-drag-bg);
+  position: relative;
+}
+
+/* Dashed border indicator for external drop target (distinguishes from internal drag) */
+.project-tree-item.directory[data-external-drop-target="true"]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: var(--border-width) dashed var(--color-accent-drag);
+  pointer-events: none;
+}
+
+/* Invalid drop target during external drag (file, not folder) */
+/* Shows not-allowed cursor and muted appearance */
+.project-tree-item:not(.directory)[data-external-drag-hover="true"] {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+/* Text indicator for external drop */
+/* Applied to folder name when it's the active drop target */
+.project-tree-item.directory[data-external-drop-target="true"] .file-name {
+  color: var(--color-accent-drag);
+  font-weight: var(--font-medium);
+}
+
+/* Children area highlight during external drop (for expanded folders) */
+/* Shows where files will be placed */
+.project-tree-node[data-external-drop-highlight="true"] > .project-tree-children {
+  background-color: var(--color-accent-drag-bg-subtle);
+  position: relative;
+}
+
+/* Left border indicator for children area */
+.project-tree-node[data-external-drop-highlight="true"] > .project-tree-children::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--border-width);
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--color-accent-drag) 0,
+    var(--color-accent-drag) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+/* ===================================================================
+   Git Status Indicators
+   =================================================================== */
+
+/* Git status badge - letter indicator for files */
+.git-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--space-7);
+  height: var(--space-7);
+  padding: 0 var(--space-1);
+  margin-left: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  border-radius: var(--border-radius);
+  flex-shrink: 0;
+}
+
+/* Git status dot - colored indicator for folders */
+/* Must match badge dimensions for horizontal alignment */
+.git-status-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--space-7);
+  height: var(--space-7);
+  margin-left: var(--space-2);
+  flex-shrink: 0;
+}
+
+/* The actual dot - centered within the container */
+.git-status-dot::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: var(--border-radius-circle);
+}
+
+/* Status color variants - badge background and text */
+.git-status-badge[data-git-status="modified"] {
+  background-color: var(--color-git-modified-light);
+  color: var(--color-bg-primary);
+}
+
+.git-status-badge[data-git-status="untracked"] {
+  background-color: var(--color-git-untracked-light);
+  color: var(--color-bg-primary);
+}
+
+.git-status-badge[data-git-status="deleted"] {
+  background-color: var(--color-git-deleted-light);
+  color: var(--color-bg-primary);
+}
+
+.git-status-badge[data-git-status="staged"] {
+  background-color: var(--color-git-staged-light);
+  color: var(--color-bg-primary);
+}
+
+.git-status-badge[data-git-status="renamed"] {
+  background-color: var(--color-git-renamed-light);
+  color: var(--color-bg-primary);
+}
+
+.git-status-badge[data-git-status="conflicted"] {
+  background-color: var(--color-git-conflicted-light);
+  color: var(--color-bg-primary);
+}
+
+/* Status color variants - dot background (via ::before pseudo-element) */
+.git-status-dot[data-git-status="modified"]::before {
+  background-color: var(--color-git-modified);
+}
+
+.git-status-dot[data-git-status="untracked"]::before {
+  background-color: var(--color-git-untracked);
+}
+
+.git-status-dot[data-git-status="deleted"]::before {
+  background-color: var(--color-git-deleted);
+}
+
+.git-status-dot[data-git-status="staged"]::before {
+  background-color: var(--color-git-staged);
+}
+
+.git-status-dot[data-git-status="renamed"]::before {
+  background-color: var(--color-git-renamed);
+}
+
+.git-status-dot[data-git-status="conflicted"]::before {
+  background-color: var(--color-git-conflicted);
+}
+
+/* File name color override for git status */
+.file-name[data-git-status="modified"] {
+  color: var(--color-git-modified-light);
+}
+
+.file-name[data-git-status="untracked"] {
+  color: var(--color-git-untracked-light);
+}
+
+.file-name[data-git-status="deleted"] {
+  color: var(--color-git-deleted-light);
+}
+
+.file-name[data-git-status="staged"] {
+  color: var(--color-git-staged-light);
+}
+
+.file-name[data-git-status="renamed"] {
+  color: var(--color-git-renamed-light);
+}
+
+.file-name[data-git-status="conflicted"] {
+  color: var(--color-git-conflicted-light);
+}
+
+/* ===================================================================
+   Git Status Bar (Footer)
+   =================================================================== */
+
+.git-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  height: var(--header-height);
+  box-sizing: border-box;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-tertiary);
+  border-top: var(--border-width) solid var(--color-border-default);
+}
+
+/* Branch section (left) */
+.git-branch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--font-medium);
+  flex: 1 1 auto;
+}
+
+/* Counts section (right) */
+.git-counts {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+.git-count-item {
+  font-weight: var(--font-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Count item colors - match git status colors */
+.git-count-item[data-git-status="modified"] {
+  color: var(--color-git-modified-light);
+}
+
+.git-count-item[data-git-status="untracked"] {
+  color: var(--color-git-untracked-light);
+}
+
+.git-count-item[data-git-status="deleted"] {
+  color: var(--color-git-deleted-light);
+}
+
+.git-count-item[data-git-status="staged"] {
+  color: var(--color-git-staged-light);
+}
+
+.git-count-item[data-git-status="conflicted"] {
+  color: var(--color-git-conflicted-light);
+}
+
+.git-count-clean {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.git-truncated-warning {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-warning);
+}
+
+/* Refresh button (right) */
+.git-refresh {
+  flex: 0 0 auto;
+}

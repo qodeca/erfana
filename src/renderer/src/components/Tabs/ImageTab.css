@@ -1,0 +1,166 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * ImageTab Styles
+ *
+ * Chrome-style tab for image viewer panels.
+ * Similar to EditorTab but simpler (no dirty indicator).
+ *
+ * @see ImageTab.tsx for component implementation
+ * @see EditorTab.css for editor tab styles
+ * @see Spec #015 - Image preview viewer specification
+ */
+
+/* ============================================
+ * Tab Container
+ * ============================================ */
+
+.image-tab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 41px;
+  min-width: 80px;
+  max-width: 300px;
+  padding: 0 var(--space-2) 0 var(--space-6);
+  box-sizing: border-box;
+  cursor: pointer;
+  user-select: none;
+  gap: var(--space-2);
+  flex: 1 1 0;
+  overflow: hidden;
+  transition: background-color var(--transition-fast);
+}
+
+/* Hover indication */
+.image-tab:hover {
+  background-color: var(--color-bg-hover);
+}
+
+/* Active tab hover - slightly brighter */
+.dv-active-tab .image-tab:hover {
+  background-color: var(--color-bg-hover-solid);
+}
+
+/* ============================================
+ * Tab Icon
+ * ============================================ */
+
+.image-tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+
+/* Active tab icon - brighter */
+.dv-active-tab .image-tab-icon {
+  color: var(--color-text-primary);
+}
+
+/* ============================================
+ * Tab Label (Filename)
+ * ============================================ */
+
+.image-tab-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  flex: 1;
+  min-width: 0;
+}
+
+/* Active tab label - brighter */
+.dv-active-tab .image-tab-label {
+  color: var(--color-white);
+}
+
+/* ============================================
+ * Close Button
+ * ============================================ */
+
+.image-tab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-size-md);
+  height: var(--icon-size-md);
+  min-width: var(--icon-size-md);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition-fast),
+              background-color var(--transition-fast),
+              color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+/* Show close button on tab hover */
+.image-tab:hover .image-tab-close {
+  opacity: 1;
+}
+
+/* Close button hover state */
+.image-tab-close:hover {
+  background-color: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+
+/* Close button active state */
+.image-tab-close:active {
+  background-color: var(--color-gray-600);
+}
+
+/* Close button focus state */
+.image-tab-close:focus-visible {
+  outline: 1px solid var(--color-border-focus);
+  outline-offset: -1px;
+  opacity: 1;
+}
+
+/* ============================================
+ * Dockview Integration Overrides
+ * ============================================ */
+
+/* Remove default dockview tab padding */
+.dockview-theme-dark .dv-tab:has(.image-tab) {
+  padding: 0 !important;
+  flex: 1 1 0 !important;
+  min-width: 80px !important;
+  max-width: 300px !important;
+}
+
+.dockview-theme-dark .dv-default-tab:has(.image-tab) {
+  padding: 0 !important;
+  width: auto !important;
+  min-width: 80px !important;
+  max-width: 300px !important;
+  flex: 1 1 0 !important;
+}
+
+/* Hide dockview's default close button when using custom tab */
+.dockview-theme-dark .dv-default-tab:has(.image-tab) .dv-default-tab-action {
+  display: none !important;
+}
+
+/* Hide dockview's default tab content when using custom tab */
+.dockview-theme-dark .dv-default-tab:has(.image-tab) .dv-default-tab-content {
+  display: none !important;
+}
+
+/* ============================================
+ * Accessibility
+ * ============================================ */
+
+/* Focus state for entire tab (keyboard navigation) */
+.image-tab:focus-visible {
+  outline: 1px solid var(--color-border-focus);
+  outline-offset: -1px;
+}

@@ -1,0 +1,75 @@
+name: Setup Node with retry
+description: |
+  Installs Node.js 24, caches ~/.npm (never node_modules), and runs
+  `npm ci --ignore-scripts` with retry on transient ECONNRESET. Optional
+  postinstall step runs only allowlisted native-module builds.
+
+  The caller MUST run `actions/checkout` before calling this composite.
+  Local composite actions cannot check out on behalf of the caller, because
+  their own YAML file can't be loaded until the workspace is checked out.
+
+  Why no node_modules cache: an install tree cache poisoned by a compromised
+  postinstall script would persist indefinitely. Caching the download cache
+  (~/.npm) is supply-chain-safe because a fresh `npm ci --ignore-scripts`
+  still runs every time.
+
+inputs:
+  node-version:
+    description: Node.js version. Matches project target.
+    required: false
+    default: "24"
+  run-postinstall:
+    description: Run allowlisted postinstall for electron, node-pty, node-addon-api.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node
+      # actions/setup-node v6.4.0
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Cache ~/.npm (download cache only)
+      # actions/cache v5.0.5
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+      with:
+        path: ~/.npm
+        key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+        restore-keys: |
+          npm-${{ runner.os }}-
+
+    - name: Install dependencies (npm ci, no scripts, retry x3)
+      shell: bash
+      run: |
+        set -euo pipefail
+        npm ci --ignore-scripts \
+          || (sleep 10 && npm ci --ignore-scripts) \
+          || (sleep 20 && npm ci --ignore-scripts)
+
+    - name: Run allowlisted postinstall (electron, node-pty, node-addon-api)
+      if: ${{ inputs.run-postinstall == 'true' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Apply committed patches before rebuilding. `npm ci --ignore-scripts`
+        # skips the postinstall hook that normally runs patch-package, so we
+        # invoke it explicitly here. This MUST run before `npm rebuild
+        # node-pty` so the patched gyp files (Windows msvs-only fields) are in
+        # place at compile time. On Linux/macOS the msvs-only fields are inert,
+        # so applying the patch is harmless. `--no-install` keeps it pinned to
+        # the local devDep (no registry fallback); `--error-on-fail` makes a
+        # stale/orphaned patch (e.g. after a node-pty bump) fail the step loudly
+        # instead of relying on CI auto-detection.
+        npx --no-install patch-package --error-on-fail
+        # Only rebuild native modules we explicitly trust. Any other package
+        # with a postinstall script was blocked by --ignore-scripts above and
+        # stays blocked.
+        for pkg in electron node-pty node-addon-api; do
+          if [ -d "node_modules/$pkg" ]; then
+            echo "Rebuilding $pkg"
+            npm rebuild "$pkg"
+          fi
+        done

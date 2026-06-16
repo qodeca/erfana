@@ -1,0 +1,54 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+.resizable-divider {
+  position: relative;
+  width: var(--space-4);
+  background-color: var(--color-border-default);
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background-color var(--transition-normal);
+  z-index: var(--z-dropdown);
+}
+
+.resizable-divider:hover {
+  background-color: var(--color-accent-secondary);
+}
+
+.resizable-divider.dragging {
+  background-color: var(--color-accent-secondary);
+}
+
+.divider-handle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: 40px;
+  background-color: var(--color-bg-hover);
+  border-radius: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+}
+
+.resizable-divider:hover .divider-handle,
+.resizable-divider.dragging .divider-handle {
+  opacity: 1;
+}
+
+/* Horizontal orientation styles */
+.resizable-divider.horizontal {
+  width: 100%;
+  height: var(--space-4);
+  cursor: row-resize;
+  flex-shrink: 0;
+}
+
+.resizable-divider.horizontal .divider-handle {
+  width: 40px;
+  height: 3px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}

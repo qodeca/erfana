@@ -1,0 +1,150 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * Area-select overlay styles (#164).
+ *
+ * The overlay BrowserWindow is transparent and frameless, so we fill the
+ * viewport with a semi-opaque scrim and draw the selection rectangle on top.
+ *
+ * **Design token bypass** (#164 F[36]): the overlay is its own renderer
+ * root (mounted by `main.tsx` when the hash route matches) and does NOT
+ * import `design-tokens.css`. Loading the host app's full stylesheet would
+ * defeat the point of the dedicated overlay bundle. The hardcoded values
+ * below are deliberate. See FT-5 for the long-term plan to give the overlay
+ * its own tokenized stylesheet entry.
+ *
+ * **Forced-colors mode** (#164 F[17] / round-2 F#3): Windows High Contrast
+ * strips translucent backgrounds and may remap 1px white borders to system
+ * colors. The `@media (forced-colors: active)` block at the bottom keeps
+ * the scrim transparent (so the user can SEE the desktop they're trying to
+ * area-select) and switches the selection rectangle's border to
+ * `CanvasText` — and `Highlight` when keyboard-focused — so it stays
+ * visible against any background palette.
+ *
+ * Round-2 correction: the prior implementation painted `Canvas` over the
+ * scrim, which made HCM users area-select against an opaque panel and
+ * defeated the whole feature.
+ */
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+  cursor: crosshair;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.screenshot-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.25);
+  cursor: crosshair;
+}
+
+.screenshot-overlay-hint {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  background-color: rgba(0, 0, 0, 0.65);
+  color: #ffffff;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 12px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.screenshot-overlay-selection {
+  position: absolute;
+  border: 1px solid #ffffff;
+  background-color: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+.screenshot-overlay-selection--keyboard {
+  border-style: dashed;
+  border-width: 2px;
+}
+
+.screenshot-overlay-size {
+  position: absolute;
+  bottom: -22px;
+  right: 0;
+  padding: 2px 6px;
+  background-color: rgba(0, 0, 0, 0.65);
+  color: #ffffff;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 11px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+
+.screenshot-overlay-keyboard-handle {
+  position: absolute;
+  outline: none;
+  background: transparent;
+  cursor: default;
+}
+
+.screenshot-overlay-keyboard-handle:focus-visible {
+  /* Visible focus indicator on the keyboard rectangle even without box-shadow,
+   * which can't cross the BrowserWindow transparency. */
+  outline: 2px dashed #ffffff;
+  outline-offset: 2px;
+}
+
+/* Visually-hidden status region for screen-reader announcements (#164 F[19]).
+ * Standard `sr-only` pattern — kept inline because the overlay can't reach
+ * the host app's tokens. */
+.screenshot-overlay-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Windows High Contrast / forced-colors mode (#164 F[17], round-2 F#3).
+ *
+ * The overlay scrim MUST stay transparent so the user can see the desktop
+ * they're trying to area-select. The selection rectangle gets a system-
+ * color border (`CanvasText`, or `Highlight` while keyboard-focused) so it
+ * remains visible against any HCM palette. The size readout and hint banner
+ * pair `Canvas` background with `CanvasText` foreground for forced contrast. */
+@media (forced-colors: active) {
+  .screenshot-overlay {
+    /* Intentionally no background — preserve desktop visibility. */
+    background-color: transparent;
+  }
+  .screenshot-overlay-selection {
+    border: 2px solid CanvasText;
+    background-color: transparent;
+    box-shadow: none;
+    forced-color-adjust: none;
+  }
+  .screenshot-overlay-selection--keyboard {
+    border-color: Highlight;
+  }
+  .screenshot-overlay-hint,
+  .screenshot-overlay-size {
+    background-color: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+    forced-color-adjust: none;
+  }
+  .screenshot-overlay-keyboard-handle:focus-visible {
+    outline: 2px solid Highlight;
+  }
+}

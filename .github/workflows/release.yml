@@ -1,0 +1,363 @@
+name: Release
+
+# Tag-push release orchestrator. One green run produces one draft GitHub
+# release containing signed, notarized, attested multi-platform artifacts.
+#
+# Design anchor: research-driven spec in qodeca/erfana#174.
+# Detailed ops doc: docs/build/release.md
+#
+# Flow:
+#   prepare → {build_mac, build_win} → finalize → operator
+#                 │
+#                 └─ any failure → cleanup (deletes draft, fails workflow red)
+#
+# Tag pattern is strict: v[0-9]+.[0-9]+.[0-9]+. Pre-release suffixes
+# (-rc, -beta) are out of scope for v1 and will never match this trigger.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Dry-run (skip draft creation and asset uploads)"
+        required: false
+        type: boolean
+        default: true
+
+# Zero-privilege default. Each job opts into the minimum it needs.
+permissions: {}
+
+# Two pushes of the SAME tag (different refs NOT included) cannot overlap.
+# Different tags produce different github.ref and will run in parallel,
+# which is intentional — they're independent release events.
+# cancel-in-progress MUST be false; cancelling a near-complete signed build
+# wastes money and can leave half-built drafts.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Fork guard on EVERY job (not just signing legs). Defense in depth.
+    if: github.repository == 'qodeca/erfana'
+    permissions:
+      contents: write
+      actions: read
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      is_dry_run: ${{ steps.meta.outputs.is_dry_run }}
+    steps:
+      - name: Resolve tag + dry-run flag
+        id: meta
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DRY_RUN_INPUT: ${{ github.event.inputs.dry-run }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            TAG="${GITHUB_REF_NAME}"
+            echo "is_dry_run=${DRY_RUN_INPUT:-true}" >> "$GITHUB_OUTPUT"
+          else
+            TAG="${GITHUB_REF_NAME}"
+            echo "is_dry_run=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      # actions/checkout v6.0.3
+      - name: Checkout tag
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+
+      - name: Assert release notes file exists
+        # Skipped in dry-run (workflow_dispatch from a branch — GITHUB_REF_NAME
+        # is the branch name, not a semver tag, so docs/release-notes/<branch>.md
+        # would never exist). Real tag pushes still hit this gate.
+        if: steps.meta.outputs.is_dry_run != 'true'
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          set -euo pipefail
+          NOTES="docs/release-notes/${TAG}.md"
+          if [ ! -f "$NOTES" ]; then
+            echo "::error::Release notes file missing: $NOTES"
+            echo "Run the releasing-erfana skill before pushing the tag."
+            exit 1
+          fi
+
+      - name: Assert checks.yml has a green run for this commit
+        # Lockfile-drift guard, layer 1 (existence check): if the tagged
+        # commit never produced a green checks.yml run, its lint /
+        # typecheck / tests / build / audit-signatures / release-guards
+        # have never been validated. Abort before signing.
+        # Skipped in dry-run — caller is validating the signing pipeline
+        # itself, not gating on pre-merge CI state.
+        id: green_run
+        if: steps.meta.outputs.is_dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG_SHA=$(git rev-parse HEAD)
+          RUN_ID=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/workflows/checks.yml/runs?head_sha=${TAG_SHA}&status=success" \
+            --jq '.workflow_runs[0].id // "none"')
+          STATUS=$(gh api \
+            "/repos/${GITHUB_REPOSITORY}/actions/workflows/checks.yml/runs?head_sha=${TAG_SHA}&status=success" \
+            --jq '.workflow_runs[0].conclusion // "none"')
+          if [ "$STATUS" != "success" ] || [ "$RUN_ID" = "none" ]; then
+            echo "::error::No green checks.yml run for ${TAG_SHA}"
+            exit 1
+          fi
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Verify package-lock.json byte-equality vs checks.yml digest
+        # Lockfile-drift guard, layer 2 (content check): downloads the
+        # package-lock-digest artifact recorded by the green checks.yml run
+        # and asserts the local package-lock.json hashes to the same value.
+        # Closes the gap where checks.yml saw lockfile A but release.yml
+        # gets lockfile B at the same SHA (cache poisoning, mid-flight tag
+        # repoint, etc.). Acceptance criterion behind issue #174 §Security
+        # architecture row 8.
+        if: steps.meta.outputs.is_dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.green_run.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            -n package-lock-digest \
+            -D /tmp/lock-digest
+          EXPECTED=$(tr -d '[:space:]' < /tmp/lock-digest/package-lock.sha256)
+          ACTUAL=$(sha256sum package-lock.json | cut -d' ' -f1)
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "::error::package-lock.json drift detected"
+            echo "expected (from checks.yml run $RUN_ID): $EXPECTED" >&2
+            echo "actual   (this commit):                 $ACTUAL"   >&2
+            exit 1
+          fi
+          echo "package-lock.json byte-equal vs checks.yml run $RUN_ID"
+
+      - name: Create draft release
+        if: steps.meta.outputs.is_dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Draft is created ONCE here and matrix legs upload into it.
+          # Do NOT let electron-builder create its own draft per leg
+          # (electron-builder bug #6676 produces duplicate drafts).
+          gh release create "$TAG" \
+            --draft \
+            --title "$TAG" \
+            --notes-file "docs/release-notes/${TAG}.md"
+
+  build_mac:
+    name: Build macOS
+    needs: [prepare]
+    if: github.repository == 'qodeca/erfana'
+    uses: ./.github/workflows/build_mac.yml
+    with:
+      tag: ${{ needs.prepare.outputs.tag }}
+      is-dry-run: ${{ needs.prepare.outputs.is_dry_run == 'true' }}
+    # Explicit per-secret allowlist (replaces `secrets: inherit`) so the
+    # macOS leg cannot see Azure or minisign secrets it never uses. Reduces
+    # blast radius if the runner is compromised. Reusable workflow declares
+    # these in its on.workflow_call.secrets block.
+    secrets:
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      MAC_CERT_P12_BASE64: ${{ secrets.MAC_CERT_P12_BASE64 }}
+      MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+    permissions:
+      contents: write
+
+  build_win:
+    name: Build Windows
+    needs: [prepare]
+    if: github.repository == 'qodeca/erfana'
+    uses: ./.github/workflows/build_win.yml
+    with:
+      tag: ${{ needs.prepare.outputs.tag }}
+      is-dry-run: ${{ needs.prepare.outputs.is_dry_run == 'true' }}
+    # Explicit per-secret allowlist (replaces `secrets: inherit`) so the
+    # Windows leg cannot see Apple or minisign secrets it never uses.
+    secrets:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_CERTIFICATE_BASE64: ${{ secrets.AZURE_CLIENT_CERTIFICATE_BASE64 }}
+      AZURE_CLIENT_CERTIFICATE_PASSWORD: ${{ secrets.AZURE_CLIENT_CERTIFICATE_PASSWORD }}
+      AZURE_SIGNING_ENDPOINT: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+      AZURE_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
+      AZURE_CERT_PROFILE_NAME: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
+    # id-token: write was previously declared here for an OIDC-federated
+    # azure/login attempt. electron-builder 26 WindowsSignAzureManager does
+    # not yet support AZURE_FEDERATED_TOKEN_FILE so we use cert-auth
+    # instead. Re-add id-token: write here AND in build_win.yml when
+    # upstream OIDC support lands and we migrate off the PFX credential.
+    permissions:
+      contents: write
+
+  finalize:
+    name: Finalize draft
+    # Default GHA semantics: runs only when ALL `needs` succeeded and no
+    # cancellation occurred. Do NOT add `if: always()` — that would run
+    # finalize on failures and crash partway through verification.
+    needs: [prepare, build_mac, build_win]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.repository == 'qodeca/erfana'
+    permissions:
+      contents: write
+    outputs:
+      sha256sums: ${{ steps.sign.outputs.sha256sums }}
+    steps:
+      # actions/checkout v6.0.3
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+
+      - name: Install minisign
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y minisign
+
+      - name: Wait for asset list to stabilize
+        # GitHub's release-assets API indexes newly uploaded assets
+        # asynchronously after `gh release upload` returns. Without this
+        # wait, we can race and sha256sum a partial set.
+        if: needs.prepare.outputs.is_dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          PREV=0
+          STABLE=0
+          for _ in $(seq 1 24); do
+            COUNT=$(gh release view "$TAG" --json assets --jq '.assets | length')
+            if [ "$COUNT" = "$PREV" ] && [ "$COUNT" -gt 0 ]; then
+              STABLE=$((STABLE + 1))
+              if [ "$STABLE" -ge 3 ]; then
+                echo "Asset count stable at $COUNT across 3 polls"
+                break
+              fi
+            else
+              STABLE=0
+            fi
+            PREV=$COUNT
+            sleep 5
+          done
+          if [ "$STABLE" -lt 3 ]; then
+            echo "ERROR: asset count never stabilized within 2 min (last=$COUNT)" >&2
+            exit 1
+          fi
+
+      - name: Delete leaked auto-updater files
+        # electron-builder is configured with publish:null so these should
+        # not appear, but belt-and-suspenders: if any latest*.yml leaks,
+        # strip it before signing. Downstream consumers of SHA256SUMS would
+        # otherwise see a hash for an auto-update file we never intended
+        # to ship.
+        if: needs.prepare.outputs.is_dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          for f in latest.yml latest-mac.yml; do
+            if gh release view "$TAG" --json assets --jq '.assets[].name' \
+                 | grep -qx "$f"; then
+              echo "Deleting leaked $f"
+              gh release delete-asset "$TAG" "$f" --yes
+            fi
+          done
+
+      - name: Download, hash, sign SHA256SUMS
+        id: sign
+        if: needs.prepare.outputs.is_dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          MINISIGN_SECRET_KEY_BASE64: ${{ secrets.MINISIGN_SECRET_KEY_BASE64 }}
+          MINISIGN_KEY_PASSWORD: ${{ secrets.MINISIGN_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          # Do NOT `set -x`. Even masked secrets can leak via tool debug.
+          mkdir -p dl
+          cd dl
+          gh release download "$TAG" --pattern '*' --clobber
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+
+          umask 077
+          KEYFILE=$(mktemp)
+          trap 'rm -f "$KEYFILE"' EXIT
+          printf '%s' "$MINISIGN_SECRET_KEY_BASE64" | base64 -d > "$KEYFILE"
+          printf '%s' "$MINISIGN_KEY_PASSWORD" \
+            | minisign -S -s "$KEYFILE" -m SHA256SUMS -x SHA256SUMS.minisig
+
+          gh release upload "$TAG" SHA256SUMS SHA256SUMS.minisig --clobber
+
+          # Export SHA256SUMS content as workflow output. The releasing-erfana
+          # skill (Phase 4) fetches the published draft's SHA256SUMS and
+          # asserts byte-for-byte equality against this output as a tamper
+          # check on the draft between finalize completion and operator
+          # publish.
+          {
+            echo "sha256sums<<EOF"
+            cat SHA256SUMS
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish SHA256SUMS as workflow artifact (tamper-check for skill Phase 4)
+        if: needs.prepare.outputs.is_dry_run != 'true'
+        # actions/upload-artifact v7.0.1
+        # The skill downloads this artifact via `gh run download` and byte-compares
+        # against the SHA256SUMS on the draft release. Any delta between this
+        # artifact and the release asset indicates tampering after finalize.
+        # Note: job-level `outputs` are not retrievable via the REST API after
+        # a workflow run completes; an artifact gives us a durable, API-reachable
+        # handle that the skill can diff against.
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: sha256sums-digest
+          path: dl/SHA256SUMS
+          retention-days: 30
+          if-no-files-found: error
+
+  cleanup:
+    name: Cleanup on failure
+    # Fires on any failure/cancellation of prepare or any build leg. Runs
+    # even if the whole thing was cancelled (always()) so leaked drafts
+    # don't survive. Final `exit 1` turns the workflow red so operators
+    # aren't fooled by a green cleanup.
+    needs: [prepare, build_mac, build_win]
+    if: >-
+      always()
+      && github.repository == 'qodeca/erfana'
+      && (needs.prepare.result != 'success'
+          || needs.build_mac.result != 'success'
+          || needs.build_win.result != 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Delete draft release (if any)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release delete "$TAG" --yes --cleanup-tag=false
+          fi
+      - name: Fail the workflow
+        run: exit 1

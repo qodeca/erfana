@@ -1,0 +1,229 @@
+{
+  "spec_id": "018",
+  "tier": 3,
+  "sequence": 1,
+  "slug": "implementation",
+  "created": "2026-03-10",
+  "implementation_plan": {
+    "overview": "Decompose monolithic e2e/utils/helpers.ts into POM classes (e2e/pages/), restructure fixtures (e2e/fixtures/), replace 13 waitForTimeout calls with condition-based waits, and maintain backward compatibility via thin adapter layer.",
+    "steps": [
+      {
+        "order": 1,
+        "description": "Create KeyboardHelper POM class with platform modifier caching",
+        "files": ["e2e/pages/keyboard.helper.ts"],
+        "dependencies": [],
+        "rationale": "Foundation class with no dependencies; caches modifier to eliminate redundant page.evaluate() calls"
+      },
+      {
+        "order": 2,
+        "description": "Create TerminalPage POM class with waitForPrompt() replacing 6 waitForTimeout calls",
+        "files": ["e2e/pages/terminal.page.ts"],
+        "dependencies": [],
+        "rationale": "Standalone POM; eliminates the largest cluster of fixed waits (terminal PTY init)"
+      },
+      {
+        "order": 3,
+        "description": "Create MermaidPage POM class",
+        "files": ["e2e/pages/mermaid.page.ts"],
+        "dependencies": [],
+        "rationale": "Standalone POM; existing methods already use condition-based waits"
+      },
+      {
+        "order": 4,
+        "description": "Create ProjectTreePage POM class for tree navigation",
+        "files": ["e2e/pages/project-tree.page.ts"],
+        "dependencies": [],
+        "rationale": "Encapsulates tree interactions; openProject/openProjectViaUI remain standalone in helpers.ts due to ElectronApplication dependency"
+      },
+      {
+        "order": 5,
+        "description": "Create MonacoPage POM class with KeyboardHelper dependency injection",
+        "files": ["e2e/pages/monaco.page.ts"],
+        "dependencies": ["e2e/pages/keyboard.helper.ts"],
+        "rationale": "Depends on KeyboardHelper for shortcut operations; encapsulates editor state"
+      },
+      {
+        "order": 6,
+        "description": "Create pages barrel export",
+        "files": ["e2e/pages/index.ts"],
+        "dependencies": ["e2e/pages/keyboard.helper.ts", "e2e/pages/terminal.page.ts", "e2e/pages/monaco.page.ts", "e2e/pages/mermaid.page.ts", "e2e/pages/project-tree.page.ts"],
+        "rationale": "Clean import path for all POM classes"
+      },
+      {
+        "order": 7,
+        "description": "Create waitForIpcComplete cross-cutting utility",
+        "files": ["e2e/utils/wait-helpers.ts"],
+        "dependencies": [],
+        "rationale": "FR-013: general-purpose IPC roundtrip wait helper"
+      },
+      {
+        "order": 8,
+        "description": "Rewrite helpers.ts as backward-compatibility adapter with WeakMap caching",
+        "files": ["e2e/utils/helpers.ts"],
+        "dependencies": ["e2e/pages/index.ts"],
+        "rationale": "NFR-001: all existing test imports continue working via namespace delegation to POM instances"
+      },
+      {
+        "order": 9,
+        "description": "Create app fixtures (userDataDir, app, window) from existing fixtures.ts",
+        "files": ["e2e/fixtures/app.fixtures.ts"],
+        "dependencies": [],
+        "rationale": "Foundation fixture layer; teardown uses closeApp() for robustness"
+      },
+      {
+        "order": 10,
+        "description": "Create project fixtures (testProject, withSettings)",
+        "files": ["e2e/fixtures/project.fixtures.ts"],
+        "dependencies": ["e2e/fixtures/app.fixtures.ts"],
+        "rationale": "FR-007/FR-008: test-scoped project isolation with settings override"
+      },
+      {
+        "order": 11,
+        "description": "Create POM fixtures (keyboardHelper, terminalPage, monacoPage, mermaidPage, projectTreePage)",
+        "files": ["e2e/fixtures/pom.fixtures.ts"],
+        "dependencies": ["e2e/pages/index.ts", "e2e/fixtures/app.fixtures.ts"],
+        "rationale": "FR-010: auto-instantiate POMs from window fixture"
+      },
+      {
+        "order": 12,
+        "description": "Create editor fixtures (withOpenFile)",
+        "files": ["e2e/fixtures/editor.fixtures.ts"],
+        "dependencies": ["e2e/fixtures/pom.fixtures.ts", "e2e/fixtures/project.fixtures.ts"],
+        "rationale": "FR-009: declarative file-open setup eliminating common boilerplate"
+      },
+      {
+        "order": 13,
+        "description": "Create composed fixture index with chained extensions",
+        "files": ["e2e/fixtures/index.ts"],
+        "dependencies": ["e2e/fixtures/app.fixtures.ts", "e2e/fixtures/project.fixtures.ts", "e2e/fixtures/pom.fixtures.ts", "e2e/fixtures/editor.fixtures.ts"],
+        "rationale": "Single import point for tests: import { test } from './fixtures'"
+      },
+      {
+        "order": 14,
+        "description": "Update e2e/fixtures.ts to re-export from new fixture structure",
+        "files": ["e2e/fixtures.ts"],
+        "dependencies": ["e2e/fixtures/index.ts"],
+        "rationale": "Backward compatibility for any code importing from e2e/fixtures"
+      },
+      {
+        "order": 15,
+        "description": "Add KNOWN_WAIT annotations to setTimeout calls in teardown paths",
+        "files": ["e2e/utils/helpers.ts", "e2e/fixtures/app.fixtures.ts", "e2e/app-launch.e2e.ts"],
+        "dependencies": [],
+        "rationale": "NFR-002: document remaining fixed waits as intentional (teardown-only)"
+      },
+      {
+        "order": 16,
+        "description": "Replace 6 waitForTimeout calls in third-party-components.e2e.ts with condition-based waits",
+        "files": ["e2e/third-party-components.e2e.ts"],
+        "dependencies": ["e2e/utils/helpers.ts"],
+        "rationale": "NFR-002: eliminate all fixed waits in assertion paths"
+      },
+      {
+        "order": 17,
+        "description": "Update E2E helper documentation",
+        "files": ["docs/testing/e2e-helpers.md"],
+        "dependencies": [],
+        "rationale": "AC definition of done: documentation updated to reflect POM pattern"
+      }
+    ],
+    "patterns_to_follow": [
+      "Page Object Model with Page constructor injection",
+      "WeakMap caching for backward-compatible adapters",
+      "Playwright test.extend() fixture composition",
+      "Condition-based waits (waitForFunction, waitFor, toBeVisible)",
+      "Barrel exports (index.ts) for clean imports",
+      "Worker-scoped vs test-scoped fixture separation",
+      "KNOWN_WAIT annotation convention for intentional fixed waits"
+    ],
+    "patterns_to_avoid": [
+      "Static/namespace helper patterns (being replaced by POM)",
+      "waitForTimeout in assertion paths",
+      "Module-level mutable state (replaced by instance fields)",
+      "Deep fixture chains without clear dependency ordering"
+    ]
+  },
+  "file_changes": [
+    { "path": "e2e/pages/keyboard.helper.ts", "action": "create", "description": "KeyboardHelper POM class with cached platform modifier" },
+    { "path": "e2e/pages/terminal.page.ts", "action": "create", "description": "TerminalPage POM class with waitForPrompt() condition-based wait" },
+    { "path": "e2e/pages/mermaid.page.ts", "action": "create", "description": "MermaidPage POM class for diagram interactions" },
+    { "path": "e2e/pages/project-tree.page.ts", "action": "create", "description": "ProjectTreePage POM class for tree navigation" },
+    { "path": "e2e/pages/monaco.page.ts", "action": "create", "description": "MonacoPage POM class with KeyboardHelper DI" },
+    { "path": "e2e/pages/index.ts", "action": "create", "description": "Barrel export for all POM classes" },
+    { "path": "e2e/utils/wait-helpers.ts", "action": "create", "description": "Cross-cutting waitForIpcComplete utility" },
+    { "path": "e2e/utils/helpers.ts", "action": "modify", "description": "Rewrite as thin backward-compat adapter delegating to POM classes via WeakMap" },
+    { "path": "e2e/fixtures/app.fixtures.ts", "action": "create", "description": "App lifecycle fixtures (userDataDir, app, window)" },
+    { "path": "e2e/fixtures/project.fixtures.ts", "action": "create", "description": "Project fixtures (testProject, withSettings)" },
+    { "path": "e2e/fixtures/pom.fixtures.ts", "action": "create", "description": "POM instance fixtures for all 5 classes" },
+    { "path": "e2e/fixtures/editor.fixtures.ts", "action": "create", "description": "Editor fixtures (withOpenFile)" },
+    { "path": "e2e/fixtures/index.ts", "action": "create", "description": "Composed test export merging all fixture sets" },
+    { "path": "e2e/fixtures.ts", "action": "modify", "description": "Re-export from new fixtures/ structure for backward compat" },
+    { "path": "e2e/third-party-components.e2e.ts", "action": "modify", "description": "Replace 6 waitForTimeout calls with condition-based waits" },
+    { "path": "e2e/app-launch.e2e.ts", "action": "modify", "description": "Add KNOWN_WAIT annotations to setTimeout calls" },
+    { "path": "docs/testing/e2e-helpers.md", "action": "create", "description": "POM and fixture documentation" }
+  ],
+  "test_strategy": {
+    "coverage_target": 80,
+    "test_types": ["e2e-regression"],
+    "test_files": [
+      "e2e/app-launch.e2e.ts",
+      "e2e/third-party-components.e2e.ts",
+      "e2e/directory-watcher.e2e.ts",
+      "e2e/audio-transcription.e2e.ts"
+    ],
+    "key_scenarios": [
+      "All 4 existing E2E tests pass without import modifications (AC-002)",
+      "POM classes instantiable via fixtures (AC-001)",
+      "waitForPrompt() resolves on shell prompt without setTimeout (AC-007)",
+      "Zero waitForTimeout in assertion paths after migration (AC-008)",
+      "TypeScript compiles cleanly (npm run typecheck)"
+    ]
+  },
+  "risks": [
+    {
+      "risk": "waitForPrompt() unreliable in CI due to non-standard shell prompts",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Configurable regex patterns + 10s timeout fallback; KNOWN_WAIT annotation if specific wait proves flaky"
+    },
+    {
+      "risk": "WeakMap adapter masks bugs with stale Page references",
+      "likelihood": "medium",
+      "impact": "low",
+      "mitigation": "WeakMap keys are Page objects; GC'd when Page closes; each test gets fresh Page"
+    },
+    {
+      "risk": "Fixture chain too deep causing slow test startup",
+      "likelihood": "low",
+      "impact": "medium",
+      "mitigation": "Worker-scoped userDataDir amortizes setup; test-scoped testProject is cheap (<10ms)"
+    },
+    {
+      "risk": "xterm DOM structure (.xterm-rows) changes in future updates",
+      "likelihood": "low",
+      "impact": "high",
+      "mitigation": "Pin xterm.js version; waitForPrompt uses accessibility layer that xterm maintains for screen readers"
+    },
+    {
+      "risk": "openProject/openProjectViaUI awkward in ProjectTreePage due to ElectronApplication dependency",
+      "likelihood": "medium",
+      "impact": "low",
+      "mitigation": "Keep as standalone functions in helpers.ts; ProjectTreePage only has tree navigation methods"
+    }
+  ],
+  "estimates": {
+    "complexity": "medium",
+    "files_affected": 8,
+    "new_files": 10,
+    "test_files": 0
+  },
+  "verification_criteria": [
+    "npm run test:e2e passes with 0 failures across all 4 test files",
+    "npm run typecheck passes cleanly",
+    "e2e/pages/ contains 6 files: index.ts, keyboard.helper.ts, terminal.page.ts, monaco.page.ts, mermaid.page.ts, project-tree.page.ts",
+    "e2e/fixtures/ contains 5 files: index.ts, app.fixtures.ts, project.fixtures.ts, pom.fixtures.ts, editor.fixtures.ts",
+    "grep -rn 'waitForTimeout' e2e/ returns 0 matches in assertion paths",
+    "All imports from e2e/utils/helpers resolve correctly",
+    "POM classes composable in same test without conflicts"
+  ]
+}

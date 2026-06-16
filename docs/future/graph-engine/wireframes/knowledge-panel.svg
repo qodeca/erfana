@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 700" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 11px;">
+  <!-- Container (dark theme) -->
+  <rect x="10" y="10" width="360" height="680" fill="#252526" stroke="#0066cc" stroke-width="2"/>
+
+  <!-- Header -->
+  <rect x="10" y="10" width="360" height="35" fill="#2d2d30" stroke="#3e3e42" stroke-width="1"/>
+  <text x="20" y="32" fill="#ccc" font-weight="bold" font-size="13">Knowledge Panel</text>
+  <text x="340" y="32" fill="#888" font-size="14">×</text>
+
+  <!-- Context section -->
+  <rect x="20" y="55" width="340" height="45" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <text x="25" y="72" font-size="10" fill="#888">Context: architecture.md</text>
+  <text x="25" y="90" font-size="10" fill="#ccc">Section: "System Overview"</text>
+
+  <!-- Entities header -->
+  <line x1="20" y1="110" x2="360" y2="110" stroke="#3e3e42" stroke-width="1"/>
+  <text x="25" y="130" font-weight="bold" font-size="12" fill="#ccc">Entities Mentioned (5):</text>
+
+  <!-- Entity 1: SQLite -->
+  <rect x="25" y="145" width="335" height="75" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <text x="30" y="163" font-size="12" font-weight="bold" fill="#569cd6">🗂️ [[SQLite]]</text>
+  <text x="35" y="180" font-size="10" fill="#888">Type: Database</text>
+  <text x="35" y="197" font-size="10" fill="#888">Backlinks: 12 sections</text>
+  <rect x="35" y="203" width="90" height="16" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="40" y="215" font-size="9" fill="#ccc">[View Timeline]</text>
+
+  <!-- Entity 2: FTS5 -->
+  <rect x="25" y="230" width="335" height="75" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <text x="30" y="248" font-size="12" font-weight="bold" fill="#569cd6">🗂️ [[FTS5]]</text>
+  <text x="35" y="265" font-size="10" fill="#888">Type: Technology</text>
+  <text x="35" y="282" font-size="10" fill="#888">Backlinks: 7 sections</text>
+  <rect x="35" y="288" width="90" height="16" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="40" y="300" font-size="9" fill="#ccc">[View Timeline]</text>
+
+  <!-- Entity 3: React -->
+  <rect x="25" y="315" width="335" height="75" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <text x="30" y="333" font-size="12" font-weight="bold" fill="#569cd6">🗂️ [[React]]</text>
+  <text x="35" y="350" font-size="10" fill="#888">Type: Framework</text>
+  <text x="35" y="367" font-size="10" fill="#888">Backlinks: 15 sections</text>
+  <rect x="35" y="373" width="90" height="16" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="40" y="385" font-size="9" fill="#ccc">[View Timeline]</text>
+
+  <text x="30" y="410" font-size="10" fill="#666">... (2 more)</text>
+
+  <!-- Backlinks section -->
+  <line x1="20" y1="425" x2="360" y2="425" stroke="#3e3e42" stroke-width="1"/>
+  <text x="25" y="445" font-weight="bold" font-size="12" fill="#ccc">Backlinks to Current (8):</text>
+
+  <!-- Backlink 1 -->
+  <rect x="25" y="460" width="335" height="55" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <text x="30" y="478" font-size="11" font-weight="bold" fill="#ccc">📄 docs/database.md</text>
+  <text x="30" y="493" font-size="10" fill="#888">"Our architecture uses..."</text>
+  <rect x="30" y="498" width="60" height="14" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="35" y="509" font-size="8" fill="#ccc">[Jump to]</text>
+
+  <!-- Backlink 2 -->
+  <rect x="25" y="520" width="335" height="55" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <text x="30" y="538" font-size="11" font-weight="bold" fill="#ccc">📄 docs/tech-stack.md</text>
+  <text x="30" y="553" font-size="10" fill="#888">"System built on..."</text>
+  <rect x="30" y="558" width="60" height="14" fill="#2d2d30" stroke="#569cd6" stroke-width="1" rx="2"/>
+  <text x="35" y="569" font-size="8" fill="#ccc">[Jump to]</text>
+
+  <text x="30" y="595" font-size="10" fill="#666">... (6 more)</text>
+
+  <!-- Impact Analysis section -->
+  <line x1="20" y1="605" x2="360" y2="605" stroke="#3e3e42" stroke-width="1"/>
+  <rect x="20" y="608" width="340" height="75" fill="#1e1e1e" stroke="#3e3e42" stroke-width="1"/>
+  <text x="25" y="628" font-size="10" font-weight="bold" fill="#ccc">Impact Analysis:</text>
+  <text x="25" y="648" font-size="9" fill="#888">What depends on this section?</text>
+  <rect x="220" y="635" width="130" height="20" fill="#0066cc" stroke="#0066cc" stroke-width="1" rx="2"/>
+  <text x="235" y="649" font-size="9" fill="white">[Run Analysis]</text>
+
+  <text x="25" y="673" font-size="8" fill="#666">M3+ feature</text>
+</svg>

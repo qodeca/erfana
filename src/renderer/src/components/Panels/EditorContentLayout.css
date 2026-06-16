@@ -1,0 +1,75 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * EditorContentLayout styles
+ *
+ * Styles for the editor/preview split layout.
+ * Uses design tokens from design-tokens.css.
+ * Follows project conventions: no rounded corners (border-radius: 0).
+ */
+
+.editor-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* All view modes use flex layout */
+.editor-content.view-mode-split,
+.editor-content.view-mode-split-horizontal,
+.editor-content.view-mode-editor,
+.editor-content.view-mode-preview {
+  display: flex;
+}
+
+/* Horizontal split: stack vertically (preview on top, editor on bottom) */
+.editor-content.view-mode-split-horizontal {
+  flex-direction: column;
+}
+
+.editor-content.view-mode-editor .preview-pane,
+.editor-content.view-mode-preview .editor-pane {
+  display: none;
+}
+
+/* Ensure editor and preview panes fill available space in single-pane modes */
+.editor-content.view-mode-editor .editor-pane,
+.editor-content.view-mode-preview .preview-pane {
+  flex: 1;
+  width: 100%;
+}
+
+/* In vertical split mode, widths are controlled by inline styles */
+.editor-content.view-mode-split .editor-pane,
+.editor-content.view-mode-split .preview-pane {
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* In horizontal split mode, heights are controlled by inline styles */
+.editor-content.view-mode-split-horizontal .editor-pane,
+.editor-content.view-mode-split-horizontal .preview-pane {
+  flex-shrink: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+.editor-content .editor-pane,
+.editor-content .preview-pane {
+  position: relative;  /* Establish positioning context for SearchBar */
+}
+
+.editor-content .editor-pane {
+  height: 100%;
+  overflow: hidden;
+}
+
+.editor-content .preview-pane {
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* In horizontal split mode, preview pane should have explicit height handling */
+.editor-content.view-mode-split-horizontal .preview-pane {
+  overflow-y: auto;
+}

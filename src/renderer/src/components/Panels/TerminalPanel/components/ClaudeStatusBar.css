@@ -1,0 +1,104 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * Claude Code context status bar styles (issue #216).
+ *
+ * Design tokens only; border-radius:0 throughout (dark-mode-only product).
+ * Rail height matches the Project sidebar footer (`.git-status-bar`), i.e.
+ * `var(--header-height)`. The 64px meter-track width is a documented literal
+ * from design §5 — the proposed `--terminal-ccbar-track-width` token is NOT yet
+ * in design-tokens.css, so it is inlined here rather than inventing a token.
+ *
+ * @see docs/designs/216-claude-status-bar.md §5, §10
+ */
+
+.terminal-claude-statusbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--header-height); /* match Project sidebar footer (.git-status-bar) */
+  box-sizing: border-box;
+  padding-inline: var(--space-6);
+  background: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border-subtle);
+  border-radius: 0;
+  font-family: var(--font-sans);
+  flex-shrink: 0;
+}
+
+.terminal-claude-statusbar__name {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Window-size badge chip. Text uses --color-text-primary on a --color-bg-tertiary
+ * surface for a 9.54:1 contrast ratio (design §10 contrast fix). */
+.terminal-claude-statusbar__badge {
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  background: var(--color-bg-tertiary);
+  padding: var(--space-1) var(--space-3);
+  border-radius: 0;
+  line-height: var(--leading-none);
+}
+
+.terminal-claude-statusbar__percent {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  font-variant-numeric: tabular-nums;
+  /* Default (green) keeps neutral text; amber/red override below. */
+  color: var(--color-text-primary);
+}
+
+/* Meter track: fills the available width between the badge and the percent;
+ * 4px tall. */
+.terminal-claude-statusbar__meter {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 4px;
+  background: var(--color-bg-tertiary);
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.terminal-claude-statusbar__fill {
+  height: 100%;
+  /* Safe band uses a true green (not Qodeca lime, which reads as yellow next to
+   * the amber band) so green→amber→red is an unmistakable traffic-light. */
+  background: var(--color-context-safe);
+  border-radius: 0;
+  transition: width var(--transition-normal);
+}
+
+/* Color states — color is never the sole signal; percent text mirrors the band.
+ * green: neutral percent text + lime fill (defaults above).
+ * amber: warning-bright fill + text. red: error-bright fill + text. */
+.terminal-claude-statusbar[data-level='amber'] .terminal-claude-statusbar__fill {
+  background: var(--color-warning-bright);
+}
+
+.terminal-claude-statusbar[data-level='amber'] .terminal-claude-statusbar__percent {
+  color: var(--color-warning-bright);
+}
+
+.terminal-claude-statusbar[data-level='red'] .terminal-claude-statusbar__fill {
+  background: var(--color-error-bright);
+}
+
+.terminal-claude-statusbar[data-level='red'] .terminal-claude-statusbar__percent {
+  color: var(--color-error-bright);
+}
+
+/* Respect reduced-motion: disable the fill-width transition. */
+@media (prefers-reduced-motion: reduce) {
+  .terminal-claude-statusbar__fill {
+    transition: none;
+  }
+}

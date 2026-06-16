@@ -1,0 +1,139 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/* DiagramViewer.css - Full-screen Mermaid diagram viewer */
+
+/* Full-screen overlay */
+.diagram-viewer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  flex-direction: column;
+  animation: viewerFadeIn var(--transition-normal);
+  z-index: var(--z-modal);
+}
+
+@keyframes viewerFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Floating close button (issue #37) */
+.diagram-viewer-close-floating {
+  position: fixed;
+  top: var(--space-8);
+  right: var(--space-8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: rgba(45, 45, 48, 0.9);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  z-index: var(--z-fixed);
+  transition: background-color var(--transition-fast),
+              color var(--transition-fast);
+}
+
+.diagram-viewer-close-floating:hover {
+  background: rgba(60, 60, 64, 0.95);
+  color: var(--color-text-primary);
+}
+
+.diagram-viewer-close-floating:focus-visible {
+  outline: var(--border-width) solid var(--color-border-focus);
+  outline-offset: var(--border-width);
+}
+
+
+/* Content wrapper - full width, contains diagram and chat bubble */
+.diagram-viewer-content-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Content area */
+.diagram-viewer-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-primary);
+  overflow: hidden;
+  cursor: grab;
+}
+
+.diagram-viewer-content:active {
+  cursor: grabbing;
+}
+
+/* SVG container - viewBox-based zoom (no CSS transforms needed) */
+.diagram-viewer-svg-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.diagram-viewer-svg-container svg {
+  background: var(--color-bg-diagram);
+  border-radius: var(--border-radius);
+}
+
+
+/* Expand button on MermaidDiagram */
+.mermaid-expand-btn {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: rgba(45, 45, 48, 0.9);
+  border: var(--border-width) solid var(--color-border-subtle);
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition-normal),
+              background-color var(--transition-fast);
+  z-index: var(--z-dropdown);
+}
+
+.mermaid-container:hover .mermaid-expand-btn,
+.mermaid-expand-btn:focus {
+  opacity: 1;
+}
+
+.mermaid-expand-btn:hover {
+  background: rgba(60, 60, 64, 0.95);
+}
+
+.mermaid-expand-btn:focus-visible {
+  outline: var(--border-width) solid var(--color-border-focus);
+  outline-offset: var(--border-width);
+  opacity: 1;
+}
+
+/* Always visible on touch devices */
+@media (pointer: coarse) {
+  .mermaid-expand-btn {
+    opacity: 1;
+  }
+}
+
+/* Keyboard shortcuts hint */
+.diagram-viewer-shortcuts-hint {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  margin-left: var(--space-6);
+}

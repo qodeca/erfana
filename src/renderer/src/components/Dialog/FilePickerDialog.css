@@ -1,0 +1,83 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * FilePickerDialog Styles
+ *
+ * VS Code-inspired file picker dialog for disambiguating
+ * multiple file matches in smart path resolution.
+ */
+
+.file-picker-dialog .dialog-content {
+  min-width: 400px;
+  max-width: 600px;
+  outline: none;
+}
+
+.file-picker-dialog .dialog-title {
+  margin: 0 0 var(--space-4) 0;
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  word-break: break-word;
+}
+
+.file-picker-dialog .dialog-subtitle {
+  margin: 0 0 var(--space-6) 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.file-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 300px;
+  overflow-y: auto;
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: 0;
+  background: var(--color-bg-tertiary);
+}
+
+.file-picker-item {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4) var(--space-6);
+  cursor: pointer;
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  transition: var(--transition-fast);
+}
+
+.file-picker-item:last-child {
+  border-bottom: none;
+}
+
+.file-picker-item:hover,
+.file-picker-item.selected {
+  background: var(--color-bg-selected);
+}
+
+.file-picker-item.selected {
+  outline: 1px solid var(--color-border-focus);
+  outline-offset: -1px;
+}
+
+.file-picker-filename {
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.file-picker-path {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  word-break: break-all;
+}
+
+.file-picker-dialog .dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-8);
+  padding-top: var(--space-6);
+  border-top: var(--border-width) solid var(--color-border-default);
+}

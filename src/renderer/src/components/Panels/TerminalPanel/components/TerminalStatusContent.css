@@ -1,0 +1,29 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * Terminal Status Content Styles
+ *
+ * Styles for terminal status messages and actions.
+ * Base terminal-status styles are in TerminalPanel.css.
+ */
+
+/* Status actions button group */
+.terminal-status-actions {
+  display: flex;
+  gap: var(--space-2, 8px);
+  margin-top: var(--space-2, 8px);
+}
+
+/* Hint text with code */
+.terminal-status-hint {
+  margin-top: var(--space-3, 12px);
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--color-text-secondary, #888);
+}
+
+.terminal-status-hint code {
+  background: var(--color-bg-tertiary, #1e1e1e);
+  padding: 2px 6px;
+  font-family: 'Cascadia Mono', 'SF Mono', 'Monaco', Consolas, 'Courier New', monospace;
+  font-size: var(--text-xs, 0.75rem);
+}

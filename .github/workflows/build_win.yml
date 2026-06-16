@@ -1,0 +1,293 @@
+name: Build Windows (Reusable)
+
+# Reusable workflow callable from release.yml. Signs with Azure Artifact
+# Signing (formerly Azure Trusted Signing) via certificate-based auth
+# against the app registration (electron-builder 26's WindowsSignAzureManager
+# rejects AZURE_FEDERATED_TOKEN_FILE — OIDC is not supported upstream).
+# Verifies Authenticode signature on the NSIS installer.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag name (e.g. v0.9.5)
+        required: true
+        type: string
+      is-dry-run:
+        description: Skip gh release upload
+        required: false
+        type: boolean
+        default: false
+    # Explicit secrets declaration so the caller (release.yml) can pass an
+    # explicit per-secret allowlist instead of `secrets: inherit` — keeps
+    # the Windows leg blind to Apple / minisign credentials it never uses.
+    secrets:
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_CLIENT_CERTIFICATE_BASE64:
+        required: true
+      AZURE_CLIENT_CERTIFICATE_PASSWORD:
+        required: true
+      AZURE_SIGNING_ENDPOINT:
+        required: true
+      AZURE_SIGNING_ACCOUNT_NAME:
+        required: true
+      AZURE_CERT_PROFILE_NAME:
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Windows artifacts
+    runs-on: windows-latest
+    timeout-minutes: 45
+    if: github.repository == 'qodeca/erfana'
+    environment: production-signing
+    env:
+      EP_GH_IGNORE_TIME: "true"
+      # electron-builder.yml references these env vars inside
+      # win.azureSignOptions via ${env.VAR} interpolation.
+      AZURE_PUBLISHER_NAME: ${{ vars.AZURE_PUBLISHER_NAME }}
+      AZURE_SIGNING_ENDPOINT: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+      AZURE_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
+      AZURE_CERT_PROFILE_NAME: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
+      # electron-builder 26's WindowsSignAzureManager.initialize() checks:
+      #   verifyPrincipleSecretEnv || verifyPrincipleCertificateEnv || verifyUsernamePasswordEnv
+      # It does NOT check AZURE_FEDERATED_TOKEN_FILE — OIDC federation is
+      # unsupported (no open PR upstream as of 2026-04). Certificate auth is
+      # the security-equivalent substitute: no shared secret in transit;
+      # only the public cert lives on the app registration; private key is
+      # a rotatable GitHub Secret.
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_CLIENT_CERTIFICATE_PASSWORD: ${{ secrets.AZURE_CLIENT_CERTIFICATE_PASSWORD }}
+    steps:
+      # actions/checkout v6.0.3 — MUST run before the local composite action.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - name: Setup Node + install
+        uses: ./.github/actions/setup-node-with-retry
+        with:
+          run-postinstall: "true"
+
+      - name: Decode Azure signing certificate to PFX file
+        # Decode the base64-encoded .pfx from GitHub Secrets onto disk so
+        # @azure/identity's EnvironmentCredential can load it via
+        # AZURE_CLIENT_CERTIFICATE_PATH. The PFX bundles the private key
+        # + public cert uploaded to the app registration.
+        shell: bash
+        env:
+          AZURE_CLIENT_CERTIFICATE_BASE64: ${{ secrets.AZURE_CLIENT_CERTIFICATE_BASE64 }}
+        run: |
+          set -euo pipefail
+          CERT_PATH="${RUNNER_TEMP}/azure-signing.pfx"
+          # -d on windows-latest (git-for-windows bash) supports the same
+          # flags as GNU base64 via busybox/openssl shim. Using openssl is
+          # portable across all runner images.
+          # tr -d '\r\n' strips CR/LF that `gh secret set <file>` retains —
+          # openssl base64 -d -A truncates silently on mid-string \r,
+          # producing a corrupted PFX that passes the size check but fails
+          # deep inside @azure/identity with a cryptic PKCS#12 parse error.
+          printf '%s' "$AZURE_CLIENT_CERTIFICATE_BASE64" | tr -d '\r\n' | openssl base64 -d -A > "$CERT_PATH"
+          SIZE=$(wc -c < "$CERT_PATH")
+          if [ "$SIZE" -lt 100 ]; then
+            echo "::error::Decoded PFX is implausibly small ($SIZE bytes)"
+            exit 1
+          fi
+          # PKCS#12 envelope sanity check — catches a corrupted PFX
+          # (e.g., truncation from mid-string CR/LF) that's larger than
+          # the 100-byte floor but still won't load. Without this, the
+          # error surfaces 20+ minutes later inside @azure/identity
+          # with a cryptic message. `-noout` suppresses output;
+          # 2>/dev/null hides openssl's verbose error output (we just
+          # want exit code).
+          if ! openssl pkcs12 -info -in "$CERT_PATH" -noout \
+              -password "pass:$AZURE_CLIENT_CERTIFICATE_PASSWORD" >/dev/null 2>&1; then
+            echo "::error::Decoded file is not a valid PKCS#12 envelope or password is wrong"
+            exit 1
+          fi
+          echo "PFX written: $CERT_PATH (${SIZE} bytes, PKCS#12 envelope valid)"
+          # Convert to a Windows-style path for AZURE_CLIENT_CERTIFICATE_PATH —
+          # @azure/identity running under pwsh expects backslashes. We
+          # also export AZURE_SIGNING_PFX_POSIX_PATH (POSIX form) for the
+          # cleanup step: bash `[ -e "C:\..." ]` does NOT resolve Windows
+          # paths under Git Bash, so the Windows-form path can't be used
+          # for `rm -f` on the cleanup step. Track both forms.
+          WIN_PATH=$(cygpath -w "$CERT_PATH")
+          echo "AZURE_CLIENT_CERTIFICATE_PATH=$WIN_PATH" >> "$GITHUB_ENV"
+          echo "AZURE_SIGNING_PFX_POSIX_PATH=$CERT_PATH" >> "$GITHUB_ENV"
+
+      - name: Verify AZURE_* env reaches the build step
+        # Diagnostic — prints byte lengths (safe, not value) so empty env
+        # vars are visible. Signing metadata's Endpoint field gets parsed
+        # as System.Uri; if AZURE_SIGNING_ENDPOINT ever lands empty the
+        # sign step throws UriFormatException. Same class of check for
+        # publisher / account / profile.
+        shell: bash
+        run: |
+          len() {
+            # Print "set(NN)" if non-empty, "UNSET" if empty — safe to log.
+            local val="${1:-}"
+            if [ -n "$val" ]; then
+              printf 'set(%d)\n' "${#val}"
+            else
+              printf 'UNSET\n'
+            fi
+          }
+          echo "AZURE_TENANT_ID: $(len "$AZURE_TENANT_ID")"
+          echo "AZURE_CLIENT_ID: $(len "$AZURE_CLIENT_ID")"
+          echo "AZURE_CLIENT_CERTIFICATE_PATH: $(len "$AZURE_CLIENT_CERTIFICATE_PATH")"
+          echo "AZURE_CLIENT_CERTIFICATE_PASSWORD: $(len "$AZURE_CLIENT_CERTIFICATE_PASSWORD")"
+          echo "AZURE_SIGNING_ENDPOINT: $(len "$AZURE_SIGNING_ENDPOINT")"
+          echo "AZURE_SIGNING_ACCOUNT_NAME: $(len "$AZURE_SIGNING_ACCOUNT_NAME")"
+          echo "AZURE_CERT_PROFILE_NAME: $(len "$AZURE_CERT_PROFILE_NAME")"
+          echo "AZURE_PUBLISHER_NAME: $(len "$AZURE_PUBLISHER_NAME")"
+          # Also verify Endpoint has a proper URL shape without revealing the
+          # full host: print first 8 bytes and last 4 bytes with a mask in
+          # the middle. Should start with 'https://' and end with '.net/' or '.net'.
+          if [ -n "${AZURE_SIGNING_ENDPOINT:-}" ]; then
+            head=$(printf '%s' "$AZURE_SIGNING_ENDPOINT" | head -c 8)
+            tail=$(printf '%s' "$AZURE_SIGNING_ENDPOINT" | tail -c 4)
+            echo "AZURE_SIGNING_ENDPOINT shape: '${head}...${tail}'"
+          fi
+
+      - name: Bundle sources (electron-vite)
+        # electron-builder packages prebuilt bundles from out/; it does NOT
+        # invoke electron-vite itself. Must run before electron-builder or
+        # packaging fails the sanity check for out/main/index.js.
+        shell: bash
+        run: npx electron-vite build
+
+      - name: Normalize AZURE_SIGNING_ENDPOINT (trim CR/LF/whitespace)
+        # GitHub Secrets preserve any trailing whitespace / CRLF from the
+        # `gh secret set` source. Azure.CodeSigning.Dlib's DigestSigner
+        # constructs a System.Uri directly from the JSON; a stray '\r\n'
+        # causes UriFormatException. Normalize before electron-builder
+        # macro-expands ${env.AZURE_SIGNING_ENDPOINT} into the metadata.
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Strip leading/trailing whitespace only — DO NOT use awk
+          # '{$1=$1;print}' which re-splits on any whitespace run and would
+          # silently collapse internal whitespace if a misconfigured
+          # endpoint somehow contained spaces. sed strips edges only.
+          clean=$(printf '%s' "${AZURE_SIGNING_ENDPOINT:-}" | tr -d '\r\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+          if [ -z "$clean" ]; then
+            echo "::error::AZURE_SIGNING_ENDPOINT is empty"
+            exit 1
+          fi
+          # Must start with https:// — a bare hostname triggers UriFormatException.
+          case "$clean" in
+            https://*) ;;
+            *) echo "::error::AZURE_SIGNING_ENDPOINT must start with 'https://' (got '${clean:0:8}...')"; exit 1 ;;
+          esac
+          echo "AZURE_SIGNING_ENDPOINT=$clean" >> "$GITHUB_ENV"
+          echo "endpoint length after normalize: ${#clean}"
+
+      - name: Build + sign (electron-builder / Azure Artifact Signing)
+        shell: bash
+        # Azure signing config is injected via --config flags rather than
+        # YAML `${env.X}` macros, because electron-builder 26's macro
+        # expander (util/macroExpander.ts) is only applied to pattern
+        # fields (artifactName, etc.) and NOT to azureSignOptions. If
+        # these values lived in electron-builder.yml as `${env.FOO}`,
+        # the literal string "${env.FOO}" would reach signtool and cause
+        # System.UriFormatException in Azure.CodeSigning.Dlib. This was
+        # confirmed by inspecting WindowsSignAzureManager.signFile source.
+        #
+        # CLI --config.KEY=VALUE overrides ARE evaluated at electron-builder
+        # bootstrap time after full config merge, so they carry the real
+        # env-var values into the underlying Invoke-TrustedSigning call.
+        run: |
+          set -euo pipefail
+          npx electron-builder --win --publish never \
+            --config.win.azureSignOptions.endpoint="$AZURE_SIGNING_ENDPOINT" \
+            --config.win.azureSignOptions.publisherName="$AZURE_PUBLISHER_NAME" \
+            --config.win.azureSignOptions.codeSigningAccountName="$AZURE_SIGNING_ACCOUNT_NAME" \
+            --config.win.azureSignOptions.certificateProfileName="$AZURE_CERT_PROFILE_NAME"
+
+      - name: Resolve artifact dir
+        id: art
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          DIR="release/${VERSION}"
+          [ -d "$DIR" ] || { echo "::error::Missing $DIR"; exit 1; }
+          # compgen -G has cleaner semantics than `ls` for existence testing.
+          if compgen -G "$DIR/latest*.yml" >/dev/null; then
+            echo "::error::Auto-updater file leaked into $DIR"
+            compgen -G "$DIR/latest*.yml" || true
+            exit 1
+          fi
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+          ls -la "$DIR"
+
+      - name: Verify Authenticode signatures (signtool)
+        shell: pwsh
+        # signtool ships with Windows SDK; resolve the latest SDK bin dir
+        # to avoid hardcoding a versioned path.
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sdkRoot = "C:\Program Files (x86)\Windows Kits\10\bin"
+          $sdkBin = Get-ChildItem $sdkRoot -Directory `
+            | Where-Object { $_.Name -match '^10\.' } `
+            | Sort-Object Name -Descending `
+            | Select-Object -First 1
+          $signtool = Join-Path $sdkBin.FullName "x64\signtool.exe"
+          if (-not (Test-Path $signtool)) {
+            throw "signtool.exe not found under $sdkRoot"
+          }
+          $dir = "${{ steps.art.outputs.dir }}"
+          # The NSIS installer must verify.
+          foreach ($pattern in @('*-setup.exe')) {
+            Get-ChildItem -Path $dir -Filter $pattern | ForEach-Object {
+              Write-Host "signtool verifying: $($_.FullName)"
+              & $signtool verify /pa /all /tw $_.FullName
+              if ($LASTEXITCODE -ne 0) {
+                throw "signtool verify failed for $($_.FullName)"
+              }
+            }
+          }
+
+      - name: Clean up PFX
+        # Ensure the private key file never outlives the job even on
+        # failure paths above. Use the POSIX-form path for cleanup —
+        # bash `[ -e "C:\..." ]` does NOT resolve Windows-form paths
+        # under Git Bash on windows-latest, so the cleanup would silently
+        # no-op against the AZURE_CLIENT_CERTIFICATE_PATH (Windows form)
+        # and the PFX would leak to RUNNER_TEMP for the rest of the job.
+        if: always()
+        shell: bash
+        run: |
+          if [ -n "${AZURE_SIGNING_PFX_POSIX_PATH:-}" ] && [ -e "$AZURE_SIGNING_PFX_POSIX_PATH" ]; then
+            rm -f "$AZURE_SIGNING_PFX_POSIX_PATH" || true
+            echo "PFX private key removed: $AZURE_SIGNING_PFX_POSIX_PATH"
+          else
+            echo "PFX cleanup: no POSIX path available (decode step likely failed before export)"
+          fi
+
+      - name: Upload to draft release
+        if: ${{ !inputs.is-dry-run }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          ART_DIR: ${{ steps.art.outputs.dir }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" \
+            "$ART_DIR"/*-setup.exe \
+            --clobber
+
+      - name: Upload workflow-run artifacts (dry-run)
+        if: ${{ inputs.is-dry-run }}
+        # actions/upload-artifact v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: win-dry-run
+          path: ${{ steps.art.outputs.dir }}
+          retention-days: 7

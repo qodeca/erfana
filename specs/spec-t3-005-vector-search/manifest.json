@@ -1,0 +1,451 @@
+{
+  "spec_id": 5,
+  "slug": "vector-search",
+  "tier": "T3",
+  "version": "0.2.0",
+  "created": "2025-12-22T22:30:00Z",
+  "updated": "2025-12-22T23:00:00Z",
+  "application": {
+    "name": "Vector Search & Hybrid Retrieval",
+    "domain": "search",
+    "tech_stack": [
+      "sqlite-vec",
+      "onnxruntime-node",
+      "all-MiniLM-L6-v2",
+      "@huggingface/tokenizers",
+      "TypeScript"
+    ]
+  },
+  "scope": {
+    "type": "feature",
+    "name": "Vector Search & Hybrid Retrieval"
+  },
+  "sections": [
+    {
+      "id": "01",
+      "file": "requirements/01-overview.md",
+      "title": "Overview",
+      "word_count": 356,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    },
+    {
+      "id": "02",
+      "file": "requirements/02-requirements.md",
+      "title": "Requirements",
+      "word_count": 2150,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    },
+    {
+      "id": "03",
+      "file": "requirements/03-acceptance.md",
+      "title": "Acceptance",
+      "word_count": 1820,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    }
+  ],
+  "requirements_index": {
+    "005-FR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-005": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-006": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-007": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-008": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-009": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-010": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-011": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-012": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-013": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-014": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-015": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-016": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-017": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-018": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-019": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-020": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-021": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-022": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-023": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-024": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-025": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-026": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-027": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-028": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-029": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-030": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-031": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-032": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-033": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-034": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-035": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-036": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-037": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-FR-038": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-NFR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-NFR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-NFR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-NFR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-NFR-005": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-NFR-006": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-NFR-007": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-NFR-008": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-AC-001": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-002": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-003": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-004": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-005": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-006": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-007": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-008": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-009": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-010": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-011": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-012": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-013": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-014": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-015": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-016": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-017": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-018": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-019": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-020": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-021": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-022": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-023": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-024": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-025": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-026": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-027": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-028": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-029": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-030": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-031": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-AC-032": {
+      "section": "03-acceptance",
+      "status": "active"
+    }
+  },
+  "requirement_sequences": {
+    "FR": 38,
+    "NFR": 8,
+    "UC": 0,
+    "AC": 32,
+    "TC": 0,
+    "ES": 0,
+    "BO": 0,
+    "SH": 0,
+    "CA": 0,
+    "AP": 0
+  },
+  "cross_references": [
+    {
+      "type": "depends_on",
+      "target": "Spec #004",
+      "description": "Requires database infrastructure, file indexing pipeline, and sections table"
+    }
+  ],
+  "statistics": {
+    "total_sections": 3,
+    "total_requirements": 78,
+    "total_words": 4326,
+    "total_use_cases": 0,
+    "total_stakeholders": 0,
+    "deprecated_count": 0
+  },
+  "validation": {
+    "overall_score": null,
+    "passed": false,
+    "last_validated": null,
+    "threshold": 50
+  },
+  "change_history": [
+    {
+      "date": "2025-12-22T22:30:00Z",
+      "operation": "INIT",
+      "target": "manifest",
+      "description": "Spec initialized as T3 with 3 sections",
+      "by": "system"
+    },
+    {
+      "date": "2025-12-22T23:00:00Z",
+      "operation": "UPDATE",
+      "target": "02-requirements, 03-acceptance",
+      "description": "Applied validation fixes: Added FR-035 (text preprocessing), FR-036 (model bundling), FR-037 (binary quantization), FR-038 (content hash deduplication); Fixed FR-007 trace; Fixed AC-012 ID typo; Added AC-031 and AC-032",
+      "changes": {
+        "fields_updated": [
+          "requirements_index",
+          "requirement_sequences",
+          "statistics"
+        ],
+        "requirements_added": [
+          "005-FR-035",
+          "005-FR-036",
+          "005-FR-037",
+          "005-FR-038",
+          "005-AC-031",
+          "005-AC-032"
+        ],
+        "fixes_applied": [
+          "FR-007 trace updated",
+          "AC-012 trace typo fixed"
+        ]
+      },
+      "by": "user"
+    },
+    {
+      "date": "2026-02-03T08:30:00+01:00",
+      "operation": "MIGRATE",
+      "target": "manifest",
+      "description": "Migrated from BRS to managing-specs naming convention",
+      "by": "system"
+    }
+  ],
+  "components": {
+    "requirements": true,
+    "architecture": false,
+    "solution": false,
+    "design": false,
+    "ux": false
+  },
+  "tags": [],
+  "related_specs": [],
+  "id_migrations": []
+}

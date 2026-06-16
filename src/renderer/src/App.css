@@ -1,0 +1,28 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.app {
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  overflow: hidden;
+}
+
+/* Fix: Allow native tooltips on buttons with SVG icons
+ * SVG icons capture hover events, preventing parent button's title tooltip.
+ * pointer-events: none makes hover events pass through to the button. */
+button svg {
+  pointer-events: none;
+}

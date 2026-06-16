@@ -1,0 +1,347 @@
+{
+  "sequence": {
+    "current": 22,
+    "next": 23
+  },
+  "registry": [
+    {
+      "id": 4,
+      "slug": "graph-foundation",
+      "name": "Graph engine foundation",
+      "tier": "T4",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Foundational graph engine delivering SQLite database layer (FTS5, WAL mode), text preprocessing pipeline, file indexing, BM25 keyword search, event-driven integration with FileWatcherService, four UI components (Related Sidebar, Global Search, Settings Panel, Status Indicator), and MCP server with `erfana_graph_search` tool for Claude Code integration. Corresponds to implementation milestone M1.",
+      "created": "2025-12-22T21:00:00.000Z",
+      "path": "spec-t4-004-graph-foundation",
+      "last_modified": "2025-12-22T21:00:00.000Z",
+      "sections_count": 5,
+      "requirements_count": 107,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": []
+      }
+    },
+    {
+      "id": 5,
+      "slug": "vector-search",
+      "name": "Vector search & hybrid retrieval",
+      "tier": "T3",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Adds semantic search via vector embeddings using sqlite-vec extension and ONNX Runtime in worker threads. Implements hybrid search fusion combining BM25 keyword scores with vector similarity using configurable weights (α, β). Includes Settings UI for weight tuning and MCP tool `erfana_graph_related` for finding related sections. Corresponds to implementation milestone M2.",
+      "created": "2025-12-22T22:30:00.000Z",
+      "path": "spec-t3-005-vector-search",
+      "last_modified": "2025-12-22T22:30:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 72,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": []
+      }
+    },
+    {
+      "id": 6,
+      "slug": "knowledge-graph",
+      "name": "Knowledge graph & entities",
+      "tier": "T3",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Extracts entities from markdown content using rule-based patterns (wikilinks, tags, mentions), builds a knowledge graph with entities, edges, and mentions tables, and enables Obsidian-like backlink navigation. Includes Knowledge Panel UI showing entities and backlinks for the current section, plus MCP tools `erfana_graph_entities` and `erfana_graph_backlinks` for Claude Code integration. Corresponds to implementation milestone M3.",
+      "created": "2025-12-22T23:00:00.000Z",
+      "path": "spec-t3-006-knowledge-graph",
+      "last_modified": "2025-12-22T16:54:15Z",
+      "sections_count": 3,
+      "requirements_count": 66,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": []
+      }
+    },
+    {
+      "id": 7,
+      "slug": "temporal-queries",
+      "name": "Temporal queries & timeline",
+      "tier": "T3",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Enables time-travel queries and change timelines for documentation evolution tracking. Implements temporal fields (valid_from, valid_to, tx_time) on edges, as-of query API for historical state reconstruction, Timeline UI with date slider for time-aware navigation, and MCP tool `erfana_graph_timeline` for Claude Code. Supports contradiction detection and audit trails. Corresponds to implementation milestone M4.",
+      "created": "2025-12-22T17:10:00.000Z",
+      "path": "spec-t3-007-temporal-queries",
+      "last_modified": "2025-12-22T17:57:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 49,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": []
+      }
+    },
+    {
+      "id": 8,
+      "slug": "graph-polish",
+      "name": "Graph engine polish & maintenance",
+      "tier": "T3",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Production-ready polish and maintenance features for the Graph Engine. Includes Mermaid graph visualization (entity neighborhood diagrams), reindex/reembed UX with progress tracking, binary quantization for large datasets (>100K documents), model migration for switching embedding models safely, and monitoring/health checks for database, workers, and disk space. Corresponds to implementation milestone M5.",
+      "created": "2025-12-22T18:15:00.000Z",
+      "path": "spec-t3-008-graph-polish",
+      "last_modified": "2025-12-22T18:15:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 46,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": []
+      }
+    },
+    {
+      "id": 9,
+      "slug": "media-import-transcription",
+      "name": "Media import with transcription",
+      "tier": "T4",
+      "status": "archived",
+      "scope": "feature",
+      "description": "Extend import system to support audio/video files via transcription. Dual backends (OpenAI API, local whisper.cpp), markdown output with metadata, per-import language selection, progress reporting, settings UI for backend selection and model management. All stages complete: audio (#75), video (#110), local whisper (#111), settings UI (#112).",
+      "created": "2025-12-22T21:45:00.000Z",
+      "path": "archived/spec-t4-009-media-import-transcription",
+      "last_modified": "2025-12-22T23:15:00.000Z",
+      "sections_count": 5,
+      "requirements_count": 51,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": []
+      }
+    },
+    {
+      "id": 13,
+      "slug": "multi-cli-tool-prompt-optimization",
+      "name": "Multi-CLI tool prompt optimization",
+      "tier": "T3",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Support for multiple CLI tools (Claude Code, Codex, Gemini CLI) with prompts optimized per tool selected from terminal dropdown",
+      "created": "2026-01-18T00:00:00.000Z",
+      "path": "spec-t3-013-multi-cli-tool-prompt-optimization",
+      "last_modified": "2026-01-18T18:30:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 27,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": [
+          "#88"
+        ]
+      }
+    },
+    {
+      "id": 16,
+      "slug": "project-tree-refresh",
+      "name": "Project Tree refresh specification",
+      "tier": "T3",
+      "status": "archived",
+      "scope": "feature",
+      "description": "Comprehensive specification for how and when Project Tree content (folder structure and git statuses) should refresh to achieve near-live responsiveness. Documents the full refresh pipeline including watcher submodules, identifies gaps, and defines acceptance criteria.",
+      "created": "2026-02-05T12:00:00.000Z",
+      "path": "archived/spec-t3-016-project-tree-refresh",
+      "last_modified": "2026-02-07T14:23:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 38,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": [
+          "#103",
+          "#104",
+          "#105",
+          "#106"
+        ]
+      },
+      "components": {
+        "total": 0,
+        "implemented": 0,
+        "list": []
+      }
+    },
+    {
+      "id": 17,
+      "slug": "test-id-accessibility",
+      "name": "Test ID coverage and accessibility selectors",
+      "tier": "T2",
+      "status": "archived",
+      "scope": "improvement",
+      "description": "Expand data-testid coverage to UI elements currently missing identifiers (drag handles, drop zones, overflow menus, transitional states, tooltips) and add ARIA attributes to improve both accessibility and test selector reliability. All testids implemented (211 total), ARIA roles added, unit tests added. Delivered in PRs #116, #117.",
+      "created": "2026-03-09T12:23:00.000Z",
+      "path": "archived/spec-t2-017-test-id-accessibility",
+      "last_modified": "2026-03-09T12:23:00.000Z",
+      "sections_count": 1,
+      "requirements_count": 17,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": []
+      }
+    },
+    {
+      "id": 18,
+      "slug": "e2e-infrastructure",
+      "name": "E2E infrastructure overhaul",
+      "tier": "T3",
+      "status": "archived",
+      "scope": "improvement",
+      "description": "Modernize E2E test infrastructure: migrate helper functions to Page Object Model classes, promote test project setup to Playwright fixtures, and replace all fixed waitForTimeout() calls with condition-based waits for deterministic test execution. POM classes, composed fixtures, condition-based waits, waitForIpcComplete all delivered. PRs #117, #119, #120.",
+      "created": "2026-03-09T12:23:00.000Z",
+      "path": "archived/spec-t3-018-e2e-infrastructure",
+      "last_modified": "2026-03-09T12:23:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 25,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": []
+      }
+    },
+    {
+      "id": 19,
+      "slug": "visual-regression-ci",
+      "name": "Visual regression and CI resilience",
+      "tier": "T2",
+      "status": "archived",
+      "scope": "improvement",
+      "description": "Configure Playwright visual regression testing with screenshot comparisons for key UI states, and improve CI resilience with video recording on failure, artifact management, and rendering tolerance for cross-platform consistency. Fully implemented in #118.",
+      "created": "2026-03-09T12:23:00.000Z",
+      "path": "archived/spec-t2-019-visual-regression-ci",
+      "last_modified": "2026-03-09T12:23:00.000Z",
+      "sections_count": 1,
+      "requirements_count": 16,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": []
+      }
+    },
+    {
+      "id": 20,
+      "slug": "google-drive-links",
+      "name": "Google Drive link integration",
+      "tier": "T4",
+      "status": "draft",
+      "scope": "feature",
+      "description": "Reference-based Google Drive integration via .gdrive link files visible in the project tree. Includes OAuth2 sign-in, Google Picker for linking, context menu with direct operations and AI prompts, googleapis SDK for Erfana internals, and CLAUDE.md conventions for Claude Code discovery via gws CLI.",
+      "created": "2026-03-26T14:39:00.000Z",
+      "path": "spec-t4-020-google-drive-links",
+      "last_modified": "2026-03-26T15:45:00.000Z",
+      "sections_count": 5,
+      "requirements_count": 110,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": []
+      }
+    },
+    {
+      "id": 21,
+      "tier": "T3",
+      "slug": "liteparse-document-import",
+      "name": "LiteParse document import",
+      "status": "archived",
+      "scope": "feature",
+      "description": "Replace PdfConverter with LiteParse for enhanced document import supporting PDF, Office, and image files with OCR, spatial text output, and optional page screenshots. All stages complete: backend (#132), IPC layer (#133), frontend UI (#134), compliance fixes.",
+      "created": "2026-03-28T12:00:00.000Z",
+      "path": "archived/spec-t3-021-liteparse-document-import",
+      "last_modified": "2026-03-30T08:00:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 73,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [
+          "specs/archived/spec-t3-021-liteparse-document-import/design/001-liteparse-document-import-design.md"
+        ],
+        "issues": [
+          "#132",
+          "#133",
+          "#134"
+        ]
+      },
+      "components": {
+        "total": 6,
+        "implemented": 6,
+        "list": [
+          "main-services",
+          "ipc",
+          "preload",
+          "renderer-components",
+          "renderer-stores",
+          "shared-types"
+        ]
+      }
+    },
+    {
+      "id": 22,
+      "tier": "T3",
+      "slug": "git-status-offload",
+      "name": "Git status thread offloading",
+      "status": "archived",
+      "scope": "improvement",
+      "description": "Move isomorphic-git statusMatrix() from Electron's main thread to a worker_threads worker, add .git/index size guard for large repos, fallback to native git status --porcelain for oversized repos, add cache parameter. Eliminates UI freezes caused by main-thread blocking during git status operations on large repositories (56K+ files). All stages complete: worker offloading (#147), EMFILE cascade fix (#146), diagnostic logging (#151).",
+      "created": "2026-04-02T12:00:00.000Z",
+      "path": "archived/spec-t3-022-git-status-offload",
+      "last_modified": "2026-04-03T18:20:00.000Z",
+      "sections_count": 3,
+      "requirements_count": 25,
+      "documents": {
+        "technical_adrs": [],
+        "solution_adrs": [],
+        "solution_specs": [],
+        "designs": [],
+        "issues": [
+          "#147",
+          "#146",
+          "#148",
+          "#105"
+        ]
+      },
+      "components": {
+        "total": 0,
+        "implemented": 0,
+        "list": []
+      }
+    }
+  ],
+  "metadata": {
+    "schema_version": "2.0.0",
+    "created": "2025-12-22T00:00:00.000Z",
+    "last_updated": "2026-04-03T18:20:00.000Z"
+  }
+}

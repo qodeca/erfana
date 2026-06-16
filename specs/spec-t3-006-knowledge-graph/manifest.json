@@ -1,0 +1,478 @@
+{
+  "spec_id": 6,
+  "slug": "knowledge-graph",
+  "tier": "T3",
+  "version": "0.2.0",
+  "created": "2025-12-22T23:00:00.000Z",
+  "updated": "2025-12-22T23:30:00Z",
+  "application": {
+    "name": "Knowledge graph & entities",
+    "domain": "graph-engine",
+    "tech_stack": [
+      "SQLite",
+      "graphology",
+      "TypeScript"
+    ]
+  },
+  "scope": {
+    "type": "feature",
+    "name": "Knowledge graph & entities"
+  },
+  "sections": [
+    {
+      "id": "01",
+      "file": "requirements/01-overview.md",
+      "title": "Overview",
+      "word_count": 416,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    },
+    {
+      "id": "02",
+      "file": "requirements/02-requirements.md",
+      "title": "Requirements",
+      "word_count": 1380,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    },
+    {
+      "id": "03",
+      "file": "requirements/03-acceptance.md",
+      "title": "Acceptance",
+      "word_count": 1320,
+      "exists": true,
+      "last_updated": null,
+      "validation_score": null
+    }
+  ],
+  "requirements_index": {
+    "006-FR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-005": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-006": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-007": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-008": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-009": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-010": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-011": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-012": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-013": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-014": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-015": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-016": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-017": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-018": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-019": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-020": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-021": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-022": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-023": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-024": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-025": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-026": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-027": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-NFR-001": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-NFR-002": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-NFR-003": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-NFR-004": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-NFR-005": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-NFR-006": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-NFR-007": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-AC-001": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-002": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-003": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-004": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-005": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-006": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-007": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-008": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-009": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-010": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-011": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-012": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-013": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-014": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-015": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-016": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-017": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-018": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-019": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-020": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-021": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-022": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-023": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-024": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-025": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-026": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-027": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-028": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-029": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-030": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-031": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-032": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-033": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-034": {
+      "section": "03-acceptance",
+      "status": "active"
+    }
+  },
+  "requirement_sequences": {
+    "FR": 27,
+    "NFR": 7,
+    "UC": 0,
+    "AC": 34,
+    "TC": 0,
+    "ES": 0,
+    "BO": 0,
+    "SH": 0,
+    "CA": 0,
+    "AP": 0
+  },
+  "cross_references": [],
+  "statistics": {
+    "total_sections": 3,
+    "total_requirements": 68,
+    "total_words": 3116,
+    "total_use_cases": 0,
+    "total_stakeholders": 0,
+    "deprecated_count": 0
+  },
+  "validation": {
+    "overall_score": null,
+    "passed": false,
+    "last_validated": null,
+    "threshold": 50
+  },
+  "change_history": [
+    {
+      "date": "2025-12-22T16:54:15Z",
+      "operation": "INIT",
+      "target": "manifest",
+      "description": "Spec initialized as T3 with 3 sections",
+      "by": "system"
+    },
+    {
+      "date": "2025-12-22T23:30:00Z",
+      "operation": "UPDATE",
+      "target": "006-FR-001",
+      "description": "Added canonical_id and alias_score columns to entities table schema for entity deduplication support",
+      "changes": {
+        "fields_updated": [
+          "description"
+        ],
+        "schema_additions": [
+          "canonical_id",
+          "alias_score"
+        ]
+      },
+      "by": "user"
+    },
+    {
+      "date": "2025-12-22T23:30:00Z",
+      "operation": "UPDATE",
+      "target": "006-FR-007",
+      "description": "Updated mention extraction pattern to support hyphens in addition to alphanumeric and underscores",
+      "changes": {
+        "fields_updated": [
+          "description"
+        ],
+        "pattern_change": "Added hyphen support: /[@][a-zA-Z0-9_-]+/"
+      },
+      "by": "user"
+    },
+    {
+      "date": "2025-12-22T23:30:00Z",
+      "operation": "UPDATE",
+      "target": "006-FR-011",
+      "description": "Abstracted implementation detail (INSERT OR IGNORE) to behavior description",
+      "changes": {
+        "fields_updated": [
+          "description"
+        ]
+      },
+      "by": "user"
+    },
+    {
+      "date": "2025-12-22T23:30:00Z",
+      "operation": "UPDATE",
+      "target": "006-FR-013",
+      "description": "Abstracted implementation detail (transactions) to atomic behavior description",
+      "changes": {
+        "fields_updated": [
+          "description"
+        ]
+      },
+      "by": "user"
+    },
+    {
+      "date": "2025-12-22T23:30:00Z",
+      "operation": "UPDATE",
+      "target": "006-AC-007",
+      "description": "Updated test case to use @bob-smith (with hyphen) to match FR-007 pattern update",
+      "changes": {
+        "fields_updated": [
+          "steps",
+          "expected_result"
+        ]
+      },
+      "by": "user"
+    },
+    {
+      "date": "2025-12-22T23:30:00Z",
+      "operation": "UPDATE",
+      "target": "006-AC-010",
+      "description": "Clarified position semantics: positions include wikilink brackets",
+      "changes": {
+        "fields_updated": [
+          "expected_result"
+        ]
+      },
+      "by": "user"
+    },
+    {
+      "date": "2025-12-22T23:30:00Z",
+      "operation": "ADD",
+      "target": "006-FR-027",
+      "description": "Added contradiction detection requirement for data quality",
+      "changes": {
+        "new_requirement": true,
+        "priority": "Medium",
+        "section": "Data Quality"
+      },
+      "by": "user"
+    },
+    {
+      "date": "2025-12-22T23:30:00Z",
+      "operation": "ADD",
+      "target": "006-AC-034",
+      "description": "Added acceptance criteria for contradiction detection",
+      "changes": {
+        "new_requirement": true,
+        "traces_to": "006-FR-027"
+      },
+      "by": "user"
+    },
+    {
+      "date": "2026-02-03T08:30:00+01:00",
+      "operation": "MIGRATE",
+      "target": "manifest",
+      "description": "Migrated from BRS to managing-specs naming convention",
+      "by": "system"
+    }
+  ],
+  "components": {
+    "requirements": true,
+    "architecture": false,
+    "solution": false,
+    "design": false,
+    "ux": false
+  },
+  "tags": [],
+  "related_specs": [],
+  "id_migrations": []
+}

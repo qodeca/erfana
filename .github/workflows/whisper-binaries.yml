@@ -1,0 +1,591 @@
+# Whisper binaries build & release
+#
+# Builds whisper.cpp from a pinned upstream commit on macOS (universal) and
+# Windows x64, signs + notarizes the macOS artifact, packages both, and
+# publishes to Erfana's own GitHub Releases as a pre-release tag
+# `whisper-build-<upstream_label>-erfana<erfana_revision>`.
+#
+# The Erfana application (`src/main/services/whisper-assets.ts`) pins specific
+# releases by URL + SHA-256. Consuming app code lives in Branch B
+# (`feature/windows-phase-4-whisper`).
+#
+# Triggered manually only. Publish job gated on the `production-signing`
+# GitHub Environment (requires repo-admin approval before secrets are
+# attached).
+#
+# See `docs/build/whisper-binaries.md` for the operational runbook,
+# diff-review checklist, and cert-revocation procedures.
+
+name: Whisper Binaries
+run-name: whisper-build ${{ inputs.upstream_label }}-erfana${{ inputs.erfana_revision }} (${{ inputs.upstream_sha }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_sha:
+        description: "ggml-org/whisper.cpp commit SHA to build (full 40-char)"
+        required: true
+        type: string
+      upstream_label:
+        description: "Human-readable label, e.g. v1.8.4"
+        required: true
+        type: string
+      erfana_revision:
+        description: "Monotonic revision for our builds of the same upstream (increment on re-sign / rebuild)"
+        required: true
+        type: number
+        default: 1
+      skip_notarization:
+        description: "Debug only — skip macOS notarization. The publish job will refuse to create a non-prerelease with this set."
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write   # required to create/upload release assets
+
+# Serialize dispatches targeting the same tag to prevent a tag-collision /
+# asset-overwrite race. `cancel-in-progress: false` so an in-flight build
+# finishes before a second one starts — safer than mid-run cancel for
+# notarization / signtool streams.
+concurrency:
+  group: whisper-build-${{ inputs.upstream_label }}-erfana${{ inputs.erfana_revision }}
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPO: ggml-org/whisper.cpp
+  FIXTURE_MODEL_URL: https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+  FIXTURE_AUDIO_URL: https://github.com/ggml-org/whisper.cpp/raw/master/samples/jfk.wav
+  # Upstream JFK sample is ~11s, small enough for smoke-test; we assert the
+  # output contains a known fragment of the JFK inaugural.
+  FIXTURE_ASSERT_PHRASE: "ask not what your country"
+
+jobs:
+  # Validate workflow_dispatch inputs early. These values flow into shell
+  # heredocs that produce `manifest.json` later, so a crafted dispatch could
+  # inject extra JSON fields or break the heredoc entirely. Rather than
+  # defending the heredoc (fragile), we reject any input that doesn't match
+  # the expected alphabet up front.
+  validate-inputs:
+    name: Validate dispatch inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    # Fork exfiltration guard — applied to every job in this workflow for
+    # consistency with release.yml + build_*.yml. workflow_dispatch from
+    # forks is already blocked by GitHub default, but defense-in-depth.
+    if: github.repository == 'qodeca/erfana'
+    steps:
+      - name: Reject malformed inputs
+        env:
+          U_SHA: ${{ inputs.upstream_sha }}
+          U_LABEL: ${{ inputs.upstream_label }}
+          E_REV: ${{ inputs.erfana_revision }}
+        run: |
+          set -euo pipefail
+          # 40-char lowercase hex, nothing else.
+          printf '%s' "$U_SHA" | grep -Eq '^[a-f0-9]{40}$' || {
+            echo "::error::upstream_sha must be a 40-char lowercase hex commit SHA (got: ${U_SHA})"
+            exit 1
+          }
+          # Conservative label alphabet: letters, digits, dot, underscore, hyphen.
+          # Long enough to cover `v1.8.4-patch`, short enough to reject injection.
+          printf '%s' "$U_LABEL" | grep -Eq '^[A-Za-z0-9._-]{1,64}$' || {
+            echo "::error::upstream_label must match [A-Za-z0-9._-]{1,64} (got: ${U_LABEL})"
+            exit 1
+          }
+          # Non-negative integer only (workflow_dispatch passes all inputs as
+          # strings even when type: number).
+          printf '%s' "$E_REV" | grep -Eq '^(0|[1-9][0-9]{0,6})$' || {
+            echo "::error::erfana_revision must be a non-negative integer (got: ${E_REV})"
+            exit 1
+          }
+
+  build-macos:
+    name: macOS universal build
+    needs: [validate-inputs]
+    runs-on: macos-14
+    timeout-minutes: 45
+    # Fork exfiltration guard — defense-in-depth alongside the
+    # production-signing environment gate.
+    if: github.repository == 'qodeca/erfana'
+    # Needed to access APPLE_CERT_P12 / APPLE_CERT_PASSWORD / APPLE_ID /
+    # APPLE_APP_PASSWORD / APPLE_TEAM_ID, which are scoped to this
+    # environment (not repo-wide).
+    environment: production-signing
+    steps:
+      - name: Checkout whisper.cpp
+        # actions/checkout v6.0.3 — keep aligned with release.yml + checks.yml
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          repository: ${{ env.UPSTREAM_REPO }}
+          ref: ${{ inputs.upstream_sha }}
+          persist-credentials: false
+
+      - name: Pin Xcode version
+        # macos-14 runner currently ships 16.2 as latest; 16.3 is not
+        # available as of 2026-04-22. Bump when the runner image updates.
+        # maxim-lobanov/setup-xcode v1 (resolved 2026-04-25 to commit
+        # 1242409711ff5721add51979e9e11e23ebb7e5a4). Third-party action;
+        # SHA-pin is a hard requirement for any step in the signing path.
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90
+        with:
+          xcode-version: "16.2"
+
+      - name: Configure (universal, Metal embedded, no host-CPU auto-detect)
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          -DGGML_NATIVE=OFF
+          -DGGML_METAL_EMBED_LIBRARY=ON
+
+      - name: Build
+        run: cmake --build build --config Release -j"$(sysctl -n hw.ncpu)"
+
+      - name: Verify universal binary contains both slices
+        run: |
+          set -euo pipefail
+          echo "::group::All executables produced"
+          find build -type f -perm -u+x \( -name 'whisper*' -o -name 'main' \) -exec ls -la {} \;
+          echo "::endgroup::"
+          # Prefer the real CLI (whisper-cli in v1.8+, further renamed to
+          # whisper-whisper upstream at some point). `main` is a deprecation
+          # shim that only prints a warning and exits — picking it would make
+          # transcription silently fail.
+          BIN=""
+          for candidate in whisper-whisper whisper-cli main; do
+            found=$(find build -type f -name "$candidate" -print -quit)
+            if [ -n "$found" ]; then BIN="$found"; break; fi
+          done
+          [ -n "$BIN" ] || { echo "::error::No CLI produced"; exit 1; }
+          echo "Selected BIN=$BIN"
+          echo "BIN=$BIN" >>"$GITHUB_ENV"
+          lipo -info "$BIN" | tee lipo-info.txt
+          grep -q "arm64" lipo-info.txt || { echo "::error::Missing arm64 slice"; exit 1; }
+          grep -q "x86_64" lipo-info.txt || { echo "::error::Missing x86_64 slice"; exit 1; }
+
+      - name: Stage artifact dir
+        run: |
+          set -euo pipefail
+          mkdir -p staging
+          cp "$BIN" staging/whisper-cli
+          cp LICENSE staging/LICENSE.whisper-cpp
+          cat >staging/NOTICE.md <<'EOF'
+          # Whisper CLI (bundled by Erfana)
+
+          This binary is a build of [ggml-org/whisper.cpp](https://github.com/ggml-org/whisper.cpp).
+
+          ## Attribution
+
+          whisper.cpp is released under the MIT License. The `LICENSE.whisper-cpp`
+          file alongside this binary contains the upstream MIT copyright notice.
+
+          ## Build provenance
+
+          - Built by Erfana CI from `${{ env.UPSTREAM_REPO }}`
+          - Commit: `${{ inputs.upstream_sha }}`
+          - Label: `${{ inputs.upstream_label }}`
+          - Erfana revision: `${{ inputs.erfana_revision }}`
+          - Workflow run: `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`
+
+          This binary is NOT the official ggml-org release asset; it is an
+          Erfana-rebuilt copy. See `docs/build/whisper-binaries.md` in the
+          Erfana repository for rebuild procedure and supply-chain notes.
+          EOF
+
+      - name: Configure signing keychain
+        # apple-actions/import-codesign-certs v3 (resolved 2026-04-25 to
+        # commit 63fff01cd422d4b7b855d40ca1e9d34d2de9427d). This action
+        # consumes APPLE_CERT_P12 directly — SHA-pin is mandatory; a
+        # tag-move would be a credential-handling supply-chain incident.
+        uses: apple-actions/import-codesign-certs@5142e029c445c10ffc7149d172e540235a065466
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERT_P12 }}
+          p12-password: ${{ secrets.APPLE_CERT_PASSWORD }}
+
+      - name: Code-sign binary
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          IDENTITY="Developer ID Application: ${APPLE_TEAM_ID}"
+          # Use substring-match against the imported identity — works
+          # regardless of the owner's legal-name formatting.
+          codesign --force --options runtime --timestamp \
+                   --sign "$APPLE_TEAM_ID" staging/whisper-cli
+          codesign --verify --deep --strict --verbose=2 staging/whisper-cli
+
+      - name: Notarize
+        if: ${{ !inputs.skip_notarization }}
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          ditto -c -k --keepParent staging/whisper-cli notarize.zip
+          xcrun notarytool submit notarize.zip \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          # stapler requires a bundle, not a raw binary — since whisper-cli is
+          # a Mach-O executable, the notarization ticket is attached to the
+          # zip record on Apple's side (offline Gatekeeper checks it via
+          # spctl). We keep the code-sign stamp verified here.
+          codesign --verify --verbose=2 staging/whisper-cli
+
+      - name: Smoke test (transcribe JFK sample)
+        run: |
+          set -euo pipefail
+          curl -fsSL "$FIXTURE_MODEL_URL" -o ggml-tiny.bin
+          curl -fsSL "$FIXTURE_AUDIO_URL" -o jfk.wav
+          staging/whisper-cli -m ggml-tiny.bin -l en -otxt --no-timestamps -f jfk.wav
+          grep -q "$FIXTURE_ASSERT_PHRASE" jfk.wav.txt || {
+            echo "::error::Smoke test transcript missing expected phrase"
+            cat jfk.wav.txt
+            exit 1
+          }
+
+      - name: Package reproducibly
+        run: |
+          set -euo pipefail
+          # GNU tar flags for reproducibility; macOS bsdtar on macos-14 supports --options
+          # but we install GNU tar to keep flags consistent with what the Erfana
+          # client expects. Reproducibility is best-effort; see ops runbook.
+          brew install gnu-tar
+          PKG="whisper-macos-universal-${{ inputs.upstream_label }}-erfana${{ inputs.erfana_revision }}.tar.gz"
+          gtar -czf "$PKG" \
+            --owner=0 --group=0 --numeric-owner \
+            --mtime="1970-01-01 00:00:00 UTC" \
+            --sort=name \
+            -C staging .
+          echo "PKG=$PKG" >>"$GITHUB_ENV"
+          shasum -a 256 "$PKG" | tee "$PKG.sha256"
+
+      - name: Upload artifact
+        # actions/upload-artifact v7.0.1 — keep aligned with build_*.yml + checks.yml
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: whisper-macos-universal
+          path: |
+            ${{ env.PKG }}
+            ${{ env.PKG }}.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  build-windows:
+    name: Windows x64 build
+    needs: [validate-inputs]
+    runs-on: windows-latest
+    timeout-minutes: 45
+    # Fork exfiltration guard — defense-in-depth alongside the
+    # production-signing environment gate.
+    if: github.repository == 'qodeca/erfana'
+    # Scoped to the same environment as build-macos + publish-release so
+    # Phase 5 can add WINDOWS_CERT_PFX / WINDOWS_CERT_PASSWORD here without
+    # moving the job's env context.
+    environment: production-signing
+    steps:
+      - name: Checkout whisper.cpp
+        # actions/checkout v6.0.3 — keep aligned with release.yml + checks.yml
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          repository: ${{ env.UPSTREAM_REPO }}
+          ref: ${{ inputs.upstream_sha }}
+          persist-credentials: false
+
+      - name: Configure (x64, no host-CPU auto-detect)
+        shell: pwsh
+        run: |
+          cmake -G "Visual Studio 17 2022" -A x64 `
+                -DCMAKE_BUILD_TYPE=Release `
+                -DGGML_NATIVE=OFF `
+                -B build
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build --config Release -j
+
+      - name: Stage artifact dir
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Path staging | Out-Null
+          # Diagnostic: list every .exe produced so we can triage future renames.
+          Write-Host "::group::All .exe files in build\bin\Release"
+          Get-ChildItem -Recurse build\bin\Release -Filter *.exe | Format-Table Name, Length, FullName
+          Write-Host "::endgroup::"
+          # Prefer the real CLI (whisper-cli / whisper-whisper in v1.8+). `main.exe`
+          # is a deprecation shim that only prints a warning and exits — staging it
+          # would cause silent smoke-test failure.
+          $preferredNames = @("whisper-whisper.exe", "whisper-cli.exe", "main.exe")
+          $bin = $null
+          foreach ($name in $preferredNames) {
+            $found = Get-ChildItem -Recurse build\bin\Release -Filter $name -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { $bin = $found; break }
+          }
+          if (-not $bin) { throw "No whisper CLI .exe produced" }
+          Write-Host "Selected binary: $($bin.Name) from $($bin.FullName)"
+          Copy-Item $bin.FullName staging\whisper.exe
+          # All DLLs alongside — whisper.dll, ggml.dll, ggml-base.dll, ggml-cpu.dll, etc.
+          Get-ChildItem build\bin\Release -Filter *.dll | Copy-Item -Destination staging\
+          Copy-Item LICENSE staging\LICENSE.whisper-cpp
+          @"
+          # Whisper CLI (bundled by Erfana)
+
+          Built by Erfana CI from ${env:UPSTREAM_REPO}.
+          Commit: ${{ inputs.upstream_sha }}
+          Label: ${{ inputs.upstream_label }}
+          Erfana revision: ${{ inputs.erfana_revision }}
+          Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          whisper.cpp is MIT-licensed. See LICENSE.whisper-cpp.
+
+          Phase 4 note: this binary is NOT Authenticode-signed. Erfana relies
+          on SHA-256 pinning + MOTW-strip for trust until Phase 5 procures a
+          Windows code-sign certificate.
+          "@ | Out-File -FilePath staging\NOTICE.md -Encoding utf8
+
+      - name: Smoke test (transcribe JFK sample)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Invoke-WebRequest -Uri $env:FIXTURE_MODEL_URL -OutFile ggml-tiny.bin
+          Invoke-WebRequest -Uri $env:FIXTURE_AUDIO_URL -OutFile jfk.wav
+          staging\whisper.exe -m ggml-tiny.bin -l en -otxt --no-timestamps -f jfk.wav
+          $got = Get-Content jfk.wav.txt -Raw
+          if (-not ($got -match $env:FIXTURE_ASSERT_PHRASE)) {
+            Write-Error "Smoke test transcript missing expected phrase"
+            Write-Output $got
+            exit 1
+          }
+
+      - name: Package via 7z (Compress-Archive is extract-zip-incompatible)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $pkg = "whisper-win-x64-${{ inputs.upstream_label }}-erfana${{ inputs.erfana_revision }}.zip"
+          # 7z is pre-installed on windows-latest. -mx=9 maximum compression.
+          & 7z a -tzip -mx=9 $pkg .\staging\* | Out-Null
+          "PKG=$pkg" >> $env:GITHUB_ENV
+          $hash = (Get-FileHash -Algorithm SHA256 $pkg).Hash.ToLower()
+          "$hash *$pkg" | Out-File -FilePath "$pkg.sha256" -Encoding ascii
+
+      - name: Round-trip compatibility check (extract-zip)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Smoke-test that the Erfana client's zip extractor can read the
+          # artifact. Catches Compress-Archive-style format issues before publish.
+          npm init -y >/dev/null
+          npm install --silent extract-zip@2.0.1
+          mkdir roundtrip
+          node -e "require('extract-zip')(process.argv[1], { dir: process.argv[2] })" \
+               "$(pwd)/${PKG}" "$(pwd)/roundtrip"
+          test -f roundtrip/whisper.exe
+          ls roundtrip/*.dll | grep -E "(whisper|ggml)" >/dev/null
+
+      - name: Upload artifact
+        # actions/upload-artifact v7.0.1 — keep aligned with build_*.yml + checks.yml
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: whisper-win-x64
+          path: |
+            ${{ env.PKG }}
+            ${{ env.PKG }}.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish release
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Fork exfiltration guard — defense-in-depth alongside the
+    # production-signing environment gate.
+    if: github.repository == 'qodeca/erfana'
+    # Required-reviewer gate lives on the Environment configuration in repo
+    # settings. Secrets (signing + notarization + manifest key) are scoped to
+    # this environment only; PRs cannot exfiltrate them.
+    environment: production-signing
+    steps:
+      - name: Refuse non-prerelease on skip_notarization
+        if: ${{ inputs.skip_notarization }}
+        run: |
+          echo "::error::skip_notarization=true — this workflow will not publish a release. Re-run with skip_notarization=false."
+          exit 1
+
+      - name: Download artifacts
+        # actions/download-artifact v8.0.1 (resolved 2026-06-04 to commit
+        # 3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c). Dependabot github-actions
+        # ecosystem (.github/dependabot.yml) keeps this fresh.
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          path: artifacts
+
+      - name: Gather checksums + compose manifest
+        run: |
+          set -euo pipefail
+          MAC_PKG=$(ls artifacts/whisper-macos-universal/whisper-macos-universal-*.tar.gz)
+          WIN_PKG=$(ls artifacts/whisper-win-x64/whisper-win-x64-*.zip)
+          MAC_SHA=$(cut -d' ' -f1 < "${MAC_PKG}.sha256")
+          WIN_SHA=$(awk '{print $1}' < "${WIN_PKG}.sha256")
+          MAC_SIZE=$(stat -c%s "$MAC_PKG")
+          WIN_SIZE=$(stat -c%s "$WIN_PKG")
+          BUILT_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          cat >manifest.json <<EOF
+          {
+            "schemaVersion": 1,
+            "revisionIndex": ${{ inputs.erfana_revision }},
+            "upstream": {
+              "sha": "${{ inputs.upstream_sha }}",
+              "label": "${{ inputs.upstream_label }}"
+            },
+            "erfanaRevision": ${{ inputs.erfana_revision }},
+            "builtAt": "${BUILT_AT}",
+            "workflowRunUrl": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "workflowCommitSha": "${{ github.sha }}",
+            "artifacts": {
+              "macosUniversal": {
+                "filename": "$(basename "$MAC_PKG")",
+                "sha256": "${MAC_SHA}",
+                "size": ${MAC_SIZE}
+              },
+              "win64": {
+                "filename": "$(basename "$WIN_PKG")",
+                "sha256": "${WIN_SHA}",
+                "size": ${WIN_SIZE}
+              }
+            },
+            "signingKey": "primary"
+          }
+          EOF
+          cat manifest.json
+          echo "MAC_PKG=$MAC_PKG" >>"$GITHUB_ENV"
+          echo "WIN_PKG=$WIN_PKG" >>"$GITHUB_ENV"
+
+      - name: Install minisign
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y minisign
+
+      - name: Sign manifest with primary key
+        env:
+          MANIFEST_SIGNING_KEY: ${{ secrets.MANIFEST_SIGNING_KEY }}
+          MANIFEST_SIGNING_KEY_PASSWORD: ${{ secrets.MANIFEST_SIGNING_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::${MANIFEST_SIGNING_KEY}"
+          echo "::add-mask::${MANIFEST_SIGNING_KEY_PASSWORD}"
+          # minisign reads the key from a file; pipe via /dev/shm (tmpfs) so it
+          # never hits persistent storage. Cleanup in trap.
+          KEYFILE=$(mktemp --tmpdir=/dev/shm minisign-key.XXXXXX)
+          trap 'shred -u "$KEYFILE" 2>/dev/null || rm -f "$KEYFILE"' EXIT
+          printf '%s' "${MANIFEST_SIGNING_KEY}" >"$KEYFILE"
+          # -s signs; -m is the data file; output is manifest.json.minisig
+          printf '%s\n' "${MANIFEST_SIGNING_KEY_PASSWORD}" \
+            | minisign -S -s "$KEYFILE" -m manifest.json
+          test -f manifest.json.minisig
+
+      - name: Scan workflow output for leaked secrets
+        # Defense-in-depth — if a previous step echoed a secret, fail the job.
+        run: |
+          set -euo pipefail
+          # We cannot scan the GitHub runner logs from inside the job; instead,
+          # verify the runner has not left any secret material on disk.
+          test ! -f /dev/shm/minisign-key.* || {
+            echo "::error::Secret key file left on disk"
+            exit 1
+          }
+
+      - name: Pattern-scan job output for leaked credential patterns
+        # B5c / audit I2 — Plan §"CI workflow" step 4 originally said "grep
+        # workflow logs for leaked APPLE_APP_PASSWORD / WINDOWS_CERT_PASSWORD
+        # / MANIFEST_SIGNING_KEY patterns". Grepping the live GitHub runner
+        # log from inside the job is infeasible (the log streams out of the
+        # runner to GitHub storage; the job doesn't have read access to its
+        # own rendered log). This step approximates the intent by grepping
+        # the files the job DOES produce: the step-summary markdown and the
+        # manifest JSON we wrote to disk. Paired with GitHub's built-in
+        # `::add-mask::` (primary defense) this is belt-and-suspenders for
+        # materials that bypass masking — e.g. a secret transformed through
+        # `jq` into a different shape before being echoed.
+        if: always()
+        run: |
+          set -euo pipefail
+          SCAN_TARGETS=()
+          [ -n "${GITHUB_STEP_SUMMARY:-}" ] && [ -f "$GITHUB_STEP_SUMMARY" ] && SCAN_TARGETS+=("$GITHUB_STEP_SUMMARY")
+          [ -f manifest.json ] && SCAN_TARGETS+=(manifest.json)
+          if [ ${#SCAN_TARGETS[@]} -eq 0 ]; then
+            echo "No scannable output files produced — nothing to scan."
+            exit 0
+          fi
+          PATTERN='APPLE_APP_PASSWORD=|APPLE_CERT_PASSWORD=|WINDOWS_CERT_PASSWORD=|MANIFEST_SIGNING_KEY=|MANIFEST_SIGNING_KEY_PASSWORD=|-----BEGIN [A-Z ]*PRIVATE KEY-----|untrusted comment:.*minisign encrypted secret key'
+          for target in "${SCAN_TARGETS[@]}"; do
+            if grep -iE "$PATTERN" "$target"; then
+              echo "::error::Credential pattern leaked in job output: $target"
+              exit 1
+            fi
+          done
+          echo "No credential patterns detected in scanned job outputs (${SCAN_TARGETS[*]})."
+
+      - name: Refuse overwrite of existing release / tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="whisper-build-${{ inputs.upstream_label }}-erfana${{ inputs.erfana_revision }}"
+          # `gh release view` exits 0 when the release exists, non-zero otherwise.
+          # We deliberately fail the run if it already exists — increment
+          # `erfana_revision` to create a new release, never overwrite.
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "::error::Release $TAG already exists. Bump erfana_revision to publish a new build."
+            exit 1
+          fi
+          echo "Release tag $TAG is free to create."
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="whisper-build-${{ inputs.upstream_label }}-erfana${{ inputs.erfana_revision }}"
+          TITLE="whisper.cpp ${{ inputs.upstream_label }} (erfana build ${{ inputs.erfana_revision }})"
+          NOTES=$(cat <<EOF
+          **Binary build from [ggml-org/whisper.cpp](https://github.com/ggml-org/whisper.cpp), rebuilt by Erfana CI.**
+
+          - Upstream commit: \`${{ inputs.upstream_sha }}\`
+          - Upstream label: \`${{ inputs.upstream_label }}\`
+          - Erfana revision: \`${{ inputs.erfana_revision }}\`
+          - Workflow run: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          ## SHA-256
+
+          - \`$(basename "$MAC_PKG")\`: \`$(awk '{print $1}' <"${MAC_PKG}.sha256")\`
+          - \`$(basename "$WIN_PKG")\`: \`$(awk '{print $1}' <"${WIN_PKG}.sha256")\`
+
+          ## Signing status
+
+          - macOS: Developer ID Application signed, notarized by Apple.
+          - Windows: **unsigned** (Phase 4 ships without a Windows code-sign cert; Phase 5 procures one and re-signs). SHA-256 + MOTW-strip are the current trust anchors.
+          - Manifest: signed with Erfana primary minisign key.
+
+          ## Retention policy
+
+          **Do not delete** this release if any shipped Erfana app version pins it. See [\`docs/build/whisper-binaries.md\`](https://github.com/${{ github.repository }}/blob/develop/docs/build/whisper-binaries.md).
+          EOF
+          )
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            --title "$TITLE" \
+            --notes "$NOTES" \
+            --prerelease \
+            --target develop \
+            "$MAC_PKG" \
+            "$MAC_PKG.sha256" \
+            "$WIN_PKG" \
+            "$WIN_PKG.sha256" \
+            manifest.json \
+            manifest.json.minisig

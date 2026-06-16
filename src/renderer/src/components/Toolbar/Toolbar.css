@@ -1,0 +1,76 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  background: var(--color-bg-secondary);
+  border-bottom: var(--border-width) solid var(--color-bg-primary);
+  padding: 0 var(--space-6);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.toolbar-left {
+  flex: 0 0 auto;
+}
+
+.toolbar-center {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+.toolbar-right {
+  flex: 0 0 auto;
+}
+
+.toolbar-title {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  padding: 0 var(--space-4);
+}
+
+/* Icon-only toggle buttons (VS Code style) */
+.toolbar-icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  outline: none;
+}
+
+.toolbar-icon-button:hover {
+  background: var(--color-bg-hover);
+}
+
+.toolbar-icon-button.active {
+  background: var(--color-bg-active);
+}
+
+.toolbar-icon-button svg {
+  opacity: 0.8;
+}
+
+.toolbar-icon-button:hover svg {
+  opacity: 1;
+}
+
+.toolbar-icon-button.active svg {
+  opacity: 1;
+}

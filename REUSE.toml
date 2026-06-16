@@ -1,0 +1,17 @@
+version = 1
+SPDX-PackageName = "erfana"
+SPDX-PackageSupplier = "Qodeca sp. z o.o."
+SPDX-PackageDownloadLocation = "https://github.com/qodeca/erfana"
+
+# REUSE specification (https://reuse.software/spec-3.3/) coverage for files that
+# cannot carry an inline SPDX header (markdown with line-1 frontmatter, JSON,
+# lockfiles, binary assets). Source files carry inline `SPDX-License-Identifier`
+# headers instead. Per-asset overrides (e.g. a third-party asset under a non-GPL
+# license) are added as more specific [[annotations]] blocks, or via `.license`
+# sidecar files, with precedence = "closest".
+
+[[annotations]]
+path = "**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2025-2026 Qodeca sp. z o.o."
+SPDX-License-Identifier = "GPL-3.0-only"

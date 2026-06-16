@@ -1,0 +1,33 @@
+# Default: let git handle text normalization
+* text=auto
+
+# Whisper trust-chain test fixtures must keep LF endings — the .minisig
+# signature was computed against the exact LF bytes of manifest.fixture.json.
+# Allowing autocrlf to convert these on Windows checkout breaks signature
+# verification (verifyManifest.test.ts fails locally only).
+src/main/utils/__fixtures__/manifest.fixture.json text eol=lf
+src/main/utils/__fixtures__/manifest.fixture.json.minisig text eol=lf
+
+# Shell scripts must stay LF on every host (Windows-checkout safety)
+*.sh text eol=lf
+
+# patch-package patches must stay LF — autocrlf converting them to CRLF on
+# Windows checkout breaks patch application (patches/node-pty+1.1.0.patch
+# is applied at install time by the postinstall hook).
+patches/*.patch text eol=lf
+
+# Binary assets — never normalize
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.pdf binary
+*.dmg binary
+*.exe binary
+*.dll binary
+*.zip binary
+*.tar.gz binary
+*.tgz binary
+*.traineddata binary

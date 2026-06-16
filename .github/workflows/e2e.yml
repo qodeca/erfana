@@ -1,0 +1,112 @@
+name: E2E Tests
+
+# DISABLED 2026-04-25 via `gh workflow disable "E2E Tests"`.
+# Reason: Playwright + Electron tests do not run reliably on `macos-latest`
+#   (visual suite hangs at `waitForLoadState('domcontentloaded')`); the
+#   functional `--project=electron` suite is also unstable on hosted runners.
+# Background + remediation tracking: docs/ci.md § Visual regression on CI.
+# Re-enable when stable:  gh workflow enable "E2E Tests"
+#
+# Re-enable strategy (Phase G of the test-infrastructure plan,
+# C:\Users\marcinobel\.claude\plans\synchronous-napping-rain.md):
+#
+# G.0  Spike the macOS-latest hang first on a feature branch:
+#        (i)  pass `--disable-gpu` to electron.launch in
+#             e2e/fixtures/index.ts (Electron 39 + macos-latest hosted
+#             runners frequently hang at GPU init for headless WebGL —
+#             Erfana's main process explicitly enables WebGL/WebGL2/
+#             ignore-blocklist, which interacts badly with hosted-runner
+#             GPU drivers).
+#        (ii) change `waitForLoadState('domcontentloaded')` to
+#             `waitForLoadState('load')` inside getReadyWindow — `load`
+#             is the signal the Playwright-Electron quickstart examples
+#             use; `domcontentloaded` can race against React rendering.
+#      Locally run the suite 10× on a macOS box; only proceed if 10/10
+#      green. Do NOT move to ubuntu+xvfb — Linux is not a shipped
+#      platform and the watcher/PTY code paths differ from macOS, so
+#      Linux runs coverage-launder Windows-ish behaviour under a
+#      non-shipped runner.
+#
+# G.1  Re-enable on macos-latest with the spike fix applied. Keep the
+#      existing single job during the bake-in window so failures are
+#      attribution-clean.
+#
+# G.2  Once 3+ runs are green, split into two jobs below:
+#        e2e-stable     — required check; the bulk of the suite.
+#        e2e-quarantine — advisory (does NOT block merges); rotates
+#                         tests in/out via Playwright `tag:@quarantine`
+#                         until they stabilise.
+#
+# G.3  retries: 2 on CI / 0 locally — already configured in
+#      playwright.config.ts (Phase G.3 of the plan).
+#
+# G.4  Promote `e2e-stable` to required-status-checks in branch
+#      protection ONLY after 5 consecutive green runs across separate
+#      pushes. Quarantine job stays advisory permanently.
+#
+# Runs on develop + main (branch-protected) and every PR.
+# main must be included so branch-protection required-status-checks can see
+# a run; otherwise the release workflow will never satisfy branch protection.
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
+    steps:
+      # actions/checkout v6.0.3 — MUST run before the local composite action.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: ./.github/actions/setup-node-with-retry
+        with:
+          # Playwright launches Erfana (real Electron binary) in the e2e
+          # suite; `--ignore-scripts` blocked electron's postinstall.
+          # Rebuild the allowlisted natives so electron + node-pty load.
+          run-postinstall: "true"
+
+      - name: Build app
+        run: npx electron-vite build
+
+      - name: Run E2E tests
+        # Scoped to --project=electron because visual regression tests (5/5)
+        # time out at waitForLoadState('domcontentloaded') on macos-latest
+        # runners while passing 5/5 locally. Follow-up needed to root-cause
+        # and restore visual coverage. Local:
+        #   npm run test:e2e:visual          (run visual suite)
+        #   npx playwright test              (run everything)
+        run: npx playwright test --project=electron
+        env:
+          CI: true
+
+      # Visual tests require platform-specific baselines in e2e/screenshots/.
+      # macOS (darwin) baselines are committed; tests skip on other platforms.
+      # If ALL visual tests skip, the run still passes – generate baselines
+      # for the new platform before relying on CI visual regression.
+
+      - name: Upload test artifacts
+        # actions/upload-artifact v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: e2e-test-results
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: ${{ (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') && 30 || 14 }}
+
+      - name: Upload visual diffs
+        # actions/upload-artifact v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: failure()
+        with:
+          name: visual-regression-diffs
+          path: test-results/**/*-diff.png
+          if-no-files-found: ignore
+          retention-days: ${{ (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') && 30 || 14 }}

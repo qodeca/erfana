@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "revisionIndex": 1,
+  "upstream": {
+    "sha": "9386f239401074690479731c1e41683fbbeac557",
+    "label": "v1.8.4"
+  },
+  "erfanaRevision": 1,
+  "builtAt": "2026-04-22T16:38:16Z",
+  "workflowRunUrl": "https://github.com/qodeca/erfana/actions/runs/24790206935",
+  "workflowCommitSha": "961a031344a0cbcc88aec4d74ddbf37282b0795f",
+  "artifacts": {
+    "macosUniversal": {
+      "filename": "whisper-macos-universal-v1.8.4-erfana1.tar.gz",
+      "sha256": "78fa53c26f62da7f842def18f57338908641449fcee5da533037237d09bc696b",
+      "size": 744152
+    },
+    "win64": {
+      "filename": "whisper-win-x64-v1.8.4-erfana1.zip",
+      "sha256": "8e3c63e8e7112e3f04304a4d58937696d72881d88ad0c436665e194b7af846f1",
+      "size": 909525
+    }
+  },
+  "signingKey": "primary"
+}

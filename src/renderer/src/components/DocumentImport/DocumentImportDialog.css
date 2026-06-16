@@ -1,0 +1,253 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/* Document Import Dialog - LiteParse document import workflow dialog */
+
+/* Dialog container override */
+.dialog-container.doc-import-dialog {
+  max-width: 600px;
+}
+
+/* File info display */
+.doc-import-file-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  background: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: 0;
+  margin-bottom: var(--space-8);
+}
+
+.doc-import-file-icon {
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.doc-import-file-name {
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.doc-import-file-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-shrink: 0;
+}
+
+.doc-import-file-size {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.doc-import-file-type {
+  font-size: var(--text-sm);
+  color: var(--color-accent-primary);
+  text-transform: uppercase;
+  font-weight: var(--font-medium);
+}
+
+/* Options section */
+.doc-import-options {
+  margin-bottom: var(--space-8);
+}
+
+.doc-import-option-row {
+  margin-bottom: var(--space-6);
+}
+
+.doc-import-option-row:last-child {
+  margin-bottom: 0;
+}
+
+.doc-import-option-label {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-4);
+}
+
+.doc-import-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.doc-import-checkbox-label input[type="checkbox"] {
+  accent-color: var(--color-accent-primary);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Select dropdowns (language + DPI) */
+.doc-import-language-select,
+.doc-import-dpi-select {
+  width: 100%;
+  padding: var(--space-4) var(--space-6);
+  padding-right: var(--space-12);
+  background-color: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
+
+  /* Remove default browser styling */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  /* Custom dropdown arrow */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23858585' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-6) center;
+  background-size: 12px;
+}
+
+.doc-import-language-select:hover:not(:disabled),
+.doc-import-dpi-select:hover:not(:disabled) {
+  border-color: var(--color-border-subtle);
+}
+
+.doc-import-language-select:focus,
+.doc-import-dpi-select:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.doc-import-language-select:disabled,
+.doc-import-dpi-select:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.doc-import-language-select option,
+.doc-import-dpi-select option {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  padding: var(--space-4);
+}
+
+/* Screenshot page limit hint */
+.doc-import-screenshot-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--space-2);
+}
+
+/* Progress section */
+.doc-import-progress-section {
+  margin-bottom: var(--space-8);
+}
+
+.doc-import-progress-track {
+  width: 100%;
+  height: var(--space-4);
+  background: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: 0;
+  overflow: hidden;
+  margin-bottom: var(--space-4);
+}
+
+.doc-import-progress-fill {
+  height: 100%;
+  background: var(--color-accent-primary);
+  transition: width var(--transition-normal);
+}
+
+.doc-import-progress-indeterminate {
+  width: 40% !important;
+  animation: doc-import-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes doc-import-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+.doc-import-progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.doc-import-phase-text {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-import-progress-text {
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  font-weight: var(--font-medium);
+  flex-shrink: 0;
+}
+
+/* Warning banner (OCR availability) */
+.doc-import-warning {
+  font-size: var(--text-sm);
+  color: var(--color-warning);
+  background: var(--color-warning-bg);
+  border: var(--border-width) solid var(--color-warning-border);
+  border-radius: 0;
+  padding: var(--space-4) var(--space-6);
+  margin-top: var(--space-4);
+}
+
+/* Error section */
+.doc-import-error {
+  padding: var(--space-6);
+  background: var(--color-error-bg);
+  border: var(--border-width) solid var(--color-error-border);
+  border-radius: 0;
+  margin-bottom: var(--space-8);
+}
+
+.doc-import-error-message {
+  font-size: var(--text-base);
+  color: var(--color-error);
+  margin: 0;
+}
+
+/* Success section */
+.doc-import-success {
+  padding: var(--space-6);
+  background: var(--color-success-bg);
+  border: var(--border-width) solid var(--color-success-border);
+  border-radius: 0;
+  margin-bottom: var(--space-8);
+}
+
+.doc-import-success-message {
+  font-size: var(--text-base);
+  color: var(--color-success);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.doc-import-output-path {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  margin: 0;
+  word-break: break-all;
+}

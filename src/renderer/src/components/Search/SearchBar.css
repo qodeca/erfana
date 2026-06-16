@@ -1,0 +1,155 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * SearchBar.css - Unified search overlay styles
+ *
+ * Uses design tokens ONLY - no hardcoded values.
+ * See docs/ui-style-guide.md for token reference.
+ */
+
+/* Search bar container - positioned absolutely in parent pane */
+.search-bar {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-8);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-elevated);
+  border: var(--border-width) solid var(--color-border-default);
+  box-shadow: var(--shadow-md);
+  z-index: var(--z-fixed);
+}
+
+/* Search input field */
+.search-input {
+  width: 200px;
+  height: var(--input-height-sm);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-input);
+  border: var(--border-width) solid var(--color-border-default);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  font-family: var(--font-sans);
+  transition: var(--transition-fast);
+}
+
+.search-input::placeholder {
+  color: var(--color-text-placeholder);
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+/* Toggle buttons container */
+.search-toggles {
+  display: flex;
+  gap: var(--space-1);
+}
+
+/* Toggle buttons (Case sensitive, Whole word) */
+.search-toggle-btn {
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  border: var(--border-width) solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-family: var(--font-sans);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.search-toggle-btn:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-default);
+  background: var(--color-bg-hover);
+}
+
+.search-toggle-btn:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.search-toggle-btn.active {
+  background: var(--color-bg-selected);
+  border-color: var(--color-accent-primary);
+  color: var(--color-text-primary);
+}
+
+/* Match count display */
+.search-match-count {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  min-width: 80px;
+  text-align: center;
+  font-family: var(--font-sans);
+}
+
+/* Navigation buttons container */
+.search-navigation {
+  display: flex;
+  gap: var(--space-1);
+}
+
+/* Navigation buttons (Previous/Next) */
+.search-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-height-sm);
+  height: var(--btn-height-sm);
+  padding: 0;
+  background: transparent;
+  border: var(--border-width) solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.search-nav-btn:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-default);
+  background: var(--color-bg-hover);
+}
+
+.search-nav-btn:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+  box-shadow: var(--shadow-focus);
+}
+
+.search-nav-btn:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+/* Close button */
+.search-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-height-sm);
+  height: var(--btn-height-sm);
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.search-close-btn:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}
+
+.search-close-btn:focus {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}

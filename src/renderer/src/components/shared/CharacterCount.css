@@ -1,0 +1,26 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * CharacterCount - Shared styles for character count display
+ */
+
+.char-count {
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+}
+
+/* Validation state colors */
+.char-count--warning {
+  color: var(--color-warning);
+}
+
+.char-count--error {
+  color: var(--color-error);
+}
+
+.char-count--hint {
+  color: var(--color-text-secondary);
+}

@@ -1,0 +1,66 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/* UIBlocker - Global overlay that prevents ALL user interactions */
+
+.ui-blocker {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-blocker); /* Above everything */
+  background-color: rgba(0, 0, 0, 0.3); /* Semi-transparent dark overlay */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: wait;
+  pointer-events: all; /* Block ALL pointer events */
+  user-select: none; /* Prevent text selection */
+  animation: ui-blocker-fade-in var(--transition-normal);
+}
+
+@keyframes ui-blocker-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ui-blocker-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-16);
+  background-color: var(--color-bg-secondary);
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+}
+
+.ui-blocker-spinner {
+  width: var(--icon-size-xl);
+  height: var(--icon-size-xl);
+  border: 3px solid var(--color-border-default);
+  border-top-color: var(--color-brand-violet);
+  border-radius: var(--border-radius-circle);
+  animation: ui-blocker-spin 0.8s linear infinite;
+}
+
+@keyframes ui-blocker-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ui-blocker-message {
+  color: var(--color-text-primary);
+  font-size: var(--text-md);
+  font-weight: var(--font-medium);
+  white-space: nowrap;
+}

@@ -1,0 +1,215 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/* Shell container for portal - fills parent and holds portaled content */
+.terminal-portal-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.terminal-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--color-black);
+}
+
+/* Header styling - matches Project panel */
+.terminal-panel .sidebar-panel-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-6);
+  height: var(--header-height);
+  border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.1);
+  background: var(--color-gray-950);
+  flex-shrink: 0;
+}
+
+.terminal-panel .sidebar-panel-title {
+  flex: 1;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-primary);
+}
+
+.terminal-panel .panel-header-icon {
+  opacity: 0.8;
+  color: var(--color-text-primary);
+}
+
+.terminal-panel .sidebar-panel-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Terminal container */
+.terminal-container {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  background: var(--color-black);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Ensure xterm terminal fills the container */
+.terminal-container .xterm {
+  height: 100% !important;
+  padding: var(--space-4);
+}
+
+/* xterm v6: DomScrollableElement handles scrolling via its own custom scrollbar widget.
+ * Hide native scrollbar on .xterm-viewport to prevent double scrollbar. */
+.terminal-container .xterm-viewport {
+  background: var(--color-black) !important;
+  overflow-y: hidden;
+}
+
+.terminal-container .xterm-screen {
+  background: var(--color-black) !important;
+}
+
+/* Status messages (checking, error) */
+.terminal-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: var(--space-16) var(--space-12);
+  text-align: center;
+  gap: var(--space-8);
+}
+
+.terminal-status h3 {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+}
+
+.terminal-status p {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-normal);
+}
+
+.terminal-error-icon {
+  font-size: 48px;
+  opacity: 0.8;
+}
+
+.error-details {
+  background: rgba(244, 135, 113, 0.1);
+  border: var(--border-width) solid rgba(244, 135, 113, 0.3);
+  color: var(--color-error);
+  padding: var(--space-4) var(--space-6);
+  border-radius: var(--border-radius);
+  font-size: var(--text-sm);
+  margin-top: var(--space-4) !important;
+  font-family: var(--font-mono);
+}
+
+/* Hide the helper textarea completely */
+.terminal-container .xterm-helper-textarea {
+  position: absolute !important;
+  opacity: 0 !important;
+  left: -9999px !important;
+  top: -9999px !important;
+  width: 0 !important;
+  height: 0 !important;
+  z-index: -9999 !important;
+  pointer-events: none !important;
+}
+
+/* Cursor styling - keep consistent when focused/unfocused */
+.terminal-container .xterm-cursor {
+  background-color: var(--color-cursor) !important;
+  color: var(--color-black) !important;
+  border-radius: var(--border-radius) !important;
+  border: none !important;
+}
+
+/* Ensure cursor stays the same when terminal is focused */
+.terminal-container .xterm.focus .xterm-cursor {
+  background-color: var(--color-cursor) !important;
+  color: var(--color-black) !important;
+  border-radius: var(--border-radius) !important;
+  border: none !important;
+}
+
+/* Custom scrollbar for terminal – xterm v6 uses VS Code's DomScrollableElement */
+.terminal-container .xterm-scrollable-element > .scrollbar > .slider {
+  background: var(--color-gray-700);
+}
+
+.terminal-container .xterm-scrollable-element > .scrollbar > .slider:hover {
+  background: var(--color-gray-600);
+}
+
+.terminal-container .xterm-scrollable-element > .scrollbar > .slider:active {
+  background: var(--color-gray-500);
+}
+
+/* Hide the top shadow that VS Code's scrollbar adds by default */
+.terminal-container .xterm-scrollable-element > .shadow {
+  display: none !important;
+}
+
+/* Active state for toggle buttons (scroll lock) - issue #60 */
+.terminal-panel .icon-btn--active {
+  background: var(--color-bg-active);
+  color: var(--color-accent-primary);
+}
+
+.terminal-panel .icon-btn--active:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-accent-primary);
+}
+
+/* Drop target visual feedback (issue #85) */
+.terminal-container[data-drop-target="true"] {
+  background-color: var(--color-accent-drag-bg);
+  outline: var(--border-width-thick) dashed var(--color-accent-drag-border);
+  outline-offset: calc(-1 * var(--border-width-thick));
+}
+
+/* Loading state for screenshot buttons (issue #86) */
+.terminal-panel .icon-btn--loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.terminal-panel .icon-btn--loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border: 2px solid transparent;
+  border-top-color: var(--color-accent-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.terminal-panel .icon-btn--loading > svg {
+  opacity: 0.3;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+

@@ -1,0 +1,38 @@
+# Copyright and licensing notice
+
+Copyright (c) 2025-2026 Qodeca sp. z o.o.
+
+Erfana — an Electron-based markdown IDE with integrated terminal and project
+management — is released under the GNU General Public License, version 3 only
+(`GPL-3.0-only`). The full license text is in [`LICENSE`](LICENSE) (and, per the
+REUSE specification, in [`LICENSES/GPL-3.0-only.txt`](LICENSES/GPL-3.0-only.txt)).
+
+## Relicensing record
+
+This work was previously distributed under a proprietary license ("All rights
+reserved"). Qodeca sp. z o.o., as the sole copyright holder of the contents of
+this repository at the time of release, authorises and releases this work under
+`GPL-3.0-only`, effective 2026-06-16. This relicensing notice is the authorising
+act of record; the prior proprietary license no longer applies to this published
+work.
+
+Authorised by: Marcin Obel, on behalf of Qodeca sp. z o.o.
+
+## Names, logos, and trademarks
+
+The `GPL-3.0-only` grant covers source code, documentation, and bundled assets.
+It does **not** grant rights to the names "Erfana" or "Qodeca", the Qodeca or
+Erfana logos, or any Qodeca trademark or service mark. See [`TRADEMARKS.md`](TRADEMARKS.md).
+
+## Third-party components
+
+Bundled third-party dependencies and assets retain their own licenses, reproduced
+in [`THIRD-PARTY-LICENSES.md`](THIRD-PARTY-LICENSES.md) and, for binary assets, in
+`.license` sidecar files per the REUSE specification.
+
+## Per-file licensing
+
+Per-file license information follows the REUSE specification
+(<https://reuse.software>): inline SPDX identifiers in source files, `.license`
+sidecar files for binary assets, and glob rules in [`REUSE.toml`](REUSE.toml).
+Run `reuse lint` to verify coverage.

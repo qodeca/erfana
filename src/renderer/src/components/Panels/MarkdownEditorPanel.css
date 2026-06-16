@@ -1,0 +1,343 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+.markdown-editor-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--color-bg-primary);
+  outline: none; /* Remove focus outline */
+}
+
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-6);
+  background-color: var(--color-bg-tertiary);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  height: 48px;
+  flex-shrink: 0;
+}
+
+.editor-file-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: var(--icon-size-lg); /* Reserve space for modified indicator */
+}
+
+.modified-indicator {
+  color: var(--color-accent-secondary);
+  font-size: var(--text-xl);
+  line-height: var(--leading-none);
+}
+
+.file-status-indicator {
+  color: var(--color-accent-secondary);
+  font-size: var(--text-sm);
+  animation: fadeIn var(--transition-normal);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.editor-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.view-mode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3) var(--space-6);
+  background-color: transparent;
+  border: var(--border-width) solid var(--color-border-default);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  border-radius: 0;
+  font-size: var(--text-md);
+  transition: all var(--transition-normal);
+}
+
+.view-mode-btn:hover {
+  background-color: var(--color-bg-hover-solid);
+  border-color: var(--color-accent-secondary);
+}
+
+.view-mode-btn.active {
+  background-color: var(--color-btn-primary-bg);
+  border-color: var(--color-btn-primary-bg);
+  color: var(--color-white);
+}
+
+.toolbar-separator {
+  width: 1px;
+  height: var(--icon-size-lg);
+  background-color: var(--color-border-default);
+  margin: 0 var(--space-4);
+}
+
+.save-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-6);
+  background-color: var(--color-btn-primary-bg);
+  border: none;
+  color: var(--color-white);
+  cursor: pointer;
+  border-radius: 0;
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  transition: background-color var(--transition-normal);
+}
+
+.save-btn:hover:not(:disabled) {
+  background-color: var(--color-btn-primary-hover);
+}
+
+.save-btn:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.markdown-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-6);
+  background-color: var(--color-bg-primary);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  flex-shrink: 0;
+}
+
+.toolbar-spacer {
+  flex: 1;
+  min-width: var(--space-6);
+}
+
+.markdown-toolbar .modified-indicator,
+.markdown-toolbar .file-status-indicator {
+  margin-right: var(--space-6);
+}
+
+.markdown-toolbar .modified-indicator {
+  font-size: var(--text-lg);
+}
+
+.markdown-toolbar .view-mode-btn {
+  width: var(--btn-height-md);
+  height: 28px;
+  padding: 0;
+  background-color: transparent;
+  border: var(--border-width) solid transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  border-radius: 0;
+  transition: all var(--transition-normal);
+}
+
+.markdown-toolbar .view-mode-btn:hover {
+  background-color: var(--color-bg-hover-solid);
+  border-color: var(--color-border-default);
+  color: var(--color-white);
+}
+
+.markdown-toolbar .view-mode-btn.active {
+  background-color: var(--color-btn-primary-bg);
+  border-color: var(--color-btn-primary-bg);
+  color: var(--color-white);
+}
+
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-height-md);
+  height: 28px;
+  padding: 0;
+  background-color: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.toolbar-btn:hover {
+  background-color: var(--color-bg-hover-solid);
+  color: var(--color-white);
+}
+
+.toolbar-btn:active {
+  background-color: var(--color-bg-selected);
+}
+
+.editor-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* All view modes use flex layout */
+.editor-content.view-mode-split,
+.editor-content.view-mode-split-horizontal,
+.editor-content.view-mode-editor,
+.editor-content.view-mode-preview {
+  display: flex;
+}
+
+/* Horizontal split: stack vertically (preview on top, editor on bottom) */
+.editor-content.view-mode-split-horizontal {
+  flex-direction: column;
+}
+
+.editor-content.view-mode-editor .preview-pane,
+.editor-content.view-mode-preview .editor-pane {
+  display: none;
+}
+
+/* Ensure editor and preview panes fill available space in single-pane modes */
+.editor-content.view-mode-editor .editor-pane,
+.editor-content.view-mode-preview .preview-pane {
+  flex: 1;
+  width: 100%;
+}
+
+/* In vertical split mode, widths are controlled by inline styles */
+.editor-content.view-mode-split .editor-pane,
+.editor-content.view-mode-split .preview-pane {
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* In horizontal split mode, heights are controlled by inline styles */
+.editor-content.view-mode-split-horizontal .editor-pane,
+.editor-content.view-mode-split-horizontal .preview-pane {
+  flex-shrink: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+.editor-pane,
+.preview-pane {
+  position: relative;  /* Establish positioning context for SearchBar */
+}
+
+.editor-pane {
+  height: 100%;
+  overflow: hidden;
+}
+
+.preview-pane {
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* In horizontal split mode, preview pane should have explicit height handling */
+.editor-content.view-mode-split-horizontal .preview-pane {
+  overflow-y: auto;
+}
+
+.editor-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  gap: var(--space-4);
+}
+
+.editor-empty p {
+  margin: 0;
+}
+
+.editor-empty .hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.document-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-6);
+  background-color: var(--color-bg-primary);
+  border-top: var(--border-width) solid var(--color-border-default);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+  height: 26px;
+}
+
+.stats-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.stat-label {
+  color: var(--color-text-secondary);
+}
+
+.stat-value {
+  color: var(--color-text-primary);
+  font-weight: var(--font-medium);
+}
+
+.stat-separator {
+  color: var(--color-border-default);
+  font-size: var(--text-xs);
+}
+
+.selection-stats {
+  margin-left: auto;
+}
+
+.selection-stats .stat-value {
+  color: var(--color-accent-secondary);
+}
+
+/* File deleted warning banner */
+.file-deleted-warning {
+  display: flex;
+  align-items: center;
+  padding: var(--space-5) var(--space-7);
+  background: var(--color-error-bg);
+  border: var(--border-width) solid var(--color-error-border);
+  border-radius: 0;
+  margin: 0 0 var(--space-4) 0;
+  animation: slideDown var(--transition-normal);
+}
+
+.file-deleted-warning span {
+  font-size: var(--text-base);
+  color: var(--color-error-text-light);
+  font-weight: var(--font-medium);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

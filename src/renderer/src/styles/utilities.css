@@ -1,0 +1,51 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/*
+ * Project-level CSS utilities.
+ *
+ * Central declarations for cross-cutting CSS policies. Per-file duplication of
+ * one-line policies is fragile (any single site can drift, every change pollutes
+ * diffs, contributors must remember the canonical form), so declare them once
+ * here and let the cascade do the work.
+ *
+ * Imported once from `src/renderer/src/index.css` after `design-tokens.css` so
+ * these selectors load before component stylesheets reference the same tokens.
+ *
+ * See docs/ui-style-guide.md § Text selection policy.
+ */
+
+/*
+ * Text-selection policy (issue #211 audit).
+ *
+ * dockview-core sets `user-select: none` on panel chrome, which inherits into
+ * nested content. Every data-bearing surface that users would reasonably want
+ * to copy declares `user-select: text` here so the policy is auditable in one
+ * place. New selectable surfaces are added to this list (and to
+ * `src/renderer/src/styles/userSelect.audit.test.ts`), not to component CSS.
+ *
+ * Two surfaces (`.metadataItem`, `.errorMessage` in ImageViewerPanel.module.css)
+ * remain declared in their CSS-module file because the build-time class-name
+ * hashing prevents a global selector here from matching them at runtime.
+ */
+.markdown-preview-content,
+.dialog-body,
+.dialog-title,
+.file-picker-filename,
+.file-picker-path,
+.welcome-content h2,
+.welcome-content p,
+.recent-project-name,
+.recent-project-path,
+.recent-project-time,
+.chat-panel,
+.file-conflict-message,
+.document-stats-bar,
+.project-panel .sidebar-panel-content,
+.terminal-claude-statusbar,
+.terminal-status-hint,
+.search-match-count,
+.settings-content,
+.toast-message,
+.char-count {
+  user-select: text;
+}

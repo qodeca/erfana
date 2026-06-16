@@ -1,0 +1,329 @@
+name: Quality Checks
+
+# Fast, platform-independent quality gates that run on every push to every
+# branch. Complements e2e.yml (slow, macOS-only, develop/main/PR) by giving
+# feature branches fast-feedback CI on lint / typecheck / unit tests / build
+# plus supply-chain and release-readiness guards.
+#
+# Runner: ubuntu-latest (~10x cheaper than macos-latest; none of these
+# checks need macOS). Node version matches e2e.yml (24). npm download cache
+# enabled via setup-node-with-retry.
+
+on:
+  push:
+
+permissions:
+  contents: read
+
+# Cancel any in-flight run on the same ref when a new push lands.
+# Saves runner minutes on rapid pushes / force-pushes.
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
+    steps:
+      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # below so the action.yml file can be loaded from the workspace.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: ./.github/actions/setup-node-with-retry
+      - name: Lint
+        run: npm run lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
+    steps:
+      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # below so the action.yml file can be loaded from the workspace.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: ./.github/actions/setup-node-with-retry
+      - name: Typecheck
+        run: npm run typecheck
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
+    steps:
+      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # below so the action.yml file can be loaded from the workspace.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: ./.github/actions/setup-node-with-retry
+        with:
+          # ConverterRegistry.test.ts + other electron-aware tests import
+          # the electron binary; `--ignore-scripts` skipped electron's
+          # postinstall download. Rebuild the allowlisted natives so the
+          # binary + node-pty are present for vitest.
+          run-postinstall: "true"
+
+      # Guard: chokidar pinned to exact 3.6.0.
+      # v4 removed disableGlobbing — DirectoryWatcherService /
+      # FileWatcherService / GitWatcherService all rely on it (FD-exhaustion
+      # fix shipped in merge 1139bf2). A regenerated lockfile, an
+      # `npm install chokidar` bump, or a transitive declaring ^4 would all
+      # have failed today's clean-checkout typecheck silently in the past;
+      # this guard makes it loud. Runs before tests so we know what's being
+      # tested.
+      - name: Guard - chokidar v3 pinned
+        run: |
+          set -euo pipefail
+          ACTUAL=$(node -p "require('chokidar/package.json').version")
+          if [ "$ACTUAL" != "3.6.0" ]; then
+            echo "::error::chokidar version drift: expected 3.6.0, got $ACTUAL — see package.json overrides and #1416"
+            exit 1
+          fi
+          echo "chokidar pinned at $ACTUAL"
+
+      - name: Unit tests
+        # Deprecation tripwire: captures vitest output and fails if any
+        # deprecation warning that ISN'T already on the known-and-tracked
+        # whitelist appears. The known `workspace` / `defineWorkspace`
+        # deprecation is on the whitelist because Phase H of the test-
+        # infrastructure plan migrates it (root vitest.config.ts with
+        # `projects: [...]`). Any other deprecation (e.g. a new vitest 3.x
+        # warning, a Node.js DEPnnn) fires this step.
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/vitest.log"
+          set +e
+          npm run test:ci 2>&1 | tee "$OUT"
+          TEST_EXIT=${PIPESTATUS[0]}
+          set -e
+          # Match deprecation/DEP-warning lines NOT covered by the whitelist.
+          # Whitelist (known, tracked):
+          #   - `workspace` / `defineWorkspace` — vitest 3.2 → 4 migration (Phase H)
+          UNTRACKED=$(grep -iE 'deprecated|DEP[0-9]+' "$OUT" | \
+            grep -viE 'workspace|defineWorkspace' || true)
+          if [ -n "$UNTRACKED" ]; then
+            echo "::error::Untracked deprecation warning(s) detected:"
+            echo "$UNTRACKED"
+            exit 1
+          fi
+          exit "$TEST_EXIT"
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
+    steps:
+      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # below so the action.yml file can be loaded from the workspace.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: ./.github/actions/setup-node-with-retry
+        with:
+          # electron-vite build imports native modules at config resolution
+          # time; run the allowlisted postinstall to avoid import errors.
+          run-postinstall: "true"
+      - name: Build
+        run: npx electron-vite build
+
+  license:
+    name: License compliance
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
+    steps:
+      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # below so the action.yml file can be loaded from the workspace.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: ./.github/actions/setup-node-with-retry
+      - name: SPDX headers present on all source files
+        run: npm run check:headers
+      - name: REUSE compliance
+        # charset-normalizer extra avoids reuse's "no encoding module" error on
+        # minimal runners. pipx is preinstalled on ubuntu-latest.
+        run: pipx run --spec "reuse[charset-normalizer]" reuse lint
+
+  windows-checks:
+    name: Windows checks
+    runs-on: windows-latest
+    timeout-minutes: 15
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
+    # Advisory Windows gate (typecheck + main-process tests only). Excluded
+    # from branch-protection required checks until proven stable, mirroring
+    # how e2e is kept out of the required set. The concurrency block above
+    # already cancels in-flight runs on the same ref.
+    steps:
+      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # below so the action.yml file can be loaded from the workspace.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: ./.github/actions/setup-node-with-retry
+        with:
+          # test:main imports the electron binary + node-pty native bindings;
+          # run the allowlisted postinstall so they're present for vitest.
+          # node-pty rebuild on hardened Windows 11 is fixed (commit 51e5946).
+          run-postinstall: "true"
+      - name: Typecheck
+        # windows-latest defaults to PowerShell; force bash for parity with
+        # the local composite action and the other jobs.
+        shell: bash
+        run: npm run typecheck
+      - name: Main-process tests
+        shell: bash
+        run: npm run test:main
+
+  audit-signatures:
+    name: npm audit signatures
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
+    steps:
+      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # below so the action.yml file can be loaded from the workspace.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: ./.github/actions/setup-node-with-retry
+      - name: Verify npm registry signatures
+        # Asserts every package in package-lock.json is signed by npm's
+        # registry key. Detects lockfile tampering / sidecar attacks.
+        # Plain `npm audit` is not required here because vulnerability
+        # fixes flow through Dependabot PRs (also gated by this workflow).
+        run: npm audit signatures
+
+      - name: Record package-lock.json digest
+        # release.yml prepare downloads this artifact from the matching
+        # green checks.yml run and asserts byte-equality with the
+        # package-lock.json present at tag time. Defense against lockfile
+        # substitution between "checks green" and "tag pushed".
+        run: |
+          set -euo pipefail
+          sha256sum package-lock.json | cut -d' ' -f1 > package-lock.sha256
+          echo "package-lock.json digest: $(cat package-lock.sha256)"
+
+      - name: Upload package-lock digest artifact
+        # actions/upload-artifact v7.0.1 — keep SHA aligned with build_*.yml
+        # (Dependabot will keep these in lockstep once #B2 lands).
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: package-lock-digest
+          path: package-lock.sha256
+          retention-days: 90
+
+  release-guards:
+    name: Release readiness guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+
+      # Guard 1: no pull_request_target triggers anywhere.
+      # Fork exfiltration vector: pull_request_target runs with base-repo
+      # write permissions on code from an untrusted PR.
+      #
+      # Exclude checks.yml from the scan — this file contains the literal
+      # string `pull_request_target:` inside the grep pattern below, which
+      # would otherwise cause a self-referential match.
+      - name: Guard - no pull_request_target
+        run: |
+          set -euo pipefail
+          if grep -Rn --include='*.yml' --include='*.yaml' \
+              --exclude=checks.yml \
+              'pull_request_target:' .github/workflows/; then
+            echo "::error::pull_request_target found — fork exfiltration vector"
+            exit 1
+          fi
+
+      # Guard 2: forbidden entitlements must not appear in any plist.
+      # cs.disable-library-validation weakens hardened runtime by allowing
+      # unsigned libraries to load. cs.allow-dyld-environment-variables lets
+      # DYLD_* env vars inject code into the app at launch.
+      #
+      # Match only the XML <key>...</key> form so our own plist comments
+      # documenting the rule don't trigger a self-referential match.
+      - name: Guard - no forbidden entitlements
+        run: |
+          set -euo pipefail
+          if grep -Rn --include='*.plist' \
+              -E '<key>com\.apple\.security\.cs\.(disable-library-validation|allow-dyld-environment-variables)</key>' \
+              build/; then
+            echo "::error::forbidden entitlement found"
+            exit 1
+          fi
+
+      # Guard 3: legacy and forbidden signing credentials must not appear
+      # in any workflow.
+      # - `altool`: the deprecated Apple notarization CLI (replaced by notarytool).
+      # - `AZ_CLIENT_SECRET`: the pre-Azure-CLI-2.x env var name used with
+      #   cascading auth in older Azure pipelines. We specifically reject
+      #   this legacy form; the modern `AZURE_CLIENT_SECRET` (used by
+      #   @azure/identity) is PERMITTED as a fallback credential path,
+      #   though this project uses AZURE_CLIENT_CERTIFICATE_* since
+      #   electron-builder 26's WindowsSignAzureManager rejects OIDC
+      #   federated tokens (no AZURE_FEDERATED_TOKEN_FILE support upstream).
+      # Note: APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD are PERMITTED. notarytool
+      # accepts both the API-key and user-auth modes; only the altool CLI
+      # binding was deprecated. This project uses the user-auth mode for
+      # simplicity since the app-specific password is already provisioned.
+      # Exclude checks.yml (this file) to avoid matching the literal tokens
+      # inside the grep pattern itself. We keep the scan scoped to
+      # .github/workflows/ so allow-lists in other docs/scripts aren't
+      # reported as violations.
+      - name: Guard - no legacy/forbidden credentials
+        run: |
+          set -euo pipefail
+          if grep -REn --include='*.yml' --include='*.yaml' \
+              --exclude=checks.yml \
+              '\bAZ_CLIENT_SECRET\b|\baltool\b' \
+              .github/workflows/; then
+            echo "::error::forbidden credential reference in workflow"
+            exit 1
+          fi
+
+      # Guard 4 (advisory, non-failing): warn if AZURE_CLIENT_SECRET appears
+      # in any workflow. The modern AZURE_CLIENT_SECRET is permitted as a
+      # fallback @azure/identity auth path, but this project uses
+      # AZURE_CLIENT_CERTIFICATE_* exclusively. A future contributor adding
+      # AZURE_CLIENT_SECRET would silently downgrade the auth path; surface
+      # it for review without failing the run.
+      - name: Guard - warn on AZURE_CLIENT_SECRET (advisory)
+        run: |
+          set -euo pipefail
+          if grep -REn --include='*.yml' --include='*.yaml' \
+              --exclude=checks.yml \
+              '\bAZURE_CLIENT_SECRET\b' \
+              .github/workflows/; then
+            echo "::warning::AZURE_CLIENT_SECRET found in workflow — this project uses certificate auth (AZURE_CLIENT_CERTIFICATE_*); confirm this is intentional"
+          fi
+
+      # Guard 5: minisign release-pubkey drift detector.
+      # The release-signing minisign pubkeys (PRIMARY + ROTATION, dual-key
+      # per ADR-0003) MUST be byte-equal across three published locations:
+      #   - docs/release-pubkey.txt  (canonical, consumed by skill Phase 4)
+      #   - docs/security.md         (between minisign-pubkey-{primary,rotation}-{begin,end} fences)
+      #   - README.md                (mirrored in verification recipe)
+      # If they drift, end-user verification will fail in confusing ways.
+      # This guard extracts the keys from each source and asserts equality.
+      - name: Guard - release pubkey drift across docs
+        run: |
+          set -euo pipefail
+          # Sorted set of all RW... lines in the canonical file.
+          CANONICAL=$(grep -E '^RW[A-Za-z0-9+/=]+$' docs/release-pubkey.txt | sort -u)
+          # Every base64 line between any minisign-pubkey-*-begin / -end pair.
+          SECURITY_MD=$(awk '
+            /^<!-- minisign-pubkey-(primary|rotation)-begin -->$/ { in_block=1; next }
+            /^<!-- minisign-pubkey-(primary|rotation)-end -->$/   { in_block=0; next }
+            in_block && /^RW[A-Za-z0-9+\/=]+$/                    { print }
+          ' docs/security.md | sort -u)
+          # README mirror — match RW... lines on their own (e.g. inside `text` fences).
+          README=$(grep -E '^RW[A-Za-z0-9+/=]+$' README.md | sort -u || true)
+          if [ "$CANONICAL" != "$SECURITY_MD" ]; then
+            echo "::error::release pubkey drift between docs/release-pubkey.txt and docs/security.md"
+            diff <(printf '%s\n' "$CANONICAL") <(printf '%s\n' "$SECURITY_MD") || true
+            exit 1
+          fi
+          if [ -n "$README" ] && [ "$CANONICAL" != "$README" ]; then
+            echo "::error::release pubkey drift between docs/release-pubkey.txt and README.md"
+            diff <(printf '%s\n' "$CANONICAL") <(printf '%s\n' "$README") || true
+            exit 1
+          fi
+          echo "release pubkeys consistent across docs/release-pubkey.txt, docs/security.md$( [ -n "$README" ] && echo ', README.md')"

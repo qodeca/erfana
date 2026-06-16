@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "circuit-electron": {
+      "command": "node",
+      "args": [
+        "scripts/run-mcp.js",
+        "-y",
+        "@snowfort/circuit-electron@latest"
+      ]
+    }
+  }
+}

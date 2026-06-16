@@ -1,0 +1,505 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+.app-dock-layout {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+.app-dock-content {
+  flex: 1;
+  overflow: hidden;
+}
+
+.dockview-theme-dark {
+  --dv-activegroup-visiblepanel-tab-background-color: var(--color-bg-secondary);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--color-bg-secondary);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--color-bg-tertiary);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--color-bg-tertiary);
+  --dv-tabs-and-actions-container-background-color: var(--color-bg-tertiary);
+  --dv-tabs-and-actions-container-color: var(--color-text-primary);
+  --dv-separator-border: var(--color-border-default);
+  --dv-paneview-header-border-color: var(--color-border-default);
+  --dv-group-view-background-color: var(--color-bg-preview);
+  --dv-activegroup-visiblepanel-tab-color: var(--color-white);
+  --dv-activegroup-hiddenpanel-tab-color: var(--color-text-primary);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--color-text-primary);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--color-text-secondary);
+  /* Sash (resize handle) styling - Issue #10 */
+  --dv-sash-color: transparent;
+  --dv-active-sash-color: var(--color-accent-secondary);
+  --dv-active-sash-transition-duration: 0.15s;
+  --dv-active-sash-transition-delay: 0s;
+}
+
+/* Sash (resize handle) hit area - thinner for cleaner look */
+.dockview-theme-dark .dv-split-view-container.dv-horizontal > .dv-sash-container > .dv-sash {
+  width: 4px;
+}
+
+.dockview-theme-dark .dv-split-view-container.dv-vertical > .dv-sash-container > .dv-sash {
+  height: 4px;
+}
+
+/* Set tab height to 41px to match sidebar panels */
+.dockview-theme-dark .dv-tabs-and-actions-container {
+  height: var(--header-height);
+  min-height: var(--header-height);
+  max-height: var(--header-height);
+}
+
+.dockview-theme-dark .dv-default-tab {
+  height: var(--header-height);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding-left: var(--space-6);
+  padding-right: var(--space-6);
+}
+
+/* Remove padding from tab wrappers */
+.dockview-theme-dark .dv-tab.dv-inactive-tab,
+.dockview-theme-dark .dv-tab.dv-active-tab {
+  padding: 0;
+}
+
+/* Hover effect for inactive tabs - lighter background */
+.dockview-theme-dark .dv-inactive-tab:hover .dv-default-tab {
+  background-color: var(--color-bg-hover-solid) !important;
+}
+
+/* Hover effect for active tabs - slightly lighter than default */
+.dockview-theme-dark .dv-active-tab:hover .dv-default-tab {
+  background-color: var(--color-bg-secondary) !important;
+  opacity: 0.9;
+}
+
+/* Active tab indicator - bottom border like activity bar and VS Code */
+.dockview-theme-dark .dv-tab.dv-active-tab {
+  position: relative;
+  overflow: visible;
+}
+
+/* Active tab border indicator at the bottom - always visible regardless of focus */
+.dockview-theme-dark .dv-tab.dv-active-tab::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-brand-lime) !important;
+  z-index: 100;
+  pointer-events: none;
+  display: block !important;
+}
+
+/* Ensure active indicator shows in both active and inactive groups */
+.dockview-theme-dark .groupview .dv-tab.dv-active-tab::after,
+.dockview-theme-dark .dv-group-view .dv-tab.dv-active-tab::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-brand-lime) !important;
+  z-index: 100;
+  pointer-events: none;
+  display: block !important;
+}
+
+.panel-content {
+  width: 100%;
+  height: 100%;
+  padding: var(--space-10);
+  overflow: auto;
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-preview);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  outline: none; /* Remove focus outline */
+}
+
+.panel-content h3 {
+  margin-top: 0;
+  color: var(--color-white);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--space-6);
+}
+
+.panel-content p {
+  color: var(--color-text-secondary);
+  font-size: var(--text-md);
+}
+
+.panel-content .hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Hide close buttons for system panels (Project, Terminal, Git) */
+/* Uses correct dockview class names: .dv-default-tab-content (title), .dv-default-tab-action (close button) */
+
+/* Hide close button for tabs with Project, Terminal, or Git title */
+.dv-default-tab:has(.dv-default-tab-content:is([textContent="Project"], [textContent="Terminal"], [textContent="Git"])) .dv-default-tab-action {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Alternative: Target by checking text content (browser support may vary) */
+.dv-default-tab .dv-default-tab-content:is([textContent~="Project"], [textContent~="Terminal"], [textContent~="Git"]) ~ .dv-default-tab-action {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Fallback: Hide using sibling selector if :has() not supported */
+.dv-default-tab-content:first-child ~ .dv-default-tab-action {
+  /* Will be overridden by JavaScript for protected panels */
+}
+
+/* Home view background image (welcome panel only — not shared panel-content) */
+.panel-content.home-bg {
+  padding: 0;
+  background-color: var(--color-bg-preview);
+  background-image: url('../../assets/home-background.jpg');
+  background-size: cover;
+  background-position: top left;
+  background-repeat: no-repeat;
+}
+
+/* Welcome panel styles */
+.welcome-panel {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  padding: var(--space-10);
+  box-sizing: border-box;
+}
+
+.welcome-content {
+  text-align: right;
+  color: var(--color-text-secondary);
+  max-width: 420px;
+  padding: var(--space-10);
+  background-color: rgba(15, 13, 12, 0.78);
+  backdrop-filter: blur(6px);
+}
+
+.welcome-icon {
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-10);
+}
+
+.welcome-content h2 {
+  color: var(--color-text-primary);
+  font-size: var(--text-2xl);
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--space-6);
+}
+
+.welcome-content p {
+  color: var(--color-text-secondary);
+  font-size: var(--text-md);
+}
+
+/* Recent Projects Section */
+.recent-projects-section {
+  margin-top: var(--space-20);
+  min-width: 300px;
+  max-width: 800px;
+  width: 100%;
+}
+
+.recent-projects-title {
+  color: var(--color-text-primary);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--space-8);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  justify-content: flex-start;
+}
+
+.recent-projects-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.recent-project-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-8);
+  background-color: var(--color-bg-tertiary);
+  border: var(--border-width) solid var(--color-border-default);
+  border-radius: 0;
+  cursor: pointer;
+  transition: var(--transition-normal);
+  text-align: left;
+}
+
+.recent-project-item:hover {
+  background-color: var(--color-bg-hover-solid);
+  border-color: var(--color-brand-violet);
+}
+
+.recent-project-icon {
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.recent-project-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.recent-project-name {
+  color: var(--color-text-primary);
+  font-size: var(--text-md);
+  font-weight: var(--font-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-project-path {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: var(--space-1);
+}
+
+.recent-project-time {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+  margin-left: var(--space-12);
+}
+
+.recent-project-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: var(--space-2);
+  margin-left: var(--space-4);
+  border-radius: 0;
+  transition: var(--transition-normal);
+  flex-shrink: 0;
+}
+
+.recent-project-remove:hover {
+  background-color: var(--color-border-default);
+  color: var(--color-text-primary);
+}
+
+.recent-project-remove:active {
+  background-color: var(--color-btn-secondary-hover);
+}
+
+/* todo028: CSS classes for disabled/opening states (replaced inline styles) */
+.recent-project-item.disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+.recent-project-item.opening {
+  cursor: wait;
+}
+
+.recent-project-opening-text {
+  margin-left: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.recent-project-remove.disabled {
+  opacity: 0.5;
+}
+
+/* Welcome Actions Section (Import PDF button, etc.) */
+.welcome-actions {
+  margin-top: var(--space-12);
+  display: flex;
+  gap: var(--space-6);
+  justify-content: flex-end;
+}
+
+.welcome-action-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-10);
+  background-color: var(--color-btn-primary-bg);
+  color: var(--color-white);
+  border: none;
+  border-radius: 0;
+  font-size: var(--text-md);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: var(--transition-normal);
+}
+
+.welcome-action-button:hover:not(:disabled) {
+  background-color: var(--color-btn-primary-hover);
+}
+
+.welcome-action-button:active:not(:disabled) {
+  background-color: var(--color-btn-primary-active);
+}
+
+.welcome-action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.welcome-action-button:focus-visible {
+  /* White (not the violet focus token) so the ring contrasts ≥3:1 against the
+     button's own violet fill; placed over the dark .welcome-content overlay via
+     the offset. WCAG 2.2 SC 1.4.11 / 2.4.13. */
+  outline: var(--border-width-thick) solid var(--color-white);
+  outline-offset: var(--border-width-thick);
+}
+
+/* Remove Dockview's default padding from welcome tab container */
+.dockview-theme-dark .dv-default-tab:has(.welcome-tab) {
+  padding: 0 !important;
+  width: var(--header-height) !important;
+  min-width: var(--header-height) !important;
+  max-width: var(--header-height) !important;
+}
+
+/* Remove padding from dv-tab wrapper */
+.dockview-theme-dark .dv-tab:has(.welcome-tab) {
+  padding: 0 !important;
+}
+
+/* Welcome tab icon styling - 41px square */
+.welcome-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--header-height);
+  height: var(--header-height);
+  min-width: var(--header-height);
+  min-height: var(--header-height);
+  max-width: var(--header-height);
+  max-height: var(--header-height);
+  color: var(--color-text-primary);
+  user-select: none;
+  cursor: pointer;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+/* Center the icon precisely */
+.welcome-tab svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Disable dragging for welcome tab */
+.welcome-tab * {
+  pointer-events: none;
+}
+
+/* Hide close button for locked welcome tab */
+.dv-default-tab.dv-tab-locked .dv-default-tab-action {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Sidebar panel styling (Git & Terminal) - matches Project panel */
+.sidebar-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+}
+
+.sidebar-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4);
+  height: var(--header-height);
+  box-sizing: border-box;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+}
+
+.sidebar-panel-title {
+  flex: 1;
+}
+
+.sidebar-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0;
+}
+
+.sidebar-panel-content p {
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+  margin: 0;
+}
+
+/* Scrollbar styling for sidebar panels */
+.sidebar-panel-content::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+}
+
+.sidebar-panel-content::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+.sidebar-panel-content::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 0;
+}
+
+.sidebar-panel-content::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* Visually-hidden utility for screen-reader-only live regions */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

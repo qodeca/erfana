@@ -1,0 +1,36 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/* ============================================
+ * BUNDLED FONTS
+ * ============================================
+ *
+ * Cascadia Mono is vendored (src/renderer/src/assets/fonts/) and shipped with
+ * the app so the terminal and code surfaces render identically on every
+ * platform — Apple's SF Mono cannot be redistributed, so this is the closest
+ * freely-licensable match (SIL OFL 1.1, see assets/fonts/Cascadia-LICENSE.txt).
+ *
+ * `font-display: block` keeps the canvas-rendered terminal (xterm.js) from
+ * briefly measuring a fallback font before Cascadia Mono loads. The terminal
+ * also explicitly awaits `document.fonts.load(...)` before opening (see
+ * TerminalPanel.initializeTerminal), so this is belt-and-suspenders.
+ *
+ * Vite resolves the relative url() below, fingerprinting the woff2 into the
+ * build (works in dev and inside the packaged ASAR — the same asset path the
+ * bundled KaTeX fonts already rely on).
+ */
+
+@font-face {
+  font-family: 'Cascadia Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('../assets/fonts/CascadiaMono-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Cascadia Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url('../assets/fonts/CascadiaMono-Bold.woff2') format('woff2');
+}

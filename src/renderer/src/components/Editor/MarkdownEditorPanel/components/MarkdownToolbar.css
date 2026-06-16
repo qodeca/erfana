@@ -1,0 +1,119 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * Styles for MarkdownToolbar component.
+ *
+ * Uses design tokens from design-tokens.css for consistent theming.
+ * All styles follow project conventions:
+ * - No hardcoded colors (use CSS variables)
+ * - border-radius: 0 (project convention)
+ * - Use design tokens for spacing, typography, transitions
+ */
+
+.markdown-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-6);
+  background-color: var(--color-bg-primary);
+  border-bottom: var(--border-width) solid var(--color-border-default);
+  flex-shrink: 0;
+}
+
+.toolbar-spacer {
+  flex: 1;
+  min-width: var(--space-6);
+}
+
+/* Status indicators in toolbar context */
+.markdown-toolbar .modified-indicator,
+.markdown-toolbar .file-status-indicator {
+  margin-right: var(--space-6);
+}
+
+.markdown-toolbar .modified-indicator {
+  font-size: var(--text-lg);
+  color: var(--color-accent-secondary);
+  line-height: var(--leading-none);
+}
+
+.markdown-toolbar .file-status-indicator {
+  color: var(--color-accent-secondary);
+  font-size: var(--text-sm);
+  animation: fadeIn var(--transition-normal);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Toolbar buttons (formatting, search, export) */
+.markdown-toolbar .toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-height-md);
+  height: 28px;
+  padding: 0;
+  background-color: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.markdown-toolbar .toolbar-btn:hover:not(:disabled) {
+  background-color: var(--color-bg-hover-solid);
+  color: var(--color-white);
+}
+
+.markdown-toolbar .toolbar-btn:active:not(:disabled) {
+  background-color: var(--color-bg-selected);
+}
+
+.markdown-toolbar .toolbar-btn:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+/* View mode buttons */
+.markdown-toolbar .view-mode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--btn-height-md);
+  height: 28px;
+  padding: 0;
+  background-color: transparent;
+  border: var(--border-width) solid transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  border-radius: 0;
+  transition: all var(--transition-normal);
+}
+
+.markdown-toolbar .view-mode-btn:hover {
+  background-color: var(--color-bg-hover-solid);
+  border-color: var(--color-border-default);
+  color: var(--color-white);
+}
+
+.markdown-toolbar .view-mode-btn.active {
+  background-color: var(--color-btn-primary-bg);
+  border-color: var(--color-btn-primary-bg);
+  color: var(--color-white);
+}
+
+/* Separator between button groups */
+.markdown-toolbar .toolbar-separator {
+  width: 1px;
+  height: var(--icon-size-lg);
+  background-color: var(--color-border-default);
+  margin: 0 var(--space-4);
+}

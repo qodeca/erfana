@@ -1,0 +1,55 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o. */
+/**
+ * DocumentStatsBar styles
+ *
+ * Uses design tokens from design-tokens.css.
+ * Follows project conventions: no rounded corners (border-radius: 0).
+ */
+
+.document-stats-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-6);
+  background-color: var(--color-bg-primary);
+  border-top: var(--border-width) solid var(--color-border-default);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+  height: 26px;
+}
+
+.document-stats-bar .stats-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.document-stats-bar .stat-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.document-stats-bar .stat-label {
+  color: var(--color-text-secondary);
+}
+
+.document-stats-bar .stat-value {
+  color: var(--color-text-primary);
+  font-weight: var(--font-medium);
+}
+
+.document-stats-bar .stat-separator {
+  color: var(--color-border-default);
+  font-size: var(--text-xs);
+}
+
+.document-stats-bar .selection-stats {
+  margin-left: auto;
+}
+
+.document-stats-bar .selection-stats .stat-value {
+  color: var(--color-accent-secondary);
+}
