@@ -95,5 +95,32 @@ export default [
     rules: {
       '@typescript-eslint/no-require-imports': 'off'
     }
+  },
+  // Renderer process: ban POSIX-only path manipulation. The renderer is
+  // sandboxed (no Node `path` module) and receives paths in their NATIVE
+  // separators from the main process, so `.split('/')`-based basename/join
+  // logic silently breaks on Windows. Use the cross-platform helpers in
+  // `utils/fileUtils.ts` instead (which is itself exempt, as it owns the
+  // separator-class logic). See issue #238.
+  {
+    files: ['src/renderer/**/*.{ts,tsx}'],
+    ignores: ['src/renderer/src/utils/fileUtils.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.property.name='pop'][callee.object.type='CallExpression'][callee.object.callee.property.name='split'][callee.object.arguments.length=1][callee.object.arguments.0.type='Literal'][callee.object.arguments.0.value='/']",
+          message:
+            "POSIX-only basename: .split('/').pop() breaks on Windows native paths. Use getBasename() from utils/fileUtils."
+        },
+        {
+          selector:
+            "ConditionalExpression[test.type='CallExpression'][test.callee.property.name='endsWith'][test.arguments.length=1][test.arguments.0.type='Literal'][test.arguments.0.value='/']",
+          message:
+            "POSIX-only path join: x.endsWith('/') ? x : x+'/' breaks on Windows. Use isPathInside()/isStrictDescendant()/getDisplayRelativePath() from utils/fileUtils."
+        }
+      ]
+    }
   }
 ]

@@ -31,7 +31,7 @@ import { TerminalContextMenu } from '../ContextMenu/TerminalContextMenu'
 import { FilePickerDialog } from '../Dialog/FilePickerDialog'
 import { ScreenSelectDialog, WindowPickerDialog, CameraDialog } from '../Dialog'
 import { useScreenshotCapture } from './TerminalPanel/hooks/useScreenshotCapture'
-import { sanitizeFilePath } from '../../utils/fileUtils'
+import { sanitizeFilePath, getBasename } from '../../utils/fileUtils'
 import { formatPathsForTerminal, escapePathForShell, type ShellKind } from '../../utils/shellPathEscape'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
@@ -267,7 +267,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     }
 
     // Create new editor panel
-    const fileName = filePath.split('/').pop() || 'Untitled'
+    const fileName = getBasename(filePath) || 'Untitled'
     const editorPanel = dockviewApi.addPanel({
       id: panelId,
       component: 'editor',
@@ -1025,7 +1025,7 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
       window.api.terminal.write(currentTerminalId, quotedPath)
 
       // Show success toast with filename only
-      const filename = filePath.split('/').pop() || 'photo.jpg'
+      const filename = getBasename(filePath) || 'photo.jpg'
       showSuccessToast('Photo captured', filename)
 
       // Return focus to terminal after dialog cleanup completes

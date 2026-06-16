@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import type { FileNode } from '../../../preload/index'
+import { isStrictDescendant } from '../utils/fileUtils'
 
 /**
  * Flattened node with depth and parent information for drag-drop operations
@@ -89,16 +90,9 @@ export function buildTree(flattenedNodes: FlattenedNode[]): FileNode[] {
  * Check if one path is a descendant of another
  */
 export function isDescendant(possibleDescendant: string, possibleAncestor: string): boolean {
-  if (possibleDescendant === possibleAncestor) {
-    return false
-  }
-
-  // Simple string-based check: descendant must start with ancestor path + separator
-  const ancestorWithSep = possibleAncestor.endsWith('/')
-    ? possibleAncestor
-    : possibleAncestor + '/'
-
-  return possibleDescendant.startsWith(ancestorWithSep)
+  // isStrictDescendant(parent, child): equal paths return false, and it handles
+  // both POSIX and Windows separators with proper boundary checking.
+  return isStrictDescendant(possibleAncestor, possibleDescendant)
 }
 
 /**

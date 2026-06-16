@@ -5,6 +5,8 @@
  * All functions are pure - no side effects, deterministic outputs.
  */
 
+import { getBasename } from '../utils/fileUtils'
+
 /**
  * Project change event data structure
  */
@@ -225,9 +227,7 @@ export function shouldMarkInitialLoadComplete(
  */
 export function extractProjectName(path: string): string {
   if (!path) return ''
-  const normalized = path.replace(/\\/g, '/')
-  const segments = normalized.split('/').filter(Boolean)
-  return segments[segments.length - 1] || path
+  return getBasename(path) || path
 }
 
 /**

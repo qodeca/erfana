@@ -9,7 +9,7 @@ import type { DropModeDialogResult, ConflictDialogResult } from '../Dialog/types
 import './ProjectTree.css'
 import { showGlobalToast } from '../Toast/toastService'
 import { isPointInElement } from '../../utils/domGeometry'
-import { getBasename } from '../../utils/fileUtils'
+import { getBasename, getDirname } from '../../utils/fileUtils'
 import type { MenuContext } from './context-menu/types'
 import { ContextMenuFactory } from './context-menu/factory'
 import {
@@ -1091,7 +1091,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
           const stats = await window.api.file.getStats(filePath)
           return {
             path: filePath,
-            name: filePath.split('/').pop() || 'unknown',
+            name: getBasename(filePath) || 'unknown',
             sizeInBytes: stats.size,
             isDirectory: false // File picker only returns files
           }
@@ -1101,7 +1101,7 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
           statsFailureCount++
           return {
             path: filePath,
-            name: filePath.split('/').pop() || 'unknown',
+            name: getBasename(filePath) || 'unknown',
             sizeInBytes: 0, // Large file warning won't trigger
             isDirectory: false
           }
@@ -1192,9 +1192,9 @@ export function ProjectTree({ onFileSelect, showControlPanel, filterMode, onFilt
     onGitRefresh: refreshGitStatus,
     formatFileOperationError,
     getSiblingNames: (nodePath: string, currentName: string) => {
-      const parentPath = nodePath.substring(0, nodePath.lastIndexOf('/'))
+      const parentPath = getDirname(nodePath) || '/'
       const siblings = files.filter((file) => {
-        const siblingParent = file.path.substring(0, file.path.lastIndexOf('/'))
+        const siblingParent = getDirname(file.path) || '/'
         return siblingParent === parentPath && file.name !== currentName
       })
       return siblings.map((s) => s.name)

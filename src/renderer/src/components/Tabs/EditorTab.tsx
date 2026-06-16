@@ -20,36 +20,12 @@ import { ContextMenu } from '../ContextMenu/ContextMenu'
 import { useTabContextMenu } from './useTabContextMenu'
 import { useProjectManagementContext } from '../../context/ProjectManagementContext'
 import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
+import { getBasename, getDisplayRelativePath } from '../../utils/fileUtils'
 import './EditorTab.css'
 
 interface EditorTabParams {
   filePath?: string
   panelId?: string
-}
-
-/**
- * Extract filename from full file path
- */
-function getFileName(filePath: string): string {
-  return filePath.split('/').pop() || 'Untitled'
-}
-
-/**
- * Get relative path from project root
- * If filePath starts with projectPath, strip it to show relative path
- */
-function getRelativePath(filePath: string, projectPath: string | null): string {
-  if (!projectPath || !filePath) return filePath
-
-  // Ensure paths end consistently for comparison
-  const normalizedProjectPath = projectPath.endsWith('/') ? projectPath : projectPath + '/'
-
-  if (filePath.startsWith(normalizedProjectPath)) {
-    return filePath.slice(normalizedProjectPath.length)
-  }
-
-  // If file is not under project, show full path
-  return filePath
 }
 
 export function EditorTab(props: IDockviewPanelHeaderProps<EditorTabParams>) {
@@ -73,8 +49,8 @@ export function EditorTab(props: IDockviewPanelHeaderProps<EditorTabParams>) {
   const contextMenuItems = useTabContextMenu(panelId, () => setContextMenu(null))
 
   // Get filename and tooltip content with relative path
-  const fileName = getFileName(filePath)
-  const relativePath = getRelativePath(filePath, projectPath)
+  const fileName = getBasename(filePath) || 'Untitled'
+  const relativePath = getDisplayRelativePath(filePath, projectPath)
   const tooltipContent = `${fileName}\n${relativePath}`
 
   /**

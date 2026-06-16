@@ -17,6 +17,7 @@
 import { Copy, Scissors, Clipboard as ClipboardIcon, Edit, Trash, FilePlus, FolderPlus, FileUp, FolderOpen } from 'lucide-react'
 import type { IMenuItem, MenuContext, FileNode, FileNodeDirectory, FileNodeFile } from './types'
 import { isMacOS, isWindows } from '../../../utils/platform'
+import { getDirname } from '../../../utils/fileUtils'
 
 /**
  * Base class for all commands
@@ -170,8 +171,7 @@ abstract class RenameCommandBase<T extends FileNodeFile | FileNodeDirectory> ext
   protected abstract itemType: 'file' | 'directory'
 
   protected getParentPath(fullPath: string): string {
-    const i = fullPath.lastIndexOf('/')
-    return i > 0 ? fullPath.substring(0, i) : '/'
+    return getDirname(fullPath) || '/'
   }
 
   async execute(): Promise<void> {

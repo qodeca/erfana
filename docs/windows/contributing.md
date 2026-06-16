@@ -96,6 +96,8 @@ import os from 'node:os'
 const fixtureDir = path.join(os.tmpdir(), 'erfana-test', 'my-scope')
 ```
 
+In **renderer** runtime code (not just fixtures), never derive a basename, dirname, or relative path with `filePath.split('/')` / `lastIndexOf('/')` — the main process passes native separators across IPC, so a path can contain `\` on Windows. Use the cross-platform helpers in [`src/renderer/src/utils/fileUtils.ts`](../../src/renderer/src/utils/fileUtils.ts) (`getBasename`, `getDirname`, `getDisplayRelativePath`, `isPathInside`, `isStrictDescendant`); a renderer-scoped ESLint `no-restricted-syntax` rule enforces this. These helpers are display/parse-only — filesystem confinement stays main-side in `ExternalFileService` via `realpath` ([#238](https://github.com/qodeca/erfana/issues/238)).
+
 ### Platform overrides in tests
 
 Override `process.platform` per-test rather than gating the whole test with `describe.runIf`:

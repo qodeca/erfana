@@ -201,6 +201,13 @@ describe('useDragDropTree', () => {
 
       expect(isDescendant(notDescendant, ancestor)).toBe(false)
     })
+
+    it('should detect descendants in Windows backslash paths', () => {
+      const ancestor = 'C:\\project\\folder1'
+      const descendant = 'C:\\project\\folder1\\subfolder\\file.md'
+
+      expect(isDescendant(descendant, ancestor)).toBe(true)
+    })
   })
 
   describe('getProjection', () => {

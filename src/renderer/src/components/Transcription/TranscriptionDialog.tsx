@@ -28,7 +28,7 @@ import { TEST_IDS } from '../../constants/testids'
 import type { TranscriptionLanguage } from '../../../../shared/ipc/transcription-schema'
 import { ErrorCode } from '../../../../shared/errors'
 import { BaseDialog } from '../Dialog/BaseDialog'
-import { sanitizeFilePath } from '../../utils/fileUtils'
+import { sanitizeFilePath, getBasename } from '../../utils/fileUtils'
 import { triggerOrganizePrompt } from '../../hooks/useImport'
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { logger } from '../../utils/logger'
@@ -242,7 +242,7 @@ export function TranscriptionDialog(): JSX.Element | null {
     try {
       const dockviewApi = useProjectStore.getState().dockviewApi
       if (dockviewApi) {
-        const panelTitle = outputPath.split('/').pop() || 'Transcript'
+        const panelTitle = getBasename(outputPath) || 'Transcript'
         const panelId = `editor-${sanitizeFilePath(outputPath)}`
 
         let editorPanel = dockviewApi.getPanel(panelId)

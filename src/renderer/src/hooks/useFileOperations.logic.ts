@@ -7,6 +7,7 @@
 
 import type { FileNode } from '../interfaces/IProjectTreeApi'
 import { INVALID_FILENAME_MARKER } from '../../../shared/errors'
+import { getDirname } from '../utils/fileUtils'
 
 /**
  * Gets the target path for file/folder operations
@@ -52,8 +53,7 @@ export function getRelativePath(targetPath: string, projectPath: string | null):
  * @returns Parent directory path
  */
 export function extractParentPath(fullPath: string): string {
-  const lastSlash = fullPath.lastIndexOf('/')
-  return lastSlash > 0 ? fullPath.substring(0, lastSlash) : '/'
+  return getDirname(fullPath) || '/'
 }
 
 /**
@@ -71,7 +71,7 @@ export function getSiblingNames(
 ): string[] {
   const parentPath = extractParentPath(itemPath)
   const siblings = files.filter((file) => {
-    const siblingParent = file.path.substring(0, file.path.lastIndexOf('/'))
+    const siblingParent = getDirname(file.path) || '/'
     return siblingParent === parentPath && file.name !== currentName
   })
   return siblings.map((s) => s.name)
@@ -304,6 +304,7 @@ export function buildChildPath(parentPath: string, childName: string): string {
     return `/${childName}`
   }
   // Handle normal path with trailing slash check
+  // eslint-disable-next-line no-restricted-syntax -- constructs a new child segment; the '/'-join yields a mixed-separator path Node fs accepts on Windows (parses no existing native path; currently no runtime caller)
   return parentPath.endsWith('/') ? `${parentPath}${childName}` : `${parentPath}/${childName}`
 }
 

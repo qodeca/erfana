@@ -9,6 +9,8 @@
  * @module markdownEditorPanel.logic
  */
 
+import { getBasename } from '../../utils/fileUtils'
+
 /**
  * Document statistics calculated from content
  */
@@ -524,7 +526,7 @@ export function isSplitMode(
  * ```
  */
 export function extractFileName(filePath: string): string {
-  return filePath.split('/').pop() || '(Untitled)'
+  return getBasename(filePath) || '(Untitled)'
 }
 
 /**

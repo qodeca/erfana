@@ -65,9 +65,9 @@ describe('Template Helpers', () => {
       expect(result).toBe('file.md')
     })
 
-    it('should handle trailing slash (returns original path)', () => {
+    it('should ignore a trailing slash and return the final segment', () => {
       const result = basename('/Users/test/directory/')
-      expect(result).toBe('/Users/test/directory/')
+      expect(result).toBe('directory')
     })
 
     it('should handle root path (returns original path)', () => {
@@ -85,9 +85,9 @@ describe('Template Helpers', () => {
       expect(result).toBe('')
     })
 
-    it('should handle Windows-style paths (note: only splits on /)', () => {
+    it('should extract the filename from Windows-style backslash paths', () => {
       const result = basename('C:\\Users\\test\\file.md')
-      expect(result).toBe('C:\\Users\\test\\file.md')
+      expect(result).toBe('file.md')
     })
 
     it('should handle multiple levels deep', () => {
@@ -127,9 +127,9 @@ describe('Template Helpers', () => {
       expect(result).toBe('')
     })
 
-    it('should handle trailing slash', () => {
+    it('should ignore a trailing slash and return the parent directory', () => {
       const result = dirname('/Users/test/directory/')
-      expect(result).toBe('/Users/test/directory')
+      expect(result).toBe('/Users/test')
     })
 
     it('should handle multiple levels deep', () => {

@@ -110,6 +110,10 @@ describe('useFileOperations.logic', () => {
     it('should handle single-level path', () => {
       expect(extractParentPath('/project')).toBe('/')
     })
+
+    it('should extract parent from a Windows backslash path', () => {
+      expect(extractParentPath('C:\\a\\b\\c.md')).toBe('C:\\a\\b')
+    })
   })
 
   describe('getSiblingNames', () => {
@@ -143,6 +147,17 @@ describe('useFileOperations.logic', () => {
       const siblings = getSiblingNames(mockFiles, '/project/file2.txt', 'file2.txt')
       expect(siblings).toHaveLength(2) // file1.txt and folder1
       expect(siblings).not.toContain('nested.txt')
+    })
+
+    it('should group root-level siblings together', () => {
+      const rootFiles: FileNode[] = [
+        { name: 'c.md', path: '/c.md', type: 'file', size: 0, modified: 0 },
+        { name: 'd.md', path: '/d.md', type: 'file', size: 0, modified: 0 },
+        { name: 'nested.md', path: '/sub/nested.md', type: 'file', size: 0, modified: 0 }
+      ]
+      const siblings = getSiblingNames(rootFiles, '/c.md', 'c.md')
+      expect(siblings).toEqual(['d.md'])
+      expect(siblings).not.toContain('nested.md')
     })
   })
 

@@ -667,12 +667,16 @@ describe('extractFileName', () => {
     expect(extractFileName('')).toBe('(Untitled)')
   })
 
-  it('should handle path ending with slash', () => {
-    expect(extractFileName('/path/to/')).toBe('(Untitled)')
+  it('should ignore a trailing slash and return the final segment', () => {
+    expect(extractFileName('/path/to/')).toBe('to')
   })
 
   it('should handle deeply nested paths', () => {
     expect(extractFileName('/a/b/c/d/e/file.txt')).toBe('file.txt')
+  })
+
+  it('should extract the file name from a Windows backslash path', () => {
+    expect(extractFileName('C:\\path\\to\\document.md')).toBe('document.md')
   })
 })
 

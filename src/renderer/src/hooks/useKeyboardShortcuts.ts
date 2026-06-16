@@ -68,7 +68,7 @@ export interface UseKeyboardShortcutsOptions {
  *     onClose: handleClose,
  *     isModified: currentFile?.modified ?? false,
  *     showConfirm,
- *     fileName: currentFile?.path?.split('/').pop() ?? null
+ *     fileName: currentFile?.path ? getBasename(currentFile.path) : null
  *   })
  *
  *   return <Editor />

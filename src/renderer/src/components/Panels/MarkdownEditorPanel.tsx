@@ -24,7 +24,7 @@ import { useDialog } from '../Dialog'
 import { useToast } from '../Toast/ToastContext'
 import { useProjectStore } from '../../stores/useProjectStore'
 import { useSearchStore } from '../../stores/useSearchStore'
-import { sanitizeFilePath } from '../../utils/fileUtils'
+import { sanitizeFilePath, getBasename } from '../../utils/fileUtils'
 import { logger } from '../../utils/logger'
 import { useAutoSave } from '../../hooks/useAutoSave'
 import { useFileWatcher, createFileSaveGuard } from '../../hooks/useFileWatcher'
@@ -348,7 +348,7 @@ export function MarkdownEditorPanel(
     onClose: () => props.api.close(),
     isModified: currentFile?.modified ?? false,
     showConfirm,
-    fileName: currentFile?.path?.split('/').pop() ?? null
+    fileName: currentFile?.path ? getBasename(currentFile.path) : null
   })
 
   // =========================================================================
@@ -538,7 +538,7 @@ export function MarkdownEditorPanel(
           {/* File conflict notification */}
           {externalChangeDetected && (
             <FileConflictNotification
-              fileName={currentFile.path.split('/').pop() || 'File'}
+              fileName={getBasename(currentFile.path) || 'File'}
               onReload={handleReloadFromDisk}
               onKeepLocal={handleKeepLocal}
               onDismiss={dismissConflict}

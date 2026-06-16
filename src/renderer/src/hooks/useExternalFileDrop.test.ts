@@ -834,6 +834,13 @@ describe('useExternalFileDrop', () => {
 
       expect(result.current.isValidDropTarget('/project/docs/', true)).toBe(true)
     })
+
+    it('rejects a sibling folder that shares a name prefix with the project', () => {
+      const { result } = renderHook(() => useExternalFileDrop(defaultOptions))
+
+      // '/projector' starts with '/project' textually but is not inside it
+      expect(result.current.isValidDropTarget('/projector/sub', true)).toBe(false)
+    })
   })
 
   describe('getTargetFromEvent', () => {

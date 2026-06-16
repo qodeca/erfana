@@ -11,6 +11,7 @@
 
 import type { DockviewApi } from 'dockview'
 import { useProjectStore } from '../../stores/useProjectStore'
+import { getBasename } from '../../utils/fileUtils'
 
 /**
  * Get all editor panel IDs from dockview API
@@ -80,7 +81,7 @@ export function getFilenameFromPanelId(panelId: string): string {
     if (panel) {
       const params = panel.params as { filePath?: string } | undefined
       if (params?.filePath) {
-        return params.filePath.split('/').pop() || 'Untitled'
+        return getBasename(params.filePath) || 'Untitled'
       }
     }
   }

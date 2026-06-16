@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { WelcomePanel } from './WelcomePanel'
+import { getBasename } from '../../utils/fileUtils'
 
 // Simulated project store
 let simulatedProjects: Array<{ path: string; name: string; lastOpened: number }> = []
@@ -82,7 +83,7 @@ const mockApi = {
   file: {
     openProjectByPath: vi.fn(async (path: string) => {
       // Simulate adding to recent projects on open
-      const name = path.split('/').pop() || path
+      const name = getBasename(path) || path
       simulatedProjects = simulatedProjects.filter(p => p.path !== path)
       simulatedProjects.unshift({ path, name, lastOpened: nextTimestamp++ })
       if (simulatedProjects.length > 5) {
@@ -114,7 +115,7 @@ describe('Recent Projects Integration', () => {
     // Configure mock to call the simulated API (for integration behavior)
     mockHandleOpenProjectByPath.mockImplementation(async (path: string) => {
       // Simulate the API call behavior
-      const name = path.split('/').pop() || path
+      const name = getBasename(path) || path
       simulatedProjects = simulatedProjects.filter(p => p.path !== path)
       simulatedProjects.unshift({ path, name, lastOpened: nextTimestamp++ })
       if (simulatedProjects.length > 5) {

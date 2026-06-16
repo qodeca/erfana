@@ -27,6 +27,7 @@ import { ContextMenu } from '../ContextMenu/ContextMenu'
 import { useTabContextMenu } from './useTabContextMenu'
 import { useProjectManagementContext } from '../../context/ProjectManagementContext'
 import { TEST_IDS, getDynamicTestId } from '../../constants/testids'
+import { getBasename, getDisplayRelativePath } from '../../utils/fileUtils'
 import './ImageTab.css'
 
 // ============================================================================
@@ -41,39 +42,6 @@ interface ImageTabParams {
   filePath?: string
   /** Unique panel identifier */
   panelId?: string
-}
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Extract filename from full file path.
- *
- * @param filePath - Full file path
- * @returns Filename only
- */
-function getFileName(filePath: string): string {
-  return filePath.split('/').pop() || 'Image'
-}
-
-/**
- * Get relative path from project root for tooltip.
- *
- * @param filePath - Full file path
- * @param projectPath - Project root path
- * @returns Relative path or full path if not under project
- */
-function getRelativePath(filePath: string, projectPath: string | null): string {
-  if (!projectPath || !filePath) return filePath
-
-  const normalizedProjectPath = projectPath.endsWith('/') ? projectPath : projectPath + '/'
-
-  if (filePath.startsWith(normalizedProjectPath)) {
-    return filePath.slice(normalizedProjectPath.length)
-  }
-
-  return filePath
 }
 
 // ============================================================================
@@ -113,8 +81,8 @@ export function ImageTab(props: IDockviewPanelHeaderProps<ImageTabParams>) {
   const contextMenuItems = useTabContextMenu(panelId, () => setContextMenu(null))
 
   // Derived values
-  const fileName = getFileName(filePath)
-  const relativePath = getRelativePath(filePath, projectPath)
+  const fileName = getBasename(filePath) || 'Image'
+  const relativePath = getDisplayRelativePath(filePath, projectPath)
   const tooltipContent = `${fileName}\n${relativePath}`
 
   /**

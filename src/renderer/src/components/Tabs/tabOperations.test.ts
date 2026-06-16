@@ -371,7 +371,7 @@ describe('tabOperations', () => {
 
       const result = getFilenameFromPanelId('editor-test')
 
-      // Empty filePath means filePath.split('/').pop() returns '', which is falsy
+      // Empty filePath means getBasename(filePath) returns '', which is falsy
       // So it falls back to panel ID extraction: 'editor-test' -> 'test'
       expect(result).toBe('test')
     })

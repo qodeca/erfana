@@ -55,10 +55,12 @@ vi.mock('./useTabContextMenu', () => ({
   useTabContextMenu: () => mockContextMenuItems
 }))
 
-// Mock useProjectManagementContext
+// Mock useProjectManagementContext - mutable so individual tests can vary the base
+let mockProjectPath: string | null = '/Users/test/Projects/myproject'
+
 vi.mock('../../context/ProjectManagementContext', () => ({
   useProjectManagementContext: () => ({
-    projectPath: '/Users/test/Projects/myproject'
+    projectPath: mockProjectPath
   })
 }))
 
@@ -111,6 +113,7 @@ describe('EditorTab', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockDirtyPanelIds.clear()
+    mockProjectPath = '/Users/test/Projects/myproject'
 
     // Create portal-root for context menu
     const portalRoot = document.createElement('div')
@@ -156,12 +159,37 @@ describe('EditorTab', () => {
       expect(screen.getByText('Untitled')).toBeInTheDocument()
     })
 
-    it('should have tooltip with filename and path', () => {
-      const props = createMockProps({ filePath: '/project/README.md' })
+    it('should have tooltip with filename and relative path', () => {
+      const props = createMockProps({
+        filePath: '/Users/test/Projects/myproject/docs/README.md'
+      })
 
       render(<EditorTab {...props} />)
 
-      const tab = screen.getByTitle(/README\.md[\s\S]*\/project\/README\.md/)
+      // getByTitle normalizes whitespace, so the embedded newline becomes a space
+      const tab = screen.getByTitle('README.md docs/README.md')
+      expect(tab).toBeInTheDocument()
+    })
+
+    it('should render basename and /-separated relative path for a Windows path', () => {
+      // Override the project context to a Windows base for this case
+      mockProjectPath = 'C:\\proj'
+      const props = createMockProps({ filePath: 'C:\\proj\\sub\\note.md' })
+
+      render(<EditorTab {...props} />)
+
+      expect(screen.getByText('note.md')).toBeInTheDocument()
+      const tab = screen.getByTitle('note.md sub/note.md')
+      expect(tab).toBeInTheDocument()
+    })
+
+    it('should fall back to basename in the tooltip for an out-of-project file', () => {
+      const props = createMockProps({ filePath: '/other/place/note.md' })
+
+      render(<EditorTab {...props} />)
+
+      // Second tooltip line is the basename when the file is outside the project
+      const tab = screen.getByTitle('note.md note.md')
       expect(tab).toBeInTheDocument()
     })
 

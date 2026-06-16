@@ -28,6 +28,77 @@ export function getBasename(path: string): string {
 }
 
 /**
+ * Extract the parent (directory) portion of a path, handling both POSIX ('/')
+ * and Windows ('\\') separators plus any trailing separators.
+ *
+ * Returns the parent in the path's NATIVE separators, or '' when there is no
+ * separator at all (unlike Node's `path.dirname`, which would return '.').
+ * Callers that need the root sentinel should wrap the result as `|| '/'`.
+ *
+ * Display/parse-only — not for security confinement.
+ */
+export function getDirname(path: string): string {
+  const trimmed = path.replace(/[\\/]+$/, '')
+  const m = trimmed.match(/^(.*)[\\/][^\\/]+$/)
+  return m ? m[1] : ''
+}
+
+/**
+ * Normalize a path for comparison: collapse runs of either separator to a
+ * single '/' and strip any trailing separators. Internal helper only.
+ *
+ * Display/parse-only — not for security confinement.
+ */
+function normalizePathForCompare(p: string): string {
+  return p.replace(/[\\/]+/g, '/').replace(/\/+$/, '')
+}
+
+/**
+ * Derive a display-friendly relative path for a file under a base path,
+ * handling both POSIX ('/') and Windows ('\\') separators. The returned tail
+ * uses '/' separators. Falls back to the basename when there is no base path,
+ * when the file equals the base, or when the file lies outside the base.
+ *
+ * Display/parse-only — not for security confinement.
+ */
+export function getDisplayRelativePath(filePath: string, basePath: string | null): string {
+  if (!basePath || !filePath) return getBasename(filePath)
+  const normFile = filePath.replace(/[\\/]+/g, '/')
+  const normBase = basePath.replace(/[\\/]+/g, '/').replace(/\/+$/, '')
+  if (normFile === normBase) return getBasename(filePath)
+  if (normFile.startsWith(normBase + '/')) return normFile.slice(normBase.length + 1)
+  return getBasename(filePath)
+}
+
+/**
+ * Check whether childPath is the same as, or nested under, parentPath. Handles
+ * both POSIX ('/') and Windows ('\\') separators and ignores trailing
+ * separators. Equal paths return true.
+ *
+ * Display/parse-only — not for security confinement.
+ */
+export function isPathInside(parentPath: string, childPath: string): boolean {
+  if (!parentPath || !childPath) return false
+  const p = normalizePathForCompare(parentPath)
+  const c = normalizePathForCompare(childPath)
+  return c === p || c.startsWith(p + '/')
+}
+
+/**
+ * Check whether childPath is strictly nested under parentPath (a proper
+ * descendant). Equal paths return false. Handles both POSIX ('/') and
+ * Windows ('\\') separators.
+ *
+ * Display/parse-only — not for security confinement.
+ */
+export function isStrictDescendant(parentPath: string, childPath: string): boolean {
+  return (
+    normalizePathForCompare(childPath) !== normalizePathForCompare(parentPath) &&
+    isPathInside(parentPath, childPath)
+  )
+}
+
+/**
  * Check if file is a markdown file by extension
  */
 export function isMarkdownFile(fileName: string): boolean {

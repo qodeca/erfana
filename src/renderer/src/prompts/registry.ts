@@ -25,6 +25,7 @@ const templateModules = import.meta.glob<string>('./templates/*.md', {
  */
 const templateInputs = Object.entries(templateModules).map(([path, raw]) => {
   // Extract filename from path: './templates/explain.md' -> 'explain.md'
+  // eslint-disable-next-line no-restricted-syntax -- Vite import.meta.glob keys are always POSIX '/'
   const filename = path.split('/').pop() || path
   return { raw, filename }
 })

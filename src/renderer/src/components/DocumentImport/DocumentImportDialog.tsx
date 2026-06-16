@@ -26,7 +26,7 @@ import { useProjectStore } from '../../stores/useProjectStore'
 import { OcrLanguageSelect } from './OcrLanguageSelect'
 import { TEST_IDS } from '../../constants/testids'
 import { BaseDialog } from '../Dialog/BaseDialog'
-import { sanitizeFilePath } from '../../utils/fileUtils'
+import { sanitizeFilePath, getBasename } from '../../utils/fileUtils'
 import { triggerOrganizePrompt } from '../../hooks/useImport'
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { logger } from '../../utils/logger'
@@ -173,7 +173,7 @@ export function DocumentImportDialog(): JSX.Element | null {
     try {
       const dockviewApi = useProjectStore.getState().dockviewApi
       if (dockviewApi) {
-        const panelTitle = outputPath.split('/').pop() || 'Document'
+        const panelTitle = getBasename(outputPath) || 'Document'
         const panelId = `editor-${sanitizeFilePath(outputPath)}`
 
         let editorPanel = dockviewApi.getPanel(panelId)

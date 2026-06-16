@@ -12,6 +12,7 @@
 
 import { useState, useCallback } from 'react'
 import { convertMermaidDiagramsToImages } from '../../../../utils/svgToImage'
+import { getBasename } from '../../../../utils/fileUtils'
 import { logger } from '../../../../utils/logger'
 import type { MarkdownPreviewHandle } from '../../MarkdownPreview'
 import type { EditorFile } from '../types'
@@ -72,7 +73,7 @@ export interface UseExportHandlersReturn {
  * ```
  */
 function extractFileName(filePath: string): string {
-  return filePath.split('/').pop() || filePath
+  return getBasename(filePath) || filePath
 }
 
 /**

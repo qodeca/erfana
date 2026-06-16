@@ -11,6 +11,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { AUTO_EXPAND } from '../components/ProjectTree/constants'
 import { logger } from '../utils/logger'
+import { isPathInside } from '../utils/fileUtils'
 
 /**
  * Represents a file dropped from an external source.
@@ -289,12 +290,11 @@ export function useExternalFileDrop(
       return false
     }
 
-    // Must be within project boundary (security requirement NFR-004)
-    // Check that path starts with project path (with proper separator handling)
-    const normalizedPath = path.endsWith('/') ? path.slice(0, -1) : path
-    const normalizedProjectPath = projectPath.endsWith('/') ? projectPath.slice(0, -1) : projectPath
-
-    return normalizedPath === normalizedProjectPath || normalizedPath.startsWith(normalizedProjectPath + '/')
+    // UX-level drop-target gate; authoritative project confinement is enforced
+    // main-side in ExternalFileService (NFR-004). isPathInside treats an equal
+    // path as inside, so dropping ON the project root remains a valid target.
+    // Handles both POSIX and Windows separators.
+    return isPathInside(projectPath, path)
   }, [projectPath])
 
   /**

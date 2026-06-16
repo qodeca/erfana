@@ -51,6 +51,7 @@ import {
   getZoomButtonStates
 } from './imageViewer.logic'
 import { getImageFormat } from '../../utils/imageUtils'
+import { getBasename } from '../../utils/fileUtils'
 import { logger } from '../../utils/logger'
 import { TEST_IDS } from '../../constants/testids'
 import styles from './ImageViewerPanel.module.css'
@@ -79,7 +80,7 @@ const MAX_FILENAME_LENGTH = 255
  */
 function sanitizeFileName(filePath: string): string {
   // Extract filename from path
-  const fileName = filePath.split('/').pop() || 'image'
+  const fileName = getBasename(filePath) || 'image'
 
   // Remove control characters (ASCII 0-31 and 127) and truncate to max length
   // Using split/filter/join instead of regex to avoid eslint no-control-regex warning

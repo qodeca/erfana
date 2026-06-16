@@ -10,7 +10,7 @@ import { ISplitviewPanelProps, DockviewApi } from 'dockview'
 import { FolderOpen, ChevronDown, ChevronLeft } from 'lucide-react'
 import { ProjectTree } from '../ProjectTree/ProjectTree'
 import type { FilterMode } from '../../types/filters'
-import { sanitizeFilePath } from '../../utils/fileUtils'
+import { sanitizeFilePath, getBasename } from '../../utils/fileUtils'
 import { isImageFile } from '../../utils/imageUtils'
 import './ProjectPanel.css'
 import { useProjectStore } from '../../stores/useProjectStore'
@@ -71,7 +71,7 @@ export function ProjectPanel(props: ISplitviewPanelProps) {
       return
     }
 
-    const fileName = filePath.split('/').pop() || 'File'
+    const fileName = getBasename(filePath) || 'File'
 
     // Check if the file is an image - open in ImageViewerPanel instead of editor
     if (isImageFile(filePath)) {

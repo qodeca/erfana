@@ -19,6 +19,7 @@ import {
   showInfoToast
 } from '../../../../utils/toastHelpers'
 import { escapePathForShell, type ShellKind } from '../../../../utils/shellPathEscape'
+import { getBasename } from '../../../../utils/fileUtils'
 import { logger } from '../../../../utils/logger'
 import type { ScreenshotCaptureMode, DisplayInfo, WindowSource } from '../types'
 
@@ -266,7 +267,7 @@ export function useScreenshotCapture(
         const quotedPath = escapePathForShell(result.filePath, shellKind)
         await window.api.terminal.write(currentTerminalId, quotedPath)
 
-        const filename = result.filePath.split(/[\\/]/).pop() || 'screenshot.png'
+        const filename = getBasename(result.filePath) || 'screenshot.png'
         showSuccessToast('Screenshot captured', filename)
 
         xtermRef.current?.focus()

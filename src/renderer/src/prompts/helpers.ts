@@ -3,6 +3,8 @@
  * These are simple functions that don't require Handlebars (CSP-safe)
  */
 
+import { getBasename, getDirname } from '../utils/fileUtils'
+
 /**
  * Truncate a string to a maximum length
  * Usage: {{truncate selectedText 100}}
@@ -19,7 +21,7 @@ export function truncate(str?: string | number, length?: string | number): strin
  */
 export function basename(path?: string | number): string {
   if (typeof path !== 'string') return ''
-  return path.split('/').pop() || path
+  return getBasename(path) || path
 }
 
 /**
@@ -28,9 +30,7 @@ export function basename(path?: string | number): string {
  */
 export function dirname(path?: string | number): string {
   if (typeof path !== 'string') return ''
-  const parts = path.split('/')
-  parts.pop()
-  return parts.join('/') || '/'
+  return getDirname(path) || '/'
 }
 
 /**
