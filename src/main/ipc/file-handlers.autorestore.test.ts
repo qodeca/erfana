@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // Capture ipc handlers
 const handlers: Record<string, (...args: any[]) => any> = {}
 
+vi.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
+
 vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn((channel: string, cb: (...args: any[]) => any) => {
