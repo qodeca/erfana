@@ -54,7 +54,7 @@ export const TEST_IDS = {
   ACTIVITY_BAR_BTN_SETTINGS: 'activity-bar-btn-settings',
 
   // =========================================================================
-  // Project Tree (15)
+  // Project Tree (16)
   // =========================================================================
 
   /** Project tree container */
@@ -69,6 +69,8 @@ export const TEST_IDS = {
   PROJECT_TREE_BTN_NEW_FILE: 'project-tree-btn-new-file',
   /** New folder button */
   PROJECT_TREE_BTN_NEW_FOLDER: 'project-tree-btn-new-folder',
+  /** Import file button */
+  PROJECT_TREE_BTN_IMPORT: 'project-tree-btn-import',
   /** Refresh project tree button */
   PROJECT_TREE_BTN_REFRESH: 'project-tree-btn-refresh',
   /** Tree node (file or folder) - use with getDynamicTestId */
@@ -603,9 +605,11 @@ export const TEST_IDS = {
   DOCUMENT_IMPORT_PHASE_TEXT: 'doc-import-phase-text',
 
   // =========================================================================
-  // Welcome Panel (4)
+  // Welcome Panel (5)
   // =========================================================================
 
+  /** Open/Change project button on WelcomePanel */
+  WELCOME_BTN_OPEN: 'welcome-btn-open',
   /** Import file button on WelcomePanel */
   WELCOME_BTN_IMPORT: 'welcome-btn-import',
   /** Recent projects list container */

@@ -55,6 +55,27 @@ export class ProjectTreePage {
   }
 
   // ---------------------------------------------------------------------------
+  // Toolbar action buttons
+  // ---------------------------------------------------------------------------
+
+  /** The toolbar "Open project" / "Change project" button. */
+  openProjectButton(): Locator {
+    return byTestId(this.page, TEST_IDS.PROJECT_TREE_BTN_OPEN)
+  }
+
+  /** The toolbar "Import" button (rendered only when a project is open). */
+  toolbarImportButton(): Locator {
+    return byTestId(this.page, TEST_IDS.PROJECT_TREE_BTN_IMPORT)
+  }
+
+  /** Click the toolbar Import button (asserts it is visible first). */
+  async clickToolbarImport(): Promise<void> {
+    const btn = this.toolbarImportButton()
+    await expect(btn).toBeVisible({ timeout: 5000 })
+    await btn.click()
+  }
+
+  // ---------------------------------------------------------------------------
   // Git status decorations (badges on files, dots on folders)
   //
   // Node test-ids are a djb2 hash of the node's ABSOLUTE path, so matching by
