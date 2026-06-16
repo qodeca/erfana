@@ -22,7 +22,7 @@ const { mockSwitchProject, mockShowOpenDialog } = vi.hoisted(() => ({
 }))
 
 // Mock electron
-vi.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
+vi.mock('./senderValidation', () => ({ isTrustedSender: () => true }))
 
 vi.mock('electron', () => ({
   ipcMain: {
