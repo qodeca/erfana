@@ -1,7 +1,7 @@
 {
   "name": "erfana",
   "version": "0.16.1",
-  "description": "An AI-native Markdown workspace that runs terminal coding agents like Claude Code beside your editor",
+  "description": "An agent-native Markdown workspace that runs terminal coding agents like Claude Code beside your editor",
   "main": "./out/main/index.js",
   "author": "Qodeca sp. z o.o.",
   "license": "GPL-3.0-only",

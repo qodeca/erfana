@@ -49,6 +49,5 @@ body:
     attributes:
       label: Logs or screenshots
       description: Relevant log output (Settings shows the logs folder path) or screenshots. Redact anything sensitive.
-      render: shell
     validations:
       required: false
