@@ -1,19 +1,26 @@
 # Erfana
 
-**Open-source Markdown IDE with an AI-native terminal and signed builds — for macOS & Windows.**
+**An open-source, AI-native Markdown workspace — run a terminal coding agent like Claude Code right beside your editor.**
 
 [![Quality Checks](https://github.com/qodeca/erfana/actions/workflows/checks.yml/badge.svg?branch=main)](https://github.com/qodeca/erfana/actions/workflows/checks.yml)
 [![Latest release](https://img.shields.io/github/v/release/qodeca/erfana?sort=semver)](https://github.com/qodeca/erfana/releases)
 [![License: GPL-3.0-only](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE)
 [![Platforms: macOS · Windows](https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Windows-lightgrey.svg)](#platforms)
 
-Erfana is a desktop workspace for working in Markdown next to a real terminal: a Monaco-powered editor with live preview, a project tree with live git status, and an integrated terminal where AI text operations and CLI tools (including Claude Code) run in your project's context. It is free software under **GPL-3.0-only**.
+Erfana puts a coding agent at the center of your Markdown work. Open a project and the agent, your files, and your live preview share one window — and one feedback loop:
+
+- **Run the agent in your editor** — a clean top-level `claude` session (or any CLI agent) in the integrated terminal, in your project's context.
+- **Watch its context** — a per-panel meter shows the model, its 200k/1M context window, and how full it is, live.
+- **Turn Markdown into prompts** — right-click a selection for prompt templates (Explain, Modify, Ask, Visualize); the prompt goes straight to the agent.
+- **Edits land in your file** — mutation prompts apply the agent's changes back into the document.
+
+It is free software under **GPL-3.0-only**, for macOS & Windows.
 
 | | |
 |---|---|
+| 🤖 **AI workflow** | Run Claude Code (or any CLI agent) in the integrated terminal; a per-panel meter tracks the model and live context-window usage; right-click prompt templates turn Markdown into prompts and apply edits back to the file |
+| 💻 **Integrated terminal** | xterm.js + PTY with WebGL rendering, file links, drag-drop paths, cross-platform screenshot & camera capture |
 | 📝 **Markdown editor** | Monaco editor, live preview with scroll sync, Mermaid diagrams (22 types, zoom/pan/full-screen), YAML frontmatter, unified in-file search |
-| 💻 **Integrated terminal** | xterm.js + PTY with WebGL rendering, file links, drag-drop paths, cross-platform screenshot & camera capture, and a per-panel Claude Code context status bar |
-| 🤖 **AI text operations** | Right-click prompt templates (Explain, Modify, Ask, Visualize) routed to the terminal; mutation prompts apply edits back to the document |
 | 📁 **Project tree** | Real-time git status (worker-thread offloaded), drag-drop reorganization, Markdown filtering, Reveal in Finder/Explorer |
 | 📄 **Import & export** | 50+ document formats via LiteParse with local OCR; print-optimized PDF and Word (DOCX) export with Mermaid diagrams |
 | 🎙️ **Media transcription** | Audio/video → text via the OpenAI API or fully offline `whisper.cpp` |
