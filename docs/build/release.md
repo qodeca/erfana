@@ -124,7 +124,7 @@ All secrets live in the GitHub repo `qodeca/erfana` (Settings → Secrets and va
 |---|---|---|---|
 | `APPLE_APP_SPECIFIC_PASSWORD` | appleid.apple.com | Event-driven (account compromise, key leak) — no fixed expiry | — |
 | `MAC_CERT_P12_BASE64` | Apple Developer | 60 days before cert expiry | **2027-04-15** (current cert expires 2027-06-14 — verify with `security find-certificate -c "Developer ID Application" -p \| openssl x509 -noout -enddate` and refresh this date when the cert is rotated) |
-| `AZURE_CLIENT_CERTIFICATE_BASE64` (auth cert — app registration credential) | `az ad app credential list --id $AZURE_CLIENT_ID --cert` | 60 days before cert expiry (currently 2028-04-23) — i.e. **2028-02-22** | 2028-02-22 |
+| `AZURE_CLIENT_CERTIFICATE_BASE64` (auth cert — app registration credential) | `az ad app credential list --id $AZURE_CLIENT_ID --cert` | 60 days before cert expiry (currently 2028-06-15, rotated 2026-06-16) — i.e. **2028-04-16** | 2028-04-16 |
 | `AZURE_CERT_PROFILE_NAME` (signing cert — service-side, separate from auth cert above) | Azure Artifact Signing profile | 60 days before certificate-profile expiry — current cert profile rotation hooks into Azure portal alerts | **2027-08-22** (assumes 2-year cert profile from initial 2025-10-22 provisioning; verify in Azure portal Trusted Signing → Certificate profiles → expiry date and refresh) |
 | `MINISIGN_SECRET_KEY_BASE64` (primary) | Internal ops vault | Scheduled annually + event-driven (compromise); rotation key published alongside primary so end users can verify both | **2027-04-25** |
 
