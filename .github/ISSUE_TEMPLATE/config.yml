@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability (private)
+    url: https://github.com/qodeca/erfana/security/advisories/new
+    about: Do not open a public issue for security problems — report them privately here.
+  - name: Security policy
+    url: https://github.com/qodeca/erfana/blob/main/SECURITY.md
+    about: How Erfana handles vulnerability reports, scope, and disclosure.
+  - name: Questions & ideas
+    url: https://github.com/qodeca/erfana/discussions
+    about: Ask questions, share ideas, or discuss usage in Discussions.

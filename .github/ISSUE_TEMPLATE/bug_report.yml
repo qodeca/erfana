@@ -1,0 +1,54 @@
+name: Bug report
+description: Report a reproducible problem in Erfana
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please **do not** report security
+        vulnerabilities here — use [private advisory reporting](https://github.com/qodeca/erfana/security/advisories/new) instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, including what you expected to happen.
+      placeholder: When I open a project with… Erfana…
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal, ordered steps that reliably reproduce the problem.
+      placeholder: |
+        1. Open a folder with…
+        2. Click…
+        3. See…
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Erfana version
+      description: Help → About, or the app's version string.
+      placeholder: "0.16.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Windows
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Relevant log output (Settings shows the logs folder path) or screenshots. Redact anything sensitive.
+      render: shell
+    validations:
+      required: false
