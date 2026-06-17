@@ -102,6 +102,15 @@ This is the canonical cookbook for `release.yml` failures. Each row below is a r
 - **Platform:** All
 - **First seen:** run 24905191415
 
+### Row 11: PKCS#12 envelope invalid or password mismatch
+
+- **Regex:** `Decoded file is not a valid PKCS#12 envelope or password is wrong`
+- **Human-readable symptom:** The "Decode Azure signing certificate to PFX file" step fails immediately after the base64 decode with `##[error]Decoded file is not a valid PKCS#12 envelope or password is wrong`. The size gate passed (binary is non-empty), but `openssl pkcs12 -info` exits non-zero.
+- **Root cause:** `AZURE_CLIENT_CERTIFICATE_BASE64` and `AZURE_CLIENT_CERTIFICATE_PASSWORD` GitHub Secrets are mismatched. Either (a) the PFX was regenerated with a new password and only one secret was updated, or (b) the base64 value encodes the wrong file (e.g., a CA cert or CSR rather than the PFX). Because the size check passes, the binary is non-empty — this is not the CR/LF truncation from Row 9, which would produce an undersized file.
+- **Fix:** (1) On the signing workstation, locate the matching PFX + password from the key vault (see `docs/build/release.md § B.3 PFX hygiene`). (2) Verify locally: `printf '%s' "$B64" | tr -d '\r\n' | openssl base64 -d -A > /tmp/t.pfx && openssl pkcs12 -info -in /tmp/t.pfx -noout -passin pass:'<pw>'` — should print `MAC verified OK`. (3) Re-upload BOTH secrets atomically: `printf '%s' "$(base64 -i signing.pfx | tr -d '\n')" | gh secret set AZURE_CLIENT_CERTIFICATE_BASE64 --repo qodeca/erfana` and `printf '%s' '<password>' | gh secret set AZURE_CLIENT_CERTIFICATE_PASSWORD --repo qodeca/erfana`. (4) Bump to the next patch version (v0.16.1 is burned) and re-invoke the releasing-erfana skill from Phase 0.
+- **Platform:** Windows
+- **First seen:** run 27699667579
+
 ### Adding a new row (template)
 
 Copy this template, fill in each field, and insert at the end of the row list. Do not skip fields — the analyzer parser depends on every row having all six.
@@ -199,7 +208,7 @@ After this, `git log --show-signature` displays "Good signature" for both commit
 The skill no longer builds locally — every binary is produced by `release.yml` on GitHub-hosted runners. There is no local `release/{version}/` directory to clean.
 
 1. Read the `release-failure-analyzer` incident memo at `docs/release-incidents/v{version}-attempt-{N}.md`.
-2. Match the failure signature against the cookbook above (Rows 1–10) using the typed regex field. Apply the matched fix verbatim.
+2. Match the failure signature against the cookbook above (Rows 1–11) using the typed regex field. Apply the matched fix verbatim.
 3. If no row matches, follow the diagnostic habits and **add a new row** using the template — preserves the next operator's discovery cost.
 4. Bump the patch version (`v{N}` is burned regardless of `release.yml` outcome) and re-invoke the skill from Phase 0.
 

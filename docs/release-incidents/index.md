@@ -16,7 +16,7 @@ Newest first. Auto-appended by the `release-failure-analyzer` agent on terminal-
 
 | Date | Version | Attempt | Run | Failed leg | Matched signature | Memo |
 |------|---------|---------|-----|------------|-------------------|------|
-| _no `release.yml` incidents recorded yet — first one will be appended automatically by the failure-analyzer agent_ |
+| 2026-06-17 | v0.16.1 | #1 | [27699667579](https://github.com/qodeca/erfana/actions/runs/27699667579) | Windows | unknown (Row 11 — add to cookbook) | [memo](v0.16.1-attempt-1.md) |
 
 ## Operator-side incident history
 

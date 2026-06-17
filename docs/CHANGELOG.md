@@ -4,9 +4,9 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
-## 0.16.1
+## 0.16.2
 
-*First public open-source release of Erfana. Tag [`v0.16.1`](https://github.com/qodeca/erfana/releases/tag/v0.16.1).*
+*First public open-source release of Erfana. Tag [`v0.16.2`](https://github.com/qodeca/erfana/releases/tag/v0.16.2). (v0.16.1 was tagged but never published — its release build was voided by a Windows code-signing secret mismatch; see [`docs/release-incidents/v0.16.1-attempt-1.md`](release-incidents/v0.16.1-attempt-1.md).)*
 
 ### Changed
 
