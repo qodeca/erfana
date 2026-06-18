@@ -1,0 +1,20 @@
+# Code owners for qodeca/erfana
+#
+# Outside (fork) pull requests that touch these paths require review from
+# @marcinobel. The solo-developer direct-push workflow on `main` is
+# unaffected — CODEOWNERS only gates pull requests.
+#
+# When a second maintainer is onboarded, replace the catch-all with
+# finer path-scoped rules so review load can be shared while @marcinobel
+# keeps gatekeeping the security-critical surfaces listed below.
+
+* @marcinobel
+
+# Security-critical surfaces (explicit for emphasis; covered by the
+# catch-all above, repeated here so intent is unmistakable):
+#   - CI/CD and release automation
+#   - build configuration, fuses, and code-signing/resigning scripts
+/.github/               @marcinobel
+/scripts/               @marcinobel
+/build/                 @marcinobel
+/electron-builder.yml   @marcinobel
