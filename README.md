@@ -76,7 +76,7 @@ The GPL covers Erfana's **code**, not its **name or branding**. "Erfana" and "Qo
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md). Contributions are accepted under **GPL-3.0-only** and require signing the project [Contributor License Agreement](CLA.md); the CLA-assistant bot prompts first-time contributors automatically on their pull request.
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md). Contributions are accepted under **GPL-3.0-only** and require agreeing to the project [Contributor License Agreement](CLA.md) — by opening a pull request you agree to its terms (your Git author identity is your record).
 
 ## Development
 
