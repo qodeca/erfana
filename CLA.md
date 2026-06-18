@@ -32,4 +32,4 @@ Contributions are provided "as is", without warranty of any kind.
 
 ## How to sign
 
-Signing is handled automatically: open a pull request, and the CLA-assistant bot will post a one-time link to record your agreement. Your Git author identity on the PR is used as your signature of record.
+By opening a pull request, you agree to the terms of this CLA; your Git author identity on the PR is your signature of record. (A CLA-assistant bot to record signatures automatically may be enabled in the future.)
