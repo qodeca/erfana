@@ -301,6 +301,15 @@ The cert is short-lived (2 years) so this DR path is straightforward — the pro
 - **Storage:** the PFX and its password live ONLY in 1Password (or equivalent password manager). They are NEVER on disk for longer than the seconds it takes to base64-encode and `gh secret set`.
 - **Anti-pattern (do NOT use):** `~/Documents/erfana-signing-backup/` or any path under `~/Documents`, `~/Downloads`, OneDrive-synced folders, iCloud Drive, or any cloud-synced location. OneDrive auto-syncs and the PFX would land in Microsoft's cloud + version history; even after deletion the OneDrive Recycle Bin retains it for 30+ days.
 - **Migration of any existing on-disk PFX backup:** copy to 1Password as a secure-note attachment named "Erfana Azure signing cert (expires <YYYY-MM-DD>)", verify the entry, then securely delete the on-disk copy (`sdelete` on Windows, `shred` on POSIX). Inspect OneDrive Recycle Bin and version history; purge any cloud copies.
+- **Encryption algorithm — must be AES (PBES2), not legacy:** when (re-)exporting the PFX, force modern PKCS#12 encryption. The CI runner's OpenSSL 3.x and `@azure/identity` (Node) **reject** legacy PKCS#12 algorithms (`pbeWithSHA1And40BitRC2-CBC`, `3DES`) — a legacy PFX fails the decode step with `Decoded file is not a valid PKCS#12 envelope or password is wrong` even when the secret pair is correct. macOS LibreSSL reads legacy PFXs transparently, so a local `MAC verified OK` does **not** prove CI compatibility. Export and verify with OpenSSL 3.x:
+  ```bash
+  openssl pkcs12 -export -inkey azure-private.key -in azure-public.crt \
+    -out azure-signing.pfx -passout env:PFXPW \
+    -keypbe AES-256-CBC -certpbe AES-256-CBC -macalg sha256
+  # Verify it loads WITHOUT -legacy (this is exactly what CI does):
+  openssl pkcs12 -info -in azure-signing.pfx -noout -password env:PFXPW
+  ```
+  Re-exporting only changes the container encryption — the cert identity and validity are unchanged, so app-registration trust and expiry are unaffected. First burned: v0.16.2 ([`docs/release-incidents/v0.16.2-attempt-1.md`](../release-incidents/v0.16.2-attempt-1.md)).
 - **Rotation reminder:** add a calendar entry 60 days before the cert's expiry date — see the rotation calendar table above.
 
 ### C. Minisign key compromise
