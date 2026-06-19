@@ -56,6 +56,10 @@ The same rigor shows up in Erfana: minisign-signed and notarized release artifac
 
 Every release on or after `v0.9.5` ships signed artifacts: a minisign-signed `SHA256SUMS`, macOS notarization, and Windows Authenticode. Verify downloads before installing – the release-signing public keys and the step-by-step `minisign` + `sha256sum` recipe live in [`docs/security.md`](docs/security.md#release-signing-v095-174) and [`docs/build/release.md`](docs/build/release.md), with the keys mirrored in [`docs/release-pubkey.txt`](docs/release-pubkey.txt).
 
+## Support
+
+Questions, ideas, or need help using Erfana? Start a [GitHub Discussion](https://github.com/qodeca/erfana/discussions), or file a bug or feature request from the [issue templates](.github/ISSUE_TEMPLATE). [SUPPORT.md](SUPPORT.md) explains where each kind of request goes (and security issues stay private – see below).
+
 ## Security
 
 Erfana enables context isolation, disables node integration in the renderer, exposes a sandboxed `contextBridge` IPC layer with input validation on every channel, and applies a Content Security Policy. Details: [`docs/security.md`](docs/security.md).
