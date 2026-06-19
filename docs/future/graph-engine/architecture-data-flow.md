@@ -20,7 +20,7 @@
 
 ### Complete event-driven architecture
 
-**Overview:** The Graph Engine integrates with ERFANA through an event-driven architecture where services communicate via an EventEmitter bus.
+**Overview:** The Graph Engine integrates with Erfana through an event-driven architecture where services communicate via an EventEmitter bus.
 
 ```mermaid
 graph LR
@@ -155,7 +155,7 @@ graph TD
 ```mermaid
 graph TD
     Step1["1. Claude Code starts<br/>in Terminal panel"]
-    Step2["2. ERFANA launches<br/>MCPServerService<br/>(stdio transport)"]
+    Step2["2. Erfana launches<br/>MCPServerService<br/>(stdio transport)"]
     Step3["3. MCPServerService registers 5 tools:<br/>• erfana_graph_search<br/>• erfana_graph_related<br/>• erfana_graph_entities<br/>• erfana_graph_backlinks<br/>• erfana_graph_timeline"]
     Step4["4. Claude Code queries:<br/>'Show me docs about SQLite'"]
     Step5["5. MCP client calls<br/>erfana_graph_search()<br/>{ query: 'SQLite', k: 10 }"]
@@ -218,7 +218,7 @@ graph TD
 **Why:** Mixing vector spaces causes poor results.
 **Migration:** Re-embed all on model switch (background job with progress).
 
-### 8. Event-driven integration with ERFANA
+### 8. Event-driven integration with Erfana
 **Why:** Loose coupling; GraphEngine doesn't need to know about FileWatcherService internals.
 **How:** GraphEngine subscribes to EventEmitter events (`file:saved`, `project:changed`, etc.).
 **Benefits:**

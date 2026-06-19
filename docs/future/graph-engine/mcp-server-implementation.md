@@ -191,7 +191,7 @@ export class MCPServerService {
 }
 ```
 
-### Auto-start on ERFANA launch
+### Auto-start on Erfana launch
 
 **File:** `src/main/index.ts`
 
@@ -223,8 +223,8 @@ Claude Code automatically discovers MCP servers running on stdio.
 
 **How it works:**
 
-1. ERFANA starts → MCP server starts on stdio
-2. Claude Code detects ERFANA process
+1. Erfana starts → MCP server starts on stdio
+2. Claude Code detects Erfana process
 3. Claude Code connects to MCP server
 4. Tools become available in Claude Code context
 
@@ -314,7 +314,7 @@ This matches your documented architecture using BM25 (FTS5) and sqlite-vec."
 # Install MCP inspector
 npm install -g @modelcontextprotocol/inspector
 
-# Test ERFANA MCP server
+# Test Erfana MCP server
 mcp-inspector erfana
 ```
 
@@ -327,7 +327,7 @@ mcp-inspector erfana
 ### Security considerations
 
 **Threat model:**
-- Claude Code is **trusted** (runs in user's Terminal, same security boundary as ERFANA)
+- Claude Code is **trusted** (runs in user's Terminal, same security boundary as Erfana)
 - No external network access (stdio transport only)
 - No authentication required (single-user, local-only)
 
@@ -386,7 +386,7 @@ export class RateLimiter {
 
 - [ ] MCPServerService implemented
 - [ ] 5 MCP tools registered (search, related, entities, backlinks, timeline)
-- [ ] Auto-start on ERFANA launch
+- [ ] Auto-start on Erfana launch
 - [ ] Claude Code auto-discovery working
 - [ ] Rate limiting configured
 - [ ] Error handling (graceful failures, don't crash app)
@@ -395,7 +395,7 @@ export class RateLimiter {
 
 **Manual test:**
 
-1. Start ERFANA
+1. Start Erfana
 2. Open Terminal panel (Cmd+J)
 3. Start Claude Code session
 4. Ask: "What entities are in my project?"

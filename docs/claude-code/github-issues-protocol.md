@@ -1,6 +1,6 @@
 # GitHub Issues Protocol for Claude Code
 
-This document defines when and how Claude Code should interact with GitHub Issues in the ERFANA project.
+This document defines when and how Claude Code should interact with GitHub Issues in the Erfana project.
 
 ## Core Principle
 

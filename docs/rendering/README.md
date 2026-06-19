@@ -4,7 +4,7 @@ Markdown to HTML conversion architecture for the preview pane.
 
 ## Overview
 
-ERFANA renders markdown to HTML with:
+Erfana renders markdown to HTML with:
 - GitHub-Flavored Markdown support
 - Security sanitization
 - Line tracking for scroll sync

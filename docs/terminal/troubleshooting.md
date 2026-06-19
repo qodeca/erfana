@@ -1,14 +1,14 @@
 # Terminal Troubleshooting
 
-Known issues, common problems, and solutions for ERFANA's terminal panel.
+Known issues, common problems, and solutions for Erfana's terminal panel.
 
 ## Known Issues
 
 ### Claude Code Scroll Jumping (External Issue)
 
-**Status**: NOT an ERFANA bug - Claude CLI Ink library issue
+**Status**: NOT an Erfana bug - Claude CLI Ink library issue
 
-**Issue**: When running Claude Code inside ERFANA's terminal, the viewport may jump to top repeatedly during streaming output, creating a "stroboscope effect."
+**Issue**: When running Claude Code inside Erfana's terminal, the viewport may jump to top repeatedly during streaming output, creating a "stroboscope effect."
 
 **Root Cause**: Claude Code's Ink library (terminal UI framework) causes background buffer redraws that override scroll position management. This affects **ALL** terminals universally (VS Code, IntelliJ, iTerm2, GNOME Terminal, Cursor, Ghostty).
 
@@ -17,7 +17,7 @@ Known issues, common problems, and solutions for ERFANA's terminal panel.
 - GitHub Issue [anthropics/claude-code#1413](https://github.com/anthropics/claude-code/issues/1413) (Laggy scrolling with long history)
 - Affects IDE-integrated terminals universally across all platforms
 - Works correctly in native terminal windows
-- ERFANA's scroll preservation logic is correctly implemented per xterm.js best practices
+- Erfana's scroll preservation logic is correctly implemented per xterm.js best practices
 
 **Symptoms**:
 - Scrolls to top every 1/10 second or 10-20 seconds
@@ -26,21 +26,21 @@ Known issues, common problems, and solutions for ERFANA's terminal panel.
 - Occurs when typing prompts, when Claude adds text, or reviewing diffs
 
 **Workarounds**:
-- **Built-in Helper**: ERFANA v0.3.2+ includes a "Scroll to Bottom" button (⬇️ icon) in the terminal header to instantly jump to the latest output. Use this when Claude Code causes unwanted scroll jumping.
-- **Recommended**: Run Claude Code in a native terminal window (Terminal.app, iTerm2, etc.) instead of ERFANA's integrated terminal
-- Resize ERFANA window (temporarily fixes until next buffer redraw)
+- **Built-in Helper**: Erfana v0.3.2+ includes a "Scroll to Bottom" button (⬇️ icon) in the terminal header to instantly jump to the latest output. Use this when Claude Code causes unwanted scroll jumping.
+- **Recommended**: Run Claude Code in a native terminal window (Terminal.app, iTerm2, etc.) instead of Erfana's integrated terminal
+- Resize Erfana window (temporarily fixes until next buffer redraw)
 - Select response options to pause scrolling during diffs
 - Clear terminal history periodically
 
-**ERFANA Implementation Status**: ✅ Correctly implements all xterm.js scroll preservation best practices:
+**Erfana Implementation Status**: ✅ Correctly implements all xterm.js scroll preservation best practices:
 - `scrollOnUserInput: false` - Prevents auto-scroll when typing
 - Buffer API scroll position tracking (`viewportY` vs `baseY`)
 - `smoothScrollDuration: 0` - Instant scroll response
 - `overflow-y: hidden` - xterm v6 DomScrollableElement manages scrolling
 
-**Why ERFANA Can't Fix This**: The issue is in Claude Code's closed-source Ink library, which controls terminal rendering and line management. The buffer redraws happen at a level below xterm.js's scroll management, making it impossible for terminal emulators to prevent.
+**Why Erfana Can't Fix This**: The issue is in Claude Code's closed-source Ink library, which controls terminal rendering and line management. The buffer redraws happen at a level below xterm.js's scroll management, making it impossible for terminal emulators to prevent.
 
-**Related**: See [Scroll Fixes](./scroll-fixes.md) for ERFANA's scroll preservation implementation
+**Related**: See [Scroll Fixes](./scroll-fixes.md) for Erfana's scroll preservation implementation
 
 ---
 
@@ -215,10 +215,10 @@ echo $PATH        # Should include /opt/homebrew/bin and other Homebrew paths
 ```
 
 **If still not found**:
-1. Close ERFANA
+1. Close Erfana
 2. Verify command works in native terminal (e.g., `which npm`)
 3. Check your shell RC files (.zshrc, .bash_profile)
-4. Restart ERFANA - terminal should inherit environment
+4. Restart Erfana - terminal should inherit environment
 
 **Environment Variables**: Terminal uses filtered environment (see [Bootstrap Pattern](./bootstrap-pattern.md))
 

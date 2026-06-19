@@ -1,6 +1,6 @@
 # Editor Documentation
 
-The ERFANA editor subsystem provides a comprehensive markdown editing experience with Monaco Editor and live preview.
+The Erfana editor subsystem provides a comprehensive markdown editing experience with Monaco Editor and live preview.
 
 ## Components
 

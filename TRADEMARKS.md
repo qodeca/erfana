@@ -22,6 +22,15 @@ The names **"Erfana"** and **"Qodeca"**, the Qodeca and Erfana logos, and any as
 
 The repository ships the Erfana application icon (`resources/icon.png`) so the app builds and runs out of the box. It is provided as a functional default; treat the Erfana and Qodeca marks as trademarks per the rules above — do not present them as your own brand, and replace them when distributing a renamed fork.
 
+## Third-party trademarks
+
+Erfana names third-party tools descriptively (nominative use) and is not affiliated with, sponsored by, or endorsed by their owners.
+
+- **Anthropic / "Claude" / "Claude Code"** – "Claude" and "Claude Code" are trademarks of Anthropic. Erfana is not affiliated with, sponsored by, or endorsed by Anthropic; it simply runs the `claude` CLI like any other terminal program.
+- **OpenAI / "Whisper"** – "OpenAI" and "Whisper" are trademarks of OpenAI. Erfana is not affiliated with, sponsored by, or endorsed by OpenAI; it optionally calls the OpenAI API for transcription and bundles `whisper.cpp` (an independent open-source project, MIT-licensed, not produced by OpenAI) for offline transcription.
+
+All other third-party names and marks are the property of their respective owners; bundled third-party components are listed in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).
+
 ## Questions
 
 If you are unsure whether a use is permitted, ask first by opening a GitHub Discussion or issue. We aim to be permissive about genuine community and descriptive use, and strict only about uses that could confuse users about origin or endorsement.
