@@ -4,7 +4,8 @@ Erfana runs GitHub Actions workflows on pushes. The author-controlled workflows 
 
 | Workflow | File | Status | Trigger | Runner | Wall-clock | Purpose |
 |----------|------|--------|---------|--------|-----------|---------|
-| Quality Checks | `.github/workflows/checks.yml` | active | push to **any branch** | `ubuntu-latest` | ~3 min | Fast feedback on lint / types / unit tests / build |
+| Quality Checks | `.github/workflows/checks.yml` | active | push to **any branch** | `ubuntu-latest` | ~3 min | Fast feedback on lint / types / unit tests / build / licensing (see job table below) |
+| Secret Scan | `.github/workflows/secret-scan.yml` | active (**required check**) | push + PR | `ubuntu-latest` | ~1 min | gitleaks (full git history) + trufflehog (verified secrets only). Version-pinned, SHA-256-checksum-verified binary downloads; no third-party actions |
 | E2E Tests | `.github/workflows/e2e.yml` | **disabled** (2026-04-25) | (would be: push to `develop` + PRs) | `macos-latest` | ~5–8 min | Electron integration tests (Playwright) — see [E2E Tests (disabled)](#e2e-tests-e2eyml-disabled) below |
 | Release | `.github/workflows/release.yml` | active | tag push `v*.*.*` | matrix (mac/win) | ~15–25 min | Multi-platform release build → `prepare`/`build_*`/`finalize`/`cleanup` (calls `build_mac.yml`, `build_win.yml` reusables; Linux distribution target dropped) |
 | Whisper Binaries | `.github/workflows/whisper-binaries.yml` | active | `workflow_dispatch` only | `macos-14` + `windows-latest` | ~25 min | Self-hosted whisper.cpp build, sign, notarize, publish (see [`build/whisper-binaries.md`](./build/whisper-binaries.md)) |
@@ -16,19 +17,25 @@ Node 24, `actions/setup-node@v4` with `cache: npm`, `permissions: contents: read
 
 ## Quality checks (`checks.yml`)
 
-Four jobs run in parallel:
+Eight jobs run in parallel (all `ubuntu-latest` except `windows-checks`). The **Required check?** column reflects the live branch-protection required set on `main`; the separate `Secret scan` workflow (above) is the sixth required check.
 
-| Job | Command | Typical duration |
-|-----|---------|------------------|
-| `lint` | `npm run lint` | 1–2 min |
-| `typecheck` | `npm run typecheck` (tsc node + web) | 1–2 min |
-| `test` | `npm run test:ci` (vitest workspace, ~8,474 tests across 286 files — v0.10.0 added `prompts/applyFooter.test.ts` + `prompts/mutation-templates.test.ts` for the deterministic-apply prompt feature and `components/DockLayout/terminalExpand.test.ts` for terminal maximize; #203 added the clipboard service test files `ipc/clipboard-handlers.test.ts`, `services/textClipboard.test.ts`, `utils/monacoClipboardCommands.test.ts`, `components/Editor/MonacoMarkdownEditor.clipboard.test.ts`; #164 added the screenshot suite `services/screenshot/MacScreenshotCapturer.test.ts`, `services/screenshot/DesktopCapturerScreenshotCapturer.test.ts`, `services/screenshot/ScreenshotOverlayWindow.test.ts`; v0.13.0 added the Claude Code status-bar suite under `services/claudeStatus/` + `ipc/claude-status-handlers.test.ts` + `stores/useClaudeStatusStore.test.ts` (#216), `utils/redactUserInput.test.ts` + `utils/platform.test.ts` (#167); v0.14.0 added git-status worker tests (`workers/parseBranchHeader.test.ts`, `workers/parsePorcelainOutput.test.ts`, `workers/git-status.worker.{classification,fallback,crlf,crlf-integration}.test.ts`) for the native-git-preference + CRLF fix and repo-transition tests (`watcher/RepoPresenceWatcher.test.ts`, `GitWatcherService.repoTransition.test.ts`)) | 2–3 min |
-| `build` | `npx electron-vite build` | 2–3 min |
+| Job (`name:`) | Command | Required check? | Notes |
+|-----|---------|:---:|-------|
+| `lint` (Lint) | `npm run lint` | yes | |
+| `typecheck` (Typecheck) | `npm run typecheck` | yes | tsc node + web |
+| `test` (Unit tests) | `npm run test:ci` | yes | full vitest workspace (main / renderer / preload) |
+| `build` (Build) | `npx electron-vite build` | yes | |
+| `license` (License compliance) | `npm run check:headers` + `pipx run reuse lint` | yes | SPDX headers on all sources + REUSE conformance |
+| `audit-signatures` (npm audit signatures) | `npm audit signatures` | no | also records the `package-lock.json` digest artifact that `release.yml` byte-verifies at tag time |
+| `release-guards` (Release readiness guards) | guard scripts | no | fails the build on a `pull_request_target` trigger, forbidden plist entitlements, etc. |
+| `windows-checks` (Windows checks) | `npm run typecheck` + `npm run test:main` on `windows-latest` | no | advisory Windows gate; excluded from the required set until proven stable |
+
+**Required status checks on `main`** (six): `Lint`, `Typecheck`, `Unit tests`, `Build`, `License compliance` (from `checks.yml`), and `Secret scan` (from `secret-scan.yml`). `npm audit signatures`, `Release readiness guards`, and `Windows checks` run on every push but are not required to merge.
 
 **Design notes**:
 - **`on: push:` only** (not `pull_request`). Same-repo PRs already trigger a push event on their source branch; adding `pull_request` would double-run the same SHA.
-- **ubuntu-latest** — none of these checks need macOS; Ubuntu runners are ~10x cheaper and allocate faster.
-- **Separate jobs** (not matrix). 4 items doesn't justify DRY abstraction; explicit jobs are clearer.
+- **ubuntu-latest** — the core checks do not need macOS; Ubuntu runners are ~10x cheaper and allocate faster (`windows-checks` is the sole exception, by design).
+- **Separate jobs** (not matrix). Even at eight jobs the count does not justify a matrix abstraction; explicit jobs are clearer.
 - **Concurrency cancellation** via `concurrency: group: checks-${{ github.ref }} cancel-in-progress: true`. Rapid pushes / force-pushes to the same ref abort in-flight runs.
 - **`npm ci` retry** — every `npm ci` is wrapped in a 3-attempt loop with backoff to tolerate transient ECONNRESET on GitHub runners:
   ```bash

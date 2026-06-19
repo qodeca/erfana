@@ -80,7 +80,7 @@ See `docs/` for details (keep Claude's context focused):
 - [Logging](docs/logging.md) — Logging layer, log levels, file rotation, configuration
 - [IPC Patterns](docs/ipc-patterns.md) — Schemas, broadcast, race-guard tokens
 - [Testing](docs/testing/README.md) — Workspace, E2E (POM), visual regression, coverage
-- [Continuous Integration](docs/ci.md) — GitHub Actions workflows (`checks.yml` active; `e2e.yml` **disabled** — local-only until macos-latest fix; `release.yml` + `whisper-binaries*.yml` for release flow), retry patterns, visual-on-CI gap
+- [Continuous Integration](docs/ci.md) — GitHub Actions workflows (`checks.yml` + `secret-scan.yml` active; `e2e.yml` **disabled** — local-only until macos-latest fix; `release.yml` + `whisper-binaries*.yml` for release flow), required-checks set, retry patterns, visual-on-CI gap
 - [Known Issues](docs/known-issues.md) — Limitations and workarounds
 - [API Services](docs/api-services.md) — Service APIs (Terminal, File, Settings, Watchers)
 - [API Services – Features](docs/api-services-features.md) — Feature service APIs (GitStatus worker architecture, GitWatcher, GitPolling, GitStatusWorkerAdapter, GitStatusCircuitBreaker, Camera, ProjectLock, ExternalFile, LiteParse, DependencyDetector, DOCX, Transcription, LocalWhisper, WhisperModelManager, AudioMetadata, AudioExtraction, ApiKey)
@@ -175,10 +175,11 @@ For detailed changelog, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ## Continuous Integration
 See [docs/ci.md](docs/ci.md) for the full pipeline map. Summary:
-- **`checks.yml`** (`.github/workflows/checks.yml`) — runs on **every push to any branch**. 4 parallel jobs on `ubuntu-latest`: `lint`, `typecheck`, `test` (the full vitest workspace — main/renderer/preload), `build` (`electron-vite build`). ~3 min wall-clock. Plus an advisory `windows-checks` job on `windows-latest` (typecheck + `test:main` only; `shell: bash`; not a branch-protection required check until proven stable).
+- **`checks.yml`** (`.github/workflows/checks.yml`) — runs on **every push to any branch**. Eight parallel jobs on `ubuntu-latest` (except `windows-checks`): the four core required checks `lint` / `typecheck` / `test` (full vitest workspace — main/renderer/preload) / `build` (`electron-vite build`); `license` (`check:headers` + `reuse lint`, also a required check); `audit-signatures` (`npm audit signatures` + records the `package-lock.json` digest artifact `release.yml` verifies); `release-guards` (fails on `pull_request_target`, forbidden plist entitlements, etc.); and an advisory `windows-checks` job on `windows-latest` (typecheck + `test:main`; `shell: bash`; not required until proven stable). ~3 min wall-clock. See [docs/ci.md](docs/ci.md) for the full job table + required-checks set.
 - **`e2e.yml`** (`.github/workflows/e2e.yml`) — **disabled**: both functional `electron` and `visual` suites run locally only until macos-latest instability is root-caused. Re-enable with `gh workflow enable "E2E Tests"`. E2E is excluded from branch-protection required checks, so disabling blocks no merges.
 - **`release.yml`** — fires on `v*.*.*` tag push, calls `build_mac.yml` / `build_win.yml` reusables (multi-platform build — macOS + Windows; Linux distribution target dropped). See [docs/build/release.md](docs/build/release.md).
 - **`whisper-binaries.yml` + `whisper-binaries-canary.yml`** — `workflow_dispatch` only and monthly schedule respectively. See [docs/build/whisper-binaries.md](docs/build/whisper-binaries.md).
+- **`secret-scan.yml`** — runs on **every push + PR**: gitleaks (full git history) + trufflehog (verified secrets), with version-pinned, SHA-256-checksum-verified binary downloads and no third-party actions. Its `Secret scan` job is a branch-protection required check.
 - **Every `npm ci` is wrapped in retry**: `npm ci || (sleep 10 && npm ci) || (sleep 20 && npm ci)` – handles transient ECONNRESET on GitHub runners.
 - **Concurrency cancellation** via `github.ref` — rapid pushes cancel in-flight runs on the same branch.
 - **Workflow display names** use Title Case in the Actions UI (e.g. `Quality Checks`, `Whisper Binaries (Canary)`). This is a project-specific convention that overrides the global Sentence-case style rule for `name:` fields only — see [`.github/workflows/`](.github/workflows/) for the canonical list. Filenames stay lowercase/kebab-case.
