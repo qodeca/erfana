@@ -65,7 +65,7 @@ graph TD
     subgraph MainProcess["MAIN PROCESS (Node.js)"]
         direction TB
 
-        subgraph ServicesIntegration["ERFANA Services Integration"]
+        subgraph ServicesIntegration["Erfana Services Integration"]
             FileWatcherService["FileWatcherService<br/>(Event Emitter)<br/>• file:saved<br/>• file:created<br/>• file:deleted<br/>• project:changed"]
             GraphEngineServiceSub["GraphEngineService<br/>(Subscriber)<br/>• Listens to events<br/>• Queues indexing<br/>• Debounces changes<br/>• Emits progress"]
 
@@ -101,9 +101,9 @@ graph TD
 
 ### Component responsibilities
 
-#### Integration with ERFANA services
+#### Integration with Erfana services
 
-The Graph Engine integrates seamlessly with existing ERFANA services through an event-driven architecture:
+The Graph Engine integrates seamlessly with existing Erfana services through an event-driven architecture:
 
 **FileWatcherService → GraphEngineService**
 - GraphEngineService subscribes to FileWatcherService events on initialization

@@ -14,7 +14,7 @@
 
 **Last Updated:** October 2025
 
-This document explains how ERFANA exposes the Graph Engine to Claude Code via the Model Context Protocol (MCP), enabling Claude Code to query project knowledge for better coding assistance.
+This document explains how Erfana exposes the Graph Engine to Claude Code via the Model Context Protocol (MCP), enabling Claude Code to query project knowledge for better coding assistance.
 
 ---
 
@@ -25,7 +25,7 @@ This document explains how ERFANA exposes the Graph Engine to Claude Code via th
 **Model Context Protocol (MCP)** is a standard protocol for exposing tools and resources to AI assistants like Claude Code.
 
 **Key concepts:**
-- **Server:** Exposes tools (e.g., ERFANA graph engine)
+- **Server:** Exposes tools (e.g., Erfana graph engine)
 - **Client:** AI assistant that uses tools (e.g., Claude Code)
 - **Tools:** Functions that client can invoke (e.g., `erfana_graph_search`)
 - **Resources:** Static content that client can read (e.g., docs, schemas)
@@ -61,7 +61,7 @@ Claude Code:
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│                     ERFANA (Electron App)                       │
+│                     Erfana (Electron App)                       │
 │                                                                  │
 │  ┌─────────────────────────────────────────────────────────┐  │
 │  │                 Main Process (Node.js)                   │  │
@@ -91,7 +91,7 @@ Claude Code:
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │                    MCP Client                             │  │
-│  │  - Connects to ERFANA MCP server (stdio)                 │  │
+│  │  - Connects to Erfana MCP server (stdio)                 │  │
 │  │  - Invokes tools: erfana_graph_search, etc.              │  │
 │  │  - Receives results from graph engine                    │  │
 │  └──────────────────────────────────────────────────────────┘  │
@@ -104,10 +104,10 @@ Claude Code:
 ### Communication flow
 
 ```
-1. ERFANA starts MCP server (MCPServerService) on stdio
+1. Erfana starts MCP server (MCPServerService) on stdio
    │
    ▼
-2. Claude Code detects ERFANA MCP server (auto-discovery)
+2. Claude Code detects Erfana MCP server (auto-discovery)
    │
    ▼
 3. Claude Code sends MCP request:
@@ -149,7 +149,7 @@ Claude Code:
 
 ### Tool definitions
 
-ERFANA exposes 5 MCP tools (aligned with [user-guide-features.md](./user-guide-features.md)):
+Erfana exposes 5 MCP tools (aligned with [user-guide-features.md](./user-guide-features.md)):
 
 #### 1. `erfana_graph_search`
 

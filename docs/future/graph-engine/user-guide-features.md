@@ -157,7 +157,7 @@ Query "as of 2024-11-01": ERFANA uses sqlite-vec
 **What it does:** Exposes graph engine to Claude Code (running in Terminal panel) via MCP server.
 
 **How it works:**
-- ERFANA runs MCP server in background
+- Erfana runs MCP server in background
 - Claude Code connects as MCP client
 - Claude can query graph for context
 
@@ -185,7 +185,7 @@ Claude Code:
 
 **Graph engine starts automatically when you open a project:**
 
-1. Open project in ERFANA (File → Open Project)
+1. Open project in Erfana (File → Open Project)
 2. Graph engine detects all `.md` files
 3. Indexing starts in background (see status indicator)
 4. Wait for completion (usually 1-5 minutes for 10K files)

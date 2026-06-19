@@ -7,7 +7,7 @@
 **Status:** Design exploration (October 2025). Requirements authoritative in specs #004–#008.
 **Research Validated:** ✅ Extensively validated against 2025 production practices
 
-This document provides an overview of the Erfana Graph Engine—a local-first, embedded knowledge graph and hybrid search system built on SQLite. The system combines BM25 keyword search (FTS5), vector similarity (sqlite-vec), and lightweight graph capabilities to power semantic retrieval, backlinks, and temporal queries within the ERFANA markdown IDE.
+This document provides an overview of the Erfana Graph Engine—a local-first, embedded knowledge graph and hybrid search system built on SQLite. The system combines BM25 keyword search (FTS5), vector similarity (sqlite-vec), and lightweight graph capabilities to power semantic retrieval, backlinks, and temporal queries within the Erfana markdown IDE.
 
 ---
 
@@ -96,7 +96,7 @@ The Erfana Graph Engine solves common documentation challenges:
 
 4. **[Architecture](./graph-engine/architecture-overview.md)** ⭐ START HERE
    - System design and component interactions
-   - ERFANA services integration (event-driven)
+   - Erfana services integration (event-driven)
    - MCP layer and Claude Code flow
    - Technology stack justification (October 2025)
 

@@ -1,7 +1,7 @@
-# ERFANA Documentation
+# Erfana Documentation
 
 ## Overview
-ERFANA is an Electron-based IDE focused on markdown editing with integrated terminal and project management.
+Erfana is an Electron-based IDE focused on markdown editing with integrated terminal and project management.
 
 ## Onboarding (For New Developers)
 - [Getting Started](./getting-started.md) – Day 1 setup and orientation

@@ -18,11 +18,11 @@
 
 ## UI components
 
-### Overview: ERFANA layout with graph engine
+### Overview: Erfana layout with graph engine
 
-![ERFANA Application Layout](./wireframes/erfana-layout.svg)
+![Erfana Application Layout](./wireframes/erfana-layout.svg)
 
-The diagram above shows how Graph Engine components integrate into the ERFANA IDE:
+The diagram above shows how Graph Engine components integrate into the Erfana IDE:
 - **Project Panel** (left): File tree with Graph Engine widget at bottom
 - **Editor** (center): Monaco editor with markdown editing and preview
 - **Terminal** (right): Terminal with Claude Code and MCP server indicator
@@ -292,7 +292,7 @@ The [[FTS5]] extension provides full-text search.
 **Fix:**
 1. Wait 5 minutes (large files take time)
 2. Check logs (Settings → Diagnostics)
-3. Restart ERFANA
+3. Restart Erfana
 4. If persists, report issue with logs
 
 ### "MCP tools not working in Claude Code"
@@ -302,7 +302,7 @@ The [[FTS5]] extension provides full-text search.
 **Fix:**
 1. Check status indicator (should show MCP server running)
 2. Restart Claude Code session
-3. Check Claude Code MCP config (should auto-detect ERFANA)
+3. Check Claude Code MCP config (should auto-detect Erfana)
 
 ### "Memory usage high"
 

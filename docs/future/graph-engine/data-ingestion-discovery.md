@@ -25,7 +25,7 @@ This document explains how the Erfana Graph Engine automatically discovers, proc
 **Design principle:** Zero-configuration knowledge graph that "just works."
 
 **User experience:**
-1. User opens project in ERFANA
+1. User opens project in Erfana
 2. Graph engine automatically detects all `.md` files
 3. Indexing starts in background (non-blocking)
 4. User can continue working while indexing completes
@@ -39,7 +39,7 @@ This document explains how the Erfana Graph Engine automatically discovers, proc
 
 ### Trigger: `project:changed` event
 
-When user opens a project (File → Open Project), ERFANA's main process emits `project:changed` event.
+When user opens a project (File → Open Project), Erfana's main process emits `project:changed` event.
 
 **Event payload:**
 ```typescript

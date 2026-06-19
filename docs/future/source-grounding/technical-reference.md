@@ -60,7 +60,7 @@ Input document types:
 
 ```
 +-----------------------------------------------------------+
-|                     ERFANA (Electron)                      |
+|                     Erfana (Electron)                      |
 |  Monaco Editor | Terminal | Project tree | Related panel   |
 +----------------------------+------------------------------+
                              | IPC
