@@ -23,4 +23,4 @@ SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 - [ ] Ran `npm run test:e2e` locally if this touches Electron-specific paths (CI does not cover e2e).
 - [ ] Documentation updated if behavior or APIs changed.
 
-> First-time contributors: the **CLA-assistant** bot will comment on this PR with a one-time link to sign the [Contributor License Agreement](../CLA.md). Signing is required before merge; the bot handles it automatically — there's nothing to do up front.
+> By opening this PR you agree to the project [Contributor License Agreement](../CLA.md); your Git author identity is your signature of record. (Automatic signature recording via a CLA-assistant bot may be added in the future.)

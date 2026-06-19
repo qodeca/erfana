@@ -12,7 +12,7 @@ By participating you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md)
 ## Licensing of contributions
 
 - **Inbound = outbound.** Contributions are accepted under the project's license, **GPL-3.0-only**. You retain copyright in your contribution.
-- **Contributor License Agreement (CLA).** Because Qodeca keeps the option to offer Erfana under additional terms (dual-licensing), contributions also require signing the project CLA — see [`CLA.md`](CLA.md). On each pull request the CLA-assistant check prompts you to sign once; PRs require a signed CLA before merge.
+- **Contributor License Agreement (CLA).** Because Qodeca keeps the option to offer Erfana under additional terms (dual-licensing), contributions also require agreeing to the project CLA — see [`CLA.md`](CLA.md). By opening a pull request you agree to its terms; your Git author identity on the PR is your signature of record. (A CLA-assistant bot to record signatures automatically may be enabled in the future.)
 - **Trademarks.** The GPL covers the code, not the "Erfana"/"Qodeca" names or logos — see [`TRADEMARKS.md`](TRADEMARKS.md).
 
 ## Prerequisites
@@ -80,7 +80,7 @@ Never commit a real secret, even to history — rewrite it out and rotate the cr
 - [ ] All quality gates pass locally (lint, typecheck, test:ci, build, check:headers, reuse lint).
 - [ ] No secrets introduced — `gitleaks` and `trufflehog` are clean locally.
 - [ ] Docs updated if behavior or project shape changed.
-- [ ] The CLA-assistant check is green.
+- [ ] You agree to the project [CLA](CLA.md) (opening this PR records your agreement).
 
 ## Reporting bugs and security issues
 
