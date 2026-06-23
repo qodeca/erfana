@@ -42,7 +42,7 @@
     "@noble/ed25519": "2.1.0",
     "@turbodocx/html-to-docx": "^1.18.1",
     "async-mutex": "^0.5.0",
-    "chokidar": "3.6.0",
+    "chokidar": "5.0.0",
     "electron-log": "^5.4.4",
     "electron-store": "^11.0.2",
     "extract-zip": "2.0.1",
@@ -115,7 +115,7 @@
   },
   "overrides": {
     "@electron/rebuild": "3.7.1",
-    "chokidar": "3.6.0",
+    "chokidar": "5.0.0",
     "lodash": "4.18.1",
     "lodash-es": "4.18.1",
     "dompurify": "^3.4.1"
