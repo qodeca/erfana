@@ -30,7 +30,7 @@ jobs:
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - uses: ./.github/actions/setup-node-with-retry
       - name: Lint
         run: npm run lint
@@ -43,7 +43,7 @@ jobs:
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - uses: ./.github/actions/setup-node-with-retry
       - name: Typecheck
         run: npm run typecheck
@@ -56,7 +56,7 @@ jobs:
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - uses: ./.github/actions/setup-node-with-retry
         with:
           # ConverterRegistry.test.ts + other electron-aware tests import
@@ -118,7 +118,7 @@ jobs:
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - uses: ./.github/actions/setup-node-with-retry
         with:
           # electron-vite build imports native modules at config resolution
@@ -135,7 +135,7 @@ jobs:
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - uses: ./.github/actions/setup-node-with-retry
       - name: SPDX headers present on all source files
         run: npm run check:headers
@@ -156,7 +156,7 @@ jobs:
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - uses: ./.github/actions/setup-node-with-retry
         with:
           # test:main imports the electron binary + node-pty native bindings;
@@ -180,7 +180,7 @@ jobs:
     steps:
       # actions/checkout v6.0.3 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       - uses: ./.github/actions/setup-node-with-retry
       - name: Verify npm registry signatures
         # Asserts every package in package-lock.json is signed by npm's
@@ -214,7 +214,7 @@ jobs:
     timeout-minutes: 3
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
       # Guard 1: no pull_request_target triggers anywhere.
       # Fork exfiltration vector: pull_request_target runs with base-repo
