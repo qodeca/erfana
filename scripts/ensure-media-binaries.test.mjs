@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto'
 import { createRequire } from 'module'
 
 const require = createRequire(import.meta.url)
-const { verifyBinary, MEDIA_BINARY_MIN_BYTES } = require('./ensure-media-binaries.js')
+const { verifyBinary, MEDIA_BINARY_MIN_BYTES, cacheNativeFfmpeg } = require('./ensure-media-binaries.js')
 
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex')
 
@@ -51,5 +51,24 @@ describe('verifyBinary', () => {
     expect(() =>
       verifyBinary(p, 'ffmpeg', MEDIA_BINARY_MIN_BYTES, 'deadbeef'.repeat(8))
     ).toThrow(/integrity|sha/i)
+  })
+})
+
+describe('cacheNativeFfmpeg', () => {
+  it('copies a present native binary into the cache dest and returns it', () => {
+    const staticBin = join(dir, 'native-ffmpeg.exe')
+    writeFileSync(staticBin, Buffer.alloc(MEDIA_BINARY_MIN_BYTES, 9))
+    const dest = join(dir, 'cache', 'win32-arm64', 'ffmpeg.exe')
+    const out = cacheNativeFfmpeg(staticBin, dest, 'win32-arm64')
+    expect(out).toBe(dest)
+    expect(() => verifyBinary(dest, 'win32-arm64')).not.toThrow()
+  })
+
+  it('throws a remediation-pointing error when the native binary is absent', () => {
+    const staticBin = join(dir, 'does-not-exist.exe')
+    const dest = join(dir, 'cache2', 'ffmpeg.exe')
+    expect(() => cacheNativeFfmpeg(staticBin, dest, 'win32-arm64')).toThrow(
+      /npm install|fetch-ffmpeg-arm64/i
+    )
   })
 })

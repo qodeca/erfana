@@ -73,6 +73,31 @@ function ffmpegStaticBinary(platform) {
 }
 
 /**
+ * Cache an already-present native ffmpeg binary (no download).
+ *
+ * ffmpeg-static publishes no win32-arm64 binary, so on Windows-on-ARM the
+ * native ffmpeg is provisioned into node_modules by
+ * scripts/fetch-ffmpeg-arm64.mjs (postinstall). This copies that binary into
+ * the per-arch build cache, size-verified. No SHA pin is required for
+ * win32-arm64 — the archive SHA-256 checked at fetch time is the integrity
+ * anchor.
+ * @returns the cache path.
+ * @throws if the native binary is absent (points at the provisioning step).
+ */
+function cacheNativeFfmpeg(staticBin, dest, key) {
+  if (!fs.existsSync(staticBin)) {
+    throw new Error(
+      `Native ffmpeg missing at ${staticBin}. ffmpeg-static has no ${key} ` +
+        `build — run \`npm install\` (or \`node scripts/fetch-ffmpeg-arm64.mjs\`) first.`
+    )
+  }
+  verifyBinary(staticBin, key, MEDIA_BINARY_MIN_BYTES, FFMPEG_SHA256[key])
+  fs.mkdirSync(path.dirname(dest), { recursive: true })
+  fs.copyFileSync(staticBin, dest)
+  return dest
+}
+
+/**
  * Download one arch via ffmpeg-static's installer (honors npm_config_arch) and
  * copy it into the per-arch build cache, verified against its pin.
  * @returns the cache path.
@@ -83,6 +108,12 @@ function cacheFfmpegArch(platform, arch) {
   if (fs.existsSync(dest)) {
     verifyBinary(dest, key, MEDIA_BINARY_MIN_BYTES, FFMPEG_SHA256[key])
     return dest
+  }
+  // Windows-on-ARM: ffmpeg-static's installer 404s (no win32-arm64 asset).
+  // The native binary was placed in node_modules by fetch-ffmpeg-arm64.mjs.
+  if (platform === 'win32' && arch === 'arm64') {
+    console.log(`ℹ️  using pre-provisioned native arm64 ffmpeg for ${key}`)
+    return cacheNativeFfmpeg(ffmpegStaticBinary(platform), dest, key)
   }
   const installer = path.join(path.dirname(require.resolve('ffmpeg-static/package.json')), 'install.js')
   const staticBin = ffmpegStaticBinary(platform)
@@ -113,6 +144,7 @@ async function beforePack(context) {
 
 module.exports = beforePack
 module.exports.verifyBinary = verifyBinary
+module.exports.cacheNativeFfmpeg = cacheNativeFfmpeg
 module.exports.cacheFfmpegArch = cacheFfmpegArch
 module.exports.ffmpegStaticBinary = ffmpegStaticBinary
 module.exports.MEDIA_BINARY_MIN_BYTES = MEDIA_BINARY_MIN_BYTES
