@@ -81,16 +81,20 @@ export function ffprobeDest() {
 }
 
 function extract7z(archive, outDir) {
-  // 7zip-bin ships with electron-builder; 7za reads .7z natively.
+  // 7zip-bin ships with electron-builder; 7za reads .7z natively. Only a
+  // missing module falls back to tar — an actual extraction failure must
+  // surface, not be masked by a second attempt with a misleading message.
+  let path7za
   try {
-    const { path7za } = require('7zip-bin')
-    execFileSync(path7za, ['x', archive, `-o${outDir}`, '-y'], { stdio: 'inherit' })
-    return
+    ;({ path7za } = require('7zip-bin'))
   } catch (err) {
-    console.warn(`⚠️  7zip-bin unavailable (${err.message}); falling back to tar`)
+    console.warn(
+      `⚠️  7zip-bin unavailable (${err.message}); falling back to tar (bsdtar reads .7z on Windows 11)`
+    )
+    execFileSync('tar', ['-xf', archive, '-C', outDir], { stdio: 'inherit' })
+    return
   }
-  // Windows 11 bundles bsdtar (libarchive), which reads .7z.
-  execFileSync('tar', ['-xf', archive, '-C', outDir], { stdio: 'inherit' })
+  execFileSync(path7za, ['x', archive, `-o${outDir}`, '-y'], { stdio: 'inherit' })
 }
 
 async function main() {
@@ -134,6 +138,15 @@ async function main() {
     fs.mkdirSync(path.dirname(ffprobeOut), { recursive: true })
     fs.copyFileSync(ffmpegSrc, ffmpegOut)
     fs.copyFileSync(ffprobeSrc, ffprobeOut)
+    for (const [label, p] of [
+      ['ffmpeg', ffmpegOut],
+      ['ffprobe', ffprobeOut]
+    ]) {
+      const size = fs.statSync(p).size
+      if (size < MIN_EXE_BYTES) {
+        throw new Error(`Installed ${label} is implausibly small (${size} bytes) at ${p}`)
+      }
+    }
     console.log(`✅ installed native arm64 ffmpeg  → ${ffmpegOut}`)
     console.log(`✅ installed native arm64 ffprobe → ${ffprobeOut}`)
   } finally {
