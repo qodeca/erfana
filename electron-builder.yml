@@ -43,6 +43,8 @@ win:
   executableName: Erfana
   target:
     - target: nsis
+      arch:
+        - arm64
   # signingHashAlgorithms + rfc3161TimeStampServer moved into signtoolOptions
   # as a nested block in electron-builder 26 (flat fields were removed from
   # the win schema). azureSignOptions stays at win level.
