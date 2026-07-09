@@ -127,6 +127,46 @@ This produces an NSIS installer in `release/{version}/`. The build runs `prebuil
 
 ---
 
+## Building on Windows ARM64
+
+Erfana builds and runs **natively** on Windows-on-ARM (arm64) hosts.
+
+**Extra toolchain requirement:** in the Visual Studio 2022 Build Tools installer,
+add the **MSVC v143 — ARM64 build tools** individual component (alongside the
+x64 component from step 3). `node-pty`'s native addon is rebuilt for arm64 by
+`electron-builder install-app-deps` during `postinstall`, and that needs the
+ARM64 compiler.
+
+**ffmpeg / ffprobe:** `ffmpeg-static` and `ffprobe-static` publish no
+win32-arm64 binary. `npm install`'s `postinstall` therefore runs
+`scripts/fetch-ffmpeg-arm64.mjs`, which downloads a pinned, SHA-256-verified
+native arm64 build from
+[`tordona/ffmpeg-win-arm64`](https://github.com/tordona/ffmpeg-win-arm64)
+(release `8.1.2`, `full-static`) and installs `ffmpeg.exe` / `ffprobe.exe` into
+`node_modules`. The script is a no-op on every other platform.
+
+> **Trust caveat:** the tordona binary is a community maintainer's build. We pin
+> its published SHA-256 (`8af8143d…4981`), but this is trust-on-first-use — it
+> is **not** covered by the minisign-signed trust chain used for whisper.cpp.
+> Re-pin by bumping `TAG` / `ASSET` / `ARCHIVE_SHA256` in
+> `scripts/fetch-ffmpeg-arm64.mjs` together (hash from the release's
+> `<asset>.sha256` companion).
+
+**Build:**
+
+```powershell
+npm run build:win
+```
+
+produces an arm64 NSIS installer in `release/{version}/`.
+
+**Local Whisper transcription is not available on ARM64** (upstream whisper.cpp
+ships no win-arm64 binary). Transcription still works via the OpenAI API
+backend. See [`docs/windows/README.md`](../windows/README.md) for the ARM64
+scope boundary.
+
+---
+
 ## node-pty build failures on Windows 11
 
 A fresh `git clone && npm ci` on a default-hardened Windows 11 box previously failed in two ways while compiling `node-pty`. Both are now fixed automatically by the committed `patches/node-pty+1.1.0.patch`, applied via `patch-package` in the `postinstall` hook — no manual intervention required.

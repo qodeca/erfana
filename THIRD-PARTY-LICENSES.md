@@ -27,6 +27,15 @@ Regenerate it whenever production dependencies change.
 Dual-licensed packages are used under their permissive option where one exists
 (e.g. `jszip` under MIT, `type-fest` under MIT).
 
+### FFmpeg (Windows ARM64 binary)
+
+- **Source:** https://github.com/tordona/ffmpeg-win-arm64 (release `8.1.2`, `full-static`)
+- **Component:** FFmpeg — https://ffmpeg.org
+- **License:** GPL/LGPL (per the FFmpeg build configuration)
+- **Usage:** bundled `ffmpeg.exe` / `ffprobe.exe` on Windows-ARM64 builds only,
+  provisioned by `scripts/fetch-ffmpeg-arm64.mjs`. Not present on macOS or
+  Windows-x64 builds (those use `ffmpeg-static` / `ffprobe-static`).
+
 ---
 
 ## Per-dependency license texts
