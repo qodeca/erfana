@@ -155,10 +155,14 @@ native arm64 build from
 **Build:**
 
 ```powershell
-npm run build:win
+npm run build:win:arm64
 ```
 
-produces an arm64 NSIS installer in `release/{version}/`.
+This runs `electron-builder --win --arm64` — the `--arm64` CLI flag targets
+the arm64 build for this invocation only, so the shared `electron-builder.yml`
+`win` target config stays defaulted to x64 and the Windows-x64 release build
+(`npm run build:win`, and the x64 CI release leg) is unaffected. It produces
+an arm64 NSIS installer in `release/{version}/`.
 
 **Local Whisper transcription is not available on ARM64** (upstream whisper.cpp
 ships no win-arm64 binary). Transcription still works via the OpenAI API

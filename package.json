@@ -27,6 +27,7 @@
     "prebuild": "node scripts/prebuild.mjs",
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win",
+    "build:win:arm64": "npm run build && electron-builder --win --arm64",
     "build:mac": "npm run build && electron-builder --mac",
     "build:mac:test": "npm run build && ERFANA_TEST_BUILD=true electron-builder --mac -c.directories.output=release/test/${npm_package_version}",
     "test:e2e": "electron-vite build && playwright test --project=electron",

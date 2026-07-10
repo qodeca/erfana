@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
-/* global fetch */
+/* global fetch, AbortSignal */
 /**
  * Provision native Windows-ARM64 ffmpeg + ffprobe.
  *
@@ -35,6 +35,9 @@ export const DOWNLOAD_URL =
 
 /** Size floor guarding against a stub/truncated exe (real ffmpeg is 10s of MB). */
 export const MIN_EXE_BYTES = 1_000_000
+
+/** Hang-guard for the archive download (~108MB) — generous, but finite so `npm install` cannot hang forever. */
+export const DOWNLOAD_TIMEOUT_MS = 300_000
 
 export function isTargetPlatform(platform = process.platform, arch = process.arch) {
   return platform === 'win32' && arch === 'arm64'
@@ -118,7 +121,19 @@ async function main() {
   try {
     const archive = path.join(tmp, ASSET)
     console.log(`⬇️  downloading ${DOWNLOAD_URL}`)
-    const res = await fetch(DOWNLOAD_URL) // follows the release-assets redirect
+    let res
+    try {
+      // follows the release-assets redirect; AbortSignal.timeout guards against
+      // an indefinitely hung connection so `npm install` cannot stall forever.
+      res = await fetch(DOWNLOAD_URL, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
+    } catch (err) {
+      if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+        throw new Error(
+          `Download timed out after ${DOWNLOAD_TIMEOUT_MS}ms: ${DOWNLOAD_URL}`
+        )
+      }
+      throw err
+    }
     if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`)
     fs.writeFileSync(archive, Buffer.from(await res.arrayBuffer()))
 
