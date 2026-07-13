@@ -16,6 +16,7 @@ export { ConflictDialog } from './ConflictDialog'
 export { ScreenSelectDialog } from './ScreenSelectDialog'
 export { WindowPickerDialog } from './WindowPickerDialog'
 export { CameraDialog } from './CameraDialog'
+export { ScreenPermissionDialog } from './ScreenPermissionDialog'
 export { showGlobalDialog, subscribeGlobalDialogs } from './dialogService'
 export type { PromptDialogResult } from './PromptDialog'
 
