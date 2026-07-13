@@ -91,6 +91,7 @@ mac:
   extendInfo:
     - NSCameraUsageDescription: Erfana uses the camera to capture photos you insert into notes.
     - NSMicrophoneUsageDescription: Erfana uses the microphone for audio transcription you request.
+    - NSScreenCaptureUsageDescription: Erfana captures screenshots you insert into notes and terminals.
     - NSDocumentsFolderUsageDescription: Erfana reads and writes project files in folders you open.
     - NSDownloadsFolderUsageDescription: Erfana writes exported files (PDF, DOCX) to folders you choose.
   # Notarization is auto-invoked by electron-builder 26 when either:
