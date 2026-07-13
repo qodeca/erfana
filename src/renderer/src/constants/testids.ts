@@ -133,6 +133,15 @@ export const TEST_IDS = {
   TERMINAL_BTN_CAPTURE_WINDOW: 'terminal-btn-capture-window',
   /** Capture area screenshot button (macOS only) */
   TERMINAL_BTN_CAPTURE_AREA: 'terminal-btn-capture-area',
+  // Screen Recording permission dialog (macOS grant-and-relaunch flow)
+  /** Screen-recording permission dialog container */
+  SCREEN_PERMISSION_DIALOG: 'screen-permission-dialog',
+  /** Open macOS Screen Recording settings pane */
+  SCREEN_PERMISSION_BTN_OPEN_SETTINGS: 'screen-permission-btn-open-settings',
+  /** Relaunch Erfana to apply the granted permission */
+  SCREEN_PERMISSION_BTN_RELAUNCH: 'screen-permission-btn-relaunch',
+  /** Dismiss the permission dialog */
+  SCREEN_PERMISSION_BTN_CLOSE: 'screen-permission-btn-close',
   /** Capture camera photo button (cross-platform) */
   TERMINAL_BTN_CAMERA: 'terminal-btn-camera',
   /** Expand/restore terminal to cover the editor area */
