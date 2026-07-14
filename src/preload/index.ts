@@ -15,7 +15,8 @@ import type {
   GetDisplaysResponse,
   EnumerateWindowsRequest,
   EnumerateWindowsResponse,
-  ScreenshotCapabilities
+  ScreenshotCapabilities,
+  ScreenRecordingPermission
 } from '../shared/ipc/screenshot-schema'
 import type {
   CameraSaveRequest,
@@ -646,7 +647,16 @@ const api = {
      * `getPlatform()` so platform routing stays single-sourced in main.
      */
     getCapabilities: (): Promise<ScreenshotCapabilities> =>
-      ipcRenderer.invoke('screenshot:getCapabilities')
+      ipcRenderer.invoke('screenshot:getCapabilities'),
+
+    /**
+     * Advisory macOS Screen Recording status (`'granted' | 'denied' |
+     * 'not-determined' | 'restricted' | 'unknown'`). Non-macOS returns
+     * `'unknown'`. Used ONLY to enrich the denial dialog — never to gate a
+     * capture. See `system.openScreenRecordingSettings` / `relaunchApp`.
+     */
+    getScreenPermission: (): Promise<ScreenRecordingPermission> =>
+      ipcRenderer.invoke('screenshot:getScreenPermission')
 
     // Note (#164 lens-review F[6]): the overlay-only verbs
     // (`areaSelected` / `areaCancelled`) are intentionally NOT exposed here.
@@ -654,6 +664,22 @@ const api = {
     // by the per-display area-select overlay BrowserWindows. Exposing them
     // to every renderer would let any compromised window forge a selection
     // or DoS an active capture.
+  },
+
+  /**
+   * System / OS-integration actions for the screen-recording permission flow.
+   * Both are sender-gated main-side.
+   */
+  system: {
+    /** Open the macOS Screen Recording privacy pane (no-op off macOS). */
+    openScreenRecordingSettings: (): Promise<void> =>
+      ipcRenderer.invoke('system:openScreenRecordingSettings'),
+
+    /**
+     * Relaunch the app (macOS applies a fresh Screen Recording grant only to
+     * a newly-launched process). Runs graceful shutdown before restarting.
+     */
+    relaunchApp: (): Promise<void> => ipcRenderer.invoke('system:relaunchApp')
   },
 
   /**

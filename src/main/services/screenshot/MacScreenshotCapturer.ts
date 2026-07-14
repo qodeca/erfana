@@ -21,10 +21,11 @@
  */
 
 import { execFile } from 'child_process'
-import { screen } from 'electron'
+import { screen, systemPreferences } from 'electron'
 import { SCREENSHOT } from '../../../shared/constants'
 import { ErrorCode } from '../../../shared/errors'
 import type {
+  ScreenRecordingPermission,
   ScreenshotCapabilities,
   ScreenshotCaptureRequest,
   ScreenshotCaptureResponse,
@@ -35,6 +36,18 @@ import { fileExists, generateScreenshotPath, sleep } from './sharedHelpers'
 import type { IScreenshotCapturer } from './types'
 
 export class MacScreenshotCapturer implements IScreenshotCapturer {
+  /**
+   * @param getScreenPermission Advisory TCC probe used ONLY to classify an
+   *   ambiguous capture failure (see `runCapture`). Injected for testability;
+   *   defaults to Electron's `systemPreferences.getMediaAccessStatus('screen')`.
+   *   It is never consulted before a capture — the capture is always attempted,
+   *   so a stale read cannot block a granted user.
+   */
+  constructor(
+    private readonly getScreenPermission: () => ScreenRecordingPermission = () =>
+      systemPreferences.getMediaAccessStatus('screen') as ScreenRecordingPermission
+  ) {}
+
   getCapabilities(): ScreenshotCapabilities {
     return { supported: true, hasNativeWindowPicker: true, areaCaptureMode: 'native' }
   }
@@ -135,6 +148,19 @@ export class MacScreenshotCapturer implements IScreenshotCapturer {
 
       const exists = await fileExists(filePath)
       if (!exists) {
+        // No file can mean a real user cancel (Escape) OR a silent denial —
+        // on modern macOS a denied capture can exit 0 with no file and no
+        // `cannot capture` stderr. The authoritative TCC status disambiguates.
+        // The capture was already attempted, so this never blocks a granted
+        // user (status would be 'granted' and we keep the cancel outcome).
+        if (this.getScreenPermission() === 'denied') {
+          logger.warn('Screenshot produced no file and screen status is denied')
+          return {
+            success: false,
+            error: 'Screen recording permission required',
+            errorCode: ErrorCode.SCREENSHOT_PERMISSION_DENIED
+          }
+        }
         logger.debug('Screenshot cancelled - file not created')
         return {
           success: false,

@@ -53,7 +53,10 @@ const mockEnumerateWindows = vi.fn()
 const mockCapture = vi.fn()
 const mockGetPlatform = vi.fn()
 const mockGetCapabilities = vi.fn()
+const mockGetScreenPermission = vi.fn()
 const mockTerminalWrite = vi.fn()
+const mockOpenScreenRecordingSettings = vi.fn()
+const mockRelaunchApp = vi.fn()
 
 Object.defineProperty(global.window, 'api', {
   writable: true,
@@ -63,7 +66,12 @@ Object.defineProperty(global.window, 'api', {
       getDisplays: mockGetDisplays,
       enumerateWindows: mockEnumerateWindows,
       capture: mockCapture,
-      getCapabilities: mockGetCapabilities
+      getCapabilities: mockGetCapabilities,
+      getScreenPermission: mockGetScreenPermission
+    },
+    system: {
+      openScreenRecordingSettings: mockOpenScreenRecordingSettings,
+      relaunchApp: mockRelaunchApp
     },
     terminal: {
       write: mockTerminalWrite
@@ -112,6 +120,7 @@ describe('useScreenshotCapture', () => {
     mockGetDisplays.mockResolvedValue({ displays: [mockDisplay] })
     mockEnumerateWindows.mockResolvedValue({ sources: [mockWindowSource] })
     mockCapture.mockResolvedValue({ success: true, filePath: '/tmp/screenshot.png' })
+    mockGetScreenPermission.mockResolvedValue('denied')
     mockTerminalWrite.mockResolvedValue(undefined)
     // Default: macOS-style capabilities (supported, native picker). Tests
     // that exercise Windows / unsupported flows override per-test.
@@ -398,7 +407,9 @@ describe('useScreenshotCapture', () => {
       )
     })
 
-    it('shows error toast on SCREENSHOT_PERMISSION_DENIED', async () => {
+    it('opens the permission dialog on SCREENSHOT_PERMISSION_DENIED (macOS)', async () => {
+      mockGetPlatform.mockReturnValue('darwin')
+      mockGetScreenPermission.mockResolvedValue('denied')
       mockCapture.mockResolvedValue({
         success: false,
         errorCode: 'SCREENSHOT_PERMISSION_DENIED'
@@ -412,10 +423,57 @@ describe('useScreenshotCapture', () => {
         await result.current.handleScreenshot('window')
       })
 
+      // Capture is always attempted — never gated by a status pre-check.
+      expect(mockCapture).toHaveBeenCalledTimes(1)
+      // On denial the actionable dialog opens instead of a dead-end toast.
+      expect(result.current.screenPermissionDialogOpen).toBe(true)
+      expect(result.current.screenPermissionStatus).toBe('denied')
+      expect(showErrorToast).not.toHaveBeenCalled()
+    })
+
+    it('falls back to a toast on SCREENSHOT_PERMISSION_DENIED (non-macOS)', async () => {
+      mockGetPlatform.mockReturnValue('win32')
+      mockGetCapabilities.mockResolvedValue({
+        supported: true,
+        hasNativeWindowPicker: false,
+        areaCaptureMode: 'overlay'
+      })
+      mockCapture.mockResolvedValue({
+        success: false,
+        errorCode: 'SCREENSHOT_PERMISSION_DENIED'
+      })
+      const refs = createRefs()
+      const { result } = renderHook(() => useScreenshotCapture(refs))
+
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
+
+      await act(async () => {
+        await result.current.handleScreenshot('window', { windowId: 'window:1:0' })
+      })
+
       expect(showErrorToast).toHaveBeenCalledWith(
         'Permission required',
-        'Grant screen recording permission in System Settings > Privacy & Security'
+        expect.stringContaining('screen recording')
       )
+      expect(result.current.screenPermissionDialogOpen).toBe(false)
+    })
+
+    it('closeScreenPermissionDialog closes the dialog', async () => {
+      mockGetPlatform.mockReturnValue('darwin')
+      mockCapture.mockResolvedValue({ success: false, errorCode: 'SCREENSHOT_PERMISSION_DENIED' })
+      const refs = createRefs()
+      const { result } = renderHook(() => useScreenshotCapture(refs))
+      await waitFor(() => expect(result.current.isScreenshotSupported).toBe(true))
+
+      await act(async () => {
+        await result.current.handleScreenshot('window')
+      })
+      expect(result.current.screenPermissionDialogOpen).toBe(true)
+
+      act(() => {
+        result.current.closeScreenPermissionDialog()
+      })
+      expect(result.current.screenPermissionDialogOpen).toBe(false)
     })
 
     it('shows error toast on SCREENSHOT_WINDOW_NOT_FOUND', async () => {

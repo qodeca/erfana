@@ -19,6 +19,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { systemPreferences } from 'electron'
 
 const macCapabilities = {
   supported: true,
@@ -58,6 +59,10 @@ vi.mock('./screenshot/sharedHelpers', () => ({
   listDisplays: vi.fn(() => [
     { id: 1, label: 'Primary', isPrimary: true, bounds: { x: 0, y: 0, width: 2560, height: 1600 } }
   ])
+}))
+
+vi.mock('electron', () => ({
+  systemPreferences: { getMediaAccessStatus: vi.fn(() => 'granted') }
 }))
 
 function stubCapturer(capabilities = desktopCapabilities) {
@@ -223,6 +228,25 @@ describe('ScreenshotService dispatcher + factory', () => {
         areaCaptureMode: 'native'
       })
       expect(stub.getCapabilities).toHaveBeenCalled()
+    })
+  })
+
+  describe('getScreenRecordingPermission (advisory)', () => {
+    it('returns the systemPreferences screen status on darwin', async () => {
+      const { createScreenshotService } = await import('./ScreenshotService')
+      vi.mocked(systemPreferences.getMediaAccessStatus).mockReturnValue('denied')
+      const service = createScreenshotService(stubCapturer(), 'darwin')
+
+      expect(service.getScreenRecordingPermission()).toBe('denied')
+      expect(systemPreferences.getMediaAccessStatus).toHaveBeenCalledWith('screen')
+    })
+
+    it('returns "unknown" off darwin without querying systemPreferences', async () => {
+      const { createScreenshotService } = await import('./ScreenshotService')
+      const service = createScreenshotService(stubCapturer(), 'win32')
+
+      expect(service.getScreenRecordingPermission()).toBe('unknown')
+      expect(systemPreferences.getMediaAccessStatus).not.toHaveBeenCalled()
     })
   })
 })

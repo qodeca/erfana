@@ -31,7 +31,12 @@ import { useProjectManagementContextSafe } from '../../context/ProjectManagement
 import { useTerminalPortalOptional } from '../../context/TerminalPortalContext'
 import { TerminalContextMenu } from '../ContextMenu/TerminalContextMenu'
 import { FilePickerDialog } from '../Dialog/FilePickerDialog'
-import { ScreenSelectDialog, WindowPickerDialog, CameraDialog } from '../Dialog'
+import {
+  ScreenSelectDialog,
+  WindowPickerDialog,
+  CameraDialog,
+  ScreenPermissionDialog
+} from '../Dialog'
 import { useScreenshotCapture } from './TerminalPanel/hooks/useScreenshotCapture'
 import { sanitizeFilePath, getBasename } from '../../utils/fileUtils'
 import { formatPathsForTerminal, escapePathForShell, type ShellKind } from '../../utils/shellPathEscape'
@@ -95,7 +100,10 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
     setShowWindowPickerDialog,
     refreshDisplays,
     refreshWindowSources,
-    handleScreenshot
+    handleScreenshot,
+    screenPermissionDialogOpen,
+    screenPermissionStatus,
+    closeScreenPermissionDialog
   } = useScreenshotCapture({ terminalIdRef, shellKindRef, xtermRef })
   const [isLoadingWindowSources, setIsLoadingWindowSources] = useState(false)
 
@@ -1202,6 +1210,12 @@ export function TerminalPanel(_props: ISplitviewPanelProps) {
                         handleScreenshot('screen', { displayId })
                       }}
                       onCancel={() => setShowScreenSelectDialog(false)}
+                    />
+                    <ScreenPermissionDialog
+                      isOpen={screenPermissionDialogOpen}
+                      status={screenPermissionStatus}
+                      zIndex={10000}
+                      onClose={closeScreenPermissionDialog}
                     />
                     <button
                       className={`icon-btn${capturingMode === 'window' ? ' icon-btn--loading' : ''}`}

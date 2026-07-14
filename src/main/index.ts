@@ -16,6 +16,7 @@ import { registerPdfHandlers } from './ipc/pdf-handlers'
 import { registerDocxHandlers } from './ipc/docx-handlers'
 import { registerScreenshotHandlers } from './ipc/screenshot-handlers'
 import { registerShellHandlers } from './ipc/shell-handlers'
+import { registerSystemHandlers } from './ipc/system-handlers'
 import { registerCameraHandlers } from './ipc/camera-handlers'
 import { registerGlobalSettingsHandlers } from './ipc/global-settings-handlers'
 import { registerLoggingHandlers } from './ipc/logging-handlers'
@@ -232,6 +233,7 @@ app.whenReady().then(async () => {
   registerDocxHandlers()
   registerScreenshotHandlers()
   registerShellHandlers()
+  registerSystemHandlers()
   registerCameraHandlers()
   registerGlobalSettingsHandlers()
   registerLoggingHandlers()

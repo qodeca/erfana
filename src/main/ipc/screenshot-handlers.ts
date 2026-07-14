@@ -13,7 +13,8 @@ import {
   type ScreenshotCaptureResponse,
   type GetDisplaysResponse,
   type EnumerateWindowsResponse,
-  type ScreenshotCapabilities
+  type ScreenshotCapabilities,
+  type ScreenRecordingPermission
 } from '../../shared/ipc/screenshot-schema'
 import { logger } from '../services/LoggingService'
 
@@ -103,6 +104,27 @@ export function registerScreenshotHandlers(
       } catch (error) {
         logger.error('getCapabilities failed', error instanceof Error ? error : undefined)
         return { supported: false, hasNativeWindowPicker: false, areaCaptureMode: 'unsupported' }
+      }
+    }
+  )
+
+  ipcMain.handle(
+    SCREENSHOT_CHANNELS.GET_SCREEN_PERMISSION,
+    async (event): Promise<ScreenRecordingPermission> => {
+      if (!validateMainRendererSender(event)) {
+        logger.warn('Rejected screenshot:getScreenPermission from untrusted sender', {
+          url: event.senderFrame?.url
+        })
+        return 'unknown'
+      }
+      try {
+        return service.getScreenRecordingPermission()
+      } catch (error) {
+        logger.error(
+          'getScreenRecordingPermission failed',
+          error instanceof Error ? error : undefined
+        )
+        return 'unknown'
       }
     }
   )

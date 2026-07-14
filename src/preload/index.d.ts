@@ -15,7 +15,8 @@ import type {
   GetDisplaysResponse,
   EnumerateWindowsRequest,
   EnumerateWindowsResponse,
-  ScreenshotCapabilities
+  ScreenshotCapabilities,
+  ScreenRecordingPermission
 } from '../shared/ipc/screenshot-schema'
 import type {
   CameraSaveRequest,
@@ -285,9 +286,21 @@ declare global {
         capture: (request: ScreenshotCaptureRequest) => Promise<ScreenshotCaptureResponse>
         /** Platform capability matrix (#164 F[31]) */
         getCapabilities: () => Promise<ScreenshotCapabilities>
+        /** Advisory macOS Screen Recording status ('unknown' off macOS) */
+        getScreenPermission: () => Promise<ScreenRecordingPermission>
         // Overlay-only verbs are NOT exposed here (#164 F[6]). The overlay
         // window's preload (`src/preload/screenshotOverlay.ts`) exposes them
         // as `window.overlayApi.areaSelected` / `areaCancelled`.
+      }
+      /**
+       * System / OS-integration actions for the screen-recording permission
+       * flow. Both handlers are sender-gated main-side.
+       */
+      system: {
+        /** Open the macOS Screen Recording privacy pane (no-op off macOS) */
+        openScreenRecordingSettings: () => Promise<void>
+        /** Relaunch the app (graceful shutdown, then restart) */
+        relaunchApp: () => Promise<void>
       }
       /**
        * Camera photo capture operations
