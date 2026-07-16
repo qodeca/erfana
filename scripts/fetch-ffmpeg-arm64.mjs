@@ -83,21 +83,56 @@ export function ffprobeDest() {
   return path.join(dir, 'bin', 'win32', 'arm64', 'ffprobe.exe')
 }
 
-function extract7z(archive, outDir) {
-  // 7zip-bin ships with electron-builder; 7za reads .7z natively. Only a
-  // missing module falls back to tar — an actual extraction failure must
-  // surface, not be masked by a second attempt with a misleading message.
-  let path7za
-  try {
-    ;({ path7za } = require('7zip-bin'))
-  } catch (err) {
-    console.warn(
-      `⚠️  7zip-bin unavailable (${err.message}); falling back to tar (bsdtar reads .7z on Windows 11)`
-    )
-    execFileSync('tar', ['-xf', archive, '-C', outDir], { stdio: 'inherit' })
-    return
+/**
+ * Ordered list of system 7-Zip executables to try, most-likely-modern first.
+ *
+ * The tordona arm64 archive applies 7-Zip's ARM64 executable filter (introduced
+ * in 7-Zip 22.00) to exactly the exes we need, so a modern extractor is
+ * mandatory. Bare `7z`/`7za` are resolved via PATH by execFileSync.
+ */
+export function sevenZipCandidates(env = process.env, platform = process.platform) {
+  const candidates = []
+  if (platform === 'win32') {
+    for (const base of [env.ProgramW6432, env.ProgramFiles, env['ProgramFiles(x86)']]) {
+      if (base) candidates.push(path.join(base, '7-Zip', '7z.exe'))
+    }
   }
-  execFileSync(path7za, ['x', archive, `-o${outDir}`, '-y'], { stdio: 'inherit' })
+  candidates.push('7z', '7za')
+  return candidates
+}
+
+function extract7z(archive, outDir) {
+  // The archive uses 7-Zip's ARM64 executable filter (7-Zip >= 22.00), which the
+  // 7za bundled by 7zip-bin (21.02 alpha, 2021) cannot decode — it reports
+  // "Unsupported Method" on ffmpeg.exe/ffprobe.exe. So we try a modern system
+  // 7-Zip first, then fall back to the bundled 7za (fine for a re-pin to an
+  // unfiltered archive), and only fail if none can produce both exes.
+  const candidates = [...sevenZipCandidates()]
+  try {
+    candidates.push(require('7zip-bin').path7za)
+  } catch (err) {
+    console.warn(`⚠️  7zip-bin unavailable (${err.message})`)
+  }
+
+  const failures = []
+  for (const bin of candidates) {
+    try {
+      execFileSync(bin, ['x', archive, `-o${outDir}`, '-y'], { stdio: 'inherit' })
+    } catch (err) {
+      failures.push(`${bin}: ${String(err.message).split('\n')[0]}`)
+      continue
+    }
+    // An older 7-Zip can exit 0 on the container yet skip the filtered members,
+    // so success requires both exes to actually be present.
+    if (findExe(outDir, 'ffmpeg.exe') && findExe(outDir, 'ffprobe.exe')) return
+    failures.push(`${bin}: ran but ffmpeg.exe/ffprobe.exe missing (too old for the ARM64 filter?)`)
+  }
+
+  throw new Error(
+    `Could not extract ${archive}. The archive uses 7-Zip's ARM64 filter ` +
+      `(7-Zip >= 22.00); install a modern 7-Zip (e.g. \`winget install 7zip.7zip\`) and re-run. ` +
+      `Tried:\n  ${failures.join('\n  ')}`
+  )
 }
 
 async function main() {

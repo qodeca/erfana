@@ -145,6 +145,17 @@ native arm64 build from
 (release `8.1.2`, `full-static`) and installs `ffmpeg.exe` / `ffprobe.exe` into
 `node_modules`. The script is a no-op on every other platform.
 
+> **Extra prerequisite — a modern 7-Zip:** the tordona archive is compressed
+> with 7-Zip's **ARM64 executable filter** (introduced in 7-Zip 22.00), applied
+> to exactly the `.exe` files we need. The `7za` bundled by `7zip-bin` (21.02
+> alpha, 2021, a transitive electron-builder dependency) predates that filter and
+> fails extraction with `Unsupported Method`. `fetch-ffmpeg-arm64.mjs` therefore
+> prefers a system 7-Zip (`%ProgramFiles%\7-Zip\7z.exe`, or `7z`/`7za` on PATH)
+> and only falls back to the bundled `7za`. **Install 7-Zip ≥ 22** before
+> `npm install`: `winget install 7zip.7zip`. If none of the candidates can decode
+> the archive the script aborts with a remediation message rather than leaving a
+> half-provisioned tree.
+
 > **Trust caveat:** the tordona binary is a community maintainer's build. We pin
 > its published SHA-256 (`8af8143d…4981`), but this is trust-on-first-use — it
 > is **not** covered by the minisign-signed trust chain used for whisper.cpp.

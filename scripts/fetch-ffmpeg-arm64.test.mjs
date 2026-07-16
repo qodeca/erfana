@@ -14,6 +14,7 @@ const {
   sha256File,
   assertArchiveSha,
   findExe,
+  sevenZipCandidates,
   ARCHIVE_SHA256,
 } = require('./fetch-ffmpeg-arm64.mjs')
 
@@ -63,5 +64,28 @@ describe('findExe', () => {
     const root = join(dir, 'empty')
     mkdirSync(root, { recursive: true })
     expect(findExe(root, 'ffmpeg.exe')).toBeNull()
+  })
+})
+
+describe('sevenZipCandidates', () => {
+  it('includes Program Files 7-Zip and bare PATH names on Windows', () => {
+    const env = {
+      ProgramFiles: 'C:\\Program Files',
+      'ProgramFiles(x86)': 'C:\\Program Files (x86)',
+    }
+    const c = sevenZipCandidates(env, 'win32')
+    expect(c.some((p) => /Program Files[\\/]7-Zip[\\/]7z\.exe/i.test(p))).toBe(true)
+    expect(c).toContain('7z')
+    expect(c).toContain('7za')
+  })
+  it('omits Program Files entries that are not set', () => {
+    const c = sevenZipCandidates({}, 'win32')
+    expect(c.every((p) => typeof p === 'string' && p.length > 0)).toBe(true)
+    expect(c).toContain('7z')
+  })
+  it('falls back to bare names on non-Windows', () => {
+    const c = sevenZipCandidates({}, 'linux')
+    expect(c).toContain('7z')
+    expect(c).toContain('7za')
   })
 })
