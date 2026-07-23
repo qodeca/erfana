@@ -4,7 +4,7 @@
   "tier": "T3",
   "version": "0.2.0",
   "created": "2025-12-22T23:00:00.000Z",
-  "updated": "2026-07-23T13:20:00+02:00",
+  "updated": "2026-07-23T13:24:00+02:00",
   "application": {
     "name": "Knowledge graph & entities",
     "domain": "graph-engine",
@@ -531,6 +531,13 @@
       "operation": "UPDATE",
       "target": "02-requirements, 03-acceptance",
       "description": "Lens-review round 2: AC-040 added (typed relation extraction test, FR-031 retraced), AC-010 char count fixed (16)",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T13:24:00+02:00",
+      "operation": "UPDATE",
+      "target": "requirements/overview",
+      "description": "Lens-review round 2 cosmetics: Kuzu note softened to verified fact (repository archived)",
       "by": "user"
     }
   ],

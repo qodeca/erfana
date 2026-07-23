@@ -46,7 +46,7 @@ The Knowledge Graph system addresses these challenges by:
 
 ## Technology decisions
 
-- **Graph storage: SQLite tables over an embedded graph database – deliberate.** Kuzu was archived after Apple's Oct 2025 acquisition (maintenance moved to community forks); backlink/traversal at this scale (<100ms, 100K mentions) is a join-shaped workload; SQLite tables reuse Spec #004 infrastructure. Decision re-affirmed 2026-07-23.
+- **Graph storage: SQLite tables over an embedded graph database – deliberate.** Kuzu was archived after Apple's Oct 2025 acquisition (the upstream repository is archived); backlink/traversal at this scale (<100ms, 100K mentions) is a join-shaped workload; SQLite tables reuse Spec #004 infrastructure. Decision re-affirmed 2026-07-23.
 
 ## Dependencies
 

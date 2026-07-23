@@ -279,7 +279,7 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 ---
 
-#### 005-FR-021: L2 distance search
+#### 005-FR-021: Cosine distance search
 
 **Title:** Search by cosine distance
 

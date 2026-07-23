@@ -569,7 +569,7 @@
 
 **Description:** Embeddings from a previous model profile are detected and re-embedded.
 
-**Given:** Database contains embeddings with embedder_id "all-MiniLM-L6-v2:1.0.0:d384" and the active profile is "embeddinggemma-300m:1.0:d256".
+**Given:** Database contains embeddings with embedder_id "all-MiniLM-L6-v2:1.0:d384" and the active profile is "embeddinggemma-300m:1.0:d256".
 
 **When:** Application starts.
 
