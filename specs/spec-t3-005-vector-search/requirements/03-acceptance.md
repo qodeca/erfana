@@ -447,18 +447,18 @@
 
 ---
 
-### 005-AC-024: Rate limiting enforced
+### 005-AC-024: Advisory rate limiting applied
 
-**Description:** Excessive MCP queries are rate limited.
+**Description:** Excessive MCP queries are slowed by backpressure, not rejected.
 
-**Given:** MCP client making rapid requests.
+**Given:** MCP client has made 100 requests in the last minute (default limit).
 
-**When:** 101 requests are made in one minute.
+**When:** Request 101 is made.
 
 **Then:**
-- First 100 requests succeed
-- 101st request returns rate limit error
-- Error includes retry-after value
+- The request is queued and delayed (backpressure), not rejected
+- No error is returned; the request eventually completes
+- The limit is configurable (shared with Spec #004 FR-042)
 
 **Traces to:** 005-FR-034
 

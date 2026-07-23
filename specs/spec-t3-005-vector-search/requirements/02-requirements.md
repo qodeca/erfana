@@ -443,13 +443,13 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 #### 005-FR-034: Rate limiting
 
-**Title:** Rate limit MCP queries
+**Title:** MCP rate limiting (advisory)
 
-**Description:** The system shall rate limit `erfana_graph_related` queries to 100 per minute per client. Exceeding limit shall return rate limit error with retry-after header.
+**Description:** The system shall apply the shared advisory MCP rate limit (Spec #004 FR-042: configurable, default 100 queries/minute, backpressure queue-and-delay, never hard rejection) to `erfana_graph_related` queries.
 
 **Priority:** Medium
 
-**Traces to:** 005-FR-033
+**Traces to:** 005-FR-033, Spec #004 FR-042
 
 ---
 
