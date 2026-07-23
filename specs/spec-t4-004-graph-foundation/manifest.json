@@ -4,7 +4,7 @@
   "tier": "T4",
   "version": "0.2.0",
   "created": "2025-12-22T21:00:00Z",
-  "updated": "2026-07-23T13:15:00+02:00",
+  "updated": "2026-07-23T13:20:00+02:00",
   "application": {
     "name": "Graph Engine Foundation",
     "domain": "search",
@@ -642,6 +642,13 @@
       "operation": "UPDATE",
       "target": "05-notes, 02-requirements",
       "description": "Lens-review round 2: MCP SDK v2 package coordinate corrected to @modelcontextprotocol/server (v2 split the monolithic /sdk package); /sdk retained only for the v1.x fallback path",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T13:20:00+02:00",
+      "operation": "UPDATE",
+      "target": "acceptance/requirements",
+      "description": "Lens-review round 2: AC-010 NFR-003 citation corrected (<500ms bound)",
       "by": "user"
     }
   ],

@@ -4,7 +4,7 @@
   "tier": "T3",
   "version": "0.2.0",
   "created": "2025-12-22T18:15:00.000Z",
-  "updated": "2026-07-23T12:26:00+02:00",
+  "updated": "2026-07-23T13:20:00+02:00",
   "application": {
     "name": "Graph engine polish & maintenance",
     "domain": null,
@@ -365,6 +365,13 @@
       "operation": "UPDATE",
       "target": "02-requirements, 03-acceptance",
       "description": "Lens-review remediation: two-stage oversample-and-rescore binary quantization (FR-020/021), reconciled NFR-001 (index footprint vs on-disk, recall@10 floor), strengthened AC-009, added FR-031 MRL dimension profile + AC-019, OTel-aligned NFR-007",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T13:20:00+02:00",
+      "operation": "UPDATE",
+      "target": "acceptance/requirements",
+      "description": "Lens-review round 2: NFR-001/AC-009 recall target scoped to shipped profile (EmbeddingGemma-300m @ 256-dim) on named fixture corpus",
       "by": "user"
     }
   ],

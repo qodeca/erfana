@@ -69,7 +69,7 @@
 
 | ID | Title | Description | Target |
 |----|-------|-------------|--------|
-| 008-NFR-001 | Quantization memory savings | Binary quantization must reduce the in-memory/index vector footprint (~32x for the binary index); total on-disk storage is NOT reduced 32x because float32 vectors are retained for rescoring – document both numbers | >30x index footprint; recall@10 >= 0.95 vs float32 baseline |
+| 008-NFR-001 | Quantization memory savings | Binary quantization must reduce the in-memory/index vector footprint (~32x for the binary index); total on-disk storage is NOT reduced 32x because float32 vectors are retained for rescoring – document both numbers | >30x index footprint; recall@10 >= 0.95 vs float32 baseline for the shipped profile (EmbeddingGemma-300m @ 256-dim) on the named fixture corpus; other profiles gate per-model |
 | 008-NFR-002 | Progress update frequency | Reindex progress must update at regular intervals | Every 1 second |
 | 008-NFR-003 | Neighborhood query latency | Entity neighborhood query (2 hops) must complete quickly | <200ms |
 

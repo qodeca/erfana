@@ -56,9 +56,9 @@
       "description": "Extracts entities from markdown content using rule-based patterns (wikilinks, tags, mentions), builds a knowledge graph with entities, edges, and mentions tables, and enables Obsidian-like backlink navigation. Includes Knowledge Panel UI showing entities and backlinks for the current section, plus MCP tools `erfana_graph_entities` and `erfana_graph_backlinks` for Claude Code integration. Corresponds to implementation milestone M3. Includes optional local ONNX NER extractor and a typed relation vocabulary with exclusivity.",
       "created": "2025-12-22T23:00:00.000Z",
       "path": "spec-t3-006-knowledge-graph",
-      "last_modified": "2026-07-23T12:30:00+02:00",
+      "last_modified": "2026-07-23T13:20:00+02:00",
       "sections_count": 3,
-      "requirements_count": 79,
+      "requirements_count": 80,
       "documents": {
         "technical_adrs": [],
         "solution_adrs": [],
@@ -342,6 +342,6 @@
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2026-07-23T12:30:00+02:00"
+    "last_updated": "2026-07-23T13:20:00+02:00"
   }
 }

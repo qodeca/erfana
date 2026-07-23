@@ -18,7 +18,7 @@
 | 006-AC-007 | 006-FR-007 | Mentions extracted correctly | 1. Index section with `@alice and @bob-smith`<br>2. Query entities | Two entities: "alice" (person), "bob-smith" (person) with correct positions |
 | 006-AC-008 | 006-FR-008 | Technical terms extracted | 1. Configure dictionary with ["SQLite", "TypeScript"]<br>2. Index section with "Using SQLite for storage"<br>3. Query entities | "SQLite" (technology) entity created |
 | 006-AC-009 | 006-FR-009 | Pipeline processes all patterns | 1. Index section with `[[API]] #docs @dev uses TypeScript`<br>2. Query entities and mentions | Four entities created; four mentions linked to section |
-| 006-AC-010 | 006-FR-010 | Character positions accurate | 1. Index `Hello [[World]]!` (15 chars total)<br>2. Query mentions for World entity | Mention has start_char=6, end_char=15 (including brackets: positions span from first `[` to after last `]`). For wikilinks, positions include the bracket syntax so `[[World]]` at index 6 means start_char=6 and end_char=15. |
+| 006-AC-010 | 006-FR-010 | Character positions accurate | 1. Index `Hello [[World]]!` (16 chars total)<br>2. Query mentions for World entity | Mention has start_char=6, end_char=15 (including brackets: positions span from first `[` to after last `]`). For wikilinks, positions include the bracket syntax so `[[World]]` at index 6 means start_char=6 and end_char=15. |
 
 ## Entity Storage
 
@@ -93,6 +93,7 @@
 | 006-AC-037 | 006-FR-030, 006-FR-031 | Vocabulary exclusivity respected | 1. Create active edges: ERFANA --uses--> X and ERFANA --uses--> Y<br>2. Query for contradictions | No contradiction flagged (`uses` is non-exclusive in the vocabulary) |
 | 006-AC-038 | 006-FR-032 | Traverse tool returns neighbors | 1. Build small graph A->B->C<br>2. Invoke `erfana_graph_traverse` with entity_name=B, hops=1, direction=both | Returns A (incoming) and C (outgoing) |
 | 006-AC-039 | 006-NFR-008 | NER does not delay deterministic pipeline | 1. Measure deterministic extraction latency with NER off<br>2. Enable NER and re-measure | Deterministic pipeline latency unchanged (within measurement noise); NER results merge after pipeline completion |
+| 006-AC-040 | 006-FR-031 | Typed relation extraction produces vocabulary edges | 1. Enable NER + relation extraction<br>2. Index fixture with co-occurring entities in a vocabulary relation ("Erfana is licensed under GPL-3.0")<br>3. Query edges | A typed `licensed-under` edge exists from "Erfana" to "GPL-3.0"; edge type belongs to the FR-030 vocabulary; no edges with out-of-vocabulary types |
 
 ## Definition of Done
 

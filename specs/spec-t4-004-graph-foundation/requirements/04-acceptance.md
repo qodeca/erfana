@@ -149,7 +149,7 @@ Content for h3
 **Then:**
 - Only the changed section is updated (1 UPDATE)
 - Unchanged sections are not touched (4 skipped)
-- Operation completes in < 100ms (per 004-NFR-003 incremental update latency requirement)
+- Operation completes in < 100ms (stricter than 004-NFR-003's < 500ms incremental update latency bound)
 
 ---
 
