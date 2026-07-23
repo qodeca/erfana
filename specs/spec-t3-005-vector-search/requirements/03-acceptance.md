@@ -29,7 +29,7 @@
 
 **Then:**
 - `vss_sections` virtual table exists
-- Table accepts 384-dimensional vectors
+- Table accepts vectors of the model-profile dimension (default 256)
 - Table can be queried without errors
 
 **Traces to:** 005-FR-002
@@ -65,7 +65,7 @@
 
 **Then:**
 - Worker thread spawns successfully
-- all-MiniLM-L6-v2 model loads without errors
+- The active model profile (default EmbeddingGemma-300m) loads without errors via the transformers.js pipeline
 - Tokenizer initializes
 - Worker reports ready status
 
@@ -82,9 +82,10 @@
 **When:** Text "Hello world" is embedded.
 
 **Then:**
-- Output is 384-dimensional float array
+- Token embeddings are mean-pooled (attention-mask weighted), L2-normalized, MRL-truncated to the profile dimension (default 256), and re-normalized – in that order
+- Output is a float array of the model-profile dimension
 - Vector is L2-normalized (magnitude approximately 1.0)
-- embedder_id is recorded as "all-MiniLM-L6-v2:1.0.0"
+- embedder_id is recorded as "embeddinggemma-300m:1.0:d256"
 
 **Traces to:** 005-FR-011, 005-FR-005
 
@@ -229,8 +230,8 @@
 **When:** Embedding worker initializes.
 
 **Then:**
-- Model loads from resources/models/all-MiniLM-L6-v2.onnx
-- Tokenizer loads from resources/models/all-MiniLM-L6-v2-tokenizer.json
+- Model loads from `resources/models/` (active profile's ONNX artifact, default EmbeddingGemma-300m quantized)
+- Tokenizer loads from `resources/models/` (active profile's tokenizer files)
 - No network requests are made
 - Worker becomes ready within 5 seconds
 
@@ -547,7 +548,7 @@
 
 **Description:** Missing model file is handled gracefully.
 
-**Given:** all-MiniLM-L6-v2 model file is missing.
+**Given:** The active profile's model file is missing.
 
 **When:** Worker attempts to initialize.
 
@@ -557,6 +558,23 @@
 - User notified via status indicator
 
 **Traces to:** 005-NFR-005
+
+---
+
+### 005-AC-033: Stale embeddings detected and re-queued
+
+**Description:** Embeddings from a previous model profile are detected and re-embedded.
+
+**Given:** Database contains embeddings with embedder_id "all-MiniLM-L6-v2:1.0.0:d384" and the active profile is "embeddinggemma-300m:1.0:d256".
+
+**When:** Application starts.
+
+**Then:**
+- Stale embeddings are detected via embedder_id mismatch
+- Affected sections are queued for re-embedding through the 005-FR-038 content-hash pipeline
+- Search excludes stale embeddings until re-embedding completes
+
+**Traces to:** 005-FR-039
 
 ---
 
@@ -576,4 +594,5 @@
 | MCP integration | 2 | 005-AC-023 through 005-AC-024 |
 | Performance criteria | 4 | 005-AC-025 through 005-AC-028 |
 | Error handling | 2 | 005-AC-029 through 005-AC-030 |
-| **Total** | **32** | |
+| Model migration | 1 | 005-AC-033 |
+| **Total** | **33** | |

@@ -4,9 +4,9 @@
 
 ## Summary
 
-Vector Search & Hybrid Retrieval extends the Graph Engine with semantic search capabilities through vector embeddings. This feature enables finding conceptually related content even when exact keywords differ, by computing similarity between document embeddings using the all-MiniLM-L6-v2 model and sqlite-vec extension.
+Vector Search & Hybrid Retrieval extends the Graph Engine with semantic search capabilities through vector embeddings. This feature enables finding conceptually related content even when exact keywords differ, by computing similarity between document embeddings using the EmbeddingGemma-300m model (MRL-truncated to 256 dimensions, running via a transformers.js v4 pipeline) and the sqlite-vec extension.
 
-The hybrid search approach combines BM25 keyword scores with vector similarity using configurable weights, providing the best of both lexical and semantic matching. Users can tune the fusion weights through a settings UI to optimize results for their specific use cases.
+The hybrid search approach fuses BM25 keyword results with vector similarity using reciprocal rank fusion (RRF) by default, with an optional linear-weighting mode, providing the best of both lexical and semantic matching. Users can tune the fusion method and its parameters through a settings UI.
 
 ## Purpose
 
@@ -23,13 +23,13 @@ This feature adds:
 
 ### In scope (Milestone M2)
 
-- sqlite-vec extension integration with better-sqlite3
-- ONNX embedding worker with all-MiniLM-L6-v2 model
+- sqlite-vec extension integration with better-sqlite3 (exact version pin)
+- Embedding worker with EmbeddingGemma-300m (transformers.js v4 pipeline, MRL 256-dim default; all-MiniLM-L6-v2 as low-resource fallback profile)
 - Worker pool management (2-4 concurrent workers)
-- Text chunking with overlap (256-384 tokens, 10-15% overlap)
-- Vector similarity search (L2 distance)
-- Hybrid search fusion with configurable weights
-- Settings UI for weight tuning
+- Text chunking with overlap (256-512 tokens, 10-15% overlap)
+- Vector similarity search (cosine distance)
+- Hybrid search fusion: RRF default, optional linear weighting
+- Settings UI for fusion tuning
 - MCP tool: `erfana_graph_related`
 
 ### Out of scope (Future milestones)

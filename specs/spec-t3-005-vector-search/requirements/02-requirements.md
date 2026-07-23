@@ -20,7 +20,7 @@
 
 **Title:** Create vector virtual table for embeddings
 
-**Description:** The system shall create a virtual table `vss_sections` using sqlite-vec's virtual table syntax. The table shall store 384-dimensional vectors (matching all-MiniLM-L6-v2 output) with section ID foreign key reference.
+**Description:** The system shall create a virtual table `vss_sections` using sqlite-vec's virtual table syntax. The table shall store vectors of the model-profile dimension (default 256, MRL-truncated from EmbeddingGemma-300m's native 768) with section ID foreign key reference. The dimension shall be read from the model profile, never hardcoded.
 
 **Priority:** High
 
@@ -58,7 +58,7 @@
 
 **Title:** Track embedding model version
 
-**Description:** The system shall store an embedder_id with each embedding to track which model version generated it. Format: `{model_name}:{version}` (e.g., `all-MiniLM-L6-v2:1.0.0`). When model changes, stale embeddings shall be re-computed.
+**Description:** The system shall store an embedder_id with each embedding to track which model version generated it. Format: `{model_name}:{version}:d{dimension}` (e.g., `embeddinggemma-300m:1.0:d256`). When the model changes, stale embeddings shall be re-computed via the 005-FR-039 detection mechanism.
 
 **Priority:** Medium
 
@@ -82,9 +82,9 @@
 
 #### 005-FR-007: Worker initialization
 
-**Title:** Initialize ONNX runtime worker thread
+**Title:** Initialize embedding worker thread
 
-**Description:** The system shall create a dedicated worker thread using Node.js worker_threads for ONNX inference. Worker shall load onnxruntime-node and initialize the inference session on startup.
+**Description:** The system shall create a dedicated worker thread using Node.js worker_threads for embedding inference. The worker shall host a transformers.js v4 feature-extraction pipeline (which uses onnxruntime-node under the hood) and initialize the inference session on startup.
 
 **Priority:** High
 
@@ -94,9 +94,9 @@
 
 #### 005-FR-008: Model loading
 
-**Title:** Load all-MiniLM-L6-v2 model
+**Title:** Load embedding model
 
-**Description:** The system shall load the all-MiniLM-L6-v2 ONNX model (384 dimensions, ~23MB) from bundled assets. Model path shall be configurable for development/testing.
+**Description:** The system shall load the EmbeddingGemma-300m ONNX model (quantized variant from `onnx-community/embeddinggemma-300m-ONNX`; record the actual artifact size when pinning) from bundled assets. Native output is 768 dimensions; the system shall apply Matryoshka (MRL) truncation to the configured dimension (default 256). Model path and dimension shall come from a single model-profile config. A low-resource fallback profile (all-MiniLM-L6-v2, 384-dim, ~23 MB) may be offered where bundle size matters. Model path shall be configurable for development/testing.
 
 **Priority:** High
 
@@ -106,9 +106,9 @@
 
 #### 005-FR-009: Tokenization
 
-**Title:** Tokenize text with HuggingFace tokenizer
+**Title:** Tokenize text via the pipeline
 
-**Description:** The system shall use @huggingface/tokenizers for text tokenization matching the all-MiniLM-L6-v2 vocabulary. Tokenizer shall be loaded once and reused across batches.
+**Description:** Text tokenization shall be provided by the transformers.js pipeline using the bundled tokenizer matching the active model profile (no separate @huggingface/tokenizers dependency). Tokenizer shall be loaded once and reused across batches.
 
 **Priority:** High
 
@@ -130,9 +130,9 @@
 
 #### 005-FR-011: L2 normalization
 
-**Title:** Normalize embedding vectors
+**Title:** Pooling and normalization
 
-**Description:** The system shall L2-normalize all embedding vectors before storage to enable cosine similarity via dot product. Normalization shall occur in the worker thread after inference.
+**Description:** The pipeline shall produce sentence embeddings via attention-mask-weighted mean pooling of token embeddings followed by L2 normalization (transformers.js options `pooling: 'mean', normalize: true`), then apply MRL truncation to the profile dimension and re-normalize. Raw un-pooled token output shall never be stored. Pooling and normalization occur in the worker thread after inference.
 
 **Priority:** High
 
@@ -208,7 +208,7 @@
 
 **Title:** Split text into embedding chunks
 
-**Description:** The system shall split text into chunks of 256-384 tokens. Chunk size shall be configurable with default of 300 tokens.
+**Description:** The system shall split text into chunks of 256-512 tokens. Chunk size shall be configurable with default of 300 tokens. Note: EmbeddingGemma's 2048-token context means chunk size is bounded by retrieval granularity, not the model window.
 
 **Priority:** High
 
@@ -271,7 +271,7 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 **Title:** Generate embedding for search query
 
-**Description:** The system shall generate a 384-dimensional embedding for the search query using the same model and normalization as document embeddings.
+**Description:** The system shall generate an embedding of the model-profile dimension for the search query using the same model, pooling, normalization, and truncation as document embeddings.
 
 **Priority:** High
 
@@ -459,7 +459,7 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 **Title:** Bundle embedding model with application
 
-**Description:** The system shall bundle the all-MiniLM-L6-v2 ONNX model (~23MB) and tokenizer.json file in the application resources folder at `resources/models/`. The application shall not require network access to download models at runtime.
+**Description:** The system shall bundle the EmbeddingGemma-300m quantized ONNX model and tokenizer files in the application resources folder at `resources/models/` (record the actual artifact size when pinning; it is substantially larger than MiniLM's ~23 MB – trade-off accepted 2026-07-23). The application shall not require network access to download models at runtime.
 
 **Priority:** High
 
@@ -492,6 +492,18 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 **Priority:** Medium
 
 **Traces to:** Performance optimization, resource efficiency
+
+---
+
+#### 005-FR-039: Stale-embedding detection
+
+**Title:** Detect and re-embed stale embeddings on model change
+
+**Description:** On startup and after any model-profile change, the system shall scan for embeddings whose embedder_id differs from the active profile and queue affected sections for re-embedding, reusing the 005-FR-038 content-hash pipeline. Search shall exclude stale embeddings.
+
+**Priority:** Medium
+
+**Traces to:** 005-FR-005, 005-FR-038
 
 ---
 
@@ -567,7 +579,7 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 **Title:** Worker pool stability limit
 
-**Description:** The system shall not exceed 4 concurrent ONNX workers due to onnxruntime-node stability constraints documented in their issue tracker.
+**Description:** The system shall not exceed 4 concurrent ONNX workers due to onnxruntime-node stability constraints documented in their issue tracker. Re-verify the 4-worker cap against the current onnxruntime-node issue tracker at implementation time; adjust if resolved upstream.
 
 **Acceptance:** Configuration attempting >4 workers is capped at 4.
 
@@ -589,6 +601,6 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 | Category | Count | IDs |
 |----------|-------|-----|
-| Functional Requirements | 38 | 005-FR-001 through 005-FR-038 |
+| Functional Requirements | 39 | 005-FR-001 through 005-FR-039 |
 | Non-Functional Requirements | 8 | 005-NFR-001 through 005-NFR-008 |
-| **Total** | **46** |
+| **Total** | **47** |
