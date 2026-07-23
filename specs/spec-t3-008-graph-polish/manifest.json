@@ -4,7 +4,7 @@
   "tier": "T3",
   "version": "0.2.0",
   "created": "2025-12-22T18:15:00.000Z",
-  "updated": "2025-12-22T19:30:00.000Z",
+  "updated": "2026-07-23T12:26:00+02:00",
   "application": {
     "name": "Graph engine polish & maintenance",
     "domain": null,
@@ -267,13 +267,21 @@
     "008-AC-018": {
       "section": "03-acceptance",
       "status": "active"
+    },
+    "008-FR-031": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "008-AC-019": {
+      "section": "03-acceptance",
+      "status": "active"
     }
   },
   "requirement_sequences": {
-    "FR": 30,
+    "FR": 31,
     "NFR": 8,
     "UC": 0,
-    "AC": 18,
+    "AC": 19,
     "TC": 0,
     "ES": 0,
     "BO": 0,
@@ -284,7 +292,7 @@
   "cross_references": [],
   "statistics": {
     "total_sections": 3,
-    "total_requirements": 56,
+    "total_requirements": 58,
     "total_words": 2578,
     "total_use_cases": 0,
     "total_stakeholders": 0,
@@ -351,6 +359,13 @@
       "target": "manifest",
       "description": "Migrated from BRS to managing-specs naming convention",
       "by": "system"
+    },
+    {
+      "date": "2026-07-23T12:26:00+02:00",
+      "operation": "UPDATE",
+      "target": "02-requirements, 03-acceptance",
+      "description": "Lens-review remediation: two-stage oversample-and-rescore binary quantization (FR-020/021), reconciled NFR-001 (index footprint vs on-disk, recall@10 floor), strengthened AC-009, added FR-031 MRL dimension profile + AC-019, OTel-aligned NFR-007",
+      "by": "user"
     }
   ],
   "components": {
