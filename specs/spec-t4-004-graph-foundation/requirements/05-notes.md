@@ -74,7 +74,7 @@ FTS5 + BM25 re-affirmed for M1 at this scale (≤10k sections, <50ms p95):
 | Dependency | Version | Purpose |
 |------------|---------|---------|
 | better-sqlite3 | ^13.x | SQLite database with FTS5 (N-API line; required for Electron 39 – v12 and older fail to compile against Electron 39's V8, which removed Context::GetIsolate) |
-| @modelcontextprotocol/sdk | ^2.x | MCP server implementation (SDK v2 registerTool API, targeting protocol revision 2026-07-28; v2 was beta as of 2026-07 – if not stable at implementation time, fall back to latest v1.x targeting revision 2025-11-25) |
+| @modelcontextprotocol/server | ^2.x (beta as of 2026-07) | MCP server implementation (SDK v2 registerTool API, protocol revision 2026-07-28; v2 split the monolithic SDK into @modelcontextprotocol/server + /client – if v2 is not stable at implementation time, fall back to @modelcontextprotocol/sdk latest v1.x targeting revision 2025-11-25) |
 
 ### Internal dependencies
 
@@ -199,7 +199,7 @@ projectManagement.on('project:changed', (event) => this.switchDatabase(event));
 ### MCP tool definition (proposed)
 
 ```typescript
-// SDK v2 (@modelcontextprotocol/sdk ^2.x) – registerTool replaces raw tool JSON
+// SDK v2 (@modelcontextprotocol/server ^2.x) – registerTool replaces raw tool JSON
 server.registerTool('erfana_graph_search', {
   title: 'Search project content',
   description: 'Search project content using BM25 keyword ranking',

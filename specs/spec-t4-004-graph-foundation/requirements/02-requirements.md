@@ -443,7 +443,7 @@ The system shall show detailed indexing information when user clicks the status 
 **Priority:** Critical
 **Traces to:** Claude integration
 
-The system shall implement an MCP server using stdio transport that exposes graph engine capabilities to Claude Code. The server shall be built on `@modelcontextprotocol/sdk` v2 (`registerTool` API) targeting protocol revision 2026-07-28; if v2 is not yet stable at implementation time, use the latest v1.x targeting revision 2025-11-25.
+The system shall implement an MCP server using stdio transport that exposes graph engine capabilities to Claude Code. The server shall be built on the MCP TypeScript SDK v2 (`@modelcontextprotocol/server`, `registerTool` API) targeting protocol revision 2026-07-28; if v2 is not yet stable at implementation time, use `@modelcontextprotocol/sdk` latest v1.x targeting revision 2025-11-25.
 
 **Acceptance:** MCP server responds to initialize/shutdown protocol messages.
 
