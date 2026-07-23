@@ -14,7 +14,7 @@
       "description": "Foundational graph engine delivering SQLite database layer (FTS5, WAL mode), text preprocessing pipeline, file indexing, BM25 keyword search, event-driven integration with FileWatcherService, four UI components (Related Sidebar, Global Search, Settings Panel, Status Indicator), and MCP server with `erfana_graph_search` tool for Claude Code integration. Corresponds to implementation milestone M1. Stack refreshed 2026-07-23: better-sqlite3 v13/N-API, MCP SDK v2.",
       "created": "2025-12-22T21:00:00.000Z",
       "path": "spec-t4-004-graph-foundation",
-      "last_modified": "2026-07-23T12:30:00+02:00",
+      "last_modified": "2026-07-23T14:30:00+02:00",
       "sections_count": 5,
       "requirements_count": 109,
       "documents": {
@@ -22,7 +22,9 @@
         "solution_adrs": [],
         "solution_specs": [],
         "designs": [],
-        "issues": []
+        "issues": [
+          "#17"
+        ]
       }
     },
     {
@@ -342,6 +344,6 @@
   "metadata": {
     "schema_version": "2.0.0",
     "created": "2025-12-22T00:00:00.000Z",
-    "last_updated": "2026-07-23T13:20:00+02:00"
+    "last_updated": "2026-07-23T14:30:00+02:00"
   }
 }

@@ -4,7 +4,7 @@
   "tier": "T4",
   "version": "0.2.0",
   "created": "2025-12-22T21:00:00Z",
-  "updated": "2026-07-23T14:12:00+02:00",
+  "updated": "2026-07-23T14:30:00+02:00",
   "application": {
     "name": "Graph Engine Foundation",
     "domain": "search",
@@ -656,6 +656,13 @@
       "operation": "UPDATE",
       "target": "requirements/notes/overview",
       "description": "Interview D20: Contract stability (beta period) subsection in 05-notes, beta disclaimer carried in tool-definition example and FR-039/FR-040",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T14:30:00+02:00",
+      "operation": "UPDATE",
+      "target": "registry link",
+      "description": "Release-1 implementation issue #17 (Graph engine R1: project search) filed and linked",
       "by": "user"
     }
   ],
