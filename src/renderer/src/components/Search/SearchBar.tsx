@@ -13,17 +13,27 @@ const SEARCH_DEBOUNCE_MS = 100
 /** Focus delay to ensure component is mounted */
 const FOCUS_DELAY_MS = 10
 
+/** A debounced function with a `cancel` for discarding a pending call. */
+type Debounced<TArgs extends unknown[]> = ((...args: TArgs) => void) & {
+  cancel: () => void
+}
+
 /**
  * Creates a debounced function that delays execution until after
  * the specified wait time has elapsed since the last call.
+ *
+ * The returned function exposes `cancel()` to drop a pending call – callers
+ * must invoke it on unmount, otherwise a late callback applies search results
+ * after the search bar is gone (the store is global, so the stale write would
+ * land on whatever is mounted next).
  */
 function debounce<T extends (...args: Parameters<T>) => void>(
   fn: T,
   delay: number
-): (...args: Parameters<T>) => void {
+): Debounced<Parameters<T>> {
   let timeoutId: ReturnType<typeof setTimeout> | null = null
 
-  return (...args: Parameters<T>) => {
+  const debounced = (...args: Parameters<T>): void => {
     if (timeoutId) {
       clearTimeout(timeoutId)
     }
@@ -31,6 +41,15 @@ function debounce<T extends (...args: Parameters<T>) => void>(
       fn(...args)
     }, delay)
   }
+
+  debounced.cancel = (): void => {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+      timeoutId = null
+    }
+  }
+
+  return debounced
 }
 
 interface SearchBarProps {
@@ -94,6 +113,10 @@ export function SearchBar({ provider }: SearchBarProps) {
       provider.clearHighlights()
     }
   }, [query, options, provider, debouncedSearch, setMatches])
+
+  // Drop any pending debounced search on unmount (or when the debounced
+  // function is recreated) so a late result cannot write to the global store
+  useEffect(() => () => debouncedSearch.cancel(), [debouncedSearch])
 
   // Navigate when currentIndex changes
   // Pass focusEditor: false to prevent Monaco from stealing focus from search input
