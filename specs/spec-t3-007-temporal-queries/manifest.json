@@ -5,7 +5,7 @@
   "version": "0.1.1",
   "status": "draft",
   "created": "2025-12-22T17:10:00.000Z",
-  "updated": "2026-07-23T13:10:00+02:00",
+  "updated": "2026-07-23T13:12:00+02:00",
   "application": {
     "name": "Temporal queries & timeline",
     "domain": "knowledge-graph",
@@ -366,6 +366,13 @@
       "operation": "UPDATE",
       "target": "02-requirements, 03-acceptance",
       "description": "Lens-review round 2: edges timestamp columns standardized to INTEGER Unix-seconds (006-FR-002 canonical; 007-FR-001 deferred-types clause removed; 006-AC-002 asserts types)",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T13:12:00+02:00",
+      "operation": "UPDATE",
+      "target": "03-acceptance",
+      "description": "Lens-review round 2: AC-004 rewritten to test git-derived valid_to (removing-commit %ct) instead of wall-clock closure",
       "by": "user"
     }
   ],

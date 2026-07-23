@@ -14,7 +14,7 @@
 | ID | Description | Steps | Expected result | Traces to |
 |----|-------------|-------|-----------------|-----------|
 | 007-AC-003 | Create edge sets valid_from | 1. Create new edge via API (source file committed in git) 2. Query edge record | valid_from equals the source file's last git commit timestamp (not the indexer clock), valid_source='git', valid_to is NULL | 007-FR-003 |
-| 007-AC-004 | Close edge sets valid_to | 1. Create edge 2. Wait 1 second 3. Close edge via API 4. Query edge record | valid_to equals closure timestamp, record still exists | 007-FR-004 |
+| 007-AC-004 | Close edge sets git-derived valid_to | 1. Commit fixture file containing the fact at T1, index (edge created) 2. Commit a change removing the fact at T2 3. Re-index 4. Query edge record | valid_to equals T2 (the removing commit's committer timestamp, not the indexer clock), valid_source='git', record still exists. Uncommitted removal falls back to file mtime with valid_source='fs' | 007-FR-004 |
 | 007-AC-005 | Edges are never deleted | 1. Create 5 edges 2. Close 3 edges 3. Count total edge records | 5 records exist (none deleted) | 007-FR-005 |
 
 ### As-of queries
