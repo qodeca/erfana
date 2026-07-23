@@ -30,6 +30,7 @@ GRAPH ENGINE (sequential chain):       INDEPENDENT:
 
 - 006 benefits from 005 (semantic entity matching)
 - 008 benefits from 006 (entity neighborhood visualization)
+- 005 benefits from 008 (index-rebuild progress reuses 008's reindex-progress UX when available)
 - 013 enhances 020 (multi-tool AI prompts for Drive content)
 
 ---
@@ -39,11 +40,11 @@ GRAPH ENGINE (sequential chain):       INDEPENDENT:
 | # | Spec | Tier | FRs | Rationale |
 |---|------|------|-----|-----------|
 | 1 | **004** Graph engine foundation | T4 | 50 | Foundational – unlocks entire graph pipeline. Largest single spec, best tackled with full focus |
-| 2 | **005** Vector search & hybrid retrieval | T3 | 38 | First graph dependency – needs 004's database + sections table |
-| 3 | **006** Knowledge graph & entities | T3 | 27 | Needs 004; benefits from 005's vector similarity for semantic entity matching |
+| 2 | **005** Vector search & hybrid retrieval | T3 | 40 | First graph dependency – needs 004's database + sections table |
+| 3 | **006** Knowledge graph & entities | T3 | 32 | Needs 004; benefits from 005's vector similarity for semantic entity matching |
 | 4 | **020** Google Drive link integration | T4 | 50 | Independent but complex (OAuth, Picker, 4 services). Placed here as a break between graph milestones |
-| 5 | **007** Temporal queries & timeline | T3 | 23 | Needs 006's edges table to extend with temporal fields |
-| 6 | **008** Graph engine polish | T3 | 30 | Needs 004+005 (required) + 006 (Mermaid viz) + 007 (temporal health). Gets all optional enhancements |
+| 5 | **007** Temporal queries & timeline | T3 | 26 | Needs 006's edges table to extend with temporal fields |
+| 6 | **008** Graph engine polish | T3 | 31 | Needs 004+005 (required) + 006 (Mermaid viz) + 007 (temporal health). Gets all optional enhancements |
 | 7 | **013** Multi-CLI tool prompts | T3 | 13 | Lowest complexity, no dependencies. Enhances AI prompts across all features retroactively |
 
 ---
@@ -66,7 +67,7 @@ GRAPH ENGINE (sequential chain):       INDEPENDENT:
 
 | Risk | Spec | Mitigation |
 |------|------|------------|
-| Native modules in packaged Electron (better-sqlite3, Sharp, onnxruntime) | 004, 005 | Test packaged builds early (pattern proven by 021 LiteParse) |
+| Native modules in packaged Electron (better-sqlite3, Sharp, onnxruntime) | 004, 005 | Test packaged builds early (pattern proven by 021 LiteParse). better-sqlite3 v13 N-API prebuilds lower this risk (pending Electron 39 prebuild-coverage verification at pin time); exact sqlite-vec pin + rebuild-from-BLOBs path (005-FR-040) |
 | OAuth + Google Picker complexity | 020 | Well-scoped: `drive.file` only, single account |
 | 004 is the largest single spec (50 FRs + 11 NFRs) | 004 | Consider staged delivery: DB+indexing first, then UI |
 | Graph pipeline is 5 specs deep | 004–008 | Each milestone is independently shippable |
