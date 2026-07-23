@@ -96,7 +96,7 @@
 
 **Title:** Load embedding model
 
-**Description:** The system shall load the EmbeddingGemma-300m ONNX model (quantized variant from `onnx-community/embeddinggemma-300m-ONNX`; record the actual artifact size when pinning) from bundled assets. Native output is 768 dimensions; the system shall apply Matryoshka (MRL) truncation to the configured dimension (default 256). Model path and dimension shall come from a single model-profile config. A low-resource fallback profile (all-MiniLM-L6-v2, 384-dim, ~23 MB) may be offered where bundle size matters. Model path shall be configurable for development/testing.
+**Description:** The system shall load the EmbeddingGemma-300m ONNX model (quantized variant from `onnx-community/embeddinggemma-300m-ONNX`; record the actual artifact size when pinning) from the local model store (see FR-036). Native output is 768 dimensions; the system shall apply Matryoshka (MRL) truncation to the configured dimension (default 256). Model path and dimension shall come from a single model-profile config. A low-resource fallback profile (all-MiniLM-L6-v2, 384-dim, ~23 MB) may be offered where download size matters; the fallback profile is also delivered via the model store. Model path shall be configurable for development/testing.
 
 **Priority:** High
 
@@ -108,7 +108,7 @@
 
 **Title:** Tokenize text via the pipeline
 
-**Description:** Text tokenization shall be provided by the transformers.js pipeline using the bundled tokenizer matching the active model profile (no separate @huggingface/tokenizers dependency). Tokenizer shall be loaded once and reused across batches.
+**Description:** Text tokenization shall be provided by the transformers.js pipeline using the tokenizer downloaded alongside the model into the local model store (see FR-036), matching the active model profile (no separate @huggingface/tokenizers dependency). Tokenizer shall be loaded once and reused across batches.
 
 **Priority:** High
 
@@ -453,17 +453,17 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 ---
 
-### Model bundling
+### On-demand model delivery
 
-#### 005-FR-036: Model bundling
+#### 005-FR-036: On-demand model delivery
 
-**Title:** Bundle embedding model with application
+**Title:** Deliver embedding model on demand
 
-**Description:** The system shall bundle the EmbeddingGemma-300m quantized ONNX model and tokenizer files in the application resources folder at `resources/models/` (record the actual artifact size when pinning; it is substantially larger than MiniLM's ~23 MB – trade-off accepted 2026-07-23). The application shall not require network access to download models at runtime.
+**Description:** The embedding model shall NOT be bundled with the application. On first enablement of semantic search, the system shall download the pinned model artifact directly from Hugging Face (the user accepts upstream model terms at enable time; Qodeca does not redistribute the artifact), verify it against a SHA-256 hash pinned in the application, and store it in the local model store. After download, all operation is offline. BM25 keyword search works without the model. UX and storage follow the existing whisper model-download pattern (WhisperModelManager) minus the self-hosted mirror. Download failure leaves search in BM25-only mode with a clear retry path. (Decision 2026-07-23.)
 
 **Priority:** High
 
-**Traces to:** Offline operation, deployment simplicity
+**Traces to:** Offline after first download; upstream-terms compliance; no redistribution
 
 ---
 

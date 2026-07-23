@@ -4,7 +4,7 @@
   "tier": "T3",
   "version": "0.2.0",
   "created": "2025-12-22T22:30:00Z",
-  "updated": "2026-07-23T13:24:00+02:00",
+  "updated": "2026-07-23T14:05:00+02:00",
   "application": {
     "name": "Vector Search & Hybrid Retrieval",
     "domain": "search",
@@ -479,6 +479,13 @@
       "operation": "UPDATE",
       "target": "requirements/overview",
       "description": "Lens-review round 2 cosmetics: FR-021 heading renamed to Cosine distance search, embedder_id example format normalized",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T14:05:00+02:00",
+      "operation": "UPDATE",
+      "target": "01-overview, 02-requirements, 03-acceptance",
+      "description": "Interview D18/D19: model delivery changed from bundled to on-demand SHA-256-pinned Hugging Face download (FR-036 rewrite + section rename, FR-008/FR-009 model-store sourcing, AC-032 rewrite, AC-004 gated on prior download, overview delivery sentence)",
       "by": "user"
     }
   ],

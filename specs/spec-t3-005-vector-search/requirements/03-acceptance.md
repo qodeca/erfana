@@ -59,7 +59,7 @@
 
 **Description:** Embedding worker initializes and loads model successfully.
 
-**Given:** Application starts.
+**Given:** Application starts and the model was previously downloaded (005-FR-036).
 
 **When:** Embedding worker pool initializes.
 
@@ -68,6 +68,7 @@
 - The active model profile (default EmbeddingGemma-300m) loads without errors via the transformers.js pipeline
 - Tokenizer initializes
 - Worker reports ready status
+- Alternative: if the model has not been downloaded, the worker reports BM25-only readiness without error
 
 **Traces to:** 005-FR-007, 005-FR-008, 005-FR-009
 
@@ -219,21 +220,21 @@
 
 ---
 
-## Model bundling
+## On-demand model delivery
 
-### 005-AC-032: Model loads from bundled resources
+### 005-AC-032: Model available after on-demand download
 
-**Description:** Embedding model loads from application resources without network.
+**Description:** Semantic search works only after the one-time verified download; BM25 works regardless.
 
-**Given:** Application installed with bundled models.
+**Given:** Fresh install, semantic search never enabled.
 
-**When:** Embedding worker initializes.
+**When:** The user searches, then enables semantic search.
 
 **Then:**
-- Model loads from `resources/models/` (active profile's ONNX artifact, default EmbeddingGemma-300m quantized)
-- Tokenizer loads from `resources/models/` (active profile's tokenizer files)
-- No network requests are made
-- Worker becomes ready within 5 seconds
+- Before enablement: BM25 search works, no model artifact on disk, no network requests
+- On enablement: the pinned artifact downloads from Hugging Face with progress indication; SHA-256 is verified (a tampered artifact is rejected and semantic search stays disabled with a retry path)
+- After completed download: worker becomes ready; model and tokenizer load from the local model store
+- On subsequent runs: no further network requests
 
 **Traces to:** 005-FR-036
 
@@ -608,7 +609,7 @@
 | Worker pool management | 3 | 005-AC-007 through 005-AC-009 |
 | Chunking | 2 | 005-AC-010 through 005-AC-011 |
 | Text preprocessing | 1 | 005-AC-031 |
-| Model bundling | 1 | 005-AC-032 |
+| On-demand model delivery | 1 | 005-AC-032 |
 | Vector search | 3 | 005-AC-012 through 005-AC-014 |
 | Hybrid search fusion | 4 | 005-AC-015 through 005-AC-018 |
 | Settings UI | 4 | 005-AC-019 through 005-AC-022 |

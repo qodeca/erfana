@@ -8,6 +8,8 @@ Vector Search & Hybrid Retrieval extends the Graph Engine with semantic search c
 
 The hybrid search approach fuses BM25 keyword results with vector similarity using reciprocal rank fusion (RRF) by default, with an optional linear-weighting mode, providing the best of both lexical and semantic matching. Users can tune the fusion method and its parameters through a settings UI.
 
+The embedding model is delivered on demand: first enablement downloads a SHA-256-pinned artifact directly from Hugging Face; operation is offline afterwards, and BM25 keyword search works without any download.
+
 ## Purpose
 
 Traditional keyword search (BM25) excels at finding exact matches but fails when users describe concepts using different terminology. Vector embeddings capture semantic meaning, enabling queries like "user authentication" to find documents about "login flow" or "credential validation."
