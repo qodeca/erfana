@@ -78,6 +78,8 @@ All dialogs MUST compose on `BaseDialog`. Never build portals, overlays, or focu
 | `ConflictDialog.tsx` | File conflict resolution |
 | `CameraDialog.tsx` | Webcam photo capture with shutter + review states |
 | `ScreenSelectDialog.tsx` | macOS screen/window/area picker (behind feature gate) |
+| `WindowPickerDialog.tsx` | Windows/Linux screen/window capture picker – `desktopCapturer` thumbnail grid |
+| `ScreenPermissionDialog.tsx` | Advisory macOS Screen Recording permission prompt – open-settings + relaunch-app actions; never blocks a capture (appears after the OS denies one) |
 | `DialogContext.tsx` | Dialog stack manager (z-index) |
 | `DialogManager.tsx` | Imperative stack renderer (mounts dialogs from `dialogService`) |
 | `dialogService.ts` | Imperative dialog API |
