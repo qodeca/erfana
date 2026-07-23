@@ -13,15 +13,23 @@ Heavy computation (indexing) should use worker threads or be chunked to avoid bl
 
 ### SQLite in Electron
 
-- Must use `better-sqlite3` (synchronous API) rather than `sqlite3` (callback-based)
-- Native module requires rebuild for Electron version
+- Must use `better-sqlite3` **>= 13** (synchronous API, N-API build) rather than `sqlite3` (callback-based)
+- v13+ is the N-API line: decoupled from V8 ABI, so a single N-API prebuild should serve Electron 39 – but Electron 39 prebuild coverage was still contested upstream as of 2026-07 (see better-sqlite3 issues #1416, #1384). At pin time, verify the published N-API prebuild actually covers Electron 39's N-API version and target platforms
+- `node:sqlite` (bundled with Node 22 in Electron 39) rejected for M1: compiled with `SQLITE_OMIT_LOAD_EXTENSION` and without FTS5, still experimental before Node 26 – cannot satisfy 004-FR-001/017/018. Revisit only if it gains FTS5
 - Database file must be in writable location (`.erfana/` directory)
 
 ### FTS5 limitations
 
 - FTS5 provides BM25 ranking but no semantic/vector search
 - Custom tokenizers require C extension (not available in M1)
-- Porter stemmer is built-in; language-specific stemming deferred
+- Porter stemmer is built-in; porter stemming is English-only – language-specific stemming and multilingual support deferred (see General deferrals)
+
+### Alternatives considered (2026-07)
+
+FTS5 + BM25 re-affirmed for M1 at this scale (≤10k sections, <50ms p95):
+- **Tantivy** rejected – would add a second native-module/ABI surface alongside better-sqlite3
+- **DuckDB FTS** rejected – analytics-oriented, not a fit for incremental per-project indexing
+- **Orama / minisearch** rejected – in-memory engines, no persisted per-project index
 
 ### MCP transport
 
@@ -65,7 +73,7 @@ Heavy computation (indexing) should use worker threads or be chunked to avoid bl
 
 | Dependency | Version | Purpose |
 |------------|---------|---------|
-| better-sqlite3 | ^11.x | SQLite database with FTS5 |
+| better-sqlite3 | ^13.x | SQLite database with FTS5 (N-API line; required for Electron 39 – v12 and older fail to compile against Electron 39's V8, which removed Context::GetIsolate) |
 | @modelcontextprotocol/sdk | ^1.x | MCP server implementation |
 
 ### Internal dependencies
@@ -78,9 +86,9 @@ Heavy computation (indexing) should use worker threads or be chunked to avoid bl
 
 ### Build dependencies
 
-- `better-sqlite3` requires Python and C++ build tools
-- Native module rebuild for Electron version
-- electron-rebuild or similar in build pipeline
+- `better-sqlite3` >= 13 uses N-API prebuilt binaries in the common case; Python and C++ toolchain retained for source-build fallback
+- The `.node` binary must be listed in `asarUnpack` in `electron-builder.yml` (native modules cannot load from inside ASAR)
+- electron-rebuild remains the documented fallback if the N-API prebuild does not cover the target Electron/platform (do not declare it unnecessary until prebuild coverage is verified at pin time)
 
 ## Out of Scope (Deferred)
 
@@ -159,7 +167,8 @@ CREATE VIRTUAL TABLE sections_fts USING fts5(
   file_path UNINDEXED,
   section_id UNINDEXED,
   content_hash UNINDEXED,
-  tokenize = 'porter'
+  -- porter stemming is English-only; unicode61 with remove_diacritics 2 normalizes accented text
+  tokenize = 'porter unicode61 remove_diacritics 2'
 );
 ```
 

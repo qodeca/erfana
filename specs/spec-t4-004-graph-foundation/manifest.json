@@ -4,7 +4,7 @@
   "tier": "T4",
   "version": "0.2.0",
   "created": "2025-12-22T21:00:00Z",
-  "updated": "2025-12-22T22:30:00Z",
+  "updated": "2026-07-23T11:45:00+02:00",
   "application": {
     "name": "Graph Engine Foundation",
     "domain": "search",
@@ -622,6 +622,13 @@
       "target": "manifest",
       "description": "Migrated from BRS to managing-specs naming convention",
       "by": "system"
+    },
+    {
+      "date": "2026-07-23T11:45:00+02:00",
+      "operation": "UPDATE",
+      "target": "05-notes",
+      "description": "Lens-review remediation: better-sqlite3 ^13.x, N-API build notes, node:sqlite rejection rationale, FTS5 alternatives note, tokenizer diacritics",
+      "by": "user"
     }
   ],
   "components": {
