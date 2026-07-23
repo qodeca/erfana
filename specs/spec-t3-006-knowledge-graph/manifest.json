@@ -4,7 +4,7 @@
   "tier": "T3",
   "version": "0.2.0",
   "created": "2025-12-22T23:00:00.000Z",
-  "updated": "2026-07-23T12:12:00+02:00",
+  "updated": "2026-07-23T13:10:00+02:00",
   "application": {
     "name": "Knowledge graph & entities",
     "domain": "graph-engine",
@@ -513,6 +513,13 @@
       "operation": "UPDATE",
       "target": "01-overview, 02-requirements, 03-acceptance",
       "description": "Lens-review remediation: edges schema aligned with Spec #007 (recorded_at + valid_source, canonical src_id/dst_id), optional local NER extractor (FR-029), links-to edges (FR-028), relation-type vocabulary with exclusivity (FR-030/031), erfana_graph_traverse MCP tool (FR-032), FR-027 rescoped to exclusive types, FR-008 demoted to Could, SQLite-over-Kuzu rationale, NFR-008 + AC-035..039",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T13:10:00+02:00",
+      "operation": "UPDATE",
+      "target": "02-requirements, 03-acceptance",
+      "description": "Lens-review round 2: edges timestamp columns standardized to INTEGER Unix-seconds (006-FR-002 canonical; 007-FR-001 deferred-types clause removed; 006-AC-002 asserts types)",
       "by": "user"
     }
   ],

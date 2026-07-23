@@ -6,7 +6,7 @@
 
 | ID | Title | Description | Priority | Traces to |
 |----|-------|-------------|----------|-----------|
-| 007-FR-001 | Temporal fields on edges | The system shall extend the edges table to include temporal fields: valid_from (Unix timestamp when the fact became true in the source content), valid_to (Unix timestamp when it stopped being true, nullable if still valid), recorded_at (audit-only Unix timestamp of the database write), and valid_source ('git' or 'fs', provenance of the validity timestamp). Transaction-time travel ("what did the database believe on date X") is out of scope; recorded_at exists for audit logging only. Data type specifications are deferred to design documentation. | Must | Spec #006 |
+| 007-FR-001 | Temporal fields on edges | The system shall extend the edges table to include temporal fields: valid_from (Unix timestamp when the fact became true in the source content), valid_to (Unix timestamp when it stopped being true, nullable if still valid), recorded_at (audit-only Unix timestamp of the database write), and valid_source ('git' or 'fs', provenance of the validity timestamp). Transaction-time travel ("what did the database believe on date X") is out of scope; recorded_at exists for audit logging only. Column types are INTEGER Unix-seconds per Spec #006 FR-002 (valid_source TEXT). | Must | Spec #006 |
 | 007-FR-002 | Temporal indexes | The system shall create indexes on edges(valid_from), edges(valid_to), and edges(src_id, valid_from) to optimize temporal queries | Must | 007-FR-001 |
 
 ### Edge lifecycle management

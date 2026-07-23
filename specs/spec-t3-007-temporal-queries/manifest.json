@@ -5,7 +5,7 @@
   "version": "0.1.1",
   "status": "draft",
   "created": "2025-12-22T17:10:00.000Z",
-  "updated": "2026-07-23T12:20:00+02:00",
+  "updated": "2026-07-23T13:10:00+02:00",
   "application": {
     "name": "Temporal queries & timeline",
     "domain": "knowledge-graph",
@@ -359,6 +359,13 @@
       "operation": "UPDATE",
       "target": "01-overview, 02-requirements, 03-acceptance",
       "description": "Lens-review remediation: git-derived valid time (FR-003/004, FR-025 git-as-source-of-truth), tx_time renamed to audit-only recorded_at + valid_source provenance (FR-001/006), contradiction detection scoped to exclusive relation types (FR-014), idempotent re-extraction (FR-026), event-anchored slider (FR-017); AC-001/002/003/012/013 updated, AC-022..025 added",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T13:10:00+02:00",
+      "operation": "UPDATE",
+      "target": "02-requirements, 03-acceptance",
+      "description": "Lens-review round 2: edges timestamp columns standardized to INTEGER Unix-seconds (006-FR-002 canonical; 007-FR-001 deferred-types clause removed; 006-AC-002 asserts types)",
       "by": "user"
     }
   ],

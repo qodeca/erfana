@@ -5,7 +5,7 @@
 | ID | Requirement | Acceptance Criteria | Steps | Expected Result |
 |----|-------------|---------------------|-------|-----------------|
 | 006-AC-001 | 006-FR-001 | Entities table exists with correct schema | 1. Open SQLite database<br>2. Query `.schema entities` | Table exists with columns: id, name, type, canonical_id, alias_score, created_at; unique constraint on (name, type) |
-| 006-AC-002 | 006-FR-002 | Edges table exists with correct schema | 1. Open SQLite database<br>2. Query `.schema edges` | Table exists with columns: id, src_id, dst_id, type, valid_from, valid_to, recorded_at, valid_source; foreign keys to entities |
+| 006-AC-002 | 006-FR-002 | Edges table exists with correct schema | 1. Open SQLite database<br>2. Query `.schema edges` | Table exists with columns: id, src_id, dst_id, type, valid_from (INTEGER), valid_to (INTEGER), recorded_at (INTEGER), valid_source (TEXT); foreign keys to entities |
 | 006-AC-003 | 006-FR-003 | Mentions table exists with correct schema | 1. Open SQLite database<br>2. Query `.schema mentions` | Table exists with columns: id, section_id, entity_id, start_char, end_char, created_at; foreign keys valid |
 | 006-AC-004 | 006-FR-004 | Performance indexes created | 1. Query `.indexes`<br>2. Check index presence | Indexes idx_entities_name, idx_entities_type, idx_mentions_section, idx_mentions_entity all exist |
 
