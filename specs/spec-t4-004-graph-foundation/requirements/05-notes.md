@@ -33,8 +33,8 @@ FTS5 + BM25 re-affirmed for M1 at this scale (≤10k sections, <50ms p95):
 
 ### MCP transport
 
-- MCP SDK supports stdio, SSE, and WebSocket transports
-- stdio selected for simplicity and security (no network exposure)
+- MCP defines two standard transports: stdio and Streamable HTTP (HTTP+SSE was replaced by Streamable HTTP in protocol rev 2025-03-26; WebSocket was never a standard transport)
+- stdio selected: local single-client server, no network exposure – choice re-affirmed 2026-07 against protocol revs through 2026-07-28
 - Single MCP server instance per Erfana process
 - Client connection management handled by MCP SDK
 
@@ -74,7 +74,7 @@ FTS5 + BM25 re-affirmed for M1 at this scale (≤10k sections, <50ms p95):
 | Dependency | Version | Purpose |
 |------------|---------|---------|
 | better-sqlite3 | ^13.x | SQLite database with FTS5 (N-API line; required for Electron 39 – v12 and older fail to compile against Electron 39's V8, which removed Context::GetIsolate) |
-| @modelcontextprotocol/sdk | ^1.x | MCP server implementation |
+| @modelcontextprotocol/sdk | ^2.x | MCP server implementation (SDK v2 registerTool API, targeting protocol revision 2026-07-28; v2 was beta as of 2026-07 – if not stable at implementation time, fall back to latest v1.x targeting revision 2025-11-25) |
 
 ### Internal dependencies
 
@@ -198,26 +198,20 @@ projectManagement.on('project:changed', (event) => this.switchDatabase(event));
 
 ### MCP tool definition (proposed)
 
-```json
-{
-  "name": "erfana_graph_search",
-  "description": "Search project content using BM25 keyword ranking",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "query": { "type": "string", "description": "Search query" },
-      "k": { "type": "number", "default": 10, "description": "Number of results" },
-      "filters": {
-        "type": "object",
-        "properties": {
-          "folder": { "type": "string" },
-          "file_type": { "type": "string" },
-          "date_from": { "type": "string", "format": "date" },
-          "date_to": { "type": "string", "format": "date" }
-        }
-      }
-    },
-    "required": ["query"]
+```typescript
+// SDK v2 (@modelcontextprotocol/sdk ^2.x) – registerTool replaces raw tool JSON
+server.registerTool('erfana_graph_search', {
+  title: 'Search project content',
+  description: 'Search project content using BM25 keyword ranking',
+  inputSchema: {
+    query: z.string().describe('Search query'),
+    k: z.number().default(10).describe('Number of results'),
+    filters: z.object({
+      folder: z.string().optional(),
+      file_type: z.string().optional(),
+      date_from: z.string().optional(),
+      date_to: z.string().optional()
+    }).optional()
   }
-}
+}, async (args) => { /* returns structured results */ })
 ```
