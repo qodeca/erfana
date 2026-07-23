@@ -39,10 +39,14 @@ The Knowledge Graph system addresses these challenges by:
 ### Out of Scope
 
 - Semantic entity matching (covered by Spec #005 vector search)
-- Natural language entity extraction (NER) - rule-based patterns only
-- Entity relationship types beyond mentions (e.g., "is-a", "part-of" hierarchies)
+- Cloud/LLM-based entity extraction (local ONNX NER is in scope as an optional, default-off extractor)
+- Open-ended relationship ontologies (a small fixed relation-type vocabulary is in scope; see 006-FR-030)
 - Cross-workspace entity linking
 - Entity editing or manual graph manipulation
+
+## Technology decisions
+
+- **Graph storage: SQLite tables over an embedded graph database – deliberate.** Kuzu was archived after Apple's Oct 2025 acquisition (maintenance moved to community forks); backlink/traversal at this scale (<100ms, 100K mentions) is a join-shaped workload; SQLite tables reuse Spec #004 infrastructure. Decision re-affirmed 2026-07-23.
 
 ## Dependencies
 
