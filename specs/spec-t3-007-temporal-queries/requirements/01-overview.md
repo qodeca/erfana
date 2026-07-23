@@ -6,7 +6,7 @@
 
 Spec #007 implements temporal query capabilities and timeline visualization for the Graph Engine, enabling time-travel queries to reconstruct historical knowledge graph states and track documentation evolution over time.
 
-This feature adds temporal semantics to graph edges (valid_from, valid_to, tx_time), provides as-of query APIs for point-in-time state reconstruction, implements a Timeline UI with date slider navigation, and exposes temporal data through the MCP `erfana_graph_timeline` tool.
+This feature adds temporal semantics to graph edges (valid_from, valid_to, recorded_at, valid_source), provides as-of query APIs for point-in-time state reconstruction, implements a Timeline UI with date slider navigation, and exposes temporal data through the MCP `erfana_graph_timeline` tool. Git history is the authoritative timeline for document evolution – validity timestamps are derived from git commits, and the temporal store is a queryable projection of that history. Transaction-time travel ("what did the database believe on date X") is explicitly out of scope; recorded_at is an audit-only timestamp.
 
 ## Purpose
 
@@ -16,13 +16,14 @@ Temporal queries solve three key problems:
 
 1. **Historical reconstruction**: Answer "What did the graph look like on date X?" for debugging, auditing, or understanding past project states
 2. **Change tracking**: See exactly when relationships were added or invalidated, creating a complete audit trail
-3. **Contradiction detection**: Identify conflicting statements over time (e.g., "uses sqlite-vss" in January vs "uses sqlite-vec" in October)
+3. **Contradiction detection**: Identify conflicting statements over time for exclusive relation types (e.g., "licensed-under GPL-3.0" in January vs "licensed-under MIT" in October)
 
 ## Scope
 
 ### In scope
 
-- Temporal fields on edge records (valid_from, valid_to, tx_time)
+- Temporal fields on edge records (valid_from, valid_to, recorded_at, valid_source)
+- Git-derived validity timestamps (git commit time; file mtime fallback for untracked files)
 - Edge lifecycle management (create with valid_from, close with valid_to, never delete)
 - As-of query API for historical graph state reconstruction
 - Timeline API for retrieving change events by entity or file
@@ -35,6 +36,7 @@ Temporal queries solve three key problems:
 
 - Temporal fields on entities (entities are version-agnostic identifiers)
 - Temporal fields on the FTS/vector search indexes (search always queries current state)
+- Transaction-time travel ("what did the database believe on date X") – recorded_at is audit-only
 - Branch/fork support (single linear timeline only)
 - Collaborative conflict resolution (single-user desktop app)
 
@@ -43,7 +45,7 @@ Temporal queries solve three key problems:
 1. Any historical graph state can be reconstructed via as-of queries with 100% accuracy
 2. Timeline UI shows all edge changes for a selected entity or file
 3. Temporal queries complete in <200ms for graphs with up to 10,000 edges
-4. Contradiction detection flags conflicting statements with same src_entity and edge type
+4. Contradiction detection flags conflicting statements with same src entity and exclusive edge type (Spec #006 FR-030 vocabulary)
 5. MCP tool enables Claude Code to query timelines and historical state
 
 ## Dependencies

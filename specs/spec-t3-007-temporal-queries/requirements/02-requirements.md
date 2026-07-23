@@ -6,17 +6,17 @@
 
 | ID | Title | Description | Priority | Traces to |
 |----|-------|-------------|----------|-----------|
-| 007-FR-001 | Temporal fields on edges | The system shall extend the edges table to include temporal fields: valid_from (Unix timestamp when edge became valid), valid_to (Unix timestamp when edge was invalidated, nullable if still valid), tx_time (Unix timestamp when change was recorded in database). Data type specifications are deferred to design documentation. | Must | Spec #006 |
-| 007-FR-002 | Temporal indexes | The system shall create indexes on edges(valid_from), edges(valid_to), and edges(src_entity_id, valid_from) to optimize temporal queries | Must | 007-FR-001 |
+| 007-FR-001 | Temporal fields on edges | The system shall extend the edges table to include temporal fields: valid_from (Unix timestamp when the fact became true in the source content), valid_to (Unix timestamp when it stopped being true, nullable if still valid), recorded_at (audit-only Unix timestamp of the database write), and valid_source ('git' or 'fs', provenance of the validity timestamp). Transaction-time travel ("what did the database believe on date X") is out of scope; recorded_at exists for audit logging only. Data type specifications are deferred to design documentation. | Must | Spec #006 |
+| 007-FR-002 | Temporal indexes | The system shall create indexes on edges(valid_from), edges(valid_to), and edges(src_id, valid_from) to optimize temporal queries | Must | 007-FR-001 |
 
 ### Edge lifecycle management
 
 | ID | Title | Description | Priority | Traces to |
 |----|-------|-------------|----------|-----------|
-| 007-FR-003 | Create edge with validity | The system shall set valid_from to current Unix timestamp and leave valid_to as NULL when creating an edge | Must | 007-FR-001 |
-| 007-FR-004 | Close edge (soft delete) | The system shall close an edge by setting valid_to to current Unix timestamp instead of deleting the record | Must | 007-FR-001 |
+| 007-FR-003 | Create edge with validity | When creating an edge, valid_from shall be derived from the source file's git history – the committer timestamp of the last commit touching the file at index time (obtainable via the existing git services; e.g. `git log -1 --format=%ct -- <file>`), with valid_source='git'. For untracked/uncommitted files, fall back to file mtime with valid_source='fs'. valid_to is left NULL. The indexer's own clock is never used as valid time. | Must | 007-FR-001 |
+| 007-FR-004 | Close edge (soft delete) | The system shall close an edge by setting valid_to instead of deleting the record; valid_to is derived with the same git-first provenance rules as valid_from (007-FR-003) | Must | 007-FR-001 |
 | 007-FR-005 | Audit trail preservation | The system shall never physically delete edges from the database; invalidation uses valid_to closure | Must | 007-FR-004 |
-| 007-FR-006 | Transaction time recording | The system shall record tx_time as the database transaction timestamp for all edge mutations for audit purposes | Must | 007-FR-001 |
+| 007-FR-006 | Audit timestamp | The system shall record recorded_at as the database write timestamp for all edge mutations, for audit/debug purposes only; it shall not participate in as-of query predicates | Must | 007-FR-001 |
 
 ### As-of query API
 
@@ -39,7 +39,7 @@
 
 | ID | Title | Description | Priority | Traces to |
 |----|-------|-------------|----------|-----------|
-| 007-FR-014 | Contradiction identification | The system shall detect contradicting statements where same src_entity has edges of same type to different dst_entities at different times (e.g., "uses sqlite-vss" vs "uses sqlite-vec") | Should | 007-FR-001 |
+| 007-FR-014 | Contradiction identification | The system shall detect contradicting statements only among relation types declared exclusive (Spec #006 FR-030): same src entity, same exclusive type, different dst entities (e.g., "licensed-under GPL-3.0" vs "licensed-under MIT"). This is a heuristic; flagged pairs go to user review (007-FR-015), never auto-resolution. | Should | 007-FR-001 |
 | 007-FR-015 | Contradiction flagging | The system shall flag potential contradictions for user review rather than auto-resolving; user decides if contradiction is intentional evolution | Should | 007-FR-014 |
 | 007-FR-016 | Contradiction API | The system shall provide an API to retrieve detected contradictions, optionally filtered by entity ID. Results include the source entity, edge type, and conflicting destination entities. | Should | 007-FR-014 |
 
@@ -47,7 +47,7 @@
 
 | ID | Title | Description | Priority | Traces to |
 |----|-------|-------------|----------|-----------|
-| 007-FR-017 | Date slider component | The system shall provide a date slider in the timeline panel ranging from project start date to current date. In addition to the slider, users may manually enter a specific date for precise temporal queries. | Must | 007-FR-010 |
+| 007-FR-017 | Date slider component | The system shall provide a date slider in the timeline panel ranging from project start date to current date. The slider shall snap to actual event timestamps (event-anchored navigation) rather than continuous calendar positions; manual date entry remains the precise-query path. | Must | 007-FR-010 |
 | 007-FR-018 | Event list display | The system shall display a scrollable list of change events in the timeline panel, sorted chronologically with newest first | Must | 007-FR-010 |
 | 007-FR-019 | As-of toggle | The system shall provide a toggle button that enables "as-of mode" where all graph queries use the slider's selected date | Should | 007-FR-008 |
 | 007-FR-020 | Visual date indicator | The system shall prominently display the selected date in human-readable format (e.g., "December 22, 2025") | Must | 007-FR-017 |
@@ -60,6 +60,13 @@
 | 007-FR-022 | Timeline MCP tool | The system shall expose `erfana_graph_timeline` tool via MCP server for Claude Code integration | Must | 007-FR-010 |
 | 007-FR-023 | MCP tool parameters | The system shall accept the following tool parameters: entityId (optional), fileId (optional), asOf (optional Unix timestamp), limit (optional, default 50) | Must | 007-FR-022 |
 | 007-FR-024 | MCP tool response | The system shall return an array of timeline events with valid_from, valid_to, src_entity, dst_entity, relationship_type, file_path | Must | 007-FR-022 |
+
+### Provenance and consistency
+
+| ID | Title | Description | Priority | Traces to |
+|----|-------|-------------|----------|-----------|
+| 007-FR-025 | Git as source of truth | Git history is the authoritative timeline for document evolution; the temporal store is a queryable projection of it. On full reindex, valid_from/valid_to shall be re-derivable from git history, and re-derivation shall be deterministic (supports 007-NFR-003). | Must | 007-FR-003 |
+| 007-FR-026 | Idempotent re-extraction | Re-indexing a section shall be a no-op for derived edges that are unchanged (same src, dst, type, source file): no close-and-recreate, no new timeline event, no new rows. Only genuine changes produce edge mutations. Complements 007-FR-005 (never-delete). | Must | 007-FR-005 |
 
 ## Non-functional requirements
 
