@@ -291,33 +291,35 @@
 
 ## Hybrid search fusion
 
-### 005-AC-015: BM25 scores normalized correctly
+### 005-AC-015: RRF fuses ranked lists correctly
 
-**Description:** BM25 scores are normalized to [0, 1] range.
+**Description:** Reciprocal rank fusion combines the two ranked lists by rank, not score.
 
-**Given:** BM25 search returns scores [10, 5, 2, 1].
+**Given:** BM25 ranking [A, B, C] and vector ranking [B, A, D]; k = 60, weights = 1.0.
 
-**When:** Normalization is applied.
+**When:** RRF fusion is applied.
 
 **Then:**
-- Normalized scores are [1.0, 0.44, 0.11, 0.0]
-- Highest original score maps to 1.0
-- Lowest original score maps to 0.0
+- score(A) = 1/61 + 1/62, score(B) = 1/62 + 1/61, score(C) = 1/63, score(D) = 1/63
+- A and B tie ahead of C and D; ties broken by section ID (005-FR-027)
+- No score normalization is performed in rrf mode
+- In linear mode, a result set where max == min normalizes all scores to 1.0 (no division by zero)
 
-**Traces to:** 005-FR-024
+**Traces to:** 005-FR-024, 005-FR-026
 
 ---
 
 ### 005-AC-016: Vector distances converted to similarity
 
-**Description:** L2 distances are converted to similarity scores.
+**Description:** Cosine distances are converted to similarity scores.
 
-**Given:** L2 distances [0.0, 0.5, 1.0, 2.0].
+**Given:** Cosine distances [0.0, 0.5, 1.0, 2.0].
 
-**When:** Conversion is applied.
+**When:** Conversion (`similarity = 1 - cosine_distance`) is applied.
 
 **Then:**
-- Similarities are [1.0, 0.67, 0.5, 0.33]
+- Similarities are [1.0, 0.5, 0.0, -1.0]
+- For [0, 1] display and linear fusion, negative similarities clamp to 0 → [1.0, 0.5, 0.0, 0.0]
 - Distance 0 produces similarity 1.0
 - Higher distance produces lower similarity
 
@@ -325,32 +327,34 @@
 
 ---
 
-### 005-AC-017: Fusion weights applied correctly
+### 005-AC-017: Fusion method switch is deterministic
 
-**Description:** Combined score uses correct weight formula.
+**Description:** Switching fusion methods changes results deterministically; linear mode uses the weight formula.
 
-**Given:** BM25 normalized = 0.8, vector similarity = 0.6, alpha = 0.4, beta = 0.6.
+**Given:** A fixed corpus and query; method = rrf.
 
-**When:** Fusion is applied.
+**When:** Method is switched to linear (BM25 normalized = 0.8, vector similarity = 0.6, alpha = 0.4, beta = 0.6).
 
 **Then:**
-- Combined score = 0.4 * 0.8 + 0.6 * 0.6 = 0.68
+- Linear combined score = 0.4 * 0.8 + 0.6 * 0.6 = 0.68
+- Repeating the same query under the same method reproduces the same ordering
+- Switching back to rrf restores the rrf ordering
 
 **Traces to:** 005-FR-026
 
 ---
 
-### 005-AC-018: Invalid weights rejected
+### 005-AC-018: Invalid fusion parameters rejected
 
-**Description:** Weight validation catches invalid values.
+**Description:** Per-mode parameter validation catches invalid values.
 
-**Given:** Attempt to set alpha = 0.7, beta = 0.5.
+**Given:** Attempt to set linear alpha = 0.7, beta = 0.5 (and separately rrf k = 0).
 
 **When:** Settings are saved.
 
 **Then:**
-- Error is shown: "Weights must sum to 1.0"
-- Previous valid weights are retained
+- Linear mode: error "Weights must sum to 1.0"; previous valid weights retained
+- Rrf mode: error for k < 1; previous valid k retained
 
 **Traces to:** 005-FR-028
 
@@ -358,17 +362,17 @@
 
 ## Settings UI
 
-### 005-AC-019: Weight sliders linked
+### 005-AC-019: Fusion controls follow the selected method
 
-**Description:** Adjusting one slider updates the other.
+**Description:** The Settings overlay shows method-appropriate controls; linear sliders stay linked.
 
-**Given:** Settings overlay is open, alpha = 0.4, beta = 0.6.
+**Given:** Settings overlay is open, method = rrf.
 
-**When:** Alpha slider is dragged to 0.7.
+**When:** Method is switched to linear and the alpha slider is dragged to 0.7.
 
 **Then:**
-- Beta automatically updates to 0.3
-- Sum remains 1.0
+- Rrf controls (k, per-ranker weights) are replaced by linked alpha/beta sliders
+- Beta automatically updates to 0.3; sum remains 1.0
 
 **Traces to:** 005-FR-029
 
@@ -395,13 +399,13 @@
 
 **Description:** Custom weights are retained after app restart.
 
-**Given:** Alpha = 0.7, beta = 0.3 are saved.
+**Given:** Method = linear with alpha = 0.7, beta = 0.3 is saved.
 
 **When:** App restarts.
 
 **Then:**
-- Settings load with alpha = 0.7, beta = 0.3
-- Searches use these weights
+- Settings load with method = linear, alpha = 0.7, beta = 0.3
+- Searches use these fusion settings
 
 **Traces to:** 005-FR-031
 
@@ -409,15 +413,15 @@
 
 ### 005-AC-022: Reset to defaults works
 
-**Description:** Reset button restores default weights.
+**Description:** Reset button restores default fusion settings.
 
-**Given:** Custom weights alpha = 0.8, beta = 0.2.
+**Given:** Method = linear with custom weights alpha = 0.8, beta = 0.2.
 
 **When:** "Reset to defaults" is clicked.
 
 **Then:**
-- Alpha becomes 0.4, beta becomes 0.6
-- Preview updates with default weights
+- Method becomes rrf with k = 60 and per-ranker weights = 1.0
+- Preview updates with default settings
 
 **Traces to:** 005-FR-032
 
@@ -578,6 +582,23 @@
 
 ---
 
+### 005-AC-034: Index rebuild on sqlite-vec version drift
+
+**Description:** An incompatible sqlite-vec upgrade triggers rebuild from stored embeddings.
+
+**Given:** Stored `vss_sections` index was created by a sqlite-vec version incompatible with the currently pinned one.
+
+**When:** Application starts and the version check (005-FR-003) detects the drift.
+
+**Then:**
+- `vss_sections` is rebuilt from the float32 embeddings in the `embeddings` table
+- No embedding re-inference occurs
+- Progress is surfaced to the user during the rebuild
+
+**Traces to:** 005-FR-040
+
+---
+
 ## Acceptance criteria summary
 
 | Category | Count | IDs |
@@ -595,4 +616,5 @@
 | Performance criteria | 4 | 005-AC-025 through 005-AC-028 |
 | Error handling | 2 | 005-AC-029 through 005-AC-030 |
 | Model migration | 1 | 005-AC-033 |
-| **Total** | **33** | |
+| Index maintenance | 1 | 005-AC-034 |
+| **Total** | **34** | |

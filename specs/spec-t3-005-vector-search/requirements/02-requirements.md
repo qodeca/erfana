@@ -32,7 +32,7 @@
 
 **Title:** Verify sqlite-vec extension version
 
-**Description:** The system shall verify the loaded sqlite-vec extension version on startup and log it. Minimum supported version shall be documented. Version mismatch shall produce a warning log.
+**Description:** The system shall pin sqlite-vec to an exact version (no caret) in package.json – sqlite-vec is pre-v1 with announced breaking changes to SQL API and storage format – and verify the loaded version matches the pin at startup. Version mismatch shall produce an error, not a warning.
 
 **Priority:** Medium
 
@@ -281,9 +281,9 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 #### 005-FR-021: L2 distance search
 
-**Title:** Search by L2 distance
+**Title:** Search by cosine distance
 
-**Description:** The system shall use sqlite-vec's L2 distance function to find nearest neighbors. L2 distance on normalized vectors is equivalent to cosine distance.
+**Description:** The system shall use sqlite-vec's cosine distance (`distance_metric=cosine` on the virtual table) to find nearest neighbors. Note: L2 distance on normalized vectors is rank-equivalent to cosine, but the system standardizes on cosine.
 
 **Priority:** High
 
@@ -317,15 +317,15 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 ### Hybrid search fusion
 
-#### 005-FR-024: BM25 score normalization
+#### 005-FR-024: Reciprocal rank fusion (default)
 
-**Title:** Normalize BM25 scores
+**Title:** Fuse result lists with RRF
 
-**Description:** The system shall normalize BM25 scores to [0, 1] range using min-max normalization within each result set. Zero results shall produce empty normalized set.
+**Description:** The system shall fuse BM25 and vector result lists with reciprocal rank fusion: `score(d) = Σ_r w_r / (k + rank_r(d))` over the rankers that returned d, with k = 60 (configurable, ≥ 1) and per-ranker weights w_r default 1.0. RRF operates on ranks, requiring no score normalization. Zero results from both rankers shall produce an empty fused set.
 
 **Priority:** High
 
-**Traces to:** Spec #004 (BM25 search)
+**Traces to:** Spec #004 (BM25 search), 005-FR-021
 
 ---
 
@@ -333,7 +333,7 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 **Title:** Convert distance to similarity
 
-**Description:** The system shall convert L2 distances to similarity scores in [0, 1] range. Formula: `similarity = 1 / (1 + distance)`. Closer vectors produce higher similarity.
+**Description:** The system shall convert cosine distances to similarity scores. Formula: `similarity = 1 - cosine_distance`. Cosine distance is in [0, 2], so similarity is in [-1, 1]; for the linear-fusion mode and any [0, 1] display score, negative similarities shall be clamped to 0. Closer vectors produce higher similarity.
 
 **Priority:** High
 
@@ -341,11 +341,11 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 ---
 
-#### 005-FR-026: Weight application
+#### 005-FR-026: Fusion method selection
 
-**Title:** Apply fusion weights
+**Title:** Select fusion method
 
-**Description:** The system shall combine normalized scores using formula: `final_score = alpha * bm25_normalized + beta * vector_similarity`. Default weights: alpha=0.4, beta=0.6.
+**Description:** The system shall support fusion methods `rrf` (default) and `linear`. Linear mode combines min-max-normalized BM25 scores with clamped vector similarity as `final_score = alpha * bm25_normalized + beta * vector_similarity` (defaults alpha=0.4, beta=0.6), retained for experimentation. In linear mode, when max == min within a result set, all scores in that set normalize to 1.0.
 
 **Priority:** High
 
@@ -367,9 +367,9 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 #### 005-FR-028: Weight constraints
 
-**Title:** Validate fusion weight constraints
+**Title:** Validate fusion parameter constraints
 
-**Description:** The system shall enforce that alpha + beta = 1.0 and both weights are in [0, 1]. Invalid weights shall be rejected with descriptive error.
+**Description:** The system shall enforce per-mode constraints: rrf mode – k ≥ 1 and per-ranker weights ≥ 0; linear mode – alpha + beta = 1.0 and both weights in [0, 1]. Invalid parameters shall be rejected with descriptive error.
 
 **Priority:** Medium
 
@@ -379,11 +379,11 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 ### Settings UI
 
-#### 005-FR-029: Weight sliders
+#### 005-FR-029: Fusion tuning controls
 
-**Title:** Provide weight tuning sliders
+**Title:** Provide fusion tuning controls
 
-**Description:** The system shall provide slider controls in the Settings overlay for adjusting fusion weights (alpha, beta). Sliders shall be linked (adjusting one updates the other to maintain sum = 1).
+**Description:** The system shall provide a fusion-method selector (rrf | linear) in the Settings overlay with method-appropriate controls: rrf mode – k and per-ranker weights; linear mode – linked alpha/beta sliders (adjusting one updates the other to maintain sum = 1).
 
 **Priority:** Medium
 
@@ -395,7 +395,7 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 **Title:** Preview search results with current weights
 
-**Description:** The system shall show a live preview of search results with current weight settings. Preview shall update debounced (300ms) as weights change.
+**Description:** The system shall show a live preview of search results with current fusion settings. Preview shall update debounced (300ms) as settings change.
 
 **Priority:** Low
 
@@ -407,7 +407,7 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 **Title:** Persist weight settings
 
-**Description:** The system shall persist fusion weight settings to global settings (GlobalSettingsService). Settings shall be loaded on app start and applied to all searches.
+**Description:** The system shall persist fusion settings (method, k, weights) to global settings (GlobalSettingsService). Settings shall be loaded on app start and applied to all searches.
 
 **Priority:** Medium
 
@@ -417,9 +417,9 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 #### 005-FR-032: Reset to defaults
 
-**Title:** Reset weights to defaults
+**Title:** Reset fusion settings to defaults
 
-**Description:** The system shall provide a "Reset to defaults" button to restore weights to alpha=0.4, beta=0.6.
+**Description:** The system shall provide a "Reset to defaults" button to restore fusion settings to method=rrf, k=60, per-ranker weights=1.0 (linear-mode defaults remain alpha=0.4, beta=0.6).
 
 **Priority:** Low
 
@@ -473,11 +473,11 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 **Title:** Support binary quantization for large datasets
 
-**Description:** The system shall support optional binary quantization (BIT[384]) for datasets exceeding 500,000 documents, reducing storage requirements by approximately 32x while maintaining acceptable search quality.
+**Description:** The system shall support optional binary quantization of model-profile-dimension vectors for large datasets, using the two-stage oversample-and-rescore design specified in Spec #008 (FR-020); float32 vectors are retained for rescoring, so the ~32x reduction applies to the binary index footprint, not total storage. Recommendation threshold aligned with Spec #008 FR-028 (100,000 documents).
 
 **Priority:** Low (Could)
 
-**Traces to:** Scalability for large documentation projects
+**Traces to:** Scalability for large documentation projects, Spec #008
 
 ---
 
@@ -504,6 +504,18 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 **Priority:** Medium
 
 **Traces to:** 005-FR-005, 005-FR-038
+
+---
+
+#### 005-FR-040: Vector index rebuild on version drift
+
+**Title:** Rebuild vector index after incompatible sqlite-vec upgrade
+
+**Description:** When a sqlite-vec upgrade is incompatible with the stored index format, the system shall rebuild `vss_sections` from the float32 embeddings retained in the `embeddings` table (no re-inference needed), with progress surfaced to the user (minimal progress indication in M2; upgraded to the Spec #008 reindex-progress UX once that ships – soft dependency, not blocking).
+
+**Priority:** Medium
+
+**Traces to:** 005-FR-003, 005-FR-004
 
 ---
 
@@ -601,6 +613,6 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 | Category | Count | IDs |
 |----------|-------|-----|
-| Functional Requirements | 39 | 005-FR-001 through 005-FR-039 |
+| Functional Requirements | 40 | 005-FR-001 through 005-FR-040 |
 | Non-Functional Requirements | 8 | 005-NFR-001 through 005-NFR-008 |
-| **Total** | **47** |
+| **Total** | **48** |
