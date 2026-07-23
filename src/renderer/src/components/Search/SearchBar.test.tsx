@@ -693,6 +693,27 @@ describe('SearchBar', () => {
       })
     })
 
+    it('does not apply a pending debounced search after unmount', async () => {
+      const user = userEvent.setup()
+      const { unmount } = render(<SearchBar provider={mockProvider} />)
+
+      // Type to schedule a debounced search (100ms), then unmount before it fires
+      await user.type(screen.getByLabelText('Search in document'), 'test')
+      unmount()
+
+      // Inject matches the way a later mount would see them
+      const matches: SearchMatch[] = [
+        { id: '1', line: 1, startColumn: 0, endColumn: 4, text: 'test' }
+      ]
+      useSearchStore.setState({ matches, currentIndex: 0 })
+
+      // Wait past the debounce window: the cancelled callback must not run
+      await new Promise((resolve) => setTimeout(resolve, 200))
+
+      expect(useSearchStore.getState().matches).toEqual(matches)
+      expect(mockProvider.search).not.toHaveBeenCalled()
+    })
+
     it('updates match count when currentIndex changes', async () => {
       const matches: SearchMatch[] = [
         { id: '1', line: 1, startColumn: 0, endColumn: 4, text: 'test' },
