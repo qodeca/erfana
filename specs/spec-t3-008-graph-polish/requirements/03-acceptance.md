@@ -33,7 +33,8 @@
 
 | ID | Description | Steps | Expected Result | Traces To |
 |----|-------------|-------|-----------------|-----------|
-| 008-AC-009 | Enable quantization | 1. Open Settings > Graph Engine<br>2. Enable "Binary Quantization"<br>3. Trigger re-embed<br>4. Compare memory usage | Vector storage memory usage reduced by >30x; search still returns relevant results | 008-FR-019, 008-FR-020, 008-FR-021, 008-NFR-001 |
+| 008-AC-009 | Enable quantization | 1. Open Settings > Graph Engine<br>2. Enable "Binary Quantization"<br>3. Trigger index rebuild on a fixed fixture corpus<br>4. Compare index memory and search quality vs full-float32 baseline | Binary index footprint reduced by >30x (float32 vectors retained on disk for rescoring); recall@10 of quantized two-stage search >= 0.95 relative to full-float32 search on the same corpus for the shipped profile (EmbeddingGemma-300m @ 256-dim); other profiles gate per-model | 008-FR-019, 008-FR-020, 008-FR-021, 008-NFR-001 |
+| 008-AC-019 | MRL dimension profile switch | 1. Open Settings > Graph Engine<br>2. Switch dimension profile (e.g. 256 to 128)<br>3. Observe migration flow<br>4. Run search at each profile rung (512/256/128) | Profile switch triggers the model-migration flow (008-FR-012 through 008-FR-018); search returns relevant results at each rung; profiles compose with binary quantization | 008-FR-031 |
 
 ### Health Monitoring
 

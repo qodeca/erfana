@@ -7,7 +7,7 @@
 | ID | Title | Description | Priority | Traces To |
 |----|-------|-------------|----------|-----------|
 | 006-FR-001 | Entities table | Create `entities` table with columns: `id` (INTEGER PRIMARY KEY), `name` (TEXT NOT NULL), `type` (TEXT NOT NULL), `canonical_id` (INTEGER REFERENCES entities(id)), `alias_score` (REAL), `created_at` (TEXT NOT NULL). Unique constraint on (name, type) pair for deduplication. Supports entity deduplication through canonical entity references (e.g., 'React' and 'ReactJS' can reference the same canonical entity). | Must | 006-AC-001 |
-| 006-FR-002 | Edges table | Create `edges` table with columns: `id` (INTEGER PRIMARY KEY), `src_id` (INTEGER REFERENCES entities), `dst_id` (INTEGER REFERENCES entities), `type` (TEXT NOT NULL), `valid_from` (TEXT), `valid_to` (TEXT), `tx_time` (TEXT NOT NULL). Supports bitemporal tracking. | Must | 006-AC-002 |
+| 006-FR-002 | Edges table | Create `edges` table with columns: `id` (INTEGER PRIMARY KEY), `src_id` (INTEGER REFERENCES entities), `dst_id` (INTEGER REFERENCES entities), `type` (TEXT NOT NULL), `valid_from` (INTEGER, Unix seconds), `valid_to` (INTEGER, nullable), `recorded_at` (INTEGER NOT NULL, audit-only), `valid_source` (TEXT, 'git' or 'fs'). INTEGER Unix-seconds chosen so temporal range predicates compare numerically (Spec #007 FR-007), matching git `%ct` output. Supports validity-interval tracking with an audit timestamp (temporal semantics defined in Spec #007; transaction-time travel out of scope). | Must | 006-AC-002 |
 | 006-FR-003 | Mentions table | Create `mentions` table with columns: `id` (INTEGER PRIMARY KEY), `section_id` (INTEGER REFERENCES sections), `entity_id` (INTEGER REFERENCES entities), `start_char` (INTEGER NOT NULL), `end_char` (INTEGER NOT NULL), `created_at` (TEXT NOT NULL). Enables position-based highlighting. | Must | 006-AC-003 |
 | 006-FR-004 | Entity indexes | Create indexes: `idx_entities_name` on (name), `idx_entities_type` on (type), `idx_mentions_section` on (section_id), `idx_mentions_entity` on (entity_id) for query performance. | Must | 006-AC-004 |
 
@@ -18,9 +18,13 @@
 | 006-FR-005 | Wikilink extraction | Extract entities from wikilink pattern `[[Entity Name]]` using regex. Entity type inferred as "concept" by default. Support pipe syntax `[[actual|display]]` extracting "actual" as entity name. | Must | 006-AC-005 |
 | 006-FR-006 | Tag extraction | Extract entities from tag pattern `#tag-name` using regex. Entity type set to "tag". Support alphanumeric characters, hyphens, and underscores. | Must | 006-AC-006 |
 | 006-FR-007 | Mention extraction | Extract entities from mention pattern `@username` using regex. Entity type set to "person". Support alphanumeric characters, hyphens, and underscores (pattern: `/[@][a-zA-Z0-9_-]+/`). | Must | 006-AC-007 |
-| 006-FR-008 | Technical terms extraction | Extract entities matching a configurable dictionary of technical terms (e.g., SQLite, React, TypeScript, Electron). Entity type set to "technology". Dictionary loaded from configuration file. | Should | 006-AC-008 |
+| 006-FR-008 | Technical terms extraction | Extract entities matching a configurable dictionary of technical terms (e.g., SQLite, React, TypeScript, Electron). Entity type set to "technology". Dictionary loaded from configuration file. Provisional: superseded by 006-FR-029 when NER is enabled. | Could | 006-AC-008 |
 | 006-FR-009 | Extraction pipeline | Process section content through all extractors in sequence, collecting entities with their character positions. Pipeline executes on section index/update. | Must | 006-AC-009 |
 | 006-FR-010 | Position tracking | For each extracted entity mention, capture exact `start_char` and `end_char` positions relative to section content for editor highlighting integration. | Must | 006-AC-010 |
+| 006-FR-028 | Link edges | Create `links-to` edges in the edges table from wikilink extraction: source = entity representing the containing section's file/heading context, destination = linked entity. Deterministic, always on; populated during the FR-009 pipeline; carries valid_from/valid_to per Spec #007 semantics. | Must | 006-AC-035 |
+| 006-FR-029 | Optional local NER extractor | When enabled in settings (default off), run a GLiNER-class zero-shot NER model (quantized ONNX, e.g. `onnx-community/gliner_medium-v2.1`) in a worker thread (same pattern as the Spec #005 embedding worker and the existing whisper worker) to extract entities without markup. Fully local inference; results feed the same upsert/mention pipeline with a `source: 'ner'` marker. The NER model is delivered on demand like the Spec #005 embedding model (downloaded at enablement, hash-verified, offline afterwards). | Could | 006-AC-036 |
+| 006-FR-030 | Relation-type vocabulary | Define a fixed relation-type vocabulary in configuration; each type declares `exclusive` (boolean: whether one source entity may hold only one active edge of this type). Initial vocabulary: `links-to` (non-exclusive), `uses` (non-exclusive), `part-of` (non-exclusive), `defined-in` (exclusive), `licensed-under` (exclusive). | Should | 006-AC-037 |
+| 006-FR-031 | Typed relation extraction | When relation extraction is enabled, extract typed relations between co-occurring entities restricted to the FR-030 vocabulary and write them as typed edges. Relation extraction requires a relation-capable model distinct from the FR-029 NER checkpoint (GLiNER-Relex or GLiREL as a second stage over NER output – `gliner_medium-v2.1` itself is NER-only). Feasibility caveat: GLiNER-family tooling is Python-first; before committing to this FR at implementation time, verify a working ONNX-in-Node inference path exists for the chosen relation model; if none exists, this FR stays deferred. | Could | 006-AC-040 |
 
 ### Entity Storage
 
@@ -62,12 +66,13 @@
 |----|-------|-------------|----------|-----------|
 | 006-FR-025 | erfana_graph_entities tool | Implement MCP tool `erfana_graph_entities` with parameters: `query` (optional string filter), `type` (optional entity type filter), `limit` (default 50). Returns entity list with id, name, type, mention_count. | Must | 006-AC-025 |
 | 006-FR-026 | erfana_graph_backlinks tool | Implement MCP tool `erfana_graph_backlinks` with parameters: `entity_name` (required), `entity_type` (optional), `limit` (default 20). Returns backlinks with section path, title, snippet. | Must | 006-AC-026 |
+| 006-FR-032 | erfana_graph_traverse tool | Implement MCP tool `erfana_graph_traverse` (SDK v2 registerTool) with parameters: `entity_name` (required), `direction` (`out` \| `in` \| `both`, default `both`), `hops` (1-3, default 1), `limit` (default 50). Reuses getOutgoingLinks (FR-017) / getIncomingLinks (FR-018). Name deliberately distinct from `erfana_graph_related` (Spec #005). | Should | 006-AC-038 |
 
 ### Data Quality
 
 | ID | Title | Description | Priority | Traces To |
 |----|-------|-------------|----------|-----------|
-| 006-FR-027 | Contradiction detection | Detect contradictions where the same source entity has multiple active edges (valid_to IS NULL) of the same type pointing to different destination entities. For example, if "ERFANA" has active "uses" edges to both "sqlite-vss" and "sqlite-vec", this is flagged as a potential contradiction. Query returns all entities with conflicting active relationships including source entity, edge type, and conflicting destinations. | Medium | 006-AC-034 |
+| 006-FR-027 | Contradiction detection | Detect contradictions only among active typed edges whose relation type is declared `exclusive` in the 006-FR-030 vocabulary: same source entity, same exclusive type, different destination entities, both valid_to IS NULL. Non-exclusive types (e.g. `uses`, `links-to`) are never flagged. For example, if "ERFANA" has active "licensed-under" edges to both "GPL-3.0" and "MIT", this is flagged as a potential contradiction. Query returns all entities with conflicting active exclusive relationships including source entity, edge type, and conflicting destinations. | Medium | 006-AC-034 |
 
 ## Non-Functional Requirements
 
@@ -92,3 +97,9 @@
 |----|-------|-------------|----------|-----------|
 | 006-NFR-006 | Entity capacity | System must handle 100,000+ entities without query degradation (backlinks <100ms maintained). | Must | 006-AC-032 |
 | 006-NFR-007 | Memory efficiency | Graphology graph loaded lazily and released after 60 seconds of inactivity. Peak memory for graph operations <50MB for 100K entity graph. | Should | 006-AC-033 |
+
+### Extraction Pipeline
+
+| ID | Title | Description | Priority | Traces To |
+|----|-------|-------------|----------|-----------|
+| 006-NFR-008 | NER asynchrony | Optional NER extraction runs asynchronously after the deterministic pipeline and shall not delay deterministic indexing; NER results merge incrementally when ready. | Should | 006-AC-039 |

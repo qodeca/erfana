@@ -40,8 +40,9 @@
 | ID | Title | Description | Priority |
 |----|-------|-------------|----------|
 | 008-FR-019 | Enable/disable quantization | Allow user to enable or disable binary quantization via Settings toggle | Should |
-| 008-FR-020 | Vector compression | Compress 384-dimensional float32 vectors to binary representation (32x compression) | Should |
-| 008-FR-021 | Quantization migration | Re-embed all sections with quantization when enabled on existing corpus | Should |
+| 008-FR-020 | Vector compression | Compress model-profile-dimension float32 vectors to binary (1 bit/dim) for the search index, using a two-stage query: the binary index retrieves an oversampled candidate set (default 8 × k, configurable), then candidates are rescored with the retained float32 vectors and top-k returned. Float32 vectors are always retained in the embeddings table (they also serve Spec #005 FR-040 index rebuilds). | Should |
+| 008-FR-021 | Quantization migration | Rebuild the binary index from retained float32 embeddings when quantization is enabled on an existing corpus (no re-inference) | Should |
+| 008-FR-031 | MRL dimension profile | Offer Matryoshka dimension truncation as a first-tier compression lever: selectable dimension profile (512 / 256 / 128) for MRL-capable models (EmbeddingGemma native 768; Spec #005 default already 256). Changing the profile triggers the model-migration flow (008-FR-012 through 008-FR-018). MRL truncation composes with binary quantization (e.g. 128-dim binary = smallest ladder rung). | Should |
 
 ### Monitoring & Health Checks
 
@@ -68,7 +69,7 @@
 
 | ID | Title | Description | Target |
 |----|-------|-------------|--------|
-| 008-NFR-001 | Quantization memory savings | Binary quantization must reduce vector storage memory usage | >30x reduction |
+| 008-NFR-001 | Quantization memory savings | Binary quantization must reduce the in-memory/index vector footprint (~32x for the binary index); total on-disk storage is NOT reduced 32x because float32 vectors are retained for rescoring – document both numbers | >30x index footprint; recall@10 >= 0.95 vs float32 baseline for the shipped profile (EmbeddingGemma-300m @ 256-dim) on the named fixture corpus; other profiles gate per-model |
 | 008-NFR-002 | Progress update frequency | Reindex progress must update at regular intervals | Every 1 second |
 | 008-NFR-003 | Neighborhood query latency | Entity neighborhood query (2 hops) must complete quickly | <200ms |
 
@@ -84,7 +85,7 @@
 
 | ID | Title | Description | Target |
 |----|-------|-------------|--------|
-| 008-NFR-007 | Health metrics format | Health check results must be exportable in standard format | JSON format |
+| 008-NFR-007 | Health metrics format | Health check results exportable as JSON for the in-app diagnostics tab; any externally-surfaced metrics/logs (e.g. to MCP clients or monitoring) shall follow OpenTelemetry conventions – MCP protocol rev 2026-07-28 deprecates MCP-level logging in favor of stderr/OTel | JSON (internal) / OTel-aligned (external) |
 | 008-NFR-008 | Metric completeness | Health API must report all monitored subsystems in single call | DB, workers, disk |
 
 ## Traceability Matrix
@@ -106,6 +107,7 @@
 | 008-FR-017 | 008-FR-015 | 008-AC-008 |
 | 008-FR-018 | 008-FR-014 | 008-AC-016 |
 | 008-FR-019 | Spec #005 (vectors) | 008-AC-009 |
+| 008-FR-031 | Spec #005 (model profile), 008-FR-012 | 008-AC-019 |
 | 008-FR-022 | Spec #004 (database) | 008-AC-010 |
 | 008-FR-026 | 008-FR-022, 008-FR-023, 008-FR-024 | 008-AC-011 |
 | 008-FR-027 | 008-FR-023 | 008-AC-017 |

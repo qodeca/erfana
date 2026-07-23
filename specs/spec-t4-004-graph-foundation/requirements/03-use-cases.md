@@ -216,7 +216,7 @@
 1. Claude Code sends tool invocation for `erfana_graph_search`
 2. Request includes: query (required), k (optional, default 10), filters (optional)
 3. System validates request parameters against schema
-4. System checks rate limit (100 queries/minute)
+4. System checks the advisory rate limit (default 100 queries/minute, configurable)
 5. System executes BM25 search with provided parameters
 6. System formats results as JSON array with:
    - file_path (relative to project root)
@@ -227,7 +227,7 @@
 8. Claude Code receives and processes results
 
 ### Alternative Flows
-- **A1 (Rate limited):** At step 4, rate limit exceeded. System returns error response with retry-after hint.
+- **A1 (Rate limited):** At step 4, rate exceeded. System applies backpressure – the query is queued and delayed; the client observes slower responses but no error is returned.
 - **A2 (Invalid query):** At step 3, validation fails. System returns error with parameter details.
 - **A3 (No results):** At step 5, no matches. System returns empty array.
 - **A4 (Server busy):** System queues request and processes when available.

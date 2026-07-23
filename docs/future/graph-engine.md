@@ -5,6 +5,7 @@
 > **Do not start implementation from this folder.** Read the specs' `requirements/02-requirements.md` for acceptance-bearing requirements.
 
 **Status:** Design exploration (October 2025). Requirements authoritative in specs #004–#008.
+**Currency note (2026-07-23):** the specs were technology-refreshed after a lens review and planning interview – EmbeddingGemma-300m via transformers.js (on-demand Hugging Face delivery, not bundled), RRF as default hybrid fusion, cosine distance, git-derived temporal validity (`recorded_at`, no `tx_time`), MCP SDK v2, and a value-recut release model (see `ROADMAP.md`). Exploration content below predates these decisions – where this folder and the specs disagree (e.g. all-MiniLM-L6-v2, α/β linear fusion, bundled models, bitemporal edges), the specs win.
 **Research Validated:** ✅ Extensively validated against 2025 production practices
 
 This document provides an overview of the Erfana Graph Engine—a local-first, embedded knowledge graph and hybrid search system built on SQLite. The system combines BM25 keyword search (FTS5), vector similarity (sqlite-vec), and lightweight graph capabilities to power semantic retrieval, backlinks, and temporal queries within the Erfana markdown IDE.

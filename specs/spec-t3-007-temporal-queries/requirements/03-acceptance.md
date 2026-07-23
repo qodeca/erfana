@@ -6,15 +6,15 @@
 
 | ID | Description | Steps | Expected result | Traces to |
 |----|-------------|-------|-----------------|-----------|
-| 007-AC-001 | Verify temporal fields exist | 1. Open SQLite database 2. Inspect edges table schema | Columns valid_from (INTEGER NOT NULL), valid_to (INTEGER), tx_time (INTEGER NOT NULL) exist | 007-FR-001 |
-| 007-AC-002 | Verify temporal indexes | 1. Query sqlite_master for indexes 2. Check index definitions | Indexes on edges(valid_from), edges(valid_to), edges(src_entity_id, valid_from) exist | 007-FR-002 |
+| 007-AC-001 | Verify temporal fields exist | 1. Open SQLite database 2. Inspect edges table schema | Columns valid_from (INTEGER NOT NULL), valid_to (INTEGER), recorded_at (INTEGER NOT NULL), valid_source (TEXT) exist | 007-FR-001 |
+| 007-AC-002 | Verify temporal indexes | 1. Query sqlite_master for indexes 2. Check index definitions | Indexes on edges(valid_from), edges(valid_to), edges(src_id, valid_from) exist | 007-FR-002 |
 
 ### Edge lifecycle
 
 | ID | Description | Steps | Expected result | Traces to |
 |----|-------------|-------|-----------------|-----------|
-| 007-AC-003 | Create edge sets valid_from | 1. Create new edge via API 2. Query edge record | valid_from equals creation timestamp, valid_to is NULL | 007-FR-003 |
-| 007-AC-004 | Close edge sets valid_to | 1. Create edge 2. Wait 1 second 3. Close edge via API 4. Query edge record | valid_to equals closure timestamp, record still exists | 007-FR-004 |
+| 007-AC-003 | Create edge sets valid_from | 1. Create new edge via API (source file committed in git) 2. Query edge record | valid_from equals the source file's last git commit timestamp (not the indexer clock), valid_source='git', valid_to is NULL | 007-FR-003 |
+| 007-AC-004 | Close edge sets git-derived valid_to | 1. Commit fixture file containing the fact at T1, index (edge created) 2. Commit a change removing the fact at T2 3. Re-index 4. Query edge record | valid_to equals T2 (the removing commit's committer timestamp, not the indexer clock), valid_source='git', record still exists. Uncommitted removal falls back to file mtime with valid_source='fs' | 007-FR-004 |
 | 007-AC-005 | Edges are never deleted | 1. Create 5 edges 2. Close 3 edges 3. Count total edge records | 5 records exist (none deleted) | 007-FR-005 |
 
 ### As-of queries
@@ -37,8 +37,8 @@
 
 | ID | Description | Steps | Expected result | Traces to |
 |----|-------------|-------|-----------------|-----------|
-| 007-AC-012 | Detect contradicting edges | 1. Create edge: Project -> uses -> sqlite-vss at T1 2. Close edge at T2 3. Create edge: Project -> uses -> sqlite-vec at T2 4. Call getContradictions() | Returns contradiction pair for "Project uses" with different targets | 007-FR-014, 007-FR-016 |
-| 007-AC-013 | No false positive contradictions | 1. Create edge: Project -> uses -> React 2. Create edge: Project -> uses -> TypeScript 3. Call getContradictions() | No contradictions (different relationship semantics) | 007-FR-014 |
+| 007-AC-012 | Detect contradicting edges | 1. Create active edge: Project -> licensed-under -> MIT (valid_to=NULL) 2. Create active edge: Project -> licensed-under -> GPL-3.0 (valid_to=NULL) 3. Call getContradictions() | Returns contradiction pair for "Project licensed-under" (exclusive type) with both active targets | 007-FR-014, 007-FR-016 |
+| 007-AC-013 | No false positive contradictions | 1. Create edge: Project -> uses -> React 2. Create edge: Project -> uses -> TypeScript 3. Call getContradictions() | No contradictions (`uses` is non-exclusive in the Spec #006 FR-030 vocabulary) | 007-FR-014 |
 
 ### Timeline UI
 
@@ -62,6 +62,15 @@
 |----|-------------|-------|-----------------|-----------|
 | 007-AC-020 | Temporal query performance | 1. Seed 10,000 edges 2. Run as-of query 3. Measure duration | Query completes in <200ms | 007-NFR-001 |
 | 007-AC-021 | Slider responsiveness | 1. Open Timeline panel 2. Drag date slider rapidly 3. Observe UI updates | No perceptible lag (<100ms) | 007-NFR-004 |
+
+### Provenance and consistency
+
+| ID | Description | Steps | Expected result | Traces to |
+|----|-------------|-------|-----------------|-----------|
+| 007-AC-022 | Git-derived valid_from matches commit | 1. Create fixture repo, commit file at known timestamp T 2. Index the file 3. Query created edges | valid_from equals T (the commit's committer timestamp), valid_source='git' | 007-FR-003, 007-FR-025 |
+| 007-AC-023 | Filesystem fallback for untracked files | 1. Create untracked file (not committed) 2. Index the file 3. Query created edges | valid_from equals file mtime, valid_source='fs' | 007-FR-003 |
+| 007-AC-024 | Idempotent re-index creates no rows | 1. Index a section (edges created) 2. Count edge rows and timeline events 3. Re-index the unchanged section 4. Re-count | Zero new edge rows, zero new timeline events after re-index | 007-FR-026 |
+| 007-AC-025 | Slider snaps to event timestamps | 1. Create events at 3 distinct timestamps 2. Drag the slider between them | Slider position snaps to the 3 actual event timestamps; manual date entry still accepts arbitrary dates | 007-FR-017 |
 
 ## Definition of done
 

@@ -5,7 +5,7 @@
   "version": "0.1.1",
   "status": "draft",
   "created": "2025-12-22T17:10:00.000Z",
-  "updated": "2025-12-22T18:30:00.000Z",
+  "updated": "2026-07-23T13:12:00+02:00",
   "application": {
     "name": "Temporal queries & timeline",
     "domain": "knowledge-graph",
@@ -247,13 +247,37 @@
     "007-AC-021": {
       "section": "03-acceptance",
       "status": "active"
+    },
+    "007-FR-025": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-FR-026": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "007-AC-022": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-023": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-024": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "007-AC-025": {
+      "section": "03-acceptance",
+      "status": "active"
     }
   },
   "requirement_sequences": {
-    "FR": 24,
+    "FR": 26,
     "NFR": 4,
     "UC": 0,
-    "AC": 21,
+    "AC": 25,
     "TC": 0,
     "ES": 0,
     "BO": 0,
@@ -264,7 +288,7 @@
   "cross_references": [],
   "statistics": {
     "total_sections": 3,
-    "total_requirements": 49,
+    "total_requirements": 55,
     "total_words": 2180,
     "total_use_cases": 0,
     "total_stakeholders": 0,
@@ -329,6 +353,27 @@
       "target": "manifest",
       "description": "Migrated from BRS to managing-specs naming convention",
       "by": "system"
+    },
+    {
+      "date": "2026-07-23T12:20:00+02:00",
+      "operation": "UPDATE",
+      "target": "01-overview, 02-requirements, 03-acceptance",
+      "description": "Lens-review remediation: git-derived valid time (FR-003/004, FR-025 git-as-source-of-truth), tx_time renamed to audit-only recorded_at + valid_source provenance (FR-001/006), contradiction detection scoped to exclusive relation types (FR-014), idempotent re-extraction (FR-026), event-anchored slider (FR-017); AC-001/002/003/012/013 updated, AC-022..025 added",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T13:10:00+02:00",
+      "operation": "UPDATE",
+      "target": "02-requirements, 03-acceptance",
+      "description": "Lens-review round 2: edges timestamp columns standardized to INTEGER Unix-seconds (006-FR-002 canonical; 007-FR-001 deferred-types clause removed; 006-AC-002 asserts types)",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T13:12:00+02:00",
+      "operation": "UPDATE",
+      "target": "03-acceptance",
+      "description": "Lens-review round 2: AC-004 rewritten to test git-derived valid_to (removing-commit %ct) instead of wall-clock closure",
+      "by": "user"
     }
   ],
   "components": {

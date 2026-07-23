@@ -13,22 +13,37 @@ Heavy computation (indexing) should use worker threads or be chunked to avoid bl
 
 ### SQLite in Electron
 
-- Must use `better-sqlite3` (synchronous API) rather than `sqlite3` (callback-based)
-- Native module requires rebuild for Electron version
+- Must use `better-sqlite3` **>= 13** (synchronous API, N-API build) rather than `sqlite3` (callback-based)
+- v13+ is the N-API line: decoupled from V8 ABI, so a single N-API prebuild should serve Electron 39 – but Electron 39 prebuild coverage was still contested upstream as of 2026-07 (see better-sqlite3 issues #1416, #1384). At pin time, verify the published N-API prebuild actually covers Electron 39's N-API version and target platforms
+- `node:sqlite` (bundled with Node 22 in Electron 39) rejected for M1: compiled with `SQLITE_OMIT_LOAD_EXTENSION` and without FTS5, still experimental before Node 26 – cannot satisfy 004-FR-001/017/018. Revisit only if it gains FTS5
 - Database file must be in writable location (`.erfana/` directory)
 
 ### FTS5 limitations
 
 - FTS5 provides BM25 ranking but no semantic/vector search
 - Custom tokenizers require C extension (not available in M1)
-- Porter stemmer is built-in; language-specific stemming deferred
+- Porter stemmer is built-in; porter stemming is English-only – language-specific stemming and multilingual support deferred (see General deferrals)
+
+### Alternatives considered (2026-07)
+
+FTS5 + BM25 re-affirmed for M1 at this scale (≤10k sections, <50ms p95):
+- **Tantivy** rejected – would add a second native-module/ABI surface alongside better-sqlite3
+- **DuckDB FTS** rejected – analytics-oriented, not a fit for incremental per-project indexing
+- **Orama / minisearch** rejected – in-memory engines, no persisted per-project index
 
 ### MCP transport
 
-- MCP SDK supports stdio, SSE, and WebSocket transports
-- stdio selected for simplicity and security (no network exposure)
+- MCP defines two standard transports: stdio and Streamable HTTP (HTTP+SSE was replaced by Streamable HTTP in protocol rev 2025-03-26; WebSocket was never a standard transport)
+- stdio selected: local single-client server, no network exposure – choice re-affirmed 2026-07 against protocol revs through 2026-07-28
 - Single MCP server instance per Erfana process
 - Client connection management handled by MCP SDK
+
+### Contract stability (beta period)
+
+- MCP tool names and schemas (`erfana_graph_*` – all of them, including the Spec #005/#006/#007 tools) and the on-disk database schema are **beta until frozen**
+- Tool descriptions state "beta – contract may change" until the freeze
+- The database is a derived cache of the markdown sources: delete + reindex is always a valid recovery, so schema churn during beta needs no migration guarantees
+- Freeze criterion: ~one month of stable dogfood use and two consecutive releases without contract/schema churn (decision 2026-07-23)
 
 ## Assumptions
 
@@ -65,8 +80,8 @@ Heavy computation (indexing) should use worker threads or be chunked to avoid bl
 
 | Dependency | Version | Purpose |
 |------------|---------|---------|
-| better-sqlite3 | ^11.x | SQLite database with FTS5 |
-| @modelcontextprotocol/sdk | ^1.x | MCP server implementation |
+| better-sqlite3 | ^13.x | SQLite database with FTS5 (N-API line; required for Electron 39 – v12 and older fail to compile against Electron 39's V8, which removed Context::GetIsolate) |
+| @modelcontextprotocol/server | ^2.x (beta as of 2026-07) | MCP server implementation (SDK v2 registerTool API, protocol revision 2026-07-28; v2 split the monolithic SDK into @modelcontextprotocol/server + /client – if v2 is not stable at implementation time, fall back to @modelcontextprotocol/sdk latest v1.x targeting revision 2025-11-25) |
 
 ### Internal dependencies
 
@@ -78,9 +93,9 @@ Heavy computation (indexing) should use worker threads or be chunked to avoid bl
 
 ### Build dependencies
 
-- `better-sqlite3` requires Python and C++ build tools
-- Native module rebuild for Electron version
-- electron-rebuild or similar in build pipeline
+- `better-sqlite3` >= 13 uses N-API prebuilt binaries in the common case; Python and C++ toolchain retained for source-build fallback
+- The `.node` binary must be listed in `asarUnpack` in `electron-builder.yml` (native modules cannot load from inside ASAR)
+- electron-rebuild remains the documented fallback if the N-API prebuild does not cover the target Electron/platform (do not declare it unnecessary until prebuild coverage is verified at pin time)
 
 ## Out of Scope (Deferred)
 
@@ -159,7 +174,8 @@ CREATE VIRTUAL TABLE sections_fts USING fts5(
   file_path UNINDEXED,
   section_id UNINDEXED,
   content_hash UNINDEXED,
-  tokenize = 'porter'
+  -- porter stemming is English-only; unicode61 with remove_diacritics 2 normalizes accented text
+  tokenize = 'porter unicode61 remove_diacritics 2'
 );
 ```
 
@@ -189,26 +205,20 @@ projectManagement.on('project:changed', (event) => this.switchDatabase(event));
 
 ### MCP tool definition (proposed)
 
-```json
-{
-  "name": "erfana_graph_search",
-  "description": "Search project content using BM25 keyword ranking",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "query": { "type": "string", "description": "Search query" },
-      "k": { "type": "number", "default": 10, "description": "Number of results" },
-      "filters": {
-        "type": "object",
-        "properties": {
-          "folder": { "type": "string" },
-          "file_type": { "type": "string" },
-          "date_from": { "type": "string", "format": "date" },
-          "date_to": { "type": "string", "format": "date" }
-        }
-      }
-    },
-    "required": ["query"]
+```typescript
+// SDK v2 (@modelcontextprotocol/server ^2.x) – registerTool replaces raw tool JSON
+server.registerTool('erfana_graph_search', {
+  title: 'Search project content',
+  description: 'Search project content using BM25 keyword ranking (beta – contract may change)',
+  inputSchema: {
+    query: z.string().describe('Search query'),
+    k: z.number().default(10).describe('Number of results'),
+    filters: z.object({
+      folder: z.string().optional(),
+      file_type: z.string().optional(),
+      date_from: z.string().optional(),
+      date_to: z.string().optional()
+    }).optional()
   }
-}
+}, async (args) => { /* returns structured results */ })
 ```

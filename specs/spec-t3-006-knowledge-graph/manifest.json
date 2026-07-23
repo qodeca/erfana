@@ -4,7 +4,7 @@
   "tier": "T3",
   "version": "0.2.0",
   "created": "2025-12-22T23:00:00.000Z",
-  "updated": "2025-12-22T23:30:00Z",
+  "updated": "2026-07-23T14:12:00+02:00",
   "application": {
     "name": "Knowledge graph & entities",
     "domain": "graph-engine",
@@ -319,13 +319,61 @@
     "006-AC-034": {
       "section": "03-acceptance",
       "status": "active"
+    },
+    "006-FR-028": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-029": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-030": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-031": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-FR-032": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-NFR-008": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "006-AC-035": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-036": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-037": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-038": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-039": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "006-AC-040": {
+      "section": "03-acceptance",
+      "status": "active"
     }
   },
   "requirement_sequences": {
-    "FR": 27,
-    "NFR": 7,
+    "FR": 32,
+    "NFR": 8,
     "UC": 0,
-    "AC": 34,
+    "AC": 40,
     "TC": 0,
     "ES": 0,
     "BO": 0,
@@ -336,7 +384,7 @@
   "cross_references": [],
   "statistics": {
     "total_sections": 3,
-    "total_requirements": 68,
+    "total_requirements": 80,
     "total_words": 3116,
     "total_use_cases": 0,
     "total_stakeholders": 0,
@@ -463,6 +511,41 @@
       "target": "manifest",
       "description": "Migrated from BRS to managing-specs naming convention",
       "by": "system"
+    },
+    {
+      "date": "2026-07-23T12:12:00+02:00",
+      "operation": "UPDATE",
+      "target": "01-overview, 02-requirements, 03-acceptance",
+      "description": "Lens-review remediation: edges schema aligned with Spec #007 (recorded_at + valid_source, canonical src_id/dst_id), optional local NER extractor (FR-029), links-to edges (FR-028), relation-type vocabulary with exclusivity (FR-030/031), erfana_graph_traverse MCP tool (FR-032), FR-027 rescoped to exclusive types, FR-008 demoted to Could, SQLite-over-Kuzu rationale, NFR-008 + AC-035..039",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T13:10:00+02:00",
+      "operation": "UPDATE",
+      "target": "02-requirements, 03-acceptance",
+      "description": "Lens-review round 2: edges timestamp columns standardized to INTEGER Unix-seconds (006-FR-002 canonical; 007-FR-001 deferred-types clause removed; 006-AC-002 asserts types)",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T13:20:00+02:00",
+      "operation": "UPDATE",
+      "target": "02-requirements, 03-acceptance",
+      "description": "Lens-review round 2: AC-040 added (typed relation extraction test, FR-031 retraced), AC-010 char count fixed (16)",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T13:24:00+02:00",
+      "operation": "UPDATE",
+      "target": "requirements/overview",
+      "description": "Lens-review round 2 cosmetics: Kuzu note softened to verified fact (repository archived)",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T14:12:00+02:00",
+      "operation": "UPDATE",
+      "target": "requirements/notes/overview",
+      "description": "Interview D21 + D18 ripple: success criterion 5 rewritten to dogfood observable (no telemetry); FR-029/AC-036 NER model delivered on demand like the 005 embedding model",
+      "by": "user"
     }
   ],
   "components": {

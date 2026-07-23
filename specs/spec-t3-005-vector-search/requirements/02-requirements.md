@@ -20,7 +20,7 @@
 
 **Title:** Create vector virtual table for embeddings
 
-**Description:** The system shall create a virtual table `vss_sections` using sqlite-vec's virtual table syntax. The table shall store 384-dimensional vectors (matching all-MiniLM-L6-v2 output) with section ID foreign key reference.
+**Description:** The system shall create a virtual table `vss_sections` using sqlite-vec's virtual table syntax. The table shall store vectors of the model-profile dimension (default 256, MRL-truncated from EmbeddingGemma-300m's native 768) with section ID foreign key reference. The dimension shall be read from the model profile, never hardcoded.
 
 **Priority:** High
 
@@ -32,7 +32,7 @@
 
 **Title:** Verify sqlite-vec extension version
 
-**Description:** The system shall verify the loaded sqlite-vec extension version on startup and log it. Minimum supported version shall be documented. Version mismatch shall produce a warning log.
+**Description:** The system shall pin sqlite-vec to an exact version (no caret) in package.json – sqlite-vec is pre-v1 with announced breaking changes to SQL API and storage format – and verify the loaded version matches the pin at startup. Version mismatch shall produce an error, not a warning.
 
 **Priority:** Medium
 
@@ -58,7 +58,7 @@
 
 **Title:** Track embedding model version
 
-**Description:** The system shall store an embedder_id with each embedding to track which model version generated it. Format: `{model_name}:{version}` (e.g., `all-MiniLM-L6-v2:1.0.0`). When model changes, stale embeddings shall be re-computed.
+**Description:** The system shall store an embedder_id with each embedding to track which model version generated it. Format: `{model_name}:{version}:d{dimension}` (e.g., `embeddinggemma-300m:1.0:d256`). When the model changes, stale embeddings shall be re-computed via the 005-FR-039 detection mechanism.
 
 **Priority:** Medium
 
@@ -82,9 +82,9 @@
 
 #### 005-FR-007: Worker initialization
 
-**Title:** Initialize ONNX runtime worker thread
+**Title:** Initialize embedding worker thread
 
-**Description:** The system shall create a dedicated worker thread using Node.js worker_threads for ONNX inference. Worker shall load onnxruntime-node and initialize the inference session on startup.
+**Description:** The system shall create a dedicated worker thread using Node.js worker_threads for embedding inference. The worker shall host a transformers.js v4 feature-extraction pipeline (which uses onnxruntime-node under the hood) and initialize the inference session on startup.
 
 **Priority:** High
 
@@ -94,9 +94,9 @@
 
 #### 005-FR-008: Model loading
 
-**Title:** Load all-MiniLM-L6-v2 model
+**Title:** Load embedding model
 
-**Description:** The system shall load the all-MiniLM-L6-v2 ONNX model (384 dimensions, ~23MB) from bundled assets. Model path shall be configurable for development/testing.
+**Description:** The system shall load the EmbeddingGemma-300m ONNX model (quantized variant from `onnx-community/embeddinggemma-300m-ONNX`; record the actual artifact size when pinning) from the local model store (see FR-036). Native output is 768 dimensions; the system shall apply Matryoshka (MRL) truncation to the configured dimension (default 256). Model path and dimension shall come from a single model-profile config. A low-resource fallback profile (all-MiniLM-L6-v2, 384-dim, ~23 MB) may be offered where download size matters; the fallback profile is also delivered via the model store. Model path shall be configurable for development/testing.
 
 **Priority:** High
 
@@ -106,9 +106,9 @@
 
 #### 005-FR-009: Tokenization
 
-**Title:** Tokenize text with HuggingFace tokenizer
+**Title:** Tokenize text via the pipeline
 
-**Description:** The system shall use @huggingface/tokenizers for text tokenization matching the all-MiniLM-L6-v2 vocabulary. Tokenizer shall be loaded once and reused across batches.
+**Description:** Text tokenization shall be provided by the transformers.js pipeline using the tokenizer downloaded alongside the model into the local model store (see FR-036), matching the active model profile (no separate @huggingface/tokenizers dependency). Tokenizer shall be loaded once and reused across batches.
 
 **Priority:** High
 
@@ -130,9 +130,9 @@
 
 #### 005-FR-011: L2 normalization
 
-**Title:** Normalize embedding vectors
+**Title:** Pooling and normalization
 
-**Description:** The system shall L2-normalize all embedding vectors before storage to enable cosine similarity via dot product. Normalization shall occur in the worker thread after inference.
+**Description:** The pipeline shall produce sentence embeddings via attention-mask-weighted mean pooling of token embeddings followed by L2 normalization (transformers.js options `pooling: 'mean', normalize: true`), then apply MRL truncation to the profile dimension and re-normalize. Raw un-pooled token output shall never be stored. Pooling and normalization occur in the worker thread after inference.
 
 **Priority:** High
 
@@ -208,7 +208,7 @@
 
 **Title:** Split text into embedding chunks
 
-**Description:** The system shall split text into chunks of 256-384 tokens. Chunk size shall be configurable with default of 300 tokens.
+**Description:** The system shall split text into chunks of 256-512 tokens. Chunk size shall be configurable with default of 300 tokens. Note: EmbeddingGemma's 2048-token context means chunk size is bounded by retrieval granularity, not the model window.
 
 **Priority:** High
 
@@ -271,7 +271,7 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 **Title:** Generate embedding for search query
 
-**Description:** The system shall generate a 384-dimensional embedding for the search query using the same model and normalization as document embeddings.
+**Description:** The system shall generate an embedding of the model-profile dimension for the search query using the same model, pooling, normalization, and truncation as document embeddings.
 
 **Priority:** High
 
@@ -279,11 +279,11 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 ---
 
-#### 005-FR-021: L2 distance search
+#### 005-FR-021: Cosine distance search
 
-**Title:** Search by L2 distance
+**Title:** Search by cosine distance
 
-**Description:** The system shall use sqlite-vec's L2 distance function to find nearest neighbors. L2 distance on normalized vectors is equivalent to cosine distance.
+**Description:** The system shall use sqlite-vec's cosine distance (`distance_metric=cosine` on the virtual table) to find nearest neighbors. Note: L2 distance on normalized vectors is rank-equivalent to cosine, but the system standardizes on cosine.
 
 **Priority:** High
 
@@ -317,15 +317,15 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 ### Hybrid search fusion
 
-#### 005-FR-024: BM25 score normalization
+#### 005-FR-024: Reciprocal rank fusion (default)
 
-**Title:** Normalize BM25 scores
+**Title:** Fuse result lists with RRF
 
-**Description:** The system shall normalize BM25 scores to [0, 1] range using min-max normalization within each result set. Zero results shall produce empty normalized set.
+**Description:** The system shall fuse BM25 and vector result lists with reciprocal rank fusion: `score(d) = Σ_r w_r / (k + rank_r(d))` over the rankers that returned d, with k = 60 (configurable, ≥ 1) and per-ranker weights w_r default 1.0. RRF operates on ranks, requiring no score normalization. Zero results from both rankers shall produce an empty fused set.
 
 **Priority:** High
 
-**Traces to:** Spec #004 (BM25 search)
+**Traces to:** Spec #004 (BM25 search), 005-FR-021
 
 ---
 
@@ -333,7 +333,7 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 **Title:** Convert distance to similarity
 
-**Description:** The system shall convert L2 distances to similarity scores in [0, 1] range. Formula: `similarity = 1 / (1 + distance)`. Closer vectors produce higher similarity.
+**Description:** The system shall convert cosine distances to similarity scores. Formula: `similarity = 1 - cosine_distance`. Cosine distance is in [0, 2], so similarity is in [-1, 1]; for the linear-fusion mode and any [0, 1] display score, negative similarities shall be clamped to 0. Closer vectors produce higher similarity.
 
 **Priority:** High
 
@@ -341,11 +341,11 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 ---
 
-#### 005-FR-026: Weight application
+#### 005-FR-026: Fusion method selection
 
-**Title:** Apply fusion weights
+**Title:** Select fusion method
 
-**Description:** The system shall combine normalized scores using formula: `final_score = alpha * bm25_normalized + beta * vector_similarity`. Default weights: alpha=0.4, beta=0.6.
+**Description:** The system shall support fusion methods `rrf` (default) and `linear`. Linear mode combines min-max-normalized BM25 scores with clamped vector similarity as `final_score = alpha * bm25_normalized + beta * vector_similarity` (defaults alpha=0.4, beta=0.6), retained for experimentation. In linear mode, when max == min within a result set, all scores in that set normalize to 1.0.
 
 **Priority:** High
 
@@ -367,9 +367,9 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 #### 005-FR-028: Weight constraints
 
-**Title:** Validate fusion weight constraints
+**Title:** Validate fusion parameter constraints
 
-**Description:** The system shall enforce that alpha + beta = 1.0 and both weights are in [0, 1]. Invalid weights shall be rejected with descriptive error.
+**Description:** The system shall enforce per-mode constraints: rrf mode – k ≥ 1 and per-ranker weights ≥ 0; linear mode – alpha + beta = 1.0 and both weights in [0, 1]. Invalid parameters shall be rejected with descriptive error.
 
 **Priority:** Medium
 
@@ -379,11 +379,11 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 ### Settings UI
 
-#### 005-FR-029: Weight sliders
+#### 005-FR-029: Fusion tuning controls
 
-**Title:** Provide weight tuning sliders
+**Title:** Provide fusion tuning controls
 
-**Description:** The system shall provide slider controls in the Settings overlay for adjusting fusion weights (alpha, beta). Sliders shall be linked (adjusting one updates the other to maintain sum = 1).
+**Description:** The system shall provide a fusion-method selector (rrf | linear) in the Settings overlay with method-appropriate controls: rrf mode – k and per-ranker weights; linear mode – linked alpha/beta sliders (adjusting one updates the other to maintain sum = 1).
 
 **Priority:** Medium
 
@@ -395,7 +395,7 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 **Title:** Preview search results with current weights
 
-**Description:** The system shall show a live preview of search results with current weight settings. Preview shall update debounced (300ms) as weights change.
+**Description:** The system shall show a live preview of search results with current fusion settings. Preview shall update debounced (300ms) as settings change.
 
 **Priority:** Low
 
@@ -407,7 +407,7 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 **Title:** Persist weight settings
 
-**Description:** The system shall persist fusion weight settings to global settings (GlobalSettingsService). Settings shall be loaded on app start and applied to all searches.
+**Description:** The system shall persist fusion settings (method, k, weights) to global settings (GlobalSettingsService). Settings shall be loaded on app start and applied to all searches.
 
 **Priority:** Medium
 
@@ -417,9 +417,9 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 #### 005-FR-032: Reset to defaults
 
-**Title:** Reset weights to defaults
+**Title:** Reset fusion settings to defaults
 
-**Description:** The system shall provide a "Reset to defaults" button to restore weights to alpha=0.4, beta=0.6.
+**Description:** The system shall provide a "Reset to defaults" button to restore fusion settings to method=rrf, k=60, per-ranker weights=1.0 (linear-mode defaults remain alpha=0.4, beta=0.6).
 
 **Priority:** Low
 
@@ -443,27 +443,27 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 #### 005-FR-034: Rate limiting
 
-**Title:** Rate limit MCP queries
+**Title:** MCP rate limiting (advisory)
 
-**Description:** The system shall rate limit `erfana_graph_related` queries to 100 per minute per client. Exceeding limit shall return rate limit error with retry-after header.
+**Description:** The system shall apply the shared advisory MCP rate limit (Spec #004 FR-042: configurable, default 100 queries/minute, backpressure queue-and-delay, never hard rejection) to `erfana_graph_related` queries.
 
 **Priority:** Medium
 
-**Traces to:** 005-FR-033
+**Traces to:** 005-FR-033, Spec #004 FR-042
 
 ---
 
-### Model bundling
+### On-demand model delivery
 
-#### 005-FR-036: Model bundling
+#### 005-FR-036: On-demand model delivery
 
-**Title:** Bundle embedding model with application
+**Title:** Deliver embedding model on demand
 
-**Description:** The system shall bundle the all-MiniLM-L6-v2 ONNX model (~23MB) and tokenizer.json file in the application resources folder at `resources/models/`. The application shall not require network access to download models at runtime.
+**Description:** The embedding model shall NOT be bundled with the application. On first enablement of semantic search, the system shall download the pinned model artifact directly from Hugging Face (the user accepts upstream model terms at enable time; Qodeca does not redistribute the artifact), verify it against a SHA-256 hash pinned in the application, and store it in the local model store. After download, all operation is offline. BM25 keyword search works without the model. UX and storage follow the existing whisper model-download pattern (WhisperModelManager) minus the self-hosted mirror. Download failure leaves search in BM25-only mode with a clear retry path. (Decision 2026-07-23.)
 
 **Priority:** High
 
-**Traces to:** Offline operation, deployment simplicity
+**Traces to:** Offline after first download; upstream-terms compliance; no redistribution
 
 ---
 
@@ -473,11 +473,11 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 **Title:** Support binary quantization for large datasets
 
-**Description:** The system shall support optional binary quantization (BIT[384]) for datasets exceeding 500,000 documents, reducing storage requirements by approximately 32x while maintaining acceptable search quality.
+**Description:** The system shall support optional binary quantization of model-profile-dimension vectors for large datasets, using the two-stage oversample-and-rescore design specified in Spec #008 (FR-020); float32 vectors are retained for rescoring, so the ~32x reduction applies to the binary index footprint, not total storage. Recommendation threshold aligned with Spec #008 FR-028 (100,000 documents).
 
 **Priority:** Low (Could)
 
-**Traces to:** Scalability for large documentation projects
+**Traces to:** Scalability for large documentation projects, Spec #008
 
 ---
 
@@ -492,6 +492,30 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 **Priority:** Medium
 
 **Traces to:** Performance optimization, resource efficiency
+
+---
+
+#### 005-FR-039: Stale-embedding detection
+
+**Title:** Detect and re-embed stale embeddings on model change
+
+**Description:** On startup and after any model-profile change, the system shall scan for embeddings whose embedder_id differs from the active profile and queue affected sections for re-embedding, reusing the 005-FR-038 content-hash pipeline. Search shall exclude stale embeddings.
+
+**Priority:** Medium
+
+**Traces to:** 005-FR-005, 005-FR-038
+
+---
+
+#### 005-FR-040: Vector index rebuild on version drift
+
+**Title:** Rebuild vector index after incompatible sqlite-vec upgrade
+
+**Description:** When a sqlite-vec upgrade is incompatible with the stored index format, the system shall rebuild `vss_sections` from the float32 embeddings retained in the `embeddings` table (no re-inference needed), with progress surfaced to the user (minimal progress indication in M2; upgraded to the Spec #008 reindex-progress UX once that ships – soft dependency, not blocking).
+
+**Priority:** Medium
+
+**Traces to:** 005-FR-003, 005-FR-004
 
 ---
 
@@ -567,7 +591,7 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 **Title:** Worker pool stability limit
 
-**Description:** The system shall not exceed 4 concurrent ONNX workers due to onnxruntime-node stability constraints documented in their issue tracker.
+**Description:** The system shall not exceed 4 concurrent ONNX workers due to onnxruntime-node stability constraints documented in their issue tracker. Re-verify the 4-worker cap against the current onnxruntime-node issue tracker at implementation time; adjust if resolved upstream.
 
 **Acceptance:** Configuration attempting >4 workers is capped at 4.
 
@@ -589,6 +613,6 @@ The system shall normalize whitespace (max 2 consecutive newlines, collapse mult
 
 | Category | Count | IDs |
 |----------|-------|-----|
-| Functional Requirements | 38 | 005-FR-001 through 005-FR-038 |
+| Functional Requirements | 40 | 005-FR-001 through 005-FR-040 |
 | Non-Functional Requirements | 8 | 005-NFR-001 through 005-NFR-008 |
-| **Total** | **46** |
+| **Total** | **48** |

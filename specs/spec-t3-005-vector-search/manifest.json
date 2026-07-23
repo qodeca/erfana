@@ -4,15 +4,15 @@
   "tier": "T3",
   "version": "0.2.0",
   "created": "2025-12-22T22:30:00Z",
-  "updated": "2025-12-22T23:00:00Z",
+  "updated": "2026-07-23T14:05:00+02:00",
   "application": {
     "name": "Vector Search & Hybrid Retrieval",
     "domain": "search",
     "tech_stack": [
       "sqlite-vec",
+      "transformers.js",
       "onnxruntime-node",
-      "all-MiniLM-L6-v2",
-      "@huggingface/tokenizers",
+      "EmbeddingGemma-300m",
       "TypeScript"
     ]
   },
@@ -361,13 +361,29 @@
     "005-AC-032": {
       "section": "03-acceptance",
       "status": "active"
+    },
+    "005-FR-039": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-AC-033": {
+      "section": "03-acceptance",
+      "status": "active"
+    },
+    "005-FR-040": {
+      "section": "02-requirements",
+      "status": "active"
+    },
+    "005-AC-034": {
+      "section": "03-acceptance",
+      "status": "active"
     }
   },
   "requirement_sequences": {
-    "FR": 38,
+    "FR": 40,
     "NFR": 8,
     "UC": 0,
-    "AC": 32,
+    "AC": 34,
     "TC": 0,
     "ES": 0,
     "BO": 0,
@@ -384,7 +400,7 @@
   ],
   "statistics": {
     "total_sections": 3,
-    "total_requirements": 78,
+    "total_requirements": 82,
     "total_words": 4326,
     "total_use_cases": 0,
     "total_stakeholders": 0,
@@ -436,6 +452,41 @@
       "target": "manifest",
       "description": "Migrated from BRS to managing-specs naming convention",
       "by": "system"
+    },
+    {
+      "date": "2026-07-23T11:58:00+02:00",
+      "operation": "UPDATE",
+      "target": "01-overview, 02-requirements, 03-acceptance",
+      "description": "Lens-review remediation: EmbeddingGemma-300m re-baseline (MRL 256-dim, model profile), transformers.js v4 runtime with explicit mean-pooling requirement (FR-011), chunk-range note, added FR-039 stale-embedding detection + AC-033",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T12:05:00+02:00",
+      "operation": "UPDATE",
+      "target": "02-requirements, 03-acceptance",
+      "description": "Lens-review remediation: RRF as default fusion (FR-024/026/028 fusion group redefined in place \u2013 deliberate exception to append-only, see plan), cosine distance standardization with clamping (FR-021/025), exact sqlite-vec pin (FR-003), added FR-040 index-rebuild-on-drift + AC-034; Settings FRs reworked to fusion-method controls",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T13:05:00+02:00",
+      "operation": "UPDATE",
+      "target": "02-requirements, 03-acceptance",
+      "description": "Lens-review round 2: FR-034/AC-024 aligned with Spec #004 FR-042 advisory backpressure rate limiting (was hard-reject with retry-after)",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T13:24:00+02:00",
+      "operation": "UPDATE",
+      "target": "requirements/overview",
+      "description": "Lens-review round 2 cosmetics: FR-021 heading renamed to Cosine distance search, embedder_id example format normalized",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T14:05:00+02:00",
+      "operation": "UPDATE",
+      "target": "01-overview, 02-requirements, 03-acceptance",
+      "description": "Interview D18/D19: model delivery changed from bundled to on-demand SHA-256-pinned Hugging Face download (FR-036 rewrite + section rename, FR-008/FR-009 model-store sourcing, AC-032 rewrite, AC-004 gated on prior download, overview delivery sentence)",
+      "by": "user"
     }
   ],
   "components": {

@@ -4,7 +4,7 @@
   "tier": "T4",
   "version": "0.2.0",
   "created": "2025-12-22T21:00:00Z",
-  "updated": "2025-12-22T22:30:00Z",
+  "updated": "2026-07-23T14:30:00+02:00",
   "application": {
     "name": "Graph Engine Foundation",
     "domain": "search",
@@ -622,6 +622,48 @@
       "target": "manifest",
       "description": "Migrated from BRS to managing-specs naming convention",
       "by": "system"
+    },
+    {
+      "date": "2026-07-23T11:45:00+02:00",
+      "operation": "UPDATE",
+      "target": "05-notes",
+      "description": "Lens-review remediation: better-sqlite3 ^13.x, N-API build notes, node:sqlite rejection rationale, FTS5 alternatives note, tokenizer diacritics",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T11:50:00+02:00",
+      "operation": "UPDATE",
+      "target": "05-notes, 02-requirements, 03-use-cases, 04-acceptance",
+      "description": "Lens-review remediation: MCP SDK v2 (registerTool, protocol 2026-07-28 with v1.x fallback), corrected transport rationale (stdio + Streamable HTTP), FR-042/UC-007/AC-030 advisory backpressure rate limiting",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T13:15:00+02:00",
+      "operation": "UPDATE",
+      "target": "05-notes, 02-requirements",
+      "description": "Lens-review round 2: MCP SDK v2 package coordinate corrected to @modelcontextprotocol/server (v2 split the monolithic /sdk package); /sdk retained only for the v1.x fallback path",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T13:20:00+02:00",
+      "operation": "UPDATE",
+      "target": "acceptance/requirements",
+      "description": "Lens-review round 2: AC-010 NFR-003 citation corrected (<500ms bound)",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T14:12:00+02:00",
+      "operation": "UPDATE",
+      "target": "requirements/notes/overview",
+      "description": "Interview D20: Contract stability (beta period) subsection in 05-notes, beta disclaimer carried in tool-definition example and FR-039/FR-040",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T14:30:00+02:00",
+      "operation": "UPDATE",
+      "target": "registry link",
+      "description": "Release-1 implementation issue #17 (Graph engine R1: project search) filed and linked",
+      "by": "user"
     }
   ],
   "components": {

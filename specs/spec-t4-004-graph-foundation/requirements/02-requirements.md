@@ -443,7 +443,7 @@ The system shall show detailed indexing information when user clicks the status 
 **Priority:** Critical
 **Traces to:** Claude integration
 
-The system shall implement an MCP server using stdio transport that exposes graph engine capabilities to Claude Code.
+The system shall implement an MCP server using stdio transport that exposes graph engine capabilities to Claude Code. The server shall be built on the MCP TypeScript SDK v2 (`@modelcontextprotocol/server`, `registerTool` API) targeting protocol revision 2026-07-28; if v2 is not yet stable at implementation time, use `@modelcontextprotocol/sdk` latest v1.x targeting revision 2025-11-25. Until the beta freeze (see notes §Contract stability), tool descriptions shall carry a beta disclaimer.
 
 **Acceptance:** MCP server responds to initialize/shutdown protocol messages.
 
@@ -454,7 +454,7 @@ The system shall implement an MCP server using stdio transport that exposes grap
 **Priority:** Critical
 **Traces to:** Claude integration
 
-The system shall register an `erfana_graph_search` tool with parameters: query (string), k (number, optional), filters (object, optional).
+The system shall register an `erfana_graph_search` tool with parameters: query (string), k (number, optional), filters (object, optional). Tool registration shall use the SDK v2 `registerTool` API with `title`, `description`, and Zod input schema. The registered description shall include the beta disclaimer until freeze.
 
 **Acceptance:** Tool appears in MCP tools list with correct schema.
 
@@ -476,9 +476,9 @@ The system shall execute search queries received via MCP and return formatted re
 **Priority:** Medium
 **Traces to:** Stability
 
-The system shall implement rate limiting of 100 queries per minute per MCP client to prevent runaway queries.
+The system shall apply configurable, advisory rate limiting to MCP queries (default 100 queries/minute) using backpressure (queue-and-delay) rather than hard rejection; the limit exists as runaway-query cost protection for a local single-client stdio server and shall be adjustable in settings.
 
-**Acceptance:** 101st query within one minute returns rate limit error response.
+**Acceptance:** Queries beyond the configured rate are queued and delayed, not rejected; all queries eventually complete.
 
 ---
 

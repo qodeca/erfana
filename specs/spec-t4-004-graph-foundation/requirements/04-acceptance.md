@@ -149,7 +149,7 @@ Content for h3
 **Then:**
 - Only the changed section is updated (1 UPDATE)
 - Unchanged sections are not touched (4 skipped)
-- Operation completes in < 100ms (per 004-NFR-003 incremental update latency requirement)
+- Operation completes in < 100ms (stricter than 004-NFR-003's < 500ms incremental update latency bound)
 
 ---
 
@@ -438,14 +438,14 @@ Content for h3
 ### 004-AC-030: MCP rate limiting
 
 **Traces to:** 004-FR-042
-**Type:** Error scenario
+**Type:** Behavioral scenario
 
-**Given:** MCP client has made 100 queries in the last minute
+**Given:** MCP client has made 100 queries in the last minute (default limit)
 **When:** Client makes query 101
 **Then:**
-- Error response is returned
-- Error indicates rate limit exceeded
-- Retry-after hint is provided
+- The query is queued and delayed (backpressure), not rejected
+- No error response is returned; the query eventually completes
+- The limit is configurable in settings
 
 ---
 
