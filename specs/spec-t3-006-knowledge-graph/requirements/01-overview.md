@@ -61,5 +61,5 @@ The Knowledge Graph system addresses these challenges by:
 2. **Extraction performance**: <50ms per section for entity extraction
 3. **Backlinks query performance**: <100ms for retrieving backlinks for any entity
 4. **Scalability**: Handle 100,000+ entities without degradation
-5. **User adoption**: Knowledge Panel used in >30% of editing sessions (measured via telemetry)
+5. **User adoption**: Knowledge Panel proves its worth in user-zero dogfooding – in routine use (opened without deliberate effort) within a month of its release; no telemetry is collected
 6. **Developer integration**: MCP tools successfully invoked by Claude Code for entity queries

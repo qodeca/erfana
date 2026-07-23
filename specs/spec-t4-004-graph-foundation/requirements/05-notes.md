@@ -38,6 +38,13 @@ FTS5 + BM25 re-affirmed for M1 at this scale (≤10k sections, <50ms p95):
 - Single MCP server instance per Erfana process
 - Client connection management handled by MCP SDK
 
+### Contract stability (beta period)
+
+- MCP tool names and schemas (`erfana_graph_*` – all of them, including the Spec #005/#006/#007 tools) and the on-disk database schema are **beta until frozen**
+- Tool descriptions state "beta – contract may change" until the freeze
+- The database is a derived cache of the markdown sources: delete + reindex is always a valid recovery, so schema churn during beta needs no migration guarantees
+- Freeze criterion: ~one month of stable dogfood use and two consecutive releases without contract/schema churn (decision 2026-07-23)
+
 ## Assumptions
 
 ### File system
@@ -202,7 +209,7 @@ projectManagement.on('project:changed', (event) => this.switchDatabase(event));
 // SDK v2 (@modelcontextprotocol/server ^2.x) – registerTool replaces raw tool JSON
 server.registerTool('erfana_graph_search', {
   title: 'Search project content',
-  description: 'Search project content using BM25 keyword ranking',
+  description: 'Search project content using BM25 keyword ranking (beta – contract may change)',
   inputSchema: {
     query: z.string().describe('Search query'),
     k: z.number().default(10).describe('Number of results'),

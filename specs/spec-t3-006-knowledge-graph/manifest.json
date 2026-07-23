@@ -4,7 +4,7 @@
   "tier": "T3",
   "version": "0.2.0",
   "created": "2025-12-22T23:00:00.000Z",
-  "updated": "2026-07-23T13:24:00+02:00",
+  "updated": "2026-07-23T14:12:00+02:00",
   "application": {
     "name": "Knowledge graph & entities",
     "domain": "graph-engine",
@@ -538,6 +538,13 @@
       "operation": "UPDATE",
       "target": "requirements/overview",
       "description": "Lens-review round 2 cosmetics: Kuzu note softened to verified fact (repository archived)",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-23T14:12:00+02:00",
+      "operation": "UPDATE",
+      "target": "requirements/notes/overview",
+      "description": "Interview D21 + D18 ripple: success criterion 5 rewritten to dogfood observable (no telemetry); FR-029/AC-036 NER model delivered on demand like the 005 embedding model",
       "by": "user"
     }
   ],
