@@ -18,6 +18,8 @@ Heavy computation (indexing) should use worker threads or be chunked to avoid bl
 - `node:sqlite` (bundled with Node 22 in Electron 39) rejected for M1: compiled with `SQLITE_OMIT_LOAD_EXTENSION` and without FTS5, still experimental before Node 26 – cannot satisfy 004-FR-001/017/018. Revisit only if it gains FTS5
 - Database file must be in writable location (`.erfana/` directory)
 
+> **Native-dependency spike (#19 / SD-019):** the prebuild-coverage, FTS5, worker-concurrency, and MCP-SDK questions in this section and under Dependencies are empirically de-risked in the spike findings note — see [`docs/graph/native-dependencies.md`](../../../docs/graph/native-dependencies.md) (consumed by #23 DB layer / #30 MCP server).
+
 ### FTS5 limitations
 
 - FTS5 provides BM25 ranking but no semantic/vector search

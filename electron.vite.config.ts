@@ -17,7 +17,18 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve('src/main/index.ts'),
-          'git-status.worker': resolve('src/main/services/workers/git-status.worker.ts')
+          'git-status.worker': resolve('src/main/services/workers/git-status.worker.ts'),
+          // SD-019 (#19) native-dependency spike: emits out/main/sqlite-smoke.worker.js,
+          // loaded by nativeDepsSmoke.ts via join(__dirname, ...) like the git worker.
+          'sqlite-smoke.worker': resolve('src/main/services/workers/sqlite-smoke.worker.ts')
+        },
+        output: {
+          // Keep split chunks flat in out/main/ (not out/main/chunks/) so a
+          // dynamically-imported module's __dirname is out/main — the same
+          // directory as the worker entries it loads via join(__dirname, …).
+          // Required for nativeDepsSmoke.ts (a dynamic-import chunk) to resolve
+          // out/main/sqlite-smoke.worker.js. See SD-019 §5.
+          chunkFileNames: '[name]-[hash].js'
         }
       },
       // externalizeDeps defaults to true for main process (electron-vite convention).

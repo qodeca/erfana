@@ -421,6 +421,74 @@ function pruneForeignNodePtyPrebuilds(resourcesDir, platform, archEnum, { requir
 }
 
 /**
+ * Delete foreign-platform/arch better-sqlite3 prebuilds from the packed bundle.
+ *
+ * SD-019 (#19): unlike node-pty's per-arch *directory* layout, better-sqlite3
+ * ships **flat** files — `prebuilds/<plat>-<arch>.node` (8 of them: darwin,
+ * linux, linuxmusl, win32 × x64/arm64). A single-arch bundle loads only its
+ * own (the loader resolves `<platform>-<arch>.node`; musl is Linux-only and
+ * never shipped), so a win bundle would otherwise carry ~6 foreign `.node`
+ * files. Keep `<platform>-<arch>.node`, delete the rest, then verify the
+ * target survived (keep-then-verify — never delete the file we keep).
+ *
+ * Reframed as size hygiene (SD-019 §4 Decision 3): the prune runs on **both**
+ * mac + win regardless of whether foreign prebuilds gate codesign. Runs in
+ * afterPack (before signing) so the pruned tree is what gets signed.
+ *
+ * @param {string} resourcesDir - dir containing `app/node_modules`
+ * @param {string} platform - context.electronPlatformName ('darwin'|'linux'|'win32')
+ * @param {number} archEnum - electron-builder Arch enum value (context.arch)
+ * @param {object} [options]
+ * @param {boolean} [options.requireMatch=false] - throw if the target prebuild is absent
+ */
+function pruneForeignBetterSqlitePrebuilds(resourcesDir, platform, archEnum, { requireMatch = false } = {}) {
+  const arch = Arch[archEnum];
+  if (arch === 'armv7l' || arch === 'ia32') {
+    console.warn(`⚠️  better-sqlite3 prune: arch '${arch}' is not a shipped target — skipping`);
+    return;
+  }
+  // 'universal' keeps every arch of the target platform ('<platform>-*.node');
+  // a narrow build keeps exactly '<platform>-<arch>.node'.
+  const narrowArch = arch !== 'universal';
+
+  const prebuildsDir = path.join(resourcesDir, 'app', 'node_modules', 'better-sqlite3', 'prebuilds');
+  if (!fs.existsSync(prebuildsDir)) {
+    console.warn(`⚠️  better-sqlite3 prebuilds not found at ${prebuildsDir} — skipping prune`);
+    return;
+  }
+
+  // Keep the host prebuild only. better-sqlite3 names files '<plat>-<arch>.node'
+  // (musl is a Linux-only variant we never ship on mac/win).
+  const keep = (name) =>
+    narrowArch ? name === `${platform}-${arch}.node` : name.startsWith(`${platform}-`) && name.endsWith('.node');
+  let removed = 0;
+
+  for (const entry of fs.readdirSync(prebuildsDir, { withFileTypes: true })) {
+    // Only prune regular `.node` files. Symlinks report isFile() === false
+    // under lstat semantics and are skipped — never deleted-through.
+    if (!entry.isFile() || entry.isSymbolicLink()) continue;
+    if (!entry.name.endsWith('.node') || keep(entry.name)) continue;
+    fs.rmSync(path.join(prebuildsDir, entry.name), { force: true });
+    removed++;
+  }
+
+  // Keep-then-verify: a target prebuild MUST survive the prune.
+  const kept = fs.readdirSync(prebuildsDir).filter(keep);
+  if (kept.length === 0) {
+    if (requireMatch) {
+      throw new Error(
+        `better-sqlite3 prune left no prebuild for ${platform}-${narrowArch ? arch : '*'}. ` +
+        `Refusing to ship a broken bundle.`
+      );
+    }
+    console.warn(`⚠️  better-sqlite3 target for ${platform} absent after prune (cross-platform pack?)`);
+    return;
+  }
+
+  console.log(`✅ Pruned ${removed} foreign better-sqlite3 prebuild(s); kept ${kept.join(', ')}`);
+}
+
+/**
  * Rename app bundle to include test suffix for visual differentiation.
  * This helps prevent accidental distribution of test builds.
  *
@@ -513,6 +581,9 @@ async function afterPack(context) {
     const requireMatch = context.electronPlatformName === process.platform;
     pruneForeignFfprobeBinaries(pruneResources(), context.electronPlatformName, context.arch, { requireMatch });
     pruneForeignNodePtyPrebuilds(pruneResources(), context.electronPlatformName, context.arch, { requireMatch });
+    // SD-019 (#19): flat-file prune of better-sqlite3 prebuilds. Runs for both
+    // mac + win (the two shipped platforms carry foreign `<plat>-<arch>.node`).
+    pruneForeignBetterSqlitePrebuilds(pruneResources(), context.electronPlatformName, context.arch, { requireMatch });
   }
 
   // Restore execute bit on node-pty's spawn-helper before code-signing so
@@ -603,5 +674,6 @@ module.exports.chmodNodePtySpawnHelper = chmodNodePtySpawnHelper;
 module.exports.ensurePackedMediaBinaries = ensurePackedMediaBinaries;
 module.exports.pruneForeignFfprobeBinaries = pruneForeignFfprobeBinaries;
 module.exports.pruneForeignNodePtyPrebuilds = pruneForeignNodePtyPrebuilds;
+module.exports.pruneForeignBetterSqlitePrebuilds = pruneForeignBetterSqlitePrebuilds;
 module.exports.SPAWN_HELPER_MODE = SPAWN_HELPER_MODE;
 module.exports.MEDIA_BINARY_MIN_BYTES = MEDIA_BINARY_MIN_BYTES;

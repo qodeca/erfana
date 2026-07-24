@@ -32,6 +32,10 @@ files:
   - '!node_modules/jsdom/**'
   - '!node_modules/canvas/**'
   - '!node_modules/@mapbox/node-pre-gyp/**'
+  # SD-019 (#19): better-sqlite3 loads its bundled flat prebuild
+  # (prebuilds/<plat>-<arch>.node); the source-build inputs + node-gyp
+  # build tree are dead weight in the shipped bundle.
+  - '!node_modules/better-sqlite3/{deps,build,src}/**'
 asar: false
 npmRebuild: false
 # Explicitly disable auto-updater metadata.

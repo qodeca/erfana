@@ -140,6 +140,70 @@ jobs:
           echo "dir=$DIR" >> "$GITHUB_OUTPUT"
           ls -la "$DIR"
 
+      - name: Packaged native-deps smoke (advisory)
+        # SD-019 (#19): launch the signed, fuse-flipped .app with
+        # ERFANA_SMOKE=native-deps. The main-process guard runs the
+        # better-sqlite3 (FTS5 + worker_thread + concurrent main-process DB)
+        # and MCP in-memory round-trip smoke, then app.exit(0/1) BEFORE any
+        # window is created. Placed after the electron-builder sign step and
+        # before DMG notarize/staple (design F15) so a bundle-load regression
+        # in the signed .app surfaces early on the packaged authority path
+        # (AC#1/AC#2 for mac-arm64).
+        #
+        # advisory-first per SD-019 §Decision 5 — promote to a hard gate after
+        # a green soak; exercised on is-dry-run before any live tag.
+        continue-on-error: true
+        # Step-level hard ceiling (FIX 1b): even if the bounded launch below is
+        # bypassed, a hang self-terminates here and — being continue-on-error —
+        # never burns the job.
+        timeout-minutes: 5
+        env:
+          ERFANA_SMOKE: native-deps
+          # Persist the smoke report to a file (FIX 2) and `cat` it below — the
+          # app writes summary + checks[] + loadedBinaryPath there synchronously
+          # before app.exit, so a failure is triageable even if stderr is lost.
+          ERFANA_SMOKE_LOG: ${{ runner.temp }}/native-deps-smoke-mac.log
+          # Pass the build-output dir via env (not inline ${{ }} interpolation
+          # into the shell) — defense-in-depth against untrusting this output.
+          DIR: ${{ steps.art.outputs.dir }}
+        run: |
+          set -uo pipefail
+          # Anchor the expected packaged app path directly (FIX 7); fall back to
+          # a find only if electron-builder ever changes the mac-arm64 layout.
+          APP="$DIR/mac-arm64/Erfana.app"
+          if [ ! -d "$APP" ]; then
+            APP=$(find "$DIR" -maxdepth 3 -name 'Erfana.app' -print | head -n1)
+          fi
+          if [ -z "$APP" ] || [ ! -d "$APP" ]; then
+            echo "::warning::Erfana.app not found under $DIR — skipping packaged native-deps smoke"
+            exit 0
+          fi
+          BIN="$APP/Contents/MacOS/Erfana"
+          echo "Running packaged native-deps smoke: $BIN"
+          # Bounded launch (FIX 1b): cap the binary at 120s so a hang in the
+          # native load / concurrent DB / MCP round-trip fails fast instead of
+          # waiting out the step ceiling. `timeout` ships in coreutils on the
+          # GitHub macOS image; fall back to a direct launch if it is ever
+          # absent (the step timeout-minutes still bounds it).
+          if command -v timeout >/dev/null 2>&1; then
+            timeout 120 "$BIN" 2>&1 | tee "$RUNNER_TEMP/native-deps-smoke-mac.console.log"
+          else
+            "$BIN" 2>&1 | tee "$RUNNER_TEMP/native-deps-smoke-mac.console.log"
+          fi
+          CODE=${PIPESTATUS[0]}
+          echo "packaged native-deps smoke exit code: $CODE"
+          echo "----- native-deps smoke log ($ERFANA_SMOKE_LOG) -----"
+          cat "$ERFANA_SMOKE_LOG" 2>/dev/null || echo "(no smoke log file written)"
+          echo "-----------------------------------------------------"
+          if [ "$CODE" -eq 124 ]; then
+            echo "::warning::packaged native-deps smoke TIMED OUT after 120s (advisory — non-blocking per SD-019 Decision 5)"
+          elif [ "$CODE" -ne 0 ]; then
+            echo "::warning::packaged native-deps smoke returned $CODE (advisory — non-blocking per SD-019 Decision 5)"
+          else
+            echo "packaged native-deps smoke PASSED (exit 0)"
+          fi
+          exit "$CODE"
+
       - name: Notarize + staple DMGs
         # electron-builder's `mac.notarize: true` notarizes the .app bundle
         # inside each DMG but NOT the DMG container itself. spctl assesses
