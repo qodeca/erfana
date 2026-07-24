@@ -16,9 +16,11 @@ rely on it.
 (`node scripts/smoke/sqlite-worker-smoke.mjs`), the in-process vitest smoke, and a
 **local unpacked Electron 39 mac-arm64 developer run**
 (`ERFANA_SMOKE=native-deps electron .` — real worker + real main DB concurrent,
-exit 0) are **verified**. The packaged, signed, notarized mac/win bundle load is
-**not yet run in CI** — the advisory packaged smoke steps are wired but must be
-exercised (§13). Treat any claim tagged _(UNVERIFIED)_ accordingly.
+exit 0) are **verified**. The **signed, packaged win-x64 bundle load is now
+verified in CI** (run 30102038426 — §3/§13); the **signed/notarized mac-arm64**
+packaged load is **not yet run in CI** — its advisory packaged smoke step is
+wired but must still be exercised (§13). Treat any claim tagged _(UNVERIFIED)_
+accordingly.
 
 See the design for full rationale: `specs/designs/sd-019-native-dep-spike.md`.
 
@@ -119,6 +121,31 @@ printed the absolute path of the loaded `.node`:
   **record the loaded path**. #23 should keep the smoke's path assertion so a
   future install that starts source-building a real `build/Release/*.node` is
   caught.
+
+**win-x64 — VERIFIED (signed, packaged CI run).** The packaged Windows smoke in
+the signed bundle recorded the loaded binary as the flat win-x64 prebuild inside
+the packaged (unpacked, `asar:false`) app tree:
+
+```
+\\?\D:\a\erfana\erfana\release\0.16.3\win-unpacked\resources\app\node_modules\better-sqlite3\prebuilds\win32-x64.node
+```
+
+- Evidence: `release.yml` dry-run **run 30102038426**, `build_win` job
+  **89510284522**, branch `feat/19-native-dep-spike` @ `3229b7e` (dry-run —
+  nothing shipped). The `sqlite:prebuild-path` check reported
+  `loaded from prebuilds/: …\prebuilds\win32-x64.node` — the **prebuild wins on
+  win-x64 too**, not `build/Release/`. The foreign-prebuild prune ran in
+  `afterPack` and logged `✅ Pruned 7 foreign better-sqlite3 prebuild(s); kept
+  win32-x64.node` (v13 ships 8 flat prebuilds → 7 pruned), so only
+  `win32-x64.node` remained under `prebuilds/` in the signed bundle.
+- **Not run locally.** The local unpacked-Electron proxy was **not** executed on
+  the spike owner's Windows box — it is Windows-x64 **emulated on Apple Silicon
+  (Parallels)** and its native toolchain is broken for this build: node-gyp
+  `10.2.0-electron.1` does not recognize the installed **Visual Studio 2026
+  (v18.6)** and falls back to an uninstalled **ClangCL** toolset (`MSB8020`), so
+  `electron-builder install-app-deps` cannot rebuild better-sqlite3 there. The
+  **CI `windows-latest` (real bare-metal x64) signed run is therefore the sole
+  win-x64 authority** — which is the stronger proof anyway (§11).
 
 ## 4. better-sqlite3 13 freshness + regression history (risk for #23)
 
@@ -274,7 +301,7 @@ per worker plus a main-process instance.
 | Arch | Status | Path |
 |---|---|---|
 | **mac-arm64** | Supported — verified path (local + will be packaged authority) | bundled prebuild |
-| **win-x64** | Supported — verified path _(packaged run still pending, §13)_ | bundled prebuild |
+| **win-x64** | Supported — **VERIFIED** (signed packaged CI run 30102038426, §3/§13) | bundled prebuild |
 | mac-x64 | Source-build-only, **unverified** | silent source build |
 | win-arm64 | Source-build-only, **unverified** | silent source build |
 | Linux (all) | Source-build-only, **unverified** (dev/CI cross-check only) | silent source build |
@@ -326,45 +353,68 @@ $ node scripts/smoke/sqlite-worker-smoke.mjs
 Supply chain: `npm audit signatures` → **1314 signatures verified, 134
 attestations** (PASS).
 
-## 13. Still UNVERIFIED — what the packaged CI run must confirm
+## 13. Verification status — packaged/signed CI runs
 
-These carry the **AC#1/AC#2 authority** and are **not yet run**. #23/#30 must not
-treat them as proven until a packaged/signed CI run is green:
+These carry the **AC#1/AC#2 authority**. #23/#30 must not treat any item still
+tagged UNVERIFIED as proven until its packaged/signed CI run is green.
 
-1. **Signed packaged bundle load (AC#1/AC#2 authority).** better-sqlite3 loading
-   from the **signed, notarized/stapled, fuse-flipped** mac-arm64 `.app` and the
-   signed win-x64 bundle — via the advisory packaged smoke steps. Local runs use
-   an unsigned dev binary.
+> **Update (win-x64 VERIFIED, 2026-07-24).** The **Windows x64** leg is now
+> proven end-to-end by a signed packaged CI run — `release.yml` dry-run
+> **run 30102038426**, `build_win` job **89510284522**, branch
+> `feat/19-native-dep-spike` @ `3229b7e`, on `windows-latest` (real bare-metal
+> x64), signed via Azure Trusted Signing (`signtool verify /pa /all` →
+> "Successfully verified"). The packaged smoke exited **0** with **7/7 checks
+> PASS** and `loadedBinaryPath = …\win-unpacked\resources\app\node_modules\
+> better-sqlite3\prebuilds\win32-x64.node`. This flips items **1 (win half)**,
+> **3**, and **4 (win half)** below. The **mac-arm64** halves and item **2**
+> remain UNVERIFIED (this pass was Windows-only). The advisory-first gating is
+> intentionally **unchanged** — a single green run is not the multi-run soak
+> SD-019 Decision 5 requires before promoting the step to a hard gate.
+
+1. **Signed packaged bundle load (AC#1/AC#2 authority).**
+   - **win-x64 — VERIFIED** (run 30102038426): better-sqlite3 loaded from the
+     signed, fuse-flipped `win-unpacked` bundle's `node_modules/…/prebuilds/
+     win32-x64.node`.
+   - **mac-arm64 — UNVERIFIED:** loading from the **signed, notarized/stapled,
+     fuse-flipped** `.app` is still pending (local runs used an unsigned dev
+     binary).
 2. **Codesign A/B (F9).** `codesign --verify --deep --strict` on **pruned vs
    unpruned** signed mac bundles — records whether the foreign-prebuild prune
    actually gates codesign (expected: no; prune stays for size regardless).
-3. **The entire Windows x64 leg.** The win-x64 prebuild load, FTS5, worker_thread
-   execution, and MCP round-trip inside the packaged Windows app. Only the Node
-   cross-check + `windows-checks` vitest have run; the **packaged** Windows smoke
-   is pending. Note the Electron Windows GUI-subsystem caveat: the packaged smoke
-   relies on the `app.exit` **code** (stderr may not reach the CI console). To
+3. **The entire Windows x64 leg — VERIFIED** (run 30102038426). The win-x64
+   prebuild load (`sqlite:load`), FTS5 compile-option + two-doc MATCH
+   (`sqlite:fts5-compileoption`, `sqlite:fts5-match`), `worker_thread` +
+   main-process concurrency (`main:concurrent-db`), and the MCP round-trip
+   (`mcp:listTools`, `mcp:callTool`) **all PASSED inside the signed, packaged
+   Windows app** (exit 0). The foreign-prebuild prune logged `Pruned 7 …; kept
+   win32-x64.node`. Note the Electron Windows GUI-subsystem caveat that made this
+   verifiable: the packaged smoke relies on the `app.exit` **code** (stderr may
+   not reach the CI console). To
    preserve the which-binary-loaded evidence despite that, the smoke also writes
    its summary + `checks[]` + `loadedBinaryPath` to `ERFANA_SMOKE_LOG`
    (synchronously, before `app.exit`); both the mac and win CI steps set that env
    var to a temp path and `cat` it after the launch (FIX 2). Both packaged steps
    are additionally bounded — `timeout-minutes: 5` plus a `timeout 120` (mac) /
    120s SIGKILL watchdog (win) — so a hang fails only the advisory step.
-4. **Packaged AC#4 — MCP round-trip in the signed bundle _(UNVERIFIED)_.** The
-   MCP `mcp:listTools` + `mcp:callTool` checks are proven **in-process** (vitest)
-   and via the local dev run, but their execution **inside the signed, packaged
-   mac/win bundle** — where the SDK ships as electron-vite-inlined JS in
-   `out/main` rather than as a `node_modules` package (§5, §8) — has **not** been
-   confirmed. Because the packaged mac/win smoke steps are `continue-on-error`
-   (advisory-first, Decision 5), a silent MCP failure in the signed bundle would
-   emit only a `::warning::` and would **not** red CI. This item stays UNVERIFIED
-   until a **packaged smoke log shows `mcp:listTools` + `mcp:callTool` PASS**
-   (exit 0) in the signed bundle. The advisory-first gating is intentionally left
-   unchanged; do not read a green (non-blocking) job as AC#4 authority.
+4. **Packaged AC#4 — MCP round-trip in the signed bundle.** The SDK ships as
+   electron-vite-inlined JS in `out/main` rather than as a `node_modules` package
+   (§5, §8), so the packaged path had to be proven separately from the in-process
+   vitest.
+   - **win-x64 — VERIFIED** (run 30102038426): the signed packaged smoke log shows
+     `mcp:listTools` (advertised `[erfana_smoke_echo]`) + `mcp:callTool`
+     (returned `echo:ping`) **PASS** at exit 0 — inlined-SDK path confirmed in the
+     signed Windows bundle.
+   - **mac-arm64 — UNVERIFIED:** the same checks inside the signed/notarized mac
+     bundle are still pending. The advisory-first (`continue-on-error`) gating is
+     intentionally unchanged; do not read a green (non-blocking) job as AC#4
+     authority.
 
-**Action for the spike owner:** exercise both advisory packaged smoke steps via a
-develop push / `workflow_dispatch` / `is-dry-run` before any live tag, then record
-the results here (flip items 1–3 to VERIFIED) before promoting the steps to hard
-gates.
+**Action for the spike owner:** the **win-x64** advisory packaged smoke has now
+been exercised via a `workflow_dispatch` dry-run (run 30102038426) and items
+1 (win)/3/4 (win) are flipped above. Still to do before promoting the steps to
+hard gates: (a) exercise the **mac** packaged smoke the same way and flip the mac
+halves + item 2, and (b) accumulate a **multi-run green soak** (SD-019 Decision 5)
+— a single green run does not justify dropping `continue-on-error`.
 
 ---
 
