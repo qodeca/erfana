@@ -83,7 +83,7 @@ FTS5 + BM25 re-affirmed for M1 at this scale (≤10k sections, <50ms p95):
 | Dependency | Version | Purpose |
 |------------|---------|---------|
 | better-sqlite3 | ^13.x | SQLite database with FTS5 (N-API line; required for Electron 39 – v12 and older fail to compile against Electron 39's V8, which removed Context::GetIsolate) |
-| @modelcontextprotocol/server | ^2.x (beta as of 2026-07) | MCP server implementation (SDK v2 registerTool API, protocol revision 2026-07-28; v2 split the monolithic SDK into @modelcontextprotocol/server + /client – if v2 is not stable at implementation time, fall back to @modelcontextprotocol/sdk latest v1.x targeting revision 2025-11-25) |
+| @modelcontextprotocol/sdk | ^1.x (SD-019 pins `1.29.0`) | MCP server implementation via the v1 SDK `registerTool` API (protocol rev 2025-11-25). SD-019 **rejected `@modelcontextprotocol/server@2.x` (beta-only)** and pinned v1; the v1→v2 SDK split (`@modelcontextprotocol/server` + `/client`) is a deferred #30 migration once v2 stabilizes, and #30 also moves the SDK from `devDependencies` to `dependencies` when a real transport ships – see [`native-dependencies.md`](../../../docs/graph/native-dependencies.md) §1/§8 |
 
 ### Internal dependencies
 
@@ -208,7 +208,7 @@ projectManagement.on('project:changed', (event) => this.switchDatabase(event));
 ### MCP tool definition (proposed)
 
 ```typescript
-// SDK v2 (@modelcontextprotocol/server ^2.x) – registerTool replaces raw tool JSON
+// v1 SDK (@modelcontextprotocol/sdk, SD-019 pin) – registerTool replaces raw tool JSON; v2 (@modelcontextprotocol/server) is a deferred #30 migration
 server.registerTool('erfana_graph_search', {
   title: 'Search project content',
   description: 'Search project content using BM25 keyword ranking (beta – contract may change)',
