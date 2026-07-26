@@ -173,7 +173,7 @@ cd node_modules/better-sqlite3 && npm run build-release
 1. **OQ-1 (resolved by F6):** "accept the rebuild?" is replaced by "**prove and record** which `.node` loads." No standing question — the spike outputs the answer.
 2. **OQ-2 (resolved):** findings note path settled at `docs/graph/native-dependencies.md`.
 3. **OQ-3 (resolved by Decision 5):** packaged smoke is advisory-first-then-gate; deterministic checks are the always-on hard gate.
-4. **OQ-4 (new, non-blocking):** does the unpruned bundle actually fail mac codesign? Answered by the §12 A/B — keep the prune either way (size hygiene).
+4. **OQ-4 (RESOLVED):** does the unpruned bundle actually fail mac codesign? **No.** Local Developer ID A/B (2026-07-26): **both** the pruned `Erfana.app` and an unpruned copy (7 foreign better-sqlite3 prebuilds injected back + re-signed `--deep --options runtime`) pass `codesign --verify --deep --strict` (exit 0, "satisfies its Designated Requirement"). The prune is **size hygiene only**, not a codesign gate — keep it regardless. (Notarization was not part of this check; moot since production always ships pruned.)
 5. **OQ-5 (new, deferred to #30):** `utilityProcess` vs alternative for the stdio MCP host under `RunAsNode:false`.
 
 ## 12. Verification criteria (phase 8)
@@ -181,7 +181,7 @@ cd node_modules/better-sqlite3 && npm run build-release
 - **Always-on hard gates:** `npm run test:main` passes incl. `nativeDeps.smoke.test.ts` (in-proc sqlite + two-doc FTS5 filtering [rows===1 + matching row] + `compileoption_used` + MCP `listTools`/`callTool`) **and `runSqliteWorker.test.ts`** (real fail-closed worker-spawn: timeout / `error` / non-zero exit / clean-exit-without-result) on ubuntu + windows; `electron-vite build` emits `out/main/sqlite-smoke.worker.js`; `node scripts/smoke/sqlite-worker-smoke.mjs` exits 0 (Node-ABI cross-check) **and asserts the expected sqlite checks are present, not just `ok`**.
 - **Advisory-first (Decision 5):** packaged mac arm64 + win x64 unpacked apps exit 0 under `ERFANA_SMOKE=native-deps`, exercised on a develop push / `workflow_dispatch` / `is-dry-run` before any live tag; mac smoke runs **before** DMG notarize/staple [F15].
 - **Which-binary output** [F6]: smoke logs the resolved `better_sqlite3.node` absolute path; recorded in the findings note.
-- **Prune A/B** [F9]: `codesign --verify --deep --strict` runs on **both** the pruned and the **unpruned** mac bundle; the result (which, if either, fails) is recorded — criterion is falsifiable.
+- **Prune A/B** [F9] — **DONE (local Developer ID A/B, 2026-07-26):** `codesign --verify --deep --strict` ran on **both** the pruned and the **unpruned** mac bundle; **both pass** (exit 0, "satisfies its Designated Requirement"). The prune does **not** gate codesign — it is **size hygiene only**; keep it regardless. (CI only builds the pruned bundle, so the unpruned arm was produced locally; notarization not part of this check.)
 - **Supply chain** [F10]: `npm audit signatures` green on the new tree; `package-lock.json` committed; provenance/attestations checked for both packages.
 - `docs/graph/native-dependencies.md` present with all §8 contents.
 - `npm run lint`, `typecheck`, `check:headers`, `reuse lint` green.

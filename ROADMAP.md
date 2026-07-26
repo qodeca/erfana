@@ -90,7 +90,7 @@ Per the delivery model: plumbing/tail items may move across releases; cuts reduc
 
 | Risk | Spec | Status (decisions 2026-07-23) |
 |------|------|-------------------------------|
-| Native modules in packaged Electron (better-sqlite3, Sharp, onnxruntime) | 004, 005 | **Accepted as-is** – no structural countermeasures by decision. Context: better-sqlite3 v13 N-API prebuilds lower the risk – Electron 39 win-x64 prebuild load is verified by the SD-019 packaged/signed CI spike (2026-07-24), mac-arm64 packaged verification still pending; exact sqlite-vec pin + rebuild-from-BLOBs path (005-FR-040) exist in-spec |
+| Native modules in packaged Electron (better-sqlite3, Sharp, onnxruntime) | 004, 005 | **Accepted as-is** – no structural countermeasures by decision. Context: better-sqlite3 v13 N-API prebuilds lower the risk – Electron 39 win-x64 and mac-arm64 prebuild loads are both verified by the SD-019 packaged/signed CI spike (run 30102038426, 2026-07-24 win / 2026-07-26 mac; mac verified on the signed + notarized `.app`, DMG-staple not separately smoked); exact sqlite-vec pin + rebuild-from-BLOBs path (005-FR-040) exist in-spec |
 | Chain stalls before completion (no deadline, solo maintainer) | 004–008 | **Accepted as-is** – no structural countermeasures by decision; the fold trigger (delivery model) is the only guard |
 | HF model availability / first-run download | 005+ | Accepted; 008's model-migration flow is the designed swap path if the artifact is ever gated or removed |
 | OAuth + Google Picker complexity | 020 | Deferred with 020 |

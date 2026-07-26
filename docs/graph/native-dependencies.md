@@ -16,11 +16,16 @@ rely on it.
 (`node scripts/smoke/sqlite-worker-smoke.mjs`), the in-process vitest smoke, and a
 **local unpacked Electron 39 mac-arm64 developer run**
 (`ERFANA_SMOKE=native-deps electron .` — real worker + real main DB concurrent,
-exit 0) are **verified**. The **signed, packaged win-x64 bundle load is now
-verified in CI** (run 30102038426 — §3/§13); the **signed/notarized mac-arm64**
-packaged load is **not yet run in CI** — its advisory packaged smoke step is
-wired but must still be exercised (§13). Treat any claim tagged _(UNVERIFIED)_
-accordingly.
+exit 0) are **verified**. The **signed, packaged win-x64 bundle load is
+verified in CI** (run 30102038426 — §3/§13), and the **signed + notarized
+mac-arm64 `.app` packaged load is now also verified in CI** (run 30102038426,
+`build_mac` job 89510284551 — §3/§13). **Nuance:** the mac packaged smoke ran
+against the signed + notarized `.app` **but before DMG notarize/staple**, so
+DMG-stapled load was not separately smoked. The
+`codesign --deep --strict` pruned-vs-unpruned **A/B** is now **VERIFIED locally**
+(§5/§13 item 2) — **both** bundles pass deep-strict, so the prune is size hygiene
+only. The sole remaining task is the multi-run green soak before promoting the
+advisory step to a hard gate. Treat any claim tagged _(UNVERIFIED)_ accordingly.
 
 See the design for full rationale: `specs/designs/sd-019-native-dep-spike.md`.
 
@@ -81,9 +86,10 @@ harness), and (b) a **local unpacked Electron 39 (Node 22.20.0) developer run**
 thread + concurrent main-process DB — and exited 0. In both, the prebuilt binary
 loaded and executed its FTS5 assertions without an ABI mismatch. This is
 **verified locally on the unpacked build**; the **signed packaged win-x64 bundle
-load is now verified in CI** (run 30102038426 — §3/§13), while the
-**signed/notarized mac-arm64 packaged load is still pending** (§13) — do not read
-the mac side as "confirmed under Electron 39" in the packaged sense. Because it is an
+load is verified in CI** (run 30102038426 — §3/§13), and the
+**signed + notarized mac-arm64 `.app` packaged load is now also verified in CI**
+(run 30102038426, `build_mac` job 89510284551 — §3/§13; smoke ran on the notarized
+`.app` before DMG staple). Because it is an
 N-API (ABI-stable) addon, a single prebuild is portable across the Node and
 Electron ABIs — this is the whole reason the Linux cross-check is meaningful (see
 §11). State it as inferred + runtime-confirmed-on-the-unpacked-build, not as a
@@ -122,6 +128,14 @@ printed the absolute path of the loaded `.node`:
   **record the loaded path**. #23 should keep the smoke's path assertion so a
   future install that starts source-building a real `build/Release/*.node` is
   caught.
+- **Signed packaged CI run confirms the same path (VERIFIED).** The
+  `build_mac` packaged smoke (run 30102038426, job 89510284551) recorded
+  `loadedBinaryPath = …/release/0.16.3/mac-arm64/Erfana.app/Contents/Resources/
+  app/node_modules/better-sqlite3/prebuilds/darwin-arm64.node` — the flat
+  `darwin-arm64.node` prebuild **inside the signed + notarized `.app`**, matching
+  the local unpacked run. The `afterPack` prune logged `Pruned 7 foreign
+  better-sqlite3 prebuild(s); kept darwin-arm64.node`, so only that prebuild
+  remained under `prebuilds/` in the signed bundle.
 
 **win-x64 — VERIFIED (signed, packaged CI run).** The packaged Windows smoke in
 the signed bundle recorded the loaded binary as the flat win-x64 prebuild inside
@@ -185,15 +199,35 @@ the packaged (unpacked, `asar:false`) app tree:
 - **Flat-file prune of foreign prebuilds (mac + win)** — `scripts/fuses.js`
   keeps `prebuilds/<plat>-<arch>.node` and deletes the other 6 flat prebuilds in
   `afterPack` (keep-then-verify). v13 ships **8 flat** `prebuilds/*.node`; without
-  the prune a Windows bundle would carry 6 foreign `.node` files. **Reframed as
-  size hygiene:** the "unpruned bundle fails mac deep-strict codesign" claim is
-  likely overstated (electron-builder already deep-signs nested Mach-O — node-pty
-  ships that way today). The prune stays for size regardless of the codesign
-  outcome.
-  - **A/B codesign result — _(UNVERIFIED)_:** the `codesign --verify --deep
-    --strict` comparison of a pruned vs unpruned signed mac bundle has **not yet
-    run in CI**. #23 should record the result when the packaged mac job runs;
-    keep the prune either way.
+  the prune a Windows bundle would carry 6 foreign `.node` files. **Confirmed size
+  hygiene (A/B: both pruned and unpruned pass `codesign --deep --strict`):** the
+  "unpruned bundle fails mac deep-strict codesign" claim is **disproven** —
+  electron-builder already deep-signs nested Mach-O (node-pty ships that way
+  today). The prune stays for bundle size regardless (drops ~15 MB).
+  - **A/B codesign result — VERIFIED (local Developer ID codesign A/B):** the
+    `codesign --verify --deep --strict --verbose=2` comparison of a **pruned**
+    vs **unpruned** signed mac bundle was run locally on the maintainer's Mac.
+    **Both pass** → exit 0, "valid on disk" + "satisfies its Designated
+    Requirement". **Method:** the pruned bundle is the electron-builder-signed
+    `release/0.16.3/mac-arm64/Erfana.app` (afterPack kept only
+    `darwin-arm64.node`; signed `Developer ID Application: QODECA sp. z o.o.
+    (DZ477VK57L)`; `resign.js` afterSign already verified it). The unpruned bundle
+    is a copy of that `.app` with all 7 foreign better-sqlite3 prebuilds
+    (`darwin-x64`, `linux-arm64`, `linux-x64`, `linuxmusl-arm64`, `linuxmusl-x64`,
+    `win32-arm64`, `win32-x64`) injected back, then re-signed with
+    `codesign --force --deep --options runtime --sign "Developer ID Application:
+    QODECA sp. z o.o. (DZ477VK57L)"`. **Caveats:** the unpruned bundle was
+    produced by injecting the foreign prebuilds into the already-signed `.app` and
+    re-signing `--deep` (not a second full electron-builder afterPack run) —
+    faithful for the codesign-seal question this item asked, but note the method;
+    `darwin-x64.node` is Mach-O (signed as nested code) while the `win32-*` /
+    `linux-*` `.node` files are non-Mach-O (sealed as resources); **notarization
+    was NOT part of this check** (this is the local `codesign --verify --deep
+    --strict` verification item 2 asked for — Apple notary-service acceptance of
+    an unpruned bundle was not tested, and is moot since production always ships
+    pruned). **Conclusion:** the foreign-prebuild prune is **NOT** required for
+    `codesign --deep --strict` — it is size hygiene only. Keep the prune either
+    way.
 - **`files` exclusion** — `electron-builder.yml` adds
   `!node_modules/better-sqlite3/{deps,build,src}/**`, dropping the source-build
   inputs and the node-gyp `build/` tree (see §3) from the shipped bundle.
@@ -238,8 +272,10 @@ matching/non-matching MATCH assertion, not a bare row-count) as the FTS5 smoke; 
 
 ## 7. Concurrency model (context-aware N-API, DB-per-worker)
 
-**Proven in the local unpacked Electron run (real worker + main DB coexisted);
-packaged pending (§13).** The simultaneous main + worker handle coexistence was
+**Proven in the local unpacked Electron run (real worker + main DB coexisted),
+and now in both signed packaged CI bundles — the `main:concurrent-db` check
+PASSED inside the signed win-x64 app and the signed + notarized mac-arm64 `.app`
+(run 30102038426, §13).** The simultaneous main + worker handle coexistence was
 exercised end-to-end by the local unpacked `ERFANA_SMOKE=native-deps` run (which
 spawns the real worker thread while the main-process handle stays open) and by
 the real-worker fail-closed unit test — **not** by the in-process vitest
@@ -301,7 +337,7 @@ per worker plus a main-process instance.
 
 | Arch | Status | Path |
 |---|---|---|
-| **mac-arm64** | Supported — verified path (local + will be packaged authority) | bundled prebuild |
+| **mac-arm64** | Supported — **VERIFIED** (signed + notarized packaged CI run 30102038426, §3/§13; DMG-staple not separately smoked) | bundled prebuild |
 | **win-x64** | Supported — **VERIFIED** (signed packaged CI run 30102038426, §3/§13) | bundled prebuild |
 | mac-x64 | Source-build-only, **unverified** | silent source build |
 | win-arm64 | Source-build-only, **unverified** | silent source build |
@@ -367,21 +403,62 @@ tagged UNVERIFIED as proven until its packaged/signed CI run is green.
 > "Successfully verified"). The packaged smoke exited **0** with **7/7 checks
 > PASS** and `loadedBinaryPath = …\win-unpacked\resources\app\node_modules\
 > better-sqlite3\prebuilds\win32-x64.node`. This flips items **1 (win half)**,
-> **3**, and **4 (win half)** below. The **mac-arm64** halves and item **2**
-> remain UNVERIFIED (this pass was Windows-only). The advisory-first gating is
-> intentionally **unchanged** — a single green run is not the multi-run soak
-> SD-019 Decision 5 requires before promoting the step to a hard gate.
+> **3**, and **4 (win half)** below.
+>
+> **Update (mac-arm64 VERIFIED, 2026-07-26).** The **mac arm64** leg is now also
+> proven by a signed packaged CI run — same `release.yml` dry-run
+> **run 30102038426**, `build_mac` job **89510284551**, branch
+> `feat/19-native-dep-spike` @ `3229b7e`. The `afterPack` prune logged
+> `Pruned 7 foreign better-sqlite3 prebuild(s); kept darwin-arm64.node`, `.app`
+> notarization succeeded, and the packaged smoke ran against the signed +
+> notarized `release/0.16.3/mac-arm64/Erfana.app`, exiting **0** with **7/7
+> checks PASS** and `loadedBinaryPath = …/mac-arm64/Erfana.app/Contents/
+> Resources/app/node_modules/better-sqlite3/prebuilds/darwin-arm64.node`. This
+> flips items **1 (mac half)** and **4 (mac half)** below. **Honest nuance:** the
+> smoke ran **after `.app` sign + `.app` notarization but before DMG
+> notarize/staple**, so the loaded bundle was a signed + notarized `.app`;
+> **DMG-level stapling was not separately exercised** by the smoke.
+>
+> **Update (codesign A/B VERIFIED, 2026-07-26).** Item **2** (codesign A/B) is now
+> **VERIFIED** by a local Developer ID codesign A/B on the maintainer's Mac (CI
+> only ever builds the pruned bundle, so the unpruned arm was produced locally).
+> **Both** the pruned `Erfana.app` and an unpruned copy (all 7 foreign
+> better-sqlite3 prebuilds injected back + re-signed `--deep --options runtime`)
+> **pass** `codesign --verify --deep --strict --verbose=2` (exit 0, "valid on
+> disk" + "satisfies its Designated Requirement"). The foreign-prebuild prune is
+> therefore **size hygiene only**, not a codesign gate — the earlier F9 concern is
+> disproven. The advisory-first gating is intentionally **unchanged** — two single
+> green packaged runs are not the multi-run soak SD-019 Decision 5 requires before
+> promoting the step to a hard gate, which is now the sole remaining task.
 
 1. **Signed packaged bundle load (AC#1/AC#2 authority).**
    - **win-x64 — VERIFIED** (run 30102038426): better-sqlite3 loaded from the
      signed, fuse-flipped `win-unpacked` bundle's `node_modules/…/prebuilds/
      win32-x64.node`.
-   - **mac-arm64 — UNVERIFIED:** loading from the **signed, notarized/stapled,
-     fuse-flipped** `.app` is still pending (local runs used an unsigned dev
-     binary).
-2. **Codesign A/B (F9).** `codesign --verify --deep --strict` on **pruned vs
-   unpruned** signed mac bundles — records whether the foreign-prebuild prune
-   actually gates codesign (expected: no; prune stays for size regardless).
+   - **mac-arm64 — VERIFIED** (run 30102038426, `build_mac` job 89510284551):
+     better-sqlite3 loaded from the **signed + notarized, fuse-flipped**
+     `Erfana.app`'s `Contents/Resources/app/node_modules/…/prebuilds/
+     darwin-arm64.node`. **Nuance:** the smoke ran after `.app` sign + `.app`
+     notarization but **before DMG notarize/staple**, so a signed + notarized
+     `.app` load is VERIFIED; **DMG-stapled load was not separately smoked**.
+2. **Codesign A/B (F9) — VERIFIED (local Developer ID codesign A/B).**
+   `codesign --verify --deep --strict --verbose=2` on **pruned vs unpruned**
+   signed mac bundles — **both pass** (exit 0, "valid on disk" + "satisfies its
+   Designated Requirement"). The foreign-prebuild prune therefore does **NOT** gate
+   codesign; it is **size hygiene only** (drops ~15 MB) — the earlier F9 "unpruned
+   fails deep-strict" concern is disproven. **Method:** pruned = the
+   electron-builder-signed `release/0.16.3/mac-arm64/Erfana.app` (kept only
+   `darwin-arm64.node`; `Developer ID Application: QODECA sp. z o.o. (DZ477VK57L)`;
+   `resign.js` afterSign already verified). Unpruned = a copy of that `.app` with
+   all 7 foreign prebuilds (`darwin-x64`, `linux-arm64`, `linux-x64`,
+   `linuxmusl-arm64`, `linuxmusl-x64`, `win32-arm64`, `win32-x64`) injected back,
+   re-signed `codesign --force --deep --options runtime`. **Not run in CI:** the
+   pipeline only ever builds the pruned bundle, so the unpruned arm was produced
+   locally. **Caveats:** the unpruned bundle was made by injecting prebuilds into
+   the already-signed `.app` and re-signing `--deep` (not a fresh electron-builder
+   afterPack run); `darwin-x64.node` seals as nested Mach-O code, `win32-*` /
+   `linux-*` `.node` seal as resources; **notarization was not part of this check**
+   (moot — production always ships pruned). Keep the prune for size regardless.
 3. **The entire Windows x64 leg — VERIFIED** (run 30102038426). The win-x64
    prebuild load (`sqlite:load`), FTS5 compile-option + two-doc MATCH
    (`sqlite:fts5-compileoption`, `sqlite:fts5-match`), `worker_thread` +
@@ -405,17 +482,24 @@ tagged UNVERIFIED as proven until its packaged/signed CI run is green.
      `mcp:listTools` (advertised `[erfana_smoke_echo]`) + `mcp:callTool`
      (returned `echo:ping`) **PASS** at exit 0 — inlined-SDK path confirmed in the
      signed Windows bundle.
-   - **mac-arm64 — UNVERIFIED:** the same checks inside the signed/notarized mac
-     bundle are still pending. The advisory-first (`continue-on-error`) gating is
-     intentionally unchanged; do not read a green (non-blocking) job as AC#4
-     authority.
+   - **mac-arm64 — VERIFIED** (run 30102038426, `build_mac` job 89510284551): the
+     signed + notarized `.app` smoke log shows `mcp:listTools` (advertised
+     `[erfana_smoke_echo]`) + `mcp:callTool` (returned `echo:ping`) **PASS** at
+     exit 0 — inlined-SDK path confirmed inside the notarized mac bundle (smoke
+     ran before DMG staple). The advisory-first (`continue-on-error`) gating is
+     intentionally unchanged; a single green (non-blocking) job is not yet the
+     multi-run soak required to promote to a hard gate.
 
-**Action for the spike owner:** the **win-x64** advisory packaged smoke has now
-been exercised via a `workflow_dispatch` dry-run (run 30102038426) and items
-1 (win)/3/4 (win) are flipped above. Still to do before promoting the steps to
-hard gates: (a) exercise the **mac** packaged smoke the same way and flip the mac
-halves + item 2, and (b) accumulate a **multi-run green soak** (SD-019 Decision 5)
-— a single green run does not justify dropping `continue-on-error`.
+**Action for the spike owner:** both the **win-x64** and the **mac-arm64**
+advisory packaged smokes have now been exercised via the same `workflow_dispatch`
+dry-run (run 30102038426 — `build_win` job 89510284522, `build_mac` job
+89510284551); items 1, 3, and 4 are fully flipped above (the mac item-1 flip is
+scoped to a signed + notarized **`.app`** load — DMG stapling was not separately
+smoked). The **codesign A/B** (item 2) is now **VERIFIED** by a local Developer ID
+A/B — both pruned and unpruned bundles pass `codesign --deep --strict`, so the
+prune is size hygiene only. The **only** genuinely remaining item is a **multi-run
+green soak** (SD-019 Decision 5) before dropping `continue-on-error` and promoting
+the packaged smoke to a hard gate — two single green runs do not satisfy it.
 
 ---
 
