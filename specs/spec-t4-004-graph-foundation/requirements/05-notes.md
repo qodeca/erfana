@@ -14,9 +14,11 @@ Heavy computation (indexing) should use worker threads or be chunked to avoid bl
 ### SQLite in Electron
 
 - Must use `better-sqlite3` **>= 13** (synchronous API, N-API build) rather than `sqlite3` (callback-based)
-- v13+ is the N-API line: decoupled from V8 ABI, so a single N-API prebuild should serve Electron 39 – but Electron 39 prebuild coverage was still contested upstream as of 2026-07 (see better-sqlite3 issues #1416, #1384). At pin time, verify the published N-API prebuild actually covers Electron 39's N-API version and target platforms
+- v13+ is the N-API line: decoupled from V8 ABI, so a single N-API prebuild should serve Electron 39. Electron 39 win-x64 prebuild coverage is now empirically verified (SD-019 packaged/signed CI run, 2026-07-24 – loads the flat `win32-x64.node` prebuild); mac-arm64 packaged/notarized coverage remains to be confirmed at pin time (context: better-sqlite3 issues #1416, #1384). See [`docs/graph/native-dependencies.md`](../../../docs/graph/native-dependencies.md)
 - `node:sqlite` (bundled with Node 22 in Electron 39) rejected for M1: compiled with `SQLITE_OMIT_LOAD_EXTENSION` and without FTS5, still experimental before Node 26 – cannot satisfy 004-FR-001/017/018. Revisit only if it gains FTS5
 - Database file must be in writable location (`.erfana/` directory)
+
+> **Native-dependency spike (#19 / SD-019):** the prebuild-coverage, FTS5, worker-concurrency, and MCP-SDK questions in this section and under Dependencies are empirically de-risked in the spike findings note — see [`docs/graph/native-dependencies.md`](../../../docs/graph/native-dependencies.md) (consumed by #23 DB layer / #30 MCP server).
 
 ### FTS5 limitations
 
@@ -81,7 +83,7 @@ FTS5 + BM25 re-affirmed for M1 at this scale (≤10k sections, <50ms p95):
 | Dependency | Version | Purpose |
 |------------|---------|---------|
 | better-sqlite3 | ^13.x | SQLite database with FTS5 (N-API line; required for Electron 39 – v12 and older fail to compile against Electron 39's V8, which removed Context::GetIsolate) |
-| @modelcontextprotocol/server | ^2.x (beta as of 2026-07) | MCP server implementation (SDK v2 registerTool API, protocol revision 2026-07-28; v2 split the monolithic SDK into @modelcontextprotocol/server + /client – if v2 is not stable at implementation time, fall back to @modelcontextprotocol/sdk latest v1.x targeting revision 2025-11-25) |
+| @modelcontextprotocol/sdk | ^1.x (SD-019 pins `1.29.0`) | MCP server implementation via the v1 SDK `registerTool` API (protocol rev 2025-11-25). SD-019 **rejected `@modelcontextprotocol/server@2.x` (beta-only)** and pinned v1; the v1→v2 SDK split (`@modelcontextprotocol/server` + `/client`) is a deferred #30 migration once v2 stabilizes, and #30 also moves the SDK from `devDependencies` to `dependencies` when a real transport ships – see [`native-dependencies.md`](../../../docs/graph/native-dependencies.md) §1/§8 |
 
 ### Internal dependencies
 
@@ -94,8 +96,8 @@ FTS5 + BM25 re-affirmed for M1 at this scale (≤10k sections, <50ms p95):
 ### Build dependencies
 
 - `better-sqlite3` >= 13 uses N-API prebuilt binaries in the common case; Python and C++ toolchain retained for source-build fallback
-- The `.node` binary must be listed in `asarUnpack` in `electron-builder.yml` (native modules cannot load from inside ASAR)
-- electron-rebuild remains the documented fallback if the N-API prebuild does not cover the target Electron/platform (do not declare it unnecessary until prebuild coverage is verified at pin time)
+- The build ships `asar: false`, so the `.node` binary loads from the unpacked `resources/app/node_modules/better-sqlite3/prebuilds/` tree – no `asarUnpack` is used; the win-x64 packaged smoke confirmed this load path (SD-019)
+- electron-rebuild / source-build remains the documented fallback if a prebuild does not cover the target Electron/platform. win-x64 prebuild coverage is verified (SD-019, 2026-07-24); mac-arm64 remains to be confirmed at pin time
 
 ## Out of Scope (Deferred)
 
@@ -206,7 +208,7 @@ projectManagement.on('project:changed', (event) => this.switchDatabase(event));
 ### MCP tool definition (proposed)
 
 ```typescript
-// SDK v2 (@modelcontextprotocol/server ^2.x) – registerTool replaces raw tool JSON
+// v1 SDK (@modelcontextprotocol/sdk, SD-019 pin) – registerTool replaces raw tool JSON; v2 (@modelcontextprotocol/server) is a deferred #30 migration
 server.registerTool('erfana_graph_search', {
   title: 'Search project content',
   description: 'Search project content using BM25 keyword ranking (beta – contract may change)',

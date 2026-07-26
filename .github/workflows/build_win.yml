@@ -253,6 +253,66 @@ jobs:
             }
           }
 
+      - name: Packaged native-deps smoke (advisory)
+        # SD-019 (#19): launch the built win-unpacked Erfana.exe with
+        # ERFANA_SMOKE=native-deps. The main-process guard runs the
+        # better-sqlite3 (FTS5 + worker_thread + concurrent main-process DB)
+        # and MCP in-memory round-trip smoke, then app.exit(0/1) BEFORE any
+        # window is created. Placed after signtool verify and before Upload so
+        # a bundle-load regression surfaces on the packaged authority path
+        # (AC#1/AC#2 for win-x64). Uses the win-unpacked exe rather than the
+        # NSIS installer so no install step is needed.
+        #
+        # advisory-first per SD-019 §Decision 5 — promote to a hard gate after
+        # a green soak; exercised on is-dry-run before any live tag.
+        continue-on-error: true
+        # Step-level hard ceiling (FIX 1b): the watchdog below fails fast, but
+        # this guarantees a hang self-terminates and — being continue-on-error —
+        # never burns the job.
+        timeout-minutes: 5
+        shell: bash
+        env:
+          ERFANA_SMOKE: native-deps
+          # Electron on Windows is a GUI-subsystem binary, so its stderr does
+          # NOT reach this bash pipe — the console log ends up empty and the
+          # which-binary-loaded evidence is lost. Persist the report to a file
+          # (FIX 2); the app writes summary + checks[] + loadedBinaryPath there
+          # synchronously before app.exit, and we `cat` it below.
+          ERFANA_SMOKE_LOG: ${{ runner.temp }}/native-deps-smoke-win.log
+          # Pass the build-output dir via env (not inline ${{ }} interpolation
+          # into the shell) — defense-in-depth against untrusting this output.
+          DIR: ${{ steps.art.outputs.dir }}
+        run: |
+          set -uo pipefail
+          EXE="$DIR/win-unpacked/Erfana.exe"
+          if [ ! -f "$EXE" ]; then
+            echo "::warning::win-unpacked/Erfana.exe not found at $EXE — skipping packaged native-deps smoke"
+            exit 0
+          fi
+          echo "Running packaged native-deps smoke: $EXE"
+          # Bounded launch (FIX 1b): GNU `timeout` is not in Git Bash, so run the
+          # exe in the background with a 120s watchdog that SIGKILLs it if it
+          # hangs. app.exit code is the authoritative signal (stderr is a
+          # GUI-subsystem no-op); a SIGKILL surfaces as exit 137.
+          "$EXE" > "$RUNNER_TEMP/native-deps-smoke-win.console.log" 2>&1 &
+          APP_PID=$!
+          ( sleep 120; kill -9 "$APP_PID" 2>/dev/null ) &
+          WATCHDOG=$!
+          if wait "$APP_PID"; then CODE=0; else CODE=$?; fi
+          kill "$WATCHDOG" 2>/dev/null || true
+          echo "packaged native-deps smoke exit code: $CODE"
+          echo "----- native-deps smoke log ($ERFANA_SMOKE_LOG) -----"
+          cat "$ERFANA_SMOKE_LOG" 2>/dev/null || echo "(no smoke log file written)"
+          echo "-----------------------------------------------------"
+          if [ "$CODE" -eq 137 ]; then
+            echo "::warning::packaged native-deps smoke TIMED OUT (~120s, watchdog SIGKILL) — advisory, non-blocking per SD-019 Decision 5"
+          elif [ "$CODE" -ne 0 ]; then
+            echo "::warning::packaged native-deps smoke returned $CODE (advisory — non-blocking per SD-019 Decision 5)"
+          else
+            echo "packaged native-deps smoke PASSED (exit 0)"
+          fi
+          exit "$CODE"
+
       - name: Clean up PFX
         # Ensure the private key file never outlives the job even on
         # failure paths above. Use the POSIX-form path for cleanup —

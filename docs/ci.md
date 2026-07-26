@@ -24,7 +24,7 @@ Eight jobs run in parallel (all `ubuntu-latest` except `windows-checks`). The **
 | `lint` (Lint) | `npm run lint` | yes | |
 | `typecheck` (Typecheck) | `npm run typecheck` | yes | tsc node + web |
 | `test` (Unit tests) | `npm run test:ci` | yes | full vitest workspace (main / renderer / preload) |
-| `build` (Build) | `npx electron-vite build` | yes | |
+| `build` (Build) | `npx electron-vite build` + `node scripts/smoke/sqlite-worker-smoke.mjs` | yes | after the build, runs an always-on native-deps Node-ABI cross-check (better-sqlite3 prebuild load + FTS5 `MATCH`; SD-019/#19). The packaged mac/win smokes in `build_mac.yml` / `build_win.yml` are advisory (`continue-on-error`) |
 | `license` (License compliance) | `npm run check:headers` + `pipx run reuse lint` | yes | SPDX headers on all sources + REUSE conformance |
 | `audit-signatures` (npm audit signatures) | `npm audit signatures` | no | also records the `package-lock.json` digest artifact that `release.yml` byte-verifies at tag time |
 | `release-guards` (Release readiness guards) | guard scripts | no | fails the build on a `pull_request_target` trigger, forbidden plist entitlements, etc. |

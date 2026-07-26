@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 import { app, shell, BrowserWindow, Menu } from 'electron'
 import { join } from 'path'
+import { writeFileSync } from 'fs'
+import type { NativeDepsSmokeOutcome } from './smoke/nativeDepsSmoke'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawnNewInstance } from './utils/spawnNewInstance'
 import { registerFileHandlers } from './ipc/file-handlers'
@@ -190,6 +192,58 @@ function createWindow(): BrowserWindow {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
+  // SD-019 (#19) native-dependency spike: when ERFANA_SMOKE=native-deps, run
+  // the packaged better-sqlite3 + MCP smoke and exit before any window is
+  // created. Dynamically imported so the smoke code stays off the normal hot
+  // startup path (it only ships env-gated; see SD-019 §4 Decision 6).
+  if (process.env.ERFANA_SMOKE === 'native-deps') {
+    // Write synchronously to stderr: app.exit() terminates before Node flushes
+    // buffered stdout, so a plain console.log would be lost in the packaged run.
+    // ERFANA_SMOKE_LOG (if set) additionally persists the report to a file so a
+    // GUI-subsystem OS (Windows), where the packaged app's stderr never reaches
+    // the CI pipe, still leaves triageable evidence (FIX 2).
+    const smokeLogPath = process.env.ERFANA_SMOKE_LOG
+    const emitReport = (report: string): void => {
+      process.stderr.write(report.endsWith('\n') ? report : `${report}\n`)
+      if (smokeLogPath) {
+        try {
+          writeFileSync(smokeLogPath, report.endsWith('\n') ? report : `${report}\n`)
+        } catch (err) {
+          process.stderr.write(`failed to write ERFANA_SMOKE_LOG (${smokeLogPath}): ${err instanceof Error ? err.message : err}\n`)
+        }
+      }
+    }
+    // Hard ceiling (FIX 1a): a hang in the main-thread native load,
+    // assertMainDbStillUsable, or the MCP round-trip would never reach app.exit
+    // and would burn the CI job timeout. Race the smoke against a bounded
+    // timeout that resolves to a failing outcome so ANY hang still exits 1.
+    const SMOKE_HARD_CEILING_MS = 60_000
+    try {
+      const { runNativeDepsSmoke, renderSmokeReport } = await import('./smoke/nativeDepsSmoke')
+      const outcome = await Promise.race<NativeDepsSmokeOutcome>([
+        runNativeDepsSmoke(),
+        new Promise<NativeDepsSmokeOutcome>((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                code: 1,
+                checks: [],
+                loadedBinaryPath: null,
+                summary: `native-deps smoke FAILED — hard ceiling ${SMOKE_HARD_CEILING_MS}ms exceeded (hang guard)`,
+              }),
+            SMOKE_HARD_CEILING_MS
+          )
+        ),
+      ])
+      emitReport(renderSmokeReport(outcome))
+      app.exit(outcome.code)
+    } catch (error) {
+      emitReport(`native-deps smoke crashed: ${error instanceof Error ? error.message : error}`)
+      app.exit(1)
+    }
+    return
+  }
+
   // Set application name (shows in macOS menu bar)
   app.setName('ERFANA')
 

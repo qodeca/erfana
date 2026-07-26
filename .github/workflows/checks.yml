@@ -127,6 +127,18 @@ jobs:
       - name: Build
         run: npx electron-vite build
 
+      # SD-019 (#19): always-on hard gate — Node-ABI portability cross-check.
+      # Spawns the just-built out/main/sqlite-smoke.worker.js in a plain-Node
+      # worker_thread and asserts better-sqlite3 loads from its prebuild and
+      # FTS5 MATCH returns one row. If the same worker bundle runs under Node
+      # here and under Electron in the packaged mac/win smoke, the Node/Electron
+      # ABI is portable. Requires the electron-vite build step above (it needs
+      # out/main/sqlite-smoke.worker.js). No continue-on-error: this is a hard
+      # gate (Linux is a cross-check, never the AC#2 authority — that stays the
+      # packaged mac/win smoke). See SD-019 §5 verification matrix, §6 #14.
+      - name: Native-deps worker smoke (Node-ABI cross-check)
+        run: node scripts/smoke/sqlite-worker-smoke.mjs
+
   license:
     name: License compliance
     runs-on: ubuntu-latest
