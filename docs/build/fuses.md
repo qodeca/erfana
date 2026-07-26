@@ -68,6 +68,7 @@ The same `scripts/fuses.js` `afterPack` hook deletes binaries for platforms/arch
 
 - **`ffprobe-static`** vendors a binary for every platform/arch under `bin/<plat>/<arch>` (~335 MB). `pruneForeignFfprobeBinaries` keeps only the build target's `<plat>/<arch>` (e.g. `darwin/arm64`, ~74 MB) and deletes the rest — ~260 MB off a mac build.
 - **`node-pty`** ships `prebuilds/<platform>-<arch>` for every target (the Windows prebuilds are ~28–30 MB each, dominated by `.pdb`). `pruneForeignNodePtyPrebuilds` keeps only the target prebuild and, on a `win32` target, also strips `.pdb` debug symbols from the kept prebuild (never loaded at runtime).
+- **`better-sqlite3`** ships 8 flat `prebuilds/<plat>-<arch>.node`. `pruneForeignBetterSqlitePrebuilds` keeps only the build target's prebuild and deletes the other 7 (~15 MB). Confirmed size hygiene only — a codesign A/B showed both pruned and unpruned mac bundles pass `codesign --deep --strict` (SD-019/#19; see [../graph/native-dependencies.md § 5](../graph/native-dependencies.md)).
 
 Runtime resolution is platform-native (`ffprobe-static` resolves `bin/<os.platform()>/<os.arch()>`; node-pty loads `prebuilds/<process.platform>-<process.arch>`), so deleting foreign arches cannot affect resolution.
 

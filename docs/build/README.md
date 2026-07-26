@@ -101,7 +101,7 @@ npm install
    - Restore node-pty `spawn-helper` executable bit (`0755`)
    - Verify the per-arch ffmpeg binary is present and executable
    - Prune foreign-platform/arch `ffprobe-static` binaries (keeps only the target, ~260 MB saved on mac)
-   - Prune foreign node-pty prebuilds, and strip `.pdb` debug symbols from the kept Windows prebuild
+   - Prune foreign node-pty and better-sqlite3 prebuilds, and strip `.pdb` debug symbols from the kept Windows prebuild
    - Each prune is keep-then-verify (fails the build rather than shipping a binary-less bundle)
 7. **Code Signing**: electron-builder ad-hoc signs all binaries
 8. **afterSign Hook**: Deep re-sign bundle for consistent identity (`scripts/resign.js`)
