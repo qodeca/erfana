@@ -14,7 +14,7 @@ Heavy computation (indexing) should use worker threads or be chunked to avoid bl
 ### SQLite in Electron
 
 - Must use `better-sqlite3` **>= 13** (synchronous API, N-API build) rather than `sqlite3` (callback-based)
-- v13+ is the N-API line: decoupled from V8 ABI, so a single N-API prebuild should serve Electron 39 – but Electron 39 prebuild coverage was still contested upstream as of 2026-07 (see better-sqlite3 issues #1416, #1384). At pin time, verify the published N-API prebuild actually covers Electron 39's N-API version and target platforms
+- v13+ is the N-API line: decoupled from V8 ABI, so a single N-API prebuild should serve Electron 39. Electron 39 win-x64 prebuild coverage is now empirically verified (SD-019 packaged/signed CI run, 2026-07-24 – loads the flat `win32-x64.node` prebuild); mac-arm64 packaged/notarized coverage remains to be confirmed at pin time (context: better-sqlite3 issues #1416, #1384). See [`docs/graph/native-dependencies.md`](../../../docs/graph/native-dependencies.md)
 - `node:sqlite` (bundled with Node 22 in Electron 39) rejected for M1: compiled with `SQLITE_OMIT_LOAD_EXTENSION` and without FTS5, still experimental before Node 26 – cannot satisfy 004-FR-001/017/018. Revisit only if it gains FTS5
 - Database file must be in writable location (`.erfana/` directory)
 
@@ -96,8 +96,8 @@ FTS5 + BM25 re-affirmed for M1 at this scale (≤10k sections, <50ms p95):
 ### Build dependencies
 
 - `better-sqlite3` >= 13 uses N-API prebuilt binaries in the common case; Python and C++ toolchain retained for source-build fallback
-- The `.node` binary must be listed in `asarUnpack` in `electron-builder.yml` (native modules cannot load from inside ASAR)
-- electron-rebuild remains the documented fallback if the N-API prebuild does not cover the target Electron/platform (do not declare it unnecessary until prebuild coverage is verified at pin time)
+- The build ships `asar: false`, so the `.node` binary loads from the unpacked `resources/app/node_modules/better-sqlite3/prebuilds/` tree – no `asarUnpack` is used; the win-x64 packaged smoke confirmed this load path (SD-019)
+- electron-rebuild / source-build remains the documented fallback if a prebuild does not cover the target Electron/platform. win-x64 prebuild coverage is verified (SD-019, 2026-07-24); mac-arm64 remains to be confirmed at pin time
 
 ## Out of Scope (Deferred)
 

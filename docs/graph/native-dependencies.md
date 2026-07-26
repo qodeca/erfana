@@ -80,9 +80,10 @@ harness), and (b) a **local unpacked Electron 39 (Node 22.20.0) developer run**
 (`ERFANA_SMOKE=native-deps electron .`) that executed the smoke — real worker
 thread + concurrent main-process DB — and exited 0. In both, the prebuilt binary
 loaded and executed its FTS5 assertions without an ABI mismatch. This is
-**verified locally on the unpacked build**; the
-**packaged/signed/notarized bundle load is still pending** (§13) — do not read
-these as "confirmed under Electron 39" in the packaged sense. Because it is an
+**verified locally on the unpacked build**; the **signed packaged win-x64 bundle
+load is now verified in CI** (run 30102038426 — §3/§13), while the
+**signed/notarized mac-arm64 packaged load is still pending** (§13) — do not read
+the mac side as "confirmed under Electron 39" in the packaged sense. Because it is an
 N-API (ABI-stable) addon, a single prebuild is portable across the Node and
 Electron ABIs — this is the whole reason the Linux cross-check is meaningful (see
 §11). State it as inferred + runtime-confirmed-on-the-unpacked-build, not as a
