@@ -106,6 +106,14 @@ function openDatabaseCapturingBinary(): { db: Database.Database; binaryPath: str
   const captured: string[] = []
   process.dlopen = function (mod: { exports: unknown }, filename: string, flags?: number): void {
     captured.push(filename)
+    // Preserve the caller's arity. Node's `.node` loader calls dlopen with two
+    // args (no flags), and `process.dlopen` is a native binding with no JS
+    // default for `flags` — so forwarding an explicit `undefined` third arg
+    // makes libc `dlopen` reject the mode on Linux ("invalid mode for
+    // dlopen(): Invalid argument"). Only pass `flags` when it was supplied.
+    if (flags === undefined) {
+      return originalDlopen(mod, filename)
+    }
     return originalDlopen(mod, filename, flags)
   } as typeof process.dlopen
 
