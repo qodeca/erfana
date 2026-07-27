@@ -144,7 +144,7 @@ FTS5 + BM25 re-affirmed for M1 at this scale (≤10k sections, <50ms p95):
 ### Performance tuning
 
 1. **Batch size:** Should batch size be configurable or auto-tuned based on system resources?
-2. **Debounce timing:** Is 300ms optimal, or should it adapt to typing speed?
+2. **Debounce timing:** Is 300ms optimal, or should it adapt to typing speed? _**Resolved for M1 (#20):** fixed at 300 ms flat (no adaptive heuristic), realized via a dedicated `ThrottledWorker(collectionDelay: 300)` + `EventCoalescer`. See `analysis/20-save-watch-index-pipeline.md`._
 3. **FTS5 parameters:** Should BM25 k1 and b parameters be exposed for tuning?
 
 ### UI/UX
@@ -196,6 +196,8 @@ LIMIT ?;
 ```
 
 ### Event subscription pattern
+
+> **Erratum (#20):** The pseudocode below is **illustrative only** – this event API does not exist in the codebase (grep returns zero hits for `file:saved/created/deleted`). Real triggers: `DirectoryWatcherService` typed events + the `file:writeFile` save path (consumed main-side in `processEvents`) and the renderer-directed `project:changed` IPC broadcast (DB-swap hooks `ProjectService.updateServices`). See `analysis/20-save-watch-index-pipeline.md`.
 
 ```typescript
 // GraphEngineService subscribes to FileWatcherService events
