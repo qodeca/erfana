@@ -94,6 +94,7 @@ Erfana is an Electron-based IDE focused on markdown editing with integrated term
 ### Future Features (Planned)
 - [Graph Engine](./future/graph-engine.md) – SQLite + vec + FTS5 knowledge graph (not yet implemented)
 - [Native dependencies spike findings](./graph/native-dependencies.md) – better-sqlite3 13 + MCP SDK de-risking results (SD-019/#19); input to the graph DB layer (#23) and MCP server (#30)
+- [Save/watch → index pipeline analysis](../specs/spec-t4-004-graph-foundation/analysis/20-save-watch-index-pipeline.md) – reconciles spec-004's illustrative file-event API onto the real watcher/save/project-switch surfaces; event→action mapping consumed by the indexing issues (#25/#32) (#20)
 - [Source Grounding](./future/source-grounding/README.md) – NotebookLM-style source grounding research for audit document generation
 
 ## Quick Start

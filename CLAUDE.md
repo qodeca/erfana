@@ -125,7 +125,7 @@ Feature specifications live in `specs/`. Check registry before implementing new 
 
 **Registry**: `specs/registry.json`
 
-**Before implementing a feature**: Read the spec overview (`requirements/01-overview.md`), requirements (`requirements/02-requirements.md`), and acceptance criteria (`requirements/03-acceptance.md`).
+**Before implementing a feature**: Read the spec overview (`requirements/01-overview.md`), requirements (`requirements/02-requirements.md`), and acceptance criteria (`requirements/03-acceptance.md` for T3 specs; `requirements/04-acceptance.md` for T4, where `03` is use-cases).
 
 ## Code Style & Conventions
 - TypeScript strict mode enabled

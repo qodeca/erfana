@@ -4,7 +4,7 @@
   "tier": "T4",
   "version": "0.2.0",
   "created": "2025-12-22T21:00:00Z",
-  "updated": "2026-07-23T14:30:00+02:00",
+  "updated": "2026-07-27T12:00:00+02:00",
   "application": {
     "name": "Graph Engine Foundation",
     "domain": "search",
@@ -539,6 +539,31 @@
       "type": "related"
     }
   ],
+  "linked_documents": [
+    {
+      "path": "analysis/20-save-watch-index-pipeline.md",
+      "title": "Save/watch → index pipeline integration analysis",
+      "type": "analysis",
+      "issue": "#20",
+      "exists": true,
+      "purpose": "Reconciles the spec's illustrative file-event API (which does not exist in code) onto the real DirectoryWatcherService / file:writeFile / project:changed surfaces; provides the event→action mapping table consumed by implementation issues #25/#32; fixes the debounce at 300 ms; documents correlation-ID handling (NFR-011) and integration guidance.",
+      "consumed_by": [
+        "#25",
+        "#32"
+      ],
+      "traces_to": [
+        "004-FR-014",
+        "004-FR-045",
+        "004-FR-046",
+        "004-FR-047",
+        "004-FR-048",
+        "004-FR-015",
+        "004-FR-016",
+        "004-NFR-011"
+      ],
+      "added": "2026-07-27"
+    }
+  ],
   "statistics": {
     "total_sections": 5,
     "total_requirements": 109,
@@ -663,6 +688,20 @@
       "operation": "UPDATE",
       "target": "registry link",
       "description": "Release-1 implementation issue #17 (Graph engine R1: project search) filed and linked",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-27",
+      "operation": "UPDATE",
+      "target": "02-requirements, 05-notes",
+      "description": "Issue #20 (Graph R1) erratum: corrected FR-014 and FR-045–048 and NFR-011 in 02-requirements.md; in 05-notes.md marked the illustrative file-event API as non-existent in code and resolved the 300 ms debounce open question. No requirement IDs, priorities, statistics, or cross-references changed.",
+      "by": "user"
+    },
+    {
+      "date": "2026-07-27",
+      "operation": "LINK",
+      "target": "linked_documents",
+      "description": "Registered spec-internal analysis deliverable analysis/20-save-watch-index-pipeline.md ('Save/watch → index pipeline integration analysis') for issue #20; traces to FR-014, FR-045–048, FR-015, FR-016, NFR-011; consumed by implementation issues #25/#32.",
       "by": "user"
     }
   ],
