@@ -160,6 +160,8 @@ The system shall subscribe to `file:saved`, `file:created`, `file:deleted`, and 
 
 **Acceptance:** Saving file triggers index update without manual intervention.
 
+> **Erratum (#20):** The literal event API named here (`file:saved/created/deleted`) does not exist in the codebase. Realized via `DirectoryWatcherService` typed events + the `file:writeFile` save path, consumed main-side in `processEvents`. See `analysis/20-save-watch-index-pipeline.md`.
+
 ---
 
 #### 004-FR-015: Debounce rapid file changes
@@ -515,6 +517,8 @@ The system shall subscribe to `file:saved` events from FileWatcherService to tri
 
 **Acceptance:** Saving file in editor triggers index update for that file.
 
+> **Erratum (#20):** The literal event API named here (`file:saved/created/deleted`) does not exist in the codebase. Realized via `DirectoryWatcherService` typed events + the `file:writeFile` save path, consumed main-side in `processEvents`. See `analysis/20-save-watch-index-pipeline.md`.
+
 ---
 
 #### 004-FR-046: Subscribe to file:created events
@@ -525,6 +529,8 @@ The system shall subscribe to `file:saved` events from FileWatcherService to tri
 The system shall subscribe to `file:created` events to add new files to the index.
 
 **Acceptance:** Creating new markdown file adds it to index within 500ms.
+
+> **Erratum (#20):** The literal event API named here (`file:saved/created/deleted`) does not exist in the codebase. Realized via `DirectoryWatcherService` typed events + the `file:writeFile` save path, consumed main-side in `processEvents`. See `analysis/20-save-watch-index-pipeline.md`.
 
 ---
 
@@ -537,6 +543,8 @@ The system shall subscribe to `file:deleted` events to remove deleted files from
 
 **Acceptance:** Deleting markdown file removes it from index within 500ms.
 
+> **Erratum (#20):** The literal event API named here (`file:saved/created/deleted`) does not exist in the codebase. Realized via `DirectoryWatcherService` typed events + the `file:writeFile` save path, consumed main-side in `processEvents`. See `analysis/20-save-watch-index-pipeline.md`.
+
 ---
 
 #### 004-FR-048: Handle project:changed events
@@ -547,6 +555,8 @@ The system shall subscribe to `file:deleted` events to remove deleted files from
 The system shall handle `project:changed` events by closing the current database and opening/creating the database for the new project.
 
 **Acceptance:** Switching projects loads correct index for new project.
+
+> **Erratum (#20):** `project:changed` is renderer-directed IPC (`webContents.send` from `ProjectService.switchProject`), not a service-level EventEmitter. The DB-swap hooks `ProjectService.updateServices` (teardown mirror `rollbackServices`), not a `.on('project:changed')` subscription. See `analysis/20-save-watch-index-pipeline.md`.
 
 ---
 
@@ -703,5 +713,7 @@ The system shall emit progress events during indexing operations, enabling real-
 The system shall include correlation IDs in IPC events to enable end-to-end tracing of operations across main and renderer processes.
 
 **Verification:** Single operation traceable via correlation ID.
+
+> **Erratum (#20):** No generic correlation-ID utility exists. Realized per the `GitWatcherService.generateCorrelationId` precedent – mint `idx-${Date.now()}-${rand}` per ingestion batch (in `processEvents`) and per DB-swap (in `switchProject`), threaded through structured logs as `logger.info(msg, { correlationId })` / `logger.error(msg, err, { correlationId })` (context is the third arg for `error`/`fatal`) and into the index-op IPC payload (modeled on `GitStateChangeEvent.correlationId`). See `analysis/20-save-watch-index-pipeline.md`.
 
 ---
