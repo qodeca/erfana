@@ -76,7 +76,15 @@ All seven are `invoke`; the one event is a push. A single status channel (not se
 ```ts
 export const GraphMatchMode = z.enum(['all', 'any'])
 
-export const GraphSearchFiltersSchema = z.strictObject({
+// §7.0 base/leaf split. The filter/request SHAPES live in unrefined `*BaseSchema`
+// objects; the renderer-facing leaves (`GraphSearchFiltersSchema`,
+// `GraphSearchRequestSchema`) derive from them, and later joint refinements
+// (`offset + k`, `modifiedAfterMs <= modifiedBeforeMs`) attach to the LEAVES.
+// This is load-bearing: zod 4 throws on `.pick()`/`.omit()`/`.check()` applied to
+// an object that carries a refinement, and §7.10's `GraphMcpToolArgsSchema`
+// derives from the bases with `.pick()`/`.omit()`.
+
+export const GraphSearchFiltersBaseSchema = z.strictObject({
   /**
    * Project-relative POSIX prefix. MUST end in '/' — 'doc' would otherwise match
    * documentation/ and doc-archive/ via the substr() prefix compare, silently and
@@ -94,8 +102,10 @@ export const GraphSearchFiltersSchema = z.strictObject({
   /** AC-018: omit the CURRENT section, keeping sibling sections eligible. */
   excludeSectionId: z.number().int().positive().optional()
 })
+/** Renderer-facing leaf — currently the base verbatim; joint refinements attach here. */
+export const GraphSearchFiltersSchema = GraphSearchFiltersBaseSchema
 
-export const GraphSearchRequestSchema = z.strictObject({
+export const GraphSearchRequestBaseSchema = z.strictObject({
   query: z.string().trim().min(1).max(GRAPH.MAX_QUERY_LENGTH),
   /** 'all' = implicit AND (typed query). 'any' = OR, required for #28's passage
    *  queries, which return zero rows under AND. */
@@ -109,6 +119,8 @@ export const GraphSearchRequestSchema = z.strictObject({
   filters: GraphSearchFiltersSchema.optional(),
   correlationId: z.string().min(1).optional()
 })
+/** Renderer-facing leaf — currently the base verbatim; the `offset + k` joint bound attaches here. */
+export const GraphSearchRequestSchema = GraphSearchRequestBaseSchema
 ```
 
 **Passage budget.** `MAX_QUERY_LENGTH` is 4096, not 512, because #28 sends a passage. `GraphSearchService` reduces it to at most `GRAPH.MAX_QUERY_TERMS` (24) tokens by the single normative pipeline in §9 row 11 — revision 2 specified it twice, inconsistently, in two files.
@@ -420,7 +432,7 @@ export const GraphPortRequestSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('graph:search'), correlationId: z.string().min(1),
     /** Fenced like a worker message: one port spans arbitrary project switches (M7). */
     switchVersion: z.number().int().nonnegative(),
-    payload: GraphMcpToolInputSchema }),
+    payload: GraphMcpToolArgsSchema }),
   /** FR-044: complete pending requests before shutdown. */
   z.strictObject({ kind: z.literal('graph:drain'), correlationId: z.string().min(1) })
 ])
@@ -441,12 +453,23 @@ export const GraphPortResponseSchema = z.discriminatedUnion('kind', [
 **Model-facing tool input.** Reusing `GraphSearchRequestSchema` verbatim would have handed `registerTool` a shape containing `correlationId`, `offset` and `excludeSectionId` — a DB-internal integer no model can know — while MCP requires a valid `inputSchema` that servers MUST validate.
 
 ```ts
-export const GraphMcpToolInputSchema = GraphSearchRequestSchema
+// Derived from the unrefined BASE object, not the renderer leaf: zod 4 throws on
+// `.pick()`/`.omit()` applied to an object that carries a refinement, and the
+// leaves are where later joint bounds (`offset + k`, `modifiedAfterMs <=
+// modifiedBeforeMs`) attach. See §7.0's base/leaf split.
+export const GraphMcpToolArgsSchema = GraphSearchRequestBaseSchema
   .pick({ query: true, k: true, filters: true })
   .extend({
     k: z.number().int().min(1).max(MCP.MAX_TOP_K).default(GRAPH.DEFAULT_TOP_K),
-    filters: GraphSearchFiltersSchema.omit({ excludeSectionId: true }).optional()
+    filters: GraphSearchFiltersBaseSchema.omit({ excludeSectionId: true }).optional()
   })
+
+// JSON-Schema: convert with `z.toJSONSchema(GraphMcpToolArgsSchema, { io: 'input' })`.
+// The default and `{ io: 'output' }` forms throw (`Transforms cannot be represented
+// in JSON Schema`) on the inherited `filters.folder` transform; `io:'input'` both
+// avoids that and yields `required: ["query"]`. Refinements are likewise NOT
+// representable in JSON Schema, so later joint bounds are absent from the published
+// `inputSchema` — zod-side validation, not the published schema, enforces them.
 
 /** Declared as the tool's outputSchema. The untrusted-data envelope, control-char
  *  stripping and byte caps that wrap it are contracted in §9.4 (B1). */

@@ -21,27 +21,45 @@
  */
 import { z } from 'zod'
 import { GRAPH, MCP } from '../graph-constants'
-import { GraphErrorCodeSchema, GraphSearchFiltersSchema, GraphSearchRequestSchema } from './graph-schema'
+import {
+  GraphErrorCodeSchema,
+  GraphSearchFiltersBaseSchema,
+  GraphSearchRequestBaseSchema
+} from './graph-schema'
 
 // ─── model-facing tool contract ──────────────────────────────────────────────
 
 /**
  * The tool's `inputSchema`, which MCP requires servers to validate.
  *
- * Reusing {@link GraphSearchRequestSchema} verbatim would hand `registerTool` a
- * shape containing `correlationId`, `offset` and `excludeSectionId` — a
+ * Reusing {@link GraphSearchRequestBaseSchema} verbatim would hand `registerTool`
+ * a shape containing `correlationId`, `offset` and `excludeSectionId` — a
  * DB-internal integer no model can know. `MCP.MAX_TOP_K` (20) is deliberately
  * lower than the renderer's, and `offset` is not exposed at all: every MCP
  * request lands on the synchronous main-thread reader from **outside** the
  * trust boundary, so the cheapest bound is the request shape itself.
+ *
+ * Derived from the unrefined **base** schemas, not the renderer leaves: `.pick()`
+ * and `.omit()` throw on an object carrying a refinement in zod 4, and the leaves
+ * are where later joint bounds attach.
+ *
+ * **JSON-Schema conversion.** Convert with
+ * `z.toJSONSchema(GraphMcpToolArgsSchema, { io: 'input' })`. The default form and
+ * `{ io: 'output' }` both **throw** (`Transforms cannot be represented in JSON
+ * Schema`) because the args inherit `filters.folder`'s `.transform()`; only the
+ * `io: 'input'` form avoids that throw *and* yields the optional-`k`,
+ * `required: ["query"]` shape a model needs. Note that refinements are likewise
+ * not representable in JSON Schema, so any later joint bound (e.g. an inverted
+ * date-range check) is absent from the published `inputSchema` — zod-side
+ * validation, not the published schema, is the enforcement point.
  */
-export const GraphMcpToolInputSchema = GraphSearchRequestSchema.pick({
+export const GraphMcpToolArgsSchema = GraphSearchRequestBaseSchema.pick({
   query: true,
   k: true,
   filters: true
 }).extend({
   k: z.number().int().min(1).max(MCP.MAX_TOP_K).default(GRAPH.DEFAULT_TOP_K),
-  filters: GraphSearchFiltersSchema.omit({ excludeSectionId: true }).optional()
+  filters: GraphSearchFiltersBaseSchema.omit({ excludeSectionId: true }).optional()
 })
 /**
  * `…Args`, not `…Input`. The schema keeps the name of the MCP field it
@@ -50,8 +68,8 @@ export const GraphMcpToolInputSchema = GraphSearchRequestSchema.pick({
  * whose two `Input`s mean different things. The subject is the tool's
  * arguments, so that is what the types are called.
  */
-export type GraphMcpToolArgsInput = z.input<typeof GraphMcpToolInputSchema>
-export type GraphMcpToolArgs = z.output<typeof GraphMcpToolInputSchema>
+export type GraphMcpToolArgsInput = z.input<typeof GraphMcpToolArgsSchema>
+export type GraphMcpToolArgs = z.output<typeof GraphMcpToolArgsSchema>
 
 const TAB = 0x09
 const LINE_FEED = 0x0a
@@ -142,7 +160,7 @@ export const GraphPortSearchRequestSchema = z.strictObject({
    *  project switches, answering an in-flight search from whichever reader was
    *  attached when the handler ran. */
   switchVersion: z.number().int().nonnegative(),
-  payload: GraphMcpToolInputSchema
+  payload: GraphMcpToolArgsSchema
 })
 
 /** FR-044: complete pending requests before shutdown. */

@@ -80,7 +80,19 @@ export type {
 export const GraphMatchMode = z.enum(['all', 'any'])
 export type GraphMatchMode = z.infer<typeof GraphMatchMode>
 
-export const GraphSearchFiltersSchema = z.strictObject({
+/**
+ * Unrefined base object for the search filters — the derivation root (§7.0).
+ *
+ * A base/leaf split, because zod 4 **throws** on `.pick()`/`.omit()`/`.check()`
+ * applied to an object schema that carries a refinement
+ * (`".pick() cannot be used on object schemas containing refinements"`). The MCP
+ * args schema derives its filter set with `.omit({ excludeSectionId })`, so the
+ * shape it derives from must stay refinement-free. Any joint filter refinement
+ * (e.g. a `modifiedAfterMs <= modifiedBeforeMs` bound) therefore attaches to the
+ * LEAF export {@link GraphSearchFiltersSchema}, never to this base — that way the
+ * `.omit()` keeps working.
+ */
+export const GraphSearchFiltersBaseSchema = z.strictObject({
   /**
    * Project-relative POSIX prefix, terminated with `/` by the transform.
    * `'doc'` would otherwise match `documentation/` and `doc-archive/` through
@@ -106,10 +118,25 @@ export const GraphSearchFiltersSchema = z.strictObject({
   /** AC-018: omit the CURRENT section, keeping sibling sections eligible. */
   excludeSectionId: z.number().int().positive().optional()
 })
+
+/**
+ * Renderer-facing filters leaf. Currently the base verbatim; a joint refinement
+ * (`modifiedAfterMs <= modifiedBeforeMs`) attaches here rather than on
+ * {@link GraphSearchFiltersBaseSchema} so the MCP `.omit()` derivation survives.
+ */
+export const GraphSearchFiltersSchema = GraphSearchFiltersBaseSchema
 export type GraphSearchFiltersInput = z.input<typeof GraphSearchFiltersSchema>
 export type GraphSearchFilters = z.output<typeof GraphSearchFiltersSchema>
 
-export const GraphSearchRequestSchema = z.strictObject({
+/**
+ * Unrefined base object for the search request — the derivation root (§7.0).
+ *
+ * Same base/leaf reason as {@link GraphSearchFiltersBaseSchema}: the MCP args
+ * schema derives with `.pick({ query, k, filters })`, which zod 4 refuses on a
+ * refined object. A joint request refinement (e.g. an `offset + k` probe bound)
+ * attaches to the LEAF export {@link GraphSearchRequestSchema}, never here.
+ */
+export const GraphSearchRequestBaseSchema = z.strictObject({
   /** Up to `GRAPH.MAX_QUERY_LENGTH` — the related sidebar sends a whole passage,
    *  which the search service reduces to `GRAPH.MAX_QUERY_TERMS` tokens. */
   query: z.string().trim().min(1).max(GRAPH.MAX_QUERY_LENGTH),
@@ -124,6 +151,13 @@ export const GraphSearchRequestSchema = z.strictObject({
   /** Optional inbound, required outbound: main echoes a supplied id or mints one. */
   correlationId: z.string().min(1).optional()
 })
+
+/**
+ * Renderer-facing request leaf. Currently the base verbatim; a joint refinement
+ * (`offset + k`) attaches here rather than on {@link GraphSearchRequestBaseSchema}
+ * so the MCP `.pick()` derivation survives.
+ */
+export const GraphSearchRequestSchema = GraphSearchRequestBaseSchema
 export type GraphSearchRequestInput = z.input<typeof GraphSearchRequestSchema>
 export type GraphSearchRequest = z.output<typeof GraphSearchRequestSchema>
 

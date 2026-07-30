@@ -12,9 +12,9 @@
  *   local process can reach, hence the 256-bit token and the handshake.
  *
  * The tool input is the narrowest surface in the design: it is derived from
- * `GraphSearchRequestSchema` by `.pick()` + `.extend()`, so the assertions below
- * pin what that derivation MUST NOT let through — `offset`, `correlationId` and
- * `excludeSectionId`, none of which a model can know, and a `k` above
+ * `GraphSearchRequestBaseSchema` by `.pick()` + `.extend()`, so the assertions
+ * below pin what that derivation MUST NOT let through — `offset`, `correlationId`
+ * and `excludeSectionId`, none of which a model can know, and a `k` above
  * `MCP.MAX_TOP_K`. Every request lands on the synchronous main-thread reader
  * from outside the trust boundary, so the request shape is the cheapest bound.
  *
@@ -23,12 +23,13 @@
  * @see specs/designs/sd-021-cross-cutting.md §9.3, §9.4, §9.5
  */
 import { describe, it, expect } from 'vitest'
+import { z } from 'zod'
 import { ErrorCode } from '../errors'
 import { GRAPH, MCP } from '../graph-constants'
 import {
   GraphMcpConnectAckSchema,
   GraphMcpConnectSchema,
-  GraphMcpToolInputSchema,
+  GraphMcpToolArgsSchema,
   GraphMcpToolResultSchema,
   GraphPortDrainRequestSchema,
   GraphPortDrainedSchema,
@@ -55,20 +56,20 @@ const TOOL_RESULT = {
 
 const HEX64 = 'a'.repeat(64)
 
-describe('GraphMcpToolInputSchema', () => {
+describe('GraphMcpToolArgsSchema', () => {
   it('resolves k from a query alone', () => {
-    expect(GraphMcpToolInputSchema.parse({ query: 'alpha' })).toEqual({
+    expect(GraphMcpToolArgsSchema.parse({ query: 'alpha' })).toEqual({
       query: 'alpha',
       k: GRAPH.DEFAULT_TOP_K
     })
   })
 
   it('fails on parse({}) — query has no default', () => {
-    expect(GraphMcpToolInputSchema.safeParse({}).success).toBe(false)
+    expect(GraphMcpToolArgsSchema.safeParse({}).success).toBe(false)
   })
 
   it('fails on parse(undefined)', () => {
-    expect(GraphMcpToolInputSchema.safeParse(undefined).success).toBe(false)
+    expect(GraphMcpToolArgsSchema.safeParse(undefined).success).toBe(false)
   })
 
   describe('k is bounded harder than the renderer', () => {
@@ -77,17 +78,17 @@ describe('GraphMcpToolInputSchema', () => {
     })
 
     it('accepts k at MCP.MAX_TOP_K', () => {
-      expect(GraphMcpToolInputSchema.parse({ query: 'a', k: MCP.MAX_TOP_K }).k).toBe(MCP.MAX_TOP_K)
+      expect(GraphMcpToolArgsSchema.parse({ query: 'a', k: MCP.MAX_TOP_K }).k).toBe(MCP.MAX_TOP_K)
     })
 
     it('rejects k one over MCP.MAX_TOP_K even though the renderer allows it', () => {
       const k = MCP.MAX_TOP_K + 1
-      expect(GraphMcpToolInputSchema.safeParse({ query: 'a', k }).success).toBe(false)
+      expect(GraphMcpToolArgsSchema.safeParse({ query: 'a', k }).success).toBe(false)
       expect(k).toBeLessThanOrEqual(GRAPH.MAX_TOP_K)
     })
 
     it('rejects k = GRAPH.MAX_TOP_K, the renderer ceiling', () => {
-      expect(GraphMcpToolInputSchema.safeParse({ query: 'a', k: GRAPH.MAX_TOP_K }).success).toBe(
+      expect(GraphMcpToolArgsSchema.safeParse({ query: 'a', k: GRAPH.MAX_TOP_K }).success).toBe(
         false
       )
     })
@@ -97,7 +98,7 @@ describe('GraphMcpToolInputSchema', () => {
     it.each(['offset', 'correlationId', 'matchMode', 'includeMatchedTerms'])(
       'rejects %s rather than stripping it',
       (key) => {
-        expect(GraphMcpToolInputSchema.safeParse({ query: 'a', [key]: 1 }).success).toBe(false)
+        expect(GraphMcpToolArgsSchema.safeParse({ query: 'a', [key]: 1 }).success).toBe(false)
       }
     )
 
@@ -105,12 +106,12 @@ describe('GraphMcpToolInputSchema', () => {
     // from the MCP filter set, and the omit must not silently strip.
     it('rejects excludeSectionId inside filters', () => {
       expect(
-        GraphMcpToolInputSchema.safeParse({ query: 'a', filters: { excludeSectionId: 3 } }).success
+        GraphMcpToolArgsSchema.safeParse({ query: 'a', filters: { excludeSectionId: 3 } }).success
       ).toBe(false)
     })
 
     it('keeps the remaining five filters usable', () => {
-      const parsed = GraphMcpToolInputSchema.parse({
+      const parsed = GraphMcpToolArgsSchema.parse({
         query: 'a',
         filters: {
           folder: 'docs',
@@ -125,23 +126,41 @@ describe('GraphMcpToolInputSchema', () => {
 
     it('still rejects an unknown filter key after the omit', () => {
       expect(
-        GraphMcpToolInputSchema.safeParse({ query: 'a', filters: { excludeSection: 3 } }).success
+        GraphMcpToolArgsSchema.safeParse({ query: 'a', filters: { excludeSection: 3 } }).success
       ).toBe(false)
     })
 
     it('still applies the fileType regex after the omit', () => {
       expect(
-        GraphMcpToolInputSchema.safeParse({ query: 'a', filters: { fileType: 'md' } }).success
+        GraphMcpToolArgsSchema.safeParse({ query: 'a', filters: { fileType: 'md' } }).success
       ).toBe(false)
     })
   })
 
   it('inherits the query trim and length bound', () => {
-    expect(GraphMcpToolInputSchema.parse({ query: '  alpha ' }).query).toBe('alpha')
-    expect(GraphMcpToolInputSchema.safeParse({ query: '   ' }).success).toBe(false)
+    expect(GraphMcpToolArgsSchema.parse({ query: '  alpha ' }).query).toBe('alpha')
+    expect(GraphMcpToolArgsSchema.safeParse({ query: '   ' }).success).toBe(false)
     expect(
-      GraphMcpToolInputSchema.safeParse({ query: 'a'.repeat(GRAPH.MAX_QUERY_LENGTH + 1) }).success
+      GraphMcpToolArgsSchema.safeParse({ query: 'a'.repeat(GRAPH.MAX_QUERY_LENGTH + 1) }).success
     ).toBe(false)
+  })
+
+  // S-016: #30 publishes this shape as the tool's `inputSchema`. The args inherit
+  // `filters.folder`'s `.transform()`, which has no JSON-Schema representation, so
+  // only the `io:'input'` form converts — the default and `io:'output'` forms
+  // throw. Pin both halves so a refactor that drops the transform is noticed.
+  describe('JSON-Schema conversion (S-016)', () => {
+    it('converts under { io: "input" } and marks query the only required field', () => {
+      let jsonSchema: { required?: unknown } | undefined
+      expect(() => {
+        jsonSchema = z.toJSONSchema(GraphMcpToolArgsSchema, { io: 'input' })
+      }).not.toThrow()
+      expect(jsonSchema?.required).toEqual(['query'])
+    })
+
+    it('throws under the default (output) conversion because of the inherited transform', () => {
+      expect(() => z.toJSONSchema(GraphMcpToolArgsSchema)).toThrow()
+    })
   })
 })
 
