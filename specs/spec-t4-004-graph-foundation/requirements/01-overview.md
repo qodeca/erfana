@@ -27,6 +27,8 @@ The foundation layer (M1) delivers keyword-based search that provides immediate 
 - Schema versioning and migration system
 - Integrity checks and corruption recovery
 
+> **Erratum (#21):** During beta there are **no data-preserving migrations**. The database is a derived cache (05-notes "Contract stability"), so a schema-version mismatch — **higher or lower** — discards all indexed data and triggers a full reindex, **in place**: `DROP` + recreate in one transaction on the same file, never `unlink()` and never `rename()`, because a live read-only handle keeps serving a deleted inode and no PRAGMA detects it. Version lives in `graph_meta.schema_version` (`value_int`, not `value` — TEXT affinity would return `'1'` and fail the `===` gate on every open). The "Schema versioning and migration system" bullet becomes "Schema versioning with discard-and-rebuild on mismatch (no migrations during beta)". See `specs/designs/sd-021-db-contracts.md` C3 and `specs/designs/sd-021-db-schema.md` §6.6.
+
 **Preprocessing Pipeline:**
 - Markdown syntax normalization (strip formatting, preserve text)
 - Whitespace normalization and text deduplication
@@ -38,6 +40,8 @@ The foundation layer (M1) delivers keyword-based search that provides immediate 
 - Incremental updates via content hash comparison
 - Batch processing with progress events
 - Event-driven triggers from FileWatcherService
+
+> **Erratum (#21, propagating #20):** The literal `file:saved` / `file:created` / `file:deleted` API does not exist — a grep across `src/` returns zero hits — and `FileWatcherService` is a **single-file** watcher for the open editor file, not a project-wide bus. Read every "FileWatcherService emits/detects `file:*`" step as: "`DirectoryWatcherService` emits a coalesced `add`/`change`/`unlink` batch, consumed **main-side** in `processEvents` via the constructor-injected `onCoalescedBatch(dirPath, events, version)` callback at `DirectoryWatcherService.ts:545-546`, where `coalescedEvents` (bound `:518`) is still intact, immediately before the count-only send at `:547`." The renderer `directory-watch:changed` payload carries counts only. The "Event-driven triggers from FileWatcherService" bullet becomes "Event-driven triggers from DirectoryWatcherService".
 
 **Search API:**
 - BM25 keyword search with weighted ranking

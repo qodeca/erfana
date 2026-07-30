@@ -204,6 +204,8 @@ hooking DB close+open directly there runs the `004-FR-004` `PRAGMA integrity_che
 synchronous), blocking the UI on large DBs. Prefer opening the DB lazily off the
 synchronous funnel, or deferring `integrity_check` to a post-switch microtask.
 
+> **Erratum (#21):** There are no migrations — during beta a schema-version mismatch discards and rebuilds in place (see the 004-FR-003 erratum in `../requirements/02-requirements.md`). The caution above stands and is stronger than stated: `updateServices` is synchronous, so the DB is opened **in the worker**, off the switch path, with main only recording the path, bumping the switch version and aborting pending timers synchronously. Read "migrations" as "the schema-version gate and any resulting in-place rebuild".
+
 ---
 
 ## Event → action mapping table

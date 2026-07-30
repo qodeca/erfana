@@ -25,6 +25,7 @@ import { randomUUID } from 'crypto'
 import { ffmpegPath } from '../utils/mediaBinaries'
 import { LOCAL_WHISPER, TRANSCRIPTION } from '../../shared/constants'
 import { AppError, ErrorCode } from '../../shared/errors'
+import { WIN32_RESERVED_BASENAMES } from '../../shared/win32-reserved'
 import type {
   TranscriptionProgress,
   TranscriptionResult,
@@ -72,17 +73,15 @@ const FFMPEG_PROBE_TIMEOUT = 30_000
 const PROGRESS_REGEX = /progress\s*=\s*(\d+)%/
 
 /**
- * Windows reserved basenames (case-insensitive), with or without extension.
- * Passing these to CreateProcess or CreateFile has OS-specific behaviour
- * that can confuse ffmpeg/whisper.exe's argv handling — reject at the entry.
+ * {@link WIN32_RESERVED_BASENAMES} is shared with the graph path-confinement
+ * predicate ({@link isConfinedRelativePath} in `graph-error-schema.ts`) so the
+ * two argv/path guards cannot drift (issue #21, decision D4). This file's
+ * `validateAudioPath` still owns the argv-hardening logic below.
  *
+ * @see src/shared/win32-reserved.ts - the hoisted device-name set
+ * @see src/shared/ipc/graph-error-schema.ts - isConfinedRelativePath
  * @see https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file
  */
-const WIN32_RESERVED_BASENAMES = new Set([
-  'CON', 'PRN', 'AUX', 'NUL',
-  'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
-  'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'
-])
 
 /**
  * Node child.kill('SIGTERM') on Windows maps to TerminateProcess — abrupt, not

@@ -100,7 +100,8 @@ describe('ProjectService integration with ProjectLockService', () => {
       loadSettings: vi.fn(() =>
         Promise.resolve({
           treeHiddenPatterns: [],
-          watcherIgnorePatterns: []
+          watcherIgnorePatterns: [],
+          graphExcludePatterns: []
         })
       ),
       clearSettings: vi.fn()
@@ -157,7 +158,7 @@ describe('ProjectService integration with ProjectLockService', () => {
 
       mockProjectSettingsService.loadSettings.mockImplementation(async () => {
         callOrder.push('loadSettings')
-        return { treeHiddenPatterns: [], watcherIgnorePatterns: [] }
+        return { treeHiddenPatterns: [], watcherIgnorePatterns: [], graphExcludePatterns: [] }
       })
 
       await projectService.switchProject(projectPath)

@@ -1,5 +1,7 @@
 ## Milestone 1: Foundation (FTS5 + Keyword Search)
 
+> **Superseded for M1 (2026-07).** The authoritative M1 architecture is `specs/designs/sd-021-graph-architecture.md` and its companion parts. Where this document conflicts — the FileWatcherService event bus, external-content FTS5 with triggers, `ON DELETE CASCADE`, main-thread DB ownership, and the `electron-rebuild` packaging steps — **SD-021 wins**. See SD-021 §15.
+
 **Goal:** Ship working keyword search with complete UI components and MCP server for Claude Code.
 
 **Duration:** 3-4 weeks

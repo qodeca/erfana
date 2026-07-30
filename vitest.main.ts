@@ -7,7 +7,21 @@ export default defineConfig({
   test: {
     name: 'main',
     environment: 'node',
-    include: ['src/main/**/*.test.{ts,tsx}', 'src/shared/**/*.test.{ts,tsx}', 'scripts/**/*.test.{js,mjs,ts}'],
+    // `scripts/**`, deliberately broad. #21 briefly narrowed this to
+    // `scripts/spikes/**` on the false premise that `scripts/fuses.test.mjs`
+    // and `scripts/ensure-media-binaries.test.mjs` had never been collected.
+    // They had: `git show origin/develop:vitest.main.ts` line 10 carries this
+    // same broad glob, and narrowing it silently removed 34 assertions
+    // (fuses 29, media-binaries 5) covering Electron fuse verification,
+    // node-pty spawn-helper chmod, foreign-prebuild pruning and media-binary
+    // SHA-256 checks from the branch-protection-required `test` job.
+    // `scripts/**` already covers `scripts/spikes/**`, so the #21 spike
+    // harness is collected by this pattern too — no separate entry needed.
+    include: [
+      'src/main/**/*.test.{ts,tsx}',
+      'src/shared/**/*.test.{ts,tsx}',
+      'scripts/**/*.test.{js,mjs,ts}'
+    ],
     exclude: ['node_modules', 'dist', 'out', 'e2e', 'tests/fixtures'],
     globals: true,
     setupFiles: ['tests/setup/setupTests.main.ts'],

@@ -1,5 +1,7 @@
 # Data Model & Schema
 
+> **Superseded for M1 (2026-07).** The authoritative M1 architecture is `specs/designs/sd-021-graph-architecture.md` and its companion parts. Where this document conflicts — the FileWatcherService event bus, external-content FTS5 with triggers, `ON DELETE CASCADE`, main-thread DB ownership, and the `electron-rebuild` packaging steps — **SD-021 wins**. See SD-021 §15.
+
 > ⚠️ **WORK IN PROGRESS - NOT READY FOR DEVELOPMENT**
 >
 > This documentation is currently under active development and review. The Graph Engine specification, architecture, and implementation details are subject to significant changes. **DO NOT start implementation work based on these documents.**

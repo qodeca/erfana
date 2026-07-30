@@ -8,6 +8,15 @@
  * Centralizes configuration values that are used across multiple files.
  */
 
+/**
+ * Graph engine + MCP constants live in their own module to keep this file under
+ * the 500-line house cap, and are re-exported here so callers have one import site.
+ *
+ * @see ./graph-constants.ts
+ * @see Issue #21 - graph R1 architecture
+ */
+export { GRAPH, MCP, DEFAULT_GRAPH_EXCLUDE_PATTERNS } from './graph-constants'
+
 /** Maximum number of recent projects to track */
 export const MAX_RECENT_PROJECTS = 5
 
@@ -73,6 +82,10 @@ export const TEXT_INPUT_LIMITS = {
 /**
  * Default watcher ignore patterns (performance optimization)
  * These directories cause chokidar performance issues (50K+ files)
+ *
+ * Deliberately broader than DEFAULT_GRAPH_EXCLUDE_PATTERNS (graph-constants.ts):
+ * these entries protect the FD budget, not indexing relevance. Editing either
+ * list should prompt a review of the other.
  *
  * @see DirectoryWatcherService.ts - uses these patterns
  * @see Issue #63 - project-level settings

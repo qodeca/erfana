@@ -28,6 +28,8 @@
 - Schema version is updated to current
 - Existing data is preserved
 
+> **Erratum (#21):** During beta there are **no data-preserving migrations**, so this criterion inverts: a schema-version mismatch — **higher or lower** — discards all indexed data and triggers a full reindex, **in place** (`DROP` + recreate in one transaction on the same file, never `unlink()` and never `rename()`, because a live read-only handle keeps serving a deleted inode and no PRAGMA detects it). The database is a derived cache (05-notes "Contract stability"), so "Existing data is preserved" does **not** apply. Version lives in `graph_meta.schema_version` (`value_int`, not `value` — TEXT affinity would return `'1'` and fail the `===` gate on every open). See `specs/designs/sd-021-db-contracts.md` C3 and `specs/designs/sd-021-db-schema.md` §6.6.
+
 ---
 
 ### 004-AC-003: Corruption detection and recovery
@@ -41,6 +43,10 @@
 - Integrity check fails
 - User sees "Index corrupted" dialog
 - "Rebuild" option deletes and recreates database
+
+> **Erratum (#21):** The dialog clause is **dropped**. Corruption recovery is automatic and silent for the first recovery — the index is a rebuildable derived cache, so there is no modal, no confirmation and no "Rebuild?" prompt; the sequence surfaces only through the status indicator (yellow → green). **A recurring rebuild is not silent:** `GRAPH.MAX_AUTO_REBUILDS_PER_SESSION` = 2 with a 10-minute cooldown, persisted in `graph_meta`; on exhaustion Erfana stops rebuilding, enters `disabled` with `GRAPH_DB_REBUILD_FAILED`, and surfaces it. See `specs/designs/sd-021-cross-cutting.md` §9.10.
+
+> **Erratum (#21):** Rebuild is **in place** — `DROP` + recreate in a single transaction on the same `graph.db` — never by deleting or renaming it. A live read-only connection follows an in-place rebuild transparently, but after `unlink()` + recreate it silently serves the deleted inode forever (measured; `data_version` / `schema_version` / `user_version` all fail to detect it), and on Windows unlinking an open file typically fails outright. Read "deletes and recreates database" as "drops and recreates all tables in place". See `specs/designs/sd-021-db-contracts.md` C3 and `specs/designs/sd-021-db-schema.md` §6.6.
 
 ---
 
@@ -151,6 +157,8 @@ Content for h3
 - Unchanged sections are not touched (4 skipped)
 - Operation completes in < 100ms (stricter than 004-NFR-003's < 500ms incremental update latency bound)
 
+> **Erratum (#21):** The write path re-indexes at **file** granularity: an unchanged file is short-circuited on `files.file_hash`, and a changed file has its sections deleted and re-inserted with fresh ids rather than upserted per ordinal. Section-level upsert was rejected because it strands trailing `sections` and `sections_fts` rows when an edited file yields fewer sections, never decrements `contents.ref_count`, and drifts every counter — and because FTS5 rows must then be `UPDATE`d at a retained rowid, which nothing in the spec described. Read "only the changed section is updated (1 UPDATE)" as "only changed **files** are re-indexed; an unchanged file performs zero writes". The < 100 ms bound is unaffected. See `specs/designs/sd-021-db-schema.md` §6.7.
+
 ---
 
 ### 004-AC-011: Progress events during batch indexing
@@ -178,6 +186,8 @@ Content for h3
 - `file:saved` event is received by GraphEngineService
 - Index update is queued
 - Index is updated within 500ms of save
+
+> **Erratum (#21, propagating #20):** The literal `file:saved` / `file:created` / `file:deleted` API does not exist — a grep across `src/` returns zero hits — and `FileWatcherService` is a **single-file** watcher for the open editor file, not a project-wide bus. Read "`file:saved` event is received by GraphEngineService" as: "`DirectoryWatcherService` emits a coalesced `add`/`change`/`unlink` batch, consumed **main-side** in `processEvents` via the constructor-injected `onCoalescedBatch(dirPath, events, version)` callback at `DirectoryWatcherService.ts:545-546`, where `coalescedEvents` (bound `:518`) is still intact, immediately before the count-only send at `:547`." The renderer `directory-watch:changed` payload carries counts only. See `analysis/20-save-watch-index-pipeline.md`.
 
 ---
 
@@ -359,6 +369,8 @@ Content for h3
 - Progress is shown
 - Completion message displays stats
 
+> **Erratum (#21):** Rebuild is **in place** — `DROP` + recreate in a single transaction on the same `graph.db` — never by deleting or renaming it. A live read-only connection follows an in-place rebuild transparently, but after `unlink()` + recreate it silently serves the deleted inode forever (measured; `data_version` / `schema_version` / `user_version` all fail to detect it), and on Windows unlinking an open file typically fails outright. Read "Existing index is deleted" as "all tables are dropped and recreated in place". The confirmation copy becomes "This will clear and rebuild the entire index. Continue?". See `specs/designs/sd-021-db-contracts.md` C3 and `specs/designs/sd-021-db-schema.md` §6.6.
+
 ---
 
 ### 004-AC-025: Corpus statistics display
@@ -447,6 +459,8 @@ Content for h3
 - No error response is returned; the query eventually completes
 - The limit is configurable in settings
 
+> **Erratum (#21):** "Queued and delayed, not rejected" assumes a transport with flow control. `MessagePortMain` has none — `postMessage` never blocks and queues unconditionally — so unbounded delay-queueing is not backpressure; it is an unbounded main-process queue a looping client can grow without limit, each entry landing on the synchronous main-thread reader from outside the trust boundary. Read this as: "apply advisory rate limiting with a bounded queue (`MCP.MAX_INFLIGHT` = 4, `MCP.MAX_QUEUE_DEPTH` = 32); requests beyond the bound receive a typed `graph:throttled` response carrying `retryAfterMs`, which the client is expected to honour." "No error response is returned" becomes "no *failure* response is returned; a throttle signal with a retry hint is". See `specs/designs/sd-021-cross-cutting.md` §9.5.
+
 ---
 
 ### 004-AC-031: MCP auto-lifecycle
@@ -477,6 +491,8 @@ Content for h3
 - New file is indexed within 500ms
 - File appears in search results
 
+> **Erratum (#21, propagating #20):** The literal `file:saved` / `file:created` / `file:deleted` API does not exist — a grep across `src/` returns zero hits — and `FileWatcherService` is a **single-file** watcher for the open editor file, not a project-wide bus. Read "`file:created` event is received" as: "`DirectoryWatcherService` emits a coalesced `add`/`change`/`unlink` batch, consumed **main-side** in `processEvents` via the constructor-injected `onCoalescedBatch(dirPath, events, version)` callback at `DirectoryWatcherService.ts:545-546`, where `coalescedEvents` (bound `:518`) is still intact, immediately before the count-only send at `:547`." The renderer `directory-watch:changed` payload carries counts only. See `analysis/20-save-watch-index-pipeline.md`.
+
 ---
 
 ### 004-AC-033: Handle file:deleted event
@@ -490,6 +506,8 @@ Content for h3
 - `file:deleted` event is received
 - File is removed from index
 - File no longer appears in search results
+
+> **Erratum (#21, propagating #20):** The literal `file:saved` / `file:created` / `file:deleted` API does not exist — a grep across `src/` returns zero hits — and `FileWatcherService` is a **single-file** watcher for the open editor file, not a project-wide bus. Read "`file:deleted` event is received" as: "`DirectoryWatcherService` emits a coalesced `add`/`change`/`unlink` batch, consumed **main-side** in `processEvents` via the constructor-injected `onCoalescedBatch(dirPath, events, version)` callback at `DirectoryWatcherService.ts:545-546`, where `coalescedEvents` (bound `:518`) is still intact, immediately before the count-only send at `:547`." The renderer `directory-watch:changed` payload carries counts only. See `analysis/20-save-watch-index-pipeline.md`.
 
 ---
 
@@ -505,6 +523,8 @@ Content for h3
 - Database for Project A is closed
 - Database for Project B is opened/created
 - Project B content is searchable
+
+> **Erratum (#21, propagating #20):** `project:changed` is renderer-directed IPC (`webContents.send` from `switchProject`), not a service EventEmitter — nothing can `.on()` it. Read "`project:changed` event is received" as: "`ProjectService.updateServices` (`:125-129`) calls `IGraphProjectLifecycle.onProjectPathChanged`, which synchronously bumps the switch version, aborts pending timers, drops queued batches and detaches the reader, then enqueues **close-then-open** asynchronously off the switch path; teardown mirrors in `rollbackServices` (`:147-159`)." See `specs/designs/sd-021-db-contracts.md` §5.2.
 
 ---
 
@@ -577,6 +597,8 @@ Content for h3
 - Each entry has timestamp, level, message
 - Operations include duration metrics
 - Errors include stack traces
+
+> **Erratum (#21):** "Log entries are in JSON format" is **not** satisfied by the current logger: the file transport is a plaintext template (`LoggingService.ts:245`), `formatMessage` emits `` `${message} ${JSON.stringify(context)}` `` (`:498`), and `formatErrorMessage` joins parts with `' | '` (`:522`) — no log line is a JSON object. Two ways forward, and the choice belongs to the **JSON log transport** parcel (`(new issue — not yet created)`), not to #31, which is chartered to verify and today has nothing to verify: **(a)** add a JSON file transport (electron-log accepts a `format` function returning a serialised object, so `instanceId`, level, timestamp, message and context become fields); or **(b)** narrow 004-NFR-009/this criterion to "**a human-readable message followed by a single-line JSON context object**", whose parse recipe is: take everything from the first `{` to the end of line and `JSON.parse` it; entries with no context have none. Duration metrics are satisfied by `specs/designs/sd-021-worker-contracts.md` §8.8's phase fields; stack traces are **already automatic** (`LoggingService.ts:511-513`). **Until (a) or (b) lands, this criterion is open** and must not be ticked.
 
 ---
 

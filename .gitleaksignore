@@ -1,0 +1,9 @@
+# gitleaks false-positive allowlist. Each line is a finding fingerprint
+# (commit:file:rule:line) gitleaks should skip. Entries here are reviewed
+# non-secrets — test fixtures that resemble high-entropy tokens.
+#
+# graph-mcp-schema.test.ts: a static 64-hex string used as a fake
+# randomBytes(32) MCP bearer token in commit e5ec5f9 (issue #21). The current
+# file also carries an inline `gitleaks:allow`; this entry covers the original
+# historical commit, which predates the comment.
+e5ec5f9714543b6e9f71c39212b7349cf19f28f6:src/shared/ipc/graph-mcp-schema.test.ts:generic-api-key:440

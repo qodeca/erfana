@@ -17,7 +17,8 @@ import {
 import { AppError, ErrorCode } from '../../shared/errors'
 import {
   DEFAULT_WATCHER_IGNORE_PATTERNS,
-  DEFAULT_TREE_HIDDEN_PATTERNS
+  DEFAULT_TREE_HIDDEN_PATTERNS,
+  DEFAULT_GRAPH_EXCLUDE_PATTERNS
 } from '../../shared/constants'
 import type { IProjectSettingsService } from '../interfaces/IProjectSettingsService'
 
@@ -113,6 +114,10 @@ export class ProjectSettingsService implements IProjectSettingsService {
       treeHiddenPatterns: this.resolvePatterns(
         settings.tree?.hiddenPatterns,
         DEFAULT_TREE_HIDDEN_PATTERNS
+      ),
+      graphExcludePatterns: this.resolvePatterns(
+        settings.graph?.excludeFolders,
+        DEFAULT_GRAPH_EXCLUDE_PATTERNS
       )
     }
   }
@@ -140,7 +145,8 @@ export class ProjectSettingsService implements IProjectSettingsService {
   private getDefaultSettings(): ResolvedProjectSettings {
     return {
       watcherIgnorePatterns: [...DEFAULT_WATCHER_IGNORE_PATTERNS],
-      treeHiddenPatterns: [...DEFAULT_TREE_HIDDEN_PATTERNS]
+      treeHiddenPatterns: [...DEFAULT_TREE_HIDDEN_PATTERNS],
+      graphExcludePatterns: [...DEFAULT_GRAPH_EXCLUDE_PATTERNS]
     }
   }
 }
