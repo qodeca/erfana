@@ -22,14 +22,17 @@
  */
 import { randomBytes } from 'node:crypto'
 
+// Hoisted to the shared leaf so `src/shared/ipc/*` schemas (which cannot import
+// from `src/main/`) can pin outbound ids to the same pattern this generator
+// produces. Re-exported here so the generator, its tests and existing callers
+// keep one import path (D6, item [15]).
+export {
+  GRAPH_CORRELATION_ID_PATTERN,
+  GRAPH_JOB_ID_PATTERN
+} from '../../../shared/ipc/graph-error-schema'
+
 /** Bytes of CSPRNG entropy per id — 48 bits, rendered as 12 lowercase hex digits. */
 const ID_ENTROPY_BYTES = 6
-
-/** Matches {@link generateGraphCorrelationId} output. */
-export const GRAPH_CORRELATION_ID_PATTERN = /^idx-\d+-[0-9a-f]{12}$/
-
-/** Matches {@link generateGraphJobId} output. */
-export const GRAPH_JOB_ID_PATTERN = /^job-\d+-[0-9a-f]{12}$/
 
 function mintId(prefix: string): string {
   return `${prefix}-${Date.now()}-${randomBytes(ID_ENTROPY_BYTES).toString('hex')}`

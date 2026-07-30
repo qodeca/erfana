@@ -59,10 +59,12 @@ const GraphWorkerEnvelope = {
   switchVersion: z.number().int().nonnegative(),
   /** Worker-incarnation fence — bumped on every respawn (§8.5). */
   sessionVersion: z.number().int().nonnegative(),
-  /** Batch/request scope (NFR-011). */
-  correlationId: z.string().min(1),
+  /** Batch/request scope (NFR-011). Main mints every id on this in-process
+   *  boundary and the worker echoes it, so both directions carry the main-minted
+   *  shape — pattern-pinned, not the looser inbound form (D6). */
+  correlationId: GraphOutboundCorrelationIdSchema,
   /** Parent scope: one reindex or DB swap spans ~200 batches (M25). */
-  jobId: z.string().min(1)
+  jobId: GraphOutboundJobIdSchema
 }
 
 /** Every main -> worker shape is strictObject. The renderer's permissiveness
@@ -139,11 +141,26 @@ export const GraphWorkerProgressSchema = z.object({
   currentFilePath: z.string().max(4096).nullable()   // IPC-payload only; never logged raw (§9.6)
 })
 
+/** The reply to a `close` request (S-[9]). `close` is awaited through `pending`
+ *  with a timeout, so its honest acknowledgement needs a union member — without
+ *  one it fails safeParse, is dropped as a protocol error, and every close hangs
+ *  to WORKER_CLOSE_TIMEOUT before a force-terminate (the FAILURE path).
+ *  `checkpointed` reports whether SQLite completed its final checkpoint-and-delete
+ *  of -wal/-shm; the envelope's jobId is kept (a shutdown is part of a DB-swap
+ *  scope), it is a correlation string, not the jobVersion fence. */
+export const GraphWorkerClosedMessageSchema = z.object({
+  ...GraphWorkerEnvelope,
+  type: z.literal('closed'),
+  checkpointed: z.boolean(),
+  phaseDurationsMs: GraphPhaseDurationsSchema
+})
+
 export const GraphWorkerMessageSchema = z.discriminatedUnion('type', [
   GraphWorkerIndexResultSchema.extend({ type: z.literal('result') }),
   GraphWorkerErrorSchema.extend({ type: z.literal('error') }),
   GraphWorkerReadySchema.extend({ type: z.literal('ready') }),
-  GraphWorkerProgressSchema.extend({ type: z.literal('progress') })
+  GraphWorkerProgressSchema.extend({ type: z.literal('progress') }),
+  GraphWorkerClosedMessageSchema
 ])
 ```
 
@@ -151,10 +168,10 @@ export const GraphWorkerMessageSchema = z.discriminatedUnion('type', [
 
 **Fencing rule, per message class.** `jobVersion` is declared per-message, not on the envelope, so "drop unless all three match" is unimplementable for `ready` and `error` — they have no third fence, and an adapter written to the absolute rule drops every one of them. The rule the schemas implement:
 
-- **Replies** (`ready`, `error`, `result`) are correlated by `id` through `pending` and dropped unless `switchVersion` **and** `sessionVersion` match. `result` additionally carries `jobVersion` and is dropped unless it matches too.
+- **Replies** (`ready`, `error`, `result`, `closed`) are correlated by `id` through `pending` and dropped unless `switchVersion` **and** `sessionVersion` match. `result` additionally carries `jobVersion` and is dropped unless it matches too.
 - The **stream** (`progress`) is never routed through `pending` — it carries an `id` only for symmetry — and IS triple-fenced (`switchVersion`, `sessionVersion`, `jobVersion`). Revision 2 left `progress` unfenced, so a late message from a terminated worker or a pre-switch project could drive the status bar after a restart.
 
-`jobId` is a correlation string, not a version, and cannot serve this purpose — hence `jobVersion` (M10), which stops a cancelled job's in-flight result and trailing `progress` from driving the *next* job's accumulator and terminal snapshot. `open`, `rebuild` and `close` are lifecycle verbs scoped by `sessionVersion` and carry no `jobVersion` for the same reason.
+`jobId` is a correlation string, not a version, and cannot serve this purpose — hence `jobVersion` (M10), which stops a cancelled job's in-flight result and trailing `progress` from driving the *next* job's accumulator and terminal snapshot. `open`, `rebuild`, `close` and `closed` are lifecycle verbs scoped by `sessionVersion` and carry no `jobVersion` for the same reason.
 
 ### 8.3 Fail-closed contract
 

@@ -219,7 +219,7 @@ export interface IGraphIndexWorker {
   open(req: GraphWorkerOpenRequest): Promise<GraphWorkerReady>
   index(req: GraphWorkerIndexRequest): Promise<GraphWorkerIndexResult>
   rebuild(req: GraphWorkerRebuildRequest): Promise<GraphWorkerReady>
-  close(req: GraphWorkerCloseRequest): Promise<void>
+  close(req: GraphWorkerCloseRequest): Promise<GraphWorkerClosed>  // `closed` reply: checkpointed + phases (S-[9])
   dispose(): Promise<void>
   isAlive(): boolean
 }

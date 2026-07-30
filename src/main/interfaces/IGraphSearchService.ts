@@ -4,9 +4,14 @@
  * Interface for the graph search service
  *
  * Owns **all** SQL composition and the FTS5 sanitiser, and is the **only**
- * caller of `IGraphReadConnection`. Takes RESOLVED (`z.output`) requests: by
- * this point the handler has already run `safeParse`, so every default is
- * materialised and no field is optional-by-omission.
+ * caller of `IGraphReadConnection`. `search` demands a
+ * {@link GraphSearchRequestValidated} — the branded form minted only by
+ * `parseSearchRequest`. That makes the "already validated" claim the compiler's
+ * job rather than a comment: a request that has not been through `safeParse`
+ * (even a hand-built literal with every default filled in, which would satisfy
+ * the plain `z.output` type yet skip `trim()`, the `folder` transform and every
+ * refine) is not assignable, so **no-parse is a compile error** (S-[6]).
+ * `IGraphQueryService` owns the single parse on the way in from IPC.
  *
  * Every method is synchronous. Reads run on the main thread deliberately — a
  * worker round-trip would cost more than the query and would serialise search
@@ -21,7 +26,7 @@ import type {
   GraphCorpusStatsResponse,
   GraphExplainRequest,
   GraphExplainResponse,
-  GraphSearchRequest,
+  GraphSearchRequestValidated,
   GraphSearchResponse
 } from '../../shared/ipc/graph-schema'
 
@@ -45,8 +50,12 @@ export interface IGraphSearchService {
    * reduces to zero terms short-circuits to an empty result set **without
    * touching SQLite**, which is why `GRAPH_SEARCH_QUERY_INVALID` is unreachable
    * from user input.
+   *
+   * Takes the branded {@link GraphSearchRequestValidated}: the request must have
+   * passed `parseSearchRequest`, so this method can never be handed an unvalidated
+   * shape.
    */
-  search(req: GraphSearchRequest, ids: GraphTraceIds): GraphSearchResponse
+  search(req: GraphSearchRequestValidated, ids: GraphTraceIds): GraphSearchResponse
 
   /** Per-term windows and exact per-section counts for one section (FR-032). */
   explain(req: GraphExplainRequest, ids: GraphTraceIds): GraphExplainResponse

@@ -36,8 +36,10 @@ import {
   GraphSearchResponseSchema,
   GraphSearchResultSchema,
   GraphTermOffsetSchema,
+  parseSearchRequest,
   type GraphSearchRequest,
-  type GraphSearchRequestInput
+  type GraphSearchRequestInput,
+  type GraphSearchRequestValidated
 } from './graph-schema'
 
 /** Structural omission — the payload genuinely lacks the key, rather than
@@ -197,11 +199,72 @@ describe('GraphSearchRequestSchema', () => {
       expect(parsed.correlationId).toBe('idx-1-ab')
     })
 
+    // D6: inbound is bounded + model-safe, NOT pattern-pinned. A caller may supply
+    // its own trace id (the short `idx-1-ab` above, or a full main-minted one),
+    // and either is echoed verbatim; only bound and control-safety are enforced.
+    it('accepts and echoes a full main-minted id supplied by the caller', () => {
+      const parsed = GraphSearchRequestSchema.parse({
+        ...MINIMAL_SEARCH,
+        correlationId: 'idx-1-abcdef012345'
+      })
+      expect(parsed.correlationId).toBe('idx-1-abcdef012345')
+    })
+
     it('rejects an empty id — absent and blank must not be the same thing', () => {
       expect(
         GraphSearchRequestSchema.safeParse({ ...MINIMAL_SEARCH, correlationId: '' }).success
       ).toBe(false)
     })
+
+    it('rejects an over-long inbound id (>128 chars)', () => {
+      expect(
+        GraphSearchRequestSchema.safeParse({
+          ...MINIMAL_SEARCH,
+          correlationId: 'x'.repeat(129)
+        }).success
+      ).toBe(false)
+    })
+
+    // D6 makes inbound "control-safe" via isModelSafeText, which — matching the
+    // model-text predicate — permits tab/newline. A correlation id never
+    // legitimately carries them, but a newline that slips in inbound cannot reach
+    // a field a reader trusts: every OUTBOUND correlation field is pattern-pinned,
+    // so main re-mints rather than echo a non-conforming id. The smuggling vectors
+    // isModelSafeText DOES reject are what matter here.
+    it.each([
+      ['an ANSI escape', `idx-1${String.fromCodePoint(0x1b)}abcdef`],
+      ['a C1 control', `idx-1${String.fromCodePoint(0x9b)}abcdef`],
+      ['a Unicode tag char', `idx-1-${String.fromCodePoint(0xe0041)}`]
+    ])('rejects a control-laden inbound id carrying %s', (_label, correlationId) => {
+      expect(
+        GraphSearchRequestSchema.safeParse({ ...MINIMAL_SEARCH, correlationId }).success
+      ).toBe(false)
+    })
+  })
+})
+
+// S-[6]: `IGraphSearchService` claims it takes an "already validated" request.
+// The brand makes that the compiler's job: only `parseSearchRequest` mints
+// `GraphSearchRequestValidated`, so skipping the parse cannot typecheck.
+describe('parseSearchRequest (branded validation)', () => {
+  it('resolves defaults and returns a usable request', () => {
+    const validated = parseSearchRequest({ query: 'alpha' })
+    expect(validated.k).toBe(GRAPH.DEFAULT_TOP_K)
+    expect(validated.query).toBe('alpha')
+  })
+
+  it('rejects an invalid request just like the schema', () => {
+    expect(() => parseSearchRequest({})).toThrow()
+  })
+
+  it('brands so an unparsed request cannot reach a validated-only sink', () => {
+    const sink = (_req: GraphSearchRequestValidated): void => {}
+    sink(parseSearchRequest({ query: 'alpha' })) // the only accepted path
+
+    const merelyParsed = GraphSearchRequestSchema.parse({ query: 'alpha' })
+    // @ts-expect-error a merely-shaped request lacks the validation brand — if this
+    // stops erroring, the brand has been weakened and no-parse became legal.
+    sink(merelyParsed)
   })
 })
 
@@ -231,6 +294,19 @@ describe('GraphSearchResponseSchema', () => {
   it('fails on a blank correlationId', () => {
     expect(
       GraphSearchResponseSchema.safeParse({ ...VALID_RESPONSE, correlationId: '' }).success
+    ).toBe(false)
+  })
+
+  // D6: outbound is pattern-pinned to the main-minted shape. The short `idx-1-ab`
+  // a caller may send inbound is NOT a valid response id — main mints or echoes
+  // only a value that still matches the pattern.
+  it.each([
+    ['a short inbound-style id', 'idx-1-ab'],
+    ['a job-prefixed id', 'job-1-abcdef012345'],
+    ['a free-form id', 'my-trace-id']
+  ])('rejects a non-pattern outbound correlationId: %s', (_label, correlationId) => {
+    expect(
+      GraphSearchResponseSchema.safeParse({ ...VALID_RESPONSE, correlationId }).success
     ).toBe(false)
   })
 

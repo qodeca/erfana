@@ -24,9 +24,16 @@ import { GRAPH, MCP } from '../graph-constants'
 import {
   ConfinedRelativePathSchema,
   GraphErrorCodeSchema,
+  GraphInboundCorrelationIdSchema,
+  GraphOutboundCorrelationIdSchema,
   GraphSearchFiltersBaseSchema,
-  GraphSearchRequestBaseSchema
+  GraphSearchRequestBaseSchema,
+  isModelSafeText
 } from './graph-schema'
+
+// Re-exported from the shared leaf so #30 (and this module's tests) keep one
+// import path for the model-facing text-safety predicate.
+export { isModelSafeText } from './graph-schema'
 
 // ─── model-facing tool contract ──────────────────────────────────────────────
 
@@ -72,40 +79,17 @@ export const GraphMcpToolArgsSchema = GraphSearchRequestBaseSchema.pick({
 export type GraphMcpToolArgsInput = z.input<typeof GraphMcpToolArgsSchema>
 export type GraphMcpToolArgs = z.output<typeof GraphMcpToolArgsSchema>
 
-const TAB = 0x09
-const LINE_FEED = 0x0a
-const C0_MAX = 0x1f
-const C1_MIN = 0x80
-const C1_MAX = 0x9f
-
-/**
- * True when a string carries no C0 (`U+0000`–`U+001F`, except `\t` and `\n`) and
- * no C1 (`U+0080`–`U+009F`) control character.
- *
- * That range is exactly what carries ANSI escape sequences and the
- * `char(2)`/`char(3)`/`char(4)` snippet sentinels — Erfana-internal markers that
- * must never leave the process, in the payload a model trusts most.
- *
- * A code-point scan rather than a regex: a character class over this range is
- * the literal thing `no-control-regex` exists to flag, and suppressing that rule
- * on a security check reads worse than the loop.
- */
-export function isControlCharFree(value: string): boolean {
-  for (let i = 0; i < value.length; i++) {
-    const code = value.charCodeAt(i)
-    if (code === TAB || code === LINE_FEED) continue
-    if (code <= C0_MAX || (code >= C1_MIN && code <= C1_MAX)) return false
-  }
-  return true
-}
-
-/** A model-facing string: sentinel-free and bounded. Applied to `heading` and
- *  `snippet`, which are free text, not paths. */
+/** A model-facing string: sentinel-free, smuggling-free and bounded. Applied to
+ *  `heading` and `snippet`, which are free text, not paths. The predicate
+ *  {@link isModelSafeText} rejects C0/C1 controls (ANSI escapes, the
+ *  `char(2)`/`char(3)`/`char(4)` snippet sentinels) plus the model-facing bidi
+ *  and Unicode-tag smuggling vectors. */
 const McpTextSchema = z
   .string()
   .max(MCP.MAX_RESULT_BYTES)
-  .refine(isControlCharFree, {
-    message: 'must not contain C0 (except tab/newline) or C1 control characters'
+  .refine(isModelSafeText, {
+    message:
+      'must not contain control, bidi or Unicode tag characters (tab/newline allowed)'
   })
 
 /**
@@ -117,8 +101,11 @@ const McpTextSchema = z
  * home-directory layout.
  */
 const McpFilePathSchema = ConfinedRelativePathSchema(MCP.MAX_RESULT_BYTES).refine(
-  isControlCharFree,
-  { message: 'must not contain C0 (except tab/newline) or C1 control characters' }
+  isModelSafeText,
+  {
+    message:
+      'must not contain control, bidi or Unicode tag characters (tab/newline allowed)'
+  }
 )
 
 /**
@@ -130,8 +117,12 @@ const McpFilePathSchema = ConfinedRelativePathSchema(MCP.MAX_RESULT_BYTES).refin
  * **expressed here**, because a schema that documents an obligation it cannot
  * fail is a comment, not a contract:
  *
- * 1. `untrustedContentNotice` is `MCP.UNTRUSTED_NOTICE`, emitted **once per
- *    response** as the first content block so a large result set cannot dilute it.
+ * 1. `untrustedContentNotice` is pinned to the exact `MCP.UNTRUSTED_NOTICE`
+ *    literal — `z.literal`, not `z.string().min(1)`, so a truncated, localised or
+ *    tampered guardrail cannot validate. The literal pins the VALUE only; #30
+ *    still owns the ORDERING obligation (emitted **once per response** as the
+ *    first content block so a large result set cannot dilute it), which a schema
+ *    on a single field cannot express.
  * 2. Every string field is refused if it carries C0 (`U+0000`–`U+001F`, except
  *    `\t`/`\n`) or C1 (`U+0080`–`U+009F`), so the strip #30 performs is verified
  *    rather than assumed: ANSI escapes and the `char(2)`/`char(3)`/`char(4)`
@@ -152,7 +143,7 @@ const McpFilePathSchema = ConfinedRelativePathSchema(MCP.MAX_RESULT_BYTES).refin
  * enforced by {@link McpFilePathSchema}, not just documented.
  */
 export const GraphMcpToolResultSchema = z.object({
-  untrustedContentNotice: z.string().min(1),
+  untrustedContentNotice: z.literal(MCP.UNTRUSTED_NOTICE),
   results: z
     .array(
       z.object({
@@ -171,7 +162,9 @@ export type GraphMcpToolResult = z.output<typeof GraphMcpToolResultSchema>
 
 export const GraphPortSearchRequestSchema = z.strictObject({
   kind: z.literal('graph:search'),
-  correlationId: z.string().min(1),
+  /** Inbound at the port boundary an external client reaches: bounded +
+   *  model-safe, not pattern-pinned (D6). */
+  correlationId: GraphInboundCorrelationIdSchema,
   /** Fenced like a worker message: one port would otherwise span arbitrary
    *  project switches, answering an in-flight search from whichever reader was
    *  attached when the handler ran. */
@@ -182,7 +175,8 @@ export const GraphPortSearchRequestSchema = z.strictObject({
 /** FR-044: complete pending requests before shutdown. */
 export const GraphPortDrainRequestSchema = z.strictObject({
   kind: z.literal('graph:drain'),
-  correlationId: z.string().min(1)
+  /** Inbound request id: bounded + model-safe, not pattern-pinned (D6). */
+  correlationId: GraphInboundCorrelationIdSchema
 })
 
 export const GraphPortRequestSchema = z.discriminatedUnion('kind', [
@@ -194,13 +188,13 @@ export type GraphPortRequest = z.output<typeof GraphPortRequestSchema>
 
 export const GraphPortSearchResultSchema = z.strictObject({
   kind: z.literal('graph:search:result'),
-  correlationId: z.string().min(1),
+  correlationId: GraphOutboundCorrelationIdSchema,
   payload: GraphMcpToolResultSchema
 })
 
 export const GraphPortSearchErrorSchema = z.strictObject({
   kind: z.literal('graph:search:error'),
-  correlationId: z.string().min(1),
+  correlationId: GraphOutboundCorrelationIdSchema,
   code: GraphErrorCodeSchema
 })
 
@@ -212,13 +206,13 @@ export const GraphPortSearchErrorSchema = z.strictObject({
  */
 export const GraphPortThrottledSchema = z.strictObject({
   kind: z.literal('graph:throttled'),
-  correlationId: z.string().min(1),
+  correlationId: GraphOutboundCorrelationIdSchema,
   retryAfterMs: z.number().int().positive()
 })
 
 export const GraphPortDrainedSchema = z.strictObject({
   kind: z.literal('graph:drained'),
-  correlationId: z.string().min(1),
+  correlationId: GraphOutboundCorrelationIdSchema,
   completed: z.number().int().nonnegative()
 })
 
@@ -245,7 +239,24 @@ export const GraphMcpConnectSchema = z.strictObject({
   /** 256-bit, `randomBytes(32)` hex, minted at project open and rotated on every open. */
   token: z.string().regex(/^[0-9a-f]{64}$/),
   protocolVersion: z.literal(1),
-  clientName: z.string().max(128)
+  /**
+   * Supplied by an unauthenticated local process BEFORE the token is validated,
+   * then rendered in the consent dialog and written to the connection log. Two
+   * refines guard it: {@link isModelSafeText} rejects ANSI, C1 and bidi/tag
+   * smuggling, and a single-line check rejects tab/newline — which
+   * `isModelSafeText` deliberately PERMITS for multi-line model text but which a
+   * one-line identifier must never carry, since a newline is the log-line forgery
+   * vector this field is guarded against. #30 renders it as plain text, never markup.
+   */
+  clientName: z
+    .string()
+    .max(128)
+    .refine(isModelSafeText, {
+      message: 'clientName must not contain control, bidi or Unicode tag characters'
+    })
+    .refine((v) => !/[\t\n]/.test(v), {
+      message: 'clientName must be a single line (no tab or newline)'
+    })
 })
 export type GraphMcpConnect = z.output<typeof GraphMcpConnectSchema>
 

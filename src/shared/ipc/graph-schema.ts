@@ -39,6 +39,9 @@ import {
   ConfinedRelativePathSchema,
   GraphErrorCodeSchema,
   GraphErrorSchema,
+  GraphInboundCorrelationIdSchema,
+  GraphOutboundCorrelationIdSchema,
+  GraphOutboundJobIdSchema,
   isConfinedRelativePath
 } from './graph-error-schema'
 import type {
@@ -50,12 +53,18 @@ import type {
 
 export {
   ConfinedRelativePathSchema,
+  GRAPH_CORRELATION_ID_PATTERN,
   GRAPH_ERROR_CODES,
+  GRAPH_JOB_ID_PATTERN,
   GraphErrorCodeSchema,
   GraphErrorSchema,
   GraphGenerationSchema,
+  GraphInboundCorrelationIdSchema,
+  GraphOutboundCorrelationIdSchema,
+  GraphOutboundJobIdSchema,
   isConfinedRelativePath,
-  isConfinedTruncatedPath
+  isConfinedTruncatedPath,
+  isModelSafeText
 } from './graph-error-schema'
 export type { GraphError, GraphErrorCode } from './graph-error-schema'
 
@@ -159,8 +168,10 @@ export const GraphSearchRequestBaseSchema = z.strictObject({
    *  `matchedTerms` contingency is a config change, not a contract change. */
   includeMatchedTerms: z.boolean().default(true),
   filters: GraphSearchFiltersSchema.optional(),
-  /** Optional inbound, required outbound: main echoes a supplied id or mints one. */
-  correlationId: z.string().min(1).optional()
+  /** Optional inbound, required outbound: main echoes a supplied id or mints one.
+   *  Inbound is bounded + model-safe but NOT pattern-pinned (D6) — a caller may
+   *  supply its own trace id, which need not match the main-minted shape. */
+  correlationId: GraphInboundCorrelationIdSchema.optional()
 })
 
 /**
@@ -171,6 +182,41 @@ export const GraphSearchRequestBaseSchema = z.strictObject({
 export const GraphSearchRequestSchema = GraphSearchRequestBaseSchema
 export type GraphSearchRequestInput = z.input<typeof GraphSearchRequestSchema>
 export type GraphSearchRequest = z.output<typeof GraphSearchRequestSchema>
+
+/** Unforgeable brand: minted only by {@link parseSearchRequest}, never exported,
+ *  so it cannot be spelled by a hand-built object literal. */
+declare const searchRequestValidated: unique symbol
+
+/**
+ * A search request that has provably passed `safeParse`.
+ *
+ * `IGraphSearchService.search` demands this type, so the compiler — not a
+ * comment — enforces its header's "already validated" claim. A plain
+ * {@link GraphSearchRequest} (or a hand-built literal that merely *looks* resolved)
+ * is not assignable, so **skipping the parse is a compile error** (S-[6]).
+ *
+ * Branding rather than "take the `z.output` type" (the other option in the plan)
+ * because `z.output` proves only that the object is SHAPED like a resolved
+ * request — a literal with every field populated bypasses `trim()`, the
+ * `folder` transform and every refine yet still typechecks. Only a value the parse
+ * funnel produced proves the refinements ran, which is what "validated" means on
+ * a security boundary.
+ */
+export type GraphSearchRequestValidated = GraphSearchRequest & {
+  readonly [searchRequestValidated]: true
+}
+
+/**
+ * The sole producer of {@link GraphSearchRequestValidated}: it parses (throwing on
+ * invalid input, like every other `.parse` at this boundary) and re-tags the
+ * result with the brand. `IGraphQueryService` owns this single call on the way in
+ * from IPC; everything downstream takes the branded type.
+ *
+ * Contract-only for #21: `GraphEngineService` (#23/#26) wires it.
+ */
+export function parseSearchRequest(input: unknown): GraphSearchRequestValidated {
+  return GraphSearchRequestSchema.parse(input) as GraphSearchRequestValidated
+}
 
 export const GraphTermOffsetSchema = z.object({
   /** Offset into the sentinel-stripped snippet or heading. Never the source file. */
@@ -239,7 +285,7 @@ export const GraphSearchResponseSchema = z.object({
   queryDurationMs: z.number().nonnegative(),
   degraded: z.boolean(),
   error: GraphErrorSchema.nullable(),
-  correlationId: z.string().min(1)
+  correlationId: GraphOutboundCorrelationIdSchema
 })
 export type GraphSearchResponse = z.output<typeof GraphSearchResponseSchema>
 
@@ -249,7 +295,7 @@ export const GraphExplainRequestSchema = z.strictObject({
   sectionId: z.number().int().positive(),
   query: z.string().trim().min(1).max(GRAPH.MAX_QUERY_LENGTH),
   matchMode: GraphMatchMode.default('all'),
-  correlationId: z.string().min(1).optional()
+  correlationId: GraphInboundCorrelationIdSchema.optional()
 })
 export type GraphExplainRequestInput = z.input<typeof GraphExplainRequestSchema>
 export type GraphExplainRequest = z.output<typeof GraphExplainRequestSchema>
@@ -271,7 +317,7 @@ export const GraphExplainResponseSchema = z.object({
   windows: z.array(GraphExplainWindowSchema),
   occurrencesInSection: z.record(z.string(), z.number().int().nonnegative()),
   error: GraphErrorSchema.nullable(),
-  correlationId: z.string().min(1)
+  correlationId: GraphOutboundCorrelationIdSchema
 })
 export type GraphExplainResponse = z.output<typeof GraphExplainResponseSchema>
 
@@ -291,18 +337,18 @@ export type GraphReindexReason = z.infer<typeof GraphReindexReason>
 export const GraphReindexRequestSchema = z.strictObject({
   mode: GraphReindexMode.default('full'),
   reason: GraphReindexReason.default('user'),
-  correlationId: z.string().min(1).optional()
+  correlationId: GraphInboundCorrelationIdSchema.optional()
 })
 export type GraphReindexRequestInput = z.input<typeof GraphReindexRequestSchema>
 export type GraphReindexRequest = z.output<typeof GraphReindexRequestSchema>
 
 export const GraphReindexResponseSchema = z.object({
   accepted: z.boolean(),
-  jobId: z.string().min(1).nullable(),
+  jobId: GraphOutboundJobIdSchema.nullable(),
   /** `GRAPH_INDEX_ALREADY_RUNNING` when a job is live — reindex is idempotent,
    *  and `jobId` then names the RUNNING job so the caller can follow it. */
   rejectedCode: GraphErrorCodeSchema.nullable(),
-  correlationId: z.string().min(1)
+  correlationId: GraphOutboundCorrelationIdSchema
 })
 export type GraphReindexResponse = z.output<typeof GraphReindexResponseSchema>
 
@@ -312,7 +358,7 @@ export type GraphReindexResponse = z.output<typeof GraphReindexResponseSchema>
  * the only lever. There is deliberately no `cancel` worker verb.
  */
 export const GraphCancelReindexRequestSchema = z.strictObject({
-  correlationId: z.string().min(1).optional()
+  correlationId: GraphInboundCorrelationIdSchema.optional()
 })
 export type GraphCancelReindexRequestInput = z.input<typeof GraphCancelReindexRequestSchema>
 export type GraphCancelReindexRequest = z.output<typeof GraphCancelReindexRequestSchema>
@@ -322,14 +368,14 @@ export const GraphCancelReindexResponseSchema = z.object({
   cancelled: z.boolean(),
   droppedBatches: z.number().int().nonnegative(),
   inFlightAllowedToFinish: z.boolean(),
-  correlationId: z.string().min(1)
+  correlationId: GraphOutboundCorrelationIdSchema
 })
 export type GraphCancelReindexResponse = z.output<typeof GraphCancelReindexResponseSchema>
 
 // ─── corpus stats ────────────────────────────────────────────────────────────
 
 export const GraphCorpusStatsRequestSchema = z.strictObject({
-  correlationId: z.string().min(1).optional()
+  correlationId: GraphInboundCorrelationIdSchema.optional()
 })
 export type GraphCorpusStatsRequestInput = z.input<typeof GraphCorpusStatsRequestSchema>
 export type GraphCorpusStatsRequest = z.output<typeof GraphCorpusStatsRequestSchema>
@@ -363,7 +409,7 @@ export type GraphCorpusStats = z.output<typeof GraphCorpusStatsSchema>
 export const GraphCorpusStatsResponseSchema = z.object({
   stats: GraphCorpusStatsSchema.nullable(),
   error: GraphErrorSchema.nullable(),
-  correlationId: z.string().min(1)
+  correlationId: GraphOutboundCorrelationIdSchema
 })
 export type GraphCorpusStatsResponse = z.output<typeof GraphCorpusStatsResponseSchema>
 
@@ -372,7 +418,7 @@ export type GraphCorpusStatsResponse = z.output<typeof GraphCorpusStatsResponseS
 /** The request stays here with its request siblings; the snapshot, progress and
  *  response payloads live in `graph-status-schema.ts` and are re-exported above. */
 export const GraphStatusRequestSchema = z.strictObject({
-  correlationId: z.string().min(1).optional()
+  correlationId: GraphInboundCorrelationIdSchema.optional()
 })
 export type GraphStatusRequestInput = z.input<typeof GraphStatusRequestSchema>
 export type GraphStatusRequest = z.output<typeof GraphStatusRequestSchema>
@@ -385,7 +431,7 @@ export const GraphPriorityPathsRequestSchema = z.strictObject({
       message: 'path must be project-relative and free of ".." segments'
     }))
     .max(GRAPH.MAX_PRIORITY_PATHS),
-  correlationId: z.string().min(1).optional()
+  correlationId: GraphInboundCorrelationIdSchema.optional()
 })
 export type GraphPriorityPathsRequestInput = z.input<typeof GraphPriorityPathsRequestSchema>
 export type GraphPriorityPathsRequest = z.output<typeof GraphPriorityPathsRequestSchema>
@@ -393,7 +439,7 @@ export type GraphPriorityPathsRequest = z.output<typeof GraphPriorityPathsReques
 export const GraphPriorityPathsResponseSchema = z.object({
   accepted: z.number().int().nonnegative(),
   rejected: z.number().int().nonnegative(),
-  correlationId: z.string().min(1)
+  correlationId: GraphOutboundCorrelationIdSchema
 })
 export type GraphPriorityPathsResponse = z.output<typeof GraphPriorityPathsResponseSchema>
 

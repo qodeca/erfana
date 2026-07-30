@@ -21,6 +21,8 @@ import {
   ConfinedRelativePathSchema,
   GraphErrorCodeSchema,
   GraphGenerationSchema,
+  GraphOutboundCorrelationIdSchema,
+  GraphOutboundJobIdSchema,
   GraphReindexMode,
   GraphReindexReason
 } from './graph-schema'
@@ -74,10 +76,12 @@ const GraphWorkerEnvelope = {
   switchVersion: z.number().int().nonnegative(),
   /** Worker-incarnation fence — bumped on every respawn. */
   sessionVersion: z.number().int().nonnegative(),
-  /** Batch/request scope (NFR-011). */
-  correlationId: z.string().min(1),
+  /** Batch/request scope (NFR-011). Main mints every id on this in-process
+   *  boundary and the worker echoes it verbatim, so both directions carry the
+   *  main-minted shape — hence the pattern, not the looser inbound form (D6). */
+  correlationId: GraphOutboundCorrelationIdSchema,
   /** Parent scope: one reindex or DB swap spans ~200 batches. */
-  jobId: z.string().min(1)
+  jobId: GraphOutboundJobIdSchema
 }
 
 // ─── main → worker ───────────────────────────────────────────────────────────
@@ -254,6 +258,35 @@ export const GraphWorkerProgressMessageSchema = GraphWorkerProgressSchema.extend
 export type GraphWorkerProgressMessage = z.output<typeof GraphWorkerProgressMessageSchema>
 
 /**
+ * The reply to a `close` request. `close` is awaited with a timeout through the
+ * adapter's `pending` map (`IGraphIndexWorker.close()`), so the worker's honest
+ * acknowledgement needs a home in the union — without it a real `closed` fails
+ * `safeParse`, is dropped as a protocol error, and every close hangs to
+ * `WORKER_CLOSE_TIMEOUT` before a force-terminate that {@link IGraphIndexWorker}
+ * documents as the FAILURE path.
+ *
+ * `checkpointed` reports whether SQLite completed its final
+ * checkpoint-and-delete of `-wal`/`-shm`; `phaseDurationsMs` keeps close on the
+ * same "answer 'where did it go?' from a log bundle" contract as every other
+ * reply (it reports the `write_txn`/`fts_merge` split of the shutdown).
+ *
+ * The envelope's `jobId` is kept, not sentinelled or split away: the envelope is
+ * uniform by design ("present on EVERY message in both directions"), and the
+ * `close` REQUEST already carries a `jobId` — a shutdown is part of a DB-swap or
+ * teardown scope, which is exactly what a job id names ("minted once per reindex
+ * or DB swap"). It is a correlation string here, not the `jobVersion` fence
+ * (which stays absent from lifecycle verbs). Breaking envelope uniformity for one
+ * verb would cost more than the field.
+ */
+export const GraphWorkerClosedMessageSchema = z.object({
+  ...GraphWorkerEnvelope,
+  type: z.literal('closed'),
+  checkpointed: z.boolean(),
+  phaseDurationsMs: GraphPhaseDurationsSchema
+})
+export type GraphWorkerClosed = z.output<typeof GraphWorkerClosedMessageSchema>
+
+/**
  * Worker → main union, and the **normative fencing rule** for it.
  *
  * "Triple fence on every inbound message" is not implementable as written:
@@ -261,17 +294,17 @@ export type GraphWorkerProgressMessage = z.output<typeof GraphWorkerProgressMess
  * no third fence to check and an adapter written to the absolute rule would drop
  * every one of them. The real rule, which the schemas above implement:
  *
- * - **Replies** (`ready`, `error`, `result`) are correlated by `id` through the
- *   adapter's `pending` map, and fenced on `switchVersion` + `sessionVersion`.
- *   `result` is additionally fenced on `jobVersion`, so a cancelled job's
- *   in-flight batch cannot drive the next job's accumulator.
+ * - **Replies** (`ready`, `error`, `result`, `closed`) are correlated by `id`
+ *   through the adapter's `pending` map, and fenced on `switchVersion` +
+ *   `sessionVersion`. `result` is additionally fenced on `jobVersion`, so a
+ *   cancelled job's in-flight batch cannot drive the next job's accumulator.
  * - The **stream** (`progress`) is never routed through `pending` — it carries
  *   an `id` only for symmetry — and IS triple-fenced (`switchVersion`,
  *   `sessionVersion`, `jobVersion`), because a late `progress` from a terminated
  *   worker or a pre-switch project would otherwise drive the status bar.
  *
- * `jobVersion` is absent from `open`, `rebuild` and `close` for the same reason:
- * they are lifecycle verbs, scoped by `sessionVersion`, not by a job.
+ * `jobVersion` is absent from `open`, `rebuild`, `close` and `closed` for the
+ * same reason: they are lifecycle verbs, scoped by `sessionVersion`, not by a job.
  *
  * @see specs/designs/sd-021-worker-contracts.md §8.2 - the normative union
  */
@@ -279,6 +312,7 @@ export const GraphWorkerMessageSchema = z.discriminatedUnion('type', [
   GraphWorkerIndexResultMessageSchema,
   GraphWorkerErrorMessageSchema,
   GraphWorkerReadyMessageSchema,
-  GraphWorkerProgressMessageSchema
+  GraphWorkerProgressMessageSchema,
+  GraphWorkerClosedMessageSchema
 ])
 export type GraphWorkerMessage = z.output<typeof GraphWorkerMessageSchema>

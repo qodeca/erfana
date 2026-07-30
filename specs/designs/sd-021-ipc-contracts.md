@@ -25,9 +25,11 @@ export type GraphSearchRequestInput = z.input<typeof GraphSearchRequestSchema>
 export type GraphSearchRequest      = z.output<typeof GraphSearchRequestSchema>  // "Resolved"
 ```
 
-`GraphBridge` and `IGraphQueryService` are typed against **`…Input`**; `IGraphSearchService` and everything downstream of `safeParse` against the resolved type. **The preload passes `request ?? {}`** for the four optional-argument bridge methods — `Schema.parse(undefined)` throws on a `z.object`, and revision 2 never said who substituted the empty object.
+`GraphBridge` and `IGraphQueryService` are typed against **`…Input`**; `IGraphSearchService` against the **branded** resolved type and everything else downstream of `safeParse` against the resolved type. **The preload passes `request ?? {}`** for the four optional-argument bridge methods — `Schema.parse(undefined)` throws on a `z.object`, and revision 2 never said who substituted the empty object.
 
-**Correlation (§7.9).** Request fields are `.optional()`; response, echo and event fields are **required** `z.string().min(1)`. Main echoes a supplied id, else mints one and returns it. Both `correlationId` (per request) and `jobId` (per reindex/DB-swap) appear wherever a job is in scope.
+**Validated brand (S-[6]).** `IGraphSearchService.search` claimed to take an "already validated" request, but the resolved `z.output` type is structurally assignable *from* the input type, so parse-once, parse-twice and parse-never all typechecked and a hand-built literal (defaults filled, refinements skipped) satisfied it. The fix brands the validated form — `GraphSearchRequestValidated = GraphSearchRequest & { readonly [unique symbol]: true }`, minted only by `parseSearchRequest()` — and `IGraphSearchService.search` demands the brand, so **skipping the parse is now a compile error**. `IGraphQueryService` (typed against `…Input`) owns that single `parseSearchRequest` call; branding was chosen over "take the `z.output` type" because `z.output` proves only that an object is *shaped* like a resolved request, whereas the header's claim is that it is *validated* — only a value the parse funnel produced proves the refinements ran.
+
+**Correlation (§7.9).** Request fields are `.optional()`; response, echo and event fields are **required**. Per D6 the two directions carry different schemas: **outbound / echo / response** ids are pattern-pinned (`GraphOutboundCorrelationIdSchema` = `/^idx-\d+-[0-9a-f]{12}$/`, `GraphOutboundJobIdSchema` = `/^job-.../`) because they always carry a main-minted value; **inbound request** ids are `GraphInboundCorrelationIdSchema` (`.min(1).max(128).refine(isModelSafeText)`) — bounded and model-safe but NOT pattern-pinned, because §7.9 lets a caller supply its own trace id, which the pattern would reject. Main echoes a supplied id when it still matches the outbound pattern, else mints one. Both `correlationId` (per request) and `jobId` (per reindex/DB-swap) appear wherever a job is in scope. The two patterns and `isModelSafeText` are hoisted to the shared leaf `graph-error-schema.ts`, so `src/shared/ipc/*` schemas and the main-side `graphCorrelation.ts` generator import the same source.
 
 **Error codes (m5).** `z.enum(ErrorCode)` is valid in Zod 4 for an externally-declared TypeScript enum, and `z.nativeEnum` is deprecated — revision 2's "confirm the form and fall back" hedge is deleted as dead text. But `ErrorCode` is also **too broad**: only the graph/MCP subset is producible here, so a `WHISPER_*` code would validate on a graph channel and #27/#29 would get no exhaustive switch.
 
@@ -123,7 +125,7 @@ export const GraphSearchRequestBaseSchema = z.strictObject({
    *  config change rather than a contract change (M16). */
   includeMatchedTerms: z.boolean().default(true),
   filters: GraphSearchFiltersSchema.optional(),
-  correlationId: z.string().min(1).optional()
+  correlationId: GraphInboundCorrelationIdSchema.optional()
 })
 /** Renderer-facing leaf — currently the base verbatim; the `offset + k` joint bound attaches here. */
 export const GraphSearchRequestSchema = GraphSearchRequestBaseSchema
@@ -195,7 +197,7 @@ export const GraphSearchResponseSchema = z.object({
   queryDurationMs: z.number().nonnegative(),
   degraded: z.boolean(),
   error: GraphErrorSchema.nullable(),
-  correlationId: z.string().min(1)
+  correlationId: GraphOutboundCorrelationIdSchema
 })
 ```
 
@@ -212,7 +214,7 @@ export const GraphExplainRequestSchema = z.strictObject({
   sectionId: z.number().int().positive(),
   query: z.string().trim().min(1).max(GRAPH.MAX_QUERY_LENGTH),
   matchMode: GraphMatchMode.default('all'),
-  correlationId: z.string().min(1).optional()
+  correlationId: GraphInboundCorrelationIdSchema.optional()
 })
 
 export const GraphExplainResponseSchema = z.object({
@@ -226,7 +228,7 @@ export const GraphExplainResponseSchema = z.object({
   })),
   occurrencesInSection: z.record(z.string(), z.number().int().nonnegative()),
   error: GraphErrorSchema.nullable(),
-  correlationId: z.string().min(1)
+  correlationId: GraphOutboundCorrelationIdSchema
 })
 ```
 
@@ -242,31 +244,31 @@ export const GraphReindexReason =
 export const GraphReindexRequestSchema = z.strictObject({
   mode: GraphReindexMode.default('full'),
   reason: GraphReindexReason.default('user'),
-  correlationId: z.string().min(1).optional()
+  correlationId: GraphInboundCorrelationIdSchema.optional()
 })
 export const GraphReindexResponseSchema = z.object({
   accepted: z.boolean(),
-  jobId: z.string().min(1).nullable(),
+  jobId: GraphOutboundJobIdSchema.nullable(),
   /** GRAPH_INDEX_ALREADY_RUNNING when a job is live — reindex is IDEMPOTENT, and
    *  jobId then names the RUNNING job so the caller can follow it (m9). */
   rejectedCode: GraphErrorCodeSchema.nullable(),
-  correlationId: z.string().min(1)
+  correlationId: GraphOutboundCorrelationIdSchema
 })
 
 /** Cooperative and MAIN-SIDE: better-sqlite3 cannot be interrupted, so the in-flight
  *  batch finishes and draining the queue is the only lever. No 'cancel' worker verb. */
 export const GraphCancelReindexRequestSchema = z.strictObject({
-  correlationId: z.string().min(1).optional()
+  correlationId: GraphInboundCorrelationIdSchema.optional()
 })
 export const GraphCancelReindexResponseSchema = z.object({
   cancelled: z.boolean(),              // false when no job was running (m9)
   droppedBatches: z.number().int().nonnegative(),
   inFlightAllowedToFinish: z.boolean(),
-  correlationId: z.string().min(1)
+  correlationId: GraphOutboundCorrelationIdSchema
 })
 
 export const GraphCorpusStatsRequestSchema = z.strictObject({
-  correlationId: z.string().min(1).optional()
+  correlationId: GraphInboundCorrelationIdSchema.optional()
 })
 export const GraphCorpusStatsSchema = z.object({
   fileCount: z.number().int().nonnegative(),
@@ -287,27 +289,27 @@ export const GraphCorpusStatsSchema = z.object({
 export const GraphCorpusStatsResponseSchema = z.object({
   stats: GraphCorpusStatsSchema.nullable(),
   error: GraphErrorSchema.nullable(),
-  correlationId: z.string().min(1)
+  correlationId: GraphOutboundCorrelationIdSchema
 })
 
 export const GraphStatusRequestSchema = z.strictObject({
-  correlationId: z.string().min(1).optional()
+  correlationId: GraphInboundCorrelationIdSchema.optional()
 })
 export const GraphStatusResponseSchema = z.object({
   snapshot: GraphStatusSnapshotSchema.nullable(),
   error: GraphErrorSchema.nullable(),
-  correlationId: z.string().min(1)
+  correlationId: GraphOutboundCorrelationIdSchema
 })
 
 export const GraphPriorityPathsRequestSchema = z.strictObject({
   /** Project-relative; absolute paths and any '..' segment are rejected (§9.5). */
   paths: z.array(z.string().max(4096).refine(isConfinedRelativePath)).max(GRAPH.MAX_PRIORITY_PATHS),
-  correlationId: z.string().min(1).optional()
+  correlationId: GraphInboundCorrelationIdSchema.optional()
 })
 export const GraphPriorityPathsResponseSchema = z.object({
   accepted: z.number().int().nonnegative(),
   rejected: z.number().int().nonnegative(),
-  correlationId: z.string().min(1)
+  correlationId: GraphOutboundCorrelationIdSchema
 })
 ```
 
@@ -322,7 +324,7 @@ export const GraphStatusDot = z.enum(['grey', 'green', 'yellow', 'red'])
 export const GraphBreakerState = z.enum(['closed', 'open', 'half-open'])
 
 export const GraphProgressSchema = z.object({
-  jobId: z.string().min(1),
+  jobId: GraphOutboundJobIdSchema,
   processedFiles: z.number().int().nonnegative(),
   totalFiles: z.number().int().nonnegative(),
   skippedFiles: z.number().int().nonnegative(),
@@ -382,8 +384,8 @@ export const GraphStatusSnapshotSchema = z.object({
  *  event (snapshot: null) still carries one (M15). */
 export const GraphStatusChangePayloadSchema = z.object({
   snapshot: GraphStatusSnapshotSchema.nullable(),
-  correlationId: z.string().min(1),
-  jobId: z.string().min(1).nullable()
+  correlationId: GraphOutboundCorrelationIdSchema,
+  jobId: GraphOutboundJobIdSchema.nullable()
 })
 ```
 
@@ -424,7 +426,7 @@ Optional-with-default is what makes returning `service` meaningful (`claude-stat
 
 ### 7.9 Correlation policy and contract evolution (m4)
 
-`correlationId` optional inbound, required outbound; main echoes or mints. `jobId` accompanies it whenever a reindex or DB swap is in scope. `generateGraphCorrelationId()` = `` `idx-${Date.now()}-${randomBytes(6).toString('hex')}` `` (48 bits CSPRNG); `generateGraphJobId()` = `` `job-${Date.now()}-${randomBytes(6).toString('hex')}` ``.
+`correlationId` optional inbound, required outbound; main echoes or mints. **Direction split (D6):** outbound/echo/response fields are pattern-pinned to the main-minted shape (`GraphOutboundCorrelationIdSchema` / `GraphOutboundJobIdSchema`); inbound request fields are `GraphInboundCorrelationIdSchema` (`.min(1).max(128).refine(isModelSafeText)`) — bounded and model-safe, not pattern-pinned, since the pattern matches only main-minted ids and a caller may supply its own. `jobId` accompanies it whenever a reindex or DB swap is in scope. `generateGraphCorrelationId()` = `` `idx-${Date.now()}-${randomBytes(6).toString('hex')}` `` (48 bits CSPRNG); `generateGraphJobId()` = `` `job-${Date.now()}-${randomBytes(6).toString('hex')}` ``. The two patterns live in `graph-error-schema.ts` (the shared leaf), re-exported from `graphCorrelation.ts`.
 
 **Evolution rule** — revision 2 versioned the on-disk schema, the worker session and the MCP contract but said nothing about how #26–#32 may extend a wire payload:
 
@@ -441,24 +443,26 @@ Revision 2 named `GraphPortRequestSchema`/`GraphPortResponseSchema` in prose and
 /** main ↔ utilityProcess over MessageChannelMain. `requestId` renamed to
  *  correlationId — it was the one boundary leaving the main process and used a
  *  different identifier from every other payload, breaking §7.9 there. */
+// Inbound port REQUESTS use GraphInboundCorrelationIdSchema (bounded + model-safe);
+// port RESPONSES use GraphOutboundCorrelationIdSchema (pattern-pinned) — D6.
 export const GraphPortRequestSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('graph:search'), correlationId: z.string().min(1),
+  z.strictObject({ kind: z.literal('graph:search'), correlationId: GraphInboundCorrelationIdSchema,
     /** Fenced like a worker message: one port spans arbitrary project switches (M7). */
     switchVersion: z.number().int().nonnegative(),
     payload: GraphMcpToolArgsSchema }),
   /** FR-044: complete pending requests before shutdown. */
-  z.strictObject({ kind: z.literal('graph:drain'), correlationId: z.string().min(1) })
+  z.strictObject({ kind: z.literal('graph:drain'), correlationId: GraphInboundCorrelationIdSchema })
 ])
 
 export const GraphPortResponseSchema = z.discriminatedUnion('kind', [
-  z.strictObject({ kind: z.literal('graph:search:result'), correlationId: z.string().min(1),
+  z.strictObject({ kind: z.literal('graph:search:result'), correlationId: GraphOutboundCorrelationIdSchema,
     payload: GraphMcpToolResultSchema }),
-  z.strictObject({ kind: z.literal('graph:search:error'), correlationId: z.string().min(1),
+  z.strictObject({ kind: z.literal('graph:search:error'), correlationId: GraphOutboundCorrelationIdSchema,
     code: GraphErrorCodeSchema }),
   /** FR-042 backpressure needs a SIGNAL, or the peer cannot tell throttled from hung. */
-  z.strictObject({ kind: z.literal('graph:throttled'), correlationId: z.string().min(1),
+  z.strictObject({ kind: z.literal('graph:throttled'), correlationId: GraphOutboundCorrelationIdSchema,
     retryAfterMs: z.number().int().positive() }),
-  z.strictObject({ kind: z.literal('graph:drained'), correlationId: z.string().min(1),
+  z.strictObject({ kind: z.literal('graph:drained'), correlationId: GraphOutboundCorrelationIdSchema,
     completed: z.number().int().nonnegative() })
 ])
 ```
@@ -486,19 +490,26 @@ export const GraphMcpToolArgsSchema = GraphSearchRequestBaseSchema
 
 /** Declared as the tool's outputSchema. The untrusted-data envelope, control-char
  *  stripping and byte caps that wrap it are contracted in §9.4 (B1). */
-/** The C0/C1 strip and the payload caps are EXPRESSED here, not just described:
+/** The strip and the payload caps are EXPRESSED here, not just described:
  *  a schema that documents an obligation it cannot fail is a comment. McpText =
- *  z.string().max(MCP.MAX_RESULT_BYTES).refine(isControlCharFree) — the refine
- *  rejects C0 except tab/newline and all of C1, which is what carries ANSI
- *  escapes and Erfana's char(2)/char(3)/char(4) snippet sentinels. The .max() is
- *  a CHARACTER backstop; #30 still measures the serialised byte size. */
+ *  z.string().max(MCP.MAX_RESULT_BYTES).refine(isModelSafeText) — the refine
+ *  rejects C0 except tab/newline and all of C1 (which carry ANSI escapes and
+ *  Erfana's char(2)/char(3)/char(4) snippet sentinels), AND the model-facing
+ *  smuggling vectors: unpaired surrogates, bidi controls (U+202A–U+202E,
+ *  U+2066–U+2069) and the Unicode tag block (U+E0000–U+E007F, an invisible ASCII
+ *  mirror a model still reads). isModelSafeText scans by CODE POINT, so a tag
+ *  char arriving as a surrogate pair is caught. The .max() is a CHARACTER
+ *  backstop; #30 still measures the serialised byte size. */
 // filePath is the one result field that is ALSO a path, so it is confined on top
 // of the sentinel/bounds check (project-relative, no `..`, no ADS colon, no
 // reserved device name): McpFilePath = ConfinedRelativePathSchema(MAX_RESULT_BYTES)
-// .refine(isControlCharFree). This makes the "never absolute" clause enforceable
+// .refine(isModelSafeText). This makes the "never absolute" clause enforceable
 // at the external-client boundary. heading/snippet are free text, not paths.
 export const GraphMcpToolResultSchema = z.object({
-  untrustedContentNotice: z.string().min(1),
+  // Pinned to the exact literal (S-[14]), not `.min(1)`: a truncated, localised or
+  // tampered guardrail must not validate. #30 still owns emitting it once, first,
+  // per response — the literal pins the VALUE, not the ordering.
+  untrustedContentNotice: z.literal(MCP.UNTRUSTED_NOTICE),
   results: z.array(z.object({
     filePath: McpFilePath, heading: McpText, snippet: McpText, score: z.number()
   })).max(MCP.MAX_TOP_K),

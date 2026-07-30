@@ -5,8 +5,10 @@
  *
  * The worker is the only component that writes to disk, so `safeParse` runs in
  * BOTH directions and the discriminated unions must be exhaustive: a message
- * whose `type` falls out of the union is dropped, and a dropped `result`
- * silently strands a `pending` entry until its timeout.
+ * whose `type` falls out of the union is dropped, and a dropped `result` — or a
+ * dropped `closed`, the reply to the awaited `close` request — silently strands a
+ * `pending` entry until its timeout. The worker → main union is five members:
+ * `ready`, `result`, `error`, `progress`, `closed`.
  *
  * The envelope carries TWO fences — `switchVersion` and `sessionVersion` — on
  * every message in both directions. `jobVersion` is a third fence but is
@@ -28,6 +30,7 @@ import {
   GraphPhaseDurationsSchema,
   GraphWorkerBatchEntrySchema,
   GraphWorkerCloseRequestSchema,
+  GraphWorkerClosedMessageSchema,
   GraphWorkerErrorMessageSchema,
   GraphWorkerIndexRequestSchema,
   GraphWorkerIndexResultMessageSchema,
@@ -111,6 +114,13 @@ const PROGRESS = {
   totalFiles: 10,
   skippedFiles: 1,
   currentFilePath: 'docs/a.md'
+}
+
+const CLOSED = {
+  ...ENVELOPE,
+  type: 'closed' as const,
+  checkpointed: true,
+  phaseDurationsMs: { write_txn: 3, fts_merge: 1 }
 }
 
 describe('GRAPH_PHASES', () => {
@@ -339,33 +349,38 @@ describe('worker → main messages', () => {
     ['ready', READY, GraphWorkerReadyMessageSchema],
     ['result', RESULT, GraphWorkerIndexResultMessageSchema],
     ['error', WORKER_ERROR, GraphWorkerErrorMessageSchema],
-    ['progress', PROGRESS, GraphWorkerProgressMessageSchema]
+    ['progress', PROGRESS, GraphWorkerProgressMessageSchema],
+    ['closed', CLOSED, GraphWorkerClosedMessageSchema]
   ] as const)('round-trips a %s message', (_label, payload, schema) => {
     expect(schema.parse(payload)).toEqual(payload)
   })
 
   describe('discriminated union exhaustiveness', () => {
-    it.each([READY, RESULT, WORKER_ERROR, PROGRESS])('routes $type through the union', (payload) => {
-      expect(GraphWorkerMessageSchema.parse(payload).type).toBe(payload.type)
-    })
+    it.each([READY, RESULT, WORKER_ERROR, PROGRESS, CLOSED])(
+      'routes $type through the union',
+      (payload) => {
+        expect(GraphWorkerMessageSchema.parse(payload).type).toBe(payload.type)
+      }
+    )
 
-    it('covers exactly the four inbound types', () => {
-      const types = [READY, RESULT, WORKER_ERROR, PROGRESS].map(
+    it('covers exactly the five inbound types', () => {
+      const types = [READY, RESULT, WORKER_ERROR, PROGRESS, CLOSED].map(
         (m) => GraphWorkerMessageSchema.parse(m).type
       )
-      expect(new Set(types)).toEqual(new Set(['ready', 'result', 'error', 'progress']))
+      expect(new Set(types)).toEqual(new Set(['ready', 'result', 'error', 'progress', 'closed']))
     })
 
     it.each(['done', 'log', 'Ready', 'result '])('drops the unknown type %j', (type) => {
       expect(GraphWorkerMessageSchema.safeParse({ ...ENVELOPE, type }).success).toBe(false)
     })
 
-    // The fencing rule is per message class, not blanket: `ready` and `error`
-    // have no third fence to check, so an adapter written to "drop unless all
-    // three match" would drop every one of them.
+    // The fencing rule is per message class, not blanket: `ready`, `error` and
+    // `closed` have no third fence to check, so an adapter written to "drop
+    // unless all three match" would drop every one of them.
     it('declares jobVersion only on the job-scoped members', () => {
       expect(GraphWorkerReadyMessageSchema.parse(READY)).not.toHaveProperty('jobVersion')
       expect(GraphWorkerErrorMessageSchema.parse(WORKER_ERROR)).not.toHaveProperty('jobVersion')
+      expect(GraphWorkerClosedMessageSchema.parse(CLOSED)).not.toHaveProperty('jobVersion')
       expect(GraphWorkerIndexResultMessageSchema.parse(RESULT).jobVersion).toBe(0)
       expect(GraphWorkerProgressMessageSchema.parse(PROGRESS).jobVersion).toBe(0)
     })
@@ -507,6 +522,46 @@ describe('worker → main messages', () => {
     it('requires currentFilePath to be present, even as null', () => {
       const withoutPath = omitKey(PROGRESS, 'currentFilePath')
       expect(GraphWorkerProgressMessageSchema.safeParse(withoutPath).success).toBe(false)
+    })
+  })
+
+  describe('closed', () => {
+    // `close` is awaited through the pending map, so its reply needs a union
+    // member — without one an honest `closed` fails safeParse and every close
+    // hangs to WORKER_CLOSE_TIMEOUT before a force-terminate.
+    it('reports whether the final checkpoint completed', () => {
+      expect(GraphWorkerClosedMessageSchema.parse({ ...CLOSED, checkpointed: false }).checkpointed)
+        .toBe(false)
+    })
+
+    it('requires checkpointed rather than defaulting it', () => {
+      const withoutFlag = omitKey(CLOSED, 'checkpointed')
+      expect(GraphWorkerClosedMessageSchema.safeParse(withoutFlag).success).toBe(false)
+    })
+
+    it('carries phase durations like every other reply', () => {
+      expect(
+        GraphWorkerClosedMessageSchema.parse(CLOSED).phaseDurationsMs
+      ).toEqual({ write_txn: 3, fts_merge: 1 })
+    })
+
+    it('rejects an unknown phase key in its durations', () => {
+      expect(
+        GraphWorkerClosedMessageSchema.safeParse({
+          ...CLOSED,
+          phaseDurationsMs: { teardown: 1 }
+        }).success
+      ).toBe(false)
+    })
+
+    // The envelope is uniform, so `closed` echoes the close request's correlation
+    // ids. jobId is a correlation string (a shutdown is part of a DB-swap scope),
+    // not the jobVersion fence, which stays absent from lifecycle verbs.
+    it('carries the envelope correlation ids but no jobVersion fence', () => {
+      const parsed = GraphWorkerClosedMessageSchema.parse(CLOSED)
+      expect(parsed.correlationId).toBe(ENVELOPE.correlationId)
+      expect(parsed.jobId).toBe(ENVELOPE.jobId)
+      expect(parsed).not.toHaveProperty('jobVersion')
     })
   })
 })

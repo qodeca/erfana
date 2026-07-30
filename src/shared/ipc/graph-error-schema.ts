@@ -1,7 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
 /**
- * Error vocabulary and path confinement for the graph boundary (issue #21).
+ * Shared leaf primitives for the graph boundary (issue #21): the error
+ * vocabulary, path confinement, the `generation` token schema, the model-facing
+ * text-safety predicate ({@link isModelSafeText}) and the two-level correlation-id
+ * patterns and their direction-split schemas.
+ *
+ * These last two live here rather than in `graph-mcp-schema.ts` /
+ * `graphCorrelation.ts` for one structural reason: `graph-schema.ts` needs both
+ * (the inbound refine and the outbound pattern) and imports FROM the MCP module,
+ * so a definition there would be an import cycle. `src/shared/ipc/*` also may not
+ * import from `src/main/`, so the correlation patterns cannot live in
+ * `graphCorrelation.ts` (main-side) either. The leaf is the one place every graph
+ * schema — and the main-side generator — can reach without a cycle.
  *
  * **Layering rule — this module is the LEAF of the graph schema layer.** It
  * must never import from `graph-schema.ts` or `graph-status-schema.ts`.
@@ -91,6 +102,114 @@ export const GraphGenerationSchema = z
   .min(1)
   .max(20)
   .regex(/^-?\d+$/, { message: 'generation must be a decimal integer string' })
+
+// ─── model-facing text safety (§9.3) ─────────────────────────────────────────
+
+const TAB = 0x09
+const LINE_FEED = 0x0a
+const C0_MAX = 0x1f
+const C1_MIN = 0x80
+const C1_MAX = 0x9f
+/** Lone/unpaired UTF-16 surrogate — a valid pair is iterated as one astral code
+ *  point (≥ U+10000), so anything the code-point scan still sees in this range is
+ *  unpaired and cannot render as text. */
+const SURROGATE_MIN = 0xd800
+const SURROGATE_MAX = 0xdfff
+/** Bidi embeddings/overrides U+202A–U+202E (LRE/RLE/PDF/LRO/RLO). */
+const BIDI_EMBED_MIN = 0x202a
+const BIDI_EMBED_MAX = 0x202e
+/** Bidi isolates U+2066–U+2069 (LRI/RLI/FSI/PDI). */
+const BIDI_ISOLATE_MIN = 0x2066
+const BIDI_ISOLATE_MAX = 0x2069
+/** Unicode tag block U+E0000–U+E007F: invisible, mirrors ASCII, read as text by
+ *  models — the canonical text-smuggling vector. */
+const TAG_MIN = 0xe0000
+const TAG_MAX = 0xe007f
+
+/**
+ * True when a string is safe to hand a model verbatim: no C0 (`U+0000`–`U+001F`,
+ * except `\t`/`\n`), no C1 (`U+0080`–`U+009F`), no unpaired surrogate, no bidi
+ * control (`U+202A`–`U+202E`, `U+2066`–`U+2069`) and no Unicode tag character
+ * (`U+E0000`–`U+E007F`).
+ *
+ * The C0/C1 range is exactly what carries ANSI escape sequences and the
+ * `char(2)`/`char(3)`/`char(4)` snippet sentinels — Erfana-internal markers that
+ * must never leave the process. The bidi and tag ranges close the *model-facing*
+ * smuggling vectors: tag characters are invisible ASCII mirrors a model still
+ * reads, and bidi overrides can reorder rendered text to disguise an instruction.
+ *
+ * A **code-point** scan (`for…of`), not `charCodeAt`: a tag character arrives as
+ * a surrogate PAIR (high `U+DB40`, low `U+DC00`–`U+DC7F`), so a `charCodeAt` loop
+ * comparing two more 16-bit ranges would miss the astral block entirely. Iterating
+ * by code point also makes the unpaired-surrogate test exact — a valid pair is
+ * yielded as its combined astral value and never enters the surrogate range.
+ *
+ * A loop rather than a regex character class: such a class over these ranges is
+ * the literal thing `no-control-regex` exists to flag, and suppressing that rule
+ * on a security check reads worse than the scan.
+ */
+export function isModelSafeText(value: string): boolean {
+  for (const ch of value) {
+    const cp = ch.codePointAt(0) as number
+    if (cp === TAB || cp === LINE_FEED) continue
+    if (cp <= C0_MAX || (cp >= C1_MIN && cp <= C1_MAX)) return false
+    if (cp >= SURROGATE_MIN && cp <= SURROGATE_MAX) return false
+    if (cp >= BIDI_EMBED_MIN && cp <= BIDI_EMBED_MAX) return false
+    if (cp >= BIDI_ISOLATE_MIN && cp <= BIDI_ISOLATE_MAX) return false
+    if (cp >= TAG_MIN && cp <= TAG_MAX) return false
+  }
+  return true
+}
+
+// ─── correlation ids (§7.9) ──────────────────────────────────────────────────
+
+/** Bound on an inbound, caller-supplied correlation id — long enough for any
+ *  minted form, short enough that it cannot be a smuggling channel. */
+const MAX_CORRELATION_ID_LENGTH = 128
+
+/** The main-minted correlation-id shape (`idx-<epochMs>-<12 hex>`); the value
+ *  `generateGraphCorrelationId` produces. */
+export const GRAPH_CORRELATION_ID_PATTERN = /^idx-\d+-[0-9a-f]{12}$/
+
+/** The main-minted job-id shape (`job-<epochMs>-<12 hex>`); the value
+ *  `generateGraphJobId` produces. */
+export const GRAPH_JOB_ID_PATTERN = /^job-\d+-[0-9a-f]{12}$/
+
+/**
+ * Outbound / echo / response correlation id, pinned to the main-minted pattern
+ * (D6). Every reply, push and echo carries a value main produced, so the
+ * boundary can afford the tight shape.
+ *
+ * Its inbound counterpart {@link GraphInboundCorrelationIdSchema} is deliberately
+ * looser: §7.9 lets a caller supply its own id, which the pattern would reject.
+ * Main reconciles the two — it echoes a caller id only when the id it emits still
+ * satisfies this pattern, otherwise it mints a fresh one (#26 runtime).
+ */
+export const GraphOutboundCorrelationIdSchema = z
+  .string()
+  .regex(GRAPH_CORRELATION_ID_PATTERN, {
+    message: 'correlationId must match idx-<epochMs>-<12 hex>'
+  })
+
+/** Outbound / echo job id, pinned to the main-minted pattern (D6). */
+export const GraphOutboundJobIdSchema = z
+  .string()
+  .regex(GRAPH_JOB_ID_PATTERN, { message: 'jobId must match job-<epochMs>-<12 hex>' })
+
+/**
+ * Inbound, caller-supplied correlation id (D6): bounded and model-safe, but NOT
+ * pattern-pinned. §7.9 requires main to echo a caller-supplied id, and the
+ * outbound pattern matches only main-minted ids — pinning inbound would reject
+ * every request that supplied its own trace id. `.min(1)` keeps "absent" (the
+ * field is optional) distinct from "blank".
+ */
+export const GraphInboundCorrelationIdSchema = z
+  .string()
+  .min(1)
+  .max(MAX_CORRELATION_ID_LENGTH)
+  .refine(isModelSafeText, {
+    message: 'correlationId must be free of control, bidi and Unicode tag characters'
+  })
 
 // ─── path confinement (§9.5 c) ───────────────────────────────────────────────
 

@@ -20,6 +20,7 @@
  */
 import type {
   GraphWorkerCloseRequest,
+  GraphWorkerClosed,
   GraphWorkerIndexRequest,
   GraphWorkerIndexResult,
   GraphWorkerOpenRequest,
@@ -79,8 +80,13 @@ export interface IGraphIndexWorker {
    * Close the write handle so SQLite performs its final checkpoint-and-delete of
    * `-wal`/`-shm`. Bounded by a timeout; on expiry the worker is terminated,
    * because a leaked handle is worse than a lost worker.
+   *
+   * Resolves with the worker's `closed` reply ({@link GraphWorkerClosed}):
+   * `checkpointed` tells the caller whether the final checkpoint completed, so a
+   * refused checkpoint (WAL still growing) is observable rather than swallowed by
+   * a `void`. The timeout-then-terminate path stays the FAILURE path.
    */
-  close(req: GraphWorkerCloseRequest): Promise<void>
+  close(req: GraphWorkerCloseRequest): Promise<GraphWorkerClosed>
 
   /** Terminate the worker thread and release resources. Safe to call repeatedly. */
   dispose(): Promise<void>

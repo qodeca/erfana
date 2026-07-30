@@ -530,9 +530,11 @@ WHERE fts.heading <> s.heading OR fts.text <> c.text`,
    * present in a *source* file forges `snippetTruncated: true`, and `char(2)`/
    * `char(3)` forge spans — breaking the declared
    * `occurrencesInSnippet === offsets.length` invariant. The ingest strip (owned
-   * by #24 Preprocessing) is the exact complement of `isControlCharFree`: strip
-   * C0 except tab and LF, plus C1 (0x80–0x9F), and normalise CRLF / lone CR to
-   * LF. This audit is the backstop that detects a lapse, covering every
+   * by #24 Preprocessing) is the exact complement of the C0/C1 half of
+   * `isModelSafeText`: strip C0 except tab and LF, plus C1 (0x80–0x9F), and
+   * normalise CRLF / lone CR to LF. (`isModelSafeText` also rejects bidi and
+   * Unicode-tag smuggling, which the MCP result schema refuses outright rather
+   * than stripping.) This audit is the backstop that detects a lapse, covering every
    * document-derived string that becomes an `McpTextSchema` field: the heading
    * columns and `files.path` as well as the section body. `char(0)` cannot appear
    * in a GLOB pattern (it terminates the C-string), an acceptable gap for a value

@@ -29,7 +29,9 @@ import {
   ConfinedRelativePathSchema,
   GraphErrorCodeSchema,
   GraphErrorSchema,
-  GraphGenerationSchema
+  GraphGenerationSchema,
+  GraphOutboundCorrelationIdSchema,
+  GraphOutboundJobIdSchema
 } from './graph-error-schema'
 
 /**
@@ -55,7 +57,7 @@ export const GraphBreakerState = z.enum(['closed', 'open', 'half-open'])
 export type GraphBreakerState = z.infer<typeof GraphBreakerState>
 
 export const GraphProgressSchema = z.object({
-  jobId: z.string().min(1),
+  jobId: GraphOutboundJobIdSchema,
   processedFiles: z.number().int().nonnegative(),
   totalFiles: z.number().int().nonnegative(),
   skippedFiles: z.number().int().nonnegative(),
@@ -161,8 +163,8 @@ export type GraphStatusSnapshot = z.output<typeof GraphStatusSnapshotSchema>
  */
 export const GraphStatusChangePayloadSchema = z.object({
   snapshot: GraphStatusSnapshotSchema.nullable(),
-  correlationId: z.string().min(1),
-  jobId: z.string().min(1).nullable()
+  correlationId: GraphOutboundCorrelationIdSchema,
+  jobId: GraphOutboundJobIdSchema.nullable()
 })
 export type GraphStatusChangePayload = z.output<typeof GraphStatusChangePayloadSchema>
 
@@ -174,6 +176,6 @@ export type GraphStatusChangePayload = z.output<typeof GraphStatusChangePayloadS
 export const GraphStatusResponseSchema = z.object({
   snapshot: GraphStatusSnapshotSchema.nullable(),
   error: GraphErrorSchema.nullable(),
-  correlationId: z.string().min(1)
+  correlationId: GraphOutboundCorrelationIdSchema
 })
 export type GraphStatusResponse = z.output<typeof GraphStatusResponseSchema>

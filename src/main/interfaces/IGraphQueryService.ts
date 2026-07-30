@@ -7,6 +7,12 @@
  * caller may omit every defaulted field and the resolution happens once, at the
  * `safeParse` boundary, rather than being hard-coded at each call site.
  *
+ * This is the single owner of that parse: `search` runs the request through
+ * `parseSearchRequest` and hands `IGraphSearchService.search` the resulting
+ * branded `GraphSearchRequestValidated`. The two interfaces therefore agree
+ * — this one accepts the raw (`z.input`) request and validates exactly once; the
+ * search service accepts only the branded, provably-validated form.
+ *
  * Follows Interface Segregation Principle: the IPC handler needs the seven
  * verbs and nothing else — no lifecycle, no disposal.
  *
