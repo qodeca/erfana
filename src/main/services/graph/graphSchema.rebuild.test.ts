@@ -43,8 +43,16 @@ import {
   GRAPH_SCHEMA_DDL,
   GRAPH_SCHEMA_VERSION,
   GRAPH_STAMP_SQL,
+  type GraphRebuildBudgetRow,
   type GraphSchemaProgram
 } from './graphSchema'
+
+/** The stamp binds five named params; apply-fresh preserves no budget. */
+const NO_BUDGET: GraphRebuildBudgetRow = {
+  autoRebuildCount: null,
+  lastAutoRebuildMs: null,
+  lastAutoRebuildReason: null
+}
 
 /** SQLite's own bookkeeping objects, which no DDL of ours creates or drops. */
 const INTERNAL = /^sqlite_/
@@ -68,12 +76,26 @@ function nextGeneration(): bigint {
   return randomBytes(8).readBigInt64BE(0)
 }
 
-/** Run an exported program the way §6.6 specifies: one transaction, one file. */
+/**
+ * Run an exported program the way §6.6 specifies: one transaction, one file.
+ *
+ * The `preserve` read runs BEFORE the DROP steps so the rebuild budget survives
+ * `graph_meta` being dropped (B4/[2]); apply-fresh has no `preserve` and binds
+ * NULL budget params, which the stamp's `WHERE :param IS NOT NULL` arms drop.
+ * `generation` is bound as a decimal string (D5).
+ */
 function runProgram(db: Database.Database, program: GraphSchemaProgram, generation: bigint): void {
   db.exec('BEGIN IMMEDIATE')
   try {
+    const budget = program.preserve
+      ? (db.prepare(program.preserve).get() as GraphRebuildBudgetRow)
+      : NO_BUDGET
     for (const step of program.steps) db.exec(step)
-    db.prepare(program.stamp).run({ version: GRAPH_SCHEMA_VERSION, generation })
+    db.prepare(program.stamp).run({
+      version: GRAPH_SCHEMA_VERSION,
+      generation: generation.toString(),
+      ...budget
+    })
     db.exec('COMMIT')
   } catch (error) {
     db.exec('ROLLBACK')
@@ -135,11 +157,12 @@ describe('apply fresh', () => {
     const generation = nextGeneration()
     runProgram(writer, GRAPH_APPLY_FRESH_PROGRAM, generation)
 
-    // `generation` is a full-width signed 64-bit value (`readBigInt64BE`), so a
-    // default read returns a lossy JS number and `Number(generation)` on the
-    // expected side loses the SAME low bits — two wrong values comparing equal.
-    // `safeIntegers` makes the column read back as a bigint, which is the only
-    // way this round-trip can actually fail when the stamp truncates.
+    // `generation` is a full-width signed 64-bit value (`readBigInt64BE`) stored
+    // as a DECIMAL STRING in `value` (D5), never in `value_int`: a default read
+    // of an INTEGER column returns a lossy JS number, and the key-based reader
+    // cannot flip `safeIntegers()`. TEXT round-trips the full width. `value_int`
+    // stays used for schema_version, which `safeIntegers(true)` reads back as a
+    // bigint here so a truncating stamp would be caught.
     const rows = writer
       .prepare('SELECT key, value, value_int FROM graph_meta ORDER BY key')
       .safeIntegers(true)
@@ -150,7 +173,12 @@ describe('apply fresh', () => {
       BigInt(GRAPH_SCHEMA_VERSION)
     )
     expect(rows.find((r) => r.key === 'schema_stability')?.value).toBe('beta')
-    expect(rows.find((r) => r.key === 'generation')?.value_int).toBe(generation)
+    const generationRow = rows.find((r) => r.key === 'generation')
+    expect(generationRow?.value).toBe(generation.toString())
+    expect(generationRow?.value_int).toBeNull()
+    // The whole point of D5: the string reconstructs the 64-bit value exactly,
+    // even above Number.MAX_SAFE_INTEGER.
+    expect(BigInt(generationRow?.value ?? '')).toBe(generation)
   })
 
   it('reports APPLY_FRESH before the stamp and OK after it', () => {
@@ -159,18 +187,33 @@ describe('apply fresh', () => {
 
     writer
       .prepare(GRAPH_APPLY_FRESH_PROGRAM.stamp)
-      .run({ version: GRAPH_SCHEMA_VERSION, generation: nextGeneration() })
+      .run({ version: GRAPH_SCHEMA_VERSION, generation: nextGeneration().toString(), ...NO_BUDGET })
     expect(runVersionGate(writer)).toBe('OK')
   })
 
-  it.each([GRAPH_SCHEMA_VERSION + 1, GRAPH_SCHEMA_VERSION + 7])(
-    'reports REBUILD for the HIGHER on-disk version %s',
-    (version) => {
-      for (const step of GRAPH_APPLY_FRESH_PROGRAM.steps) writer.exec(step)
-      writer.prepare(GRAPH_STAMP_SQL).run({ version, generation: nextGeneration() })
-      expect(runVersionGate(writer)).toBe('REBUILD')
-    }
-  )
+  // §6.6 gate: a mismatch in EITHER direction rebuilds (a newer Erfana wrote a
+  // higher value, or a downgrade left a lower one) — the case migrations cannot
+  // handle, and the reason beta has none. The exact-version → OK case is covered
+  // by 'reports APPLY_FRESH before the stamp and OK after it' above, so it cannot
+  // join a REBUILD table. `GRAPH_SCHEMA_VERSION - 1` (0) is the only lower value
+  // at version 1.
+  it.each<[number, GateOutcome]>([
+    [GRAPH_SCHEMA_VERSION + 1, 'REBUILD'],
+    [GRAPH_SCHEMA_VERSION + 7, 'REBUILD'],
+    [GRAPH_SCHEMA_VERSION - 1, 'REBUILD']
+  ])('reports %2$s for on-disk version %1$s (mismatch either direction)', (version, expected) => {
+    for (const step of GRAPH_APPLY_FRESH_PROGRAM.steps) writer.exec(step)
+    writer
+      .prepare(GRAPH_STAMP_SQL)
+      .run({
+        version,
+        generation: nextGeneration().toString(),
+        autoRebuildCount: null,
+        lastAutoRebuildMs: null,
+        lastAutoRebuildReason: null
+      })
+    expect(runVersionGate(writer)).toBe(expected)
+  })
 
   /**
    * Applying fresh onto a database that already holds differently-shaped tables
@@ -227,11 +270,16 @@ describe('DROP/CREATE symmetry (M35)', () => {
 
     const remaining = schemaSnapshot(writer)
     expect(remaining).toEqual([{ name: 'sqlite_sequence', type: 'table' }])
-    // Everything else in the pre-DROP snapshot is gone — asserted as a count
-    // relationship so it cannot silently drift.
-    expect(created.filter((o) => o.name !== 'sqlite_sequence')).toHaveLength(
-      created.length - remaining.length
-    )
+    // Every created object except sqlite_sequence is actually gone. The prior
+    // form asserted `created-minus-sequence` had length `created.length - 1`,
+    // which is true by construction once `remaining` is pinned to
+    // `[sqlite_sequence]` — a tautology that would survive a DROP list missing an
+    // entry. This checks membership instead, so a forgotten DROP fails here.
+    const remainingNames = new Set(remaining.map((o) => o.name))
+    for (const { name } of created) {
+      if (name === 'sqlite_sequence') continue
+      expect(remainingNames.has(name)).toBe(false)
+    }
   })
 
   it('drops the FTS5 shadow tables with sections_fts', () => {
@@ -302,10 +350,10 @@ describe('stamp round-trip across a rebuild (B9)', () => {
   })
 
   it('re-stamps a DIFFERENT generation', () => {
-    const before = (writer.prepare(GRAPH_QUERIES.generation).get() as { generation: number })
+    const before = (writer.prepare(GRAPH_QUERIES.generation).get() as { generation: string })
       .generation
     runProgram(writer, GRAPH_REBUILD_PROGRAM, nextGeneration())
-    const after = (writer.prepare(GRAPH_QUERIES.generation).get() as { generation: number })
+    const after = (writer.prepare(GRAPH_QUERIES.generation).get() as { generation: string })
       .generation
     expect(after).not.toBe(before)
   })
@@ -336,6 +384,84 @@ describe('stamp round-trip across a rebuild (B9)', () => {
     runProgram(writer, GRAPH_REBUILD_PROGRAM, nextGeneration())
     expect(writer.prepare('SELECT file_count AS n FROM corpus_stats WHERE id = 1').get()).toEqual({
       n: 0
+    })
+  })
+})
+
+describe('rebuild budget preservation (B4/[2])', () => {
+  beforeEach(() => {
+    runProgram(writer, GRAPH_APPLY_FRESH_PROGRAM, nextGeneration())
+  })
+
+  /** Record a prior automatic rebuild's budget the way #23's writer will — through the stamp's budget params. */
+  function stampBudget(count: number, ms: number, reason: string): void {
+    writer.prepare(GRAPH_STAMP_SQL).run({
+      version: GRAPH_SCHEMA_VERSION,
+      generation: nextGeneration().toString(),
+      autoRebuildCount: count,
+      lastAutoRebuildMs: ms,
+      lastAutoRebuildReason: reason
+    })
+  }
+
+  it('leaves the budget all-NULL after apply-fresh, which preserves nothing', () => {
+    expect(writer.prepare(GRAPH_QUERIES.rebuildBudget).get()).toEqual({
+      autoRebuildCount: null,
+      lastAutoRebuildMs: null,
+      lastAutoRebuildReason: null
+    })
+  })
+
+  // The blocker: the rebuild DROPs graph_meta, and before the pre-DROP preserve
+  // read the stamp restored only 3 of 6 keys — so `rebuildBudget` read all-NULL
+  // after every rebuild ("never rebuilt"), MAX_AUTO_REBUILDS_PER_SESSION was
+  // unreachable and the cooldown compared against NULL: an unbounded rebuild
+  // loop, invisible in Settings.
+  it('carries the budget across a rebuild rather than erasing it', () => {
+    stampBudget(2, 1_700_000_000_000, 'corruption')
+    runProgram(writer, GRAPH_REBUILD_PROGRAM, nextGeneration())
+    expect(writer.prepare(GRAPH_QUERIES.rebuildBudget).get()).toEqual({
+      autoRebuildCount: 2,
+      lastAutoRebuildMs: 1_700_000_000_000,
+      lastAutoRebuildReason: 'corruption'
+    })
+  })
+
+  // The case v1's verification missed: an existing graph_meta left in the legacy
+  // CHECK-less shape (a sync client / bad restore) is what makes DROPing it the
+  // repair path — `CREATE TABLE IF NOT EXISTS` alone would keep the old shape.
+  // The rebuild repairs it into the constrained shape AND the budget survives.
+  it('rebuilds a legacy CHECK-less graph_meta into the constrained shape while preserving the budget', () => {
+    writer.exec('DROP TABLE graph_meta')
+    writer.exec(
+      'CREATE TABLE graph_meta (key TEXT NOT NULL PRIMARY KEY, value TEXT, value_int INTEGER)'
+    )
+    writer.prepare("INSERT INTO graph_meta VALUES ('auto_rebuild_count', NULL, 2)").run()
+    writer.prepare("INSERT INTO graph_meta VALUES ('last_auto_rebuild_ms', NULL, 1700000000000)").run()
+    writer
+      .prepare("INSERT INTO graph_meta VALUES ('last_auto_rebuild_reason', 'corruption', NULL)")
+      .run()
+
+    const legacySql = (
+      writer.prepare("SELECT sql FROM sqlite_master WHERE name = 'graph_meta'").get() as {
+        sql: string
+      }
+    ).sql
+    expect(legacySql).not.toMatch(/key IN \(/)
+
+    runProgram(writer, GRAPH_REBUILD_PROGRAM, nextGeneration())
+
+    const rebuiltSql = (
+      writer.prepare("SELECT sql FROM sqlite_master WHERE name = 'graph_meta'").get() as {
+        sql: string
+      }
+    ).sql
+    expect(rebuiltSql).toMatch(/key IN \(/)
+    expect(rebuiltSql).toMatch(/CASE/)
+    expect(writer.prepare(GRAPH_QUERIES.rebuildBudget).get()).toEqual({
+      autoRebuildCount: 2,
+      lastAutoRebuildMs: 1700000000000,
+      lastAutoRebuildReason: 'corruption'
     })
   })
 })
@@ -431,10 +557,10 @@ describe('in-place rebuild under a live reader (C2 + C3)', () => {
   })
 
   it('exposes the new generation to the reader after the rebuild', () => {
-    const before = (reader.prepare(GRAPH_QUERIES.generation).get() as { generation: number })
+    const before = (reader.prepare(GRAPH_QUERIES.generation).get() as { generation: string })
       .generation
     runProgram(writer, GRAPH_REBUILD_PROGRAM, nextGeneration())
-    const after = (reader.prepare(GRAPH_QUERIES.generation).get() as { generation: number })
+    const after = (reader.prepare(GRAPH_QUERIES.generation).get() as { generation: string })
       .generation
     expect(after).not.toBe(before)
   })
@@ -462,7 +588,10 @@ describe('in-place rebuild under a live reader (C2 + C3)', () => {
 
     writer.prepare(GRAPH_STAMP_SQL).run({
       version: GRAPH_SCHEMA_VERSION,
-      generation: nextGeneration()
+      generation: nextGeneration().toString(),
+      autoRebuildCount: null,
+      lastAutoRebuildMs: null,
+      lastAutoRebuildReason: null
     })
     expect(runVersionGate(reader)).toBe('OK')
   })

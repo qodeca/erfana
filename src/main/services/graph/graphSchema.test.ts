@@ -123,11 +123,7 @@ describe('GRAPH_SCHEMA_DDL', () => {
       'sections',
       'sections_fts'
     ])
-    expect(indexes.sort()).toEqual([
-      'idx_contents_orphan',
-      'idx_sections_file',
-      'idx_sections_file_ordinal'
-    ])
+    expect(indexes.sort()).toEqual(['idx_contents_orphan', 'idx_sections_file_ordinal'])
     expect(owned).toHaveLength(tables.length + indexes.length)
   })
 
@@ -340,7 +336,29 @@ describe('STRICT and CHECK constraints (M1/m1)', () => {
   })
 
   it('refuses a graph_meta row with neither value nor value_int', () => {
-    expect(() => db.exec("INSERT INTO graph_meta(key) VALUES ('empty')")).toThrow(
+    // A valid key with both columns NULL, so it is the base OR-CHECK (and the
+    // column-discipline CHECK) that trips, not the key-IN allow-list.
+    expect(() =>
+      db.exec("INSERT INTO graph_meta(key, value, value_int) VALUES ('schema_version', NULL, NULL)")
+    ).toThrow(/CHECK constraint failed/)
+  })
+
+  // [20]: the key allow-list and the per-key column discipline are contracts, not
+  // comments — a version in the text column would read back NULL and the §6.6
+  // gate would discard-and-rebuild a correct corpus.
+  it('refuses a graph_meta key outside the exhaustive allow-list', () => {
+    expect(() =>
+      db.exec("INSERT INTO graph_meta(key, value, value_int) VALUES ('bogus', 'x', NULL)")
+    ).toThrow(/CHECK constraint failed/)
+  })
+
+  it.each([
+    ['schema_version in the text column', "('schema_version', '1', NULL)"],
+    ['generation in the integer column', "('generation', NULL, 5)"],
+    ['auto_rebuild_count in the text column', "('auto_rebuild_count', '2', NULL)"],
+    ['schema_stability in the integer column', "('schema_stability', NULL, 1)"]
+  ])('refuses %s (column discipline)', (_label, values) => {
+    expect(() => db.exec(`INSERT INTO graph_meta(key, value, value_int) VALUES ${values}`)).toThrow(
       /CHECK constraint failed/
     )
   })

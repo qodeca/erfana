@@ -51,6 +51,7 @@ export {
   GRAPH_ERROR_CODES,
   GraphErrorCodeSchema,
   GraphErrorSchema,
+  GraphGenerationSchema,
   isConfinedRelativePath
 } from './graph-error-schema'
 export type { GraphError, GraphErrorCode } from './graph-error-schema'

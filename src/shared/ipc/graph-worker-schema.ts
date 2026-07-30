@@ -17,7 +17,12 @@
  */
 import { z } from 'zod'
 import { GRAPH } from '../graph-constants'
-import { GraphErrorCodeSchema, GraphReindexMode, GraphReindexReason } from './graph-schema'
+import {
+  GraphErrorCodeSchema,
+  GraphGenerationSchema,
+  GraphReindexMode,
+  GraphReindexReason
+} from './graph-schema'
 
 // ─── phase durations (§8.8) ──────────────────────────────────────────────────
 
@@ -176,8 +181,10 @@ export type GraphWorkerIndexResult = z.output<typeof GraphWorkerIndexResultSchem
 export const GraphWorkerReadySchema = z.object({
   ...GraphWorkerEnvelope,
   /** Random 64-bit token, not a counter — contract C2 needs difference, not
-   *  monotonicity. Serialised as a decimal string because it is a `bigint`. */
-  generation: z.string().regex(/^-?\d+$/),
+   *  monotonicity. Serialised as a decimal string because it is a `bigint`; the
+   *  adapter does `BigInt(...)` before `attach()`. One schema across all three
+   *  hops (D5). */
+  generation: GraphGenerationSchema,
   schemaVersion: z.number().int().positive(),
   rebuilt: z.boolean(),
   autoRebuildCount: z.number().int().nonnegative(),

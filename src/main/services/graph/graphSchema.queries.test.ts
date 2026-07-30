@@ -232,6 +232,81 @@ describe('audits (M3, C6)', () => {
   })
 })
 
+describe('FTS rowid alignment audit ([3])', () => {
+  beforeEach(() => {
+    seedSection({ path: 'a.md', heading: 'Alpha', text: 'alpha body' })
+    seedSection({ path: 'b.md', heading: 'Beta', text: 'beta body' })
+  })
+
+  it('reports zero on an aligned corpus', () => {
+    expect(db.prepare(GRAPH_QUERIES.ftsAlignmentAudit).get()).toEqual({ misalignedCount: 0 })
+  })
+
+  // A posting that is present and non-orphaned but carries a DIFFERENT section's
+  // body: it passes BOTH orphan audits (every rowid has a section, every section
+  // a posting) and FTS5's own integrity-check, then serves one section's
+  // path/heading with another's text. This is the only detector.
+  it('detects a posting whose text no longer matches its rowid source', () => {
+    db.prepare('DELETE FROM sections_fts WHERE rowid = 1').run()
+    db.prepare(
+      "INSERT INTO sections_fts(rowid, heading, text) VALUES (1, 'Alpha', 'a wholly different body')"
+    ).run()
+
+    expect(db.prepare(GRAPH_QUERIES.ftsOrphanAudit).get()).toEqual({ orphanCount: 0 })
+    expect(db.prepare(GRAPH_QUERIES.sectionOrphanAudit).get()).toEqual({ orphanCount: 0 })
+    expect(db.prepare(GRAPH_QUERIES.ftsAlignmentAudit).get()).toEqual({ misalignedCount: 1 })
+  })
+
+  it('detects a heading swap that both orphan audits miss', () => {
+    db.prepare('DELETE FROM sections_fts WHERE rowid = 1').run()
+    db.prepare(
+      "INSERT INTO sections_fts(rowid, heading, text) VALUES (1, 'Wrong heading', 'alpha body')"
+    ).run()
+    expect(db.prepare(GRAPH_QUERIES.ftsAlignmentAudit).get()).toEqual({ misalignedCount: 1 })
+  })
+})
+
+describe('control-character / sentinel audit ([4])', () => {
+  /** The forgeable markers: STX/ETX span sentinels and the EOT truncation marker. */
+  const STX = String.fromCharCode(2)
+  const EOT = String.fromCharCode(4)
+
+  beforeEach(() => {
+    seedSection({ path: 'a.md', heading: 'Alpha', text: 'alpha body' })
+    seedSection({ path: 'b.md', heading: 'Beta', text: 'beta body' })
+  })
+
+  it('reports zero on a corpus free of control characters', () => {
+    expect(db.prepare(GRAPH_QUERIES.controlCharAudit).get()).toEqual({ violationCount: 0 })
+  })
+
+  // A raw char(4) in a source file forges `snippetTruncated: true`, breaking the
+  // declared `occurrencesInSnippet === offsets.length` invariant.
+  it('detects a forged truncation marker in section text', () => {
+    seedSection({ path: 'x.md', heading: 'X', text: `forged ${EOT} body` })
+    expect(db.prepare(GRAPH_QUERIES.controlCharAudit).get()).toEqual({ violationCount: 1 })
+  })
+
+  // Covers the heading columns as well as the body — every string that becomes
+  // an McpTextSchema field.
+  it('detects a forged span sentinel in a heading', () => {
+    seedSection({ path: 'y.md', heading: `Head${STX}ing`, text: 'clean body' })
+    expect(db.prepare(GRAPH_QUERIES.controlCharAudit).get()).toEqual({ violationCount: 1 })
+  })
+
+  // The ingest strip keeps tab and LF (D2); the audit must not flag them.
+  it('does not flag ordinary tab or newline', () => {
+    seedSection({ path: 'z.md', heading: 'Z', text: 'line one\tcol\nline two' })
+    expect(db.prepare(GRAPH_QUERIES.controlCharAudit).get()).toEqual({ violationCount: 0 })
+  })
+
+  // C1 (0x80–0x9F) is in the strip set too.
+  it('detects a C1 control character', () => {
+    seedSection({ path: 'c1.md', heading: 'C1', text: `body${String.fromCharCode(0x85)}next` })
+    expect(db.prepare(GRAPH_QUERIES.controlCharAudit).get()).toEqual({ violationCount: 1 })
+  })
+})
+
 describe('query catalogue (§6.5)', () => {
   const KEYS: GraphQueryKey[] = [
     'searchPage',
@@ -242,10 +317,12 @@ describe('query catalogue (§6.5)', () => {
     'rebuildBudget',
     'ftsOrphanAudit',
     'sectionOrphanAudit',
+    'ftsAlignmentAudit',
+    'controlCharAudit',
     'counterAudit'
   ]
 
-  it('exposes exactly the nine keys the reader may address', () => {
+  it('exposes exactly the eleven keys the reader may address', () => {
     expect(Object.keys(GRAPH_QUERIES).sort()).toEqual([...KEYS].sort())
   })
 

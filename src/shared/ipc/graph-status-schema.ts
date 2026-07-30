@@ -25,7 +25,7 @@
  */
 import { z } from 'zod'
 import { GRAPH } from '../graph-constants'
-import { GraphErrorCodeSchema, GraphErrorSchema } from './graph-error-schema'
+import { GraphErrorCodeSchema, GraphErrorSchema, GraphGenerationSchema } from './graph-error-schema'
 
 /**
  * Six members. `error` is deliberately absent: every plausible producer is
@@ -125,8 +125,12 @@ export const GraphStatusSnapshotSchema = z.object({
    */
   lastAutoRebuildReason: z.string().max(64).nullable().optional(),
   /** Diagnostics. These four fully determine whether a search can return rows,
-   *  and the log-parity invariant requires them on the state-transition line. */
-  generation: z.string().nullable(),
+   *  and the log-parity invariant requires them on the state-transition line.
+   *  The same decimal-string form as the worker `ready` reply and the on-disk
+   *  token (D5): the snapshot builder does `reader.generation().toString()`, so
+   *  `BigInt(snapshot.generation)` on an accepted value round-trips a 64-bit
+   *  token exactly. Null before the reader is attached. */
+  generation: GraphGenerationSchema.nullable(),
   sessionVersion: z.number().int().nonnegative(),
   restartAttempts: z.number().int().nonnegative(),
   breakerState: GraphBreakerState,

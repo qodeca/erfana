@@ -181,6 +181,24 @@ describe('GraphStatusSnapshotSchema', () => {
     expect(parsed.generation).toBe('-9223372036854775808')
   })
 
+  // D5: the snapshot shares GraphGenerationSchema with the worker `ready` reply
+  // and the on-disk token, so a value above Number.MAX_SAFE_INTEGER round-trips
+  // exactly and `BigInt(...)` on it cannot throw.
+  it('round-trips a generation above Number.MAX_SAFE_INTEGER exactly', () => {
+    const generation = '9223372036854775807'
+    const parsed = GraphStatusSnapshotSchema.parse({ ...VALID_SNAPSHOT, generation })
+    expect(parsed.generation).toBe(generation)
+    expect(BigInt(parsed.generation ?? '')).toBe(9223372036854775807n)
+  })
+
+  // Previously `z.string()` accepted any string; the shared schema now pins the
+  // decimal form so a non-numeric token cannot reach `BigInt(...)`.
+  it.each(['1.5', '0x1f', 'abc', ' 1', ''])('rejects the non-decimal generation %j', (generation) => {
+    expect(GraphStatusSnapshotSchema.safeParse({ ...VALID_SNAPSHOT, generation }).success).toBe(
+      false
+    )
+  })
+
   it('records walSizeBytes when a checkpoint was refused (C8)', () => {
     expect(
       GraphStatusSnapshotSchema.parse({ ...VALID_SNAPSHOT, walSizeBytes: 38_797_312 }).walSizeBytes

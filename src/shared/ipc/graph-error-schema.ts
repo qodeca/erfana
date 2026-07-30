@@ -67,6 +67,30 @@ export const GRAPH_ERROR_CODES = [
 export const GraphErrorCodeSchema = z.enum(GRAPH_ERROR_CODES)
 export type GraphErrorCode = z.infer<typeof GraphErrorCodeSchema>
 
+/**
+ * The rebuild `generation` token as it crosses every boundary: a **decimal
+ * string**, not a JS number (D5).
+ *
+ * It is `randomBytes(8)` read as a signed 64-bit integer (contract C2 needs
+ * difference, not monotonicity), so it routinely exceeds `Number.MAX_SAFE_INTEGER`
+ * — `1n === 1` is permanently false and a value above 2^53 is lossy as a number.
+ * A single representation on all three hops keeps it lossless: on disk in
+ * `graph_meta.value` (TEXT), on the worker `ready` reply, and on the status
+ * snapshot. The **main-side owner** is the only place it is a `bigint`: the
+ * worker adapter does `BigInt(ready.generation)` before
+ * `IGraphReadConnection.attach(dbPath, generation)`, and the snapshot builder
+ * does `reader.generation().toString()` on the way back out.
+ *
+ * `.max(20)` bounds it to the width of the most negative int64
+ * (`-9223372036854775808`, 20 chars); the regex pins it to an optionally-signed
+ * run of digits so `BigInt(...)` on an accepted value cannot throw.
+ */
+export const GraphGenerationSchema = z
+  .string()
+  .min(1)
+  .max(20)
+  .regex(/^-?\d+$/, { message: 'generation must be a decimal integer string' })
+
 // ─── path confinement (§9.5 c) ───────────────────────────────────────────────
 
 /**

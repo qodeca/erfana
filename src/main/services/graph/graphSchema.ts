@@ -41,9 +41,15 @@ export const GRAPH_SCHEMA_BETA_NOTICE =
 /**
  * SQLite floor, in the integer encoding `sqlite_version()` implies.
  *
- * 3.37.0 for `STRICT` tables, which subsumes `RETURNING`'s 3.35.0.
+ * 3.38.0 for the JSON1 built-ins: `GRAPH_SEARCH_HYDRATE_SQL` and the delete
+ * sweep bind `json_each(:ids)`, and JSON functions became unconditional
+ * (always-compiled) built-ins only in 3.38.0. A 3.37.x build without
+ * `-DSQLITE_ENABLE_JSON1` would pass a 3.37.0 gate, satisfy every DDL statement
+ * (none exercises JSON), then fail phase 2 of *every* search — a gate meant to
+ * fail closed failing open on the one query the schema never touches at open.
+ * 3.38.0 subsumes `STRICT` (3.37.0), which subsumes `RETURNING` (3.35.0).
  */
-export const GRAPH_MIN_SQLITE = 3_037_000
+export const GRAPH_MIN_SQLITE = 3_038_000
 
 /**
  * Numeric `sqlite_version()` comparison.
@@ -87,14 +93,35 @@ export const GRAPH_SCHEMA_DDL: readonly string[] = [
   // `value_int` exists because TEXT affinity converts numerics to text on
   // storage, so a schema_version written as a number reads back as '1' and
   // breaks the === gate in §6.6. Numeric keys use value_int; string keys value.
-  // Exhaustive keys: 'schema_version'(int) | 'generation'(int)
-  //                  'schema_stability'(text) | 'auto_rebuild_count'(int)
-  //                  'last_auto_rebuild_ms'(int) | 'last_auto_rebuild_reason'(text)
+  //
+  // `generation` is the exception: it is a 64-bit token yet lives in `value`
+  // (TEXT), a decimal string. better-sqlite3 returns an INTEGER column as a
+  // lossy JS `number` unless `safeIntegers()` is on — a per-statement lever a
+  // key-based reader cannot reach — and turning it on globally would re-widen
+  // every OTHER integer column to `bigint`, breaking `schemaVersion: z.number()`
+  // and `sectionId: z.number()`. TEXT gives one lossless representation across
+  // all three hops (D5): on disk here, on the worker `ready` reply, and on the
+  // status snapshot — see `GraphGenerationSchema`.
+  //
+  // Exhaustive keys, with the column each MUST use — the per-key CHECK below
+  // makes that discipline unforgeable: a version written into `value` would make
+  // `GRAPH_QUERIES.schemaVersion` read NULL, which the §6.6 gate treats as
+  // unstamped and answers with discard-and-rebuild of a correct corpus.
+  //   'schema_version'(int) | 'generation'(text) | 'schema_stability'(text)
+  //   'auto_rebuild_count'(int) | 'last_auto_rebuild_ms'(int)
+  //   'last_auto_rebuild_reason'(text)
   `CREATE TABLE IF NOT EXISTS graph_meta (
   key       TEXT    NOT NULL PRIMARY KEY,
   value     TEXT,
   value_int INTEGER,
-  CHECK (value IS NOT NULL OR value_int IS NOT NULL)
+  CHECK (value IS NOT NULL OR value_int IS NOT NULL),
+  CHECK (key IN ('schema_version', 'generation', 'schema_stability',
+                 'auto_rebuild_count', 'last_auto_rebuild_ms', 'last_auto_rebuild_reason')),
+  CHECK (CASE
+           WHEN key IN ('schema_version', 'auto_rebuild_count', 'last_auto_rebuild_ms')
+             THEN value_int IS NOT NULL AND value IS NULL
+             ELSE value IS NOT NULL AND value_int IS NULL
+         END)
 ) STRICT`,
 
   // mtime_ms MUST be written as Math.trunc(stat.mtimeMs): INTEGER affinity
@@ -166,9 +193,12 @@ export const GRAPH_SCHEMA_DDL: readonly string[] = [
   CHECK (end_line >= start_line)
 ) STRICT`,
 
+  // Also serves the per-file delete resolver and the re-index sequence: a
+  // UNIQUE (file_id, ordinal) index already answers every `file_id`-only lookup
+  // from its leftmost prefix, so a bare `idx_sections_file ON sections(file_id)`
+  // was a strict-prefix duplicate — a b-tree write per section insert/delete for
+  // zero read benefit, the redundant-index anti-pattern SQLite documents.
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_sections_file_ordinal ON sections(file_id, ordinal)`,
-  // Consumed by the per-file delete resolver and the re-index sequence.
-  `CREATE INDEX IF NOT EXISTS idx_sections_file ON sections(file_id)`,
 
   // rowid IS sections.id. Exactly TWO columns and no UNINDEXED payload, so
   // bm25() weights map 1:1 to (heading, text) and snippet()/highlight() column
@@ -202,7 +232,6 @@ export const GRAPH_SCHEMA_DDL: readonly string[] = [
  * dropping `files` while `sections` rows still reference it aborts.
  */
 export const GRAPH_DROP_DDL: readonly string[] = [
-  `DROP INDEX IF EXISTS idx_sections_file`,
   `DROP INDEX IF EXISTS idx_sections_file_ordinal`,
   `DROP INDEX IF EXISTS idx_contents_orphan`,
   `DROP TABLE IF EXISTS corpus_stats`,
@@ -214,37 +243,90 @@ export const GRAPH_DROP_DDL: readonly string[] = [
 ]
 
 /**
- * The version/generation stamp — PARAMETERISED, named params `:version` and
- * `:generation`.
+ * The version/generation/budget stamp — PARAMETERISED. Named params:
+ * `:version` (int), `:generation` (decimal string, D5), and the three
+ * rebuild-budget params `:autoRebuildCount`, `:lastAutoRebuildMs`,
+ * `:lastAutoRebuildReason`.
  *
  * It cannot live in an ordered string array driven by `db.exec()`, which is why
  * a "rebuild steps" array alone left a rebuilt database carrying no
  * `schema_version` row at all.
+ *
+ * **Budget preservation (B4/[2]).** `GRAPH_DROP_DDL` drops `graph_meta`
+ * completely — it must, because the CHECK-less legacy shape a sync client or a
+ * bad restore can leave behind is repaired only by a full drop-and-recreate
+ * (`CREATE TABLE IF NOT EXISTS` would keep the old shape forever). The rebuild is
+ * *the* repair path, so the budget cannot simply ride an un-dropped table.
+ * Instead the rebuild program carries a pre-DROP `preserve` read whose row feeds
+ * these three params, and the stamp re-inserts each **only when non-null**:
+ * before the first automatic rebuild all three are NULL, and a `graph_meta` row
+ * with both columns NULL violates the base CHECK, so an unconditional insert
+ * would abort every apply-fresh. The `WHERE :param IS NOT NULL` arms keep
+ * apply-fresh (which preserves nothing) inserting exactly the three fixed rows.
+ * Without this the budget read all-NULL after every rebuild — "never rebuilt" —
+ * so `MAX_AUTO_REBUILDS_PER_SESSION` was unreachable and the cooldown compared
+ * against NULL: an unbounded rebuild loop, invisible in Settings.
  */
-export const GRAPH_STAMP_SQL = `INSERT INTO graph_meta(key, value, value_int) VALUES
-  ('schema_version',   NULL,   :version),
-  ('generation',       NULL,   :generation),
-  ('schema_stability', 'beta', NULL)
+export const GRAPH_STAMP_SQL = `INSERT INTO graph_meta(key, value, value_int)
+SELECT 'schema_version', NULL, :version
+UNION ALL SELECT 'generation', :generation, NULL
+UNION ALL SELECT 'schema_stability', 'beta', NULL
+UNION ALL SELECT 'auto_rebuild_count', NULL, :autoRebuildCount WHERE :autoRebuildCount IS NOT NULL
+UNION ALL SELECT 'last_auto_rebuild_ms', NULL, :lastAutoRebuildMs WHERE :lastAutoRebuildMs IS NOT NULL
+UNION ALL SELECT 'last_auto_rebuild_reason', :lastAutoRebuildReason, NULL WHERE :lastAutoRebuildReason IS NOT NULL
 ON CONFLICT(key) DO UPDATE SET value = excluded.value, value_int = excluded.value_int`
 
-/** A program is `exec()`-able steps plus one prepared stamp, run in the same transaction. */
-export interface GraphSchemaProgram {
-  readonly steps: readonly string[]
-  readonly stamp: string
+/**
+ * The pre-DROP budget read for the rebuild program (B4/[2]).
+ *
+ * Reads the three persisted budget keys BEFORE `GRAPH_DROP_DDL` removes
+ * `graph_meta`, so the values survive the drop and feed {@link GRAPH_STAMP_SQL}.
+ * Its output columns are exactly the stamp's budget param names, so the row can
+ * be spread straight onto the `run()` bind object. Identical to
+ * `GRAPH_QUERIES.rebuildBudget` (the reader-facing view of the same three keys) —
+ * shared here so the two cannot drift.
+ */
+export const GRAPH_REBUILD_PRESERVE_SQL = `SELECT
+  (SELECT value_int FROM graph_meta WHERE key = 'auto_rebuild_count')       AS autoRebuildCount,
+  (SELECT value_int FROM graph_meta WHERE key = 'last_auto_rebuild_ms')     AS lastAutoRebuildMs,
+  (SELECT value     FROM graph_meta WHERE key = 'last_auto_rebuild_reason') AS lastAutoRebuildReason`
+
+/** One row of {@link GRAPH_REBUILD_PRESERVE_SQL}; spread onto the stamp's bind object. */
+export interface GraphRebuildBudgetRow {
+  autoRebuildCount: number | null
+  lastAutoRebuildMs: number | null
+  lastAutoRebuildReason: string | null
 }
 
 /**
- * The rebuild program: `DROP`s then `CREATE`s, then the stamp, all inside one
- * `BEGIN IMMEDIATE` on the **same file**. Never `unlink()`, never `rename()` — a
- * live read-only handle silently serves the deleted inode forever and no PRAGMA
- * detects the swap (contract C3).
+ * A program is `exec()`-able steps plus one prepared stamp, run in the same
+ * transaction. `preserve` is an optional read run BEFORE the steps whose single
+ * row supplies the stamp's budget params (B4/[2]); apply-fresh omits it and
+ * preserves nothing.
+ */
+export interface GraphSchemaProgram {
+  readonly steps: readonly string[]
+  readonly stamp: string
+  readonly preserve?: string
+}
+
+/**
+ * The rebuild program: `preserve`-read the budget, then `DROP`s then `CREATE`s,
+ * then the stamp, all inside one `BEGIN IMMEDIATE` on the **same file**. Never
+ * `unlink()`, never `rename()` — a live read-only handle silently serves the
+ * deleted inode forever and no PRAGMA detects the swap (contract C3).
  */
 export const GRAPH_REBUILD_PROGRAM: GraphSchemaProgram = {
   steps: [...GRAPH_DROP_DDL, ...GRAPH_SCHEMA_DDL],
-  stamp: GRAPH_STAMP_SQL
+  stamp: GRAPH_STAMP_SQL,
+  preserve: GRAPH_REBUILD_PRESERVE_SQL
 }
 
-/** The apply-fresh program. Same stamp — a fresh database must be stamped too. */
+/**
+ * The apply-fresh program. Same stamp — a fresh database must be stamped too —
+ * but no `preserve`: there is no prior budget to carry, so the stamp's budget
+ * params bind NULL and the three budget rows are not inserted.
+ */
 export const GRAPH_APPLY_FRESH_PROGRAM: GraphSchemaProgram = {
   steps: [...GRAPH_SCHEMA_DDL],
   stamp: GRAPH_STAMP_SQL
@@ -267,6 +349,8 @@ export type GraphQueryKey =
   | 'rebuildBudget'
   | 'ftsOrphanAudit'
   | 'sectionOrphanAudit'
+  | 'ftsAlignmentAudit'
+  | 'controlCharAudit'
   | 'counterAudit'
 
 /**
@@ -372,7 +456,11 @@ WHERE id = 1`,
 
   schemaVersion: `SELECT value_int AS schemaVersion FROM graph_meta WHERE key = 'schema_version'`,
 
-  generation: `SELECT value_int AS generation FROM graph_meta WHERE key = 'generation'`,
+  // `generation` is a decimal STRING in `value`, not `value_int` (D5): a 64-bit
+  // token read from an INTEGER column comes back as a lossy JS number without a
+  // per-statement `safeIntegers()` the key-based reader cannot set. The caller
+  // does `BigInt(row.generation)`; see `GraphGenerationSchema`.
+  generation: `SELECT value AS generation FROM graph_meta WHERE key = 'generation'`,
 
   /**
    * §9.10 / E5: the three persisted rebuild-budget keys.
@@ -388,9 +476,7 @@ WHERE id = 1`,
    * "no row" are the same, unambiguous answer. `lastAutoRebuildMs` is not on the
    * snapshot — it feeds the `GRAPH.REBUILD_COOLDOWN_MS` check main-side.
    */
-  rebuildBudget: `SELECT (SELECT value_int FROM graph_meta WHERE key = 'auto_rebuild_count')       AS autoRebuildCount,
-       (SELECT value_int FROM graph_meta WHERE key = 'last_auto_rebuild_ms')     AS lastAutoRebuildMs,
-       (SELECT value     FROM graph_meta WHERE key = 'last_auto_rebuild_reason') AS lastAutoRebuildReason`,
+  rebuildBudget: GRAPH_REBUILD_PRESERVE_SQL,
 
   /**
    * Divergence audit — `PRAGMA integrity_check` CANNOT see this.
@@ -408,6 +494,59 @@ WHERE rowid NOT IN (SELECT id FROM sections)`,
   /** The mirror case: a section row with no posting, so it can never be found. */
   sectionOrphanAudit: `SELECT count(*) AS orphanCount FROM sections s
 WHERE NOT EXISTS (SELECT 1 FROM sections_fts WHERE rowid = s.id)`,
+
+  /**
+   * FTS rowid-alignment audit ([3]) — the failure NEITHER orphan audit nor
+   * FTS5's own `integrity-check` can see.
+   *
+   * FTS5 takes no constraints, and an INSERT that omits the rowid gets
+   * `max(rowid)+1`. A posting can therefore be *present and non-orphaned* yet
+   * carry a DIFFERENT section's `heading`/`text` than its rowid resolves to. Such
+   * a pair passes both orphan audits (every rowid has a section, every section a
+   * posting) AND, for a non-contentless table, `integrity-check` (which compares
+   * the index only to its own shadow content, never to `sections`), then serves
+   * one section's path/heading with another section's body. This is the only
+   * detector: compare the stored posting columns against the joined source rows.
+   * Bounded like the orphan audits (≤10k, worker, off any frame budget).
+   *
+   * The writer-side complement — asserting `last_insert_rowid()` equals the
+   * `sections.id` just inserted before writing the posting — is #21-out-of-scope
+   * (there is no writer yet) and is recorded as a #23/#25 obligation in
+   * `sd-021-db-schema.md` §6.6.
+   */
+  ftsAlignmentAudit: `SELECT count(*) AS misalignedCount
+FROM sections_fts fts
+JOIN sections s ON s.id = fts.rowid
+JOIN contents c ON c.content_hash = s.content_hash
+WHERE fts.heading <> s.heading OR fts.text <> c.text`,
+
+  /**
+   * Control-character / sentinel audit ([4]) — enforces the ingest contract (D2)
+   * against the columns that reach the model.
+   *
+   * The snippet/highlight helpers insert `char(2)`/`char(3)` (span sentinels) and
+   * `char(4)` (truncation marker) VERBATIM, escaping nothing in the copied text,
+   * and `snippetTruncated` is derived by searching for `char(4)`. So a `char(4)`
+   * present in a *source* file forges `snippetTruncated: true`, and `char(2)`/
+   * `char(3)` forge spans — breaking the declared
+   * `occurrencesInSnippet === offsets.length` invariant. The ingest strip (owned
+   * by #24 Preprocessing) is the exact complement of `isControlCharFree`: strip
+   * C0 except tab and LF, plus C1 (0x80–0x9F), and normalise CRLF / lone CR to
+   * LF. This audit is the backstop that detects a lapse, covering every
+   * document-derived string that becomes an `McpTextSchema` field: the heading
+   * columns and `files.path` as well as the section body. `char(0)` cannot appear
+   * in a GLOB pattern (it terminates the C-string), an acceptable gap for a value
+   * whose *only* control character is NUL. Bounded like the other audits.
+   */
+  controlCharAudit: `SELECT count(*) AS violationCount
+FROM sections s
+JOIN contents c ON c.content_hash = s.content_hash
+JOIN files    f ON f.id = s.file_id
+WHERE s.heading      GLOB '*[' || char(1,2,3,4,5,6,7,8,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159) || ']*'
+   OR s.heading_path GLOB '*[' || char(1,2,3,4,5,6,7,8,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159) || ']*'
+   OR s.heading_slug GLOB '*[' || char(1,2,3,4,5,6,7,8,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159) || ']*'
+   OR f.path         GLOB '*[' || char(1,2,3,4,5,6,7,8,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159) || ']*'
+   OR c.text         GLOB '*[' || char(1,2,3,4,5,6,7,8,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159) || ']*'`,
 
   /**
    * Recount for the open-time reconciliation. `count(*)` on the ordinary b-tree

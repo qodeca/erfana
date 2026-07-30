@@ -50,11 +50,26 @@ describe('meta reads', () => {
     expect(db.prepare(GRAPH_QUERIES.schemaVersion).get()).toEqual({ schemaVersion: 1 })
   })
 
-  it('reads generation from value_int', () => {
+  // D5: `generation` is a DECIMAL STRING in `value`, not `value_int` — an INTEGER
+  // column reads back as a lossy JS number without a `safeIntegers()` the
+  // key-based reader cannot set, and the token routinely exceeds 2^53.
+  it('reads generation as a decimal string from value', () => {
     db.prepare(
-      "INSERT INTO graph_meta(key, value, value_int) VALUES ('generation', NULL, -42)"
+      "INSERT INTO graph_meta(key, value, value_int) VALUES ('generation', '-42', NULL)"
     ).run()
-    expect(db.prepare(GRAPH_QUERIES.generation).get()).toEqual({ generation: -42 })
+    expect(db.prepare(GRAPH_QUERIES.generation).get()).toEqual({ generation: '-42' })
+  })
+
+  // The reason for the TEXT column: a 64-bit token above Number.MAX_SAFE_INTEGER
+  // round-trips exactly, and `BigInt(...)` on the read value reconstructs it.
+  it('round-trips a generation above Number.MAX_SAFE_INTEGER exactly', () => {
+    const generation = '9223372036854775807'
+    db.prepare("INSERT INTO graph_meta(key, value, value_int) VALUES ('generation', ?, NULL)").run(
+      generation
+    )
+    const row = db.prepare(GRAPH_QUERIES.generation).get() as { generation: string }
+    expect(row.generation).toBe(generation)
+    expect(BigInt(row.generation)).toBe(9223372036854775807n)
   })
 })
 
@@ -108,16 +123,18 @@ describe('rebuildBudget (§9.10)', () => {
     })
   })
 
-  // The count is a NUMERIC key: written to `value` it would read back as the
-  // string '2' and the >= MAX_AUTO_REBUILDS_PER_SESSION comparison would be a
-  // string compare, exactly the trap value_int exists to close.
-  it('returns null for a count written to the text column', () => {
-    db.prepare(
-      "INSERT INTO graph_meta(key, value, value_int) VALUES ('auto_rebuild_count', '2', NULL)"
-    ).run()
-    expect(
-      (db.prepare(GRAPH_QUERIES.rebuildBudget).get() as { autoRebuildCount: number | null })
-        .autoRebuildCount
-    ).toBeNull()
+  // [20]: the count is a NUMERIC key. Writing it to `value` would read back as
+  // the string '2' and the >= MAX_AUTO_REBUILDS_PER_SESSION comparison would be a
+  // string compare — the exact trap `value_int` closes. The per-key column
+  // discipline CHECK now makes the mis-columned write impossible at all, rather
+  // than merely reading back NULL.
+  it('refuses a count written to the text column', () => {
+    expect(() =>
+      db
+        .prepare(
+          "INSERT INTO graph_meta(key, value, value_int) VALUES ('auto_rebuild_count', '2', NULL)"
+        )
+        .run()
+    ).toThrow(/CHECK constraint failed/)
   })
 })

@@ -100,7 +100,11 @@ export interface IGraphReadConnection {
    * generation-scoped cache.
    *
    * @param dbPath - Absolute path to `graph.db`
-   * @param generation - Token from the worker's `ready` reply
+   * @param generation - The rebuild token. It crosses IPC and lives on disk as a
+   *   decimal string (`GraphGenerationSchema`, D5); this in-process API is the
+   *   **only** hop where it is a `bigint`. The worker adapter converts with
+   *   `BigInt(ready.generation)` before calling this, and the status-snapshot
+   *   builder converts back with `generation().toString()`.
    */
   attach(dbPath: string, generation: bigint): void
 
@@ -109,6 +113,11 @@ export interface IGraphReadConnection {
 
   isAttached(): boolean
 
+  /**
+   * The attached handle's rebuild token, as a `bigint` (the sole in-process
+   * form). The snapshot builder stringifies it via `GraphGenerationSchema`; on
+   * disk and on the wire it is a decimal string (D5).
+   */
   generation(): bigint
 
   /**
