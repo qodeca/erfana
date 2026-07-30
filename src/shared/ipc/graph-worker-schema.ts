@@ -18,6 +18,7 @@
 import { z } from 'zod'
 import { GRAPH } from '../graph-constants'
 import {
+  ConfinedRelativePathSchema,
   GraphErrorCodeSchema,
   GraphGenerationSchema,
   GraphReindexMode,
@@ -94,8 +95,10 @@ const GraphWorkerEnvelope = {
  * nothing logged. The sole writer to disk is not the boundary to be lenient at.
  */
 export const GraphWorkerBatchEntrySchema = z.strictObject({
-  /** Project-relative, NFC. The worker derives `path_key` itself. */
-  path: z.string().min(1).max(4096),
+  /** Project-relative, NFC. The worker derives `path_key` itself. Confined
+   *  because a batch is the write path into the index: an absolute or `..`
+   *  entry here is a read-into-index primitive. */
+  path: ConfinedRelativePathSchema(4096),
   op: z.enum(['upsert', 'delete', 'deleteSubtree'])
 })
 export type GraphWorkerBatchEntry = z.output<typeof GraphWorkerBatchEntrySchema>
@@ -152,6 +155,10 @@ export const GraphWorkerSkipSchema = z.object({
    * ABSOLUTE — the worker's own view, hence the 4096 ceiling. Main projects it
    * to project-relative and truncates to `GRAPH.MAX_STATUS_PATH_LENGTH` before
    * it becomes `GraphRecentSkip.relativePath` (#29).
+   *
+   * Deliberately NOT `ConfinedRelativePathSchema`: this path is absolute by
+   * design, so confining it would reject every real payload. Confinement is
+   * applied downstream, on the projected `relativePath`.
    */
   path: z.string().min(1).max(4096),
   /** `GRAPH_INDEX_FILE_UNREADABLE` | `_FILE_TOO_LARGE` | `_PARSE_FAILED`. */
@@ -223,6 +230,10 @@ export const GraphWorkerProgressSchema = z.object({
    * which would fail the status snapshot rather than the field.
    *
    * IPC-payload only; never logged raw (§9.8).
+   *
+   * Deliberately NOT `ConfinedRelativePathSchema`: this is the worker's absolute
+   * filesystem view, so confining it would reject every real payload.
+   * Confinement is applied downstream, on the projected/truncated status path.
    */
   currentFilePath: z.string().max(4096).nullable()
 })

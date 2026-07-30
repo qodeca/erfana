@@ -25,7 +25,12 @@
  */
 import { z } from 'zod'
 import { GRAPH } from '../graph-constants'
-import { GraphErrorCodeSchema, GraphErrorSchema, GraphGenerationSchema } from './graph-error-schema'
+import {
+  ConfinedRelativePathSchema,
+  GraphErrorCodeSchema,
+  GraphErrorSchema,
+  GraphGenerationSchema
+} from './graph-error-schema'
 
 /**
  * Six members. `error` is deliberately absent: every plausible producer is
@@ -59,16 +64,21 @@ export const GraphProgressSchema = z.object({
    *  in this payload — an unbounded string pushed at `MAX_STATUS_PUSH_RATE_HZ`
    *  is the one field with no ceiling at all, and a ceiling that disagrees with
    *  its siblings blanks the snapshot instead. #29 truncates; this is a
-   *  backstop. */
-  currentFilePath: z.string().max(GRAPH.MAX_STATUS_PATH_LENGTH).nullable(),
+   *  backstop — hence `truncatable`, so a byte-truncated trailing `..` does not
+   *  fail the whole snapshot (see `isConfinedTruncatedPath`). */
+  currentFilePath: ConfinedRelativePathSchema(GRAPH.MAX_STATUS_PATH_LENGTH, {
+    truncatable: true
+  }).nullable(),
   startedAtMs: z.number().int().nonnegative()
 })
 export type GraphProgress = z.output<typeof GraphProgressSchema>
 
 export const GraphRecentSkipSchema = z.object({
   code: GraphErrorCodeSchema,
-  /** IPC-payload only; never logged (§9.8). #29 truncates to the bound. */
-  relativePath: z.string().max(GRAPH.MAX_STATUS_PATH_LENGTH)
+  /** IPC-payload only; never logged (§9.8). #29 truncates to the bound, so
+   *  confinement is `truncatable` — a severed trailing `..` must not blank the
+   *  skip surface. */
+  relativePath: ConfinedRelativePathSchema(GRAPH.MAX_STATUS_PATH_LENGTH, { truncatable: true })
 })
 export type GraphRecentSkip = z.output<typeof GraphRecentSkipSchema>
 
@@ -76,7 +86,11 @@ export const GraphStatusSnapshotSchema = z.object({
   /** Absolute, and the only absolute path on this boundary — the Settings panel
    *  names the directory being indexed. Keeps the 4096 absolute-path ceiling
    *  rather than `MAX_STATUS_PATH_LENGTH`: it is one field per snapshot, not a
-   *  per-file array, and truncating a project root would misname it. */
+   *  per-file array, and truncating a project root would misname it.
+   *
+   *  Deliberately NOT `ConfinedRelativePathSchema`: it is absolute by design, so
+   *  confinement would reject every real payload. Do not "fix" this to match the
+   *  confined sibling paths. */
   projectPath: z.string().max(4096).nullable(),
   state: GraphIndexState,
   dot: GraphStatusDot,
@@ -87,9 +101,11 @@ export const GraphStatusSnapshotSchema = z.object({
   queueDepth: z.number().int().nonnegative(),
   /** FR-038. Project-relative, bounded in count and in element length — an
    *  uncapped preview is ~80 KB per snapshot at the push rate. IPC-payload only
-   *  (§9.8). #29 truncates each entry to the bound. */
+   *  (§9.8). #29 truncates each entry to the bound, so each element uses
+   *  `truncatable` confinement (a severed trailing `..` must not blank the
+   *  preview). */
   queuedFilePaths: z
-    .array(z.string().max(GRAPH.MAX_STATUS_PATH_LENGTH))
+    .array(ConfinedRelativePathSchema(GRAPH.MAX_STATUS_PATH_LENGTH, { truncatable: true }))
     .max(GRAPH.MAX_QUEUE_PREVIEW),
   /** Bounded per-file skip surface, so `GRAPH_INDEX_PARSE_FAILED` has somewhere
    *  to go other than thrashing `lastError` across a 10k-file pass. */

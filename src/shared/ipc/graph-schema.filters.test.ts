@@ -43,15 +43,32 @@ describe('GraphSearchFiltersSchema', () => {
       expect(GraphSearchFiltersSchema.parse({ folder: 'a/b/c' }).folder).toBe('a/b/c/')
     })
 
-    // Recorded behaviour, not an endorsement: the schema has no `.min(1)`, so an
-    // empty folder becomes '/'. That is fail-closed — no project-relative
-    // path_key starts with '/' — but a caller must not read it as "no filter".
-    it("turns an empty folder into '/', which matches nothing", () => {
-      expect(GraphSearchFiltersSchema.parse({ folder: '' }).folder).toBe('/')
+    // Confinement now runs AFTER the transform: an empty folder becomes '/',
+    // which `isConfinedRelativePath` rejects as a leading-slash absolute. So the
+    // schema fails closed by REJECTING rather than by yielding a '/' the caller
+    // must remember not to read as "no filter". This also makes B3's proposed
+    // `.min(1)` redundant — confinement already refuses ''.
+    it("rejects an empty folder rather than yielding '/'", () => {
+      expect(GraphSearchFiltersSchema.safeParse({ folder: '' }).success).toBe(false)
     })
 
     it('rejects an over-length folder', () => {
       expect(GraphSearchFiltersSchema.safeParse({ folder: 'x'.repeat(1025) }).success).toBe(false)
+    })
+
+    // Confinement is applied to the transformed value, so a `..`-bearing or
+    // absolute folder is refused rather than prefix-matched into the corpus.
+    // (ADS/reserved-name checks target a basename; a folder's basename is empty
+    // after the trailing-slash transform, so those are covered on file fields.)
+    it.each(['../secret', '/etc', 'C:\\Windows', 'docs/../../etc'])(
+      'rejects the unconfined folder %j',
+      (folder) => {
+        expect(GraphSearchFiltersSchema.safeParse({ folder }).success).toBe(false)
+      }
+    )
+
+    it('still accepts and terminates a legitimate nested folder', () => {
+      expect(GraphSearchFiltersSchema.parse({ folder: 'docs/api' }).folder).toBe('docs/api/')
     })
   })
 
@@ -110,9 +127,21 @@ describe('GraphSearchFiltersSchema', () => {
     ['a zero excludeSectionId', { excludeSectionId: 0 }],
     ['a negative modifiedAfterMs', { modifiedAfterMs: -1 }],
     ['a fractional modifiedBeforeMs', { modifiedBeforeMs: 1.5 }],
-    ['an over-length excludeFilePath', { excludeFilePath: 'x'.repeat(4097) }]
+    ['an over-length excludeFilePath', { excludeFilePath: 'x'.repeat(4097) }],
+    // excludeFilePath is now confined like every other file path on the boundary.
+    ['an absolute excludeFilePath', { excludeFilePath: '/etc/passwd' }],
+    ['a traversal excludeFilePath', { excludeFilePath: '../a.md' }],
+    ['a drive-qualified excludeFilePath', { excludeFilePath: 'C:\\x' }],
+    ['an NTFS ADS excludeFilePath', { excludeFilePath: 'notes.md:hidden' }],
+    ['a reserved-name excludeFilePath', { excludeFilePath: 'COM1' }]
   ])('rejects %s', (_label, payload) => {
     expect(GraphSearchFiltersSchema.safeParse(payload).success).toBe(false)
+  })
+
+  it('accepts an ordinary project-relative excludeFilePath', () => {
+    expect(GraphSearchFiltersSchema.parse({ excludeFilePath: 'docs/notes.md' }).excludeFilePath).toBe(
+      'docs/notes.md'
+    )
   })
 })
 

@@ -24,11 +24,14 @@
  */
 import { describe, it, expect } from 'vitest'
 import { ErrorCode } from '../errors'
+import { GRAPH } from '../graph-constants'
 import {
+  ConfinedRelativePathSchema,
   GRAPH_ERROR_CODES,
   GraphErrorCodeSchema,
   GraphErrorSchema,
-  isConfinedRelativePath
+  isConfinedRelativePath,
+  isConfinedTruncatedPath
 } from './graph-error-schema'
 import { GraphErrorSchema as ErrorSchemaFromGraphSchema } from './graph-schema'
 
@@ -140,6 +143,29 @@ describe('isConfinedRelativePath', () => {
     expect(isConfinedRelativePath(p)).toBe(false)
   })
 
+  // [28] NTFS alternate-data-stream and Windows reserved device names, rejected
+  // UNCONDITIONALLY (D3) — the same on the ubuntu and Windows CI jobs, because
+  // `src/shared/` has no platform signal to branch on.
+  it.each([
+    ['an NTFS ADS colon', 'notes.md:hidden'],
+    ['an ADS colon in a subdir', 'docs/notes.md:hidden'],
+    ['a reserved device name', 'COM1'],
+    ['a reserved name lower-case', 'com1'],
+    ['NUL', 'NUL'],
+    ['a reserved name with extension', 'CON.md'],
+    ['a reserved name in a subdir', 'docs/NUL']
+  ])('rejects %s (%j)', (_label, p) => {
+    expect(isConfinedRelativePath(p)).toBe(false)
+  })
+
+  // The reserved list only matches whole reserved basenames, not substrings.
+  it.each(['COM10', 'COMP1/a.md', 'console.md', 'docs/COM1x.md'])(
+    'still accepts the look-alike %j that is not reserved',
+    (p) => {
+      expect(isConfinedRelativePath(p)).toBe(true)
+    }
+  )
+
   // S-M1: Win32 strips trailing spaces and periods from every path component,
   // so each of these resolves to `..` on the platform Erfana ships on, and
   // exact segment equality accepted all of them.
@@ -163,4 +189,70 @@ describe('isConfinedRelativePath', () => {
       expect(isConfinedRelativePath(p)).toBe(true)
     }
   )
+})
+
+// The shared factory the seven confined fields all use. Exercised directly here
+// with the adversarial corpus §7 names, so the guarantee is proven once and the
+// per-field tests only confirm the wiring.
+describe('ConfinedRelativePathSchema (§7)', () => {
+  const schema = ConfinedRelativePathSchema(GRAPH.MAX_STATUS_PATH_LENGTH)
+
+  it('accepts an ordinary project-relative path', () => {
+    expect(schema.parse('docs/notes.md')).toBe('docs/notes.md')
+  })
+
+  // Identical outcome on every platform (D3): no branch, so this row passes on
+  // the ubuntu and Windows CI jobs alike.
+  it.each([
+    ['a POSIX absolute', '/etc/passwd'],
+    ['a Windows drive path', 'C:\\x'],
+    ['a traversal', '../a.md'],
+    ['a Win32-normalised traversal', '.. /a.md'],
+    ['an NTFS ADS', 'notes.md:hidden'],
+    ['a reserved device name', 'COM1'],
+    ['NUL', 'NUL'],
+    ['an empty string', '']
+  ])('rejects %s (%j)', (_label, p) => {
+    expect(schema.safeParse(p).success).toBe(false)
+  })
+
+  it('enforces the parameterised length bound', () => {
+    const tight = ConfinedRelativePathSchema(8)
+    expect(tight.safeParse('docs/a.md').success).toBe(false)
+    expect(tight.safeParse('docs/.md').success).toBe(true)
+  })
+})
+
+// Truncation safety: #29 truncates the three status paths at a BYTE boundary,
+// which can sever a segment into a spurious trailing `..`. The `truncatable`
+// predicate keeps the schema a genuine backstop (it still rejects real
+// escapes) rather than a landmine that blanks the panel over a cosmetic trim.
+describe('isConfinedTruncatedPath (truncation safety)', () => {
+  it('accepts a path whose ONLY traversal is a truncated trailing segment', () => {
+    // A legal path severed at MAX_STATUS_PATH_LENGTH so its tail becomes `..`.
+    const truncated = `${'a'.repeat(GRAPH.MAX_STATUS_PATH_LENGTH - 3)}/..evil/x.md`.slice(
+      0,
+      GRAPH.MAX_STATUS_PATH_LENGTH
+    )
+    expect(truncated).toHaveLength(GRAPH.MAX_STATUS_PATH_LENGTH)
+    expect(truncated.endsWith('/..')).toBe(true)
+    // The tolerant predicate accepts it; strict confinement does NOT — proving
+    // the two differ and the status backstop is genuinely looser only here.
+    expect(isConfinedTruncatedPath(truncated)).toBe(true)
+    expect(isConfinedRelativePath(truncated)).toBe(false)
+  })
+
+  it('still rejects a real escape that a truncated tail cannot explain', () => {
+    // A leading traversal or a non-final `..` is never a truncation artefact.
+    expect(isConfinedTruncatedPath('../secret')).toBe(false)
+    expect(isConfinedTruncatedPath('a/../../x')).toBe(false)
+    expect(isConfinedTruncatedPath('/etc/passwd')).toBe(false)
+    expect(isConfinedTruncatedPath('C:\\x')).toBe(false)
+  })
+
+  it('accepts ordinary paths exactly as strict confinement does', () => {
+    for (const p of ['docs/notes.md', 'a.md', 'v1.2.3/notes.md']) {
+      expect(isConfinedTruncatedPath(p)).toBe(true)
+    }
+  })
 })

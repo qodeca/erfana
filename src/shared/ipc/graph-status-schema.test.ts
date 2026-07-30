@@ -342,6 +342,77 @@ describe('GraphStatusSnapshotSchema', () => {
       })
       expect(parsed.progress?.processedFiles).toBe(5)
     })
+
+    // The three status paths are confined like every other file path on the
+    // boundary. currentFilePath is nullable, so null still parses.
+    it.each(['/etc/passwd', '../a.md', 'C:\\x', 'notes.md:hidden', 'COM1'])(
+      'rejects the unconfined currentFilePath %j',
+      (currentFilePath) => {
+        expect(GraphProgressSchema.safeParse({ ...PROGRESS, currentFilePath }).success).toBe(false)
+      }
+    )
+  })
+
+  describe('confined status paths', () => {
+    const PROGRESS = {
+      jobId: 'job-1-abcdef012345',
+      processedFiles: 5,
+      totalFiles: 10,
+      skippedFiles: 1,
+      currentFilePath: 'docs/a.md',
+      startedAtMs: 1_700_000_000_000
+    }
+
+    it.each(['/etc/passwd', '../a.md', 'C:\\x', 'notes.md:hidden', 'COM1'])(
+      'rejects an unconfined queuedFilePaths entry %j',
+      (path) => {
+        expect(
+          GraphStatusSnapshotSchema.safeParse({ ...VALID_SNAPSHOT, queuedFilePaths: [path] }).success
+        ).toBe(false)
+      }
+    )
+
+    it.each(['/etc/passwd', '../a.md', 'notes.md:hidden', 'NUL'])(
+      'rejects an unconfined recentSkips relativePath %j',
+      (relativePath) => {
+        expect(
+          GraphStatusSnapshotSchema.safeParse({
+            ...VALID_SNAPSHOT,
+            recentSkips: [{ code: ErrorCode.GRAPH_INDEX_PARSE_FAILED, relativePath }]
+          }).success
+        ).toBe(false)
+      }
+    )
+
+    // projectPath is deliberately EXEMPT — absolute by design — and must still
+    // parse, or the Settings panel could never name the indexed directory.
+    it('still accepts an absolute projectPath', () => {
+      const parsed = GraphStatusSnapshotSchema.parse({
+        ...VALID_SNAPSHOT,
+        projectPath: '/Users/x/Projects/erfana'
+      })
+      expect(parsed.projectPath).toBe('/Users/x/Projects/erfana')
+    })
+
+    // Truncation safety: #29 truncates the three status paths at a BYTE
+    // boundary, which can sever a segment into a spurious trailing `..`. The
+    // status schema tolerates that (backstop, not enforcement point) so a
+    // cosmetic trim never blanks the panel — while a real escape still fails.
+    it('accepts a path truncated at MAX_STATUS_PATH_LENGTH into a trailing ..', () => {
+      const truncated = `${'a'.repeat(GRAPH.MAX_STATUS_PATH_LENGTH - 3)}/..evil/x.md`.slice(
+        0,
+        GRAPH.MAX_STATUS_PATH_LENGTH
+      )
+      expect(truncated).toHaveLength(GRAPH.MAX_STATUS_PATH_LENGTH)
+      expect(truncated.endsWith('/..')).toBe(true)
+      expect(GraphProgressSchema.safeParse({ ...PROGRESS, currentFilePath: truncated }).success).toBe(
+        true
+      )
+      expect(
+        GraphStatusSnapshotSchema.safeParse({ ...VALID_SNAPSHOT, queuedFilePaths: [truncated] })
+          .success
+      ).toBe(true)
+    })
   })
 })
 

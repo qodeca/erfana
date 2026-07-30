@@ -92,13 +92,19 @@ export const GraphSearchFiltersBaseSchema = z.strictObject({
    * yields. The transform is why z.input !== z.output here (M14/M17).
    */
   folder: z.string().max(1024)
-    .transform((s) => (s.endsWith('/') ? s : `${s}/`)).optional(),
+    .transform((s) => (s.endsWith('/') ? s : `${s}/`))
+    // Confinement runs AFTER the transform, so it validates the '/'-terminated
+    // value that flows downstream: a trailing '/' is confined, a leading one is
+    // not. It also rejects '' (the transform yields '/'), so B3's `.min(1)` is
+    // redundant with confinement and is NOT added.
+    .refine(isConfinedRelativePath).optional(),
   /** Lowercase, leading dot. 'md' / '.MD' / '*.md' previously returned zero rows
    *  with error:null — indistinguishable from a genuine no-match (M17). */
   fileType: z.string().regex(/^\.[a-z0-9]+$/).max(16).optional(),
   modifiedAfterMs: z.number().int().nonnegative().optional(),
   modifiedBeforeMs: z.number().int().nonnegative().optional(),
-  excludeFilePath: z.string().max(4096).optional(),
+  /** Confined like every file path on the boundary (§9.5). */
+  excludeFilePath: ConfinedRelativePathSchema(4096).optional(),
   /** AC-018: omit the CURRENT section, keeping sibling sections eligible. */
   excludeSectionId: z.number().int().positive().optional()
 })
@@ -321,12 +327,16 @@ export const GraphProgressSchema = z.object({
   totalFiles: z.number().int().nonnegative(),
   skippedFiles: z.number().int().nonnegative(),
   // Project-relative, bounded by the ONE status-surface ceiling; IPC-payload
-  // only, never logged raw (§9.6)
-  currentFilePath: z.string().max(GRAPH.MAX_STATUS_PATH_LENGTH).nullable(),
+  // only, never logged raw (§9.6). `truncatable`: #29 truncates at a BYTE
+  // boundary, so a severed trailing `..` must not blank the snapshot (§9.5).
+  currentFilePath:
+    ConfinedRelativePathSchema(GRAPH.MAX_STATUS_PATH_LENGTH, { truncatable: true }).nullable(),
   startedAtMs: z.number().int().nonnegative()
 })
 
 export const GraphStatusSnapshotSchema = z.object({
+  /** Absolute by design — the only absolute path on this boundary — so
+   *  deliberately NOT confined; confinement would reject every real payload. */
   projectPath: z.string().max(4096).nullable(),
   state: GraphIndexState,
   dot: GraphStatusDot,
@@ -335,13 +345,14 @@ export const GraphStatusSnapshotSchema = z.object({
   searchAvailable: z.boolean(),
   progress: GraphProgressSchema.nullable(),
   queueDepth: z.number().int().nonnegative(),
-  queuedFilePaths: z.array(z.string().max(GRAPH.MAX_STATUS_PATH_LENGTH))
-    .max(GRAPH.MAX_QUEUE_PREVIEW),  // FR-038, m7
+  queuedFilePaths: z.array(
+    ConfinedRelativePathSchema(GRAPH.MAX_STATUS_PATH_LENGTH, { truncatable: true })
+  ).max(GRAPH.MAX_QUEUE_PREVIEW),  // FR-038, m7
   /** Bounded per-file skip surface, so GRAPH_INDEX_PARSE_FAILED has somewhere to
    *  go other than thrashing `lastError` across a 10k-file pass (m9). */
   recentSkips: z.array(z.object({
     code: GraphErrorCodeSchema,
-    relativePath: z.string().max(GRAPH.MAX_STATUS_PATH_LENGTH)
+    relativePath: ConfinedRelativePathSchema(GRAPH.MAX_STATUS_PATH_LENGTH, { truncatable: true })
   })).max(GRAPH.MAX_RECENT_SKIPS),
   stale: z.boolean(),
   lastError: GraphErrorSchema.nullable(),
@@ -379,6 +390,8 @@ export const GraphStatusChangePayloadSchema = z.object({
 **Push rate — MIN, not MAX (m7).** Emit when `elapsed ≥ GRAPH.STATUS_PUSH_MIN_INTERVAL_MS` **AND** (a file was processed **or** the state changed). Revision 2's `OR` gave the combined rate no ceiling: at 2000 files/s — plausible, since NFR-002 is a floor — that is 40 pushes/s, each composed, `safeParse`d, structure-cloned, broadcast to every window and committed into React, with `queuedFilePaths` uncapped in string length at ~80 KB/snapshot ≈ 3 MB/s arriving precisely when the machine is saturated. `GRAPH.MAX_STATUS_PUSH_RATE_HZ` (10) is the stated ceiling; element length is capped at `GRAPH.MAX_STATUS_PATH_LENGTH`. State transitions and terminal snapshots still emit immediately and are never dropped. AC-011's "at least every 50 files" holds because a file-processed tick always accompanies the interval.
 
 **One ceiling for relative paths on the status surface (M6).** Revision 3 bounded `currentFilePath` at 4096 and `queuedFilePaths` / `recentSkips[].relativePath` / `GraphError.relativePath` at 1024, which made a 1025–4096-character path clear the worker boundary (`GraphWorkerSkipSchema.path`, `GraphWorkerProgressSchema.currentFilePath` — both 4096, both **absolute**, correctly so) and then fail `GraphStatusSnapshotSchema` **as a whole** — blanking the indicator whose job is to report the skip, exactly the failure mode `lastAutoRebuildReason` above is worded to avoid. Resolved with `GRAPH.MAX_STATUS_PATH_LENGTH` (1024) applied to all four relative-path fields. `projectPath` keeps 4096: it is absolute, one per snapshot, and truncating a project root misnames it. **The producer truncates.** `GraphStatusPublisher` (#29) projects worker-absolute → project-relative and truncates to the bound; the zod `.max()` is a backstop, never the enforcement point, because over-length must be impossible by construction rather than rejected at the boundary.
+
+**Truncation-safe confinement (§9.5).** The three status paths are also confined — `ConfinedRelativePathSchema` refuses absolutes, `..`, NTFS ADS colons and Windows reserved device basenames — but with the `truncatable` variant (`isConfinedTruncatedPath`). #29 truncates at a **byte** boundary, which can sever a segment into a spurious trailing `..`; under strict confinement that lone artefact would fail the whole snapshot and blank the panel over a cosmetic trim — the very failure mode the backstop exists to avoid. The truncatable predicate keeps every structural guard and every **non-final** traversal segment (so `../secret`, `a/../../x` and `../..` are still rejected) but exempts the **final** segment from the `..` check, because that is the one a byte-truncation can corrupt. This keeps the schema a genuine backstop rather than a landmine; the alternative (contracting #29 to truncate on a segment boundary) would make the schema reject legitimate producer output on any naive future edit.
 
 Delivered via `broadcastToAllWindows` (`ipcBroadcast.ts:26`) — one project per process, so every window shows the same state. Re-validated with `safeParse` immediately before `send`, mirroring `claude-status-handlers.ts:90-103`.
 
@@ -479,10 +492,15 @@ export const GraphMcpToolArgsSchema = GraphSearchRequestBaseSchema
  *  rejects C0 except tab/newline and all of C1, which is what carries ANSI
  *  escapes and Erfana's char(2)/char(3)/char(4) snippet sentinels. The .max() is
  *  a CHARACTER backstop; #30 still measures the serialised byte size. */
+// filePath is the one result field that is ALSO a path, so it is confined on top
+// of the sentinel/bounds check (project-relative, no `..`, no ADS colon, no
+// reserved device name): McpFilePath = ConfinedRelativePathSchema(MAX_RESULT_BYTES)
+// .refine(isControlCharFree). This makes the "never absolute" clause enforceable
+// at the external-client boundary. heading/snippet are free text, not paths.
 export const GraphMcpToolResultSchema = z.object({
   untrustedContentNotice: z.string().min(1),
   results: z.array(z.object({
-    filePath: McpText, heading: McpText, snippet: McpText, score: z.number()
+    filePath: McpFilePath, heading: McpText, snippet: McpText, score: z.number()
   })).max(MCP.MAX_TOP_K),
   truncated: z.boolean()
 })

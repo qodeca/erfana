@@ -273,6 +273,24 @@ describe('main → worker requests', () => {
       expect(GraphWorkerBatchEntrySchema.safeParse({ path: '', op: 'upsert' }).success).toBe(false)
     })
 
+    // The batch is the write path INTO the index, so an absolute, traversal, ADS
+    // or reserved-name entry is a read-into-index primitive — now confined.
+    it.each([
+      ['a POSIX absolute', '/etc/passwd'],
+      ['a traversal', '../a.md'],
+      ['a drive path', 'C:\\x'],
+      ['an NTFS ADS', 'notes.md:hidden'],
+      ['a reserved device name', 'COM1']
+    ])('rejects %s (%j) on a batch entry', (_label, path) => {
+      expect(GraphWorkerBatchEntrySchema.safeParse({ path, op: 'upsert' }).success).toBe(false)
+    })
+
+    it('accepts an ordinary project-relative batch path', () => {
+      expect(GraphWorkerBatchEntrySchema.parse({ path: 'docs/notes.md', op: 'upsert' }).path).toBe(
+        'docs/notes.md'
+      )
+    })
+
     it('accepts a batch at exactly MAX_BATCH_SIZE', () => {
       const batch = Array.from({ length: GRAPH.MAX_BATCH_SIZE }, (_, i) => ({
         path: `a${i}.md`,

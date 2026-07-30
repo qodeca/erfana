@@ -36,6 +36,7 @@
 import { z } from 'zod'
 import { GRAPH } from '../graph-constants'
 import {
+  ConfinedRelativePathSchema,
   GraphErrorCodeSchema,
   GraphErrorSchema,
   isConfinedRelativePath
@@ -48,11 +49,13 @@ import type {
 // ─── re-exports (single import path for the boundary) ────────────────────────
 
 export {
+  ConfinedRelativePathSchema,
   GRAPH_ERROR_CODES,
   GraphErrorCodeSchema,
   GraphErrorSchema,
   GraphGenerationSchema,
-  isConfinedRelativePath
+  isConfinedRelativePath,
+  isConfinedTruncatedPath
 } from './graph-error-schema'
 export type { GraphError, GraphErrorCode } from './graph-error-schema'
 
@@ -103,6 +106,14 @@ export const GraphSearchFiltersBaseSchema = z.strictObject({
     .string()
     .max(1024)
     .transform((s) => (s.endsWith('/') ? s : `${s}/`))
+    // Refine AFTER the transform, so confinement validates the value that flows
+    // downstream (the `/`-terminated form): a trailing `/` is confined, a
+    // leading one is not. This also rejects `''` — the transform turns it into
+    // `'/'`, which `isConfinedRelativePath` refuses — so B3's proposed `.min(1)`
+    // is redundant with confinement and is deliberately NOT added.
+    .refine(isConfinedRelativePath, {
+      message: 'folder must be a project-relative path with no ".." segment'
+    })
     .optional(),
   /** Lowercase, leading dot. `'md'` / `'.MD'` / `'*.md'` are rejected rather than
    *  returning zero rows with `error: null`, which is indistinguishable from a
@@ -114,7 +125,7 @@ export const GraphSearchFiltersBaseSchema = z.strictObject({
     .optional(),
   modifiedAfterMs: z.number().int().nonnegative().optional(),
   modifiedBeforeMs: z.number().int().nonnegative().optional(),
-  excludeFilePath: z.string().max(4096).optional(),
+  excludeFilePath: ConfinedRelativePathSchema(4096).optional(),
   /** AC-018: omit the CURRENT section, keeping sibling sections eligible. */
   excludeSectionId: z.number().int().positive().optional()
 })

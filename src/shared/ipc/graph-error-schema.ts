@@ -22,9 +22,10 @@
  */
 import { z } from 'zod'
 import { ErrorCode } from '../errors'
-// `graph-constants.ts` has zero imports of its own, so this cannot re-enter the
-// layering cycle the header forbids.
+// `graph-constants.ts` and `win32-reserved.ts` both have zero imports of their
+// own, so neither can re-enter the layering cycle the header forbids.
 import { GRAPH } from '../graph-constants'
+import { WIN32_RESERVED_BASENAMES } from '../win32-reserved'
 
 /**
  * The 26 error codes producible on a graph or MCP channel.
@@ -111,7 +112,58 @@ function isTraversalSegment(segment: string): boolean {
 }
 
 /**
- * True when `p` is a non-empty, project-relative path with no `..` segment.
+ * The final path component, split on either separator with simple string logic.
+ *
+ * Deliberately NOT `node:path.basename`: this module is renderer-reachable (it
+ * is pulled in through the IPC layer) and `process.platform` is `undefined`
+ * under the sandbox, so a platform-aware path parser is both unavailable and
+ * wrong to use in a cross-boundary contract.
+ */
+function basenameOf(p: string): string {
+  const cut = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'))
+  return cut === -1 ? p : p.slice(cut + 1)
+}
+
+/**
+ * True when the path's basename is an NTFS alternate-data-stream reference
+ * (`notes.md:hidden`) or a Windows reserved device name (`COM1`, `NUL`,
+ * `CON.md`).
+ *
+ * **Unconditional, not platform-gated (D3).** `src/shared/` has no platform
+ * signal and may not read `process.platform`, and a schema that validated
+ * differently per process would be a per-boundary contract, not one contract.
+ * The trade-off — `notes.md:hidden` is a legal POSIX filename — is accepted: a
+ * colon in a project-relative Markdown path is pathological, and this module
+ * already rejects UNC and drive paths unconditionally on the same reasoning.
+ *
+ * Mirrors the basename-only check in `LocalWhisperService.validateAudioPath`
+ * (colon anywhere in the basename → ADS; name-without-extension in the reserved
+ * set → device name), and shares {@link WIN32_RESERVED_BASENAMES} with it so the
+ * two lists cannot drift (D4).
+ *
+ * @see src/main/services/LocalWhisperService.ts - validateAudioPath
+ */
+function hasWin32ReservedOrAdsBasename(p: string): boolean {
+  const base = basenameOf(p)
+  // NTFS ADS: a colon in the basename (a drive-letter colon is a whole-path
+  // concern, handled by the drive-qualified reject in the callers).
+  if (base.includes(':')) return true
+  const nameSansExt = base.replace(/\.[^.]*$/, '').toUpperCase()
+  return WIN32_RESERVED_BASENAMES.has(nameSansExt)
+}
+
+/** The structural checks a confined path must pass regardless of truncation. */
+function hasConfinedPrefix(p: string): boolean {
+  if (p.length === 0) return false
+  if (p.startsWith('/') || p.startsWith('\\')) return false
+  if (/^[A-Za-z]:/.test(p)) return false
+  if (hasWin32ReservedOrAdsBasename(p)) return false
+  return true
+}
+
+/**
+ * True when `p` is a non-empty, project-relative path with no `..` segment, no
+ * NTFS ADS colon and no Windows reserved device basename.
  *
  * Rejects POSIX absolutes, Windows drive-qualified paths and UNC paths, in both
  * separator conventions, because the indexer reads whatever it is handed — an
@@ -123,10 +175,63 @@ function isTraversalSegment(segment: string): boolean {
  * @see specs/designs/sd-021-cross-cutting.md §9.5 (c) - path confinement
  */
 export function isConfinedRelativePath(p: string): boolean {
-  if (p.length === 0) return false
-  if (p.startsWith('/') || p.startsWith('\\')) return false
-  if (/^[A-Za-z]:/.test(p)) return false
+  if (!hasConfinedPrefix(p)) return false
   return !p.split(/[/\\]/).some(isTraversalSegment)
+}
+
+/**
+ * Truncation-tolerant confinement for the status paths (`currentFilePath`,
+ * `recentSkips[].relativePath`, `queuedFilePaths[]`).
+ *
+ * #29 truncates those three at `MAX_STATUS_PATH_LENGTH` on a **byte** boundary,
+ * which can sever a segment into a spurious trailing `..` (dots are ubiquitous
+ * in real paths). Under strict {@link isConfinedRelativePath} that lone
+ * artefact would fail the WHOLE snapshot's `safeParse` and blank the status
+ * panel over a cosmetic trim — turning a schema documented as "a backstop, never
+ * the enforcement point" into a landmine.
+ *
+ * The fix keeps every structural guard (no absolute, drive, UNC, ADS or reserved
+ * name) and every NON-final traversal segment — so `../secret`, `a/../../x` and
+ * `../..` are still rejected — but exempts the FINAL segment from the traversal
+ * check, because it is the one a byte-truncation can corrupt. A genuine escape
+ * needs a traversal segment that is not last (there is real path after it) or a
+ * leading `../`, both of which remain refused.
+ */
+export function isConfinedTruncatedPath(p: string): boolean {
+  if (!hasConfinedPrefix(p)) return false
+  const segments = p.split(/[/\\]/)
+  return !segments.slice(0, -1).some(isTraversalSegment)
+}
+
+const CONFINED_PATH_MESSAGE =
+  'must be a project-relative path with no ".." segment, NTFS ADS colon or reserved device name'
+
+/**
+ * Factory for the shared confined-relative-path field: a bounded, non-empty
+ * string refined by {@link isConfinedRelativePath}. The length bound `n` is the
+ * only free parameter — each boundary passes its own ceiling
+ * (`MAX_STATUS_PATH_LENGTH` on the status surface, `4096`/`MAX_RESULT_BYTES`
+ * elsewhere).
+ *
+ * `truncatable: true` swaps in {@link isConfinedTruncatedPath} for the three
+ * status paths #29 truncates, so a severed trailing `..` does not blank the
+ * snapshot (see that predicate). This second parameter exists solely to satisfy
+ * the truncation-safety contract; every other call site takes the strict
+ * default.
+ *
+ * NOTE: `folder` cannot use this factory verbatim — its `.transform()` that
+ * appends a trailing `/` must sit between `.max()` and the confinement refine —
+ * so it applies {@link isConfinedRelativePath} directly, in the correct order.
+ *
+ * @see specs/designs/sd-021-ipc-contracts.md §7 - the confined fields
+ */
+export function ConfinedRelativePathSchema(n: number, options?: { truncatable?: boolean }) {
+  const predicate = options?.truncatable ? isConfinedTruncatedPath : isConfinedRelativePath
+  return z
+    .string()
+    .min(1)
+    .max(n)
+    .refine(predicate, { message: CONFINED_PATH_MESSAGE })
 }
 
 // ─── errors ──────────────────────────────────────────────────────────────────

@@ -22,6 +22,7 @@
 import { z } from 'zod'
 import { GRAPH, MCP } from '../graph-constants'
 import {
+  ConfinedRelativePathSchema,
   GraphErrorCodeSchema,
   GraphSearchFiltersBaseSchema,
   GraphSearchRequestBaseSchema
@@ -98,13 +99,27 @@ export function isControlCharFree(value: string): boolean {
   return true
 }
 
-/** A model-facing string: sentinel-free and bounded. Applied to all three. */
+/** A model-facing string: sentinel-free and bounded. Applied to `heading` and
+ *  `snippet`, which are free text, not paths. */
 const McpTextSchema = z
   .string()
   .max(MCP.MAX_RESULT_BYTES)
   .refine(isControlCharFree, {
     message: 'must not contain C0 (except tab/newline) or C1 control characters'
   })
+
+/**
+ * `filePath` is the one result field that is also a PATH, so on top of the
+ * sentinel/bounds check it is confined: project-relative, no `..`, no NTFS ADS
+ * colon, no reserved device basename. This is what makes the "never absolute"
+ * clause in the schema JSDoc below enforceable rather than aspirational — a tool
+ * result crossing the external-client boundary cannot leak the user's
+ * home-directory layout.
+ */
+const McpFilePathSchema = ConfinedRelativePathSchema(MCP.MAX_RESULT_BYTES).refine(
+  isControlCharFree,
+  { message: 'must not contain C0 (except tab/newline) or C1 control characters' }
+)
 
 /**
  * The tool's `outputSchema`.
@@ -133,14 +148,15 @@ const McpTextSchema = z
  * reviewer would expect to catch it.
  *
  * `filePath` is display-only: project-relative, NFC, forward slashes, never
- * absolute, so a tool result cannot leak the user's home-directory layout.
+ * absolute, so a tool result cannot leak the user's home-directory layout — now
+ * enforced by {@link McpFilePathSchema}, not just documented.
  */
 export const GraphMcpToolResultSchema = z.object({
   untrustedContentNotice: z.string().min(1),
   results: z
     .array(
       z.object({
-        filePath: McpTextSchema,
+        filePath: McpFilePathSchema,
         heading: McpTextSchema,
         snippet: McpTextSchema,
         score: z.number()

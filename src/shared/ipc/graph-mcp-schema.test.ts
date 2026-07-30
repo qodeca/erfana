@@ -275,6 +275,33 @@ describe('GraphMcpToolResultSchema', () => {
       expect(isControlCharFree(STX)).toBe(false)
       expect(isControlCharFree('\u009f')).toBe(false)
     })
+
+    // filePath is the one result field that is also a PATH: the "never absolute"
+    // clause in the JSDoc is now a constraint, so a tool result crossing the
+    // external-client boundary cannot leak the home-directory layout.
+    it.each([
+      ['a POSIX absolute', '/Users/x/secret.md'],
+      ['a traversal', '../../.ssh/id_rsa'],
+      ['a drive path', 'C:\\Users\\x\\a.md'],
+      ['an NTFS ADS', 'notes.md:hidden'],
+      ['a reserved device name', 'COM1']
+    ])('rejects a filePath that is %s (%j)', (_label, filePath) => {
+      expect(
+        GraphMcpToolResultSchema.safeParse({
+          ...TOOL_RESULT,
+          results: [{ ...TOOL_RESULT.results[0], filePath }]
+        }).success
+      ).toBe(false)
+    })
+
+    it('accepts an ordinary project-relative filePath', () => {
+      expect(
+        GraphMcpToolResultSchema.parse({
+          ...TOOL_RESULT,
+          results: [{ ...TOOL_RESULT.results[0], filePath: 'docs/notes.md' }]
+        }).results[0].filePath
+      ).toBe('docs/notes.md')
+    })
   })
 
   // The model-facing result is deliberately four fields: no sectionId, no line
