@@ -30,6 +30,12 @@ export interface SeedSectionArgs {
   text?: string
   contentHash?: string
   fileId?: number
+  /** File extension stored in `files.extension`; filtered by `searchPage`'s
+   *  `:fileType`. Defaults to `.md`. Ignored when `fileId` reuses a file. */
+  extension?: string
+  /** `files.mtime_ms`; filtered by `searchPage`'s `:after`/`:before`. Defaults
+   *  to a fixed epoch. Ignored when `fileId` reuses a file. */
+  mtime?: number
 }
 
 /**
@@ -62,7 +68,9 @@ export function seedSection(db: Database, args: SeedSectionArgs = {}): number {
     ordinal = 0,
     heading = 'Alpha',
     text = 'alpha beta gamma',
-    contentHash = `hash-${text}`
+    contentHash = `hash-${text}`,
+    extension = '.md',
+    mtime = 1700000000000
   } = args
 
   let fileId = args.fileId
@@ -71,9 +79,9 @@ export function seedSection(db: Database, args: SeedSectionArgs = {}): number {
       db
         .prepare(
           `INSERT INTO files(path, path_key, extension, mtime_ms, size_bytes, file_hash, indexed_at_ms)
-           VALUES (?, ?, '.md', 1700000000000, 128, 'filehash', 1700000000001)`
+           VALUES (?, ?, ?, ?, 128, 'filehash', 1700000000001)`
         )
-        .run(path, pathKey).lastInsertRowid
+        .run(path, pathKey, extension, mtime).lastInsertRowid
     )
   }
 

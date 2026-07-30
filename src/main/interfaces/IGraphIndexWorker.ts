@@ -60,7 +60,7 @@ export interface IGraphIndexWorker {
    * already held — it never lazily opens, because it must not guess a path.
    *
    * `GRAPH_DB_OPEN_FAILED` and not a dedicated already-open code: `GRAPH_ERROR_CODES`
-   * is a closed set of 26, and a worker replying with a code outside it fails
+   * is a closed set, and a worker replying with a code outside it fails
    * the adapter's `safeParse`, is dropped as `GRAPH_WORKER_PROTOCOL`, and leaves
    * this promise hanging to its `GRAPH.WORKER_OPEN_TIMEOUT`. §8.6 already routes
    * every writer-open fault to `GRAPH_DB_OPEN_FAILED`.

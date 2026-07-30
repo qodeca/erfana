@@ -18,6 +18,11 @@
  * module is evaluated first, so the schemas built from `GraphErrorSchema` would
  * throw a temporal-dead-zone `ReferenceError` at import time.
  *
+ * A fourth tier sits ABOVE this file: `graph-worker-schema.ts` and
+ * `graph-mcp-schema.ts` both import FROM `graph-schema.ts` and derive their own
+ * shapes from it. The same one-way rule extends outward — nothing here may
+ * import from either of those two modules, or the cycle reappears one layer up.
+ *
  * Three conventions apply throughout and are load-bearing (§7.0):
  *
  * 1. **Requests and filters use `z.strictObject`.** Zod strips unrecognised keys
@@ -456,9 +461,8 @@ export const GraphCorpusStatsSchema = z.object({
 export type GraphCorpusStats = z.output<typeof GraphCorpusStatsSchema>
 
 /**
- * Envelope, not a bare `null`: the Settings panel must be able to tell "no
- * project" from "reader down" from "the query threw", or it picks no
- * `ERROR_MESSAGES` entry and renders an unexplained blank.
+ * Envelope, not a bare `null`, for the same reason as `GraphStatusResponseSchema`
+ * in `graph-status-schema.ts` (which carries the full rationale — one source of truth).
  */
 export const GraphCorpusStatsResponseSchema = z.object({
   stats: GraphCorpusStatsSchema.nullable(),

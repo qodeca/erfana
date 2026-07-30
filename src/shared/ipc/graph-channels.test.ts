@@ -13,6 +13,11 @@
  */
 import { describe, it, expect } from 'vitest'
 import { GraphChannels, GraphEvents, type GraphChannel, type GraphEvent } from './graph-channels'
+// Deliberate cross-feature import: the graph channels mirror the claude-status
+// namespace, so the disjointness test below imports the actual claude-status
+// channel names to guard against a real namespace collision. This is the first
+// such coupling in `src/shared/ipc` and exists only to make that guard mechanical.
+import { ClaudeStatusChannels, ClaudeStatusEvents } from './claude-status-channels'
 
 const CONTROL = Object.values(GraphChannels)
 const EVENTS = Object.values(GraphEvents)
@@ -90,6 +95,17 @@ describe('channel union types', () => {
   })
 
   it('does not collide with the claude-status namespace it mirrors', () => {
-    expect(ALL.some((c) => c.startsWith('claude-status:'))).toBe(false)
+    // Assert the two channel-name SETS are DISJOINT — the property that can
+    // actually regress if either feature reuses a literal. A prefix check is
+    // implied by the earlier `graph:` assertion and never imports the names it
+    // guards against, so it could not catch an exact-string overlap.
+    const graphNames = new Set<string>(ALL)
+    const claudeStatusNames = [
+      ...Object.values(ClaudeStatusChannels),
+      ...Object.values(ClaudeStatusEvents)
+    ]
+    for (const name of claudeStatusNames) {
+      expect(graphNames.has(name)).toBe(false)
+    }
   })
 })

@@ -3,7 +3,7 @@
 /**
  * Contract tests for the graph job payloads: reindex, cancel and corpus stats.
  *
- * Split out of `graph-status-schema.test.ts` to keep both inside the house cap.
+ * Split out of `graph-schema.test.ts` to keep both inside the house cap.
  *
  * Two design decisions are pinned here because nothing else enforces them:
  *

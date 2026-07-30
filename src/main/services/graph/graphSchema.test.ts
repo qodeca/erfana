@@ -420,10 +420,16 @@ describe('program shapes', () => {
     expect(GRAPH_STAMP_SQL).toMatch(/ON CONFLICT\(key\) DO UPDATE/)
   })
 
-  // C3 in the source itself: nothing in the rebuild path may remove the file.
-  it('contains no DROP DATABASE-equivalent, no VACUUM and no file operation', () => {
+  // C3 in the source itself: nothing in the rebuild path may remove the file or
+  // reach outside the single in-place handle. The scan covers the full forbidden
+  // set the contract names, not just VACUUM/ATTACH: `writable_schema` (corrupts
+  // the schema in place) and `journal_mode` (C5 forbids flipping WAL while a
+  // reader is attached) are each an equally file-destructive escape hatch.
+  it('contains no VACUUM, no ATTACH/DETACH, no journal_mode flip and no writable_schema', () => {
     const sql = GRAPH_REBUILD_PROGRAM.steps.join('\n')
     expect(sql).not.toMatch(/VACUUM/i)
     expect(sql).not.toMatch(/ATTACH|DETACH/i)
+    expect(sql).not.toMatch(/journal_mode/i)
+    expect(sql).not.toMatch(/writable_schema/i)
   })
 })

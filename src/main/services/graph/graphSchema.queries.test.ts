@@ -417,6 +417,96 @@ describe('query catalogue (§6.5)', () => {
         .all({ ...NO_FILTERS, match: 'ranking', probeLimit: 1 })
       expect(rows).toHaveLength(1)
     })
+
+    // Positive AND negative pairs for `after`/`before`/`excludeKey`/`fileType`.
+    // The outer suite pinned every one of these filters to null, so inverting a
+    // comparison in the SQL (>= ↔ <=, after ↔ before, <> ↔ =) stayed green.
+    // These seed a corpus with DISTINCT mtimes, path_keys and extensions and
+    // assert each filter admits the expected row and excludes the other, so a
+    // flipped comparison must redden a test.
+    describe('mtime, extension and exclude-key filters', () => {
+      // A term absent from the outer beforeEach so only these three rows match.
+      let older: number
+      let middle: number
+      let newer: number
+
+      beforeEach(() => {
+        older = seedSection({
+          path: 'alpha/old.md',
+          extension: '.md',
+          mtime: 1_000,
+          heading: 'Old',
+          text: 'zebra content'
+        })
+        middle = seedSection({
+          path: 'beta/mid.md',
+          extension: '.md',
+          mtime: 2_000,
+          heading: 'Mid',
+          text: 'zebra content'
+        })
+        newer = seedSection({
+          path: 'gamma/new.txt',
+          extension: '.txt',
+          mtime: 3_000,
+          heading: 'New',
+          text: 'zebra content'
+        })
+      })
+
+      const idsFor = (overrides: Record<string, unknown>): number[] =>
+        (
+          db.prepare(GRAPH_QUERIES.searchPage).all({
+            ...NO_FILTERS,
+            match: 'zebra',
+            ...overrides
+          }) as Array<{ sectionId: number }>
+        )
+          .map((r) => r.sectionId)
+          .sort((a, b) => a - b)
+
+      it('sees all three matches with no filter', () => {
+        expect(idsFor({})).toEqual([older, middle, newer].sort((a, b) => a - b))
+      })
+
+      it('after admits rows at or above the bound and excludes older ones', () => {
+        // 1_500 sits between older(1_000) and middle(2_000): mtime_ms >= :after.
+        expect(idsFor({ after: 1_500 })).toEqual([middle, newer].sort((a, b) => a - b))
+        expect(idsFor({ after: 1_500 })).not.toContain(older)
+      })
+
+      it('before admits rows at or below the bound and excludes newer ones', () => {
+        // 2_500 sits between middle(2_000) and newer(3_000): mtime_ms <= :before.
+        expect(idsFor({ before: 2_500 })).toEqual([older, middle].sort((a, b) => a - b))
+        expect(idsFor({ before: 2_500 })).not.toContain(newer)
+      })
+
+      it('after and before together bound an inclusive window', () => {
+        expect(idsFor({ after: 2_000, before: 2_000 })).toEqual([middle])
+      })
+
+      it('excludeKey drops exactly the named path_key and keeps its siblings', () => {
+        const rows = idsFor({ excludeKey: 'beta/mid.md' })
+        expect(rows).toEqual([older, newer].sort((a, b) => a - b))
+        expect(rows).not.toContain(middle)
+      })
+
+      it('admits the row whose path_key differs from excludeKey', () => {
+        // A key present in the corpus but NOT the excluded one must still match,
+        // so `<>` cannot be silently flipped to `=`.
+        expect(idsFor({ excludeKey: 'no/such/file.md' })).toEqual(
+          [older, middle, newer].sort((a, b) => a - b)
+        )
+      })
+
+      it('fileType admits matching extensions (positive .md case)', () => {
+        expect(idsFor({ fileType: '.md' })).toEqual([older, middle].sort((a, b) => a - b))
+      })
+
+      it('fileType excludes non-matching extensions (negative .txt case)', () => {
+        expect(idsFor({ fileType: '.txt' })).toEqual([newer])
+      })
+    })
   })
 
   describe('phase 2 hydrate', () => {

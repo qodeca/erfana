@@ -60,8 +60,19 @@ describe('id uniqueness', () => {
     expect(drawUnique(generateGraphJobId)).toBe(DRAWS)
   })
 
-  it('never collides across the two prefixes', () => {
-    const mixed = new Set([generateGraphCorrelationId(), generateGraphJobId()])
-    expect(mixed.size).toBe(2)
+  // A 2-element Set has size 2 regardless of prefix, so the discriminating
+  // property is asserted directly: the two ids carry DIFFERENT prefixes, and
+  // each fails the OTHER family's pattern. If the prefixes ever converged (the
+  // collision this test is named for) a job id would satisfy the correlation
+  // pattern and vice versa, reddening these.
+  it('mints distinct prefixes so neither id matches the other family pattern', () => {
+    const correlationId = generateGraphCorrelationId()
+    const jobId = generateGraphJobId()
+
+    const prefixOf = (id: string): string => id.split('-')[0]
+    expect(prefixOf(correlationId)).not.toBe(prefixOf(jobId))
+
+    expect(jobId).not.toMatch(GRAPH_CORRELATION_ID_PATTERN)
+    expect(correlationId).not.toMatch(GRAPH_JOB_ID_PATTERN)
   })
 })
