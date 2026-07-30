@@ -90,7 +90,7 @@ No database file, no worker, no IPC channel, no preload bridge, no watcher callb
 | **#23** | DB layer: SQLite + FTS5 + WAL + recovery; the ESLint SQL-sink rule; `onOwnershipLost` implementation; FTS5 merge policy | FR-001–005, **NFR-007**, **NFR-008** |
 | **#24** | Preprocessing: markdown strip, hashing, section extraction, NFC path canonicalisation | FR-006–009, FR-011 |
 | **#25** | Indexing (1/2): discovery, batch initial indexing, progress, write/delete repositories | FR-010, FR-013, FR-049, FR-050 |
-| **#26** | Search API: two-phase query, FTS5 sanitiser, filters, pagination, explain | FR-017–023, **NFR-004** |
+| **#26** | Search API: two-phase query, *calls* the FTS5 sanitiser (`buildMatchExpression` moved to #21 per D7 — #26 owns only the call site and may revise the invented tuning), filters, pagination, explain | FR-017–023, **NFR-004** |
 | **#27** | UI: Global Search panel; owns the `useSearchKeyboard.test.ts` edit | FR-029–032, **NFR-011** |
 | **#28** | UI: Related Sidebar | FR-024–028, **NFR-011** |
 | **#29** | UI: Settings panel + Status indicator (**one** issue) | FR-033–038, NFR-010, **NFR-011** |
@@ -208,7 +208,7 @@ Graph adds three roles GitStatus has no analogue for: a main-process **read-only
 | `graph/GraphIndexWorkerAdapter.ts` | 230 | #23 | Anchor `GitStatusWorkerAdapter` **133** plus stream demux, `safeParse` both directions, triple fence. **Split `graphWorkerProtocol.ts` at >400.** |
 | `graph/GraphCircuitBreaker.ts` | 130 | #23 | Anchor `GitStatusCircuitBreaker` **122** plus the half-open-completes-a-batch rule. |
 | `graph/GraphReadConnection.ts` | 230 | #23 | Handle, generation cache, key-based API, `querySearchPage` composite, inode guard. **Split `graphStatementCache.ts` at >400.** |
-| `graph/GraphSearchService.ts` | 280 | #26 | **Sole caller of `IGraphReadConnection`.** Two-phase query, sanitiser, result + explain mapping. **Split `ftsQueryBuilder.ts` at >400.** |
+| `graph/GraphSearchService.ts` | 280 | #26 | **Sole caller of `IGraphReadConnection`.** Two-phase query, result + explain mapping; *calls* `buildMatchExpression` (committed by #21 in `src/shared/graphMatch.ts` per D7 — the `ftsQueryBuilder.ts` split no longer applies to this file). |
 | `graph/GraphStatusPublisher.ts` | 140 | #29 | Snapshot composition, min-rate coalescing, broadcast. |
 | `graph/GraphIndexQueue.ts` | 220 | #25 | `ThrottledWorker(300)` + `EventCoalescer`, priority paths, overflow→stale, singleton re-enqueue. |
 | `graph/gitignoreFilter.ts` | 130 | #25 | async `isIgnored` + excludes + `.md` gate + confinement. |
@@ -246,7 +246,7 @@ A single 200-LOC `GraphEngineService` owning a 7-state machine, an 11-step async
 | `GraphLifecycle` | The state machine and every transition (§8.6); the close→open→attach sequence; reader attach/detach + `AbortSignal`; `generation`; the rebuild budget; the cancel flag |
 | `GraphWorkerSupervisor` | Worker construction and `resourceLimits`; the respawn ladder + healthy-dwell reset; the breaker; poison-file quarantine; the `onProgress` / `onExit` sinks |
 | `GraphEngineService` | The operation queue; the `switchVersion` / `sessionVersion` / `jobVersion` fences; `correlationId` / `jobId` minting; **delegation only** |
-| `GraphSearchService` | **All** SQL composition and the FTS5 sanitiser; the **only** caller of `IGraphReadConnection` |
+| `GraphSearchService` | **All** SQL composition; *calls* the FTS5 sanitiser `buildMatchExpression` (owned by #21 in `src/shared/graphMatch.ts` per D7, not composed here); the **only** caller of `IGraphReadConnection` |
 
 **Queue scoping (M10) — normative.** `operationQueues` is a single per-project promise-chained tail borrowed from `GitStatusService`, which has one verb and no long jobs. Handing it all seven verbs breaks two things:
 

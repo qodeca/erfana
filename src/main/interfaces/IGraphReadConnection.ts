@@ -14,6 +14,7 @@
  * @see specs/designs/sd-021-db-contracts.md §5.5, C1-C4 - the reader contracts
  */
 import type { GraphQueryKey } from '../services/graph/graphSchema'
+import type { FtsMatchExpression } from '../../shared/graphMatch'
 
 /**
  * Bind parameters for the two search phases.
@@ -39,8 +40,17 @@ import type { GraphQueryKey } from '../services/graph/graphSchema'
  * {@link GraphSearchRankRow} list; only `:match` is shared between the phases.
  */
 export interface GraphSearchQueryParams {
-  /** Sanitised FTS5 match expression — quoted tokens joined by ' ' or ' OR '. */
-  match: string
+  /**
+   * Sanitised FTS5 match expression — quoted tokens joined by ' ' or ' OR '.
+   *
+   * Branded {@link FtsMatchExpression}, whose **only** producer is
+   * `buildMatchExpression`. A raw user string is a `TS2322` compile error here,
+   * so "binding alone is insufficient" (FTS5 parses the bound string as its own
+   * grammar) cannot regress unnoticed. `buildMatchExpression` returns
+   * `FtsMatchExpression | null`; the caller resolves the `null` path (empty
+   * result set, no SQLite touched) *before* constructing these params.
+   */
+  match: FtsMatchExpression
   folderKey: string | null
   fileType: string | null
   after: number | null
@@ -89,6 +99,24 @@ export interface GraphSearchPageRows {
   totalMatched: number
   /** True when phase 1 hit `probeLimit`, so `totalMatched` is a floor. */
   totalMatchedCapped: boolean
+}
+
+/**
+ * Bind parameters for the key-addressed reads (`queryAll`/`queryGet`).
+ *
+ * **The `explain` MATCH site (#21 [13]).** `GRAPH_QUERIES.explain` binds `:match`
+ * exactly as phase-1 `searchPage` does, but reaches SQLite through `queryAll`
+ * rather than the typed `querySearchPage` composite — and per §9.6 `explain` runs
+ * **per term**, so it is the *more frequent* raw-string site. A plain
+ * `Record<string, unknown>` accepts any string, reopening the "binding alone is
+ * insufficient" hazard the brand exists to close. Intersecting the loose record
+ * with an optional branded `match` keeps every other key's params open while
+ * making a raw `match` string a compile error at this second site too:
+ * {@link buildMatchExpression} (returning {@link FtsMatchExpression}) is the only
+ * value that satisfies it.
+ */
+export type GraphKeyedQueryParams = Record<string, unknown> & {
+  match?: FtsMatchExpression
 }
 
 export interface IGraphReadConnection {
@@ -142,9 +170,9 @@ export interface IGraphReadConnection {
    */
   verifyIdentity(): boolean
 
-  queryAll<T>(key: GraphQueryKey, params: Record<string, unknown>): T[]
+  queryAll<T>(key: GraphQueryKey, params: GraphKeyedQueryParams): T[]
 
-  queryGet<T>(key: GraphQueryKey, params: Record<string, unknown>): T | undefined
+  queryGet<T>(key: GraphQueryKey, params: GraphKeyedQueryParams): T | undefined
 
   /**
    * The ONE composite: search phase 1 and phase 2 in a single synchronous

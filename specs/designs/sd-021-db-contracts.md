@@ -250,11 +250,17 @@ export interface IGraphReadConnection {
   clearStatements(): void
   /** Re-stat {dev, ino}; false if the file was replaced underneath us (C3/M24). */
   verifyIdentity(): boolean
-  queryAll<T>(key: GraphQueryKey, params: Record<string, unknown>): T[]
-  queryGet<T>(key: GraphQueryKey, params: Record<string, unknown>): T | undefined
+  // `params` is `GraphKeyedQueryParams = Record<string, unknown> & { match?:
+  // FtsMatchExpression }`, not a bare record: the `explain` key binds `:match`
+  // through this method (and per §9.6 runs per term), so a raw match string must
+  // be a compile error here as it is on `querySearchPage` (#21 [13], D7).
+  queryAll<T>(key: GraphQueryKey, params: GraphKeyedQueryParams): T[]
+  queryGet<T>(key: GraphQueryKey, params: GraphKeyedQueryParams): T | undefined
   /** The ONE composite: §6.5 phase 1 + phase 2 in a single synchronous snapshot (C4/M9). */
   querySearchPage(params: GraphSearchQueryParams): GraphSearchPageRows
 }
 ```
+
+`GraphSearchQueryParams.match` and the optional `GraphKeyedQueryParams.match` are typed `FtsMatchExpression` (`string & { readonly __fts: unique symbol }`, from `src/shared/graphMatch.ts`), whose sole producer is `buildMatchExpression` — so binding a raw user query to either MATCH site is a `TS2322`. Committed by **#21** (reassigned from #26 per D7); see [`sd-021-cross-cutting.md` §9.6](sd-021-cross-cutting.md).
 
 The worker request/message types these signatures reference are defined as zod discriminated unions in `src/shared/ipc/graph-worker-schema.ts` — see [`sd-021-worker-contracts.md` §8.2](sd-021-worker-contracts.md). Revision 2 referenced five such types without defining any of them, so `IGraphIndexWorker` could not typecheck (B6).
