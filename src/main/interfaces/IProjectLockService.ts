@@ -82,6 +82,32 @@ export interface IProjectLockService {
   computeLockHash(projectPath: string): Promise<string>
 
   /**
+   * Subscribes to loss of lock ownership for a project.
+   *
+   * The lock is what guarantees a single Erfana process per project, and so a
+   * single graph-index writer. Today the heartbeat's ownership-lost hook is
+   * wired inline and only deletes the entry from `activeLocks` — nothing is
+   * emitted, so a consumer that must react (close the writer, detach the
+   * reader) has nothing to subscribe to.
+   *
+   * Declared by #21 as part of the graph contract set; **implemented by #23**,
+   * which fans it out from the existing `LockHeartbeat` hook and wires
+   * `GraphLifecycle` to it. Optional until then, purely so this declaration
+   * changes no runtime behaviour — #23 drops the `?` when it lands.
+   *
+   * Residual, recorded rather than papered over: `checkLock` is async and
+   * main-side while writes are synchronous in the worker, and the lock has a
+   * documented stale-takeover window. This event narrows the TOCTOU window; it
+   * does not close it.
+   *
+   * @param cb - Invoked with the project path whose lock was lost
+   * @returns Unsubscribe function
+   * @see Issue #21 - graph R1 architecture
+   * @see specs/designs/sd-021-cross-cutting.md §9.7
+   */
+  onOwnershipLost?(cb: (projectPath: string) => void): () => void
+
+  /**
    * Disposes of the service, releasing all locks and stopping polling.
    * Called on app shutdown.
    */

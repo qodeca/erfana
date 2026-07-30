@@ -43,6 +43,20 @@ export const TreeSettingsSchema = z.object({
 export type TreeSettings = z.infer<typeof TreeSettingsSchema>
 
 /**
+ * Graph configuration - controls which folders the search index skips
+ *
+ * Independent of the watcher ignore list: the watcher's defaults protect
+ * chokidar's file-descriptor budget and are over-broad for indexing.
+ *
+ * @see Issue #21 - graph R1 architecture
+ * @see specs/designs/sd-021-cross-cutting.md §9.1 rows 1-2
+ */
+export const GraphSettingsSchema = z.object({
+  excludeFolders: PatternConfigSchema.optional()
+}).optional()
+export type GraphSettings = z.infer<typeof GraphSettingsSchema>
+
+/**
  * Root schema for .erfana/settings.json
  */
 export const ProjectSettingsSchema = z.object({
@@ -51,7 +65,9 @@ export const ProjectSettingsSchema = z.object({
   /** File watcher configuration */
   watcher: WatcherSettingsSchema,
   /** Project tree UI configuration */
-  tree: TreeSettingsSchema
+  tree: TreeSettingsSchema,
+  /** Graph search index configuration */
+  graph: GraphSettingsSchema
 })
 export type ProjectSettings = z.infer<typeof ProjectSettingsSchema>
 
@@ -61,4 +77,9 @@ export type ProjectSettings = z.infer<typeof ProjectSettingsSchema>
 export interface ResolvedProjectSettings {
   watcherIgnorePatterns: string[]
   treeHiddenPatterns: string[]
+  /**
+   * Folders the graph indexer skips. Resolved but not yet consumed — #21 commits
+   * contract code only, so no caller reads this field.
+   */
+  graphExcludePatterns: string[]
 }

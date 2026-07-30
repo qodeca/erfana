@@ -62,6 +62,20 @@ local Windows hardware):
 - **Tests with `{ timeout: NNNN }` overrides** — grep for these; each is a
   tacit acknowledgement that the test is slow. Review whether mocking or
   fake timers can eliminate the need.
+- **`scripts/spikes/graph-wal-concurrency.test.mjs:235`** (#21) — registered
+  **pre-emptively; not yet observed**. The C8 case asserts a wall-clock lower
+  bound: `expect(elapsed).toBeGreaterThanOrEqual(BUSY_TIMEOUT_MS * 0.5)`, i.e.
+  that a busy `wal_checkpoint(TRUNCATE)` burns at least half the 200 ms
+  `busy_timeout` rather than failing fast. Unlike every row in the register
+  above this is a **lower** bound, so the usual Windows failure mode — a
+  pre-empted worker running slow — cannot break it; the risk is the inverse,
+  a Windows SQLite build returning `busy` early and the assertion reading as a
+  contract violation rather than a timing artefact. The spike runs in the
+  advisory `windows-checks` job, so a break is a non-blocking red mark. If it
+  fires, do **not** widen the tolerance blindly: `result.busy === 1` on the
+  line above is the contract, and the elapsed check is only evidence for the
+  §12.6 stall budget. Fake timers are not applicable — the wait happens inside
+  the native SQLite call.
 
 ## Remediation patterns cheat-sheet
 

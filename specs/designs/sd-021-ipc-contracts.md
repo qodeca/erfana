@@ -1,0 +1,468 @@
+<!--
+SPDX-License-Identifier: GPL-3.0-only
+SPDX-FileCopyrightText: 2025-2026 Qodeca sp. z o.o.
+-->
+
+# SD-021 part 4 — IPC contracts: renderer bridge and MCP port (AC-1)
+
+Part of the SD-021 set — index in [`sd-021-graph-architecture.md` §0](sd-021-graph-architecture.md). Covers **§7**. Worker protocol: [`sd-021-worker-contracts.md`](sd-021-worker-contracts.md) §8. Queries: [`sd-021-db-schema.md`](sd-021-db-schema.md) §6.5.
+
+---
+
+## 7. IPC contracts
+
+### 7.0 Conventions that apply to every schema below
+
+**Strictness (m4).** Zod strips unrecognised keys by default — safe, but not *correct* at a trust boundary. A renderer sending `matchmode: 'any'` (case typo) or `excludeSection: 12` (missing `Id`) would parse successfully, the key would be dropped, and `.default()` would supply `'all'`/`undefined` — so #28's sidebar silently returns zero rows under implicit AND, the exact bug §7.2 exists to fix, reachable by typo. `GraphSearchFiltersSchema` is worst: a dropped filter **widens** results rather than erroring.
+
+- **Requests and filters use `z.strictObject`** — the inbound, typo-reachable direction.
+- **Responses and events stay permissive** so main can add a field without breaking an older renderer during a partial upgrade.
+
+**Two types per request (M14).** In Zod 4 `z.infer` aliases `z.output`, and `.default()` affects only the output type: the field is optional on **input** and required on **output**. Typing callers against `z.infer` would have forced #27/#28/#30 to write `{query, matchMode:'all', k:10, offset:0}` at every call site — defeating the defaults and hard-coding constants into the renderer instead of `GRAPH`. Every request therefore exports both:
+
+```ts
+export type GraphSearchRequestInput = z.input<typeof GraphSearchRequestSchema>
+export type GraphSearchRequest      = z.output<typeof GraphSearchRequestSchema>  // "Resolved"
+```
+
+`GraphBridge` and `IGraphQueryService` are typed against **`…Input`**; `IGraphSearchService` and everything downstream of `safeParse` against the resolved type. **The preload passes `request ?? {}`** for the four optional-argument bridge methods — `Schema.parse(undefined)` throws on a `z.object`, and revision 2 never said who substituted the empty object.
+
+**Correlation (§7.9).** Request fields are `.optional()`; response, echo and event fields are **required** `z.string().min(1)`. Main echoes a supplied id, else mints one and returns it. Both `correlationId` (per request) and `jobId` (per reindex/DB-swap) appear wherever a job is in scope.
+
+**Error codes (m5).** `z.enum(ErrorCode)` is valid in Zod 4 for an externally-declared TypeScript enum, and `z.nativeEnum` is deprecated — revision 2's "confirm the form and fall back" hedge is deleted as dead text. But `ErrorCode` is also **too broad**: only the graph/MCP subset is producible here, so a `WHISPER_*` code would validate on a graph channel and #27/#29 would get no exhaustive switch.
+
+```ts
+export const GRAPH_ERROR_CODES = [ErrorCode.GRAPH_DB_OPEN_FAILED, /* … */] as const
+export const GraphErrorCodeSchema = z.enum(GRAPH_ERROR_CODES)
+```
+
+The set is **26 codes**, not revision 2's 23: `GRAPH_DB_MOVED` (M24), `GRAPH_DB_DISK_FULL` and `GRAPH_INDEX_FILE_TOO_LARGE` (M20), and `GRAPH_WORKER_PROTOCOL` (B6) were added, and the phantom `GRAPH_DB_NOT_WRITABLE` was removed (m9). `GRAPH_INDEX_ALREADY_RUNNING` is the 26th (§7.5).
+
+```ts
+export const GraphErrorSchema = z.object({
+  code: GraphErrorCodeSchema,
+  atMs: z.number().int().nonnegative(),
+  /** Project-relative path when the error is attributable to one file (M22). Never
+   *  absolute — enforced by the same isConfinedRelativePath refine the priority-path
+   *  list uses, because "never absolute" as a comment is not a constraint and this
+   *  field is composed from a path the indexer was HANDED. */
+  relativePath: z.string().max(1024).refine(isConfinedRelativePath).nullable().default(null)
+})
+```
+
+### 7.1 `src/shared/ipc/graph-channels.ts`
+
+```ts
+export const GraphChannels = {
+  SEARCH: 'graph:search',
+  EXPLAIN: 'graph:explain',                 // FR-032 "why this result?" (M16)
+  REINDEX: 'graph:reindex',
+  CANCEL_REINDEX: 'graph:cancelReindex',
+  GET_CORPUS_STATS: 'graph:getCorpusStats',
+  GET_STATUS: 'graph:getStatus',
+  SET_PRIORITY_PATHS: 'graph:setPriorityPaths'   // FR-049
+} as const
+
+export const GraphEvents = { STATUS_CHANGED: 'graph:statusChanged' } as const
+
+export type GraphChannel = (typeof GraphChannels)[keyof typeof GraphChannels]
+export type GraphEvent = (typeof GraphEvents)[keyof typeof GraphEvents]
+```
+
+All seven are `invoke`; the one event is a push. A single status channel (not separate progress/status channels) mirrors `claude-status:changed`: FR-036/037/038 must land in one renderer commit.
+
+### 7.2 Search request
+
+```ts
+export const GraphMatchMode = z.enum(['all', 'any'])
+
+export const GraphSearchFiltersSchema = z.strictObject({
+  /**
+   * Project-relative POSIX prefix. MUST end in '/' — 'doc' would otherwise match
+   * documentation/ and doc-archive/ via the substr() prefix compare, silently and
+   * with no error, and FR-031's folder-tree picker sends whatever label the node
+   * yields. The transform is why z.input !== z.output here (M14/M17).
+   */
+  folder: z.string().max(1024)
+    .transform((s) => (s.endsWith('/') ? s : `${s}/`)).optional(),
+  /** Lowercase, leading dot. 'md' / '.MD' / '*.md' previously returned zero rows
+   *  with error:null — indistinguishable from a genuine no-match (M17). */
+  fileType: z.string().regex(/^\.[a-z0-9]+$/).max(16).optional(),
+  modifiedAfterMs: z.number().int().nonnegative().optional(),
+  modifiedBeforeMs: z.number().int().nonnegative().optional(),
+  excludeFilePath: z.string().max(4096).optional(),
+  /** AC-018: omit the CURRENT section, keeping sibling sections eligible. */
+  excludeSectionId: z.number().int().positive().optional()
+})
+
+export const GraphSearchRequestSchema = z.strictObject({
+  query: z.string().trim().min(1).max(GRAPH.MAX_QUERY_LENGTH),
+  /** 'all' = implicit AND (typed query). 'any' = OR, required for #28's passage
+   *  queries, which return zero rows under AND. */
+  matchMode: GraphMatchMode.default('all'),
+  k: z.number().int().min(1).max(GRAPH.MAX_TOP_K).default(GRAPH.DEFAULT_TOP_K),
+  /** Bounded by the probe cap so totalMatched/hasMore stay defined (§7.3). */
+  offset: z.number().int().min(0).max(GRAPH.MAX_COUNT_PROBE - 1).default(0),
+  /** False lets #26 skip highlight() entirely — §12.2's lazy fallback becomes a
+   *  config change rather than a contract change (M16). */
+  includeMatchedTerms: z.boolean().default(true),
+  filters: GraphSearchFiltersSchema.optional(),
+  correlationId: z.string().min(1).optional()
+})
+```
+
+**Passage budget.** `MAX_QUERY_LENGTH` is 4096, not 512, because #28 sends a passage. `GraphSearchService` reduces it to at most `GRAPH.MAX_QUERY_TERMS` (24) tokens by the single normative pipeline in §9 row 11 — revision 2 specified it twice, inconsistently, in two files.
+
+**Debounce and supersede (M18).** The contract, not #27's UI, owns the rate bound: callers issue at most one search per `GRAPH.SEARCH_DEBOUNCE_MS` (120 ms) per surface, and **a newer `correlationId` for the same surface abandons the older result** — main drops the superseded response rather than racing it into the store. Without this, a search-as-you-type panel at ~10 keystrokes/s puts 10 synchronous SQLite invocations per second onto the process that also owns node-pty and every IPC channel.
+
+**Performance trigger, restated in main-process terms.** Revision 2 nominated "p95 > 4 ms = 25 % of the 16 ms frame budget". That mis-frames the risk: the frame budget belongs to the **renderer**, and this code runs on **main**, where blocking shows up as input lag and terminal stutter, not dropped frames. The real budget is **synchronous main-thread occupancy per search: p95 < 4 ms and worst case < 16 ms**, measured with `perf_hooks.monitorEventLoopDelay`, over the **whole handler** (both §6.5 phases plus mapping), not the canonical query in isolation. Owner #31.
+
+### 7.3 Search response
+
+```ts
+export const GraphTermOffsetSchema = z.object({
+  /** Offset into the SENTINEL-STRIPPED snippet, or into heading. Never the source file. */
+  start: z.number().int().nonnegative(),
+  length: z.number().int().positive()
+})
+
+export const GraphMatchedTermSchema = z.object({
+  /** The marked DOCUMENT token, as it appears in the snippet or heading — NOT the
+   *  query term. Phase 2 issues one snippet()/highlight() with the whole multi-term
+   *  :match, so FTS5 says a token matched but never WHICH query term marked it;
+   *  deriving the query form needs a Porter implementation agreeing exactly with
+   *  SQLite's, and is ambiguous when two terms share a stem. Exact query-form
+   *  attribution comes from graph:explain, which runs one marked read per term. */
+  term: z.string(),
+  column: z.enum(['heading', 'text']),
+  /** Renamed from `occurrences`, which had two plausible meanings an order of
+   *  magnitude apart and no JSDoc (M16). Always === offsets.length. */
+  occurrencesInSnippet: z.number().int().nonnegative(),
+  /** True count in the whole section; null unless the caller used graph:explain. */
+  occurrencesInSection: z.number().int().nonnegative().nullable().default(null),
+  offsets: z.array(GraphTermOffsetSchema)
+})
+
+export const GraphSearchResultSchema = z.object({
+  sectionId: z.number().int().positive(),
+  filePath: z.string(),          // project-relative, NFC display form (§6.2)
+  heading: z.string(),
+  headingPath: z.string(),
+  headingSlug: z.string(),
+  headingLevel: z.number().int().min(0).max(6),
+  startLine: z.number().int().min(1),
+  endLine: z.number().int().min(1),
+  /** Sentinel-stripped. Spans live in matchedTerms[].offsets — no HTML crosses IPC. */
+  snippet: z.string(),
+  /** True when the 30-token window omitted part of the section, so the UI can label
+   *  a partial view and not read `offsets: []` as "term absent" (M16). Derived from
+   *  the char(4) (EOT) truncation marker: a printable '…' is ambiguous with a section
+   *  whose own prose ends in an ellipsis, and survives the C0/C1 strip into the MCP
+   *  payload. EOT sits in the same C0 range as the char(2)/char(3) sentinels. */
+  snippetTruncated: z.boolean(),
+  /** Raw FTS5 bm25(): NEGATIVE, ascending = most relevant. Never render as a percentage. */
+  score: z.number(),
+  matchedTerms: z.array(GraphMatchedTermSchema)
+})
+
+export const GraphSearchResponseSchema = z.object({
+  results: z.array(GraphSearchResultSchema),
+  /** Rows returned by §6.5 phase 1, bounded by GRAPH.MAX_COUNT_PROBE. */
+  totalMatched: z.number().int().nonnegative(),
+  totalMatchedCapped: z.boolean(),
+  hasMore: z.boolean(),
+  offset: z.number().int().nonnegative(),
+  k: z.number().int().positive(),
+  /** Covers BOTH phases of §6.5 plus result mapping — the whole handler, not one query. */
+  queryDurationMs: z.number().nonnegative(),
+  degraded: z.boolean(),
+  error: GraphErrorSchema.nullable(),
+  correlationId: z.string().min(1)
+})
+```
+
+**Probe skip (m6).** When `offset === 0 && results.length < k`, `totalMatched` is exactly `results.length`: phase 1 is capped at `k + 1` instead of `MAX_COUNT_PROBE`, `totalMatchedCapped = false`, `hasMore = false`. Revision 2 walked up to 1000 matching rows unconditionally — every match in the corpus when fewer than 1000 exist — for the majority of real searches.
+
+The handler **never throws**: failure returns `{results: [], error: {…}, degraded: true}`. Zero surviving query terms short-circuits to an empty result set **without touching SQLite**.
+
+### 7.4 Explain (M16)
+
+FR-032 requires matched terms *with context snippets* — plural, per term. One 30-token `snippet()` window cannot supply that, and §12.2's own contingency ("compute `matchedTerms` lazily on expansion") had no request flag and no channel, so executing the documented fallback would have required editing `graph-schema.ts` and adding a channel — exactly the reopen #21 exists to prevent.
+
+```ts
+export const GraphExplainRequestSchema = z.strictObject({
+  sectionId: z.number().int().positive(),
+  query: z.string().trim().min(1).max(GRAPH.MAX_QUERY_LENGTH),
+  matchMode: GraphMatchMode.default('all'),
+  correlationId: z.string().min(1).optional()
+})
+
+export const GraphExplainResponseSchema = z.object({
+  sectionId: z.number().int().positive(),
+  /** One window per term occurrence, not one per result. */
+  windows: z.array(z.object({
+    term: z.string(),
+    column: z.enum(['heading', 'text']),
+    text: z.string(),                       // sentinel-stripped context
+    offsets: z.array(GraphTermOffsetSchema)
+  })),
+  occurrencesInSection: z.record(z.string(), z.number().int().nonnegative()),
+  error: GraphErrorSchema.nullable(),
+  correlationId: z.string().min(1)
+})
+```
+
+Backed by `GRAPH_QUERIES.explain` (§6.4).
+
+### 7.5 Reindex, cancel, corpus stats, status, priority paths
+
+```ts
+export const GraphReindexMode = z.enum(['full', 'incremental'])
+export const GraphReindexReason =
+  z.enum(['user', 'corruption', 'schema-mismatch', 'overflow-reconcile'])
+
+export const GraphReindexRequestSchema = z.strictObject({
+  mode: GraphReindexMode.default('full'),
+  reason: GraphReindexReason.default('user'),
+  correlationId: z.string().min(1).optional()
+})
+export const GraphReindexResponseSchema = z.object({
+  accepted: z.boolean(),
+  jobId: z.string().min(1).nullable(),
+  /** GRAPH_INDEX_ALREADY_RUNNING when a job is live — reindex is IDEMPOTENT, and
+   *  jobId then names the RUNNING job so the caller can follow it (m9). */
+  rejectedCode: GraphErrorCodeSchema.nullable(),
+  correlationId: z.string().min(1)
+})
+
+/** Cooperative and MAIN-SIDE: better-sqlite3 cannot be interrupted, so the in-flight
+ *  batch finishes and draining the queue is the only lever. No 'cancel' worker verb. */
+export const GraphCancelReindexRequestSchema = z.strictObject({
+  correlationId: z.string().min(1).optional()
+})
+export const GraphCancelReindexResponseSchema = z.object({
+  cancelled: z.boolean(),              // false when no job was running (m9)
+  droppedBatches: z.number().int().nonnegative(),
+  inFlightAllowedToFinish: z.boolean(),
+  correlationId: z.string().min(1)
+})
+
+export const GraphCorpusStatsRequestSchema = z.strictObject({
+  correlationId: z.string().min(1).optional()
+})
+export const GraphCorpusStatsSchema = z.object({
+  fileCount: z.number().int().nonnegative(),
+  sectionCount: z.number().int().nonnegative(),      // section ROWS
+  wordCount: z.number().int().nonnegative(),         // summed over section ROWS (m2)
+  uniqueContentCount: z.number().int().nonnegative(),// contents ROWS
+  skippedFileCount: z.number().int().nonnegative(),  // last full pass (§6.3)
+  lastIndexedAtMs: z.number().int().nonnegative().nullable(),
+  schemaVersion: z.number().int().positive(),
+  /** Relaxed from z.literal('beta') so the freeze is not itself a breaking change (m4). */
+  schemaStability: z.enum(['beta', 'stable']),
+  dbSizeBytes: z.number().int().nonnegative().nullable()
+})
+
+/** M15: bare `null` gave #29 no way to tell "no project" from "reader down" from
+ *  "the query threw", so it could pick no ERROR_MESSAGES entry and rendered an
+ *  unexplained blank — the exact failure §9 row 13 was written to prevent. */
+export const GraphCorpusStatsResponseSchema = z.object({
+  stats: GraphCorpusStatsSchema.nullable(),
+  error: GraphErrorSchema.nullable(),
+  correlationId: z.string().min(1)
+})
+
+export const GraphStatusRequestSchema = z.strictObject({
+  correlationId: z.string().min(1).optional()
+})
+export const GraphStatusResponseSchema = z.object({
+  snapshot: GraphStatusSnapshotSchema.nullable(),
+  error: GraphErrorSchema.nullable(),
+  correlationId: z.string().min(1)
+})
+
+export const GraphPriorityPathsRequestSchema = z.strictObject({
+  /** Project-relative; absolute paths and any '..' segment are rejected (§9.5). */
+  paths: z.array(z.string().max(4096).refine(isConfinedRelativePath)).max(GRAPH.MAX_PRIORITY_PATHS),
+  correlationId: z.string().min(1).optional()
+})
+export const GraphPriorityPathsResponseSchema = z.object({
+  accepted: z.number().int().nonnegative(),
+  rejected: z.number().int().nonnegative(),
+  correlationId: z.string().min(1)
+})
+```
+
+### 7.6 Status snapshot and push
+
+```ts
+/** Six members — `error` deleted: every plausible producer is routed elsewhere by a
+ *  contract that says so in words (§8.6). */
+export const GraphIndexState =
+  z.enum(['uninitialized', 'opening', 'ready', 'indexing', 'degraded', 'disabled'])
+export const GraphStatusDot = z.enum(['grey', 'green', 'yellow', 'red'])
+export const GraphBreakerState = z.enum(['closed', 'open', 'half-open'])
+
+export const GraphProgressSchema = z.object({
+  jobId: z.string().min(1),
+  processedFiles: z.number().int().nonnegative(),
+  totalFiles: z.number().int().nonnegative(),
+  skippedFiles: z.number().int().nonnegative(),
+  // Project-relative, bounded by the ONE status-surface ceiling; IPC-payload
+  // only, never logged raw (§9.6)
+  currentFilePath: z.string().max(GRAPH.MAX_STATUS_PATH_LENGTH).nullable(),
+  startedAtMs: z.number().int().nonnegative()
+})
+
+export const GraphStatusSnapshotSchema = z.object({
+  projectPath: z.string().max(4096).nullable(),
+  state: GraphIndexState,
+  dot: GraphStatusDot,
+  /** Orthogonal to `state`: a stale index is degraded+true, a down reader is
+   *  degraded+false. Without it FR-037/038 cannot render the difference. */
+  searchAvailable: z.boolean(),
+  progress: GraphProgressSchema.nullable(),
+  queueDepth: z.number().int().nonnegative(),
+  queuedFilePaths: z.array(z.string().max(GRAPH.MAX_STATUS_PATH_LENGTH))
+    .max(GRAPH.MAX_QUEUE_PREVIEW),  // FR-038, m7
+  /** Bounded per-file skip surface, so GRAPH_INDEX_PARSE_FAILED has somewhere to
+   *  go other than thrashing `lastError` across a 10k-file pass (m9). */
+  recentSkips: z.array(z.object({
+    code: GraphErrorCodeSchema,
+    relativePath: z.string().max(GRAPH.MAX_STATUS_PATH_LENGTH)
+  })).max(GRAPH.MAX_RECENT_SKIPS),
+  stale: z.boolean(),
+  lastError: GraphErrorSchema.nullable(),
+  lastIndexedAtMs: z.number().int().nonnegative().nullable(),
+  lastIndexDurationMs: z.number().nonnegative().nullable(),
+  schemaVersion: z.number().int().positive().nullable(),
+  /** §9.10 / E5: the rebuild budget must be SHOWN with its count and reason, and
+   *  three graph_meta keys hold it — so the snapshot has to carry it or Settings
+   *  has no wire. Read via GRAPH_QUERIES.rebuildBudget. Optional, not defaulted:
+   *  absent means "not read yet", which must not render as "never rebuilt". The
+   *  reason is bounded TEXT, not GraphReindexReason — the source column carries
+   *  no CHECK, and a strict enum would fail the WHOLE snapshot's safeParse on one
+   *  unexpected token, blanking the indicator that exists to report the fault. */
+  autoRebuildCount: z.number().int().nonnegative().optional(),
+  lastAutoRebuildReason: z.string().max(64).nullable().optional(),
+  /** M28 diagnostics — every field the UI shows must be recoverable from a log
+   *  bundle, and these four fully determine whether a search can return rows. */
+  generation: z.string().nullable(),
+  sessionVersion: z.number().int().nonnegative(),
+  restartAttempts: z.number().int().nonnegative(),
+  breakerState: GraphBreakerState,
+  /** C8: non-null when a checkpoint was refused and the WAL is growing. */
+  walSizeBytes: z.number().int().nonnegative().nullable()
+})
+
+/** correlationId lives on the ENVELOPE, not the snapshot, so a hide-the-indicator
+ *  event (snapshot: null) still carries one (M15). */
+export const GraphStatusChangePayloadSchema = z.object({
+  snapshot: GraphStatusSnapshotSchema.nullable(),
+  correlationId: z.string().min(1),
+  jobId: z.string().min(1).nullable()
+})
+```
+
+**Push rate — MIN, not MAX (m7).** Emit when `elapsed ≥ GRAPH.STATUS_PUSH_MIN_INTERVAL_MS` **AND** (a file was processed **or** the state changed). Revision 2's `OR` gave the combined rate no ceiling: at 2000 files/s — plausible, since NFR-002 is a floor — that is 40 pushes/s, each composed, `safeParse`d, structure-cloned, broadcast to every window and committed into React, with `queuedFilePaths` uncapped in string length at ~80 KB/snapshot ≈ 3 MB/s arriving precisely when the machine is saturated. `GRAPH.MAX_STATUS_PUSH_RATE_HZ` (10) is the stated ceiling; element length is capped at `GRAPH.MAX_STATUS_PATH_LENGTH`. State transitions and terminal snapshots still emit immediately and are never dropped. AC-011's "at least every 50 files" holds because a file-processed tick always accompanies the interval.
+
+**One ceiling for relative paths on the status surface (M6).** Revision 3 bounded `currentFilePath` at 4096 and `queuedFilePaths` / `recentSkips[].relativePath` / `GraphError.relativePath` at 1024, which made a 1025–4096-character path clear the worker boundary (`GraphWorkerSkipSchema.path`, `GraphWorkerProgressSchema.currentFilePath` — both 4096, both **absolute**, correctly so) and then fail `GraphStatusSnapshotSchema` **as a whole** — blanking the indicator whose job is to report the skip, exactly the failure mode `lastAutoRebuildReason` above is worded to avoid. Resolved with `GRAPH.MAX_STATUS_PATH_LENGTH` (1024) applied to all four relative-path fields. `projectPath` keeps 4096: it is absolute, one per snapshot, and truncating a project root misnames it. **The producer truncates.** `GraphStatusPublisher` (#29) projects worker-absolute → project-relative and truncates to the bound; the zod `.max()` is a backstop, never the enforcement point, because over-length must be impossible by construction rather than rejected at the boundary.
+
+Delivered via `broadcastToAllWindows` (`ipcBroadcast.ts:26`) — one project per process, so every window shows the same state. Re-validated with `safeParse` immediately before `send`, mirroring `claude-status-handlers.ts:90-103`.
+
+### 7.7 `GraphBridge`
+
+```ts
+export interface GraphBridge {
+  search(request: GraphSearchRequestInput): Promise<GraphSearchResponse>
+  explain(request: GraphExplainRequestInput): Promise<GraphExplainResponse>
+  reindex(request?: GraphReindexRequestInput): Promise<GraphReindexResponse>
+  cancelReindex(request?: GraphCancelReindexRequestInput): Promise<GraphCancelReindexResponse>
+  getCorpusStats(request?: GraphCorpusStatsRequestInput): Promise<GraphCorpusStatsResponse>
+  getStatus(request?: GraphStatusRequestInput): Promise<GraphStatusResponse>
+  setPriorityPaths(request: GraphPriorityPathsRequestInput): Promise<GraphPriorityPathsResponse>
+  onStatusChanged(cb: (payload: GraphStatusChangePayload) => void): () => void
+}
+```
+
+Every method has a named request **and** response schema; no bare `null` returns and no inline anonymous types remain. `src/preload/index.d.ts` gets one line: `graph: GraphBridge`.
+
+### 7.8 Handler contract (`src/main/ipc/graph-handlers.ts`, #26)
+
+```ts
+export function registerGraphHandlers(
+  engine?: IGraphEngineService          // optional; defaults to createGraphEngineService()
+): { service: IGraphEngineService; dispose: () => Promise<void> }
+```
+
+Optional-with-default is what makes returning `service` meaningful (`claude-status-handlers.ts:167-172`). Handlers take `(event, arg: unknown)`; **`isTrustedSender` is IMPORTED** from `senderValidation.ts:35`, never re-implemented; `safeParse` never `parse`; no handler throws; `dispose()` removes one handler per `GraphChannels` value. Registered in the `src/main/index.ts:276-300` block.
+
+### 7.9 Correlation policy and contract evolution (m4)
+
+`correlationId` optional inbound, required outbound; main echoes or mints. `jobId` accompanies it whenever a reindex or DB swap is in scope. `generateGraphCorrelationId()` = `` `idx-${Date.now()}-${randomBytes(6).toString('hex')}` `` (48 bits CSPRNG); `generateGraphJobId()` = `` `job-${Date.now()}-${randomBytes(6).toString('hex')}` ``.
+
+**Evolution rule** — revision 2 versioned the on-disk schema, the worker session and the MCP contract but said nothing about how #26–#32 may extend a wire payload:
+
+1. A new **response or event** field must be `.optional()` or `.default()`.
+2. A new **request** field must be `.optional()` — `strictObject` means an older main would otherwise reject a newer renderer.
+3. Any field **removal** or type **narrowing** requires a **new channel name**; the old channel is kept for one release.
+4. `schemaStability` is `z.enum(['beta','stable'])`, so the freeze is a value change rather than a breaking wire change.
+
+### 7.10 MCP port and tool contracts (B7)
+
+Revision 2 named `GraphPortRequestSchema`/`GraphPortResponseSchema` in prose and defined neither. Four gaps #30 would hit immediately, all closed here.
+
+```ts
+/** main ↔ utilityProcess over MessageChannelMain. `requestId` renamed to
+ *  correlationId — it was the one boundary leaving the main process and used a
+ *  different identifier from every other payload, breaking §7.9 there. */
+export const GraphPortRequestSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('graph:search'), correlationId: z.string().min(1),
+    /** Fenced like a worker message: one port spans arbitrary project switches (M7). */
+    switchVersion: z.number().int().nonnegative(),
+    payload: GraphMcpToolInputSchema }),
+  /** FR-044: complete pending requests before shutdown. */
+  z.strictObject({ kind: z.literal('graph:drain'), correlationId: z.string().min(1) })
+])
+
+export const GraphPortResponseSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('graph:search:result'), correlationId: z.string().min(1),
+    payload: GraphMcpToolResultSchema }),
+  z.strictObject({ kind: z.literal('graph:search:error'), correlationId: z.string().min(1),
+    code: GraphErrorCodeSchema }),
+  /** FR-042 backpressure needs a SIGNAL, or the peer cannot tell throttled from hung. */
+  z.strictObject({ kind: z.literal('graph:throttled'), correlationId: z.string().min(1),
+    retryAfterMs: z.number().int().positive() }),
+  z.strictObject({ kind: z.literal('graph:drained'), correlationId: z.string().min(1),
+    completed: z.number().int().nonnegative() })
+])
+```
+
+**Model-facing tool input.** Reusing `GraphSearchRequestSchema` verbatim would have handed `registerTool` a shape containing `correlationId`, `offset` and `excludeSectionId` — a DB-internal integer no model can know — while MCP requires a valid `inputSchema` that servers MUST validate.
+
+```ts
+export const GraphMcpToolInputSchema = GraphSearchRequestSchema
+  .pick({ query: true, k: true, filters: true })
+  .extend({
+    k: z.number().int().min(1).max(MCP.MAX_TOP_K).default(GRAPH.DEFAULT_TOP_K),
+    filters: GraphSearchFiltersSchema.omit({ excludeSectionId: true }).optional()
+  })
+
+/** Declared as the tool's outputSchema. The untrusted-data envelope, control-char
+ *  stripping and byte caps that wrap it are contracted in §9.4 (B1). */
+/** The C0/C1 strip and the payload caps are EXPRESSED here, not just described:
+ *  a schema that documents an obligation it cannot fail is a comment. McpText =
+ *  z.string().max(MCP.MAX_RESULT_BYTES).refine(isControlCharFree) — the refine
+ *  rejects C0 except tab/newline and all of C1, which is what carries ANSI
+ *  escapes and Erfana's char(2)/char(3)/char(4) snippet sentinels. The .max() is
+ *  a CHARACTER backstop; #30 still measures the serialised byte size. */
+export const GraphMcpToolResultSchema = z.object({
+  untrustedContentNotice: z.string().min(1),
+  results: z.array(z.object({
+    filePath: McpText, heading: McpText, snippet: McpText, score: z.number()
+  })).max(MCP.MAX_TOP_K),
+  truncated: z.boolean()
+})
+```
+
+`MCP.MAX_TOP_K` (20) is deliberately lower than the renderer's 100, and `offset` is not exposed at all: every MCP request lands on the synchronous main-thread reader from **outside** the trust boundary, so the cheapest bound is the request shape itself.

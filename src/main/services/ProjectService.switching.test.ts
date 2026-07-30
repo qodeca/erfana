@@ -123,7 +123,8 @@ describe('ProjectService switching – session token orchestration', () => {
       loadSettings: vi.fn(() =>
         Promise.resolve({
           treeHiddenPatterns: [],
-          watcherIgnorePatterns: []
+          watcherIgnorePatterns: [],
+          graphExcludePatterns: []
         })
       ),
       clearSettings: vi.fn()

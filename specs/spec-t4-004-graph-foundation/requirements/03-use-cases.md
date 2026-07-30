@@ -22,10 +22,16 @@
 9. System emits completion event when all files indexed
 10. UI updates status indicator to green "up to date"
 
+> **Erratum (#21, propagating #20):** `project:changed` is renderer-directed IPC (`webContents.send` from `switchProject`), not a service EventEmitter — nothing can `.on()` it. Read step 1's "System detects `project:changed`" as: "`ProjectService.updateServices` (`:125-129`) calls `IGraphProjectLifecycle.onProjectPathChanged`, which synchronously bumps the switch version, aborts pending timers, drops queued batches and detaches the reader, then enqueues **close-then-open** asynchronously off the switch path; teardown mirrors in `rollbackServices` (`:147-159`)." See `specs/designs/sd-021-db-contracts.md` §5.2.
+
 ### Alternative Flows
 - **A1 (Corrupted database):** At step 3, integrity check fails. System prompts user with "Index corrupted. Rebuild?" dialog. On confirm, system deletes database and proceeds from step 4.
 - **A2 (No markdown files):** At step 5, no files discovered. System creates empty database and shows "No content to index" message.
 - **A3 (Large project):** At step 6, more than 1000 files. System shows estimated time and allows background indexing.
+
+> **Erratum (#21):** Corruption recovery is **automatic and silent for the first recovery** — the index is a rebuildable derived cache, so A1's prompt/confirm steps are dropped: there is no modal, no confirmation and no "Rebuild?" dialog; the sequence surfaces only through the status indicator (yellow → green). **A recurring rebuild is not silent:** the budget is `GRAPH.MAX_AUTO_REBUILDS_PER_SESSION` = 2 with a 10-minute cooldown, persisted in `graph_meta` so it survives a restart; on exhaustion Erfana stops rebuilding, enters `disabled` with `GRAPH_DB_REBUILD_FAILED`, and surfaces it. See `specs/designs/sd-021-cross-cutting.md` §9.10.
+
+> **Erratum (#21):** Rebuild is **in place** — `DROP` + recreate in a single transaction on the same `graph.db` — never by deleting or renaming it. A live read-only connection follows an in-place rebuild transparently, but after `unlink()` + recreate it silently serves the deleted inode forever (measured; `data_version` / `schema_version` / `user_version` all fail to detect it), and on Windows unlinking an open file typically fails outright. Read A1's "system deletes database" as "drops and recreates all tables in place". See `specs/designs/sd-021-db-contracts.md` C3 and `specs/designs/sd-021-db-schema.md` §6.6.
 
 ### Postconditions
 - All markdown sections are indexed and searchable
@@ -56,6 +62,8 @@
 9. System removes sections that no longer exist in file
 10. System emits index update completion event
 11. Related sidebar refreshes if affected file is related
+
+> **Erratum (#21, propagating #20):** The literal `file:saved` / `file:created` / `file:deleted` API does not exist — a grep across `src/` returns zero hits — and `FileWatcherService` is a **single-file** watcher for the open editor file, not a project-wide bus. Read step 2's "FileWatcherService emits `file:saved`" as: "`DirectoryWatcherService` emits a coalesced `add`/`change`/`unlink` batch, consumed **main-side** in `processEvents` via the constructor-injected `onCoalescedBatch(dirPath, events, version)` callback at `DirectoryWatcherService.ts:545-546`, where `coalescedEvents` (bound `:518`) is still intact, immediately before the count-only send at `:547`." The renderer `directory-watch:changed` payload carries counts only. See `analysis/20-save-watch-index-pipeline.md`.
 
 ### Alternative Flows
 - **A1 (File deleted during save):** At step 5, file not found. System removes file from index.
@@ -157,6 +165,8 @@
 9. System re-indexes all markdown files (same as UC-001)
 10. System updates corpus statistics in settings panel
 11. System shows completion message with stats
+
+> **Erratum (#21):** Rebuild is **in place** — `DROP` + recreate in a single transaction on the same `graph.db` — never by deleting or renaming it. A live read-only connection follows an in-place rebuild transparently, but after `unlink()` + recreate it silently serves the deleted inode forever (measured; `data_version` / `schema_version` / `user_version` all fail to detect it), and on Windows unlinking an open file typically fails outright. Read step 7's "System deletes existing `graph.db` file" as "drops and recreates all tables in place", and step 4's confirmation copy becomes "This will clear and rebuild the entire index. Continue?". See `specs/designs/sd-021-db-contracts.md` C3 and `specs/designs/sd-021-db-schema.md` §6.6.
 
 ### Alternative Flows
 - **A1 (Cancel):** User cancels at step 5. No changes made.
@@ -261,6 +271,8 @@
    - Deleted: Remove from index
 8. System emits completion event
 9. UI updates if affected content is visible
+
+> **Erratum (#21, propagating #20):** The literal `file:saved` / `file:created` / `file:deleted` API does not exist — a grep across `src/` returns zero hits — and `FileWatcherService` is a **single-file** watcher for the open editor file, not a project-wide bus. Read steps 2–3's "FileWatcherService detects … emits appropriate event" as: "`DirectoryWatcherService` emits a coalesced `add`/`change`/`unlink` batch, consumed **main-side** in `processEvents` via the constructor-injected `onCoalescedBatch(dirPath, events, version)` callback at `DirectoryWatcherService.ts:545-546`, where `coalescedEvents` (bound `:518`) is still intact, immediately before the count-only send at `:547`." The renderer `directory-watch:changed` payload carries counts only. See `analysis/20-save-watch-index-pipeline.md`.
 
 ### Alternative Flows
 - **A1 (Bulk changes):** Many files changed at once (git checkout). System queues all and processes in batches.

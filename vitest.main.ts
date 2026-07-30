@@ -7,7 +7,17 @@ export default defineConfig({
   test: {
     name: 'main',
     environment: 'node',
-    include: ['src/main/**/*.test.{ts,tsx}', 'src/shared/**/*.test.{ts,tsx}', 'scripts/**/*.test.{js,mjs,ts}'],
+    // `scripts/spikes/**`, not `scripts/**`: the spike harness (#21, M31) is
+    // collected as assertions, while `scripts/fuses.test.mjs` and
+    // `scripts/ensure-media-binaries.test.mjs` are pre-existing build-tooling
+    // tests that no config has ever collected. Widening the glob would enrol
+    // them into the required `test` check and the Windows job as a side effect
+    // of an unrelated change — a scope decision, not a glob detail.
+    include: [
+      'src/main/**/*.test.{ts,tsx}',
+      'src/shared/**/*.test.{ts,tsx}',
+      'scripts/spikes/**/*.test.{js,mjs,ts}'
+    ],
     exclude: ['node_modules', 'dist', 'out', 'e2e', 'tests/fixtures'],
     globals: true,
     setupFiles: ['tests/setup/setupTests.main.ts'],

@@ -183,6 +183,40 @@ export enum ErrorCode {
   VIDEO_EXTRACTION_FAILED = 'VIDEO_EXTRACTION_FAILED',
   VIDEO_FFMPEG_UNAVAILABLE = 'VIDEO_FFMPEG_UNAVAILABLE',
 
+  // Graph engine errors (Issue #21)
+  GRAPH_DB_OPEN_FAILED = 'GRAPH_DB_OPEN_FAILED',
+  GRAPH_DB_DIR_NOT_WRITABLE = 'GRAPH_DB_DIR_NOT_WRITABLE',
+  GRAPH_DB_CORRUPTED = 'GRAPH_DB_CORRUPTED',
+  GRAPH_DB_SCHEMA_MISMATCH = 'GRAPH_DB_SCHEMA_MISMATCH',
+  GRAPH_DB_REBUILD_FAILED = 'GRAPH_DB_REBUILD_FAILED',
+  GRAPH_DB_NOT_READY = 'GRAPH_DB_NOT_READY',
+  /** The database file was replaced or removed underneath a live reader. */
+  GRAPH_DB_MOVED = 'GRAPH_DB_MOVED',
+  /** `SQLITE_FULL` / `SQLITE_IOERR_*` — indexing suspends rather than retrying. */
+  GRAPH_DB_DISK_FULL = 'GRAPH_DB_DISK_FULL',
+  GRAPH_FTS5_UNAVAILABLE = 'GRAPH_FTS5_UNAVAILABLE',
+  GRAPH_WORKER_UNAVAILABLE = 'GRAPH_WORKER_UNAVAILABLE',
+  GRAPH_WORKER_TIMEOUT = 'GRAPH_WORKER_TIMEOUT',
+  GRAPH_WORKER_DISABLED = 'GRAPH_WORKER_DISABLED',
+  /** An inbound worker message failed `safeParse` in either direction. */
+  GRAPH_WORKER_PROTOCOL = 'GRAPH_WORKER_PROTOCOL',
+  GRAPH_SEARCH_FAILED = 'GRAPH_SEARCH_FAILED',
+  GRAPH_SEARCH_QUERY_INVALID = 'GRAPH_SEARCH_QUERY_INVALID',
+  GRAPH_INDEX_ALREADY_RUNNING = 'GRAPH_INDEX_ALREADY_RUNNING',
+  GRAPH_INDEX_FILE_UNREADABLE = 'GRAPH_INDEX_FILE_UNREADABLE',
+  GRAPH_INDEX_FILE_TOO_LARGE = 'GRAPH_INDEX_FILE_TOO_LARGE',
+  GRAPH_INDEX_PARSE_FAILED = 'GRAPH_INDEX_PARSE_FAILED',
+  GRAPH_INDEX_BATCH_FAILED = 'GRAPH_INDEX_BATCH_FAILED',
+  /** Never thrown — emitted as a terminal `lastError` by `cancelReindex()`. */
+  GRAPH_INDEX_CANCELLED = 'GRAPH_INDEX_CANCELLED',
+  GRAPH_INDEX_STALE = 'GRAPH_INDEX_STALE',
+  GRAPH_INDEX_PROJECT_CHANGED = 'GRAPH_INDEX_PROJECT_CHANGED',
+
+  // Graph engine MCP server errors (Issue #21)
+  MCP_SERVER_START_FAILED = 'MCP_SERVER_START_FAILED',
+  MCP_SERVER_ALREADY_RUNNING = 'MCP_SERVER_ALREADY_RUNNING',
+  MCP_TOOL_INVALID_ARGS = 'MCP_TOOL_INVALID_ARGS',
+
   // Generic errors
   UNKNOWN_ERROR = 'UNKNOWN_ERROR'
 }
@@ -380,6 +414,37 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   [ErrorCode.VIDEO_NO_AUDIO_TRACK]: 'This video file contains no audio track to transcribe.',
   [ErrorCode.VIDEO_EXTRACTION_FAILED]: 'Failed to extract audio from video file.',
   [ErrorCode.VIDEO_FFMPEG_UNAVAILABLE]: 'Video import requires ffmpeg which is not available.',
+
+  // Graph engine errors (Issue #21)
+  [ErrorCode.GRAPH_DB_OPEN_FAILED]: 'Erfana could not open the search index for this project. Search is unavailable until you reopen the project.',
+  // Markdown code ticks around ".erfana" in SD-021 §9.2 are doc formatting, not user copy.
+  [ErrorCode.GRAPH_DB_DIR_NOT_WRITABLE]: 'Erfana cannot write to this project\'s .erfana folder, so search is unavailable. Check the folder permissions and reopen the project.',
+  [ErrorCode.GRAPH_DB_CORRUPTED]: 'The search index was damaged and is being rebuilt automatically. Results may be incomplete until it finishes.',
+  [ErrorCode.GRAPH_DB_SCHEMA_MISMATCH]: 'The search index was built by a different version of Erfana and is being rebuilt automatically. No action needed.',
+  [ErrorCode.GRAPH_DB_REBUILD_FAILED]: 'Erfana could not rebuild the search index and has stopped trying. Use "Rebuild index" in Settings once the problem is resolved.',
+  [ErrorCode.GRAPH_DB_NOT_READY]: 'The search index is still being prepared. Try again in a moment.',
+  [ErrorCode.GRAPH_DB_MOVED]: 'The search index file was replaced or removed by another program. Erfana has reconnected; results may be incomplete until the next pass.',
+  [ErrorCode.GRAPH_DB_DISK_FULL]: 'Indexing is paused because the disk is full. Free some space and Erfana will resume automatically.',
+  [ErrorCode.GRAPH_FTS5_UNAVAILABLE]: 'This build of Erfana is missing full-text search support, so project search is unavailable. Reinstall or update Erfana.',
+  [ErrorCode.GRAPH_WORKER_UNAVAILABLE]: 'Indexing is paused while Erfana restarts its indexer. Existing search results still work.',
+  [ErrorCode.GRAPH_WORKER_TIMEOUT]: 'Indexing took too long and was stopped. Erfana will retry automatically.',
+  [ErrorCode.GRAPH_WORKER_DISABLED]: 'Indexing has been disabled after repeated failures. Use "Rebuild index" in Settings to try again.',
+  [ErrorCode.GRAPH_WORKER_PROTOCOL]: 'Erfana\'s indexer sent an unexpected message and was restarted. No action needed.',
+  [ErrorCode.GRAPH_SEARCH_FAILED]: 'The search could not be completed. Try a simpler query, or rebuild the index from Settings.',
+  [ErrorCode.GRAPH_SEARCH_QUERY_INVALID]: 'That search query could not be understood. Try plain words without special characters.',
+  [ErrorCode.GRAPH_INDEX_ALREADY_RUNNING]: 'Indexing is already running. Watch the status indicator for progress.',
+  [ErrorCode.GRAPH_INDEX_FILE_UNREADABLE]: 'A file could not be read while indexing and was skipped. Check that it still exists and is readable.',
+  [ErrorCode.GRAPH_INDEX_FILE_TOO_LARGE]: 'A file was too large to index and was skipped.',
+  [ErrorCode.GRAPH_INDEX_PARSE_FAILED]: 'A file could not be parsed while indexing and was skipped.',
+  [ErrorCode.GRAPH_INDEX_BATCH_FAILED]: 'Part of the index update failed. Erfana is reconciling the affected files automatically.',
+  [ErrorCode.GRAPH_INDEX_CANCELLED]: 'Indexing was cancelled. The index stays incomplete until you run it again.',
+  [ErrorCode.GRAPH_INDEX_STALE]: 'Too many files changed at once, so some updates were dropped. Erfana is reconciling the index now.',
+  [ErrorCode.GRAPH_INDEX_PROJECT_CHANGED]: 'Indexing stopped because the project changed. The new project is being indexed instead.',
+
+  // Graph engine MCP server errors (Issue #21)
+  [ErrorCode.MCP_SERVER_START_FAILED]: 'Erfana could not start its MCP server, so Claude Code cannot query this project. Restart Erfana to try again.',
+  [ErrorCode.MCP_SERVER_ALREADY_RUNNING]: 'An MCP server is already running for this Erfana window.',
+  [ErrorCode.MCP_TOOL_INVALID_ARGS]: 'The MCP tool was called with invalid arguments. Check the query and try again.',
 
   // Generic errors
   [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred'

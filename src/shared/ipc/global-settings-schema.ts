@@ -45,6 +45,24 @@ export const GitStatusSettingsSchema = z.object({
 export type GitStatusSettings = z.infer<typeof GitStatusSettingsSchema>
 
 /**
+ * Graph engine configuration (global, user-level)
+ *
+ * Only the FR-042 MCP rate limit lives here — the per-project exclude list is
+ * project settings, not global. Every field is `.optional()`, and the section
+ * itself is attached with `.optional()` rather than `.default()` unlike every
+ * other section above, so parsing an existing `~/.erfana/settings.json` does
+ * not materialise a `graph` key and nothing new is written back.
+ *
+ * @see Issue #21 - graph R1 architecture (schema); #30 consumes it
+ * @see specs/designs/sd-021-cross-cutting.md §9.1 row 6a
+ */
+export const GraphGlobalSettingsSchema = z.object({
+  /** Advisory MCP requests-per-minute ceiling; defaults to `MCP.RATE_LIMIT_PER_MINUTE`. */
+  mcpRateLimitPerMinute: z.number().int().min(1).max(10_000).optional()
+})
+export type GraphGlobalSettings = z.infer<typeof GraphGlobalSettingsSchema>
+
+/**
  * Root schema for ~/.erfana/settings.json
  */
 export const GlobalSettingsSchema = z.object({
@@ -61,7 +79,9 @@ export const GlobalSettingsSchema = z.object({
     backend: 'openai' as const,
     openaiApiKeyStored: false,
     whisperModel: 'base' as const
-  }))
+  })),
+  /** Graph engine configuration — optional, so it is never written by default */
+  graph: GraphGlobalSettingsSchema.optional()
 })
 export type GlobalSettings = z.infer<typeof GlobalSettingsSchema>
 

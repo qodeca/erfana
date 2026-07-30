@@ -54,3 +54,15 @@ playwright-report/
 
 # Superpowers visual brainstorm scratch
 .superpowers/
+
+# Graph search index (derived cache, issue #21)
+# Scoped to the DB artifacts only - .erfana/settings.json stays tracked.
+# The first three mirror GRAPH.DB_ARTIFACTS in src/shared/graph-constants.ts
+# (the in-process watcher/tree/discovery filter); -journal is NOT in that list
+# because it is not produced in WAL mode - SQLite writes it only if WAL setup
+# fails or a fallback to rollback journalling occurs, which is exactly the case
+# where a stray artifact would otherwise be offered for commit.
+.erfana/graph.db
+.erfana/graph.db-wal
+.erfana/graph.db-shm
+.erfana/graph.db-journal

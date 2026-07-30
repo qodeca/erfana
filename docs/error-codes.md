@@ -2,7 +2,7 @@
 
 Project-wide index of `ErrorCode` values in `src/shared/errors.ts`, grouped by category. For each code: the enum name, the user-facing message (from `ERROR_MESSAGES` map), and the primary throw site. For whisper + transcription codes, also the operator action on encounter.
 
-**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)); the full enum has grown to ~100 codes. A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
+**Why this document exists**: Phase 4 introduced 6 new whisper codes (see [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)) and issue #21 another 26 graph/MCP codes; the full enum has grown to ~130 codes. A single mapping table saves every future maintainer a `grep -r ErrorCode` sweep.
 
 **Source of truth**: `src/shared/errors.ts`. If this doc drifts, `errors.ts` wins — file an issue.
 
@@ -122,6 +122,43 @@ Most Phase 4 / issue #165. See also [`docs/windows/whisper-support-runbook.md`](
 ## Video import (3 codes)
 
 `VIDEO_NO_AUDIO_TRACK`, `VIDEO_EXTRACTION_FAILED`, `VIDEO_FFMPEG_UNAVAILABLE`. See `src/main/services/AudioExtractionService.ts`.
+
+---
+
+## Graph engine (26 codes)
+
+Issue #21 commits the **codes and copy only** — no throw site exists yet. The "primary throw site" column names the module that will own each code, per [`specs/designs/sd-021-graph-architecture.md`](../specs/designs/sd-021-graph-architecture.md) §4.2 and [`sd-021-cross-cutting.md`](../specs/designs/sd-021-cross-cutting.md) §9.2. The renderer maps every one of these through `ERROR_MESSAGES` into the graph status indicator; only a subset ever reaches a toast.
+
+Not every code is thrown: `GRAPH_INDEX_CANCELLED` is emitted as a terminal `lastError` by `GraphLifecycle.cancelReindex()`, and `GRAPH_SEARCH_QUERY_INVALID` is unreachable from user input because the FTS5 sanitiser short-circuits an empty token set before touching SQLite.
+
+| Code | User copy | Primary throw site |
+|------|-----------|--------------------|
+| `GRAPH_DB_OPEN_FAILED` | "Erfana could not open the search index for this project..." | `GraphDatabase.open()` — `SQLITE_NOTADB`, or a symlinked `.erfana` / `graph.db` failing closed |
+| `GRAPH_DB_DIR_NOT_WRITABLE` | "Erfana cannot write to this project's .erfana folder..." | `GraphDatabase` writer-side directory probe (contract C7) |
+| `GRAPH_DB_CORRUPTED` | "The search index was damaged and is being rebuilt automatically..." | `integrity_check` / FTS integrity audit on open |
+| `GRAPH_DB_SCHEMA_MISMATCH` | "...built by a different version of Erfana and is being rebuilt..." | `graph_meta.schema_version` gate on open |
+| `GRAPH_DB_REBUILD_FAILED` | "Erfana could not rebuild the search index and has stopped trying..." | Rebuild failure, or the `MAX_AUTO_REBUILDS_PER_SESSION` budget exhausting |
+| `GRAPH_DB_NOT_READY` | "The search index is still being prepared. Try again in a moment." | Worker receives `index` before a successful `open`; search before reader attach |
+| `GRAPH_DB_MOVED` | "The search index file was replaced or removed by another program..." | `GraphReadConnection.verifyIdentity()` returning false |
+| `GRAPH_DB_DISK_FULL` | "Indexing is paused because the disk is full..." | `SQLITE_FULL` / `SQLITE_IOERR_*`, or the free-space pre-flight |
+| `GRAPH_FTS5_UNAVAILABLE` | "This build of Erfana is missing full-text search support..." | `sqlite_compileoption_used('ENABLE_FTS5')` assertion — permanent, no retry |
+| `GRAPH_WORKER_UNAVAILABLE` | "Indexing is paused while Erfana restarts its indexer..." | `GraphWorkerSupervisor` on a non-zero worker `exit` |
+| `GRAPH_WORKER_TIMEOUT` | "Indexing took too long and was stopped. Erfana will retry automatically." | `GraphIndexWorkerAdapter` per-request timeout |
+| `GRAPH_WORKER_DISABLED` | "Indexing has been disabled after repeated failures..." | `GraphCircuitBreaker` opening — the sole terminal authority |
+| `GRAPH_WORKER_PROTOCOL` | "Erfana's indexer sent an unexpected message and was restarted..." | `safeParse` failure at either end of the worker boundary |
+| `GRAPH_SEARCH_FAILED` | "The search could not be completed..." | `GraphSearchService` query execution |
+| `GRAPH_SEARCH_QUERY_INVALID` | "That search query could not be understood..." | Reserved — the sanitiser makes this unreachable from user input |
+| `GRAPH_INDEX_ALREADY_RUNNING` | "Indexing is already running. Watch the status indicator for progress." | `graph:reindex` while a pass is in flight |
+| `GRAPH_INDEX_FILE_UNREADABLE` | "A file could not be read while indexing and was skipped..." | Worker read step — carried back in `skippedFiles`, never thrown to the renderer |
+| `GRAPH_INDEX_FILE_TOO_LARGE` | "A file was too large to index and was skipped." | `GRAPH.MAX_INDEXED_FILE_BYTES` pre-read check (8 MB) |
+| `GRAPH_INDEX_PARSE_FAILED` | "A file could not be parsed while indexing and was skipped." | Markdown section extraction; also the aggregate code for a skipping pass |
+| `GRAPH_INDEX_BATCH_FAILED` | "Part of the index update failed..." | Write-transaction failure; also the quarantine code for a poison file |
+| `GRAPH_INDEX_CANCELLED` | "Indexing was cancelled..." | `GraphLifecycle.cancelReindex()` — a terminal `lastError`, not a throw |
+| `GRAPH_INDEX_STALE` | "Too many files changed at once, so some updates were dropped..." | `GraphIndexQueue` overflow |
+| `GRAPH_INDEX_PROJECT_CHANGED` | "Indexing stopped because the project changed..." | `switchVersion` fence mismatch (logged at `debug`, also the MCP port-fence reply) |
+| `MCP_SERVER_START_FAILED` | "Erfana could not start its MCP server..." | `McpEndpoint` socket / named-pipe listen failure |
+| `MCP_SERVER_ALREADY_RUNNING` | "An MCP server is already running for this Erfana window." | Second `McpEndpoint` start — one endpoint per process |
+| `MCP_TOOL_INVALID_ARGS` | "The MCP tool was called with invalid arguments..." | Tool-input schema rejection at the MCP boundary |
 
 ---
 

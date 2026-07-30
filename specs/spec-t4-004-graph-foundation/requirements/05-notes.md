@@ -20,6 +20,8 @@ Heavy computation (indexing) should use worker threads or be chunked to avoid bl
 
 > **Native-dependency spike (#19 / SD-019):** the prebuild-coverage, FTS5, worker-concurrency, and MCP-SDK questions in this section and under Dependencies are empirically de-risked in the spike findings note — see [`docs/graph/native-dependencies.md`](../../../docs/graph/native-dependencies.md) (consumed by #23 DB layer / #30 MCP server).
 
+> **Erratum (#21):** Both supported arches are confirmed — mac-arm64 (signed + notarized) and win-x64 (signed) packaged smokes pass (`docs/graph/native-dependencies.md:275-278`, run 30102038426), so "mac-arm64 … remains to be confirmed at pin time" above is stale. SD-019 proved **handle coexistence**, explicitly not shared-file concurrency (both smokes used `:memory:`, `:295-301`). The shared-WAL-file topology this spec depends on is separately evidenced in SD-021 §3.2; that evidence is a **one-off local observation until** `scripts/spikes/graph-wal-concurrency.test.mjs` lands and runs in CI (M31).
+
 ### FTS5 limitations
 
 - FTS5 provides BM25 ranking but no semantic/vector search
@@ -85,6 +87,8 @@ FTS5 + BM25 re-affirmed for M1 at this scale (≤10k sections, <50ms p95):
 | better-sqlite3 | ^13.x | SQLite database with FTS5 (N-API line; required for Electron 39 – v12 and older fail to compile against Electron 39's V8, which removed Context::GetIsolate) |
 | @modelcontextprotocol/sdk | ^1.x (SD-019 pins `1.29.0`) | MCP server implementation via the v1 SDK `registerTool` API (protocol rev 2025-11-25). SD-019 **rejected `@modelcontextprotocol/server@2.x` (beta-only)** and pinned v1; the v1→v2 SDK split (`@modelcontextprotocol/server` + `/client`) is a deferred #30 migration once v2 stabilizes, and #30 also moves the SDK from `devDependencies` to `dependencies` when a real transport ships – see [`native-dependencies.md`](../../../docs/graph/native-dependencies.md) §1/§8 |
 
+> **Erratum (#21):** Both pins are exact, not caret ranges: `better-sqlite3` `"13.0.1"` in `dependencies` (`package.json:45`); `@modelcontextprotocol/sdk` `"1.29.0"` in **`devDependencies`** (`:68`), moving to `dependencies` in #30.
+
 ### Internal dependencies
 
 | Service | Purpose |
@@ -93,11 +97,15 @@ FTS5 + BM25 re-affirmed for M1 at this scale (≤10k sections, <50ms p95):
 | ProjectManagementContext | Current project path |
 | LoggingService | Structured logging |
 
+> **Erratum (#21):** The source of project-wide file change events is **`DirectoryWatcherService`** (`:504-554`). `FileWatcherService` watches only the open editor file.
+
 ### Build dependencies
 
 - `better-sqlite3` >= 13 uses N-API prebuilt binaries in the common case; Python and C++ toolchain retained for source-build fallback
 - The build ships `asar: false`, so the `.node` binary loads from the unpacked `resources/app/node_modules/better-sqlite3/prebuilds/` tree – no `asarUnpack` is used; the win-x64 packaged smoke confirmed this load path (SD-019)
 - electron-rebuild / source-build remains the documented fallback if a prebuild does not cover the target Electron/platform. win-x64 prebuild coverage is verified (SD-019, 2026-07-24); mac-arm64 remains to be confirmed at pin time
+
+> **Erratum (#21):** Both supported arches are confirmed — mac-arm64 (signed + notarized) and win-x64 (signed) packaged smokes pass (`docs/graph/native-dependencies.md:275-278`, run 30102038426), so "mac-arm64 remains to be confirmed at pin time" above is stale. SD-019 proved **handle coexistence**, explicitly not shared-file concurrency (both smokes used `:memory:`, `:295-301`). The shared-WAL-file topology this spec depends on is separately evidenced in SD-021 §3.2; that evidence is a **one-off local observation until** `scripts/spikes/graph-wal-concurrency.test.mjs` lands and runs in CI (M31).
 
 ## Out of Scope (Deferred)
 

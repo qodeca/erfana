@@ -35,6 +35,8 @@ The system shall track schema version in a metadata table and apply migrations a
 
 **Acceptance:** Upgrading from schema v1 to v2 applies migrations without data loss.
 
+> **Erratum (#21):** During beta there are **no data-preserving migrations**. The database is a derived cache (05-notes "Contract stability"), so a schema-version mismatch — **higher or lower** — discards all indexed data and triggers a full reindex, **in place**: `DROP` + recreate in one transaction on the same file, never `unlink()` and never `rename()`, because a live read-only handle keeps serving a deleted inode and no PRAGMA detects it. Version lives in `graph_meta.schema_version` (`value_int`, not `value` — TEXT affinity would return `'1'` and fail the `===` gate on every open). See `specs/designs/sd-021-db-contracts.md` C3 and `specs/designs/sd-021-db-schema.md` §6.6.
+
 ---
 
 #### 004-FR-004: Execute database integrity checks on startup
@@ -45,6 +47,8 @@ The system shall track schema version in a metadata table and apply migrations a
 The system shall run `PRAGMA integrity_check` on startup and report any corruption to the user with recovery options.
 
 **Acceptance:** Corrupted database triggers warning dialog with "Rebuild Index" option.
+
+> **Erratum (#21):** Corruption recovery is **automatic and silent for the first recovery** — the index is a rebuildable derived cache, so there is no modal, no confirmation and no "Rebuild?" prompt; the sequence surfaces only through the status indicator (yellow → green). Read this requirement's "report … with recovery options" as "detect on startup, recover automatically, and surface state through the status indicator". **A recurring rebuild is not silent:** the budget is `GRAPH.MAX_AUTO_REBUILDS_PER_SESSION` = 2 with a 10-minute cooldown, persisted in `graph_meta` so it survives a restart; on exhaustion Erfana stops rebuilding, enters `disabled` with `GRAPH_DB_REBUILD_FAILED`, and surfaces it. The manual "Rebuild index" button (004-FR-033) is unaffected and resets the budget. See `specs/designs/sd-021-cross-cutting.md` §9.10.
 
 ---
 
@@ -137,6 +141,8 @@ The system shall split markdown files into sections based on heading hierarchy (
 The system shall compare content hashes to identify changed sections and update only those sections, avoiding full re-indexing on each file save.
 
 **Acceptance:** Saving file with one changed section re-indexes only that section, not entire file.
+
+> **Erratum (#21):** The write path re-indexes at **file** granularity: an unchanged file is short-circuited on `files.file_hash`, and a changed file has its sections deleted and re-inserted with fresh ids rather than upserted per ordinal. Section-level upsert was rejected because it strands trailing `sections` and `sections_fts` rows when an edited file yields fewer sections, never decrements `contents.ref_count`, and drifts every counter — and because FTS5 rows must then be `UPDATE`d at a retained rowid, which nothing in the spec described. Read the acceptance above as "only changed **files** are re-indexed; an unchanged file performs zero writes". See `specs/designs/sd-021-db-schema.md` §6.7.
 
 ---
 
@@ -425,6 +431,8 @@ The system shall display a status dot indicating indexing state: green (up to da
 
 **Acceptance:** Dot is green when idle, yellow during indexing, red on database error.
 
+> **Erratum (#21):** A fourth **grey** value is added for the null state (no project open / not yet initialised). Green/yellow/red keep their meanings above; grey means "nothing to report". The snapshot also carries `searchAvailable`, orthogonal to the dot: yellow + `true` = "index behind", red + `false` = "search is broken". Without that split the 004-FR-037/004-FR-038 UI cannot render the difference. Additionally, **green is reserved for a zero-skip pass**: a pass that skipped files ends `degraded` with "Indexed with {n} files skipped". See `specs/designs/sd-021-ipc-contracts.md`.
+
 ---
 
 #### 004-FR-038: Show queue and error details on click
@@ -448,6 +456,8 @@ The system shall show detailed indexing information when user clicks the status 
 The system shall implement an MCP server using stdio transport that exposes graph engine capabilities to Claude Code. The server shall be built on the MCP TypeScript SDK v2 (`@modelcontextprotocol/server`, `registerTool` API) targeting protocol revision 2026-07-28; if v2 is not yet stable at implementation time, use `@modelcontextprotocol/sdk` latest v1.x targeting revision 2025-11-25. Until the beta freeze (see notes §Contract stability), tool descriptions shall carry a beta disclaimer.
 
 **Acceptance:** MCP server responds to initialize/shutdown protocol messages.
+
+> **Erratum (#21):** The v2-first ordering above is inverted relative to the shipped decision. SD-019 **rejected `@modelcontextprotocol/server@2.x` as beta-only** and pinned `@modelcontextprotocol/sdk@1.29.0` (rev 2025-11-25). Read this requirement as "built on `@modelcontextprotocol/sdk` v1 pinned at 1.29.0 using `registerTool`; the v1→v2 migration is a tracked #30 follow-up." Note also that the "stdio transport" clause is refined by `specs/designs/sd-021-cross-cutting.md` §9.4: Erfana hosts an ACL'd local socket and ships a **client-spawned** stdio bridge.
 
 ---
 
@@ -481,6 +491,8 @@ The system shall execute search queries received via MCP and return formatted re
 The system shall apply configurable, advisory rate limiting to MCP queries (default 100 queries/minute) using backpressure (queue-and-delay) rather than hard rejection; the limit exists as runaway-query cost protection for a local single-client stdio server and shall be adjustable in settings.
 
 **Acceptance:** Queries beyond the configured rate are queued and delayed, not rejected; all queries eventually complete.
+
+> **Erratum (#21):** "Queued and delayed, not rejected" assumes a transport with flow control. `MessagePortMain` has none — `postMessage` never blocks and queues unconditionally — so unbounded delay-queueing is not backpressure; it is an unbounded main-process queue a looping client can grow without limit, each entry landing on the synchronous main-thread reader from outside the trust boundary. Read this requirement as: "apply advisory rate limiting with a bounded queue (`MCP.MAX_INFLIGHT` = 4, `MCP.MAX_QUEUE_DEPTH` = 32); requests beyond the bound receive a typed `graph:throttled` response carrying `retryAfterMs`, which the client is expected to honour. This is a rejection in transport terms and a delay in client terms." See `specs/designs/sd-021-cross-cutting.md` §9.5.
 
 ---
 
@@ -670,6 +682,8 @@ The system shall detect database corruption on startup and offer automatic recov
 
 **Verification:** Corrupt database file triggers rebuild prompt.
 
+> **Erratum (#21):** Read "offer automatic recovery" as "**perform** automatic recovery" — recovery is automatic and silent for the first recovery, with no prompt; the sequence surfaces only through the status indicator (yellow → green). A recurring rebuild is not silent: `GRAPH.MAX_AUTO_REBUILDS_PER_SESSION` = 2 with a 10-minute cooldown, persisted in `graph_meta`; on exhaustion Erfana enters `disabled` with `GRAPH_DB_REBUILD_FAILED`. See `specs/designs/sd-021-cross-cutting.md` §9.10.
+
 ---
 
 ### 004-NFR-008: Worker thread recovery
@@ -691,6 +705,8 @@ The system shall restart failed worker threads (if using worker-based architectu
 The system shall use structured logging (JSON format) for all significant operations including indexing, search, and errors.
 
 **Verification:** Log output parseable; contains operation context.
+
+> **Erratum (#21):** "JSON format" is **not** satisfied by the current logger: the file transport is a plaintext template (`LoggingService.ts:245`), `formatMessage` emits `` `${message} ${JSON.stringify(context)}` `` (`:498`), and `formatErrorMessage` joins parts with `' | '` (`:522`) — no log line is a JSON object. Two ways forward, and the choice belongs to the **JSON log transport** parcel (`(new issue — not yet created)`), not to #31, which is chartered to verify and today has nothing to verify: **(a)** add a JSON file transport (electron-log accepts a `format` function returning a serialised object, so `instanceId`, level, timestamp, message and context become fields); or **(b)** narrow this NFR to "**a human-readable message followed by a single-line JSON context object**", whose parse recipe is: take everything from the first `{` to the end of line and `JSON.parse` it; entries with no context have none. Duration metrics are satisfied by `specs/designs/sd-021-worker-contracts.md` §8.8's phase fields; stack traces are **already automatic** (`LoggingService.ts:511-513`). **Until (a) or (b) lands, this NFR is open** and must not be ticked.
 
 ---
 
