@@ -329,7 +329,7 @@ const CONFINED_PATH_MESSAGE =
  * Factory for the shared confined-relative-path field: a bounded, non-empty
  * string refined by {@link isConfinedRelativePath}. The length bound `n` is the
  * only free parameter — each boundary passes its own ceiling
- * (`MAX_STATUS_PATH_LENGTH` on the status surface, `4096`/`MAX_RESULT_BYTES`
+ * (`MAX_STATUS_PATH_LENGTH` on the status surface, `4096`/`MAX_RESULT_CHARS`
  * elsewhere).
  *
  * `truncatable: true` swaps in {@link isConfinedTruncatedPath} for the three

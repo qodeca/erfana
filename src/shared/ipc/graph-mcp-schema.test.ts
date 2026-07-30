@@ -124,6 +124,35 @@ describe('GraphMcpToolArgsSchema', () => {
       expect(parsed.filters?.folder).toBe('docs/')
     })
 
+    // [#21] The renderer filters LEAF carries the modifiedAfterMs <= modifiedBeforeMs
+    // refine, but the MCP filter set omits excludeSectionId off the UNREFINED base
+    // (.omit() throws on a refined object), so the joint bound is re-attached to the
+    // MCP filters leaf. Without it an inverted range would silently reach the
+    // external-client reader and return nothing.
+    it('rejects an inverted modified* range', () => {
+      expect(
+        GraphMcpToolArgsSchema.safeParse({
+          query: 'a',
+          filters: { modifiedAfterMs: 2, modifiedBeforeMs: 1 }
+        }).success
+      ).toBe(false)
+    })
+
+    it('accepts an ordered modified* range and either bound alone', () => {
+      expect(
+        GraphMcpToolArgsSchema.safeParse({
+          query: 'a',
+          filters: { modifiedAfterMs: 1, modifiedBeforeMs: 2 }
+        }).success
+      ).toBe(true)
+      expect(
+        GraphMcpToolArgsSchema.safeParse({ query: 'a', filters: { modifiedAfterMs: 5 } }).success
+      ).toBe(true)
+      expect(
+        GraphMcpToolArgsSchema.safeParse({ query: 'a', filters: { modifiedBeforeMs: 5 } }).success
+      ).toBe(true)
+    })
+
     it('still rejects an unknown filter key after the omit', () => {
       expect(
         GraphMcpToolArgsSchema.safeParse({ query: 'a', filters: { excludeSection: 3 } }).success
@@ -238,15 +267,48 @@ describe('GraphMcpToolResultSchema', () => {
       ).toBe(false)
     })
 
-    it.each(['filePath', 'heading', 'snippet'])('bounds %s at MCP.MAX_RESULT_BYTES', (field) => {
-      const atCap = { ...TOOL_RESULT.results[0], [field]: 'x'.repeat(MCP.MAX_RESULT_BYTES) }
-      const overCap = { ...TOOL_RESULT.results[0], [field]: 'x'.repeat(MCP.MAX_RESULT_BYTES + 1) }
+    it.each(['filePath', 'heading', 'snippet'])('bounds %s at MCP.MAX_RESULT_CHARS', (field) => {
+      const atCap = { ...TOOL_RESULT.results[0], [field]: 'x'.repeat(MCP.MAX_RESULT_CHARS) }
+      const overCap = { ...TOOL_RESULT.results[0], [field]: 'x'.repeat(MCP.MAX_RESULT_CHARS + 1) }
       expect(GraphMcpToolResultSchema.safeParse({ ...TOOL_RESULT, results: [atCap] }).success).toBe(
         true
       )
       expect(
         GraphMcpToolResultSchema.safeParse({ ...TOOL_RESULT, results: [overCap] }).success
       ).toBe(false)
+    })
+
+    // [#21] The per-field char caps bound each string but not the JSON envelope,
+    // and `.max()` counts UTF-16 CODE UNITS, not bytes — so a field of multi-byte
+    // characters can sit within its char cap yet carry ~3x its length in bytes.
+    // This is the exact defect the rename fixes: every field is individually
+    // legal, but the serialised BYTES of a full result set exceed the response
+    // budget, and only the object-level byte refine catches it.
+    it('rejects a result whose serialised bytes exceed MCP.MAX_RESPONSE_BYTES', () => {
+      const CJK = '好' // a 3-byte UTF-8 code point, model-safe (not control/bidi/tag)
+      const fatResult = {
+        ...TOOL_RESULT.results[0],
+        heading: CJK.repeat(MCP.MAX_RESULT_CHARS),
+        snippet: CJK.repeat(MCP.MAX_RESULT_CHARS)
+      }
+      const oversized = {
+        ...TOOL_RESULT,
+        results: Array.from({ length: MCP.MAX_TOP_K }, () => fatResult)
+      }
+      // Every field is within its own CHARACTER cap...
+      expect(fatResult.heading.length).toBeLessThanOrEqual(MCP.MAX_RESULT_CHARS)
+      // ...yet its multi-byte encoding blows the response BYTE budget.
+      expect(new TextEncoder().encode(JSON.stringify(oversized)).length).toBeGreaterThan(
+        MCP.MAX_RESPONSE_BYTES
+      )
+      expect(GraphMcpToolResultSchema.safeParse(oversized).success).toBe(false)
+    })
+
+    it('accepts a normal-sized result within the response byte budget', () => {
+      expect(
+        new TextEncoder().encode(JSON.stringify(TOOL_RESULT)).length
+      ).toBeLessThanOrEqual(MCP.MAX_RESPONSE_BYTES)
+      expect(GraphMcpToolResultSchema.safeParse(TOOL_RESULT).success).toBe(true)
     })
 
     // char(2)/char(3)/char(4) are Erfana's own snippet sentinels, ESC opens

@@ -261,8 +261,11 @@ export const MCP = {
   MAX_INFLIGHT: 4,
   MAX_QUEUE_DEPTH: 32,
   MAX_TOP_K: 20,                          // lower than the renderer's (M7)
-  MAX_RESULT_BYTES: 8 * 1024,
-  MAX_RESPONSE_BYTES: 64 * 1024,
+  // CHARACTER cap (z.string().max() counts UTF-16 code units, not bytes), sized as
+  // MAX_RESPONSE_BYTES / (3 × MAX_TOP_K) = 1092 so MAX_TOP_K × 3 fields × cap cannot
+  // exceed the response byte budget even at 3 bytes/char ([#21]).
+  MAX_RESULT_CHARS: Math.floor((64 * 1024) / (3 * 20)),   // 1092
+  MAX_RESPONSE_BYTES: 64 * 1024,          // byte cap — bounds the serialised envelope
   BETA_DISCLAIMER: 'beta – contract may change'
 } as const
 ```

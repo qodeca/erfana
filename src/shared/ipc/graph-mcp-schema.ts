@@ -28,6 +28,8 @@ import {
   GraphOutboundCorrelationIdSchema,
   GraphSearchFiltersBaseSchema,
   GraphSearchRequestBaseSchema,
+  MODIFIED_RANGE_REFINE,
+  isAscendingModifiedRange,
   isModelSafeText
 } from './graph-schema'
 
@@ -67,7 +69,14 @@ export const GraphMcpToolArgsSchema = GraphSearchRequestBaseSchema.pick({
   filters: true
 }).extend({
   k: z.number().int().min(1).max(MCP.MAX_TOP_K).default(GRAPH.DEFAULT_TOP_K),
-  filters: GraphSearchFiltersBaseSchema.omit({ excludeSectionId: true }).optional()
+  // The renderer filters LEAF carries the `modifiedAfterMs <= modifiedBeforeMs`
+  // refine, but the MCP filter set omits `excludeSectionId` off the unrefined
+  // BASE (`.omit()` throws on a refined object), so the same joint bound is
+  // re-attached here — otherwise an inverted range would silently reach the
+  // external-client reader and return nothing.
+  filters: GraphSearchFiltersBaseSchema.omit({ excludeSectionId: true })
+    .refine(isAscendingModifiedRange, MODIFIED_RANGE_REFINE)
+    .optional()
 })
 /**
  * `…Args`, not `…Input`. The schema keeps the name of the MCP field it
@@ -86,7 +95,7 @@ export type GraphMcpToolArgs = z.output<typeof GraphMcpToolArgsSchema>
  *  and Unicode-tag smuggling vectors. */
 const McpTextSchema = z
   .string()
-  .max(MCP.MAX_RESULT_BYTES)
+  .max(MCP.MAX_RESULT_CHARS)
   .refine(isModelSafeText, {
     message:
       'must not contain control, bidi or Unicode tag characters (tab/newline allowed)'
@@ -100,7 +109,7 @@ const McpTextSchema = z
  * result crossing the external-client boundary cannot leak the user's
  * home-directory layout.
  */
-const McpFilePathSchema = ConfinedRelativePathSchema(MCP.MAX_RESULT_BYTES).refine(
+const McpFilePathSchema = ConfinedRelativePathSchema(MCP.MAX_RESULT_CHARS).refine(
   isModelSafeText,
   {
     message:
@@ -127,12 +136,17 @@ const McpFilePathSchema = ConfinedRelativePathSchema(MCP.MAX_RESULT_BYTES).refin
  *    `\t`/`\n`) or C1 (`U+0080`–`U+009F`), so the strip #30 performs is verified
  *    rather than assumed: ANSI escapes and the `char(2)`/`char(3)`/`char(4)`
  *    snippet sentinels must never leave Erfana.
- * 3. `MCP.MAX_RESULT_BYTES` per result and `MCP.MAX_RESPONSE_BYTES` per response,
- *    measured after serialisation; on truncation `truncated` is set so the model
- *    is told the view is partial rather than silently receiving a clipped corpus.
- *    The `.max()` bounds below are CHARACTER counts, a cheap backstop that pins
- *    the order of magnitude — #30 still measures the serialised byte size, which
- *    for non-ASCII text is up to 4x higher.
+ * 3. `MCP.MAX_RESULT_CHARS` per model-facing text field and
+ *    `MCP.MAX_RESPONSE_BYTES` per response. The per-field `.max()` bounds are
+ *    CHARACTER counts (`z.string().max()` measures UTF-16 code units, not bytes),
+ *    sized so `MAX_TOP_K × 3 fields × MAX_RESULT_CHARS` cannot exceed the response
+ *    byte budget even at the UTF-8 worst case of 3 bytes/char ([#21]). Because
+ *    per-field char caps alone do not bound the JSON envelope (keys, structure,
+ *    `score`), the true per-response backstop is the object-level
+ *    serialised-length refine below, which measures `TextEncoder`-encoded BYTES
+ *    against `MCP.MAX_RESPONSE_BYTES`. On truncation `truncated` is set so the
+ *    model is told the view is partial rather than silently receiving a clipped
+ *    corpus.
  *
  * `results` is capped at `MCP.MAX_TOP_K`, matching the input bound: an
  * unbounded array would let a mis-sized response through the one schema a
@@ -142,20 +156,29 @@ const McpFilePathSchema = ConfinedRelativePathSchema(MCP.MAX_RESULT_BYTES).refin
  * absolute, so a tool result cannot leak the user's home-directory layout — now
  * enforced by {@link McpFilePathSchema}, not just documented.
  */
-export const GraphMcpToolResultSchema = z.object({
-  untrustedContentNotice: z.literal(MCP.UNTRUSTED_NOTICE),
-  results: z
-    .array(
-      z.object({
-        filePath: McpFilePathSchema,
-        heading: McpTextSchema,
-        snippet: McpTextSchema,
-        score: z.number()
-      })
-    )
-    .max(MCP.MAX_TOP_K),
-  truncated: z.boolean()
-})
+export const GraphMcpToolResultSchema = z
+  .object({
+    untrustedContentNotice: z.literal(MCP.UNTRUSTED_NOTICE),
+    results: z
+      .array(
+        z.object({
+          filePath: McpFilePathSchema,
+          heading: McpTextSchema,
+          snippet: McpTextSchema,
+          score: z.number()
+        })
+      )
+      .max(MCP.MAX_TOP_K),
+    truncated: z.boolean()
+  })
+  // The true per-response backstop: per-field CHARACTER caps bound the fields but
+  // not the serialised JSON envelope. `TextEncoder`, not `Buffer.byteLength`,
+  // because this module is renderer-reachable through the IPC layer and `Buffer`
+  // is a Node-only global absent in the sandboxed renderer — `TextEncoder` is a
+  // Web/Node standard and gives the same UTF-8 byte length in both processes.
+  .refine((v) => new TextEncoder().encode(JSON.stringify(v)).length <= MCP.MAX_RESPONSE_BYTES, {
+    message: `serialised result must not exceed MCP.MAX_RESPONSE_BYTES (${MCP.MAX_RESPONSE_BYTES} bytes)`
+  })
 export type GraphMcpToolResult = z.output<typeof GraphMcpToolResultSchema>
 
 // ─── main ↔ utilityProcess port ──────────────────────────────────────────────

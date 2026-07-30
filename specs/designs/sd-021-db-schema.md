@@ -246,7 +246,7 @@ WHERE sections_fts MATCH :match
   AND (:excludeKey   IS NULL OR f.path_key <> :excludeKey)
   AND (:excludeSection IS NULL OR s.id <> :excludeSection)
 ORDER BY score
-LIMIT :probeLimit;                       -- GRAPH.MAX_COUNT_PROBE
+LIMIT :probeLimit;                       -- min(GRAPH.MAX_COUNT_PROBE, offset + k + 1)  (#21 [19])
 
 -- phase 2: hydrate ONLY the returned page (≤ MAX_TOP_K rowids).
 SELECT s.id AS sectionId, f.path AS filePath, s.heading, s.heading_path AS headingPath,
@@ -260,7 +260,7 @@ JOIN files    f ON f.id = s.file_id
 WHERE sections_fts MATCH :match AND sections_fts.rowid IN (SELECT value FROM json_each(:ids));
 ```
 
-Phase 1 doubles as the probe: it returns up to `MAX_COUNT_PROBE` ranked rowids, so `totalMatched = rows.length`, `totalMatchedCapped = rows.length === MAX_COUNT_PROBE`, and the page is `rows.slice(offset, offset + k)`. **This removes the separate `searchProbe` query entirely** (m6) — revision 2 ran the MATCH, both joins and all six filter expressions twice, unconditionally, including when `offset === 0 && results.length < k` where the answer was already known.
+Phase 1 doubles as the probe: `:probeLimit` is bound as `min(GRAPH.MAX_COUNT_PROBE, offset + k + 1)` (#21 [19]) — the `+1` distinguishes a full last page from "more rows exist" (`hasMore`), the `min` keeps it inside the count-probe ceiling, and the leaf's `offset + k <= MAX_COUNT_PROBE` refine guarantees the bound is reachable so the page `rows.slice(offset, offset + k)` holds. It returns up to that many ranked rowids, so `totalMatched = rows.length` and `totalMatchedCapped = rows.length === probeLimit && probeLimit === MAX_COUNT_PROBE`. **This removes the separate `searchProbe` query entirely** (m6) — revision 2 ran the MATCH, both joins and all six filter expressions twice, unconditionally, including when `offset === 0 && results.length < k` where the answer was already known.
 
 **Contracts.**
 

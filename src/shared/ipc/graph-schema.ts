@@ -140,11 +140,43 @@ export const GraphSearchFiltersBaseSchema = z.strictObject({
 })
 
 /**
- * Renderer-facing filters leaf. Currently the base verbatim; a joint refinement
- * (`modifiedAfterMs <= modifiedBeforeMs`) attaches here rather than on
- * {@link GraphSearchFiltersBaseSchema} so the MCP `.omit()` derivation survives.
+ * True when the `modified*` bounds are ordered, i.e. `modifiedAfterMs <=
+ * modifiedBeforeMs`. An absent bound disables the check on that side.
+ *
+ * Shared so the identical joint refinement can attach to BOTH filter leaves — the
+ * renderer {@link GraphSearchFiltersSchema} and the MCP args' omitted filter set
+ * — without either duplicating the predicate or attaching it to
+ * {@link GraphSearchFiltersBaseSchema} (which the MCP `.omit()` derivation would
+ * then refuse to derive from). The two bounds are independent on the base, so an
+ * inverted range (`after > before`) parses and silently returns nothing.
  */
-export const GraphSearchFiltersSchema = GraphSearchFiltersBaseSchema
+export function isAscendingModifiedRange(f: {
+  modifiedAfterMs?: number
+  modifiedBeforeMs?: number
+}): boolean {
+  return (
+    f.modifiedAfterMs === undefined ||
+    f.modifiedBeforeMs === undefined ||
+    f.modifiedAfterMs <= f.modifiedBeforeMs
+  )
+}
+
+/** Path + message for the {@link isAscendingModifiedRange} refine, shared by both leaves. */
+export const MODIFIED_RANGE_REFINE = {
+  path: ['modifiedAfterMs'],
+  message: 'modifiedAfterMs must be <= modifiedBeforeMs'
+}
+
+/**
+ * Renderer-facing filters leaf. The base plus the joint
+ * `modifiedAfterMs <= modifiedBeforeMs` refinement — attached HERE rather than on
+ * {@link GraphSearchFiltersBaseSchema} so the MCP `.omit()` derivation (which zod
+ * 4 refuses on a refined object) still survives.
+ */
+export const GraphSearchFiltersSchema = GraphSearchFiltersBaseSchema.refine(
+  isAscendingModifiedRange,
+  MODIFIED_RANGE_REFINE
+)
 export type GraphSearchFiltersInput = z.input<typeof GraphSearchFiltersSchema>
 export type GraphSearchFilters = z.output<typeof GraphSearchFiltersSchema>
 
@@ -175,11 +207,26 @@ export const GraphSearchRequestBaseSchema = z.strictObject({
 })
 
 /**
- * Renderer-facing request leaf. Currently the base verbatim; a joint refinement
- * (`offset + k`) attaches here rather than on {@link GraphSearchRequestBaseSchema}
- * so the MCP `.pick()` derivation survives.
+ * Renderer-facing request leaf. The base plus the joint `offset + k` probe bound,
+ * attached HERE rather than on {@link GraphSearchRequestBaseSchema} so the MCP
+ * `.pick()` derivation (which zod 4 refuses on a refined object) still survives.
+ *
+ * `offset` and `k` cap independently on the base (`k <= GRAPH.MAX_TOP_K`, `offset
+ * <= GRAPH.MAX_COUNT_PROBE - 1`), so `offset: 999, k: 100` would ask for rows
+ * 999–1098 from a probe capped at `GRAPH.MAX_COUNT_PROBE` (1000) — the last page
+ * returns one row while `hasMore` reads false. The refine binds the two so the
+ * slice contract `rows.slice(offset, offset + k)` holds against a probe of
+ * `min(GRAPH.MAX_COUNT_PROBE, offset + k + 1)` (see `IGraphReadConnection`'s
+ * `probeLimit`). The refine runs on the resolved output, so both fields carry
+ * their defaults.
  */
-export const GraphSearchRequestSchema = GraphSearchRequestBaseSchema
+export const GraphSearchRequestSchema = GraphSearchRequestBaseSchema.refine(
+  (r) => r.offset + r.k <= GRAPH.MAX_COUNT_PROBE,
+  {
+    path: ['offset'],
+    message: 'offset + k must not exceed GRAPH.MAX_COUNT_PROBE (the count-probe cap)'
+  }
+)
 export type GraphSearchRequestInput = z.input<typeof GraphSearchRequestSchema>
 export type GraphSearchRequest = z.output<typeof GraphSearchRequestSchema>
 
@@ -253,15 +300,19 @@ export const GraphSearchResultSchema = z.object({
   sectionId: z.number().int().positive(),
   /** Project-relative, NFC display form. */
   filePath: z.string(),
-  heading: z.string(),
-  headingPath: z.string(),
+  /** Bounded like the status snapshot's path/text siblings (`MAX_STATUS_PATH_LENGTH`):
+   *  the response was the one payload that bounded no string, in contrast to the
+   *  status surface which caps every path and array ([#29]). */
+  heading: z.string().max(GRAPH.MAX_STATUS_PATH_LENGTH),
+  headingPath: z.string().max(GRAPH.MAX_STATUS_PATH_LENGTH),
   headingSlug: z.string(),
   /** 1..6; 0 marks a pre-heading preamble. */
   headingLevel: z.number().int().min(0).max(6),
   startLine: z.number().int().min(1),
   endLine: z.number().int().min(1),
-  /** Sentinel-stripped. Spans live in `matchedTerms[].offsets` — no HTML crosses IPC. */
-  snippet: z.string(),
+  /** Sentinel-stripped. Spans live in `matchedTerms[].offsets` — no HTML crosses IPC.
+   *  Bounded like its status siblings ([#29]). */
+  snippet: z.string().max(GRAPH.MAX_STATUS_PATH_LENGTH),
   /** True when the 30-token window omitted part of the section, so the UI can
    *  label a partial view instead of reading `offsets: []` as "term absent".
    *  Derived from the `char(4)` truncation marker, which the same C0/C1 strip
@@ -274,7 +325,10 @@ export const GraphSearchResultSchema = z.object({
 export type GraphSearchResult = z.output<typeof GraphSearchResultSchema>
 
 export const GraphSearchResponseSchema = z.object({
-  results: z.array(GraphSearchResultSchema),
+  /** Bounded at `GRAPH.MAX_TOP_K`: `k` caps the page, so a response carrying more
+   *  results than the renderer's own ceiling is malformed. Matches the status
+   *  snapshot's discipline of bounding every array ([#29]). */
+  results: z.array(GraphSearchResultSchema).max(GRAPH.MAX_TOP_K),
   /** Rows returned by the ranking phase, bounded by `GRAPH.MAX_COUNT_PROBE`. */
   totalMatched: z.number().int().nonnegative(),
   totalMatchedCapped: z.boolean(),

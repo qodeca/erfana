@@ -57,7 +57,17 @@ export interface GraphSearchQueryParams {
   before: number | null
   excludeKey: string | null
   excludeSection: number | null
-  /** Phase-1 cap, `GRAPH.MAX_COUNT_PROBE`, or `k + 1` when the probe is skippable. */
+  /**
+   * Phase-1 cap. Bound as `min(GRAPH.MAX_COUNT_PROBE, offset + k + 1)` (#21 [19]):
+   * the `+1` distinguishes "exactly a full last page" from "more rows exist"
+   * (`hasMore`), while the `min` keeps it inside the count-probe ceiling. This is
+   * what makes the slice contract `rows.slice(offset, offset + k)` hold — a probe
+   * fixed at `GRAPH.MAX_COUNT_PROBE` would, for a deep page like `offset: 999,
+   * k: 100`, walk fewer than `offset + k` rows and return a truncated last page
+   * with `hasMore` reading false. The joint `offset + k <= GRAPH.MAX_COUNT_PROBE`
+   * refine on {@link GraphSearchRequestSchema} guarantees this bound is reachable.
+   * Collapses to `k + 1` when the probe is skippable (`offset === 0`, m6).
+   */
   probeLimit: number
   offset: number
   k: number

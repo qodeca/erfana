@@ -17,6 +17,14 @@
 const GRAPH_DB_FILE = 'graph.db'
 
 /**
+ * Hoisted so {@link MCP.MAX_RESULT_CHARS} can derive from them: an object literal
+ * cannot reference its own sibling properties, and `MAX_RESULT_CHARS` is a
+ * function of both the response byte budget and the result count.
+ */
+const MCP_MAX_TOP_K = 20
+const MCP_MAX_RESPONSE_BYTES = 64 * 1024
+
+/**
  * Graph engine constants: database layout, worker supervision, indexing,
  * FTS5 merge policy, search bounds and status-push rate limits.
  */
@@ -129,11 +137,25 @@ export const MCP = {
   MAX_INFLIGHT: 4,
   MAX_QUEUE_DEPTH: 32,
   /** Lower than `GRAPH.MAX_TOP_K` — an external client's cost is bounded harder. */
-  MAX_TOP_K: 20,
-  /** Per-result cap, measured after serialisation. */
-  MAX_RESULT_BYTES: 8 * 1024,
-  /** Per-response cap, measured after serialisation. */
-  MAX_RESPONSE_BYTES: 64 * 1024,
+  MAX_TOP_K: MCP_MAX_TOP_K,
+  /**
+   * Per-result **character** cap for the model-facing text fields (`heading`,
+   * `snippet`, `filePath`). `z.string().max()` counts UTF-16 code units, NOT
+   * bytes — so a byte-sized bound here would admit up to ~3x its number in bytes
+   * under multi-byte UTF-8, and `MAX_TOP_K × 3 fields × cap` could then exceed the
+   * whole response budget many times over ([#21]).
+   *
+   * Sized as `MAX_RESPONSE_BYTES / (3 × MAX_TOP_K)` so that even at the UTF-8
+   * worst case of 3 bytes/char, `MAX_TOP_K × 3 fields × MAX_RESULT_CHARS` cannot
+   * exceed {@link MCP.MAX_RESPONSE_BYTES}. The per-field char cap is a cheap
+   * backstop; the true per-response bound is the serialised-length refine on
+   * {@link GraphMcpToolResultSchema}, which measures bytes.
+   */
+  MAX_RESULT_CHARS: Math.floor(MCP_MAX_RESPONSE_BYTES / (3 * MCP_MAX_TOP_K)),
+  /** Per-response cap in **bytes**, measured after serialisation — it bounds the
+   *  JSON envelope, which per-field character caps alone cannot. Enforced by the
+   *  serialised-length refine on {@link GraphMcpToolResultSchema}. */
+  MAX_RESPONSE_BYTES: MCP_MAX_RESPONSE_BYTES,
   /**
    * Composed onto every `erfana_graph_*` tool description as
    * `` `${description} (${MCP.BETA_DISCLAIMER})` ``. The dash is U+2013.

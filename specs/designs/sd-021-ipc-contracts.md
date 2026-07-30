@@ -110,8 +110,13 @@ export const GraphSearchFiltersBaseSchema = z.strictObject({
   /** AC-018: omit the CURRENT section, keeping sibling sections eligible. */
   excludeSectionId: z.number().int().positive().optional()
 })
-/** Renderer-facing leaf — currently the base verbatim; joint refinements attach here. */
-export const GraphSearchFiltersSchema = GraphSearchFiltersBaseSchema
+/** Renderer-facing leaf — the base plus the joint `modifiedAfterMs <=
+ *  modifiedBeforeMs` refine (attached HERE, never on the base, so §7.10's MCP
+ *  `.omit()` derivation survives). Independent bounds on the base let an inverted
+ *  range parse and return nothing silently; the refine rejects it. The MCP filter
+ *  set re-attaches the same refine after its `.omit()`, so both leaves carry it. */
+export const GraphSearchFiltersSchema = GraphSearchFiltersBaseSchema.refine(
+  isAscendingModifiedRange, { path: ['modifiedAfterMs'] })
 
 export const GraphSearchRequestBaseSchema = z.strictObject({
   query: z.string().trim().min(1).max(GRAPH.MAX_QUERY_LENGTH),
@@ -127,8 +132,14 @@ export const GraphSearchRequestBaseSchema = z.strictObject({
   filters: GraphSearchFiltersSchema.optional(),
   correlationId: GraphInboundCorrelationIdSchema.optional()
 })
-/** Renderer-facing leaf — currently the base verbatim; the `offset + k` joint bound attaches here. */
-export const GraphSearchRequestSchema = GraphSearchRequestBaseSchema
+/** Renderer-facing leaf — the base plus the joint `offset + k <= GRAPH.MAX_COUNT_PROBE`
+ *  bound (attached HERE, never on the base, so §7.10's MCP `.pick()` derivation
+ *  survives). offset and k cap independently on the base, so `offset: 999, k: 100`
+ *  would ask for rows 999–1098 from a probe capped at 1000 — a truncated last page
+ *  with hasMore false. The refine makes the slice `rows.slice(offset, offset + k)`
+ *  hold against a probe of `min(MAX_COUNT_PROBE, offset + k + 1)` (§7.3). */
+export const GraphSearchRequestSchema = GraphSearchRequestBaseSchema.refine(
+  (r) => r.offset + r.k <= GRAPH.MAX_COUNT_PROBE, { path: ['offset'] })
 ```
 
 **Passage budget.** `MAX_QUERY_LENGTH` is 4096, not 512, because #28 sends a passage. `GraphSearchService` reduces it to at most `GRAPH.MAX_QUERY_TERMS` (24) tokens by the single normative pipeline in §9 row 11 — revision 2 specified it twice, inconsistently, in two files.
@@ -166,14 +177,16 @@ export const GraphMatchedTermSchema = z.object({
 export const GraphSearchResultSchema = z.object({
   sectionId: z.number().int().positive(),
   filePath: z.string(),          // project-relative, NFC display form (§6.2)
-  heading: z.string(),
-  headingPath: z.string(),
+  /** heading/headingPath/snippet bounded at MAX_STATUS_PATH_LENGTH, matching the
+   *  status snapshot's per-string discipline — the response bounded no string before ([#29]). */
+  heading: z.string().max(GRAPH.MAX_STATUS_PATH_LENGTH),
+  headingPath: z.string().max(GRAPH.MAX_STATUS_PATH_LENGTH),
   headingSlug: z.string(),
   headingLevel: z.number().int().min(0).max(6),
   startLine: z.number().int().min(1),
   endLine: z.number().int().min(1),
   /** Sentinel-stripped. Spans live in matchedTerms[].offsets — no HTML crosses IPC. */
-  snippet: z.string(),
+  snippet: z.string().max(GRAPH.MAX_STATUS_PATH_LENGTH),
   /** True when the 30-token window omitted part of the section, so the UI can label
    *  a partial view and not read `offsets: []` as "term absent" (M16). Derived from
    *  the char(4) (EOT) truncation marker: a printable '…' is ambiguous with a section
@@ -186,7 +199,9 @@ export const GraphSearchResultSchema = z.object({
 })
 
 export const GraphSearchResponseSchema = z.object({
-  results: z.array(GraphSearchResultSchema),
+  /** Capped at GRAPH.MAX_TOP_K — k caps the page, so more results than the renderer
+   *  ceiling is malformed; matches the status snapshot's array discipline ([#29]). */
+  results: z.array(GraphSearchResultSchema).max(GRAPH.MAX_TOP_K),
   /** Rows returned by §6.5 phase 1, bounded by GRAPH.MAX_COUNT_PROBE. */
   totalMatched: z.number().int().nonnegative(),
   totalMatchedCapped: z.boolean(),
@@ -200,6 +215,8 @@ export const GraphSearchResponseSchema = z.object({
   correlationId: GraphOutboundCorrelationIdSchema
 })
 ```
+
+**Probe bound (#21 [19]).** Phase 1's `LIMIT :probeLimit` is bound as `min(GRAPH.MAX_COUNT_PROBE, offset + k + 1)` — the `+1` distinguishes "exactly a full last page" from "more rows exist" (`hasMore`), the `min` keeps it inside the count-probe ceiling, and the leaf's `offset + k <= MAX_COUNT_PROBE` refine guarantees the bound is reachable so `rows.slice(offset, offset + k)` holds. Without the joint refine, `offset: 999, k: 100` walks only to row 1000 and returns a one-row last page with `hasMore` false.
 
 **Probe skip (m6).** When `offset === 0 && results.length < k`, `totalMatched` is exactly `results.length`: phase 1 is capped at `k + 1` instead of `MAX_COUNT_PROBE`, `totalMatchedCapped = false`, `hasMore = false`. Revision 2 walked up to 1000 matching rows unconditionally — every match in the corpus when fewer than 1000 exist — for the majority of real searches.
 
@@ -478,7 +495,11 @@ export const GraphMcpToolArgsSchema = GraphSearchRequestBaseSchema
   .pick({ query: true, k: true, filters: true })
   .extend({
     k: z.number().int().min(1).max(MCP.MAX_TOP_K).default(GRAPH.DEFAULT_TOP_K),
-    filters: GraphSearchFiltersBaseSchema.omit({ excludeSectionId: true }).optional()
+    // Omit off the UNREFINED base (.omit() throws on a refined object), then
+    // re-attach the same `modifiedAfterMs <= modifiedBeforeMs` refine the renderer
+    // leaf carries — so an inverted range cannot silently reach the external reader.
+    filters: GraphSearchFiltersBaseSchema.omit({ excludeSectionId: true })
+      .refine(isAscendingModifiedRange, { path: ['modifiedAfterMs'] }).optional()
   })
 
 // JSON-Schema: convert with `z.toJSONSchema(GraphMcpToolArgsSchema, { io: 'input' })`.
@@ -492,17 +513,21 @@ export const GraphMcpToolArgsSchema = GraphSearchRequestBaseSchema
  *  stripping and byte caps that wrap it are contracted in §9.4 (B1). */
 /** The strip and the payload caps are EXPRESSED here, not just described:
  *  a schema that documents an obligation it cannot fail is a comment. McpText =
- *  z.string().max(MCP.MAX_RESULT_BYTES).refine(isModelSafeText) — the refine
+ *  z.string().max(MCP.MAX_RESULT_CHARS).refine(isModelSafeText) — the refine
  *  rejects C0 except tab/newline and all of C1 (which carry ANSI escapes and
  *  Erfana's char(2)/char(3)/char(4) snippet sentinels), AND the model-facing
  *  smuggling vectors: unpaired surrogates, bidi controls (U+202A–U+202E,
  *  U+2066–U+2069) and the Unicode tag block (U+E0000–U+E007F, an invisible ASCII
  *  mirror a model still reads). isModelSafeText scans by CODE POINT, so a tag
- *  char arriving as a surrogate pair is caught. The .max() is a CHARACTER
- *  backstop; #30 still measures the serialised byte size. */
+ *  char arriving as a surrogate pair is caught. `.max()` counts UTF-16 CHARACTERS,
+ *  not bytes — MAX_RESULT_CHARS is sized as MAX_RESPONSE_BYTES / (3 × MAX_TOP_K)
+ *  ([#21]) so MAX_TOP_K × 3 fields × cap cannot exceed the response byte budget
+ *  even at 3 bytes/char. The true per-response backstop is the object-level
+ *  serialised-BYTE refine below (TextEncoder, portable to the sandboxed renderer,
+ *  not Buffer). */
 // filePath is the one result field that is ALSO a path, so it is confined on top
 // of the sentinel/bounds check (project-relative, no `..`, no ADS colon, no
-// reserved device name): McpFilePath = ConfinedRelativePathSchema(MAX_RESULT_BYTES)
+// reserved device name): McpFilePath = ConfinedRelativePathSchema(MAX_RESULT_CHARS)
 // .refine(isModelSafeText). This makes the "never absolute" clause enforceable
 // at the external-client boundary. heading/snippet are free text, not paths.
 export const GraphMcpToolResultSchema = z.object({
@@ -514,7 +539,7 @@ export const GraphMcpToolResultSchema = z.object({
     filePath: McpFilePath, heading: McpText, snippet: McpText, score: z.number()
   })).max(MCP.MAX_TOP_K),
   truncated: z.boolean()
-})
+}).refine((v) => new TextEncoder().encode(JSON.stringify(v)).length <= MCP.MAX_RESPONSE_BYTES)
 ```
 
 `MCP.MAX_TOP_K` (20) is deliberately lower than the renderer's 100, and `offset` is not exposed at all: every MCP request lands on the synchronous main-thread reader from **outside** the trust boundary, so the cheapest bound is the request shape itself.

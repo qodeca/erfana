@@ -115,14 +115,31 @@ describe('MCP bounds', () => {
     expect(MCP.MAX_QUEUE_DEPTH).toBeGreaterThan(MCP.MAX_INFLIGHT)
   })
 
-  it('bounds a response above a single result', () => {
-    expect(MCP.MAX_RESULT_BYTES).toBeGreaterThan(0)
-    expect(MCP.MAX_RESPONSE_BYTES).toBeGreaterThan(MCP.MAX_RESULT_BYTES)
+  it('bounds a response above a single result field', () => {
+    expect(MCP.MAX_RESULT_CHARS).toBeGreaterThan(0)
+    expect(MCP.MAX_RESPONSE_BYTES).toBeGreaterThan(MCP.MAX_RESULT_CHARS)
   })
 
-  it('fits MCP.MAX_TOP_K results inside the response cap only by truncating', () => {
-    // Not a defect — it is why `truncated` exists on the tool result.
-    expect(MCP.MAX_TOP_K * MCP.MAX_RESULT_BYTES).toBeGreaterThan(MCP.MAX_RESPONSE_BYTES)
+  // [#21] INVERTED invariant. The old assertion held `MAX_TOP_K × MAX_RESULT_BYTES
+  // > MAX_RESPONSE_BYTES`, i.e. "the response cap is the binding one" — but
+  // `MAX_RESULT_BYTES` was a `z.string().max()` bound, which counts UTF-16 code
+  // units, NOT bytes. At the UTF-8 worst case of 3 bytes/char the aggregate of the
+  // per-field caps ran ~22x over the response budget, so the per-field bound
+  // enforced nothing. `MAX_RESULT_CHARS` is now sized as `MAX_RESPONSE_BYTES /
+  // (3 fields × MAX_TOP_K)` so the OPPOSITE holds: the aggregate of every
+  // model-facing char field across a full result set CANNOT exceed the response
+  // byte budget, even at 3 bytes/char. The serialised-byte refine on
+  // GraphMcpToolResultSchema remains the true backstop; this proves the cheap
+  // per-field char caps can no longer overshoot it.
+  it('sizes the per-field char cap so a full result set cannot exceed the response byte budget', () => {
+    const FIELDS_PER_RESULT = 3 // heading, snippet, filePath
+    expect(MCP.MAX_TOP_K * FIELDS_PER_RESULT * MCP.MAX_RESULT_CHARS).toBeLessThanOrEqual(
+      MCP.MAX_RESPONSE_BYTES
+    )
+    // Derived from exactly that relationship (floor keeps it an integer).
+    expect(MCP.MAX_RESULT_CHARS).toBe(
+      Math.floor(MCP.MAX_RESPONSE_BYTES / (FIELDS_PER_RESULT * MCP.MAX_TOP_K))
+    )
   })
 
   describe('BETA_DISCLAIMER', () => {
@@ -151,7 +168,7 @@ describe('MCP bounds', () => {
     })
 
     it('fits comfortably inside one response budget', () => {
-      expect(Buffer.byteLength(MCP.UNTRUSTED_NOTICE, 'utf8')).toBeLessThan(MCP.MAX_RESULT_BYTES)
+      expect(Buffer.byteLength(MCP.UNTRUSTED_NOTICE, 'utf8')).toBeLessThan(MCP.MAX_RESPONSE_BYTES)
     })
   })
 })

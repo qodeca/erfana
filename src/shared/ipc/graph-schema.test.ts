@@ -141,9 +141,11 @@ describe('GraphSearchRequestSchema', () => {
       expect(GraphSearchRequestSchema.parse({ ...MINIMAL_SEARCH, k }).k).toBe(k)
     })
 
-    it('accepts offset at MAX_COUNT_PROBE - 1', () => {
+    it('accepts offset at MAX_COUNT_PROBE - 1 when k leaves room (k = 1)', () => {
+      // The offset field's own ceiling is MAX_COUNT_PROBE - 1; it is only reachable
+      // with k = 1, since the joint refine also caps offset + k at MAX_COUNT_PROBE.
       const offset = GRAPH.MAX_COUNT_PROBE - 1
-      expect(GraphSearchRequestSchema.parse({ ...MINIMAL_SEARCH, offset }).offset).toBe(offset)
+      expect(GraphSearchRequestSchema.parse({ ...MINIMAL_SEARCH, offset, k: 1 }).offset).toBe(offset)
     })
 
     it.each([GRAPH.MAX_COUNT_PROBE, GRAPH.MAX_COUNT_PROBE + 1, -1])(
@@ -154,6 +156,45 @@ describe('GraphSearchRequestSchema', () => {
         )
       }
     )
+  })
+
+  // [#21] offset and k cap INDEPENDENTLY on the base (offset <= MAX_COUNT_PROBE - 1,
+  // k <= MAX_TOP_K), so without the joint leaf refine `offset: 999, k: 100` asks
+  // for rows 999–1098 from a probe capped at MAX_COUNT_PROBE (1000): the last page
+  // returns one row while hasMore reads false. The refine binds
+  // offset + k <= MAX_COUNT_PROBE so the slice rows.slice(offset, offset + k) holds.
+  describe('joint offset + k probe bound', () => {
+    it('rejects offset: 999, k: 100 even though each is individually at its own ceiling', () => {
+      expect(GRAPH.MAX_COUNT_PROBE - 1).toBe(999)
+      expect(100).toBeLessThanOrEqual(GRAPH.MAX_TOP_K)
+      expect(GraphSearchRequestSchema.safeParse({ query: 'x', offset: 999, k: 100 }).success).toBe(
+        false
+      )
+    })
+
+    it('accepts offset: 0, k: MAX_TOP_K', () => {
+      expect(
+        GraphSearchRequestSchema.safeParse({ query: 'x', offset: 0, k: GRAPH.MAX_TOP_K }).success
+      ).toBe(true)
+    })
+
+    it('accepts the boundary offset + k === MAX_COUNT_PROBE', () => {
+      const k = GRAPH.MAX_TOP_K
+      const offset = GRAPH.MAX_COUNT_PROBE - k
+      expect(GraphSearchRequestSchema.parse({ query: 'x', offset, k }).offset).toBe(offset)
+    })
+
+    it('rejects offset + k one over MAX_COUNT_PROBE', () => {
+      const k = GRAPH.MAX_TOP_K
+      const offset = GRAPH.MAX_COUNT_PROBE - k + 1
+      expect(GraphSearchRequestSchema.safeParse({ query: 'x', offset, k }).success).toBe(false)
+    })
+
+    it('applies the bound against the DEFAULT k when k is omitted', () => {
+      // offset + default k (DEFAULT_TOP_K) exceeds MAX_COUNT_PROBE by 1.
+      const offset = GRAPH.MAX_COUNT_PROBE - GRAPH.DEFAULT_TOP_K + 1
+      expect(GraphSearchRequestSchema.safeParse({ query: 'x', offset }).success).toBe(false)
+    })
   })
 
   describe('matchMode', () => {
@@ -335,6 +376,21 @@ describe('GraphSearchResponseSchema', () => {
       }).success
     ).toBe(false)
   })
+
+  // [#29] The response bounded nothing — an unbounded results array, in contrast
+  // to the status snapshot which caps every array. `k` caps the page, so a
+  // response carrying more than GRAPH.MAX_TOP_K results is malformed.
+  it('accepts exactly GRAPH.MAX_TOP_K results', () => {
+    const results = Array.from({ length: GRAPH.MAX_TOP_K }, () => VALID_RESULT)
+    expect(GraphSearchResponseSchema.parse({ ...VALID_RESPONSE, results }).results).toHaveLength(
+      GRAPH.MAX_TOP_K
+    )
+  })
+
+  it('rejects one result over GRAPH.MAX_TOP_K', () => {
+    const results = Array.from({ length: GRAPH.MAX_TOP_K + 1 }, () => VALID_RESULT)
+    expect(GraphSearchResponseSchema.safeParse({ ...VALID_RESPONSE, results }).success).toBe(false)
+  })
 })
 
 describe('GraphSearchResultSchema', () => {
@@ -363,6 +419,18 @@ describe('GraphSearchResultSchema', () => {
   it('rejects startLine 0 — lines are 1-based', () => {
     expect(GraphSearchResultSchema.safeParse({ ...VALID_RESULT, startLine: 0 }).success).toBe(false)
   })
+
+  // [#29] heading/headingPath/snippet were unbounded strings, unlike their status
+  // snapshot siblings which carry MAX_STATUS_PATH_LENGTH ceilings. Match that.
+  it.each(['heading', 'headingPath', 'snippet'])(
+    'bounds %s at MAX_STATUS_PATH_LENGTH',
+    (field) => {
+      const atCap = { ...VALID_RESULT, [field]: 'x'.repeat(GRAPH.MAX_STATUS_PATH_LENGTH) }
+      const overCap = { ...VALID_RESULT, [field]: 'x'.repeat(GRAPH.MAX_STATUS_PATH_LENGTH + 1) }
+      expect(GraphSearchResultSchema.safeParse(atCap).success).toBe(true)
+      expect(GraphSearchResultSchema.safeParse(overCap).success).toBe(false)
+    }
+  )
 })
 
 describe('GraphMatchedTermSchema', () => {

@@ -143,5 +143,35 @@ describe('GraphSearchFiltersSchema', () => {
       'docs/notes.md'
     )
   })
+
+  // [#21] The two modified* bounds are independent on the base object, so an
+  // inverted range parses and returns nothing SILENTLY. The joint leaf refine
+  // rejects it. (This is the leaf the MCP filter set inherits the bound from.)
+  describe('joint modified* range', () => {
+    it('rejects modifiedAfterMs > modifiedBeforeMs', () => {
+      expect(
+        GraphSearchFiltersSchema.safeParse({ modifiedAfterMs: 2, modifiedBeforeMs: 1 }).success
+      ).toBe(false)
+    })
+
+    it('accepts an ordered range', () => {
+      expect(
+        GraphSearchFiltersSchema.safeParse({ modifiedAfterMs: 1, modifiedBeforeMs: 2 }).success
+      ).toBe(true)
+    })
+
+    it('accepts an equal range (a single-instant window)', () => {
+      expect(
+        GraphSearchFiltersSchema.safeParse({ modifiedAfterMs: 5, modifiedBeforeMs: 5 }).success
+      ).toBe(true)
+    })
+
+    it.each([{ modifiedAfterMs: 5 }, { modifiedBeforeMs: 5 }, {}])(
+      'accepts a filter set with only one bound (or neither): %j',
+      (payload) => {
+        expect(GraphSearchFiltersSchema.safeParse(payload).success).toBe(true)
+      }
+    )
+  })
 })
 
