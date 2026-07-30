@@ -68,7 +68,7 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      # actions/checkout v6.0.3
+      # actions/checkout v7.0.1
       - name: Checkout tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
@@ -218,7 +218,7 @@ jobs:
     outputs:
       sha256sums: ${{ steps.sign.outputs.sha256sums }}
     steps:
-      # actions/checkout v6.0.3
+      # actions/checkout v7.0.1
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 

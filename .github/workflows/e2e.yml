@@ -62,7 +62,7 @@ jobs:
     timeout-minutes: 30
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action.
+      # actions/checkout v7.0.1 — MUST run before the local composite action.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
         with:

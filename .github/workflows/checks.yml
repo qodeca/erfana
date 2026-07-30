@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 5
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
@@ -41,7 +41,7 @@ jobs:
     timeout-minutes: 5
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
@@ -54,7 +54,7 @@ jobs:
     timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
@@ -116,7 +116,7 @@ jobs:
     timeout-minutes: 10
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
@@ -145,7 +145,7 @@ jobs:
     timeout-minutes: 5
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
@@ -166,7 +166,7 @@ jobs:
     # how e2e is kept out of the required set. The concurrency block above
     # already cancels in-flight runs on the same ref.
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry
@@ -190,7 +190,7 @@ jobs:
     timeout-minutes: 5
     if: github.repository == 'qodeca/erfana' || github.event_name == 'pull_request'
     steps:
-      # actions/checkout v6.0.3 — MUST run before the local composite action
+      # actions/checkout v7.0.1 — MUST run before the local composite action
       # below so the action.yml file can be loaded from the workspace.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: ./.github/actions/setup-node-with-retry

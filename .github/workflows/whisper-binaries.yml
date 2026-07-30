@@ -114,7 +114,7 @@ jobs:
     environment: production-signing
     steps:
       - name: Checkout whisper.cpp
-        # actions/checkout v6.0.3 — keep aligned with release.yml + checks.yml
+        # actions/checkout v7.0.1 — keep aligned with release.yml + checks.yml
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ${{ env.UPSTREAM_REPO }}
@@ -288,7 +288,7 @@ jobs:
     environment: production-signing
     steps:
       - name: Checkout whisper.cpp
-        # actions/checkout v6.0.3 — keep aligned with release.yml + checks.yml
+        # actions/checkout v7.0.1 — keep aligned with release.yml + checks.yml
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ${{ env.UPSTREAM_REPO }}
