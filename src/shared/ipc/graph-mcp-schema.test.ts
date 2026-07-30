@@ -605,7 +605,9 @@ describe('external client handshake (§9.4)', () => {
   })
 
   it('accepts a realistic randomBytes(32) hex token', () => {
-    const token = '3f6c1b9a0d4e7f2c8b5a1e0d9c7f4a2b6e3d0c9f8a7b6c5d4e3f2a1b0c9d8e7f'
+    // Static 64-hex fixture standing in for a randomBytes(32) token; not a real
+    // secret. gitleaks:allow marks it so the generic-api-key rule skips it.
+    const token = '3f6c1b9a0d4e7f2c8b5a1e0d9c7f4a2b6e3d0c9f8a7b6c5d4e3f2a1b0c9d8e7f' // gitleaks:allow
     expect(GraphMcpConnectSchema.parse({ ...CONNECT, token }).token).toBe(token)
   })
 
