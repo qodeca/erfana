@@ -1,13 +1,13 @@
 # E2E selector catalog
 
-All `data-testid` attributes available for E2E testing – **225 testids** across 33 sections.
+All `data-testid` attributes available for E2E testing – **238 testids** across 35 sections.
 
 **Related documentation**:
 - [E2E Testing Guide](./e2e-testing.md) – Main E2E documentation
 - [Test ID constants](../../src/renderer/src/constants/testids.ts) – Source of truth
 - Spec #011 (archived) – Specification
 
-> **Counts are validated** by automated tests in `testids.test.ts`. If a section count becomes stale, tests fail.
+> **Scope of the automated check**: `testids.test.ts` asserts per-section counts against `testids.ts` – it validates the **source of truth, not this page**. Nothing fails when a table here drifts, so add the row by hand whenever you add a testid.
 
 ---
 
@@ -22,7 +22,7 @@ All `data-testid` attributes available for E2E testing – **225 testids** acros
 
 ---
 
-## Project tree (15 testids)
+## Project tree (16 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -32,6 +32,7 @@ All `data-testid` attributes available for E2E testing – **225 testids** acros
 | `project-tree-btn-close` | Close project button | static |
 | `project-tree-btn-new-file` | New file button | static |
 | `project-tree-btn-new-folder` | New folder button | static |
+| `project-tree-btn-import` | Import file button | static |
 | `project-tree-btn-refresh` | Refresh tree button | static |
 | `project-tree-node-{hash}` | Tree node | dynamic |
 | `project-tree-toggle-{hash}` | Folder toggle | dynamic |
@@ -63,7 +64,7 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Terminal panel (13 testids)
+## Terminal panel (14 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -80,6 +81,32 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 | `terminal-btn-capture-window` | Window capture (macOS) | static |
 | `terminal-btn-capture-area` | Area capture (macOS) | static |
 | `terminal-btn-camera` | Camera photo capture | static |
+| `terminal-btn-expand` | Expand/restore terminal to cover the editor area | static |
+
+---
+
+## Screen permission dialog (4 testids)
+
+Advisory macOS Screen Recording permission prompt. It appears **after** the OS denies a capture and never blocks one – see [`ScreenPermissionDialog.tsx`](../../src/renderer/src/components/Dialog/ScreenPermissionDialog.tsx).
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `screen-permission-dialog` | Screen-recording permission dialog container | static |
+| `screen-permission-btn-open-settings` | Opens the macOS Screen Recording privacy pane | static |
+| `screen-permission-btn-relaunch` | Relaunches the app so a fresh grant takes effect | static |
+| `screen-permission-btn-close` | Dismisses the dialog | static |
+
+---
+
+## Claude status bar (3 testids)
+
+Per-terminal Claude Code context meter (macOS + Windows). Present only while `claude` is running in that panel.
+
+| Testid | Element | Type |
+|--------|---------|------|
+| `claude-status-bar` | Status bar container | static |
+| `claude-status-badge` | Context-window size badge chip ("200k" / "1M") | static |
+| `claude-status-fill` | Progress meter fill element (width = percent) | static |
 
 ---
 
@@ -110,10 +137,11 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Editor content layout (5 testids)
+## Editor content layout (6 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
+| `editor-area` | Editor area wrapper – the center dockview region; collapses when the terminal is maximized | static |
 | `editor-content` | Content container | static |
 | `editor-pane` | Editor pane wrapper | static |
 | `preview-pane` | Preview pane wrapper | static |
@@ -377,7 +405,7 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Toast notifications (4 testids)
+## Toast notifications (6 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
@@ -385,6 +413,8 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 | `toast` | Individual toast | static |
 | `toast-message` | Toast message | static |
 | `toast-btn-dismiss` | Dismiss button | static |
+| `toast-live-polite` | Persistent visually-hidden polite live region (info/success/warning) | static |
+| `toast-live-alert` | Persistent visually-hidden alert live region (errors) | static |
 
 ---
 
@@ -451,10 +481,11 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 
 ---
 
-## Welcome panel (4 testids)
+## Welcome panel (5 testids)
 
 | Testid | Element | Type |
 |--------|---------|------|
+| `welcome-btn-open` | Open/Change project button | static |
 | `welcome-btn-import` | Import file button | static |
 | `welcome-recent-projects` | Recent projects list | static |
 | `welcome-recent-project-{hash}` | Recent project item | dynamic |

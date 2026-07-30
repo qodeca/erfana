@@ -16,11 +16,12 @@ Erfana is an Electron-based IDE focused on markdown editing with integrated term
 - [API Services – Features](./api-services-features.md) - Feature service implementations (Git, Transcription, Camera, etc.)
 - [IPC Patterns](./ipc-patterns.md) - Inter-process communication patterns
 - [Security](./security.md) - Security considerations and implementations
-- [Error Codes](./error-codes.md) - Project-wide `ErrorCode` enum index (~100 codes grouped by category; operator actions for the most-visible ones)
+- [Error Codes](./error-codes.md) - Project-wide `ErrorCode` enum index (~130 codes grouped by category; operator actions for the most-visible ones). Includes the 26-code graph/MCP block, which is contract-only until #23–#32 raise it
 - [Architecture Decision Records](./adrs/README.md) - Durable rationale for load-bearing design choices (ADR 0001 self-host whisper, 0002 minisign, 0003 dual-pubkey, 0004 TOCTOU close)
 - [Technical Debt](./technical-debt.md) - Technical debt tracking and priorities
 
 ### Feature Documentation
+- [Core features](./features/README.md) - Catalogue of all 14 shipped features (editor, project tree, terminal, prompt templates, export, import, transcription, Claude Code status bar). Referenced from the root `CLAUDE.md` rather than inlined there
 - [Editor](./editor/README.md) - Monaco editor, markdown preview, scroll sync, Mermaid diagrams (full-screen viewer), PDF/DOCX export
 - [Image Viewer](./ui-components.md#image-viewer-panel) - Image preview panel with zoom, pan, and fullscreen
 - [Terminal](./terminal/README.md) - xterm.js terminal integration
@@ -51,7 +52,7 @@ Erfana is an Electron-based IDE focused on markdown editing with integrated term
 - [Development Tasks](./development-tasks.md) - Build, test, and deployment
 - [Continuous Integration](./ci.md) - GitHub Actions workflows (`checks.yml` active on every push; `e2e.yml` **disabled** since 2026-04-25 — local-only verification until macos-latest stability is fixed; `release.yml` and `whisper-binaries*.yml` for release flow), retry patterns, visual-on-CI gap
 - [Build](./build/README.md) - electron-builder, ASAR, fuses, troubleshooting
-- [Windows Enablement](./windows/README.md) - Phases 0–2 shipped in v0.9.3; Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in [v0.9.4](https://github.com/qodeca/erfana/releases/tag/v0.9.4) on 2026-04-23 per [#165](https://github.com/qodeca/erfana/issues/165); Windows-host test-flake remediation pool ([#172](https://github.com/qodeca/erfana/issues/172)) + ThrottledWorker offset-deque refactor ([#173](https://github.com/qodeca/erfana/issues/173)) also in v0.9.4; Phase 3 (screenshots, [#164](https://github.com/qodeca/erfana/issues/164)) unstarted; Phases 5–6 tracked under [#166–#167](https://github.com/qodeca/erfana/issues?q=label%3Awindows)
+- [Windows Enablement](./windows/README.md) - Phases 0–2 shipped in v0.9.3; Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in [v0.9.4](https://github.com/qodeca/erfana/releases/tag/v0.9.4) on 2026-04-23 per [#165](https://github.com/qodeca/erfana/issues/165); Windows-host test-flake remediation pool ([#172](https://github.com/qodeca/erfana/issues/172)) + ThrottledWorker offset-deque refactor ([#173](https://github.com/qodeca/erfana/issues/173)) also in v0.9.4; Phase 3 (screenshots, [#164](https://github.com/qodeca/erfana/issues/164)) shipped in [v0.12.0](https://github.com/qodeca/erfana/releases/tag/v0.12.0); Phases 5–6 tracked under [#166–#167](https://github.com/qodeca/erfana/issues?q=label%3Awindows). **[`implementation-plan.md`](./windows/implementation-plan.md) is the canonical phase status – prefer it over this line**
   - [Implementation Plan](./windows/implementation-plan.md) - Canonical phased roadmap + status snapshot + Phase 4 test inventory
   - [Gap Analysis](./windows/gap-analysis.md) - Feature-parity baseline (P0/P1/P2 with file:line refs)
   - [Contributing](./windows/contributing.md) - Branch strategy, commit scope, test expectations, reviewer checklist, **amendment-not-drop discipline**, **test-file split policy**, **`src/main/utils/` tier rules**
@@ -66,7 +67,7 @@ Erfana is an Electron-based IDE focused on markdown editing with integrated term
 - [Large Project Performance Plan](./large-project-performance-plan.md) - EMFILE mitigation, worker threads, diagnostics
 - [Testing](./testing/README.md) - Testing strategies and coverage
   - [E2E Testing](./testing/e2e-testing.md) - Playwright/Electron E2E guide
-  - [E2E Selectors](./testing/e2e-selectors.md) - 225 testids catalog
+  - [E2E Selectors](./testing/e2e-selectors.md) - 238 testids catalog
   - [E2E Helpers](./testing/e2e-helpers.md) - Test utility functions
   - [E2E Third-Party](./testing/e2e-third-party.md) - Monaco, xterm.js, Mermaid patterns
   - [E2E Debugging](./testing/e2e-debugging.md) - Debugging and CI/CD
