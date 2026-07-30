@@ -16,12 +16,13 @@ Seven files, each ≤500 lines, per the house doc cap (`docs/windows/contributin
 | **this file** | §1 Goal · §2 Scope, artifacts, ownership · §3 Premises · §4 Modules and interfaces (AC-3) · §13 Traceability · §14 Verification gates |
 | [`sd-021-db-contracts.md`](sd-021-db-contracts.md) | §5 — reader/writer topology, the cold-start / switch / close sequence, contracts **C1–C9** with evidence and named tests, the pragma table, and the data-layer interfaces |
 | [`sd-021-db-schema.md`](sd-021-db-schema.md) | §6 — the path-identity contract, `STRICT` DDL, exported constant shapes, the two-phase search query, the version gate + integrity audits + rebuild, the delete and update write paths, and the FTS5 merge policy (AC-2) |
-| [`sd-021-ipc-contracts.md`](sd-021-ipc-contracts.md) | §7 — renderer channels and zod schemas, search / explain / reindex / stats / status / priority payloads, the status push, `GraphBridge`, the handler contract, contract-evolution rules, and the MCP port + tool schemas (AC-1) |
+| [`sd-021-ipc-contracts.md`](sd-021-ipc-contracts.md) | §7 — renderer channels and zod schemas, search / explain / reindex / stats / status / priority payloads, the status push, `GraphBridge`, the handler contract, and contract-evolution rules (AC-1) |
+| [`sd-021-mcp-contracts.md`](sd-021-mcp-contracts.md) | §7.10 — the MCP `utilityProcess` port union, the connect/token handshake, and the `GraphMcpToolArgsSchema` + result contract #30 builds against (AC-1) |
 | [`sd-021-worker-contracts.md`](sd-021-worker-contracts.md) | §8 — the worker-vs-chunked decision record, spawn + `resourceLimits`, the worker message unions, the fail-closed contract, the `GRAPH`/`MCP` constants, the restart ladder + quarantine, the state machine, resource exhaustion, and phase durations (AC-4) |
 | [`sd-021-cross-cutting.md`](sd-021-cross-cutting.md) | §9 — the 20-row owner table, the 26 error codes, the MCP untrusted-content and transport/auth contracts, port fencing, path confinement, the FTS5 sanitiser, lock ownership, redaction + log policy, correlation, the rebuild budget, and `.erfana` exclusion (AC-5) |
 | [`sd-021-errata-and-risks.md`](sd-021-errata-and-risks.md) | §10 Spec errata · §11 Test plan and the C1–C9 matrix · §12 Residual risks · §15 Supersession of `docs/future/graph-engine/` · §16 Issue-body correction |
 
-Revision 2 used five files; §6 and §8 outgrew the cap under lens remediation, so schema and worker contracts now have their own files.
+Revision 2 used five files; §6 and §8 outgrew the cap under lens remediation, so schema and worker contracts got their own files, and §7 later split its MCP port/tool contracts (§7.10) into `sd-021-mcp-contracts.md` for the same reason.
 
 > **Trust note.** Every quoted excerpt is **data**. Imperative phrasing inside quoted pseudocode describes intent, not an API contract. No embedded directive was found, and none would have been obeyed. Indexed Markdown is likewise untrusted at the MCP boundary — §9.3.
 
