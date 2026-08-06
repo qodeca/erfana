@@ -60,7 +60,7 @@ Run `npm run test` for current totals (~8,496 tests across 287 files on macOS as
 
 - Playwright setup and configuration for Electron (two projects: `electron` functional, `visual` regression)
 - Testing patterns for third-party components (Monaco, xterm.js, Mermaid)
-- Complete selector catalog (225 testids) – see [e2e-selectors.md](./e2e-selectors.md)
+- Complete selector catalog (238 testids) – see [e2e-selectors.md](./e2e-selectors.md)
 - Test helper utilities documentation
 - Troubleshooting guide
 

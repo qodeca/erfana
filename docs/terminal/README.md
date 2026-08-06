@@ -207,6 +207,16 @@ Capture screenshots directly from the terminal toolbar with file paths automatic
 - 30 s timeout for the macOS native selection, 60 s for the cross-platform overlay (`SCREENSHOT.OVERLAY_TIMEOUT_MS`)
 - Loading spinner during capture; window picker shows a "Looking for capturable windows…" state while sources resolve
 
+**macOS Screen Recording permission (grant-and-relaunch flow)**:
+
+When a macOS capture returns `SCREENSHOT_PERMISSION_DENIED`, the renderer shows `ScreenPermissionDialog` instead of a dead-end error toast. On every other platform the same error code still falls back to a toast.
+
+- **Never gated by a pre-check.** The capture is always attempted first; the dialog appears only after the OS itself denies it. A stale permission read must never block a user who has actually been granted access – `status` from `screenshot:getScreenPermission` only tailors the wording.
+- **Two actions**, both backed by `system:*` IPC: *Open settings* (`system:openScreenRecordingSettings`) opens the Screen Recording privacy pane, and *Relaunch* (`system:relaunchApp`) restarts Erfana – macOS applies a fresh Screen Recording grant only to a newly-launched process, so a relaunch is genuinely required, not a convenience.
+- Dismissable by Close, Escape, or backdrop click.
+
+> A repeated "asks every time" prompt despite a granted permission is usually a stale TCC record on the machine, not an app bug. Reset it with `tccutil reset ScreenCapture com.erfana.app` and reboot.
+
 **Architecture (strategy pattern, #164)**:
 - `IScreenshotCapturer` interface in `src/main/services/screenshot/types.ts`
 - `MacScreenshotCapturer` wraps the existing `screencapture` flow
@@ -227,6 +237,8 @@ Capture screenshots directly from the terminal toolbar with file paths automatic
 - `src/shared/ipc/screenshot-schema.ts` (adds `WindowSource`, `AreaSelection`, `windowId`)
 - `src/renderer/src/components/Screenshot/ScreenshotOverlay.tsx` + `.css`
 - `src/renderer/src/components/Dialog/WindowPickerDialog.tsx` + `.css`
+- `src/renderer/src/components/Dialog/ScreenPermissionDialog.tsx` (macOS grant-and-relaunch flow)
+- `src/shared/ipc/system-channels.ts` + `src/main/ipc/system-handlers.ts` (open-settings / relaunch, sender-gated)
 - `src/renderer/src/components/Panels/TerminalPanel.tsx` (renamed gate, removed duplicated effect)
 - `src/renderer/src/main.tsx` (hash-routed overlay mount)
 

@@ -36,6 +36,8 @@ GRAPH ENGINE (sequential chain):       INDEPENDENT:
 
 ## Sequential implementation order
 
+> **The graph chain (004–008) is already underway on the `graph` branch, not here.** Its R1 contracts are frozen under [#21](https://github.com/qodeca/erfana/issues/21) — schemas, DDL, `IGraph*` interfaces, error codes and the `specs/designs/sd-021-*` design set — and the refreshed spec requirements live there too. `develop` deliberately carries none of it, so the table below reflects the pre-freeze plan. Before starting any of 004–008, branch off `graph` and read its `specs/` and design set first; starting from `develop` means re-implementing work that already exists. See the Branching model section in `CLAUDE.md`.
+
 | # | Spec | Tier | FRs | Rationale |
 |---|------|------|-----|-----------|
 | 1 | **004** Graph engine foundation | T4 | 50 | Foundational – unlocks entire graph pipeline. Largest single spec, best tackled with full focus |

@@ -4,6 +4,16 @@ Per-version release notes for Erfana (v0.6.0 onwards; earlier in [archive/change
 
 > **Note:** In v0.7.2, BRS (Business Requirements Specifications) were renamed to "specs" and relocated from `specs/business-reqs/` to `specs/spec-t{tier}-{id}-{slug}/`. All references in code and docs now use `Spec #XXX`. Historical entries below have been updated accordingly.
 
+## Unreleased
+
+### Added
+
+- **macOS Screen Recording permission – grant-and-relaunch flow** – when a screenshot capture is denied by macOS, Erfana now shows `ScreenPermissionDialog` instead of a dead-end error toast. It offers *Open settings* (jumps straight to the Screen Recording privacy pane) and *Relaunch* (macOS applies a fresh grant only to a newly-launched process, so restarting is genuinely required). The capture is always attempted first and is never gated by a permission pre-check, so a stale TCC record cannot block a user who does have access. Backed by two sender-gated `system:*` IPC channels. Other platforms keep the toast fallback. See [`docs/terminal/README.md`](terminal/README.md).
+
+### Fixed
+
+- **Search bar no longer applies stale results after closing** – a pending debounced search survived unmount and wrote into the global search store, so results from a closed find bar could land on whatever was shown next. The debounce helper now exposes `cancel()`, which the search bar calls on unmount. Also removes an intermittent CI test failure.
+
 ## 0.16.3
 
 *First public open-source release of Erfana. Tag [`v0.16.3`](https://github.com/qodeca/erfana/releases/tag/v0.16.3). (v0.16.1 and v0.16.2 were tagged but never published — Windows code-signing failures: first an Azure cert secret mismatch, then a legacy-encrypted (RC2/3DES) signing PFX that the CI/Node OpenSSL 3.x toolchain rejects. Resolved by re-exporting the PFX with AES-256 (PBES2). See [`docs/release-incidents/`](release-incidents/index.md).)*

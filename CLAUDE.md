@@ -10,6 +10,13 @@ An agent-native Markdown workspace (Electron) that runs terminal coding agents l
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 24+ (development), Electron 39 bundles Node.js 22.20.0
 
+## Branching model
+- `main` — released code only. Protected (required status checks, `enforce_admins`, signed `v*.*.*` tags); direct push is the intended solo-dev workflow, no PR required.
+- `develop` — the day-to-day integration branch, and the base for small features and bugfixes. Branch general work off `develop`, **not** `main` (main lags).
+- `graph` — "develop for the graph engine": the integration branch for spec 004 and the [#21](https://github.com/qodeca/erfana/issues/21) contract chain (#22–#32) plus related functionality. **The R1 contract freeze already landed there** — schemas, STRICT DDL, `IGraph*` interfaces, `GRAPH_*`/`MCP_*` error codes and the `specs/designs/sd-021-*` design set all live on `graph` and are deliberately absent from `develop`. Do **not** start graph-engine work from `develop`; branch off `graph` (`git checkout -b feature/<name> graph`) or the frozen contracts will be re-implemented from scratch.
+- Graph-engine work merges back into `graph`; `graph` merges into `develop` only when the engine is shippable. Merge `develop` **into** `graph` periodically to limit drift — never the reverse until the chain lands.
+- Feature branches: `feature/<name>`, off whichever integration branch owns the work. Commits follow Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`).
+
 ## Key Commands
 ```bash
 npm run dev          # Development server
@@ -215,6 +222,9 @@ See [docs/ci.md](docs/ci.md) for the full pipeline map. Summary:
   - `claude-status:unregister` – Stop tracking a panel (invoke; on PTY exit / panel unmount)
   - `claude-status:nudge` – Request an immediate refresh for a panel (invoke)
   - `claude-status:changed` – Snapshot update for a `terminalId` (main → renderer push)
+- System channels (`src/shared/ipc/system-channels.ts`) – payload-free OS-integration actions behind the macOS Screen Recording grant-and-relaunch flow. Both handlers are sender-gated main-side in `src/main/ipc/system-handlers.ts`:
+  - `system:openScreenRecordingSettings` – Open the macOS Screen Recording privacy pane (invoke)
+  - `system:relaunchApp` – Restart Erfana; macOS applies a fresh Screen Recording grant only to a newly-launched process (invoke)
 
 ## Important Notes
 - node-pty may fail to build on Python 3.13 (use 3.12)
