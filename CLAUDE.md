@@ -13,6 +13,15 @@ An agent-native Markdown workspace (Electron) that runs terminal coding agents l
 - `graph` — "develop for the graph engine": the integration branch for spec #004 and the [#21](https://github.com/qodeca/erfana/issues/21) contract chain (#22–#32) plus related functionality. Graph-engine work branches off `graph` and merges back into `graph`; `graph` merges into `develop` only when the engine is shippable. Merge `develop` **into** `graph` periodically to limit drift — never the reverse until the chain lands.
 - Feature branches: `feature/<name>`, off whichever integration branch owns the work. Commits follow Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`).
 
+### Merge-back hazards (`graph` → `develop`)
+
+`graph` forked before `develop` was rewound to 2026-07-14, so the two branches' CI config has diverged in ways a merge would carry silently. Check each before merging back:
+
+- **`.github/workflows/claude-code-review.yml` is deleted here** (commit `ec849e8`, "ci: disable Claude Code Review workflow") and still present on `develop` and `main`. Merging `graph` as-is **removes automated Claude review repo-wide**. Confirm that is intended, or restore the file in the merge — do not let the deletion ride along unnoticed.
+- **`checks.yml` here has an extra hard gate `develop` lacks**: the `build` job runs `node scripts/smoke/sqlite-worker-smoke.mjs` (Node-ABI cross-check) with no `continue-on-error`, and that script exists only on this branch. Merging brings both; dropping the script without the step, or vice versa, breaks the Build check.
+- **Action pins differ**: `graph` is on `actions/checkout` v7.0.1 and a newer `claude-code-action`; `develop` is on v6.0.3 with the older action, because the rewind dropped the Dependabot bumps. Reconcile deliberately rather than accepting whichever side the merge picks.
+- **Dependabot never targets `graph`** (`.github/dependabot.yml` pins `target-branch: develop`, and Dependabot reads that config from the default branch). This branch gets no dependency maintenance of its own — pick it up by merging `develop` in.
+
 ## Core features
 
 The full catalogue of shipped features (editor, project tree, terminal, prompt
