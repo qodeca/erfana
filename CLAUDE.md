@@ -7,6 +7,12 @@ An agent-native Markdown workspace (Electron) that runs terminal coding agents l
 - **Architecture**: Hybrid SplitviewReact (layout) + DockviewReact (tabs)
 - **Node Version**: 24+ (development), Electron 39 bundles Node.js 22.20.0 (not expressed in `package.json` `engines`)
 
+## Branching model
+- `main` — released code only. Protected (required status checks, `enforce_admins`, signed `v*.*.*` tags); direct push is the intended solo-dev workflow, no PR required.
+- `develop` — the day-to-day integration branch. Branch general feature/fix work off `develop`, **not** `main` (main lags and lacks current specs).
+- `graph` — "develop for the graph engine": the integration branch for spec #004 and the [#21](https://github.com/qodeca/erfana/issues/21) contract chain (#22–#32) plus related functionality. Graph-engine work branches off `graph` and merges back into `graph`; `graph` merges into `develop` only when the engine is shippable. Merge `develop` **into** `graph` periodically to limit drift — never the reverse until the chain lands.
+- Feature branches: `feature/<name>`, off whichever integration branch owns the work. Commits follow Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`).
+
 ## Core features
 
 The full catalogue of shipped features (editor, project tree, terminal, prompt
