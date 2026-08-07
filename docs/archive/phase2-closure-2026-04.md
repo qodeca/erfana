@@ -1,10 +1,14 @@
 # Phase 2 closure plan
 
-> **Lifecycle**: Write-once-archive. This document captures the closure plan for Phase 2 of the Windows enablement roadmap. Move to `docs/archive/` once Phase 3 (#164) opens, since the closure work is then historical.
+Historical closure plan for Phase 2 of the Windows enablement roadmap (v0.9.3, April 2026). For the current Windows status see [`../windows/implementation-plan.md`](../windows/implementation-plan.md); for the folder's document map see [`../windows/README.md`](../windows/README.md).
+
+> **Lifecycle**: Write-once-archive. **Archived 2026-08-07** from `docs/windows/phase2-closure.md`. Retained as a template for future phase closures — do not delete.
+
+> **Note**: issue and PR numbers, commit SHAs, release tags and CI run links below predate the 2026-06 open-source migration and no longer resolve on `qodeca/erfana`; they are retained as provenance.
 
 ## Context
 
-Phase 2 implementation completed on the `windows` branch on 2026-04-21 and **shipped to `develop` in v0.9.3 on 2026-04-22** (merge commit `c1e085d`, release `0b593a1`). All four sub-issues landed: #160 (git allowlist + liveness), #161 (reserved-filename guard with bidi-override defence), #162 (LibreOffice Windows detection + liveness), #163 (long-path activation deferred to Phase 6 with promotion criteria). The 4-reviewer audit is complete; shared `flakeGuard.ts` deployed; 23+ consecutive clean `test:renderer` runs since. The historical merge-readiness gate snapshot lives at [`implementation-plan.md` § Merge-to-develop readiness](implementation-plan.md#merge-to-develop-readiness-historical--gate-satisfied-2026-04-22).
+Phase 2 implementation completed on the `windows` branch on 2026-04-21 and **shipped to `develop` in v0.9.3 on 2026-04-22** (merge commit `c1e085d`, release `0b593a1`). All four sub-issues landed: #160 (git allowlist + liveness), #161 (reserved-filename guard with bidi-override defence), #162 (LibreOffice Windows detection + liveness), #163 (long-path activation deferred to Phase 6 with promotion criteria). The 4-reviewer audit is complete; shared `flakeGuard.ts` deployed; 23+ consecutive clean `test:renderer` runs since. The historical merge-readiness gate snapshot lives at [`implementation-plan.md` § Merge-to-develop readiness](../windows/implementation-plan.md#merge-to-develop-readiness-historical--gate-satisfied-2026-04-22).
 
 ## Streams (A–G)
 
@@ -17,7 +21,7 @@ Four checklist items (shell cwd, cmd.exe force, Ctrl+C interrupt, ampersand path
 `npm run test:cov` + `npm run build:mac` clean on macOS; 7887 tests / 244 files / 0 failures; both DMGs produced.
 
 ### Stream B – Code & docs cleanup ✅ DONE
-- B1: Renumber `#155b/c/a/d` → `#160/161/162/163` in [`implementation-plan.md:212-230`](implementation-plan.md); convert "Decision (2026-04-20)" block to past-tense (commit `0ab61ef`).
+- B1: Renumber `#155b/c/a/d` → `#160/161/162/163` in [`implementation-plan.md`](../windows/implementation-plan.md); convert "Decision (2026-04-20)" block to past-tense (commit `0ab61ef`).
 - B2: Last-mile test sweep (`npm run typecheck`, `test:main`, `test:renderer`, `test:preload`).
 - B3: Document pre-existing lint baseline (`LocalWhisperService.test.ts`, `CameraService.test.ts` unused vars + escape regexes) in PR so not blamed on Phase 2.
 
@@ -64,7 +68,7 @@ All seven streams closed by the v0.9.3 merge + release cycle (2026-04-22).
 - **Merge style**: merge-commit — preserves per-issue commit trail + review findings
 - **Dependabot**: triage individually; trivial bumps merge before Phase 2 PR; risky ones defer with comment
 - **`windows` branch**: delete after merge; per-phase feature branches (`feature/windows-phase-3-*`) off develop
-- **Long-path activation (#163)**: deferred to Phase 6 with promotion criteria recorded at `PlatformConfig.ts:194-201` (comment above `isWindowsLongPath` at `:203`)
+- **Long-path activation (#163)**: deferred to Phase 6 with promotion criteria recorded at `PlatformConfig.ts:188` (comment above `isWindowsLongPath` at `:205`)
 - **LibreOffice registry probe (#162)**: deferred unless filesystem probe proves insufficient
 - **`INVALID_FILENAME_MARKER` shared constant**: chosen over structured-error IPC serialization (D4 deferred to Phase 6)
 - **Bidi regex `u` flag (CRITICAL)**: hex-escape ranges + `u` flag for engine-consistent code-point matching
@@ -73,11 +77,11 @@ All seven streams closed by the v0.9.3 merge + release cycle (2026-04-22).
 
 ## Cross-references
 
-- [`implementation-plan.md`](implementation-plan.md) — canonical Phase 0–6 roadmap, status snapshot, merge-readiness gate
-- [`deferred-work.md`](deferred-work.md) — D1–D8 deferred items with promotion criteria
-- [`gap-analysis.md`](gap-analysis.md) — verified inventory of every Windows gap with file:line refs
-- [`README.md`](README.md) — quick-start for new sessions
+- [`implementation-plan.md`](../windows/implementation-plan.md) — canonical Phase 0–6 roadmap, status snapshot, merge-readiness gate
+- [`deferred-work.md`](../windows/deferred-work.md) — D1–D8 deferred items with promotion criteria
+- [`gap-analysis.md`](../windows/gap-analysis.md) — verified inventory of every Windows gap with file:line refs
+- [`README.md`](../windows/README.md) — quick-start for new sessions
 
-## When to archive this file
+## Archival record
 
-When Phase 3 (#164) implementation begins, move this file to `docs/archive/phase2-closure-2026-04.md` and update the "Lifecycle" line to "Archived YYYY-MM-DD". Do NOT delete — useful for future phase-closure templates.
+Archived 2026-08-07 (moved from `docs/windows/phase2-closure.md`). The original trigger — "archive once Phase 3 (#164) implementation begins" — was met when Phase 3 shipped in v0.12.0 on 2026-06-04; the move simply lagged. Retained as a template for future phase closures.
