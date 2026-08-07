@@ -14,7 +14,7 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 **Workaround**: Right-click the `.exe` → Properties → Unblock; OR click "More info → Run anyway" in the SmartScreen dialog.
 
-**Tracking**: [#166](https://github.com/qodeca/erfana/issues/166) (Phase 5 — code-signing).
+**Tracking**: #166 (Phase 5 — code-signing).
 
 ---
 
@@ -24,7 +24,7 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 **Workaround**: Run `npx vitest --run --config vitest.main.ts --coverage` directly (exits 0). On macOS the wrapper exits 0 normally.
 
-**Tracking**: [#158](https://github.com/qodeca/erfana/issues/158) (Phase 6 — switch coverage provider to Istanbul OR reduce parallelism on Windows).
+**Tracking**: #158 (Phase 6 — switch coverage provider to Istanbul OR reduce parallelism on Windows).
 
 ---
 
@@ -34,7 +34,7 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 **Workaround**: Enable Win32 long paths per [`docs/build/windows.md`](./build/windows.md) step 5 + `git config --global core.longpaths true`.
 
-**Tracking**: [#163](https://github.com/qodeca/erfana/issues/163) (decision-deferred to Phase 6 with promotion criteria recorded inline at `PlatformConfig.ts:194-201`).
+**Tracking**: #163 (decision-deferred to Phase 6 with promotion criteria recorded inline at `PlatformConfig.ts:194-201`).
 
 ---
 
@@ -56,7 +56,7 @@ Phases 0–2 of Windows enablement shipped in **v0.9.3** (2026-04-22); Phase 4 (
 
 **Workaround**: SHA-256 pinning + MOTW strip in `WhisperModelManager` means the binary has the same integrity guarantee as a signed one for Erfana's trust chain; only SmartScreen's UX-layer prompt is affected. Click "Run anyway" once. Erfana's own installer is signed, so this affects only the whisper subprocess.
 
-**Tracking**: [Phase 5](https://github.com/qodeca/erfana/issues/166) — procure Windows code-sign cert and add a signtool step to `.github/workflows/whisper-binaries.yml`.
+**Tracking**: Phase 5 (#166) — procure Windows code-sign cert and add a signtool step to `.github/workflows/whisper-binaries.yml`.
 
 ---
 
@@ -141,7 +141,7 @@ Pipeline contributors on Windows:
 
 ### Screenshot capture on Windows
 
-**Status**: ✅ Resolved by [#164](https://github.com/qodeca/erfana/issues/164) (Phase 3) — `ScreenshotService` now picks `MacScreenshotCapturer` on `darwin` and `DesktopCapturerScreenshotCapturer` on Windows + Linux. All three modes (screen / window / area) work cross-platform via Electron's `desktopCapturer` and an in-app overlay window. Area selection currently spawns the overlay on the **primary display only**; multi-display area-select is a deferred polish item.
+**Status**: ✅ Resolved by #164 (Phase 3) – `pickCapturer()` picks `MacScreenshotCapturer` on `darwin` and `DesktopCapturerScreenshotCapturer` on `win32`; every other platform gets `UnsupportedCapturer`, which fails each call with `SCREENSHOT_NOT_SUPPORTED`. All three modes (screen / window / area) work on both supported platforms via Electron's `desktopCapturer` and in-app overlay windows. Area selection spawns **one overlay per attached display** (`screen.getAllDisplays()`), so multi-display area-select is shipped – see [`docs/windows/implementation-plan.md`](./windows/implementation-plan.md).
 
 ---
 
@@ -172,6 +172,24 @@ Pipeline contributors on Windows:
 ---
 
 ## Active Issues
+
+### macOS Screen Recording: Erfana asks for permission every time
+
+**Issue**: On macOS, screen capture keeps prompting for Screen Recording permission (or keeps failing with `SCREENSHOT_PERMISSION_DENIED`) even though the grant is already visible and enabled under System Settings › Privacy & Security › Screen Recording.
+
+**Root cause**: A stale TCC (Transparency, Consent and Control) record on the machine – typically left behind by an ad-hoc-signed build, a re-signed build, or an app bundle that moved. This is a machine-state problem, not an app bug: the OS is matching the grant against a code signature that no longer corresponds to the installed bundle. Because a denied `/usr/sbin/screencapture` exits 0 with no file, Erfana re-classifies the empty result as `SCREENSHOT_PERMISSION_DENIED` and shows `ScreenPermissionDialog` (see [terminal/README.md § macOS Screen Recording permission](./terminal/README.md#screenshot-capture-v065-macos-cross-platform-via-164)).
+
+**Workaround**: Reset the record and reboot.
+
+```bash
+tccutil reset ScreenCapture com.erfana.app
+```
+
+Then relaunch Erfana and grant the permission again when prompted. A relaunch is genuinely required – macOS applies a fresh Screen Recording grant only to a newly-launched process – which is why the in-app dialog offers a *Relaunch* button next to *Open settings*.
+
+**Tracking**: Accepted OS behaviour; no code fix planned.
+
+---
 
 ### Visual regression E2E suite hangs on GitHub `macos-latest` CI
 
@@ -249,17 +267,17 @@ ModuleNotFoundError: No module named 'distutils'
 
 Solution: downgrade to Python 3.12 (the `node-gyp` shipped with Node 24 doesn't yet handle Python 3.13's removed `distutils`). Not auto-fixable — see [`docs/build/windows.md`](./build/windows.md) step 2.
 
-**2. Windows 11 — `cmd.exe` current-directory hardening (resolved by [#213](https://github.com/qodeca/erfana/issues/213))**
+**2. Windows 11 — `cmd.exe` current-directory hardening (resolved by #213)**
 
 Symptom: `'GetCommitHash.bat' is not recognized` during the winpty build. When Windows sets `NoDefaultCurrentDirectoryInExePath=1` (a security-hardening flag, often via enterprise / Group Policy baselines), `cmd.exe` stops searching the current directory, so node-pty's `winpty.gyp` `.bat` invocations fail.
 
-**3. Windows 11 — Spectre-mitigated libraries (resolved by [#213](https://github.com/qodeca/erfana/issues/213))**
+**3. Windows 11 — Spectre-mitigated libraries (resolved by #213)**
 
 Symptom: `MSB8040: Spectre-mitigated libraries are required for this project`. node-pty's gyp requests `SpectreMitigation: 'Spectre'`, which fails on a default MSVC install that lacks those libs.
 
 **Status of (2) and (3)**: both are now handled automatically by the committed `patches/node-pty+1.1.0.patch`, applied via `patch-package` in the `postinstall` hook, so a fresh `npm ci` on a default-hardened Windows 11 box succeeds. The patch is keyed to the resolved version — when `node-pty` is bumped it must be regenerated (see [`docs/build/README.md`](./build/README.md#install-dependencies) and [`docs/build/windows.md` § node-pty build failures on Windows 11](./build/windows.md#node-pty-build-failures-on-windows-11)). A follow-up will evaluate node-pty `1.2.0-beta.7+`, which removes the winpty build step and eliminates failure (2) at the root.
 
-**Tracking**: [#213](https://github.com/qodeca/erfana/issues/213) (Windows 11 build fix, resolved); https://github.com/microsoft/node-pty/issues (upstream).
+**Tracking**: #213 (Windows 11 build fix, resolved); https://github.com/microsoft/node-pty/issues (upstream).
 
 ---
 

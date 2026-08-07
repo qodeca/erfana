@@ -127,11 +127,11 @@ export const TEST_IDS = {
   TERMINAL_STATUS_UNAVAILABLE: 'terminal-status-unavailable',
   /** Terminal status: error occurred */
   TERMINAL_STATUS_ERROR: 'terminal-status-error',
-  /** Capture full screen screenshot button (macOS only) */
+  /** Capture full screen screenshot button (macOS + Windows; gated by `capabilities.supported`) */
   TERMINAL_BTN_CAPTURE_SCREEN: 'terminal-btn-capture-screen',
-  /** Capture window screenshot button (macOS only) */
+  /** Capture window screenshot button (macOS + Windows; gated by `capabilities.supported`) */
   TERMINAL_BTN_CAPTURE_WINDOW: 'terminal-btn-capture-window',
-  /** Capture area screenshot button (macOS only) */
+  /** Capture area screenshot button (macOS + Windows; gated by `capabilities.supported`) */
   TERMINAL_BTN_CAPTURE_AREA: 'terminal-btn-capture-area',
   // Screen Recording permission dialog (macOS grant-and-relaunch flow)
   /** Screen-recording permission dialog container */

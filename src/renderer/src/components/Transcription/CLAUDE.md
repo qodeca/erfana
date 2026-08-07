@@ -5,9 +5,11 @@ Media import dialog for audio/video transcription – dual backend: OpenAI API (
 ## Architecture
 
 ```
-TranscriptionDialog.tsx  ← composes on BaseDialog (see ../Dialog/CLAUDE.md)
-LanguageSelect.tsx       ← select dropdown, 31 languages
-useTranscriptionStore.ts ← Zustand store (stores/)
+TranscriptionDialog.tsx         ← composes on BaseDialog (see ../Dialog/CLAUDE.md)
+LanguageSelect.tsx              ← select dropdown, 31 languages
+useTranscriptionStore.ts        ← Zustand store (stores/)
+../Settings/SettingsOverlay.tsx ← Transcription settings section; owns the Backend
+                                  dropdown and its `isLocalWhisperSupported` platform gate
 ```
 
 ## Key design decisions
@@ -18,31 +20,31 @@ useTranscriptionStore.ts ← Zustand store (stores/)
 - **Video detection**: Checks file extension against `VIDEO_IMPORT.SUPPORTED_EXTENSIONS` to show FileVideo icon and "Transcribe video" title
 - **Done button post-actions**: `handleDone` auto-opens the transcript file in an editor tab and triggers the organize-import prompt in the terminal (#113)
 - **Local whisper trust chain (Phase 4)**: Trust is anchored client-side — manifest minisign signature (dual-pubkey) → artifact SHA-256 pin → pre-spawn re-hash (TOCTOU close) → monotonic `lastSeenRevision` downgrade block. Error codes are granular: `WHISPER_MANIFEST_INVALID`, `WHISPER_DOWNGRADE_BLOCKED`, `WHISPER_SOURCE_PIN_DRIFT`, `WHISPER_BINARY_TAMPERED`, `WHISPER_CPU_UNSUPPORTED`, `WHISPER_INVALID_PATH`. Full documentation: [`docs/api-services-features.md` § WhisperModelManager / LocalWhisperService](../../../../../docs/api-services-features.md).
-- **Platform gate in Backend dropdown**: `isLocalWhisperSupported = darwin || (win32 && x64)`. ARM64 Windows shows disabled option with "Local (macOS / Windows x64 only – ARM64 not supported)". Uses `window.api.utils.getArch()` preload helper.
+- **Platform gate in Backend dropdown**: `isLocalWhisperSupported = darwin || (win32 && x64)`, defined in `../Settings/SettingsOverlay.tsx` (not in this directory). ARM64 Windows shows disabled option with "Local (macOS / Windows x64 only – ARM64 not supported)". Uses `window.api.utils.getArch()` preload helper.
 
 ## IPC flow
 
 ```
-renderer                          main
-   │                                │
-   ├─ transcription:import ────────►│ routes by backend setting:
-   │                                │   openai → TranscriptionService.transcribe()
-   │                                │   local  → LocalWhisperService.transcribe()
-   │◄─ transcription:progress ──────┤ (streamed events)
-   │◄─ result ──────────────────────┤
-   │                                │
-   ├─ transcription:cancel ────────►│ AbortController.abort()
-   │                                │
-   Video files:                     │
-   │────────────────────────────────►│ AudioExtractionService.extractAudio()
-   │                                │ → then route by backend (as above)
-   │                                │
-   Whisper model management:        │
-   ├─ whisper:ensureBinary ────────►│ WhisperModelManager.ensureBinary()
-   ├─ whisper:ensureModel ─────────►│ WhisperModelManager.ensureModel()
-   ├─ whisper:listModels ──────────►│ WhisperModelManager.listInstalledModels()
-   ├─ whisper:deleteModel ─────────►│ WhisperModelManager.deleteModel()
-   │◄─ whisper:downloadProgress ────┤ (streamed during downloads)
+renderer                                       main
+   │                                             │
+   ├─ transcription:import ─────────────────────►│ routes by backend setting:
+   │                                             │   openai → TranscriptionService.transcribe()
+   │                                             │   local  → LocalWhisperService.transcribe()
+   │◄─ transcription:progress ───────────────────┤ (streamed events)
+   │◄─ result ───────────────────────────────────┤
+   │                                             │
+   ├─ transcription:cancel ─────────────────────►│ AbortController.abort()
+   │                                             │
+   Video files:                                  │
+   │────────────────────────────────────────────►│ AudioExtractionService.extractAudio()
+   │                                             │ → then route by backend (as above)
+   │                                             │
+   Whisper model management:                     │
+   ├─ transcription:whisperEnsureBinary ────────►│ WhisperModelManager.ensureBinary()
+   ├─ transcription:whisperEnsureModel ─────────►│ WhisperModelManager.ensureModel()
+   ├─ transcription:whisperListModels ──────────►│ WhisperModelManager.listInstalledModels()
+   ├─ transcription:whisperDeleteModel ─────────►│ WhisperModelManager.deleteModel()
+   │◄─ transcription:whisperDownloadProgress ────┤ (streamed during downloads)
 ```
 
 ## State management
@@ -59,9 +61,10 @@ Tracked in [`docs/technical-debt.md`](../../../../../docs/technical-debt.md): it
 
 ## Related files
 
-- `src/shared/ipc/transcription-schema.ts` – Zod schemas (`TranscriptionLanguage`, `WhisperModelSchema`, `TranscriptionBackendSchema`)
+- `src/shared/ipc/transcription-schema.ts` – Zod schemas (`TranscriptionLanguageSchema` – the exported `TranscriptionLanguage` is its inferred type – plus `WhisperModelSchema`, `TranscriptionBackendSchema`)
 - `src/shared/ipc/transcription-channels.ts` – IPC channel constants (transcription + whisper model management)
 - `src/shared/constants.ts` – `VIDEO_IMPORT.SUPPORTED_EXTENSIONS`, `LOCAL_WHISPER` (version, model sizes, timeouts)
+- `src/renderer/src/components/Settings/SettingsOverlay.tsx` – Transcription settings section: Backend dropdown, `isLocalWhisperSupported` gate, model management UI
 - `src/main/services/TranscriptionService.ts` – OpenAI backend transcription
 - `src/main/services/LocalWhisperService.ts` – Local whisper.cpp backend (macOS + Windows x64 since Phase 4); also exports `validateAudioPath` (argv hardening) and `checkCpuSupport` (pre-flight CPU probe)
 - `src/main/services/WhisperModelManager.ts` – 9-step install flow with manifest sig → SHA → TOCTOU close → downgrade block; `verifyInstalledBinary()` returns `VerifiedBinary` shape `{spec, mainSha, revisionIndex}` for spawn-log correlation

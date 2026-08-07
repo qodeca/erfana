@@ -71,13 +71,13 @@ All dialogs MUST compose on `BaseDialog`. Never build portals, overlays, or focu
 | `ConfirmDialog.tsx` | Yes/No confirmation |
 | `FilePickerDialog.tsx` | List selection with keyboard nav |
 | `PromptDialog.tsx` | Text input with validation |
-| `NewFileDialog.tsx` / `NewFolderDialog.tsx` | Thin wrappers on PromptDialog, preset with filename validation |
-| `RenameDialog.tsx` | File rename with validation |
-| `FileSystemDialog.tsx` | Shared base for file-creation dialogs (SOLID refactor) |
+| `NewFileDialog.tsx` / `NewFolderDialog.tsx` | Thin wrappers on `FileSystemDialog` (`operation="create"`), preset with icon and filename validation |
+| `RenameDialog.tsx` | File/folder rename with validation – wraps `FileSystemDialog` (`operation="rename"`, auto-selects the whole name) |
+| `FileSystemDialog.tsx` | Shared base for file/folder create **and** rename dialogs – validation, character count, keyboard shortcuts |
 | `DropModeDialog.tsx` | Mode selection (move/copy/import) |
 | `ConflictDialog.tsx` | File conflict resolution |
-| `CameraDialog.tsx` | Webcam photo capture with shutter + review states |
-| `ScreenSelectDialog.tsx` | macOS screen/window/area picker (behind feature gate) |
+| `CameraDialog.tsx` | Webcam photo capture – live preview, device selector, shutter animation. Single-shot: the frame is written to a temp file and returned to the caller immediately, with no review/retake state. Mirror gotcha: the `<video>` always carries `.camera-preview--mirrored` (`transform: scaleX(-1)`) while `captureVideoFrame()` in `useCameraCapture.ts` draws the frame unflipped, so the saved JPEG is the horizontal mirror of what the preview showed (#42) |
+| `ScreenSelectDialog.tsx` | Multi-monitor display picker – takes `displays: DisplayInfo[]`, returns the chosen `displayId`. Not macOS-only and not feature-gated: the TerminalPanel toolbar opens it wherever screenshot capture is supported (macOS + Windows) whenever more than one display is connected |
 | `WindowPickerDialog.tsx` | Cross-platform window picker – thumbnail grid with roving tabindex, used where the OS has no native picker |
 | `ScreenPermissionDialog.tsx` | macOS Screen Recording denial – offers open-settings and relaunch; shown only after a capture is actually denied, never as a pre-check gate |
 | `DialogContext.tsx` | Dialog stack manager (z-index) |

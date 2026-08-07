@@ -77,9 +77,9 @@ const testId = getDynamicTestId(TEST_IDS.PROJECT_TREE_NODE, 'src/main/index.ts')
 | `terminal-status-checking` | Status: checking availability | static |
 | `terminal-status-unavailable` | Status: node-pty missing | static |
 | `terminal-status-error` | Status: error occurred | static |
-| `terminal-btn-capture-screen` | Full screen capture (macOS) | static |
-| `terminal-btn-capture-window` | Window capture (macOS) | static |
-| `terminal-btn-capture-area` | Area capture (macOS) | static |
+| `terminal-btn-capture-screen` | Full screen capture (macOS + Windows) | static |
+| `terminal-btn-capture-window` | Window capture (macOS + Windows) | static |
+| `terminal-btn-capture-area` | Area capture (macOS + Windows) | static |
 | `terminal-btn-camera` | Camera photo capture | static |
 | `terminal-btn-expand` | Expand/restore terminal to cover the editor area | static |
 

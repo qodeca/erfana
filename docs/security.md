@@ -424,7 +424,44 @@ See [`build/architectures.md`](./build/architectures.md) for the full rationale.
 
 ## IPC Security Checklist
 
-Shipped: contextBridge on all IPC, Zod input validation in all handlers, path-traversal prevention, TypeScript + Zod type safety, error messages sanitised at the IPC boundary. Pending: rate limiting; permission system for destructive operations.
+Shipped: contextBridge on all IPC; Zod input validation on every handler that accepts a payload (the payload-free `system:openScreenRecordingSettings` and `system:relaunchApp` have nothing to validate and rely on sender-frame gating instead – see below); path-traversal prevention; TypeScript + Zod type safety; error messages sanitised at the IPC boundary. Pending: rate limiting; permission system for destructive operations.
+
+---
+
+## Sender-frame gating
+
+Zod answers "is this payload well-formed?". It cannot answer "did this call come from our own window?". For channels that reach OS-level capabilities, the second question is the one that matters – and for the payload-free `system:*` channels it is the **only** guard, because there is no payload to validate.
+
+### `isTrustedSender` (shared predicate)
+
+`isTrustedSender(event)` in [`src/main/ipc/senderValidation.ts`](../src/main/ipc/senderValidation.ts) accepts a call only when both hold:
+
+1. **Top-level frame.** `event.senderFrame` exists and `frame.parent === null` – any iframe or sub-frame is rejected.
+2. **Exact expected origin.** In development (`is.dev && ELECTRON_RENDERER_URL`) the sender's origin must equal the electron-vite dev-server origin. In production the sender URL must equal `RENDERER_FILE_URL` – `pathToFileURL(join(__dirname, '../renderer/index.html'))`, mirroring the exact `mainWindow.loadFile` call in `src/main/index.ts`. An arbitrary `file://` URL is **not** accepted, and the dev branch is unreachable in a production build because it is gated on the same condition that decides which URL the window actually loads.
+
+Consumers: `clipboard-handlers.ts` (`clipboard:readText` / `clipboard:writeText`), `file-handlers.ts` (`file:revealInFileManager`), `claude-status-handlers.ts` (via a local copy of the same predicate), and `system-handlers.ts`.
+
+### Why `system:*` needs it most
+
+`system:relaunchApp` calls `app.relaunch()` followed by `app.quit()`. That is a renderer-triggerable process restart – without the gate, an injected frame could drive a boot loop. `app.quit()` (not `app.exit()`) is used deliberately so `before-quit` still runs and releases the project lock, watchers and PTYs.
+
+`system:openScreenRecordingSettings` calls `shell.openExternal` on a **fixed module-level constant**:
+
+```
+x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture
+```
+
+No part of that URL comes from the renderer, so there is no arbitrary-URL or protocol-injection surface. The handler also no-ops off `darwin` (Screen Recording is a macOS TCC concept). Note that only *this* handler is platform-gated – `system:relaunchApp` runs on every platform.
+
+### Screenshot: a stricter local variant
+
+`screenshot-handlers.ts` defines its own `validateMainRendererSender`, applying the same top-level-frame + exact-`file://`-URL rule to every public screenshot channel (`capture`, `getDisplays`, `getCapabilities`, `getScreenPermission`, `enumerateWindows`). It is deliberately separate from `isTrustedSender` because it must also exclude the app's **own** per-display area-select overlay windows, which are legitimate `BrowserWindow`s of the same app but must never be able to invoke the public capture API. Rejections fail closed (empty display list, `supported: false`, `'unknown'` permission, `SCREENSHOT_FAILED`) and are logged.
+
+The overlay windows have their own, tighter channel path: `screenshot:areaSelected` / `screenshot:areaCancelled` are attached per capture to each overlay's `webContents.mainFrame.ipc` (never global `ipcMain`) and every payload must carry that round's freshly minted UUID token.
+
+### macOS usage-description strings
+
+`electron-builder.yml` declares the TCC purpose strings under `mac.extendInfo`, including `NSScreenCaptureUsageDescription` ("Erfana captures screenshots you insert into notes and terminals.") alongside `NSCameraUsageDescription`, `NSMicrophoneUsageDescription`, `NSDocumentsFolderUsageDescription` and `NSDownloadsFolderUsageDescription`. Without the screen-capture entry macOS shows an unexplained prompt, and a missing purpose string is a notarisation/UX liability rather than a bypass.
 
 ---
 
@@ -523,7 +560,7 @@ After A4 (`powerMonitor` resume), B1 (symlink TOCTOU), and D3 (HMAC), the major 
 
 4-layer client-side trust model for the whisper.cpp subprocess (manifest Ed25519 sig + artifact SHA pin + per-spawn re-hash for TOCTOU + monotonic revision floor). Composition + attacker model: [`windows/whisper-trust-chain.md`](./windows/whisper-trust-chain.md). Decisions: [ADR 0001](./adrs/0001-self-host-whisper-binaries.md)–[ADR 0004](./adrs/0004-per-spawn-toctou-rehash.md). Operator runbook: [`windows/whisper-support-runbook.md`](./windows/whisper-support-runbook.md).
 
-## Release signing (v0.9.5+, [#174](https://github.com/qodeca/erfana/issues/174))
+## Release signing (v0.9.5+, #174)
 
 End-to-end signed multi-platform release pipeline. Full operator reference: [`build/release.md`](./build/release.md).
 
@@ -570,7 +607,7 @@ Full verification recipes (macOS `codesign`, Windows `signtool`) are in [`build/
 
 ## Future enhancements
 
-Auto-updates via signed electron-updater (deferred — not shipped with #174 per non-goals). Encrypted storage via OS keychain. Confirmation prompts before destructive operations. SLSA Build L2 attestations (re-enable when Erfana moves to Enterprise Cloud or repo goes public). **Windows code signing is now covered by #174; [#166](https://github.com/qodeca/erfana/issues/166) narrows to NSIS installer UX. Branch protection on `main` + protected `v*.*.*` tag ruleset are live as of 2026-04-25 — see [`build/release.md` § Branch protection](./build/release.md#branch-protection-phase-i--done-2026-04-25).**
+Auto-updates via signed electron-updater (deferred — not shipped with #174 per non-goals). Encrypted storage via OS keychain. Confirmation prompts before destructive operations. SLSA Build L2 attestations (re-enable when Erfana moves to Enterprise Cloud or repo goes public). **Windows code signing is now covered by #174; #166 narrows to NSIS installer UX. Branch protection on `main` + protected `v*.*.*` tag ruleset are live as of 2026-04-25 — see [`build/release.md` § Branch protection](./build/release.md#branch-protection-phase-i--done-2026-04-25).**
 
 ## References
 

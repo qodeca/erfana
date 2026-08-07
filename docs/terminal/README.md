@@ -54,7 +54,7 @@ A thin status bar pinned to the bottom of a terminal panel — its height matche
 - Window size uses a model-capability registry: Claude Code auto-upgrades **Opus 4.6+** to the 1M window with no on-disk marker (Opus 4.5/older, all Sonnet incl. sonnet-4-6, and all Haiku stay 200k), while observed usage > 200k or a `settings.json` `[1m]` model still force 1M
 - Colour bands track usage against the active window: a true green safe band (`--color-context-safe` #3fb950, distinct from the Qodeca-lime brand colour) below 30%, orange at 30–60%, red at ≥60% (on a 1M window that's 300k / 600k tokens; on 200k it's 60k / 120k)
 - On any detection/parse failure the bar hides gracefully — no error, no stale data
-- macOS and Windows are both supported (Windows added in v0.16.0 via [#217](https://github.com/qodeca/erfana/issues/217)); on Linux the process detector is a no-op so the bar never appears there
+- macOS and Windows are both supported (Windows added in v0.16.0 via #217); on Linux the process detector is a no-op so the bar never appears there
 
 See the full design in [`docs/designs/216-claude-status-bar.md`](../designs/216-claude-status-bar.md). IPC: `claude-status:register` / `:unregister` / `:nudge` (invoke) and `claude-status:changed` (main → renderer push).
 
@@ -193,7 +193,7 @@ Drag files or folders from project tree or Finder to insert shell-escaped paths 
 
 ### Screenshot Capture (v0.6.5 macOS, cross-platform via #164)
 
-Capture screenshots directly from the terminal toolbar with file paths automatically pasted into the terminal. macOS uses the native `/usr/sbin/screencapture` binary; Windows (and Linux as a fallback) use Electron's `desktopCapturer` API + an in-app area-select overlay window.
+Capture screenshots directly from the terminal toolbar with file paths automatically pasted into the terminal. macOS uses the native `/usr/sbin/screencapture` binary; Windows uses Electron's `desktopCapturer` API + an in-app area-select overlay window. Every other platform gets `UnsupportedCapturer`, which fails each call with `SCREENSHOT_NOT_SUPPORTED`.
 
 **Toolbar Buttons** (visible on macOS + Windows; hidden on Linux):
 - **Capture Screen** (Camera icon): captures the chosen display immediately (or shows a picker when there is more than one display)
@@ -212,6 +212,7 @@ Capture screenshots directly from the terminal toolbar with file paths automatic
 When a macOS capture returns `SCREENSHOT_PERMISSION_DENIED`, the renderer shows `ScreenPermissionDialog` instead of a dead-end error toast. On every other platform the same error code still falls back to a toast.
 
 - **Never gated by a pre-check.** The capture is always attempted first; the dialog appears only after the OS itself denies it. A stale permission read must never block a user who has actually been granted access – `status` from `screenshot:getScreenPermission` only tailors the wording.
+- **Silent-denial reclassification (the case users actually hit).** On modern macOS a *denied* `/usr/sbin/screencapture` exits 0 and simply writes no file – indistinguishable from a user pressing Escape. `MacScreenshotCapturer` therefore re-classifies "process succeeded but produced no file" from `SCREENSHOT_CANCELLED` to `SCREENSHOT_PERMISSION_DENIED` when `systemPreferences.getMediaAccessStatus('screen')` reads `'denied'`. That reclassification is what opens this dialog – without it the denial would surface as a silent no-op.
 - **Two actions**, both backed by `system:*` IPC: *Open settings* (`system:openScreenRecordingSettings`) opens the Screen Recording privacy pane, and *Relaunch* (`system:relaunchApp`) restarts Erfana – macOS applies a fresh Screen Recording grant only to a newly-launched process, so a relaunch is genuinely required, not a convenience.
 - Dismissable by Close, Escape, or backdrop click.
 
@@ -221,8 +222,9 @@ When a macOS capture returns `SCREENSHOT_PERMISSION_DENIED`, the renderer shows 
 - `IScreenshotCapturer` interface in `src/main/services/screenshot/types.ts`
 - `MacScreenshotCapturer` wraps the existing `screencapture` flow
 - `DesktopCapturerScreenshotCapturer` uses `desktopCapturer.getSources()` + `nativeImage.toPNG()` for full-resolution captures, and `nativeImage.crop()` for area mode
-- `ScreenshotOverlayWindow.selectArea()` spawns the area-select `BrowserWindow` on the primary display, awaits the renderer's `screenshot:areaSelected` / `screenshot:areaCancelled` IPC, then destroys the window. A module-level `isActive` guard prevents concurrent overlays. Sender frame validated against `overlay.webContents` to reject cross-window messages.
-- `ScreenshotService` is a thin dispatcher selecting the capturer in its constructor based on `process.platform`
+- `AreaSelectOverlay.selectArea()` (in `ScreenshotOverlayWindow.ts`) spawns **one frameless transparent always-on-top `BrowserWindow` per attached display** (`screen.getAllDisplays()` → `createOverlayForDisplay`), each with its own 5 s `did-finish-load` watchdog so a slow first load on one display cannot block the round. Whichever overlay the user drags on first resolves the selection; the rest are destroyed synchronously. It then awaits the renderer's `screenshot:areaSelected` / `screenshot:areaCancelled` IPC and tears the round down. A per-instance `isActive` guard rejects overlapping calls, and a per-round 60 s timeout (`SCREENSHOT.OVERLAY_TIMEOUT_MS`) covers every overlay at once. Listeners are attached to each overlay's own `webContents.mainFrame.ipc` (not global `ipcMain`) and every payload must carry the round's per-capture UUID token, so cross-window messages are rejected.
+- `ScreenshotService` is a thin dispatcher that takes its `IScreenshotCapturer` **by constructor injection**. Platform routing lives in the `pickCapturer(platform)` / `createScreenshotService(capturer?, platform?)` factory pair – that factory is the DI seam tests use to inject a stub instead of mocking `process.platform`
+- `IScreenshotService.getScreenRecordingPermission()` returns the advisory macOS `ScreenRecordingPermission` (`granted` / `denied` / `not-determined` / `restricted` / `unknown`) read from `systemPreferences.getMediaAccessStatus('screen')`; it reports `'unknown'` off macOS and is never used to gate a capture
 - Renderer state lives in `useScreenshotCapture` (was macOS-only; the boolean flag was renamed `isMacOS` → `isScreenshotSupported` to reflect the cross-platform reality)
 - The overlay re-uses the main renderer bundle via a hash route (`#overlay/screenshot?displayId=…`); `main.tsx` mounts `ScreenshotOverlay` instead of `App` when the hash is present
 
@@ -233,8 +235,9 @@ When a macOS capture returns `SCREENSHOT_PERMISSION_DENIED`, the renderer shows 
 - `src/main/services/screenshot/ScreenshotOverlayWindow.ts`
 - `src/main/services/screenshot/sharedHelpers.ts`
 - `src/main/services/screenshot/types.ts`
-- `src/main/ipc/screenshot-handlers.ts` (now also `screenshot:enumerateWindows`)
-- `src/shared/ipc/screenshot-schema.ts` (adds `WindowSource`, `AreaSelection`, `windowId`)
+- `src/main/ipc/screenshot-handlers.ts` (now also `screenshot:enumerateWindows` and `screenshot:getScreenPermission`; every channel gated by `validateMainRendererSender`)
+- `src/shared/ipc/screenshot-schema.ts` (adds `WindowSource`, `AreaSelection`, `windowId`, `ScreenRecordingPermissionSchema` / `ScreenRecordingPermission`)
+- `src/shared/ipc/screenshot-channels.ts` (channel constants incl. `screenshot:getScreenPermission`, plus the overlay hash-route helpers)
 - `src/renderer/src/components/Screenshot/ScreenshotOverlay.tsx` + `.css`
 - `src/renderer/src/components/Dialog/WindowPickerDialog.tsx` + `.css`
 - `src/renderer/src/components/Dialog/ScreenPermissionDialog.tsx` (macOS grant-and-relaunch flow)
@@ -261,10 +264,11 @@ Capture photos from connected cameras directly from the terminal toolbar.
 - Shutter animation on capture
 
 **Behavior**:
-- Photos saved to OS temp directory as JPEG (`erfana-camera-{timestamp}.jpg`)
+- Photos saved to OS temp directory as JPEG, named from the **local** date/time: `erfana-camera-YYYY-MM-DD-HHMMSS.jpg` (e.g. `erfana-camera-2026-08-07-143052.jpg`)
 - File path automatically pasted to active terminal with proper quoting
 - Success/error toasts provide user feedback
 - 20MB size limit for photo data
+- **Preview is mirrored, the saved file is not.** `CameraDialog.tsx` applies `.camera-preview--mirrored` (`transform: scaleX(-1)`) to the `<video>` unconditionally for every camera, while `captureVideoFrame()` in `useCameraCapture.ts` draws the frame to the canvas with no flip. The saved JPEG is therefore always the horizontal mirror of what the preview showed – which matters for the document-scanning / OCR use case, where any text in frame comes out reversed. Tracked as [#42](https://github.com/qodeca/erfana/issues/42)
 
 **Use Cases**:
 - Quick attachment of photos in chat/command workflows

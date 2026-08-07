@@ -32,12 +32,12 @@ Erfana uses a **hybrid architecture** matching VS Code's actual implementation p
 
 ```
 SplitviewReact (outer horizontal 3-column split)
-  ├─ Left: ProjectPanelWrapper (170-600px, resizable)
+  ├─ Left: ProjectPanel (170-600px, resizable)
   │   └─ Wraps ProjectTree component
   ├─ Center: EditorAreaSplitPanel (400px min, flex-fills remaining)
   │   └─ Contains DockviewReact for tabbed editors
-  └─ Right: TerminalSplitPanel (170-600px)
-      └─ Separate panels, only one visible at a time
+  └─ Right: TerminalPanel (170-1200px)
+      └─ Added only when a project is open; cap relaxed while maximized
 ```
 
 **SplitviewReact** (outer layer):
@@ -53,16 +53,19 @@ SplitviewReact (outer horizontal 3-column split)
 - Each opened file = new tab in DockviewReact
 
 **Key Components**:
-- `ProjectPanelWrapper` - Splitview panel wrapping ProjectTree
+- `ProjectPanel` - Splitview panel wrapping ProjectTree
 - `EditorAreaSplitPanel` - Splitview panel containing nested DockviewReact
-- `TerminalSplitPanel` - Splitview panel for terminal (mutually exclusive with Git)
- 
+- `TerminalPanel` - Splitview panel for the terminal, and the only right-side panel. `activityBarConfig.ts` defines exactly three entries: `project`, `search` (disabled, "coming soon") and `terminal` – there is no Git panel.
 
-**Panel Communication**: DockviewApi passed via params to ProjectPanelWrapper for opening files as tabs.
+**Size constraints** (`AppDockLayout.tsx`): left sidebar 170–600px, center editor 400px minimum, terminal 170–`TERMINAL_MAX` (1200px). Maximizing the terminal swaps the cap for `TERMINAL_EXPANDED_MAX` (`Number.MAX_SAFE_INTEGER`) and hides the center panel.
+
+**Panel Communication**: DockviewApi passed via params to `ProjectPanel` for opening files as tabs.
 
 Reference: [Dockview Documentation](https://dockview.dev/)
 
 ## Directory Structure
+
+The tree below is annotated rather than exhaustive: `services/`, `interfaces/`, `ipc/` and `components/` are listed in full, everything else (`utils/`, `hooks/`, `stores/`, …) shows representative entries only. Run `ls` for the authoritative listing.
 
 ```
 src/
@@ -93,21 +96,34 @@ src/
 │   │   ├── AudioExtractionService.ts # Video → audio extraction (ffmpeg)
 │   │   ├── ApiKeyService.ts     # Encrypted API key storage (Electron safeStorage)
 │   │   ├── TerminalService.ts   # PTY management with node-pty
+│   │   ├── WindowsTerminalBootstrap.ts # Shell-specific ConPTY bootstrap strategies
+│   │   ├── ProjectSettingsService.ts   # Per-project settings (.erfana/settings.json)
+│   │   ├── ExternalFileService.ts      # Files opened from outside the project root (realpath confinement)
+│   │   ├── ScreenshotService.ts # Screenshot dispatcher + pickCapturer/createScreenshotService factory
+│   │   ├── CameraService.ts     # Webcam photo capture
+│   │   ├── HtmlToDocxConverter.ts      # DOCX export conversion step
+│   │   ├── LockHeartbeat.ts, LockStalenessPolicy.ts, MonotonicTimestampGenerator.ts  # ProjectLock internals
+│   │   ├── RecentProjectsRepository.ts, RecentProjectsDeduplicator.ts  # SettingsService internals
+│   │   ├── screenshot/          # MacScreenshotCapturer, DesktopCapturerScreenshotCapturer, ScreenshotOverlayWindow
+│   │   ├── claudeStatus/        # ClaudeStatusService, ClaudeTranscriptWatcher/Parser/Locator,
+│   │   │                        #   ClaudeWindowDetector, encodeCwd, friendlyModelName, thresholds,
+│   │   │                        #   process/ (Mac/Win detectors + createProcessDetector)
 │   │   ├── workers/             # worker_threads scripts (git-status.worker.ts)
-│   │   ├── watcher/             # ThrottledWorker (offset-deque, #173), EventCoalescer, AtomicSaveDetector, WatcherMetrics
-│   │   └── import/converters/   # LiteParseConverter, Audio/VideoConverter, TextConverter (IConverter)
-│   ├── interfaces/
-│   │   └── IGitStatusWorker.ts  # Worker adapter interface
-│   ├── ipc/
-│   │   ├── file-handlers.ts     # IPC handlers
-│   │   ├── file-watcher-handlers.ts  # File watching IPC
-│   │   ├── directory-watcher-handlers.ts  # Directory watching IPC
-│   │   ├── logging-handlers.ts  # Logging IPC (getLevel, getLogsDir, openLogsFolder)
-│   │   ├── git-watcher-handlers.ts # Git watching IPC
-│   │   ├── project-lock-handlers.ts # Project lock IPC
-│   │   ├── import-handlers.ts   # Document import IPC (LiteParse)
-│   │   ├── transcription-handlers.ts # Transcription IPC
-│   │   └── terminal-handlers.ts # Terminal emulator IPC
+│   │   ├── watcher/             # ThrottledWorker (offset-deque, #173), EventCoalescer, GitEventCoalescer,
+│   │   │                        #   AtomicSaveDetector, RepoPresenceWatcher, WatcherMetrics, PlatformConfig
+│   │   └── import/              # ImportService, ConverterRegistry, DependencyDetector, extensions,
+│   │                            #   converters/ (LiteParseConverter, Audio/VideoConverter, TextConverter – IConverter)
+│   ├── interfaces/              # 9 service interfaces (DIP seams)
+│   │   ├── IFileService.ts, IFileWatcherService.ts, IDirectoryWatcherService.ts
+│   │   ├── IGitStatusWorker.ts, IGitWatcherService.ts, IGitPollingService.ts
+│   │   └── IProjectLockService.ts, IProjectSettingsService.ts, ISettingsService.ts
+│   ├── ipc/                     # 22 handler modules + senderValidation.ts (frame/origin gate)
+│   │   ├── file-handlers.ts, file-watcher-handlers.ts, directory-watcher-handlers.ts
+│   │   ├── terminal-handlers.ts, shell-handlers.ts, quit-handlers.ts, system-handlers.ts
+│   │   ├── settings-handlers.ts, global-settings-handlers.ts, logging-handlers.ts
+│   │   ├── git-handlers.ts, git-watcher-handlers.ts, project-lock-handlers.ts, external-file-handlers.ts
+│   │   ├── screenshot-handlers.ts, camera-handlers.ts, clipboard-handlers.ts, claude-status-handlers.ts
+│   │   └── import-handlers.ts, transcription-handlers.ts, docx-handlers.ts, pdf-handlers.ts
 │   └── utils/
 │       ├── PauseController.ts   # Pause/resume with safety timeout
 │       ├── RateLimitedLogger.ts # Cooldown-based log deduplication
@@ -119,18 +135,25 @@ src/
 └── renderer/
     └── src/
         ├── assets/              # Vendored fonts (Cascadia Mono) and static assets
-        ├── components/
+        ├── components/          # 18 directories
+        │   ├── ActivityBar/     # Vertical activity bars (left/right) + activityBarConfig.ts
+        │   ├── ContextMenu/     # Right-click menus (tree, editor, preview, terminal)
+        │   ├── Dialog/          # Unified dialog system (Context + Provider + Hook) – inventory in Dialog/CLAUDE.md
         │   ├── DockLayout/      # Hybrid SplitviewReact + DockviewReact
-        │   ├── ActivityBar/     # Vertical activity bars (left/right)
-        │   ├── Panels/          # Panel implementations + WelcomePanel
-        │   ├── Editor/          # Monaco + Preview + Context Menus
+        │   ├── DocumentImport/  # DocumentImportDialog, OcrLanguageSelect
+        │   ├── Editor/          # Monaco + Preview + formatting toolbar
+        │   ├── FileConflictNotification/  # External-change conflict banner
+        │   ├── Panels/          # Panel implementations (Project, Terminal, Editor, ImageViewer) + WelcomePanel
         │   ├── ProjectTree/     # Project tree with context menu
-        │   ├── Tabs/            # EditorTab, WelcomeTab (Chrome-style tabs)
-        │   ├── Dialog/          # Unified dialog system (Context + Provider + Hook)
-        │   ├── ContextMenu/     # Right-click context menu
-        │   ├── Toast/           # Toast notification system
+        │   ├── Screenshot/      # ScreenshotOverlay (area-select surface for the overlay window)
+        │   ├── Search/          # SearchBar (app-level unified search)
         │   ├── Settings/        # Settings overlay
-        │   └── Transcription/   # TranscriptionDialog, LanguageSelect
+        │   ├── Tabs/            # EditorTab, WelcomeTab (Chrome-style tabs)
+        │   ├── Toast/           # Toast notification system
+        │   ├── Toolbar/         # Top application toolbar (app title bar)
+        │   ├── Transcription/   # TranscriptionDialog, LanguageSelect
+        │   ├── UIBlocker/       # Full-surface interaction blocker for long operations
+        │   └── shared/          # Cross-component primitives (CharacterCount)
         ├── constants/           # Shared renderer constants
         ├── context/             # React contexts (ProjectManagementContext, TerminalPortalContext)
         ├── hooks/               # React hooks
@@ -145,7 +168,9 @@ src/
         │   └── types.ts         # TypeScript interfaces
         ├── providers/           # React provider components
         ├── services/            # Renderer-side services (textClipboard transport)
-        ├── stores/              # Zustand stores (ActivityBar, Settings, GlobalSettings, Transcription)
+        ├── stores/              # 12 Zustand stores: ActivityBar, ClaudeStatus, Clipboard, DiagramViewer,
+        │                        #   DocumentImport, Git, GlobalSettings, Project, Search, Settings,
+        │                        #   Terminal, Transcription
         ├── styles/              # Global stylesheets
         │   ├── fonts.css            # @font-face declarations (Cascadia Mono)
         │   ├── design-tokens.css    # Design system tokens (colors, spacing, typography)
@@ -177,6 +202,7 @@ src/
 - **Component Registry**: Splitview and Dockview use string-based component lookup
 - **Multi-model Editor**: Single Monaco instance, swap models per file
 - **Worker thread offloading**: Git status runs in a `worker_threads` Worker to keep the main thread responsive. Three-layer design: `IGitStatusWorker` (interface) → `GitStatusWorkerAdapter` (wraps worker_threads) → `git-status.worker.ts` (runs isomorphic-git or native git). Circuit breaker disables worker after repeated crashes. Strategy selector uses `.git/index` file size to choose between isomorphic-git (small repos) and native `git status --porcelain` (large repos). See [API Services – Features](./api-services-features.md) for details.
+- **Factory injection over module-eval singletons**: `ScreenshotService` is built by `createScreenshotService(capturer?, platform?)`, which falls back to `pickCapturer(platform)` – `darwin` → `MacScreenshotCapturer` (native `/usr/sbin/screencapture`), `win32` → `DesktopCapturerScreenshotCapturer` (Electron `desktopCapturer` + renderer-driven area-select overlay), anything else → `UnsupportedCapturer`. Both arguments are optional, so production gets `process.platform` while tests inject a fake capturer and a fake platform without stubbing globals. This replaced a module-eval singleton that froze the platform choice at import time (#164). `pickCapturer` is exported separately so the routing table can be asserted directly. The capturers implement one `IScreenshotCapturer.capture(request)` method over a discriminated-union request rather than three per-mode methods, keeping the platform branch in exactly one place.
 - **Mermaid Integration**: Client-side diagram rendering (22 types) with dark theme
 - **Prompt Template System**: CSP-compliant markdown templates with Handlebars-style syntax for context menu AI prompts (see [Prompt Templates](./prompts/README.md))
 - **Line Range Tracking**: Enhanced markdown preview with `data-line-start/end` attributes for accurate source mapping
@@ -276,10 +302,10 @@ if (confirmed) await deleteFile()
 - Submit button disabled when input invalid/empty
 - Context display showing parent path (e.g., "in /project/docs")
 
-**Test Coverage**: 129 tests (see [Testing](./testing/README.md#dialog-system))
-- `fileValidation.test.ts` - 80 tests covering all validation scenarios
-- `FileSystemDialog.test.tsx` - 49 tests covering component behavior
-- `WrapperDialogs.test.tsx` - Integration tests for wrapper components
+**Test Coverage** (see [Testing](./testing/README.md#dialog-system)) – run `npm run test:cov` for current numbers rather than trusting a hardcoded count:
+- `src/renderer/src/utils/fileValidation.test.ts` - validation scenarios
+- `src/renderer/src/components/Dialog/FileSystemDialog.test.tsx` - component behavior
+- `src/renderer/src/components/Dialog/WrapperDialogs.test.tsx` - integration tests for the wrapper components
 
 **Benefits of SOLID Refactoring**:
 - DRY: Eliminated duplication across 3 dialog types

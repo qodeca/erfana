@@ -47,7 +47,8 @@ Project-specific terminology used in Erfana documentation and code.
 | **DirectoryWatcherService** | Monitors file system changes for auto-refresh |
 | **FileWatcherService** | Watches individual files for external changes |
 | **GitStatusService** | Tracks git status using isomorphic-git |
-| **SettingsService** | Per-project settings persistence |
+| **SettingsService** | Application-level state persisted with electron-store – `lastProjectPath`, `recentProjects`, `projectFilterMode`, `directoryWatchDepth`. Not per-project settings |
+| **ProjectSettingsService** | Per-project settings loaded and Zod-validated from `<project>/.erfana/settings.json` |
 | **GlobalSettingsService** | Application-wide settings in `~/.erfana/` |
 | **ProjectLockService** | File-based locking for multi-instance support |
 | **TranscriptionService** | Audio-to-text transcription via OpenAI API (GPT-4o-transcribe, Whisper-1 fallback) |

@@ -26,7 +26,7 @@ Dual vertical activity bars on left and right edges (VS Code-style).
 ### Design
 
 - Background: `var(--color-gray-800)` (#3c3c3c)
-- Icons: Lucide React (`Folder`, `Terminal`)
+- Icons: Lucide React – `activityBarConfig.ts` imports `Files`, `Search` and `Terminal`
 - Active indicator: 2px Qodeca Lime vertical bar (`var(--color-brand-lime)`)
 - Hover: Icon changes to white
 
@@ -88,25 +88,66 @@ Hierarchical file tree with filtering, visual indicators, context menu operation
 Integrated terminal with xterm.js + node-pty.
 
 **Access**: Terminal icon (right sidebar) or Cmd/Ctrl+J
-**Restart**: X in header kills/restarts session
+**Restart**: `RotateCw` icon in the header (`title="Restart terminal"`) kills and restarts the session – there is no X in the terminal header
+
+**Header controls** (left to right, all rendered only once the terminal is ready):
+
+| Control | Icon | Title |
+|---------|------|-------|
+| Capture screen | `Camera` | Capture screen |
+| Capture window | `AppWindow` | Capture window |
+| Capture area | `BoxSelect` | Capture area |
+| Capture photo (webcam) | `Webcam` | Capture photo |
+| Scroll to bottom | `ArrowDownToLine` | Scroll to bottom |
+| Restart terminal | `RotateCw` | Restart terminal |
+| Scroll lock | `LockKeyhole` / `LockKeyholeOpen` | Lock scroll to bottom / Disable scroll lock |
+| Maximize terminal | `Maximize2` / `Minimize2` | Maximize terminal (⌘⇧M) |
+
+The three capture buttons appear only on platforms where screenshot capture is supported.
 
 **Features**:
-- Native PTY (zsh/bash)
+- Native PTY (zsh/bash/PowerShell)
 - WebGL rendering (canvas fallback)
 - Auto-resize, bold fonts
 - High contrast theme (white on black)
+- Cross-platform screenshot capture (screen / window / area) and webcam photo capture, inserted as a path into the terminal
+- Maximize over the editor (Cmd/Ctrl+Shift+M)
+- Per-terminal Claude Code context status bar (`ClaudeStatusBar`)
 - "Send Selection to Terminal" from preview context menu
 
 **Theme**: Uses design tokens - `var(--color-black)` bg, white fg, `var(--color-cursor)` cursor
 
 **Tech**: xterm.js v6.0.0, node-pty v1.0.0, WebglAddon, FitAddon, WebLinksAddon
 
-**Modular architecture** (v0.6.5+):
-- `TerminalStatusContent.tsx` – Status state display (checking, unavailable, error, ready)
-- Extracted hooks: `useTerminalDragDrop`, `useScreenshotCapture`, `useTerminalResize`, `useTerminalPortal`
-- `activityBarConfig.ts` owns panel `testId` values (no more parallel mapping in `ActivityBarItem`)
+**Modular architecture** (started v0.6.5, **not finished**):
+- Extraction is partial. `TerminalPanel.tsx` currently consumes only `useScreenshotCapture`, plus the extracted `TerminalStatusContent.tsx` and `ClaudeStatusBar.tsx` components; the rest of the panel – including its header toolbar – is still inlined in `TerminalPanel.tsx`.
+- `useTerminalDragDrop`, `useTerminalResize`, `useTerminalPortal` and `TerminalToolbar.tsx` exist and are re-exported from `TerminalPanel/index.ts`, but nothing outside their own tests imports them yet.
+- `TerminalPanel/index.ts` still re-exports the component from its old location with a `// Will be moved here in Phase 6` comment, so the module boundary is not yet real.
+- `TerminalStatusContent.tsx` – Status state display (checking, unavailable, error, ready). In use.
+- `activityBarConfig.ts` owns panel `testId` values (no more parallel mapping in `ActivityBarItem`).
 
 📚 **Full docs**: [Terminal](./terminal/README.md)
+
+## Dialogs
+
+**Location**: `src/renderer/src/components/Dialog/`
+
+The maintained inventory – BaseDialog API, focus trap, ESC/backdrop handling, and how to add a dialog – lives in [`src/renderer/src/components/Dialog/CLAUDE.md`](../src/renderer/src/components/Dialog/CLAUDE.md). What ships today, one line each:
+
+| Dialog | Purpose |
+|--------|---------|
+| `ConfirmDialog` | Confirm/cancel, with danger styling |
+| `PromptDialog` | Single text input with validation and character count |
+| `AlertDialog` | Single-OK notice |
+| `FileSystemDialog` (+ `NewFileDialog`, `NewFolderDialog`, `RenameDialog`) | Create/rename files and folders with cross-platform name validation |
+| `CameraDialog` | Live webcam preview, device selection, single-frame photo capture |
+| `ScreenSelectDialog` | Pick which display to capture when multiple monitors are connected |
+| `WindowPickerDialog` | Thumbnail grid for picking a window to capture (desktopCapturer backend; macOS uses the OS picker instead) |
+| `ScreenPermissionDialog` | Advisory macOS Screen Recording flow – open the privacy pane, then relaunch |
+| `FilePickerDialog` | Disambiguate multiple file matches during smart path resolution |
+| `DropModeDialog` | Choose move / copy / import for dropped external files |
+| `ConflictDialog` | Resolve a name conflict at the drop target – replace or keep both; cancel skips the file |
+| `TranscriptionDialog`, `DocumentImportDialog` | Media and document import – documented in their own sections below |
 
 ## Context Menu
 
@@ -143,8 +184,8 @@ Work **anywhere** in app:
 | `Cmd/Ctrl+J` | Toggle right panel (Terminal) |
 | `Cmd/Ctrl+Shift+M` | Maximize terminal over the editor |
 
-**Implementation**: `AppDockLayout.tsx` keydown listener
-**Note**: Overrides Monaco shortcuts with same keys
+**Implementation**: `AppDockLayout.tsx` bubble-phase `window` keydown listener
+**Note**: `Cmd/Ctrl+B` is also registered inside Monaco as Bold. Which one wins while the editor is focused is unverified – see [Keyboard Shortcuts § Conflicts](./keyboard-shortcuts.md#conflicts)
 
 ## Panel Toggle System
 
@@ -153,9 +194,9 @@ Work **anywhere** in app:
 VS Code-style: Toggles entire splitview panel, preserves dimensions, persists state.
 
 **Panels**:
-- Left: `ProjectPanelWrapper`
-- Center: `EditorAreaSplitPanel` (always visible)
-- Right: `TerminalSplitPanel`
+- Left: `ProjectPanel`
+- Center: `EditorAreaSplitPanel` (hidden only while the terminal is maximized)
+- Right: `TerminalPanel` (added only when a project is open)
 
 **Toggle**: `splitviewApi.getPanel(id).api.setVisible(bool)`
 **State**: `useActivityBarStore` (Zustand + localStorage)
@@ -163,8 +204,8 @@ VS Code-style: Toggles entire splitview panel, preserves dimensions, persists st
 ### Size Constraints
 
 **Min**: 170px sidebars, 400px center
-**Max**: 600px sidebars, unlimited center
-**Default**: 300px left, 250px right
+**Max**: 600px left sidebar, 1200px terminal (`TERMINAL_MAX`; relaxed to `Number.MAX_SAFE_INTEGER` while the terminal is maximized), unlimited center
+**Default**: 300px left, 300px right (`useActivityBarStore`)
 
 ### Resize
 
@@ -183,7 +224,7 @@ leftPanel.api.onDidSizeChange(() => {
 **Flow**:
 1. `EditorAreaSplitPanel` creates DockviewReact → gets `dockviewApi`
 2. Calls `setDockviewApi` callback → updates parent ref
-3. Parent passes to `ProjectPanelWrapper` via params
+3. Parent passes to `ProjectPanel` via params
 4. ProjectTree calls `dockviewApi.addPanel()` to open files
 
 ## Tab Styling
@@ -329,7 +370,7 @@ Modal dialog for media file import with transcription (OpenAI API or local whisp
 
 **Components**:
 - `TranscriptionDialog.tsx` – Composes on BaseDialog; progress bar, error display, cancel
-- `LanguageSelect.tsx` – Dropdown with 31 languages + auto-detect option
+- `LanguageSelect.tsx` – Dropdown with 30 languages plus an auto-detect option (31 entries total)
 
 **State**: `useTranscriptionStore.ts` (Zustand) manages dialog visibility, progress, result, error
 
@@ -340,7 +381,7 @@ Modal dialog for media file import with transcription (OpenAI API or local whisp
 - ARIA: `role="progressbar"`, `aria-live` on phase text/error/success, `aria-describedby`
 - Cancel via footer button or Escape key
 - Error display with retry option and actionable suggestions per error code
-- Language selector: 31 options (persists within session)
+- Language selector: 31 options – 30 languages plus auto-detect (persists within session)
 - Video-aware: FileVideo icon and "Transcribe video" title for video files
 - Batch import rejection: media files in multi-file drops show toast, not dialog
 

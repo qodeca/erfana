@@ -1,7 +1,7 @@
 # Erfana Documentation
 
 ## Overview
-Erfana is an Electron-based IDE focused on markdown editing with integrated terminal and project management.
+Erfana is an agent-native Markdown workspace – an Electron app that runs a terminal coding agent such as Claude Code beside the editor, with live preview, a project tree, and a Claude Code context-window meter.
 
 ## Onboarding (For New Developers)
 - [Getting Started](./getting-started.md) – Day 1 setup and orientation
@@ -23,6 +23,8 @@ Erfana is an Electron-based IDE focused on markdown editing with integrated term
 ### Feature Documentation
 - [Core features](./features/README.md) - Catalogue of all 14 shipped features (editor, project tree, terminal, prompt templates, export, import, transcription, Claude Code status bar). Referenced from the root `CLAUDE.md` rather than inlined there
 - [Editor](./editor/README.md) - Monaco editor, markdown preview, scroll sync, Mermaid diagrams (full-screen viewer), PDF/DOCX export
+  - [Export](./editor/export.md) - PDF and DOCX export pipeline
+  - [Mermaid Viewer](./editor/mermaid-viewer.md) - Full-screen diagram viewer with zoom and pan
 - [Image Viewer](./ui-components.md#image-viewer-panel) - Image preview panel with zoom, pan, and fullscreen
 - [Terminal](./terminal/README.md) - xterm.js terminal integration
   - [Bootstrap Pattern](./terminal/bootstrap-pattern.md) - Clean initialization without artifacts
@@ -52,11 +54,12 @@ Erfana is an Electron-based IDE focused on markdown editing with integrated term
 - [Development Tasks](./development-tasks.md) - Build, test, and deployment
 - [Continuous Integration](./ci.md) - GitHub Actions workflows (`checks.yml` active on every push; `e2e.yml` **disabled** since 2026-04-25 — local-only verification until macos-latest stability is fixed; `release.yml` and `whisper-binaries*.yml` for release flow), retry patterns, visual-on-CI gap
 - [Build](./build/README.md) - electron-builder, ASAR, fuses, troubleshooting
-- [Windows Enablement](./windows/README.md) - Phases 0–2 shipped in v0.9.3; Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in [v0.9.4](https://github.com/qodeca/erfana/releases/tag/v0.9.4) on 2026-04-23 per [#165](https://github.com/qodeca/erfana/issues/165); Windows-host test-flake remediation pool ([#172](https://github.com/qodeca/erfana/issues/172)) + ThrottledWorker offset-deque refactor ([#173](https://github.com/qodeca/erfana/issues/173)) also in v0.9.4; Phase 3 (screenshots, [#164](https://github.com/qodeca/erfana/issues/164)) shipped in [v0.12.0](https://github.com/qodeca/erfana/releases/tag/v0.12.0); Phases 5–6 tracked under [#166–#167](https://github.com/qodeca/erfana/issues?q=label%3Awindows). **[`implementation-plan.md`](./windows/implementation-plan.md) is the canonical phase status – prefer it over this line**
+- [Release signing keys](./release-pubkey.txt) - Published minisign public keys (primary + standby rotation) for verifying release artifacts
+- [Windows Enablement](./windows/README.md) - Phases 0–2 shipped in v0.9.3; Phase 4 (local Whisper trust chain + Windows x64 binary) shipped in v0.9.4 on 2026-04-23 per #165; Windows-host test-flake remediation pool (#172) + ThrottledWorker offset-deque refactor (#173) also in v0.9.4; Phase 3 (screenshots, #164) shipped in v0.12.0; Phases 5–6 tracked under #166–#167. Those issue and release numbers predate the public-repo migration and are kept as plain references – they do not resolve on `qodeca/erfana`. **[`implementation-plan.md`](./windows/implementation-plan.md) is the canonical phase status – prefer it over this line**
   - [Implementation Plan](./windows/implementation-plan.md) - Canonical phased roadmap + status snapshot + Phase 4 test inventory
   - [Gap Analysis](./windows/gap-analysis.md) - Feature-parity baseline (P0/P1/P2 with file:line refs)
   - [Contributing](./windows/contributing.md) - Branch strategy, commit scope, test expectations, reviewer checklist, **amendment-not-drop discipline**, **test-file split policy**, **`src/main/utils/` tier rules**
-  - [Deferred Work](./windows/deferred-work.md) - D1–D8 ledger (Phase 2 review aftermath); [Deferred Work — Phase 4](./windows/deferred-work-phase4.md) - D9–D12 (Phase 4 audit aftermath). Both tracked in [#168](https://github.com/qodeca/erfana/issues/168)
+  - [Deferred Work](./windows/deferred-work.md) - D1–D8 ledger (Phase 2 review aftermath); [Deferred Work — Phase 4](./windows/deferred-work-phase4.md) - D9–D12 (Phase 4 audit aftermath). Both tracked in #168 (pre-migration reference, does not resolve on the public repo)
   - [Known test flakes](./windows/known-flakes.md) - Windows-host flake register with status, issue link, and remediation-patterns cheat-sheet (fake timers, mocked-fs splits, per-platform e2e budgets, offset-deque)
   - [Whisper Trust Chain](./windows/whisper-trust-chain.md) - **4-layer client-side trust model with composition diagram and attacker model**
   - [Whisper Support Runbook](./windows/whisper-support-runbook.md) - **Operator playbook for Phase 4 error codes** (`WHISPER_MANIFEST_INVALID`, `WHISPER_DOWNGRADE_BLOCKED`, `WHISPER_CPU_UNSUPPORTED`, etc.) with diagnostic trails + stuck-user procedures
@@ -92,6 +95,11 @@ Erfana is an Electron-based IDE focused on markdown editing with integrated term
 - [Markdown Editor Panel Refactoring](./architecture-reviews/reviews/markdown-editor-panel-refactoring-review.md) - Editor panel architecture review
 - [Terminal Panel Architecture](./architecture-reviews/reviews/terminal-panel-architecture-review.md) - Terminal panel design review
 
+### Design records and plans
+- [Claude Code status bar](./designs/216-claude-status-bar.md) - Per-terminal context status bar design (issue #216; Windows follow-up #217)
+- [Clipboard service](./designs/issue-203-clipboard-service.md) - Central text-clipboard service design (issue #203)
+- [Open-source under GPL-3.0-only](./superpowers/plans/2026-06-16-open-source-gplv3.md) - Relicensing and public-release implementation plan
+
 ### Future Features (Planned)
 - [Graph Engine](./future/graph-engine.md) – SQLite + vec + FTS5 knowledge graph (not yet implemented)
 - [Source Grounding](./future/source-grounding/README.md) – NotebookLM-style source grounding research for audit document generation
@@ -109,6 +117,8 @@ Erfana is an Electron-based IDE focused on markdown editing with integrated term
 ## Changelog
 
 - [CHANGELOG](./CHANGELOG.md) – Per-version release notes (v0.6.0 onward; earlier in archive)
+- [Release notes](./release-notes/README.md) – Per-version release-notes files used as GitHub release bodies (v0.9.5 onward)
+- [Release incidents](./release-incidents/index.md) – Running log of `release.yml` failures with matched signatures and fixes
 
 ## Archive
 

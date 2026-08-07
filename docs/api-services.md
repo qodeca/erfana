@@ -22,7 +22,7 @@ Manages terminal emulator instances with xterm.js + node-pty. Cross-platform: ma
 
 ### Public Methods
 
-#### `async createTerminal(config?: TerminalConfig, webContentsId?: number): Promise<string | null>`
+#### `async createTerminal(config?: TerminalConfig, webContentsId?: number): Promise<{ terminalId: string; shellKind: ShellKind } | null>`
 Create a new PTY instance. Async because `node-pty` is dynamically imported on first call.
 
 **Parameters** (`config?: TerminalConfig`, all optional — defaults to `{}`):
@@ -34,7 +34,7 @@ Create a new PTY instance. Async because `node-pty` is dynamically imported on f
 **Parameters** (top-level):
 - `webContentsId?: number` — Owning webContents ID; used by `cleanupForWebContentsId(id)` to kill orphaned PTYs when the window closes
 
-**Returns:** Generated terminal ID (`terminal-N`), or `null` if cwd failed Windows deny-list validation or the shell could not be resolved.
+**Returns:** `{ terminalId, shellKind }` — the generated terminal ID (`terminal-N`) plus the `ShellKind` resolved at create time, so the renderer can quote pasted paths for the right shell flavour without a follow-up IPC round-trip (#164). Returns `null` if `node-pty` is unavailable, the cwd failed Windows deny-list validation, or the shell could not be resolved.
 
 **Side Effects:**
 - Spawns new PTY process (platform-resolved shell)
@@ -87,11 +87,12 @@ Watches file content for external changes with auto-reload and conflict detectio
 
 ### Public Methods
 
-#### `watchFile(filePath: string): void`
-Start watching file for changes.
+#### `async watchFile(filePath: string, webContents: WebContents): Promise<void>`
+Start watching file for changes. Watches are refcounted per `webContents`, so the caller must pass the owning window's `WebContents` (the same object is used to push change events back and to clean up via `cleanupForWebContentsId(id)`).
 
 **Parameters:**
 - `filePath` - Absolute path to file
+- `webContents` - Electron `WebContents` of the subscribing window
 
 **Side Effects:**
 - Creates chokidar watcher (300ms debounce)
@@ -99,27 +100,37 @@ Start watching file for changes.
 
 ---
 
-#### `unwatchFile(filePath: string): void`
-Stop watching file.
+#### `async unwatchFile(filePath: string, webContents: WebContents): Promise<void>`
+Stop watching file for one subscriber. The underlying chokidar watcher is closed only when the last subscriber unwatches.
+
+**Parameters:**
+- `filePath` - Absolute path to file
+- `webContents` - Electron `WebContents` of the unsubscribing window
+
+---
+
+#### `pauseWatch(filePath: string): void`
+Temporarily pause watching (used during save operations). Synchronous.
 
 **Parameters:**
 - `filePath` - Absolute path to file
 
 ---
 
-#### `pauseWatching(filePath: string): void`
-Temporarily pause watching (used during save operations).
+#### `resumeWatch(filePath: string): void`
+Resume watching after pause. Synchronous.
 
 **Parameters:**
 - `filePath` - Absolute path to file
 
 ---
 
-#### `resumeWatching(filePath: string): void`
-Resume watching after pause.
-
-**Parameters:**
-- `filePath` - Absolute path to file
+#### Other public methods
+- `async unwatchAll(webContents: WebContents): Promise<void>` - Drop every watch held by one window
+- `async cleanupForWebContentsId(webContentsId: number): Promise<void>` - Called on window close to prevent stale watchers
+- `setProjectPath(path: string): void` - Set the project root and bump the session token so stale events from the previous project are dropped
+- `getStats(): { totalWatched: number; fileDetails: Array<{ path: string; watchers: number }> }`
+- `async stopAll(): Promise<void>` / `async dispose(): Promise<void>` - Shutdown paths
 
 ---
 
@@ -149,11 +160,12 @@ Watches directory tree for changes with auto-refresh and pause/resume pattern.
 
 ### Public Methods
 
-#### `watchDirectory(dirPath: string): void`
-Start watching directory recursively.
+#### `async watchDirectory(dirPath: string, webContents: WebContents): Promise<void>`
+Start watching directory recursively. Watches are refcounted per `webContents`; the same object receives the change pushes and drives `cleanupForWebContentsId(id)`.
 
 **Parameters:**
 - `dirPath` - Absolute path to directory
+- `webContents` - Electron `WebContents` of the subscribing window
 
 **Side Effects:**
 - Creates chokidar watcher feeding a 75 ms collection window + 200 ms throttle (VS Code pattern). The renderer's `useDirectoryWatcher` debounces its `onRefresh` callback by another 250 ms.
@@ -162,41 +174,54 @@ Start watching directory recursively.
 
 ---
 
-#### `unwatchDirectory(dirPath: string): void`
-Stop watching directory.
+#### `async unwatchDirectory(dirPath: string, webContents: WebContents): Promise<void>`
+Stop watching directory for one subscriber. The chokidar watcher is closed only when the last subscriber unwatches.
 
 **Parameters:**
 - `dirPath` - Absolute path to directory
+- `webContents` - Electron `WebContents` of the unsubscribing window
 
 ---
 
-#### `pauseWatching(dirPath: string): void`
-Pause watching (used during CRUD operations).
+#### `pauseWatch(dirPath: string): void`
+Pause watching (used during CRUD operations). Synchronous, and reference-counted so nested pause/resume pairs nest safely. A no-op if no watcher exists for `dirPath`.
 
 **Parameters:**
 - `dirPath` - Absolute path to directory
 
-**Safety timeout:** A 10-second auto-resume guard prevents permanent pause states. If `resume()` is not called within 10 s (e.g., due to a lost IPC message), the PauseController auto-resumes, logs a warning, and triggers a compensating refresh (#103).
+**Safety timeout:** A 10-second auto-resume guard prevents permanent pause states. If `resumeWatch()` is not called within 10 s (e.g., due to a lost IPC message), the PauseController auto-resumes, logs a warning, and triggers a compensating refresh (#103).
 
 **Usage Pattern:**
 ```typescript
 // Before internal operation
-await directoryWatcherService.pauseWatching(projectPath)
+directoryWatcherService.pauseWatch(projectPath)
 
 // Perform CRUD
 await fs.writeFile(newFilePath, content)
 
 // After operation
-await directoryWatcherService.resumeWatching(projectPath)
+directoryWatcherService.resumeWatch(projectPath)
 ```
 
 ---
 
-#### `resumeWatching(dirPath: string): void`
-Resume watching after pause.
+#### `resumeWatch(dirPath: string): boolean`
+Resume watching after pause. Synchronous. Decrements the pause reference count; the watcher only actually resumes once the count reaches 0.
 
 **Parameters:**
 - `dirPath` - Absolute path to directory
+
+**Returns:** `false` if no watcher exists for `dirPath` (resume called for an unknown path), `true` otherwise — including when the watch stays paused because outer pauses are still outstanding.
+
+---
+
+#### Other public methods
+- `async unwatchAll(webContents: WebContents): Promise<void>` - Drop every watch held by one window
+- `async cleanupForWebContentsId(webContentsId: number): Promise<void>` - Called on window close to prevent stale watchers
+- `setProjectPath(path: string): void` - Set the project root and bump the session token so stale events are dropped
+- `setIgnorePatterns(patterns: string[]): void` / `getIgnorePatterns(): string[]`
+- `getStats()` / `getFormattedMetrics(): string` - Watcher diagnostics
+- `async stopAll(): Promise<void>` / `async dispose(): Promise<void>` - Shutdown paths
 
 ---
 
@@ -323,39 +348,69 @@ Clear last project path.
 
 ---
 
-#### `getApprovedTools(): Promise<string[]>`
- 
+#### `getProjectFilterMode(): Promise<string>`
+Get the project tree filter mode.
 
-**Returns:** Array of tool names (defaults to all 17 tools).
+**Returns:** The stored mode, defaulting to `'all'`.
+
+**Throws:** `SettingsServiceError` if the store cannot be read.
 
 ---
 
-#### `setApprovedTools(tools: string[]): Promise<void>`
-Set approved tools.
+#### `setProjectFilterMode(mode: string): Promise<void>`
+Persist the project tree filter mode.
 
 **Parameters:**
-- `tools` - Array of tool names
+- `mode` - Filter mode to store
 
 ---
 
-#### `addApprovedTool(toolName: string): Promise<void>`
-Add single tool to approved list.
+#### `getDirectoryWatchDepth(): Promise<number | undefined>`
+Get the chokidar recursion depth used by `DirectoryWatcherService` (performance tuning).
+
+**Returns:** The stored non-negative depth, or `undefined` when unset or invalid (chokidar then watches unlimited depth).
+
+---
+
+#### `setDirectoryWatchDepth(depth: number | null): Promise<void>`
+Persist the directory watch depth. Values are floored and clamped to `>= 0`; pass `null` to clear the override and restore unlimited depth.
 
 **Parameters:**
-- `toolName` - Tool to add
+- `depth` - Depth to store, or `null` to clear
 
 ---
 
-#### `removeApprovedTool(toolName: string): Promise<void>`
-Remove single tool from approved list.
+#### `getRecentProjects(): Promise<RecentProject[]>`
+Get the recent-projects list (max 5), newest first.
+
+**Returns:** `Array<{ path: string; name: string; lastOpened: number }>`.
+
+---
+
+#### `addRecentProject(path: string, name: string): Promise<void>`
+Add or promote a project in the recent list. Mutex-guarded against parallel project opens; duplicates are collapsed by canonical path via `RecentProjectsDeduplicator`.
 
 **Parameters:**
-- `toolName` - Tool to remove
+- `path` - Absolute project path
+- `name` - Display name
 
 ---
 
-#### `resetApprovedTools(): Promise<void>`
-Reset to default (all 17 tools).
+#### `removeRecentProject(path: string): Promise<void>`
+Remove a project from the recent list (canonical-path match). Mutex-guarded.
+
+**Parameters:**
+- `path` - Absolute project path
+
+---
+
+#### `cleanupStaleProjects(): Promise<void>`
+Drop recent projects that are no longer accessible (`access(R_OK | X_OK)` checked in parallel), freeing slots for valid projects. Only writes when something changed. Mutex-guarded; intended for app startup.
+
+---
+
+#### `clearRecentProjects(): Promise<void>`
+Clear the entire recent-projects list. Mutex-guarded.
 
 ---
 
@@ -366,18 +421,21 @@ Reset to default (all 17 tools).
 ```typescript
 import { terminalService } from './services/TerminalService'
 
-// Create terminal — returns the generated ID, or null on failure
-const terminalId = await terminalService.createTerminal({
+// Create terminal — returns { terminalId, shellKind }, or null on failure
+const created = await terminalService.createTerminal({
   cwd: '/path/to/project',
   cols: 80,
   rows: 24,
 }, webContentsId)
 
-if (terminalId === null) {
-  // Cwd validation failed (Windows deny-list) or shell could not be resolved.
+if (created === null) {
+  // node-pty unavailable, cwd validation failed (Windows deny-list),
+  // or the shell could not be resolved.
   // Inspect the most recent 'error' event for details.
   return
 }
+
+const { terminalId, shellKind } = created
 
 // Listen for output (note: payload key is `terminalId`, not `id`)
 terminalService.on('data', ({ terminalId: id, data }) => {
@@ -399,8 +457,8 @@ terminalService.killTerminal(terminalId)
 ```typescript
 import { directoryWatcherService } from './services/DirectoryWatcherService'
 
-// Start watching
-directoryWatcherService.watchDirectory('/path/to/project')
+// Start watching — the owning window's WebContents is required
+await directoryWatcherService.watchDirectory('/path/to/project', webContents)
 
 // Listen for changes (renderer subscribes via preload bridge:
 //   window.api.directoryWatch.onDirectoryChanged((data) => …))
@@ -411,8 +469,8 @@ directoryWatcherService.on('directory-watch:changed', ({ dirPath, eventCount, su
 
 // Internal operation pattern
 async function createNewFile(fileName: string) {
-  // Pause watching
-  await directoryWatcherService.pauseWatching(projectPath)
+  // Pause watching (synchronous, reference-counted)
+  directoryWatcherService.pauseWatch(projectPath)
 
   // Perform operation
   await fs.writeFile(path.join(projectPath, fileName), '')
@@ -421,7 +479,7 @@ async function createNewFile(fileName: string) {
   await refreshProjectTree()
 
   // Resume watching
-  await directoryWatcherService.resumeWatching(projectPath)
+  directoryWatcherService.resumeWatch(projectPath)
 
   // No duplicate refresh event
 }
@@ -456,14 +514,24 @@ Application-wide settings with Zod schema validation.
 
 ### Public Methods
 
-#### `get(): GlobalSettings`
-Get current settings.
+#### `getSettings(): GlobalSettings`
+Get the whole in-memory settings object (synchronous).
 
-#### `update(partial: Partial<GlobalSettings>): GlobalSettings`
-Update settings (partial merge).
+#### `getSetting<K extends keyof GlobalSettings>(key: K): GlobalSettings[K]`
+Get one setting by key (synchronous).
 
-#### `reset(): GlobalSettings`
-Reset to defaults.
+#### `async setSetting<K extends keyof GlobalSettings>(key: K, value: GlobalSettings[K]): Promise<void>`
+Update one setting. Validates the resulting object against `GlobalSettingsSchema`, persists to disk, then notifies listeners. `$schema` writes are ignored (metadata only).
+
+**Throws:** `AppError(GLOBAL_SETTINGS_VALIDATION_FAILED)` if the new value fails schema validation.
+
+#### `async resetSettings(): Promise<void>`
+Back up the current file, then reset to defaults and notify listeners.
+
+#### Also public
+- `async initialize(): Promise<void>` - Load and validate settings at startup
+- `onSettingsChanged(callback): () => void` - Subscribe to change events; returns an unsubscribe function
+- `getSettingsPath(): string` - Resolved path of the settings file
 
 ---
 
@@ -498,11 +566,13 @@ Get the resolved logs directory path (e.g., `~/.erfana/logs/`).
 - `api.logging.openLogsFolder()` – Opens logs folder via `shell.openPath()`
 
 ### Usage
-```typescript
-import { MainLogger } from './services/LoggingService'
+The module exports the `LoggingService` class, the `loggingService` singleton, and a convenience `logger` object — `logger` is what main-process code imports.
 
-MainLogger.info('Application started')
-MainLogger.error('Operation failed', error)
+```typescript
+import { logger } from './services/LoggingService'
+
+logger.info('Application started')
+logger.error('Operation failed', error) // second arg is an Error, third an optional context object
 ```
 
 See [Logging Documentation](./logging.md) for details.
