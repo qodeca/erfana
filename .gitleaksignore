@@ -1,0 +1,15 @@
+# gitleaks false-positive allowlist. Each line is a finding fingerprint
+# (commit:file:rule:line) gitleaks should skip. Entries here are reviewed
+# non-secrets — test fixtures that resemble high-entropy tokens.
+#
+# The Secret Scan workflow runs `gitleaks detect --log-opts="--all"`, which
+# scans every ref in the repository, not just this branch. So a finding in a
+# commit that exists only on `graph` still fails the check here, and this file
+# has to carry the fingerprint even though the offending file is not on
+# `develop`.
+#
+# graph-mcp-schema.test.ts: a static 64-hex string used as a fake
+# randomBytes(32) MCP bearer token in commit e5ec5f9 (issue #21). The file
+# also carries an inline `gitleaks:allow` on the `graph` branch; this entry
+# covers the original historical commit, which predates that comment.
+e5ec5f9714543b6e9f71c39212b7349cf19f28f6:src/shared/ipc/graph-mcp-schema.test.ts:generic-api-key:440
