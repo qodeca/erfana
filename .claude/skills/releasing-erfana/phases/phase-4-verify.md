@@ -129,10 +129,24 @@ This catches tampering between `finalize` completion and the moment the operator
 ART_DIR="$WORK/ci-digest"
 SKIP_DIGEST_DIFF=0
 
-if ! gh run download "$RUN_ID" --name sha256sums-digest --dir "$ART_DIR" 2>"$WORK/digest-err.log"; then
+# --repo is mandatory here for the same reason as §4.2: cwd is a temp dir,
+# so gh cannot resolve the repo from remote.origin.url. Mirrors the idiom in
+# .github/workflows/release.yml (the package-lock-digest download step).
+if ! gh run download "$RUN_ID" --repo qodeca/erfana \
+     --name sha256sums-digest --dir "$ART_DIR" 2>"$WORK/digest-err.log"; then
   # Distinguish artifact-expired (>30 days retention) from genuine errors.
-  # GitHub's error wording: "expired" or "no artifact named" or "404".
-  if grep -qiE 'expired|not found|404|no artifact' "$WORK/digest-err.log"; then
+  # The expiry branch must not swallow repo-resolution or auth failures —
+  # "not found" alone is too loose (gh emits it for an unresolvable repo too),
+  # so require the artifact-specific wording and explicitly exclude the
+  # repo/auth signatures before routing the operator to the degraded gate.
+  if grep -qiE 'could not (determine|resolve) .*repos|not a git repository|authentication|HTTP 40[13]' \
+       "$WORK/digest-err.log"; then
+    echo "FAIL: sha256sums-digest fetch failed to resolve the repo or authenticate."
+    echo "This is NOT artifact expiry — do not accept a degraded gate."
+    cat "$WORK/digest-err.log" >&2
+    exit 1
+  fi
+  if grep -qiE 'expired|no artifact (named|match)|artifact not found|HTTP 404' "$WORK/digest-err.log"; then
     echo "WARN: sha256sums-digest artifact unavailable (>30 days retention?)."
     cat "$WORK/digest-err.log" >&2
     # AskUserQuestion (orchestrator): "Proceed with degraded verification

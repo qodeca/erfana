@@ -5,7 +5,7 @@ capabilities:
   - pre-release-checklist
   - environment-validation
   - ci-config-integrity
-description: MUST BE USED in Phase 0 of the releasing-erfana skill to enforce the pre-flight checklist before any release tag is pushed. Erfana-local override. Validates: branch gate, clean working tree, required tools, green checks.yml for HEAD, GitHub Secrets completeness, workflow YAML lint, electron-builder config integrity. Heavyweight quality gates (lint, typecheck, tests, audit) are already enforced as required status checks on main, so this agent does NOT re-run them.
+description: MUST BE USED in Phase 0 of the releasing-erfana skill to enforce the pre-flight checklist before any release tag is pushed. Erfana-local override. Validates: branch gate, clean working tree, required tools, green checks.yml for HEAD, GitHub Secrets completeness, workflow YAML lint, electron-builder config integrity, Windows status-snapshot freshness (docs/windows/implementation-plan.md re-anchored on the version about to ship). Heavyweight quality gates (lint, typecheck, tests, audit) are already enforced as required status checks on main, so this agent does NOT re-run them.
 tools: Bash, Read, Glob, Grep
 model: sonnet
 ---
@@ -116,12 +116,31 @@ Run the Phase 0 release-readiness checklist and return structured results.
     " -- "{project_path}"`
     FAIL if exit code != 0.
 
-11. Compile results
+11. Windows status snapshot is current
+    `docs/windows/implementation-plan.md` is the single source of truth for Windows
+    phase status; the root CLAUDE.md refresh policy requires re-anchoring it on the
+    version about to ship, BEFORE the tag. Strict equality against package.json —
+    Phase 0 runs after the version bump, so the snapshot is deliberately written
+    ahead of the tag. Full rationale + traps: `.claude/skills/releasing-erfana/guides/pre-flight-checks.md`.
+
+    `Bash cd {project_path} && VERSION={version} SNAP_FILE=docs/windows/implementation-plan.md bash -c '
+      SNAP_HIT=$(grep -nE "^\\*Last updated [0-9]{4}-[0-9]{2}-[0-9]{2}, anchored on v[0-9]+\\.[0-9]+\\.[0-9]+" "$SNAP_FILE" | head -1 || true)
+      if [ -z "$SNAP_HIT" ]; then echo "FAIL: no parsable status-snapshot anchor in $SNAP_FILE"; exit 1; fi
+      SNAP_VER=$(printf "%s" "$SNAP_HIT" | sed -E "s/.*anchored on v([0-9]+\\.[0-9]+\\.[0-9]+).*/\\1/")
+      if [ "$SNAP_VER" != "$VERSION" ]; then
+        echo "FAIL: snapshot anchored on v$SNAP_VER; package.json is $VERSION (edit $SNAP_FILE:${SNAP_HIT%%:*})"; exit 1
+      fi
+      echo "OK: snapshot anchored on v$SNAP_VER"'`
+    Non-zero exit = FAIL, with the offending line number in the remediation string.
+    This gate is deliberately duplicated with the skill's inline §0.4.6, exactly as
+    gates 1-3 duplicate the skill's §0.1-§0.3.
+
+12. Compile results
     Aggregate into structured output.
 </workflow>
 
 <bash_constraints>
-**ALLOWED:** git status, git branch, git rev-parse, git log, git fetch, git rev-list, git tag --list, gh api, gh run list, gh secret list, gh variable list, command -v, node -p, node -e (read-only YAML parse + cross-field assertion only), actionlint, ls .github/workflows.
+**ALLOWED:** git status, git branch, git rev-parse, git log, git fetch, git rev-list, git tag --list, gh api, gh run list, gh secret list, gh variable list, command -v, node -p, node -e (read-only YAML parse + cross-field assertion only), actionlint, ls .github/workflows, read-only grep/sed/head over tracked docs (gate 11).
 **NEVER:** rm, npm install, npm uninstall, git push, git checkout, git reset, git tag (create), sudo, curl, wget, gh secret set, gh variable set.
 </bash_constraints>
 
@@ -156,7 +175,8 @@ Return exactly:
     "checks_yml_status": { "result": "PASS"|"FAIL", "head_sha": string, "conclusion": string },
     "secrets_completeness": { "result": "PASS"|"FAIL"|"WARN", "missing": string[], "present_count": number, "extra": string[] },
     "workflow_yaml_lint":   { "result": "PASS"|"FAIL"|"WARN", "details": string, "actionlint_installed": boolean },
-    "electron_builder_config": { "result": "PASS"|"FAIL", "details": string, "errors": string[] }
+    "electron_builder_config": { "result": "PASS"|"FAIL", "details": string, "errors": string[] },
+    "windows_snapshot":  { "result": "PASS"|"FAIL", "details": string, "anchored_version": string, "expected_version": string }
   },
   "overall": "pass" | "fail",
   "failures":  string[],
@@ -166,7 +186,7 @@ Return exactly:
 
 <quality_gate>
 Before returning, ALL must be true:
-- [ ] All 10 gates attempted
+- [ ] All 11 gates attempted
 - [ ] Each gate has result and details
 - [ ] Overall is FAIL if any gate is FAIL; PASS only if all gates are PASS or WARN
 - [ ] Failures list has a one-line actionable remediation for each FAIL
